@@ -153,12 +153,10 @@ export interface ForgeDeps {
    *
    * The list is a door onto work in flight, so it has to say what that work is
    * doing — and the graph, the gates and whether an agent is alive are none of
-   * them in the order record. Absent, a row still stands somewhere: a draft is
-   * being shaped and everything else is starting, which is what a host with no
-   * run runtime is actually true of.
+   * them in the order record.
    */
-  readonly standingSources?: StandingSources
-  readonly readIssue?: (tracker: 'linear' | 'jira', key: string) => Promise<IssueLike | null>
+  readonly standingSources: StandingSources & Required<Pick<StandingSources, 'gatesFor'>>
+  readonly readIssue: (tracker: 'linear' | 'jira', key: string) => Promise<IssueLike | null>
   /**
    * Which write-backs a new order starts with (FR-062), from configuration.
    *
@@ -166,24 +164,22 @@ export interface ForgeDeps {
    * the extension activates, and a value read then is the value the operator
    * had at start-up rather than the one they have now.
    */
-  readonly writeBackDefault?: () => readonly WriteBack[]
+  readonly writeBackDefault: () => readonly WriteBack[]
   /**
    * The budgets a new order starts with (FR-030), from configuration.
    *
    * A default, not a ceiling: the operator may change them per order, and the
-   * architect may not. Absent, the schema's own defaults stand — which is what
-   * happened for every order before this was wired, and is why an operator who
-   * set the agent limit to 1 still got three.
+   * architect may not.
    */
-  readonly budgetDefaults?: () => Omit<Budgets, 'tokens'>
+  readonly budgetDefaults: () => Omit<Budgets, 'tokens'>
   /**
    * The paths the operator declared critical (FR-043). Workspace-scoped and
    * operator-declared: Foundry never infers this list, and an order that
    * cannot see it grades a change to a critical path as if it were ordinary.
    */
-  readonly criticalPaths?: () => readonly string[]
+  readonly criticalPaths: () => readonly string[]
   /** Past decisions about the files a new idea names (FR-077). */
-  readonly priorArtFor?: (paths: readonly string[]) => Promise<string[]>
+  readonly priorArtFor: (paths: readonly string[]) => Promise<string[]>
   /**
    * Start one turn of intake, and resolve as soon as it is *running*.
    *
@@ -194,10 +190,9 @@ export interface ForgeDeps {
    *
    * The redraft lands later, through the store, and the surface sees it on its
    * next read. A seam, so this file starts no sessions and knows nothing about
-   * terminals; absent means intake cannot run, which is said out loud rather
-   * than leaving a draft that can never be agreed.
+   * terminals.
    */
-  readonly converge?: (order: WorkOrder, message: string) => Promise<ConvergeStarted>
+  readonly converge: (order: WorkOrder, message: string) => Promise<ConvergeStarted>
   /**
    * What the source tracker can be asked to do, and the states it offers.
    *
@@ -212,18 +207,14 @@ export interface ForgeDeps {
    * Where the records live, so the list can read each order's `ci.json`.
    *
    * Resolved on every call, like the other read-only deps here: the records
-   * location follows the open workspace. Absent means the row carries no `ci`
-   * field at all, which is what a host that has never wired CI is actually
-   * true of.
+   * location follows the open workspace.
    */
-  readonly dataRoot?: () => string
+  readonly dataRoot: () => string
   /**
    * Every in-flight order's queue entries, for the refinery's file-overlap
    * queue: the list's `queue` field, and the advisory shown on agreement.
-   * Absent means no queue to ask, which reads as "not queued" — a host that
-   * has never wired the refinery has nothing to say either way.
    */
-  readonly queueEntries?: () => Promise<readonly QueueEntry[]>
+  readonly queueEntries: () => Promise<readonly QueueEntry[]>
   /**
    * The side effect of releasing a hold: pick the loop back up.
    *
@@ -232,7 +223,7 @@ export interface ForgeDeps {
    * "release" actually resumes (start the next review round, send a
    * follow-up, hand off) is the loop's own business, in `src/index.ts`.
    */
-  readonly onReleased?: (order: WorkOrder) => void
+  readonly onReleased: (order: WorkOrder) => void
 }
 
 export interface ForgeChannels {
@@ -351,14 +342,14 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     // they thought was settled.
     const configured: WorkOrder = {
       ...seeded.order,
-      writeBack: [...(deps.writeBackDefault?.() ?? [])],
+      writeBack: [...deps.writeBackDefault()],
       budgets: {
         ...seeded.order.budgets,
-        ...(deps.budgetDefaults?.() ?? {}),
+        ...deps.budgetDefaults(),
       },
       risk: {
         ...seeded.order.risk,
-        criticalPaths: [...(deps.criticalPaths?.() ?? [])],
+        criticalPaths: [...deps.criticalPaths()],
       },
     }
 
@@ -490,14 +481,6 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
    * place that starts a session and one place that records it.
    */
   async function runArchitectTurn(order: WorkOrder, message?: string): Promise<unknown> {
-    if (deps.converge === undefined) {
-      return {
-        ...view(order),
-        error:
-          'Intake cannot run: there is no supervision runtime, so no architect can draft the plan.',
-      }
-    }
-
     const started = await deps.converge(order, message ?? '')
     if (!started.ok) {
       await deps.store.record({
@@ -706,10 +689,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     // What this order is about to queue behind, if anything — said once, at
     // the moment it becomes real work, rather than left for the operator to
     // discover as a merge conflict later.
-    const advisory =
-      deps.queueEntries === undefined
-        ? null
-        : advisoryForOrder(agreed.order, await deps.queueEntries())
+    const advisory = advisoryForOrder(agreed.order, await deps.queueEntries())
 
     return {
       compile: compileOrder(agreed.order),
@@ -816,13 +796,13 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     const live = orders.filter((order) => order.status !== 'cancelled')
     // Computed once for the whole list rather than per row: every row's
     // queue position comes from the same set of in-flight orders.
-    const queuePositions = deps.queueEntries === undefined ? null : queue(await deps.queueEntries())
+    const queuePositions = queue(await deps.queueEntries())
     return {
       orders: await Promise.all(
         live.map(async (order) => {
           // Read once: the standing needs the order's gates to say whose move
           // it is, and the row needs the open one to put its answers on the line.
-          const gates = (await deps.standingSources?.gatesFor?.(order.id)) ?? []
+          const gates = await deps.standingSources.gatesFor(order.id)
           const standing = await readStanding(order, {
             ...deps.standingSources,
             ...orderStandingSources(deps.store),
@@ -857,38 +837,33 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
               holding === undefined
                 ? null
                 : { id: holding.id, options: holding.options, breach: holding.breach ?? null },
-            // Absent when this host has never wired a records location for CI;
-            // null once it has one and this order has not shipped a pull yet.
-            ...(deps.dataRoot === undefined
-              ? {}
-              : {
-                  ci: await readCiState(deps.dataRoot(), order.id).then((state) => {
-                    if (state === null) return null
-                    const checks = state.pulls.flatMap((pull) => pull.checks)
-                    return {
-                      status: state.status,
-                      round: state.round,
-                      max: state.max,
-                      reason: state.reason,
-                      checks: {
-                        done: checks.filter((check) => check.bucket !== 'pending').length,
-                        total: checks.length,
-                      },
-                    }
-                  }),
-                  // Where the pull requests are, for the link on the row.
-                  pulls:
-                    order.status === 'draft'
-                      ? []
-                      : (await readPulls(deps.dataRoot(), order.id)).map((pull) => ({
-                          number: pullNumber(pull.url),
-                          url: pull.url,
-                        })),
-                }),
+            // Null once a records location exists and this order has not shipped
+            // a pull yet.
+            ci: await readCiState(deps.dataRoot(), order.id).then((state) => {
+              if (state === null) return null
+              const checks = state.pulls.flatMap((pull) => pull.checks)
+              return {
+                status: state.status,
+                round: state.round,
+                max: state.max,
+                reason: state.reason,
+                checks: {
+                  done: checks.filter((check) => check.bucket !== 'pending').length,
+                  total: checks.length,
+                },
+              }
+            }),
+            // Where the pull requests are, for the link on the row.
+            pulls:
+              order.status === 'draft'
+                ? []
+                : (await readPulls(deps.dataRoot(), order.id)).map((pull) => ({
+                    number: pullNumber(pull.url),
+                    url: pull.url,
+                  })),
             // Where this order stands in the refinery's file-overlap queue.
-            // Null when it is not in a queue at all, or the host has never
-            // wired the refinery.
-            queue: queuePositions?.find((position) => position.orderId === order.id) ?? null,
+            // Null when it is not in a queue at all.
+            queue: queuePositions.find((position) => position.orderId === order.id) ?? null,
           }
         })
       ),
@@ -1008,7 +983,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       evidence: [],
     })
 
-    if (!parsed.data.held) deps.onReleased?.(order)
+    if (!parsed.data.held) deps.onReleased(order)
 
     return view(order)
   }

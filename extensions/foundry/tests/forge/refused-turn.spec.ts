@@ -5,6 +5,7 @@ import * as path from 'node:path'
 import { readProposal } from '../../src/forge/converge.js'
 import { lastIntake } from '../../src/forge/intake-outcome.js'
 import { createForgeChannels } from '../../src/ipc/forge-channels.js'
+import { quietForgeSeams } from '../ipc/forge-deps.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { orderDir } from '../../src/data-root.js'
 import type { OrderStore } from '../../src/order/store.js'
@@ -159,7 +160,11 @@ describe('a proposal refused after the turn ended', () => {
 
   it('reaches the surface that has to say so', async () => {
     await finish(seeded(), writeProposal(BAD_PROPOSAL))
-    const c = createForgeChannels({ store, now: () => '2026-09-09T19:34:00.000Z' })
+    const c = createForgeChannels({
+      store,
+      now: () => '2026-09-09T19:34:00.000Z',
+      ...quietForgeSeams(() => root),
+    })
 
     // What the Forge polls. Before this it was the document and the checks,
     // and a refusal changes neither — so the screen said "The architect is
@@ -196,7 +201,11 @@ describe('a proposal refused after the turn ended', () => {
     expect(after.kind).toBe('redrafted')
     expect((await store.load('WO-0909-6db'))?.acceptance).toHaveLength(1)
 
-    const c = createForgeChannels({ store, now: () => '2026-09-09T19:41:00.000Z' })
+    const c = createForgeChannels({
+      store,
+      now: () => '2026-09-09T19:41:00.000Z',
+      ...quietForgeSeams(() => root),
+    })
     const listed = (await c.list()) as { orders: Array<{ standing: { turn: string } }> }
     expect(listed.orders[0].standing.turn).not.toBe('you')
   })

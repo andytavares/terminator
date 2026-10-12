@@ -3,6 +3,8 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { createForgeChannels } from '../../src/ipc/forge-channels.js'
+import type { ForgeDeps } from '../../src/ipc/forge-channels.js'
+import { quietForgeSeams } from './forge-deps.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import { writeCiState } from '../../src/line/ci-state.js'
@@ -22,12 +24,12 @@ interface OrderView {
   unavailableChecks?: string[]
 }
 
+function forgeDeps(over: Partial<ForgeDeps> = {}): ForgeDeps {
+  return { store, now: () => NOW, ...quietForgeSeams(() => root), ...over }
+}
+
 function channels(readIssue?: ReturnType<typeof vi.fn>) {
-  return createForgeChannels({
-    store,
-    now: () => '2026-09-06T10:00:00.000Z',
-    readIssue: readIssue as never,
-  })
+  return createForgeChannels(forgeDeps({ readIssue: readIssue as never }))
 }
 
 beforeEach(() => {
@@ -161,10 +163,25 @@ describe('foundry:order.turn', () => {
     expect(ledger).toContain('question.answered')
   })
 
-  it('returns the order unchanged for free text, which goes to the session instead', async () => {
+  it('hands free text to the architect and leaves the order unchanged', async () => {
     const order = await seeded()
-    const r = (await channels().turn({ id: order.id, message: 'what about resize?' })) as OrderView
+    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 'sess-arch' }))
+    const c = createForgeChannels(forgeDeps({ converge }))
+    const before = await store.load(order.id)
+
+    const r = (await c.turn({ id: order.id, message: 'what about resize?' })) as OrderView & {
+      converging: string
+      error?: string
+    }
+
+    expect(converge).toHaveBeenCalledWith(
+      expect.objectContaining({ id: order.id }),
+      'what about resize?'
+    )
+    expect(r.error).toBeUndefined()
+    expect(r.converging).toBe('sess-arch')
     expect(r.changed).toEqual([])
+    expect(await store.load(order.id)).toEqual(before)
   })
 
   it('reports an order it cannot find', async () => {
@@ -278,21 +295,21 @@ describe('foundry:order.compile', () => {
 
   it('advises when the newly agreed order overlaps an in-flight one', async () => {
     const order = await completeOrder()
-    const c = createForgeChannels({
-      store,
-      now: () => '2026-09-06T10:00:00.000Z',
-      queueEntries: async () => [
-        {
-          orderId: 'WO-earlier',
-          title: 'Earlier work',
-          repo: order.context.repos[0]?.name ?? '',
-          base: order.context.repos[0]?.baseBranch ?? 'main',
-          agreedAt: '2026-09-01T00:00:00.000Z',
-          files: ['src/a.ts'],
-          merged: false,
-        },
-      ],
-    })
+    const c = createForgeChannels(
+      forgeDeps({
+        queueEntries: async () => [
+          {
+            orderId: 'WO-earlier',
+            title: 'Earlier work',
+            repo: order.context.repos[0]?.name ?? '',
+            base: order.context.repos[0]?.baseBranch ?? 'main',
+            agreedAt: '2026-09-01T00:00:00.000Z',
+            files: ['src/a.ts'],
+            merged: false,
+          },
+        ],
+      })
+    )
     const r = (await c.compile({ id: order.id, commit: true })) as OrderView & {
       advisory: string | null
     }
@@ -316,30 +333,30 @@ describe('foundry:order.list', () => {
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
     })) as OrderView
-    const c = createForgeChannels({
-      store,
-      now: () => '2026-09-06T10:00:00.000Z',
-      queueEntries: async () => [
-        {
-          orderId: seeded.order.id,
-          title: seeded.order.title,
-          repo: 'repo',
-          base: 'main',
-          agreedAt: '2026-09-02T00:00:00.000Z',
-          files: ['src/a.ts'],
-          merged: false,
-        },
-        {
-          orderId: 'WO-earlier',
-          title: 'Earlier work',
-          repo: 'repo',
-          base: 'main',
-          agreedAt: '2026-09-01T00:00:00.000Z',
-          files: ['src/a.ts'],
-          merged: false,
-        },
-      ],
-    })
+    const c = createForgeChannels(
+      forgeDeps({
+        queueEntries: async () => [
+          {
+            orderId: seeded.order.id,
+            title: seeded.order.title,
+            repo: 'repo',
+            base: 'main',
+            agreedAt: '2026-09-02T00:00:00.000Z',
+            files: ['src/a.ts'],
+            merged: false,
+          },
+          {
+            orderId: 'WO-earlier',
+            title: 'Earlier work',
+            repo: 'repo',
+            base: 'main',
+            agreedAt: '2026-09-01T00:00:00.000Z',
+            files: ['src/a.ts'],
+            merged: false,
+          },
+        ],
+      })
+    )
     const r = (await c.list()) as { orders: { id: string; queue: { position: number } | null }[] }
     const row = r.orders.find((o) => o.id === seeded.order.id)
     expect(row?.queue?.position).toBe(2)
@@ -385,11 +402,7 @@ describe('foundry:order.list', () => {
       why: 'the order budgets 90 and this run is at 90',
       at: '2026-09-06T11:30:00.000Z',
     })
-    const c = createForgeChannels({
-      store,
-      now: () => '2026-09-06T10:00:00.000Z',
-      standingSources: { gatesFor: async () => [held] },
-    })
+    const c = createForgeChannels(forgeDeps({ standingSources: { gatesFor: async () => [held] } }))
     const seeded = (await c.create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
@@ -438,7 +451,7 @@ describe('foundry:order.list', () => {
 
   // The Factory sorts its cards newest first, and only the row reaches it.
   it('carries when each order was made', async () => {
-    const c = createForgeChannels({ store, now: () => NOW })
+    const c = createForgeChannels(forgeDeps())
     await c.create({ source: { kind: 'typed', text: 'first idea' }, repoPaths: [repo] })
 
     const r = (await c.list()) as { orders: { createdAt: string }[] }
@@ -446,7 +459,7 @@ describe('foundry:order.list', () => {
   })
 
   it('counts the checks that have finished, and links the pull requests', async () => {
-    const c = createForgeChannels({ store, now: () => NOW, dataRoot: () => root })
+    const c = createForgeChannels(forgeDeps({ dataRoot: () => root }))
     const seeded = (await c.create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
@@ -495,11 +508,7 @@ describe('foundry:order.list', () => {
       why: 'the work shipped as drafts',
       at: '2026-09-06T11:30:00.000Z',
     })
-    const c = createForgeChannels({
-      store,
-      now: () => '2026-09-06T10:00:00.000Z',
-      standingSources: { gatesFor: async () => [held] },
-    })
+    const c = createForgeChannels(forgeDeps({ standingSources: { gatesFor: async () => [held] } }))
     const seeded = (await c.create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
@@ -515,21 +524,13 @@ describe('foundry:order.list', () => {
     expect(r.orders[0].gate?.options[0].id).toBe('mark_ready')
 
     await store.save({ ...loaded, status: 'running' })
-    const none = createForgeChannels({ store, now: () => NOW })
+    const none = createForgeChannels(forgeDeps())
     const again = (await none.list()) as { orders: { gate: unknown }[] }
     expect(again.orders[0].gate).toBeNull()
   })
 
-  it('carries no ci field when this host has no records location wired', async () => {
-    const c = channels()
-    await c.create({ source: { kind: 'typed', text: 'first idea' }, repoPaths: [repo] })
-    const r = (await c.list()) as { orders: Record<string, unknown>[] }
-    expect(r.orders[0].ci).toBeUndefined()
-    expect('ci' in r.orders[0]).toBe(false)
-  })
-
   it('says an order has no CI yet when nothing has shipped', async () => {
-    const c = createForgeChannels({ store, now: () => NOW, dataRoot: () => root })
+    const c = createForgeChannels(forgeDeps({ dataRoot: () => root }))
     const seeded = (await c.create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
@@ -539,7 +540,7 @@ describe('foundry:order.list', () => {
   })
 
   it("reports a shipped order's CI round and status", async () => {
-    const c = createForgeChannels({ store, now: () => NOW, dataRoot: () => root })
+    const c = createForgeChannels(forgeDeps({ dataRoot: () => root }))
     const seeded = (await c.create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
@@ -635,7 +636,7 @@ describe('channel edge cases', () => {
   })
 
   it('seeds without a tracker reader at all', async () => {
-    const c = createForgeChannels({ store, now: () => '2026-09-06T10:00:00.000Z' })
+    const c = createForgeChannels(forgeDeps())
     const r = (await c.create({
       source: { kind: 'typed', text: 'no tracker here' },
       repoPaths: [repo],
@@ -706,7 +707,7 @@ describe('the capability check at agreement (FR-059a)', () => {
     }))
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({ store, now: () => NOW, capability })
+    const channels = createForgeChannels(forgeDeps({ capability }))
 
     const result = (await channels.compile({ id: 'WO-1', commit: true })) as {
       capability?: { transitions: string }
@@ -723,7 +724,7 @@ describe('the capability check at agreement (FR-059a)', () => {
     }))
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({ store, now: () => NOW, capability })
+    const channels = createForgeChannels(forgeDeps({ capability }))
 
     await channels.compile({ id: 'WO-1', commit: false })
     expect(capability).not.toHaveBeenCalled()
@@ -732,11 +733,9 @@ describe('the capability check at agreement (FR-059a)', () => {
   it('agrees the order even when the tracker cannot be reached', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({
-      store,
-      now: () => NOW,
-      capability: async () => Promise.reject(new Error('offline')),
-    })
+    const channels = createForgeChannels(
+      forgeDeps({ capability: async () => Promise.reject(new Error('offline')) })
+    )
 
     const result = (await channels.compile({ id: 'WO-1', commit: true })) as { order: WorkOrder }
     expect(result.order.status).toBe('agreed')
@@ -745,11 +744,9 @@ describe('the capability check at agreement (FR-059a)', () => {
   it('agrees the order even when the summary comment fails', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({
-      store,
-      now: () => NOW,
-      onAgreed: async () => Promise.reject(new Error('rate limited')),
-    })
+    const channels = createForgeChannels(
+      forgeDeps({ onAgreed: async () => Promise.reject(new Error('rate limited')) })
+    )
 
     const result = (await channels.compile({ id: 'WO-1', commit: true })) as { order: WorkOrder }
     expect(result.order.status).toBe('agreed')
@@ -760,7 +757,7 @@ describe('the capability check at agreement (FR-059a)', () => {
     const onAgreed = vi.fn(async () => undefined)
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    await createForgeChannels({ store, now: () => NOW, onAgreed }).compile({
+    await createForgeChannels(forgeDeps({ onAgreed })).compile({
       id: 'WO-1',
       commit: true,
     })
@@ -772,17 +769,17 @@ describe('the intent-to-state mapping (FR-060)', () => {
   it('offers the tracker states and the mapping as it stands', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({
-      store,
-      now: () => NOW,
-      capability: async () => ({
-        transitions: 'supported' as const,
-        states: [
-          { id: 'st-review', name: 'In Review', intent: 'in_review' as const, available: true },
-        ],
-        unreachable: [],
-      }),
-    })
+    const channels = createForgeChannels(
+      forgeDeps({
+        capability: async () => ({
+          transitions: 'supported' as const,
+          states: [
+            { id: 'st-review', name: 'In Review', intent: 'in_review' as const, available: true },
+          ],
+          unreachable: [],
+        }),
+      })
+    )
 
     const result = (await channels.states({ id: 'WO-1' })) as {
       capability: { states: { id: string }[] }
@@ -795,7 +792,7 @@ describe('the intent-to-state mapping (FR-060)', () => {
   it('reports no issue when the host has no tracker connection at all', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const result = (await createForgeChannels({ store, now: () => NOW }).states({
+    const result = (await createForgeChannels(forgeDeps()).states({
       id: 'WO-1',
     })) as { capability: { transitions: string } }
     expect(result.capability.transitions).toBe('no_issue')
@@ -804,18 +801,16 @@ describe('the intent-to-state mapping (FR-060)', () => {
   it('reports the tracker own failure rather than pretending it has no states', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const result = (await createForgeChannels({
-      store,
-      now: () => NOW,
-      capability: async () => Promise.reject(new Error('offline')),
-    }).states({ id: 'WO-1' })) as { error: string }
+    const result = (await createForgeChannels(
+      forgeDeps({ capability: async () => Promise.reject(new Error('offline')) })
+    ).states({ id: 'WO-1' })) as { error: string }
     expect(result.error).toBe('offline')
   })
 
   it('stores the operator override and keeps it', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({ store, now: () => NOW })
+    const channels = createForgeChannels(forgeDeps())
 
     await channels.mapState({ id: 'WO-1', intent: 'in_review', optionId: 'st-progress' })
     expect((await store.load('WO-1'))?.stateMapping.in_review).toBe('st-progress')
@@ -824,7 +819,7 @@ describe('the intent-to-state mapping (FR-060)', () => {
   it('puts an intent back to whatever the tracker resolves', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({ store, now: () => NOW })
+    const channels = createForgeChannels(forgeDeps())
 
     await channels.mapState({ id: 'WO-1', intent: 'done', optionId: 'st-done' })
     await channels.mapState({ id: 'WO-1', intent: 'done', optionId: null })
@@ -835,7 +830,7 @@ describe('the intent-to-state mapping (FR-060)', () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
     expect(
-      await createForgeChannels({ store, now: () => NOW }).mapState({
+      await createForgeChannels(forgeDeps()).mapState({
         id: 'WO-1',
         intent: 'shipped',
         optionId: 'x',
@@ -844,7 +839,7 @@ describe('the intent-to-state mapping (FR-060)', () => {
   })
 
   it('reports an order it cannot find', async () => {
-    const channels = createForgeChannels({ store: createOrderStore(root), now: () => NOW })
+    const channels = createForgeChannels(forgeDeps({ store: createOrderStore(root) }))
     expect(await channels.mapState({ id: 'WO-nope', intent: 'done', optionId: null })).toEqual({
       error: 'No order WO-nope.',
     })
@@ -852,7 +847,7 @@ describe('the intent-to-state mapping (FR-060)', () => {
   })
 
   it('rejects a malformed states request', async () => {
-    const channels = createForgeChannels({ store: createOrderStore(root), now: () => NOW })
+    const channels = createForgeChannels(forgeDeps({ store: createOrderStore(root) }))
     expect(await channels.states({ nope: true })).toEqual({ error: 'Malformed request.' })
   })
 })
@@ -867,7 +862,7 @@ describe('foundry:order.converge — the half that was missing', () => {
   it('starts the architect and answers straight away, rather than holding the bridge', async () => {
     const seed = await drafted()
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 'sess-arch' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     const r = (await c.converge({ id: seed.order.id })) as OrderView & { converging: string }
     expect(converge).toHaveBeenCalled()
@@ -880,22 +875,18 @@ describe('foundry:order.converge — the half that was missing', () => {
 
   it('names the session, so the surface can take the operator to it', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: true, sessionId: 'sess-arch' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: true, sessionId: 'sess-arch' }) })
+    )
     const r = (await c.converge({ id: seed.order.id })) as { converging: string }
     expect(r.converging).toBe('sess-arch')
   })
 
   it('records that it started, and what it was asked', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: true, sessionId: 'sess-arch' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: true, sessionId: 'sess-arch' }) })
+    )
     await c.converge({ id: seed.order.id, message: 'tighten AC-2' })
     const ledger = fs.readFileSync(path.join(root, 'orders', seed.order.id, 'ledger.jsonl'), 'utf8')
     expect(ledger).toContain('converge.started')
@@ -904,11 +895,11 @@ describe('foundry:order.converge — the half that was missing', () => {
 
   it('returns the order untouched, and why, when the proposal was refused', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: false, reason: 'the architect could not be started' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({
+        converge: async () => ({ ok: false, reason: 'the architect could not be started' }),
+      })
+    )
     const r = (await c.converge({ id: seed.order.id })) as OrderView & { error: string }
     expect(r.error).toBe('the architect could not be started')
     expect(r.order.acceptance).toEqual([])
@@ -916,11 +907,9 @@ describe('foundry:order.converge — the half that was missing', () => {
 
   it('records a refusal, so a run of bad proposals is visible afterwards', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: false, reason: 'no runtime' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: false, reason: 'no runtime' }) })
+    )
     await c.converge({ id: seed.order.id })
     const ledger = fs.readFileSync(path.join(root, 'orders', seed.order.id, 'ledger.jsonl'), 'utf8')
     expect(ledger).toContain('converge.refused')
@@ -932,11 +921,11 @@ describe('foundry:order.converge — the half that was missing', () => {
   // saying the architect was working over a turn that had ended.
   it('carries how the last turn ended on the read the Forge polls', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: false, reason: 'acceptance.5: Invalid enum value.' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({
+        converge: async () => ({ ok: false, reason: 'acceptance.5: Invalid enum value.' }),
+      })
+    )
     await c.converge({ id: seed.order.id })
 
     const r = (await c.compile({ id: seed.order.id, commit: false })) as {
@@ -948,11 +937,9 @@ describe('foundry:order.converge — the half that was missing', () => {
 
   it('says a turn is running the moment it starts one', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: true, sessionId: 'sess-arch' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: true, sessionId: 'sess-arch' }) })
+    )
     // On this call and not only on the next poll: the surface reads whether a
     // turn is in flight from here, and would otherwise sit idle.
     const started = (await c.converge({ id: seed.order.id, message: 'close the gap' })) as {
@@ -981,11 +968,11 @@ describe('foundry:order.converge — the half that was missing', () => {
   // ever run.
   it('hands a refused draft back to the operator in the list', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: false, reason: 'acceptance.5: Invalid enum value.' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({
+        converge: async () => ({ ok: false, reason: 'acceptance.5: Invalid enum value.' }),
+      })
+    )
     await c.converge({ id: seed.order.id })
 
     const listed = (await c.list()) as {
@@ -996,31 +983,21 @@ describe('foundry:order.converge — the half that was missing', () => {
     expect(row?.standing.headline).toMatch(/refused/i)
   })
 
-  it('says so when there is no runtime to run an architect', async () => {
-    const seed = await drafted()
-    const r = (await channels().converge({ id: seed.order.id })) as { error: string }
-    expect(r.error).toMatch(/no architect can draft the plan/)
-  })
-
   it('refuses to converge an order that is no longer a draft', async () => {
     const done = await agreeable()
     await store.save({ ...done, status: 'running' })
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: true, sessionId: 's' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: true, sessionId: 's' }) })
+    )
     expect(await c.converge({ id: 'WO-1' })).toEqual({
       error: 'Only a draft can be converged; this order is running.',
     })
   })
 
   it('reports an order it cannot find', async () => {
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: true, sessionId: 's' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: true, sessionId: 's' }) })
+    )
     expect(await c.converge({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
   })
 })
@@ -1084,7 +1061,7 @@ describe('foundry:order.converge — settling everything in one submit', () => {
   it('applies every answer and every accept, with no architect turn', async () => {
     const order = await withQuestionsAndFindings()
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     const r = (await c.converge({
       id: order.id,
@@ -1117,7 +1094,7 @@ describe('foundry:order.converge — settling everything in one submit', () => {
   it('folds every fix and ask into exactly one converge call naming every finding', async () => {
     const order = await withQuestionsAndFindings()
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 'sess-arch' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     await c.converge({
       id: order.id,
@@ -1140,7 +1117,7 @@ describe('foundry:order.converge — settling everything in one submit', () => {
   it('refuses the whole settle on a blank accept reason, applying nothing', async () => {
     const order = await withQuestionsAndFindings()
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     const r = (await c.converge({
       id: order.id,
@@ -1166,7 +1143,7 @@ describe('free text reaches the architect', () => {
       repoPaths: [repo],
     })) as OrderView
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     await c.turn({ id: seed.order.id, message: 'the second unit is not needed' })
     expect(converge).toHaveBeenCalledWith(expect.anything(), 'the second unit is not needed')
@@ -1178,7 +1155,7 @@ describe('free text reaches the architect', () => {
       repoPaths: [repo],
     })) as OrderView
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     await c.turn({ id: seed.order.id, strike: seed.order.assumptions[0]?.id ?? 'A-1' })
     expect(converge).not.toHaveBeenCalled()
@@ -1190,7 +1167,7 @@ describe('free text reaches the architect', () => {
       repoPaths: [repo],
     })) as OrderView
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     await c.turn({ id: seed.order.id, message: '   ' })
     expect(converge).not.toHaveBeenCalled()
@@ -1525,7 +1502,7 @@ describe('setting one order’s budgets', () => {
 
 describe('what configuration a new order starts with', () => {
   async function seeded(deps: Partial<Parameters<typeof createForgeChannels>[0]>) {
-    const c = createForgeChannels({ store, now: () => NOW, ...deps })
+    const c = createForgeChannels(forgeDeps({ ...deps }))
     return (await c.create({
       source: { kind: 'typed', text: 'change the session refresh' },
       repoPaths: [repo],
@@ -1553,11 +1530,9 @@ describe('what configuration a new order starts with', () => {
 
   it('reads the budgets on every order, not once when the extension started', async () => {
     let agents = 1
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      budgetDefaults: () => ({ agents, wallClockMinutes: 45 }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ budgetDefaults: () => ({ agents, wallClockMinutes: 45 }) })
+    )
     const first = (await c.create({
       source: { kind: 'typed', text: 'first' },
       repoPaths: [repo],
@@ -1715,11 +1690,9 @@ describe('the backend facts every Forge response carries', () => {
 
   it('carries them on a running converge answer too', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: true as const, sessionId: 'sess-arch' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: true as const, sessionId: 'sess-arch' }) })
+    )
     const r = (await c.converge({ id: seed.order.id, message: 'go' })) as OrderView & {
       loop: unknown
       agreed: unknown
@@ -1804,7 +1777,7 @@ describe('foundry:order.hold', () => {
   it('records a hold and releases it, calling onReleased only on release', async () => {
     const seed = await drafted()
     const onReleased = vi.fn()
-    const c = createForgeChannels({ store, now: () => NOW, onReleased })
+    const c = createForgeChannels(forgeDeps({ onReleased }))
 
     await c.hold({ id: seed.order.id, held: true })
     expect(onReleased).not.toHaveBeenCalled()

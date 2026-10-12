@@ -2696,7 +2696,7 @@ export function activate(api: ExtensionAPI): void {
     }
   }
 
-  const standingSources: StandingSources = {
+  const standingSources = {
     graphFor: (orderId) => readRunGraph(dataRoot(), orderId),
     shapingFor: async (orderId) => {
       if (deciding.has(orderId)) return true
@@ -2724,7 +2724,7 @@ export function activate(api: ExtensionAPI): void {
     // only this process can say whether one is still there.
     orphansFor: (orderId, graph) =>
       executingOrders.has(orderId) ? [] : orphanedNodes(graph, isLiveSession).map((n) => n.id),
-  }
+  } satisfies StandingSources
 
   const nextReviewRound = async (orderId: string): Promise<number> =>
     nextRound(loopFacts(await createOrderStore(dataRoot()).entries(orderId)))
