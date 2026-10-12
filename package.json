@@ -98,7 +98,7 @@
     "playwright": "1.61.0",
     "prettier": "3.3.3",
     "syncpack": "15.3.3",
-    "typescript": "5.5.4",
+    "typescript": "6.0.3",
     "typescript-eslint": "8.71.1",
     "vite": "7.3.5",
     "vitest": "4.1.11",

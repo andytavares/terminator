@@ -11,7 +11,7 @@
     "esModuleInterop": true,
     // The scripts specs import .mjs; their types are inferred, not checked.
     "allowJs": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vite/client", "vitest/globals"]
   },
   "include": [
     "tests/unit/**/*",
