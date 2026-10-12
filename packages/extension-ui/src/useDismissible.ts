@@ -59,9 +59,11 @@ export function useDismissible({
   // Read through refs so a caller passing a fresh closure each render does not
   // rebind the document listeners on every keystroke.
   const alsoInsideRef = useRef(alsoInside)
-  alsoInsideRef.current = alsoInside
   const dismissRef = useRef(onDismiss)
-  dismissRef.current = onDismiss
+  useEffect(() => {
+    alsoInsideRef.current = alsoInside
+    dismissRef.current = onDismiss
+  })
 
   useEffect(() => {
     if (!enabled) return
