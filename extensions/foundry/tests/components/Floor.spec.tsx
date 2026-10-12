@@ -724,7 +724,6 @@ describe('a finished run no longer holds a new one back', () => {
   it('never asks for the review queue and says nothing about refusing a run', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
-    expect(invoke).not.toHaveBeenCalledWith('foundry:supervision-snapshot')
     expect(screen.queryByText(/A new run is refused/)).toBeNull()
   })
 })

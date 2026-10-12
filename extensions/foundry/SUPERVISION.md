@@ -13,14 +13,12 @@ Architecture and the verified hook contract:
 ## The surfaces
 
 The **supervision panel** sits above the board (`components/SupervisionPanel.tsx`)
-in four sections:
+in two sections:
 
-| Section     | Reads                                      | Answers                              |
-| ----------- | ------------------------------------------ | ------------------------------------ |
-| **runs**    | `foundry:supervision-snapshot`             | what is running, and how it is going |
-| **stalls**  | `foundry:stalls-list`                      | what stopped making progress         |
-| **feed**    | `foundry:feed-list`, `foundry:feed-digest` | what happened while you were away    |
-| **history** | `foundry:supervision-snapshot`             | what is over, and what it did        |
+| Section    | Reads                 | Answers                           |
+| ---------- | --------------------- | --------------------------------- |
+| **stalls** | `foundry:stalls-list` | what stopped making progress      |
+| **feed**   | `foundry:feed-list`   | what happened while you were away |
 
 A card's drawer shows the same run: the phase's console renders the **terminal's
 transcript**, with **Open the terminal** next to it. A supervised phase

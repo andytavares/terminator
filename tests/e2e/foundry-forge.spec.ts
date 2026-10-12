@@ -194,11 +194,8 @@ test('a run cuts a worktree and launches a supervised agent in a visible termina
   expect(launched.length).toBeGreaterThan(1024)
 
   // The agent was told what to build, not merely who it is.
-  const snapshot = (await foundryChannel(handle, 'foundry:supervision-snapshot')) as {
-    runs: { sessionId: string; branch: string }[]
-  }
-  expect(snapshot.runs.length).toBeGreaterThan(0)
-  expect(snapshot.runs[0].branch).toContain('wo-e2e-1')
+  const branches = execFileSync('git', ['branch', '--list'], { cwd: repo }).toString()
+  expect(branches).toContain('wo-e2e-1')
 
   // The worktree is a real checkout of the fixture repository, cut under the
   // data root rather than inside the repository being worked on.

@@ -144,7 +144,7 @@ import { createPendingPermissions } from './runtime/pending-permissions.js'
 import type { PendingAsk } from './runtime/pending-permissions.js'
 import { createStallWatcher, type StallWatcher } from './runtime/stall-watcher.js'
 import { createSupervision, type Supervision } from './runtime/supervision.js'
-import { buildDigest, channelFor, type NotifiableEvent } from './runtime/feed/digest.js'
+import { channelFor, type NotifiableEvent } from './runtime/feed/digest.js'
 import { paletteEntries } from './runtime/palette.js'
 import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
@@ -3765,11 +3765,6 @@ export function activate(api: ExtensionAPI): void {
     shadowMode: stallShadowMode(api),
   }))
 
-  // What is running, and what is over.
-  reg(api, 'foundry:supervision-snapshot', () =>
-    supervision === null ? { runs: [], history: [] } : supervision.snapshot()
-  )
-
   reg(api, 'foundry:feed-list', () => ({
     entries: supervision?.feed.list() ?? [],
     mutes: mutes?.list() ?? [],
@@ -3807,15 +3802,6 @@ export function activate(api: ExtensionAPI): void {
     if (!parsed.success) return { error: 'Malformed request.' }
     mutes?.remove(parsed.data)
     return { mutes: mutes?.list() ?? [] }
-  })
-
-  // What happened while you were away. Progress posts are rolled up rather
-  // than replayed one by one — the point of coming back to a digest is not to
-  // read every line the agents wrote.
-  reg(api, 'foundry:feed-digest', (payload: unknown) => {
-    const { from, to } = payload as { from: number; to?: number }
-    const entries = supervision?.feed.list() ?? []
-    return buildDigest(entries, from, to ?? Date.now())
   })
 
   reg(api, 'foundry:permission-resolve', (payload: unknown) => {
