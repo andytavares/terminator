@@ -29,6 +29,13 @@ import { registerMetricsHandlers } from './ipc/metrics.ipc.js'
 import { registerDbIpcHandlers } from './ipc/db.ipc.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
+import { ExtensionHostProcess, spawnUtilityHost } from './extensions/host/host-process.js'
+import { trackerAbilitiesOf, workspacesOf } from './extensions/host/main-snapshot.js'
+import {
+  getAllExtensionSettings,
+  onExtensionSettingsChanged,
+} from './storage/extension-settings-store.js'
+import { onWorkspacesChanged } from './storage/workspace-store.js'
 import { ExtensionViewHost } from './extensions/extension-view-host.js'
 import { routeExtensionExitRequest } from './extensions/extension-exit.js'
 import { logger } from './logger.js'
@@ -39,6 +46,7 @@ import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
 import { legacyImportPending, importLegacyDatabase } from './db/legacy-pglite-import.js'
 import {
+  createExtensionAPI,
   listNativeViewMenuItems,
   getPanelMenuItemId,
   setMenuRebuildCallback,
@@ -422,6 +430,7 @@ app.whenReady().then(async () => {
     },
   })
 
+  startExtensionHostProcess(userData)
   setupMenu()
   createWindow()
 
@@ -446,6 +455,34 @@ app.whenReady().then(async () => {
     .catch((error) => logger.error('extension startup failed', { error: String(error) }))
 })
 
+/**
+ * Extension backends run in one utilityProcess (ADR 094). Main pushes it the
+ * settings and workspaces its synchronous getters read, on every change.
+ */
+function startExtensionHostProcess(userData: string): void {
+  // Reads core state the way an extension's API does, for the host's snapshot.
+  const coreView = createExtensionAPI('terminator.extension-host', app.getVersion())
+  const hostProcess = new ExtensionHostProcess({
+    spawn: spawnUtilityHost(join(__dirname, 'extension-host.js')),
+    snapshot: () => ({
+      databasePath: join(userData, 'app.sqlite'),
+      paths: { app: app.getAppPath(), userData },
+      settings: getAllExtensionSettings(),
+      workspaces: workspacesOf(coreView.workspace),
+      trackers: trackerAbilitiesOf(coreView.issues),
+    }),
+    apiFor: (id) => extensionHost.hostedApi(id),
+    onBackendsFailed: (ids, message) => extensionHost.failHostedBackends(ids, message),
+    log: (message) => logger.warn(message),
+  })
+  extensionHost.useBackendHost(hostProcess)
+  onExtensionSettingsChanged(() => hostProcess.pushSettings(getAllExtensionSettings()))
+  onWorkspacesChanged(() => hostProcess.pushWorkspaces(workspacesOf(coreView.workspace)))
+  stopExtensionHostProcess = () => hostProcess.stop()
+}
+
+let stopExtensionHostProcess = (): void => {}
+
 // A rejection in the startup chain above (e.g. database or extension init
 // failure) would otherwise leave the process alive with no window ever
 // created — a blank, unquittable app. Surface it loudly and exit instead of
@@ -462,6 +499,7 @@ app.on('before-quit', async (event) => {
   event.preventDefault()
   isQuitting = true
   await extensionHost.unloadAll()
+  stopExtensionHostProcess()
   await ptyManager.killAll()
   closeAppDb()
   app.exit(0)

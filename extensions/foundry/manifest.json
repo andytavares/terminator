@@ -6,6 +6,7 @@
   "main": "src/index.js",
   "renderer": "dist/index.html",
   "minAppVersion": "0.1.0",
+  "mainProcess": true,
   "contributes": {
     "workspaceTab": {
       "label": "Foundry",

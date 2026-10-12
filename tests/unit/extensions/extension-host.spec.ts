@@ -717,3 +717,76 @@ describe('ExtensionHost – registration disposal on unload', () => {
     expect(globalRegistry.topBarItems.has('com.dispose.topbar.disp-top')).toBe(false)
   })
 })
+
+// ADR 094: backends run in the extension host unless the manifest keeps them in main.
+describe('ExtensionHost with an extension host process', () => {
+  let root: string
+
+  beforeEach(() => {
+    vi.resetModules()
+    storeData.extensions = []
+    root = join(os.tmpdir(), `ext-host-routing-${Date.now()}-${Math.random()}`)
+  })
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }))
+
+  function writeExtension(id: string, manifestExtra: Record<string, unknown> = {}): string {
+    const directory = join(root, id)
+    mkdirSync(directory, { recursive: true })
+    const manifest = { id, name: id, version: '1.0.0', description: 'd', main: 'main.js' }
+    writeFileSync(
+      join(directory, 'manifest.json'),
+      JSON.stringify({ ...manifest, minAppVersion: '0.1.0', ...manifestExtra })
+    )
+    writeFileSync(
+      join(directory, 'main.js'),
+      `exports.activate = () => { globalThis.__activatedInMain = '${id}' }`
+    )
+    return directory
+  }
+
+  async function hostWithBackendHost() {
+    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+    const host = new ExtensionHost()
+    const backendHost = { activate: vi.fn(async () => {}), deactivate: vi.fn(async () => {}) }
+    host.useBackendHost(backendHost)
+    return { host, backendHost }
+  }
+
+  it('activates a backend in the extension host, with the API it calls kept in main', async () => {
+    const { host, backendHost } = await hostWithBackendHost()
+    const directory = writeExtension('com.hosted')
+
+    await host.load(directory)
+
+    expect(backendHost.activate).toHaveBeenCalledWith({
+      id: 'com.hosted',
+      entryPoint: join(directory, 'main.js'),
+      dependencies: [],
+    })
+    expect(host.hostedApi('com.hosted')).toBeDefined()
+    expect((globalThis as { __activatedInMain?: string }).__activatedInMain).toBeUndefined()
+  })
+
+  it('keeps a backend whose manifest asks for the main process there', async () => {
+    const { host, backendHost } = await hostWithBackendHost()
+    await host.load(writeExtension('com.inmain', { mainProcess: true }))
+
+    expect(backendHost.activate).not.toHaveBeenCalled()
+    expect((globalThis as { __activatedInMain?: string }).__activatedInMain).toBe('com.inmain')
+    delete (globalThis as { __activatedInMain?: string }).__activatedInMain
+  })
+
+  it('shows backends the extension host lost as failed, with why', async () => {
+    const { host } = await hostWithBackendHost()
+    await host.load(writeExtension('com.lost'))
+
+    host.failHostedBackends(['com.lost'], 'Extension host exited with code 134')
+
+    expect(host.listExtensions().find((e) => e.id === 'com.lost')).toMatchObject({
+      status: 'error',
+      errorMessage: 'Extension host exited with code 134',
+    })
+    expect(host.hostedApi('com.lost')).toBeUndefined()
+  })
+})

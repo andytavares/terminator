@@ -11,6 +11,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
+          // The extension host, a utilityProcess main starts (ADR 094).
+          'extension-host': resolve(__dirname, 'src/main/extensions/host/entry.ts'),
         },
       },
     },

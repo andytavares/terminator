@@ -158,7 +158,7 @@ function partitionNotificationSettings(properties: Record<string, SettingPropDef
 
 function ExtensionsSection(): JSX.Element {
   const [extensions, setExtensions] = React.useState<
-    Array<{ id: string; name: string; version: string; status: string }>
+    Array<{ id: string; name: string; version: string; status: string; errorMessage?: string }>
   >([])
   const [schemas, setSchemas] = React.useState<ExtensionSchema[]>([])
   const [settingValues, setSettingValues] = React.useState<Record<string, unknown>>({})
@@ -315,7 +315,10 @@ function ExtensionsSection(): JSX.Element {
                 <div className="extension-item__meta">
                   <span className="extension-item__name">{ext.name}</span>
                   <span className="extension-item__version">v{ext.version}</span>
-                  <span className={`extension-item__status extension-item__status--${ext.status}`}>
+                  <span
+                    className={`extension-item__status extension-item__status--${ext.status}`}
+                    title={ext.errorMessage}
+                  >
                     {ext.status}
                   </span>
                 </div>
