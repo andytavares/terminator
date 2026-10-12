@@ -74,7 +74,7 @@ export function ChapterFileList({
         const isActive = file.path === currentFilePath
         const isViewed = viewedFiles.has(file.path)
         const isDragOver = dragOverIndex === index
-        const state = rowState(file, viewedFiles, changedSince, newSinceLook)
+        const state = rowState(file, { viewedFiles, changedSince, newSinceLook })
 
         return (
           <div

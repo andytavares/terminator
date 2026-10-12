@@ -110,7 +110,7 @@ export function FullFileList({
               files.map((file, fi) => {
                 const isActive = file.path === currentFilePath
                 const isViewed = viewedFiles.has(file.path)
-                const state = rowState(file, viewedFiles, changedSince, newSinceLook)
+                const state = rowState(file, { viewedFiles, changedSince, newSinceLook })
                 const reasonInfo = reasonByPath.get(file.path)
                 return (
                   <button

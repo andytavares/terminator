@@ -91,19 +91,26 @@ export function PrRow({ pr, meta, action, onOpen, testId, children }: PrRowProps
         <span className="rd-num">~{pr.estimatedMinutes} min</span>
       </span>
       <span className="rd-actions">
-        <Button
-          size="sm"
-          variant={action.primary ? 'primary' : 'secondary'}
-          className={action.always ? 'rd-row-action rd-always' : 'rd-row-action'}
-          onClick={(e) => {
-            e.stopPropagation()
-            onOpen()
-          }}
-        >
-          {action.label}
-        </Button>
+        <RowAction action={action} onOpen={onOpen} />
         {children}
       </span>
     </div>
+  )
+}
+
+/** The row's own button. It opens the pull request without the click reaching the row. */
+function RowAction({ action, onOpen }: Pick<PrRowProps, 'action' | 'onOpen'>): JSX.Element {
+  return (
+    <Button
+      size="sm"
+      variant={action.primary ? 'primary' : 'secondary'}
+      className={action.always ? 'rd-row-action rd-always' : 'rd-row-action'}
+      onClick={(e) => {
+        e.stopPropagation()
+        onOpen()
+      }}
+    >
+      {action.label}
+    </Button>
   )
 }

@@ -1,5 +1,19 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+  type RefObject,
+} from 'react'
 import type React from 'react'
+
+interface DragState {
+  active: boolean
+  startX: number
+  startPct: number
+  containerWidth: number
+}
 
 /**
  * The left column's share of a split diff, in percent, and the divider's
@@ -11,25 +25,9 @@ export function useSplitDrag(containerRef: RefObject<HTMLElement>): {
   onDividerMouseDown: (e: React.MouseEvent) => void
 } {
   const [splitLeftPct, setSplitLeftPct] = useState(50)
-  const drag = useRef({ active: false, startX: 0, startPct: 50, containerWidth: 0 })
+  const drag = useRef<DragState>({ active: false, startX: 0, startPct: 50, containerWidth: 0 })
 
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      const s = drag.current
-      if (!s.active || s.containerWidth === 0) return
-      const deltaPct = ((e.clientX - s.startX) / s.containerWidth) * 100
-      setSplitLeftPct(Math.max(20, Math.min(80, s.startPct + deltaPct)))
-    }
-    const onUp = () => {
-      drag.current.active = false
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [])
+  useEffect(() => followPointer(drag, setSplitLeftPct), [])
 
   const onDividerMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -47,4 +45,26 @@ export function useSplitDrag(containerRef: RefObject<HTMLElement>): {
   )
 
   return { splitLeftPct, onDividerMouseDown }
+}
+
+/** Moves the split with the pointer while a drag is active; returns the cleanup. */
+function followPointer(
+  drag: MutableRefObject<DragState>,
+  setSplitLeftPct: (pct: number) => void
+): () => void {
+  const onMove = (e: MouseEvent) => {
+    const s = drag.current
+    if (!s.active || s.containerWidth === 0) return
+    const deltaPct = ((e.clientX - s.startX) / s.containerWidth) * 100
+    setSplitLeftPct(Math.max(20, Math.min(80, s.startPct + deltaPct)))
+  }
+  const onUp = () => {
+    drag.current.active = false
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+  return () => {
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+  }
 }

@@ -219,8 +219,7 @@ function syncViewed(
   }
 }
 
-/** The review fields a fresh pull request starts from, and `reset` returns to. */
-function freshReview(): Pick<
+type ReviewFields = Pick<
   PrReviewStore,
   | 'activePr'
   | 'currentChapterId'
@@ -240,7 +239,10 @@ function freshReview(): Pick<
   | 'threads'
   | 'issueComments'
   | 'rateLimitState'
-> {
+>
+
+/** The review fields a fresh pull request starts from, and `reset` returns to. */
+function freshReview(): ReviewFields {
   return {
     activePr: null,
     currentChapterId: null,
