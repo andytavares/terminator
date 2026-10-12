@@ -386,6 +386,7 @@ app.whenReady().then(async () => {
 
   extensionHost.setDeps({
     ptyManager,
+    terminalRelay,
     db: getAppDb(),
     broadcastToWindows: (channel, data) => {
       // Auxiliary windows (extension pop-outs) are real BrowserWindows and must

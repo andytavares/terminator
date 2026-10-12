@@ -188,7 +188,8 @@ acknowledged, calls `PtyManager.pause()` (node-pty `pause()`) above 1 MiB and `r
 process that prints faster than xterm can parse blocks on its own output instead of filling the renderer's
 memory. Only output actually delivered to a window is counted, output for a session with no subscriber is
 acknowledged on arrival, and `terminal:attach` forgets what an earlier renderer owed, so a reload cannot
-leave a process paused. A browser client (remote) does not acknowledge: its output arrives by its own path.
+leave a process paused. A browser client (remote) does not acknowledge: its output arrives by its own path. A terminal an extension
+opens (`api.pty.openTerminalTab`) uses the same relay, not a broadcast to every window and view.
 In the renderer the output router (`src/renderer/terminal/output-router.ts`) holds the one
 `terminal:output` listener and dispatches by session id.
 
