@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import ReactMarkdown, { type Components, type Options } from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform, type Components, type Options } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import './extension-ui.css'
 
@@ -35,29 +35,39 @@ function inPageHref(href: string | undefined): string | undefined {
 export interface MarkdownProps {
   children: string
   className?: string
-  /** Called with an absolute http(s) address the reader clicked. */
+  /** Called with the absolute http(s) or mailto address the reader clicked. */
   onOpenLink: (url: string) => void
   /**
    * Draws a fenced block that names a language, e.g. with a syntax highlighter.
    * Without it the block renders as plain `pre` and `code`.
    */
   renderCode?: (code: string, language: string) => React.ReactNode
+  /**
+   * One line, in a `span`: code, bold, italic, strikethrough and links, so it
+   * can sit inside a button or a label. Any other block keeps only its words.
+   */
+  inline?: boolean
+  /**
+   * For text anyone can write, such as a tracker's issue: raw HTML is dropped,
+   * not parsed, and no image or other `src` survives, so nothing is fetched.
+   */
+  fetchesNothing?: boolean
 }
+
+const OPENS_OUTSIDE = /^(https?|mailto):/i
+const INLINE_ELEMENTS = ['code', 'strong', 'em', 'del', 'a']
 
 function markdownLink(onOpenLink: (url: string) => void): Components['a'] {
   return function MarkdownLink({ href, children }) {
-    const isAbsolute = href?.startsWith('http://') || href?.startsWith('https://')
-    // Extension views have no navigation guard, so a relative or
-    // protocol-relative href would replace the view itself.
-    const navigatesView = !!href && !href.startsWith('#') && !/^[a-z][a-z\d+.-]*:/i.test(href)
     return (
       <a
         href={inPageHref(href)}
         onClick={(event) => {
-          if (navigatesView) event.preventDefault()
-          if (!isAbsolute) return
+          // Extension views have no navigation guard, so anything but an in-page
+          // link would replace the view itself, an empty href included.
+          if (href?.startsWith('#')) return
           event.preventDefault()
-          onOpenLink(href!)
+          if (href && OPENS_OUTSIDE.test(href)) onOpenLink(href)
         }}
       >
         {children}
@@ -66,9 +76,17 @@ function markdownLink(onOpenLink: (url: string) => void): Components['a'] {
   }
 }
 
-function markdownComponents({ onOpenLink, renderCode }: MarkdownProps): Components {
+// Null removes the attribute outright; every other address still goes through
+// the library's own guard against `javascript:` and friends.
+function withoutResources(url: string, key: string): string | null {
+  return key === 'src' ? null : defaultUrlTransform(url)
+}
+
+function markdownComponents({ onOpenLink, renderCode, fetchesNothing }: MarkdownProps): Components {
   return {
     a: markdownLink(onOpenLink),
+    // An image whose address was removed is not worth a broken-image icon.
+    ...(fetchesNothing && { img: () => null }),
     code({ className, children }) {
       const language = /language-(\w+)/.exec(className ?? '')?.[1]
       if (!language || !renderCode) return <code className={className}>{children}</code>
@@ -83,23 +101,28 @@ function markdownComponents({ onOpenLink, renderCode }: MarkdownProps): Componen
  * agent, and this view can run shell commands, so nothing here sets inner HTML.
  */
 export function Markdown(props: MarkdownProps): JSX.Element {
-  const { children, className } = props
+  const { children, className, inline, fetchesNothing } = props
   const [rehypePlugins, setRehypePlugins] = useState(htmlPlugins)
   useEffect(() => {
-    if (!rehypePlugins) void loadHtmlPlugins().then(setRehypePlugins)
-  }, [rehypePlugins])
+    if (!rehypePlugins && !fetchesNothing) void loadHtmlPlugins().then(setRehypePlugins)
+  }, [rehypePlugins, fetchesNothing])
 
+  const Container = inline ? 'span' : 'div'
+  const classes = ['tmui-markdown', inline && 'tmui-markdown--inline', className]
   return (
-    <div className={`tmui-markdown${className ? ` ${className}` : ''}`}>
+    <Container className={classes.filter(Boolean).join(' ')}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        skipHtml={!rehypePlugins}
+        skipHtml={fetchesNothing || !rehypePlugins}
         remarkRehypeOptions={{ clobberPrefix: '' }}
-        rehypePlugins={rehypePlugins}
+        rehypePlugins={fetchesNothing ? undefined : rehypePlugins}
+        urlTransform={fetchesNothing ? withoutResources : undefined}
+        allowedElements={inline ? INLINE_ELEMENTS : undefined}
+        unwrapDisallowed={inline}
         components={markdownComponents(props)}
       >
         {children}
       </ReactMarkdown>
-    </div>
+    </Container>
   )
 }

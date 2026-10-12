@@ -109,6 +109,20 @@ describe('IssueDrawer — the issue', () => {
     expect(document.querySelector('.issue-drawer__comment code')?.textContent).toBe('npm test')
   })
 
+  // Anyone who can comment on a ticket writes this text: a remote image in it
+  // is a tracking pixel aimed at whoever opens the drawer.
+  it('fetches nothing a description names, and opens its links in the browser', async () => {
+    const { container } = await setupSettled({
+      issue: issue({
+        description: '![pixel](https://evil.example/p.png) <b>raw</b> [docs](https://e.example/d)',
+      }),
+    })
+    const body = container.querySelector('.issue-markdown') as Element
+    expect(body.querySelector('img, [src], b')).toBeNull()
+    fireEvent.click(screen.getByRole('link', { name: 'docs' }))
+    expect(openExternal).toHaveBeenCalledWith('https://e.example/d')
+  })
+
   it('says so when there is no description', async () => {
     await setupSettled({ issue: issue({ description: '' }) })
     expect(screen.getByText('No description.')).toBeTruthy()

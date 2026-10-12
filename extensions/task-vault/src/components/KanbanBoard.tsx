@@ -5,7 +5,8 @@ import { DEFAULT_KANBAN_CONFIG } from '../vault/types'
 import { useVaultStore } from '../stores/vault.store'
 import { KanbanLaneEditor } from './KanbanLaneEditor'
 import { TaskDetailPanel } from './TaskDetailPanel'
-import { renderMarkdown } from '../utils/markdown'
+import { Markdown } from '@terminator/extension-ui'
+import { openInBrowser } from '../utils/open-in-browser'
 
 interface KanbanTask {
   id: string
@@ -113,22 +114,16 @@ function LaneColumn({
               }, 0)
             }}
             onClick={(e) => {
-              const anchor = (e.target as HTMLElement).closest('a')
-              if (anchor?.href) {
-                e.preventDefault()
-                e.stopPropagation()
-                window.electronAPI.shell.openExternal(anchor.href).catch(() => {})
-                return
-              }
+              // A link in the description opens itself; it does not select the card.
+              if ((e.target as HTMLElement).closest('a')) return
               if (!didDragRef.current) onSelect(task)
             }}
           >
             <div className="tv-kanban__card-text">{task.text}</div>
             {task.description && (
-              <div
-                className="tv-kanban__card-desc"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(task.description) }}
-              />
+              <Markdown fetchesNothing className="tv-kanban__card-desc" onOpenLink={openInBrowser}>
+                {task.description}
+              </Markdown>
             )}
             <div className="tv-kanban__card-meta">
               {task.project && (

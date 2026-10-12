@@ -186,14 +186,14 @@ If `@terminator/extension-ui` has the control, use it; do not write another. A
 missing one is added there first (ADR 098). Storybook shows each in both themes:
 `npm run storybook`.
 
-| Need                           | Use                                                    |
-| ------------------------------ | ------------------------------------------------------ |
-| A button                       | `Button` (primary, secondary, ghost, danger; sm, md)   |
-| An icon-only button            | `IconButton`, which requires its accessible name       |
-| Switching between views        | `Tabs`, the WAI-ARIA tabs pattern                      |
-| Markdown from a person/agent   | `Markdown`, never `dangerouslySetInnerHTML`            |
-| "5 minutes ago"                | `RelativeTime` / `formatRelativeTime`, never hand-made |
-| Re-reading something on a tick | `usePolling`                                           |
+| Need                           | Use                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------- |
+| A button                       | `Button` (primary, secondary, ghost, danger; sm, md)                                                |
+| An icon-only button            | `IconButton`, which requires its accessible name                                                    |
+| Switching between views        | `Tabs`, the WAI-ARIA tabs pattern                                                                   |
+| Markdown from a person/agent   | `Markdown`, never `dangerouslySetInnerHTML`; `inline` in a label, `fetchesNothing` for tracker text |
+| "5 minutes ago"                | `RelativeTime` / `formatRelativeTime`, never hand-made                                              |
+| Re-reading something on a tick | `usePolling`                                                                                        |
 
 A button's icon is the `icon` prop, sized by the stylesheet, not by `size`.
 

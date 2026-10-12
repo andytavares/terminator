@@ -5,7 +5,8 @@ import type { Gate } from '../gates/rules.js'
 import { gradeInWords } from '../runtime/review/risk-grade.js'
 import { GateEvidence } from './GateEvidence.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
-import { Markdown } from './Markdown.js'
+import { Markdown } from '@terminator/extension-ui'
+import { openInBrowser } from './ExternalLink.js'
 import { OrderLinks } from './OrderLinks.js'
 
 // One gate, one line.
@@ -145,7 +146,9 @@ export function GateCard({
         <div className="fdry-gate-detail">
           {open ? (
             <>
-              <Markdown text={gate.why} />
+              <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
+                {gate.why}
+              </Markdown>
               <GateEvidence evidence={gate.evidence} />
               <ul className="fdry-gate-consequences">
                 {gate.options.map((option) => (

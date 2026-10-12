@@ -75,7 +75,31 @@ export const LinkOpensThroughTheCaller: Story = {
   },
 }
 
+export const InlineInAButton: Story = {
+  args: { children: 'Hide **done** tickets in `Orders.tsx`, *not* grey', inline: true },
+  render: (args) => (
+    <button type="button">
+      <Markdown {...args} />
+    </button>
+  ),
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelector('button p, button div')).toBeNull()
+  },
+}
+
+export const FetchesNothing: Story = {
+  args: {
+    fetchesNothing: true,
+    children: `${PROSE}\n\n![tracking pixel](https://example.com/pixel.png)\n\n<b>raw HTML is dropped</b>`,
+  },
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelector('img, b')).toBeNull()
+  },
+}
+
 export const ProseLight = inLight(Prose)
+export const InlineInAButtonLight = inLight(InlineInAButton)
+export const FetchesNothingLight = inLight(FetchesNothing)
 export const TablesAndTaskListsLight = inLight(TablesAndTaskLists)
 export const CodeDrawnByTheCallerLight = inLight(CodeDrawnByTheCaller)
 export const RawHtmlIsRenderedAndSanitisedLight = inLight(RawHtmlIsRenderedAndSanitised)

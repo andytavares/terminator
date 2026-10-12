@@ -457,3 +457,77 @@
 :where(.tmui-markdown img) {
   max-width: 100%;
 }
+
+:where(.tmui-markdown h1, .tmui-markdown h2, .tmui-markdown h3, .tmui-markdown h4) {
+  margin: 14px 0 6px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+:where(.tmui-markdown > :first-child) {
+  margin-top: 0;
+}
+
+:where(.tmui-markdown h1) {
+  font-size: 1.15em;
+}
+
+:where(.tmui-markdown h2) {
+  font-size: 1.05em;
+}
+
+:where(.tmui-markdown h3, .tmui-markdown h4, .tmui-markdown h5, .tmui-markdown h6) {
+  font-size: 1em;
+}
+
+/* A task list carries its own marker; the bullet as well is noise. */
+:where(.tmui-markdown li:has(> input[type='checkbox'])) {
+  list-style: none;
+  margin-left: -18px;
+}
+
+:where(.tmui-markdown li > input[type='checkbox']) {
+  margin: 0 6px 0 0;
+  vertical-align: -1px;
+}
+
+:where(.tmui-markdown blockquote) {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--tm-border-strong);
+  color: var(--tm-text-muted);
+}
+
+/* A wide table or code block scrolls inside its own box, never widens the view. */
+:where(.tmui-markdown table) {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0 0 8px;
+  border-collapse: collapse;
+}
+
+:where(.tmui-markdown th, .tmui-markdown td) {
+  border: 1px solid var(--tm-border);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+:where(.tmui-markdown th) {
+  background: var(--tm-bg-surface);
+  font-weight: 600;
+}
+
+:where(.tmui-markdown hr) {
+  border: none;
+  border-top: 1px solid var(--tm-border);
+  margin: 12px 0;
+}
+
+/* Inline text takes its size and colour from the button or label it sits in. */
+:where(.tmui-markdown--inline) {
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}

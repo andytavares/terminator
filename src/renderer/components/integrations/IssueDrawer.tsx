@@ -1,9 +1,8 @@
 import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useState } from 'react'
 import { ExternalLink, RefreshCw, X } from 'lucide-react'
-import { RelativeTime } from '@terminator/extension-ui'
+import { Markdown, RelativeTime } from '@terminator/extension-ui'
 import { useIntegrationsStore } from '../../stores/integrations.store'
-import { IssueMarkdown } from './IssueMarkdown'
 import type { AgentContext, Issue, TrackerId } from '../../../shared/types/index'
 import './IssueDrawer.css'
 
@@ -18,6 +17,12 @@ const TRACKER_LABELS: Record<TrackerId, string> = { linear: 'Linear', jira: 'Jir
 const CONTEXT_LIMIT = 10_000
 /** Where the counter starts warning: close enough that trimming is imminent. */
 const CONTEXT_WARN_AT = 0.85
+
+// Issue text is written by anyone who can comment on the ticket, so it renders
+// with `fetchesNothing` and its links leave through the shell, never navigation.
+function openInBrowser(url: string): void {
+  void window.electronAPI?.shell?.openExternal(url)
+}
 
 export interface IssueDrawerProps {
   projectId: string
@@ -167,7 +172,9 @@ export function IssueDrawer({ projectId, projectName, onClose }: IssueDrawerProp
       {issue !== null && (
         <section className="issue-drawer__section">
           {issue.description.trim().length > 0 ? (
-            <IssueMarkdown>{issue.description}</IssueMarkdown>
+            <Markdown fetchesNothing className="issue-markdown" onOpenLink={openInBrowser}>
+              {issue.description}
+            </Markdown>
           ) : (
             <p className="issue-drawer__empty">No description.</p>
           )}
@@ -184,7 +191,9 @@ export function IssueDrawer({ projectId, projectName, onClose }: IssueDrawerProp
               <span className="issue-drawer__who">
                 {c.author} · <RelativeTime value={c.createdAt} />
               </span>
-              <IssueMarkdown>{c.body}</IssueMarkdown>
+              <Markdown fetchesNothing className="issue-markdown" onOpenLink={openInBrowser}>
+                {c.body}
+              </Markdown>
             </div>
           ))}
         </section>

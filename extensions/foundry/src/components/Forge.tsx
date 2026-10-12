@@ -1,4 +1,5 @@
-import { Markdown, MarkdownInline } from './Markdown.js'
+import { Markdown } from '@terminator/extension-ui'
+import { openInBrowser } from './ExternalLink.js'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Check,
@@ -895,13 +896,17 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                   {order.intent.problem === '' ? (
                     <p className="fdry-note">Not stated yet.</p>
                   ) : (
-                    <Markdown text={order.intent.problem} />
+                    <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
+                      {order.intent.problem}
+                    </Markdown>
                   )}
                   <h3 className="fdry-field-h">Outcome</h3>
                   {order.intent.outcome === '' ? (
                     <p className="fdry-note">Not stated yet.</p>
                   ) : (
-                    <Markdown text={order.intent.outcome} />
+                    <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
+                      {order.intent.outcome}
+                    </Markdown>
                   )}
                 </section>
                 {order.acceptance.length === 0 ? (
@@ -943,9 +948,20 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                     {openQuestions.map((question) => (
                       <div key={question.id} className="fdry-fnd">
                         <b>
-                          <MarkdownInline text={question.text} />
+                          <Markdown
+                            inline
+                            fetchesNothing
+                            className="fdry-md-inline"
+                            onOpenLink={openInBrowser}
+                          >
+                            {question.text}
+                          </Markdown>
                         </b>
-                        {question.why !== '' ? <Markdown text={question.why} /> : null}
+                        {question.why !== '' ? (
+                          <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
+                            {question.why}
+                          </Markdown>
+                        ) : null}
                         <div className="fdry-fnd-acts">
                           {question.options.map((option, optionIndex) => (
                             <button
@@ -962,7 +978,14 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                                 }))
                               }
                             >
-                              <MarkdownInline text={option} />
+                              <Markdown
+                                inline
+                                fetchesNothing
+                                className="fdry-md-inline"
+                                onOpenLink={openInBrowser}
+                              >
+                                {option}
+                              </Markdown>
                               {optionIndex === question.recommended ? ' (recommended)' : ''}
                             </button>
                           ))}
@@ -988,7 +1011,9 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                         <div key={criterion.id} className={`fdry-ac ${uncovered ? 'is-gap' : ''}`}>
                           <span className="fdry-ac-id">{criterion.id}</span>
                           <div>
-                            <Markdown text={criterion.statement} />
+                            <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
+                              {criterion.statement}
+                            </Markdown>
                             <span className="fdry-verify">
                               proven by {criterion.verify.kind}
                               {uncovered ? ' · no unit satisfies this' : ''}
@@ -1101,7 +1126,15 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                           reason={askReason}
                           onClick={() => void turn({ strike: assumption.id })}
                         >
-                          <MarkdownInline text={assumption.text} /> <X aria-hidden="true" />
+                          <Markdown
+                            inline
+                            fetchesNothing
+                            className="fdry-md-inline"
+                            onOpenLink={openInBrowser}
+                          >
+                            {assumption.text}
+                          </Markdown>{' '}
+                          <X aria-hidden="true" />
                         </ReasonButton>
                       ))}
                     </div>
@@ -1150,7 +1183,14 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                     {findingsByGroup.fixing.map((finding) => (
                       <div key={finding.id} className="fdry-fnd">
                         <span className="fdry-fnd-text">
-                          <MarkdownInline text={finding.text} />
+                          <Markdown
+                            inline
+                            fetchesNothing
+                            className="fdry-md-inline"
+                            onOpenLink={openInBrowser}
+                          >
+                            {finding.text}
+                          </Markdown>
                         </span>
                         <span className="fdry-fnd-meta">{finding.meta}</span>
                       </div>
@@ -1172,7 +1212,14 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                       return (
                         <div key={finding.id} className="fdry-fnd">
                           <span className="fdry-fnd-text">
-                            <MarkdownInline text={finding.text} />
+                            <Markdown
+                              inline
+                              fetchesNothing
+                              className="fdry-md-inline"
+                              onOpenLink={openInBrowser}
+                            >
+                              {finding.text}
+                            </Markdown>
                           </span>
                           <span className="fdry-fnd-meta">{finding.meta}</span>
                           <div className="fdry-fnd-acts">
@@ -1268,7 +1315,14 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                     {findingsByGroup.notes.map((finding) => (
                       <div key={finding.id} className="fdry-fnd">
                         <span className="fdry-fnd-text">
-                          <MarkdownInline text={finding.text} />
+                          <Markdown
+                            inline
+                            fetchesNothing
+                            className="fdry-md-inline"
+                            onOpenLink={openInBrowser}
+                          >
+                            {finding.text}
+                          </Markdown>
                         </span>
                         <span className="fdry-fnd-meta">{finding.meta}</span>
                       </div>
@@ -1286,7 +1340,14 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                     {findingsByGroup.resolved.map((finding) => (
                       <div key={finding.id} className="fdry-fnd">
                         <span className="fdry-fnd-text">
-                          <MarkdownInline text={finding.text} />
+                          <Markdown
+                            inline
+                            fetchesNothing
+                            className="fdry-md-inline"
+                            onOpenLink={openInBrowser}
+                          >
+                            {finding.text}
+                          </Markdown>
                         </span>
                         <span className="fdry-fnd-meta">{finding.meta}</span>
                       </div>

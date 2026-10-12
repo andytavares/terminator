@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { X, Eye, Pencil } from 'lucide-react'
-import { renderMarkdown } from '../utils/markdown'
+import { Markdown } from '@terminator/extension-ui'
+import { openInBrowser } from '../utils/open-in-browser'
 
 interface TaskDetail {
   description: string
@@ -134,22 +135,16 @@ function SectionEditor({ label, value, placeholder, onSave }: SectionEditorProps
         <div
           className={`tv-detail__preview${!value.trim() ? ' tv-detail__preview--empty' : ''}`}
           onClick={(e) => {
-            const anchor = (e.target as HTMLElement).closest('a')
-            if (anchor?.href) {
-              e.preventDefault()
-              e.stopPropagation()
-              window.electronAPI.shell.openExternal(anchor.href).catch(() => {})
-              return
-            }
+            // A link in the text opens itself; it does not start editing.
+            if ((e.target as HTMLElement).closest('a')) return
             setEditing(true)
           }}
           title="Click to edit"
         >
           {value.trim() ? (
-            <div
-              className="tv-detail__markdown"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(value) }}
-            />
+            <Markdown fetchesNothing className="tv-detail__markdown" onOpenLink={openInBrowser}>
+              {value}
+            </Markdown>
           ) : (
             <span className="tv-detail__empty-hint">{placeholder.split('\n')[0]}</span>
           )}

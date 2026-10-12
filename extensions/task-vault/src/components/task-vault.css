@@ -5599,7 +5599,7 @@ h2.daily-log__date {
   margin: 1px 0;
 }
 
-.tv-detail__markdown li.md-check {
+.tv-detail__markdown li.task-list-item {
   list-style: none;
   margin-left: -12px;
   display: flex;
@@ -5607,14 +5607,7 @@ h2.daily-log__date {
   gap: 4px;
 }
 
-.tv-detail__markdown .md-checkbox {
-  font-size: 10px;
-  color: var(--tm-text-muted);
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.tv-detail__markdown li.md-check--done {
+.tv-detail__markdown li.task-list-item:has(> input:checked) {
   color: var(--tm-text-muted);
   text-decoration: line-through;
 }
