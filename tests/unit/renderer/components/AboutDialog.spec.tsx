@@ -27,8 +27,9 @@ beforeEach(() => {
 describe('AboutDialog', () => {
   it('renders the dialog with app name and version after loading', async () => {
     render(<AboutDialog onClose={vi.fn()} />)
-    await waitFor(() => expect(screen.getByText('Terminator')).toBeTruthy())
-    expect(screen.getByText('v1.2.3')).toBeTruthy()
+    // The title is drawn at once; the version arrives with the app info.
+    expect(await screen.findByText('v1.2.3')).toBeTruthy()
+    expect(screen.getByText('Terminator')).toBeTruthy()
   })
 
   it('renders version info rows', async () => {
