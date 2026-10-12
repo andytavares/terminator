@@ -63,6 +63,7 @@ function build(over: Partial<Harness> = {}) {
           : { tracker: 'jira', site: 's', email: 'e@x.c', apiToken: 't' }
         : null,
     getMine: async () => ({ kind: 'assignee', email: null }),
+    onTrackerError: () => {},
     now: () => now.value,
     ttlMs: 5 * 60 * 1000,
     sleep,

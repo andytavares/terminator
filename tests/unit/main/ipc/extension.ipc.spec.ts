@@ -53,6 +53,7 @@ function makeExtensionHost(overrides: Partial<ExtensionHost> = {}): ExtensionHos
 }
 
 let broadcast: ReturnType<typeof vi.fn>
+const noViewHost = () => null
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -63,7 +64,7 @@ beforeEach(() => {
 
 describe('extension:execute-command', () => {
   it('forwards the key and ctx to executeExtensionCommand', async () => {
-    registerExtensionHandlers(makeExtensionHost())
+    registerExtensionHandlers(makeExtensionHost(), broadcast, noViewHost)
     const listener = onHandlers.get('extension:execute-command')!
     const ctx = { projectId: 'p1', sessionId: null, repoRoot: '/repo' }
 
@@ -76,7 +77,7 @@ describe('extension:execute-command', () => {
 describe('extension:run-command', () => {
   it('runs the command with args and a null ctx, returning its result', async () => {
     mockExecuteExtensionCommand.mockResolvedValue({ ok: false, reason: 'not-registered' })
-    registerExtensionHandlers(makeExtensionHost())
+    registerExtensionHandlers(makeExtensionHost(), broadcast, noViewHost)
     const handler = handleHandlers.get('extension:run-command')!
 
     const result = await handler({}, { key: 'ext.command.open', args: { n: 1 } })
@@ -93,7 +94,7 @@ describe('extension:run-command', () => {
 describe('extension:has-command', () => {
   it('answers from isExtensionCommandRegistered', async () => {
     mockIsRegistered.mockReturnValue(true)
-    registerExtensionHandlers(makeExtensionHost())
+    registerExtensionHandlers(makeExtensionHost(), broadcast, noViewHost)
     const handler = handleHandlers.get('extension:has-command')!
 
     expect(await handler({}, { key: 'ext.command.open' })).toBe(true)
@@ -104,7 +105,7 @@ describe('extension:has-command', () => {
 describe('extension:get-commands', () => {
   it('returns listExtensionCommands()', async () => {
     mockListExtensionCommands.mockReturnValue([{ key: 'ext.command.push' }])
-    registerExtensionHandlers(makeExtensionHost())
+    registerExtensionHandlers(makeExtensionHost(), broadcast, noViewHost)
     const handler = handleHandlers.get('extension:get-commands')!
 
     expect(await handler({}, undefined)).toEqual({ commands: [{ key: 'ext.command.push' }] })
@@ -114,7 +115,7 @@ describe('extension:get-commands', () => {
 describe('extension:list', () => {
   it('returns extensionHost.listExtensions()', async () => {
     const host = makeExtensionHost({ listExtensions: vi.fn(() => [{ id: 'ext' }] as never) })
-    registerExtensionHandlers(host)
+    registerExtensionHandlers(host, broadcast, noViewHost)
 
     expect(await handleHandlers.get('extension:list')!({}, undefined)).toEqual({
       extensions: [{ id: 'ext' }],
@@ -125,7 +126,7 @@ describe('extension:list', () => {
 describe('extension:install', () => {
   it('loads the extension at the given path', async () => {
     const host = makeExtensionHost({ load: vi.fn().mockResolvedValue({ ok: true }) })
-    registerExtensionHandlers(host)
+    registerExtensionHandlers(host, broadcast, noViewHost)
 
     await expect(
       handleHandlers.get('extension:install')!({}, { directoryPath: '/dir' })
@@ -137,7 +138,7 @@ describe('extension:install', () => {
 describe('extension:toggle', () => {
   it('returns the toggled extension', async () => {
     const host = makeExtensionHost({ toggle: vi.fn().mockResolvedValue({ id: 'ext' }) })
-    registerExtensionHandlers(host)
+    registerExtensionHandlers(host, broadcast, noViewHost)
 
     await expect(
       handleHandlers.get('extension:toggle')!({}, { id: 'ext', enabled: true })
@@ -146,7 +147,7 @@ describe('extension:toggle', () => {
 
   it('returns NOT_FOUND when the extension does not exist', async () => {
     const host = makeExtensionHost({ toggle: vi.fn().mockResolvedValue(undefined) })
-    registerExtensionHandlers(host)
+    registerExtensionHandlers(host, broadcast, noViewHost)
 
     await expect(
       handleHandlers.get('extension:toggle')!({}, { id: 'missing', enabled: true })
@@ -157,7 +158,7 @@ describe('extension:toggle', () => {
 describe('extension:uninstall', () => {
   it('returns ok when removed', async () => {
     const host = makeExtensionHost({ uninstall: vi.fn().mockResolvedValue(true) })
-    registerExtensionHandlers(host)
+    registerExtensionHandlers(host, broadcast, noViewHost)
 
     await expect(handleHandlers.get('extension:uninstall')!({}, { id: 'ext' })).resolves.toEqual({
       ok: true,
@@ -166,7 +167,7 @@ describe('extension:uninstall', () => {
 
   it('returns NOT_FOUND when not removed', async () => {
     const host = makeExtensionHost({ uninstall: vi.fn().mockResolvedValue(false) })
-    registerExtensionHandlers(host)
+    registerExtensionHandlers(host, broadcast, noViewHost)
 
     await expect(handleHandlers.get('extension:uninstall')!({}, { id: 'ext' })).resolves.toEqual({
       error: 'NOT_FOUND',
@@ -177,7 +178,7 @@ describe('extension:uninstall', () => {
 describe('extension:reload', () => {
   it('broadcasts extension:renderer-reload on success', async () => {
     const host = makeExtensionHost({ reload: vi.fn().mockResolvedValue({ id: 'ext' }) })
-    registerExtensionHandlers(host, broadcast)
+    registerExtensionHandlers(host, broadcast, noViewHost)
 
     await handleHandlers.get('extension:reload')!({}, { id: 'ext' })
 
@@ -186,7 +187,7 @@ describe('extension:reload', () => {
 
   it('does not broadcast on error', async () => {
     const host = makeExtensionHost({ reload: vi.fn().mockResolvedValue({ error: 'NOT_FOUND' }) })
-    registerExtensionHandlers(host, broadcast)
+    registerExtensionHandlers(host, broadcast, noViewHost)
 
     await handleHandlers.get('extension:reload')!({}, { id: 'ext' })
 
@@ -197,7 +198,7 @@ describe('extension:reload', () => {
 describe('extension settings channels', () => {
   it('extension:get-settings-schemas returns listExtensionSettingsSections()', async () => {
     mockListExtensionSettingsSections.mockReturnValue([{ extensionId: 'ext' }])
-    registerExtensionHandlers(makeExtensionHost())
+    registerExtensionHandlers(makeExtensionHost(), broadcast, noViewHost)
 
     expect(await handleHandlers.get('extension:get-settings-schemas')!({}, undefined)).toEqual({
       schemas: [{ extensionId: 'ext' }],
@@ -206,7 +207,7 @@ describe('extension settings channels', () => {
 
   it('extension:get-settings-values returns getAllExtensionSettings()', async () => {
     mockGetAllExtensionSettings.mockReturnValue({ 'ext.setting': 1 })
-    registerExtensionHandlers(makeExtensionHost())
+    registerExtensionHandlers(makeExtensionHost(), broadcast, noViewHost)
 
     expect(await handleHandlers.get('extension:get-settings-values')!({}, undefined)).toEqual({
       values: { 'ext.setting': 1 },
@@ -214,7 +215,7 @@ describe('extension settings channels', () => {
   })
 
   it('extension:update-setting calls setExtensionSetting', async () => {
-    registerExtensionHandlers(makeExtensionHost())
+    registerExtensionHandlers(makeExtensionHost(), broadcast, noViewHost)
 
     expect(
       await handleHandlers.get('extension:update-setting')!({}, { key: 'ext.setting', value: 2 })

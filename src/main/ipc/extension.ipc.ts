@@ -33,8 +33,8 @@ const PanelBoundsSchema = z.object({
 
 export function registerExtensionHandlers(
   extensionHost: ExtensionHost,
-  broadcast?: (channel: string, data: unknown) => void,
-  getViewHost: () => ExtensionViewHost | null = () => null
+  broadcast: (channel: string, data: unknown) => void,
+  getViewHost: () => ExtensionViewHost | null
 ): void {
   registerInvokeTable([
     ...lifecycleSpecs(extensionHost, broadcast),
@@ -68,7 +68,7 @@ export function registerExtensionHandlers(
 
 function lifecycleSpecs(
   extensionHost: ExtensionHost,
-  broadcast?: (channel: string, data: unknown) => void
+  broadcast: (channel: string, data: unknown) => void
 ): ChannelSpec[] {
   return [
     defineChannel({
@@ -109,7 +109,7 @@ function lifecycleSpecs(
       invalid,
       run: async ({ id }) => {
         const result = await extensionHost.reload(id)
-        if (!('error' in result)) broadcast?.('extension:renderer-reload', { id })
+        if (!('error' in result)) broadcast('extension:renderer-reload', { id })
         return result
       },
     }),

@@ -58,9 +58,7 @@ function byCloseTime(a: { closedAt?: string }, b: { closedAt?: string }): number
   return Date.parse(b.closedAt) - Date.parse(a.closedAt)
 }
 
-export function registerSessionRecordsHandlers(
-  getWindow: () => BrowserWindow | null = () => null
-): void {
+export function registerSessionRecordsHandlers(getWindow: () => BrowserWindow | null): void {
   registerInvokeTable([
     defineChannel({
       channel: 'session-records:list',

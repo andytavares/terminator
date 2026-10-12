@@ -77,7 +77,11 @@ describe('extension IPC handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(globalRegistry.settingsSections as Map<string, unknown>).clear()
-    registerExtensionHandlers(mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0])
+    registerExtensionHandlers(
+      mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
+      vi.fn(),
+      () => null
+    )
   })
 
   describe('extension:list', () => {
@@ -160,7 +164,8 @@ describe('extension IPC handlers', () => {
       vi.clearAllMocks()
       registerExtensionHandlers(
         mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        broadcast
+        broadcast,
+        () => null
       )
       const ext = { id: 'com.test', status: 'enabled' }
       mockExtensionHost.reload.mockResolvedValue({ extension: ext })
@@ -174,7 +179,8 @@ describe('extension IPC handlers', () => {
       vi.clearAllMocks()
       registerExtensionHandlers(
         mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        broadcast
+        broadcast,
+        () => null
       )
       mockExtensionHost.reload.mockResolvedValue({ error: 'NOT_FOUND' })
       const handler = captureHandle('extension:reload')
@@ -189,7 +195,7 @@ describe('extension IPC handlers', () => {
       vi.clearAllMocks()
       registerExtensionHandlers(
         mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        undefined,
+        vi.fn(),
         () => ({ updatePanelBounds }) as never
       )
       const ext = { id: 'com.test', name: 'Test' }
@@ -213,7 +219,7 @@ describe('extension IPC handlers', () => {
       )
       registerExtensionHandlers(
         mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        undefined,
+        vi.fn(),
         () => ({ updatePanelBounds }) as never
       )
       const bounds = { x: 0, y: 0, width: 1, height: 1 }

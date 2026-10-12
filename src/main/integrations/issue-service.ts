@@ -43,7 +43,7 @@ export interface IssueServiceDeps {
   ttlMs?: number
   sleep?: (ms: number) => Promise<void>
   /** Called when a tracker's credential starts or stops failing. */
-  onTrackerError?: (tracker: TrackerId, kind: ReturnType<typeof toErrorKind> | null) => void
+  onTrackerError: (tracker: TrackerId, kind: ReturnType<typeof toErrorKind> | null) => void
 }
 
 export interface IssueService {
@@ -132,7 +132,7 @@ export function createIssueService(deps: IssueServiceDeps): IssueService {
     for (let attempt = 0; ; attempt++) {
       try {
         const result = await work()
-        deps.onTrackerError?.(tracker, null)
+        deps.onTrackerError(tracker, null)
         return result
       } catch (error) {
         const kind = toErrorKind(error)
@@ -144,7 +144,7 @@ export function createIssueService(deps: IssueServiceDeps): IssueService {
           await sleep(wait)
           continue
         }
-        if (kind === 'auth-failed') deps.onTrackerError?.(tracker, kind)
+        if (kind === 'auth-failed') deps.onTrackerError(tracker, kind)
         throw error instanceof TrackerError
           ? error
           : new TrackerError(kind, toErrorMessage(error), { cause: error })
