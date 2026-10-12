@@ -2,15 +2,13 @@ import { execFile as execFileCb } from 'child_process'
 import { promisify } from 'util'
 import { join } from 'path'
 import type { Branch, WorktreeInfo } from '../../shared/types/index.js'
-import type { GitStatus, FileDiff, ChangeStats } from '../../shared/schemas/git.schema.js'
-import { parseStatus, parseDiff } from './git-parser.js'
+import type { ChangeStats } from '../../shared/schemas/git.schema.js'
 import { GIT_ENV } from './git-env.js'
 
 const execFile = promisify(execFileCb)
 
 const GIT_TIMEOUT = 10_000
 const FETCH_TIMEOUT = 60_000
-const DIFF_MAX_BYTES = 500 * 1024
 
 async function git(args: string[], cwd: string): Promise<string> {
   const { stdout } = await execFile('git', args, {
@@ -19,19 +17,6 @@ async function git(args: string[], cwd: string): Promise<string> {
     env: GIT_ENV,
   })
   return stdout.trim()
-}
-
-export async function getStatus(repoRoot: string, maxFiles: number = 500): Promise<GitStatus> {
-  const [statusOut, branch] = await Promise.all([
-    execFile('git', ['status', '--porcelain=v1', '-z'], {
-      cwd: repoRoot,
-      timeout: GIT_TIMEOUT,
-      env: GIT_ENV,
-    }).then(({ stdout }) => stdout),
-    git(['branch', '--show-current'], repoRoot).catch(() => 'HEAD'),
-  ])
-  const partial = parseStatus(statusOut, maxFiles)
-  return { ...partial, branch: branch || 'HEAD' }
 }
 
 /**
@@ -71,45 +56,6 @@ export async function getChangeStats(cwd: string): Promise<ChangeStats> {
     if (Number.isFinite(r)) removed += r
   }
   return { added, removed, files }
-}
-
-export async function getDiff(
-  repoRoot: string,
-  filePath: string,
-  staged: boolean
-): Promise<FileDiff> {
-  const args = staged
-    ? ['diff', '--cached', '--unified=3', '--', filePath]
-    : ['diff', '--unified=3', '--', filePath]
-
-  const { stdout } = await execFile('git', args, {
-    cwd: repoRoot,
-    timeout: GIT_TIMEOUT,
-    maxBuffer: DIFF_MAX_BYTES + 1024,
-    env: GIT_ENV,
-  })
-  return { ...parseDiff(stdout, DIFF_MAX_BYTES), path: filePath }
-}
-
-export async function stageFiles(repoRoot: string, paths: string[]): Promise<void> {
-  await git(['add', '--', ...paths], repoRoot)
-}
-
-export async function unstageFiles(repoRoot: string, paths: string[]): Promise<void> {
-  await git(['restore', '--staged', '--', ...paths], repoRoot)
-}
-
-export async function commitChanges(
-  repoRoot: string,
-  message: string,
-  signOff: boolean = false
-): Promise<string> {
-  const args = ['commit', '-m', message]
-  if (signOff) args.push('--signoff')
-  const output = await git(args, repoRoot)
-  // Extract short hash from output like "[main abc1234] message"
-  const match = output.match(/\[[\w/]+ ([a-f0-9]+)\]/)
-  return match?.[1] ?? ''
 }
 
 export async function isGitRepo(dirPath: string): Promise<boolean> {
