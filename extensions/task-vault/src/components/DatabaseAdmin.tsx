@@ -108,7 +108,8 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
         if (res.error) {
           setResult({ rows: [], changes: 0, error: res.error, elapsed, sourceSql: querySql })
         } else {
-          const isWrite = !res.rows
+          // A write answers with an empty row list too, so it shows as rows it changed.
+          const isWrite = (res.changes ?? 0) > 0
           setResult({
             rows: res.rows ?? [],
             changes: res.changes ?? 0,
