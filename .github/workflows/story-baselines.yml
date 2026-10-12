@@ -44,6 +44,10 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      # test:visual serves the built Storybook (playwright.visual.config.ts).
+      - name: Build Storybook
+        run: npm run build-storybook
+
       # Writes a baseline only for a story that has none; an existing baseline
       # is never overwritten here. Playwright reports each baseline it writes as
       # a failure, so the step may fail and the commit still runs; the Stories
