@@ -1,5 +1,12 @@
 # Changelog — @terminator/extension-sdk
 
+## Unreleased
+
+### Added
+
+- `@terminator/extension-sdk/vite`: `extensionViewConfig(directory, { plugins, chunkSizeWarningLimit? })`,
+  the Vite config of an extension's view (`index.html` built to `dist/` with relative URLs).
+
 ## 4.0.0
 
 Every member of the Extension API now crosses a process boundary: extension backends run in
