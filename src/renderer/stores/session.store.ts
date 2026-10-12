@@ -406,7 +406,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       for (const [id, session] of sessions) {
         if (session.projectId !== projectId) continue
         const isActive = id === sessionId
-        const status = isActive ? ('active' as const) : ('backgrounded' as const)
+        // An exited terminal stays closed whichever tab is shown.
+        const shown = isActive ? 'active' : 'backgrounded'
+        const status = session.status === 'closed' ? session.status : shown
         const bellCount = isActive ? undefined : session.bellCount
         sessions.set(id, {
           ...session,

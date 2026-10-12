@@ -264,13 +264,34 @@ describe('useSessionStore', () => {
     })
 
     it('clears bell count for the newly active session', () => {
-      const session = makeSession()
-      useSessionStore.setState({
-        sessions: new Map([['sess-1', session]]),
-        // bell count folded into the session record below
-      })
+      useSessionStore.setState({ sessions: new Map([['sess-1', makeSession({ bellCount: 3 })]]) })
       useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
       expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
+    })
+
+    // An exited terminal stays exited: the sidebar, Quick Actions and tab
+    // cycling all leave out a closed session, whichever tab is shown.
+    it('keeps an exited tab closed when another tab of its project is shown', () => {
+      useSessionStore.setState({
+        sessions: new Map([
+          ['sess-1', makeSession({ id: 'sess-1' })],
+          ['sess-2', makeSession({ id: 'sess-2', status: 'closed' })],
+        ]),
+      })
+      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
+      expect(useSessionStore.getState().sessions.get('sess-2')?.status).toBe('closed')
+    })
+
+    it('keeps an exited tab closed when it is the one shown', () => {
+      useSessionStore.setState({
+        sessions: new Map([['sess-1', makeSession({ status: 'closed', bellCount: 1 })]]),
+      })
+      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1', 42)
+      expect(useSessionStore.getState().sessions.get('sess-1')).toMatchObject({
+        status: 'closed',
+        bellCount: undefined,
+        lastAttendedAt: 42,
+      })
     })
 
     it('sets activeSessionIdByProject for the project', () => {
