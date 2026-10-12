@@ -1,5 +1,5 @@
 import React from 'react'
-import type { SystemMetrics } from '../../../../shared/types/index'
+import type { SystemMetrics } from '@shared/types/index'
 import './MetricsBar.css'
 
 function formatBytesPerSec(n: number): string {

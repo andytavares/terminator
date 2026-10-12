@@ -194,6 +194,8 @@ export interface GlobalSettings {
   ui: {
     hasSeenWelcome: boolean
     showMetricsBar?: boolean
+    /** Which editor "Open in editor" launches, by id. Empty means detect. */
+    editor: string
   }
   sidebar?: {
     /** How long a quiet session waits before the sidebar treats it as stale. */

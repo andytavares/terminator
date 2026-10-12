@@ -13,3 +13,5 @@ export const WORKSPACE_PRESET_COLORS = [
   '#3CB371',
   '#DC143C',
 ] as const
+
+export type WorkspacePresetColor = (typeof WORKSPACE_PRESET_COLORS)[number]

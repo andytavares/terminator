@@ -46,12 +46,8 @@ import {
 // registry entry and its remote-access declaration explicitly. ipcMain is
 // never monkey-patched.
 
-declare module 'electron' {
-  interface App {
-    isQuitting?: boolean
-  }
-}
-
+// Set by before-quit so the macOS close handler lets the window go.
+let isQuitting = false
 let mainWindow: BrowserWindow | null = null
 let viewHost: ExtensionViewHost | null = null
 const ptyManager = new PtyManager()
@@ -123,7 +119,7 @@ function createWindow(): void {
   // Full quit (Cmd+Q / right-click Quit) still goes through before-quit → killAll().
   if (process.platform === 'darwin') {
     mainWindow.on('close', (event) => {
-      if (!app.isQuitting) {
+      if (!isQuitting) {
         event.preventDefault()
         mainWindow?.hide()
       }
@@ -480,7 +476,7 @@ process.on('unhandledRejection', (reason) => {
 
 app.on('before-quit', async (event) => {
   event.preventDefault()
-  app.isQuitting = true
+  isQuitting = true
   await extensionHost.unloadAll()
   await ptyManager.killAll()
   await closeAppDb()

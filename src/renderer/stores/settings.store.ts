@@ -43,7 +43,7 @@ const DEFAULT_SETTINGS: GlobalSettings = {
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
-  ui: { hasSeenWelcome: false },
+  ui: { hasSeenWelcome: false, editor: '' },
   notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
   quickActions: { pins: [], usage: [], directUse: [], custom: [] },
 }

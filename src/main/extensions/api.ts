@@ -93,7 +93,12 @@ export interface ProjectSnapshot {
 
 // Canonical session-authority types live with the authority (pty-manager.ts);
 // re-exported here so the ExtensionAPI contract exposes them.
-import type { SessionOrigin, SpawnSessionOptions, SessionInfo } from '../terminal/pty-manager.js'
+import type {
+  PtyManager,
+  SessionOrigin,
+  SpawnSessionOptions,
+  SessionInfo,
+} from '../terminal/pty-manager.js'
 export type { SessionOrigin, SpawnSessionOptions, SessionInfo }
 
 // Issue-tracker types are re-exported here rather than re-declared by every
@@ -606,7 +611,7 @@ export function getPanelMenuItemId(panelId: string): string | undefined {
 const auxiliaryWindows = new Map<string, BrowserWindow>()
 
 export interface ExtensionAPIDeps {
-  ptyManager?: PtyManagerAPI
+  ptyManager?: PtyManager
   broadcastToWindows?: (channel: string, data: unknown) => void
   focusExtensionView?: (extensionId: string, viewParam: string) => void
   bridge?: BridgeDeps

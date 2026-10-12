@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from 'react'
-import type { PaneSplitDirection } from '../../../../shared/types/index'
+import type { PaneSplitDirection } from '@shared/types/index'
 import './SplitContainer.css'
 
 interface Props {

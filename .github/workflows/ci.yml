@@ -57,14 +57,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # `tsc --noEmit` on the root tsconfig checks nothing: it is `files: []`
+      # plus references, which only `tsc --build` follows. This checks each
+      # project by name.
       - name: Typecheck
-        run: npx tsc --noEmit
-
-      # The root typecheck references only main, renderer and shared, so
-      # extension code was never checked at all and type errors in it reached
-      # a green build.
-      - name: Typecheck extensions
-        run: npm run typecheck:extensions
+        run: npm run typecheck
 
   format:
     name: Format

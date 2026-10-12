@@ -42,6 +42,7 @@ export const GlobalSettingsSchema = z.object({
   ui: z
     .object({
       hasSeenWelcome: z.boolean(),
+      showMetricsBar: z.boolean().optional(),
       /**
        * Which editor "Open in editor" launches, by id. Empty means detect —
        * the common case, and why this is not a required choice buried in

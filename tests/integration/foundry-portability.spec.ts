@@ -5,6 +5,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { createOrderStore } from '../../extensions/foundry/src/order/store.js'
 import { createForgeChannels } from '../../extensions/foundry/src/ipc/forge-channels.js'
+import { quietForgeSeams } from '../../extensions/foundry/tests/ipc/forge-deps.js'
 import { createRunChannels } from '../../extensions/foundry/src/ipc/run-channels.js'
 import { probeToolchain } from '../../extensions/foundry/src/verify/toolchain-probe.js'
 import type { WorkOrder } from '../../extensions/foundry/src/order/schema.js'
@@ -32,6 +33,7 @@ let dataRoot: string
 
 function forge() {
   return createForgeChannels({
+    ...quietForgeSeams(() => dataRoot),
     store: createOrderStore(dataRoot),
     now: () => new Date().toISOString(),
   })
