@@ -1,3 +1,4 @@
+import { createChangeBus } from '../../helpers/change-bus.js'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
@@ -40,12 +41,15 @@ const METRICS = {
   forgeDecisionsStruckShare: 0.25,
 }
 
+let bus = createChangeBus()
+
 function mount(
   orders: FactoryOrderRow[],
   metrics: Record<string, unknown> = METRICS,
   extra: { signals?: Signal[]; sensors?: unknown[]; promote?: unknown } = {}
 ) {
   const onOpen = vi.fn()
+  bus = createChangeBus()
   const invoke = vi.fn(async (channel: string, payload?: unknown) => {
     if (channel === 'foundry:order.list') return { orders }
     if (channel === 'foundry:factory.metrics') return metrics
@@ -61,13 +65,29 @@ function mount(
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    extensionBridge: { invoke, on: bus.on },
   }
   render(<FactorySite repoRoot="/repo" onOpen={onOpen} />)
   return { onOpen, invoke }
 }
 
 beforeEach(() => vi.clearAllMocks())
+
+describe('FactorySite reading', () => {
+  it('reads the orders again when Foundry says one changed, and not for time passing', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { invoke } = mount([])
+    const lists = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:order.list').length
+    await waitFor(() => expect(lists()).toBe(1))
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(lists()).toBe(1)
+    vi.useRealTimers()
+
+    bus.emit({ kind: 'order', orderId: 'WO-1' })
+    await waitFor(() => expect(lists()).toBe(2))
+  })
+})
 
 describe('FactorySite', () => {
   it('says there is nothing yet', async () => {

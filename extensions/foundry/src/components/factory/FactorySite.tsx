@@ -7,6 +7,7 @@ import type { CiState } from '../../line/ci-state.js'
 import { HallThumbnail } from './HallThumbnail.js'
 import { ciLabel } from '../../line/ci-label.js'
 import { usePolling } from '@terminator/extension-ui'
+import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
 
 // The Factory's front door: every order in the workspace, as a hall card, in
 // place of the list rows `Orders.tsx` draws in List mode.
@@ -193,9 +194,9 @@ function newestFirst(a: FactoryOrderRow, b: FactoryOrderRow): number {
   return byTime !== 0 ? byTime : b.id.localeCompare(a.id)
 }
 
-/** How often the grid is refetched. Slower than a live run's own poll: this
- *  is a door, not a dashboard. */
-const POLL_MS = 4000
+/** How often the sensors' signals are asked for. Sensors record on their own
+ *  tick and announce nothing; orders and metrics are pushed. */
+const SIGNALS_POLL_MS = 4000
 
 interface SignalsRead {
   readonly signals: Signal[]
@@ -246,9 +247,9 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
 
   const refreshSignals = useCallback(() => readSignals().then(showSignals), [showSignals])
 
-  usePolling(readOrders, setRows, POLL_MS)
-  usePolling(readMetricsFor, showMetrics, POLL_MS)
-  usePolling(readSignals, showSignals, POLL_MS)
+  usePushed(readOrders, setRows, { kinds: ANY_RECORD })
+  usePushed(readMetricsFor, showMetrics, { kinds: ANY_RECORD })
+  usePolling(readSignals, showSignals, SIGNALS_POLL_MS)
 
   const startPromote = useCallback(
     (signal: Signal) => {

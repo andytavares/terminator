@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import React from 'react'
+import { createChangeBus } from '../helpers/change-bus.js'
 import { Forge } from '../../src/components/Forge.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
@@ -38,6 +39,17 @@ let invoke: ReturnType<typeof vi.fn>
 /** What `foundry:run-terminal` answers. Reset before every test. */
 let terminalReply: unknown = { ok: true }
 
+let bus = createChangeBus()
+beforeEach(() => {
+  bus = createChangeBus()
+})
+
+/** Foundry says this order's records changed, and the view reads once the burst is over. */
+async function orderChanged(): Promise<void> {
+  bus.emit({ kind: 'ledger', orderId: 'WO-1' })
+  await vi.advanceTimersByTimeAsync(200)
+}
+
 function mount(statesReply: unknown, over: Partial<WorkOrder> = {}) {
   const current = order(over)
   invoke = vi.fn(async (channel: string) => {
@@ -58,7 +70,7 @@ function mount(statesReply: unknown, over: Partial<WorkOrder> = {}) {
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    extensionBridge: { invoke, on: bus.on },
   }
   render(<Forge orderId="WO-1" />)
 }
@@ -311,7 +323,7 @@ function mountForStart(over: Record<string, unknown> = {}) {
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    extensionBridge: { invoke, on: bus.on },
   }
   render(<Forge orderId="WO-1" onStarted={onStarted} />)
   return onStarted
@@ -469,7 +481,7 @@ describe('choosing the shape of work', () => {
       ).toBe('true')
     )
 
-    await vi.advanceTimersByTimeAsync(3000)
+    await orderChanged()
     await openStep('Hand off')
     await vi.waitFor(() => expect(isUnavailable(handOffButton())).toBe(false))
     fireEvent.click(handOffButton())
@@ -531,7 +543,7 @@ describe('drafting the plan', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
 
@@ -560,7 +572,7 @@ describe('drafting the plan', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
     await waitFor(() => expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy())
@@ -602,7 +614,7 @@ describe('drafting the plan', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
     await waitFor(() => expect(screen.getByRole('button', { name: /Redraft/ })).toBeTruthy())
@@ -617,7 +629,7 @@ describe('drafting the plan', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
     await waitFor(() => expect(screen.getAllByText(/Handed off/).length).toBeGreaterThan(0))
@@ -635,7 +647,7 @@ describe('the hand-off pill on an order that has shipped', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" standing={standing as never} />)
   }
@@ -672,7 +684,7 @@ describe('only the parts affected are redrawn (FR-007)', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
   }
@@ -746,7 +758,7 @@ describe('deciding a blocking finding, in the band', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
   }
@@ -933,7 +945,7 @@ describe('answering the open questions on the Plan step, one submit', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
   }
@@ -1008,7 +1020,7 @@ describe('deciding two red-team findings on the Red team step, one submit', () =
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
   }
@@ -1111,7 +1123,7 @@ describe('a settle made while the architect is drafting', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
 
@@ -1128,7 +1140,7 @@ describe('a settle made while the architect is drafting', () => {
     expect(isUnavailable(send)).toBe(true)
     expect(reasonFor(send)).toContain('queued')
 
-    await vi.advanceTimersByTimeAsync(3000)
+    await orderChanged()
     await vi.waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
         id: 'WO-1',
@@ -1146,7 +1158,7 @@ describe('reading a finding', () => {
       channel === 'foundry:order.compile' ? { order: current, compile: compileOrder(current) } : {}
     )
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
   }
@@ -1249,7 +1261,7 @@ describe('while the architect is working', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
   }
@@ -1261,7 +1273,7 @@ describe('while the architect is working', () => {
     reason: "acceptance.5.verify.evidence.1: Invalid enum value. Expected 'exit_code' | 'stdout'",
   }
 
-  it('keeps asking until the redraft lands, rather than giving up after one tick', async () => {
+  it('reads again each time the order changes until the redraft lands, rather than giving up after one', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     landsAfter(3, REDRAFTED)
     await vi.waitFor(() =>
@@ -1271,32 +1283,30 @@ describe('while the architect is working', () => {
     fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
     await vi.waitFor(() => expect(screen.getByText(/The architect is working/)).toBeTruthy())
 
-    // Three polls before the turn ends. A poll that stopped after one would
-    // never see it.
-    await vi.advanceTimersByTimeAsync(12_000)
-    await vi.waitFor(() =>
-      expect(
-        invoke.mock.calls.filter((c) => c[0] === 'foundry:order.compile').length
-      ).toBeGreaterThan(4)
-    )
+    // Three changes before the turn ends. A view that stopped listening after
+    // one would never see it.
+    const compiled = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:order.compile').length
+    const before = compiled()
+    for (let change = 0; change < 3; change++) await orderChanged()
+    expect(compiled()).toBe(before + 3)
     vi.useRealTimers()
   })
 
   // Deleted: "stops once the architect has written its line" and "stops
   // when the turn was refused, though nothing was saved" asserted that the
-  // 3s poll itself stopped once a turn ended. Under the redesign the poll's
-  // only gate is `order.status === 'draft'` (Forge.tsx's REDRAFT_POLL_MS
-  // effect) — it keeps refreshing a draft order for as long as it stays a
-  // draft, independent of whether a turn is running, so there is no longer
-  // a "poll stopped" moment to assert. What each test actually cared about —
-  // the "architect is working" strip clearing once the turn ends — still
-  // holds, and is kept below without the call-count assertion.
+  // 3s poll itself stopped once a turn ended. The view now listens to its
+  // order for as long as it is a draft, independent of whether a turn is
+  // running, so there is no longer a "poll stopped" moment to assert. What
+  // each test actually cared about — the "architect is working" strip
+  // clearing once the turn ends — still holds, and is kept below.
   it('clears "the architect is working" once the redraft lands', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     landsAfter(1, REDRAFTED)
     await vi.waitFor(() => screen.getByRole('button', { name: /Draft the plan/ }))
     fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
-    await vi.advanceTimersByTimeAsync(9_000)
+    // The first read still sees the turn in flight; the second sees it end.
+    await orderChanged()
+    await orderChanged()
     await vi.waitFor(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
     vi.useRealTimers()
   })
@@ -1310,7 +1320,9 @@ describe('while the architect is working', () => {
     landsAfter(1, REFUSED)
     await vi.waitFor(() => screen.getByRole('button', { name: /Draft the plan/ }))
     fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
-    await vi.advanceTimersByTimeAsync(9_000)
+    // The first read still sees the turn in flight; the second sees it end.
+    await orderChanged()
+    await orderChanged()
     await vi.waitFor(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
     vi.useRealTimers()
   })
@@ -1349,7 +1361,7 @@ describe('a turn that was refused', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
   }
@@ -1522,7 +1534,7 @@ function mountBlocked(over: Record<string, unknown> = {}) {
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    extensionBridge: { invoke, on: bus.on },
   }
   render(<Forge orderId="WO-1" />)
   return current
@@ -1561,7 +1573,7 @@ function mountAsking(current: WorkOrder) {
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    extensionBridge: { invoke, on: bus.on },
   }
   render(<Forge orderId="WO-1" />)
 }
@@ -1986,7 +1998,7 @@ describe('choosing a shape while a turn is running', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
   }
@@ -2026,7 +2038,7 @@ describe('an order agreed and handed off automatically', () => {
         : {}
     )
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
     await waitFor(() => expect(screen.getByText(/Handed off automatically at/)).toBeTruthy())
@@ -2083,7 +2095,7 @@ describe('findings grouped by who acts on them', () => {
         : {}
     )
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
     await openStep('Red team')
@@ -2127,7 +2139,7 @@ describe('holding and releasing the red-team loop from the strip', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
   }
@@ -2198,7 +2210,7 @@ describe('every unavailable control names why, everywhere (ADR 074)', () => {
         : {}
     )
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
     await waitFor(() => screen.getByText(/plan was refused/i))
@@ -2241,7 +2253,7 @@ describe('every unavailable control names why, everywhere (ADR 074)', () => {
         : {}
     )
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<Forge orderId="WO-1" />)
     await openStep('Red team')

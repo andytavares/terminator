@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { launchApp, closeApp, workspaceRow } from './helpers'
 import type { AppHandle } from './helpers'
 
 // Shared helpers for every `tests/e2e/foundry-*.spec.ts` file. Each spec keeps
@@ -164,6 +165,23 @@ export function hasStation(handle: AppHandle, prefix: string): Promise<boolean> 
     return false
   })()`
   )
+}
+
+/**
+ * Closes the app and opens it again on the same profile, with Foundry showing.
+ *
+ * Foundry reads its records from disk once and keeps them in memory, updated by
+ * its own writes. A spec that writes records by hand while the app is running
+ * is editing behind its back, which is not something the app notices — so it
+ * writes first and restarts, the way an operator who edited them would.
+ */
+export async function restartFoundry(handle: AppHandle, workspaceName: string): Promise<AppHandle> {
+  const userDataDir = handle.userDataDir
+  await closeApp(handle)
+  const next = await launchApp(userDataDir)
+  await expect(workspaceRow(next.page, workspaceName)).toBeVisible({ timeout: 30_000 })
+  await openFoundry(next)
+  return next
 }
 
 /** Opens the Foundry panel and waits until its view has actually rendered

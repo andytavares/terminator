@@ -1,8 +1,6 @@
 import { z } from 'zod'
-import { queryEntries } from '../ledger/append.js'
 import type { LedgerEntry } from '../ledger/append.js'
 import { propose } from '../ledger/curator.js'
-import { ledgerPath } from '../data-root.js'
 import {
   acceptProposal,
   declineProposal,
@@ -12,6 +10,7 @@ import {
 } from '../verify/rules.js'
 import type { OrderStore } from '../order/store.js'
 import { createGateStore } from '../gates/store.js'
+import type { FoundryIndex } from '../state/foundry-index.js'
 import { readRunGraph } from './run-channels.js'
 import { factoryMetrics as computeFactoryMetrics } from '../factory/metrics.js'
 import type { OrderRecords } from '../factory/metrics.js'
@@ -72,6 +71,8 @@ export interface LedgerDeps {
    */
   readonly sources: () => ResolveSources
   readonly now: () => string
+  /** The in-memory index over this root's records; absent, every read parses the files. */
+  readonly index?: (root: string) => FoundryIndex
 }
 
 export interface LedgerChannels {
@@ -95,9 +96,7 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
   async function entriesFor(orderId: string | undefined): Promise<LedgerEntry[]> {
     const ids =
       orderId === undefined ? (await deps.store.list()).map((order) => order.id) : [orderId]
-    const perOrder = await Promise.all(
-      ids.map((id) => queryEntries(ledgerPath(deps.dataRoot(), id)))
-    )
+    const perOrder = await Promise.all(ids.map((id) => deps.store.entries(id)))
     return perOrder.flat().sort((a, b) => a.at.localeCompare(b.at))
   }
 
@@ -217,12 +216,14 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     const window = parsed.data.window ?? '30d'
 
     const orders = await deps.store.list()
-    const allGates = await createGateStore(deps.dataRoot()).list()
+    const root = deps.dataRoot()
+    const index = deps.index?.(root)
+    const allGates = await createGateStore(root, index).list()
     const records: OrderRecords[] = await Promise.all(
       orders.map(async (order) => {
         const [ledger, graph] = await Promise.all([
-          queryEntries(ledgerPath(deps.dataRoot(), order.id)),
-          readRunGraph(deps.dataRoot(), order.id),
+          deps.store.entries(order.id),
+          readRunGraph(root, order.id, index),
         ])
         return {
           order,

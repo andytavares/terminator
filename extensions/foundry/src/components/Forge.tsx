@@ -28,6 +28,7 @@ import { PROPOSAL_FILE } from '../order/proposal.js'
 import { openingStep, forgeSteps, type StepId } from '../forge/steps.js'
 import { budgetsInWords } from '../order/render.js'
 import { BudgetForm } from './BudgetForm.js'
+import { usePushed } from '../renderer/use-pushed.js'
 import { ReasonButton } from './ReasonButton.js'
 import {
   readiness,
@@ -66,9 +67,6 @@ export interface OrderView {
   turnEndedAt?: string | null
   advisory?: string | null
 }
-
-/** How often the document is refetched while the architect is working. */
-const REDRAFT_POLL_MS = 3000
 
 interface StatesView {
   capability?: CapabilityReport
@@ -363,9 +361,14 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
     [orderId, showCompiled]
   )
 
-  useEffect(() => {
-    void readCompiled(orderId).then(showCompiled)
-  }, [orderId, showCompiled])
+  // While the architect is redrafting, the order, its ledger and the intake
+  // session change under this view; Foundry says when. Nothing is pushed for a
+  // settled order, so only a draft listens.
+  const readThisOrder = useCallback(() => readCompiled(orderId), [orderId])
+  usePushed(readThisOrder, showCompiled, {
+    kinds: view?.order.status === 'draft' ? ['order', 'ledger', 'live'] : [],
+    orderId,
+  })
 
   useEffect(() => {
     let live = true
@@ -486,13 +489,6 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
   const drafting = intake.kind === 'running'
   const asked = intake.kind === 'running' ? intake.asked : null
   const locked = busy || drafting
-
-  const orderStatus = view === null ? null : view.order.status
-  useEffect(() => {
-    if (orderStatus !== 'draft') return
-    const timer = setInterval(() => void refresh(), REDRAFT_POLL_MS)
-    return () => clearInterval(timer)
-  }, [orderStatus, refresh])
 
   const applySettle = useCallback(
     async (settle: Settle) => {

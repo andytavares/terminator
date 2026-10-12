@@ -7,6 +7,7 @@ import type { LedgerEntry } from '../ledger/append.js'
 import { parseWorkOrder } from './schema.js'
 import type { WorkOrder } from './schema.js'
 import { renderOrder } from './render.js'
+import type { FoundryIndex } from '../state/foundry-index.js'
 
 // Orders on disk.
 //
@@ -41,14 +42,18 @@ export interface OrderStore {
  * `data-root.ts` and every write still receives an absolute path; what this
  * removes is the assumption that the answer is known at activation.
  */
-export function createLiveOrderStore(root: () => string): OrderStore {
+export function createLiveOrderStore(
+  root: () => string,
+  indexFor?: (root: string) => FoundryIndex
+): OrderStore {
+  const store = (): OrderStore => createOrderStore(root(), indexFor?.(root()))
   return {
-    save: (order) => createOrderStore(root()).save(order),
-    load: (id) => createOrderStore(root()).load(id),
-    list: () => createOrderStore(root()).list(),
-    findByIssue: (tracker, key) => createOrderStore(root()).findByIssue(tracker, key),
-    record: (entry) => createOrderStore(root()).record(entry),
-    entries: (orderId) => createOrderStore(root()).entries(orderId),
+    save: (order) => store().save(order),
+    load: (id) => store().load(id),
+    list: () => store().list(),
+    findByIssue: (tracker, key) => store().findByIssue(tracker, key),
+    record: (entry) => store().record(entry),
+    entries: (orderId) => store().entries(orderId),
   }
 }
 
@@ -60,19 +65,30 @@ async function writeAtomically(file: string, content: string): Promise<void> {
   await fs.promises.rename(tmp, file)
 }
 
-export function createOrderStore(root: string): OrderStore {
+/**
+ * With an index, reads come from memory and each successful write tells the
+ * index; without one every read parses the files again.
+ */
+export function createOrderStore(root: string, index?: FoundryIndex): OrderStore {
   const dirFor = (id: string): string => orderDir(root, id)
 
   async function save(order: WorkOrder): Promise<void> {
     const dir = dirFor(order.id)
+    const json = `${JSON.stringify(order, null, 2)}\n`
     await fs.promises.mkdir(dir, { recursive: true })
-    await writeAtomically(path.join(dir, 'order.json'), `${JSON.stringify(order, null, 2)}\n`)
+    await writeAtomically(path.join(dir, 'order.json'), json)
     // Regenerated, never hand-edited: anything the operator wants to change
     // goes through intake so it lands in the truth.
     await writeAtomically(path.join(dir, 'order.md'), renderOrder(order))
+    // As a read would see it: parsed back, so defaults are filled in the same way.
+    index?.orderSaved(parseWorkOrder(JSON.parse(json)))
   }
 
   async function load(id: string): Promise<WorkOrder | null> {
+    return index === undefined ? readOrder(id) : index.order(id)
+  }
+
+  async function readOrder(id: string): Promise<WorkOrder | null> {
     try {
       const raw = await fs.promises.readFile(path.join(dirFor(id), 'order.json'), 'utf8')
       return parseWorkOrder(JSON.parse(raw))
@@ -84,13 +100,18 @@ export function createOrderStore(root: string): OrderStore {
   }
 
   async function list(): Promise<WorkOrder[]> {
+    if (index !== undefined) return index.orders()
+    return readAllOrders()
+  }
+
+  async function readAllOrders(): Promise<WorkOrder[]> {
     let ids: string[]
     try {
       ids = await fs.promises.readdir(path.join(root, 'orders'))
     } catch {
       return []
     }
-    const loaded = await Promise.all(ids.map((id) => load(id)))
+    const loaded = await Promise.all(ids.map((id) => readOrder(id)))
     return loaded
       .filter((order): order is WorkOrder => order !== null)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -112,9 +133,10 @@ export function createOrderStore(root: string): OrderStore {
     },
     async record(entry) {
       await appendEntry(ledgerPath(root, entry.orderId), entry)
+      index?.entryAppended(JSON.parse(JSON.stringify(entry)) as LedgerEntry)
     },
     entries(orderId) {
-      return readEntries(ledgerPath(root, orderId))
+      return index === undefined ? readEntries(ledgerPath(root, orderId)) : index.ledger(orderId)
     },
   }
 }

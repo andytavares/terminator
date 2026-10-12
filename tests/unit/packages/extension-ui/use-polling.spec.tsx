@@ -3,7 +3,15 @@ import { renderHook, act } from '@testing-library/react'
 import { usePolling } from '../../../../packages/extension-ui/src/usePolling'
 
 beforeEach(() => vi.useFakeTimers())
-afterEach(() => vi.useRealTimers())
+afterEach(() => {
+  vi.useRealTimers()
+  setHidden(false)
+})
+
+function setHidden(hidden: boolean): void {
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
+  document.dispatchEvent(new Event('visibilitychange'))
+}
 
 describe('usePolling', () => {
   it('reads at once, then every interval, and shows each answer', async () => {
@@ -42,5 +50,36 @@ describe('usePolling', () => {
     arrive(7)
     await act(async () => {})
     expect(show).not.toHaveBeenCalled()
+  })
+
+  it('stops while the view is hidden and reads at once when it is shown again', async () => {
+    const read = vi.fn(async () => 1)
+    renderHook(() => usePolling(read, vi.fn(), 1000))
+    await act(async () => {})
+    expect(read).toHaveBeenCalledTimes(1)
+
+    act(() => setHidden(true))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000)
+    })
+    expect(read).toHaveBeenCalledTimes(1)
+
+    act(() => setHidden(false))
+    await act(async () => {})
+    expect(read).toHaveBeenCalledTimes(2)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+    expect(read).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not start polling when mounted while hidden', async () => {
+    setHidden(true)
+    const read = vi.fn(async () => 1)
+    renderHook(() => usePolling(read, vi.fn(), 1000))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    expect(read).toHaveBeenCalledTimes(1)
   })
 })

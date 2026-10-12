@@ -79,7 +79,8 @@ const MAX_ENTRIES = 2_000
  */
 const COMPACT_EVERY = 200
 
-export function createFeedLog(path: string): FeedLog {
+/** `onChange` is told after every write, so a window can read the feed when it moves. */
+export function createFeedLog(path: string, onChange: () => void = () => {}): FeedLog {
   const log = createJsonlLog<FeedRow>(path)
   let counter = 0
   let sinceCompaction = 0
@@ -125,6 +126,7 @@ export function createFeedLog(path: string): FeedLog {
         replyable: entry.author === 'agent',
       }
       log.append(full)
+      onChange()
       return full
     },
 
@@ -136,10 +138,12 @@ export function createFeedLog(path: string): FeedLog {
       // Append-only, like every other record here: a tombstone rather than a
       // rewrite, so a crash costs the last line and not the feed.
       log.append({ forgotten: sessionId })
+      onChange()
     },
 
     removeEntry(id: string): void {
       log.append({ dropped: id })
+      onChange()
     },
 
     shouldNotify(entry: FeedEntry, mutes: readonly MuteRule[]): boolean {

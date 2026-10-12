@@ -1,5 +1,9 @@
 import type { WorkOrder } from '../order/schema.js'
+import type { OrderStore } from '../order/store.js'
 import type { QueueEntry } from './refinery.js'
+import { readObservedFiles } from './observed-files.js'
+import { readPulls } from './integrate.js'
+import { readRefineryState } from './refinery-state.js'
 
 // The queue's own data, assembled from live orders.
 //
@@ -62,4 +66,30 @@ export async function queueEntries(
   }
 
   return entries
+}
+
+/**
+ * Every in-flight order's queue entries, for the refinery's file-overlap
+ * queue: the observe/list channels' `queue` field, and the advisory shown on
+ * agreement.
+ *
+ * Reads records only. The files a checkout changed are the ones recorded when
+ * its last step settled (`observed-files.ts`), so asking for the queue never
+ * starts a process.
+ */
+export async function computeQueueEntries(
+  root: string,
+  store: Pick<OrderStore, 'list'>
+): Promise<QueueEntry[]> {
+  const orders = await store.list()
+  const merged = new Set<string>()
+  for (const order of orders.filter((o) => o.status === 'running' || o.status === 'shipped')) {
+    if ((await readRefineryState(root, order.id)).mergedAt !== null) merged.add(order.id)
+  }
+  return queueEntries(orders, {
+    readPulls: (orderId) => readPulls(root, orderId),
+    changedFiles: (order) => readObservedFiles(root, order.id),
+    merged: (orderId) => merged.has(orderId),
+    agreedAt: (order) => order.agreedAt ?? '',
+  })
 }

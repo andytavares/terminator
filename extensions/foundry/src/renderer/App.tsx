@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Settings, ArrowLeft, List, Factory } from 'lucide-react'
 import { Inbox } from '../components/Inbox.js'
+import { usePushed, ANY_RECORD } from './use-pushed.js'
 import { Orders } from '../components/Orders.js'
 import { Ledger } from '../components/Ledger.js'
 import { SettingsView } from '../components/SettingsView.js'
@@ -34,8 +35,15 @@ interface Attention {
   forge: number
 }
 
-/** How often the counts are refetched. Fast enough to notice, cheap to serve. */
-const ATTENTION_POLL_MS = 4000
+async function readAttention(): Promise<Attention | null> {
+  try {
+    return (await window.electronAPI.extensionBridge.invoke('foundry:attention', {})) as Attention
+  } catch {
+    // The badge is an affordance, not the queue. A failed read leaves the
+    // last count up rather than taking the chrome down with it.
+    return null
+  }
+}
 
 export function App(): JSX.Element {
   const [repoRoot, setRepoRoot] = useState<string | null>(
@@ -124,27 +132,10 @@ export function App(): JSX.Element {
   // of these tabs, and until this existed a tab said nothing until you
   // clicked it — so an open question or a held tool call was only ever found
   // by somebody who went looking for it on the off chance.
-  useEffect(() => {
-    let live = true
-    const read = async (): Promise<void> => {
-      try {
-        const next = (await window.electronAPI.extensionBridge.invoke(
-          'foundry:attention',
-          {}
-        )) as Attention
-        if (live) setWaiting({ inbox: next.inbox ?? 0, forge: next.forge ?? 0 })
-      } catch {
-        // The badge is an affordance, not the queue. A failed poll leaves the
-        // last count up rather than taking the chrome down with it.
-      }
-    }
-    void read()
-    const timer = setInterval(() => void read(), ATTENTION_POLL_MS)
-    return () => {
-      live = false
-      clearInterval(timer)
-    }
+  const showAttention = useCallback((next: Attention | null): void => {
+    if (next !== null) setWaiting({ inbox: next.inbox ?? 0, forge: next.forge ?? 0 })
   }, [])
+  usePushed(readAttention, showAttention, { kinds: ANY_RECORD })
 
   // Orders are per-repository, so a workspace switch resets the surfaces.
   useEffect(() => {

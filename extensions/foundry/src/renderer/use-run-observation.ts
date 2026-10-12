@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { usePolling } from '@terminator/extension-ui'
+import { usePushed, ANY_RECORD } from './use-pushed.js'
 import type { RunGraph } from '../line/run-graph.js'
 import type { Standing } from '../order/standing.js'
 import type { Gate } from '../gates/rules.js'
@@ -88,10 +88,6 @@ export interface PendingAsk {
   at: number
 }
 
-/** How often the live half is refetched. Slow enough to be cheap, fast
- *  enough that an agent is not left holding a tool call for a visible pause. */
-const LIVE_POLL_MS = 2000
-
 function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
@@ -109,7 +105,8 @@ export interface UseRunObservation {
 }
 
 /**
- * The Floor's run observation, polled rather than fetched once.
+ * The Floor's run observation, read again whenever Foundry says this order's
+ * records or live state changed rather than fetched once.
  *
  * A single call on mount left every state chip a snapshot of whenever the
  * panel happened to open: a run that halted, failed or finished while you
@@ -140,8 +137,8 @@ export function useRunObservation(orderId: string): UseRunObservation {
     [readObservation, showObservation]
   )
 
-  usePolling(readObservation, showObservation, LIVE_POLL_MS)
-  usePolling(readPending, setPending, LIVE_POLL_MS)
+  usePushed(readObservation, showObservation, { kinds: ANY_RECORD, orderId })
+  usePushed(readPending, setPending, { kinds: ['live'] })
 
   return { view, problem, pending, refresh }
 }

@@ -14,6 +14,7 @@ import {
   launchScript,
   makeFixtureRepo,
   openFoundry,
+  restartFoundry,
 } from './foundry-harness'
 
 // The Forge: opening an order, running it, and the controls that manage its
@@ -82,7 +83,6 @@ async function openOrderRow(id: string): Promise<void> {
 
 test('a run cuts a worktree and launches a supervised agent in a visible terminal', async () => {
   test.setTimeout(180_000)
-  const { page } = handle
 
   // A complete order, written where the extension keeps its records. The Forge
   // is what fills one in normally and has its own cover; what is under test
@@ -153,6 +153,9 @@ test('a run cuts a worktree and launches a supervised agent in a visible termina
       agreedAt: '2026-09-06T10:00:00.000Z',
     })
   )
+
+  handle = await restartFoundry(handle, 'Foundry Forge')
+  const { page } = handle
 
   const started = (await foundryChannel(handle, 'foundry:run.start', { id })) as {
     error?: string
@@ -356,6 +359,7 @@ test('what the architect writes is shown as markdown in the Forge', async () => 
     { id: 'A-1', text: 'The filter lives in `Orders.tsx`', struck: false, affects: [] },
   ]
   writeFileSync(file, JSON.stringify(order))
+  handle = await restartFoundry(handle, 'Foundry Forge')
 
   await openOrderRow(id)
 
@@ -478,8 +482,10 @@ test('an order’s budgets are set on the Plan step, and raised at the gate that
     breach: { kind: 'agents', limit: 4, actual: 6 },
   }
   writeFileSync(join(repo, '.foundry', 'orders', id, 'gates.json'), JSON.stringify([gate]))
+  handle = await restartFoundry(handle, 'Foundry Forge')
+  await openOrderRow(id)
 
-  // The gate is in the band above the Forge, read again on its own poll.
+  // The gate is in the band above the Forge.
   await expect.poll(() => bodyText(handle), { timeout: 10_000 }).toContain(gate.summary)
   expect(await clickByName(handle, 'button', 'Raise the budget')).toBe(true)
   await expect.poll(() => bodyText(handle), { timeout: 10_000 }).toContain('At least 6.')

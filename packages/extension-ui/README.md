@@ -34,7 +34,7 @@ should define a colour.
 | `Markdown`                           | react-markdown with GFM and sanitised raw HTML (ADR 091)       |
 | `RelativeTime`, `formatRelativeTime` | "5 minutes ago" through `Intl.RelativeTimeFormat`              |
 
-**Behaviour** — `usePolling(read, show, intervalMs)`, `useDismissible`, the focus
+**Behaviour** — `usePolling(read, show, intervalMs)`, `everyWhileVisible(tick, intervalMs)`, `useDismissible`, the focus
 trap, the modal-depth registry and the layer scale (`LAYERS`, `layerValue`,
 `nestedLayerValue`).
 

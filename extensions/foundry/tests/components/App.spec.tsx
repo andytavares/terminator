@@ -10,6 +10,8 @@ import { compileOrder } from '../../src/order/compile.js'
 // what is left to assert here is small — which is the point.
 
 const bridgeHandlers: Record<string, (data: unknown) => void> = {}
+/** Every handler, for events several parts of the window listen to. */
+const everyHandler: Record<string, ((data: unknown) => void)[]> = {}
 let pendingNewOrder = false
 let orderRows: unknown[] = []
 let currentView: 'list' | 'factory' = 'list'
@@ -105,10 +107,12 @@ beforeEach(() => {
     createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
   } as unknown as CanvasRenderingContext2D)
   for (const key of Object.keys(bridgeHandlers)) delete bridgeHandlers[key]
+  for (const key of Object.keys(everyHandler)) delete everyHandler[key]
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: {
       on: vi.fn((event: string, handler: (data: unknown) => void) => {
         bridgeHandlers[event] = handler
+        everyHandler[event] = [...(everyHandler[event] ?? []), handler]
         return vi.fn()
       }),
       invoke: mockBridgeInvoke,
@@ -266,6 +270,33 @@ describe('App', () => {
     await waitFor(() => screen.getByRole('button', { name: /back/i }))
     bridgeHandlers['workspace:changed']({ repoRoot: '/other' })
     await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
+  })
+})
+
+describe('the counts on the chrome', () => {
+  const asked = () => mockBridgeInvoke.mock.calls.filter((c) => c[0] === 'foundry:attention')
+
+  it('are read on mount, then again only when Foundry says something changed', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    render(<App />)
+    await waitFor(() => expect(asked()).toHaveLength(1))
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(asked()).toHaveLength(1)
+    vi.useRealTimers()
+
+    everyHandler['foundry:changed'].forEach((handler) =>
+      handler({ kind: 'gates', orderId: 'WO-1' })
+    )
+    await waitFor(() => expect(asked()).toHaveLength(2))
+  })
+
+  it('are read again when the workspace switches, which writes nothing to say so', async () => {
+    render(<App />)
+    await waitFor(() => expect(asked()).toHaveLength(1))
+
+    everyHandler['workspace:changed'].forEach((handler) => handler({ repoRoot: '/other' }))
+    await waitFor(() => expect(asked()).toHaveLength(2))
   })
 })
 

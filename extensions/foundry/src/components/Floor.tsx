@@ -24,6 +24,7 @@ import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { ordinal } from '../factory/format.js'
 import { usePolling } from '@terminator/extension-ui'
+import { usePushed } from '../renderer/use-pushed.js'
 import { ExternalLink, Markdown, MarkdownInline } from './Markdown.js'
 import {
   useRunObservation,
@@ -82,8 +83,11 @@ function stallInWords(firing: StallFiring['firing']): string {
   return `no tool call for ${minutes} minutes`
 }
 
-/** How often the live half is refetched. Slow enough to be cheap, fast
- *  enough that an agent is not left holding a tool call for a visible pause. */
+/**
+ * How often what an agent is saying is refetched, while the view is visible.
+ * Everything Foundry itself changes is pushed; a transcript is written by the
+ * agent's own process, so this is the one thing left to ask for.
+ */
 const LIVE_POLL_MS = 2000
 
 /** How many of a running agent's last lines the standing band shows. */
@@ -152,11 +156,9 @@ interface LiveRead {
   readonly shadowMode: boolean
   readonly feed: FeedEntry[]
   readonly mutes: MuteRule[]
-  /** Null when no agent is being watched. */
-  readonly transcript: TranscriptLine[] | null
 }
 
-async function readActivity(watching: string | null): Promise<LiveRead> {
+async function readLiveState(): Promise<LiveRead> {
   const stalled = (await invoke('foundry:stalls-list')) as {
     firings?: StallFiring[]
     shadowMode?: boolean
@@ -165,19 +167,21 @@ async function readActivity(watching: string | null): Promise<LiveRead> {
     entries?: FeedEntry[]
     mutes?: MuteRule[]
   }
-  const tail =
-    watching === null
-      ? null
-      : ((await invoke('foundry:run-transcript', { sessionId: watching, limit: 40 })) as {
-          lines?: TranscriptLine[]
-        })
   return {
     stalls: stalled.firings ?? [],
     shadowMode: stalled.shadowMode ?? true,
     feed: (activity.entries ?? []).slice(-12).reverse(),
     mutes: activity.mutes ?? [],
-    transcript: tail === null ? null : (tail.lines ?? []),
   }
+}
+
+/** The transcript of the agent being watched; null when none is. */
+async function readWatched(watching: string | null): Promise<TranscriptLine[] | null> {
+  if (watching === null) return null
+  const tail = (await invoke('foundry:run-transcript', { sessionId: watching, limit: 40 })) as {
+    lines?: TranscriptLine[]
+  }
+  return tail.lines ?? []
 }
 
 /** Every running agent's own words, by session; nothing to read when none is running. */
@@ -224,22 +228,21 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   const [stalls, setStalls] = useState<StallFiring[]>([])
   const [shadowMode, setShadowMode] = useState(true)
 
-  // The live half: what an agent is holding at, and what it has been saying.
-  //
-  // Polled rather than pushed because a surface that misses one event shows a
-  // stale answer for ever, and a held tool call shown as answered is the worst
-  // of those — the agent is genuinely stopped, waiting on somebody who has
-  // been told there is nothing to do.
-  const readLive = useCallback(() => readActivity(watching), [watching])
+  // The feed and the stall firings are Foundry's own and are pushed. What the
+  // agents say is read by the one fallback poll below, and by `pollLive` after
+  // an action.
   const showLive = useCallback((read: LiveRead): void => {
     setStalls(read.stalls)
     setShadowMode(read.shadowMode)
     setFeed(read.feed)
     setMutes(read.mutes)
-    if (read.transcript !== null) setTranscript(read.transcript)
   }, [])
-  const pollLive = useCallback(() => readLive().then(showLive), [readLive, showLive])
-  usePolling(readLive, showLive, LIVE_POLL_MS)
+  usePushed(readLiveState, showLive, { kinds: ['live'] })
+  const pollLive = useCallback(async () => {
+    showLive(await readLiveState())
+    const lines = await readWatched(watching)
+    if (lines !== null) setTranscript(lines)
+  }, [watching, showLive])
 
   const answer = useCallback(
     async (ask: PendingAsk, decision: 'allow' | 'deny') => {
@@ -435,12 +438,27 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
     .filter((n) => isLive(n, view?.orphaned ?? []))
     .map((n) => n.sessionId)
     .join(' ')
-  const readTails = useCallback(() => readRunningTails(runningSessions), [runningSessions])
   const showTails = useCallback((tails: Record<string, TranscriptLine[]>): void => {
     setLive(tails)
     setTailsReadAt(Date.now())
   }, [])
-  usePolling(readTails, showTails, LIVE_POLL_MS)
+  // The one poll left on this view: what the agents have been saying changes
+  // in their own processes, with nothing Foundry writes to announce it.
+  const readAgentWords = useCallback(
+    async () => ({
+      watched: await readWatched(watching),
+      tails: await readRunningTails(runningSessions),
+    }),
+    [watching, runningSessions]
+  )
+  const showAgentWords = useCallback(
+    (read: { watched: TranscriptLine[] | null; tails: Record<string, TranscriptLine[]> }): void => {
+      if (read.watched !== null) setTranscript(read.watched)
+      showTails(read.tails)
+    },
+    [showTails]
+  )
+  usePolling(readAgentWords, showAgentWords, LIVE_POLL_MS)
 
   const [polledSessions, setPolledSessions] = useState(runningSessions)
   if (polledSessions !== runningSessions) {

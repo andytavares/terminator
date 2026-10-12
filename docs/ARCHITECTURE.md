@@ -1514,6 +1514,24 @@ App
   tab through `pty.closeTerminalTab` when its run or command ends cleanly. A
   failed one stays open, exited, so its output can be read. A later node in the
   lane resumes the conversation in a fresh tab.
+- **It does not read its own records twice.** `src/state/foundry-index.ts` holds
+  orders, run graphs, gates and ledgers in memory, one index per data root,
+  loaded from disk the first time each is asked for. Every write still goes to
+  disk first (disk is the source of truth) and then tells the index, which
+  broadcasts `foundry:changed` `{ kind: 'order' | 'graph' | 'gates' | 'ledger' |
+'live', orderId }` through `api.window.broadcast`. The renderer reads once on
+  mount and again only for a change it draws (`renderer/use-pushed.ts`), so an
+  open Floor costs the main process nothing while nothing happens. `live` is the
+  one kind with no file behind it — a held tool call, a stall, a running or
+  stranded agent, an open intake, the feed — and carries an empty `orderId` when
+  it is not tied to one order. The only polls left read what agents write in
+  their own processes (transcript tails) or what sensors record on their own
+  tick, and they stop while the view is hidden (`usePolling` in `@terminator/extension-ui`).
+  **A record edited by hand under the data root is not noticed until the
+  application restarts**: the index is told about Foundry's own writes and
+  nothing else. The refinery's queue never runs git either: the files a
+  checkout changed are recorded in `observed-files.json` when a step settles
+  and read back from there.
 - All `foundry:*` IPC channels are extension-owned. The core app has no
   knowledge of them: delete `extensions/foundry/` and core still builds.
 

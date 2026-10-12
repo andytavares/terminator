@@ -27,7 +27,7 @@ export type { RelativeTimeProps } from './RelativeTime'
 export { formatRelativeTime } from './relative-time'
 export type { TimeInput } from './relative-time'
 
-export { usePolling } from './usePolling'
+export { usePolling, everyWhileVisible } from './usePolling'
 
 export { Popover } from './Popover'
 export type { PopoverProps } from './Popover'

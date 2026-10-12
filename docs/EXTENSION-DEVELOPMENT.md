@@ -426,6 +426,7 @@ import {
 | `Markdown`                                   | Sanitised Markdown. Links open through your `onOpenLink`.       |
 | `RelativeTime` / `formatRelativeTime`        | "5 minutes ago", through `Intl.RelativeTimeFormat`.             |
 | `usePolling`                                 | Read now and on an interval; ignores answers after unmount.     |
+| `everyWhileVisible`                          | Run a tick on an interval only while the view is visible.       |
 | `useDismissible`                             | Outside-click + Escape + focus restore, for your own surface.   |
 | `LAYERS` / `layerValue` / `nestedLayerValue` | Stacking, by name.                                              |
 
