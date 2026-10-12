@@ -97,6 +97,7 @@ const OPENED_AT = Date.parse('2026-10-01T09:00:00Z')
 /** Answers one gh command as gh would print it. */
 export function handleGhCall(context: StubContext, call: GhCall): GhReply {
   try {
+    syncPullRefs(context)
     return { stdout: ghOutput(context, call), stderr: '', exitCode: 0 }
   } catch (error) {
     if (!(error instanceof GhFailure)) throw error
@@ -127,6 +128,13 @@ function resolves(context: StubContext, ref: string): boolean {
     return true
   } catch {
     return false
+  }
+}
+
+/** As on GitHub, an open pull request's `pull/N/head` follows its branch. */
+function syncPullRefs(context: StubContext): void {
+  for (const pr of context.pullRequests.filter((p) => p.state === 'OPEN')) {
+    bareGit(context, 'update-ref', `refs/pull/${pr.number}/head`, `refs/heads/${pr.headRefName}`)
   }
 }
 

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { git } from './foundry-harness'
-import { createWorkspace, type AppHandle } from './helpers'
+import { createWorkspace, workspaceRow, type AppHandle } from './helpers'
 
 // Shared setup for the Git Integration specs: a repository with a real remote
 // (a local bare repository, which the stub GitHub also serves pull requests
@@ -79,6 +79,14 @@ export async function gitView(handle: AppHandle, view: string): Promise<Page> {
   const page = find() as Page
   await page.waitForLoadState('domcontentloaded')
   return page
+}
+
+/** Opens the repository's Code Reviews tab from its sidebar header and returns its view. */
+export async function openCodeReviews(handle: AppHandle, workspace: string): Promise<Page> {
+  const header = workspaceRow(handle.page, workspace)
+  await header.hover()
+  await header.getByRole('button', { name: 'Code Reviews' }).click()
+  return gitView(handle, 'code-reviews')
 }
 
 /** Clicks the project's Git tab and returns its view. */
