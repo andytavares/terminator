@@ -1,7 +1,8 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
+import React, { useMemo, useState, useRef } from 'react'
 import hljs from '../utils/hljs'
 import { Button, SegmentedControl } from '@terminator/extension-ui'
 import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
+import { useSplitDrag } from '../hooks/useSplitDrag'
 
 type ViewMode = 'unified' | 'split'
 
@@ -234,42 +235,8 @@ function SplitTable({
 
 export function FileDiffView({ diff, isStale, onRefresh }: FileDiffViewProps): JSX.Element {
   const [viewMode, setViewMode] = useState<ViewMode>('unified')
-  const [splitLeftPct, setSplitLeftPct] = useState(50)
-  const splitDragState = useRef({ active: false, startX: 0, startPct: 50, containerWidth: 0 })
   const scrollRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      const s = splitDragState.current
-      if (!s.active || s.containerWidth === 0) return
-      const deltaPct = ((e.clientX - s.startX) / s.containerWidth) * 100
-      setSplitLeftPct(Math.max(20, Math.min(80, s.startPct + deltaPct)))
-    }
-    const onUp = () => {
-      splitDragState.current.active = false
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [])
-
-  const handleDividerMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      const container = scrollRef.current
-      if (!container) return
-      splitDragState.current = {
-        active: true,
-        startX: e.clientX,
-        startPct: splitLeftPct,
-        containerWidth: container.getBoundingClientRect().width,
-      }
-      e.preventDefault()
-    },
-    [splitLeftPct]
-  )
+  const { splitLeftPct, onDividerMouseDown: handleDividerMouseDown } = useSplitDrag(scrollRef)
 
   if (!diff) {
     return (

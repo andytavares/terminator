@@ -29,6 +29,7 @@ import { githubAPI } from '../../api/github'
 import { EXPAND_STEP, gapsFor, reveal, splitLines, type Expansion } from '../../review/expand-gaps'
 import { buildDiffItems, type DiffItem, type MovedMark } from '../../review/diff-items'
 import './review-surface.css'
+import { useSplitDrag } from '../../hooks/useSplitDrag'
 
 interface Props {
   repoRoot: string
@@ -127,8 +128,6 @@ export function ReviewDiffPane({
     startLine: number
     endLine: number
   } | null>(null)
-  const [splitLeftPct, setSplitLeftPct] = useState(50)
-  const splitDragState = useRef({ active: false, startX: 0, startPct: 50, containerWidth: 0 })
   const {
     viewedFiles,
     threads,
@@ -367,25 +366,6 @@ export function ReviewDiffPane({
       window.removeEventListener('pr-review:mark-viewed-next', handleMarkNext)
     }
   }, [onPrevFile, onMarkViewed])
-
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      const state = splitDragState.current
-      if (!state.active || state.containerWidth === 0) return
-      const delta = e.clientX - state.startX
-      const deltaPct = (delta / state.containerWidth) * 100
-      setSplitLeftPct(Math.max(20, Math.min(80, state.startPct + deltaPct)))
-    }
-    const onUp = () => {
-      splitDragState.current.active = false
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [])
 
   // Gutter drag selects lines; it no longer opens the composer. The float bar
   // (SelectionBar) that appears under the selection offers Comment/Ask
@@ -676,20 +656,7 @@ export function ReviewDiffPane({
     selectionTouchesRevealed,
   ])
 
-  const handleSplitDividerMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const container = scrollRef.current
-      if (!container) return
-      splitDragState.current = {
-        active: true,
-        startX: e.clientX,
-        startPct: splitLeftPct,
-        containerWidth: container.getBoundingClientRect().width,
-      }
-      e.preventDefault()
-    },
-    [splitLeftPct]
-  )
+  const { splitLeftPct, onDividerMouseDown: handleSplitDividerMouseDown } = useSplitDrag(scrollRef)
 
   const splitRightPct = useMemo(() => 100 - splitLeftPct, [splitLeftPct])
 

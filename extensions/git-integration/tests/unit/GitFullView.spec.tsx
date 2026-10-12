@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { GitFullView } from '../../src/components/GitFullView'
 import { useGitStore } from '../../src/stores/git.store'
 
 vi.mock('../../src/stores/git.store', async (importOriginal) => ({
@@ -102,7 +103,6 @@ async function renderView(
   storeOverrides: Record<string, unknown> = {}
 ) {
   setupStore(storeOverrides)
-  const { GitFullView } = await import('../../src/components/GitFullView')
   return render(<GitFullView repoRoot={repoRoot} />)
 }
 
@@ -131,7 +131,6 @@ describe('GitFullView', () => {
   it('shows "Enter a commit message" hint when files staged but no message', async () => {
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
     setupStore({ status: { branch: 'feature', files: [stagedFile] } })
-    const { GitFullView } = await import('../../src/components/GitFullView')
     render(<GitFullView repoRoot="/repo" />)
     expect(screen.getByText('Enter a commit message')).toBeTruthy()
   })
@@ -145,7 +144,6 @@ describe('GitFullView', () => {
   it('calls commit when Commit is clicked with staged files and message', async () => {
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
     setupStore({ status: { branch: 'feature', files: [stagedFile] } })
-    const { GitFullView } = await import('../../src/components/GitFullView')
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'fix: something' },
@@ -165,7 +163,6 @@ describe('GitFullView', () => {
     mockGitCommit.mockResolvedValue({ error: 'NOTHING_TO_COMMIT' })
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
     setupStore({ status: { branch: 'feature', files: [stagedFile] } })
-    const { GitFullView } = await import('../../src/components/GitFullView')
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'fix: something' },
@@ -181,7 +178,6 @@ describe('GitFullView', () => {
   it('calls commit and push when Commit & Push is clicked', async () => {
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
     setupStore({ status: { branch: 'feature', files: [stagedFile] } })
-    const { GitFullView } = await import('../../src/components/GitFullView')
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'feat: add x' },
@@ -267,7 +263,6 @@ describe('GitFullView', () => {
     })
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
     setupStore({ status: { branch: 'feature', files: [stagedFile] } })
-    const { GitFullView } = await import('../../src/components/GitFullView')
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'fix: something' },
@@ -288,7 +283,6 @@ describe('GitFullView', () => {
       .mockResolvedValueOnce({ commitHash: 'def456' })
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
     setupStore({ status: { branch: 'feature', files: [stagedFile] } })
-    const { GitFullView } = await import('../../src/components/GitFullView')
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'fix: skip hooks' },
@@ -316,7 +310,6 @@ describe('GitFullView', () => {
     )
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
     setupStore({ status: { branch: 'feature', files: [stagedFile] } })
-    const { GitFullView } = await import('../../src/components/GitFullView')
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'wip' },
@@ -330,7 +323,6 @@ describe('GitFullView', () => {
     mockGitPush.mockResolvedValue({ error: 'REJECTED' })
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
     setupStore({ status: { branch: 'feature', files: [stagedFile] } })
-    const { GitFullView } = await import('../../src/components/GitFullView')
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'feat: add x' },

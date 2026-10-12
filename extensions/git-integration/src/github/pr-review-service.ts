@@ -628,7 +628,18 @@ const COVERAGE_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'codeclimat
 
 type SignalValue = 'pass' | 'warn' | 'fail' | 'unknown'
 
-// Non-blocking conclusions that don't count as success or failure
+const FAILED = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'ACTION_REQUIRED'])
+const RUNNING = new Set(['PENDING', 'IN_PROGRESS', 'QUEUED'])
+
+/** One signal for a set of status checks: any failed fails, any running warns, else any success passes. */
+function rollupSignal(checks: Array<Record<string, unknown>>): SignalValue {
+  const states = checks.map((s) => String(s.state ?? s.conclusion ?? '').toUpperCase())
+  if (states.some((s) => FAILED.has(s))) return 'fail'
+  if (states.some((s) => RUNNING.has(s))) return 'warn'
+  // SKIPPED/NEUTRAL/CANCELLED are non-blocking: pass if at least one check succeeded
+  if (states.some((s) => s === 'SUCCESS')) return 'pass'
+  return 'unknown'
+}
 
 function checkSignal(rollup: unknown, keywords: string[]): SignalValue {
   if (!rollup || !Array.isArray(rollup)) return 'unknown'
@@ -637,33 +648,12 @@ function checkSignal(rollup: unknown, keywords: string[]): SignalValue {
     return keywords.some((k) => name.includes(k))
   })
   if (checks.length === 0) return 'unknown'
-  const states = checks.map((s) => String(s.state ?? s.conclusion ?? '').toUpperCase())
-  if (
-    states.some(
-      (s) => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT' || s === 'ACTION_REQUIRED'
-    )
-  )
-    return 'fail'
-  if (states.some((s) => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
-  if (states.some((s) => s === 'SUCCESS')) return 'pass'
-  return 'unknown'
+  return rollupSignal(checks)
 }
 
 function ciSignal(rollup: unknown): SignalValue {
   if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'unknown'
-  const states = (rollup as Array<Record<string, unknown>>).map((s) =>
-    String(s.state ?? s.conclusion ?? '').toUpperCase()
-  )
-  if (
-    states.some(
-      (s) => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT' || s === 'ACTION_REQUIRED'
-    )
-  )
-    return 'fail'
-  if (states.some((s) => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
-  // SKIPPED/NEUTRAL/CANCELLED are non-blocking — pass if at least one check succeeded
-  if (states.some((s) => s === 'SUCCESS')) return 'pass'
-  return 'unknown'
+  return rollupSignal(rollup as Array<Record<string, unknown>>)
 }
 
 function testsSignal(filePaths: string[]): SignalValue {

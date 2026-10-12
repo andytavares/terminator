@@ -6,7 +6,7 @@ import { useReviewUiStore } from '../../stores/review-ui.store'
 import { sortPrs } from '../../review/sort-prs'
 import { SortSelect } from './SortSelect'
 import type { ReviewQueuePR } from '../../schemas/pr-review.schema'
-import { DiffSize, RowMeta, shortAge } from './DiffSize'
+import { PrRow, shortAge } from './DiffSize'
 import './review-dashboard.css'
 
 interface Props {
@@ -133,7 +133,7 @@ export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr, onRefresh, onDismis
               <span className="rd-ct">{totalPrCount ?? prQueue.length}</span>
             </h3>
             {sorted.map((pr) => (
-              <PrRow
+              <QueueRow
                 key={pr.number}
                 pr={pr}
                 onOpen={onOpenPr}
@@ -151,7 +151,7 @@ export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr, onRefresh, onDismis
   )
 }
 
-function PrRow({
+function QueueRow({
   pr,
   onOpen,
   onDismiss,
@@ -177,71 +177,44 @@ function PrRow({
   const open = () => onOpen(pr)
 
   return (
-    <div
-      className="rd-row rd-row--clickable"
-      tabIndex={0}
-      onClick={open}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') open()
-      }}
+    <PrRow
+      pr={pr}
+      onOpen={open}
+      meta={[
+        pr.state === 'merged' && { text: 'Merged' },
+        pr.state === 'closed' && { text: 'Closed' },
+        pr.isDraft && { text: 'Draft' },
+        pr.mergeStateStatus === 'dirty' && {
+          text: 'Conflicts',
+          tone: 'warning',
+          title: 'This PR has merge conflicts',
+        },
+        { text: pr.author },
+        { text: shortAge(pr.openedAt) },
+        pr.approvalCount > 0 && {
+          text: `${pr.approvalCount} approved`,
+          title: `Approved by: ${pr.approvedBy.join(', ')}`,
+        },
+        pr.riskLevel === 'high' && { text: 'High risk', tone: 'danger' },
+        pr.ciStatus === 'failing' && { text: 'CI failing', tone: 'danger' },
+        mine && { text: 'Your review requested' },
+        pr.sessionStatus !== 'not-started' && {
+          text: `${pr.viewedFileCount} of ${pr.fileCount} viewed`,
+        },
+      ]}
+      action={{ label: actionLabel, primary: isSession, always: isSession }}
     >
-      <span className="rd-ti">
-        <span className="rd-t1">
-          <span className="rd-no">#{pr.number}</span> <span>{pr.title}</span>
-        </span>
-        <RowMeta
-          parts={[
-            pr.state === 'merged' && { text: 'Merged' },
-            pr.state === 'closed' && { text: 'Closed' },
-            pr.isDraft && { text: 'Draft' },
-            pr.mergeStateStatus === 'dirty' && {
-              text: 'Conflicts',
-              tone: 'warning',
-              title: 'This PR has merge conflicts',
-            },
-            { text: pr.author },
-            { text: shortAge(pr.openedAt) },
-            pr.approvalCount > 0 && {
-              text: `${pr.approvalCount} approved`,
-              title: `Approved by: ${pr.approvedBy.join(', ')}`,
-            },
-            pr.riskLevel === 'high' && { text: 'High risk', tone: 'danger' },
-            pr.ciStatus === 'failing' && { text: 'CI failing', tone: 'danger' },
-            mine && { text: 'Your review requested' },
-            pr.sessionStatus !== 'not-started' && {
-              text: `${pr.viewedFileCount} of ${pr.fileCount} viewed`,
-            },
-          ]}
-        />
-      </span>
-      <span className="rd-side">
-        <DiffSize additions={pr.additions} deletions={pr.deletions} fileCount={pr.fileCount} />
-        <span className="rd-num">~{pr.estimatedMinutes} min</span>
-      </span>
-      <span className="rd-actions">
-        <Button
+      {onDismiss && pr.sessionStatus !== 'not-started' && (
+        <IconButton
+          icon={X}
           size="sm"
-          variant={isSession ? 'primary' : 'secondary'}
-          className={isSession ? 'rd-row-action rd-always' : 'rd-row-action'}
           onClick={(e) => {
             e.stopPropagation()
-            open()
+            void onDismiss(pr.number)
           }}
-        >
-          {actionLabel}
-        </Button>
-        {onDismiss && pr.sessionStatus !== 'not-started' && (
-          <IconButton
-            icon={X}
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onDismiss(pr.number)
-            }}
-            label={`Dismiss PR #${pr.number} from in-progress`}
-          />
-        )}
-      </span>
-    </div>
+          label={`Dismiss PR #${pr.number} from in-progress`}
+        />
+      )}
+    </PrRow>
   )
 }

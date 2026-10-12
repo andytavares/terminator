@@ -13,7 +13,7 @@ import { githubAPI } from '../../api/github'
 import { DashboardPRSchema, type DashboardPR } from '../../schemas/pr-review.schema'
 import { dashboardToSortable, sortPrs } from '../../review/sort-prs'
 import { useReviewUiStore } from '../../stores/review-ui.store'
-import { DiffSize, RowMeta, shortAge, type MetaPart } from './DiffSize'
+import { PrRow, shortAge, type MetaPart } from './DiffSize'
 import { SortSelect } from './SortSelect'
 import { RepoPicker } from './RepoPicker'
 import './review-dashboard.css'
@@ -162,64 +162,37 @@ function Row({
     ? [{ text: `${pr.viewedFileCount} of ${pr.fileCount} viewed` }]
     : []
   return (
-    <div
-      className="rd-row rd-row--clickable"
-      tabIndex={0}
-      data-testid={`row-${pr.number}`}
-      onClick={handle}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') handle()
-      }}
+    <PrRow
+      pr={pr}
+      testId={`row-${pr.number}`}
+      onOpen={handle}
+      meta={[
+        ...lead,
+        { text: pr.author },
+        { text: shortAge(pr.createdAt) },
+        ...parts,
+        ...sessionPart,
+        !pr.localRepoRoot && { text: 'Not cloned · diff only' },
+      ]}
+      action={{ label, primary: hasSession || primary, always: hasSession }}
     >
-      <span className="rd-ti">
-        <span className="rd-t1">
-          <span className="rd-no">#{pr.number}</span> <span>{pr.title}</span>
-        </span>
-        <RowMeta
-          parts={[
-            ...lead,
-            { text: pr.author },
-            { text: shortAge(pr.createdAt) },
-            ...parts,
-            ...sessionPart,
-            !pr.localRepoRoot && { text: 'Not cloned · diff only' },
-          ]}
-        />
-      </span>
-      <span className="rd-side">
-        <DiffSize additions={pr.additions} deletions={pr.deletions} fileCount={pr.fileCount} />
-        <span className="rd-num">~{pr.estimatedMinutes} min</span>
-      </span>
-      <span className="rd-actions">
+      {showClone && (
         <Button
           size="sm"
-          variant={hasSession || primary ? 'primary' : 'secondary'}
-          className={hasSession ? 'rd-row-action rd-always' : 'rd-row-action'}
+          className="rd-row-action"
+          disabled={cloneState?.status === 'cloning'}
           onClick={(e) => {
             e.stopPropagation()
-            handle()
+            onClone(pr)
           }}
         >
-          {label}
+          {cloneState?.status === 'cloning' ? 'Cloning…' : 'Clone and review'}
         </Button>
-        {showClone && (
-          <Button
-            size="sm"
-            className="rd-row-action"
-            disabled={cloneState?.status === 'cloning'}
-            onClick={(e) => {
-              e.stopPropagation()
-              onClone(pr)
-            }}
-          >
-            {cloneState?.status === 'cloning' ? 'Cloning…' : 'Clone and review'}
-          </Button>
-        )}
-        {cloneState?.status === 'error' && (
-          <span className="rd-clone-error">{cloneState.message}</span>
-        )}
-      </span>
-    </div>
+      )}
+      {cloneState?.status === 'error' && (
+        <span className="rd-clone-error">{cloneState.message}</span>
+      )}
+    </PrRow>
   )
 }
 

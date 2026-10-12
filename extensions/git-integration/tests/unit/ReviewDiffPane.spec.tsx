@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { ReviewDiffPane } from '../../src/components/pr-review/ReviewDiffPane'
 
 // The pane reads both stores through selectors; these resolve them against the state each test sets.
 const { prStoreMock, uiStoreMock, highlightSpy, rowRenderSpy } = vi.hoisted(() => ({
@@ -270,7 +271,6 @@ afterEach(() => {
 })
 
 async function renderPane(props: Partial<typeof defaultProps> = {}) {
-  const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
   return render(<ReviewDiffPane {...defaultProps} {...props} />)
 }
 
@@ -1771,7 +1771,6 @@ describe('ReviewDiffPane expandable context', () => {
     )
     await waitFor(() => expect(expandedRows(container).length).toBe(20))
 
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
     const other = { ...mockFile, path: 'src/bar.ts' }
     mockPrFileDiff.mockResolvedValue({ diff: { ...twoHunkDiff, path: 'src/bar.ts' } })
     rerender(<ReviewDiffPane {...defaultProps} file={other} />)
@@ -1850,7 +1849,6 @@ describe('ReviewDiffPane — fetch and render cost', () => {
       viewedFiles: new Set(['src/foo.ts']),
       viewedAt: { 'src/foo.ts': 'abc' },
     })
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
     view.rerender(<ReviewDiffPane {...defaultProps} />)
     expect(await screen.findByRole('checkbox', { name: 'Viewed' })).toHaveProperty('checked', true)
     expect(mockPrFileDiff).toHaveBeenCalledTimes(1)
@@ -1864,7 +1862,6 @@ describe('ReviewDiffPane — fetch and render cost', () => {
     )
     const view = await renderPane()
     await screen.findByText(codeLine('const in_foo = 1'))
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
     view.rerender(<ReviewDiffPane {...defaultProps} file={otherFile} />)
     await screen.findByText(codeLine('const in_bar = 1'))
     view.rerender(<ReviewDiffPane {...defaultProps} />)
@@ -1877,7 +1874,6 @@ describe('ReviewDiffPane — fetch and render cost', () => {
     mockPrFileDiff.mockResolvedValue({ diff: diffOf('src/foo.ts', 'const headMoves = 1') })
     const view = await renderPane()
     await screen.findByText(codeLine('const headMoves = 1'))
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
     view.rerender(<ReviewDiffPane {...defaultProps} pr={{ ...mockPr, headSHA: 'def' }} />)
     await waitFor(() => expect(mockPrFileDiff).toHaveBeenCalledTimes(2))
   })
@@ -1890,7 +1886,6 @@ describe('ReviewDiffPane — fetch and render cost', () => {
       String(c[0]).includes('highlightOnce')
     ).length
     expect(seen).toBe(2)
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
     view.rerender(<ReviewDiffPane {...defaultProps} onMarkViewed={vi.fn()} />)
     view.rerender(<ReviewDiffPane {...defaultProps} onMarkViewed={vi.fn()} />)
     const after = highlightSpy.mock.calls.filter((c) =>

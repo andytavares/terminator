@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react'
 import { Check, Dot, Plus } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
+import { rowState } from './file-row-state'
 
 interface Props {
   repoRoot: string
@@ -10,20 +11,6 @@ interface Props {
   chapter: Chapter
   currentFilePath: string | null
   onSelectFile: (path: string) => void
-}
-
-type RowState = 'viewed' | 'changed' | 'new' | 'default'
-
-function rowState(
-  file: PrChangedFile,
-  viewedFiles: Set<string>,
-  changedSince: Set<string>,
-  newSinceLook: Set<string>
-): RowState {
-  if (changedSince.has(file.path)) return 'changed'
-  if (newSinceLook.has(file.path)) return 'new'
-  if (viewedFiles.has(file.path)) return 'viewed'
-  return 'default'
 }
 
 export function ChapterFileList({
