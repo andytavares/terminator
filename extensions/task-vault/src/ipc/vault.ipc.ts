@@ -1027,8 +1027,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       if (Array.isArray(data.areas)) {
         for (const a of data.areas) {
           await db.run(
-            `INSERT INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`,
-            [a.id, a.name, a.created_at, a.updated_at ?? a.created_at]
+            `INSERT INTO areas (id,name,status,created_at,updated_at) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING`,
+            [a.id, a.name, a.status ?? 'active', a.created_at, a.updated_at ?? a.created_at]
           )
           imported++
         }
