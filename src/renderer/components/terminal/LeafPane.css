@@ -86,7 +86,3 @@
   height: 100%;
   padding: 6px 12px;
 }
-
-.leaf-pane__container .xterm-viewport {
-  border-radius: 0;
-}

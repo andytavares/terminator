@@ -23,9 +23,13 @@ import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } 
 // The scrollbar-width tests below guard a separate, real property: that terminal geometry
 // does not depend on the user's macOS overlay-scrollbar setting. They were mistakenly
 // believed to fix the clipping bug. They do not, and never did.
+//
+// xterm 6 draws its own scrollbar (`.xterm-scrollable-element > .scrollbar.vertical`) with a
+// fixed width, and FitAddon reserves exactly that width, so the OS setting no longer matters.
 
-// Must match the ::-webkit-scrollbar width in TerminalPane.css.
-const SCROLLBAR_WIDTH_PX = 10
+// xterm's default scrollbar width (ITerminalOptions.overviewRuler.width falls back to 14);
+// FitAddon subtracts the same value from the columns it proposes.
+const SCROLLBAR_WIDTH_PX = 14
 
 let handle: AppHandle
 
@@ -59,10 +63,12 @@ interface Geometry {
 async function measure(selector: string): Promise<Geometry> {
   return handle.page.evaluate((sel) => {
     const scope = document.querySelector(sel) as HTMLElement
-    const vp = scope.querySelector('.xterm-viewport') as HTMLElement
+    const bar = scope.querySelector(
+      '.xterm-scrollable-element > .scrollbar.vertical'
+    ) as HTMLElement
     const sc = scope.querySelector('.xterm-screen') as HTMLElement
     const rows = scope.querySelector('.xterm-rows') as HTMLElement
-    const scrollbarPx = vp.offsetWidth - vp.clientWidth
+    const scrollbarPx = bar.offsetWidth
     let maxRowRight = 0
     rows.querySelectorAll('div').forEach((d) => {
       const b = (d as HTMLElement).getBoundingClientRect()
@@ -71,19 +77,18 @@ async function measure(selector: string): Promise<Geometry> {
     return {
       scrollbarPx,
       screenRight: sc.getBoundingClientRect().right,
-      viewportContentRight: vp.getBoundingClientRect().right - scrollbarPx,
+      viewportContentRight: bar.getBoundingClientRect().left,
       maxRowRight,
     }
   }, selector)
 }
 
-test('the terminal viewport reserves real layout width for its scrollbar', async () => {
+test('the terminal reserves real layout width for its scrollbar', async () => {
   const g = await measure('.terminal-pane__container')
   // A zero-width scrollbar means we are back on OS overlay scrollbars, which is exactly
   // the condition that lets glyphs render underneath the scrollbar.
-  // Exact, not just non-zero: the width is pinned by our ::-webkit-scrollbar rule. Any
-  // other value means the scroller fell back to the OS scrollbar (0 with macOS overlay
-  // scrollbars, ~4-15 with classic ones) and the geometry is environment-dependent again.
+  // Exact, not just non-zero: xterm's own scrollbar has a fixed width that FitAddon
+  // reserves. Any other value means geometry and the reserved width have drifted apart.
   expect(g.scrollbarPx).toBe(SCROLLBAR_WIDTH_PX)
 })
 
@@ -166,9 +171,8 @@ test('split-pane: rendered text never extends under the scrollbar', async () => 
     .toBe(SCROLLBAR_WIDTH_PX)
 
   const g = await measure('.leaf-pane__container')
-  // Exact, not just non-zero: the width is pinned by our ::-webkit-scrollbar rule. Any
-  // other value means the scroller fell back to the OS scrollbar (0 with macOS overlay
-  // scrollbars, ~4-15 with classic ones) and the geometry is environment-dependent again.
+  // Exact, not just non-zero: xterm's own scrollbar has a fixed width that FitAddon
+  // reserves. Any other value means geometry and the reserved width have drifted apart.
   expect(g.scrollbarPx).toBe(SCROLLBAR_WIDTH_PX)
   expect(g.screenRight).toBeLessThanOrEqual(g.viewportContentRight)
   expect(g.maxRowRight).toBeLessThanOrEqual(g.viewportContentRight)

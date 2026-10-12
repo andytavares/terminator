@@ -1,13 +1,26 @@
-import { Terminal, ILinkProvider, ILink } from 'xterm'
-import { FitAddon } from 'xterm-addon-fit'
-import 'xterm/css/xterm.css'
+import { Terminal, ILinkProvider, ILink } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
+import '@xterm/xterm/css/xterm.css'
 import { previewWindow } from '../../terminal/preview-window'
 
 const IDLE_DEBOUNCE_MS = 1500
 
+// xterm 6 draws its own scrollbar, so the slider colours live in the theme, not CSS.
 export const XTERM_THEMES = {
-  dark: { background: '#1e1e1e', foreground: '#cccccc' },
-  light: { background: '#f5f5f5', foreground: '#1a1a1a' },
+  dark: {
+    background: '#1e1e1e',
+    foreground: '#cccccc',
+    scrollbarSliderBackground: 'rgba(255, 255, 255, 0.18)',
+    scrollbarSliderHoverBackground: 'rgba(255, 255, 255, 0.28)',
+    scrollbarSliderActiveBackground: 'rgba(255, 255, 255, 0.4)',
+  },
+  light: {
+    background: '#f5f5f5',
+    foreground: '#1a1a1a',
+    scrollbarSliderBackground: 'rgba(0, 0, 0, 0.18)',
+    scrollbarSliderHoverBackground: 'rgba(0, 0, 0, 0.28)',
+    scrollbarSliderActiveBackground: 'rgba(0, 0, 0, 0.4)',
+  },
 } as const
 
 function measureCharWidth(fontSize: number): number {

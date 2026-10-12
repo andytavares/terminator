@@ -139,7 +139,7 @@ terminal:create IPC ──► PtyManager.spawn()
       ▼
 TerminalInstance created (renderer)
       │
-      ├─ new xterm Terminal({ scrollback })
+      ├─ new Terminal({ scrollback }) from @xterm/xterm 6 (theme carries the scrollbar colours)
       ├─ subscribes to terminal:output IPC
       └─ sends keystrokes via terminal:input IPC
 
@@ -160,6 +160,14 @@ Tab close
       ├─ session removed from Zustand store
       └─ TerminalInstance.dispose() — xterm.js instance disposed, output unsubscribed
 ```
+
+The desktop and the phone client share one terminal library, `@xterm/xterm` 6 with `@xterm/addon-fit`
+(ADR 097). xterm 6 draws its own scrollbar (`.xterm-scrollable-element`) and scrolls virtually, so the
+scrollbar colours are set in the xterm theme objects (`XTERM_THEMES` in `TerminalSession.tsx`:
+`scrollbarSliderBackground`, `scrollbarSliderHoverBackground`, `scrollbarSliderActiveBackground`), not in
+CSS. Its width is fixed (14px) and `FitAddon` reserves it, whatever the OS scrollbar setting. Code and
+tests that need the scroll position read the xterm buffer or the scrollbar slider, never the
+`.xterm-viewport` element's `scrollTop`.
 
 ---
 
