@@ -6,13 +6,14 @@ import {
   COVERAGE_CHECK_NAMES,
 } from '../github/pr-review-service'
 import {
+  analyseLines,
   analyseSnippet,
   withSyntaxTree,
   type SnippetAnalysis,
   type SnippetFunction,
 } from './symbols'
 import type { ParsedPrFile } from './parsed-file'
-import type { DiffLine, FileDiff } from '../schemas/git.schema'
+import type { FileDiff } from '../schemas/git.schema'
 import type {
   Chapter,
   DryViolation,
@@ -54,11 +55,6 @@ interface FileComplexity {
   delta: number
   functions: FunctionComplexity[]
   method: 'tree-sitter' | 'keywords'
-}
-
-function analyseLines(path: string, lines: DiffLine[]): Promise<SnippetAnalysis | null> {
-  const text = lines.map((l) => l.content).join('\n')
-  return text ? analyseSnippet(path, text) : Promise.resolve(null)
 }
 
 function branchDeltaByFunction(head: SnippetFunction[], base: SnippetFunction[]) {
