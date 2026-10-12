@@ -48,7 +48,7 @@ async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string
   const pulls = await readPulls(root, orderId)
   if (pulls.length === 0) return
 
-  const { deps: executorDeps, exec } = await buildExecutorDeps(api, root, order, recipe, graph)
+  const { deps: executorDeps, exec } = await buildExecutorDeps(api, { root, order, recipe, graph })
   const integrateDeps = integrateDepsFor(api, root, orderId)
   const graphRef = { current: graph }
   const outcome = await ciRounds({

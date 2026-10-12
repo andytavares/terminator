@@ -181,7 +181,7 @@ async function anotherCiRound(
   const graph = await readGraph(root, orderId)
   if (graph === null) return
   const pulls = await readPulls(root, orderId)
-  const { deps: executorDeps, exec } = await buildExecutorDeps(api, root, order, recipe, graph)
+  const { deps: executorDeps, exec } = await buildExecutorDeps(api, { root, order, recipe, graph })
   const integrateDeps = integrateDepsFor(api, root, order.id)
   const graphRef = { current: graph }
   const outcome = await ciRounds({

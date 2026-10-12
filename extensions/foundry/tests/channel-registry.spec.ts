@@ -15,6 +15,7 @@ const src = [
   'runtime/held-calls.ts',
   'runtime/supervision-runtime.ts',
   'line/executor-deps.ts',
+  'line/node-session.ts',
   'line/ship-deps.ts',
   'line/execute-run.ts',
   'forge/intake-turn.ts',
@@ -64,21 +65,21 @@ describe('the settings surface', () => {
 // what stops it being undone between live runs.
 describe('what ends a node', () => {
   it('resolves the Line on a turn ending, not only on the process exiting', () => {
-    const turnEnd = src.slice(src.indexOf('onTurnEnd: (turns) =>'))
-    const body = turnEnd.slice(0, turnEnd.indexOf('\n          },'))
+    const turnEnd = src.slice(src.indexOf('function onTurnEnd('))
+    const body = turnEnd.slice(0, turnEnd.indexOf('\n}'))
     expect(body, 'the Line waits for onEnd, which a live session never reaches').toContain(
       'finish('
     )
   })
 
   it('still resolves on the process exiting, for the runs that do exit', () => {
-    expect(src).toMatch(/onEnd: \(exitCode\) => \{[\s\S]{0,400}?finish\(exitCode\)/)
+    expect(src).toMatch(/function onEnd\([^)]*\): void \{[\s\S]{0,400}?finish\(exitCode\)/)
   })
 
   it('takes the turn end as "it stopped", never as "it was right"', () => {
     // FR-033: the producing agent's own account is not evidence. A turn that
     // ended is not a unit that passed — the verifier and the ladder say that.
-    const turnEnd = src.slice(src.indexOf('onTurnEnd: (turns) =>'))
+    const turnEnd = src.slice(src.indexOf('function onTurnEnd('))
     expect(turnEnd.slice(0, 900)).toMatch(/verifier|ladder|FR-033/)
   })
 })

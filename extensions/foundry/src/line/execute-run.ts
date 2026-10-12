@@ -38,7 +38,7 @@ export async function executeRun(
     exec,
     store,
     houseRules,
-  } = await buildExecutorDeps(api, root, order, recipe, graph)
+  } = await buildExecutorDeps(api, { root, order, recipe, graph })
   const issuesPort = issuesPortFor(api)
 
   // The issue moves the moment work starts, not when somebody remembers.

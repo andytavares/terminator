@@ -100,6 +100,9 @@ the owning module, never back into `index.ts`.
 | One architect turn, one read-only round (red team, scout)                        | `src/forge/intake-turn.ts`, `src/forge/intake-sessions.ts`                                        |
 | The Forge loop: follow-ups, review rounds, hand-off, release                     | `src/forge/forge-loop.ts`                                                                         |
 | The executor's deps (worktrees, sessions, rungs)                                 | `src/line/executor-deps.ts`                                                                       |
+| One run's shared context (`OrderRun`, `RunContext`), checkouts, conversations    | `src/line/run-context.ts`                                                                         |
+| One node's agent session, from launch to the end of its turn                     | `src/line/node-session.ts`                                                                        |
+| Rungs and commands in a lane's checkout, the base checkout, reinstall            | `src/line/lane-commands.ts`                                                                       |
 | Running an order to its tail                                                     | `src/line/execute-run.ts`                                                                         |
 | Shipping and CI round deps, settling the ship node                               | `src/line/ship-deps.ts`                                                                           |
 | Stopping an order, adopting runs a previous process left                         | `src/line/run-control.ts`                                                                         |

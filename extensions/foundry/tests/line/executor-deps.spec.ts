@@ -157,7 +157,7 @@ function git(cwd: string, ...args: string[]) {
 
 describe('an agent node', () => {
   it('runs in the lane checkout under the records location, and is over when its turn ends', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('builder-1')
     const onStarted = vi.fn()
     const running = deps.run(runInput({ onStarted }))
@@ -175,14 +175,14 @@ describe('an agent node', () => {
   })
 
   it('launches a fast role on the small model', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('scribe-1')
     void deps.run(runInput({ role: 'scribe', modelTier: 'fast' }))
     expect((await started).model).toBe('haiku')
   })
 
   it('that ends with a failure is archived as stopped and reports its exit status', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('builder-2')
     const running = deps.run(runInput())
     const input = await started
@@ -196,7 +196,7 @@ describe('an agent node', () => {
   })
 
   it('reports nothing measured when the agent never started, or the runtime is not running', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     runner.start.mockResolvedValueOnce(null)
     expect((await deps.run(runInput())).exitCode).toBeNull()
     runner.start.mockRejectedValueOnce(new Error('no terminal'))
@@ -209,7 +209,7 @@ describe('an agent node', () => {
   })
 
   it('that asks about a tool is held for the operator and said so in the feed', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('builder-3')
     void deps.run(runInput())
     const input = await started
@@ -234,7 +234,7 @@ describe('an agent node', () => {
   })
 
   it('that is refused a tool says so in the feed', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('verifier-1')
     void deps.run(runInput({ role: 'verifier', readOnly: true }))
     const input = await started
@@ -249,12 +249,12 @@ describe('an agent node', () => {
 
   it('carries on the conversation a resumed run recorded on its graph', async () => {
     const resumed = withNode(graph, builderNode().id, { sessionId: 'earlier-builder' })
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, resumed)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph: resumed })
     expect(deps.sessionFor(1, 'builder')).toBe('earlier-builder')
   })
 
   it('ends the previous process of a conversation before it is resumed', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     let live = true
     runner.terminalFor.mockImplementation(() =>
       live ? { terminalSessionId: 'tab-1', projectId: 'p-1' } : null
@@ -279,7 +279,7 @@ describe('a check rung', () => {
   }
 
   it('runs in a terminal of its own, and is not run again on the same commit once it passed', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const log = path.join(root, 'logs', 'test.log')
     expect(await deps.runStep(step, log)).toBe(0)
     expect(runner.runCommand).toHaveBeenCalledTimes(1)
@@ -289,7 +289,7 @@ describe('a check rung', () => {
   })
 
   it('runs again once the checkout changed', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     await deps.runStep(step, path.join(root, 'test.log'))
     fs.writeFileSync(path.join(checkoutPath(root, order, 'app'), 'new.txt'), 'x')
     await deps.runStep(step, path.join(root, 'test.log'))
@@ -297,7 +297,7 @@ describe('a check rung', () => {
   })
 
   it('measures nothing when there is no command or no runtime', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     expect(await deps.runStep({ ...step, command: null }, '/x.log')).toBeNull()
     expect(await deps.runStepOnBase({ ...step, command: null }, '/x.log')).toBeNull()
     runtime.supervisedRunner = null
@@ -310,7 +310,7 @@ describe('a check rung', () => {
   })
 
   it('runs on the base branch in a checkout of its own, which is taken away again', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     runner.runCommand.mockResolvedValueOnce(1)
     expect(await deps.runStepOnBase(step, path.join(root, 'base.log'))).toBe(1)
     const ran = runner.runCommand.mock.calls[0][0] as unknown as {
@@ -327,7 +327,7 @@ describe('a check rung', () => {
 
 describe('a recipe command and a reinstall', () => {
   it('runs a recipe command in the lane checkout', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     runner.runCommand.mockResolvedValueOnce(2)
     expect(
       await deps.runCommand({
@@ -346,7 +346,7 @@ describe('a recipe command and a reinstall', () => {
   })
 
   it('reinstalls with the lockfile the checkout has, and does nothing without one', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     expect(await deps.reinstall('change', path.join(root, 'install.log'))).toBeNull()
     expect(await deps.reinstall('base', path.join(root, 'install.log'))).toBeNull()
     fs.writeFileSync(path.join(checkoutPath(root, order, 'app'), 'package-lock.json'), '{}')
@@ -357,7 +357,7 @@ describe('a recipe command and a reinstall', () => {
 
 describe('committing a node', () => {
   it('commits what the agent left, and calls an untouched tree clean', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const node = { ...builderNode(), startedAt: new Date(Date.now() + 60_000).toISOString() }
     expect(await deps.commitNode({ node, message: 'nothing' })).toEqual({ kind: 'clean' })
     fs.writeFileSync(path.join(checkoutPath(root, order, 'app'), 'red.css'), 'a { color: red }')
@@ -365,7 +365,7 @@ describe('committing a node', () => {
   })
 
   it('counts a commit the agent made itself as a change', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const checkout = checkoutPath(root, order, 'app')
     const node = { ...builderNode(), startedAt: new Date(Date.now() - 60_000).toISOString() }
     fs.writeFileSync(path.join(checkout, 'red.css'), 'a { color: red }')
@@ -379,14 +379,14 @@ describe('what a rung hands back', () => {
   const outputPath = (): string => path.join(orderDir(root, 'WO-1'), 'scout.json')
 
   it('is nothing when the rung wrote nothing', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     expect(
       await deps.collect({ nodeId: 'scout', role: 'scout', outputPath: outputPath() })
     ).toBeNull()
   })
 
   it('goes onto the order when it is readable', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     fs.writeFileSync(
       outputPath(),
       JSON.stringify({ findings: { entryPoints: ['src/theme.ts'] }, note: 'read it' })
@@ -403,7 +403,7 @@ describe('what a rung hands back', () => {
   })
 
   it('is refused on the record when it is not readable', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     fs.writeFileSync(outputPath(), 'not json')
     expect(
       await deps.collect({ nodeId: 'scout', role: 'scout', outputPath: outputPath() })
@@ -414,7 +414,7 @@ describe('what a rung hands back', () => {
 
 describe('the run’s records', () => {
   it('raises a gate on the inbox and names it on the ledger', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     await deps.raise(
       raiseGate({
         id: 'WO-1-conflict',
@@ -431,7 +431,7 @@ describe('the run’s records', () => {
   })
 
   it('records a verdict and nothing for any other event', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     deps.onEvent({
       type: 'verdict',
       verdict: {
@@ -454,7 +454,7 @@ describe('the run’s records', () => {
   })
 
   it('writes the graph on every change, and the files a checkout changed once a step settles', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const checkout = checkoutPath(root, order, 'app')
     fs.mkdirSync(path.join(checkout, 'src'))
     fs.writeFileSync(path.join(checkout, 'src', 'a.ts'), 'export const red = 1\n')
@@ -473,7 +473,7 @@ describe('the run’s records', () => {
   })
 
   it('measures what the work changed, leaving lockfiles out of the line count', async () => {
-    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const checkout = checkoutPath(root, order, 'app')
     fs.writeFileSync(path.join(checkout, 'a.ts'), 'one\ntwo\n')
     fs.writeFileSync(path.join(checkout, 'package-lock.json'), '{\n}\n')
