@@ -478,11 +478,7 @@ describe('api.ipc.registerHandler', () => {
     })
     const dispose = registerAdminIpcHandlers(api, {} as ExtensionDB)
 
-    for (const channel of [
-      'task-vault:admin:run-query',
-      'task-vault:admin:list-tables',
-      'task-vault:admin:table-stats',
-    ]) {
+    for (const channel of ['task-vault:admin:run-query', 'task-vault:admin:table-stats']) {
       expect(ipcInvokeRegistry.has(channel)).toBe(true)
       expect(await api.ipc.isRemoteAccessible(channel)).toBe(false)
     }

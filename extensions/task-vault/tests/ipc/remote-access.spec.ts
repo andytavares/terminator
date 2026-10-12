@@ -44,7 +44,6 @@ describe('task-vault remote access', () => {
     const local = [...channels].filter(([, remote]) => !remote).map(([channel]) => channel)
 
     expect(local.sort()).toEqual([
-      'task-vault:admin:list-tables',
       'task-vault:admin:run-query',
       'task-vault:admin:table-stats',
       'task-vault:review:export',
