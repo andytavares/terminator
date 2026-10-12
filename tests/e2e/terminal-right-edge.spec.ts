@@ -16,9 +16,11 @@ import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } 
 // instead compares a row's content extent (scrollWidth) against its clip box
 // (clientWidth), which is the overflow being clipped.
 //
-// Any change to that test must be re-validated by negative control: revert the
-// .xterm-rows rule in TerminalPane.css, REBUILD (the suite runs against out/, so skipping
-// the rebuild silently tests the old bundle), and confirm the test goes red.
+// Under xterm 5 the fix was a CSS rule widening each row's clip box by 6px. xterm 6 places
+// its own scrollbar directly beside the screen, so that widening put rows under the
+// scrollbar; with the rule removed this guard passes on xterm 6. Any change to that test
+// must be re-validated against a build (the suite runs against out/, so skipping the
+// rebuild silently tests the old bundle).
 //
 // The scrollbar-width tests below guard a separate, real property: that terminal geometry
 // does not depend on the user's macOS overlay-scrollbar setting. They were mistakenly
@@ -108,9 +110,9 @@ test('single-pane: rendered text never extends under the scrollbar', async () =>
 // This is NOT the same class of check as the three tests above. Those compare element
 // POSITIONS against each other and cannot see inside a box; they passed for the entire
 // time the bug was live. This compares a box's content extent against the box itself.
-// Verified by negative control: with the .xterm-rows rule in TerminalPane.css reverted,
-// a full-width row measures scrollWidth 986 vs clientWidth 984 and this fails; with the
-// fix it is 990 vs 990. Re-run that control before ever relaxing this test.
+// Under xterm 5 a full-width row measured scrollWidth 986 vs clientWidth 984 without the
+// old CSS widening, and this failed. Re-run it against a fresh build before ever relaxing
+// this test.
 //
 // Must run on a FULL-WIDTH single pane, hence its position before the split test below:
 // the overhang is cols x per-column drift, so a half-width pane roughly halves it and
