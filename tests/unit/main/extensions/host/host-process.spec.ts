@@ -84,7 +84,8 @@ function harness(modules: Record<string, BackendModule> = {}) {
   const spawned = vi.fn((initial: HostSnapshot): SpawnedHost => {
     const { port1, port2 } = new MessageChannel()
     const endpoint = new RpcEndpoint(link(port2))
-    new HostRuntime(endpoint, initial, {} as ExtensionDB, (entry) => modules[entry] ?? backend)
+    const loader = { load: (entry: string) => modules[entry] ?? backend, forget: () => {} }
+    new HostRuntime(endpoint, initial, {} as ExtensionDB, loader)
     return { link: link(port1), onExit: (listener) => exits.push(listener), kill: vi.fn() }
   })
   const onBackendsFailed = vi.fn()
@@ -95,7 +96,7 @@ function harness(modules: Record<string, BackendModule> = {}) {
     onBackendsFailed,
     log: () => {},
   })
-  const record = { id: 'demo', entryPoint: '/demo/main.cjs', dependencies: [] }
+  const record = { id: 'demo', entryPoint: '/demo/main.cjs', directory: '/demo', dependencies: [] }
   const crash = (code: number) => exits.at(-1)!(code)
   return { main, process, record, spawned, onBackendsFailed, crash }
 }
@@ -169,11 +170,21 @@ describe('extension backends in the extension host', () => {
     const provider: BackendModule = { activate: () => ({ secret: 1 }) }
     const reader: BackendModule = { activate: (api) => seen.push(api.extensions.get('provider')) }
     const { process } = harness({ '/p.cjs': provider, '/r.cjs': reader })
-    await process.activate({ id: 'provider', entryPoint: '/p.cjs', dependencies: [] })
+    await process.activate({
+      id: 'provider',
+      entryPoint: '/p.cjs',
+      directory: '/',
+      dependencies: [],
+    })
 
-    await process.activate({ id: 'declared', entryPoint: '/r.cjs', dependencies: ['provider'] })
+    await process.activate({
+      id: 'declared',
+      entryPoint: '/r.cjs',
+      directory: '/',
+      dependencies: ['provider'],
+    })
     await expect(
-      process.activate({ id: 'snoop', entryPoint: '/r.cjs', dependencies: [] })
+      process.activate({ id: 'snoop', entryPoint: '/r.cjs', directory: '/', dependencies: [] })
     ).rejects.toThrow('Extension "snoop" did not declare "provider" in extensionDependencies')
     expect(seen).toEqual([{ secret: 1 }])
   })
@@ -190,8 +201,18 @@ describe('extension backends in the extension host', () => {
       activate: (api) => seen.push(api.extensions.get<{ greet(): string }>('provider')?.greet()),
     }
     const { process, crash, onBackendsFailed } = harness({ '/p.cjs': provider, '/c.cjs': consumer })
-    await process.activate({ id: 'provider', entryPoint: '/p.cjs', dependencies: [] })
-    await process.activate({ id: 'consumer', entryPoint: '/c.cjs', dependencies: ['provider'] })
+    await process.activate({
+      id: 'provider',
+      entryPoint: '/p.cjs',
+      directory: '/',
+      dependencies: [],
+    })
+    await process.activate({
+      id: 'consumer',
+      entryPoint: '/c.cjs',
+      directory: '/',
+      dependencies: ['provider'],
+    })
 
     crash(1)
 
@@ -210,8 +231,18 @@ describe('extension backends in the extension host', () => {
     }
     const consumer: BackendModule = { activate: vi.fn() }
     const { process, crash, onBackendsFailed } = harness({ '/p.cjs': provider, '/c.cjs': consumer })
-    await process.activate({ id: 'provider', entryPoint: '/p.cjs', dependencies: [] })
-    await process.activate({ id: 'consumer', entryPoint: '/c.cjs', dependencies: ['provider'] })
+    await process.activate({
+      id: 'provider',
+      entryPoint: '/p.cjs',
+      directory: '/',
+      dependencies: [],
+    })
+    await process.activate({
+      id: 'consumer',
+      entryPoint: '/c.cjs',
+      directory: '/',
+      dependencies: ['provider'],
+    })
 
     crash(1)
 

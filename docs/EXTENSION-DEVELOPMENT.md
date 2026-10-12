@@ -149,6 +149,10 @@ provider does not come back, its dependants fail with it. If the host crashes ag
 extensions show as `error` in Settings → Extensions, with the reason on hover, until the next
 launch.
 
+Reloading an extension (or disabling and enabling it) runs your backend's code as it is on disk
+then: the host forgets your entry point and every module under your extension directory before it
+requires the entry point again. Packages from outside that directory stay loaded.
+
 ---
 
 ## What an extension may import

@@ -290,12 +290,15 @@ Three classes share the work in main:
 | ---------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `host/entry.ts` → `out/main/extension-host.js` | extension host | Receives a `MessagePort` and the snapshot, opens its own WAL connection to `app.sqlite`, runs `HostRuntime`                            |
 | `host/host-runtime.ts`                         | extension host | `require()`s each backend, calls `activate(api)`, answers main's `channel.dispatch`, `command.run` and `callback`                      |
+| `host/backend-loader.ts`                       | extension host | Requires a backend; on deactivate or a failed activate drops its entry point and its directory's modules from `require.cache`          |
 | `host/host-api.ts`                             | extension host | The `ExtensionAPI` a backend receives: each member a request or event to main, a snapshot read, or local (`db`, `extensions`, `paths`) |
 | `host/callbacks.ts`                            | both           | A function argument becomes `{ $callback: id }`; main calls it back with a `callback` event                                            |
 | `host/api-server.ts`                           | main           | Runs each call on that extension's `ExtensionAPI` from `api.ts`, for members in `CROSSING_MEMBERS` only; keeps registrations by id     |
 | `host/rpc-endpoint.ts`                         | both           | Requests with answers, events without, errors with their `name`                                                                        |
 
 Values the core holds cross as promises, except `settings.get`, `workspace.list` / `listProjects` and `issues.supports*`, which read a snapshot main pushes on every change (`onExtensionSettingsChanged`, `onWorkspacesChanged`). `pty.onData` arrives batched, one message per frame (`src/main/extensions/pty-stream.ts`), every batch before the exit. A channel's or command's schema stays in the extension host, which validates the payload before `run`.
+
+A reload is a `deactivate` then an `activate` message. The host drops the deactivated backend's entry point, and every module under its extension directory, from `require.cache` ([Node docs](https://nodejs.org/api/modules.html#requirecache)), so the next `activate` runs the code on disk; so does a backend whose `activate` threw. Modules outside the directory, such as another extension's, stay cached.
 
 When the extension host exits unasked the app stays up: it is started again once (`HOST_RESTARTS`) and its backends activated again, each after the extensions it declares in `extensionDependencies`, as at startup, so a consumer's `api.extensions.get` returns its provider's new exports. A backend whose dependency fails to come back fails too. A second exit marks them all failed, and Settings → Extensions shows them as `error` with the reason as the status's tooltip. The failure is not stored, so the next launch tries again.
 

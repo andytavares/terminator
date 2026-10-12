@@ -402,7 +402,8 @@ export class ExtensionHost {
     this.hostedApis.set(record.id, api)
     try {
       const dependencies = declaredDependencies(record)
-      await this.backends.activate({ id: record.id, entryPoint: record.entryPoint, dependencies })
+      const { id, entryPoint, directoryPath: directory } = record
+      await this.backends.activate({ id, entryPoint, directory, dependencies })
     } catch (e) {
       this.hostedApis.delete(record.id)
       this.disposeAll(getApiDisposables(api))

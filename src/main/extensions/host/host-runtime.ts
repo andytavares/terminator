@@ -4,20 +4,16 @@ import type { RpcEndpoint } from './rpc-endpoint.js'
 import { CallbackRegistry } from './callbacks.js'
 import { createHostExtensionAPI, type HostCommand } from './host-api.js'
 import type { HostSnapshot, WorkspacesSnapshot } from './snapshot.js'
+import type { BackendFiles, BackendLoader, BackendModule } from './backend-loader.js'
 
 /** What main sends to activate one backend in the extension host. */
-export interface BackendRecord {
+export interface BackendRecord extends BackendFiles {
   id: string
-  entryPoint: string
   dependencies: string[]
 }
 
-interface BackendModule {
-  activate?: (api: unknown) => unknown
-  deactivate?: () => void | Promise<void>
-}
-
 interface Active {
+  record: BackendRecord
   module: BackendModule
   exports: unknown
   callbacks: CallbackRegistry
@@ -37,7 +33,7 @@ export class HostRuntime {
     private readonly endpoint: RpcEndpoint,
     private readonly snapshot: HostSnapshot,
     private readonly db: ExtensionDB,
-    private readonly loadModule: (entryPoint: string) => BackendModule
+    private readonly loader: BackendLoader
   ) {
     endpoint.handle('activate', (record: BackendRecord) => this.activate(record))
     endpoint.handle('deactivate', (id: string) => this.deactivate(id))
@@ -58,10 +54,31 @@ export class HostRuntime {
     })
   }
 
+  /**
+   * Requires the backend and runs its activate. A backend that fails, like one
+   * deactivated, leaves the require cache, so its next activation (a reload)
+   * runs the code on disk then.
+   */
   private async activate(record: BackendRecord): Promise<void> {
-    const module = this.loadModule(record.entryPoint)
-    const callbacks = new CallbackRegistry()
-    const api = createHostExtensionAPI({
+    try {
+      const module = this.loader.load(record.entryPoint)
+      const active: Active = {
+        record,
+        module,
+        exports: undefined,
+        callbacks: new CallbackRegistry(),
+      }
+      this.active.set(record.id, active)
+      active.exports = await module.activate?.(this.apiFor(record, active.callbacks))
+    } catch (error) {
+      this.active.delete(record.id)
+      this.loader.forget(record)
+      throw error
+    }
+  }
+
+  private apiFor(record: BackendRecord, callbacks: CallbackRegistry) {
+    return createHostExtensionAPI({
       extensionId: record.id,
       endpoint: this.endpoint,
       snapshot: this.snapshot,
@@ -72,20 +89,17 @@ export class HostRuntime {
       exportsOf: (dependencyId) => this.exportsFor(record, dependencyId),
       report: (error) => console.error(`[${record.id}]`, error),
     })
-    const active: Active = { module, exports: undefined, callbacks }
-    this.active.set(record.id, active)
-    try {
-      active.exports = await module.activate?.(api)
-    } catch (error) {
-      this.active.delete(record.id)
-      throw error
-    }
   }
 
   private async deactivate(id: string): Promise<void> {
     const active = this.active.get(id)
+    if (!active) return
     this.active.delete(id)
-    await active?.module.deactivate?.()
+    try {
+      await active.module.deactivate?.()
+    } finally {
+      this.loader.forget(active.record)
+    }
   }
 
   private exportsFor(record: BackendRecord, dependencyId: string): unknown {

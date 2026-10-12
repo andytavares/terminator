@@ -4,6 +4,7 @@ import type { MessagePortMain } from 'electron'
 import { wrapDb } from '../../db/index.js'
 import { RpcEndpoint, type MessageLink, type RpcMessage } from './rpc-endpoint.js'
 import { HostRuntime } from './host-runtime.js'
+import { requireLoader } from './backend-loader.js'
 import type { HostSnapshot } from './snapshot.js'
 
 // The extension host: a utilityProcess main starts for every extension backend (ADR 094).
@@ -30,8 +31,11 @@ process.parentPort.once('message', (event) => {
   const endpoint = new RpcEndpoint(portLink(port), (method, error) =>
     console.error(`[extension-host] ${method} failed:`, error)
   )
-  new HostRuntime(endpoint, snapshot, openDatabase(snapshot.databasePath), (entryPoint) =>
-    loadCommonJs(entryPoint)
+  new HostRuntime(
+    endpoint,
+    snapshot,
+    openDatabase(snapshot.databasePath),
+    requireLoader(loadCommonJs)
   )
   port.start()
 })
