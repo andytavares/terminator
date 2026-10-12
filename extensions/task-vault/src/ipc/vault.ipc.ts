@@ -790,10 +790,13 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     const { areaName } = payload as { areaName: string }
     if (!areaName) return { error: 'VALIDATION_ERROR' }
     const now = new Date().toISOString()
-    const area = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [areaName])
+    const area = await db.get<{ id: string; updated_at: string }>(
+      `SELECT id, updated_at FROM areas WHERE name=?`,
+      [areaName]
+    )
     if (!area) return { error: 'NOT_FOUND' }
     await db.run(`UPDATE areas SET status='active', updated_at=? WHERE id=?`, [now, area.id])
-    await restoreAreaContents(db, area.id, now)
+    await restoreAreaContents(db, { id: area.id, archivedAt: area.updated_at }, now)
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })

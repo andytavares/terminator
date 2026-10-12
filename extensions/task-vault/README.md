@@ -13,11 +13,11 @@ GTD+BuJo+PARA daily productivity system backed by the shared SQLite database.
 
 ## Areas: archive and restore
 
-Archiving an area archives its projects and cancels its unfinished tasks, subtasks included. Each change is recorded with the status it replaced (table `area_archive_changes`), so restoring the area puts back exactly those statuses and nothing else: tasks you cancelled and projects you had parked or archived before stay as they were. Areas archived before this record existed restore the area only.
+Archiving an area archives its projects and cancels its unfinished tasks, subtasks included. Each change is recorded with the status it replaced (table `area_archive_changes`), so restoring the area puts back exactly those statuses and nothing else: tasks you cancelled and projects you had parked or archived before stay as they were. Areas archived before this record existed are restored the old way: their projects reactivate, and tasks cancelled at the archive time (directly in the area or its projects, not subtasks) reopen.
 
 ## Export and import
 
-Export writes tasks, projects and areas as JSON. Import into another database keeps each project in its area (via `area_id`; the older `area` name field is still read). Import skips rows whose id already exists.
+Export writes tasks, projects and areas as JSON. Import into another database keeps each project's area, each task's project and area, and each area's status (via ids; the older `area`/`project` name fields are still read). Import skips rows whose id already exists.
 
 ## Reset
 

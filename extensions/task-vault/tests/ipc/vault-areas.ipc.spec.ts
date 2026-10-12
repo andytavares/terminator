@@ -260,6 +260,23 @@ describe('task-vault:vault:archive-area and restore-area', () => {
     expect(await projectRow('finished')).toMatchObject({ status: 'archived' })
   })
 
+  it('restores an area archived before changes were recorded by matching the archive time', async () => {
+    const archivedAt = '2026-02-01T10:00:00.000Z'
+    await db.run(`UPDATE areas SET status='archived', updated_at=? WHERE id='a1'`, [archivedAt])
+    await db.run(`UPDATE projects SET status='archived', updated_at=? WHERE id='p1'`, [archivedAt])
+    for (const id of ['project-task', 'project-sub', 'area-task']) {
+      await db.run(`UPDATE tasks SET status='cancelled', updated_at=? WHERE id=?`, [archivedAt, id])
+    }
+
+    await invoke('task-vault:vault:restore-area', { areaName: 'Work' })
+
+    expect(await projectRow('p1')).toMatchObject({ status: 'active' })
+    for (const id of ['project-task', 'area-task']) {
+      expect(await taskRow(db, id)).toMatchObject({ status: 'open' })
+    }
+    expect(await taskRow(db, 'user-cancelled')).toMatchObject({ status: 'cancelled' })
+  })
+
   it.each(['archive-area', 'restore-area'])(
     '%s returns NOT_FOUND for an unknown area',
     async (name) => {
