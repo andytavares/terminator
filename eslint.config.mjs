@@ -5,6 +5,41 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
+// Constitution II / ADR 094: an extension imports only the SDK, the design
+// system and its own npm packages. A relative path may not climb out of the
+// extension's directory; how many `../` that takes depends on how deep the
+// importing file sits, so there is one block per depth under src/.
+const EXTENSION_SRC_MAX_DEPTH = 6
+
+function extensionImportBoundary() {
+  const workspacePackage = {
+    regex: '^@terminator/(?!extension-sdk(/|$)|extension-ui(/|$))',
+    message:
+      'An extension imports only @terminator/extension-sdk and @terminator/extension-ui among workspace packages; another extension is reached through its activate() exports (ADR 094).',
+  }
+  return Array.from({ length: EXTENSION_SRC_MAX_DEPTH }, (_, index) => {
+    const depth = index + 1
+    return {
+      files: [`extensions/*/src/${'*/'.repeat(depth - 1)}*.{ts,tsx}`],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              workspacePackage,
+              {
+                regex: `^(\\.\\./){${depth + 1},}`,
+                message:
+                  'This path leaves the extension. Import core types and helpers from @terminator/extension-sdk, components from @terminator/extension-ui (Constitution II).',
+              },
+            ],
+          },
+        ],
+      },
+    }
+  })
+}
+
 export default defineConfig([
   // Build output and other tools' trees. extensions/*/src/index.js is the
   // esbuild bundle of each extension (see .gitignore).
@@ -80,6 +115,7 @@ export default defineConfig([
       ],
     },
   },
+  ...extensionImportBoundary(),
   {
     files: ['tests/e2e/*.ts'],
     rules: {
