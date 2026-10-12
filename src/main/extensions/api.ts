@@ -290,8 +290,6 @@ export interface ExtensionAPIDeps {
   focusExtensionView?: (extensionId: string, viewParam: string) => void
   bridge?: BridgeDeps
   db?: ExtensionDB
-  /** Another extension's `activate` exports; throws for an id the manifest does not declare. */
-  extensionExports?: (extensionId: string) => unknown
   /** `api.paths`: the application's directory and the per-user data directory. */
   paths?: ExtensionAPI['paths']
 }
@@ -473,12 +471,9 @@ export function createExtensionAPI(
       },
     },
     extensions: {
-      // The provider's type is the declaration the caller chose; nothing here can check it.
+      // Exports live with the backends: the extension host answers this (host-runtime.ts).
       get(dependencyId: string): never {
-        if (!deps?.extensionExports) {
-          throw new Error(`Extension "${extensionId}" declares no extensionDependencies`)
-        }
-        return deps.extensionExports(dependencyId) as never
+        throw new Error(`"${dependencyId}" exports are only reachable in the extension host`)
       },
     },
     shell: {

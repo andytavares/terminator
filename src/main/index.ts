@@ -62,7 +62,23 @@ let isQuitting = false
 let mainWindow: BrowserWindow | null = null
 let viewHost: ExtensionViewHost | null = null
 const ptyManager = new PtyManager()
-const extensionHost = new ExtensionHost()
+// Reads core state the way an extension's API does, for the extension host's snapshot.
+const coreView = createExtensionAPI('terminator.extension-host', app.getVersion())
+/** Extension backends run in one utilityProcess (ADR 094), started on the first activation. */
+const extensionHostProcess: ExtensionHostProcess = new ExtensionHostProcess({
+  spawn: spawnUtilityHost(join(__dirname, 'extension-host.js')),
+  snapshot: () => ({
+    databasePath: join(app.getPath('userData'), 'app.sqlite'),
+    paths: { app: app.getAppPath(), userData: app.getPath('userData') },
+    settings: getAllExtensionSettings(),
+    workspaces: workspacesOf(coreView.workspace),
+    trackers: trackerAbilitiesOf(coreView.issues),
+  }),
+  apiFor: (id) => extensionHost.hostedApi(id),
+  onBackendsFailed: (ids, message) => extensionHost.failHostedBackends(ids, message),
+  log: (message) => logger.warn(message),
+})
+const extensionHost: ExtensionHost = new ExtensionHost(extensionHostProcess)
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -430,7 +446,9 @@ app.whenReady().then(async () => {
     },
   })
 
-  startExtensionHostProcess(userData)
+  // The extension host's synchronous getters read these; main pushes every change.
+  onExtensionSettingsChanged(() => extensionHostProcess.pushSettings(getAllExtensionSettings()))
+  onWorkspacesChanged(() => extensionHostProcess.pushWorkspaces(workspacesOf(coreView.workspace)))
   setupMenu()
   createWindow()
 
@@ -455,34 +473,6 @@ app.whenReady().then(async () => {
     .catch((error) => logger.error('extension startup failed', { error: String(error) }))
 })
 
-/**
- * Extension backends run in one utilityProcess (ADR 094). Main pushes it the
- * settings and workspaces its synchronous getters read, on every change.
- */
-function startExtensionHostProcess(userData: string): void {
-  // Reads core state the way an extension's API does, for the host's snapshot.
-  const coreView = createExtensionAPI('terminator.extension-host', app.getVersion())
-  const hostProcess = new ExtensionHostProcess({
-    spawn: spawnUtilityHost(join(__dirname, 'extension-host.js')),
-    snapshot: () => ({
-      databasePath: join(userData, 'app.sqlite'),
-      paths: { app: app.getAppPath(), userData },
-      settings: getAllExtensionSettings(),
-      workspaces: workspacesOf(coreView.workspace),
-      trackers: trackerAbilitiesOf(coreView.issues),
-    }),
-    apiFor: (id) => extensionHost.hostedApi(id),
-    onBackendsFailed: (ids, message) => extensionHost.failHostedBackends(ids, message),
-    log: (message) => logger.warn(message),
-  })
-  extensionHost.useBackendHost(hostProcess)
-  onExtensionSettingsChanged(() => hostProcess.pushSettings(getAllExtensionSettings()))
-  onWorkspacesChanged(() => hostProcess.pushWorkspaces(workspacesOf(coreView.workspace)))
-  stopExtensionHostProcess = () => hostProcess.stop()
-}
-
-let stopExtensionHostProcess = (): void => {}
-
 // A rejection in the startup chain above (e.g. database or extension init
 // failure) would otherwise leave the process alive with no window ever
 // created — a blank, unquittable app. Surface it loudly and exit instead of
@@ -499,7 +489,7 @@ app.on('before-quit', async (event) => {
   event.preventDefault()
   isQuitting = true
   await extensionHost.unloadAll()
-  stopExtensionHostProcess()
+  extensionHostProcess.stop()
   await ptyManager.killAll()
   closeAppDb()
   app.exit(0)

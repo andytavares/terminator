@@ -9,8 +9,9 @@ import { ExtensionManifestSchema } from '../../shared/schemas/extension.schema.j
 import type { Disposable, ExtensionAPI } from '@terminator/extension-sdk'
 import { createExtensionAPI, getApiDisposables, type ExtensionAPIDeps } from './api.js'
 import { makeLogger } from '../logger.js'
+import type { BackendRecord } from './host/host-runtime.js'
 
-// Extension bundles and manifests are CommonJS; main is an ES module.
+// Manifests are read with require(); main is an ES module.
 const loadCommonJs = createRequire(import.meta.url)
 
 const hostLogger = makeLogger('extension-host')
@@ -28,14 +29,6 @@ const store = new CachedStore<ExtensionStoreSchema>({
   name: 'extensions',
   defaults: { extensions: [] },
 })
-
-interface LoadedExtension {
-  record: ExtensionRecord
-  disposables: Disposable[]
-  module: { activate?: unknown; deactivate?: () => void | Promise<void> }
-  /** What `activate` returned: the API this extension offers its dependants (ADR 094). */
-  exports: unknown
-}
 
 interface StartOptions {
   bundledDirectory: string
@@ -95,7 +88,7 @@ function declaredDependencies(record: ExtensionRecord): string[] {
 
 /** Where backends run: the extension host (ADR 094). */
 export interface BackendHost {
-  activate(record: { id: string; entryPoint: string; dependencies: string[] }): Promise<void>
+  activate(record: BackendRecord): Promise<void>
   deactivate(extensionId: string): Promise<void>
 }
 
@@ -119,22 +112,20 @@ function toExtension(record: ExtensionRecord): Extension {
 }
 
 export class ExtensionHost {
-  private loaded = new Map<string, LoadedExtension>()
+  /** Each active backend's registrations in main, by extension id. */
+  private loaded = new Map<string, Disposable[]>()
   private activations = new Map<string, Promise<void>>()
   private afterActivation: Promise<void> = Promise.resolve()
   private deps: ExtensionAPIDeps = {}
-  private backendHost: BackendHost | null = null
   /** The main-side API of each backend in the extension host, which its calls run on. */
   private readonly hostedApis = new Map<string, ExtensionAPI>()
   private readonly hostFailures = new Map<string, string>()
 
+  /** Every backend runs in `backends`, the extension host process (ADR 094). */
+  constructor(private readonly backends: BackendHost) {}
+
   setDeps(deps: ExtensionAPIDeps): void {
     this.deps = deps
-  }
-
-  /** Runs every backend in `host`. Without one (unit tests), backends load in this process. */
-  useBackendHost(host: BackendHost): void {
-    this.backendHost = host
   }
 
   /** The API a backend in the extension host calls into, while it is active. */
@@ -150,7 +141,7 @@ export class ExtensionHost {
     for (const id of extensionIds) {
       const loaded = this.loaded.get(id)
       if (!loaded) continue
-      this.disposeAll(loaded.disposables)
+      this.disposeAll(loaded)
       this.loaded.delete(id)
       this.hostedApis.delete(id)
       this.hostFailures.set(id, message)
@@ -216,13 +207,13 @@ export class ExtensionHost {
     if (loaded) {
       hostLogger.info(`Unloading extension ${id}`)
       try {
-        await loaded.module.deactivate?.()
+        await this.backends.deactivate(id)
       } catch (e) {
         hostLogger.warn(
           `Extension ${id} deactivate error: ${e instanceof Error ? e.message : String(e)}`
         )
       }
-      this.disposeAll(loaded.disposables)
+      this.disposeAll(loaded)
       this.loaded.delete(id)
       this.hostedApis.delete(id)
     }
@@ -253,14 +244,6 @@ export class ExtensionHost {
     if (!record) return { error: 'NOT_FOUND' }
 
     await this.unload(id)
-
-    // Clear Node module cache so the updated code is re-evaluated
-    try {
-      delete require.cache[require.resolve(record.entryPoint)]
-    } catch {
-      // Module may not be in cache (e.g. was never successfully loaded); safe to skip
-    }
-
     const result = await this.activate(record)
     if ('error' in result) return { error: result.message }
 
@@ -410,67 +393,25 @@ export class ExtensionHost {
     return null
   }
 
-  /** The exports of `dependencyId`, for an extension that declared it. */
-  private exportsFor(record: ExtensionRecord, dependencyId: string): unknown {
-    if (!declaredDependencies(record).includes(dependencyId)) {
-      throw new Error(
-        `Extension "${record.id}" did not declare "${dependencyId}" in extensionDependencies`
-      )
-    }
-    if (this.hostedApis.has(dependencyId)) {
-      throw new Error(`Extension "${dependencyId}" runs in the extension host; its API is not here`)
-    }
-    return this.loaded.get(dependencyId)?.exports
-  }
-
   private async activate(
     record: ExtensionRecord
   ): Promise<{ ok: true } | { error: string; message: string }> {
     const inactive = this.inactiveDependency(record)
     if (inactive) return { error: 'DEPENDENCY_ERROR', message: inactive }
-    if (this.backendHost) {
-      return this.activateInHost(record, this.backendHost)
-    }
-    try {
-      const mod = loadCommonJs(record.entryPoint) as {
-        activate?: (api: unknown) => unknown
-        deactivate?: () => void | Promise<void>
-      }
-      const deps: ExtensionAPIDeps = {
-        ...this.deps,
-        extensionExports: (dependencyId) => this.exportsFor(record, dependencyId),
-      }
-      const api = createExtensionAPI(record.id, app.getVersion(), deps, record.rendererUrl)
-      const exports = await mod.activate?.(api)
-      // The live array from the api: registrations made after activate() land in
-      // it too, so unload disposes everything the extension ever registered.
-      const disposables = getApiDisposables(api)
-      this.loaded.set(record.id, { record, disposables, module: mod, exports })
-      return { ok: true }
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e)
-      return { error: 'ACTIVATE_ERROR', message }
-    }
-  }
-
-  private async activateInHost(
-    record: ExtensionRecord,
-    host: BackendHost
-  ): Promise<{ ok: true } | { error: string; message: string }> {
     const api = createExtensionAPI(record.id, app.getVersion(), this.deps, record.rendererUrl)
     this.hostedApis.set(record.id, api)
     try {
       const dependencies = declaredDependencies(record)
-      await host.activate({ id: record.id, entryPoint: record.entryPoint, dependencies })
+      await this.backends.activate({ id: record.id, entryPoint: record.entryPoint, dependencies })
     } catch (e) {
       this.hostedApis.delete(record.id)
       this.disposeAll(getApiDisposables(api))
       return { error: 'ACTIVATE_ERROR', message: e instanceof Error ? e.message : String(e) }
     }
     this.hostFailures.delete(record.id)
-    const deactivate = () => host.deactivate(record.id)
-    const disposables = getApiDisposables(api)
-    this.loaded.set(record.id, { record, disposables, module: { deactivate }, exports: undefined })
+    // The live array from the api: registrations made after activate() land in
+    // it too, so unload disposes everything the backend ever registered.
+    this.loaded.set(record.id, getApiDisposables(api))
     return { ok: true }
   }
 }

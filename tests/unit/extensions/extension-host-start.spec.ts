@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import os from 'os'
+import { FakeBackendHost, type FakeBackend } from './fake-backend-host'
 
 vi.mock('electron', () => ({
   app: {
@@ -31,338 +32,264 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
   getAllExtensionSettings: () => ({}),
 }))
 
-interface StartProbe {
-  events: string[]
-  peerStarted: Promise<void>
-  markPeerStarted: () => void
+let bundle: string
+
+beforeEach(() => {
+  vi.resetModules()
+  storeData.extensions = []
+  bundle = join(os.tmpdir(), `ext-bundle-${Date.now()}-${Math.random()}`)
+})
+
+afterEach(() => rmSync(bundle, { recursive: true, force: true }))
+
+/** Bundled extensions: a manifest each; the fake extension host holds their backends. */
+function writeBundle(dependenciesById: Record<string, string[] | undefined>): string {
+  for (const [id, extensionDependencies] of Object.entries(dependenciesById)) {
+    const directory = join(bundle, id)
+    mkdirSync(directory, { recursive: true })
+    const manifest = { id, name: id, version: '1.0.0', description: 'Test extension' }
+    writeFileSync(
+      join(directory, 'manifest.json'),
+      JSON.stringify({
+        ...manifest,
+        main: 'main.js',
+        minAppVersion: '0.0.1',
+        extensionDependencies,
+      })
+    )
+  }
+  return bundle
 }
-const probe = globalThis as unknown as { __startProbe: StartProbe }
+
+function storedRecord(id: string, status: 'enabled' | 'disabled') {
+  const directoryPath = join(bundle, id)
+  return {
+    id,
+    name: id,
+    version: '1.0.0',
+    description: '',
+    entryPoint: join(directoryPath, 'main.js'),
+    status,
+    installedAt: new Date().toISOString(),
+    directoryPath,
+  }
+}
+
+async function newHost(backends: Record<string, FakeBackend> = {}) {
+  const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+  const backendHost = new FakeBackendHost(backends)
+  return { host: new ExtensionHost(backendHost), backendHost }
+}
+
+function byId(host: { listExtensions(): Array<{ id: string }> }) {
+  return Object.fromEntries(host.listExtensions().map((e) => [e.id, e]))
+}
+
+const ready = Promise.resolve()
 
 describe('ExtensionHost.start', () => {
-  const bundles: string[] = []
-
-  function makeBundle(activateByExtensionId: Record<string, string>): string {
-    const bundle = join(os.tmpdir(), `ext-bundle-${Date.now()}-${bundles.length}`)
-    for (const [id, activateSource] of Object.entries(activateByExtensionId)) {
-      const dir = join(bundle, id)
-      mkdirSync(dir, { recursive: true })
-      writeFileSync(
-        join(dir, 'manifest.json'),
-        JSON.stringify({
-          id,
-          name: id,
-          version: '1.0.0',
-          description: 'Test extension',
-          main: 'main.js',
-          minAppVersion: '0.0.1',
-        })
-      )
-      writeFileSync(join(dir, 'main.js'), `exports.activate = ${activateSource}`)
-    }
-    bundles.push(bundle)
-    return bundle
-  }
-
-  async function newHost() {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    return new ExtensionHost()
-  }
-
-  const ready = Promise.resolve()
-
-  beforeEach(() => {
-    vi.resetModules()
-    storeData.extensions = []
+  it('activates extensions concurrently: one waits for another to have started', async () => {
     let markPeerStarted = () => {}
     const peerStarted = new Promise<void>((resolve) => (markPeerStarted = resolve))
-    probe.__startProbe = { events: [], peerStarted, markPeerStarted }
-  })
-
-  afterEach(() => {
-    for (const bundle of bundles.splice(0)) rmSync(bundle, { recursive: true, force: true })
-  })
-
-  it('activates extensions concurrently: one waits for another to have started', async () => {
-    const bundle = makeBundle({
-      'com.waiter': `async () => {
-        const probe = globalThis.__startProbe
-        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('peer never started')), 1000))
-        await Promise.race([probe.peerStarted, timeout])
-        probe.events.push('waiter')
-      }`,
-      'com.peer': `() => {
-        globalThis.__startProbe.markPeerStarted()
-        globalThis.__startProbe.events.push('peer')
-      }`,
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('peer never started')), 1000)
+    )
+    const { host, backendHost } = await newHost({
+      'com.waiter': async () => {
+        await Promise.race([peerStarted, timeout])
+      },
+      'com.peer': () => markPeerStarted(),
     })
-    const host = await newHost()
 
-    await host.start({ bundledDirectory: bundle, beforeActivation: ready })
+    await host.start({
+      bundledDirectory: writeBundle({ 'com.waiter': [], 'com.peer': [] }),
+      beforeActivation: ready,
+    })
 
-    expect([...probe.__startProbe.events].sort()).toEqual(['peer', 'waiter'])
+    expect(backendHost.activated.map((record) => record.id)).toEqual(['com.peer', 'com.waiter'])
     expect(host.listExtensions().map((e) => e.status)).toEqual(['enabled', 'enabled'])
   })
 
   it('marks a failing extension as errored and still activates the others', async () => {
-    const bundle = makeBundle({
-      'com.broken': `() => { throw new Error('boom') }`,
-      'com.healthy': `() => { globalThis.__startProbe.events.push('healthy') }`,
+    const { host, backendHost } = await newHost({
+      'com.broken': () => {
+        throw new Error('boom')
+      },
     })
-    const host = await newHost()
 
-    await host.start({ bundledDirectory: bundle, beforeActivation: ready })
+    await host.start({
+      bundledDirectory: writeBundle({ 'com.broken': [], 'com.healthy': [] }),
+      beforeActivation: ready,
+    })
 
-    const byId = Object.fromEntries(host.listExtensions().map((e) => [e.id, e]))
-    expect(byId['com.broken'].status).toBe('error')
-    expect(byId['com.broken'].errorMessage).toBe('boom')
-    expect(byId['com.healthy'].status).toBe('enabled')
-    expect(probe.__startProbe.events).toEqual(['healthy'])
+    const extensions = byId(host)
+    expect(extensions['com.broken']).toMatchObject({ status: 'error', errorMessage: 'boom' })
+    expect(extensions['com.healthy']).toMatchObject({ status: 'enabled' })
+    expect(backendHost.activated.map((record) => record.id)).toEqual(['com.healthy'])
   })
 
   it('lists extensions as soon as start is called, before any is activated, and activates only after beforeActivation', async () => {
-    const bundle = makeBundle({
-      'com.late': `() => { globalThis.__startProbe.events.push('activated') }`,
-    })
-    const host = await newHost()
+    const { host, backendHost } = await newHost()
     let release = () => {}
     const gate = new Promise<void>((resolve) => (release = resolve))
 
-    const started = host.start({ bundledDirectory: bundle, beforeActivation: gate })
+    const started = host.start({
+      bundledDirectory: writeBundle({ 'com.late': [] }),
+      beforeActivation: gate,
+    })
 
     expect(host.listExtensions().map((e) => e.id)).toEqual(['com.late'])
-    expect(probe.__startProbe.events).toEqual([])
+    expect(backendHost.activated).toEqual([])
 
     release()
     await started
-    expect(probe.__startProbe.events).toEqual(['activated'])
+    expect(backendHost.activated.map((record) => record.id)).toEqual(['com.late'])
   })
 
   it('activates an extension already stored as enabled, without registering it twice', async () => {
-    const bundle = makeBundle({
-      'com.stored': `() => { globalThis.__startProbe.events.push('stored') }`,
-    })
-    const dir = join(bundle, 'com.stored')
-    storeData.extensions = [
-      {
-        id: 'com.stored',
-        name: 'Stored',
-        version: '1.0.0',
-        description: '',
-        entryPoint: join(dir, 'main.js'),
-        status: 'enabled',
-        installedAt: new Date().toISOString(),
-        directoryPath: dir,
-      },
-    ]
-    const host = await newHost()
+    writeBundle({ 'com.stored': [] })
+    storeData.extensions = [storedRecord('com.stored', 'enabled')]
+    const { host, backendHost } = await newHost()
 
     await host.start({ bundledDirectory: bundle, beforeActivation: ready })
 
-    expect(probe.__startProbe.events).toEqual(['stored'])
+    expect(backendHost.activated.map((record) => record.id)).toEqual(['com.stored'])
     expect(host.listExtensions()).toHaveLength(1)
   })
 
   it('does not activate an extension stored as disabled', async () => {
-    const bundle = makeBundle({
-      'com.off': `() => { globalThis.__startProbe.events.push('off') }`,
-    })
-    const dir = join(bundle, 'com.off')
-    storeData.extensions = [
-      {
-        id: 'com.off',
-        name: 'Off',
-        version: '1.0.0',
-        description: '',
-        entryPoint: join(dir, 'main.js'),
-        status: 'disabled',
-        installedAt: new Date().toISOString(),
-        directoryPath: dir,
-      },
-    ]
-    const host = await newHost()
+    writeBundle({ 'com.off': [] })
+    storeData.extensions = [storedRecord('com.off', 'disabled')]
+    const { host, backendHost } = await newHost()
 
     await host.start({ bundledDirectory: bundle, beforeActivation: ready })
 
-    expect(probe.__startProbe.events).toEqual([])
+    expect(backendHost.activated).toEqual([])
   })
 
   it('whenActivated waits for that extension only, not for a slower one', async () => {
-    const bundle = makeBundle({
-      'com.quick': `() => { globalThis.__startProbe.events.push('quick') }`,
-      'com.slow': `() => new Promise(() => {})`,
-    })
-    const host = await newHost()
+    const { host, backendHost } = await newHost({ 'com.slow': () => new Promise(() => {}) })
 
-    void host.start({ bundledDirectory: bundle, beforeActivation: ready })
+    void host.start({
+      bundledDirectory: writeBundle({ 'com.quick': [], 'com.slow': [] }),
+      beforeActivation: ready,
+    })
     await host.whenActivated('com.quick')
 
-    expect(probe.__startProbe.events).toEqual(['quick'])
+    expect(backendHost.activated.map((record) => record.id)).toEqual(['com.quick'])
   })
 
   it('whenActivated also waits for afterActivation, which runs once every extension is done', async () => {
-    const bundle = makeBundle({
-      'com.first': `() => { globalThis.__startProbe.events.push('first') }`,
-      'com.second': `async () => {
+    const events: string[] = []
+    const { host } = await newHost({
+      'com.first': () => {
+        events.push('first')
+      },
+      'com.second': async () => {
         await new Promise((resolve) => setTimeout(resolve, 20))
-        globalThis.__startProbe.events.push('second')
-      }`,
+        events.push('second')
+      },
     })
-    const host = await newHost()
     const afterActivation = async () => {
-      probe.__startProbe.events.push('after')
+      events.push('after')
     }
 
-    void host.start({ bundledDirectory: bundle, beforeActivation: ready, afterActivation })
+    void host.start({
+      bundledDirectory: writeBundle({ 'com.first': [], 'com.second': [] }),
+      beforeActivation: ready,
+      afterActivation,
+    })
     await host.whenActivated('com.first')
 
-    expect(probe.__startProbe.events).toEqual(['first', 'second', 'after'])
+    expect(events).toEqual(['first', 'second', 'after'])
   })
 
   it('whenActivated resolves at once for an unknown extension', async () => {
-    const host = await newHost()
+    const { host } = await newHost()
     await host.start({ bundledDirectory: '/nonexistent/bundle', beforeActivation: ready })
     await expect(host.whenActivated('com.unknown')).resolves.toBeUndefined()
   })
 })
 
 describe('ExtensionHost.start with extensionDependencies (ADR 094)', () => {
-  const bundles: string[] = []
+  it('activates a dependency first and tells the extension host what the dependant declared', async () => {
+    const events: string[] = []
+    const { host, backendHost } = await newHost({
+      'com.a-consumer': () => {
+        events.push('consumer')
+      },
+      'com.z-provider': async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        events.push('provider')
+      },
+    })
 
-  interface BundledExtension {
-    activate: string
-    extensionDependencies?: string[]
-  }
-
-  function makeBundle(extensions: Record<string, BundledExtension>): string {
-    const bundle = join(os.tmpdir(), `ext-deps-${Date.now()}-${bundles.length}`)
-    for (const [id, { activate, extensionDependencies }] of Object.entries(extensions)) {
-      const dir = join(bundle, id)
-      mkdirSync(dir, { recursive: true })
-      const manifest = { id, name: id, version: '1.0.0', description: 'Test extension' }
-      writeFileSync(
-        join(dir, 'manifest.json'),
-        JSON.stringify({
-          ...manifest,
-          main: 'main.js',
-          minAppVersion: '0.0.1',
-          extensionDependencies,
-        })
-      )
-      writeFileSync(join(dir, 'main.js'), `exports.activate = ${activate}`)
-    }
-    bundles.push(bundle)
-    return bundle
-  }
-
-  async function startHost(bundle: string) {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    await host.start({ bundledDirectory: bundle, beforeActivation: Promise.resolve() })
-    return Object.fromEntries(host.listExtensions().map((e) => [e.id, e]))
-  }
-
-  beforeEach(() => {
-    vi.resetModules()
-    storeData.extensions = []
-    probe.__startProbe = { events: [], peerStarted: Promise.resolve(), markPeerStarted: () => {} }
-  })
-
-  afterEach(() => {
-    for (const bundle of bundles.splice(0)) rmSync(bundle, { recursive: true, force: true })
-  })
-
-  it('activates a dependency first and hands its activate() return value to the dependant', async () => {
     // Directory order would activate the consumer first.
-    const bundle = makeBundle({
-      'com.a-consumer': {
-        extensionDependencies: ['com.z-provider'],
-        activate: `(api) => {
-          globalThis.__startProbe.events.push('consumer:' + api.extensions.get('com.z-provider').greet())
-        }`,
-      },
-      'com.z-provider': {
-        activate: `async () => {
-          await new Promise((resolve) => setTimeout(resolve, 10))
-          globalThis.__startProbe.events.push('provider')
-          return { greet: () => 'hello' }
-        }`,
-      },
+    await host.start({
+      bundledDirectory: writeBundle({ 'com.a-consumer': ['com.z-provider'], 'com.z-provider': [] }),
+      beforeActivation: ready,
     })
 
-    const byId = await startHost(bundle)
-
-    expect(probe.__startProbe.events).toEqual(['provider', 'consumer:hello'])
-    expect(byId['com.a-consumer'].status).toBe('enabled')
-  })
-
-  it('refuses to hand over the exports of an extension the manifest does not declare', async () => {
-    const bundle = makeBundle({
-      'com.provider': { activate: `() => ({ secret: 1 })` },
-      'com.snoop': { activate: `(api) => { api.extensions.get('com.provider') }` },
+    expect(events).toEqual(['provider', 'consumer'])
+    expect(backendHost.activated.find((record) => record.id === 'com.a-consumer')).toMatchObject({
+      dependencies: ['com.z-provider'],
     })
-
-    const byId = await startHost(bundle)
-
-    expect(byId['com.snoop'].status).toBe('error')
-    expect(byId['com.snoop'].errorMessage).toBe(
-      'Extension "com.snoop" did not declare "com.provider" in extensionDependencies'
-    )
+    expect(byId(host)['com.a-consumer']).toMatchObject({ status: 'enabled' })
   })
 
   it('fails activation with a clear message when a dependency is not installed', async () => {
-    const bundle = makeBundle({
-      'com.orphan': {
-        extensionDependencies: ['com.missing'],
-        activate: `() => { globalThis.__startProbe.events.push('orphan') }`,
-      },
+    const { host, backendHost } = await newHost()
+
+    await host.start({
+      bundledDirectory: writeBundle({ 'com.orphan': ['com.missing'] }),
+      beforeActivation: ready,
     })
 
-    const byId = await startHost(bundle)
-
-    expect(byId['com.orphan'].status).toBe('error')
-    expect(byId['com.orphan'].errorMessage).toBe('Missing extension dependency "com.missing"')
-    expect(probe.__startProbe.events).toEqual([])
+    expect(byId(host)['com.orphan']).toMatchObject({
+      status: 'error',
+      errorMessage: 'Missing extension dependency "com.missing"',
+    })
+    expect(backendHost.activated).toEqual([])
   })
 
   it('fails activation when a dependency itself failed to activate', async () => {
-    const bundle = makeBundle({
-      'com.broken': { activate: `() => { throw new Error('boom') }` },
-      'com.dependant': {
-        extensionDependencies: ['com.broken'],
-        activate: `() => { globalThis.__startProbe.events.push('dependant') }`,
+    const { host, backendHost } = await newHost({
+      'com.broken': () => {
+        throw new Error('boom')
       },
     })
 
-    const byId = await startHost(bundle)
+    await host.start({
+      bundledDirectory: writeBundle({ 'com.broken': [], 'com.dependant': ['com.broken'] }),
+      beforeActivation: ready,
+    })
 
-    expect(byId['com.dependant'].status).toBe('error')
-    expect(byId['com.dependant'].errorMessage).toBe(
-      'Extension dependency "com.broken" failed to activate'
-    )
-    expect(probe.__startProbe.events).toEqual([])
+    expect(byId(host)['com.dependant']).toMatchObject({
+      status: 'error',
+      errorMessage: 'Extension dependency "com.broken" failed to activate',
+    })
+    expect(backendHost.activated).toEqual([])
   })
 
   it('fails every extension in a dependency cycle, naming the cycle, and activates the rest', async () => {
-    const bundle = makeBundle({
-      'com.one': {
-        extensionDependencies: ['com.two'],
-        activate: `() => { globalThis.__startProbe.events.push('one') }`,
-      },
-      'com.two': {
-        extensionDependencies: ['com.one'],
-        activate: `() => { globalThis.__startProbe.events.push('two') }`,
-      },
-      'com.free': { activate: `() => { globalThis.__startProbe.events.push('free') }` },
+    const { host, backendHost } = await newHost()
+
+    await host.start({
+      bundledDirectory: writeBundle({
+        'com.one': ['com.two'],
+        'com.two': ['com.one'],
+        'com.free': [],
+      }),
+      beforeActivation: ready,
     })
 
-    const byId = await startHost(bundle)
-
-    expect(byId['com.one'].errorMessage).toBe(
-      'Extension dependency cycle: com.one -> com.two -> com.one'
-    )
-    expect(byId['com.two'].errorMessage).toBe(
-      'Extension dependency cycle: com.two -> com.one -> com.two'
-    )
-    expect(probe.__startProbe.events).toEqual(['free'])
+    const extensions = byId(host)
+    expect(extensions['com.one']).toMatchObject({
+      errorMessage: 'Extension dependency cycle: com.one -> com.two -> com.one',
+    })
+    expect(extensions['com.two']).toMatchObject({
+      errorMessage: 'Extension dependency cycle: com.two -> com.one -> com.two',
+    })
+    expect(backendHost.activated.map((record) => record.id)).toEqual(['com.free'])
   })
 })

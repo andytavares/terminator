@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import os from 'os'
+import { FakeBackendHost, type FakeBackend } from './fake-backend-host'
 
 vi.mock('electron', () => ({
   app: {
@@ -31,200 +32,293 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
   getAllExtensionSettings: () => ({}),
 }))
 
-describe('ExtensionHost', () => {
-  beforeEach(() => {
-    vi.resetModules()
-    storeData.extensions = []
+let root: string
+
+beforeEach(() => {
+  vi.resetModules()
+  storeData.extensions = []
+  root = join(os.tmpdir(), `ext-host-${Date.now()}-${Math.random()}`)
+  mkdirSync(root, { recursive: true })
+})
+
+afterEach(() => rmSync(root, { recursive: true, force: true }))
+
+/** An extension directory: only its manifest, since the backend is the fake host's. */
+function writeExtension(id: string, manifest: Record<string, unknown> = {}): string {
+  const directory = join(root, id)
+  mkdirSync(directory, { recursive: true })
+  const fields = { id, name: id, version: '1.0.0', description: 'Test extension', main: 'main.js' }
+  writeFileSync(
+    join(directory, 'manifest.json'),
+    JSON.stringify({ ...fields, minAppVersion: '0.0.1', ...manifest })
+  )
+  return directory
+}
+
+/** A record as an earlier run stored it. */
+function storedRecord(id: string, status: 'enabled' | 'disabled') {
+  const directoryPath = join(root, id)
+  return {
+    id,
+    name: id,
+    version: '1.0.0',
+    description: '',
+    entryPoint: join(directoryPath, 'main.js'),
+    status,
+    installedAt: new Date().toISOString(),
+    directoryPath,
+  }
+}
+
+async function newHost(backends: Record<string, FakeBackend> = {}) {
+  const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+  const backendHost = new FakeBackendHost(backends)
+  return { host: new ExtensionHost(backendHost), backendHost }
+}
+
+const failing =
+  (message: string): FakeBackend =>
+  () => {
+    throw new Error(message)
+  }
+
+describe('ExtensionHost.load', () => {
+  it('activates the backend in the extension host, with the API it calls kept in main', async () => {
+    const { host, backendHost } = await newHost()
+    const directory = writeExtension('com.hosted')
+
+    const result = await host.load(directory)
+
+    expect(result).toMatchObject({ extension: { id: 'com.hosted', status: 'enabled' } })
+    expect(backendHost.activated).toEqual([
+      { id: 'com.hosted', entryPoint: join(directory, 'main.js'), dependencies: [] },
+    ])
+    expect(host.hostedApi('com.hosted')).toBeDefined()
+    expect(host.listExtensions().map((e) => e.id)).toEqual(['com.hosted'])
   })
 
-  it('activate error sets extension status to error without crashing host', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
+  it('stores the extension as failed, with why, when its backend fails to activate', async () => {
+    const { host } = await newHost({ 'com.crash': failing('activation boom') })
 
-    vi.doMock('/fake/ext/main.js', () => ({
-      activate: () => {
-        throw new Error('Extension crash')
-      },
-    }))
+    const result = await host.load(writeExtension('com.crash'))
 
-    const mockManifest = JSON.stringify({
-      id: 'com.test.crash',
-      name: 'Crash Ext',
-      version: '1.0.0',
-      description: 'A crashy extension',
-      main: 'main.js',
-      minAppVersion: '0.1.0',
+    expect(result).toMatchObject({
+      extension: { status: 'error', errorMessage: 'activation boom' },
     })
-
-    vi.doMock('/fake/ext/manifest.json', () => JSON.parse(mockManifest))
-
-    const result = await host.load('/fake/ext')
-    expect(
-      'error' in result || ('extension' in result && result.extension.status === 'error')
-    ).toBe(true)
+    expect(host.listExtensions()[0]).toMatchObject({ status: 'error' })
+    expect(host.hostedApi('com.crash')).toBeUndefined()
   })
 
-  it('invalid manifest returns INVALID_MANIFEST error', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
+  it('returns INVALID_MANIFEST for a directory without a manifest', async () => {
+    const { host, backendHost } = await newHost()
 
-    const result = await host.load('/nonexistent/path/to/extension')
-    expect('error' in result).toBe(true)
-    if ('error' in result) expect(result.error).toBe('INVALID_MANIFEST')
+    const result = await host.load(join(root, 'nothing-here'))
+
+    expect(result).toEqual({ error: 'INVALID_MANIFEST', message: 'Cannot read manifest.json' })
+    expect(host.listExtensions()).toHaveLength(0)
+    expect(backendHost.activated).toHaveLength(0)
   })
 
-  it('listExtensions returns list of registered extensions', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const list = host.listExtensions()
-    expect(Array.isArray(list)).toBe(true)
+  it('returns INVALID_MANIFEST when the manifest fails the schema', async () => {
+    const { host } = await newHost()
+
+    const result = await host.load(writeExtension('bad', { id: 'INVALID ID!' }))
+
+    expect(result).toMatchObject({ error: 'INVALID_MANIFEST', message: expect.any(String) })
   })
 
-  it('unload is a no-op for unknown extension id', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    await expect(host.unload('nonexistent.ext')).resolves.toBeUndefined()
+  it('returns DUPLICATE_ID for an extension already stored', async () => {
+    storeData.extensions = [storedRecord('com.dup', 'enabled')]
+    const { host, backendHost } = await newHost()
+
+    const result = await host.load(writeExtension('com.dup'))
+
+    expect(result).toEqual({ error: 'DUPLICATE_ID' })
+    expect(backendHost.activated).toHaveLength(0)
   })
 
-  it('toggle returns null for unknown extension id', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const result = await host.toggle('nonexistent.ext', true)
-    expect(result).toBeNull()
+  it.each(['99.0.0', '0.2.0'])(
+    'returns VERSION_INCOMPATIBLE when the manifest needs app %s',
+    async (minAppVersion) => {
+      const { host } = await newHost()
+
+      const result = await host.load(writeExtension('com.future', { minAppVersion }))
+
+      expect(result).toEqual({
+        error: 'VERSION_INCOMPATIBLE',
+        message: `Requires app >= ${minAppVersion}, got 0.1.0`,
+      })
+    }
+  )
+})
+
+describe('ExtensionHost.unload', () => {
+  it('deactivates the backend and disposes what it registered in main', async () => {
+    const { globalRegistry } = await import('../../../src/main/extensions/api')
+    const { host, backendHost } = await newHost()
+    await host.load(writeExtension('com.dispose'))
+    // The api server runs a backend's registrations on its API in main.
+    const api = host.hostedApi('com.dispose')!
+    api.commands.register({ id: 'disp-cmd', label: 'Disp' }, () => {})
+    api.topBar.registerMenuItem({ id: 'disp-top', label: 'Top', onClick: () => {} })
+
+    await host.unload('com.dispose')
+
+    expect(backendHost.deactivated).toEqual(['com.dispose'])
+    expect(globalRegistry.commandContributions.has('com.dispose.command.disp-cmd')).toBe(false)
+    expect(globalRegistry.topBarItems.has('com.dispose.topbar.disp-top')).toBe(false)
+    expect(host.hostedApi('com.dispose')).toBeUndefined()
   })
 
-  it('DUPLICATE_ID error when loading same extension twice', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
+  it('still disposes the registrations when deactivating the backend fails', async () => {
+    const { globalRegistry } = await import('../../../src/main/extensions/api')
+    const { host, backendHost } = await newHost()
+    await host.load(writeExtension('com.stubborn'))
+    host.hostedApi('com.stubborn')!.commands.register({ id: 'cmd', label: 'Cmd' }, () => {})
+    vi.spyOn(backendHost, 'deactivate').mockRejectedValue(new Error('deactivate failed'))
 
-    // First load will fail due to no manifest, but test store accumulation
-    const result1 = await host.load('/nonexistent/ext1')
-    expect('error' in result1).toBe(true)
-    // Store should still be empty since first load failed at manifest read stage
+    await expect(host.unload('com.stubborn')).resolves.toBeUndefined()
+
+    expect(globalRegistry.commandContributions.has('com.stubborn.command.cmd')).toBe(false)
+  })
+
+  it('does nothing for an extension that is not active', async () => {
+    const { host, backendHost } = await newHost()
+
+    await host.unload('com.unknown')
+
+    expect(backendHost.deactivated).toEqual([])
+  })
+})
+
+describe('ExtensionHost lifecycle', () => {
+  it('uninstall deactivates the backend and removes the extension', async () => {
+    const { host, backendHost } = await newHost()
+    await host.load(writeExtension('com.removable'))
+
+    await expect(host.uninstall('com.removable')).resolves.toBe(true)
+
+    expect(backendHost.deactivated).toEqual(['com.removable'])
     expect(host.listExtensions()).toHaveLength(0)
   })
 
-  it('uninstall returns false for unknown extension id', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const removed = await host.uninstall('nonexistent.ext')
-    expect(removed).toBe(false)
+  it('uninstall returns false for an unknown extension', async () => {
+    const { host } = await newHost()
+    await expect(host.uninstall('com.unknown')).resolves.toBe(false)
   })
 
-  it('uninstall returns true and removes extension from store', async () => {
-    storeData.extensions = [
-      {
-        id: 'com.removable',
-        name: 'Removable',
-        version: '1.0.0',
-        description: '',
-        entryPoint: '/fake/removable/main.js',
-        status: 'disabled',
-        installedAt: new Date().toISOString(),
-        directoryPath: '/fake/removable',
-      },
-    ]
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const removed = await host.uninstall('com.removable')
-    expect(removed).toBe(true)
-    expect(host.listExtensions()).toHaveLength(0)
-  })
+  it('reload deactivates the backend and activates it again', async () => {
+    const { host, backendHost } = await newHost()
+    await host.load(writeExtension('com.reload'))
 
-  it('reload returns NOT_FOUND error for unknown extension id', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const result = await host.reload('nonexistent.ext')
-    expect(result).toEqual({ error: 'NOT_FOUND' })
-  })
-
-  it('toggle enable path runs activate (even if activation fails) and returns extension', async () => {
-    storeData.extensions = [
-      {
-        id: 'com.togglable',
-        name: 'Toggle Me',
-        version: '1.0.0',
-        description: '',
-        entryPoint: '/nonexistent/toggle/main.js',
-        status: 'disabled',
-        installedAt: new Date().toISOString(),
-        directoryPath: '/nonexistent/toggle',
-      },
-    ]
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    // activate will fail (no real file) but toggle still updates status and returns extension
-    const result = await host.toggle('com.togglable', true)
-    expect(result?.id).toBe('com.togglable')
-  })
-
-  it('reload on an existing-but-unloadable extension returns an error result', async () => {
-    storeData.extensions = [
-      {
-        id: 'com.reload',
-        name: 'Reload Me',
-        version: '1.0.0',
-        description: '',
-        entryPoint: '/nonexistent/reload/main.js',
-        status: 'enabled',
-        installedAt: new Date().toISOString(),
-        directoryPath: '/nonexistent/reload',
-      },
-    ]
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    // The entry point doesn't exist, so reload will find the record but fail to activate
     const result = await host.reload('com.reload')
-    // Reload finds the record (so no NOT_FOUND) but activation fails → error
-    expect('error' in result).toBe(true)
+
+    expect(result).toMatchObject({ extension: { id: 'com.reload' } })
+    expect(backendHost.deactivated).toEqual(['com.reload'])
+    expect(backendHost.activated.map((record) => record.id)).toEqual(['com.reload', 'com.reload'])
   })
 
-  it('getExtensionDirectory returns null for unknown extension', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    expect(host.getExtensionDirectory('unknown.ext')).toBeNull()
-  })
-
-  it('getExtensionDirectory returns the directory path for a stored extension', async () => {
-    storeData.extensions = [
-      {
-        id: 'com.dirtest',
-        name: 'Dir Test',
-        version: '1.0.0',
-        description: '',
-        entryPoint: '/stored/ext/main.js',
-        status: 'enabled',
-        installedAt: new Date().toISOString(),
-        directoryPath: '/stored/ext',
+  it('reload returns why when the backend fails to activate again', async () => {
+    let starts = 0
+    const { host } = await newHost({
+      'com.reload': () => {
+        if (++starts > 1) throw new Error('second start failed')
       },
-    ]
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    expect(host.getExtensionDirectory('com.dirtest')).toBe('/stored/ext')
+    })
+    await host.load(writeExtension('com.reload'))
+
+    await expect(host.reload('com.reload')).resolves.toEqual({ error: 'second start failed' })
   })
 
-  it('listExtensions strips directoryPath and rendererRelPath from returned records', async () => {
+  it('reload returns NOT_FOUND for an unknown extension', async () => {
+    const { host } = await newHost()
+    await expect(host.reload('com.unknown')).resolves.toEqual({ error: 'NOT_FOUND' })
+  })
+
+  it('toggle off deactivates the backend; toggle on activates it again', async () => {
+    const { host, backendHost } = await newHost()
+    await host.load(writeExtension('com.toggle'))
+
+    await expect(host.toggle('com.toggle', false)).resolves.toMatchObject({ status: 'disabled' })
+    expect(backendHost.deactivated).toEqual(['com.toggle'])
+
+    await expect(host.toggle('com.toggle', true)).resolves.toMatchObject({ status: 'enabled' })
+    expect(backendHost.activated).toHaveLength(2)
+    expect(host.hostedApi('com.toggle')).toBeDefined()
+  })
+
+  it('toggle returns null for an unknown extension', async () => {
+    const { host } = await newHost()
+    await expect(host.toggle('com.unknown', true)).resolves.toBeNull()
+  })
+})
+
+describe('ExtensionHost when the extension host loses its backends', () => {
+  it('shows them as failed, with why, until they activate again', async () => {
+    const { host } = await newHost()
+    await host.load(writeExtension('com.lost'))
+
+    host.failHostedBackends(['com.lost'], 'Extension host exited with code 134')
+
+    expect(host.listExtensions()[0]).toMatchObject({
+      status: 'error',
+      errorMessage: 'Extension host exited with code 134',
+    })
+    expect(host.hostedApi('com.lost')).toBeUndefined()
+
+    await host.reload('com.lost')
+    expect(host.listExtensions()[0]).toMatchObject({ status: 'enabled' })
+    expect(host.listExtensions()[0].errorMessage).toBeUndefined()
+  })
+})
+
+describe('ExtensionHost records', () => {
+  it('getExtensionDirectory returns the stored directory, or null for an unknown extension', async () => {
+    storeData.extensions = [storedRecord('com.dir', 'enabled')]
+    const { host } = await newHost()
+
+    expect(host.getExtensionDirectory('com.dir')).toBe(join(root, 'com.dir'))
+    expect(host.getExtensionDirectory('com.unknown')).toBeNull()
+  })
+
+  it('listExtensions leaves out directoryPath and rendererRelPath', async () => {
     storeData.extensions = [
       {
-        id: 'com.strip',
-        name: 'Strip Test',
-        version: '1.0.0',
-        description: '',
-        entryPoint: '/strip/main.js',
-        status: 'enabled',
-        installedAt: new Date().toISOString(),
-        directoryPath: '/strip',
+        ...storedRecord('com.strip', 'enabled'),
         rendererRelPath: 'dist/renderer.js',
         rendererUrl: 'ext://com.strip/dist/renderer.js',
       },
     ]
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const list = host.listExtensions()
-    expect(list).toHaveLength(1)
-    expect('directoryPath' in list[0]).toBe(false)
-    expect('rendererRelPath' in list[0]).toBe(false)
-    expect(list[0].rendererUrl).toBe('ext://com.strip/dist/renderer.js')
+    const { host } = await newHost()
+
+    const [listed] = host.listExtensions()
+
+    expect('directoryPath' in listed).toBe(false)
+    expect('rendererRelPath' in listed).toBe(false)
+    expect(listed.rendererUrl).toBe('ext://com.strip/dist/renderer.js')
+  })
+})
+
+describe('ExtensionHost.start with an unusual bundled directory', () => {
+  it('skips subdirectories without a manifest', async () => {
+    mkdirSync(join(root, 'not-an-extension'))
+    const { host, backendHost } = await newHost()
+
+    await host.start({ bundledDirectory: root, beforeActivation: Promise.resolve() })
+
+    expect(host.listExtensions()).toHaveLength(0)
+    expect(backendHost.activated).toHaveLength(0)
+  })
+
+  it('copes with a bundled path that is a file', async () => {
+    const file = join(root, 'not-a-directory.txt')
+    writeFileSync(file, 'I am a file')
+    const { host } = await newHost()
+
+    await expect(
+      host.start({ bundledDirectory: file, beforeActivation: Promise.resolve() })
+    ).resolves.toBeUndefined()
+    expect(host.listExtensions()).toHaveLength(0)
   })
 })
 
@@ -261,523 +355,4 @@ describe('isVersionCompatible', () => {
       expect(await isCompatible(minVersion, appVersion)).toBe(expected)
     }
   )
-})
-
-describe('ExtensionHost – DUPLICATE_ID after successful first load', () => {
-  let tmpDir: string
-
-  beforeEach(() => {
-    vi.resetModules()
-    storeData.extensions = []
-    // Create a real temp directory with a valid manifest.json on disk
-    tmpDir = join(os.tmpdir(), `ext-dup-test-${Date.now()}`)
-    mkdirSync(tmpDir, { recursive: true })
-    writeFileSync(
-      join(tmpDir, 'manifest.json'),
-      JSON.stringify({
-        id: 'com.dup',
-        name: 'Dup',
-        version: '1.0.0',
-        description: 'A test extension',
-        main: 'main.js',
-        minAppVersion: '0.0.1',
-      })
-    )
-    // Write a stub entry point so activation can be attempted
-    writeFileSync(join(tmpDir, 'main.js'), 'module.exports = { activate: () => {} }')
-  })
-
-  afterEach(() => {
-    try {
-      rmSync(tmpDir, { recursive: true, force: true })
-    } catch {
-      /* ignore */
-    }
-  })
-
-  it('returns DUPLICATE_ID on second load attempt for same extension id', async () => {
-    // Pre-populate the store as if extension was already loaded
-    storeData.extensions = [
-      {
-        id: 'com.dup',
-        name: 'Dup',
-        version: '1.0.0',
-        description: '',
-        entryPoint: join(tmpDir, 'main.js'),
-        status: 'enabled',
-        installedAt: new Date().toISOString(),
-        directoryPath: tmpDir,
-      },
-    ]
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    // The store already has com.dup → load should detect duplicate
-    const result = await host.load(tmpDir)
-
-    expect('error' in result).toBe(true)
-    if ('error' in result) {
-      expect(result.error).toBe('DUPLICATE_ID')
-    }
-  })
-})
-
-describe('ExtensionHost – unload deactivate error path', () => {
-  beforeEach(() => {
-    vi.resetModules()
-    storeData.extensions = []
-  })
-
-  it('unload continues cleanly even when deactivate() throws', async () => {
-    // We set up a pre-loaded extension record in the store, then manually
-    // populate the internal `loaded` map via reflection so we can control
-    // the deactivate function.
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-
-    // Access private loaded map via cast
-    const loadedMap: Map<
-      string,
-      {
-        record: unknown
-        disposables: { dispose(): void }[]
-        module: { deactivate?: () => void | Promise<void> }
-      }
-    > = (host as unknown as { loaded: typeof loadedMap }).loaded
-
-    loadedMap.set('com.deact.err', {
-      record: {},
-      disposables: [
-        {
-          dispose: () => {
-            throw new Error('dispose failed')
-          },
-        },
-      ],
-      module: {
-        deactivate: () => {
-          throw new Error('deactivate failed')
-        },
-      },
-    })
-
-    // Should not throw even though deactivate and dispose both throw
-    await expect(host.unload('com.deact.err')).resolves.toBeUndefined()
-    expect(loadedMap.has('com.deact.err')).toBe(false)
-  })
-})
-
-describe('ExtensionHost – start with bundled directories', () => {
-  beforeEach(() => {
-    vi.resetModules()
-    storeData.extensions = []
-  })
-
-  it('skips subdirectories without manifest.json', async () => {
-    // We rely on the real fs — /tmp exists but has no sub-dirs with manifest.json
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    // /tmp has no manifest.json at top level sub-dirs in CI → should complete without error
-    await expect(
-      host.start({ bundledDirectory: '/tmp', beforeActivation: Promise.resolve() })
-    ).resolves.toBeUndefined()
-  })
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tests using real temp-dir extensions to exercise success paths and version
-// compatibility branches (isVersionCompatible lines 229-238).
-// ─────────────────────────────────────────────────────────────────────────────
-
-function makeExtDir(
-  id: string,
-  minAppVersion: string,
-  extraManifest: Record<string, unknown> = {}
-): string {
-  const dir = join(os.tmpdir(), `ext-${id}-${Date.now()}`)
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(
-    join(dir, 'manifest.json'),
-    JSON.stringify({
-      id,
-      name: id,
-      version: '1.0.0',
-      description: 'Test extension',
-      main: 'main.js',
-      minAppVersion,
-      ...extraManifest,
-    })
-  )
-  writeFileSync(
-    join(dir, 'main.js'),
-    'module.exports = { activate: () => {}, deactivate: () => {} }'
-  )
-  return dir
-}
-
-describe('ExtensionHost – successful load paths (real temp extensions)', () => {
-  const tmpDirs: string[] = []
-
-  beforeEach(() => {
-    vi.resetModules()
-    storeData.extensions = []
-  })
-
-  afterEach(() => {
-    for (const d of tmpDirs.splice(0)) {
-      try {
-        rmSync(d, { recursive: true, force: true })
-      } catch {
-        /* ignore */
-      }
-    }
-  })
-
-  it('load() succeeds and returns extension with status enabled', async () => {
-    const dir = makeExtDir('com.success.test', '0.0.1')
-    tmpDirs.push(dir)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const result = await host.load(dir)
-
-    expect('extension' in result).toBe(true)
-    if ('extension' in result) {
-      expect(result.extension.id).toBe('com.success.test')
-      expect(result.extension.status).toBe('enabled')
-    }
-    expect(host.listExtensions()).toHaveLength(1)
-  })
-
-  it('load() returns VERSION_INCOMPATIBLE when minAppVersion > app version', async () => {
-    // app.getVersion() === '0.1.0'; require a far-future version
-    const dir = makeExtDir('com.version.incompat', '99.0.0')
-    tmpDirs.push(dir)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const result = await host.load(dir)
-
-    expect('error' in result).toBe(true)
-    if ('error' in result) {
-      expect(result.error).toBe('VERSION_INCOMPATIBLE')
-    }
-  })
-
-  it('load() returns VERSION_INCOMPATIBLE when minor version exceeds app minor', async () => {
-    // app = 0.1.0, min = 0.2.0
-    const dir = makeExtDir('com.minor.incompat', '0.2.0')
-    tmpDirs.push(dir)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const result = await host.load(dir)
-
-    expect('error' in result).toBe(true)
-    if ('error' in result) {
-      expect(result.error).toBe('VERSION_INCOMPATIBLE')
-    }
-  })
-
-  it('load() accepts extension when app version equals minAppVersion', async () => {
-    const dir = makeExtDir('com.exact.version', '0.1.0')
-    tmpDirs.push(dir)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const result = await host.load(dir)
-
-    // Should not be VERSION_INCOMPATIBLE
-    if ('error' in result) {
-      expect(result.error).not.toBe('VERSION_INCOMPATIBLE')
-    } else {
-      expect(result.extension.id).toBe('com.exact.version')
-    }
-  })
-
-  it('load() stores extension and listExtensions returns it', async () => {
-    const dir = makeExtDir('com.list.test', '0.0.1')
-    tmpDirs.push(dir)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    await host.load(dir)
-    const list = host.listExtensions()
-
-    expect(list).toHaveLength(1)
-    expect(list[0].id).toBe('com.list.test')
-  })
-
-  it('reload() after successful load returns the extension', async () => {
-    const dir = makeExtDir('com.reload.success', '0.0.1')
-    tmpDirs.push(dir)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    await host.load(dir)
-
-    const result = await host.reload('com.reload.success')
-    expect('extension' in result).toBe(true)
-  })
-
-  it('toggle disable then re-enable updates status', async () => {
-    const dir = makeExtDir('com.toggle.full', '0.0.1')
-    tmpDirs.push(dir)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    await host.load(dir)
-
-    // Disable
-    const disabledExt = await host.toggle('com.toggle.full', false)
-    expect(disabledExt?.status).toBe('disabled')
-
-    // Re-enable
-    const enabledExt = await host.toggle('com.toggle.full', true)
-    expect(enabledExt?.status).toBe('enabled')
-  })
-
-  it('start() does not register a bundled extension that is already in the store', async () => {
-    const bundledDir = join(os.tmpdir(), `bundled-store-skip-${Date.now()}`)
-    const extDir = join(bundledDir, 'com.store.skip.test')
-    mkdirSync(extDir, { recursive: true })
-    writeFileSync(
-      join(extDir, 'manifest.json'),
-      JSON.stringify({
-        id: 'com.store.skip.test',
-        name: 'StoreSkip',
-        version: '1.0.0',
-        description: 'Store skip test',
-        main: 'main.js',
-        minAppVersion: '0.0.1',
-      })
-    )
-    writeFileSync(join(extDir, 'main.js'), 'module.exports = { activate: () => {} }')
-    tmpDirs.push(bundledDir)
-
-    storeData.extensions = [
-      {
-        id: 'com.store.skip.test',
-        name: 'StoreSkip',
-        version: '1.0.0',
-        description: 'Store skip test',
-        status: 'enabled',
-        installedAt: new Date().toISOString(),
-        entryPoint: join(extDir, 'main.js'),
-        directoryPath: extDir,
-      },
-    ]
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    await host.start({ bundledDirectory: bundledDir, beforeActivation: Promise.resolve() })
-    // Still just the pre-existing store entry, not a duplicate
-    expect(host.listExtensions()).toHaveLength(1)
-    expect(host.listExtensions()[0].id).toBe('com.store.skip.test')
-  })
-
-  it('unload() calls deactivate on a successfully loaded extension', async () => {
-    const dir = makeExtDir('com.unload.deact', '0.0.1')
-    tmpDirs.push(dir)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    await host.load(dir)
-
-    await expect(host.unload('com.unload.deact')).resolves.toBeUndefined()
-  })
-
-  it('load() returns INVALID_MANIFEST when manifest schema validation fails', async () => {
-    // Create a manifest that has invalid fields (id fails reverse-domain check)
-    const dir = join(os.tmpdir(), `ext-schema-fail-${Date.now()}`)
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(
-      join(dir, 'manifest.json'),
-      JSON.stringify({
-        id: 'INVALID ID!', // fails the regex
-        name: 'Bad',
-        version: '1.0.0',
-        description: 'Bad schema',
-        main: 'main.js',
-        minAppVersion: '0.0.1',
-      })
-    )
-    tmpDirs.push(dir)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const result = await host.load(dir)
-
-    expect('error' in result).toBe(true)
-    if ('error' in result) {
-      expect(result.error).toBe('INVALID_MANIFEST')
-      expect(result.message).toBeDefined()
-    }
-  })
-
-  it('load() returns extension with status error when activate() throws', async () => {
-    const dir = join(os.tmpdir(), `ext-act-crash-${Date.now()}`)
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(
-      join(dir, 'manifest.json'),
-      JSON.stringify({
-        id: 'com.activate.crash',
-        name: 'Crash On Activate',
-        version: '1.0.0',
-        description: 'Will crash on activate',
-        main: 'main.js',
-        minAppVersion: '0.0.1',
-      })
-    )
-    // Entry point that throws on load
-    writeFileSync(join(dir, 'main.js'), 'throw new Error("activation boom")')
-    tmpDirs.push(dir)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const result = await host.load(dir)
-
-    // Should return an extension with status 'error'
-    expect('extension' in result).toBe(true)
-    if ('extension' in result) {
-      expect(result.extension.status).toBe('error')
-    }
-    // Extension should be persisted in store with error status
-    expect(host.listExtensions()[0].status).toBe('error')
-  })
-
-  it('start() copes with a bundled path that is not a directory', async () => {
-    // Create a directory then immediately chmod it to cause readdirSync to fail
-    // Alternative: pass a file path that exists but is not a directory (readdirSync throws ENOTDIR)
-    const filePath = join(os.tmpdir(), `not-a-dir-${Date.now()}.txt`)
-    writeFileSync(filePath, 'I am a file')
-    tmpDirs.push(filePath)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-
-    // existsSync will return true (file exists) but readdirSync will throw ENOTDIR
-    await expect(
-      host.start({ bundledDirectory: filePath, beforeActivation: Promise.resolve() })
-    ).resolves.toBeUndefined()
-  })
-})
-
-describe('ExtensionHost – registration disposal on unload', () => {
-  const tmpDir = join(os.tmpdir(), `ext-dispose-${Date.now()}`)
-
-  beforeEach(() => {
-    storeData.extensions = []
-    mkdirSync(tmpDir, { recursive: true })
-    writeFileSync(
-      join(tmpDir, 'manifest.json'),
-      JSON.stringify({
-        id: 'com.dispose',
-        name: 'Dispose',
-        version: '1.0.0',
-        description: 'A test extension',
-        main: 'main.js',
-        minAppVersion: '0.0.1',
-      })
-    )
-    // Registers a command and a top-bar item WITHOUT a deactivate() — the host
-    // must dispose them through the api's collected disposables.
-    writeFileSync(
-      join(tmpDir, 'main.js'),
-      `module.exports = {
-        activate: (api) => {
-          api.commands.register({ id: 'disp-cmd', label: 'Disp' }, () => {})
-          api.topBar.registerMenuItem({ id: 'disp-top', label: 'Top', onClick: () => {} })
-        },
-      }`
-    )
-  })
-
-  afterEach(() => {
-    try {
-      rmSync(tmpDir, { recursive: true, force: true })
-    } catch {
-      /* ignore */
-    }
-  })
-
-  it('unload disposes every registration the extension made through the api', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const { globalRegistry } = await import('../../../src/main/extensions/api')
-    const host = new ExtensionHost()
-
-    const result = await host.load(tmpDir)
-    expect('error' in result).toBe(false)
-    expect(globalRegistry.commandContributions.has('com.dispose.command.disp-cmd')).toBe(true)
-    expect(globalRegistry.topBarItems.has('com.dispose.topbar.disp-top')).toBe(true)
-
-    await host.unload('com.dispose')
-    expect(globalRegistry.commandContributions.has('com.dispose.command.disp-cmd')).toBe(false)
-    expect(globalRegistry.commandHandlers.has('com.dispose.command.disp-cmd')).toBe(false)
-    expect(globalRegistry.topBarItems.has('com.dispose.topbar.disp-top')).toBe(false)
-  })
-})
-
-// ADR 094: every backend runs in the extension host.
-describe('ExtensionHost with an extension host process', () => {
-  let root: string
-
-  beforeEach(() => {
-    vi.resetModules()
-    storeData.extensions = []
-    root = join(os.tmpdir(), `ext-host-routing-${Date.now()}-${Math.random()}`)
-  })
-
-  afterEach(() => rmSync(root, { recursive: true, force: true }))
-
-  function writeExtension(id: string): string {
-    const directory = join(root, id)
-    mkdirSync(directory, { recursive: true })
-    const manifest = { id, name: id, version: '1.0.0', description: 'd', main: 'main.js' }
-    writeFileSync(
-      join(directory, 'manifest.json'),
-      JSON.stringify({ ...manifest, minAppVersion: '0.1.0' })
-    )
-    writeFileSync(
-      join(directory, 'main.js'),
-      `exports.activate = () => { globalThis.__activatedInMain = '${id}' }`
-    )
-    return directory
-  }
-
-  async function hostWithBackendHost() {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    const backendHost = { activate: vi.fn(async () => {}), deactivate: vi.fn(async () => {}) }
-    host.useBackendHost(backendHost)
-    return { host, backendHost }
-  }
-
-  it('activates a backend in the extension host, with the API it calls kept in main', async () => {
-    const { host, backendHost } = await hostWithBackendHost()
-    const directory = writeExtension('com.hosted')
-
-    await host.load(directory)
-
-    expect(backendHost.activate).toHaveBeenCalledWith({
-      id: 'com.hosted',
-      entryPoint: join(directory, 'main.js'),
-      dependencies: [],
-    })
-    expect(host.hostedApi('com.hosted')).toBeDefined()
-    expect((globalThis as { __activatedInMain?: string }).__activatedInMain).toBeUndefined()
-  })
-
-  it('shows backends the extension host lost as failed, with why', async () => {
-    const { host } = await hostWithBackendHost()
-    await host.load(writeExtension('com.lost'))
-
-    host.failHostedBackends(['com.lost'], 'Extension host exited with code 134')
-
-    expect(host.listExtensions().find((e) => e.id === 'com.lost')).toMatchObject({
-      status: 'error',
-      errorMessage: 'Extension host exited with code 134',
-    })
-    expect(host.hostedApi('com.lost')).toBeUndefined()
-  })
 })
