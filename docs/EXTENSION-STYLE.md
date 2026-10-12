@@ -197,5 +197,14 @@ missing one is added there first (ADR 098). Storybook shows each in both themes:
 
 A button's icon is the `icon` prop, sized by the stylesheet, not by `size`.
 
-Fonts ship with the app. Do not add a `<link>` to a font service or an
-`@import url(https://…)`; the UI must draw offline.
+Fonts ship with the app. Each view's entry imports `@terminator/extension-ui/fonts`
+once (the core renderer does the same); do not add a `<link>` to a font service or
+an `@import url(https://…)`; the UI must draw offline.
+
+A form in a dialog is a `Dialog` whose primary action has `submit: true`, so Enter
+submits; do not draw your own overlay, title or action row.
+
+Every story is screenshot by `npm run test:visual` (Playwright, over the built
+Storybook, both themes). A change that moves a component's pixels updates its
+baseline in `packages/extension-ui/visual/__screenshots__/linux/` in the same
+commit, generated on Linux with the Playwright version the repository pins.

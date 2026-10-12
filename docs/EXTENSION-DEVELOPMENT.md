@@ -413,6 +413,9 @@ import {
 </Dialog>
 ```
 
+An action with `submit: true` makes the dialog a form: Enter in a field runs that
+action once, and a field with `autoFocus` keeps the focus the dialog opens with.
+
 | Export                                       | Use it for                                                      |
 | -------------------------------------------- | --------------------------------------------------------------- |
 | `Dialog`                                     | A modal question or form. Scrim, focus trap, Escape.            |
@@ -424,7 +427,7 @@ import {
 | `Button`                                     | Primary, secondary, ghost or danger; an optional lucide icon.   |
 | `Tabs`                                       | An accessible tab list: arrow keys, Home, End, `aria-selected`. |
 | `Markdown`                                   | Sanitised Markdown. Links open through your `onOpenLink`.       |
-| `RelativeTime` / `formatRelativeTime`        | "5 minutes ago", through `Intl.RelativeTimeFormat`.             |
+| `RelativeTime` / `formatRelativeTime`        | "5 minutes ago"; nothing for a time that does not parse.        |
 | `usePolling`                                 | Read now and on an interval; ignores answers after unmount.     |
 | `everyWhileVisible`                          | Run a tick on an interval only while the view is visible.       |
 | `useDismissible`                             | Outside-click + Escape + focus restore, for your own surface.   |
@@ -452,6 +455,16 @@ declaration.
 `packages/extension-ui/src/tokens.css` defines every `--tm-*` token, and Storybook
 (`npm run storybook`) shows each component in both themes. Do not define a colour
 of your own.
+
+The tokens name IBM Plex Sans and IBM Plex Mono, but injected CSS cannot carry
+font files, so your view's entry imports them once, next to `createRoot`:
+
+```tsx
+import '@terminator/extension-ui/fonts'
+```
+
+Your bundler copies the font files beside your script; nothing is fetched. Without
+the import your view draws in whatever fonts the machine has.
 
 `docs/EXTENSION-STYLE.md` is the rule set — vocabulary, sentence case, button
 voice, empty states, icons, colour and layering. The vocabulary rules are enforced

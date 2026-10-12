@@ -38,6 +38,19 @@ should define a colour.
 trap, the modal-depth registry and the layer scale (`LAYERS`, `layerValue`,
 `nestedLayerValue`).
 
+**Fonts** — `@terminator/extension-ui/fonts` imports the IBM Plex Sans and Mono
+faces the tokens name. Every document imports it once from its entry: the core
+renderer, the Storybook preview and each extension view (`src/renderer/main.tsx`),
+because an extension view inherits nothing from the core and injected CSS cannot
+carry font files. The bundler copies the woff2 files next to the view's script.
+
+`Dialog` actions take `submit: true`: the panel becomes a `<form>`, so Enter in a
+field runs that action once. A field with `autoFocus` keeps focus when the dialog
+opens, and focus still returns to the control that opened it.
+
+`formatRelativeTime` returns `''`, and `RelativeTime` renders nothing, for a time
+that does not parse.
+
 `Markdown` takes `onOpenLink` for absolute addresses and an optional `renderCode`
 for fenced blocks (for example a syntax highlighter), so the package itself never
 sets inner HTML.
@@ -59,6 +72,22 @@ The stories run as tests through the
 in browser mode, so they need Playwright's Chromium (`npx playwright install
 chromium`). Their config is `vitest.stories.config.ts`, apart from the
 repository's own `vitest.config.ts`.
+
+## Screenshots
+
+```bash
+npm run build-storybook
+npm run test:visual                       # compare every story with its baseline
+npm run test:visual -- --update-snapshots # write new baselines after a deliberate change
+```
+
+`playwright.visual.config.ts` serves `storybook-static` with `vite preview` and
+`visual/stories.visual.ts` takes one screenshot per story in its `index.json`, after
+the story's play function and the fonts have finished, at 1280×800. Baselines are
+per platform (`visual/__screenshots__/{platform}/`), as the
+[Playwright docs](https://playwright.dev/docs/test-snapshots) advise, and CI
+compares on Linux only, in the Stories job. Generate them on Linux with the
+Chromium build the pinned Playwright installs (`npx playwright install chromium`).
 
 Add a component here before using it anywhere else, with a behaviour spec in
 `tests/unit/packages/extension-ui` and a story file in `stories/` (use `inLight`
