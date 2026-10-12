@@ -111,7 +111,7 @@ export async function listNotes(
             COALESCE(n.sort_order, 0) AS sort_order,
             n.folder_id,
             COALESCE((
-              SELECT STRING_AGG(t.name, ',')
+              SELECT GROUP_CONCAT(t.name, ',')
               FROM tags t JOIN note_tags nt2 ON nt2.tag_id = t.id
               WHERE nt2.note_id = n.id
             ), '') AS tags
@@ -152,7 +152,7 @@ export async function getNote(db: ExtensionDB, payload: unknown): Promise<Record
   }>(
     `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at,
             COALESCE((
-              SELECT STRING_AGG(t.name, ',')
+              SELECT GROUP_CONCAT(t.name, ',')
               FROM tags t JOIN note_tags nt ON nt.tag_id = t.id
               WHERE nt.note_id = n.id
             ), '') AS tags

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ipcMain } from 'electron'
 
 // Adapter: registerHandler forwards to the electron ipcMain mocks so existing
@@ -19,7 +19,7 @@ const mockApi = {
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { PGlite } from '@electric-sql/pglite'
+import { DatabaseSync } from 'node:sqlite'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
@@ -39,26 +39,13 @@ import {
 } from '../../../src/ipc/export.ipc'
 import type { ExtensionDB } from '../../../../../src/main/db/index'
 
-let pg: PGlite
 let db: ExtensionDB
 let exportDir: string
 let noteId: string
 
-let tables: string
-
-beforeAll(async () => {
-  pg = new PGlite()
-  await pg.waitReady
-  db = wrapDb(pg)
+beforeEach(async () => {
+  db = wrapDb(new DatabaseSync(':memory:'))
   await applyNotepadSchema(db)
-  const { rows } = await pg.query<{ names: string }>(
-    "SELECT string_agg(quote_ident(tablename), ', ') AS names FROM pg_tables WHERE schemaname = 'public'"
-  )
-  tables = rows[0].names
-})
-
-afterAll(async () => {
-  await pg.close()
 })
 
 beforeEach(async () => {
@@ -73,7 +60,6 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await pg.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`)
   fs.rmSync(exportDir, { recursive: true, force: true })
 })
 

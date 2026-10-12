@@ -18,6 +18,6 @@ Markdown notepad with live preview, margin comments, tags, and full-text search.
 
 ## Storage
 
-Notes, tags, comments, diagrams, and settings are stored in the shared PGlite (PostgreSQL-compatible) database via the injected `ExtensionDB`. Note, tag, and comment IDs are UUIDs assigned at creation and stable across restarts. Migrations run on every launch but only change a table that differs from the current schema (a legacy `diagrams.tags` column is copied into `diagram_tags` once, then dropped), so a launch never alters data that is already current.
+Notes, tags, comments, diagrams, and settings are stored in the shared SQLite database (`app.sqlite`) via the injected `ExtensionDB`. Note, tag, and comment IDs are UUIDs assigned at creation and stable across restarts. The schema is created with `CREATE TABLE IF NOT EXISTS` on every launch, so a launch never alters data that is already there. Search matches with `LIKE`, which ignores case for ASCII letters only. Notes from the previous PGlite database are imported once on the first start after the upgrade.
 
 See also: `specs/010-markdown-notepad/contracts/ipc-channels.md` for the full IPC surface.

@@ -18,7 +18,7 @@ async function readConfig(db: ExtensionDB): Promise<KanbanConfig> {
 
 async function writeConfig(db: ExtensionDB, config: KanbanConfig): Promise<void> {
   await db.run(
-    `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'kanban_config', ?) ON CONFLICT (extension_id, key) DO UPDATE SET value = EXCLUDED.value`,
+    `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'kanban_config', ?) ON CONFLICT (extension_id, key) DO UPDATE SET value = excluded.value`,
     [JSON.stringify(config)]
   )
 }

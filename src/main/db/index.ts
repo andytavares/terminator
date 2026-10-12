@@ -1,6 +1,4 @@
-import { PGlite } from '@electric-sql/pglite'
-import { createRequire } from 'node:module'
-import { readFileSync, existsSync, unlinkSync, renameSync } from 'node:fs'
+import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import * as path from 'node:path'
 
 export interface ExtensionDB {
@@ -17,150 +15,90 @@ export interface ExtensionDB {
   transaction<T>(fn: (tx: ExtensionDB) => Promise<T>): Promise<T>
 }
 
-// Convert SQLite-style ? placeholders to Postgres $1, $2, ...
-function toPositional(sql: string, params?: unknown[]): [string, unknown[]] {
-  if (!params || params.length === 0) return [sql, []]
-  let n = 0
-  return [sql.replace(/\?/g, () => `$${++n}`), params]
-}
+type Statements = Omit<ExtensionDB, 'transaction'>
 
-type PgTx = Parameters<Parameters<PGlite['transaction']>[0]>[0]
-
-let _spCount = 0
-
-function wrapTx(tx: PgTx): ExtensionDB {
+function statements(database: DatabaseSync): Statements {
+  const bind = (params: unknown[] = []) => params as SQLInputValue[]
   return {
     async exec(sql) {
-      await tx.exec(sql)
+      database.exec(sql)
     },
     async query<T extends Record<string, unknown>>(sql: string, params?: unknown[]) {
-      const [s, p] = toPositional(sql, params)
-      const result = await tx.query<T>(s, p)
-      return result.rows
+      return database.prepare(sql).all(...bind(params)) as T[]
     },
-    async get<T extends Record<string, unknown>>(
-      sql: string,
-      params?: unknown[]
-    ): Promise<T | undefined> {
-      const [s, p] = toPositional(sql, params)
-      const result = await tx.query<T>(s, p)
-      return result.rows[0]
+    async get<T extends Record<string, unknown>>(sql: string, params?: unknown[]) {
+      return database.prepare(sql).get(...bind(params)) as T | undefined
     },
-    async run(sql: string, params?: unknown[]) {
-      const [s, p] = toPositional(sql, params)
-      const result = await tx.query(s, p)
-      return result.affectedRows ?? 0
+    async run(sql, params) {
+      return Number(database.prepare(sql).run(...bind(params)).changes)
     },
-    async transaction<T>(fn: (tx2: ExtensionDB) => Promise<T>) {
-      // PGlite does not support nested BEGIN; demote to a savepoint.
-      const sp = `sp_${++_spCount}`
-      await tx.exec(`SAVEPOINT ${sp}`)
+  }
+}
+
+/**
+ * Wraps one synchronous connection in the async ExtensionDB interface. Statements
+ * and transactions run one at a time, in call order: a statement issued while a
+ * transaction is open waits for it, so it is never committed or rolled back with it.
+ */
+export function wrapDb(database: DatabaseSync): ExtensionDB {
+  const direct = statements(database)
+  let tail: Promise<unknown> = Promise.resolve()
+  let savepoints = 0
+
+  const inOrder = <T>(task: () => Promise<T>): Promise<T> => {
+    const result = tail.then(task)
+    tail = result.catch(() => undefined)
+    return result
+  }
+
+  const withinTransaction: ExtensionDB = {
+    ...direct,
+    async transaction<T>(fn: (tx: ExtensionDB) => Promise<T>): Promise<T> {
+      const savepoint = `sp_${++savepoints}`
+      database.exec(`SAVEPOINT ${savepoint}`)
       try {
-        const result = await fn(wrapTx(tx))
-        await tx.exec(`RELEASE SAVEPOINT ${sp}`)
+        const result = await fn(withinTransaction)
+        database.exec(`RELEASE ${savepoint}`)
         return result
-      } catch (e) {
-        await tx.exec(`ROLLBACK TO SAVEPOINT ${sp}`)
-        throw e
+      } catch (error) {
+        database.exec(`ROLLBACK TO ${savepoint}; RELEASE ${savepoint}`)
+        throw error
       }
     },
   }
-}
 
-export function wrapDb(db: PGlite): ExtensionDB {
+  async function transaction<T>(fn: (tx: ExtensionDB) => Promise<T>): Promise<T> {
+    database.exec('BEGIN')
+    try {
+      const result = await fn(withinTransaction)
+      database.exec('COMMIT')
+      return result
+    } catch (error) {
+      database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
   return {
-    async exec(sql) {
-      await db.exec(sql)
-    },
-    async query<T extends Record<string, unknown>>(sql: string, params?: unknown[]) {
-      const [s, p] = toPositional(sql, params)
-      const result = await db.query<T>(s, p)
-      return result.rows
-    },
-    async get<T extends Record<string, unknown>>(
-      sql: string,
-      params?: unknown[]
-    ): Promise<T | undefined> {
-      const [s, p] = toPositional(sql, params)
-      const result = await db.query<T>(s, p)
-      return result.rows[0]
-    },
-    async run(sql: string, params?: unknown[]) {
-      const [s, p] = toPositional(sql, params)
-      const result = await db.query(s, p)
-      return result.affectedRows ?? 0
-    },
-    async transaction<T>(fn: (tx: ExtensionDB) => Promise<T>) {
-      return db.transaction((tx) => fn(wrapTx(tx)))
-    },
+    exec: (sql) => inOrder(() => direct.exec(sql)),
+    query: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) =>
+      inOrder(() => direct.query<T>(sql, params)),
+    get: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) =>
+      inOrder(() => direct.get<T>(sql, params)),
+    run: (sql, params) => inOrder(() => direct.run(sql, params)),
+    transaction: (fn) => inOrder(() => transaction(fn)),
   }
 }
 
-let _pg: PGlite | null = null
+let _database: DatabaseSync | null = null
 let _db: ExtensionDB | null = null
 
-async function tryInitPGlite(
-  dbPath: string,
-  wasmModule: WebAssembly.Module,
-  fsBundle: Blob
-): Promise<PGlite> {
-  // Remove stale PostgreSQL lock files left by a previous unclean exit.
-  for (const name of ['postmaster.pid', '.s.PGSQL.5432.lock.out', '.s.PGSQL.5432']) {
-    const p = path.join(dbPath, name)
-    if (existsSync(p)) {
-      try {
-        unlinkSync(p)
-      } catch {
-        // best-effort
-      }
-    }
-  }
-  const pg = new PGlite({ dataDir: dbPath, wasmModule, fsBundle })
-  await pg.waitReady
-  // Probe the catalog — pg_attribute corruption surfaces here, not at waitReady.
-  await pg.query('SELECT 1 FROM information_schema.columns LIMIT 1')
-  // Probe each user table to force PGLite to build relation caches.
-  // pg_attribute corruption on a specific table only surfaces at this point,
-  // not during the information_schema probe above.
-  const tables = await pg.query<{ tablename: string }>(
-    `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`
-  )
-  for (const { tablename } of tables.rows) {
-    await pg.query(`SELECT 1 FROM "${tablename}" LIMIT 0`)
-  }
-  return pg
-}
-
-export async function initAppDb(userData: string): Promise<void> {
-  const dbPath = path.join(userData, 'app.pglite')
-
-  // Pass PGlite's wasm + filesystem bundle explicitly. Only the two binary
-  // files are in app.asar.unpacked (see asarUnpack in electron-builder.yml);
-  // Electron's asar fs interception redirects readFileSync on the virtual asar
-  // path to the real unpacked file. All pglite JS remains inside the asar so
-  // ESM dynamic imports (e.g. import("./fs/nodefs.js")) resolve correctly.
-  const req = createRequire(import.meta.url)
-  const distDir = path.dirname(req.resolve('@electric-sql/pglite'))
-  const wasmModule = await WebAssembly.compile(readFileSync(path.join(distDir, 'postgres.wasm')))
-  const fsBundle = new Blob([readFileSync(path.join(distDir, 'postgres.data'))])
-
-  try {
-    _pg = await tryInitPGlite(dbPath, wasmModule, fsBundle)
-  } catch {
-    // Existing database is corrupt. Back it up and start fresh.
-    if (existsSync(dbPath)) {
-      const backup = `${dbPath}.corrupt-backup-${Math.floor(Date.now() / 1000)}`
-      try {
-        renameSync(dbPath, backup)
-      } catch {
-        // Rename failed (e.g. cross-device); proceed without backup — fresh
-        // init will overwrite whatever is there.
-      }
-    }
-    _pg = await tryInitPGlite(dbPath, wasmModule, fsBundle)
-  }
-
-  _db = wrapDb(_pg)
+export function initAppDb(userData: string): void {
+  _database = new DatabaseSync(path.join(userData, 'app.sqlite'), {
+    enableForeignKeyConstraints: true,
+  })
+  _database.exec('PRAGMA journal_mode = WAL')
+  _db = wrapDb(_database)
 }
 
 export function getAppDb(): ExtensionDB {
@@ -168,13 +106,10 @@ export function getAppDb(): ExtensionDB {
   return _db
 }
 
-export async function closeAppDb(): Promise<void> {
-  if (_pg) {
-    await _pg.close()
-    _pg = null
-    _db = null
-    _spCount = 0
-  }
+export function closeAppDb(): void {
+  _database?.close()
+  _database = null
+  _db = null
 }
 
 export async function healthCheck(): Promise<{ ok: boolean; message?: string }> {

@@ -119,7 +119,11 @@ Sessions do not survive app restart. This is an explicit Phase 1 scope decision.
 
 See [ADR-003](adr/003-electron-store-for-persistence.md) for the storage decision.
 
-**One process per profile.** `userData/app.pglite` is single-user Postgres with no cross-process locking; two processes on it overwrite each other's catalog (a live DB was found with `diagrams`' row type but no table). `src/main/claim-profile.ts`, the first import of `src/main/index.ts`, takes Electron's single-instance lock (a second launch exits and focuses the first window) and moves an unpackaged run to `<userData>-dev` unless `--user-data-dir` is given, so `npm run dev` never opens the installed app's database.
+**Application database.** `userData/app.sqlite` is the one SQL database of the app, opened through Node's built-in `node:sqlite` (`DatabaseSync`, WAL journal, foreign keys on) in `src/main/db/index.ts`. The core owns no tables; each extension creates its own when it activates and reaches the database only through the injected `ExtensionDB` (`exec`, `query`, `get`, `run`, `transaction`). Statements and transactions run on the one connection in call order; a statement issued while a transaction is open waits for it. `node:sqlite` is a release candidate (stability 1.2) in Node 24, the risk ADR 099 accepts. It replaced PGlite, which added about 250 MB to the main process and about 0.6 s to every start.
+
+**Import from PGlite.** Up to and including the release before this one, the database was `userData/app.pglite`. On the first start where `app.sqlite` does not exist and `app.pglite` does, `src/main/db/legacy-pglite-import.ts` opens the old database once (PGlite is imported dynamically, on this path only, so a normal start never loads it) and, after the extensions have run their schema setup in `activate`, copies every row of each table that exists in both databases, in one transaction with foreign keys deferred. `app.pglite` is left untouched as the backup. If the import fails, the error is logged (`Legacy PGlite import failed`), the transaction is rolled back and the app starts with an empty database instead of refusing to start; the backup stays, and deleting `app.sqlite` makes the next start import again. Only tables of extensions that were activated on that start are imported. The import, the `@electric-sql/pglite` dependency and the `asarUnpack` entries for `postgres.wasm` and `postgres.data` are removed one release later (ADR 099).
+
+**One process per profile.** `userData/app.sqlite` is opened by one process at a time. `src/main/claim-profile.ts`, the first import of `src/main/index.ts`, takes Electron's single-instance lock (a second launch exits and focuses the first window) and moves an unpackaged run to `<userData>-dev` unless `--user-data-dir` is given, so `npm run dev` never opens the installed app's database.
 
 ---
 
@@ -779,11 +783,11 @@ This alias layer allows the core design system to evolve (rename, restructure to
 
 ## Task Vault Extension Architecture
 
-The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA productivity system. The shared **PGlite (PostgreSQL-compatible WASM)** database is the datastore for all structured queries and CRUD. Key subsystems:
+The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA productivity system. The shared **SQLite** database (`node:sqlite`, see Persistence boundaries) is the datastore for all structured queries and CRUD. Key subsystems:
 
 ### Vault Layer (`src/vault/`)
 
-- **db.ts** — Defines the `settings`, `tasks`, `projects`, `areas`, and `links` schema via `applyTaskVaultSchema()`, and manages incremental schema upgrades via `applyTaskVaultMigrations()`. All IPC handlers receive the shared `ExtensionDB` instance (injected by the main-process extension API) and access data exclusively through it. Runs `backfillRecurringTasks` on startup to gap-fill any missing future occurrences. The `settings` table is shared with other extensions and keyed `PRIMARY KEY (extension_id, key)`; Task Vault reads, writes and resets only rows with `extension_id = 'task-vault'`.
+- **db.ts** — Defines the `settings`, `tasks`, `projects`, `areas`, and `links` schema via `applyTaskVaultSchema()`, which creates the final schema in one idempotent step (`CREATE TABLE IF NOT EXISTS`; no column-by-column migrations, because every SQLite database is created from it). All IPC handlers receive the shared `ExtensionDB` instance (injected by the main-process extension API) and access data exclusively through it. Runs `backfillRecurringTasks` on startup to gap-fill any missing future occurrences. The `settings` table is shared with other extensions and keyed `PRIMARY KEY (extension_id, key)`; Task Vault reads, writes and resets only rows with `extension_id = 'task-vault'`.
 - **recurrence.ts** — `RecurrenceRule` discriminated union, `parseRecurrenceRule` (throws `InvalidRecurrenceRuleError` on unknown input), and `computeNextDueDate` (strict mode: next date = previous + interval, never completion date). Also exports `localDate()` helper.
 - **ensure-next-occurrence.ts** — `ensureNextOccurrence(db, taskId)`: idempotent function that checks whether a future `status='open'` instance already exists and inserts one if not. `backfillRecurringTasks(db)`: called at extension startup to handle days the app was closed.
 - **tags.ts** — Utilities for extracting and normalising `@context`, `+project`, `#area`, and `due:` inline tags from task text.
@@ -815,7 +819,7 @@ End conditions (`recurrence_end_type`, `recurrence_end_date`, `recurrence_end_co
 
 **Trigger points** (the only places that create new occurrence rows):
 
-1. Extension startup — `applyTaskVaultMigrations` runs, then `backfillRecurringTasks`. Handles days the app was closed.
+1. Extension startup — `applyTaskVaultSchema` runs, then `backfillRecurringTasks`. Handles days the app was closed.
 2. `task-vault:vault:complete-task` IPC handler — completes the current task and calls `ensureNextOccurrence` in the same SQLite transaction.
 3. `task-vault:vault:set-recurrence` IPC handler — sets the rule and immediately materialises the first future instance.
 
@@ -877,12 +881,12 @@ See [ADR-018](adr/018-codemirror6-editor.md) for the editor engine decision.
 ```
 Main process (Node.js)
   └─ extensions/notepad/src/index.ts (activate/deactivate)
-       ├─ PGlite (PostgreSQL) — shared app DB via src/main/db/index.ts (ExtensionDB interface)
+       ├─ SQLite (node:sqlite) — shared app DB via src/main/db/index.ts (ExtensionDB interface)
        ├─ registerNotesIpcHandlers()    — notes.create/list/get/autosave/archive/restore/hardDelete/reorder
        ├─ registerTagsIpcHandlers()     — tags.list/rename/delete
        ├─ registerFoldersIpcHandlers()  — folders.create/list/rename/delete/move
        ├─ registerCommentsIpcHandlers() — comments.create/reply/update/delete/resolve/updateAnchor/markOrphaned/list
-       ├─ registerSearchIpcHandlers()   — search.query (ILIKE-based full-text search)
+       ├─ registerSearchIpcHandlers()   — search.query (LIKE-based full-text search)
        └─ registerExportIpcHandlers()   — export.pickFolder/export.run/import.run (notes + diagrams)
 
 Renderer process (jsdom + React + CM6)
@@ -901,19 +905,19 @@ Renderer process (jsdom + React + CM6)
 
 ### Database Layer
 
-Notes and diagrams are stored in the **shared PGlite (PostgreSQL-compatible) database** at `<userData>/app.pglite`. The notepad extension never manages its own database file; it receives an `ExtensionDB` instance (defined in `src/main/db/index.ts`) injected into every IPC handler at registration time. `ExtensionDB` wraps PGlite with a SQLite-compatible `?`-placeholder API via a positional converter, and exposes `exec`, `query`, `get`, `run`, and `transaction`. Nested `transaction()` calls automatically demote to PostgreSQL savepoints.
+Notes and diagrams are stored in the **shared SQLite database** at `<userData>/app.sqlite`. The notepad extension never manages its own database file; it receives an `ExtensionDB` instance (defined in `src/main/db/index.ts`) injected into every IPC handler at registration time. `ExtensionDB` exposes `exec`, `query`, `get`, `run`, and `transaction` over `node:sqlite` with `?` placeholders. Nested `transaction()` calls become `SAVEPOINT`s.
 
-**Schema migrations**: `applyNotepadMigrations` is idempotent. Each step is guarded by a check of the current schema, so a launch against an up-to-date database executes no `ALTER TABLE` or `DROP` (asserted in `db.spec.ts`).
+**Schema**: `applyNotepadSchema` creates every table and index with `IF NOT EXISTS`, so running it on each launch changes nothing that already exists. The database is created from this schema, which is why there are no column migrations.
 
 **Legacy migration**: removed. The import of the old better-sqlite3 `notepad.db` / `vault.db` files through `sql.js` is closed (ADR 099).
 
-**Search**: full-text search uses `ILIKE` (case-insensitive pattern match) rather than a dedicated FTS5 virtual table. Tag filters are applied in the same query via `EXISTS` subqueries. This simplifies the schema at the cost of FTS5 BM25 ranking — results are returned in `updated_at DESC` order. See [ADR-019](adr/019-ilike-search-over-fts5.md) for the trade-off rationale and the planned `pg_trgm` upgrade path.
+**Search**: full-text search uses `LIKE` (case-insensitive pattern match) rather than a dedicated FTS5 virtual table. SQLite's `LIKE` folds case for ASCII letters only, so a search for `é` does not match `É` (PGlite's `ILIKE` matched both). Tag filters are applied in the same query via `EXISTS` subqueries. This simplifies the schema at the cost of FTS5 BM25 ranking — results are returned in `updated_at DESC` order. See [ADR-019](adr/019-ilike-search-over-fts5.md) for the trade-off rationale; its `pg_trgm` upgrade path was PGlite-specific and no longer applies.
 
 ### Data Flow
 
-1. **Note create/autosave**: Renderer → `notes.autosave` IPC → PGlite `notes` table. Inline `#tag` parsing on autosave reconciles the `note_tags` join table via `reconcileTags()`.
+1. **Note create/autosave**: Renderer → `notes.autosave` IPC → SQLite `notes` table. Inline `#tag` parsing on autosave reconciles the `note_tags` join table via `reconcileTags()`.
 
-2. **Search**: Renderer → `search.query` IPC → `ILIKE '%query%'` across `title` and `body`; `tag:foo` / `-tag:bar` tokens resolved to tag IDs before the main query.
+2. **Search**: Renderer → `search.query` IPC → `LIKE '%query%'` across `title` and `body`; `tag:foo` / `-tag:bar` tokens resolved to tag IDs before the main query.
 
 3. **Folders**: Notes and diagrams each carry a nullable `folder_id` FK. `folders.create/rename/delete` manage the `folders` table; `notes.reorder` and `folders.move` update `sort_order` and `folder_id` respectively using an explicit `{ note: 'notes', diagram: 'diagrams' }` table map (never dynamic string interpolation).
 
@@ -924,7 +928,7 @@ Notes and diagrams are stored in the **shared PGlite (PostgreSQL-compatible) dat
    - CM6 `commentAnchorField` (`StateField<CommentAnchor[]>`) remaps positions via `tr.changes.mapPos()` on every transaction
    - Orphaned anchors (collapsed or not found) surface in the "Orphaned" section of `CommentMargin`
 
-5. **Export/Import**: `export.run` → `gray-matter` YAML frontmatter → `.md` files; diagrams exported as `.excalidraw.json`. Re-export matches existing files by frontmatter `id` (idempotent). `import.run` upserts by `id`. `STRING_AGG` (Postgres) aggregates tags in the export query.
+5. **Export/Import**: `export.run` → `gray-matter` YAML frontmatter → `.md` files; diagrams exported as `.excalidraw.json`. Re-export matches existing files by frontmatter `id` (idempotent). `import.run` upserts by `id`. `GROUP_CONCAT` aggregates tags in the export query.
 
 ### New IPC Channels (22 total)
 

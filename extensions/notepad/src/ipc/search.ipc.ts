@@ -108,8 +108,8 @@ export async function searchNotes(
   }
 
   if (textQuery) {
-    // ILIKE replaces FTS5; full sequential scan on large sets — see ADR-019 for upgrade path.
-    whereConditions.push(`(n.title ILIKE ? OR n.body ILIKE ?)`)
+    // LIKE replaces FTS5 and is case-insensitive for ASCII only (ADR-019, ADR-099); full scan on large sets.
+    whereConditions.push(`(n.title LIKE ? OR n.body LIKE ?)`)
     whereParams.push(`%${textQuery}%`, `%${textQuery}%`)
   }
 
@@ -135,7 +135,7 @@ export async function searchNotes(
 
   const rows = await db.query<SearchRow>(
     `SELECT n.id, n.title, n.body, n.updated_at, n.archived_at,
-            STRING_AGG(t_all.name, ',') AS tags
+            GROUP_CONCAT(t_all.name, ',') AS tags
      FROM notes n
      ${joinSql}
      ${whereSql}

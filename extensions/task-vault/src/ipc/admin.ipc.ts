@@ -8,7 +8,7 @@ export function registerAdminIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
   handle('task-vault:admin:list-tables', async () => {
     try {
       const rows = await db.query<{ table_name: string }>(
-        `SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name`
+        `SELECT name AS table_name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
       )
       return { tables: rows.map((r) => r.table_name) }
     } catch (err) {
@@ -19,13 +19,13 @@ export function registerAdminIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
   handle('task-vault:admin:table-stats', async () => {
     try {
       const tableRows = await db.query<{ table_name: string }>(
-        `SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name`
+        `SELECT name AS table_name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
       )
       const tables = tableRows.map((r) => r.table_name)
       const stats: Record<string, number> = {}
       for (const t of tables) {
-        const row = await db.get<{ n: string }>(`SELECT COUNT(*) AS n FROM "${t}"`)
-        stats[t] = parseInt(row?.n ?? '0', 10)
+        const row = await db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM "${t}"`)
+        stats[t] = row?.n ?? 0
       }
       return { stats }
     } catch (err) {

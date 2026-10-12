@@ -9,7 +9,6 @@ vi.mock('electron', () => ({
 
 vi.mock('../../src/db/db', () => ({
   applyNotepadSchema: vi.fn().mockResolvedValue(undefined),
-  applyNotepadMigrations: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('../../src/ipc/notes.ipc', () => ({
   registerNotesIpcHandlers: vi.fn(() => vi.fn()),
