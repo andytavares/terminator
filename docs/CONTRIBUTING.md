@@ -81,11 +81,18 @@ npm run build:extensions   # compile all extensions
 ```bash
 npm run lint       # ESLint (zero errors required)
 npm run lint:deps  # syncpack: exact versions, one per package
+npm run lint:unused  # knip: no unused files, exports or dependencies
 npm run typecheck  # TypeScript type check (no emit — zero errors required)
 npm run format     # Prettier (auto-fixes)
 ```
 
 The root `npx tsc --noEmit` checks nothing; use `npm run typecheck`, which checks main, renderer, shared, both packages and every extension. Both `lint` and `typecheck` must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
+
+`npm run lint:unused` runs [knip](https://knip.dev) with `knip.jsonc` and must report nothing ([ADR 102](adr/102-unused-code-is-a-ci-gate.md)). Its plugins find the entry points: electron-vite's main, preload and renderer inputs, each extension's `src/index.ts` and view, Vite, Vitest, Playwright and Storybook configs, and the `exports` of the SDK and the design system, which are their public API. When it reports something:
+
+- Unused and unreachable: delete it, with any test that covers only it (Constitution VI).
+- Exported but used only in its own file: drop the `export`.
+- Reached in a way knip cannot see (loaded by path at run time, a global declaration): add it to `knip.jsonc` with a comment that says how it is reached, and check that claim with `grep`.
 
 ---
 
@@ -214,7 +221,7 @@ Dependency install scripts are blocked by npm unless listed in `allowScripts` in
 Before opening a PR, verify:
 
 - [ ] All tests pass (`npm test`)
-- [ ] `npm run lint`, `npm run lint:deps` and `npm run typecheck` pass with 0 errors
+- [ ] `npm run lint`, `npm run lint:deps`, `npm run lint:unused` and `npm run typecheck` pass with 0 errors
 - [ ] `npm run format:check` passes
 - [ ] `npm run build:extensions` succeeds (no compile errors)
 - [ ] No unused imports, variables, or dead code introduced

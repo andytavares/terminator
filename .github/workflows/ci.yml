@@ -34,6 +34,10 @@ jobs:
       - name: Dependency versions
         run: npm run lint:deps
 
+      # Unused files, exports and dependencies (knip.jsonc, ADR 102).
+      - name: Unused code
+        run: npm run lint:unused
+
       - name: Lint
         run: npm run lint
 
