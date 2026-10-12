@@ -1,3 +1,4 @@
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { useLogStore, type LogLevel } from './stores/log.store'
 
 function ship(level: LogLevel, namespace: string, message: string): void {
@@ -9,12 +10,8 @@ function ship(level: LogLevel, namespace: string, message: string): void {
   }
 }
 
-export interface RendererLogger {
-  debug(message: string, ...meta: unknown[]): void
-  info(message: string, ...meta: unknown[]): void
-  warn(message: string, ...meta: unknown[]): void
-  error(message: string, ...meta: unknown[]): void
-}
+/** The logger the SDK declares for extensions; the renderer's own modules get the same shape. */
+export type RendererLogger = ExtensionAPI['log']
 
 function fmt(message: string, meta: unknown[]): string {
   if (meta.length === 0) return message

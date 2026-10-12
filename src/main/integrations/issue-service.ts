@@ -6,14 +6,13 @@ import type {
   TrackerFailure,
   TrackerId,
 } from '../../shared/types/index.js'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { TrackerError, toErrorKind, toErrorMessage } from './tracker-error.js'
 import type {
-  NewIssueInput,
   StoredCredential,
   TrackerProvider,
   TrackerStateOption,
   TrackerTeam,
-  TransitionIntent,
 } from './providers/provider.js'
 
 // The one place that decides how fresh is fresh enough, how many requests one
@@ -46,49 +45,11 @@ export interface IssueServiceDeps {
   onTrackerError: (tracker: TrackerId, kind: ReturnType<typeof toErrorKind> | null) => void
 }
 
-export interface IssueService {
-  listMine(opts?: { tracker?: TrackerId; limit?: number }): Promise<IssueListResult>
-  search(term: string, opts?: { tracker?: TrackerId; limit?: number }): Promise<IssueListResult>
-  get(tracker: TrackerId, key: string, opts?: { refresh?: boolean }): Promise<Issue | null>
-  comment(tracker: TrackerId, key: string, body: string): Promise<void>
-
-  /**
-   * What this issue can be moved to, right now.
-   *
-   * Per-issue rather than per-project: a tracker's answer may depend on the
-   * issue's current status.
-   */
-  states(tracker: TrackerId, key: string): Promise<TrackerStateOption[]>
-
-  /**
-   * Move it. `optionId` is the operator's own mapping for this intent, from
-   * `states()`; without one the provider resolves the intent itself.
-   */
-  transition(
-    tracker: TrackerId,
-    key: string,
-    intent: TransitionIntent,
-    optionId?: string
-  ): Promise<void>
-
-  /**
-   * Whether this tracker can be asked to move an issue at all.
-   *
-   * Synchronous because it is a fact about the provider, not about a
-   * credential or an issue — which is what lets a caller ask before it needs
-   * to know rather than calling and catching.
-   */
-  supportsTransitions(tracker: TrackerId): boolean
-
-  /** Teams an issue can be filed in (ADR-061). */
-  teams(tracker: TrackerId): Promise<TrackerTeam[]>
-
-  /** File a new issue the operator asked for, and return it (ADR-061). */
-  create(tracker: TrackerId, input: NewIssueInput): Promise<Issue>
-
-  /** Whether this tracker can create an issue at all. Synchronous, like `supportsTransitions`. */
-  supportsCreate(tracker: TrackerId): boolean
-
+/**
+ * The SDK's `api.issues` (its declaration is the documentation), less
+ * `connections`, which the integrations store answers.
+ */
+export interface IssueService extends Omit<ExtensionAPI['issues'], 'connections'> {
   /** Drops every cached copy. Used when a credential changes underneath us. */
   invalidate(tracker?: TrackerId): void
 }
