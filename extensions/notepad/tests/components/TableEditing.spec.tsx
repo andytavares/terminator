@@ -3,6 +3,7 @@ import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
+import { forceParsing } from '@codemirror/language'
 import { cursorCharRight, cursorCharLeft } from '@codemirror/commands'
 import { livePreviewPlugin } from '../../src/editor/livePreview'
 
@@ -31,6 +32,11 @@ function mountDoc(doc: string, cursor: number): EditorView {
     }),
     parent,
   })
+  // The parser works to a time budget, so on a loaded machine the first tree
+  // can stop short of the table. Finish parsing, then re-select so the
+  // decorations are rebuilt from the whole tree.
+  forceParsing(view, doc.length, 5000)
+  view.dispatch({ selection: { anchor: cursor } })
   return view
 }
 
