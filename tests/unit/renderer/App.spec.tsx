@@ -350,7 +350,6 @@ afterEach(() => {
 beforeAll(async () => {
   await Promise.all([
     import('../../../src/renderer/components/settings/SettingsPanel'),
-    import('../../../src/renderer/components/QuickActionsHost'),
     import('../../../src/renderer/components/overview/OverviewScreen'),
   ])
 })

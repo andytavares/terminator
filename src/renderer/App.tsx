@@ -19,6 +19,9 @@ import { ToastContainer } from './components/ToastContainer'
 import { LogWindow } from './components/LogWindow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { HomeBadge, GlobalMetricsBar, SessionLinkHost } from './components/AppShellParts'
+// Not lazy: the keys typed straight after ⌘P ("n n", "/") would reach the
+// app before a lazily loaded panel mounted, and be lost.
+import { QuickActionsHost } from './components/QuickActionsHost'
 import { findSurface, type SurfaceRegistration } from './quick-actions/surface-actions'
 import { recordDirectUse } from './quick-actions/usage'
 import { useActiveScope } from './quick-actions/use-active-scope'
@@ -52,9 +55,6 @@ installLogInterceptor()
 // script (https://react.dev/reference/react/lazy).
 const SettingsPanel = lazy(() =>
   import('./components/settings/SettingsPanel').then((m) => ({ default: m.SettingsPanel }))
-)
-const QuickActionsHost = lazy(() =>
-  import('./components/QuickActionsHost').then((m) => ({ default: m.QuickActionsHost }))
 )
 const OverviewScreen = lazy(() =>
   import('./components/overview/OverviewScreen').then((m) => ({ default: m.OverviewScreen }))
@@ -811,16 +811,14 @@ export function App(): JSX.Element {
             <SessionLinkHost sessionId={linkSessionId} onClose={() => setLinkSessionId(null)} />
           )}
           {quickActionsOpen && (
-            <Suspense fallback={null}>
-              <QuickActionsHost
-                openedAt={quickActionsOpenedAt}
-                searchSignal={searchSignal}
-                surfaces={surfaces}
-                activateSurface={activateSurface}
-                shell={shellCommands}
-                onClose={closeQuickActions}
-              />
-            </Suspense>
+            <QuickActionsHost
+              openedAt={quickActionsOpenedAt}
+              searchSignal={searchSignal}
+              surfaces={surfaces}
+              activateSurface={activateSurface}
+              shell={shellCommands}
+              onClose={closeQuickActions}
+            />
           )}
           <HomeBadge />
           <ToastContainer />
