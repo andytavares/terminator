@@ -150,7 +150,11 @@ test('the drawer previews the agent context, feeds it to sessions, and posts a c
   await expect(drawer.locator('.issue-drawer__title')).toHaveText('Sidebar crashes on resize')
 
   const feed = drawer.getByLabel(/Feed this issue to agent sessions/)
-  if (!(await feed.isChecked())) await feed.check()
+  // A link feeds its issue by default; turn it off, then on again.
+  await expect(feed).toBeChecked()
+  await feed.click()
+  await expect(feed).not.toBeChecked()
+  await feed.click()
   await expect(feed).toBeChecked()
   await expect(drawer.locator('.issue-drawer__context')).toContainText('Sidebar crashes on resize')
 

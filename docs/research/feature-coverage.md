@@ -11,6 +11,7 @@ What the Playwright suite (`tests/e2e/*.spec.ts`) drives in the real app, measur
 - 188 passed, 6 failed, 18 did not run (212 tests in 41 spec files).
 - Three specs could not start here: `remote-app.spec.ts`, `git-integration-contrast.spec.ts` and `git-integration-stacking.spec.ts` need Playwright's own Chromium, and this container's egress policy blocks `cdn.playwright.dev`. 17 of the 18 tests that did not run are in these files. CI installs Chromium for them. Their IPC is missing from the counts below, which undercounts Git Integration's review views most.
 - Three fail on Linux and at the base commit f33208a alike, so they are not caused by this branch: `extension.spec.ts:52` and `quick-actions.spec.ts:225` press ⌘ shortcuts (`Meta+,`, `Meta+P`) that the app binds to Ctrl on Linux, and `sidebar-sorting.spec.ts:69` drags under xvfb. CI runs e2e on macOS. Their traces up to the failure are counted.
+- Git Integration's and the trackers' rows were then updated from a second run over the seven specs that drive them (`git-commit-flow`, `merge-flow-resolve`, `pr-review-diff`, `pr-review-queue`, `review-agent`, `review-dashboard`, `issue-trackers`): `E2E_IPC_TRACE=<dir>` with `--workers=1`, 36 passed, then `node scripts/feature-coverage.mjs <inventory> <dir>`, merged into the lists below. Every other row is still the first run's.
 
 Task Vault and Notepad were measured again on 2026-10-12 at commit 85e9d06, Linux (xvfb), `--workers=1`, over their 13 specs only, three runs in a row, 77 passed each time:
 
@@ -25,12 +26,12 @@ Their two sections below merge that run with the specs the full run had already 
 ## Findings
 
 - **Extension settings: 0 of 149 driven.** No spec writes an extension setting through `extension:update-setting`. `extension.spec.ts` opens Settings → Extensions and toggles extensions, but writes no setting.
-- **Integrations (issue trackers) are barely reached.** Of the 16 `integrations:*` channels only `integrations:status`, `integrations:issue-get` and `integrations:link-get` are reached, by views loading. Connect, search, link and comment never run.
-- **Git Integration: 6 of 56 extension channels.** Staging, commit, push, conflict resolution, PR creation and the review agent (`git:stage`, `git:commit`, `git:push`, `git:resolve-conflict`, `github:pr-create`, `review-agent:start`, ...) are never reached. Some of the PR review channels may be reached by the two Chromium specs that could not run here.
+- **Integrations (issue trackers): all 16 `integrations:*` channels driven** since `issue-trackers.spec.ts` (connect, list, search, link, drawer, comment, injection, unlink, set-mine, disconnect) against stub Linear and Jira (`tests/e2e/tracker-stub.ts`). It needs OS encryption for the credential: on Linux Playwright's Electron loader appends `--password-store=basic`, so the spec skips there with that reason; it ran here (6 passed, 3 runs) under a D-Bus gnome-keyring with a local copy of playwright-core that leaves the switch out.
+- **Git Integration: 56 of 56 extension channels driven** since the specs `git-commit-flow`, `merge-flow-resolve`, `pr-review-diff`, `pr-review-queue`, `review-agent` and `review-dashboard`, against real local repositories with a bare `origin` and a stub GitHub at the gh CLI (`tests/e2e/github-stub.ts`, `tests/e2e/fixtures/bin/gh`).
 - **Task Vault: 68 of 68, Notepad: 43 of 43** (re-measured on 2026-10-12 over the 13 `task-vault-*` and `notepad-*` specs, see below; they were 11 of 69 and 8 of 43). Driving them found ten bugs, each fixed with a failing test first: the GTD clarify flow skipped every other inbox item, a kanban lane's dot colour was never saved, a write in the SQL console did not refresh the vault, dragging a note to reorder never saved, search ignored case only for ASCII, Ctrl+Shift+F did nothing on Linux and Windows, typing near a comment orphaned it, renaming a diagram left the list stale, the export's comment formats wrote no comments, and live preview left raw whatever the first parse of a long note did not reach.
 - **Foundry: 60 of 60** is real but shallow: `foundry-channels.spec.ts` invokes every Foundry channel on purpose, so a full count says the channels answer, not that Foundry's flows are exercised.
 - **Core IPC: 61 of 113.** Never reached: `git:fetch`, `git:checkout`, `git:create-branch`, `git:remove-worktree`; `shell:exec`, `shell:open-path`, `shell:open-external`; all four `fs:*` channels; `extension:install`, `extension:uninstall`, `extension:reload`; every `menu:*` event; `notifications:dismiss` and `notifications:trigger-action`; `project:rename`, `project:delete`, the two `reorder` channels.
-- **Commands: 3 of 8.** Foundry's two commands and Git Integration's commit, pull and create-PR are never run.
+- **Commands: 6 of 8.** Foundry's two commands are never run; Git Integration's commit, pull and create-PR run in `git-commit-flow.spec.ts`.
 - **Core Quick Actions: 7 of 28.** Never run through the panel or a shortcut: split down, close tab, clear, previous tab, both recent-tab cycles, both workspace cycles, open home, overview, next waiting, resume, the log, and the five issue actions.
 
 ## Regenerate
@@ -48,17 +49,17 @@ The last command prints everything from here down.
 
 | Area                            | Driven | Total | Share |
 | ------------------------------- | ------ | ----- | ----- |
-| Core IPC (window.electronAPI)   | 61     | 113   | 54%   |
+| Core IPC (window.electronAPI)   | 74     | 113   | 65%   |
 | terminator.foundry IPC          | 60     | 60    | 100%  |
-| terminator.git-integration IPC  | 6      | 56    | 11%   |
+| terminator.git-integration IPC  | 56     | 56    | 100%  |
 | terminator.notepad IPC          | 43     | 43    | 100%  |
 | terminator.remote-control IPC   | 4      | 9     | 44%   |
 | terminator.task-vault IPC       | 68     | 68    | 100%  |
-| Commands (Quick Actions, menus) | 3      | 8     | 38%   |
+| Commands (Quick Actions, menus) | 6      | 8     | 75%   |
 | Core Quick Actions              | 7      | 28    | 25%   |
 | Extension settings              | 0      | 149   | 0%    |
 
-### Core IPC: 61 of 113 driven
+### Core IPC: 74 of 113 driven
 
 Not driven by any spec:
 
@@ -101,19 +102,6 @@ Not driven by any spec:
 - `notifications:trigger-action` — notifications.triggerAction (invoke)
 - `db:health` — db.health (invoke)
 - `log:write` — logger.write (send)
-- `integrations:connect` — integrations.connect (invoke)
-- `integrations:disconnect` — integrations.disconnect (invoke)
-- `integrations:set-mine` — integrations.setMine (invoke)
-- `integrations:issue-list-mine` — integrations.listMine (invoke)
-- `integrations:issue-search` — integrations.search (invoke)
-- `integrations:issue-comment` — integrations.comment (invoke)
-- `integrations:link-set` — integrations.linkSet (invoke)
-- `integrations:link-clear` — integrations.linkClear (invoke)
-- `integrations:context-preview` — integrations.contextPreview (invoke)
-- `integrations:set-inject-context` — integrations.setInjectContext (invoke)
-- `integrations:status-changed` — integrations.onStatusChanged (event)
-- `integrations:link-changed` — integrations.onLinkChanged (event)
-- `integrations:context-injected` — integrations.onContextInjected (event)
 
 <details><summary>Driven, and by which specs</summary>
 
@@ -178,6 +166,19 @@ Not driven by any spec:
 - `integrations:status` — integrations.status (invoke): branch-exclude-patterns.spec.ts, branch-name.spec.ts, close-session.spec.ts, dismiss-surface-on-click.spec.ts, extension-escape-exit.spec.ts, extension-escape.spec.ts, extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, extension.spec.ts, foundry-channels.spec.ts, foundry-factory-view.spec.ts, foundry-floor.spec.ts, foundry-forge.spec.ts, foundry-intake.spec.ts, foundry-resume.spec.ts, foundry-typography.spec.ts, git-integration-smoke.spec.ts, git-sidebar.spec.ts, merge-flow.spec.ts, monitor-wall.spec.ts, notepad-outline.spec.ts, open-in-editor.spec.ts, project.spec.ts, quick-actions.spec.ts, remote-app.spec.ts, resume-session.spec.ts, session-home.spec.ts, session-surfaces.spec.ts, settings.spec.ts, sidebar-alignment.spec.ts, sidebar-branch-first.spec.ts, sidebar-sorting.spec.ts, split-panes.spec.ts, terminal-missing-folder.spec.ts, terminal-right-edge.spec.ts, terminal-scroll.spec.ts, terminal.spec.ts, workspace.spec.ts
 - `integrations:issue-get` — integrations.getIssue (invoke): session-surfaces.spec.ts
 - `integrations:link-get` — integrations.linkGet (invoke): branch-exclude-patterns.spec.ts, branch-name.spec.ts, close-session.spec.ts, extension-escape.spec.ts, extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, foundry-channels.spec.ts, foundry-factory-view.spec.ts, foundry-floor.spec.ts, foundry-forge.spec.ts, foundry-intake.spec.ts, foundry-resume.spec.ts, foundry-typography.spec.ts, git-integration-smoke.spec.ts, git-sidebar.spec.ts, merge-flow.spec.ts, monitor-wall.spec.ts, open-in-editor.spec.ts, project.spec.ts, quick-actions.spec.ts, resume-session.spec.ts, session-home.spec.ts, session-surfaces.spec.ts, settings.spec.ts, sidebar-alignment.spec.ts, sidebar-branch-first.spec.ts, sidebar-sorting.spec.ts, split-panes.spec.ts, terminal-missing-folder.spec.ts, terminal-right-edge.spec.ts, terminal-scroll.spec.ts, terminal.spec.ts
+- `integrations:connect` — integrations.connect (invoke): issue-trackers.spec.ts
+- `integrations:disconnect` — integrations.disconnect (invoke): issue-trackers.spec.ts
+- `integrations:set-mine` — integrations.setMine (invoke): issue-trackers.spec.ts
+- `integrations:issue-list-mine` — integrations.listMine (invoke): issue-trackers.spec.ts
+- `integrations:issue-search` — integrations.search (invoke): issue-trackers.spec.ts
+- `integrations:issue-comment` — integrations.comment (invoke): issue-trackers.spec.ts
+- `integrations:link-set` — integrations.linkSet (invoke): issue-trackers.spec.ts
+- `integrations:link-clear` — integrations.linkClear (invoke): issue-trackers.spec.ts
+- `integrations:context-preview` — integrations.contextPreview (invoke): issue-trackers.spec.ts
+- `integrations:set-inject-context` — integrations.setInjectContext (invoke): issue-trackers.spec.ts
+- `integrations:status-changed` — integrations.onStatusChanged (event): issue-trackers.spec.ts
+- `integrations:link-changed` — integrations.onLinkChanged (event): issue-trackers.spec.ts
+- `integrations:context-injected` — integrations.onContextInjected (event): issue-trackers.spec.ts
 
 </details>
 
@@ -248,69 +249,66 @@ Not driven by any spec:
 
 </details>
 
-### terminator.git-integration IPC: 6 of 56 driven
-
-Not driven by any spec:
-
-- `git:commit`
-- `git:commit-output-poll`
-- `git:diff-file`
-- `git:merge-commit`
-- `git:notify`
-- `git:pr-status`
-- `git:prepare-pr-worktree`
-- `git:push`
-- `git:resolve-conflict`
-- `git:session-clear`
-- `git:session-reset`
-- `git:stage`
-- `git:undo-resolve`
-- `git:unstage`
-- `github:accessible-repos`
-- `github:active-reviews-for-repo`
-- `github:clone-repo`
-- `github:current-user`
-- `github:file-viewed-set`
-- `github:files-metrics`
-- `github:files-viewed-set`
-- `github:list-open-prs`
-- `github:pr-comment-reply`
-- `github:pr-compare`
-- `github:pr-create`
-- `github:pr-file-content`
-- `github:pr-file-diff`
-- `github:pr-inline-comments`
-- `github:pr-issue-comment-add`
-- `github:pr-issue-comments`
-- `github:pr-mark-ready`
-- `github:pr-review-detail`
-- `github:pr-review-submit`
-- `github:pr-update-branch`
-- `github:prune-active-reviews`
-- `github:remove-active-review`
-- `github:review-repos-set`
-- `github:save-active-review`
-- `github:session-get`
-- `github:session-set`
-- `github:sessions-for-repo`
-- `github:tests-for-block`
-- `review-agent:cancel`
-- `review-agent:dismiss`
-- `review-agent:list`
-- `review-agent:open-terminal`
-- `review-agent:settings`
-- `review-agent:start`
-- `window:open-pr-review`
-- `window:review-submitted`
+### terminator.git-integration IPC: 56 of 56 driven
 
 <details><summary>Driven, and by which specs</summary>
 
-- `git:conflicts-list`: merge-flow.spec.ts
-- `git:session-persist`: merge-flow.spec.ts
-- `git:session-restore`: merge-flow.spec.ts
-- `git:status`: git-integration-smoke.spec.ts, git-sidebar.spec.ts, merge-flow.spec.ts
-- `github:dashboard-search`: extension-smoke.spec.ts
-- `github:review-settings`: extension-smoke.spec.ts
+- `git:commit`: git-commit-flow.spec.ts
+- `git:commit-output-poll`: git-commit-flow.spec.ts
+- `git:conflicts-list`: merge-flow-resolve.spec.ts, merge-flow.spec.ts, pr-review-queue.spec.ts
+- `git:diff-file`: git-commit-flow.spec.ts
+- `git:merge-commit`: merge-flow-resolve.spec.ts, pr-review-queue.spec.ts
+- `git:notify`: merge-flow-resolve.spec.ts
+- `git:pr-status`: git-commit-flow.spec.ts
+- `git:prepare-pr-worktree`: pr-review-queue.spec.ts
+- `git:push`: git-commit-flow.spec.ts
+- `git:resolve-conflict`: merge-flow-resolve.spec.ts, pr-review-queue.spec.ts
+- `git:session-clear`: merge-flow-resolve.spec.ts, pr-review-queue.spec.ts
+- `git:session-persist`: merge-flow-resolve.spec.ts, merge-flow.spec.ts, pr-review-queue.spec.ts
+- `git:session-reset`: merge-flow-resolve.spec.ts
+- `git:session-restore`: merge-flow-resolve.spec.ts, merge-flow.spec.ts, pr-review-queue.spec.ts
+- `git:stage`: git-commit-flow.spec.ts
+- `git:status`: git-commit-flow.spec.ts, git-integration-smoke.spec.ts, git-sidebar.spec.ts, merge-flow-resolve.spec.ts, merge-flow.spec.ts
+- `git:undo-resolve`: merge-flow-resolve.spec.ts
+- `git:unstage`: git-commit-flow.spec.ts
+- `github:accessible-repos`: review-dashboard.spec.ts
+- `github:active-reviews-for-repo`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts, review-dashboard.spec.ts
+- `github:clone-repo`: review-dashboard.spec.ts
+- `github:current-user`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts, review-dashboard.spec.ts
+- `github:dashboard-search`: extension-smoke.spec.ts, review-dashboard.spec.ts
+- `github:file-viewed-set`: pr-review-diff.spec.ts
+- `github:files-metrics`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts, review-dashboard.spec.ts
+- `github:files-viewed-set`: pr-review-diff.spec.ts, pr-review-queue.spec.ts
+- `github:list-open-prs`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts, review-dashboard.spec.ts
+- `github:pr-comment-reply`: pr-review-diff.spec.ts
+- `github:pr-compare`: pr-review-diff.spec.ts
+- `github:pr-create`: git-commit-flow.spec.ts
+- `github:pr-file-content`: pr-review-diff.spec.ts
+- `github:pr-file-diff`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts, review-dashboard.spec.ts
+- `github:pr-inline-comments`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts, review-dashboard.spec.ts
+- `github:pr-issue-comment-add`: pr-review-queue.spec.ts
+- `github:pr-issue-comments`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts, review-dashboard.spec.ts
+- `github:pr-mark-ready`: pr-review-queue.spec.ts
+- `github:pr-review-detail`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts, review-dashboard.spec.ts
+- `github:pr-review-submit`: pr-review-diff.spec.ts, pr-review-queue.spec.ts
+- `github:pr-update-branch`: pr-review-queue.spec.ts
+- `github:prune-active-reviews`: pr-review-queue.spec.ts
+- `github:remove-active-review`: pr-review-queue.spec.ts
+- `github:review-repos-set`: review-dashboard.spec.ts
+- `github:review-settings`: extension-smoke.spec.ts, review-dashboard.spec.ts
+- `github:save-active-review`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts
+- `github:session-get`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts, review-dashboard.spec.ts
+- `github:session-set`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts
+- `github:sessions-for-repo`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts, review-dashboard.spec.ts
+- `github:tests-for-block`: pr-review-diff.spec.ts
+- `review-agent:cancel`: review-agent.spec.ts
+- `review-agent:dismiss`: review-agent.spec.ts
+- `review-agent:list`: pr-review-diff.spec.ts, pr-review-queue.spec.ts, review-agent.spec.ts, review-dashboard.spec.ts
+- `review-agent:open-terminal`: review-agent.spec.ts
+- `review-agent:settings`: review-agent.spec.ts
+- `review-agent:start`: review-agent.spec.ts
+- `window:open-pr-review`: pr-review-queue.spec.ts, review-dashboard.spec.ts
+- `window:review-submitted`: pr-review-queue.spec.ts
 
 </details>
 
@@ -462,21 +460,21 @@ Not driven by any spec:
 
 </details>
 
-### Extension commands: 3 of 8 driven
+### Extension commands: 6 of 8 driven
 
 Not driven by any spec:
 
 - `terminator.foundry.command.new-order` — New work order…
 - `terminator.foundry.command.toggle-view` — Toggle factory view
-- `terminator.git-integration.command.commit` — Commit…
-- `terminator.git-integration.command.pull` — Pull
-- `terminator.git-integration.command.create-pr` — Create PR…
 
 <details><summary>Driven, and by which specs</summary>
 
 - `terminator.git-integration.command.push` — Push: quick-actions.spec.ts
 - `terminator.notepad.command.notepad:quick-create` — New note: quick-actions.spec.ts
 - `terminator.task-vault.command.task-vault:capture-to-inbox` — Capture to inbox: quick-actions.spec.ts
+- `terminator.git-integration.command.commit` — Commit…: git-commit-flow.spec.ts
+- `terminator.git-integration.command.pull` — Pull: git-commit-flow.spec.ts
+- `terminator.git-integration.command.create-pr` — Create PR…: git-commit-flow.spec.ts
 
 </details>
 

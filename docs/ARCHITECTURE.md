@@ -725,6 +725,15 @@ existing issue's assignee or any other field, or to delete one, and a test asser
 surface so it stays true. `transition` moves an issue by intent (ADR-041); `create` files one the
 operator asked for, Linear only (ADR-061).
 
+**One writer at a time.** Every `tracker-store` change reads, edits and writes `integrations.json`;
+changes run through one queue, so two at once (a field's blur and a Disconnect click) both land.
+
+**End to end against stubs.** `tests/e2e/issue-trackers.spec.ts` drives every `integrations:*`
+channel against stub Linear and Jira at their real addresses: the app runs with
+`NODE_USE_ENV_PROXY=1`, `HTTPS_PROXY` naming a local proxy and `NODE_EXTRA_CA_CERTS` naming a CA made
+for the run, so Node's fetch tunnels to `tests/e2e/tracker-stub.ts`, which answers TLS itself and
+refuses every other host.
+
 ---
 
 ## Security model
@@ -799,6 +808,8 @@ See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural deci
 ### Git integration (`extensions/git-integration/`)
 
 The Git project tab (status, staging, commit, pull requests), the Code Reviews workspace tab and the Reviews global tab. It runs git and gh through `api.shell.exec` and `api.github`, and is the only git parser in the repository ([ADR 094](adr/094-extensions-follow-the-vs-code-model.md) ended ADR-025's two parsers).
+
+Its e2e specs run against real local repositories with a bare `origin` and a stub GitHub at the boundary the app has, the gh CLI: `tests/e2e/fixtures/bin/gh`, on the app's PATH beside the `claude` stub, forwards a call to `tests/e2e/github-stub.ts` when the app's `XDG_CONFIG_HOME` holds `gh/e2e-stub-url`, and otherwise runs the real gh. gh itself cannot be pointed at a local server (`GH_HOST` means HTTPS to `<host>/api/v3`, and the core passes no `GH_HOST`). Each extension view is a WebContentsView, which Playwright lists among the app's windows, so `tests/e2e/git-harness.ts` drives it as a page.
 
 #### The review window
 
