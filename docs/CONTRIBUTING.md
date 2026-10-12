@@ -43,6 +43,15 @@ npm run test:coverage   # Coverage report in coverage/
 
 Coverage is gated by Codecov on the pull request, not locally ([ADR 095](adr/095-coverage-is-gated-by-codecov.md)). `codecov/patch` needs 80% of the lines your change adds or modifies, and `codecov/project` must not drop. A test covers a scenario the running app can produce; a branch no real caller can reach is deleted, not tested.
 
+### Measure performance
+
+```bash
+npm run build
+node scripts/perf/app-metrics.mjs --runs=5 --throughput
+```
+
+Prints the median start-up milestones (process attached, window, DOM ready, sidebar), memory per process type after the app settles, and the time to print 50 MB in a terminal. A change that claims a speed-up records this before and after in its commit.
+
 ### E2E rules
 
 E2E runs with no retries, so a test that fails once fails the build ([ADR 070](adr/070-e2e-is-deterministic-and-selective.md)).
