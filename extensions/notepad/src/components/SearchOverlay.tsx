@@ -5,6 +5,39 @@ import { Search, X } from 'lucide-react'
 import type { SearchResult } from '../db/types'
 import { useNotesStore } from '../stores/notes.store'
 
+interface SearchOverlayProps {
+  onClose: () => void
+}
+
+/** The search's results for the current query and tag filter, and the selected row. */
+type NoteSearch = ReturnType<typeof useNoteSearch>
+
+interface TagFilterProps {
+  tagCounts: [string, number][]
+  activeTagFilter: string | null
+  setActiveTagFilter: (tag: string | null) => void
+}
+
+interface SearchResultsProps {
+  search: NoteSearch
+  query: string
+  openResult: (result: SearchResult) => void
+}
+
+interface SearchSurfaceProps {
+  surfaceRef: React.RefObject<HTMLDivElement>
+  onClose: () => void
+  children: React.ReactNode
+}
+
+interface SearchResultRowProps {
+  result: SearchResult
+  query: string
+  selected: boolean
+  onHover: () => void
+  onOpen: () => void
+}
+
 function highlightTitle(title: string, query: string): React.JSX.Element {
   const pattern = titleHighlightPattern(query)
   if (!pattern) return <>{title}</>
@@ -35,46 +68,31 @@ function TitlePart(props: { part: string; highlighted: boolean }): React.JSX.Ele
   return <span>{props.part}</span>
 }
 
-interface SearchOverlayProps {
-  onClose: () => void
-}
-
-/** The search's results for the current query and tag filter, and the selected row. */
-type NoteSearch = ReturnType<typeof useNoteSearch>
-
-interface TagFilterProps {
-  tagCounts: [string, number][]
-  activeTagFilter: string | null
-  setActiveTagFilter: (tag: string | null) => void
-}
-
-interface SearchResultsProps {
-  search: NoteSearch
-  query: string
-  openResult: (result: SearchResult) => void
-}
-
-export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Element {
-  const surfaceRef = useRef<HTMLDivElement>(null)
-  const [query, setQuery] = useState('')
-  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
-  const search = useNoteSearch(query, activeTagFilter)
-  const { setSelected } = useNotesStore()
-
-  const openResult = useCallback(
+/** Opening a result selects its note and closes the search. */
+function useOpenResult(onClose: () => void) {
+  const setSelected = useNotesStore((s) => s.setSelected)
+  return useCallback(
     (result: SearchResult) => {
       setSelected(result.id)
       onClose()
     },
     [setSelected, onClose]
   )
+}
 
-  /**
-   * Escape, focus, and a place in the open-surface count the double-Escape
-   * "leave the extension" gesture reads — which this palette was missing, so
-   * two Escapes with focus off the input closed Notepad instead of the search.
-   * The backdrop below owns the outside click.
-   */
+/**
+ * useDismissible gives Escape, focus, and a place in the open-surface count the
+ * double-Escape "leave the extension" gesture reads — which this palette was
+ * missing, so two Escapes with focus off the input closed Notepad instead of
+ * the search. The backdrop owns the outside click.
+ */
+export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Element {
+  const surfaceRef = useRef<HTMLDivElement>(null)
+  const [query, setQuery] = useState('')
+  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
+  const search = useNoteSearch(query, activeTagFilter)
+  const openResult = useOpenResult(onClose)
+
   useDismissible({ ref: surfaceRef, onDismiss: onClose, closeOnOutsideClick: false })
   useResultKeyboard(search, openResult)
 
@@ -91,12 +109,6 @@ export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Elemen
   )
 }
 
-interface SearchSurfaceProps {
-  surfaceRef: React.RefObject<HTMLDivElement>
-  onClose: () => void
-  children: React.ReactNode
-}
-
 /** The backdrop, which owns the outside click, and the dialog surface on it. */
 function SearchSurface({ surfaceRef, onClose, children }: SearchSurfaceProps): React.JSX.Element {
   return (
@@ -107,12 +119,12 @@ function SearchSurface({ surfaceRef, onClose, children }: SearchSurfaceProps): R
       }}
     >
       <div
-        ref={surfaceRef}
         data-tmui-surface=""
-        className="notepad-search-overlay"
-        role="dialog"
         aria-label="Search notes"
         aria-modal="true"
+        ref={surfaceRef}
+        className="notepad-search-overlay"
+        role="dialog"
       >
         {children}
       </div>
@@ -124,7 +136,6 @@ function useNoteSearch(query: string, tagFilter: string | null) {
   const [results, setResults] = useState<SearchResult[]>([])
   const [selectedIdx, setSelectedIdx] = useState(0)
   const [isSearching, setIsSearching] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const runSearch = useCallback(async (q: string, filter: string | null) => {
     setIsSearching(true)
@@ -140,13 +151,8 @@ function useNoteSearch(query: string, tagFilter: string | null) {
   }, [])
 
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      void runSearch(query, tagFilter)
-    }, 200)
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    }
+    const timer = setTimeout(() => void runSearch(query, tagFilter), 200)
+    return () => clearTimeout(timer)
   }, [query, tagFilter, runSearch])
 
   const tagCounts = useMemo(() => topTagCounts(results), [results])
@@ -292,14 +298,6 @@ function SearchResults({ search, query, openResult }: SearchResultsProps): React
       ))}
     </div>
   )
-}
-
-interface SearchResultRowProps {
-  result: SearchResult
-  query: string
-  selected: boolean
-  onHover: () => void
-  onOpen: () => void
 }
 
 function SearchResultRow(props: SearchResultRowProps): React.JSX.Element {

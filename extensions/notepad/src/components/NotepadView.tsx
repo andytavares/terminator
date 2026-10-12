@@ -5,6 +5,7 @@ import { useNotesStore } from '../stores/notes.store'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
 import { NoteList } from './NoteList'
+import { loadLists } from './noteListModel'
 import { NoteOutline } from './NoteOutline'
 import { EmptyState } from './EmptyState'
 import { DiagramView } from './DiagramView'
@@ -57,24 +58,6 @@ async function reloadNoteList(): Promise<void> {
   })
   const data = (result as { data?: NoteListItem[] }).data
   if (Array.isArray(data)) useNotesStore.getState().setNotes(data)
-}
-
-/** Loads the note, diagram and folder lists. */
-async function loadLists(): Promise<void> {
-  const bridge = window.electronAPI.extensionBridge
-  const [notesResult, diagramsResult, foldersResult] = await Promise.all([
-    bridge.invoke('terminator.notepad:notes.list', { includeArchived: true }),
-    bridge.invoke('terminator.notepad:diagrams.list', { includeArchived: true }),
-    bridge.invoke('terminator.notepad:folders.list', {}),
-  ])
-  const store = useNotesStore.getState()
-  const listOf = (result: unknown) => (result as { data?: unknown[] }).data
-  const notesData = listOf(notesResult)
-  if (Array.isArray(notesData)) store.setNotes(notesData as NoteListItem[])
-  const diagramsData = listOf(diagramsResult)
-  if (Array.isArray(diagramsData)) store.setDiagrams(diagramsData as typeof store.diagrams)
-  const foldersData = listOf(foldersResult)
-  if (Array.isArray(foldersData)) store.setFolders(foldersData as typeof store.folders)
 }
 
 export function NotepadView(): React.JSX.Element {
