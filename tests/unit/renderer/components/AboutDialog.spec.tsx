@@ -80,16 +80,13 @@ describe('AboutDialog', () => {
     dashes.forEach((dd) => expect(dd.textContent).toBe('—'))
   })
 
-  it('calls app.getInfo on mount', async () => {
-    render(<AboutDialog onClose={vi.fn()} />)
-    expect(mockGetInfo).toHaveBeenCalledTimes(1)
-    await waitFor(() => screen.getByText('Terminator'))
-  })
-
-  it('swallows getInfo rejection silently', async () => {
+  it('keeps the placeholders when the app info cannot be read', async () => {
     mockGetInfo.mockRejectedValue(new Error('IPC gone'))
-    expect(() => render(<AboutDialog onClose={vi.fn()} />)).not.toThrow()
-    await new Promise((r) => setTimeout(r, 0))
+    render(<AboutDialog onClose={vi.fn()} />)
+    // The database row settles from its own call; by then the rejection has too.
+    await screen.findByText('OK')
+    expect(screen.getByText('v—')).toBeTruthy()
+    expect(screen.getByText('Electron').nextElementSibling!.textContent).toBe('—')
   })
 
   it('shows DB error with message when health returns ok:false', async () => {

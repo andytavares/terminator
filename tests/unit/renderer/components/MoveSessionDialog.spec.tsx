@@ -4,8 +4,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { MoveSessionDialog } from '../../../../src/renderer/components/sidebar/MoveSessionDialog'
-import type { Project, Workspace } from '../../../../src/shared/types/index'
-import { seedStore, terminalSessionOf } from '../../../support/renderer-stores'
+import type { Project } from '../../../../src/shared/types/index'
+import { projectOf, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
 
 vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () => ({
   CreateWorkspaceDialog: ({ onClose }: { onClose: () => void }) => (
@@ -17,54 +17,50 @@ vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () 
 
 const SCRATCH = '00000000-0000-0000-0000-000000000000'
 
-const workspace1: Workspace = {
-  id: 'ws-1',
-  name: 'Alpha',
-  color: '#f00',
-  tags: [],
-  folderPath: '/a',
-  createdAt: '',
-  updatedAt: '',
-}
-const project1: Project = {
-  id: 'proj-1',
-  workspaceId: 'ws-1',
-  name: 'Proj One',
-  isWorktree: false,
-  createdAt: '',
-  updatedAt: '',
-}
-const project2: Project = {
-  id: 'proj-2',
-  workspaceId: 'ws-1',
-  name: 'Proj Two',
-  isWorktree: false,
-  createdAt: '',
-  updatedAt: '',
-}
+const workspace1 = workspaceOf({ id: 'ws-1', name: 'Alpha', folderPath: '/a' })
+const project1 = projectOf({ id: 'proj-1', workspaceId: 'ws-1', name: 'Proj One' })
+const project2 = projectOf({ id: 'proj-2', workspaceId: 'ws-1', name: 'Proj Two' })
 
-const mockMoveSession = vi.fn()
-const mockSetActiveWorkspace = vi.fn()
-const mockSetActiveProject = vi.fn()
-const mockCreateProject = vi.fn()
-const mockLoadProjects = vi.fn().mockResolvedValue(undefined)
-const mockGetSessionsForProject = vi.fn().mockReturnValue([])
-const mockDeleteProject = vi.fn().mockResolvedValue(undefined)
+type ProjectInput = Pick<Project, 'workspaceId' | 'name'>
+
+// The main process's side of the project calls the real workspace store makes,
+// over the projects it holds.
+let stored: Project[] = []
+const mockCreateProject = vi.fn(
+  async (input: ProjectInput): Promise<{ project: Project } | { error: string }> => {
+    const project = projectOf({ id: 'proj-new', ...input })
+    stored = [...stored, project]
+    return { project }
+  }
+)
+const projectApi = {
+  create: mockCreateProject,
+  delete: vi.fn(async (id: string) => {
+    stored = stored.filter((p) => p.id !== id)
+    return { ok: true }
+  }),
+  list: vi.fn(async (workspaceId: string) => ({
+    projects: stored.filter((p) => p.workspaceId === workspaceId),
+  })),
+}
 const mockOnClose = vi.fn()
 const mockOnMoved = vi.fn()
 
+const projectOfSession = (): string | undefined =>
+  useSessionStore.getState().sessions.get('sess-1')?.projectId
+const projectIds = (): string[] =>
+  (useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1') ?? []).map((p) => p.id)
+
 function setupMocks(sessionProjectId = SCRATCH) {
-  seedStore(useWorkspaceStore, {
+  stored = [project1, project2]
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = { project: projectApi }
+  useWorkspaceStore.setState({
+    ...useWorkspaceStore.getInitialState(),
     workspaces: [workspace1],
     projectsByWorkspaceId: new Map([['ws-1', [project1, project2]]]),
-    loadProjects: mockLoadProjects,
-    createProject: mockCreateProject,
-    setActiveWorkspace: mockSetActiveWorkspace,
-    setActiveProject: mockSetActiveProject,
-    deleteProject: mockDeleteProject,
   })
-
-  seedStore(useSessionStore, {
+  useSessionStore.setState({
+    ...useSessionStore.getInitialState(),
     sessions: new Map([
       [
         'sess-1',
@@ -76,8 +72,6 @@ function setupMocks(sessionProjectId = SCRATCH) {
         }),
       ],
     ]),
-    moveSession: mockMoveSession,
-    getSessionsForProject: mockGetSessionsForProject,
   })
 }
 
@@ -112,16 +106,15 @@ describe('MoveSessionDialog', () => {
     expect(screen.getByPlaceholderText('My branch')).toBeTruthy()
   })
 
-  it('calls moveSession and navigation when a project is selected', async () => {
+  it('moves the session to the chosen branch and shows it there', async () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} onMoved={mockOnMoved} />)
     fireEvent.click(screen.getByText('Proj One'))
-    await waitFor(() => {
-      expect(mockMoveSession).toHaveBeenCalledWith('sess-1', 'proj-1')
-      expect(mockSetActiveWorkspace).toHaveBeenCalledWith('ws-1')
-      expect(mockSetActiveProject).toHaveBeenCalledWith('proj-1')
-      expect(mockOnMoved).toHaveBeenCalledWith('proj-1', 'ws-1')
-      expect(mockOnClose).toHaveBeenCalled()
-    })
+    await waitFor(() => expect(mockOnClose).toHaveBeenCalled())
+    expect(projectOfSession()).toBe('proj-1')
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-1')
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-1')
+    expect(useWorkspaceStore.getState().activeProjectId).toBe('proj-1')
+    expect(mockOnMoved).toHaveBeenCalledWith('proj-1', 'ws-1')
   })
 
   it('shows Back button in new project form to return to list', () => {
@@ -133,7 +126,6 @@ describe('MoveSessionDialog', () => {
   })
 
   it('shows error when creating project with empty name', async () => {
-    mockCreateProject.mockResolvedValue({ error: 'VALIDATION' })
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
     fireEvent.click(screen.getByText('Create & move'))
@@ -142,21 +134,18 @@ describe('MoveSessionDialog', () => {
     })
   })
 
-  it('creates project and moves session when new project submitted', async () => {
-    mockCreateProject.mockResolvedValue({ project: { id: 'proj-new', workspaceId: 'ws-1' } })
+  it('creates the branch and moves the session into it', async () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
     fireEvent.change(screen.getByPlaceholderText('My branch'), { target: { value: 'New Proj' } })
     fireEvent.click(screen.getByText('Create & move'))
-    await waitFor(() => {
-      expect(mockCreateProject).toHaveBeenCalledWith({ workspaceId: 'ws-1', name: 'New Proj' })
-      expect(mockMoveSession).toHaveBeenCalledWith('sess-1', 'proj-new')
-      expect(mockOnClose).toHaveBeenCalled()
-    })
+    await waitFor(() => expect(mockOnClose).toHaveBeenCalled())
+    expect(projectIds()).toContain('proj-new')
+    expect(projectOfSession()).toBe('proj-new')
   })
 
   it('shows duplicate name error when createProject returns DUPLICATE_NAME', async () => {
-    mockCreateProject.mockResolvedValue({ error: 'DUPLICATE_NAME' })
+    mockCreateProject.mockResolvedValueOnce({ error: 'DUPLICATE_NAME' })
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
     fireEvent.change(screen.getByPlaceholderText('My branch'), {
@@ -169,7 +158,7 @@ describe('MoveSessionDialog', () => {
   })
 
   it('shows generic error when createProject returns a non-duplicate error', async () => {
-    mockCreateProject.mockResolvedValue({ error: 'UNKNOWN' })
+    mockCreateProject.mockResolvedValueOnce({ error: 'UNKNOWN' })
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
     fireEvent.change(screen.getByPlaceholderText('My branch'), { target: { value: 'My Proj' } })
@@ -188,18 +177,15 @@ describe('MoveSessionDialog', () => {
     expect(btn).toHaveProperty('disabled', true)
   })
 
-  it('deletes source project when it becomes empty after move', async () => {
+  it('removes the branch it left once nothing is open there', async () => {
     setupMocks('proj-1')
-    mockGetSessionsForProject.mockReturnValue([])
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('Proj Two'))
-    await waitFor(() => {
-      expect(mockDeleteProject).toHaveBeenCalledWith('proj-1')
-    })
+    await waitFor(() => expect(projectIds()).toEqual(['proj-2']))
+    expect(projectOfSession()).toBe('proj-2')
   })
 
   it('submits new project form on Enter key', async () => {
-    mockCreateProject.mockResolvedValue({ project: { id: 'proj-new', workspaceId: 'ws-1' } })
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
     const input = screen.getByPlaceholderText('My branch')

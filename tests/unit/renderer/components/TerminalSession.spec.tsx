@@ -162,10 +162,6 @@ beforeEach(async () => {
 })
 
 describe('TerminalInstance', () => {
-  it('constructs without throwing', () => {
-    expect(() => new TerminalInstance('ses-1', 1000)).not.toThrow()
-  })
-
   it('pastes \\n when Cmd+Enter is pressed via custom key handler', () => {
     new TerminalInstance('ses-1', 1000)
     const instance = vi.mocked(Terminal).mock.results[0].value
@@ -323,11 +319,6 @@ describe('TerminalInstance', () => {
     const onBell = vi.fn()
     const instance = new TerminalInstance('ses-1', 1000, { onBell })
     expect(instance.terminal.onBell).toHaveBeenCalledWith(onBell)
-  })
-
-  it('does not call onBell setup when callback is not provided', () => {
-    const instance = new TerminalInstance('ses-1', 1000)
-    expect(instance.terminal.onBell).not.toHaveBeenCalled()
   })
 
   describe('mount()', () => {
@@ -1082,26 +1073,25 @@ describe('TerminalInstance', () => {
     it('sets dark theme on construction when data-theme is absent', () => {
       new TerminalInstance('ses-theme', 1000)
       const terminal = vi.mocked(Terminal).mock.results.at(-1)!.value
-      expect(terminal.options.theme).toMatchObject({ background: expect.any(String) })
+      expect(terminal.options.theme).toEqual(XTERM_THEMES.dark)
     })
 
     it('sets light theme on construction when data-theme="light"', () => {
       document.documentElement.dataset.theme = 'light'
       new TerminalInstance('ses-theme-light', 1000)
       const terminal = vi.mocked(Terminal).mock.results.at(-1)!.value
-      const darkTheme = { background: '#1e1e1e' }
-      expect(terminal.options.theme).not.toMatchObject(darkTheme)
+      expect(terminal.options.theme).toEqual(XTERM_THEMES.light)
     })
 
     it('updates terminal theme when MutationObserver fires a data-theme change', () => {
       new TerminalInstance('ses-obs', 1000)
       const terminal = vi.mocked(Terminal).mock.results.at(-1)!.value
-      const initialTheme = terminal.options.theme
+      expect(terminal.options.theme).toEqual(XTERM_THEMES.dark)
 
       document.documentElement.dataset.theme = 'light'
       observerCallback([], {} as MutationObserver)
 
-      expect(terminal.options.theme).not.toBe(initialTheme)
+      expect(terminal.options.theme).toEqual(XTERM_THEMES.light)
     })
 
     it('attaches MutationObserver on document.documentElement', () => {

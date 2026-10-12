@@ -84,12 +84,12 @@ describe('CreateProjectDialog', () => {
     const nameInput = screen.getAllByRole('textbox')[0]
     fireEvent.change(nameInput, { target: { value: 'My App' } })
     fireEvent.click(screen.getByText('Create'))
-    await vi.waitFor(() => expect(mockCreateProject).toHaveBeenCalled())
-  })
-
-  it('renders Create button', () => {
-    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    expect(screen.getByText('Create')).toBeTruthy()
+    await vi.waitFor(() =>
+      expect(mockCreateProject).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceId: 'ws-1', name: 'My App' })
+      )
+    )
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
   it('sets name error on blur when name is empty', () => {
@@ -293,7 +293,7 @@ describe('CreateProjectDialog', () => {
     await vi.waitFor(() => {
       const inputs = screen.getAllByRole('textbox')
       const pathInput = inputs[inputs.length - 1] as HTMLInputElement
-      return pathInput.value.includes('.worktrees')
+      expect(pathInput.value).toContain('.worktrees')
     })
   })
 
@@ -326,7 +326,7 @@ describe('CreateProjectDialog', () => {
     const inputs = screen.getAllByRole('textbox')
     const worktreeInput = inputs[inputs.length - 1]
     fireEvent.change(worktreeInput, { target: { value: '/custom/wt/path' } })
-    expect(worktreeInput).toBeTruthy()
+    expect((worktreeInput as HTMLInputElement).value).toBe('/custom/wt/path')
   })
 
   it('clicking Branch tab switches back from worktree mode', async () => {

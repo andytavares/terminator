@@ -4,62 +4,10 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useTerminalOpenErrorStore } from '../../../../src/renderer/stores/terminal-open-error.store'
 import { TerminalPane } from '../../../../src/renderer/components/terminal/TerminalPane'
+import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 import { seedStore } from '../../../support/renderer-stores'
 import type { PaneNode } from '../../../../src/shared/types/index'
 
-const mockModalDepth = vi.fn(() => 0)
-vi.mock('../../../../src/renderer/stores/modal.store', () => ({
-  useModalStore: Object.assign(
-    (selector: (s: { depth: number }) => unknown) => selector({ depth: mockModalDepth() }),
-    { getState: () => ({ depth: mockModalDepth() }) }
-  ),
-}))
-vi.mock('../../../../src/renderer/components/terminal/SplitContainer', () => ({
-  SplitContainer: ({
-    splitId,
-    direction,
-    onRatioChange,
-    children,
-  }: {
-    splitId: string
-    direction: string
-    ratio: number
-    onRatioChange: (id: string, r: number) => void
-    children: React.ReactNode[]
-  }) => {
-    const containerRef = React.useRef<HTMLDivElement>(null)
-    return (
-      <div ref={containerRef} className={`split-container split-container--${direction}`}>
-        <div className="split-container__child">{(children as React.ReactNode[])[0]}</div>
-        <div
-          className={`split-container__divider split-container__divider--${direction}`}
-          onMouseDown={(e) => {
-            e.preventDefault()
-            const onMove = (ev: MouseEvent) => {
-              const rect = containerRef.current?.getBoundingClientRect() ?? {
-                left: 0,
-                top: 0,
-                width: 400,
-                height: 300,
-              }
-              const pos = direction === 'vertical' ? ev.clientX : ev.clientY
-              const start = direction === 'vertical' ? rect.left : rect.top
-              const size = direction === 'vertical' ? rect.width : rect.height
-              onRatioChange(splitId, Math.max(0.1, Math.min(0.9, (pos - start) / size)))
-            }
-            const onUp = () => {
-              document.removeEventListener('mousemove', onMove)
-              document.removeEventListener('mouseup', onUp)
-            }
-            document.addEventListener('mousemove', onMove)
-            document.addEventListener('mouseup', onUp)
-          }}
-        />
-        <div className="split-container__child">{(children as React.ReactNode[])[1]}</div>
-      </div>
-    )
-  },
-}))
 vi.mock('../../../../src/renderer/components/terminal/LeafPane', () => ({
   LeafPane: ({ sessionId }: { sessionId: string }) => (
     <div data-testid={`leaf-${sessionId}`}>{sessionId}</div>
@@ -78,7 +26,7 @@ const mockSetFocusedSession = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockModalDepth.mockReturnValue(0)
+  useModalStore.setState({ depth: 0 })
   seedStore(useSessionStore, {
     getSessionsForProject: mockGetSessions,
     getActiveSessionForProject: mockGetActive,
@@ -269,30 +217,38 @@ describe('TerminalPane', () => {
   })
 
   it('unmounts previous session instance when active session changes', () => {
-    const mockUnmount = vi.fn()
     const mockMount = vi.fn()
     mockGetSessions.mockReturnValue([
       { id: 'ses-1', tabTitle: 'T1', type: 'human' },
       { id: 'ses-2', tabTitle: 'T2', type: 'human' },
     ])
     mockGetActive.mockReturnValue('ses-1')
-    mockGetInstance.mockImplementation((id: string) => {
-      if (id === 'ses-1')
-        return {
+    const unmountFirst = vi.fn()
+    const unmountSecond = vi.fn()
+    const instances = new Map([
+      [
+        'ses-1',
+        {
           terminal: { focus: vi.fn(), scrollToBottom: vi.fn() },
           mount: mockMount,
-          unmount: mockUnmount,
-        }
-      return {
-        terminal: { focus: vi.fn(), scrollToBottom: vi.fn() },
-        mount: mockMount,
-        unmount: mockUnmount,
-      }
-    })
+          unmount: unmountFirst,
+        },
+      ],
+      [
+        'ses-2',
+        {
+          terminal: { focus: vi.fn(), scrollToBottom: vi.fn() },
+          mount: mockMount,
+          unmount: unmountSecond,
+        },
+      ],
+    ])
+    mockGetInstance.mockImplementation((id: string) => instances.get(id))
     const { rerender } = render(<TerminalPane projectId="proj-1" />)
     mockGetActive.mockReturnValue('ses-2')
     rerender(<TerminalPane projectId="proj-1" />)
-    expect(mockUnmount).toHaveBeenCalled()
+    expect(unmountFirst).toHaveBeenCalled()
+    expect(unmountSecond).not.toHaveBeenCalled()
   })
 
   describe('focusRequest', () => {
@@ -366,7 +322,7 @@ describe('TerminalPane', () => {
 
     it('does not focus while a modal is open', () => {
       withRaf()
-      mockModalDepth.mockReturnValue(1)
+      useModalStore.setState({ depth: 1 })
       const mockFocus = vi.fn()
       mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
       mockGetActive.mockReturnValue('ses-1')
@@ -414,7 +370,7 @@ describe('TerminalPane', () => {
       })
       render(<TerminalPane projectId="proj-1" />)
       mockFocus.mockClear()
-      mockModalDepth.mockReturnValue(1)
+      useModalStore.setState({ depth: 1 })
       frame?.(0)
       expect(mockFocus).not.toHaveBeenCalled()
     })
@@ -468,23 +424,11 @@ describe('TerminalPane', () => {
       const { container } = render(<TerminalPane projectId="proj-1" />)
       const divider = container.querySelector('.split-container__divider') as HTMLElement
       const outerContainer = container.querySelector('.split-container') as HTMLElement
-      if (outerContainer) {
-        outerContainer.getBoundingClientRect = vi.fn(() => ({
-          left: 0,
-          top: 0,
-          width: 400,
-          height: 300,
-          right: 400,
-          bottom: 300,
-          x: 0,
-          y: 0,
-          toJSON: vi.fn(),
-        }))
-        fireEvent.mouseDown(divider, { clientX: 200 })
-        fireEvent.mouseMove(document, { clientX: 300 })
-        fireEvent.mouseUp(document)
-        expect(mockSetSplitRatio).toHaveBeenCalledWith('proj-1', 'split-1', expect.any(Number))
-      }
+      outerContainer.getBoundingClientRect = () => new DOMRect(0, 0, 400, 300)
+      fireEvent.mouseDown(divider, { clientX: 200 })
+      fireEvent.mouseMove(document, { clientX: 300 })
+      fireEvent.mouseUp(document)
+      expect(mockSetSplitRatio).toHaveBeenCalledWith('proj-1', 'split-1', 0.75)
     })
   })
 })

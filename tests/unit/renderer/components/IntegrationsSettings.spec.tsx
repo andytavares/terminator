@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { IntegrationsSettings } from '../../../../src/renderer/components/settings/IntegrationsSettings'
 import type { TrackerConnection } from '../../../../src/shared/types/index'
 
@@ -139,7 +139,6 @@ describe('IntegrationsSettings — connecting', () => {
 
     expect(input.type).toBe('password')
     expect(input.getAttribute('autocomplete')).toBe('off')
-    expect(api.status).toHaveBeenCalled()
     // Nothing was sent anywhere just by typing.
     expect(api.connect).not.toHaveBeenCalled()
   })
@@ -277,19 +276,41 @@ describe('IntegrationsSettings — connected actions', () => {
       connection({ connected: true, account: { name: 'A', email: 'a@b.co' } }),
       JIRA_DISCONNECTED,
     ])
-    api.status.mockClear()
+    // The credential has been revoked since the page was drawn.
+    api.status.mockResolvedValue({
+      connections: [
+        connection({
+          connected: true,
+          account: { name: 'A', email: 'a@b.co' },
+          lastError: 'auth-failed',
+        }),
+        JIRA_DISCONNECTED,
+      ],
+    })
     fireEvent.click(await screen.findByText('Test'))
-    await waitFor(() => expect(api.status).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByText(/Credential rejected/)).toBeTruthy())
   })
 })
 
 describe('IntegrationsSettings — live updates', () => {
-  it('subscribes to status changes and unsubscribes on unmount', async () => {
+  it('shows a status change pushed from main, and stops listening on unmount', async () => {
     const unsubscribe = vi.fn()
-    api.onStatusChanged.mockReturnValue(unsubscribe)
+    let push: ((payload: unknown) => void) | null = null
+    api.onStatusChanged.mockImplementation((handler: (payload: unknown) => void) => {
+      push = handler
+      return unsubscribe
+    })
     const { unmount } = await renderWith([connection(), JIRA_DISCONNECTED])
 
-    expect(api.onStatusChanged).toHaveBeenCalled()
+    act(() =>
+      push!({
+        connections: [
+          connection({ connected: true, account: { name: 'A', email: 'a@b.co' } }),
+          JIRA_DISCONNECTED,
+        ],
+      })
+    )
+    expect(screen.getByText(/Connected as a@b.co/)).toBeTruthy()
     unmount()
     expect(unsubscribe).toHaveBeenCalled()
   })

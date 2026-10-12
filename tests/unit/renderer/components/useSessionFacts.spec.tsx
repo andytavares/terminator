@@ -9,52 +9,58 @@ import {
   useIssue,
   useIssueTitles,
 } from '../../../../src/renderer/components/session/useSessionFacts'
-import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
+import {
+  issueOf,
+  projectOf,
+  sessionRecordOf,
+  terminalSessionOf,
+  workspaceOf,
+} from '../../../support/renderer-stores'
 
-const workspace = { id: 'w1', name: 'Personal', color: '#5c6bc0', tags: [] } as unknown as Workspace
-const project = { id: 'p1', workspaceId: 'w1', name: 'terminator', gitBranch: 'main' } as Project
-const session = {
+const workspace = workspaceOf({ id: 'w1', name: 'Personal', color: '#5c6bc0' })
+const project = projectOf({ id: 'p1', workspaceId: 'w1', name: 'terminator', gitBranch: 'main' })
+const session = terminalSessionOf({
   id: 's1',
   projectId: 'p1',
   tabTitle: 'zsh',
-  status: 'active',
-  type: 'human',
   createdAt: '2026-09-15T10:00:00.000Z',
   lastActivityAt: 1,
-  agentState: 'idle',
-} as TerminalSession
+})
+const closedRecord = sessionRecordOf(
+  {
+    sessionId: 'gone',
+    projectId: 'p1',
+    workspaceName: 'Personal',
+    projectName: 'terminator',
+    branch: 'old',
+    tabTitle: 'claude',
+    shell: null,
+    startedAt: '2026-09-14T10:00:00.000Z',
+  },
+  {
+    description: 'closed one',
+    updatedAt: '2026-09-14T10:00:00.000Z',
+    closedAt: '2026-09-14T11:00:00.000Z',
+  }
+)
 
 const getIssue = vi.fn()
+const listRecords = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(window as unknown as { electronAPI: unknown }).electronAPI = { integrations: { getIssue } }
+  listRecords.mockResolvedValue({ data: [closedRecord] })
+  Object.defineProperty(window, 'electronAPI', {
+    value: { integrations: { getIssue }, sessionRecords: { list: listRecords } },
+    writable: true,
+    configurable: true,
+  })
   useSessionStore.setState({ sessions: new Map([['s1', session]]) })
   useWorkspaceStore.setState({
     workspaces: [workspace],
     projectsByWorkspaceId: new Map([['w1', [project]]]),
   })
-  useSessionRecordsStore.setState({
-    records: new Map([
-      [
-        'gone',
-        {
-          sessionId: 'gone',
-          projectId: 'p1',
-          workspaceName: 'Personal',
-          projectName: 'terminator',
-          branch: 'old',
-          tabTitle: 'claude',
-          shell: null,
-          description: 'closed one',
-          link: null,
-          startedAt: '2026-09-14T10:00:00.000Z',
-          updatedAt: '2026-09-14T10:00:00.000Z',
-          closedAt: '2026-09-14T11:00:00.000Z',
-        },
-      ],
-    ]),
-  })
+  useSessionRecordsStore.setState({ records: new Map([['gone', closedRecord]]) })
   useIntegrationsStore.setState({ links: new Map(), issuesByKey: new Map() })
 })
 
@@ -71,11 +77,14 @@ describe('useSessionFacts', () => {
   // A transcript can be deleted while the app is open, so whether a
   // conversation can still be resumed has to be asked again each time a
   // surface that offers Resume appears.
-  it('asks the main process for the records again when it appears', () => {
-    const load = vi.fn().mockResolvedValue(undefined)
-    useSessionRecordsStore.setState({ load } as never)
-    renderHook(() => useSessionFacts())
-    expect(load).toHaveBeenCalledTimes(1)
+  it('asks the main process for the records again when it appears', async () => {
+    const resumed = sessionRecordOf(closedRecord, { resumable: true })
+    listRecords.mockResolvedValue({ data: [resumed] })
+    const { result } = renderHook(() => useSessionFacts())
+    await waitFor(() =>
+      expect(result.current.find((f) => f.sessionId === 'gone')!.resumable).toBe(true)
+    )
+    expect(listRecords).toHaveBeenCalledTimes(1)
   })
 
   it('follows a change in the session store', () => {
@@ -91,10 +100,11 @@ describe('useSessionFacts', () => {
 
 describe('useIssue', () => {
   it('loads the issue for a work item and returns it once read', async () => {
-    getIssue.mockResolvedValue({ issue: { key: 'TAV-1', title: 'Home' } })
+    const home = issueOf({ key: 'TAV-1', title: 'Home' })
+    getIssue.mockResolvedValue({ issue: home })
     const { result } = renderHook(() => useIssue({ tracker: 'linear', key: 'TAV-1' }))
     expect(result.current).toBeUndefined()
-    await waitFor(() => expect(result.current).toEqual({ key: 'TAV-1', title: 'Home' }))
+    await waitFor(() => expect(result.current).toEqual(home))
     expect(getIssue).toHaveBeenCalledTimes(1)
   })
 
@@ -109,7 +119,7 @@ describe('useIssueTitles', () => {
   it('maps every issue read so far to its title, leaving out unreadable ones', () => {
     useIntegrationsStore.setState({
       issuesByKey: new Map([
-        ['linear:TAV-1', { key: 'TAV-1', title: 'Home' } as never],
+        ['linear:TAV-1', issueOf({ key: 'TAV-1', title: 'Home' })],
         ['linear:TAV-2', null],
       ]),
     })

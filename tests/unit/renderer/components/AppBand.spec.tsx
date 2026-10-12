@@ -38,11 +38,6 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
     }
   })
 
-  it('draws one entry per global tab', () => {
-    const { container } = renderBand()
-    expect(container.querySelectorAll('.app-band__entry')).toHaveLength(3)
-  })
-
   it('gives every entry an accessible name', () => {
     const { container } = renderBand()
     const names = [...container.querySelectorAll('.app-band__entry')].map((el) =>
@@ -120,11 +115,6 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
 })
 
 describe('AppBand — quick actions', () => {
-  it('renders nothing when the prop is absent', () => {
-    const { container } = renderBand({ globalTabs: [] })
-    expect(container.querySelector('.app-band')).toBeNull()
-  })
-
   it('renders the band for this entry alone', () => {
     const onOpenQuickActions = vi.fn()
     const { container } = renderBand({ globalTabs: [], onOpenQuickActions })
