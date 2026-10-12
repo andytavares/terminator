@@ -254,3 +254,23 @@ describe('tracker-store — migration from the extension (FR-004)', () => {
     await expect(store.migrateLegacyCredentials()).resolves.toBeUndefined()
   })
 })
+
+describe('tracker-store — concurrent changes', () => {
+  it('keeps both of two changes made at once, as editing one tracker and disconnecting the other does', async () => {
+    const store = await load()
+    await store.setCredential({ tracker: 'linear', apiKey: 'lin_key' })
+    await store.setCredential({ tracker: 'jira', site: 's', email: 'a@b.c', apiToken: 'tok' })
+
+    // Blurring the Linear field and clicking Jira's Disconnect send both together.
+    await Promise.all([
+      store.setMine('linear', { kind: 'assignee', email: 'grace@acme.dev' }),
+      store.clearCredential('jira'),
+    ])
+
+    await expect(store.getMine('linear')).resolves.toEqual({
+      kind: 'assignee',
+      email: 'grace@acme.dev',
+    })
+    await expect(store.getCredential('jira')).resolves.toBeNull()
+  })
+})
