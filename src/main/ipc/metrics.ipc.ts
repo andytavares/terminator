@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
-import { execFile, execSync } from 'child_process'
+import { execFile } from 'child_process'
 import * as os from 'os'
 import { readFile } from 'fs/promises'
 import { promisify } from 'util'
@@ -155,30 +155,35 @@ function keepSamplerRunning(): void {
 // ─── ps-based process metrics ────────────────────────────────────────────────
 
 /** @internal */
-export function queryProcessMetrics(pids: number[]): ProcessMetrics[] {
+export async function queryProcessMetrics(pids: number[]): Promise<ProcessMetrics[]> {
   if (pids.length === 0) return []
+  const columns =
+    process.platform === 'linux'
+      ? ['-o', 'pid,%cpu,rss', '--no-headers']
+      : ['-o', 'pid=,%cpu=,rss=']
   try {
-    const pidArg = pids.join(',')
-    const flags =
-      process.platform === 'linux'
-        ? `-p ${pidArg} -o pid,%cpu,rss --no-headers`
-        : `-p ${pidArg} -o pid=,%cpu=,rss=`
-    const raw = execSync(`ps ${flags}`, { timeout: 3000 }).toString()
-    const results: ProcessMetrics[] = []
-    for (const line of raw.split('\n')) {
-      const parts = line.trim().split(/\s+/)
-      if (parts.length < 3) continue
-      const pid = parseInt(parts[0], 10)
-      const cpu = parseFloat(parts[1])
-      const rssKb = parseInt(parts[2], 10)
-      if (!isNaN(pid) && !isNaN(cpu) && !isNaN(rssKb)) {
-        results.push({ pid, cpuPercent: cpu, rssBytes: rssKb * 1024 })
-      }
-    }
-    return results
+    const { stdout } = await execFileAsync('ps', ['-p', pids.join(','), ...columns], {
+      timeout: 3000,
+    })
+    return parsePsRows(stdout)
   } catch {
     return []
   }
+}
+
+function parsePsRows(raw: string): ProcessMetrics[] {
+  const results: ProcessMetrics[] = []
+  for (const line of raw.split('\n')) {
+    const parts = line.trim().split(/\s+/)
+    if (parts.length < 3) continue
+    const pid = parseInt(parts[0], 10)
+    const cpu = parseFloat(parts[1])
+    const rssKb = parseInt(parts[2], 10)
+    if (!isNaN(pid) && !isNaN(cpu) && !isNaN(rssKb)) {
+      results.push({ pid, cpuPercent: cpu, rssBytes: rssKb * 1024 })
+    }
+  }
+  return results
 }
 
 // ─── IPC registration ────────────────────────────────────────────────────────
@@ -206,7 +211,9 @@ export function registerMetricsHandlers(ptyManager: PtyManager): void {
       channel: 'metrics:processes',
       schema: z.object({ pids: z.array(z.number().int()).optional() }),
       invalid: { data: [] },
-      run: ({ pids }): { data: ProcessMetrics[] } => ({ data: queryProcessMetrics(pids ?? []) }),
+      run: async ({ pids }): Promise<{ data: ProcessMetrics[] }> => ({
+        data: await queryProcessMetrics(pids ?? []),
+      }),
     }),
     invokeSpec({
       channel: 'metrics:pids',

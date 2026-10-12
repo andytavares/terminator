@@ -17,11 +17,9 @@ vi.mock('os', () => ({
   totalmem: mockTotalmem,
 }))
 
-const mockExecSync = vi.fn()
 const mockExecFile = vi.fn()
 const mockReadFile = vi.fn()
 vi.mock('child_process', () => ({
-  execSync: mockExecSync,
   execFile: Object.assign(vi.fn(), { [promisify.custom]: mockExecFile }),
 }))
 vi.mock('fs/promises', () => ({ readFile: mockReadFile }))
@@ -43,7 +41,6 @@ describe('registerMetricsHandlers', () => {
     vi.clearAllMocks()
     vi.useFakeTimers()
     mockCpus.mockReturnValue(makeCpus(800, 1000))
-    mockExecSync.mockReturnValue('')
     mockExecFile.mockResolvedValue({ stdout: '' })
     mockReadFile.mockResolvedValue('')
     mockHandle.mockImplementation((_ch: string, fn: (...args: unknown[]) => unknown) => fn)
@@ -118,7 +115,6 @@ describe('registerMetricsHandlers', () => {
       const result = await system()
 
       expect(mockExecFile).toHaveBeenCalledWith('netstat', ['-ib'], expect.anything())
-      expect(mockExecSync).not.toHaveBeenCalled()
       expect(result.data.netInBytesPerSec).toBe(2000)
       expect(result.data.netOutBytesPerSec).toBe(1000)
     })
@@ -160,13 +156,12 @@ describe('registerMetricsHandlers', () => {
   })
 
   it('queryProcessMetrics skips rows with non-numeric fields', async () => {
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (String(cmd).startsWith('ps ')) return 'abc def ghi\n1234 5.0 1024\n'
-      return ''
-    })
+    mockExecFile.mockImplementation(async (cmd: string) => ({
+      stdout: cmd === 'ps' ? 'abc def ghi\n1234 5.0 1024\n' : '',
+    }))
     vi.resetModules()
     const { queryProcessMetrics } = await import('../../../src/main/ipc/metrics.ipc.js')
-    const result = queryProcessMetrics([1234])
+    const result = await queryProcessMetrics([1234])
     expect(result).toEqual([{ pid: 1234, cpuPercent: 5.0, rssBytes: 1024 * 1024 }])
   })
 
@@ -195,10 +190,9 @@ describe('registerMetricsHandlers', () => {
   })
 
   it('metrics:processes parses ps output', async () => {
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (String(cmd).startsWith('ps ')) return '1234 12.5 204800\n'
-      return ''
-    })
+    mockExecFile.mockImplementation(async (cmd: string) => ({
+      stdout: cmd === 'ps' ? '1234 12.5 204800\n' : '',
+    }))
     vi.resetModules()
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
     registerMetricsHandlers(getPtyManager() as never)
@@ -213,9 +207,9 @@ describe('registerMetricsHandlers', () => {
   })
 
   it('metrics:processes returns empty array when ps fails', async () => {
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (String(cmd).startsWith('ps ')) throw new Error('ps failed')
-      return ''
+    mockExecFile.mockImplementation(async (cmd: string) => {
+      if (cmd === 'ps') throw new Error('ps failed')
+      return { stdout: '' }
     })
     vi.resetModules()
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
@@ -283,7 +277,6 @@ describe('readNetBytes (exported)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockCpus.mockReturnValue(makeCpus(800, 1000))
-    mockExecSync.mockReturnValue('')
     mockExecFile.mockResolvedValue({ stdout: '' })
   })
 
@@ -351,28 +344,26 @@ describe('queryProcessMetrics (exported)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockCpus.mockReturnValue(makeCpus(800, 1000))
-    mockExecSync.mockReturnValue('')
   })
 
   it('returns [] without calling exec when pids is empty', async () => {
     vi.resetModules()
     const { queryProcessMetrics } = await import('../../../src/main/ipc/metrics.ipc.js')
-    const result = queryProcessMetrics([])
+    const result = await queryProcessMetrics([])
     expect(result).toEqual([])
-    expect(mockExecSync).not.toHaveBeenCalled()
+    expect(mockExecFile).not.toHaveBeenCalled()
   })
 
   it('parses ps output on Linux and returns { pid, cpuPercent, rssBytes } with rssBytes = rssKb * 1024', async () => {
     const originalPlatform = process.platform
     Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (String(cmd).startsWith('ps ')) return '1234 25.0 8192\n5678 0.5 4096\n'
-      return ''
-    })
+    mockExecFile.mockImplementation(async (cmd: string) => ({
+      stdout: cmd === 'ps' ? '1234 25.0 8192\n5678 0.5 4096\n' : '',
+    }))
 
     vi.resetModules()
     const { queryProcessMetrics } = await import('../../../src/main/ipc/metrics.ipc.js')
-    const result = queryProcessMetrics([1234, 5678])
+    const result = await queryProcessMetrics([1234, 5678])
 
     expect(result).toHaveLength(2)
     expect(result[0]).toEqual({ pid: 1234, cpuPercent: 25.0, rssBytes: 8192 * 1024 })
@@ -383,14 +374,13 @@ describe('queryProcessMetrics (exported)', () => {
   it('parses ps output on Darwin and returns the same shape', async () => {
     const originalPlatform = process.platform
     Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (String(cmd).startsWith('ps ')) return '9999 10.2 16384\n'
-      return ''
-    })
+    mockExecFile.mockImplementation(async (cmd: string) => ({
+      stdout: cmd === 'ps' ? '9999 10.2 16384\n' : '',
+    }))
 
     vi.resetModules()
     const { queryProcessMetrics } = await import('../../../src/main/ipc/metrics.ipc.js')
-    const result = queryProcessMetrics([9999])
+    const result = await queryProcessMetrics([9999])
 
     expect(result).toHaveLength(1)
     expect(result[0]).toEqual({ pid: 9999, cpuPercent: 10.2, rssBytes: 16384 * 1024 })
@@ -398,28 +388,27 @@ describe('queryProcessMetrics (exported)', () => {
   })
 
   it('skips malformed lines that have fewer than 3 parts', async () => {
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (String(cmd).startsWith('ps ')) return '1234 15.0 2048\nbadline\n  \n4321 5.0 1024\n'
-      return ''
-    })
+    mockExecFile.mockImplementation(async (cmd: string) => ({
+      stdout: cmd === 'ps' ? '1234 15.0 2048\nbadline\n  \n4321 5.0 1024\n' : '',
+    }))
 
     vi.resetModules()
     const { queryProcessMetrics } = await import('../../../src/main/ipc/metrics.ipc.js')
-    const result = queryProcessMetrics([1234, 4321])
+    const result = await queryProcessMetrics([1234, 4321])
 
     expect(result).toHaveLength(2)
     expect(result.map((r) => r.pid)).toEqual([1234, 4321])
   })
 
   it('returns [] when exec throws', async () => {
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (String(cmd).startsWith('ps ')) throw new Error('ps not found')
-      return ''
+    mockExecFile.mockImplementation(async (cmd: string) => {
+      if (cmd === 'ps') throw new Error('ps not found')
+      return { stdout: '' }
     })
 
     vi.resetModules()
     const { queryProcessMetrics } = await import('../../../src/main/ipc/metrics.ipc.js')
-    const result = queryProcessMetrics([1234])
+    const result = await queryProcessMetrics([1234])
 
     expect(result).toEqual([])
   })
