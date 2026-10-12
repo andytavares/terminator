@@ -418,6 +418,9 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
         title: trimmed,
         tags,
       })
+      useNotesStore
+        .getState()
+        .patchDiagram(diagramId, { title: trimmed, updatedAt: new Date().toISOString() })
     } catch (err) {
       console.error('[notepad] DiagramView: title save failed', err)
     }
