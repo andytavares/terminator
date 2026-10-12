@@ -63,10 +63,7 @@ function captureHandlers(
   registerGithubHandlers(
     answerInto(handlers),
     { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: USER_DATA },
-    undefined,
-    undefined,
-    getReviewRepos,
-    isBranchExcluded
+    { getReviewRepos, isBranchExcluded }
   )
   return handlers
 }
@@ -2814,8 +2811,7 @@ describe('review revamp — edge branches — maps ssh remotes, and ignores non-
     registerGithubHandlers(
       answerInto(hs),
       { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: USER_DATA },
-      undefined,
-      () => ['/src/widgets', '/src/gadgets', '/src/broken']
+      { listProjectRoots: () => ['/src/widgets', '/src/gadgets', '/src/broken'] }
     )
     const node = (repo: string, number: number) => ({
       number,
@@ -2861,8 +2857,7 @@ describe('github:dashboard-search', () => {
     registerGithubHandlers(
       answerInto(handlers),
       { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: USER_DATA },
-      undefined,
-      () => ['/Users/me/repos/widgets']
+      { listProjectRoots: () => ['/Users/me/repos/widgets'] }
     )
 
     mockDashboardExec(
@@ -3632,8 +3627,7 @@ describe('github:dashboard-search sessions and cap', () => {
     registerGithubHandlers(
       answerInto(handlers),
       { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: USER_DATA },
-      undefined,
-      () => ['/Users/me/repos/widgets']
+      { listProjectRoots: () => ['/Users/me/repos/widgets'] }
     )
     mockDashboardExec(
       { mine: [node] },

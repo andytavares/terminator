@@ -107,13 +107,16 @@ export function activate(api: ExtensionAPI): void {
       getToken: () => api.settings.get<string>('terminator.git-integration.git.githubToken') ?? '',
       noCheckoutCwd: api.paths.userData,
     },
-    // Optional: an older host has no issues namespace, and the review view
-    // then renders references exactly as it does today.
-    api.issues,
-    projectRoots,
-    () => api.settings.get<string[]>('terminator.git-integration.review.repos') ?? [],
-    // Settings → Git → Branch Exclude Patterns, matched by the core.
-    (branch, repoPath) => api.settings.isBranchExcluded(branch, repoPath)
+    {
+      // Optional: an older host has no issues namespace, and the review view
+      // then renders references exactly as it does today.
+      issues: api.issues,
+      listProjectRoots: projectRoots,
+      getReviewRepos: () =>
+        api.settings.get<string[]>('terminator.git-integration.review.repos') ?? [],
+      // Settings → Git → Branch Exclude Patterns, matched by the core.
+      isBranchExcluded: (branch, repoPath) => api.settings.isBranchExcluded(branch, repoPath),
+    }
   )
 
   // Read-only review agent: headless `claude -p` in a detached PR-head worktree.
