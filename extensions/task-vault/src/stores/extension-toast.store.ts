@@ -21,10 +21,18 @@ interface ExtensionToastState {
   removeToast: (id: string) => void
 }
 
+/** Errors stay up longer than everything else. */
+function defaultDuration(type: ToastType): number {
+  if (type === 'error') return 6000
+  return 3500
+}
+
 export const useExtensionToastStore = create<ExtensionToastState>((set) => ({
   toasts: [],
 
-  addToast: ({ type, message, duration = type === 'error' ? 6000 : 3500, onClick }) => {
+  addToast: (toast) => {
+    const { type, message, onClick } = toast
+    const duration = toast.duration ?? defaultDuration(type)
     const id = crypto.randomUUID()
     set((s) => ({ toasts: [...s.toasts, { id, type, message, duration, onClick }] }))
     setTimeout(() => {
