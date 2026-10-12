@@ -17,6 +17,13 @@ export interface SerializedNotification {
 }
 
 export interface ElectronAPI {
+  ui: {
+    /**
+     * How many dialogs the view has open, so the host's double-Escape exit
+     * stands down while one is. @terminator/extension-ui's Dialog reports it.
+     */
+    setModalDepth(depth: number): void
+  }
   terminal: {
     create(payload: unknown): Promise<{ sessionId: string } | { error: string }>
     close(sessionId: string): Promise<{ success: boolean }>
@@ -35,6 +42,12 @@ export interface ElectronAPI {
     update(payload: unknown): Promise<{ workspace: unknown } | { error: string }>
     delete(id: string): Promise<{ success: boolean }>
     reorder(ids: string[]): Promise<{ success: boolean }>
+    /** What the operator has focused in the main window. */
+    getActive(): Promise<{
+      workspaceId: string | null
+      projectId: string | null
+      repoRoot: string | null
+    }>
   }
   project: {
     list(workspaceId: string): Promise<{ projects: Array<{ id: string; name: string }> }>
