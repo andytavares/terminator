@@ -19,17 +19,15 @@ interface Props {
 
 type Loaded = { repos: Repo[] } | { error: string }
 
-function GroupCheckbox({
-  owner,
-  selected,
-  total,
-  onToggle,
-}: {
+interface GroupCheckboxProps {
   owner: string
   selected: number
   total: number
   onToggle: () => void
-}): JSX.Element {
+}
+
+function GroupCheckbox(props: GroupCheckboxProps): JSX.Element {
+  const { selected, total } = props
   const ref = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (ref.current) ref.current.indeterminate = selected > 0 && selected < total
@@ -37,13 +35,13 @@ function GroupCheckbox({
   return (
     <label className="rp-group-label">
       <input
+        aria-label={`Select every repository of ${props.owner}`}
         ref={ref}
         type="checkbox"
         checked={selected === total}
-        aria-label={`Select every repository of ${owner}`}
-        onChange={onToggle}
+        onChange={props.onToggle}
       />
-      <span className="rp-owner">{owner}</span>
+      <span className="rp-owner">{props.owner}</span>
       <span className="rp-count">
         {selected} of {total}
       </span>
@@ -51,27 +49,61 @@ function GroupCheckbox({
   )
 }
 
+function errorText(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return String(err)
+}
+
 async function fetchAccessibleRepos(refresh: boolean): Promise<Loaded> {
   try {
     return (await githubAPI.accessibleRepos(refresh)) as Loaded
   } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) }
+    return { error: errorText(err) }
   }
 }
 
-export function RepoPicker({ initial, onClose, onSaved }: Props): JSX.Element {
-  const [loaded, setLoaded] = useState<Loaded | null>(null)
-  const [query, setQuery] = useState('')
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(initial))
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
+function reposOf(loaded: Loaded | null): Repo[] {
+  if (loaded && 'repos' in loaded) return loaded.repos
+  return []
+}
 
+/** The repositories matching `query`, and the same grouped by owner. */
+function groupRepos(repos: Repo[], query: string) {
+  const needle = query.trim().toLowerCase()
+  const shown = repos.filter((r) => !needle || r.fullName.toLowerCase().includes(needle))
+  const byOwner = new Map<string, Repo[]>()
+  for (const r of shown) {
+    const list = byOwner.get(r.owner)
+    if (list) list.push(r)
+    else byOwner.set(r.owner, [r])
+  }
+  return { shown, byOwner: [...byOwner.entries()] }
+}
+
+function toggled(prev: Set<string>, fullName: string): Set<string> {
+  const next = new Set(prev)
+  if (!next.delete(fullName)) next.add(fullName)
+  return next
+}
+
+/** Selects the whole group, or clears it when every repository in it is already selected. */
+function toggledGroup(prev: Set<string>, list: Repo[]): Set<string> {
+  const next = new Set(prev)
+  const all = list.every((r) => next.has(r.fullName))
+  for (const r of list) {
+    if (all) next.delete(r.fullName)
+    else next.add(r.fullName)
+  }
+  return next
+}
+
+/** The accessible repositories, read once on open and again on `load`. */
+function useAccessibleRepos() {
+  const [loaded, setLoaded] = useState<Loaded | null>(null)
   const load = useCallback(async (refresh: boolean) => {
     setLoaded(null)
     setLoaded(await fetchAccessibleRepos(refresh))
   }, [])
-
   useEffect(() => {
     let cancelled = false
     void fetchAccessibleRepos(false).then((result) => {
@@ -81,43 +113,13 @@ export function RepoPicker({ initial, onClose, onSaved }: Props): JSX.Element {
       cancelled = true
     }
   }, [])
+  return { loaded, load }
+}
 
-  useEffect(() => {
-    searchRef.current?.focus()
-  }, [loaded])
-
-  const repos = useMemo(() => (loaded && 'repos' in loaded ? loaded.repos : []), [loaded])
-
-  const groups = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    const shown = needle ? repos.filter((r) => r.fullName.toLowerCase().includes(needle)) : repos
-    const byOwner = new Map<string, Repo[]>()
-    for (const r of shown) {
-      const list = byOwner.get(r.owner)
-      if (list) list.push(r)
-      else byOwner.set(r.owner, [r])
-    }
-    return { shown, byOwner: [...byOwner.entries()] }
-  }, [repos, query])
-
-  const toggle = (fullName: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (!next.delete(fullName)) next.add(fullName)
-      return next
-    })
-
-  const toggleGroup = (list: Repo[]) =>
-    setSelected((prev) => {
-      const next = new Set(prev)
-      const all = list.every((r) => next.has(r.fullName))
-      for (const r of list) {
-        if (all) next.delete(r.fullName)
-        else next.add(r.fullName)
-      }
-      return next
-    })
-
+function useRepoSelection(initial: string[], onSaved: () => void) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(initial))
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const save = async () => {
     setSaving(true)
     setSaveError(null)
@@ -125,104 +127,165 @@ export function RepoPicker({ initial, onClose, onSaved }: Props): JSX.Element {
       await githubAPI.setReviewRepos([...selected])
       onSaved()
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : String(err))
+      setSaveError(errorText(err))
       setSaving(false)
     }
   }
+  return { selected, setSelected, saving, saveError, save }
+}
 
-  const summary =
-    selected.size === 0
-      ? 'All repositories (nothing selected)'
-      : `${selected.size} of ${repos.length} selected`
+type Selection = ReturnType<typeof useRepoSelection>
 
+function selectionSummary(selectedCount: number, repoCount: number): string {
+  if (selectedCount === 0) return 'All repositories (nothing selected)'
+  return `${selectedCount} of ${repoCount} selected`
+}
+
+function RepoRow(props: { repo: Repo; sel: Selection }) {
+  const { repo: r, sel } = props
   return (
-    <Dialog
-      title="Repositories for Reviews"
-      size="wide"
-      onDismiss={onClose}
-      actions={[
-        { label: 'Cancel', onSelect: onClose },
-        { label: 'Save', tone: 'primary', disabled: saving, onSelect: save },
-      ]}
-    >
+    <label className="rp-row">
+      <input
+        aria-label={r.fullName}
+        type="checkbox"
+        checked={sel.selected.has(r.fullName)}
+        onChange={() => sel.setSelected((prev) => toggled(prev, r.fullName))}
+      />
+      <span className="rp-name">{r.fullName}</span>
+      {r.private && (
+        <span className="rd-chip rp-private">
+          <Lock aria-hidden="true" className="tm-icon-sm" />
+          private
+        </span>
+      )}
+      <span className="rp-pushed">pushed {formatRelativeTime(r.pushedAt)}</span>
+    </label>
+  )
+}
+
+function OwnerGroup(props: { owner: string; list: Repo[]; sel: Selection }) {
+  const { owner, list, sel } = props
+  return (
+    <div className="rp-group" role="group" aria-label={owner}>
+      <GroupCheckbox
+        owner={owner}
+        selected={list.filter((r) => sel.selected.has(r.fullName)).length}
+        total={list.length}
+        onToggle={() => sel.setSelected((prev) => toggledGroup(prev, list))}
+      />
+      {list.map((r) => (
+        <RepoRow key={r.fullName} repo={r} sel={sel} />
+      ))}
+    </div>
+  )
+}
+
+interface RepoToolsProps {
+  query: string
+  setQuery: (q: string) => void
+  shown: Repo[]
+  sel: Selection
+  load: (refresh: boolean) => Promise<void>
+}
+
+function RepoTools(props: RepoToolsProps) {
+  const searchRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    searchRef.current?.focus()
+  }, [])
+  const selectShown = () =>
+    props.sel.setSelected((prev) => new Set([...prev, ...props.shown.map((r) => r.fullName)]))
+  return (
+    <div className="rp-tools">
+      <input
+        aria-label="Search repositories"
+        ref={searchRef}
+        type="search"
+        className="rp-search"
+        placeholder="Search repositories"
+        value={props.query}
+        onChange={(e) => props.setQuery(e.target.value)}
+      />
+      <Button size="sm" onClick={selectShown}>
+        Select all shown
+      </Button>
+      <Button size="sm" onClick={() => props.sel.setSelected(new Set())}>
+        Clear
+      </Button>
+      <Button size="sm" onClick={() => void props.load(true)}>
+        Refresh list
+      </Button>
+    </div>
+  )
+}
+
+interface RepoListProps {
+  repos: Repo[]
+  sel: Selection
+  load: RepoToolsProps['load']
+  /** Kept by the picker, so a refresh keeps the search. */
+  search: { query: string; setQuery: (q: string) => void }
+}
+
+function RepoList(props: RepoListProps) {
+  const { query, setQuery } = props.search
+  const groups = useMemo(() => groupRepos(props.repos, query), [props.repos, query])
+  const { sel } = props
+  return (
+    <>
+      <RepoTools
+        query={query}
+        setQuery={setQuery}
+        shown={groups.shown}
+        sel={sel}
+        load={props.load}
+      />
+      <div className="rp-summary" aria-live="polite">
+        {selectionSummary(sel.selected.size, props.repos.length)}
+      </div>
+      <div className="rp-list">
+        {groups.byOwner.length === 0 && <div className="rp-note">No repositories match</div>}
+        {groups.byOwner.map(([owner, list]) => (
+          <OwnerGroup key={owner} owner={owner} list={list} sel={sel} />
+        ))}
+      </div>
+    </>
+  )
+}
+
+function LoadError(props: { error: string; onRetry: () => void }) {
+  return (
+    <div className="rp-error" role="alert">
+      <span>{props.error}</span>
+      <Button size="sm" onClick={props.onRetry}>
+        Retry
+      </Button>
+    </div>
+  )
+}
+
+export function RepoPicker({ initial, onClose, onSaved }: Props): JSX.Element {
+  const { loaded, load } = useAccessibleRepos()
+  const sel = useRepoSelection(initial, onSaved)
+  const repos = useMemo(() => reposOf(loaded), [loaded])
+  const [query, setQuery] = useState('')
+  const actions = [
+    { label: 'Cancel', onSelect: onClose },
+    { label: 'Save', tone: 'primary' as const, disabled: sel.saving, onSelect: sel.save },
+  ]
+  return (
+    <Dialog title="Repositories for Reviews" size="wide" onDismiss={onClose} actions={actions}>
       <div className="rp">
         {loaded === null && <div className="rp-note">Reading your repositories…</div>}
-
         {loaded !== null && 'error' in loaded && (
-          <div className="rp-error" role="alert">
-            <span>{loaded.error}</span>
-            <Button size="sm" onClick={() => void load(false)}>
-              Retry
-            </Button>
-          </div>
+          <LoadError error={loaded.error} onRetry={() => void load(false)} />
         )}
-
         {loaded !== null && 'repos' in loaded && (
-          <>
-            <div className="rp-tools">
-              <input
-                ref={searchRef}
-                type="search"
-                className="rp-search"
-                placeholder="Search repositories"
-                aria-label="Search repositories"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <Button
-                size="sm"
-                onClick={() =>
-                  setSelected((prev) => new Set([...prev, ...groups.shown.map((r) => r.fullName)]))
-                }
-              >
-                Select all shown
-              </Button>
-              <Button size="sm" onClick={() => setSelected(new Set())}>
-                Clear
-              </Button>
-              <Button size="sm" onClick={() => void load(true)}>
-                Refresh list
-              </Button>
-            </div>
-            <div className="rp-summary" aria-live="polite">
-              {summary}
-            </div>
-            <div className="rp-list">
-              {groups.byOwner.length === 0 && <div className="rp-note">No repositories match</div>}
-              {groups.byOwner.map(([owner, list]) => (
-                <div key={owner} className="rp-group" role="group" aria-label={owner}>
-                  <GroupCheckbox
-                    owner={owner}
-                    selected={list.filter((r) => selected.has(r.fullName)).length}
-                    total={list.length}
-                    onToggle={() => toggleGroup(list)}
-                  />
-                  {list.map((r) => (
-                    <label key={r.fullName} className="rp-row">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(r.fullName)}
-                        aria-label={r.fullName}
-                        onChange={() => toggle(r.fullName)}
-                      />
-                      <span className="rp-name">{r.fullName}</span>
-                      {r.private && (
-                        <span className="rd-chip rp-private">
-                          <Lock aria-hidden="true" className="tm-icon-sm" />
-                          private
-                        </span>
-                      )}
-                      <span className="rp-pushed">pushed {formatRelativeTime(r.pushedAt)}</span>
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </>
+          <RepoList repos={repos} sel={sel} load={load} search={{ query, setQuery }} />
         )}
-        {saveError && (
+        {sel.saveError && (
           <div className="rp-error" role="alert">
-            {saveError}
+            {sel.saveError}
           </div>
         )}
       </div>
