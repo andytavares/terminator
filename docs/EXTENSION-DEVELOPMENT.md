@@ -148,6 +148,7 @@ Every backend runs in the **extension host**, one Electron [`utilityProcess`](ht
 - Values you pass and return must survive structured clone: plain data, no functions or class instances. An `Error` arrives with its `name` and `message`.
 - `api.db` is the extension host's own connection to the app database, so `transaction(fn)` runs `fn` in your process.
 - `electron` is not available. Use `api.paths` for `app.getAppPath()` and for your own data folder, `api.dialog` for file dialogs, and `api.window` for windows. A store such as electron-store needs `cwd: api.paths.globalStorage`. Node's own modules work: Remote Control's HTTP server runs here.
+- Every backend shares the host's memory. Import a large dependency the first time you need it (`await import(...)`), not at the top of your entry: Remote Control loads fastify only when its server starts, and git-integration loads electron-store only when a store is first read ([measurements](research/perf/2026-10-12-extension-host.md)).
 
 If the extension host crashes, the app stays up. It is restarted once and every backend activated
 again in the same order as at startup: an extension after those in its `extensionDependencies`, so

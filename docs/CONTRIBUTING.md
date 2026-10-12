@@ -51,6 +51,8 @@ node scripts/perf/app-metrics.mjs --runs=5 --throughput
 
 Prints the median start-up milestones (process attached, window, DOM ready, sidebar), memory per process type after the app settles, and the time to print 50 MB in a terminal. A change that claims a speed-up records this before and after in its commit.
 
+`--extensions=each` measures the extension host instead: its memory with no extension, with a probe that loads nothing, with each bundled extension alone and with all of them ([2026-10-12 results](research/perf/2026-10-12-extension-host.md)).
+
 ### E2E rules
 
 E2E runs with no retries, so a test that fails once fails the build ([ADR 070](adr/070-e2e-is-deterministic-and-selective.md)).
