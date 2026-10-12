@@ -88,6 +88,7 @@ async function addProject(): Promise<string> {
     workspaceId: created.workspace.id,
     name: 'main',
     worktreePath: projectDir,
+    isWorktree: false,
   })
   if (!('project' in added)) throw new Error(added.error)
   return added.project.id

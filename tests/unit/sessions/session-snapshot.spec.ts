@@ -39,6 +39,7 @@ function addProject(gitBranch?: string): Project {
     workspaceId: created.workspace.id,
     name: 'session-home',
     gitBranch,
+    isWorktree: false,
   })
   if (!('project' in added)) throw new Error(added.error)
   return added.project

@@ -19,7 +19,7 @@ let workspaceId: string
 let P: string
 
 function addProject(name: string, worktreePath?: string): string {
-  const added = workspaces.createProject({ workspaceId, name, worktreePath })
+  const added = workspaces.createProject({ workspaceId, name, worktreePath, isWorktree: false })
   if (!('project' in added)) throw new Error(added.error)
   return added.project.id
 }
