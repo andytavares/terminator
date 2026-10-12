@@ -42,9 +42,7 @@ export function ViewMenu({ sinceNote }: ViewMenuProps) {
         onClick={() => setOpen((v) => !v)}
       >
         View
-        {(changed || commentVisibility === 'hidden') && (
-          <span className="vm-dot" aria-hidden="true" />
-        )}
+        {changed && <span className="vm-dot" aria-hidden="true" />}
         <ChevronDown aria-hidden="true" className="tm-icon-sm" />
       </button>
       {open && (

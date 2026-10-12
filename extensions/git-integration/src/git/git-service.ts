@@ -204,7 +204,7 @@ export function commitChanges(
         return
       }
       if (code === 0) {
-        const match = stdout.trim().match(/\[[\w/]+ ([a-f0-9]+)\]/)
+        const match = stdout.match(/^\[.+? ([a-f0-9]+)\]/m)
         resolve({ commitHash: match?.[1] ?? '' })
         return
       }

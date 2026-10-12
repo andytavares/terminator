@@ -45,7 +45,9 @@ export interface ElectronAPI {
   git: {
     isRepo(path: string): Promise<{ isRepo: boolean; root?: string }>
     currentBranch(path: string): Promise<{ branch: string } | { error: string }>
-    listBranches(path: string): Promise<{ branches: Array<{ name: string }> }>
+    listBranches(
+      path: string
+    ): Promise<{ branches: Array<{ name: string; isCurrent: boolean; isRemote: boolean }> }>
     checkout(path: string, branch: string): Promise<{ success: true } | { error: string }>
     createBranch(path: string, branch: string): Promise<{ success: true } | { error: string }>
     suggestWorktreePath(

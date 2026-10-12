@@ -251,6 +251,20 @@ describe('commitChanges', () => {
     await expect(pending).resolves.toEqual({ commitHash: 'a1b2c3d' })
   })
 
+  it.each([
+    ['feature/add-login', '[feature/add-login a1b2c3d] feat: add login'],
+    ['release-1.2', '[release-1.2 a1b2c3d] chore: release'],
+    ['user.name/fix_x', '[user.name/fix_x a1b2c3d] fix: x'],
+    ['the first commit', '[main (root-commit) a1b2c3d] chore: init'],
+    ['a detached HEAD', '[detached HEAD a1b2c3d] wip'],
+  ])('resolves the commit hash for %s', async (_case, summaryLine) => {
+    const pending = commitChanges('/repo', 'msg')
+    proc.stdout.emit('data', Buffer.from(`${summaryLine}\n 1 file changed, 1 insertion(+)\n`))
+    proc.emit('close', 0)
+
+    await expect(pending).resolves.toEqual({ commitHash: 'a1b2c3d' })
+  })
+
   it('strips ANSI escapes from streamed output before handing it to onOutput', async () => {
     const onOutput = vi.fn()
     const pending = commitChanges('/repo', 'msg', false, false, onOutput)

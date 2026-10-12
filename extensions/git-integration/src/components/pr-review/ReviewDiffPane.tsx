@@ -75,10 +75,16 @@ function highlightLine(content: string, lang: ReturnType<typeof detectLanguage>)
 const REWRITTEN_NOTE = 'History rewritten — showing the whole file'
 const DIFF_CACHE_CAP = 60
 
-function rememberDiff(cache: Map<string, CachedDiff>, key: string, entry: CachedDiff): void {
-  cache.delete(key)
-  cache.set(key, entry)
-  if (cache.size > DIFF_CACHE_CAP) cache.delete(cache.keys().next().value as string)
+function rememberDiff(
+  cache: Map<string, CachedDiff>,
+  key: string,
+  entry: CachedDiff
+): Map<string, CachedDiff> {
+  const next = new Map(cache)
+  next.delete(key)
+  next.set(key, entry)
+  if (next.size > DIFF_CACHE_CAP) next.delete(next.keys().next().value as string)
+  return next
 }
 
 function findChapterId(chapters: Chapter[], path: string): string | null {
@@ -94,10 +100,9 @@ export function ReviewDiffPane({
   onNextFile,
   onShowRisk,
 }: Props) {
-  const [diff, setDiff] = useState<FileDiff | null>(null)
-  const [diffLoading, setDiffLoading] = useState(false)
-  const [diffError, setDiffError] = useState<string | null>(null)
-  const [sinceNote, setSinceNote] = useState<string | null>(null)
+  const [diffCache, setDiffCache] = useState<Map<string, CachedDiff>>(() => new Map())
+  const [diffFailure, setDiffFailure] = useState<{ key: string; message: string } | null>(null)
+  const [rewrittenNoteFor, setRewrittenNoteFor] = useState<string | null>(null)
   const [composerAnchor, setComposerAnchor] = useState<ComposerAnchor | null>(null)
   const [noteAnchor, setNoteAnchor] = useState<{ line: number; side: 'LEFT' | 'RIGHT' } | null>(
     null
@@ -192,22 +197,26 @@ export function ReviewDiffPane({
     }))
   )
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Tracks which hunk nextHunk/prevHunk last scrolled to, since jsdom (and
+  // some real layouts) can't be trusted to report bounding-rect positions.
+  const currentHunkIndexRef = useRef(0)
   const [expansions, setExpansions] = useState<Map<string, Expansion>>(new Map())
   const [fileText, setFileText] = useState<FileText>({ status: 'idle' })
-  const diffCacheRef = useRef(new Map<string, CachedDiff>())
   const fileTextCache = useRef(new Map<string, string[]>())
   const fileTextKey = `${file.path}@${pr.headSHA}`
   const fileTextKeyRef = useRef(fileTextKey)
-  fileTextKeyRef.current = fileTextKey
 
   // Use refs so the complexity-patch effect always has current values without
   // making them deps of the diff-loading effect (which would cause an infinite
   // loop: patchFileComplexity updates activePr.chapters → pr.chapters ref
   // changes → effect re-runs → setDiff(null) → blank screen).
   const patchFileComplexityRef = useRef(patchFileComplexity)
-  patchFileComplexityRef.current = patchFileComplexity
   const prChaptersRef = useRef<Chapter[]>(pr.chapters)
-  prChaptersRef.current = pr.chapters
+  useEffect(() => {
+    fileTextKeyRef.current = fileTextKey
+    patchFileComplexityRef.current = patchFileComplexity
+    prChaptersRef.current = pr.chapters
+  })
 
   const lang = detectLanguage(file.path)
   const isViewed = viewedFiles.has(file.path)
@@ -254,32 +263,36 @@ export function ReviewDiffPane({
   const diffKey = `${pr.number}:${pr.headSHA}:${file.path}:${sinceSha ? `since:${sinceSha}` : 'whole'}`
   const historyNote = historyRewritten && isChangedSince ? REWRITTEN_NOTE : null
 
-  useEffect(() => {
-    setDiffError(null)
-    setSinceNote(null)
+  const cachedDiff = file.isBinary ? undefined : diffCache.get(diffKey)
+  const diff = cachedDiff?.diff ?? null
+  const diffError = !cachedDiff && diffFailure?.key === diffKey ? diffFailure.message : null
+  const sinceNote = cachedDiff
+    ? cachedDiff.note
+    : rewrittenNoteFor === diffKey
+      ? REWRITTEN_NOTE
+      : null
+  const diffLoading = !file.isBinary && !cachedDiff && !diffError
+
+  const [shownDiffKey, setShownDiffKey] = useState(diffKey)
+  if (shownDiffKey !== diffKey) {
+    setShownDiffKey(diffKey)
     setExpansions(new Map())
     setFileText({ status: 'idle' })
+  }
+
+  useEffect(() => {
     currentHunkIndexRef.current = 0
-    if (file.isBinary) {
-      setDiff(null)
-      return
-    }
-    const cached = diffCacheRef.current.get(diffKey)
-    if (cached) {
-      setDiff(cached.diff)
-      setSinceNote(cached.note)
-      setDiffLoading(false)
-      return
-    }
-    setDiff(null)
-    setDiffLoading(true)
+  }, [diffKey])
+
+  const hasCachedDiff = cachedDiff !== undefined
+  useEffect(() => {
+    if (file.isBinary || hasCachedDiff) return
 
     let cancelled = false
-    const show = (next: FileDiff, note: string | null) => {
-      rememberDiff(diffCacheRef.current, diffKey, { diff: next, note })
-      if (cancelled) return
-      setDiff(next)
-      setSinceNote(note)
+    const show = (next: FileDiff, note: string | null) =>
+      setDiffCache((prev) => rememberDiff(prev, diffKey, { diff: next, note }))
+    const fail = (message: string) => {
+      if (!cancelled) setDiffFailure({ key: diffKey, message })
     }
 
     const loadFull = (note: string | null) =>
@@ -291,51 +304,50 @@ export function ReviewDiffPane({
         .then((result) => {
           if (cancelled) return
           if ('error' in result) {
-            setDiffError((result as { error: string }).error)
+            fail(result.error)
             return
           }
-          const parsed = FileDiffSchema.safeParse((result as { diff: unknown }).diff)
+          const parsed = FileDiffSchema.safeParse(result.diff)
           if (parsed.success) {
             show(parsed.data, note)
           } else {
-            setDiffError('Unexpected diff format from server')
+            fail('Unexpected diff format from server')
           }
         })
-        .catch((e) => {
-          if (!cancelled) setDiffError(String(e))
-        })
-
-    const done = () => {
-      if (!cancelled) setDiffLoading(false)
-    }
+        .catch((e) => fail(String(e)))
 
     if (sinceSha) {
       githubAPI
         .prCompare(repoRoot, sinceSha, pr.headSHA)
         .then((cmp) => {
           if (cancelled) return
-          if ('error' in cmp || (cmp as { rewritten?: boolean }).rewritten) {
-            if ((cmp as { rewritten?: boolean }).rewritten) setSinceNote(REWRITTEN_NOTE)
-            return loadFull((cmp as { rewritten?: boolean }).rewritten ? REWRITTEN_NOTE : null)
+          if ('error' in cmp || cmp.rewritten) {
+            if (!('error' in cmp)) setRewrittenNoteFor(diffKey)
+            return loadFull(!('error' in cmp) ? REWRITTEN_NOTE : null)
           }
-          const entry = (cmp as { files: Array<{ path: string; patch: string }> }).files.find(
-            (f) => f.path === file.path
-          )
+          const entry = cmp.files.find((f) => f.path === file.path)
           if (!entry) return loadFull(null)
           show(parseDiff(entry.patch, file.path), `Showing ${sinceSha.slice(0, 8)} … head`)
         })
         .catch(() => loadFull(null))
-        .finally(done)
-      return () => {
-        cancelled = true
-      }
+    } else {
+      void loadFull(null)
     }
-
-    loadFull(null).finally(done)
     return () => {
       cancelled = true
+      setDiffFailure((failure) => (failure?.key === diffKey ? null : failure))
     }
-  }, [diffKey, file.path, file.isBinary, repoRoot, pr.number, pr.headSHA, pr.baseRefName, sinceSha])
+  }, [
+    diffKey,
+    file.path,
+    file.isBinary,
+    hasCachedDiff,
+    repoRoot,
+    pr.number,
+    pr.headSHA,
+    pr.baseRefName,
+    sinceSha,
+  ])
 
   // Feed complexity delta into the risk score whenever the diff changes.
   // Runs independently so it doesn't trigger a diff reload.
@@ -402,21 +414,23 @@ export function ReviewDiffPane({
 
   // A request from elsewhere (the agent panel, a finding) opens the composer
   // in this file, prefilled, then clears the one-shot request.
+  const requestForThisFile = composerRequest?.path === file.path ? composerRequest : null
+  const [seenComposerRequest, setSeenComposerRequest] = useState(requestForThisFile)
+  if (seenComposerRequest !== requestForThisFile) {
+    setSeenComposerRequest(requestForThisFile)
+    if (requestForThisFile) {
+      setComposerAnchor({
+        line: requestForThisFile.line,
+        startLine: requestForThisFile.startLine,
+        side: requestForThisFile.side,
+        initialBody: requestForThisFile.body,
+        fromFindingId: requestForThisFile.fromFindingId,
+      })
+    }
+  }
   useEffect(() => {
-    if (!composerRequest || composerRequest.path !== file.path) return
-    setComposerAnchor({
-      line: composerRequest.line,
-      startLine: composerRequest.startLine,
-      side: composerRequest.side,
-      initialBody: composerRequest.body,
-      fromFindingId: composerRequest.fromFindingId,
-    })
-    requestComposer(null)
-  }, [composerRequest, file.path, requestComposer])
-
-  // Tracks which hunk nextHunk/prevHunk last scrolled to, since jsdom (and
-  // some real layouts) can't be trusted to report bounding-rect positions.
-  const currentHunkIndexRef = useRef(0)
+    if (requestForThisFile) requestComposer(null)
+  }, [requestForThisFile, requestComposer])
 
   const scrollHunkIntoView = useCallback(
     (direction: 1 | -1) => {
@@ -533,6 +547,14 @@ export function ReviewDiffPane({
     },
     [gapViews, file.path]
   )
+
+  const handlePeekDefinition = useCallback(() => {
+    const use = usesWithDef[0]
+    if (!use || !use.definedInPath) return
+    const chapterId = findChapterId(pr.chapters, use.definedInPath)
+    if (chapterId) setCurrentChapter(chapterId)
+    setCurrentFile(use.definedInPath)
+  }, [usesWithDef, pr.chapters, setCurrentChapter, setCurrentFile])
 
   // REVIEW_KEY_EVENTS: the surface-level key handler (useReviewKeys, owned
   // elsewhere) raises these; only the pane knows its hunks and selection.
@@ -785,14 +807,6 @@ export function ReviewDiffPane({
     [selection, file.path, setSelection]
   )
 
-  const handlePeekDefinition = useCallback(() => {
-    const use = usesWithDef[0]
-    if (!use || !use.definedInPath) return
-    const chapterId = findChapterId(pr.chapters, use.definedInPath)
-    if (chapterId) setCurrentChapter(chapterId)
-    setCurrentFile(use.definedInPath)
-  }, [usesWithDef, pr.chapters, setCurrentChapter, setCurrentFile])
-
   const goToPath = useCallback(
     (path: string) => {
       const chapterId = findChapterId(pr.chapters, path)
@@ -818,12 +832,14 @@ export function ReviewDiffPane({
     goToPath(path)
   }
 
+  const performedJumpRef = useRef(pendingJump)
   useEffect(() => {
     if (!pendingJump || !diff || pendingJump.path !== file.path) return
+    if (performedJumpRef.current === pendingJump) return
+    performedJumpRef.current = pendingJump
     scrollRef.current
       ?.querySelector<HTMLElement>(`[data-new-line="${pendingJump.line}"]`)
       ?.scrollIntoView({ block: 'center' })
-    setPendingJump(null)
   }, [pendingJump, diff, file.path])
 
   const hunkCode = (lines: Array<{ type: string; content: string }>) =>
@@ -888,7 +904,7 @@ export function ReviewDiffPane({
         selection.path === file.path &&
         selection.side === side &&
         selection.endLine === lineNum &&
-        !lineDragRef.current.active && (
+        dragPreview === null && (
           <tr>
             <td colSpan={5} className="rs-hunk-anchor">
               <SelectionBar

@@ -98,6 +98,7 @@ const mockReconcileHead = vi.fn()
 const mockReset = vi.fn()
 const mockMarkPrInProgress = vi.fn()
 const mockDismissPr = vi.fn()
+const mockSetPaused = vi.fn()
 
 const defaultStoreState = {
   activePr: null,
@@ -107,6 +108,7 @@ const defaultStoreState = {
   reset: mockReset,
   markPrInProgress: mockMarkPrInProgress,
   dismissPr: mockDismissPr,
+  setPaused: mockSetPaused,
   nextPrCursor: null,
   viewedFiles: new Set<string>(),
   currentChapterId: null,
@@ -240,10 +242,7 @@ describe('PrReviewTab', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(mockSetActivePr).toHaveBeenCalledWith(null)
     expect(mockReset).toHaveBeenCalled()
-    expect(githubModule.githubAPI.sessionSet).toHaveBeenCalledWith(
-      '/repo:::1',
-      expect.objectContaining({ pausedAt: expect.any(String) })
-    )
+    expect(mockSetPaused).toHaveBeenCalledWith('/repo', 1, 'abc123', expect.any(String))
   })
 
   describe('after an approval', () => {

@@ -43,11 +43,14 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
   } | null>(null)
 
   // Close the editor and clear per-block state whenever the user navigates to a new block
-  React.useEffect(() => {
+  const blockPosition = `${activeFileIndex}:${activeBlockIndex}`
+  const [shownBlockPosition, setShownBlockPosition] = React.useState(blockPosition)
+  if (shownBlockPosition !== blockPosition) {
+    setShownBlockPosition(blockPosition)
     setManualMode(false)
     setManualSuggestedText(null)
     setPendingResolution(null)
-  }, [activeBlockIndex, activeFileIndex])
+  }
 
   const activeFile = session?.files[activeFileIndex]
   const activeBlock = activeFile?.blocks[activeBlockIndex]

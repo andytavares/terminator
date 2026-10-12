@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react'
-import { githubAPI } from '../api/github'
+import { githubAPI, type RawFileMetrics } from '../api/github'
 import { usePrReviewStore } from '../stores/pr-review.store'
 import {
   ReviewQueuePRSchema,
@@ -18,7 +18,7 @@ import { computeRiskScore, queueRiskLevel } from '../github/pr-review-service'
 
 // ─── Queue loading ────────────────────────────────────────────────────────────
 
-function parsePrList(raw: unknown[]): ReturnType<typeof ReviewQueuePRSchema.safeParse>['data'][] {
+function parsePrList(raw: unknown[]): ReviewQueuePR[] {
   return raw
     .map((p) => ReviewQueuePRSchema.safeParse(p))
     .filter((r) => r.success)
@@ -250,15 +250,6 @@ export function useLoadPrDetail(repoRoot: string | null) {
 }
 
 // ─── File metrics loading ─────────────────────────────────────────────────────
-
-interface RawFileMetrics {
-  churn90d: number
-  blastRadius: number
-  topImporters: string[]
-  importerCount: number
-  testFilePresent: boolean
-  patchCoverage?: number | null
-}
 
 export function useFetchFileMetrics(repoRoot: string | null) {
   const { activePr, updateFileRiskScores, updateQueuePrRisk } = usePrReviewStore()

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Dialog } from '@terminator/extension-ui'
-import { marked } from 'marked'
 import type { PullRequest } from '../schemas/git.schema'
+import { RichContent } from './pr-review/RichContent'
 
 interface Branch {
   name: string
@@ -187,8 +187,6 @@ export function PrDialog({
     }
   }
 
-  const previewHtml = marked.parse(body || '*No description*') as string
-
   const submitLabel = isCreating ? '…' : isDraft ? 'Create Draft PR' : 'Create PR'
 
   return (
@@ -263,7 +261,7 @@ export function PrDialog({
             rows={8}
           />
         ) : (
-          <div className="pr-dialog__preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          <RichContent className="pr-dialog__preview">{body || '*No description*'}</RichContent>
         )}
       </div>
 

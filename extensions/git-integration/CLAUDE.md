@@ -43,10 +43,18 @@ import { githubAPI } from '../api/github'
 await githubAPI.prFileDiff(...)    // NOT window.electronAPI.github.prFileDiff(...)
 ```
 
+### Rendering untrusted text
+
+PR descriptions, templates and comments are rendered only through `src/components/pr-review/RichContent.tsx` (react-markdown + rehype-sanitize, ADR 091). Never use `dangerouslySetInnerHTML` or a second markdown renderer: this view can run shell commands.
+
+### Lint and typecheck
+
+`npx tsc -p extensions/git-integration/tsconfig.json` and `npx eslint extensions/git-integration` must both exit 0; fix a React Compiler finding at its cause, do not silence it. The React Compiler rules apply: derive state during render instead of syncing it in an effect, read and write refs in handlers and effects, never during render.
+
 ### What extensions MUST NOT do
 
 - **Never** put extension-specific methods in `src/main/preload.ts` (core file)
-- **Never** modify `src/renderer/electron.d.ts` (core file) — use declaration merging in `src/types/electron.d.ts` only when unavoidable, prefer bridge modules instead
+- **Never** modify `src/renderer/electron.d.ts` (core file) or re-declare `window.electronAPI` here. The view API is declared once, in `packages/extension-sdk/types/renderer.d.ts`, which `tsconfig.extension.json` loads; if the extension needs something it lacks, extend the SDK declaration. Extension-owned channels are typed in the `src/api/*.ts` bridge modules through `invokeBridge<T>` (`src/api/bridge.ts`)
 - **Never** add extension-only npm deps to the **root** `package.json` — add them to `extensions/git-integration/package.json`
 - **Never** import from other extensions (`extensions/task-vault/...`, `extensions/speckit-pilot/...`)
 - **Never** hardcode the extension ID in core app files
