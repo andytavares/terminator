@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -208,19 +208,51 @@ describe('what the watcher fires on', () => {
 })
 
 describe('starting and stopping', () => {
-  it('stops looking once stopped', () => {
-    const { watcher } = watch([], 0)
+  const INTERVAL_MS = 1_000
+
+  /** A watcher on a fake clock that counts how often it looks at the runs. */
+  function counted() {
+    let looks = 0
+    const watcher = createStallWatcher({
+      runs: () => {
+        looks++
+        return []
+      },
+      onFiring: () => undefined,
+      now: () => 0,
+      intervalMs: INTERVAL_MS,
+    })
+    return { watcher, looks: () => looks }
+  }
+
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('looks at the runs once every interval after it starts', () => {
+    const { watcher, looks } = counted()
     watcher.start()
+    vi.advanceTimersByTime(3 * INTERVAL_MS)
     watcher.stop()
-    expect(() => watcher.stop()).not.toThrow()
+    expect(looks()).toBe(3)
+  })
+
+  it('looks no more after it is stopped, and stopping twice is harmless', () => {
+    const { watcher, looks } = counted()
+    watcher.start()
+    vi.advanceTimersByTime(INTERVAL_MS)
+    watcher.stop()
+    watcher.stop()
+    vi.advanceTimersByTime(5 * INTERVAL_MS)
+    expect(looks()).toBe(1)
   })
 
   it('starting twice does not run two timers', () => {
-    const { watcher } = watch([], 0)
+    const { watcher, looks } = counted()
     watcher.start()
     watcher.start()
+    vi.advanceTimersByTime(3 * INTERVAL_MS)
     watcher.stop()
-    expect(true).toBe(true)
+    expect(looks()).toBe(3)
   })
 })
 

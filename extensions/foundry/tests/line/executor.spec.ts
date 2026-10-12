@@ -1720,9 +1720,19 @@ steps:
         return ok(input)
       }
     )
+    const roleless = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: check
+    kind: run
+    command: echo hi
+`
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run as never))
-    for (const tier of seen) expect(tier).toBe('deep')
+    await execute(o, recipe(roleless), buildRunGraph(o, recipe(roleless)), deps(run as never))
+    // Said out loud: with no role-less node reached, the check below asserts nothing.
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.every((tier) => tier === 'deep')).toBe(true)
   })
 })
 
