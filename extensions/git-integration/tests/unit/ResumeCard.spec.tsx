@@ -80,6 +80,7 @@ describe('ResumeCard', () => {
         agentRuns={[]}
         changedSinceCount={0}
         onContinue={vi.fn()}
+        onReviewDrafts={vi.fn()}
       />
     )
     expect(screen.getByText('Where you left off · #209')).toBeTruthy()
@@ -101,6 +102,7 @@ describe('ResumeCard', () => {
         agentRuns={[]}
         changedSinceCount={0}
         onContinue={vi.fn()}
+        onReviewDrafts={vi.fn()}
       />
     )
     expect(screen.getByText(/Chapter 2/)).toBeTruthy()
@@ -123,6 +125,7 @@ describe('ResumeCard', () => {
         agentRuns={[]}
         changedSinceCount={0}
         onContinue={vi.fn()}
+        onReviewDrafts={vi.fn()}
       />
     )
     expect(screen.queryByText('last position')).toBeNull()
@@ -143,6 +146,7 @@ describe('ResumeCard', () => {
         agentRuns={[]}
         changedSinceCount={0}
         onContinue={vi.fn()}
+        onReviewDrafts={vi.fn()}
       />
     )
     expect(screen.getByText(/2 notes, 1 is a question/)).toBeTruthy()
@@ -165,6 +169,7 @@ describe('ResumeCard', () => {
         agentRuns={[]}
         changedSinceCount={0}
         onContinue={vi.fn()}
+        onReviewDrafts={vi.fn()}
       />
     )
     fireEvent.click(screen.getByText('Ask agent'))
@@ -222,6 +227,7 @@ describe('ResumeCard', () => {
         ]}
         changedSinceCount={0}
         onContinue={vi.fn()}
+        onReviewDrafts={vi.fn()}
       />
     )
     expect(screen.getByText(/2 agent findings you haven't opened/)).toBeTruthy()
@@ -243,10 +249,34 @@ describe('ResumeCard', () => {
         agentRuns={[]}
         changedSinceCount={0}
         onContinue={vi.fn()}
+        onReviewDrafts={vi.fn()}
       />
     )
     expect(screen.getByText('2 draft comments not yet submitted')).toBeTruthy()
     expect(screen.getByText('Review drafts')).toBeTruthy()
+  })
+
+  it('opens the drafts for review from Review drafts', () => {
+    const onReviewDrafts = vi.fn()
+    render(
+      <ResumeCard
+        pr={mockPr}
+        lastAccessedAt="2025-01-01T00:00:00Z"
+        viewedCount={0}
+        totalFiles={1}
+        currentChapterId={null}
+        currentFilePath={null}
+        lastLine={null}
+        notes={[]}
+        drafts={[makeDraft()]}
+        agentRuns={[]}
+        changedSinceCount={0}
+        onContinue={vi.fn()}
+        onReviewDrafts={onReviewDrafts}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Review drafts' }))
+    expect(onReviewDrafts).toHaveBeenCalledOnce()
   })
 
   it('shows the push-since row only when files changed since viewing', () => {
@@ -264,6 +294,7 @@ describe('ResumeCard', () => {
         agentRuns={[]}
         changedSinceCount={2}
         onContinue={vi.fn()}
+        onReviewDrafts={vi.fn()}
       />
     )
     expect(screen.getByText(/1 push since · 2 viewed files changed/)).toBeTruthy()
@@ -284,6 +315,7 @@ describe('ResumeCard', () => {
         agentRuns={[]}
         changedSinceCount={0}
         onContinue={vi.fn()}
+        onReviewDrafts={vi.fn()}
       />
     )
     expect(screen.queryByText('Review drafts')).toBeNull()

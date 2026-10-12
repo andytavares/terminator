@@ -18,6 +18,8 @@ interface Props {
   agentRuns: AgentRun[]
   changedSinceCount: number
   onContinue: () => void
+  /** Opens the drafts not yet submitted, in the submit dialog. */
+  onReviewDrafts: () => void
 }
 
 const SEVERITY_RANK: Record<string, number> = { 'must-fix': 3, suggestion: 2, question: 1, nit: 0 }
@@ -55,6 +57,7 @@ export function ResumeCard({
   agentRuns,
   changedSinceCount,
   onContinue,
+  onReviewDrafts,
 }: Props) {
   const openAgentPanel = useReviewUiStore((s) => s.openAgentPanel)
 
@@ -137,7 +140,9 @@ export function ResumeCard({
           <li>
             <span className="rc-pip">{drafts.length}</span>
             <span>{drafts.length} draft comments not yet submitted</span>
-            <Button size="sm">Review drafts</Button>
+            <Button size="sm" onClick={onReviewDrafts}>
+              Review drafts
+            </Button>
           </li>
         )}
         {changedSinceCount > 0 && (

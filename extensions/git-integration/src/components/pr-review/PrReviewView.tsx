@@ -441,6 +441,7 @@ export function PrReviewView({
               agentRuns={agentRuns}
               changedSinceCount={changedSince.size}
               onContinue={handleContinueResume}
+              onReviewDrafts={() => setShowSubmit(true)}
             />
           )}
 
