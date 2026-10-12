@@ -16,7 +16,7 @@ interface TagRow {
   note_count: number
 }
 
-interface CommentRow {
+export type CommentRow = {
   id: string
   note_id: string
   parent_id: string | null

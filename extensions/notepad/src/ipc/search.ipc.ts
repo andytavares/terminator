@@ -9,7 +9,7 @@ const searchSchema = z.object({
   includeArchived: z.boolean().optional(),
 })
 
-interface SearchRow {
+type SearchRow = {
   id: string
   title: string
   body: string

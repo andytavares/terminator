@@ -2,7 +2,7 @@ import './notepad.css'
 import React, { useEffect, useState } from 'react'
 import { DiagramView } from './DiagramView'
 
-export function DiagramWindowView(_props: { repoRoot: string | null }): React.JSX.Element {
+export function DiagramWindowView(): React.JSX.Element {
   // Read at component init so this component is testable with a mocked location.
   const diagramId = new URLSearchParams(window.location.search).get('diagramId') ?? ''
   const [title, setTitle] = useState('Diagram')

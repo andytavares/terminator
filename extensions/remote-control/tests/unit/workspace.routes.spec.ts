@@ -37,9 +37,7 @@ describe('GET /api/workspaces', () => {
 
 describe('GET /api/projects', () => {
   it('returns projects for a workspace', async () => {
-    mockListProjects.mockReturnValue([
-      { id: 'p1', workspaceId: 'ws1', name: 'Project A', isWorktree: false },
-    ])
+    mockListProjects.mockReturnValue([{ id: 'p1', workspaceId: 'ws1', name: 'Project A' }])
     const res = await app.inject({ method: 'GET', url: '/api/projects?workspaceId=ws1' })
     expect(res.statusCode).toBe(200)
     const body = JSON.parse(res.body)

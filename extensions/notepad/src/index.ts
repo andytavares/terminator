@@ -155,6 +155,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
           label: 'Re-initialise database',
           description: 'Re-apply schema and migrations without deleting data',
           channel: 'terminator.notepad:db.reinit',
+          default: null,
         },
         'terminator.notepad.mcpSidecar': {
           type: 'boolean',

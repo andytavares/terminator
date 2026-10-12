@@ -3,7 +3,7 @@ import { EditorView, keymap } from '@codemirror/view'
 import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
-import { LanguageDescription, syntaxHighlighting } from '@codemirror/language'
+import { LanguageDescription, LanguageSupport, syntaxHighlighting } from '@codemirror/language'
 import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark'
 import { javascript } from '@codemirror/lang-javascript'
 import { css } from '@codemirror/lang-css'
@@ -125,12 +125,14 @@ export function NoteEditor({
               LanguageDescription.of({
                 name: 'Go',
                 alias: ['go', 'golang'],
-                /* v8 ignore next */ load: async () => StreamLanguage.define(go),
+                /* v8 ignore next */ load: async () =>
+                  new LanguageSupport(StreamLanguage.define(go)),
               }),
               LanguageDescription.of({
                 name: 'Shell',
                 alias: ['sh', 'bash', 'shell', 'zsh'],
-                /* v8 ignore next */ load: async () => StreamLanguage.define(shell),
+                /* v8 ignore next */ load: async () =>
+                  new LanguageSupport(StreamLanguage.define(shell)),
               }),
             ],
           }),

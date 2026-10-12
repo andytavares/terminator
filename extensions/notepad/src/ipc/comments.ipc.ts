@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
-import { rowToComment } from '../db/mappers'
+import { rowToComment, type CommentRow } from '../db/mappers'
 import type { Comment } from '../db/types'
 import type { ExtensionDB } from '../../../../src/main/db/index'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api'
@@ -54,19 +54,19 @@ export async function listComments(db: ExtensionDB, payload: unknown): Promise<u
   const { noteId, includeResolved } = parsed.data
 
   const statusFilter = includeResolved === true ? '' : "AND status != 'resolved'"
-  const topRows = await db.query<Record<string, unknown>>(
+  const topRows = await db.query<CommentRow>(
     `SELECT * FROM comments WHERE note_id = ? AND parent_id IS NULL ${statusFilter} ORDER BY created_at ASC`,
     [noteId]
   )
 
   const comments: Comment[] = await Promise.all(
     topRows.map(async (row) => {
-      const comment = rowToComment(row as Parameters<typeof rowToComment>[0])
-      const replies = await db.query<Record<string, unknown>>(
+      const comment = rowToComment(row)
+      const replies = await db.query<CommentRow>(
         'SELECT * FROM comments WHERE parent_id = ? ORDER BY created_at ASC',
         [comment.id]
       )
-      comment.replies = replies.map((r) => rowToComment(r as Parameters<typeof rowToComment>[0]))
+      comment.replies = replies.map((r) => rowToComment(r))
       return comment
     })
   )

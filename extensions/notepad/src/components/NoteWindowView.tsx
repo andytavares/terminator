@@ -34,9 +34,9 @@ interface NoteData {
   tags: string[]
 }
 
-export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.Element {
+export function NoteWindowView(): React.JSX.Element {
   const [note, setNote] = useState<NoteData | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(NOTE_ID ? null : 'No note ID provided')
   const [pendingAnchor, setPendingAnchor] = useState<SelectionAnchor | null>(null)
   const [composingAnchor, setComposingAnchor] = useState<SelectionAnchor | null>(null)
   const [anchorTops, setAnchorTops] = useState<Record<string, number>>({})
@@ -65,10 +65,7 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
 
   // Load note + comments on mount
   useEffect(() => {
-    if (!NOTE_ID) {
-      setLoadError('No note ID provided')
-      return
-    }
+    if (!NOTE_ID) return
     async function load() {
       try {
         const [noteResult, commentsResult] = await Promise.all([
@@ -197,8 +194,8 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
       const view = editorViewRef.current
       const panel = commentPanelRef.current
       if (!view || !panel) return
-      function onScroll() {
-        if (panel) panel.scrollTop = view.scrollDOM.scrollTop
+      const onScroll = () => {
+        panel.scrollTop = view.scrollDOM.scrollTop
       }
       view.scrollDOM.addEventListener('scroll', onScroll, { passive: true })
       removeScroll = () => view.scrollDOM.removeEventListener('scroll', onScroll)

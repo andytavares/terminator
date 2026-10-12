@@ -38,7 +38,7 @@ const exportSchema = z.object({
   includeDiagrams: z.boolean().optional(),
 })
 
-interface NoteRow {
+type NoteRow = {
   id: string
   title: string
   body: string
@@ -48,7 +48,7 @@ interface NoteRow {
   tags: string | null
 }
 
-interface DiagramRow {
+type DiagramRow = {
   id: string
   title: string
   scene_json: string
