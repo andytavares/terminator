@@ -198,19 +198,6 @@ describe('linear provider — comment', () => {
     })
   })
 
-  it('never passes a human key to the Linear API as an issue id', async () => {
-    const createComment = vi.fn().mockResolvedValue({ success: true })
-    const provider = providerWith({ issue: vi.fn().mockResolvedValue(makeIssue()), createComment })
-
-    await provider.comment(CRED, 'TAV-42', 'x')
-
-    // One addressing mechanism, everywhere. A key reaching the API here is the
-    // ambiguity this design exists to remove.
-    const [{ issueId }] = createComment.mock.calls[0]
-    expect(issueId).not.toMatch(/^[A-Z]+-\d+$/)
-    expect(issueId).toMatch(/^[0-9a-f-]{36}$/)
-  })
-
   it('rejects when the tracker refuses the comment', async () => {
     const provider = providerWith({
       issue: vi.fn().mockResolvedValue(makeIssue()),

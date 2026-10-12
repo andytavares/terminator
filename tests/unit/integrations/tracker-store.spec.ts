@@ -100,7 +100,7 @@ describe('tracker-store — secrets at rest', () => {
 describe('tracker-store — connection view', () => {
   it('reports a connection without ever exposing the secret', async () => {
     const store = await load()
-    await store.setCredential({ tracker: 'linear', apiKey: 'k' })
+    await store.setCredential({ tracker: 'linear', apiKey: 'lin-secret' })
     await store.setAccount('linear', { name: 'Andrew', email: 'a@b.c' })
 
     const [linear] = (await store.listConnections()).filter((c) => c.tracker === 'linear')
@@ -109,7 +109,7 @@ describe('tracker-store — connection view', () => {
       connected: true,
       account: { name: 'Andrew', email: 'a@b.c' },
     })
-    expect(JSON.stringify(linear)).not.toContain('"k"')
+    expect(JSON.stringify(linear)).not.toContain('lin-secret')
   })
 
   it('reports every tracker, connected or not', async () => {

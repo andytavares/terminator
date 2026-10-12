@@ -174,7 +174,9 @@ describe('buildAgentContext — budget (FR-022)', () => {
     const { markdown } = contextOf(issue({ description }))
     expect(markdown).toContain('Paragraph 0.')
     // Whatever survived ends at a block boundary, not halfway through a word.
-    expect(markdown).not.toMatch(/Paragrap$/)
+    const kept = markdown.split('\n').filter((line) => line.startsWith('Paragrap'))
+    expect(kept.length).toBeGreaterThan(1)
+    expect(kept.every((line) => /^Paragraph \d+\.$/.test(line))).toBe(true)
   })
 })
 
