@@ -1,5 +1,14 @@
-import type { ExtensionAPI, Disposable, SettingDefinition } from '@terminator/extension-sdk'
+import { z } from 'zod'
+import { defineChannel } from '@terminator/extension-sdk'
+import type {
+  ChannelSpec,
+  ExtensionAPI,
+  Disposable,
+  SettingDefinition,
+} from '@terminator/extension-sdk'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
+import { bindWorkspaceRoots } from './ipc/repo-root.js'
+import { VALIDATION_ERROR } from './ipc/register.js'
 import { registerGithubHandlers } from './ipc/github.ipc.js'
 import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'
 import { registerQuickActionCommands } from './commands.js'
@@ -10,8 +19,16 @@ import {
   registerReviewPullRequestCommand,
   registerReviewSubmittedRelay,
   registerReviewSettings,
-  type PrReviewWindowParams,
+  PrReviewWindowParams,
 } from './review-command.js'
+
+/** A notification the isolated view asks the shared dispatcher to raise. */
+const NotifyPayload = z.object({
+  type: z.enum(['info', 'success', 'warning', 'error']),
+  title: z.string().min(1),
+  key: z.string().min(1),
+  message: z.string().optional(),
+})
 
 // Every notification kind this extension ever raises, so the user can
 // independently choose its delivery target(s) (system/in-app/toast) in this
@@ -64,11 +81,18 @@ export function activate(api: ExtensionAPI): void {
   if (!enabled) return
   bindShell(api.shell)
 
-  const registerFn = (
-    channel: string,
-    handler: (payload: unknown) => Promise<unknown> | unknown
-  ) => {
-    disposables.push(api.ipc.registerHandler(channel, handler, remoteAccessFor(channel)))
+  const projectRoots = () =>
+    api.workspace
+      .list()
+      .flatMap((w) => api.workspace.listProjects(w.id).map((p) => p.worktreePath ?? w.folderPath))
+  bindWorkspaceRoots(() => [
+    ...api.workspace.list().map((w) => w.folderPath),
+    ...projectRoots(),
+    api.settings.get<string>('terminator.git-integration.review.cloneFolder') ?? '',
+  ])
+
+  const registerFn = (spec: ChannelSpec) => {
+    disposables.push(api.ipc.registerHandler(spec, remoteAccessFor(spec.channel)))
   }
   registerGitExtensionHandlers(registerFn)
   disposables.push(...registerQuickActionCommands(api))
@@ -83,12 +107,7 @@ export function activate(api: ExtensionAPI): void {
     // Optional: an older host has no issues namespace, and the review view
     // then renders references exactly as it does today.
     api.issues,
-    () =>
-      api.workspace
-        .list()
-        .flatMap((w) =>
-          api.workspace.listProjects(w.id).map((p) => p.worktreePath ?? w.folderPath)
-        ),
+    projectRoots,
     () => api.settings.get<string[]>('terminator.git-integration.review.repos') ?? [],
     // Settings → Git → Branch Exclude Patterns, matched by the core.
     (branch, repoPath) => api.settings.isBranchExcluded(branch, repoPath)
@@ -123,17 +142,17 @@ export function activate(api: ExtensionAPI): void {
   // Bridges this extension's renderer (an isolated webview, no direct access to
   // api.notifications) to the shared notification dispatcher.
   disposables.push(
-    api.ipc.registerHandler('git:notify', (payload) => {
-      const { type, title, key, message } = (payload ?? {}) as {
-        type?: 'info' | 'success' | 'warning' | 'error'
-        title?: string
-        key?: string
-        message?: string
-      }
-      if (!type || !title || !key) return { error: 'VALIDATION_ERROR' }
-      api.notifications.createNotification({ type, title, key, message })
-      return { ok: true }
-    })
+    api.ipc.registerHandler(
+      defineChannel({
+        channel: 'git:notify',
+        schema: NotifyPayload,
+        invalid: VALIDATION_ERROR,
+        run: (notification) => {
+          api.notifications.createNotification(notification)
+          return { ok: true }
+        },
+      })
+    )
   )
 
   disposables.push(
@@ -209,10 +228,17 @@ export function activate(api: ExtensionAPI): void {
   )
 
   disposables.push(
-    api.ipc.registerHandler('window:open-pr-review', (payload) => {
-      openPrReviewWindow(api, (payload ?? {}) as PrReviewWindowParams)
-      return { ok: true }
-    })
+    api.ipc.registerHandler(
+      defineChannel({
+        channel: 'window:open-pr-review',
+        schema: PrReviewWindowParams,
+        invalid: VALIDATION_ERROR,
+        run: (params) => {
+          openPrReviewWindow(api, params ?? {})
+          return { ok: true }
+        },
+      })
+    )
   )
 
   disposables.push(

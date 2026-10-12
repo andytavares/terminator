@@ -16,25 +16,6 @@ export function isAuthError(e: unknown): boolean {
   return msg.includes('gh auth login') || msg.includes('GH_TOKEN') || msg.includes('401')
 }
 
-export type RegisterFn = (
-  channel: string,
-  handler: (payload: unknown) => Promise<unknown> | unknown
-) => void
-
-/** Wraps a handler registrar so each call logs its channel and duration. */
-export function withTiming(register: RegisterFn): RegisterFn {
-  return (channel, handler) =>
-    register(channel, (payload) => {
-      const start = performance.now()
-      const done = () =>
-        console.debug(`[git-integration] ${channel} ${Math.round(performance.now() - start)}ms`)
-      const result = handler(payload)
-      if (result instanceof Promise) return result.finally(done)
-      done()
-      return result
-    })
-}
-
 export async function getRepoOwnerAndName(
   target: GithubTarget,
   github: GithubAPI

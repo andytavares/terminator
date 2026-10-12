@@ -4,11 +4,17 @@ import { randomUUID } from 'crypto'
 import { AgentScopeSchema, AGENT_REQUESTS, type AgentRun } from '../schemas/review-agent.schema.js'
 import { ensureReviewWorktree } from '../review/worktree.js'
 import { runAgentReview } from '../review/review-agent.js'
+import { defineChannel, noPayload } from '@terminator/extension-sdk'
+import { RepoRoot } from './repo-root.js'
+import { VALIDATION_ERROR, errorEnvelope, type RegisterFn } from './register.js'
 
-type RegisterFn = (
-  channel: string,
-  handler: (payload: unknown) => Promise<unknown> | unknown
-) => void
+const RunIdPayload = z.object({ runId: z.string().min(1) })
+
+const RunsPayload = z.object({
+  repoRoot: RepoRoot,
+  prNumber: z.number(),
+  headSHA: z.string().min(1),
+})
 
 export interface OpenTerminalInput {
   repoRoot: string
@@ -79,7 +85,7 @@ export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAg
   >()
 
   const startSchema = z.object({
-    repoRoot: z.string().min(1),
+    repoRoot: RepoRoot,
     prNumber: z.number(),
     headSHA: z.string().min(1),
     baseRefName: z.string().min(1),
@@ -92,163 +98,175 @@ export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAg
     model: z.enum(['opus', 'sonnet']).optional(),
   })
 
-  register('review-agent:start', async (payload) => {
-    const parsed = startSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const input = parsed.data
-    const runningKey = `${input.repoRoot}:::${input.prNumber}:::${scopeKey(input.scope)}`
+  register(
+    defineChannel({
+      channel: 'review-agent:start',
+      schema: startSchema,
+      invalid: VALIDATION_ERROR,
+      run: async (input) => {
+        const runningKey = `${input.repoRoot}:::${input.prNumber}:::${scopeKey(input.scope)}`
 
-    const existing = runningByScope.get(runningKey)
-    if (existing && existing.status === 'running') {
-      return { run: existing }
-    }
+        const existing = runningByScope.get(runningKey)
+        if (existing && existing.status === 'running') {
+          return { run: existing }
+        }
 
-    const sessionId = randomUUID()
-    const model =
-      input.model ||
-      deps.getSetting<string>('terminator.git-integration.review.agentModel') ||
-      'sonnet'
-    const effortSetting = deps.getSetting<string>('terminator.git-integration.review.agentEffort')
-    // 'default' (or a value saved before it existed, '') leaves --effort off so claude's own config wins.
-    const effort = effortSetting === 'default' ? '' : effortSetting || ''
-    const timeoutMinutes =
-      deps.getSetting<number>('terminator.git-integration.review.agentTimeoutMinutes') ?? 5
+        const sessionId = randomUUID()
+        const model =
+          input.model ||
+          deps.getSetting<string>('terminator.git-integration.review.agentModel') ||
+          'sonnet'
+        const effortSetting = deps.getSetting<string>(
+          'terminator.git-integration.review.agentEffort'
+        )
+        // 'default' (or a value saved before it existed, '') leaves --effort off so claude's own config wins.
+        const effort = effortSetting === 'default' ? '' : effortSetting || ''
+        const timeoutMinutes =
+          deps.getSetting<number>('terminator.git-integration.review.agentTimeoutMinutes') ?? 5
 
-    const startedAt = new Date().toISOString()
-    const run: AgentRun = {
-      id: randomUUID(),
-      repoRoot: input.repoRoot,
-      prNumber: input.prNumber,
-      headSHA: input.headSHA,
-      sessionId,
-      scope: input.scope,
-      request: input.request,
-      question: input.question ?? null,
-      status: 'running',
-      startedAt,
-      finishedAt: null,
-      activity: [],
-      summary: null,
-      findings: [],
-      walkthrough: [],
-      error: null,
-    }
-
-    runningByScope.set(runningKey, run)
-    upsertRun(input.repoRoot, input.prNumber, input.headSHA, run)
-
-    void (async () => {
-      try {
-        const worktreePath = await ensureWorktree(input.repoRoot, input.prNumber, input.headSHA)
-        const { cancel, done } = runReview({
+        const startedAt = new Date().toISOString()
+        const run: AgentRun = {
+          id: randomUUID(),
           repoRoot: input.repoRoot,
-          worktreePath,
           prNumber: input.prNumber,
           headSHA: input.headSHA,
-          baseRefName: input.baseRefName,
-          title: input.title,
-          body: input.body,
+          sessionId,
           scope: input.scope,
           request: input.request,
           question: input.question ?? null,
-          sessionId,
-          model,
-          effort: effort || undefined,
-          timeoutMs: timeoutMinutes * 60_000,
-        })
-        liveRuns.set(run.id, {
-          cancel,
-          repoRoot: input.repoRoot,
-          prNumber: input.prNumber,
-          headSHA: input.headSHA,
-        })
-        const finished = await done
-        runningByScope.delete(runningKey)
-        liveRuns.delete(run.id)
-        upsertRun(input.repoRoot, input.prNumber, input.headSHA, finished)
-        deps.broadcast('review-agent:event', { run: finished })
-      } catch (e) {
-        const failed: AgentRun = {
-          ...run,
-          status: 'failed',
-          finishedAt: new Date().toISOString(),
-          error: String(e),
+          status: 'running',
+          startedAt,
+          finishedAt: null,
+          activity: [],
+          summary: null,
+          findings: [],
+          walkthrough: [],
+          error: null,
         }
-        runningByScope.delete(runningKey)
-        liveRuns.delete(run.id)
-        upsertRun(input.repoRoot, input.prNumber, input.headSHA, failed)
-        deps.broadcast('review-agent:event', { run: failed })
-      }
-    })()
 
-    return { run }
-  })
+        runningByScope.set(runningKey, run)
+        upsertRun(input.repoRoot, input.prNumber, input.headSHA, run)
 
-  register('review-agent:settings', async () => {
-    const model =
-      deps.getSetting<string>('terminator.git-integration.review.agentModel') || 'sonnet'
-    return { model }
-  })
+        void (async () => {
+          try {
+            const worktreePath = await ensureWorktree(input.repoRoot, input.prNumber, input.headSHA)
+            const { cancel, done } = runReview({
+              repoRoot: input.repoRoot,
+              worktreePath,
+              prNumber: input.prNumber,
+              headSHA: input.headSHA,
+              baseRefName: input.baseRefName,
+              title: input.title,
+              body: input.body,
+              scope: input.scope,
+              request: input.request,
+              question: input.question ?? null,
+              sessionId,
+              model,
+              effort: effort || undefined,
+              timeoutMs: timeoutMinutes * 60_000,
+            })
+            liveRuns.set(run.id, {
+              cancel,
+              repoRoot: input.repoRoot,
+              prNumber: input.prNumber,
+              headSHA: input.headSHA,
+            })
+            const finished = await done
+            runningByScope.delete(runningKey)
+            liveRuns.delete(run.id)
+            upsertRun(input.repoRoot, input.prNumber, input.headSHA, finished)
+            deps.broadcast('review-agent:event', { run: finished })
+          } catch (e) {
+            const failed: AgentRun = {
+              ...run,
+              status: 'failed',
+              finishedAt: new Date().toISOString(),
+              error: String(e),
+            }
+            runningByScope.delete(runningKey)
+            liveRuns.delete(run.id)
+            upsertRun(input.repoRoot, input.prNumber, input.headSHA, failed)
+            deps.broadcast('review-agent:event', { run: failed })
+          }
+        })()
 
-  register('review-agent:cancel', async (payload) => {
-    const schema = z.object({ runId: z.string().min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const live = liveRuns.get(parsed.data.runId)
-    if (!live) return { ok: false }
-    live.cancel()
-    return { ok: true }
-  })
-
-  register('review-agent:list', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      prNumber: z.number(),
-      headSHA: z.string().min(1),
+        return { run }
+      },
     })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { repoRoot, prNumber, headSHA } = parsed.data
-    return { runs: loadRuns(repoRoot, prNumber, headSHA) }
-  })
+  )
 
-  register('review-agent:dismiss', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      prNumber: z.number(),
-      headSHA: z.string().min(1),
-      runId: z.string().min(1),
-      findingId: z.string().min(1),
+  register(
+    defineChannel({
+      channel: 'review-agent:settings',
+      schema: noPayload,
+      invalid: VALIDATION_ERROR,
+      run: () => ({
+        model: deps.getSetting<string>('terminator.git-integration.review.agentModel') || 'sonnet',
+      }),
     })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { repoRoot, prNumber, headSHA, runId, findingId } = parsed.data
-    const runs = loadRuns(repoRoot, prNumber, headSHA)
-    const run = runs.find((r) => r.id === runId)
-    const finding = run?.findings.find((f) => f.id === findingId)
-    if (!run || !finding) return { error: 'NOT_FOUND' }
-    finding.dismissed = true
-    saveRuns(repoRoot, prNumber, headSHA, runs)
-    return { ok: true }
-  })
+  )
 
-  register('review-agent:open-terminal', async (payload) => {
-    const schema = z.object({ runId: z.string().min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const found = findStoredRun(parsed.data.runId)
-    if (!found) return { error: 'NOT_FOUND' }
-    try {
-      const cwd = await ensureWorktree(found.repoRoot, found.prNumber, found.headSHA)
-      deps.openTerminal({
-        repoRoot: found.repoRoot,
-        cwd,
-        title: `Review #${found.prNumber}`,
-        command: `claude --resume ${found.run.sessionId}`,
-      })
-      return { ok: true }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
+  register(
+    defineChannel({
+      channel: 'review-agent:cancel',
+      schema: RunIdPayload,
+      invalid: VALIDATION_ERROR,
+      run: ({ runId }) => {
+        const live = liveRuns.get(runId)
+        if (!live) return { ok: false }
+        live.cancel()
+        return { ok: true }
+      },
+    })
+  )
+
+  register(
+    defineChannel({
+      channel: 'review-agent:list',
+      schema: RunsPayload,
+      invalid: VALIDATION_ERROR,
+      run: ({ repoRoot, prNumber, headSHA }) => ({
+        runs: loadRuns(repoRoot, prNumber, headSHA),
+      }),
+    })
+  )
+
+  register(
+    defineChannel({
+      channel: 'review-agent:dismiss',
+      schema: RunsPayload.extend({ runId: z.string().min(1), findingId: z.string().min(1) }),
+      invalid: VALIDATION_ERROR,
+      run: ({ repoRoot, prNumber, headSHA, runId, findingId }) => {
+        const runs = loadRuns(repoRoot, prNumber, headSHA)
+        const run = runs.find((r) => r.id === runId)
+        const finding = run?.findings.find((f) => f.id === findingId)
+        if (!run || !finding) return { error: 'NOT_FOUND' }
+        finding.dismissed = true
+        saveRuns(repoRoot, prNumber, headSHA, runs)
+        return { ok: true }
+      },
+    })
+  )
+
+  register(
+    defineChannel({
+      channel: 'review-agent:open-terminal',
+      schema: RunIdPayload,
+      invalid: VALIDATION_ERROR,
+      run: async ({ runId }) => {
+        const found = findStoredRun(runId)
+        if (!found) return { error: 'NOT_FOUND' }
+        const cwd = await ensureWorktree(found.repoRoot, found.prNumber, found.headSHA)
+        deps.openTerminal({
+          repoRoot: found.repoRoot,
+          cwd,
+          title: `Review #${found.prNumber}`,
+          command: `claude --resume ${found.run.sessionId}`,
+        })
+        return { ok: true }
+      },
+      onError: errorEnvelope,
+    })
+  )
 }

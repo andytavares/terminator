@@ -10,21 +10,20 @@ vi.mock('../../../extensions/git-integration/src/git/git-service', () => ({
 
 import * as gitService from '../../../extensions/git-integration/src/git/git-service'
 import { registerGitExtensionHandlers } from '../../../extensions/git-integration/src/ipc/git.ipc'
+import { bindWorkspaceRoots } from '../../../extensions/git-integration/src/ipc/repo-root'
+import { channelRegistry } from '../../../extensions/git-integration/tests/unit/support/channels'
 
 type Handler = (payload: unknown) => Promise<unknown>
 
-function buildRegistry(): {
-  register: (channel: string, handler: Handler) => void
-  getHandler: (channel: string) => Handler
-} {
-  const handlers = new Map<string, Handler>()
+function buildRegistry() {
+  bindWorkspaceRoots(() => ['/tmp/repo', '/tmp/not-a-repo'])
+  const registry = channelRegistry()
   return {
-    register: (channel, handler) => handlers.set(channel, handler as Handler),
-    getHandler: (channel) => {
-      const h = handlers.get(channel)
-      if (!h) throw new Error(`Handler for "${channel}" not registered`)
-      return h
-    },
+    register: registry.register,
+    getHandler:
+      (channel: string): Handler =>
+      (payload) =>
+        registry.invoke(channel, payload),
   }
 }
 
@@ -57,11 +56,6 @@ describe('git-integration extension: git:status IPC handler', () => {
       error: string
     }
     expect(result.error).toBeDefined()
-  })
-
-  it('returns VALIDATION_ERROR for missing path', async () => {
-    const result = (await getHandler('git:status')({})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 })
 
@@ -123,13 +117,6 @@ describe('git-integration extension: git:stage / git:unstage IPC handlers', () =
     const result = await getHandler('git:stage')({ repoRoot: '/tmp/repo', paths: ['src/main.ts'] })
     expect(gitService.stageFiles).toHaveBeenCalledWith('/tmp/repo', ['src/main.ts'])
     expect(result).toMatchObject({ success: true })
-  })
-
-  it('returns error for empty paths array on stage', async () => {
-    const result = (await getHandler('git:stage')({ repoRoot: '/tmp/repo', paths: [] })) as {
-      error: string
-    }
-    expect(result.error).toBeDefined()
   })
 
   it('unstages a file', async () => {

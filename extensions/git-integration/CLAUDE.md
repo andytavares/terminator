@@ -9,7 +9,7 @@ This is a **fully isolated extension**. The core application knows nothing about
 - Import `@terminator/extension-sdk`, `@terminator/extension-ui` and this extension's own dependencies — nothing from the core's `src/` and nothing from another extension (ADR 094; `npm run lint` rejects any other import)
 - Call core IPC via `window.electronAPI.{terminal,workspace,project,git,shell,fs,settings,...}` for **core-owned channels only**
 - Call own IPC via `window.electronAPI.extensionBridge.invoke('git-integration:...')` or `window.electronAPI.extensionBridge.invoke('git:...')` etc.
-- Register IPC handlers in `src/index.ts` via `api.ipc.registerHandler()`
+- Register IPC handlers in `src/index.ts` via `api.ipc.registerHandler()`, as a `ChannelSpec` (ADR 096): a zod `schema` for the payload, the `invalid` response (`VALIDATION_ERROR` from `src/ipc/register.ts`), `run` on the parsed payload, and `onError` where a thrown error becomes a response. Never parse the payload by hand; `tests/unit/channel-schemas.spec.ts` checks every channel has a schema
 
 ### Core git channels available to ALL extensions (core-owned)
 
@@ -49,6 +49,8 @@ Every command goes through the core (ADR 094). git runs through `runGit` (`src/s
 ### Remote access
 
 A channel is local-only unless it is in `REMOTE_READ_CHANNELS` (`src/remote-access.ts`): only channels that read status or pull request data. Adding one is a decision; `tests/unit/remote-access.spec.ts` lists the set exactly.
+
+The remote browser chooses the checkout a channel runs git or gh in, so a payload's `repoRoot` (and `git:status`'s `path`) is always declared with the `RepoRoot` schema (`src/ipc/repo-root.ts`), never a bare string. It accepts a `gh:owner/name` repository, or a directory that is, or lies inside, a workspace folder, a project root or the review clone folder, compared after `realpath`, so a symlink inside a project cannot lead out of it. `activate` binds those roots with `bindWorkspaceRoots`. Anything else gets the channel's `invalid` response and nothing runs. The rule is the same for local calls: the handler cannot tell a remote caller from the app's own view. A new remote channel that takes a directory adds a row to `PAYLOAD_AT` in `tests/unit/remote-access.spec.ts`, which fails until it does.
 
 ### Rendering untrusted text
 

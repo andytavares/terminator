@@ -21,7 +21,9 @@ vi.mock('electron-store', () => ({
   },
 }))
 
+import { dispatchChannel } from '@terminator/extension-sdk'
 import { registerReviewAgentHandlers, type ReviewAgentDeps } from '../../src/ipc/review-agent.ipc'
+import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
 
 type Handler = (payload: unknown) => Promise<unknown>
@@ -37,8 +39,9 @@ function captureHandlers(deps: Partial<ReviewAgentDeps>) {
     openTerminal,
     ...deps,
   }
-  registerReviewAgentHandlers((channel, handler) => {
-    handlers[channel] = handler as Handler
+  bindWorkspaceRoots(() => ['/repo'])
+  registerReviewAgentHandlers((spec) => {
+    handlers[spec.channel] = (payload) => dispatchChannel(spec, payload)
   }, fullDeps)
   return { handlers, broadcast, openTerminal, settings }
 }

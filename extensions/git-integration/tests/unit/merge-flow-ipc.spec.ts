@@ -49,24 +49,17 @@ vi.mock('electron-store', () => ({
 bindShellToAnswers((...args) => mockExecFile(...args))
 
 import { registerMergeFlowHandlers } from '../../src/ipc/merge-flow.ipc'
+import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
+import { channelRegistry } from './support/channels'
 
-// Helper: build a register function that captures handlers
 function makeRegister() {
-  const handlers = new Map<string, (payload: unknown) => Promise<unknown>>()
-  const register = (channel: string, handler: (payload: unknown) => Promise<unknown>) => {
-    handlers.set(channel, handler)
-  }
-  registerMergeFlowHandlers(register)
-  return {
-    invoke: async (channel: string, payload: unknown) => {
-      const handler = handlers.get(channel)
-      if (!handler) throw new Error(`No handler for ${channel}`)
-      return handler(payload)
-    },
-  }
+  const registry = channelRegistry()
+  registerMergeFlowHandlers(registry.register)
+  return registry
 }
 
 beforeEach(() => {
+  bindWorkspaceRoots(() => ['/repo'])
   mockBuildConflictSession.mockReset()
   mockReadConflictBlocks.mockReset()
   mockListConflictedFiles.mockReset()
@@ -93,12 +86,6 @@ describe('git:conflicts-list', () => {
 
     const result = await bridge.invoke('git:conflicts-list', { repoRoot: '/repo' })
     expect(result).toEqual(fakeSession)
-  })
-
-  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const bridge = makeRegister()
-    const result = (await bridge.invoke('git:conflicts-list', {})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('returns error string on exception', async () => {
@@ -140,17 +127,6 @@ describe('git:resolve-conflict', () => {
     expect(result).toEqual({ success: true })
     expect(mockWriteFile).toHaveBeenCalledOnce()
   })
-
-  it('returns VALIDATION_ERROR for invalid strategy', async () => {
-    const bridge = makeRegister()
-    const result = (await bridge.invoke('git:resolve-conflict', {
-      repoRoot: '/repo',
-      blockId: 'src/foo.ts#0',
-      resolvedText: 'x',
-      strategy: 'bad-strategy',
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
 })
 
 describe('git:undo-resolve', () => {
@@ -184,15 +160,6 @@ describe('git:undo-resolve', () => {
       originalConflictText: '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch',
     })) as { error: string }
     expect(result.error).toMatch(/not found/i)
-  })
-
-  it('returns VALIDATION_ERROR for missing blockId', async () => {
-    const bridge = makeRegister()
-    const result = (await bridge.invoke('git:undo-resolve', {
-      repoRoot: '/repo',
-      originalConflictText: '<<<',
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 })
 
@@ -245,14 +212,6 @@ describe('git:merge-commit', () => {
     // push call should use force-with-lease
     const pushCall = mockExecFile.mock.calls[3]
     expect(pushCall[1]).toContain('--force-with-lease')
-  })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const bridge = makeRegister()
-    const result = (await bridge.invoke('git:merge-commit', {
-      repoRoot: '/repo',
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('returns error on commit failure', async () => {
@@ -428,12 +387,6 @@ describe('git:session-restore', () => {
     expect(result.session).toBeNull()
     expect(mockStoreDel).toHaveBeenCalledOnce()
   })
-
-  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const bridge = makeRegister()
-    const result = (await bridge.invoke('git:session-restore', {})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
 })
 
 describe('git:session-persist — error path', () => {
@@ -477,12 +430,6 @@ describe('git:session-clear', () => {
     expect(mockStoreDel).toHaveBeenCalledOnce()
   })
 
-  it('returns success even when payload is invalid', async () => {
-    const bridge = makeRegister()
-    const result = await bridge.invoke('git:session-clear', {})
-    expect(result).toEqual({ success: true })
-  })
-
   it('returns success even when store.delete throws', async () => {
     const bridge = makeRegister()
     mockStoreDel.mockImplementationOnce(() => {
@@ -512,12 +459,6 @@ describe('git:session-reset', () => {
     expect(firstCall[1]).toContain('src/foo.ts')
   })
 
-  it('returns VALIDATION_ERROR when payload is invalid', async () => {
-    const bridge = makeRegister()
-    const result = await bridge.invoke('git:session-reset', { bad: 'payload' })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
   it('returns error when git command fails', async () => {
     const bridge = makeRegister()
     mockExecFile.mockReturnValue(new Error('git error'))
@@ -530,12 +471,6 @@ describe('git:session-reset', () => {
 })
 
 describe('git:prepare-pr-worktree', () => {
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const bridge = makeRegister()
-    const result = (await bridge.invoke('git:prepare-pr-worktree', {})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('returns error when head remote ref not found', async () => {
     const bridge = makeRegister()
     // rev-parse for origin/headRef fails; origin/baseRef succeeds
