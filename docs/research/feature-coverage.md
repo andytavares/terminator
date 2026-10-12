@@ -12,12 +12,22 @@ What the Playwright suite (`tests/e2e/*.spec.ts`) drives in the real app, measur
 - Three specs could not start here: `remote-app.spec.ts`, `git-integration-contrast.spec.ts` and `git-integration-stacking.spec.ts` need Playwright's own Chromium, and this container's egress policy blocks `cdn.playwright.dev`. 17 of the 18 tests that did not run are in these files. CI installs Chromium for them. Their IPC is missing from the counts below, which undercounts Git Integration's review views most.
 - Three fail on Linux and at the base commit f33208a alike, so they are not caused by this branch: `extension.spec.ts:52` and `quick-actions.spec.ts:225` press ⌘ shortcuts (`Meta+,`, `Meta+P`) that the app binds to Ctrl on Linux, and `sidebar-sorting.spec.ts:69` drags under xvfb. CI runs e2e on macOS. Their traces up to the failure are counted.
 
+Task Vault and Notepad were measured again on 2026-10-12 at commit 85e9d06, Linux (xvfb), `--workers=1`, over their 13 specs only, three runs in a row, 77 passed each time:
+
+```bash
+E2E_IPC_TRACE=/tmp/trace npx playwright test tests/e2e/task-vault-*.spec.ts tests/e2e/notepad-*.spec.ts --workers=1
+FEATURE_INVENTORY=/tmp/inventory.json E2E_TOOLS=1 npx playwright test tests/e2e/tools/feature-inventory.spec.ts
+node scripts/feature-coverage.mjs /tmp/inventory.json /tmp/trace
+```
+
+Their two sections below merge that run with the specs the full run had already credited. `notepad:notes.openWindow` is driven by `notepad-outline.spec.ts`, which that run left out. The other sections are still the full run's.
+
 ## Findings
 
 - **Extension settings: 0 of 149 driven.** No spec writes an extension setting through `extension:update-setting`. `extension.spec.ts` opens Settings → Extensions and toggles extensions, but writes no setting.
 - **Integrations (issue trackers) are barely reached.** Of the 16 `integrations:*` channels only `integrations:status`, `integrations:issue-get` and `integrations:link-get` are reached, by views loading. Connect, search, link and comment never run.
 - **Git Integration: 6 of 56 extension channels.** Staging, commit, push, conflict resolution, PR creation and the review agent (`git:stage`, `git:commit`, `git:push`, `git:resolve-conflict`, `github:pr-create`, `review-agent:start`, ...) are never reached. Some of the PR review channels may be reached by the two Chromium specs that could not run here.
-- **Task Vault: 11 of 69, Notepad: 8 of 43.** Notepad's comments, diagrams, folders, tags, import and export, and Task Vault's projects, reviews, kanban and most task actions, are never reached.
+- **Task Vault: 68 of 68, Notepad: 43 of 43** (re-measured on 2026-10-12 over the 13 `task-vault-*` and `notepad-*` specs, see below; they were 11 of 69 and 8 of 43). Driving them found nine bugs, each fixed with a failing test first: the GTD clarify flow skipped every other inbox item, a kanban lane's dot colour was never saved, a write in the SQL console did not refresh the vault, dragging a note to reorder never saved, search ignored case only for ASCII, Ctrl+Shift+F did nothing on Linux and Windows, typing near a comment orphaned it, renaming a diagram left the list stale, and the export's comment formats wrote no comments.
 - **Foundry: 60 of 60** is real but shallow: `foundry-channels.spec.ts` invokes every Foundry channel on purpose, so a full count says the channels answer, not that Foundry's flows are exercised.
 - **Core IPC: 61 of 113.** Never reached: `git:fetch`, `git:checkout`, `git:create-branch`, `git:remove-worktree`; `shell:exec`, `shell:open-path`, `shell:open-external`; all four `fs:*` channels; `extension:install`, `extension:uninstall`, `extension:reload`; every `menu:*` event; `notifications:dismiss` and `notifications:trigger-action`; `project:rename`, `project:delete`, the two `reorder` channels.
 - **Commands: 3 of 8.** Foundry's two commands and Git Integration's commit, pull and create-PR are never run.
@@ -41,9 +51,9 @@ The last command prints everything from here down.
 | Core IPC (window.electronAPI)   | 61     | 113   | 54%   |
 | terminator.foundry IPC          | 60     | 60    | 100%  |
 | terminator.git-integration IPC  | 6      | 56    | 11%   |
-| terminator.notepad IPC          | 8      | 43    | 19%   |
+| terminator.notepad IPC          | 43     | 43    | 100%  |
 | terminator.remote-control IPC   | 4      | 9     | 44%   |
-| terminator.task-vault IPC       | 11     | 69    | 16%   |
+| terminator.task-vault IPC       | 68     | 68    | 100%  |
 | Commands (Quick Actions, menus) | 3      | 8     | 38%   |
 | Core Quick Actions              | 7      | 28    | 25%   |
 | Extension settings              | 0      | 149   | 0%    |
@@ -304,56 +314,55 @@ Not driven by any spec:
 
 </details>
 
-### terminator.notepad IPC: 8 of 43 driven
+### terminator.notepad IPC: 43 of 43 driven
 
-Not driven by any spec:
-
-- `terminator.notepad:comments.create`
-- `terminator.notepad:comments.delete`
-- `terminator.notepad:comments.markOrphaned`
-- `terminator.notepad:comments.reply`
-- `terminator.notepad:comments.resolve`
-- `terminator.notepad:comments.update`
-- `terminator.notepad:comments.updateAnchor`
-- `terminator.notepad:db.reinit`
-- `terminator.notepad:diagram-comments.create`
-- `terminator.notepad:diagram-comments.delete`
-- `terminator.notepad:diagram-comments.list`
-- `terminator.notepad:diagram-comments.resolve`
-- `terminator.notepad:diagrams.archive`
-- `terminator.notepad:diagrams.autosave`
-- `terminator.notepad:diagrams.create`
-- `terminator.notepad:diagrams.get`
-- `terminator.notepad:diagrams.hardDelete`
-- `terminator.notepad:diagrams.openWindow`
-- `terminator.notepad:diagrams.restore`
-- `terminator.notepad:export.pickFolder`
-- `terminator.notepad:export.run`
-- `terminator.notepad:folders.create`
-- `terminator.notepad:folders.delete`
-- `terminator.notepad:folders.move`
-- `terminator.notepad:folders.rename`
-- `terminator.notepad:import.run`
-- `terminator.notepad:notes.archive`
-- `terminator.notepad:notes.autosave`
-- `terminator.notepad:notes.hardDelete`
-- `terminator.notepad:notes.reorder`
-- `terminator.notepad:notes.restore`
-- `terminator.notepad:search.query`
-- `terminator.notepad:tags.delete`
-- `terminator.notepad:tags.list`
-- `terminator.notepad:tags.rename`
+`tags.list`, `tags.rename` and `tags.delete` are remote-accessible and no view calls them; `notepad-search.spec.ts` calls them as a remote client does and checks the tags on the notes.
 
 <details><summary>Driven, and by which specs</summary>
 
-- `terminator.notepad:comments.list`: notepad-outline.spec.ts
-- `terminator.notepad:diagrams.list`: dismiss-surface-on-click.spec.ts, extension-escape-exit.spec.ts, extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, notepad-outline.spec.ts, quick-actions.spec.ts
-- `terminator.notepad:folders.list`: dismiss-surface-on-click.spec.ts, extension-escape-exit.spec.ts, extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, notepad-outline.spec.ts, quick-actions.spec.ts
-- `terminator.notepad:notes.create`: notepad-outline.spec.ts
-- `terminator.notepad:notes.get`: notepad-outline.spec.ts
-- `terminator.notepad:notes.list`: dismiss-surface-on-click.spec.ts, extension-escape-exit.spec.ts, extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, notepad-outline.spec.ts, quick-actions.spec.ts
+- `terminator.notepad:comments.create`: notepad-comments.spec.ts, notepad-export.spec.ts
+- `terminator.notepad:comments.delete`: notepad-comments.spec.ts
+- `terminator.notepad:comments.list`: notepad-comments.spec.ts, notepad-notes.spec.ts, notepad-outline.spec.ts
+- `terminator.notepad:comments.markOrphaned`: notepad-comments.spec.ts
+- `terminator.notepad:comments.reply`: notepad-comments.spec.ts
+- `terminator.notepad:comments.resolve`: notepad-comments.spec.ts
+- `terminator.notepad:comments.update`: notepad-comments.spec.ts
+- `terminator.notepad:comments.updateAnchor`: notepad-comments.spec.ts
+- `terminator.notepad:db.reinit`: notepad-search.spec.ts
+- `terminator.notepad:diagram-comments.create`: notepad-diagrams.spec.ts
+- `terminator.notepad:diagram-comments.delete`: notepad-diagrams.spec.ts
+- `terminator.notepad:diagram-comments.list`: notepad-diagrams.spec.ts
+- `terminator.notepad:diagram-comments.resolve`: notepad-diagrams.spec.ts
+- `terminator.notepad:diagrams.archive`: notepad-diagrams.spec.ts
+- `terminator.notepad:diagrams.autosave`: notepad-diagrams.spec.ts, notepad-export.spec.ts
+- `terminator.notepad:diagrams.create`: notepad-diagrams.spec.ts, notepad-export.spec.ts
+- `terminator.notepad:diagrams.get`: notepad-diagrams.spec.ts
+- `terminator.notepad:diagrams.hardDelete`: notepad-diagrams.spec.ts
+- `terminator.notepad:diagrams.list`: dismiss-surface-on-click.spec.ts, extension-escape-exit.spec.ts, extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, notepad-comments.spec.ts, notepad-diagrams.spec.ts, notepad-export.spec.ts, notepad-notes.spec.ts, notepad-outline.spec.ts, notepad-search.spec.ts, quick-actions.spec.ts
+- `terminator.notepad:diagrams.openWindow`: notepad-diagrams.spec.ts
+- `terminator.notepad:diagrams.restore`: notepad-diagrams.spec.ts
+- `terminator.notepad:export.pickFolder`: notepad-export.spec.ts, notepad-search.spec.ts
+- `terminator.notepad:export.run`: notepad-export.spec.ts
+- `terminator.notepad:folders.create`: notepad-notes.spec.ts
+- `terminator.notepad:folders.delete`: notepad-notes.spec.ts
+- `terminator.notepad:folders.list`: dismiss-surface-on-click.spec.ts, extension-escape-exit.spec.ts, extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, notepad-comments.spec.ts, notepad-diagrams.spec.ts, notepad-export.spec.ts, notepad-notes.spec.ts, notepad-outline.spec.ts, notepad-search.spec.ts, quick-actions.spec.ts
+- `terminator.notepad:folders.move`: notepad-notes.spec.ts
+- `terminator.notepad:folders.rename`: notepad-notes.spec.ts
+- `terminator.notepad:import.run`: notepad-search.spec.ts
+- `terminator.notepad:notes.archive`: notepad-notes.spec.ts
+- `terminator.notepad:notes.autosave`: notepad-comments.spec.ts, notepad-notes.spec.ts
+- `terminator.notepad:notes.create`: notepad-comments.spec.ts, notepad-export.spec.ts, notepad-notes.spec.ts, notepad-outline.spec.ts
+- `terminator.notepad:notes.get`: notepad-comments.spec.ts, notepad-notes.spec.ts, notepad-outline.spec.ts
+- `terminator.notepad:notes.hardDelete`: notepad-notes.spec.ts
+- `terminator.notepad:notes.list`: dismiss-surface-on-click.spec.ts, extension-escape-exit.spec.ts, extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, notepad-comments.spec.ts, notepad-diagrams.spec.ts, notepad-export.spec.ts, notepad-notes.spec.ts, notepad-outline.spec.ts, notepad-search.spec.ts, quick-actions.spec.ts
 - `terminator.notepad:notes.openWindow`: notepad-outline.spec.ts
-- `terminator.notepad:ui.consumePendingQuickCreate`: dismiss-surface-on-click.spec.ts, extension-escape-exit.spec.ts, extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, notepad-outline.spec.ts, quick-actions.spec.ts
+- `terminator.notepad:notes.reorder`: notepad-notes.spec.ts
+- `terminator.notepad:notes.restore`: notepad-notes.spec.ts
+- `terminator.notepad:search.query`: notepad-search.spec.ts
+- `terminator.notepad:tags.delete`: notepad-search.spec.ts
+- `terminator.notepad:tags.list`: notepad-search.spec.ts
+- `terminator.notepad:tags.rename`: notepad-search.spec.ts
+- `terminator.notepad:ui.consumePendingQuickCreate`: dismiss-surface-on-click.spec.ts, extension-escape-exit.spec.ts, extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, notepad-comments.spec.ts, notepad-diagrams.spec.ts, notepad-export.spec.ts, notepad-notes.spec.ts, notepad-outline.spec.ts, notepad-search.spec.ts, quick-actions.spec.ts
 
 </details>
 
@@ -376,82 +385,80 @@ Not driven by any spec:
 
 </details>
 
-### terminator.task-vault IPC: 11 of 69 driven
+### terminator.task-vault IPC: 68 of 68 driven
 
-Not driven by any spec:
-
-- `task-vault:admin:list-tables`
-- `task-vault:admin:run-query`
-- `task-vault:admin:table-stats`
-- `task-vault:db.reinit`
-- `task-vault:db.reset`
-- `task-vault:kanban:list-tasks`
-- `task-vault:kanban:move-task`
-- `task-vault:kanban:save-config`
-- `task-vault:links:create`
-- `task-vault:links:get-for-terminator-target`
-- `task-vault:links:remove`
-- `task-vault:navigate-to-terminal`
-- `task-vault:open-panel`
-- `task-vault:projects:create`
-- `task-vault:projects:delete`
-- `task-vault:projects:get-tasks`
-- `task-vault:projects:rename`
-- `task-vault:projects:update-area`
-- `task-vault:projects:update-deadline`
-- `task-vault:projects:update-status`
-- `task-vault:projects:weekly-review`
-- `task-vault:review:complete`
-- `task-vault:review:export`
-- `task-vault:review:get`
-- `task-vault:review:list`
-- `task-vault:review:log`
-- `task-vault:review:start`
-- `task-vault:settings:set-stale-threshold`
-- `task-vault:vault:add-subtask`
-- `task-vault:vault:add-task`
-- `task-vault:vault:archive-area`
-- `task-vault:vault:block-task`
-- `task-vault:vault:cancel-task`
-- `task-vault:vault:capture`
-- `task-vault:vault:clear-recurrence`
-- `task-vault:vault:complete-task`
-- `task-vault:vault:create-area`
-- `task-vault:vault:delete-area`
-- `task-vault:vault:delete-task`
-- `task-vault:vault:edit-task`
-- `task-vault:vault:export-json`
-- `task-vault:vault:get-task-detail`
-- `task-vault:vault:import-json`
-- `task-vault:vault:list-archive`
-- `task-vault:vault:migrate-task`
-- `task-vault:vault:process-inbox-item`
-- `task-vault:vault:query`
-- `task-vault:vault:rename-area`
-- `task-vault:vault:reopen-task`
-- `task-vault:vault:reorder-tasks`
-- `task-vault:vault:reset-today-since`
-- `task-vault:vault:restore-area`
-- `task-vault:vault:restore-task`
-- `task-vault:vault:save-task-detail`
-- `task-vault:vault:set-recurrence`
-- `task-vault:vault:someday-to-today`
-- `task-vault:vault:unblock-task`
-- `task-vault:vault:update-project-status`
+`links:get-for-terminator-target`, `links:remove`, `projects:update-status`, `settings:set-stale-threshold` and `vault:query` are remote-accessible and no view calls them; `task-vault-links.spec.ts` and `task-vault-remote-api.spec.ts` call them as a remote client does and check the effect in the vault's views. `admin:list-tables` was local-only and called by nothing, so it was deleted rather than tested (71f00af). The global capture shortcut (`CommandOrControl+Shift+O`, an `api.globalShortcut`) is pressed at the X server through XTEST in `task-vault-capture.spec.ts`; that test skips on macOS, where synthesising a system-wide key needs Accessibility consent for the runner, and the closest test there opens the same capture overlay from Quick Actions in the same spec.
 
 <details><summary>Driven, and by which specs</summary>
 
-- `task-vault:kanban:get-config`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts
-- `task-vault:kanban:list-contexts`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts
-- `task-vault:pop-pending-navigation`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts
-- `task-vault:projects:list`: extension-keyboard.spec.ts, quick-actions.spec.ts
-- `task-vault:ui.consumePendingCapture`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts
-- `task-vault:vault:get-calendar-month`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts
-- `task-vault:vault:get-daily`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts
-- `task-vault:vault:get-inbox`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts
-- `task-vault:vault:get-today`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts
-- `task-vault:vault:list-areas`: extension-keyboard.spec.ts, quick-actions.spec.ts
-- `task-vault:vault:list-someday`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts
+- `task-vault:admin:run-query`: task-vault-data.spec.ts
+- `task-vault:admin:table-stats`: task-vault-data.spec.ts
+- `task-vault:db.reinit`: task-vault-data.spec.ts
+- `task-vault:db.reset`: task-vault-data.spec.ts
+- `task-vault:kanban:get-config`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts, task-vault-board.spec.ts, task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:kanban:list-contexts`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts, task-vault-board.spec.ts, task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:kanban:list-tasks`: task-vault-board.spec.ts
+- `task-vault:kanban:move-task`: task-vault-board.spec.ts
+- `task-vault:kanban:save-config`: task-vault-board.spec.ts
+- `task-vault:links:create`: task-vault-links.spec.ts
+- `task-vault:links:get-for-terminator-target`: task-vault-links.spec.ts
+- `task-vault:links:remove`: task-vault-links.spec.ts
+- `task-vault:navigate-to-terminal`: task-vault-links.spec.ts
+- `task-vault:open-panel`: task-vault-board.spec.ts
+- `task-vault:pop-pending-navigation`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts, task-vault-board.spec.ts, task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:projects:create`: task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts
+- `task-vault:projects:delete`: task-vault-projects.spec.ts
+- `task-vault:projects:get-tasks`: task-vault-projects.spec.ts
+- `task-vault:projects:list`: extension-keyboard.spec.ts, quick-actions.spec.ts, task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:projects:rename`: task-vault-projects.spec.ts
+- `task-vault:projects:update-area`: task-vault-projects.spec.ts
+- `task-vault:projects:update-deadline`: task-vault-projects.spec.ts
+- `task-vault:projects:update-status`: task-vault-remote-api.spec.ts
+- `task-vault:projects:weekly-review`: task-vault-review.spec.ts
+- `task-vault:review:complete`: task-vault-review.spec.ts
+- `task-vault:review:export`: task-vault-review.spec.ts
+- `task-vault:review:get`: task-vault-review.spec.ts
+- `task-vault:review:list`: task-vault-review.spec.ts
+- `task-vault:review:log`: task-vault-review.spec.ts
+- `task-vault:review:start`: task-vault-review.spec.ts
+- `task-vault:settings:set-stale-threshold`: task-vault-remote-api.spec.ts
+- `task-vault:ui.consumePendingCapture`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts, task-vault-board.spec.ts, task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:add-subtask`: task-vault-today.spec.ts
+- `task-vault:vault:add-task`: task-vault-board.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:archive-area`: task-vault-projects.spec.ts
+- `task-vault:vault:block-task`: task-vault-today.spec.ts
+- `task-vault:vault:cancel-task`: task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:capture`: task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts
+- `task-vault:vault:clear-recurrence`: task-vault-today.spec.ts
+- `task-vault:vault:complete-task`: task-vault-projects.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:create-area`: task-vault-capture.spec.ts, task-vault-projects.spec.ts
+- `task-vault:vault:delete-area`: task-vault-projects.spec.ts
+- `task-vault:vault:delete-task`: task-vault-capture.spec.ts, task-vault-projects.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:edit-task`: task-vault-capture.spec.ts, task-vault-projects.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:export-json`: task-vault-data.spec.ts
+- `task-vault:vault:get-calendar-month`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts, task-vault-board.spec.ts, task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:get-daily`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts, task-vault-board.spec.ts, task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:get-inbox`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts, task-vault-board.spec.ts, task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:get-task-detail`: task-vault-board.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:get-today`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts, task-vault-board.spec.ts, task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:import-json`: task-vault-data.spec.ts
+- `task-vault:vault:list-archive`: task-vault-projects.spec.ts
+- `task-vault:vault:list-areas`: extension-keyboard.spec.ts, quick-actions.spec.ts, task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:list-someday`: extension-keyboard.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, quick-actions.spec.ts, task-vault-board.spec.ts, task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:migrate-task`: task-vault-today.spec.ts
+- `task-vault:vault:process-inbox-item`: task-vault-capture.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:query`: task-vault-board.spec.ts, task-vault-capture.spec.ts, task-vault-data.spec.ts, task-vault-links.spec.ts, task-vault-projects.spec.ts, task-vault-remote-api.spec.ts, task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:rename-area`: task-vault-projects.spec.ts
+- `task-vault:vault:reopen-task`: task-vault-today.spec.ts
+- `task-vault:vault:reorder-tasks`: task-vault-today.spec.ts
+- `task-vault:vault:reset-today-since`: task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:restore-area`: task-vault-projects.spec.ts
+- `task-vault:vault:restore-task`: task-vault-projects.spec.ts
+- `task-vault:vault:save-task-detail`: task-vault-today.spec.ts
+- `task-vault:vault:set-recurrence`: task-vault-today.spec.ts
+- `task-vault:vault:someday-to-today`: task-vault-review.spec.ts, task-vault-today.spec.ts
+- `task-vault:vault:unblock-task`: task-vault-today.spec.ts
+- `task-vault:vault:update-project-status`: task-vault-projects.spec.ts, task-vault-review.spec.ts
 
 </details>
 

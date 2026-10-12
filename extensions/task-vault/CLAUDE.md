@@ -43,3 +43,7 @@ Add deps to `extensions/task-vault/package.json` only. npm workspaces hoist them
 ## Terminal Linking
 
 When showing a terminal selector, list sessions with `window.electronAPI.terminal.listSessions()` in the view or `api.pty.listSessions()` in the backend. Never import the core's stores, and never expose terminal-link logic through the core preload.
+
+## End-to-end tests
+
+`tests/e2e/task-vault-*.spec.ts` drive every channel this extension registers in the real app, through its own view (`tests/e2e/task-vault-harness.ts`). A new channel gets a step there that does what a user does and reads back what was stored; a channel no view calls is driven as a remote client calls it (`task-vault-remote-api.spec.ts`).

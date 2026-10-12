@@ -342,6 +342,24 @@ await window.electronAPI.extension.hasCommand(key) // boolean
 - **`⌘P` / `Ctrl+P`** opens the core's Quick Actions panel even while focus is in your view: the host watches `before-input-event` on every view (`isQuickActionsOpenShortcut`).
 - **`Esc` twice within 500 ms** leaves your extension and returns the operator to their terminal ([ADR 026](adr/026-double-escape-extension-exit.md)). The listener in the webview preload is passive and bubble-phase, so your own single-`Esc` handlers run as normal. It stands down inside a text field and while a dialog is open; `Dialog` from the design system reports open dialogs over `electronAPI.ui.setModalDepth`, and a modal you write yourself must call it too. Do not stop `Esc` propagation at the window level, or the gesture stops working in your view.
 
+### Testing your view end to end
+
+A view is its own `WebContentsView` on an `ext://` origin, and Playwright attaches to it like any other page in the app's browser context. `tests/e2e/extension-page.ts` finds it, so a spec clicks, types and drags in your view with ordinary locators:
+
+```ts
+const vault = await openExtension(
+  handle,
+  'Task Vault',
+  'terminator.task-vault/dist/index.html?view=main'
+)
+await vault.getByRole('button', { name: 'Add task', exact: true }).click()
+```
+
+- Read back what an action stored with `invokeChannel(page, channel, payload)`, which calls your channel exactly as your view does. Perform the action itself the way a user does.
+- A native file dialog cannot be clicked. `answerNextOpenDialog` and `answerNextSaveDialog` answer the next one in main with the path a user would pick.
+- Playwright's keyboard reaches one page and never the X server, so it cannot fire an `api.globalShortcut`. On Linux `tests/e2e/x11-keys.ts` presses the chord through XTEST; the spec skips where there is no X server.
+- `tests/e2e/task-vault-harness.ts` and `tests/e2e/notepad-harness.ts` are worked examples.
+
 ---
 
 ## The design system — `@terminator/extension-ui`
@@ -437,7 +455,7 @@ It is SQLite, not Postgres:
 - Parameters are `?`, each a `string`, `number`, `bigint`, `null` or `Uint8Array`. `undefined` throws (`Provided value cannot be bound`): write `value ?? null`. Write booleans as `flag ? 1 : 0`.
 - Store booleans as `INTEGER` 0/1, dates as ISO-8601 `TEXT`, JSON as `TEXT` read with `json_extract` / `json_remove`. Use `TEXT PRIMARY KEY` with `crypto.randomUUID()`, or `INTEGER PRIMARY KEY` for a rowid.
 - `STRING_AGG(x, ',')` is `GROUP_CONCAT(x, ',')`. Prefer passing `new Date().toISOString()` over `datetime('now')`.
-- There is no `ILIKE`. `LIKE` is case-insensitive for ASCII letters only: `'É' LIKE 'é'` is false.
+- There is no `ILIKE`. `LIKE` is case-insensitive for ASCII letters only: `'É' LIKE 'é'` is false, and so is `LOWER('É') = 'é'` ([SQLite: LIKE](https://www.sqlite.org/lang_expr.html#like)). Search that must ignore case in every script filters in TypeScript with `toLowerCase()`, as Notepad's `search.query` does.
 - `ON CONFLICT (col) DO UPDATE SET v = excluded.v` and `ON CONFLICT DO NOTHING` work. `INSERT OR IGNORE` also drops rows that violate `NOT NULL` or `UNIQUE`; prefer `ON CONFLICT`.
 - `COUNT(*)` comes back as a `number`.
 - `ALTER TABLE ... ADD COLUMN` cannot add a `NOT NULL` column without a default. To change anything else, create a new table, copy and rename.
