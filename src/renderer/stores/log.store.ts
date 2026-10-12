@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 export type LogLevel = 'log' | 'info' | 'warn' | 'error'
 
-export interface LogEntry {
+interface LogEntry {
   id: number
   level: LogLevel
   message: string

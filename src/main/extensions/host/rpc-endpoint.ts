@@ -9,7 +9,7 @@ export type RpcMessage =
   | { kind: 'event'; method: string; params: unknown[] }
 
 /** An error as it crosses: `name` survives, so a caller can still tell a MissingCwdError. */
-export interface RpcErrorShape {
+interface RpcErrorShape {
   name: string
   message: string
 }

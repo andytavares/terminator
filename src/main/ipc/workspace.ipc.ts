@@ -44,10 +44,6 @@ export function setActiveWorkspaceContext(ctx: ActiveWorkspaceContext): void {
   activeContext = ctx
 }
 
-export function getActiveWorkspaceContext(): ActiveWorkspaceContext {
-  return activeContext
-}
-
 const IdSchema = z.object({ id: z.string().min(1) })
 const failed = { success: false }
 const validationError = (error: z.ZodError) => ({

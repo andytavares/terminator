@@ -3,7 +3,7 @@
  * an extension passes and sends a marker with its id in its place; main puts a
  * function back that raises a `callback` event with that id (ADR 094).
  */
-export interface CallbackMarker {
+interface CallbackMarker {
   $callback: number
 }
 

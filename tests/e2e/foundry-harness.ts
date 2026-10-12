@@ -15,7 +15,7 @@ import type { AppHandle } from './helpers'
 
 /** Runs `git` against the fixture repo, with any inherited GIT_* stripped so a
  *  git hook running this suite does not point every command at itself. */
-export function git(repo: string, ...args: string[]): void {
+function git(repo: string, ...args: string[]): void {
   const env = { ...process.env }
   delete env.GIT_DIR
   delete env.GIT_INDEX_FILE

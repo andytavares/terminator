@@ -56,7 +56,7 @@ const CLAUDE_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures'
 const CLAUDE_STUB_ZDOTDIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'zdotdir')
 
 /** The environment every e2e-launched Electron process gets. */
-export function e2eEnv(): NodeJS.ProcessEnv {
+function e2eEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
     NODE_ENV: 'test',

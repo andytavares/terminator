@@ -1,11 +1,11 @@
 import { z } from 'zod'
 
 export const ThemeSchema = z.enum(['dark', 'light'])
-export const NotificationTargetSchema = z.enum(['system', 'center', 'toast'])
-export const CustomActionKindSchema = z.enum(['shell', 'prompt'])
-export const CustomActionTargetSchema = z.enum(['focused', 'new-tab', 'agent'])
+const NotificationTargetSchema = z.enum(['system', 'center', 'toast'])
+const CustomActionKindSchema = z.enum(['shell', 'prompt'])
+const CustomActionTargetSchema = z.enum(['focused', 'new-tab', 'agent'])
 
-export const CustomActionSchema = z.object({
+const CustomActionSchema = z.object({
   id: z.string(),
   label: z.string(),
   mnemonic: z.string().max(1).optional(),
@@ -14,7 +14,7 @@ export const CustomActionSchema = z.object({
   body: z.string().min(1),
 })
 
-export const QuickActionsSettingsSchema = z
+const QuickActionsSettingsSchema = z
   .object({
     pins: z.array(z.string()).default([]),
     usage: z

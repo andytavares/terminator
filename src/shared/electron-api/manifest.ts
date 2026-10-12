@@ -56,7 +56,7 @@ import type {
   TransferInputSchema,
 } from '../schemas/session-records.schema'
 
-export type RemoteBehavior = 'same' | 'omit' | 'stub'
+type RemoteBehavior = 'same' | 'omit' | 'stub'
 
 /**
  * Whether extension views (WebContentsViews running an extension's renderer)
@@ -75,7 +75,7 @@ export interface Signature<Method extends BridgeMethod> {
   readonly [signatureType]?: Method
 }
 
-export function signature<Method extends BridgeMethod>(): Signature<Method> {
+function signature<Method extends BridgeMethod>(): Signature<Method> {
   return {}
 }
 
@@ -108,7 +108,7 @@ export interface ChannelSpec<
 }
 
 /** Declares one method; infers its path and signature so both reach the derived types. */
-export function method<
+function method<
   const Path extends string,
   Method extends BridgeMethod,
   const View extends ExtensionViewBehavior | undefined = undefined,

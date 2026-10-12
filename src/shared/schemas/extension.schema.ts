@@ -58,8 +58,6 @@ export const ExtensionContributesSchema = z
     }
   })
 
-export type ExtensionContributes = z.infer<typeof ExtensionContributesSchema>
-
 const ExtensionIdSchema = z
   .string()
   .min(1)
@@ -77,5 +75,3 @@ export const ExtensionManifestSchema = z.object({
   /** Extensions activated before this one, whose `activate` exports it may read (ADR 094). */
   extensionDependencies: z.array(ExtensionIdSchema).optional(),
 })
-
-export type ExtensionManifestData = z.infer<typeof ExtensionManifestSchema>

@@ -4,7 +4,7 @@ import type { AgentState, TerminalSession } from '../../shared/types/index'
  * Where a session's AgentState comes from. One implementation exists today;
  * the seam is here so a better signal can replace it without the UI changing.
  */
-export interface AgentStateSource {
+interface AgentStateSource {
   derive(session: TerminalSession): AgentState
 }
 
