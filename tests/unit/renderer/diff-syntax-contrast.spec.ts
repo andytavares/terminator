@@ -86,8 +86,9 @@ describe('diff / syntax token contrast (WCAG AA)', () => {
     ['light', lightBlock],
   ] as const) {
     const bg = hexToRgb(token(block, '--tm-bg-base'))
-    const added = rgbaToken(rootBlock, '--tm-diff-added-bg')
-    const removed = rgbaToken(rootBlock, '--tm-diff-removed-bg')
+    // Each theme's own tints: the light theme defines darker ones than the dark theme.
+    const added = rgbaToken(block, '--tm-diff-added-bg')
+    const removed = rgbaToken(block, '--tm-diff-removed-bg')
     const addedBg = composite(bg, added.rgb, added.alpha)
     const removedBg = composite(bg, removed.rgb, removed.alpha)
 
