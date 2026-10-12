@@ -1,9 +1,7 @@
 import { z } from 'zod'
 import { randomUUID } from '../db/db'
-import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
-import { createIpcRegistrar } from './register'
-
-const VALIDATION_ERROR = { error: 'VALIDATION_ERROR' }
+import { noPayload, type ExtensionDB, type ExtensionAPI } from '@terminator/extension-sdk'
+import { createIpcRegistrar, IdPayload } from './register'
 
 function deriveTitle(body: string): string {
   const headingMatch = /^#{1,6}\s+(.+)/m.exec(body)
@@ -39,23 +37,21 @@ async function reconcileTags(db: ExtensionDB, noteId: string, tagNames: string[]
 
 // ---- Exported handler functions for testing ----
 
+const CreateNotePayload = z
+  .object({
+    title: z.string().optional(),
+    body: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+  })
+  .strict()
+  .default({})
+
 export async function createNote(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof CreateNotePayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z
-    .object({
-      title: z.string().optional(),
-      body: z.string().optional(),
-      tags: z.array(z.string()).optional(),
-    })
-    .strict()
-
-  const parsed = schema.safeParse(payload ?? {})
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const body = parsed.data.body ?? ''
-  const title = parsed.data.title?.trim() || deriveTitle(body)
+  const body = args.body ?? ''
+  const title = args.title?.trim() || deriveTitle(body)
   const id = randomUUID()
   const now = new Date().toISOString()
 
@@ -64,27 +60,26 @@ export async function createNote(
       `INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
       [id, title, body, now, now]
     )
-    await reconcileTags(tx, id, parsed.data.tags ?? [])
+    await reconcileTags(tx, id, args.tags ?? [])
   })
 
   return { data: { id, title, createdAt: now } }
 }
 
-export async function listNotes(
-  db: ExtensionDB,
-  payload: unknown
-): Promise<Record<string, unknown>> {
-  const schema = z.object({
+const ListNotesPayload = z
+  .object({
     tagId: z.string().optional(),
     includeArchived: z.boolean().optional(),
     sortBy: z.enum(['updated_at', 'created_at', 'title']).optional(),
     sortDir: z.enum(['asc', 'desc']).optional(),
   })
+  .default({})
 
-  const parsed = schema.safeParse(payload ?? {})
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const { tagId, includeArchived = false, sortBy = 'updated_at', sortDir = 'desc' } = parsed.data
+export async function listNotes(
+  db: ExtensionDB,
+  args: z.infer<typeof ListNotesPayload>
+): Promise<Record<string, unknown>> {
+  const { tagId, includeArchived = false, sortBy = 'updated_at', sortDir = 'desc' } = args
 
   const archivedFilter = includeArchived ? '' : 'AND n.archived_at IS NULL'
   const tagFilter = tagId
@@ -135,11 +130,10 @@ export async function listNotes(
   return { data }
 }
 
-export async function getNote(db: ExtensionDB, payload: unknown): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
+export async function getNote(
+  db: ExtensionDB,
+  args: z.infer<typeof IdPayload>
+): Promise<Record<string, unknown>> {
   const row = await db.get<{
     id: string
     title: string
@@ -156,7 +150,7 @@ export async function getNote(db: ExtensionDB, payload: unknown): Promise<Record
               WHERE nt.note_id = n.id
             ), '') AS tags
      FROM notes n WHERE n.id=?`,
-    [parsed.data.id]
+    [args.id]
   )
 
   if (!row) return { error: 'NOTE_NOT_FOUND' }
@@ -174,28 +168,25 @@ export async function getNote(db: ExtensionDB, payload: unknown): Promise<Record
   }
 }
 
+const AutosaveNotePayload = z.object({
+  id: z.string(),
+  title: z.string(),
+  body: z.string(),
+  tags: z.array(z.string()),
+  // Identifies the renderer that saved, so it can ignore the echo of its own
+  // write instead of stomping on newer keystrokes.
+  originId: z.string().optional(),
+})
+
 /** Push channel announcing a saved note body to every open notepad surface. */
 export const NOTES_CHANGED_CHANNEL = 'terminator.notepad:notes.changed'
 
 export async function autosaveNote(
   db: ExtensionDB,
-  payload: unknown,
+  args: z.infer<typeof AutosaveNotePayload>,
   broadcast?: (channel: string, data: unknown) => void
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({
-    id: z.string(),
-    title: z.string(),
-    body: z.string(),
-    tags: z.array(z.string()),
-    // Identifies the renderer that saved, so it can ignore the echo of its own
-    // write instead of stomping on newer keystrokes.
-    originId: z.string().optional(),
-  })
-
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const { id, title, body, tags, originId } = parsed.data
+  const { id, title, body, tags, originId } = args
   const now = new Date().toISOString()
 
   const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [id])
@@ -232,62 +223,47 @@ export async function autosaveNote(
 
 export async function archiveNote(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
   const archivedAt = new Date().toISOString()
 
-  const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [parsed.data.id])
+  const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [args.id])
   if (!existing) return { error: 'NOTE_NOT_FOUND' }
 
-  await db.run('UPDATE notes SET archived_at=? WHERE id=?', [archivedAt, parsed.data.id])
+  await db.run('UPDATE notes SET archived_at=? WHERE id=?', [archivedAt, args.id])
 
   return { data: { archivedAt } }
 }
 
 export async function restoreNote(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
   const now = new Date().toISOString()
 
-  const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [parsed.data.id])
+  const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [args.id])
   if (!existing) return { error: 'NOTE_NOT_FOUND' }
 
-  await db.run('UPDATE notes SET archived_at=NULL, updated_at=? WHERE id=?', [now, parsed.data.id])
+  await db.run('UPDATE notes SET archived_at=NULL, updated_at=? WHERE id=?', [now, args.id])
 
   return { data: { ok: true } }
 }
 
 export async function hardDeleteNote(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [parsed.data.id])
+  const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [args.id])
   if (!existing) return { error: 'NOTE_NOT_FOUND' }
 
-  await db.run('DELETE FROM notes WHERE id=?', [parsed.data.id])
+  await db.run('DELETE FROM notes WHERE id=?', [args.id])
 
   return { data: { ok: true } }
 }
 
 // ---- Tags IPC handlers ----
 
-export async function listTags(
-  db: ExtensionDB,
-  _payload: unknown
-): Promise<Record<string, unknown>> {
+export async function listTags(db: ExtensionDB): Promise<Record<string, unknown>> {
   const rows = await db.query<{ id: string; name: string; note_count: number }>(
     `SELECT t.id, t.name, COUNT(nt.note_id) AS note_count
      FROM tags t
@@ -301,53 +277,42 @@ export async function listTags(
   }
 }
 
+const RenameTagPayload = z.object({ id: z.string(), name: z.string().min(1) })
+
 export async function renameTag(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof RenameTagPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string(), name: z.string().min(1) })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  await db.run('UPDATE tags SET name=? WHERE id=?', [
-    parsed.data.name.toLowerCase().trim(),
-    parsed.data.id,
-  ])
+  await db.run('UPDATE tags SET name=? WHERE id=?', [args.name.toLowerCase().trim(), args.id])
   return { data: { ok: true } }
 }
 
 export async function deleteTag(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  await db.run('DELETE FROM tags WHERE id=?', [parsed.data.id])
+  await db.run('DELETE FROM tags WHERE id=?', [args.id])
   return { data: { ok: true } }
 }
 
 export function registerTagsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handleRemote, cleanup } = createIpcRegistrar(api)
-  handleRemote('terminator.notepad:tags.list', (payload) => listTags(db, payload))
-  handleRemote('terminator.notepad:tags.rename', (payload) => renameTag(db, payload))
-  handleRemote('terminator.notepad:tags.delete', (payload) => deleteTag(db, payload))
+  handleRemote('terminator.notepad:tags.list', noPayload, () => listTags(db))
+  handleRemote('terminator.notepad:tags.rename', RenameTagPayload, (args) => renameTag(db, args))
+  handleRemote('terminator.notepad:tags.delete', IdPayload, (args) => deleteTag(db, args))
 
   return cleanup
 }
 
+const ReorderItemsPayload = z.object({
+  items: z.array(z.object({ id: z.string(), type: z.enum(['note', 'diagram']) })),
+})
+
 export async function reorderItems(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof ReorderItemsPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({
-    items: z.array(z.object({ id: z.string(), type: z.enum(['note', 'diagram']) })),
-  })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const { items } = parsed.data
+  const { items } = args
 
   const TABLE_MAP = { note: 'notes', diagram: 'diagrams' } as const
   await db.transaction(async (tx) => {
@@ -365,16 +330,19 @@ export async function reorderItems(
 
 export function registerNotesIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handleRemote, cleanup } = createIpcRegistrar(api)
-  handleRemote('terminator.notepad:notes.create', (payload) => createNote(db, payload))
-  handleRemote('terminator.notepad:notes.list', (payload) => listNotes(db, payload))
-  handleRemote('terminator.notepad:notes.get', (payload) => getNote(db, payload))
-  handleRemote('terminator.notepad:notes.autosave', (payload) =>
-    autosaveNote(db, payload, (channel, data) => api.window.broadcast(channel, data))
+  const broadcast = (channel: string, data: unknown) => api.window.broadcast(channel, data)
+  handleRemote('terminator.notepad:notes.create', CreateNotePayload, (args) => createNote(db, args))
+  handleRemote('terminator.notepad:notes.list', ListNotesPayload, (args) => listNotes(db, args))
+  handleRemote('terminator.notepad:notes.get', IdPayload, (args) => getNote(db, args))
+  handleRemote('terminator.notepad:notes.autosave', AutosaveNotePayload, (args) =>
+    autosaveNote(db, args, broadcast)
   )
-  handleRemote('terminator.notepad:notes.archive', (payload) => archiveNote(db, payload))
-  handleRemote('terminator.notepad:notes.restore', (payload) => restoreNote(db, payload))
-  handleRemote('terminator.notepad:notes.hardDelete', (payload) => hardDeleteNote(db, payload))
-  handleRemote('terminator.notepad:notes.reorder', (payload) => reorderItems(db, payload))
+  handleRemote('terminator.notepad:notes.archive', IdPayload, (args) => archiveNote(db, args))
+  handleRemote('terminator.notepad:notes.restore', IdPayload, (args) => restoreNote(db, args))
+  handleRemote('terminator.notepad:notes.hardDelete', IdPayload, (args) => hardDeleteNote(db, args))
+  handleRemote('terminator.notepad:notes.reorder', ReorderItemsPayload, (args) =>
+    reorderItems(db, args)
+  )
 
   return cleanup
 }

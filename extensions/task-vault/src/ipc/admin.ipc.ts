@@ -1,11 +1,14 @@
-import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
+import { z } from 'zod'
+import { noPayload, type ExtensionAPI, type ExtensionDB } from '@terminator/extension-sdk'
 import { createIpcRegistrar } from './register'
 
 const BLOCKED_DDL = /^\s*(drop|create|alter)\s/i
 
+const RunQueryRequestSchema = z.object({ sql: z.string() })
+
 export function registerAdminIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handle, cleanup } = createIpcRegistrar(api)
-  handle('task-vault:admin:list-tables', async () => {
+  handle('task-vault:admin:list-tables', noPayload, async () => {
     try {
       const rows = await db.query<{ table_name: string }>(
         `SELECT name AS table_name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
@@ -16,7 +19,7 @@ export function registerAdminIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:admin:table-stats', async () => {
+  handle('task-vault:admin:table-stats', noPayload, async () => {
     try {
       const tableRows = await db.query<{ table_name: string }>(
         `SELECT name AS table_name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
@@ -33,10 +36,9 @@ export function registerAdminIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:admin:run-query', async (payload: unknown) => {
+  handle('task-vault:admin:run-query', RunQueryRequestSchema, async ({ sql }) => {
     try {
-      const { sql } = payload as { sql: string }
-      if (!sql?.trim()) return { error: 'Empty query' }
+      if (!sql.trim()) return { error: 'Empty query' }
       if (BLOCKED_DDL.test(sql.trim())) {
         return { error: 'DDL statements (DROP, CREATE, ALTER) are not permitted' }
       }

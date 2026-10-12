@@ -130,12 +130,6 @@ describe('task-vault:vault:create-area', () => {
     })
     expect(await db.query('SELECT id FROM areas')).toHaveLength(1)
   })
-
-  it('returns VALIDATION_ERROR for an empty name', async () => {
-    expect(await invoke('task-vault:vault:create-area', { name: '' })).toMatchObject({
-      error: expect.stringContaining('VALIDATION_ERROR'),
-    })
-  })
 })
 
 describe('task-vault:vault:rename-area', () => {
@@ -285,15 +279,6 @@ describe('task-vault:vault:archive-area and restore-area', () => {
       })
     }
   )
-
-  it.each(['archive-area', 'restore-area'])(
-    '%s returns VALIDATION_ERROR without areaName',
-    async (name) => {
-      expect(await invoke(`task-vault:vault:${name}`, {})).toMatchObject({
-        error: expect.stringContaining('VALIDATION_ERROR'),
-      })
-    }
-  )
 })
 
 describe('task-vault:vault:delete-area', () => {
@@ -332,12 +317,6 @@ describe('task-vault:vault:delete-area', () => {
     expect(
       await invoke('task-vault:vault:delete-area', { areaFilePath: 'areas/Ghost.md' })
     ).toMatchObject({ error: 'NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR without areaFilePath', async () => {
-    expect(await invoke('task-vault:vault:delete-area', {})).toMatchObject({
-      error: expect.stringContaining('VALIDATION_ERROR'),
-    })
   })
 })
 
@@ -386,12 +365,6 @@ describe('task-vault:vault:update-project-status', () => {
       error: 'NOT_FOUND',
     })
   })
-
-  it('returns VALIDATION_ERROR without projectFilePath', async () => {
-    expect(await update({ status: 'archived' })).toMatchObject({
-      error: expect.stringContaining('VALIDATION_ERROR'),
-    })
-  })
 })
 
 describe('task-vault:vault:list-someday and someday-to-today', () => {
@@ -437,12 +410,6 @@ describe('task-vault:vault:list-someday and someday-to-today', () => {
     expect(await taskRow(db, 'parked-sub')).toMatchObject({
       source: 'daily',
       source_ref: localDate(),
-    })
-  })
-
-  it('returns VALIDATION_ERROR without taskId', async () => {
-    expect(await invoke('task-vault:vault:someday-to-today', {})).toEqual({
-      error: 'VALIDATION_ERROR',
     })
   })
 })

@@ -1,17 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ipcMain } from 'electron'
+import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 
 // Adapter: registerHandler forwards to the electron ipcMain mocks so existing
 // capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
 const mockApi = {
   ipc: {
-    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+    registerHandler: (spec: ChannelSpec) => {
       ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
-        ch,
-        (_e: unknown, payload: unknown) => fn(payload)
+        spec.channel,
+        (_e: unknown, payload: unknown) => dispatchChannel(spec, payload)
       )
       return {
-        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
+        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(spec.channel),
       }
     },
   },
@@ -177,13 +178,6 @@ describe('searchNotes — empty query returns all', () => {
     const result = await searchNotes(db, { query: '' })
     const data = (result as { data: unknown[] }).data
     expect(data).toHaveLength(2)
-  })
-})
-
-describe('searchNotes — validation', () => {
-  it('returns error on invalid payload', async () => {
-    const result = await searchNotes(db, { query: 123 as unknown as string })
-    expect(result).toHaveProperty('error')
   })
 })
 

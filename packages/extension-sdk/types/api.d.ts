@@ -4,6 +4,7 @@
  */
 
 import type { ZodTypeAny } from 'zod'
+import type { ChannelSpec } from '../src/index'
 import type {
   Issue,
   IssueListResult,
@@ -18,6 +19,28 @@ import type {
 export interface Disposable {
   dispose(): void
 }
+
+/** Local-only unless `remoteAccessible` is true. */
+export interface RegisterHandlerOptions {
+  remoteAccessible?: boolean
+}
+
+/**
+ * Registers `spec.channel`. The payload is parsed with `spec.schema` before
+ * `spec.run` sees it; a payload the schema rejects is answered with
+ * `spec.invalid` and `run` is not called (ADR 096).
+ */
+export type RegisterChannel = (spec: ChannelSpec, opts?: RegisterHandlerOptions) => Disposable
+
+/**
+ * @deprecated Register a `ChannelSpec` instead (ADR 096). The handler receives
+ * the payload exactly as the caller sent it, unvalidated.
+ */
+export type RegisterUnvalidatedChannel = (
+  channel: string,
+  handler: (payload: unknown) => Promise<unknown> | unknown,
+  opts?: RegisterHandlerOptions
+) => Disposable
 
 /** The extension's own SQLite tables. Every call is async and runs in call order. */
 export interface ExtensionDB {
@@ -322,12 +345,7 @@ export interface ExtensionAPI {
     ): Disposable
   }
   ipc: {
-    /** Local-only unless `opts.remoteAccessible` is true. */
-    registerHandler(
-      channel: string,
-      handler: (payload: unknown) => Promise<unknown> | unknown,
-      opts?: { remoteAccessible?: boolean }
-    ): Disposable
+    registerHandler: RegisterChannel & RegisterUnvalidatedChannel
     invokeChannel(channel: string, payload: unknown): Promise<unknown>
     sendChannel(channel: string, payload: unknown): void
     onWindowEvent(channel: string, handler: (...args: unknown[]) => void): () => void

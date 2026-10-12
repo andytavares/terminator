@@ -1,23 +1,47 @@
+import type { z } from 'zod'
+import { defineChannel } from '@terminator/extension-sdk'
 import type { ExtensionAPI, Disposable } from '@terminator/extension-sdk'
 
+/** What every task-vault channel answers to a payload its schema rejects. */
+export function validationError(error: z.ZodError): { error: string; message: string } {
+  return { error: 'VALIDATION_ERROR', message: error.message }
+}
+
+/** A thrown handler error, answered as `{ error }` instead of rejecting the invoke. */
+export function errorResult(err: unknown): { error: string } {
+  return { error: err instanceof Error ? err.message : String(err) }
+}
+
+type Register = <S extends z.ZodType>(
+  channel: string,
+  schema: S,
+  run: (args: z.infer<S>) => Promise<unknown> | unknown
+) => void
+
 // All task-vault IPC channels register through the ExtensionAPI — never through
-// ipcMain directly (Extension Isolation). Registration records the channel in
-// the remote bridge registry. A channel is local-only unless it registers through
-// handleRemote.
-export function createIpcRegistrar(api: ExtensionAPI): {
-  handle(channel: string, fn: (payload: unknown) => Promise<unknown> | unknown): void
+// ipcMain directly (Extension Isolation). Each declares the schema its payload
+// is parsed with before `run` sees it (ADR 096). A channel is local-only
+// unless it registers through handleRemote. With `onError`, a channel whose
+// run throws answers with it instead of rejecting.
+export function createIpcRegistrar(
+  api: ExtensionAPI,
+  onError?: (err: unknown) => unknown
+): {
+  handle: Register
   /** Like `handle`, and also reachable from the remote browser client. */
-  handleRemote(channel: string, fn: (payload: unknown) => Promise<unknown> | unknown): void
+  handleRemote: Register
   cleanup(): void
 } {
   const disposables: Disposable[] = []
+  const register =
+    (remoteAccessible: boolean): Register =>
+    (channel, schema, run) => {
+      const spec = defineChannel({ channel, schema, invalid: validationError, run, onError })
+      disposables.push(api.ipc.registerHandler(spec, { remoteAccessible }))
+    }
   return {
-    handle(channel, fn) {
-      disposables.push(api.ipc.registerHandler(channel, fn))
-    },
-    handleRemote(channel, fn) {
-      disposables.push(api.ipc.registerHandler(channel, fn, { remoteAccessible: true }))
-    },
+    handle: register(false),
+    handleRemote: register(true),
     cleanup() {
       disposables.forEach((d) => d.dispose())
     },

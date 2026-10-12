@@ -1,21 +1,17 @@
 import { z } from 'zod'
 import { randomUUID } from '../db/db'
-import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
-import { createIpcRegistrar } from './register'
+import { noPayload, type ExtensionDB, type ExtensionAPI } from '@terminator/extension-sdk'
+import { createIpcRegistrar, IdPayload } from './register'
 
-const VALIDATION_ERROR = { error: 'VALIDATION_ERROR' }
+const CreateFolderPayload = z.object({ name: z.string().min(1) })
 
 export async function createFolder(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof CreateFolderPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ name: z.string().min(1) })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
   const id = randomUUID()
   const now = new Date().toISOString()
-  const name = parsed.data.name.trim()
+  const name = args.name.trim()
 
   let sortOrder = 0
   await db.transaction(async (tx) => {
@@ -52,57 +48,45 @@ export async function listFolders(db: ExtensionDB): Promise<Record<string, unkno
   }
 }
 
+const RenameFolderPayload = z.object({ id: z.string(), name: z.string().min(1) })
+
 export async function renameFolder(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof RenameFolderPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string(), name: z.string().min(1) })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const existing = await db.get<{ id: string }>('SELECT id FROM folders WHERE id=?', [
-    parsed.data.id,
-  ])
+  const existing = await db.get<{ id: string }>('SELECT id FROM folders WHERE id=?', [args.id])
   if (!existing) return { error: 'FOLDER_NOT_FOUND' }
 
-  await db.run('UPDATE folders SET name=? WHERE id=?', [parsed.data.name.trim(), parsed.data.id])
+  await db.run('UPDATE folders SET name=? WHERE id=?', [args.name.trim(), args.id])
   return { data: { ok: true } }
 }
 
 export async function deleteFolder(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const existing = await db.get<{ id: string }>('SELECT id FROM folders WHERE id=?', [
-    parsed.data.id,
-  ])
+  const existing = await db.get<{ id: string }>('SELECT id FROM folders WHERE id=?', [args.id])
   if (!existing) return { error: 'FOLDER_NOT_FOUND' }
 
   await db.transaction(async (tx) => {
-    await tx.run('UPDATE notes SET folder_id=NULL WHERE folder_id=?', [parsed.data.id])
-    await tx.run('UPDATE diagrams SET folder_id=NULL WHERE folder_id=?', [parsed.data.id])
-    await tx.run('DELETE FROM folders WHERE id=?', [parsed.data.id])
+    await tx.run('UPDATE notes SET folder_id=NULL WHERE folder_id=?', [args.id])
+    await tx.run('UPDATE diagrams SET folder_id=NULL WHERE folder_id=?', [args.id])
+    await tx.run('DELETE FROM folders WHERE id=?', [args.id])
   })
 
   return { data: { ok: true } }
 }
 
+const MoveItemsToFolderPayload = z.object({
+  items: z.array(z.object({ id: z.string(), type: z.enum(['note', 'diagram']) })),
+  folderId: z.string().nullable(),
+})
+
 export async function moveItemsToFolder(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof MoveItemsToFolderPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({
-    items: z.array(z.object({ id: z.string(), type: z.enum(['note', 'diagram']) })),
-    folderId: z.string().nullable(),
-  })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const { items, folderId } = parsed.data
+  const { items, folderId } = args
 
   if (folderId !== null) {
     const folderExists = await db.get<{ id: string }>('SELECT id FROM folders WHERE id=?', [
@@ -124,11 +108,17 @@ export async function moveItemsToFolder(
 
 export function registerFoldersIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handleRemote, cleanup } = createIpcRegistrar(api)
-  handleRemote('terminator.notepad:folders.create', (payload) => createFolder(db, payload))
-  handleRemote('terminator.notepad:folders.list', () => listFolders(db))
-  handleRemote('terminator.notepad:folders.rename', (payload) => renameFolder(db, payload))
-  handleRemote('terminator.notepad:folders.delete', (payload) => deleteFolder(db, payload))
-  handleRemote('terminator.notepad:folders.move', (payload) => moveItemsToFolder(db, payload))
+  handleRemote('terminator.notepad:folders.create', CreateFolderPayload, (args) =>
+    createFolder(db, args)
+  )
+  handleRemote('terminator.notepad:folders.list', noPayload, () => listFolders(db))
+  handleRemote('terminator.notepad:folders.rename', RenameFolderPayload, (args) =>
+    renameFolder(db, args)
+  )
+  handleRemote('terminator.notepad:folders.delete', IdPayload, (args) => deleteFolder(db, args))
+  handleRemote('terminator.notepad:folders.move', MoveItemsToFolderPayload, (args) =>
+    moveItemsToFolder(db, args)
+  )
 
   return cleanup
 }

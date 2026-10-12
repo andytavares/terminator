@@ -1,4 +1,6 @@
 import { BrowserWindow } from 'electron'
+import { z } from 'zod'
+import { noPayload } from '@terminator/extension-sdk'
 import type {
   ExtensionAPI,
   ExtensionDB,
@@ -10,6 +12,7 @@ import { registerVaultIpcHandlers } from './ipc/vault.ipc.js'
 import { registerProjectsIpcHandlers } from './ipc/projects.ipc.js'
 import { registerLinksIpcHandlers } from './ipc/links.ipc.js'
 import { registerKanbanIpcHandlers } from './ipc/kanban.ipc.js'
+import { createIpcRegistrar, errorResult } from './ipc/register.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { registerWeeklyReviewIpcHandlers } from './ipc/weekly-review.ipc.js'
 import { applyTaskVaultSchema } from './vault/db.js'
@@ -64,6 +67,13 @@ function buildNotificationSettingProperties(): Record<string, SettingDefinition>
   }
   return properties
 }
+
+/** The terminal a task links to, for jumping to its tab. */
+const TerminalTarget = z.object({ sessionId: z.string().min(1), projectId: z.string().min(1) })
+/** The day or task the vault panel opens on. */
+const VaultTarget = z
+  .object({ date: z.string().optional(), taskId: z.string().optional() })
+  .default({})
 
 const disposables: Disposable[] = []
 let _api: ExtensionAPI | null = null
@@ -141,40 +151,29 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     })
   )
 
-  const disposeDbReinit = api.ipc.registerHandler('task-vault:db.reinit', async () => {
-    try {
-      await applyTaskVaultSchema(db)
-      await backfillRecurringTasks(db)
-      maybeStartScheduler(db)
-      return { data: { ok: true } }
-    } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err) }
-    }
+  const ownIpc = createIpcRegistrar(api, errorResult)
+  disposables.push({ dispose: ownIpc.cleanup })
+  ownIpc.handle('task-vault:db.reinit', noPayload, async () => {
+    await applyTaskVaultSchema(db)
+    await backfillRecurringTasks(db)
+    maybeStartScheduler(db)
+    return { data: { ok: true } }
   })
-  const disposeDbReset = api.ipc.registerHandler(
-    'task-vault:db.reset',
-    async () => {
-      try {
-        // Delete rows in FK-safe order; do not drop tables — the settings table is
-        // shared with other extensions in the unified app database, so only this
-        // extension's own rows go.
-        await db.exec(`
+  ownIpc.handle('task-vault:db.reset', noPayload, async () => {
+    // Delete rows in FK-safe order; do not drop tables — the settings table is
+    // shared with other extensions in the unified app database, so only this
+    // extension's own rows go.
+    await db.exec(`
         DELETE FROM area_archive_changes;
         DELETE FROM tasks;
         DELETE FROM projects;
         DELETE FROM areas;
         DELETE FROM settings WHERE extension_id = 'task-vault';
       `)
-        await applyTaskVaultSchema(db)
-        maybeStartScheduler(db)
-        return { data: { ok: true } }
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : String(err) }
-      }
-    },
-    { remoteAccessible: false }
-  )
-  disposables.push(disposeDbReinit, disposeDbReset)
+    await applyTaskVaultSchema(db)
+    maybeStartScheduler(db)
+    return { data: { ok: true } }
+  })
 
   const disposeIpc = registerVaultIpcHandlers(api, db)
   disposables.push({ dispose: disposeIpc })
@@ -202,31 +201,19 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     )
   }
 
-  disposables.push(
-    api.ipc.registerHandler('task-vault:navigate-to-terminal', (data) => {
-      const { sessionId, projectId } = (data ?? {}) as {
-        sessionId?: string
-        projectId?: string
-      }
-      if (!sessionId || !projectId) return { ok: false, error: 'missing sessionId or projectId' }
-      api.window.broadcast('terminal:navigate-to-session', { sessionId, projectId })
-      return { ok: true }
-    })
-  )
+  ownIpc.handle('task-vault:navigate-to-terminal', TerminalTarget, ({ sessionId, projectId }) => {
+    api.window.broadcast('terminal:navigate-to-session', { sessionId, projectId })
+    return { ok: true }
+  })
 
-  disposables.push(
-    api.ipc.registerHandler('task-vault:open-panel', (data) => {
-      const { date, taskId } = (data ?? {}) as { date?: string; taskId?: string }
-      openInVault(api, { date, taskId })
-      return { ok: true }
-    })
-  )
+  ownIpc.handle('task-vault:open-panel', VaultTarget, ({ date, taskId }) => {
+    openInVault(api, { date, taskId })
+    return { ok: true }
+  })
 
   // Consumed by TaskVaultView on cold-start mount, when the broadcast above
   // was sent before its WebContentsView existed to hear it.
-  disposables.push(
-    api.ipc.registerHandler('task-vault:pop-pending-navigation', () => popPendingNavigation())
-  )
+  ownIpc.handle('task-vault:pop-pending-navigation', noPayload, () => popPendingNavigation())
 
   disposables.push(
     api.nativeMenu.addViewMenuItem({
@@ -247,17 +234,15 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   scheduleWeeklyReviewNudge(api, reviewDay)
 
   // Renderer calls this on mount to pick up a capture triggered before the view existed.
-  disposables.push(
-    api.ipc.registerHandler('task-vault:ui.consumePendingCapture', () => {
-      const pending = _pendingCapture
-      _pendingCapture = false
-      if (_pendingCaptureTimer !== null) {
-        clearTimeout(_pendingCaptureTimer)
-        _pendingCaptureTimer = null
-      }
-      return { data: { pending } }
-    })
-  )
+  ownIpc.handle('task-vault:ui.consumePendingCapture', noPayload, () => {
+    const pending = _pendingCapture
+    _pendingCapture = false
+    if (_pendingCaptureTimer !== null) {
+      clearTimeout(_pendingCaptureTimer)
+      _pendingCaptureTimer = null
+    }
+    return { data: { pending } }
+  })
 
   try {
     const hotkeyDisposable = api.globalShortcut.register(DEFAULT_CAPTURE_HOTKEY, () => {

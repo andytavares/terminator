@@ -1,7 +1,8 @@
 import { vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { wrapDb } from '../../../../src/main/db/index'
-import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
+import { dispatchChannel } from '@terminator/extension-sdk'
+import type { ChannelSpec, ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 import { applyTaskVaultSchema } from '../../src/vault/db'
 import { insertTask, type NewTaskRow } from '../../src/vault/task-repository'
 
@@ -12,17 +13,15 @@ export async function createVaultDb(): Promise<ExtensionDB> {
   return db
 }
 
-type Handler = (payload: unknown) => Promise<unknown> | unknown
-
-/** Stands in for the ExtensionAPI: collects the handlers an extension registers. */
+/** Stands in for the ExtensionAPI: collects the channels an extension registers. */
 export function createIpcHarness() {
-  const handlers = new Map<string, Handler>()
+  const specs = new Map<string, ChannelSpec>()
   const createNotification = vi.fn()
   const api = {
     ipc: {
-      registerHandler: (channel: string, handler: Handler) => {
-        handlers.set(channel, handler)
-        return { dispose: () => handlers.delete(channel) }
+      registerHandler: (spec: ChannelSpec) => {
+        specs.set(spec.channel, spec)
+        return { dispose: () => specs.delete(spec.channel) }
       },
     },
     notifications: { createNotification },
@@ -31,11 +30,13 @@ export function createIpcHarness() {
   return {
     api,
     createNotification,
-    channels: () => [...handlers.keys()],
+    channels: () => [...specs.keys()],
+    specs: () => [...specs.values()],
+    /** What a renderer's invoke reaches: the registered channel, payload parsing included. */
     invoke(channel: string, payload?: unknown): Promise<unknown> {
-      const handler = handlers.get(channel)
-      if (!handler) throw new Error(`no handler registered for ${channel}`)
-      return Promise.resolve(handler(payload))
+      const spec = specs.get(channel)
+      if (!spec) throw new Error(`no handler registered for ${channel}`)
+      return dispatchChannel(spec, payload)
     },
   }
 }

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
+import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { hashPassword, verifyPassword } from '../../src/server/password-hash'
 
 // Hoisted mocks must be declared before module imports
@@ -57,6 +58,16 @@ function makeApi() {
   }
 }
 
+function registeredSpecs(): ChannelSpec[] {
+  return mockIpcRegisterHandler.mock.calls.map(([spec]: [ChannelSpec]) => spec)
+}
+
+/** What a renderer's invoke of `channel` reaches: the registered channel, payload parsing included. */
+function registeredHandler(channel: string): (payload?: unknown) => Promise<unknown> {
+  const spec = registeredSpecs().find((registered) => registered.channel === channel)!
+  return (payload) => dispatchChannel(spec, payload)
+}
+
 function makeServerHandle(startImpl: () => Promise<void> = () => Promise.resolve()) {
   return {
     start: vi.fn().mockImplementation(startImpl),
@@ -87,9 +98,7 @@ async function setupAndGetToggleHandler(
   const api = makeApi()
   activate(api as never)
 
-  const toggleHandler = mockIpcRegisterHandler.mock.calls.find(
-    ([ch]: [string]) => ch === 'remote:toggle'
-  )?.[1] as (payload: unknown) => Promise<unknown>
+  const toggleHandler = registeredHandler('remote:toggle')
   return toggleHandler
 }
 
@@ -174,17 +183,13 @@ describe('remote-control extension index', () => {
       activate(api as never)
 
       // Start the server so remoteServer is set
-      const toggleHandler = mockIpcRegisterHandler.mock.calls.find(
-        ([ch]: [string]) => ch === 'remote:toggle'
-      )?.[1] as (p: unknown) => Promise<unknown>
+      const toggleHandler = registeredHandler('remote:toggle')
       await toggleHandler({ enabled: true })
       await new Promise((resolve) => setTimeout(resolve, 20))
 
       mockNgrokSetOnCrash.mockClear()
 
-      const reconnectHandler = mockIpcRegisterHandler.mock.calls.find(
-        ([ch]: [string]) => ch === 'remote:tunnel-reconnect'
-      )?.[1] as () => Promise<unknown>
+      const reconnectHandler = registeredHandler('remote:tunnel-reconnect')
 
       await reconnectHandler()
       await new Promise((resolve) => setTimeout(resolve, 50))
@@ -210,9 +215,7 @@ async function activateWithSettings(initial: Record<string, unknown>) {
   // Activation queues the credential migration; hashing takes real time.
   await new Promise((resolve) => setTimeout(resolve, 300))
   const handler = (channel: string) =>
-    mockIpcRegisterHandler.mock.calls.find(([ch]: [string]) => ch === channel)?.[1] as (
-      payload?: unknown
-    ) => Promise<Record<string, unknown>>
+    registeredHandler(channel) as (payload?: unknown) => Promise<Record<string, unknown>>
   return { values, handler }
 }
 
@@ -284,5 +287,29 @@ describe('remote-control credentials', () => {
       error: 'PASSWORD_REQUIRED',
       message: expect.stringContaining('Set a new password'),
     })
+  })
+})
+
+// ADR 096: whether a channel rejects bad input is its schema's job, so this
+// checks once, for every channel the extension registers, that one is declared.
+describe('every remote-control channel', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+  })
+
+  it('declares a schema that keeps a malformed payload from reaching run', async () => {
+    mockCreateRemoteServer.mockResolvedValue(makeServerHandle())
+    const { activate } = await import('../../src/index.ts')
+    activate(makeApi() as never)
+
+    const specs = registeredSpecs()
+    expect(specs.map((spec) => spec.channel)).toContain('remote:toggle')
+    for (const spec of specs) {
+      expect(spec.schema, `${spec.channel} has no schema`).toBeDefined()
+      const run = vi.fn()
+      await dispatchChannel({ ...spec, run }, 42)
+      expect(run, `${spec.channel} ran a malformed payload`).not.toHaveBeenCalled()
+    }
   })
 })

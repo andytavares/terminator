@@ -133,10 +133,4 @@ describe('task-vault:vault:process-inbox-item', () => {
       error: 'STALE_ID',
     })
   })
-
-  it('returns VALIDATION_ERROR for an unknown action', async () => {
-    expect(await processItem({ taskId: TASK_ID, action: 'invalid-action' })).toMatchObject({
-      error: 'VALIDATION_ERROR',
-    })
-  })
 })

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { rowToComment, type CommentRow } from '../db/mappers'
 import type { Comment } from '../db/types'
 import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
-import { createIpcRegistrar } from './register'
+import { createIpcRegistrar, IdPayload } from './register'
 
 const ListPayload = z.object({
   noteId: z.string(),
@@ -31,8 +31,6 @@ const UpdatePayload = z.object({
   body: z.string().min(1),
 })
 
-const DeletePayload = z.object({ id: z.string() })
-
 const ResolvePayload = z.object({ id: z.string(), resolved: z.boolean() })
 
 const UpdateAnchorPayload = z.object({
@@ -41,16 +39,15 @@ const UpdateAnchorPayload = z.object({
   endOffset: z.number().int().nonnegative(),
 })
 
-const MarkOrphanedPayload = z.object({ id: z.string() })
-
 function err(msg: string) {
   return { error: msg }
 }
 
-export async function listComments(db: ExtensionDB, payload: unknown): Promise<unknown> {
-  const parsed = ListPayload.safeParse(payload)
-  if (!parsed.success) return err('VALIDATION_ERROR')
-  const { noteId, includeResolved } = parsed.data
+export async function listComments(
+  db: ExtensionDB,
+  args: z.infer<typeof ListPayload>
+): Promise<unknown> {
+  const { noteId, includeResolved } = args
 
   const statusFilter = includeResolved === true ? '' : "AND status != 'resolved'"
   const topRows = await db.query<CommentRow>(
@@ -73,10 +70,11 @@ export async function listComments(db: ExtensionDB, payload: unknown): Promise<u
   return { data: comments }
 }
 
-export async function createComment(db: ExtensionDB, payload: unknown): Promise<unknown> {
-  const parsed = CreatePayload.safeParse(payload)
-  if (!parsed.success) return err('VALIDATION_ERROR')
-  const { noteId, body, startOffset, endOffset, quote, prefix, suffix } = parsed.data
+export async function createComment(
+  db: ExtensionDB,
+  args: z.infer<typeof CreatePayload>
+): Promise<unknown> {
+  const { noteId, body, startOffset, endOffset, quote, prefix, suffix } = args
   const id = randomUUID()
   const now = new Date().toISOString()
 
@@ -101,10 +99,11 @@ export async function createComment(db: ExtensionDB, payload: unknown): Promise<
   return { data: { id, createdAt: now } }
 }
 
-export async function replyComment(db: ExtensionDB, payload: unknown): Promise<unknown> {
-  const parsed = ReplyPayload.safeParse(payload)
-  if (!parsed.success) return err('VALIDATION_ERROR')
-  const { noteId, parentId, body } = parsed.data
+export async function replyComment(
+  db: ExtensionDB,
+  args: z.infer<typeof ReplyPayload>
+): Promise<unknown> {
+  const { noteId, parentId, body } = args
 
   const parent = await db.get<{ parent_id: string | null }>(
     'SELECT parent_id FROM comments WHERE id = ?',
@@ -127,37 +126,41 @@ export async function replyComment(db: ExtensionDB, payload: unknown): Promise<u
   return { data: { id, createdAt: now } }
 }
 
-export async function updateComment(db: ExtensionDB, payload: unknown): Promise<unknown> {
-  const parsed = UpdatePayload.safeParse(payload)
-  if (!parsed.success) return err('VALIDATION_ERROR')
-  const { id, body } = parsed.data
+export async function updateComment(
+  db: ExtensionDB,
+  args: z.infer<typeof UpdatePayload>
+): Promise<unknown> {
+  const { id, body } = args
   const now = new Date().toISOString()
   await db.run('UPDATE comments SET body = ?, updated_at = ? WHERE id = ?', [body, now, id])
   return { data: { updatedAt: now } }
 }
 
-export async function deleteComment(db: ExtensionDB, payload: unknown): Promise<unknown> {
-  const parsed = DeletePayload.safeParse(payload)
-  if (!parsed.success) return err('VALIDATION_ERROR')
-  const { id } = parsed.data
+export async function deleteComment(
+  db: ExtensionDB,
+  args: z.infer<typeof IdPayload>
+): Promise<unknown> {
+  const { id } = args
   await db.run('DELETE FROM comments WHERE id = ?', [id])
   return { data: { ok: true } }
 }
 
-export async function resolveComment(db: ExtensionDB, payload: unknown): Promise<unknown> {
-  const parsed = ResolvePayload.safeParse(payload)
-  if (!parsed.success) return err('VALIDATION_ERROR')
-  const { id, resolved } = parsed.data
+export async function resolveComment(
+  db: ExtensionDB,
+  args: z.infer<typeof ResolvePayload>
+): Promise<unknown> {
+  const { id, resolved } = args
   const status = resolved ? 'resolved' : 'open'
   const now = new Date().toISOString()
   await db.run('UPDATE comments SET status = ?, updated_at = ? WHERE id = ?', [status, now, id])
   return { data: { status } }
 }
 
-export async function updateAnchor(db: ExtensionDB, payload: unknown): Promise<unknown> {
-  const parsed = UpdateAnchorPayload.safeParse(payload)
-  if (!parsed.success) return err('VALIDATION_ERROR')
-  const { id, startOffset, endOffset } = parsed.data
+export async function updateAnchor(
+  db: ExtensionDB,
+  args: z.infer<typeof UpdateAnchorPayload>
+): Promise<unknown> {
+  const { id, startOffset, endOffset } = args
   const now = new Date().toISOString()
   await db.run(
     'UPDATE comments SET start_offset = ?, end_offset = ?, updated_at = ? WHERE id = ?',
@@ -166,31 +169,35 @@ export async function updateAnchor(db: ExtensionDB, payload: unknown): Promise<u
   return { data: { ok: true } }
 }
 
-export async function markOrphaned(db: ExtensionDB, payload: unknown): Promise<unknown> {
-  const parsed = MarkOrphanedPayload.safeParse(payload)
-  if (!parsed.success) return err('VALIDATION_ERROR')
-  const { id } = parsed.data
+export async function markOrphaned(
+  db: ExtensionDB,
+  args: z.infer<typeof IdPayload>
+): Promise<unknown> {
+  const { id } = args
   const now = new Date().toISOString()
   await db.run("UPDATE comments SET status = 'orphaned', updated_at = ? WHERE id = ?", [now, id])
   return { data: { ok: true } }
 }
 
 export function registerCommentsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const channels: [string, (db: ExtensionDB, payload: unknown) => Promise<unknown>][] = [
-    ['terminator.notepad:comments.list', listComments],
-    ['terminator.notepad:comments.create', createComment],
-    ['terminator.notepad:comments.reply', replyComment],
-    ['terminator.notepad:comments.update', updateComment],
-    ['terminator.notepad:comments.delete', deleteComment],
-    ['terminator.notepad:comments.resolve', resolveComment],
-    ['terminator.notepad:comments.updateAnchor', updateAnchor],
-    ['terminator.notepad:comments.markOrphaned', markOrphaned],
-  ]
-
-  const registrar = createIpcRegistrar(api)
-  for (const [channel, handler] of channels) {
-    registrar.handleRemote(channel, (payload) => handler(db, payload))
-  }
-
-  return registrar.cleanup
+  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  handleRemote('terminator.notepad:comments.list', ListPayload, (args) => listComments(db, args))
+  handleRemote('terminator.notepad:comments.create', CreatePayload, (args) =>
+    createComment(db, args)
+  )
+  handleRemote('terminator.notepad:comments.reply', ReplyPayload, (args) => replyComment(db, args))
+  handleRemote('terminator.notepad:comments.update', UpdatePayload, (args) =>
+    updateComment(db, args)
+  )
+  handleRemote('terminator.notepad:comments.delete', IdPayload, (args) => deleteComment(db, args))
+  handleRemote('terminator.notepad:comments.resolve', ResolvePayload, (args) =>
+    resolveComment(db, args)
+  )
+  handleRemote('terminator.notepad:comments.updateAnchor', UpdateAnchorPayload, (args) =>
+    updateAnchor(db, args)
+  )
+  handleRemote('terminator.notepad:comments.markOrphaned', IdPayload, (args) =>
+    markOrphaned(db, args)
+  )
+  return cleanup
 }

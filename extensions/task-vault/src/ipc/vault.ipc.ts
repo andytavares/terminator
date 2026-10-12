@@ -1,6 +1,8 @@
+import { z } from 'zod'
 import * as path from 'node:path'
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
-import { createIpcRegistrar } from './register'
+import { noPayload } from '@terminator/extension-sdk'
+import { createIpcRegistrar, errorResult } from './register'
 import { insertTask } from '../vault/task-repository'
 import { randomUUID } from '../vault/db'
 import { extractTags, toDisplayName } from '../vault/tags'
@@ -30,6 +32,12 @@ import {
   SetRecurrenceRequestSchema,
   ClearRecurrenceRequestSchema,
   ArchiveAreaRequestSchema,
+  RenameAreaRequestSchema,
+  ListAreasRequestSchema,
+  GetProjectTasksRequestSchema,
+  AddSubtaskRequestSchema,
+  CalendarMonthRequestSchema,
+  StaleThresholdRequestSchema,
 } from '../schemas/vault.schema'
 import { triggerSchedulerTick, broadcast } from '../notifications/task-scheduler.js'
 import { archiveAreaContents, restoreAreaContents } from '../vault/area-archive'
@@ -79,6 +87,16 @@ interface ImportedTask {
   metadata?: string
   terminator_links?: string
 }
+
+/** The JSON export's shape; rows are written as exported, unknown columns ignored. */
+const ImportJsonRequestSchema = z.object({
+  version: z.number().optional(),
+  tasks: z
+    .array(z.custom<ImportedTask>((task) => typeof task === 'object' && task !== null))
+    .optional(),
+  projects: z.array(z.record(z.unknown())).optional(),
+  areas: z.array(z.record(z.unknown())).optional(),
+})
 
 function today(): string {
   return localDate()
@@ -141,28 +159,10 @@ async function resolveProjectAndAreaIds(
 }
 
 export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const registrar = createIpcRegistrar(api)
+  const { handle, handleRemote, cleanup } = createIpcRegistrar(api, errorResult)
 
-  type Register = (channel: string, fn: (payload: unknown) => Promise<unknown>) => void
-
-  function withErrorResult(register: Register): Register {
-    return (channel, fn) =>
-      register(channel, async (payload) => {
-        try {
-          return await fn(payload)
-        } catch (err) {
-          return { error: err instanceof Error ? err.message : String(err) }
-        }
-      })
-  }
-
-  const handle = withErrorResult(registrar.handle)
-  const handleRemote = withErrorResult(registrar.handleRemote)
-
-  handleRemote('task-vault:vault:capture', async (payload) => {
-    const parsed = CaptureRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR: ' + parsed.error.message }
-    const { text, hintArea, hintProject } = parsed.data
+  handleRemote('task-vault:vault:capture', CaptureRequestSchema, async (args) => {
+    const { text, hintArea, hintProject } = args
 
     const tags: string[] = []
     if (hintProject) tags.push(`@${hintProject}`)
@@ -194,7 +194,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { taskId: id }
   })
 
-  handleRemote('task-vault:vault:get-today', async () => {
+  handleRemote('task-vault:vault:get-today', noPayload, async () => {
     try {
       const date = today()
       const now = new Date().toISOString()
@@ -278,11 +278,9 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:vault:get-daily', async (payload) => {
-    const parsed = GetDailyRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+  handleRemote('task-vault:vault:get-daily', GetDailyRequestSchema, async (args) => {
     try {
-      const { date } = parsed.data
+      const { date } = args
       const taskRows = await db.query<Record<string, unknown>>(
         `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
          WHERE t.source='daily' AND t.source_ref=? AND t.parent_id IS NULL ORDER BY t.sort_order, t.created_at`,
@@ -307,10 +305,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:vault:add-task', async (payload) => {
-    const parsed = AddTaskRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { filePath, text, dueDate, tags } = parsed.data
+  handleRemote('task-vault:vault:add-task', AddTaskRequestSchema, async (args) => {
+    const { filePath, text, dueDate, tags } = args
 
     const parts: string[] = [text]
     if (tags?.project) parts.push(`@${tags.project}`)
@@ -348,10 +344,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { taskId: id }
   })
 
-  handleRemote('task-vault:vault:complete-task', async (payload) => {
-    const parsed = CompleteTaskRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId } = parsed.data
+  handleRemote('task-vault:vault:complete-task', CompleteTaskRequestSchema, async (args) => {
+    const { taskId } = args
     const now = new Date().toISOString()
     const todayStr = today()
 
@@ -389,10 +383,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:vault:migrate-task', async (payload) => {
-    const parsed = MigrateTaskRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId, targetDate } = parsed.data
+  handleRemote('task-vault:vault:migrate-task', MigrateTaskRequestSchema, async (args) => {
+    const { taskId, targetDate } = args
     const task = await db.get<Record<string, unknown>>(
       `SELECT t.*, t.project_id, t.area_id FROM tasks t WHERE t.id=?`,
       [taskId]
@@ -460,10 +452,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { newTaskId: newId }
   })
 
-  handleRemote('task-vault:vault:query', async (payload) => {
-    const parsed = QueryRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { status, context, project, area, dueBefore } = parsed.data
+  handleRemote('task-vault:vault:query', QueryRequestSchema, async (args) => {
+    const { status, context, project, area, dueBefore } = args
 
     const conditions: string[] = []
     const params: unknown[] = []
@@ -498,10 +488,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { tasks: rows.map(rowToTask) }
   })
 
-  handleRemote('task-vault:vault:process-inbox-item', async (payload) => {
-    const parsed = ProcessInboxRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId, action, destination, newProjectName } = parsed.data
+  handleRemote('task-vault:vault:process-inbox-item', ProcessInboxRequestSchema, async (args) => {
+    const { taskId, action, destination, newProjectName } = args
     const now = new Date().toISOString()
 
     const task = await db.get<Record<string, unknown>>(`SELECT * FROM tasks WHERE id=?`, [taskId])
@@ -598,10 +586,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true, newTaskId: taskId }
   })
 
-  handleRemote('task-vault:vault:edit-task', async (payload) => {
-    const parsed = EditTaskRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId, text } = parsed.data
+  handleRemote('task-vault:vault:edit-task', EditTaskRequestSchema, async (args) => {
+    const { taskId, text } = args
     const extracted = extractTags(text)
     const now = new Date().toISOString()
     const { projectId, areaId } = await resolveProjectAndAreaIds(
@@ -628,10 +614,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:delete-task', async (payload) => {
-    const parsed = DeleteTaskRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId } = parsed.data
+  handleRemote('task-vault:vault:delete-task', DeleteTaskRequestSchema, async (args) => {
+    const { taskId } = args
     const existing = await db.get<{ id: string }>(`SELECT id FROM tasks WHERE id=?`, [taskId])
     if (!existing) return { error: 'STALE_ID' }
     await db.run(
@@ -647,10 +631,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:cancel-task', async (payload) => {
-    const parsed = CancelTaskRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId } = parsed.data
+  handleRemote('task-vault:vault:cancel-task', CancelTaskRequestSchema, async (args) => {
+    const { taskId } = args
     const now = new Date().toISOString()
     const existing = await db.get<{ id: string }>(`SELECT id FROM tasks WHERE id=?`, [taskId])
     if (!existing) return { error: 'STALE_ID' }
@@ -659,10 +641,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:restore-task', async (payload) => {
-    const parsed = RestoreTaskRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId } = parsed.data
+  handleRemote('task-vault:vault:restore-task', RestoreTaskRequestSchema, async (args) => {
+    const { taskId } = args
     const now = new Date().toISOString()
     const existing = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
       taskId,
@@ -688,10 +668,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:create-area', async (payload) => {
-    const parsed = CreateAreaRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { name } = parsed.data
+  handleRemote('task-vault:vault:create-area', CreateAreaRequestSchema, async (args) => {
+    const { name } = args
     const displayName = toDisplayName(name.trim())
     const now = new Date().toISOString()
     const existing = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [
@@ -708,9 +686,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true, filePath: displayName }
   })
 
-  handleRemote('task-vault:vault:rename-area', async (payload) => {
-    const { areaFilePath, newName } = payload as { areaFilePath: string; newName: string }
-    if (!areaFilePath || !newName?.trim()) return { error: 'VALIDATION_ERROR' }
+  handleRemote('task-vault:vault:rename-area', RenameAreaRequestSchema, async (args) => {
+    const { areaFilePath, newName } = args
     const now = new Date().toISOString()
     const area = await db.get<{ id: string; name: string }>(
       `SELECT id, name FROM areas WHERE name=?`,
@@ -727,10 +704,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:archive-area', async (payload) => {
-    const parsed = ArchiveAreaRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { areaName } = parsed.data
+  handleRemote('task-vault:vault:archive-area', ArchiveAreaRequestSchema, async (args) => {
+    const { areaName } = args
     const now = new Date().toISOString()
 
     const area = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [areaName])
@@ -749,10 +724,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:delete-area', async (payload) => {
-    const parsed = DeleteAreaRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { areaFilePath } = parsed.data
+  handleRemote('task-vault:vault:delete-area', DeleteAreaRequestSchema, async (args) => {
+    const { areaFilePath } = args
     const areaName = path.basename(areaFilePath, '.md')
 
     const area = await db.get<{ id: string; status: string }>(
@@ -786,9 +759,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:restore-area', async (payload) => {
-    const { areaName } = payload as { areaName: string }
-    if (!areaName) return { error: 'VALIDATION_ERROR' }
+  handleRemote('task-vault:vault:restore-area', ArchiveAreaRequestSchema, async (args) => {
+    const { areaName } = args
     const now = new Date().toISOString()
     const area = await db.get<{ id: string; updated_at: string }>(
       `SELECT id, updated_at FROM areas WHERE name=?`,
@@ -801,7 +773,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:get-inbox', async () => {
+  handleRemote('task-vault:vault:get-inbox', noPayload, async () => {
     try {
       const rows = await db.query<Record<string, unknown>>(
         `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
@@ -821,9 +793,9 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:vault:list-areas', async (payload) => {
+  handleRemote('task-vault:vault:list-areas', ListAreasRequestSchema, async (args) => {
     try {
-      const statusFilter = (payload as { status?: string } | undefined)?.status ?? 'active'
+      const statusFilter = args.status ?? 'active'
       const areaRows =
         statusFilter === 'all'
           ? await db.query<Record<string, unknown>>(`SELECT * FROM areas ORDER BY name`)
@@ -899,8 +871,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:projects:get-tasks', async (payload) => {
-    const { projectName } = payload as { projectName: string }
+  handleRemote('task-vault:projects:get-tasks', GetProjectTasksRequestSchema, async (args) => {
+    const { projectName } = args
     if (!projectName) return { tasks: [] }
     const rows = await db.query<Record<string, unknown>>(
       `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE p.name=? ORDER BY t.status, t.created_at`,
@@ -909,35 +881,38 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { tasks: rows.map(rowToTask) }
   })
 
-  handleRemote('task-vault:vault:list-archive', async (payload) => {
-    const parsed = ListArchiveRequestSchema.safeParse(payload ?? {})
-    const days = parsed.success ? (parsed.data.days ?? 30) : 30
-    try {
-      const cutoff = localDate(new Date(Date.now() - days * 86400000))
-      const taskRows = await db.query<Record<string, unknown>>(
-        `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+  handleRemote(
+    'task-vault:vault:list-archive',
+    ListArchiveRequestSchema.default({}),
+    async (args) => {
+      const days = args.days ?? 30
+      try {
+        const cutoff = localDate(new Date(Date.now() - days * 86400000))
+        const taskRows = await db.query<Record<string, unknown>>(
+          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
          WHERE t.status IN ('done','cancelled','migrated') AND t.updated_at >= ? ORDER BY t.updated_at DESC`,
-        [cutoff]
-      )
-      const projectRows = await db.query<Record<string, unknown>>(
-        `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='archived' ORDER BY p.updated_at DESC`
-      )
-      const areaRows = await db.query<Record<string, unknown>>(
-        `SELECT * FROM areas WHERE status='archived' ORDER BY updated_at DESC`
-      )
-      const projects = projectRows.map(rowToProject)
-      const areas = areaRows.map((a) => ({
-        id: a.id as string,
-        name: a.name as string,
-        updatedAt: a.updated_at as string,
-      }))
-      return { tasks: taskRows.map(rowToTask), projects, areas }
-    } catch (err) {
-      return { error: String(err) }
+          [cutoff]
+        )
+        const projectRows = await db.query<Record<string, unknown>>(
+          `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='archived' ORDER BY p.updated_at DESC`
+        )
+        const areaRows = await db.query<Record<string, unknown>>(
+          `SELECT * FROM areas WHERE status='archived' ORDER BY updated_at DESC`
+        )
+        const projects = projectRows.map(rowToProject)
+        const areas = areaRows.map((a) => ({
+          id: a.id as string,
+          name: a.name as string,
+          updatedAt: a.updated_at as string,
+        }))
+        return { tasks: taskRows.map(rowToTask), projects, areas }
+      } catch (err) {
+        return { error: String(err) }
+      }
     }
-  })
+  )
 
-  handleRemote('task-vault:vault:list-someday', async () => {
+  handleRemote('task-vault:vault:list-someday', noPayload, async () => {
     try {
       const taskRows = await db.query<Record<string, unknown>>(
         `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
@@ -953,9 +928,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:vault:someday-to-today', async (payload) => {
-    const { taskId } = payload as { taskId: string }
-    if (!taskId) return { error: 'VALIDATION_ERROR' }
+  handleRemote('task-vault:vault:someday-to-today', CompleteTaskRequestSchema, async (args) => {
+    const { taskId } = args
     try {
       const todayDate = today()
       const now = new Date().toISOString()
@@ -974,9 +948,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:vault:add-subtask', async (payload) => {
-    const { taskId, text } = payload as { taskId: string; text: string }
-    if (!taskId || !text) return { error: 'VALIDATION_ERROR' }
+  handleRemote('task-vault:vault:add-subtask', AddSubtaskRequestSchema, async (args) => {
+    const { taskId, text } = args
     const parent = await db.get<{ source: string; source_ref: string | null }>(
       `SELECT source, source_ref FROM tasks WHERE id=?`,
       [taskId]
@@ -998,7 +971,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:export-json', async () => {
+  handle('task-vault:vault:export-json', noPayload, async () => {
     try {
       const tasks = await db.query(`SELECT * FROM tasks ORDER BY created_at`)
       const projects = await db.query(`SELECT * FROM projects ORDER BY name`)
@@ -1015,19 +988,11 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:vault:import-json', async (payload) => {
+  handle('task-vault:vault:import-json', ImportJsonRequestSchema, async (data) => {
     try {
-      const data = payload as {
-        version?: number
-        tasks?: ImportedTask[]
-        projects?: Record<string, unknown>[]
-        areas?: Record<string, unknown>[]
-      }
-      if (!data || typeof data !== 'object') return { error: 'INVALID_PAYLOAD' }
-
       let imported = 0
 
-      if (Array.isArray(data.areas)) {
+      if (data.areas) {
         for (const a of data.areas) {
           await db.run(
             `INSERT INTO areas (id,name,status,created_at,updated_at) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING`,
@@ -1036,7 +1001,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
           imported++
         }
       }
-      if (Array.isArray(data.projects)) {
+      if (data.projects) {
         for (const p of data.projects) {
           const areaId = await findImportedId(db, 'areas', p.area_id, p.area)
           await db.run(
@@ -1057,7 +1022,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
           imported++
         }
       }
-      if (Array.isArray(data.tasks)) {
+      if (data.tasks) {
         for (const t of data.tasks) {
           const projectId = await findImportedId(db, 'projects', t.project_id, t.project)
           const areaId = await findImportedId(db, 'areas', t.area_id, t.area)
@@ -1093,21 +1058,22 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:vault:update-project-status', async (payload) => {
-    const parsed = UpdateProjectStatusRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { projectFilePath: projectName, status } = parsed.data
-    const now = new Date().toISOString()
+  handleRemote(
+    'task-vault:vault:update-project-status',
+    UpdateProjectStatusRequestSchema,
+    async (args) => {
+      const { projectFilePath: projectName, status } = args
+      const now = new Date().toISOString()
 
-    let proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [projectName])
-    if (!proj) {
-      proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE id=?`, [projectName])
-    }
-    if (!proj) return { error: 'NOT_FOUND' }
+      let proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [projectName])
+      if (!proj) {
+        proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE id=?`, [projectName])
+      }
+      if (!proj) return { error: 'NOT_FOUND' }
 
-    if (status === 'archived') {
-      await db.run(
-        `WITH RECURSIVE subtree(id) AS (
+      if (status === 'archived') {
+        await db.run(
+          `WITH RECURSIVE subtree(id) AS (
            SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
            UNION ALL
            SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
@@ -1115,27 +1081,26 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
          UPDATE tasks SET status='cancelled', updated_at=?
          WHERE id IN (SELECT id FROM subtree)
            AND status IN ('open','in-progress','in-review','blocked')`,
-        [proj.id, now]
-      )
-    }
+          [proj.id, now]
+        )
+      }
 
-    await db.run(`UPDATE projects SET status=?, updated_at=? WHERE id=?`, [status, now, proj.id])
-    if (status === 'archived') {
-      api.notifications.createNotification({
-        type: 'info',
-        title: 'Project archived',
-        message: projectName,
-        key: 'projectArchived',
-      })
+      await db.run(`UPDATE projects SET status=?, updated_at=? WHERE id=?`, [status, now, proj.id])
+      if (status === 'archived') {
+        api.notifications.createNotification({
+          type: 'info',
+          title: 'Project archived',
+          message: projectName,
+          key: 'projectArchived',
+        })
+      }
+      broadcast('task-vault:push:index-updated', {})
+      return { success: true }
     }
-    broadcast('task-vault:push:index-updated', {})
-    return { success: true }
-  })
+  )
 
-  handleRemote('task-vault:vault:get-task-detail', async (payload) => {
-    const parsed = GetTaskDetailRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId } = parsed.data
+  handleRemote('task-vault:vault:get-task-detail', GetTaskDetailRequestSchema, async (args) => {
+    const { taskId } = args
     try {
       const row = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
         taskId,
@@ -1152,10 +1117,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:vault:save-task-detail', async (payload) => {
-    const parsed = SaveTaskDetailRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId, description, acceptanceCriteria, devHints } = parsed.data
+  handleRemote('task-vault:vault:save-task-detail', SaveTaskDetailRequestSchema, async (args) => {
+    const { taskId, description, acceptanceCriteria, devHints } = args
     try {
       const row = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
         taskId,
@@ -1176,10 +1139,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:vault:reopen-task', async (payload) => {
-    const parsed = RestoreTaskRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId } = parsed.data
+  handleRemote('task-vault:vault:reopen-task', RestoreTaskRequestSchema, async (args) => {
+    const { taskId } = args
     const now = new Date().toISOString()
     const existing = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
       taskId,
@@ -1204,10 +1165,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:block-task', async (payload) => {
-    const parsed = BlockTaskRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR: ' + parsed.error.message }
-    const { taskId, reason, checkInterval } = parsed.data
+  handleRemote('task-vault:vault:block-task', BlockTaskRequestSchema, async (args) => {
+    const { taskId, reason, checkInterval } = args
     const now = new Date().toISOString()
     const row = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
       taskId,
@@ -1225,10 +1184,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:unblock-task', async (payload) => {
-    const parsed = UnblockTaskRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId } = parsed.data
+  handleRemote('task-vault:vault:unblock-task', UnblockTaskRequestSchema, async (args) => {
+    const { taskId } = args
     const now = new Date().toISOString()
     const row = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
       taskId,
@@ -1245,10 +1202,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:set-recurrence', async (payload) => {
-    const parsed = SetRecurrenceRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId, interval, days, time, endType, endDate, endCount } = parsed.data
+  handleRemote('task-vault:vault:set-recurrence', SetRecurrenceRequestSchema, async (args) => {
+    const { taskId, interval, days, time, endType, endDate, endCount } = args
     const task = await db.get<{
       metadata: string
       due_date: string | null
@@ -1318,10 +1273,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:vault:clear-recurrence', async (payload) => {
-    const parsed = ClearRecurrenceRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId } = parsed.data
+  handleRemote('task-vault:vault:clear-recurrence', ClearRecurrenceRequestSchema, async (args) => {
+    const { taskId } = args
     const task = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
       taskId,
     ])
@@ -1355,10 +1308,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:reorder-tasks', async (payload) => {
-    const parsed = ReorderTasksRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { orderedIds } = parsed.data
+  handleRemote('task-vault:vault:reorder-tasks', ReorderTasksRequestSchema, async (args) => {
+    const { orderedIds } = args
     const now = new Date().toISOString()
     await db.transaction(async (tx) => {
       for (let i = 0; i < orderedIds.length; i++) {
@@ -1373,8 +1324,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handleRemote('task-vault:vault:get-calendar-month', async (payload) => {
-    const { year, month } = payload as { year: number; month: number }
+  handleRemote('task-vault:vault:get-calendar-month', CalendarMonthRequestSchema, async (args) => {
+    const { year, month } = args
     const pad = (n: number) => String(n).padStart(2, '0')
     const startDate = `${year}-${pad(month)}-01`
     const endDate = `${year}-${pad(month)}-31`
@@ -1390,23 +1341,25 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { days: rows.map((r) => ({ ...r, count: Number(r.count) })) }
   })
 
-  handleRemote('task-vault:vault:reset-today-since', async (payload) => {
-    const { taskId } = payload as { taskId: string }
-    if (!taskId) return { error: 'VALIDATION_ERROR' }
+  handleRemote('task-vault:vault:reset-today-since', CompleteTaskRequestSchema, async (args) => {
+    const { taskId } = args
     const now = new Date().toISOString()
     await db.run(`UPDATE tasks SET today_since=?, updated_at=? WHERE id=?`, [today(), now, taskId])
     return { success: true }
   })
 
-  handleRemote('task-vault:settings:set-stale-threshold', async (payload) => {
-    const { days } = payload as { days: number }
-    if (typeof days !== 'number' || days < 1) return { error: 'VALIDATION_ERROR' }
-    await db.run(
-      `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'stale_days_threshold', ?) ON CONFLICT (extension_id, key) DO UPDATE SET value = excluded.value`,
-      [String(days)]
-    )
-    return { success: true }
-  })
+  handleRemote(
+    'task-vault:settings:set-stale-threshold',
+    StaleThresholdRequestSchema,
+    async (args) => {
+      const { days } = args
+      await db.run(
+        `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'stale_days_threshold', ?) ON CONFLICT (extension_id, key) DO UPDATE SET value = excluded.value`,
+        [String(days)]
+      )
+      return { success: true }
+    }
+  )
 
-  return registrar.cleanup
+  return cleanup
 }

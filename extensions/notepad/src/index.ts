@@ -1,3 +1,5 @@
+import { z } from 'zod'
+import { defineChannel, noPayload } from '@terminator/extension-sdk'
 import type { ExtensionAPI, Disposable, SettingDefinition } from '@terminator/extension-sdk'
 import { applyNotepadSchema } from './db/db'
 import { registerNotesIpcHandlers, registerTagsIpcHandlers } from './ipc/notes.ipc'
@@ -7,6 +9,10 @@ import { registerExportIpcHandlers } from './ipc/export.ipc'
 import { registerDiagramsIpcHandlers } from './ipc/diagrams.ipc'
 import { registerDiagramCommentsIpcHandlers } from './ipc/diagram-comments.ipc'
 import { registerFoldersIpcHandlers } from './ipc/folders.ipc'
+import { VALIDATION_ERROR } from './ipc/register'
+
+/** The note or diagram a dedicated window opens on. */
+const WindowTarget = z.object({ id: z.string().min(1) })
 
 // Every notification kind this extension ever raises, so the user can
 // independently choose its delivery target(s) (system/in-app/toast) in this
@@ -76,23 +82,33 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   // is loaded rather than the main app URL — which would trigger ExtensionPanelPortal and
   // wrongly attach the WebContentsView to the main window.
   disposables.push(
-    api.ipc.registerHandler('terminator.notepad:notes.openWindow', (payload) => {
-      const { id } = (payload ?? {}) as { id?: string }
-      if (!id) return { error: 'VALIDATION_ERROR' }
-      // Unique key per note so each note gets its own window; passing view:'note' in params
-      // overrides the view key that openAuxiliary would derive from the first argument.
-      api.window.openAuxiliary(`notepad-note-${id}`, { view: 'note', noteId: id })
-      return { data: { ok: true } }
-    })
+    api.ipc.registerHandler(
+      defineChannel({
+        channel: 'terminator.notepad:notes.openWindow',
+        schema: WindowTarget,
+        invalid: VALIDATION_ERROR,
+        run: ({ id }) => {
+          // Unique key per note so each note gets its own window; passing view:'note' in params
+          // overrides the view key that openAuxiliary would derive from the first argument.
+          api.window.openAuxiliary(`notepad-note-${id}`, { view: 'note', noteId: id })
+          return { data: { ok: true } }
+        },
+      })
+    )
   )
 
   disposables.push(
-    api.ipc.registerHandler('terminator.notepad:diagrams.openWindow', (payload) => {
-      const { id } = (payload ?? {}) as { id?: string }
-      if (!id) return { error: 'VALIDATION_ERROR' }
-      api.window.openAuxiliary(`notepad-diagram-${id}`, { view: 'diagram', diagramId: id })
-      return { data: { ok: true } }
-    })
+    api.ipc.registerHandler(
+      defineChannel({
+        channel: 'terminator.notepad:diagrams.openWindow',
+        schema: WindowTarget,
+        invalid: VALIDATION_ERROR,
+        run: ({ id }) => {
+          api.window.openAuxiliary(`notepad-diagram-${id}`, { view: 'diagram', diagramId: id })
+          return { data: { ok: true } }
+        },
+      })
+    )
   )
 
   const disposeDiagramComments = registerDiagramCommentsIpcHandlers(api, api.db)
@@ -101,14 +117,18 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   const disposeFolders = registerFoldersIpcHandlers(api, api.db)
   disposables.push({ dispose: disposeFolders })
 
-  const disposeDbReinit = api.ipc.registerHandler('terminator.notepad:db.reinit', async () => {
-    try {
-      await applyNotepadSchema(api.db)
-      return { data: { ok: true } }
-    } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err) }
-    }
-  })
+  const disposeDbReinit = api.ipc.registerHandler(
+    defineChannel({
+      channel: 'terminator.notepad:db.reinit',
+      schema: noPayload,
+      invalid: VALIDATION_ERROR,
+      run: async () => {
+        await applyNotepadSchema(api.db)
+        return { data: { ok: true } }
+      },
+      onError: (err) => ({ error: err instanceof Error ? err.message : String(err) }),
+    })
+  )
   disposables.push(disposeDbReinit)
 
   disposables.push(
@@ -167,15 +187,22 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 
   // Renderer calls this on mount to pick up a quick-create triggered before the view existed.
   disposables.push(
-    api.ipc.registerHandler('terminator.notepad:ui.consumePendingQuickCreate', () => {
-      const pending = _pendingQuickCreate
-      _pendingQuickCreate = false
-      if (_pendingQuickCreateTimer !== null) {
-        clearTimeout(_pendingQuickCreateTimer)
-        _pendingQuickCreateTimer = null
-      }
-      return { data: { pending } }
-    })
+    api.ipc.registerHandler(
+      defineChannel({
+        channel: 'terminator.notepad:ui.consumePendingQuickCreate',
+        schema: noPayload,
+        invalid: VALIDATION_ERROR,
+        run: () => {
+          const pending = _pendingQuickCreate
+          _pendingQuickCreate = false
+          if (_pendingQuickCreateTimer !== null) {
+            clearTimeout(_pendingQuickCreateTimer)
+            _pendingQuickCreateTimer = null
+          }
+          return { data: { pending } }
+        },
+      })
+    )
   )
 
   // Cmd+Shift+N lives on the View menu, not globalShortcut: menu accelerators fire only
