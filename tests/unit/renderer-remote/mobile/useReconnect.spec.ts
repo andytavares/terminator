@@ -25,6 +25,16 @@ describe('useReconnect', () => {
     expect(result.current.status).toBe('connected')
   })
 
+  it('becomes connected when an already-open socket replaces null', async () => {
+    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
+    const { result, rerender } = renderHook(({ ws }) => useReconnect(mockOpenWs, ws), {
+      initialProps: { ws: null as WebSocket | null },
+    })
+    expect(result.current.status).toBe('connecting')
+    rerender({ ws: { readyState: 1 } as WebSocket })
+    expect(result.current.status).toBe('connected')
+  })
+
   it('returns status "connecting" when ws is null (not yet opened)', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
     const { result } = renderHook(() => useReconnect(mockOpenWs, null))

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { createElement, useEffect } from 'react'
 import { useSettingsStore } from './stores/settings.store'
 import { useExtensionRegistry } from './extensions/registry'
 import { ToastContainer } from './components/ToastContainer'
@@ -27,7 +27,7 @@ export function ExtensionWindowView({ view }: { view: string }): JSX.Element {
       >
         {accentColor && <div style={{ height: 3, background: accentColor, flexShrink: 0 }} />}
         {ViewComponent ? (
-          <ViewComponent repoRoot={repoRoot} />
+          createElement(ViewComponent, { repoRoot })
         ) : (
           <div>Extension view not found: {view}</div>
         )}

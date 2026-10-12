@@ -116,6 +116,18 @@ describe('ExtensionPanelPortal', () => {
     expect(container.querySelector('[data-testid="extension-loading"]')).toBeTruthy()
   })
 
+  it('shows no spinner when the host cannot report that the panel loaded', () => {
+    Object.defineProperty(window, 'electronAPI', {
+      value: { extension: { updatePanelBounds: mockUpdatePanelBounds }, extensionEvents: {} },
+      configurable: true,
+      writable: true,
+    })
+    const { container } = render(
+      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
+    )
+    expect(container.querySelector('[data-testid="extension-loading"]')).toBeNull()
+  })
+
   it('dismisses the spinner when onExtensionPanelLoaded fires with matching id', () => {
     const { container } = render(
       <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />

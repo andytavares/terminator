@@ -140,9 +140,15 @@ export function QuickActions({
   const visibleRows: Row[] =
     mode === 'top' ? topRows : mode === 'group' ? groupActionRows : searchRows
 
-  useEffect(() => {
+  const [highlightedFor, setHighlightedFor] = useState({ mode, groupId, query })
+  if (
+    highlightedFor.mode !== mode ||
+    highlightedFor.groupId !== groupId ||
+    highlightedFor.query !== query
+  ) {
+    setHighlightedFor({ mode, groupId, query })
     setHighlight(0)
-  }, [mode, groupId, query])
+  }
 
   useEffect(() => {
     const row = visibleRows[highlight]

@@ -31,11 +31,10 @@ export function BranchSelect({
 
   const filtered = branches.filter((b) => b.name.toLowerCase().includes(filter.toLowerCase()))
 
+  if (!open && filter !== '') setFilter('')
+
   useEffect(() => {
-    if (!open) {
-      setFilter('')
-      return
-    }
+    if (!open) return
     setTimeout(() => filterRef.current?.focus(), 0)
   }, [open])
 

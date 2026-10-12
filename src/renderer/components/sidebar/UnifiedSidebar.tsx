@@ -37,6 +37,7 @@ import { LinkIssueDialog } from '../integrations/LinkIssueDialog'
 import { IssueDrawer } from '../integrations/IssueDrawer'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useSessionFacts } from '../session/useSessionFacts'
+import { useNow } from '../session/useNow'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import type { WorkItem } from '../../sidebar/work-item'
@@ -236,6 +237,14 @@ export function UnifiedSidebar({
       .catch(() => setEditorName(undefined))
   }, [])
 
+  const allProjects = useMemo(
+    () => workspaces.flatMap((ws) => projectsByWorkspaceId.get(ws.id) ?? []),
+    [workspaces, projectsByWorkspaceId]
+  )
+
+  const projectById = useMemo(() => new Map(allProjects.map((p) => [p.id, p])), [allProjects])
+  const workspaceById = useMemo(() => new Map(workspaces.map((w) => [w.id, w])), [workspaces])
+
   /**
    * The folder a branch's work happens in: its own working copy when it has
    * one, else the repo it was checked out from. Same resolution the terminal
@@ -303,11 +312,6 @@ export function UnifiedSidebar({
     setActiveViewId(DEFAULT_VIEW_ID)
   }
 
-  const allProjects = useMemo(
-    () => workspaces.flatMap((ws) => projectsByWorkspaceId.get(ws.id) ?? []),
-    [workspaces, projectsByWorkspaceId]
-  )
-
   // agentState is view state derived from bell, byte flow and exit — the type
   // says so, but nothing was deriving it, so every session read as 'idle'
   // forever and the Needs me / Active / Stale views filtered on a constant.
@@ -341,7 +345,8 @@ export function UnifiedSidebar({
     }
   }, [sessionList, invalidateStats])
 
-  const clock = now ?? Date.now()
+  const currentTime = useNow()
+  const clock = now ?? currentTime
 
   // A session's own link, keyed by session id, so a terminal row can draw it
   // without the pure branch-rows layer knowing trackers exist (ADR-031).
@@ -409,9 +414,6 @@ export function UnifiedSidebar({
     }
     return out
   }, [views, sessionList, allProjects, workspaces, clock, staleAfterMs])
-
-  const projectById = useMemo(() => new Map(allProjects.map((p) => [p.id, p])), [allProjects])
-  const workspaceById = useMemo(() => new Map(workspaces.map((w) => [w.id, w])), [workspaces])
 
   // ── Dragging is how the manual order is written ───────────────────────────
   //

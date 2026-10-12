@@ -19,11 +19,10 @@ export function useMenuPlacement(
 ): CSSProperties {
   const [placement, setPlacement] = useState<{ left: number; top: number } | null>(null)
 
+  if (!open && placement !== null) setPlacement(null)
+
   useLayoutEffect(() => {
-    if (!open) {
-      setPlacement(null)
-      return
-    }
+    if (!open) return
     const measure = (): void => {
       const button = buttonRef.current?.getBoundingClientRect()
       const panel = panelRef.current?.getBoundingClientRect()

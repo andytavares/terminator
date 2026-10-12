@@ -6,7 +6,9 @@ export function useReconnect(
   openWs: () => void,
   ws: WebSocket | null
 ): { status: ConnectionStatus; retry: () => void; onOpenWsFailed: () => void } {
-  const [status, setStatus] = useState<ConnectionStatus>('connecting')
+  const [status, setStatus] = useState<ConnectionStatus>(() =>
+    ws?.readyState === WebSocket.OPEN ? 'connected' : 'connecting'
+  )
   const attemptsRef = useRef(0)
   const wsRef = useRef(ws)
   const openWsRef = useRef(openWs)
@@ -19,13 +21,17 @@ export function useReconnect(
     openWsRef.current = openWs
   }, [openWs])
 
+  // A socket that is already open when it arrives is connected on that same render.
+  const [previousWs, setPreviousWs] = useState(ws)
+  if (ws !== previousWs) {
+    setPreviousWs(ws)
+    if (ws?.readyState === WebSocket.OPEN) setStatus('connected')
+  }
+
   // Clear status as soon as the socket opens
   useEffect(() => {
     if (!ws) return
-    if (ws.readyState === WebSocket.OPEN) {
-      setStatus('connected')
-      attemptsRef.current = 0
-    }
+    if (ws.readyState === WebSocket.OPEN) attemptsRef.current = 0
     const handleOpen = () => {
       setStatus('connected')
       attemptsRef.current = 0
@@ -34,7 +40,7 @@ export function useReconnect(
     return () => ws.removeEventListener?.('open', handleOpen)
   }, [ws])
 
-  const attempt = useCallback(() => {
+  const attempt = useCallback(function attempt() {
     const state = wsRef.current?.readyState
     if (state === WebSocket.OPEN) {
       setStatus('connected')

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type React from 'react'
 
 export interface DragItemProps {
@@ -27,7 +27,9 @@ export function useDragReorder<T>(items: T[], onReorder: (reordered: T[]) => voi
   // Read through a ref so a drop commits against the list as it is now, not as
   // it was when the drag started.
   const itemsRef = useRef(items)
-  itemsRef.current = items
+  useEffect(() => {
+    itemsRef.current = items
+  })
 
   const reset = useCallback(() => {
     fromIndexRef.current = null

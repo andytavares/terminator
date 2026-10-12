@@ -85,9 +85,11 @@ export function Dialog({
   // Read through a ref so the listeners below never need re-binding when the
   // caller passes a fresh closure on every render.
   const dismissRef = useRef(onDismiss)
-  dismissRef.current = onDismiss
   const dismissibleRef = useRef(dismissible)
-  dismissibleRef.current = dismissible
+  useEffect(() => {
+    dismissRef.current = onDismiss
+    dismissibleRef.current = dismissible
+  })
 
   useEffect(() => {
     const registry = createModalDepthRegistry(window as unknown as Record<string, unknown>)

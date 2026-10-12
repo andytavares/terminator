@@ -127,14 +127,14 @@ export function TabBar({
     setDragOverIndex(index)
   }
 
-  React.useEffect(() => {
-    if (!editNoteSessionId) return
-    const target = allSessions.find((s) => s.id === editNoteSessionId)
-    if (target === undefined) return
-    setNotingId(editNoteSessionId)
-    setNoteValue(factsById.get(editNoteSessionId)?.description ?? '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editNoteSessionId])
+  const [seenEditNoteSessionId, setSeenEditNoteSessionId] = useState<typeof editNoteSessionId>()
+  if (editNoteSessionId !== seenEditNoteSessionId) {
+    setSeenEditNoteSessionId(editNoteSessionId)
+    if (editNoteSessionId && allSessions.some((s) => s.id === editNoteSessionId)) {
+      setNotingId(editNoteSessionId)
+      setNoteValue(factsById.get(editNoteSessionId)?.description ?? '')
+    }
+  }
 
   function removeSessionLink(sessionId: string): void {
     const facts = factsById.get(sessionId)

@@ -23,7 +23,8 @@ interface TerminalButtonProps {
   t: TerminalSession
   label?: string
   showContextMenu?: boolean
-  longPressFired: React.MutableRefObject<boolean>
+  /** Returns true, and clears the flag, when a long press just opened the menu. */
+  consumeLongPress: () => boolean
   onSelectTerminal: (t: { sessionId: string; cwd: string }) => void
   onContextMenu?: (e: React.MouseEvent) => void
   onTouchStart?: (e: React.TouchEvent) => void
@@ -34,7 +35,7 @@ interface TerminalButtonProps {
 function TerminalButton({
   t,
   label,
-  longPressFired,
+  consumeLongPress,
   onSelectTerminal,
   onContextMenu,
   onTouchStart,
@@ -46,10 +47,7 @@ function TerminalButton({
       className="mobile-list__terminal"
       type="button"
       onClick={() => {
-        if (longPressFired.current) {
-          longPressFired.current = false
-          return
-        }
+        if (consumeLongPress()) return
         onSelectTerminal({ sessionId: t.sessionId, cwd: t.cwd })
       }}
       onKeyDown={(e) => {
@@ -75,6 +73,12 @@ export function MobileTerminalList({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
+
+  const consumeLongPress = () => {
+    const fired = longPressFired.current
+    longPressFired.current = false
+    return fired
+  }
 
   const openContextMenu = (sessionId: string, x: number, y: number) => {
     setContextMenu({ sessionId, x, y })
@@ -130,7 +134,7 @@ export function MobileTerminalList({
               <TerminalButton
                 key={t.sessionId}
                 t={t}
-                longPressFired={longPressFired}
+                consumeLongPress={consumeLongPress}
                 onSelectTerminal={onSelectTerminal}
               />
             ))}
@@ -152,7 +156,7 @@ export function MobileTerminalList({
             t={t}
             label={`Scratch ${i + 1} · ${basename(t.cwd)}`}
             showContextMenu
-            longPressFired={longPressFired}
+            consumeLongPress={consumeLongPress}
             onSelectTerminal={onSelectTerminal}
             onContextMenu={(e) => handleContextMenu(e, t.sessionId)}
             onTouchStart={(e) => handleTouchStart(e, t.sessionId)}
