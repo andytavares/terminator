@@ -182,6 +182,42 @@ describe('extension IPC handlers', () => {
     })
   })
 
+  describe('extension:update-panel-bounds', () => {
+    it("places the extension's view where the renderer's placeholder is", async () => {
+      const updatePanelBounds = vi.fn().mockResolvedValue(undefined)
+      vi.clearAllMocks()
+      registerExtensionHandlers(
+        mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
+        undefined,
+        () => ({ updatePanelBounds }) as never
+      )
+      const ext = { id: 'com.test', name: 'Test' }
+      mockExtensionHost.listExtensions.mockReturnValue([ext])
+      const bounds = { x: 10, y: 20, width: 300, height: 400 }
+      await captureHandle('extension:update-panel-bounds')(
+        {},
+        { extensionId: 'com.test', viewParam: 'main', bounds, visible: true, repoRoot: '/repo' }
+      )
+      const [findExtension, ...rest] = updatePanelBounds.mock.calls[0]
+      expect(rest).toEqual(['com.test', 'main', bounds, true, '/repo'])
+      expect(findExtension()).toBe(ext)
+    })
+
+    it('does nothing before the view host exists', async () => {
+      const handler = captureHandle('extension:update-panel-bounds')
+      const result = await handler(
+        {},
+        {
+          extensionId: 'com.test',
+          viewParam: 'main',
+          bounds: { x: 0, y: 0, width: 1, height: 1 },
+          visible: false,
+        }
+      )
+      expect(result).toBeUndefined()
+    })
+  })
+
   describe('extension:get-settings-schemas', () => {
     it('returns empty schemas when none registered', async () => {
       const handler = captureHandle('extension:get-settings-schemas')
