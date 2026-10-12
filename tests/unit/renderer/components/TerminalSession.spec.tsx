@@ -250,6 +250,34 @@ describe('TerminalInstance', () => {
     expect(instance.paste).not.toHaveBeenCalled()
   })
 
+  // Returning false tells xterm not to handle the key, so it is neither sent
+  // to the shell nor stopped from reaching the app's own shortcut listener.
+  function leaderReachesTheApp(key: Partial<KeyboardEvent>): boolean {
+    new TerminalInstance('ses-1', 1000)
+    const instance = vi.mocked(Terminal).mock.results[0].value
+    const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
+    const pressed = { metaKey: false, ctrlKey: false, shiftKey: false, altKey: false }
+    return handler({ ...pressed, type: 'keydown', key: 'p', ...key }) === false
+  }
+
+  it('leaves Ctrl+P to the app on Linux, where it opens Quick actions', () => {
+    mockPlatform = 'Linux x86_64'
+    expect(leaderReachesTheApp({ ctrlKey: true })).toBe(true)
+  })
+
+  it('leaves ⌘P to the app on macOS', () => {
+    expect(leaderReachesTheApp({ metaKey: true })).toBe(true)
+  })
+
+  it('sends Ctrl+P to the shell on macOS, where the leader is ⌘P', () => {
+    expect(leaderReachesTheApp({ ctrlKey: true })).toBe(false)
+  })
+
+  it('sends Ctrl+Shift+P to the shell on Linux', () => {
+    mockPlatform = 'Linux x86_64'
+    expect(leaderReachesTheApp({ ctrlKey: true, shiftKey: true, key: 'P' })).toBe(false)
+  })
+
   it('subscribes to its own session output on construction', () => {
     new TerminalInstance('ses-1', 1000)
     expect(mockSubscribe).toHaveBeenCalledTimes(1)
