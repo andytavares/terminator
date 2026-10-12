@@ -18,7 +18,6 @@ export function issuesPortFor(api: ExtensionAPI): IssuesPort {
 }
 
 export function writeBackDepsFor(
-  api: ExtensionAPI,
   root: string,
   order: WorkOrder,
   issues: IssuesPort

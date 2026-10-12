@@ -42,11 +42,7 @@ async function ledger(): Promise<Array<{ action: string; actor: string }>> {
 describe('an agreed order from a tracker issue', () => {
   it('comments the agreed order on the issue and records it as the write-back rule', async () => {
     const order = trackedOrder()
-    await writeBack(
-      order,
-      'agreed',
-      writeBackDepsFor(host.api, root, order, issuesPortFor(host.api))
-    )
+    await writeBack(order, 'agreed', writeBackDepsFor(root, order, issuesPortFor(host.api)))
     expect(host.issues.comment).toHaveBeenCalledWith(
       'linear',
       'ENG-1',
@@ -59,7 +55,7 @@ describe('an agreed order from a tracker issue', () => {
     const mapped = trackedOrder({
       stateMapping: { started: 'state-42', in_review: null, done: null },
     })
-    const deps = writeBackDepsFor(host.api, root, mapped, issuesPortFor(host.api))
+    const deps = writeBackDepsFor(root, mapped, issuesPortFor(host.api))
     await writeBack(mapped, 'started', deps)
     await writeBack(mapped, 'draft_opened', deps)
     expect(vi.mocked(host.issues.transition).mock.calls).toEqual([
@@ -75,7 +71,7 @@ describe('an agreed order from a tracker issue', () => {
     const order = trackedOrder()
     const report = await checkCapability(
       order,
-      writeBackDepsFor(host.api, root, order, issuesPortFor(host.api))
+      writeBackDepsFor(root, order, issuesPortFor(host.api))
     )
     expect(host.issues.states).toHaveBeenCalledWith('linear', 'ENG-1')
     expect(report).toMatchObject({ transitions: 'supported', unreachable: ['in_review', 'done'] })

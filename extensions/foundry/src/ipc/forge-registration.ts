@@ -82,10 +82,9 @@ function createForge(
     converge: (order, message) => loop.convergeMaybeScouted(order, message),
     // FR-059a: asked when the order is agreed, so an issue that will never
     // move is known before the run rather than after it.
-    capability: (order) =>
-      checkCapability(order, writeBackDepsFor(api, dataRoot(), order, issuesPort)),
+    capability: (order) => checkCapability(order, writeBackDepsFor(dataRoot(), order, issuesPort)),
     onAgreed: async (order) => {
-      await writeBack(order, 'agreed', writeBackDepsFor(api, dataRoot(), order, issuesPort))
+      await writeBack(order, 'agreed', writeBackDepsFor(dataRoot(), order, issuesPort))
     },
     readIssue: (tracker, key) => readIssue(api, tracker, key),
     queueEntries: () => computeQueueEntries(dataRoot(), orderStoreAt(dataRoot())),

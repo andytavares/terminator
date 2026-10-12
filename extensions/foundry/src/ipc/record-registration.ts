@@ -38,25 +38,28 @@ function registerLedger({ api, dataRoot }: ActivationContext): void {
     // Read by rung rather than by applicability: a check the operator accepted
     // is theirs to remove whether or not it applies to the repository they
     // happen to have open.
-    acceptedRules: () => {
-      const sources = resolveSources(api, dataRoot())
-      return availableNames('rules', sources).flatMap((name) => {
-        const resolved = resolveRule(name, sources)
-        if (!resolved.ok || resolved.resolved.rung !== 'data-root') return []
-        return [
-          {
-            id: resolved.resolved.value.id,
-            asserts: resolved.resolved.value.asserts,
-            rung: resolved.resolved.rung,
-            origin: resolved.resolved.value.origin,
-          },
-        ]
-      })
-    },
+    acceptedRules: () => acceptedRulesIn(resolveSources(api, dataRoot())),
     sources: () => resolveSources(api, dataRoot()),
     now: () => new Date().toISOString(),
   })
   reg(api, ...ledgerChannelSpecs(ledger))
+}
+
+function acceptedRulesIn(
+  sources: ReturnType<typeof resolveSources>
+): ReturnType<Parameters<typeof createLedgerChannels>[0]['acceptedRules']> {
+  return availableNames('rules', sources).flatMap((name) => {
+    const resolved = resolveRule(name, sources)
+    if (!resolved.ok || resolved.resolved.rung !== 'data-root') return []
+    return [
+      {
+        id: resolved.resolved.value.id,
+        asserts: resolved.resolved.value.asserts,
+        rung: resolved.resolved.rung,
+        origin: resolved.resolved.value.origin,
+      },
+    ]
+  })
 }
 
 function registerSensors({ api, dataRoot }: ActivationContext, signalStore: SignalStore): void {
