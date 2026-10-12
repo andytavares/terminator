@@ -15,6 +15,7 @@ import { GitFullView } from '../../extensions/git-integration/src/components/Git
 import { MergeFlowView } from '../../extensions/git-integration/src/components/merge-flow/MergeFlowView'
 import { usePrReviewStore } from '../../extensions/git-integration/src/stores/pr-review.store'
 import { useGitStore } from '../../extensions/git-integration/src/stores/git.store'
+import { electronApiOf } from '../support/electron-api'
 
 const DAY = 86400000
 const ago = (days: number): string => new Date(Date.now() - days * DAY).toISOString()
@@ -276,13 +277,20 @@ const channels: Record<string, unknown> = {
   },
 }
 
-;(window as unknown as { electronAPI: unknown }).electronAPI = {
+declare global {
+  interface Window {
+    /** Which surface this page renders; the spec sets it before loading the bundle. */
+    __SURFACE__?: string
+  }
+}
+
+window.electronAPI = electronApiOf({
   extensionBridge: {
     invoke: (channel: string) => Promise.resolve(channels[channel] ?? null),
     on: () => () => {},
   },
   fs: { onChanged: () => () => {} },
-}
+})
 
 function PrRail(): JSX.Element {
   usePrReviewStore.setState({
@@ -377,6 +385,7 @@ const surfaces: Record<string, () => JSX.Element> = {
       onMarkViewed={() => {}}
       onFinishChapter={() => {}}
       onOpenSubmit={() => {}}
+      onOpenShortcuts={() => {}}
     />
   ),
   'review-queue': PausedQueue,
@@ -401,7 +410,7 @@ const surfaces: Record<string, () => JSX.Element> = {
   ),
 }
 
-const name = (window as unknown as { __SURFACE__: string }).__SURFACE__
+const name = window.__SURFACE__ ?? ''
 const Surface = surfaces[name]
 const el = document.getElementById('app')
 if (!Surface || !el) throw new Error(`No surface ${name}`)

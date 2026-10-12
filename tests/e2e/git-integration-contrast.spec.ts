@@ -173,7 +173,7 @@ for (const theme of ['dark', 'light'] as const) {
         )
         await page.evaluate(
           (n) => {
-            ;(window as unknown as { __SURFACE__: string }).__SURFACE__ = n
+            window.__SURFACE__ = n
           },
           surface.name.replace('-mine', '')
         )

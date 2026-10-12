@@ -200,12 +200,7 @@ function graphOnDisk(): { nodes: { id: string; state: string; attempts: number }
 
 async function foundry(channel: string, payload: unknown = {}): Promise<unknown> {
   return handle.page.evaluate(
-    ([ch, body]) =>
-      (
-        window as unknown as {
-          electronAPI: { extensionBridge: { invoke(c: string, p: unknown): Promise<unknown> } }
-        }
-      ).electronAPI.extensionBridge.invoke(ch as string, body),
+    ([ch, body]) => window.electronAPI.extensionBridge.invoke(ch as string, body),
     [channel, payload] as [string, unknown]
   )
 }

@@ -38,15 +38,7 @@ test.beforeAll(async () => {
     .poll(
       async () =>
         (await handle.page
-          .evaluate(() =>
-            (
-              window as unknown as {
-                electronAPI: {
-                  extensionBridge: { invoke(c: string, p: unknown): Promise<unknown> }
-                }
-              }
-            ).electronAPI.extensionBridge.invoke('foundry:order.list', {})
-          )
+          .evaluate(() => window.electronAPI.extensionBridge.invoke('foundry:order.list', {}))
           .catch(() => null)) !== null,
       { timeout: 30_000 }
     )

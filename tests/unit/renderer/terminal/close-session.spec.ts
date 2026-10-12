@@ -8,10 +8,8 @@ const closeSession = vi.fn().mockResolvedValue(undefined)
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.spyOn(useSessionStore, 'getState').mockReturnValue({
-    closeSplitLeaf,
-    closeSession,
-  } as unknown as ReturnType<typeof useSessionStore.getState>)
+  // The real store, with the two actions that reach the main process replaced.
+  useSessionStore.setState({ ...useSessionStore.getInitialState(), closeSplitLeaf, closeSession })
 })
 
 describe('closeSessionFromFacts', () => {

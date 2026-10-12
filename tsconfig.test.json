@@ -1,5 +1,7 @@
 {
-  // Type-checks the core's specs (`npm run typecheck`). The specs import from
+  // Type-checks the core's specs, unit, integration and end-to-end
+  // (`npm run typecheck`). Playwright runs the e2e specs without checking their
+  // types, so this is the only place they are checked. The specs import from
   // main, renderer and shared alike, so this starts from the renderer config
   // (DOM, JSX, `@shared/*`) and adds Node and Vitest's globals. Extensions and
   // packages type-check their own sources.
@@ -16,6 +18,7 @@
   "include": [
     "tests/unit/**/*",
     "tests/integration/**/*",
+    "tests/e2e/**/*",
     "tests/support/**/*",
     "tests/setup.ts",
     "src/renderer/electron-api.d.ts"

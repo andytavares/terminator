@@ -56,9 +56,13 @@ const CLAUDE_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures'
 const CLAUDE_STUB_ZDOTDIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'zdotdir')
 
 /** The environment every e2e-launched Electron process gets. */
-export function e2eEnv(): NodeJS.ProcessEnv {
+export function e2eEnv(): Record<string, string> {
+  // Electron's launch takes defined strings only; an unset variable is left out.
+  const inherited = Object.entries(process.env).filter(
+    (entry): entry is [string, string] => entry[1] !== undefined
+  )
   return {
-    ...process.env,
+    ...Object.fromEntries(inherited),
     NODE_ENV: 'test',
     PATH: `${CLAUDE_STUB_DIR}${delimiter}${process.env.PATH ?? ''}`,
     // Pins terminal.defaultShell's process.env.SHELL fallback to zsh
@@ -103,7 +107,7 @@ export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<
     await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
     return { app, page, userDataDir }
   } catch (error) {
-    await closeApp({ app, page: undefined as unknown as Page, userDataDir })
+    await closeApp({ app, userDataDir })
     throw new Error(
       `The app did not finish starting within ${LAUNCH_DEADLINE_MS / 1000}s: ${String(error)}\n` +
         `--- the app's own output ---\n${output.join('').slice(-6000) || '(nothing)'}`,
@@ -119,7 +123,9 @@ export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<
 // and fails the whole job as a non-test error).
 const GRACEFUL_CLOSE_MS = 5000
 
-export async function closeApp(handle: AppHandle | undefined): Promise<void> {
+export async function closeApp(
+  handle: Pick<AppHandle, 'app' | 'userDataDir'> | undefined
+): Promise<void> {
   if (!handle) return
   // Capture the OS process up front: once app.close() resolves, Playwright
   // tears down its internal handle and app.process() would throw.
