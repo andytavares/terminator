@@ -3,11 +3,6 @@ import { createPortal } from 'react-dom'
 import { Button, IconButton, useDismissible } from '@terminator/extension-ui'
 import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 
-// ── Value format conventions ──────────────────────────────────────
-// mode='date'     → value = 'YYYY-MM-DD'
-// mode='time'     → value = 'HH:MM'   (24h internally)
-// mode='datetime' → value = 'YYYY-MM-DDTHH:MM'
-
 export interface DateTimePickerProps {
   mode: 'date' | 'time' | 'datetime'
   value: string
@@ -19,6 +14,62 @@ export interface DateTimePickerProps {
   /** When true, open the picker popover on mount without requiring a button click. */
   defaultOpen?: boolean
 }
+
+type AmPm = 'AM' | 'PM'
+
+type Shortcut = { label: string; getValue: () => string }
+
+interface CalendarCell {
+  date: Date
+  currentMonth: boolean
+}
+
+type Mode = DateTimePickerProps['mode']
+
+type Picker = ReturnType<typeof usePicker>
+
+interface PaneProps {
+  picker: Picker
+  props: DateTimePickerProps
+}
+
+interface DayProps {
+  cell: CalendarCell
+  datePart: string
+  min?: string
+  onSelect: (dateStr: string) => void
+}
+
+interface ChoiceContext {
+  props: DateTimePickerProps
+  parts: { datePart: string; timePart: string }
+  setOpen: (open: boolean) => void
+  setAmPm: (half: AmPm) => void
+}
+
+interface TimeProps {
+  picker: Picker
+  timeListRef: React.RefObject<HTMLDivElement>
+}
+
+interface PopoverProps extends PaneProps {
+  popoverRef: React.RefObject<HTMLDivElement>
+  timeListRef: React.RefObject<HTMLDivElement>
+  pos: { top: number; left: number }
+  onDone: () => void
+}
+
+interface TriggerProps {
+  props: DateTimePickerProps
+  open: boolean
+  triggerRef: React.RefObject<HTMLButtonElement>
+  onToggle: () => void
+}
+
+// ── Value format conventions ──────────────────────────────────────
+// mode='date'     → value = 'YYYY-MM-DD'
+// mode='time'     → value = 'HH:MM'   (24h internally)
+// mode='datetime' → value = 'YYYY-MM-DDTHH:MM'
 
 // ── Helpers ───────────────────────────────────────────────────────
 
@@ -92,8 +143,6 @@ for (let h = 0; h < 24; h++) {
   }
 }
 
-type AmPm = 'AM' | 'PM'
-
 function defaultAmPm(timePart: string): AmPm {
   if (timePart) {
     const h = parseInt(timePart.split(':')[0] ?? '0', 10)
@@ -101,8 +150,6 @@ function defaultAmPm(timePart: string): AmPm {
   }
   return new Date().getHours() >= 12 ? 'PM' : 'AM'
 }
-
-type Shortcut = { label: string; getValue: () => string }
 
 const DATE_SHORTCUTS: Shortcut[] = [
   { label: 'Today', getValue: () => toLocalDateStr(new Date()) },
@@ -160,11 +207,6 @@ const TIME_SHORTCUTS: Shortcut[] = [
   { label: 'End of day', getValue: () => '17:00' },
 ]
 
-interface CalendarCell {
-  date: Date
-  currentMonth: boolean
-}
-
 function buildCalendarGrid(year: number, month: number): CalendarCell[] {
   const firstDow = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -191,23 +233,67 @@ function buildCalendarGrid(year: number, month: number): CalendarCell[] {
   return cells
 }
 
-// ── Component ─────────────────────────────────────────────────────
+function halfOf(time: string): AmPm {
+  const h = parseInt(time.split(':')[0] ?? '0', 10)
+  return h >= 12 ? 'PM' : 'AM'
+}
 
-export function DateTimePicker({
-  mode,
-  value,
-  onChange,
-  placeholder,
-  min,
-  className,
-  defaultOpen,
-}: DateTimePickerProps): React.JSX.Element {
+/** A picked time moved into the other half of the day, keeping its minutes. */
+function mirrorHalf(timePart: string, half: AmPm): string {
+  const [h, m] = timePart.split(':').map(Number)
+  let newH = h
+  if (half === 'PM' && h < 12) newH = h + 12
+  else if (half === 'AM' && h >= 12) newH = h - 12
+  return `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+/** A datetime value from its parts; a missing date means today. */
+function joinDateTime(datePart: string, time: string): string {
+  return `${datePart || toLocalDateStr(new Date())}T${time}`
+}
+
+/** The date and time parts a value holds in each mode. */
+function splitValue(mode: Mode, value: string): { datePart: string; timePart: string } {
+  const v = value ?? ''
+  if (mode === 'date') return { datePart: v, timePart: '' }
+  if (mode === 'time') return { datePart: '', timePart: v }
+  const [datePart, timePart] = v.split('T')
+  return { datePart, timePart: timePart ?? '' }
+}
+
+function triggerLabel(props: DateTimePickerProps): string {
+  const { mode, value } = props
+  if (!value) return props.placeholder ?? EMPTY_LABELS[mode]
+  if (mode === 'date') return formatDateDisplay(value)
+  if (mode === 'time') return formatTimeDisplay(value)
+  const [d, t] = value.split('T')
+  return `${formatDateDisplay(d)}  ${t ? formatTimeDisplay(t) : ''}`
+}
+
+const EMPTY_LABELS: Record<Mode, string> = {
+  date: 'Pick a date',
+  time: 'Pick a time',
+  datetime: 'Pick date & time',
+}
+
+/** Below the trigger when the popover fits there, else above it. */
+function popoverPosition(rect: DOMRect): { top: number; left: number } {
+  const estimatedHeight = 360
+  const spaceBelow = window.innerHeight - rect.bottom - 8
+  const top = spaceBelow >= estimatedHeight ? rect.bottom + 4 : rect.top - estimatedHeight - 4
+  return { top, left: rect.left }
+}
+
+/**
+ * Whether the popover is open, and where. Escape and click-outside come from the
+ * shared hook; the trigger counts as inside so clicking it to close does not
+ * dismiss and immediately reopen.
+ */
+function usePopover(defaultOpen: boolean | undefined) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
-  // Escape and click-outside come from the shared hook now; the trigger counts
-  // as inside so clicking it to close does not dismiss and immediately reopen.
   useDismissible({
     ref: popoverRef,
     onDismiss: () => setOpen(false),
@@ -215,64 +301,22 @@ export function DateTimePicker({
     manageFocus: false,
     enabled: open,
   })
-  const timeListRef = useRef<HTMLDivElement>(null)
-
-  // Derive date and time parts from value
-  const datePart =
-    mode === 'time' ? '' : mode === 'datetime' ? (value?.split('T')[0] ?? '') : (value ?? '')
-  const timePart =
-    mode === 'date' ? '' : mode === 'datetime' ? (value?.split('T')[1] ?? '') : (value ?? '')
-
-  // Calendar display state – initialize to value's month or today
-  const seed = datePart ? new Date(datePart + 'T00:00:00') : new Date()
-  const [displayYear, setDisplayYear] = useState(seed.getFullYear())
-  const [displayMonth, setDisplayMonth] = useState(seed.getMonth())
-
-  // AM/PM toggle state — defaults to whichever half is closest to now (or the selected time)
-  const [amPm, setAmPm] = useState<AmPm>(() => defaultAmPm(timePart))
-
-  const visibleSlots = amPm === 'AM' ? AM_SLOTS : PM_SLOTS
-
   const openPicker = useCallback(() => {
     if (!triggerRef.current) return
-    const rect = triggerRef.current.getBoundingClientRect()
-    const estimatedHeight = 360
-    const spaceBelow = window.innerHeight - rect.bottom - 8
-    const top = spaceBelow >= estimatedHeight ? rect.bottom + 4 : rect.top - estimatedHeight - 4
-    setPos({ top, left: rect.left })
+    setPos(popoverPosition(triggerRef.current.getBoundingClientRect()))
     setOpen(true)
   }, [])
-
   useEffect(() => {
     if (defaultOpen) openPicker()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  return { open, setOpen, pos, openPicker, triggerRef, popoverRef }
+}
 
-  // Auto-scroll time list to selected slot (or closest slot in current AM/PM half)
-  useEffect(() => {
-    if (!open || !timeListRef.current) return
-    const targetSlot = timePart || toLocalTimeStr(roundToNextQuarter(new Date()))
-    const halfSlots = amPm === 'AM' ? AM_SLOTS : PM_SLOTS
-    const idx = halfSlots.indexOf(targetSlot)
-    const scrollIdx = idx >= 0 ? idx : 0
-    const el = timeListRef.current.children[scrollIdx] as HTMLElement | undefined
-    el?.scrollIntoView?.({ block: 'center' })
-  }, [open, timePart, amPm])
-
-  // When AM/PM changes, sync it with the selected timePart if one is set
-  function handleAmPmToggle(half: AmPm) {
-    setAmPm(half)
-    if (!timePart) return
-    const [h, m] = timePart.split(':').map(Number)
-    // Mirror hour to the new half
-    let newH = h
-    if (half === 'PM' && h < 12) newH = h + 12
-    else if (half === 'AM' && h >= 12) newH = h - 12
-    const newSlot = `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-    if (mode === 'time') onChange(newSlot)
-    else if (mode === 'datetime') onChange(`${datePart || toLocalDateStr(new Date())}T${newSlot}`)
-  }
-
-  // When datePart changes externally (e.g. shortcut), re-anchor the calendar
+/** The month the calendar shows: the value's month, or today's, re-anchored when the value changes. */
+function useDisplayMonth(datePart: string) {
+  const seed = datePart ? new Date(datePart + 'T00:00:00') : new Date()
+  const [displayYear, setDisplayYear] = useState(seed.getFullYear())
+  const [displayMonth, setDisplayMonth] = useState(seed.getMonth())
   const [anchoredDate, setAnchoredDate] = useState(datePart)
   if (anchoredDate !== datePart) {
     setAnchoredDate(datePart)
@@ -282,255 +326,268 @@ export function DateTimePicker({
       setDisplayMonth(d.getMonth())
     }
   }
+  const step = (delta: 1 | -1) => {
+    const next = displayMonth + delta
+    if (next < 0 || next > 11) setDisplayYear((y) => y + delta)
+    setDisplayMonth((next + 12) % 12)
+  }
+  return { displayYear, displayMonth, prev: () => step(-1), next: () => step(1) }
+}
 
-  // Sync amPm state when timePart changes externally
+/** The AM/PM half shown: the picked time's half, else the current one. */
+function useHalf(timePart: string) {
+  const [amPm, setAmPm] = useState<AmPm>(() => defaultAmPm(timePart))
   const [syncedTime, setSyncedTime] = useState(timePart)
   if (syncedTime !== timePart) {
     setSyncedTime(timePart)
-    if (timePart) {
-      const h = parseInt(timePart.split(':')[0] ?? '0', 10)
-      setAmPm(h >= 12 ? 'PM' : 'AM')
-    }
+    if (timePart) setAmPm(halfOf(timePart))
   }
+  return { amPm, setAmPm }
+}
 
-  function selectDate(dateStr: string) {
-    if (mode === 'date') {
-      onChange(dateStr)
-      setOpen(false)
-    } else {
-      onChange(`${dateStr}T${timePart || '12:00'}`)
-    }
+/** Scrolls the time list to the selected slot, or the one nearest now, in the shown half. */
+function useScrollToSlot(open: boolean, timePart: string, amPm: AmPm) {
+  const timeListRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open || !timeListRef.current) return
+    const targetSlot = timePart || toLocalTimeStr(roundToNextQuarter(new Date()))
+    const halfSlots = amPm === 'AM' ? AM_SLOTS : PM_SLOTS
+    const idx = Math.max(halfSlots.indexOf(targetSlot), 0)
+    const el = timeListRef.current.children[idx] as HTMLElement | undefined
+    el?.scrollIntoView?.({ block: 'center' })
+  }, [open, timePart, amPm])
+  return timeListRef
+}
+
+/** What picking a date, a time, a half of the day, or Clear does in each mode. */
+function choices({ props, parts, setOpen, setAmPm }: ChoiceContext) {
+  const { mode, onChange } = props
+  const { datePart, timePart } = parts
+  const commit = (value: string, close: boolean) => {
+    onChange(value)
+    if (close) setOpen(false)
   }
-
-  function selectTime(timeStr: string) {
-    if (mode === 'time') {
-      onChange(timeStr)
-      setOpen(false)
-    } else {
-      onChange(`${datePart || toLocalDateStr(new Date())}T${timeStr}`)
-    }
+  const selectDate = (dateStr: string) =>
+    mode === 'date' ? commit(dateStr, true) : commit(`${dateStr}T${timePart || '12:00'}`, false)
+  const selectTime = (time: string) =>
+    mode === 'time' ? commit(time, true) : commit(joinDateTime(datePart, time), false)
+  const toggleHalf = (half: AmPm) => {
+    setAmPm(half)
+    if (!timePart) return
+    const slot = mirrorHalf(timePart, half)
+    if (mode === 'time') onChange(slot)
+    else if (mode === 'datetime') onChange(joinDateTime(datePart, slot))
   }
-
-  function handleDateShortcut(shortcut: Shortcut) {
-    const v = shortcut.getValue()
-    if (mode === 'date') {
-      onChange(v)
-      setOpen(false)
-    } else {
-      onChange(`${v}T${timePart || '12:00'}`)
-    }
+  const timeShortcut = (time: string) => {
+    setAmPm(halfOf(time))
+    selectTime(time)
   }
+  return { selectDate, selectTime, timeShortcut, toggleHalf, clear: () => commit('', true) }
+}
 
-  function handleTimeShortcut(shortcut: Shortcut) {
-    const v = shortcut.getValue()
-    // Sync AM/PM toggle with the shortcut value
-    const h = parseInt(v.split(':')[0] ?? '0', 10)
-    setAmPm(h >= 12 ? 'PM' : 'AM')
-    if (mode === 'time') {
-      onChange(v)
-      setOpen(false)
-    } else {
-      onChange(`${datePart || toLocalDateStr(new Date())}T${v}`)
-    }
-  }
+/** Everything the popover shows and does. */
+function usePicker(props: DateTimePickerProps) {
+  const parts = splitValue(props.mode, props.value)
+  const popover = usePopover(props.defaultOpen)
+  const month = useDisplayMonth(parts.datePart)
+  const { amPm, setAmPm } = useHalf(parts.timePart)
+  const timeListRef = useScrollToSlot(popover.open, parts.timePart, amPm)
+  const actions = choices({ props, parts, setOpen: popover.setOpen, setAmPm })
+  return { ...parts, popover, month, amPm, timeListRef, ...actions }
+}
 
-  function prevMonth() {
-    if (displayMonth === 0) {
-      setDisplayYear((y) => y - 1)
-      setDisplayMonth(11)
-    } else {
-      setDisplayMonth((m) => m - 1)
-    }
-  }
+function ShortcutChips({ picker, props }: PaneProps): React.JSX.Element {
+  const showCalendar = props.mode !== 'time'
+  const chips = showCalendar ? DATE_SHORTCUTS : TIME_SHORTCUTS
+  const current = showCalendar ? picker.datePart : picker.timePart
+  const pick = showCalendar ? picker.selectDate : picker.timeShortcut
+  return (
+    <div className="dtp__shortcuts">
+      {chips.map((s) => (
+        <button
+          key={s.label}
+          type="button"
+          className={`dtp__chip${current === s.getValue() ? ' dtp__chip--active' : ''}`}
+          onClick={() => pick(s.getValue())}
+        >
+          {s.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
-  function nextMonth() {
-    if (displayMonth === 11) {
-      setDisplayYear((y) => y + 1)
-      setDisplayMonth(0)
-    } else {
-      setDisplayMonth((m) => m + 1)
-    }
-  }
+function CalendarDay({ cell, datePart, min, onSelect }: DayProps): React.JSX.Element {
+  const cellStr = toLocalDateStr(cell.date)
+  const isSelected = cellStr === datePart
+  const isDisabled = min ? cellStr < min : false
+  const className = [
+    'dtp__cal-day',
+    !cell.currentMonth && 'dtp__cal-day--other',
+    cellStr === toLocalDateStr(new Date()) && !isSelected && 'dtp__cal-day--today',
+    isSelected && 'dtp__cal-day--selected',
+    isDisabled && 'dtp__cal-day--disabled',
+  ]
+    .filter(Boolean)
+    .join(' ')
+  return (
+    <button
+      type="button"
+      disabled={isDisabled}
+      className={className}
+      onClick={() => onSelect(cellStr)}
+    >
+      {cell.date.getDate()}
+    </button>
+  )
+}
 
-  function getTriggerLabel(): string {
-    if (mode === 'date') return value ? formatDateDisplay(value) : (placeholder ?? 'Pick a date')
-    if (mode === 'time') return value ? formatTimeDisplay(value) : (placeholder ?? 'Pick a time')
-    if (!value) return placeholder ?? 'Pick date & time'
-    const [d, t] = value.split('T')
-    return `${formatDateDisplay(d)}  ${t ? formatTimeDisplay(t) : ''}`
-  }
+function CalendarPane({ picker, props }: PaneProps): React.JSX.Element {
+  const { displayYear, displayMonth, prev, next } = picker.month
+  return (
+    <div className="dtp__calendar">
+      <div className="dtp__cal-header">
+        <IconButton icon={ChevronLeft} label="Previous month" size="sm" onClick={prev} />
+        <span className="dtp__cal-month-label">
+          {MONTH_NAMES[displayMonth]} {displayYear}
+        </span>
+        <IconButton icon={ChevronRight} label="Next month" size="sm" onClick={next} />
+      </div>
+      <div className="dtp__cal-grid">
+        {DAY_HEADERS.map((d) => (
+          <div key={d} className="dtp__cal-dow">
+            {d}
+          </div>
+        ))}
+        {buildCalendarGrid(displayYear, displayMonth).map((cell, i) => (
+          <CalendarDay
+            key={i}
+            cell={cell}
+            datePart={picker.datePart}
+            min={props.min}
+            onSelect={picker.selectDate}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
 
-  const cells = buildCalendarGrid(displayYear, displayMonth)
-  const todayStr = toLocalDateStr(new Date())
-  const showCalendar = mode === 'date' || mode === 'datetime'
-  const showTime = mode === 'time' || mode === 'datetime'
+function HalfButton({ picker, half }: { picker: Picker; half: AmPm }): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      className={`dtp__ampm-btn${picker.amPm === half ? ' dtp__ampm-btn--active' : ''}`}
+      onClick={() => picker.toggleHalf(half)}
+    >
+      {half}
+    </button>
+  )
+}
 
+function TimePane({ picker, timeListRef }: TimeProps): React.JSX.Element {
+  const visibleSlots = picker.amPm === 'AM' ? AM_SLOTS : PM_SLOTS
+  return (
+    <div className="dtp__time">
+      <div className="dtp__ampm-toggle">
+        <HalfButton picker={picker} half="AM" />
+        <HalfButton picker={picker} half="PM" />
+      </div>
+      <div ref={timeListRef} className="dtp__time-list">
+        {visibleSlots.map((slot) => (
+          <button
+            key={slot}
+            type="button"
+            className={`dtp__time-slot${slot === picker.timePart ? ' dtp__time-slot--selected' : ''}`}
+            onClick={() => picker.selectTime(slot)}
+          >
+            {formatSlotLabel(slot)}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function popoverClass(mode: Mode): string {
+  if (mode === 'datetime') return 'dtp__popover dtp__popover--wide'
+  if (mode === 'time') return 'dtp__popover dtp__popover--time-only'
+  return 'dtp__popover'
+}
+
+function Popover(p: PopoverProps): React.JSX.Element {
+  const { picker, props, popoverRef, timeListRef } = p
+  return (
+    <div
+      ref={popoverRef}
+      data-tmui-surface=""
+      className={popoverClass(props.mode)}
+      style={{ top: p.pos.top, left: p.pos.left }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <ShortcutChips picker={picker} props={props} />
+      <div className="dtp__body">
+        {props.mode !== 'time' && <CalendarPane picker={picker} props={props} />}
+        {props.mode !== 'date' && <TimePane picker={picker} timeListRef={timeListRef} />}
+      </div>
+      <div className="dtp__footer">
+        <Button variant="ghost" size="sm" onClick={picker.clear}>
+          Clear
+        </Button>
+        <Button variant="primary" size="sm" onClick={p.onDone}>
+          Done
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function triggerClass(value: string, open: boolean): string {
+  let cls = 'dtp__trigger'
+  if (value) cls += ' dtp__trigger--has-value'
+  if (open) cls += ' dtp__trigger--open'
+  return cls
+}
+
+function TriggerButton({ props, open, triggerRef, onToggle }: TriggerProps): React.JSX.Element {
+  const Icon = props.mode === 'time' ? Clock : Calendar
+  return (
+    <button
+      ref={triggerRef}
+      type="button"
+      className={triggerClass(props.value, open)}
+      onClick={onToggle}
+    >
+      <Icon className="tm-icon" />
+      <span className="dtp__trigger-label">{triggerLabel(props)}</span>
+    </button>
+  )
+}
+
+export function DateTimePicker(props: DateTimePickerProps): React.JSX.Element {
+  const { className } = props
+  const picker = usePicker(props)
+  const { open, pos, setOpen, openPicker, triggerRef, popoverRef } = picker.popover
+  const { timeListRef } = picker
   return (
     <div className={`dtp${className ? ` ${className}` : ''}`}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={`dtp__trigger${value ? ' dtp__trigger--has-value' : ''}${open ? ' dtp__trigger--open' : ''}`}
-        onClick={() => (open ? setOpen(false) : openPicker())}
-      >
-        {mode === 'time' ? <Clock className="tm-icon" /> : <Calendar className="tm-icon" />}
-        <span className="dtp__trigger-label">{getTriggerLabel()}</span>
-      </button>
-
+      <TriggerButton
+        props={props}
+        open={open}
+        triggerRef={triggerRef}
+        onToggle={() => (open ? setOpen(false) : openPicker())}
+      />
       {open &&
         pos &&
         createPortal(
-          <div
-            ref={popoverRef}
-            data-tmui-surface=""
-            className={[
-              'dtp__popover',
-              mode === 'datetime' && 'dtp__popover--wide',
-              mode === 'time' && 'dtp__popover--time-only',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            style={{ top: pos.top, left: pos.left }}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            {/* Shortcut chips */}
-            <div className="dtp__shortcuts">
-              {showCalendar &&
-                DATE_SHORTCUTS.map((s) => (
-                  <button
-                    key={s.label}
-                    type="button"
-                    className={`dtp__chip${datePart === s.getValue() ? ' dtp__chip--active' : ''}`}
-                    onClick={() => handleDateShortcut(s)}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              {showTime &&
-                !showCalendar &&
-                TIME_SHORTCUTS.map((s) => (
-                  <button
-                    key={s.label}
-                    type="button"
-                    className={`dtp__chip${timePart === s.getValue() ? ' dtp__chip--active' : ''}`}
-                    onClick={() => handleTimeShortcut(s)}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-            </div>
-
-            <div className="dtp__body">
-              {/* Calendar */}
-              {showCalendar && (
-                <div className="dtp__calendar">
-                  <div className="dtp__cal-header">
-                    <IconButton
-                      icon={ChevronLeft}
-                      label="Previous month"
-                      size="sm"
-                      onClick={prevMonth}
-                    />
-                    <span className="dtp__cal-month-label">
-                      {MONTH_NAMES[displayMonth]} {displayYear}
-                    </span>
-                    <IconButton
-                      icon={ChevronRight}
-                      label="Next month"
-                      size="sm"
-                      onClick={nextMonth}
-                    />
-                  </div>
-
-                  <div className="dtp__cal-grid">
-                    {DAY_HEADERS.map((d) => (
-                      <div key={d} className="dtp__cal-dow">
-                        {d}
-                      </div>
-                    ))}
-                    {cells.map((cell, i) => {
-                      const cellStr = toLocalDateStr(cell.date)
-                      const isToday = cellStr === todayStr
-                      const isSelected = cellStr === datePart
-                      const isDisabled = min ? cellStr < min : false
-                      return (
-                        <button
-                          key={i}
-                          type="button"
-                          disabled={isDisabled}
-                          className={[
-                            'dtp__cal-day',
-                            !cell.currentMonth && 'dtp__cal-day--other',
-                            isToday && !isSelected && 'dtp__cal-day--today',
-                            isSelected && 'dtp__cal-day--selected',
-                            isDisabled && 'dtp__cal-day--disabled',
-                          ]
-                            .filter(Boolean)
-                            .join(' ')}
-                          onClick={() => selectDate(cellStr)}
-                        >
-                          {cell.date.getDate()}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Time panel */}
-              {showTime && (
-                <div className="dtp__time">
-                  {/* AM/PM toggle */}
-                  <div className="dtp__ampm-toggle">
-                    <button
-                      type="button"
-                      className={`dtp__ampm-btn${amPm === 'AM' ? ' dtp__ampm-btn--active' : ''}`}
-                      onClick={() => handleAmPmToggle('AM')}
-                    >
-                      AM
-                    </button>
-                    <button
-                      type="button"
-                      className={`dtp__ampm-btn${amPm === 'PM' ? ' dtp__ampm-btn--active' : ''}`}
-                      onClick={() => handleAmPmToggle('PM')}
-                    >
-                      PM
-                    </button>
-                  </div>
-
-                  <div ref={timeListRef} className="dtp__time-list">
-                    {visibleSlots.map((slot) => (
-                      <button
-                        key={slot}
-                        type="button"
-                        className={`dtp__time-slot${slot === timePart ? ' dtp__time-slot--selected' : ''}`}
-                        onClick={() => selectTime(slot)}
-                      >
-                        {formatSlotLabel(slot)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="dtp__footer">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  onChange('')
-                  setOpen(false)
-                }}
-              >
-                Clear
-              </Button>
-              <Button variant="primary" size="sm" onClick={() => setOpen(false)}>
-                Done
-              </Button>
-            </div>
-          </div>,
+          <Popover
+            picker={picker}
+            props={props}
+            popoverRef={popoverRef}
+            timeListRef={timeListRef}
+            pos={pos}
+            onDone={() => setOpen(false)}
+          />,
           document.body
         )}
     </div>
