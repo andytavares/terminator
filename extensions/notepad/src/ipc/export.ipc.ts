@@ -70,6 +70,71 @@ function buildExistingIdMap(folder: string): Map<string, string> {
   return map
 }
 
+type CommentFormat = NonNullable<z.infer<typeof exportSchema>['commentFormat']>
+
+interface ExportedComment {
+  id: string
+  body: string
+  quote: string | null
+  status: string
+  createdAt: string
+  replies: { id: string; body: string; createdAt: string }[]
+}
+
+type CommentRow = {
+  id: string
+  parent_id: string | null
+  body: string
+  quote: string | null
+  status: string
+  created_at: string
+}
+
+/** A note's comment threads, each with its replies, oldest first. */
+async function noteComments(db: ExtensionDB, noteId: string): Promise<ExportedComment[]> {
+  const rows = await db.query<CommentRow>(
+    `SELECT id, parent_id, body, quote, status, created_at FROM comments WHERE note_id=? ORDER BY created_at`,
+    [noteId]
+  )
+  const repliesTo = (parentId: string) =>
+    rows
+      .filter((r) => r.parent_id === parentId)
+      .map((r) => ({ id: r.id, body: r.body, createdAt: r.created_at }))
+  return rows
+    .filter((r) => r.parent_id === null)
+    .map((r) => ({ ...rowFields(r), replies: repliesTo(r.id) }))
+}
+
+function rowFields(r: CommentRow): Omit<ExportedComment, 'replies'> {
+  return { id: r.id, body: r.body, quote: r.quote, status: r.status, createdAt: r.created_at }
+}
+
+/** An HTML comment cannot contain "--", so a body that does is kept readable without it. */
+function htmlComment(text: string): string {
+  return `<!-- ${text.replace(/--/g, '- -')} -->`
+}
+
+/** The markdown with the comments appended as HTML comments, for the inline formats. */
+function withInlineComments(
+  markdown: string,
+  comments: ExportedComment[],
+  format: CommentFormat
+): string {
+  if (comments.length === 0 || (format !== 'inline' && format !== 'both')) return markdown
+  const lines = comments.flatMap((c) => [
+    htmlComment(`comment on "${c.quote ?? ''}": ${c.body}`),
+    ...c.replies.map((r) => htmlComment(`reply: ${r.body}`)),
+  ])
+  return `${markdown.trimEnd()}\n\n${lines.join('\n')}\n`
+}
+
+/** Writes the comments to `<note>.comments.json` beside the note, for the sidecar formats. */
+function writeSidecar(markdownPath: string, comments: ExportedComment[], format: CommentFormat) {
+  if (comments.length === 0 || (format !== 'sidecar' && format !== 'both')) return
+  const sidecarPath = markdownPath.replace(/\.md$/, '.comments.json')
+  fs.writeFileSync(sidecarPath, JSON.stringify(comments, null, 2), 'utf-8')
+}
+
 export async function exportNotes(
   db: ExtensionDB,
   args: z.infer<typeof exportSchema>
@@ -82,6 +147,7 @@ export async function exportNotes(
     includeFrontmatter = true,
     overwriteById = true,
     includeDiagrams = false,
+    commentFormat = 'none',
   } = args
   const resolvedFolder = folder.replace(/^~(?=$|\/)/, os.homedir())
 
@@ -129,7 +195,14 @@ export async function exportNotes(
       fileContent = note.body
     }
 
-    fs.writeFileSync(path.join(resolvedFolder, filename), fileContent, 'utf-8')
+    const comments = commentFormat === 'none' ? [] : await noteComments(db, note.id)
+    const markdownPath = path.join(resolvedFolder, filename)
+    fs.writeFileSync(
+      markdownPath,
+      withInlineComments(fileContent, comments, commentFormat),
+      'utf-8'
+    )
+    writeSidecar(markdownPath, comments, commentFormat)
   }
 
   let diagramsExported = 0

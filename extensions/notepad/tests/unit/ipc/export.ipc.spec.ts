@@ -275,6 +275,51 @@ describe('importNotes', () => {
   })
 })
 
+describe('exportNotes with comments', () => {
+  beforeEach(async () => {
+    const now = new Date().toISOString()
+    await db.run(
+      `INSERT INTO comments (id, note_id, parent_id, body, status, start_offset, end_offset, quote, created_at, updated_at)
+       VALUES ('c1', ?, NULL, 'Say more', 'open', 9, 13, 'This', ?, ?),
+              ('c2', ?, 'c1', 'Will do', 'open', NULL, NULL, NULL, ?, ?)`,
+      [noteId, now, now, noteId, now, now]
+    )
+  })
+
+  const markdown = () =>
+    fs.readFileSync(path.join(exportDir, `${toSlug('My Test Note', noteId)}.md`), 'utf-8')
+  const sidecar = () => path.join(exportDir, `${toSlug('My Test Note', noteId)}.comments.json`)
+
+  it("writes a note's comments to a JSON file beside it for the sidecar format", async () => {
+    await exportNotes(db, { folder: exportDir, commentFormat: 'sidecar' })
+
+    const comments = JSON.parse(fs.readFileSync(sidecar(), 'utf-8'))
+    expect(comments).toMatchObject([
+      { id: 'c1', body: 'Say more', quote: 'This', status: 'open', replies: [{ body: 'Will do' }] },
+    ])
+    expect(markdown()).not.toContain('Say more')
+  })
+
+  it('appends the comments to the markdown as HTML comments for the inline format', async () => {
+    await exportNotes(db, { folder: exportDir, commentFormat: 'inline' })
+
+    expect(markdown()).toContain('<!-- comment on "This": Say more -->')
+    expect(markdown()).toContain('<!-- reply: Will do -->')
+    expect(fs.existsSync(sidecar())).toBe(false)
+  })
+
+  it('writes both for the both format, and neither for none', async () => {
+    await exportNotes(db, { folder: exportDir, commentFormat: 'both' })
+    expect(fs.existsSync(sidecar())).toBe(true)
+    expect(markdown()).toContain('Say more')
+
+    fs.rmSync(sidecar())
+    await exportNotes(db, { folder: exportDir, commentFormat: 'none' })
+    expect(fs.existsSync(sidecar())).toBe(false)
+    expect(markdown()).not.toContain('Say more')
+  })
+})
+
 describe('exportNotes with includeDiagrams', () => {
   it('exports diagrams as .excalidraw files in a diagrams/ subfolder', async () => {
     const now = new Date().toISOString()
