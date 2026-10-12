@@ -80,4 +80,3 @@ export type AgentFinding = z.infer<typeof AgentFindingSchema>
 export type AgentScope = z.infer<typeof AgentScopeSchema>
 export type AgentRun = z.infer<typeof AgentRunSchema>
 export type AgentOutput = z.infer<typeof AgentOutputSchema>
-export type WalkthroughEntry = z.infer<typeof WalkthroughEntrySchema>

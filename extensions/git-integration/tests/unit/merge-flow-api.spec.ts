@@ -22,15 +22,6 @@ describe('mergeFlowAPI bridge', () => {
     expect(mockInvoke).toHaveBeenCalledWith('git:conflicts-list', { repoRoot: '/repo' })
   })
 
-  it('getConflictBlocks calls correct channel', async () => {
-    const { mergeFlowAPI } = await import('../../src/api/merge-flow')
-    await mergeFlowAPI.getConflictBlocks('/repo', 'src/foo.ts')
-    expect(mockInvoke).toHaveBeenCalledWith('git:conflict-blocks', {
-      repoRoot: '/repo',
-      filePath: 'src/foo.ts',
-    })
-  })
-
   it('resolveConflict calls correct channel with all args', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
     await mergeFlowAPI.resolveConflict('/repo', 'src/foo.ts#0', 'resolved', 'ours', 'prev', 'orig')
@@ -112,16 +103,6 @@ describe('mergeFlowAPI bridge', () => {
     const files = [{ filePath: 'src/foo.ts' }, { filePath: 'src/bar.ts' }]
     await mergeFlowAPI.resetSession('/repo', files)
     expect(mockInvoke).toHaveBeenCalledWith('git:session-reset', { repoRoot: '/repo', files })
-  })
-
-  it('prepareMergeForPr calls correct channel', async () => {
-    const { mergeFlowAPI } = await import('../../src/api/merge-flow')
-    await mergeFlowAPI.prepareMergeForPr('/repo', 'feature/branch', 'main')
-    expect(mockInvoke).toHaveBeenCalledWith('git:prepare-merge-for-pr', {
-      repoRoot: '/repo',
-      headRefName: 'feature/branch',
-      baseRefName: 'main',
-    })
   })
 
   it('preparePrWorktree calls correct channel', async () => {

@@ -9,12 +9,10 @@ vi.mock('../../src/components/pr-review/RichContent', () => ({
   ),
 }))
 
-const mockPrCommentAdd = vi.fn()
 const mockPrCommentReply = vi.fn()
 
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
-    prCommentAdd: (...args: unknown[]) => mockPrCommentAdd(...args),
     prCommentReply: (...args: unknown[]) => mockPrCommentReply(...args),
   },
 }))
@@ -99,7 +97,7 @@ describe('CommentComposer (new comment)', () => {
     expect(screen.getByText('Sent when you submit your review')).toBeTruthy()
   })
 
-  it('calls addDraft, not prCommentAdd, on submit', async () => {
+  it('adds the comment to the pending review on submit', async () => {
     const onSubmitted = vi.fn()
     render(<CommentComposer {...newCommentProps} onSubmitted={onSubmitted} />)
     fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), { target: { value: 'Nice!' } })
@@ -118,7 +116,6 @@ describe('CommentComposer (new comment)', () => {
         fromFindingId: null,
       })
     )
-    expect(mockPrCommentAdd).not.toHaveBeenCalled()
     expect(onSubmitted).toHaveBeenCalled()
   })
 

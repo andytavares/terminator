@@ -207,63 +207,6 @@ describe('github:pr-file-diff', () => {
 
 // ─── github:file-metrics ──────────────────────────────────────────────────────
 
-describe('github:file-metrics', () => {
-  it('returns VALIDATION_ERROR for missing path', async () => {
-    const result = (await getHandler('github:file-metrics')({ repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR for empty path', async () => {
-    const result = (await getHandler('github:file-metrics')({ repoRoot: '/repo', path: '' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns metrics when git commands succeed', async () => {
-    // churnRaw: 3 commits; blastRaw: 2 importers; testRaw: 1 test file
-    customMock()
-      .mockResolvedValueOnce({ stdout: 'abc commit1\ndef commit2\nghi commit3\n', stderr: '' })
-      .mockResolvedValueOnce({ stdout: 'src/foo.ts\nsrc/bar.ts\n', stderr: '' })
-      .mockResolvedValueOnce({ stdout: 'src/app.spec.ts\n', stderr: '' })
-
-    const result = (await getHandler('github:file-metrics')({
-      repoRoot: '/repo',
-      path: 'src/app.ts',
-    })) as Record<string, unknown>
-    expect(result.churn90d).toBe(3)
-    expect(result.blastRadius).toBe(2) // importerLines excludes the file itself (src/app.ts not in importer list)
-    expect(result.testFilePresent).toBe(true)
-    expect(result.patchCoverage).toBeNull() // no coverage file mocked
-  })
-
-  it.each([
-    ['JS/TS .spec.', 'src/app.spec.ts'],
-    ['JS/TS .test.', 'src/utils.test.js'],
-    ['Python test_', 'tests/test_foo.py'],
-    ['Python _test', 'src/foo_test.py'],
-    ['Go _test', 'pkg/foo_test.go'],
-    ['Ruby _spec', 'spec/foo_spec.rb'],
-    ['Ruby test_', 'test/test_foo.rb'],
-    ['Java Test', 'src/FooTest.java'],
-    ['Java Tests', 'src/FooTests.java'],
-    ['Kotlin Spec', 'src/FooSpec.kt'],
-    ['C# Tests', 'FooTests.cs'],
-  ])('returns testFilePresent=true for %s file (%s)', async (_label, path) => {
-    customMock()
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })
-
-    const result = (await getHandler('github:file-metrics')({
-      repoRoot: '/repo',
-      path,
-    })) as Record<string, unknown>
-    expect(result.testFilePresent).toBe(true)
-  })
-})
-
 // ─── github:pr-inline-comments ────────────────────────────────────────────────
 
 describe('github:pr-inline-comments', () => {
@@ -336,72 +279,6 @@ describe('github:pr-inline-comments', () => {
 })
 
 // ─── github:pr-comment-add ────────────────────────────────────────────────────
-
-describe('github:pr-comment-add', () => {
-  it('returns VALIDATION_ERROR for missing required fields', async () => {
-    const result = (await getHandler('github:pr-comment-add')({
-      repoRoot: '/repo',
-      prNumber: 42,
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR for invalid side value', async () => {
-    const result = (await getHandler('github:pr-comment-add')({
-      repoRoot: '/repo',
-      prNumber: 42,
-      commitId: 'abc',
-      path: 'src/app.ts',
-      line: 10,
-      side: 'BOTH',
-      body: 'Nit',
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns error string on gh failure', async () => {
-    mockReject('gh auth error')
-    const result = (await getHandler('github:pr-comment-add')({
-      repoRoot: '/repo',
-      prNumber: 42,
-      commitId: 'abc1234',
-      path: 'src/app.ts',
-      line: 10,
-      side: 'RIGHT',
-      body: 'Nit: rename this',
-    })) as { error: string }
-    expect(result.error).toContain('gh auth error')
-  })
-
-  it('includes start_line and start_side fields when startLine is provided', async () => {
-    const rawComment = {
-      id: 99,
-      user: { login: 'bob', avatar_url: '' },
-      body: 'range comment',
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
-      path: 'src/app.ts',
-      line: 15,
-      start_line: 10,
-      side: 'RIGHT',
-      diff_hunk: '',
-      in_reply_to_id: null,
-      pull_request_review_id: null,
-    }
-    mockResolve(JSON.stringify(rawComment))
-    const result = (await getHandler('github:pr-comment-add')({
-      repoRoot: '/repo',
-      prNumber: 42,
-      commitId: 'abc1234',
-      path: 'src/app.ts',
-      line: 15,
-      startLine: 10,
-      side: 'RIGHT',
-      body: 'Range nit',
-    })) as { comment: Record<string, unknown> }
-    expect(result.comment.startLine).toBe(10)
-  })
-})
 
 // ─── github:pr-comment-reply ──────────────────────────────────────────────────
 

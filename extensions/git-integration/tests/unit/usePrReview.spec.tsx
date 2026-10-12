@@ -31,7 +31,6 @@ vi.mock('../../src/api/github', () => ({
     currentUser: (...args: unknown[]) => mockCurrentUserAPI(...args),
     listOpenPrs: (...args: unknown[]) => mockListOpenPrsAPI(...args),
     prReviewDetail: (...args: unknown[]) => mockPrReviewDetailAPI(...args),
-    fileMetrics: (...args: unknown[]) => mockFileMetricsAPI(...args),
     // Adapts the per-file fixtures below to the batched call the hook now makes.
     filesMetrics: async (root: string, paths: string[]) => {
       mockFilesMetricsAPI(root, paths)

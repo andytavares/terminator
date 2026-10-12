@@ -398,23 +398,6 @@ export function registerGithubHandlers(
     }
   })
 
-  register('github:file-cochange', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      files: z.array(z.string()).min(1),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { repoRoot, files } = parsed.data
-    if (parseRemoteRepo(repoRoot)) return { affinity: {} }
-    try {
-      const affinity = await computeCoChangeAffinityFromGit(repoRoot, files)
-      return { affinity: Object.fromEntries(affinity) }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
   register('github:pr-mark-ready', async (payload) => {
     const schema = z.object({ repoRoot: z.string().min(1), prNumber: z.number().int().positive() })
     const parsed = schema.safeParse(payload)
@@ -550,51 +533,7 @@ export function registerGithubHandlers(
     }
   })
 
-  register('github:file-metrics', async (payload) => {
-    const schema = z.object({ repoRoot: z.string().min(1), path: z.string().min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { repoRoot, path } = parsed.data
-    if (parseRemoteRepo(repoRoot)) return REMOTE_FILE_METRICS
-    try {
-      const isTestFile = isTestPath(path)
-      const importPattern = importPatternFor(path)
-      const [churnRaw, blastRaw, testRaw] = await Promise.all([
-        runGit(repoRoot, ['log', '--oneline', '--since=90 days ago', '--', path]),
-        runGit(repoRoot, ['grep', '-rl', '--extended-regexp', importPattern]).catch(() => ''),
-        isTestFile
-          ? Promise.resolve(null)
-          : runGit(repoRoot, [
-              'ls-files',
-              '--',
-              `**/${stemOf(path)}*.spec.*`,
-              `**/${stemOf(path)}*.test.*`,
-            ]).catch(() => ''),
-      ])
-      const churn90d = churnRaw ? churnRaw.split('\n').filter(Boolean).length : 0
-      const importerLines = blastRaw
-        ? blastRaw
-            .split('\n')
-            .filter(Boolean)
-            .filter((l) => l !== path)
-        : []
-      const testFilePresent = isTestFile ? true : testRaw ? testRaw.trim().length > 0 : false
-      const patchCoverage = await readFileCoverage(repoRoot, path)
-      return {
-        churn90d,
-        blastRadius: importerLines.length,
-        topImporters: importerLines,
-        importerCount: importerLines.length,
-        testFilePresent,
-        patchCoverage,
-      }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  // The same answer as github:file-metrics for each path, from three git processes in
-  // total instead of three per path.
+  // Metrics for every path from three git processes in total, not three per path.
   register('github:files-metrics', async (payload) => {
     const schema = z.object({ repoRoot: z.string().min(1), paths: z.array(z.string().min(1)) })
     const parsed = schema.safeParse(payload)
@@ -777,48 +716,6 @@ export function registerGithubHandlers(
         `body=${body}`,
       ])
       const comment = mapIssueComment(JSON.parse(raw))
-      return { comment }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  register('github:pr-comment-add', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      prNumber: z.number().int().positive(),
-      commitId: z.string().min(1),
-      path: z.string().min(1),
-      line: z.number().int().positive(),
-      startLine: z.number().int().positive().optional(),
-      side: z.enum(['LEFT', 'RIGHT']),
-      body: z.string().min(1),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { repoRoot, prNumber, commitId, path, line, startLine, side, body } = parsed.data
-    try {
-      const args = [
-        'api',
-        `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
-        '--method',
-        'POST',
-        '--field',
-        `commit_id=${commitId}`,
-        '--field',
-        `path=${path}`,
-        '--field',
-        `line=${line}`,
-        '--field',
-        `side=${side}`,
-        '--field',
-        `body=${body}`,
-      ]
-      if (startLine != null) {
-        args.push('--field', `start_line=${startLine}`, '--field', `start_side=${side}`)
-      }
-      const raw = await gh(repoRoot, args)
-      const comment = mapComment(JSON.parse(raw))
       return { comment }
     } catch (e) {
       return { error: String(e) }
@@ -1495,15 +1392,11 @@ function fillEmpty(result: Map<string, string[]>, paths: string[]) {
   return result
 }
 
-// The test-file lookup github:file-metrics does per path, applied to one listing of every test file.
+// Whether a test file exists for the path, answered from one listing of every test file.
 function hasTestFile(testFiles: string[], path: string): boolean {
   const stem = stemOf(path).replace(/[.+^${}()|[\]\\?]/g, '\\$&')
   const re = new RegExp(`^.*/${stem}.*\\.(spec|test)\\..*$`)
   return testFiles.some((f) => re.test(f))
-}
-
-async function readFileCoverage(repoRoot: string, filePath: string): Promise<number | null> {
-  return coverageReader(repoRoot)(filePath)
 }
 
 /** Reads each coverage report at most once, however many paths are looked up. */

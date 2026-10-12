@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildChapters,
-  detectChangedFiles,
   computeRiskScore,
   parseReviewQueuePR,
   queueRiskLevel,
@@ -71,63 +70,6 @@ describe('ReviewSessionSchema', () => {
     const key1 = `${validSession.repoRoot}:::${validSession.prNumber}:::${validSession.headSHA}`
     const key2 = `${validSession.repoRoot}:::${validSession.prNumber}:::def456`
     expect(key1).not.toBe(key2)
-  })
-})
-
-// ─── detectChangedFiles (T063) ────────────────────────────────────────────────
-
-const makeFile = (path: string, additions = 10, deletions = 2): PrChangedFile => ({
-  path,
-  changeType: 'modified',
-  additions,
-  deletions,
-  isBinary: false,
-  tier: 1,
-  whyHere: 'Source file',
-  riskScore: {
-    level: 'low',
-    composite: null,
-    metrics: {
-      changeSize: null,
-      churn90d: null,
-      blastRadius: null,
-      testFilePresent: null,
-      complexityDelta: null,
-      patchCoverage: null,
-    },
-    dominantDriver: '',
-    topImporters: [],
-    importerCount: 0,
-  },
-  estimatedMinutes: 1,
-})
-
-describe('detectChangedFiles()', () => {
-  it('returns empty set when all files are unchanged', () => {
-    const files = [makeFile('src/a.ts'), makeFile('src/b.ts')]
-    const changed = detectChangedFiles(files, files)
-    expect(changed.size).toBe(0)
-  })
-
-  it('flags files whose addition/deletion counts changed', () => {
-    const old = [makeFile('src/a.ts', 10, 2)]
-    const next = [makeFile('src/a.ts', 20, 5)]
-    const changed = detectChangedFiles(old, next)
-    expect(changed.has('src/a.ts')).toBe(true)
-  })
-
-  it('flags newly added files', () => {
-    const old = [makeFile('src/a.ts')]
-    const next = [makeFile('src/a.ts'), makeFile('src/b.ts')]
-    const changed = detectChangedFiles(old, next)
-    expect(changed.has('src/b.ts')).toBe(true)
-    expect(changed.has('src/a.ts')).toBe(false)
-  })
-
-  it('does not flag files with identical sizes', () => {
-    const old = [makeFile('src/a.ts', 10, 2), makeFile('src/b.ts', 5, 1)]
-    const next = [makeFile('src/a.ts', 10, 2), makeFile('src/b.ts', 5, 1)]
-    expect(detectChangedFiles(old, next).size).toBe(0)
   })
 })
 

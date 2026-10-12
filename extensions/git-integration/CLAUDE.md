@@ -30,7 +30,7 @@ await gitAPI.diffFile(...)          // NOT window.electronAPI.git.diffFile(...)
 await gitAPI.stage(...) / gitAPI.unstage(...)
 await gitAPI.commit(...)
 await gitAPI.commitOutputPoll(...)
-await gitAPI.prStatus(...) / gitAPI.prCreate(...)
+await gitAPI.prStatus(...)
 await gitAPI.push(...)
 ```
 

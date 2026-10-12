@@ -6,10 +6,7 @@ const execFileAsync = promisify(execFile)
 
 // All gh-CLI knowledge for the PR-review surface lives here (ADR-009): binary
 // resolution for packaged apps, GH_TOKEN handling with expired-token retry,
-// auth-error detection, and the git log co-change signal. GhService
-// (gh-service.ts) is the separate, sandboxed api.shell.exec transport used by
-// the PR-create flow — it cannot set env or custom binary paths, which this
-// module needs.
+// auth-error detection, and the git log co-change signal.
 
 export interface GhOptions {
   getGhPath: () => string

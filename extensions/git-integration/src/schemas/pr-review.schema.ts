@@ -380,7 +380,6 @@ export type Chapter = z.infer<typeof ChapterSchema>
 export type PrReviewDetail = z.infer<typeof PrReviewDetailSchema>
 export type ReviewQueuePR = z.infer<typeof ReviewQueuePRSchema>
 export type StatusCheck = z.infer<typeof StatusCheckSchema>
-export type PrApproval = z.infer<typeof PrApprovalSchema>
 export type IssueComment = z.infer<typeof IssueCommentSchema>
 export type InlineComment = z.infer<typeof InlineCommentSchema>
 export type Thread = z.infer<typeof ThreadSchema>

@@ -6,12 +6,6 @@ export const mergeFlowAPI = {
   listConflicts: (repoRoot: string): Promise<ConflictSession | { error: string }> =>
     bridge().invoke('git:conflicts-list', { repoRoot }),
 
-  getConflictBlocks: (
-    repoRoot: string,
-    filePath: string
-  ): Promise<{ blocks: unknown[] } | { error: string }> =>
-    bridge().invoke('git:conflict-blocks', { repoRoot, filePath }),
-
   resolveConflict: (
     repoRoot: string,
     blockId: string,
@@ -61,13 +55,6 @@ export const mergeFlowAPI = {
     files: Array<{ filePath: string }>
   ): Promise<{ success: true } | { error: string }> =>
     bridge().invoke('git:session-reset', { repoRoot, files }),
-
-  prepareMergeForPr: (
-    repoRoot: string,
-    headRefName: string,
-    baseRefName: string
-  ): Promise<{ hasConflicts: boolean } | { error: string }> =>
-    bridge().invoke('git:prepare-merge-for-pr', { repoRoot, headRefName, baseRefName }),
 
   preparePrWorktree: (
     repoRoot: string,

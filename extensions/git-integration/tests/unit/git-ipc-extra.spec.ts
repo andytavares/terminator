@@ -330,7 +330,7 @@ describe('git:push handler (lines 96-110)', () => {
   })
 })
 
-describe('git:pr-status and git:pr-create stubs', () => {
+describe('git:pr-status stub', () => {
   let getHandler: (channel: string) => Handler
 
   beforeEach(() => {
@@ -343,10 +343,5 @@ describe('git:pr-status and git:pr-create stubs', () => {
   it('git:pr-status returns { pr: null }', async () => {
     const result = await getHandler('git:pr-status')({})
     expect(result).toEqual({ pr: null })
-  })
-
-  it('git:pr-create returns NOT_IMPLEMENTED', async () => {
-    const result = (await getHandler('git:pr-create')({})) as { error: string }
-    expect(result.error).toBe('NOT_IMPLEMENTED')
   })
 })

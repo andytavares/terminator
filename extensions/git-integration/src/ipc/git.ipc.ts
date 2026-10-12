@@ -125,9 +125,5 @@ export function registerGitExtensionHandlers(registerRaw: RegisterFn): void {
     return { pr: null }
   })
 
-  register('git:pr-create', (_payload) => {
-    return { error: 'NOT_IMPLEMENTED' }
-  })
-
   registerMergeFlowHandlers(register)
 }

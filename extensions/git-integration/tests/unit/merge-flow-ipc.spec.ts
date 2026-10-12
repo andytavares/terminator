@@ -119,48 +119,6 @@ describe('git:conflicts-list', () => {
   })
 })
 
-describe('git:conflict-blocks', () => {
-  it('returns blocks for a file', async () => {
-    const bridge = makeRegister()
-    const fakeBlocks = [
-      {
-        blockId: 'src/foo.ts#0',
-        index: 0,
-        oursText: 'a',
-        theirsText: 'b',
-        baseText: '',
-        contextBefore: [],
-        contextAfter: [],
-        originalConflictText: '<<<',
-        isResolved: false,
-      },
-    ]
-    mockReadFile
-      .mockResolvedValueOnce('') // :1:
-      .mockResolvedValueOnce('') // :2:
-      .mockResolvedValueOnce('') // :3:
-      .mockResolvedValueOnce('file content') // working tree
-    mockReadConflictBlocks.mockReturnValueOnce(fakeBlocks)
-
-    // Also mock the git show calls via execFile
-    mockExecFile.mockReturnValue('')
-
-    const result = (await bridge.invoke('git:conflict-blocks', {
-      repoRoot: '/repo',
-      filePath: 'src/foo.ts',
-    })) as { blocks: unknown[] }
-    expect(result.blocks).toHaveLength(1)
-  })
-
-  it('returns VALIDATION_ERROR for missing filePath', async () => {
-    const bridge = makeRegister()
-    const result = (await bridge.invoke('git:conflict-blocks', { repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-})
-
 describe('git:resolve-conflict', () => {
   it('writes resolved text to file and returns success', async () => {
     const bridge = makeRegister()
@@ -399,22 +357,6 @@ describe('git:resolve-conflict — branch paths', () => {
       strategy: 'ours',
     })) as { error: string }
     expect(result.error).toContain('ENOENT')
-  })
-})
-
-describe('git:merge-ai-suggest', () => {
-  it('returns NOT_IMPLEMENTED stub', async () => {
-    const bridge = makeRegister()
-    const result = (await bridge.invoke('git:merge-ai-suggest', {
-      repoRoot: '/repo',
-      blockId: 'src/foo.ts#0',
-      baseText: '',
-      oursText: 'ours',
-      theirsText: 'theirs',
-      contextBefore: [],
-      contextAfter: [],
-    })) as { error: string }
-    expect(result.error).toBe('NOT_IMPLEMENTED')
   })
 })
 
@@ -704,74 +646,5 @@ describe('git:prepare-pr-worktree', () => {
       baseRefName: 'main',
     })) as { error: string }
     expect(result.error).toContain('worktree add failed')
-  })
-})
-
-describe('git:prepare-merge-for-pr', () => {
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const bridge = makeRegister()
-    const result = (await bridge.invoke('git:prepare-merge-for-pr', {})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns hasConflicts: false on clean merge', async () => {
-    const bridge = makeRegister()
-    mockExecFile
-      .mockReturnValueOnce('') // git fetch
-      .mockReturnValueOnce('') // git checkout
-      .mockReturnValueOnce('') // git merge — clean
-
-    const result = (await bridge.invoke('git:prepare-merge-for-pr', {
-      repoRoot: '/repo',
-      headRefName: 'feature',
-      baseRefName: 'main',
-    })) as { hasConflicts: boolean }
-    expect(result.hasConflicts).toBe(false)
-  })
-
-  it('returns hasConflicts: true when conflicts exist', async () => {
-    const bridge = makeRegister()
-    mockExecFile
-      .mockReturnValueOnce('') // git fetch
-      .mockReturnValueOnce('') // git checkout
-      .mockReturnValueOnce(new Error('CONFLICT')) // git merge exits non-zero
-
-    mockListConflictedFiles.mockResolvedValueOnce(['src/foo.ts'])
-
-    const result = (await bridge.invoke('git:prepare-merge-for-pr', {
-      repoRoot: '/repo',
-      headRefName: 'feature',
-      baseRefName: 'main',
-    })) as { hasConflicts: boolean }
-    expect(result.hasConflicts).toBe(true)
-  })
-
-  it('returns error when merge fails with no conflict markers', async () => {
-    const bridge = makeRegister()
-    mockExecFile
-      .mockReturnValueOnce('') // git fetch
-      .mockReturnValueOnce('') // git checkout
-      .mockReturnValueOnce(new Error('unrelated histories')) // merge fails
-
-    mockListConflictedFiles.mockResolvedValueOnce([]) // no conflict markers
-
-    const result = (await bridge.invoke('git:prepare-merge-for-pr', {
-      repoRoot: '/repo',
-      headRefName: 'feature',
-      baseRefName: 'main',
-    })) as { error: string }
-    expect(result.error).toContain('no conflict markers')
-  })
-
-  it('returns error when fetch or checkout fails', async () => {
-    const bridge = makeRegister()
-    mockExecFile.mockReturnValueOnce(new Error('network error')) // git fetch fails
-
-    const result = (await bridge.invoke('git:prepare-merge-for-pr', {
-      repoRoot: '/repo',
-      headRefName: 'feature',
-      baseRefName: 'main',
-    })) as { error: string }
-    expect(result.error).toContain('network error')
   })
 })
