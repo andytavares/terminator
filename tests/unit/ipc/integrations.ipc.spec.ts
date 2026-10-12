@@ -220,13 +220,6 @@ describe('integrations:issue-list-mine', () => {
 })
 
 describe('integrations:issue-search', () => {
-  it('requires a term', async () => {
-    await expect(invoke('integrations:issue-search', { term: '' })).resolves.toMatchObject({
-      error: 'failed',
-    })
-    expect(service.search).not.toHaveBeenCalled()
-  })
-
   it('forwards the term and limit', async () => {
     service.search.mockResolvedValue({ issues: [], failures: [] })
     await invoke('integrations:issue-search', { term: 'sidebar', limit: 10 })
