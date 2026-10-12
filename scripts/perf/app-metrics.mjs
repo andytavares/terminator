@@ -1,12 +1,17 @@
 // Measures the built app (`npm run build` first): start-up milestones, memory
 // per process after it settles, and terminal throughput.
 //   node scripts/perf/app-metrics.mjs [--runs=5] [--settle-ms=9000] [--throughput]
-//                                     [--electron-arg=<flag>]...
+//                                     [--electron-arg=<flag>]... [--extensions=each]
 // Each run uses a throw-away profile. Memory comes from app.getAppMetrics()
 // (https://www.electronjs.org/docs/latest/api/app#appgetappmetrics), which
 // reports the same numbers on every platform.
+//
+// --extensions=each measures the extension host instead: the same runs with no
+// extension enabled, with a probe that loads nothing (the host's own cost), with
+// each bundled extension enabled alone beside the probe, and with all of them.
+// The probe also reports process.memoryUsage() from inside the host.
 import { _electron as electron } from 'playwright'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -26,6 +31,20 @@ function electronArgs() {
 function median(values) {
   const sorted = [...values].sort((a, b) => a - b)
   return sorted[Math.floor(sorted.length / 2)]
+}
+
+// The utilityProcess serviceName src/main/extensions/host/host-process.ts gives the host.
+const HOST_NAME = 'Extension Host'
+
+// The host's working set and peak in MB, or null when no host is running.
+async function hostMemory(app) {
+  const metrics = await app.evaluate(({ app: electronApp }) => electronApp.getAppMetrics())
+  const host = metrics.find((metric) => metric.type === 'Utility' && metric.name === HOST_NAME)
+  if (!host) return null
+  return {
+    workingSetMB: host.memory.workingSetSize / 1024,
+    peakWorkingSetMB: host.memory.peakWorkingSetSize / 1024,
+  }
 }
 
 async function launch(profile) {
@@ -179,9 +198,147 @@ function summarise(results) {
   }
 }
 
+// The extension records a fresh profile ends up with: the app writes them on its first start.
+async function bundledRecords() {
+  const profile = mkdtempSync(join(tmpdir(), 'terminator-perf-seed-'))
+  try {
+    const { app } = await launch(profile)
+    await app.close()
+    return JSON.parse(readFileSync(join(profile, 'extensions.json'), 'utf8')).extensions
+  } finally {
+    rmSync(profile, { recursive: true, force: true })
+  }
+}
+
+const PROBE_ID = 'perf.probe'
+
+// An extension that loads nothing and writes the host's process.memoryUsage() beside
+// itself every half second, so the last one is from when the app was sampled. Alone it
+// measures the host's own cost.
+const PROBE_SOURCE = `const { writeFileSync } = require('node:fs')
+const { join } = require('node:path')
+const write = () => writeFileSync(join(__dirname, 'memory.json'), JSON.stringify(process.memoryUsage()))
+exports.activate = () => {
+  write()
+  setInterval(write, 500)
+}
+`
+
+function probeRecord(template, directory) {
+  const manifest = {
+    id: PROBE_ID,
+    name: 'Probe',
+    version: '1.0.0',
+    description: 'Reports the extension host memory',
+    minAppVersion: '0.0.1',
+  }
+  writeFileSync(join(directory, 'manifest.json'), JSON.stringify({ ...manifest, main: 'main.js' }))
+  writeFileSync(join(directory, 'main.js'), PROBE_SOURCE)
+  return {
+    ...template,
+    ...manifest,
+    entryPoint: join(directory, 'main.js'),
+    status: 'enabled',
+    directoryPath: directory,
+    rendererRelPath: undefined,
+    rendererUrl: undefined,
+    contributes: undefined,
+  }
+}
+
+// Every bundled record, enabled only when `enabled(record)` says so.
+function recordsEnabling(records, enabled) {
+  return records.map((record) => ({ ...record, status: enabled(record) ? 'enabled' : 'disabled' }))
+}
+
+// What the probe last wrote, in MB, then removed so the next run cannot read it. Null when
+// the probe had not activated yet.
+function insideHost(probeDirectory) {
+  const file = join(probeDirectory, 'memory.json')
+  if (!existsSync(file)) return null
+  const usage = JSON.parse(readFileSync(file, 'utf8'))
+  rmSync(file)
+  return Object.fromEntries(Object.entries(usage).map(([key, bytes]) => [key, bytes / 1024 / 1024]))
+}
+
+async function measureHostOnce(records, settleMs) {
+  const profile = mkdtempSync(join(tmpdir(), 'terminator-perf-'))
+  writeFileSync(join(profile, 'extensions.json'), JSON.stringify({ extensions: records }))
+  const { app, page } = await launch(profile)
+  try {
+    await page.waitForTimeout(settleMs)
+    return { host: await hostMemory(app), memory: await memoryByProcessType(app) }
+  } finally {
+    await app.close()
+    rmSync(profile, { recursive: true, force: true })
+  }
+}
+
+// One run: the app's numbers, then what the probe wrote, read once the app has closed.
+async function measureHostRun(records, settleMs, probeDirectory) {
+  const measured = await measureHostOnce(records, settleMs)
+  return { ...measured, inside: insideHost(probeDirectory) }
+}
+
+function summariseHost(results) {
+  const pick = (read) => Math.round(median(results.map(read)))
+  const probed = results.filter((r) => r.inside !== null)
+  const pickProbed = (key) => Number(median(probed.map((r) => r.inside[key])).toFixed(1))
+  return {
+    runs: results.length,
+    hostMB: results[0].host && {
+      workingSet: pick((r) => r.host.workingSetMB),
+      peakWorkingSet: pick((r) => r.host.peakWorkingSetMB),
+    },
+    probedRuns: probed.length,
+    insideHostMB:
+      probed.length === 0
+        ? null
+        : Object.fromEntries(Object.keys(probed[0].inside).map((key) => [key, pickProbed(key)])),
+    totalMB: pick((r) => Object.values(r.memory).reduce((sum, mb) => sum + mb, 0)),
+  }
+}
+
+// --extensions=each: no extension (no host), the probe alone, each bundled one with the probe, all.
+function hostScenarios(records, probe) {
+  const only = (id) => [...recordsEnabling(records, (record) => record.id === id), probe]
+  return [
+    { name: 'none', records: recordsEnabling(records, () => false) },
+    { name: PROBE_ID, records: only(null) },
+    ...records.map((record) => ({ name: record.id, records: only(record.id) })),
+    { name: 'all', records: [...recordsEnabling(records, () => true), probe] },
+  ]
+}
+
+async function measureEachExtension(runs, settleMs) {
+  const probeDirectory = mkdtempSync(join(tmpdir(), 'terminator-perf-probe-'))
+  try {
+    const records = await bundledRecords()
+    const probe = probeRecord(records[0], probeDirectory)
+    const summary = {}
+    for (const scenario of hostScenarios(records, probe)) {
+      const results = []
+      for (let run = 0; run < runs; run++)
+        results.push(await measureHostRun(scenario.records, settleMs, probeDirectory))
+      summary[scenario.name] = summariseHost(results)
+    }
+    return summary
+  } finally {
+    rmSync(probeDirectory, { recursive: true, force: true })
+  }
+}
+
+async function measureApp(runs, settleMs) {
+  const withThroughput = process.argv.includes('--throughput')
+  const results = []
+  for (let run = 0; run < runs; run++) results.push(await measureOnce(settleMs, withThroughput))
+  return summarise(results)
+}
+
 const runs = Number(option('runs', '5'))
 const settleMs = Number(option('settle-ms', '9000'))
-const withThroughput = process.argv.includes('--throughput')
-const results = []
-for (let run = 0; run < runs; run++) results.push(await measureOnce(settleMs, withThroughput))
-console.log(JSON.stringify(summarise(results), null, 2))
+const summary =
+  option('extensions', '') === 'each'
+    ? await measureEachExtension(runs, settleMs)
+    : await measureApp(runs, settleMs)
+console.log(JSON.stringify(summary, null, 2))
