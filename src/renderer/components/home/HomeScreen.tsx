@@ -28,6 +28,7 @@ import { buildLedger } from '../../sidebar/ledger-rows'
 import { buildLogbook } from '../../sidebar/logbook-groups'
 import type { SessionFacts } from '../../sidebar/session-facts'
 import type { IssueSummary } from '../../../shared/types/index'
+import '../screen-chrome.css'
 import './HomeScreen.css'
 
 const LAYOUTS: Array<{ value: HomeLayout; label: string }> = [

@@ -1,0 +1,158 @@
+/* The chrome Home (.home) and the wall (.wall) share: the screen, its one
+   bar of controls, the search field, a segmented control and the empty state. */
+
+.home,
+.wall {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+/* One row of chrome. */
+.home__bar,
+.wall__bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.home__title,
+.wall__title {
+  margin: 0 6px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.home__meta,
+.wall__meta {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.home__layouts,
+.wall__sizes {
+  display: inline-flex;
+  height: 26px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.home__search,
+.wall__search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: var(--text-muted);
+}
+
+.home__search:focus-within,
+.wall__search:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.home__search svg,
+.wall__search svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+
+.home__search input,
+.wall__search input {
+  height: auto;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.home__empty,
+.wall__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.home__empty p,
+.wall__empty p {
+  margin: 0;
+}
+
+.home__empty-action,
+.home__empty-actions .home-menu .sidebar-menu__button,
+.wall__empty-action {
+  padding: 0 12px;
+}
+
+/* The buttons on the screen's body: the empty state's, a Ledger row's Open
+   and the Logbook's, a size up from the bar's controls. */
+.home__empty-action,
+.home__empty-actions .home-menu .sidebar-menu__button,
+.wall__empty-action,
+.ledger__open,
+.logbook__button {
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.home__empty-action:hover,
+.home__empty-actions .home-menu .sidebar-menu__button:hover,
+.wall__empty-action:hover,
+.ledger__open:hover {
+  background: var(--bg-card-hover);
+}
+
+/* The bar's controls: one height, border and fill. */
+.home__toggle,
+.home-menu .sidebar-menu__button,
+.wall__toggle,
+.wall__select select {
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  font: inherit;
+  font-size: 12px;
+}
+
+/* A tag on a Ledger row or a Logbook entry. */
+.ledger__tag,
+.logbook__tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}

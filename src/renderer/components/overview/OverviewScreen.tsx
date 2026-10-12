@@ -27,6 +27,7 @@ import {
   type WallThenBy,
 } from '../../sidebar/wall-prefs'
 import type { SessionFacts } from '../../sidebar/session-facts'
+import '../screen-chrome.css'
 import './OverviewScreen.css'
 
 const SIZES: Array<{ value: TileSize; label: string; short: string }> = [

@@ -51,17 +51,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  padding: 7px 10px;
-  font-size: 12px;
-  font-family: var(--font-ui);
-  color: var(--text-primary);
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s;
 }
 
 .branch-select__trigger:focus,

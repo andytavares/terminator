@@ -10,6 +10,7 @@ import { formatRelativeTime } from '../../sidebar/relative-time'
 import type { LedgerColumns } from '../../sidebar/home-prefs'
 import type { LedgerGroup } from '../../sidebar/ledger-rows'
 import type { SessionActions, SessionFacts } from '../../sidebar/session-facts'
+import '../screen-chrome.css'
 import './LedgerView.css'
 
 interface Props extends SessionActions {

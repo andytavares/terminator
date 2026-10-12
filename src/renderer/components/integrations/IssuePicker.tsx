@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { ERROR_TEXT, TRACKER_LABELS, useIssueSearch } from './use-issue-search'
 import type { IssueSummary } from '../../../shared/types/index'
+import './issue-search.css'
 import './IssuePicker.css'
 
 // Choosing an issue, inline.

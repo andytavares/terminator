@@ -196,15 +196,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
   padding: 0 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
 }
 
 .logbook__button--primary {
@@ -298,13 +290,4 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
-}
-
-.logbook__tag {
-  font-size: 11px;
-  padding: 1px 6px;
-  border-radius: var(--radius-xs);
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
 }

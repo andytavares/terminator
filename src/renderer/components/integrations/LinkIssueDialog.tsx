@@ -6,6 +6,7 @@ import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useModalEffect } from '../../stores/modal.store'
 import type { IssueSummary } from '../../../shared/types/index'
 import { ERROR_TEXT, TRACKER_LABELS, useIssueSearch } from './use-issue-search'
+import './issue-search.css'
 import './LinkIssueDialog.css'
 
 // Picking the issue a project is for.
