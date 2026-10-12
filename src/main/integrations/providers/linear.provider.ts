@@ -42,7 +42,7 @@ interface LinearLike {
     teams?: (vars?: unknown) => unknown
   }>
   issues(vars?: unknown): unknown
-  searchIssues(vars?: unknown): unknown
+  searchIssues(term: string, vars?: unknown): unknown
   issue(id: string): unknown
   createComment(input: { issueId: string; body: string }): unknown
   updateIssue(id: string, input: { stateId: string }): unknown
@@ -308,7 +308,7 @@ export function createLinearProvider(
     async search(cred, term, limit): Promise<IssueSummary[]> {
       const client = clientFor(cred)
       return run(async () => {
-        const connection = (await client.searchIssues({ term, first: limit })) as {
+        const connection = (await client.searchIssues(term, { first: limit })) as {
           nodes?: RawIssue[]
         } | null
         return Promise.all((connection?.nodes ?? []).map(toSummary))
