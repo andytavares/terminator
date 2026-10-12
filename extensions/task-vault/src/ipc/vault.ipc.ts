@@ -44,14 +44,16 @@ import {
 
 const localDate = _localDate
 
-/** The export writes area_id; older payloads name the area in an area field. */
-async function findImportedProjectAreaId(
+/** The export writes ids; older payloads name the project or area instead. */
+async function findImportedId(
   db: ExtensionDB,
-  project: Record<string, unknown>
+  table: 'projects' | 'areas',
+  id: unknown,
+  name: unknown
 ): Promise<string | null> {
-  const [column, value] = project.area_id ? ['id', project.area_id] : ['name', project.area]
+  const [column, value] = id ? ['id', id] : ['name', name]
   if (!value) return null
-  const row = await db.get<{ id: string }>(`SELECT id FROM areas WHERE ${column}=?`, [value])
+  const row = await db.get<{ id: string }>(`SELECT id FROM ${table} WHERE ${column}=?`, [value])
   return row?.id ?? null
 }
 
@@ -62,6 +64,8 @@ interface ImportedTask {
   created_at: string
   updated_at: string
   status?: string
+  project_id?: string | null
+  area_id?: string | null
   project?: string | null
   area?: string | null
   context?: string | null
@@ -1031,7 +1035,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       }
       if (Array.isArray(data.projects)) {
         for (const p of data.projects) {
-          const areaId = await findImportedProjectAreaId(db, p)
+          const areaId = await findImportedId(db, 'areas', p.area_id, p.area)
           await db.run(
             `INSERT INTO projects (id,name,status,area_id,deadline,outcome,terminator_links,created_at,updated_at)
              VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`,
@@ -1052,14 +1056,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       }
       if (Array.isArray(data.tasks)) {
         for (const t of data.tasks) {
-          const projRow = t.project
-            ? await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [t.project])
-            : null
-          const projectId = projRow?.id ?? null
-          const areaRow = t.area
-            ? await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [t.area])
-            : null
-          const areaId = areaRow?.id ?? null
+          const projectId = await findImportedId(db, 'projects', t.project_id, t.project)
+          const areaId = await findImportedId(db, 'areas', t.area_id, t.area)
           await insertTask(
             db,
             {

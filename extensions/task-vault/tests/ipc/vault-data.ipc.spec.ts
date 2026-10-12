@@ -391,6 +391,22 @@ describe('task-vault:vault:export-json and import-json', () => {
     ])
   })
 
+  it('keeps each task in its project and area through an export', async () => {
+    await seedArea(db, 'a1', 'Work')
+    await seedProject(db, 'p1', 'Alpha', { areaId: 'a1' })
+    await seedTask(db, { id: 'in-project', projectId: 'p1' })
+    await seedTask(db, { id: 'in-area', areaId: 'a1' })
+    const exported = await invoke('task-vault:vault:export-json')
+
+    const other = await createVaultDb()
+    const otherHarness = createIpcHarness()
+    registerVaultIpcHandlers(otherHarness.api, other)
+    await otherHarness.invoke('task-vault:vault:import-json', exported)
+
+    expect(await taskRow(other, 'in-project')).toMatchObject({ project_id: 'p1', area_id: null })
+    expect(await taskRow(other, 'in-area')).toMatchObject({ project_id: null, area_id: 'a1' })
+  })
+
   it('places an imported project in the area named by its legacy area field', async () => {
     await invoke('task-vault:vault:import-json', {
       areas: [{ id: 'a1', name: 'Work', created_at: now }],
