@@ -80,6 +80,15 @@ export function e2eEnv(): NodeJS.ProcessEnv {
 // output instead of a bare "hook timeout exceeded" that says nothing about why.
 const LAUNCH_DEADLINE_MS = 25_000
 
+/**
+ * Extra Electron switches for this machine, space-separated in
+ * E2E_ELECTRON_ARGS. A Linux runner sets `--no-sandbox`: Chromium's sandbox
+ * needs a setuid helper or user namespaces the runner does not grant.
+ */
+function machineArgs(): string[] {
+  return (process.env.E2E_ELECTRON_ARGS ?? '').split(' ').filter(Boolean)
+}
+
 export async function launchApp(
   userDataDir: string = e2eProfileDir(),
   env: Record<string, string> = {}
@@ -91,7 +100,13 @@ export async function launchApp(
     // modal "reopen windows?" alert on the next launch of the same bundle,
     // which blocks startup until firstWindow times out. The argument domain
     // turns that restore off for this process only.
-    args: ['.', `--user-data-dir=${userDataDir}`, '-ApplePersistenceIgnoreState', 'YES'],
+    args: [
+      '.',
+      ...machineArgs(),
+      `--user-data-dir=${userDataDir}`,
+      '-ApplePersistenceIgnoreState',
+      'YES',
+    ],
     env: { ...e2eEnv(), ...env },
     timeout: remaining(),
   })
