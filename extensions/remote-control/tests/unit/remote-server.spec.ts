@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'fs'
+import { createServer, type AddressInfo, type Server } from 'node:net'
 import { hashPassword } from '../../src/server/password-hash'
 
 const PASSWORD = 'correct-password'
@@ -103,8 +104,10 @@ describe('RemoteServer', () => {
     const storedHash = await hashPassword(PASSWORD)
     mockDeps.getPasswordHash.mockReturnValue(storedHash)
     const { createRemoteServer } = await import('../../src/server/remote-server')
+    // Port 0: the system picks a free port, so no other process, and no other
+    // spec running at the same time, can already hold it.
     remoteServer = await createRemoteServer({
-      port: 7683,
+      port: 0,
       appPath: '/mock/app',
       ptyManager: mockPtyManager as never,
       deps: mockDeps,
@@ -506,12 +509,25 @@ describe('RemoteServer', () => {
   })
 
   describe('EADDRINUSE handling', () => {
+    let holder: Server
+
+    /** A port another listener already holds. */
+    async function heldPort(): Promise<number> {
+      holder = createServer()
+      await new Promise<void>((resolve) => holder.listen(0, '0.0.0.0', resolve))
+      return (holder.address() as AddressInfo).port
+    }
+
+    afterEach(async () => {
+      await new Promise((resolve) => holder.close(resolve))
+    })
+
     it('start() with port in use rejects with PortInUseError', async () => {
       const { createRemoteServer: create2, PortInUseError } = await import(
         '../../src/server/remote-server'
       )
       const conflictServer = await create2({
-        port: 7683,
+        port: await heldPort(),
         appPath: '/mock/app',
         ptyManager: mockPtyManager as never,
         deps: { ...mockDeps, onPortInUse: vi.fn() },
@@ -522,14 +538,15 @@ describe('RemoteServer', () => {
     it('start() with port in use calls onPortInUse', async () => {
       const { createRemoteServer: create2 } = await import('../../src/server/remote-server')
       const onPortInUse = vi.fn()
+      const port = await heldPort()
       const conflictServer = await create2({
-        port: 7683,
+        port,
         appPath: '/mock/app',
         ptyManager: mockPtyManager as never,
         deps: { ...mockDeps, onPortInUse },
       })
       await conflictServer.start().catch(() => {})
-      expect(onPortInUse).toHaveBeenCalledWith(7683)
+      expect(onPortInUse).toHaveBeenCalledWith(port)
     })
   })
 })

@@ -82,9 +82,11 @@ function makeServerHandle(startImpl: () => Promise<void> = () => Promise.resolve
   }
 }
 
-async function setupAndGetToggleHandler(
-  serverHandle: ReturnType<typeof makeServerHandle>
-): Promise<(payload: unknown) => Promise<unknown>> {
+/**
+ * The extension's `deactivate` waits for everything its handlers queued, so a
+ * spec awaits it to see what the queued work did, at any machine speed.
+ */
+async function setupAndGetToggleHandler(serverHandle: ReturnType<typeof makeServerHandle>) {
   mockCreateRemoteServer.mockResolvedValue(serverHandle)
   mockSettingsGet.mockImplementation((key: string) => {
     if (key === 'terminator.remote-control.enabled') return false
@@ -95,21 +97,20 @@ async function setupAndGetToggleHandler(
 
   // Explicitly import the TypeScript source so vi.mock intercepts its dependencies.
   // Importing without extension would resolve to the compiled index.js bundle (where mocks have no effect).
-  const { activate } = await import('../../src/index.ts')
+  const { activate, deactivate } = await import('../../src/index.ts')
   const api = makeApi()
   activate(api as never)
 
-  const toggleHandler = registeredHandler('remote:toggle')
-  return toggleHandler
+  return { toggleHandler: registeredHandler('remote:toggle'), settled: deactivate }
 }
 
+// File level: both describes read it, in whichever order they run.
 let currentHash = ''
+beforeAll(async () => {
+  currentHash = await hashPassword('existing-password')
+})
 
 describe('remote-control extension index', () => {
-  beforeAll(async () => {
-    currentHash = await hashPassword('existing-password')
-  })
-
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
@@ -123,11 +124,10 @@ describe('remote-control extension index', () => {
   describe('startServer failure handling', () => {
     it('on non-PortInUseError, sets enabled=false in settings and broadcasts START_FAILED', async () => {
       const serverHandle = makeServerHandle(() => Promise.reject(new Error('unexpected error')))
-      const toggleHandler = await setupAndGetToggleHandler(serverHandle)
+      const { toggleHandler, settled } = await setupAndGetToggleHandler(serverHandle)
 
       await toggleHandler({ enabled: true })
-      // Flush the enqueued microtasks
-      await new Promise((resolve) => setTimeout(resolve, 10))
+      await settled()
 
       expect(mockSettingsSet).toHaveBeenCalledWith('terminator.remote-control.enabled', false)
       expect(mockBroadcast).toHaveBeenCalledWith('remote:status', {
@@ -139,10 +139,10 @@ describe('remote-control extension index', () => {
     it('on PortInUseError, does NOT set enabled=false (user intent preserved)', async () => {
       const { PortInUseError } = await import('../../src/server/remote-server')
       const serverHandle = makeServerHandle(() => Promise.reject(new PortInUseError(7681)))
-      const toggleHandler = await setupAndGetToggleHandler(serverHandle)
+      const { toggleHandler, settled } = await setupAndGetToggleHandler(serverHandle)
 
       await toggleHandler({ enabled: true })
-      await new Promise((resolve) => setTimeout(resolve, 10))
+      await settled()
 
       const enabledFalseCalls = mockSettingsSet.mock.calls.filter(
         ([key, val]: [string, unknown]) =>
@@ -153,10 +153,10 @@ describe('remote-control extension index', () => {
 
     it('on successful start, does not broadcast START_FAILED', async () => {
       const serverHandle = makeServerHandle()
-      const toggleHandler = await setupAndGetToggleHandler(serverHandle)
+      const { toggleHandler, settled } = await setupAndGetToggleHandler(serverHandle)
 
       await toggleHandler({ enabled: true })
-      await new Promise((resolve) => setTimeout(resolve, 10))
+      await settled()
 
       expect(mockBroadcast).not.toHaveBeenCalledWith(
         'remote:status',
@@ -179,21 +179,20 @@ describe('remote-control extension index', () => {
         return null
       })
 
-      const { activate } = await import('../../src/index.ts')
+      const { activate, deactivate } = await import('../../src/index.ts')
       const api = makeApi()
       activate(api as never)
 
-      // Start the server so remoteServer is set
-      const toggleHandler = registeredHandler('remote:toggle')
-      await toggleHandler({ enabled: true })
-      await new Promise((resolve) => setTimeout(resolve, 20))
+      // Reconnecting needs a listening server.
+      await registeredHandler('remote:toggle')({ enabled: true })
+      await vi.waitFor(() => expect(serverHandle.start).toHaveBeenCalled())
 
       mockNgrokSetOnCrash.mockClear()
 
       const reconnectHandler = registeredHandler('remote:tunnel-reconnect')
 
-      await reconnectHandler()
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(await reconnectHandler()).toEqual({ ok: true })
+      await deactivate()
 
       expect(mockNgrokSetOnCrash).toHaveBeenCalled()
       expect(mockBroadcast).toHaveBeenCalledWith(
@@ -211,13 +210,12 @@ async function activateWithSettings(initial: Record<string, unknown>) {
   mockSettingsGet.mockImplementation((key: string) => values.get(key))
   mockSettingsSet.mockImplementation((key: string, value: unknown) => void values.set(key, value))
   mockCreateRemoteServer.mockResolvedValue(makeServerHandle())
-  const { activate } = await import('../../src/index.ts')
+  const { activate, deactivate } = await import('../../src/index.ts')
   activate(makeApi() as never)
-  // Activation queues the credential migration; hashing takes real time.
-  await new Promise((resolve) => setTimeout(resolve, 300))
   const handler = (channel: string) =>
     registeredHandler(channel) as (payload?: unknown) => Promise<Record<string, unknown>>
-  return { values, handler }
+  // Activation queues the credential migration, which hashes: deactivate waits for it.
+  return { values, handler, settled: deactivate }
 }
 
 const EXT = 'terminator.remote-control'
@@ -266,10 +264,11 @@ describe('remote-control credentials', () => {
   })
 
   it('keeps a plaintext password from an earlier version working, as a hash only', async () => {
-    const { values } = await activateWithSettings({
+    const { values, settled } = await activateWithSettings({
       [`${EXT}.password`]: 'earlier-version-password',
       [`${EXT}.passwordHash`]: BCRYPT,
     })
+    await settled()
     expect(JSON.stringify([...values.values()])).not.toContain('earlier-version-password')
     expect(
       await verifyPassword('earlier-version-password', values.get(`${EXT}.passwordHash`) as string)
@@ -277,10 +276,11 @@ describe('remote-control credentials', () => {
   })
 
   it('turns Remote Control off and says why when the saved bcrypt hash cannot be kept', async () => {
-    const { values } = await activateWithSettings({
+    const { values, settled } = await activateWithSettings({
       [`${EXT}.enabled`]: true,
       [`${EXT}.passwordHash`]: BCRYPT,
     })
+    await settled()
     expect(values.get(`${EXT}.enabled`)).toBe(false)
     expect(mockCreateRemoteServer).not.toHaveBeenCalled()
     expect(mockBroadcast).toHaveBeenCalledWith('remote:status', {
