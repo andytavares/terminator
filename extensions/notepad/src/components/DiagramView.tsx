@@ -1,9 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react'
-import { MessageSquarePlus, X, Check, Trash2, Pencil } from 'lucide-react'
-import { Button, IconButton } from '@terminator/extension-ui'
+import { MessageSquarePlus, Pencil } from 'lucide-react'
+import { Button } from '@terminator/extension-ui'
 import type { ExcalidrawInitialDataState } from '@excalidraw/excalidraw/types/types'
 import type { DiagramComment } from '../db/types'
 import { useNotesStore } from '../stores/notes.store'
+import {
+  CommentPin,
+  CommentPopover,
+  NewCommentComposer,
+  type ScreenPoint,
+  type ThreadActions,
+} from './DiagramComments'
 
 // Lazy-load Excalidraw so it doesn't bloat the main bundle
 const ExcalidrawComponent = lazy(async () => {
@@ -12,172 +19,10 @@ const ExcalidrawComponent = lazy(async () => {
 })
 
 type SceneData = Pick<ExcalidrawInitialDataState, 'elements' | 'appState'>
+type SaveStatus = 'saved' | 'saving' | 'error' | 'idle'
+type TimerRef = React.MutableRefObject<ReturnType<typeof setTimeout> | null>
 
 const AUTOSAVE_DELAY_MS = 1200
-
-interface CommentPinProps {
-  comment: DiagramComment
-  screenX: number
-  screenY: number
-  isActive: boolean
-  onClick: () => void
-}
-
-function CommentPin({ comment, screenX, screenY, isActive, onClick }: CommentPinProps) {
-  const openCount = comment.replies.filter((r) => r.status === 'open').length + 1
-  return (
-    <button
-      className={`diagram-comment-pin${isActive ? ' diagram-comment-pin--active' : ''}`}
-      style={{ left: screenX, top: screenY }}
-      onClick={onClick}
-      title={comment.body}
-      aria-label={`Comment: ${comment.body}`}
-    >
-      <span className="diagram-comment-pin__icon">
-        <MessageSquarePlus className="tm-icon" />
-      </span>
-      {openCount > 1 && <span className="diagram-comment-pin__count">{openCount}</span>}
-    </button>
-  )
-}
-
-interface CommentPopoverProps {
-  comment: DiagramComment
-  onReply: (body: string) => void
-  onResolve: () => void
-  onDelete: () => void
-  onClose: () => void
-  screenX: number
-  screenY: number
-}
-
-function CommentPopover({
-  comment,
-  onReply,
-  onResolve,
-  onDelete,
-  onClose,
-  screenX,
-  screenY,
-}: CommentPopoverProps) {
-  const [replyText, setReplyText] = useState('')
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    textareaRef.current?.focus()
-  }, [])
-
-  function handleReply() {
-    const trimmed = replyText.trim()
-    if (!trimmed) return
-    onReply(trimmed)
-    setReplyText('')
-  }
-
-  const allMessages = [comment, ...comment.replies]
-
-  return (
-    <div className="diagram-comment-popover" style={{ left: screenX + 20, top: screenY }}>
-      <div className="diagram-comment-popover__header">
-        <span className="diagram-comment-popover__title">Comment</span>
-        <div className="diagram-comment-popover__actions">
-          <IconButton icon={Check} label="Resolve thread" size="sm" onClick={onResolve} />
-          <IconButton icon={Trash2} label="Delete thread" size="sm" onClick={onDelete} />
-          <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
-        </div>
-      </div>
-      <div className="diagram-comment-popover__messages">
-        {allMessages.map((msg) => (
-          <div key={msg.id} className="diagram-comment-popover__message">
-            <span className="diagram-comment-popover__author">{msg.author}</span>
-            <p className="diagram-comment-popover__body">{msg.body}</p>
-          </div>
-        ))}
-      </div>
-      <div className="diagram-comment-popover__reply">
-        <textarea
-          ref={textareaRef}
-          className="diagram-comment-popover__textarea"
-          placeholder="Reply…"
-          value={replyText}
-          rows={2}
-          onChange={(e) => setReplyText(e.target.value)}
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-              e.preventDefault()
-              handleReply()
-            }
-          }}
-        />
-        <Button
-          variant="primary"
-          size="sm"
-          className="diagram-comment-popover__send"
-          onClick={handleReply}
-          disabled={!replyText.trim()}
-        >
-          Reply
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-interface NewCommentComposerProps {
-  screenX: number
-  screenY: number
-  onSubmit: (body: string) => void
-  onCancel: () => void
-}
-
-function NewCommentComposer({ screenX, screenY, onSubmit, onCancel }: NewCommentComposerProps) {
-  const [body, setBody] = useState('')
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    textareaRef.current?.focus()
-  }, [])
-
-  function handleSubmit() {
-    const trimmed = body.trim()
-    if (!trimmed) return
-    onSubmit(trimmed)
-  }
-
-  return (
-    <div className="diagram-comment-popover" style={{ left: screenX + 20, top: screenY }}>
-      <div className="diagram-comment-popover__header">
-        <span className="diagram-comment-popover__title">New comment</span>
-        <IconButton icon={X} label="Cancel" size="sm" onClick={onCancel} />
-      </div>
-      <div className="diagram-comment-popover__reply">
-        <textarea
-          ref={textareaRef}
-          className="diagram-comment-popover__textarea"
-          placeholder="Add a comment…"
-          value={body}
-          rows={3}
-          onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') onCancel()
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-              e.preventDefault()
-              handleSubmit()
-            }
-          }}
-        />
-        <div className="diagram-comment-popover__footer-actions">
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!body.trim()}>
-            Save
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ─── Coordinate utilities ──────────────────────────────────────────
 
@@ -191,11 +36,12 @@ interface AppState {
   height: number
 }
 
-function sceneToViewport(
-  sceneX: number,
-  sceneY: number,
-  appState: AppState
-): { x: number; y: number } {
+interface Point {
+  x: number
+  y: number
+}
+
+function sceneToViewport(sceneX: number, sceneY: number, appState: AppState): Point {
   const { scrollX, scrollY, zoom, offsetLeft, offsetTop } = appState
   return {
     x: (sceneX + scrollX) * zoom.value + offsetLeft,
@@ -203,17 +49,336 @@ function sceneToViewport(
   }
 }
 
-function viewportToScene(
-  clientX: number,
-  clientY: number,
-  appState: AppState
-): { x: number; y: number } {
+function viewportToScene(clientX: number, clientY: number, appState: AppState): Point {
   const { scrollX, scrollY, zoom, offsetLeft, offsetTop } = appState
   return {
     x: (clientX - offsetLeft) / zoom.value - scrollX,
     y: (clientY - offsetTop) / zoom.value - scrollY,
   }
 }
+
+// ─── Loading ───────────────────────────────────────────────────────
+
+/** A comment about to be placed: where in the scene, and where on screen. */
+interface PendingPin extends ScreenPoint {
+  sceneX: number
+  sceneY: number
+}
+
+interface DiagramRecord {
+  title: string
+  tags: string[]
+  sceneJson: string
+}
+
+/** A loaded diagram, or why it could not be loaded. */
+type DiagramLoad =
+  | { ok: true; title: string; tags: string[]; scene: SceneData; comments: DiagramComment[] }
+  | { ok: false; error: string }
+
+function parseScene(sceneJson: string): SceneData {
+  try {
+    return JSON.parse(sceneJson || '{}') as SceneData
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Reads the diagram from the in-session scene cache when it has one, so
+ * content is never lost to a race between a cleanup flush and a DB read. Title
+ * and tags then come from the always-up-to-date diagrams list.
+ */
+async function readDiagram(diagramId: string): Promise<DiagramRecord | undefined> {
+  const { diagramCache, diagrams } = useNotesStore.getState()
+  const cachedScene = diagramCache[diagramId]
+  if (cachedScene !== undefined) {
+    const listed = diagrams.find((d) => d.id === diagramId) ?? { title: '', tags: [] }
+    return { ...listed, sceneJson: cachedScene }
+  }
+  const result = await window.electronAPI.extensionBridge.invoke(
+    'terminator.notepad:diagrams.get',
+    { id: diagramId }
+  )
+  const diagram = (result as { data?: DiagramRecord }).data
+  // Populate the cache on first DB fetch so future navigate-backs skip the round-trip
+  if (diagram) useNotesStore.getState().setDiagramCache(diagramId, diagram.sceneJson)
+  return diagram
+}
+
+async function listDiagramComments(diagramId: string): Promise<DiagramComment[]> {
+  const result = await window.electronAPI.extensionBridge.invoke(
+    'terminator.notepad:diagram-comments.list',
+    { diagramId, includeResolved: false }
+  )
+  return (result as { data?: DiagramComment[] }).data ?? []
+}
+
+async function loadDiagram(diagramId: string): Promise<DiagramLoad> {
+  try {
+    const [diagram, comments] = await Promise.all([
+      readDiagram(diagramId),
+      listDiagramComments(diagramId),
+    ])
+    if (!diagram) return { ok: false, error: 'Diagram not found.' }
+    const scene = parseScene(diagram.sceneJson)
+    return { ok: true, title: diagram.title, tags: diagram.tags ?? [], scene, comments }
+  } catch (err) {
+    console.error('[notepad] DiagramView: load failed', err)
+    return { ok: false, error: 'Failed to load diagram.' }
+  }
+}
+
+/** The diagram's document: title, tags, scene and comments, once loaded. */
+function useDiagramDocument(diagramId: string) {
+  const [initialScene, setInitialScene] = useState<SceneData>({})
+  const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [title, setTitle] = useState('Untitled diagram')
+  const [tags, setTags] = useState<string[]>([])
+  const [comments, setComments] = useState<DiagramComment[]>([])
+
+  useEffect(() => {
+    let current = true
+    void loadDiagram(diagramId).then((load) => {
+      if (!current) return
+      if (load.ok) {
+        setTitle(load.title)
+        setTags(load.tags)
+        setInitialScene(load.scene)
+        setComments(load.comments)
+      } else {
+        setLoadError(load.error)
+      }
+      setLoaded(true)
+    })
+    return () => {
+      current = false
+    }
+  }, [diagramId])
+
+  return { initialScene, loaded, loadError, title, setTitle, tags, comments, setComments }
+}
+
+type DiagramDocument = ReturnType<typeof useDiagramDocument>
+
+// ─── Saving ────────────────────────────────────────────────────────
+
+/** What a save writes; title and tags are read when it fires, so a rename is respected. */
+interface DiagramSave {
+  diagramId: string
+  sceneJson: string
+  title: string
+  tags: string[]
+}
+
+function saveDiagram(save: DiagramSave) {
+  return window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.autosave', {
+    id: save.diagramId,
+    title: save.title,
+    sceneJson: save.sceneJson,
+    tags: save.tags,
+  })
+}
+
+/** Saves, then keeps the sidebar in step and caches the scene for an instant navigate-back. */
+async function autosaveDiagram(save: DiagramSave): Promise<void> {
+  await saveDiagram(save)
+  const store = useNotesStore.getState()
+  store.patchDiagram(save.diagramId, {
+    title: save.title,
+    updatedAt: new Date().toISOString(),
+    tags: save.tags,
+  })
+  store.setDiagramCache(save.diagramId, save.sceneJson)
+}
+
+/** A ref that always holds the latest value. */
+function useLatest<T>(value: T): React.MutableRefObject<T> {
+  const ref = useRef(value)
+  useEffect(() => {
+    ref.current = value
+  }, [value])
+  return ref
+}
+
+/** The autosave's timer, the scene it has yet to write, and the latest title and tags. */
+interface AutosaveRefs {
+  autosaveTimerRef: TimerRef
+  pendingSceneRef: React.MutableRefObject<string | null>
+  titleRef: React.MutableRefObject<string>
+  tagsRef: React.MutableRefObject<string[]>
+}
+
+/**
+ * Saves the scene once drawing pauses. A scene not yet saved — or whose save
+ * failed — is flushed when the diagram closes.
+ */
+function useDiagramAutosave(diagramId: string, doc: DiagramDocument) {
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  const refs: AutosaveRefs = {
+    autosaveTimerRef: useRef<ReturnType<typeof setTimeout> | null>(null),
+    pendingSceneRef: useRef<string | null>(null),
+    titleRef: useLatest(doc.title),
+    tagsRef: useLatest(doc.tags),
+  }
+  useFlushOnClose(diagramId, refs)
+
+  const scheduleAutosave = useCallback(
+    (sceneJson: string) => {
+      const { autosaveTimerRef, pendingSceneRef, titleRef, tagsRef } = refs
+      pendingSceneRef.current = sceneJson
+      clearTimer(autosaveTimerRef)
+      autosaveTimerRef.current = setTimeout(() => {
+        const save = { diagramId, sceneJson, title: titleRef.current, tags: tagsRef.current }
+        void runAutosave(save, pendingSceneRef, setSaveStatus)
+      }, AUTOSAVE_DELAY_MS)
+    },
+    [diagramId] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+
+  return { saveStatus, scheduleAutosave }
+}
+
+/** A failed save leaves the scene pending, so the close flush can retry it. */
+async function runAutosave(
+  save: DiagramSave,
+  pendingSceneRef: React.MutableRefObject<string | null>,
+  setSaveStatus: (status: SaveStatus) => void
+): Promise<void> {
+  setSaveStatus('saving')
+  try {
+    await autosaveDiagram(save)
+    pendingSceneRef.current = null
+    setSaveStatus('saved')
+  } catch (err) {
+    console.error('[notepad] DiagramView: autosave failed', err)
+    setSaveStatus('error')
+  }
+}
+
+/**
+ * Writes a pending scene when the diagram closes, cached optimistically so
+ * navigating back never reads stale DB data.
+ */
+function useFlushOnClose(diagramId: string, refs: AutosaveRefs): void {
+  useEffect(() => {
+    return () => {
+      const { autosaveTimerRef, pendingSceneRef, titleRef, tagsRef } = refs
+      clearTimer(autosaveTimerRef)
+      const sceneJson = pendingSceneRef.current
+      if (sceneJson === null) return
+      pendingSceneRef.current = null
+      useNotesStore.getState().setDiagramCache(diagramId, sceneJson)
+      const save = { diagramId, sceneJson, title: titleRef.current, tags: tagsRef.current }
+      void saveDiagram(save).catch(console.error)
+    }
+  }, [diagramId]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+function clearTimer(timerRef: TimerRef): void {
+  if (timerRef.current) clearTimeout(timerRef.current)
+  timerRef.current = null
+}
+
+// ─── Canvas ────────────────────────────────────────────────────────
+
+interface ExcalidrawApi {
+  getAppState: () => AppState
+  getSceneElements: () => unknown[]
+}
+
+/** The canvas's view state, kept for placing pins, and its changes, saved. */
+function useCanvas(scheduleAutosave: (sceneJson: string) => void) {
+  const [appState, setAppState] = useState<AppState | null>(null)
+  const excalidrawApiRef = useRef<ExcalidrawApi | null>(null)
+
+  const handleExcalidrawChange = useCallback(
+    (elements: readonly unknown[], state: AppState) => {
+      setAppState(state)
+      const { scrollX, scrollY, zoom } = state
+      scheduleAutosave(JSON.stringify({ elements, appState: { scrollX, scrollY, zoom } }))
+    },
+    [scheduleAutosave]
+  )
+
+  const handleExcalidrawAPI = useCallback((api: ExcalidrawApi) => {
+    if (excalidrawApiRef.current === api) return
+    excalidrawApiRef.current = api
+    setAppState(api.getAppState())
+  }, [])
+
+  return { appState, handleExcalidrawChange, handleExcalidrawAPI }
+}
+
+// ─── Comments ──────────────────────────────────────────────────────
+
+type SetComments = React.Dispatch<React.SetStateAction<DiagramComment[]>>
+
+async function createDiagramComment(payload: Record<string, unknown>, setComments: SetComments) {
+  const diagramId = payload.diagramId as string
+  await window.electronAPI.extensionBridge.invoke(
+    'terminator.notepad:diagram-comments.create',
+    payload
+  )
+  setComments(await listDiagramComments(diagramId))
+}
+
+/** What a thread's actions change. */
+interface ThreadContext {
+  diagramId: string
+  setComments: SetComments
+  setActiveCommentId: (id: string | null) => void
+}
+
+function threadActionsFor(commentId: string, ctx: ThreadContext): ThreadActions {
+  const { diagramId, setComments, setActiveCommentId } = ctx
+  const removeThread = (channel: string, failure: string) =>
+    window.electronAPI.extensionBridge
+      .invoke(channel, { id: commentId })
+      .then(() => {
+        setComments((prev) => prev.filter((c) => c.id !== commentId))
+        setActiveCommentId(null)
+      })
+      .catch((err) => console.error(`[notepad] DiagramView: ${failure} failed`, err))
+  const reply = { diagramId, parentId: commentId, sceneX: 0, sceneY: 0 }
+  return {
+    onReply: (body) =>
+      void createDiagramComment({ ...reply, body }, setComments).catch((err) =>
+        console.error('[notepad] DiagramView: reply failed', err)
+      ),
+    onResolve: () => void removeThread('terminator.notepad:diagram-comments.resolve', 'resolve'),
+    onDelete: () =>
+      void removeThread('terminator.notepad:diagram-comments.delete', 'delete comment'),
+    onClose: () => setActiveCommentId(null),
+  }
+}
+
+/** Placing, replying to, resolving and deleting the diagram's comments. */
+function useDiagramComments(diagramId: string, setComments: SetComments) {
+  const [commentMode, setCommentMode] = useState(false)
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
+  const [pendingPin, setPendingPin] = useState<PendingPin | null>(null)
+
+  async function handleCreateComment(body: string) {
+    if (!pendingPin) return
+    const { sceneX, sceneY } = pendingPin
+    await createDiagramComment({ diagramId, body, sceneX, sceneY }, setComments).catch((err) =>
+      console.error('[notepad] DiagramView: create comment failed', err)
+    )
+    setPendingPin(null)
+  }
+
+  const threadActions = (commentId: string) =>
+    threadActionsFor(commentId, { diagramId, setComments, setActiveCommentId })
+
+  return {
+    ...{ commentMode, setCommentMode, activeCommentId, setActiveCommentId },
+    ...{ pendingPin, setPendingPin, handleCreateComment, threadActions },
+  }
+}
+
+type DiagramCommentControls = ReturnType<typeof useDiagramComments>
 
 // ─── Main DiagramView ──────────────────────────────────────────────
 
@@ -222,422 +387,225 @@ interface DiagramViewProps {
 }
 
 export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element {
-  const [initialScene, setInitialScene] = useState<SceneData>({})
-  const [loaded, setLoaded] = useState(false)
-  const [title, setTitle] = useState('Untitled diagram')
-  const [tags, setTags] = useState<string[]>([])
-  const [editingTitle, setEditingTitle] = useState(false)
-  const [draftTitle, setDraftTitle] = useState('')
-  const [comments, setComments] = useState<DiagramComment[]>([])
-  const [commentMode, setCommentMode] = useState(false)
-  const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
-  const [pendingPin, setPendingPin] = useState<{
-    sceneX: number
-    sceneY: number
-    screenX: number
-    screenY: number
-  } | null>(null)
-  const [appState, setAppState] = useState<AppState | null>(null)
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle'>('idle')
-  const [loadError, setLoadError] = useState<string | null>(null)
-
-  const excalidrawApiRef = useRef<{
-    getAppState: () => AppState
-    getSceneElements: () => unknown[]
-  } | null>(null)
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingSaveRef = useRef<{ sceneJson: string; title: string; tags: string[] } | null>(null)
-  const latestTitleRef = useRef(title)
-  const latestTagsRef = useRef(tags)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const activeIdRef = useRef(diagramId)
-
-  useEffect(() => {
-    latestTitleRef.current = title
-  }, [title])
-  useEffect(() => {
-    latestTagsRef.current = tags
-  }, [tags])
-
-  useEffect(() => {
-    activeIdRef.current = diagramId
-
-    async function load() {
-      try {
-        // Use the in-session scene cache when available so content is never lost
-        // due to a race between a cleanup flush and this DB read.
-        const cachedScene = useNotesStore.getState().diagramCache[diagramId]
-
-        const [diagramResult, commentsResult] = await Promise.all([
-          cachedScene !== undefined
-            ? Promise.resolve({
-                data: {
-                  // Title and tags come from the always-up-to-date diagrams list
-                  ...(useNotesStore.getState().diagrams.find((d) => d.id === diagramId) ?? {
-                    title: '',
-                    tags: [],
-                  }),
-                  sceneJson: cachedScene,
-                },
-              })
-            : window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.get', {
-                id: diagramId,
-              }),
-          window.electronAPI.extensionBridge.invoke('terminator.notepad:diagram-comments.list', {
-            diagramId,
-            includeResolved: false,
-          }),
-        ])
-
-        if (activeIdRef.current !== diagramId) return
-
-        const diagram = (
-          diagramResult as { data?: { title: string; tags: string[]; sceneJson: string } }
-        ).data
-        if (!diagram) {
-          setLoadError('Diagram not found.')
-          setLoaded(true)
-          return
-        }
-        // Populate the cache on first DB fetch so future navigate-backs skip the round-trip
-        if (cachedScene === undefined) {
-          useNotesStore.getState().setDiagramCache(diagramId, diagram.sceneJson)
-        }
-        setTitle(diagram.title)
-        setTags(diagram.tags ?? [])
-        try {
-          setInitialScene(JSON.parse(diagram.sceneJson || '{}') as SceneData)
-        } catch {
-          setInitialScene({})
-        }
-        const commentData = (commentsResult as { data?: DiagramComment[] }).data ?? []
-        setComments(commentData)
-        setLoaded(true)
-      } catch (err) {
-        console.error('[notepad] DiagramView: load failed', err)
-        setLoadError('Failed to load diagram.')
-        setLoaded(true)
-      }
-    }
-    void load()
-
-    return () => {
-      if (autosaveTimer.current) {
-        clearTimeout(autosaveTimer.current)
-        autosaveTimer.current = null
-      }
-      // Flush any pending save so changes aren't lost when switching diagrams.
-      // Use latest refs so a pending save picks up any title/tags renamed since scheduling.
-      const pending = pendingSaveRef.current
-      if (pending) {
-        pendingSaveRef.current = null
-        // Cache optimistically so navigate-back never reads stale DB data
-        useNotesStore.getState().setDiagramCache(diagramId, pending.sceneJson)
-        void window.electronAPI.extensionBridge
-          .invoke('terminator.notepad:diagrams.autosave', {
-            id: diagramId,
-            title: latestTitleRef.current,
-            sceneJson: pending.sceneJson,
-            tags: latestTagsRef.current,
-          })
-          .catch(console.error)
-      }
-    }
-  }, [diagramId])
-
-  const scheduleAutosave = useCallback(
-    (newSceneJson: string) => {
-      pendingSaveRef.current = {
-        sceneJson: newSceneJson,
-        title: latestTitleRef.current,
-        tags: latestTagsRef.current,
-      }
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
-      autosaveTimer.current = setTimeout(async () => {
-        // Read title/tags from refs at fire time so a rename between schedule and fire is respected
-        const fireTitle = latestTitleRef.current
-        const fireTags = latestTagsRef.current
-        setSaveStatus('saving')
-        try {
-          await window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.autosave', {
-            id: diagramId,
-            title: fireTitle,
-            sceneJson: newSceneJson,
-            tags: fireTags,
-          })
-          pendingSaveRef.current = null
-          setSaveStatus('saved')
-          // Keep sidebar in sync and cache the scene for instant navigate-back
-          const savedAt = new Date().toISOString()
-          useNotesStore.getState().patchDiagram(diagramId, {
-            title: fireTitle,
-            updatedAt: savedAt,
-            tags: fireTags,
-          })
-          useNotesStore.getState().setDiagramCache(diagramId, newSceneJson)
-        } catch (err) {
-          console.error('[notepad] DiagramView: autosave failed', err)
-          setSaveStatus('error')
-          // pendingSaveRef is intentionally kept so the unmount flush can retry
-        }
-      }, AUTOSAVE_DELAY_MS)
-    },
-    [diagramId]
-  )
-
-  const handleExcalidrawChange = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (elements: readonly unknown[], state: any) => {
-      setAppState(state as AppState)
-      const newJson = JSON.stringify({
-        elements,
-        appState: { scrollX: state.scrollX, scrollY: state.scrollY, zoom: state.zoom },
-      })
-      scheduleAutosave(newJson)
-    },
-    [scheduleAutosave]
-  )
-
-  const handleExcalidrawAPI = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (api: any) => {
-      if (excalidrawApiRef.current === api) return
-      excalidrawApiRef.current = api
-      setAppState(api.getAppState() as AppState)
-    },
-    []
-  )
-
-  async function commitTitleEdit() {
-    const trimmed = draftTitle.trim() || 'Untitled diagram'
-    setTitle(trimmed)
-    setEditingTitle(false)
-    try {
-      await window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.autosave', {
-        id: diagramId,
-        title: trimmed,
-        tags,
-      })
-    } catch (err) {
-      console.error('[notepad] DiagramView: title save failed', err)
-    }
-  }
-
-  function handleCanvasClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!commentMode || !appState) return
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const clientX = e.clientX - rect.left
-    const clientY = e.clientY - rect.top
-    const scene = viewportToScene(clientX, clientY, appState)
-    setPendingPin({ sceneX: scene.x, sceneY: scene.y, screenX: clientX, screenY: clientY })
-    setCommentMode(false)
-  }
-
-  async function handleCreateComment(body: string) {
-    if (!pendingPin) return
-    try {
-      await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:diagram-comments.create',
-        {
-          diagramId,
-          body,
-          sceneX: pendingPin.sceneX,
-          sceneY: pendingPin.sceneY,
-        }
-      )
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:diagram-comments.list',
-        { diagramId, includeResolved: false }
-      )
-      const data = (result as { data?: DiagramComment[] }).data ?? []
-      setComments(data)
-    } catch (err) {
-      console.error('[notepad] DiagramView: create comment failed', err)
-    }
-    setPendingPin(null)
-  }
-
-  async function handleReply(commentId: string, body: string) {
-    try {
-      await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:diagram-comments.create',
-        {
-          diagramId,
-          parentId: commentId,
-          body,
-          sceneX: 0,
-          sceneY: 0,
-        }
-      )
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:diagram-comments.list',
-        { diagramId, includeResolved: false }
-      )
-      setComments((result as { data?: DiagramComment[] }).data ?? [])
-    } catch (err) {
-      console.error('[notepad] DiagramView: reply failed', err)
-    }
-  }
-
-  async function handleResolve(commentId: string) {
-    try {
-      await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:diagram-comments.resolve',
-        {
-          id: commentId,
-        }
-      )
-      setComments((prev) => prev.filter((c) => c.id !== commentId))
-      setActiveCommentId(null)
-    } catch (err) {
-      console.error('[notepad] DiagramView: resolve failed', err)
-    }
-  }
-
-  async function handleDelete(commentId: string) {
-    try {
-      await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:diagram-comments.delete',
-        {
-          id: commentId,
-        }
-      )
-      setComments((prev) => prev.filter((c) => c.id !== commentId))
-      setActiveCommentId(null)
-    } catch (err) {
-      console.error('[notepad] DiagramView: delete comment failed', err)
-    }
-  }
-
-  const activeComment = comments.find((c) => c.id === activeCommentId) ?? null
+  const doc = useDiagramDocument(diagramId)
+  const { saveStatus, scheduleAutosave } = useDiagramAutosave(diagramId, doc)
+  const canvas = useCanvas(scheduleAutosave)
+  const commenting = useDiagramComments(diagramId, doc.setComments)
 
   return (
     <div className="diagram-view">
       <div className="diagram-view__toolbar">
-        <div className="diagram-view__title-area">
-          {editingTitle ? (
-            <input
-              className="diagram-view__title-input"
-              autoFocus
-              value={draftTitle}
-              onChange={(e) => setDraftTitle(e.target.value)}
-              onBlur={() => void commitTitleEdit()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void commitTitleEdit()
-                if (e.key === 'Escape') setEditingTitle(false)
-              }}
-            />
-          ) : (
-            <button
-              className="diagram-view__title-btn"
-              onClick={() => {
-                setDraftTitle(title)
-                setEditingTitle(true)
-              }}
-              title="Click to rename"
-            >
-              {title}
-              <Pencil className="diagram-view__title-edit-icon tm-icon-sm" />
-            </button>
-          )}
-          {tags.length > 0 && (
-            <span className="diagram-view__tags">{tags.map((t) => `#${t}`).join(' ')}</span>
-          )}
-        </div>
+        <DiagramTitle diagramId={diagramId} doc={doc} />
         <span className="diagram-view__save-status">
-          {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Save failed' : ''}
+          {{ saving: 'Saving…', error: 'Save failed' }[saveStatus as string] ?? ''}
         </span>
-        <Button
-          variant={commentMode ? 'primary' : 'ghost'}
-          size="sm"
-          icon={MessageSquarePlus}
-          aria-pressed={commentMode}
+        <CommentModeButton commenting={commenting} />
+      </div>
+      <DiagramCanvas diagramId={diagramId} doc={doc} canvas={canvas} commenting={commenting} />
+    </div>
+  )
+}
+
+function DiagramTitle(props: { diagramId: string; doc: DiagramDocument }): React.JSX.Element {
+  const { diagramId, doc } = props
+  const { title, tags } = doc
+  const [draftTitle, setDraftTitle] = useState<string | null>(null)
+
+  async function commitTitleEdit(draft: string) {
+    const trimmed = draft.trim() || 'Untitled diagram'
+    doc.setTitle(trimmed)
+    setDraftTitle(null)
+    await window.electronAPI.extensionBridge
+      .invoke('terminator.notepad:diagrams.autosave', { id: diagramId, title: trimmed, tags })
+      .catch((err) => console.error('[notepad] DiagramView: title save failed', err))
+  }
+
+  return (
+    <div className="diagram-view__title-area">
+      {draftTitle !== null ? (
+        <TitleInput
+          draft={draftTitle}
+          onChange={setDraftTitle}
+          onCommit={() => void commitTitleEdit(draftTitle)}
+        />
+      ) : (
+        <TitleButton title={title} onClick={() => setDraftTitle(title)} />
+      )}
+      <DiagramTags tags={tags} />
+    </div>
+  )
+}
+
+function DiagramTags({ tags }: { tags: string[] }): React.JSX.Element | null {
+  if (tags.length === 0) return null
+  return <span className="diagram-view__tags">{tags.map((t) => '#' + t).join(' ')}</span>
+}
+
+interface TitleInputProps {
+  draft: string
+  /** null cancels the edit. */
+  onChange: (draft: string | null) => void
+  onCommit: () => void
+}
+
+function TitleInput({ draft, onChange, onCommit }: TitleInputProps): React.JSX.Element {
+  return (
+    <input
+      className="diagram-view__title-input"
+      autoFocus
+      value={draft}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onCommit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onCommit()
+        if (e.key === 'Escape') onChange(null)
+      }}
+    />
+  )
+}
+
+function TitleButton({ title, onClick }: { title: string; onClick: () => void }) {
+  return (
+    <button className="diagram-view__title-btn" onClick={onClick} title="Click to rename">
+      {title}
+      <Pencil className="diagram-view__title-edit-icon tm-icon-sm" />
+    </button>
+  )
+}
+
+function CommentModeButton({ commenting }: { commenting: DiagramCommentControls }) {
+  const { commentMode, setCommentMode, setPendingPin } = commenting
+  return (
+    <Button
+      variant={commentMode ? 'primary' : 'ghost'}
+      size="sm"
+      icon={MessageSquarePlus}
+      aria-pressed={commentMode}
+      onClick={() => {
+        setCommentMode((v) => !v)
+        setPendingPin(null)
+      }}
+      title={commentMode ? 'Cancel comment placement' : 'Add comment (click anywhere on canvas)'}
+    >
+      {commentMode ? 'Placing…' : 'Comment'}
+    </Button>
+  )
+}
+
+interface DiagramCanvasProps {
+  diagramId: string
+  doc: DiagramDocument
+  canvas: ReturnType<typeof useCanvas>
+  commenting: DiagramCommentControls
+}
+
+/**
+ * The canvas, with the comment pins and popovers over it. In comment mode a
+ * transparent overlay captures clicks before Excalidraw sees them.
+ */
+function DiagramCanvas(props: DiagramCanvasProps): React.JSX.Element {
+  const { diagramId, doc, canvas, commenting } = props
+  const { commentMode, pendingPin, setPendingPin } = commenting
+  const containerRef = useRef<HTMLDivElement>(null)
+  const placePin = usePinPlacement(containerRef, canvas.appState, commenting)
+
+  return (
+    <div
+      ref={containerRef}
+      className={`diagram-view__canvas${commentMode ? ' diagram-view__canvas--comment-mode' : ''}`}
+    >
+      {commentMode && <div className="diagram-view__comment-intercept" onClick={placePin} />}
+      <ExcalidrawArea diagramId={diagramId} doc={doc} canvas={canvas} />
+      {canvas.appState && (
+        <CommentLayer doc={doc} appState={canvas.appState} commenting={commenting} />
+      )}
+      {pendingPin && (
+        <NewCommentComposer
+          screenX={pendingPin.screenX}
+          screenY={pendingPin.screenY}
+          onSubmit={(body) => void commenting.handleCreateComment(body)}
+          onCancel={() => setPendingPin(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+/** Turns a click on the canvas into a pin to comment on, in scene coordinates. */
+function usePinPlacement(
+  containerRef: React.RefObject<HTMLDivElement>,
+  appState: AppState | null,
+  commenting: DiagramCommentControls
+) {
+  return (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!commenting.commentMode || !appState || !rect) return
+    const screenX = e.clientX - rect.left
+    const screenY = e.clientY - rect.top
+    const scene = viewportToScene(screenX, screenY, appState)
+    commenting.setPendingPin({ sceneX: scene.x, sceneY: scene.y, screenX, screenY })
+    commenting.setCommentMode(false)
+  }
+}
+
+function ExcalidrawArea(props: Omit<DiagramCanvasProps, 'commenting'>) {
+  const { diagramId, doc, canvas } = props
+  if (!doc.loaded) return null
+  if (doc.loadError) return <div className="diagram-view__load-error">{doc.loadError}</div>
+  return (
+    <Suspense fallback={<div className="diagram-view__loading">Loading canvas…</div>}>
+      <ExcalidrawComponent
+        key={diagramId}
+        theme="dark"
+        initialData={{
+          elements: doc.initialScene.elements ?? [],
+          appState: doc.initialScene.appState ?? {},
+          scrollToContent: true,
+        }}
+        onChange={canvas.handleExcalidrawChange as never}
+        excalidrawAPI={canvas.handleExcalidrawAPI as never}
+      />
+    </Suspense>
+  )
+}
+
+interface CommentLayerProps {
+  doc: DiagramDocument
+  appState: AppState
+  commenting: DiagramCommentControls
+}
+
+function screenOf(c: DiagramComment, appState: AppState): ScreenPoint {
+  const { x, y } = sceneToViewport(c.sceneX, c.sceneY, appState)
+  return { screenX: x, screenY: y }
+}
+
+/** A pin per comment, and the popover of the one that is open. */
+function CommentLayer({ doc, appState, commenting }: CommentLayerProps): React.JSX.Element {
+  const { activeCommentId, setActiveCommentId, setPendingPin } = commenting
+  const activeComment = doc.comments.find((c) => c.id === activeCommentId) ?? null
+  return (
+    <>
+      {doc.comments.map((c) => (
+        <CommentPin
+          key={c.id}
+          comment={c}
+          {...screenOf(c, appState)}
+          isActive={activeCommentId === c.id}
           onClick={() => {
-            setCommentMode((v) => !v)
+            setActiveCommentId((prev) => (prev === c.id ? null : c.id))
             setPendingPin(null)
           }}
-          title={
-            commentMode ? 'Cancel comment placement' : 'Add comment (click anywhere on canvas)'
-          }
-        >
-          {commentMode ? 'Placing…' : 'Comment'}
-        </Button>
-      </div>
-
-      <div
-        ref={containerRef}
-        className={`diagram-view__canvas${commentMode ? ' diagram-view__canvas--comment-mode' : ''}`}
-      >
-        {/* Transparent overlay in comment mode captures clicks before Excalidraw sees them */}
-        {commentMode && (
-          <div className="diagram-view__comment-intercept" onClick={handleCanvasClick} />
-        )}
-        {loaded && loadError && <div className="diagram-view__load-error">{loadError}</div>}
-        {loaded && !loadError && (
-          <Suspense fallback={<div className="diagram-view__loading">Loading canvas…</div>}>
-            <ExcalidrawComponent
-              key={diagramId}
-              theme="dark"
-              initialData={{
-                elements: initialScene.elements ?? [],
-                appState: initialScene.appState ?? {},
-                scrollToContent: true,
-              }}
-              onChange={handleExcalidrawChange}
-              excalidrawAPI={handleExcalidrawAPI}
-            />
-          </Suspense>
-        )}
-
-        {/* Comment pins overlay */}
-        {appState &&
-          comments.map((c) => {
-            const { x, y } = sceneToViewport(c.sceneX, c.sceneY, appState)
-            return (
-              <CommentPin
-                key={c.id}
-                comment={c}
-                screenX={x}
-                screenY={y}
-                isActive={activeCommentId === c.id}
-                onClick={() => {
-                  setActiveCommentId((prev) => (prev === c.id ? null : c.id))
-                  setPendingPin(null)
-                }}
-              />
-            )
-          })}
-
-        {/* Active comment popover */}
-        {activeComment &&
-          appState &&
-          (() => {
-            const { x, y } = sceneToViewport(activeComment.sceneX, activeComment.sceneY, appState)
-            return (
-              <CommentPopover
-                key={activeComment.id}
-                comment={activeComment}
-                screenX={x}
-                screenY={y}
-                onReply={(body) => void handleReply(activeComment.id, body)}
-                onResolve={() => void handleResolve(activeComment.id)}
-                onDelete={() => void handleDelete(activeComment.id)}
-                onClose={() => setActiveCommentId(null)}
-              />
-            )
-          })()}
-
-        {/* New comment composer */}
-        {pendingPin && (
-          <NewCommentComposer
-            screenX={pendingPin.screenX}
-            screenY={pendingPin.screenY}
-            onSubmit={(body) => void handleCreateComment(body)}
-            onCancel={() => setPendingPin(null)}
-          />
-        )}
-      </div>
-    </div>
+        />
+      ))}
+      {activeComment && (
+        <CommentPopover
+          key={activeComment.id}
+          comment={activeComment}
+          {...screenOf(activeComment, appState)}
+          actions={commenting.threadActions(activeComment.id)}
+        />
+      )}
+    </>
   )
 }
