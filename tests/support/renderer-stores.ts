@@ -1,6 +1,7 @@
 import { vi, type Mock } from 'vitest'
 import type { StoreApi } from 'zustand'
 import type {
+  Extension,
   Issue,
   IssueSummary,
   Project,
@@ -51,6 +52,19 @@ export function terminalSessionOf(
     createdAt: CREATED,
     lastActivityAt: 0,
     agentState: 'idle',
+    ...overrides,
+  }
+}
+
+/** An installed extension, as main lists it. */
+export function extensionOf(overrides: Partial<Extension> & Pick<Extension, 'id'>): Extension {
+  return {
+    name: overrides.id,
+    version: '1.0.0',
+    description: '',
+    entryPoint: `/extensions/${overrides.id}/main.cjs`,
+    status: 'enabled',
+    installedAt: CREATED,
     ...overrides,
   }
 }
