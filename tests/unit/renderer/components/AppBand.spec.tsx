@@ -12,26 +12,14 @@ const globalTabs = [
 ]
 
 let onSelect: ReturnType<typeof vi.fn>
-let onRunItem: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   vi.clearAllMocks()
   onSelect = vi.fn()
-  onRunItem = vi.fn()
 })
 
-const sidebarItems = () => [{ id: 'git-changes', label: 'Git Changes', action: onRunItem }]
-
 function renderBand(props: Partial<React.ComponentProps<typeof AppBand>> = {}) {
-  return render(
-    <AppBand
-      globalTabs={globalTabs}
-      sidebarItems={sidebarItems()}
-      activeId={null}
-      onSelect={onSelect}
-      {...props}
-    />
-  )
+  return render(<AppBand globalTabs={globalTabs} activeId={null} onSelect={onSelect} {...props} />)
 }
 
 describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
@@ -39,7 +27,7 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
     // The 8px text label went: at that size it was barely legible and doubled
     // the band's height for what the accessible name already carries.
     const { container } = renderBand()
-    for (const label of ['Overview', 'Notes', 'Task Vault', 'Git Changes']) {
+    for (const label of ['Overview', 'Notes', 'Task Vault']) {
       expect(screen.getByRole('button', { name: label })).toBeTruthy()
     }
     for (const entry of container.querySelectorAll('.app-band__entry')) {
@@ -50,9 +38,9 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
     }
   })
 
-  it('draws global tabs and contributed sidebar items in the same band', () => {
+  it('draws one entry per global tab', () => {
     const { container } = renderBand()
-    expect(container.querySelectorAll('.app-band__entry')).toHaveLength(4)
+    expect(container.querySelectorAll('.app-band__entry')).toHaveLength(3)
   })
 
   it('gives every entry an accessible name', () => {
@@ -60,7 +48,7 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
     const names = [...container.querySelectorAll('.app-band__entry')].map((el) =>
       el.getAttribute('aria-label')
     )
-    expect(names).toEqual(['Overview', 'Notes', 'Task Vault', 'Git Changes'])
+    expect(names).toEqual(['Overview', 'Notes', 'Task Vault'])
   })
 
   it('hides the icon from assistive technology — the label carries it', () => {
@@ -84,13 +72,6 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
     renderBand()
     fireEvent.click(screen.getByRole('button', { name: 'Notes' }))
     expect(onSelect).toHaveBeenCalledWith('notes')
-  })
-
-  it('runs a contributed item action rather than selecting it as a tab', () => {
-    renderBand()
-    fireEvent.click(screen.getByRole('button', { name: 'Git Changes' }))
-    expect(onRunItem).toHaveBeenCalledOnce()
-    expect(onSelect).not.toHaveBeenCalled()
   })
 
   it('marks the active global tab', () => {
@@ -120,69 +101,33 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
     const { container } = renderBand({
       globalTabs: [...globalTabs, { id: 'secret', label: 'Secret', component: noop, hidden: true }],
     })
-    expect(container.querySelectorAll('.app-band__entry')).toHaveLength(4)
+    expect(container.querySelectorAll('.app-band__entry')).toHaveLength(3)
     expect(screen.queryByText('Secret')).toBeNull()
   })
 
   it('renders nothing at all when nothing is contributed', () => {
-    const { container } = renderBand({ globalTabs: [], sidebarItems: [] })
+    const { container } = renderBand({ globalTabs: [] })
     expect(container.querySelector('.app-band')).toBeNull()
   })
 
   it('names no extension in its own markup — it renders registry data only', () => {
     const { container } = renderBand({
       globalTabs: [{ id: 'x', label: 'Anything At All', component: noop }],
-      sidebarItems: [],
     })
     expect(screen.getByRole('button', { name: 'Anything At All' })).toBeTruthy()
     expect(container.querySelectorAll('.app-band__entry')).toHaveLength(1)
   })
 })
 
-describe('AppBand — icons', () => {
-  it('draws the icon a contribution supplies', () => {
-    const { container } = renderBand({
-      globalTabs: [],
-      sidebarItems: [
-        { id: 'git', label: 'Git Changes', icon: <svg data-testid="git-icon" />, action: noop },
-      ],
-    })
-    expect(container.querySelector('[data-testid="git-icon"]')).toBeTruthy()
-  })
-
-  /**
-   * Every contribution should name one. `SidebarContribution.icon` takes the
-   * same lucide names a manifest uses; before it existed a sidebar item could
-   * not supply an icon at all and the band drew a bare square, which said
-   * nothing once the text labels came off.
-   */
-  it('falls back to an extension glyph, never a bare square', () => {
-    const { container } = renderBand({
-      globalTabs: [],
-      sidebarItems: [{ id: 'x', label: 'No Icon', action: noop }],
-    })
-    const svg = container.querySelector('.app-band__icon svg')!
-    expect(svg.getAttribute('class')).toContain('lucide-puzzle')
-  })
-
-  it('still names an icon-only entry for a reader', () => {
-    renderBand({
-      globalTabs: [],
-      sidebarItems: [{ id: 'git', label: 'Git Changes', action: noop }],
-    })
-    expect(screen.getByRole('button', { name: 'Git Changes' })).toBeTruthy()
-  })
-})
-
 describe('AppBand — quick actions', () => {
   it('renders nothing when the prop is absent', () => {
-    const { container } = renderBand({ globalTabs: [], sidebarItems: [] })
+    const { container } = renderBand({ globalTabs: [] })
     expect(container.querySelector('.app-band')).toBeNull()
   })
 
   it('renders the band for this entry alone', () => {
     const onOpenQuickActions = vi.fn()
-    const { container } = renderBand({ globalTabs: [], sidebarItems: [], onOpenQuickActions })
+    const { container } = renderBand({ globalTabs: [], onOpenQuickActions })
     expect(container.querySelector('.app-band')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Quick actions (⌘P)' })).toBeTruthy()
   })

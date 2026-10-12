@@ -17,8 +17,6 @@ const service = vi.hoisted(() => ({
 }))
 const store = vi.hoisted(() => ({
   listConnections: vi.fn(),
-  getLink: vi.fn(),
-  onLinkChange: vi.fn(() => () => {}),
   setLink: vi.fn(),
 }))
 
@@ -27,8 +25,6 @@ vi.mock('../../../src/main/integrations/tracker-store', () => ({
   listConnections: store.listConnections,
 }))
 vi.mock('../../../src/main/integrations/issue-link-store', () => ({
-  getLink: store.getLink,
-  onLinkChange: store.onLinkChange,
   setLink: store.setLink,
 }))
 vi.mock('electron', () => ({
@@ -53,7 +49,6 @@ async function makeApi() {
 beforeEach(() => {
   vi.clearAllMocks()
   store.setLink.mockResolvedValue(LINK)
-  store.onLinkChange.mockReturnValue(() => {})
 })
 
 describe('api.issues — delegation', () => {
@@ -87,22 +82,6 @@ describe('api.issues — delegation', () => {
     service.comment.mockRejectedValue(new Error('no permission'))
     const api = await makeApi()
     await expect(api.issues.comment('linear', 'TAV-42', 'hi')).rejects.toThrow('no permission')
-  })
-
-  it('reads a project link synchronously', async () => {
-    store.getLink.mockReturnValue(LINK)
-    const api = await makeApi()
-    expect(api.issues.linkFor('p1')).toMatchObject({ key: 'TAV-42' })
-  })
-
-  it('subscribes to link changes and disposes cleanly', async () => {
-    const unsub = vi.fn()
-    store.onLinkChange.mockReturnValue(unsub)
-    const api = await makeApi()
-
-    const subscription = api.issues.onLinkChange(() => {})
-    subscription.dispose()
-    expect(unsub).toHaveBeenCalled()
   })
 })
 
@@ -181,9 +160,7 @@ describe('api.issues — the surface itself (FR-034)', () => {
         'connections',
         'create',
         'get',
-        'linkFor',
         'listMine',
-        'onLinkChange',
         'search',
         'states',
         'supportsCreate',

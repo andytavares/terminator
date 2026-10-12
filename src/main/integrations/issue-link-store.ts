@@ -17,18 +17,10 @@ import { onProjectDelete } from '../extensions/workspace-events.js'
 
 const FILE_NAME = 'issue-links.json'
 
-type LinkChangeHandler = (projectId: string, link: IssueLink | null) => void
-
 const links = new Map<string, IssueLink>()
-const handlers = new Set<LinkChangeHandler>()
 
 function filePath(): string {
   return path.join(app.getPath('userData'), FILE_NAME)
-}
-
-function announce(projectId: string): void {
-  const link = links.get(projectId) ?? null
-  for (const handler of handlers) handler(projectId, link)
 }
 
 async function persist(): Promise<void> {
@@ -91,7 +83,6 @@ export async function setLink(input: SetLinkInput): Promise<IssueLink> {
     linkedAt: new Date().toISOString(),
   }
   links.set(input.projectId, link)
-  announce(input.projectId)
   await persist()
   return link
 }
@@ -108,21 +99,12 @@ export async function setInjectContext(projectId: string, inject: boolean): Prom
   const existing = links.get(projectId)
   if (existing === undefined) return
   links.set(projectId, { ...existing, injectContext: inject })
-  announce(projectId)
   await persist()
 }
 
 export async function clearLink(projectId: string): Promise<void> {
   if (!links.delete(projectId)) return
-  announce(projectId)
   await persist()
-}
-
-export function onLinkChange(handler: LinkChangeHandler): () => void {
-  handlers.add(handler)
-  return () => {
-    handlers.delete(handler)
-  }
 }
 
 /**
@@ -135,7 +117,6 @@ export function registerLinkGarbageCollection(): () => void {
   return onProjectDelete((projectId) => {
     if (!links.has(projectId)) return
     links.delete(projectId)
-    announce(projectId)
     void persist()
   })
 }

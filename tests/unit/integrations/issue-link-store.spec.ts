@@ -249,33 +249,6 @@ describe('issue-link-store — garbage collection', () => {
     expect(store.getLink(P2)?.key).toBe('TAV-43')
   })
 
-  it('notifies a listener so surfaces can drop the badge', async () => {
-    const store = await load()
-    const { emitProjectDelete } = await import('../../../src/main/extensions/workspace-events')
-    const seen: Array<{ projectId: string; link: unknown }> = []
-
-    store.onLinkChange((projectId, link) => seen.push({ projectId, link }))
-    await store.setLink({ projectId: P1, tracker: 'linear', key: 'TAV-42', injectContext: true })
-    store.registerLinkGarbageCollection()
-    emitProjectDelete(P1)
-
-    expect(seen.map((s) => s.link)).toEqual([expect.objectContaining({ key: 'TAV-42' }), null])
-  })
-
-  it('does nothing for a project that had no link', async () => {
-    const store = await load()
-    const { emitProjectDelete } = await import('../../../src/main/extensions/workspace-events')
-    const seen: string[] = []
-    store.onLinkChange((projectId) => seen.push(projectId))
-
-    store.registerLinkGarbageCollection()
-    emitProjectDelete(P1)
-
-    // No link, so nothing to announce — a listener must not be woken for a
-    // change that did not happen.
-    expect(seen).toEqual([])
-  })
-
   it('can be unregistered', async () => {
     const store = await load()
     const { emitProjectDelete } = await import('../../../src/main/extensions/workspace-events')
@@ -286,36 +259,5 @@ describe('issue-link-store — garbage collection', () => {
     emitProjectDelete(P1)
 
     expect(store.getLink(P1)?.key).toBe('TAV-42')
-  })
-})
-
-describe('issue-link-store — change notification', () => {
-  it('fires on set and on clear', async () => {
-    const store = await load()
-    const seen: string[] = []
-    store.onLinkChange((projectId) => seen.push(projectId))
-
-    await store.setLink({ projectId: P1, tracker: 'linear', key: 'TAV-42', injectContext: true })
-    await store.clearLink(P1)
-
-    expect(seen).toEqual([P1, P1])
-  })
-
-  it('stops firing once the listener is disposed', async () => {
-    const store = await load()
-    const seen: string[] = []
-    const dispose = store.onLinkChange((projectId) => seen.push(projectId))
-    dispose()
-
-    await store.setLink({ projectId: P1, tracker: 'linear', key: 'TAV-42', injectContext: true })
-    expect(seen).toEqual([])
-  })
-
-  it('does not fire clearing a project that was never linked', async () => {
-    const store = await load()
-    const seen: string[] = []
-    store.onLinkChange((projectId) => seen.push(projectId))
-    await store.clearLink(P1)
-    expect(seen).toEqual([])
   })
 })

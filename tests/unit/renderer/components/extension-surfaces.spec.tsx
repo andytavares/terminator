@@ -11,9 +11,8 @@ import type { Project, TerminalSession, Workspace } from '../../../../src/shared
 
 // THE MERGE GATE for feature 030.
 //
-// Flattening the sidebar removes the element two of these surfaces hang on,
-// and a third — sidebar items — never had a working host at all. Surfaces are
-// enumerated from what extensions can actually contribute, not from the
+// Flattening the sidebar removes the element two of these surfaces hang on.
+// Surfaces are enumerated from what extensions can actually contribute, not from the
 // renderer registry alone: reading only the renderer is what produced the
 // wrong "this surface does not exist" conclusion during Phase 0 research.
 
@@ -84,8 +83,6 @@ const globalTab = {
 }
 const workspaceTab = { id: 'fake.wstab', label: 'Fake Workspace Tab', component: () => null }
 const projectTab = { id: 'fake.projtab', label: 'Fake Project Tab', component: () => null }
-const sidebarItemAction = vi.fn()
-const sidebarItem = { id: 'fake.item', label: 'Fake Sidebar Item', action: sidebarItemAction }
 
 const mockWorkspaceStore = {
   workspaces: [ws1],
@@ -115,7 +112,6 @@ const mockRegistryState = {
   globalTabs: new Map([[globalTab.id, globalTab]]),
   workspaceTabs: new Map([[workspaceTab.id, workspaceTab]]),
   projectTabs: new Map([[projectTab.id, projectTab]]),
-  sidebarButtons: [sidebarItem],
   activeGlobalTabId: null,
   activeWorkspaceTabId: null,
   activeProjectTabId: null,
@@ -185,14 +181,7 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
   // sidebar's header; what an extension contributes is unchanged.
   it('surface 1: the global tab button renders in the app band and fires', () => {
     const onSelectGlobalTab = vi.fn()
-    render(
-      <AppBand
-        globalTabs={[globalTab]}
-        sidebarItems={[]}
-        activeId={null}
-        onSelect={onSelectGlobalTab}
-      />
-    )
+    render(<AppBand globalTabs={[globalTab]} activeId={null} onSelect={onSelectGlobalTab} />)
     fireEvent.click(screen.getByLabelText('Fake Tab'))
     expect(onSelectGlobalTab).toHaveBeenCalledWith('fake.global')
   })
@@ -217,15 +206,6 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
       fireEvent.click(screen.getByText('Fake Workspace Tab'))
     }
     expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-1', 'fake.wstab')
-  })
-
-  it('surface 3: the contributed sidebar item renders once and its click reaches the handler', () => {
-    render(
-      <AppBand globalTabs={[]} sidebarItems={[sidebarItem]} activeId={null} onSelect={() => {}} />
-    )
-    expect(screen.getAllByRole('button', { name: 'Fake Sidebar Item' })).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: 'Fake Sidebar Item' }))
-    expect(sidebarItemAction).toHaveBeenCalledOnce()
   })
 
   it('surface 4: selecting a branch leaves activeProjectId resolved for the project tab', () => {
@@ -315,8 +295,5 @@ describe('the extension API surface is unchanged', () => {
     for (const member of rendererApi) {
       expect(typeof (state as unknown as Record<string, unknown>)[member]).toBe('function')
     }
-    // registerSidebarButton stays internal: extensions register through the
-    // main-process API, never this one (invariant I7).
-    expect(rendererApi).not.toContain('registerSidebarButton')
   })
 })

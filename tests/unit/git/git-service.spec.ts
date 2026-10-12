@@ -30,11 +30,6 @@ function mockReject(message: string) {
 }
 
 import {
-  getStatus,
-  getDiff,
-  stageFiles,
-  unstageFiles,
-  commitChanges,
   isGitRepo,
   getGitRoot,
   getCurrentBranch,
@@ -53,124 +48,6 @@ const customMock = () =>
 
 beforeEach(() => {
   vi.clearAllMocks()
-})
-
-// ─── getStatus ───────────────────────────────────────────────────────────────
-
-describe('getStatus', () => {
-  it('returns parsed status with branch name', async () => {
-    customMock().mockImplementation((_cmd: string, args: string[]) => {
-      if (args.includes('status'))
-        return Promise.resolve({ stdout: '?? new-file.ts\0', stderr: '' })
-      return Promise.resolve({ stdout: 'main\n', stderr: '' })
-    })
-
-    const result = await getStatus('/repo')
-    expect(result.branch).toBe('main')
-    expect(result.files).toHaveLength(1)
-    expect(result.files[0].status).toBe('untracked')
-  })
-
-  it('falls back to HEAD when branch command fails', async () => {
-    customMock().mockImplementation((_cmd: string, args: string[]) => {
-      if (args.includes('status')) return Promise.resolve({ stdout: '', stderr: '' })
-      return Promise.reject(new Error('not a repo'))
-    })
-
-    const result = await getStatus('/repo')
-    expect(result.branch).toBe('HEAD')
-  })
-
-  it('passes maxFiles to parser', async () => {
-    const files = Array.from({ length: 10 }, (_, i) => `?? file${i}.ts`).join('\0')
-    customMock().mockImplementation((_cmd: string, args: string[]) => {
-      if (args.includes('status')) return Promise.resolve({ stdout: files + '\0', stderr: '' })
-      return Promise.resolve({ stdout: 'main', stderr: '' })
-    })
-
-    const result = await getStatus('/repo', 3)
-    expect(result.files).toHaveLength(3)
-    expect(result.truncated).toBe(true)
-  })
-})
-
-// ─── getDiff ─────────────────────────────────────────────────────────────────
-
-describe('getDiff', () => {
-  it('calls git diff without --cached for unstaged', async () => {
-    mockResolve('@@ -1,1 +1,1 @@\n-old\n+new\n')
-    const result = await getDiff('/repo', 'src/app.ts', false)
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).not.toContain('--cached')
-    expect(result.path).toBe('src/app.ts')
-  })
-
-  it('calls git diff --cached for staged changes', async () => {
-    mockResolve('@@ -1,1 +1,1 @@\n-old\n+new\n')
-    await getDiff('/repo', 'src/app.ts', true)
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('--cached')
-  })
-
-  it('attaches path to parsed diff result', async () => {
-    mockResolve('')
-    const result = await getDiff('/repo', 'src/util.ts', false)
-    expect(result.path).toBe('src/util.ts')
-  })
-})
-
-// ─── stageFiles / unstageFiles ────────────────────────────────────────────────
-
-describe('stageFiles', () => {
-  it('calls git add with the given paths', async () => {
-    mockResolve('')
-    await stageFiles('/repo', ['src/a.ts', 'src/b.ts'])
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('add')
-    expect(args).toContain('src/a.ts')
-    expect(args).toContain('src/b.ts')
-  })
-})
-
-describe('unstageFiles', () => {
-  it('calls git restore --staged with the given paths', async () => {
-    mockResolve('')
-    await unstageFiles('/repo', ['src/a.ts'])
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('restore')
-    expect(args).toContain('--staged')
-    expect(args).toContain('src/a.ts')
-  })
-})
-
-// ─── commitChanges ────────────────────────────────────────────────────────────
-
-describe('commitChanges', () => {
-  it('returns short hash from commit output', async () => {
-    mockResolve('[main abc1234] feat: add something\n 1 file changed')
-    const hash = await commitChanges('/repo', 'feat: add something')
-    expect(hash).toBe('abc1234')
-  })
-
-  it('returns empty string when hash cannot be parsed', async () => {
-    mockResolve('nothing useful here')
-    const hash = await commitChanges('/repo', 'feat: add something')
-    expect(hash).toBe('')
-  })
-
-  it('appends --signoff when signOff is true', async () => {
-    mockResolve('[main abc1234] signed commit')
-    await commitChanges('/repo', 'signed commit', true)
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('--signoff')
-  })
-
-  it('does not append --signoff by default', async () => {
-    mockResolve('[main abc1234] unsigned commit')
-    await commitChanges('/repo', 'unsigned commit')
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).not.toContain('--signoff')
-  })
 })
 
 // ─── isGitRepo ────────────────────────────────────────────────────────────────

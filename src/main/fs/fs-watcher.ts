@@ -31,11 +31,6 @@ export class FsWatcherService {
     this.handlers.add(handler)
   }
 
-  removeHandler(handler: ChangeHandler): void {
-    this.handlers.delete(handler)
-    if (this.handlers.size === 0) this.stop()
-  }
-
   private emit(event: FsChangeEvent): void {
     for (const h of this.handlers) {
       try {

@@ -220,8 +220,6 @@ const defaultExtensionRegistry = {
   keyboardShortcuts: [],
   commands: [],
   overlays: [],
-  // App draws the app band itself now, which reads the contributed items.
-  sidebarButtons: [],
   quickActionGroups: [],
 }
 

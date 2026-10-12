@@ -609,24 +609,6 @@ describe('electron-api-shim other APIs', () => {
     expect(hasMsg(ws, 'extension:update-setting')).toBe(true)
   })
 
-  it('extension.getSidebarItems invokes extension:get-sidebar-items', async () => {
-    const { api, ws } = await loadShim()
-    void api.extension.getSidebarItems()
-    expect(hasMsg(ws, 'extension:get-sidebar-items')).toBe(true)
-  })
-
-  it('extension.getContextMenuItems invokes extension:get-context-menu-items', async () => {
-    const { api, ws } = await loadShim()
-    void api.extension.getContextMenuItems('terminal')
-    expect(hasMsg(ws, 'extension:get-context-menu-items')).toBe(true)
-  })
-
-  it('extension.contextMenuClick fires extension:context-menu-click', async () => {
-    const { api, ws } = await loadShim()
-    api.extension.contextMenuClick('terminal', 'item1', 'target1')
-    expect(hasMsg(ws, 'extension:context-menu-click')).toBe(true)
-  })
-
   it('extension.getCommands invokes extension:get-commands', async () => {
     const { api, ws } = await loadShim()
     void api.extension.getCommands()

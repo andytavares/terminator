@@ -7,7 +7,6 @@ import { ExtensionManifestSchema } from '../../shared/schemas/extension.schema.j
 import {
   createExtensionAPI,
   getApiDisposables,
-  globalRegistry,
   type Disposable,
   type ExtensionAPIDeps,
 } from './api.js'
@@ -277,8 +276,8 @@ export class ExtensionHost {
   }
 }
 
-function isVersionCompatible(minVersion: string, appVersion: string): boolean {
-  const cleanMin = minVersion.replace(/^[>=^~]/, '')
+export function isVersionCompatible(minVersion: string, appVersion: string): boolean {
+  const cleanMin = minVersion.replace(/^[>=^~]+/, '')
   const min = cleanMin.split('.').map(Number)
   const cur = appVersion.split('.').map(Number)
   for (let i = 0; i < 3; i++) {
@@ -287,5 +286,3 @@ function isVersionCompatible(minVersion: string, appVersion: string): boolean {
   }
   return true
 }
-
-export { globalRegistry }

@@ -11,26 +11,10 @@ const mockResizeObserver = vi.fn().mockImplementation(function () {
 vi.stubGlobal('ResizeObserver', mockResizeObserver)
 
 // Mock xterm and its addons
-function makeMockCell(chars = ' ', fg = -1, bg = -1, bold = false) {
-  return {
-    getChars: () => chars,
-    getFgColor: () => fg,
-    getBgColor: () => bg,
-    isBold: () => bold,
-  }
-}
-
-function makeMockBuffer(
-  rows: number,
-  cols: number,
-  cells: ReturnType<typeof makeMockCell>[][] = [],
-  lineText = '',
-  viewportY = 0
-) {
+function makeMockBuffer(rows: number, cols: number, lineText = '', viewportY = 0) {
   return {
     active: {
       getLine: (_row: number) => ({
-        getCell: (col: number, _reuse?: unknown) => cells[_row]?.[col] ?? makeMockCell(),
         translateToString: () => lineText,
       }),
       viewportY,
@@ -84,15 +68,11 @@ const mockSetSessionBusy = vi.fn()
 const mockSetSessionIdle = vi.fn()
 const ACTIVITY_HOOKS = { onBusy: () => mockSetSessionBusy(), onIdle: () => mockSetSessionIdle() }
 
-// Mock canvas getContext so captureToDataUrl's drawing code is exercisable
-const mockFillRect = vi.fn()
-const mockFillText = vi.fn()
+// Mock canvas getContext so character-width measurement works under jsdom
 const mockMeasureText = vi.fn().mockReturnValue({ width: 8 })
 const mockFakeCtx = {
   font: '',
   fillStyle: '',
-  fillRect: mockFillRect,
-  fillText: mockFillText,
   measureText: mockMeasureText,
   toJSON: vi.fn(),
 }
@@ -359,86 +339,6 @@ describe('TerminalInstance', () => {
     })
   })
 
-  describe('captureToDataUrl()', () => {
-    it('returns null when terminal has not been opened', () => {
-      const instance = new TerminalInstance('ses-1', 1000)
-      expect(instance.captureToDataUrl()).toBeNull()
-    })
-
-    it('returns null when cols or rows are 0', () => {
-      const instance = new TerminalInstance('ses-1', 1000)
-      const container = document.createElement('div')
-      document.body.appendChild(container)
-      instance.mount(container)
-      Object.defineProperty(instance.terminal, 'cols', { value: 0, configurable: true })
-      expect(instance.captureToDataUrl()).toBeNull()
-      document.body.removeChild(container)
-    })
-
-    it('returns a string or null after mount with non-zero cols/rows', () => {
-      const instance = new TerminalInstance('ses-1', 1000)
-      const container = document.createElement('div')
-      document.body.appendChild(container)
-      instance.mount(container)
-      Object.defineProperty(instance.terminal, 'cols', { value: 4, configurable: true })
-      Object.defineProperty(instance.terminal, 'rows', { value: 2, configurable: true })
-      const result = instance.captureToDataUrl()
-      expect(result === null || typeof result === 'string').toBe(true)
-      document.body.removeChild(container)
-    })
-
-    it('draws text cells with foreground and bold styling', () => {
-      const cells = [
-        [
-          makeMockCell('A', 1, -1, true),
-          makeMockCell('B', 200, 12, false),
-          makeMockCell(' ', -1, -1, false),
-          makeMockCell('C', 240, -1, false),
-        ],
-        [
-          makeMockCell('D', 0, 0, false),
-          makeMockCell('', -1, -1, false),
-          makeMockCell('E', -1, -1, false),
-          makeMockCell('F', 16, -1, false),
-        ],
-      ]
-      const instance = new TerminalInstance('ses-draw', 1000)
-      const container = document.createElement('div')
-      document.body.appendChild(container)
-      instance.mount(container)
-      Object.defineProperty(instance.terminal, 'cols', { value: 4, configurable: true })
-      Object.defineProperty(instance.terminal, 'rows', { value: 2, configurable: true })
-      Object.defineProperty(instance.terminal, 'buffer', {
-        value: makeMockBuffer(2, 4, cells),
-        configurable: true,
-      })
-      expect(() => instance.captureToDataUrl()).not.toThrow()
-      document.body.removeChild(container)
-    })
-  })
-
-  describe('snapshot in unmount()', () => {
-    it('stores lastSnapshot on unmount after successful capture', () => {
-      const instance = new TerminalInstance('ses-snap', 1000)
-      const container = document.createElement('div')
-      document.body.appendChild(container)
-      instance.mount(container)
-      Object.defineProperty(instance.terminal, 'cols', { value: 80, configurable: true })
-      Object.defineProperty(instance.terminal, 'rows', { value: 24, configurable: true })
-      // captureToDataUrl may return null in jsdom (canvas not fully supported), so just check it doesn't throw
-      expect(() => instance.unmount()).not.toThrow()
-      document.body.removeChild(container)
-    })
-
-    it('does not overwrite valid snapshot with null on subsequent unmount', () => {
-      const instance = new TerminalInstance('ses-snap', 1000)
-      instance.lastSnapshot = 'data:image/jpeg;base64,abc'
-      // captureToDataUrl will return null (not mounted) — should NOT overwrite lastSnapshot
-      instance.unmount()
-      expect(instance.lastSnapshot).toBe('data:image/jpeg;base64,abc')
-    })
-  })
-
   describe('dispose()', () => {
     it('clears busy timer and fires onIdle on dispose', () => {
       vi.useFakeTimers()
@@ -600,7 +500,7 @@ describe('TerminalInstance', () => {
       new TerminalInstance('ses-links', 1000)
       const instance = vi.mocked(Terminal).mock.results[0].value
       Object.defineProperty(instance, 'buffer', {
-        value: makeMockBuffer(24, 80, [], lineText),
+        value: makeMockBuffer(24, 80, lineText),
         configurable: true,
       })
       return instance.registerLinkProvider.mock.calls[providerIndex][0]
@@ -733,7 +633,7 @@ describe('TerminalInstance', () => {
       const instance = new TerminalInstance('ses-link', 1000)
       const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
       Object.defineProperty(termMock, 'buffer', {
-        value: makeMockBuffer(24, 80, [], lineText, 0),
+        value: makeMockBuffer(24, 80, lineText, 0),
         configurable: true,
       })
       return instance

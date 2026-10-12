@@ -155,9 +155,6 @@ export const PROVIDER_OPTIONAL_OPERATIONS = ['states', 'transition', 'teams', 'c
  */
 export type TransitionIntent = 'started' | 'in_review' | 'done'
 
-/** Every intent, for a caller that needs to offer the operator all of them. */
-export const TRANSITION_INTENTS: readonly TransitionIntent[] = ['started', 'in_review', 'done']
-
 /** One position an issue could be moved to, as this tracker describes it. */
 export interface TrackerStateOption {
   /** Provider-native identifier: a Linear state id, or a Jira transition id. */

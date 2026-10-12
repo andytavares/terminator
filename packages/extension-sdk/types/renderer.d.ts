@@ -99,9 +99,6 @@ export interface ElectronAPI {
     getSettingsSchemas(): Promise<{ schemas: unknown[] }>
     getSettingsValues(): Promise<{ values: Record<string, unknown> }>
     updateSetting(key: string, value: unknown): Promise<{ ok: true }>
-    getSidebarItems(): Promise<{ items: Array<{ id: string; label: string; tooltip?: string }> }>
-    getContextMenuItems(target: string): Promise<{ items: Array<{ id: string; label: string }> }>
-    contextMenuClick(target: string, itemId: string, targetId: string): void
     getCommands(): Promise<{
       commands: Array<{
         key: string
@@ -113,7 +110,6 @@ export interface ElectronAPI {
         extensionId: string
         mnemonic?: string
         requires?: 'repo' | 'session'
-        disabledReason?: string
       }>
     }>
     executeCommand(
@@ -124,7 +120,7 @@ export interface ElectronAPI {
      * Run another extension's command by its full id, with arguments the
      * command declared (v2.7.0, ADR-083). `reason` is 'not-registered' when the
      * command does not exist or its extension is disabled, so the caller can
-     * fall back; 'disabled', 'invalid-args: …' and 'failed: …' otherwise.
+     * fall back; 'invalid-args: …' and 'failed: …' otherwise.
      */
     runCommand(key: string, args?: unknown): Promise<{ ok: true } | { ok: false; reason: string }>
     /** Whether a command is registered, by full id: `<extensionId>.command.<id>`. */

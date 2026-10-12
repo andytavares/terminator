@@ -291,25 +291,6 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     channel: 'extension:update-setting',
     toPayload: (key: string, value: unknown) => ({ key, value }),
   },
-  { path: 'extension.getSidebarItems', kind: 'invoke', channel: 'extension:get-sidebar-items' },
-  {
-    path: 'extension.sidebarItemClick',
-    kind: 'invoke',
-    channel: 'extension:sidebar-item-click',
-    toPayload: (itemId: string) => ({ itemId }),
-  },
-  {
-    path: 'extension.getContextMenuItems',
-    kind: 'invoke',
-    channel: 'extension:get-context-menu-items',
-    toPayload: (target: string) => ({ target }),
-  },
-  {
-    path: 'extension.contextMenuClick',
-    kind: 'send',
-    channel: 'extension:context-menu-click',
-    toPayload: (target: string, itemId: string, targetId: string) => ({ target, itemId, targetId }),
-  },
   { path: 'extension.getCommands', kind: 'invoke', channel: 'extension:get-commands' },
   {
     path: 'extension.executeCommand',

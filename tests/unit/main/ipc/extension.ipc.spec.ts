@@ -15,27 +15,15 @@ const {
   mockIsRegistered,
   mockListExtensionCommands,
   mockListExtensionSettingsSections,
-  mockListExtensionSidebarItems,
-  mockDispatchSidebarItemClick,
-  mockListExtensionContextMenuItems,
-  mockDispatchContextMenuClick,
 } = vi.hoisted(() => ({
   mockExecuteExtensionCommand: vi.fn(),
   mockIsRegistered: vi.fn(() => false),
   mockListExtensionCommands: vi.fn(() => [] as unknown[]),
   mockListExtensionSettingsSections: vi.fn(() => [] as unknown[]),
-  mockListExtensionSidebarItems: vi.fn(() => [] as unknown[]),
-  mockDispatchSidebarItemClick: vi.fn(),
-  mockListExtensionContextMenuItems: vi.fn(() => [] as unknown[]),
-  mockDispatchContextMenuClick: vi.fn(),
 }))
 
 vi.mock('../../../../src/main/extensions/api.js', () => ({
   listExtensionSettingsSections: mockListExtensionSettingsSections,
-  listExtensionSidebarItems: mockListExtensionSidebarItems,
-  dispatchSidebarItemClick: mockDispatchSidebarItemClick,
-  listExtensionContextMenuItems: mockListExtensionContextMenuItems,
-  dispatchContextMenuClick: mockDispatchContextMenuClick,
   listExtensionCommands: mockListExtensionCommands,
   executeExtensionCommand: mockExecuteExtensionCommand,
   isExtensionCommandRegistered: mockIsRegistered,
@@ -232,45 +220,5 @@ describe('extension settings channels', () => {
       handleHandlers.get('extension:update-setting')!({}, { key: 'ext.setting', value: 2 })
     ).toEqual({ ok: true })
     expect(mockSetExtensionSetting).toHaveBeenCalledWith('ext.setting', 2)
-  })
-})
-
-describe('sidebar and context-menu channels', () => {
-  it('extension:get-sidebar-items returns listExtensionSidebarItems()', () => {
-    mockListExtensionSidebarItems.mockReturnValue([{ id: 'sb' }])
-    registerExtensionHandlers(makeExtensionHost())
-
-    expect(handleHandlers.get('extension:get-sidebar-items')!({}, undefined)).toEqual({
-      items: [{ id: 'sb' }],
-    })
-  })
-
-  it('extension:sidebar-item-click dispatches the click', () => {
-    registerExtensionHandlers(makeExtensionHost())
-
-    expect(handleHandlers.get('extension:sidebar-item-click')!({}, { itemId: 'sb' })).toEqual({
-      ok: true,
-    })
-    expect(mockDispatchSidebarItemClick).toHaveBeenCalledWith('sb')
-  })
-
-  it('extension:get-context-menu-items returns listExtensionContextMenuItems(target)', () => {
-    mockListExtensionContextMenuItems.mockReturnValue([{ id: 'ctx' }])
-    registerExtensionHandlers(makeExtensionHost())
-
-    expect(
-      handleHandlers.get('extension:get-context-menu-items')!({}, { target: 'workspace' })
-    ).toEqual({ items: [{ id: 'ctx' }] })
-  })
-
-  it('extension:context-menu-click dispatches the click', () => {
-    registerExtensionHandlers(makeExtensionHost())
-
-    onHandlers.get('extension:context-menu-click')!(
-      {},
-      { target: 'workspace', itemId: 'ctx', targetId: 'w1' }
-    )
-
-    expect(mockDispatchContextMenuClick).toHaveBeenCalledWith('workspace', 'ctx', 'w1')
   })
 })

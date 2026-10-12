@@ -72,15 +72,14 @@ describe('generateIndex()', () => {
 
   it('includes all v1.1.0 API surface stubs', () => {
     const index = generateIndex('my-ext', 'com.example.my-ext')
-    expect(index).toContain('sidebar')
+    expect(index).toContain('commands.register')
     expect(index).toContain('keyboard')
     expect(index).toContain('showToast')
   })
 
   it('includes commented-out stubs for v1.1.0 surfaces', () => {
     const index = generateIndex('my-ext', 'com.example.my-ext')
-    expect(index).toContain('registerPanel')
     expect(index).toContain('shell.exec')
-    expect(index).toContain('fs.watch')
+    expect(index).toContain('topBar.registerMenuItem')
   })
 })

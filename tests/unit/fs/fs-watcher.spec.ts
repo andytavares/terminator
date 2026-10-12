@@ -86,28 +86,6 @@ describe('FsWatcherService', () => {
     expect(mockClose).toHaveBeenCalled()
   })
 
-  it('stops watching when last handler is removed', () => {
-    const handler = vi.fn()
-    service.addHandler(handler)
-    service.watchStart('/tmp/repo')
-    const mockClose = (fs.watch as ReturnType<typeof vi.fn>).mock.results[0].value.close
-
-    service.removeHandler(handler)
-    expect(mockClose).toHaveBeenCalled()
-  })
-
-  it('does NOT stop when a handler is removed but others remain', () => {
-    const h1 = vi.fn()
-    const h2 = vi.fn()
-    service.addHandler(h1)
-    service.addHandler(h2)
-    service.watchStart('/tmp/repo')
-    const mockClose = (fs.watch as ReturnType<typeof vi.fn>).mock.results[0].value.close
-
-    service.removeHandler(h1) // h2 still registered → should not stop
-    expect(mockClose).not.toHaveBeenCalled()
-  })
-
   it('falls back to polling when watcher emits an error event', () => {
     // Reset so the first watchStart succeeds and we can trigger the error event
     const handler = vi.fn()

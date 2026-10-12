@@ -197,7 +197,6 @@ const mockRegistryState = {
   activeWorkspaceTabId: null,
   activeProjectTabId: null,
   dismissSurfaces: vi.fn(),
-  sidebarButtons: [] as Array<{ id: string; label: string; action: () => void }>,
   setActiveGlobalTab: vi.fn(),
   setActiveWorkspaceTab: vi.fn(),
   setActiveProjectTab: vi.fn(),

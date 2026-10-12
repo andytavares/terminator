@@ -86,11 +86,9 @@ const disposables: Array<{ dispose(): void }> = []
 export function activate(api: ExtensionAPI): void {
   // Register your contributions here
   disposables.push(
-    api.sidebar.registerItem({
-      id: 'my-panel',
-      label: 'My Panel',
-      onClick: () => api.notifications.showToast('info', 'Hello from My Panel!'),
-    })
+    api.commands.register({ id: 'hello', label: 'Say hello' }, () =>
+      api.notifications.showToast('info', 'Hello from My Extension!', 'hello')
+    )
   )
 }
 
@@ -132,14 +130,6 @@ Run `npm install` from the repo root after adding a new `package.json`. Core dep
 ## ExtensionAPI Reference
 
 The `api` object passed to `activate` is the sole interface between your extension and the host application. **Do not import from `src/main/`, `src/renderer/`, or `src/shared/` directly.**
-
-### `api.app`
-
-```typescript
-api.app.version // string — current Terminator version, e.g. "0.1.0"
-```
-
----
 
 ### `api.settings` — Register and Read Settings
 
@@ -195,56 +185,6 @@ The Git extension uses this to leave pull requests opened from an excluded branc
 
 ---
 
-### `api.sidebar` — Sidebar Contributions
-
-#### Register a simple sidebar item
-
-Adds a clickable item to the sidebar footer, below the session list. The item appears
-once per window regardless of how sessions are grouped.
-
-```typescript
-const disposable = api.sidebar.registerItem({
-  id: 'my-panel-trigger',
-  label: 'My Panel',
-  tooltip: 'Open My Panel',
-  onClick: () => {
-    /* handle click */
-  },
-})
-```
-
-#### Toggle your own sidebar panel _(v1.1.0)_
-
-Shows or hides the panel this extension registered with `registerPanel`. Pair it with a
-sidebar item so the item does something:
-
-```typescript
-api.sidebar.registerItem({
-  id: 'my-panel-trigger',
-  label: 'My Panel',
-  onClick: () => api.sidebar.togglePanel(),
-})
-```
-
-#### Register a full sidebar panel _(v1.1.0)_
-
-Registers a React component as a full UI panel in a layout slot (e.g., the right sidebar).
-
-```typescript
-import { GitSidebarPanel } from './components/GitSidebarPanel'
-
-const disposable = api.sidebar.registerPanel('right-sidebar', {
-  id: 'git-changes',
-  title: 'Git Changes',
-  component: GitSidebarPanel,
-  defaultVisible: api.settings.get('git.sidebar.defaultOpen') ?? false,
-})
-```
-
-Available slots: `'right-sidebar'`. More slots will be added in future API versions.
-
----
-
 ### `api.topBar` — Project View Menu Items _(v1.1.0)_
 
 Register a menu item in the top bar of the project view.
@@ -255,23 +195,6 @@ const disposable = api.topBar.registerMenuItem({
   label: 'Git',
   tooltip: 'Open Git view',
   onClick: () => openGitView(),
-})
-```
-
----
-
-### `api.contextMenu` — Context Menu Contributions
-
-Add items to right-click menus.
-
-```typescript
-// Available targets: 'workspace' | 'project' | 'tab' | 'terminal'
-const disposable = api.contextMenu.registerItem('workspace', {
-  id: 'open-in-editor',
-  label: 'Open in Editor',
-  onClick: (workspaceId) => {
-    // workspaceId is the id of the right-clicked entity
-  },
 })
 ```
 
@@ -288,8 +211,7 @@ const disposable = api.commands.register(
     label: 'Push',
     mnemonic: 'p', // one character, shown in the quick-actions panel
     requires: 'repo', // 'repo' | 'session' — core dims the action with a stock
-    // reason when the focused context lacks this, so you don't have to call
-    // setEnabled() for ordinary focus changes
+    // reason when the focused context lacks this
   },
   (ctx: { projectId: string | null; sessionId: string | null; repoRoot: string | null }) => {
     // ctx.repoRoot is guaranteed non-null here because requires: 'repo' dims
@@ -297,15 +219,6 @@ const disposable = api.commands.register(
   }
 )
 ```
-
-Dim or re-enable a registered command for a reason `requires` cannot express (a mid-flight operation, a missing remote, …):
-
-```typescript
-api.commands.setEnabled('push', false, 'Push already in progress')
-api.commands.setEnabled('push', true)
-```
-
-Disposing a command clears any `setEnabled` reason along with the registration.
 
 #### Commands that take arguments _(v2.7.0)_
 
@@ -331,7 +244,7 @@ if (!result.ok && result.reason === 'not-registered') {
 await window.electronAPI.extension.hasCommand(key) // boolean
 ```
 
-`runCommand` resolves `{ ok: true }` or `{ ok: false, reason }`; `reason` is `'not-registered'`, `'disabled'`, `'invalid-args: …'` or `'failed: …'`. It is not reachable over the remote bridge.
+`runCommand` resolves `{ ok: true }` or `{ ok: false, reason }`; `reason` is `'not-registered'`, `'invalid-args: …'` or `'failed: …'`. It is not reachable over the remote bridge.
 
 ---
 
@@ -375,6 +288,25 @@ Your extension keeps `Esc` for its own dismissals — closing a dropdown, cancel
 Terminator layers one gesture on top: **two `Esc` presses within 500 ms** exit the extension and return the user to their terminal. The listener that detects it lives in the core-owned webview preload, is bubble-phase, and is passive — your handlers still see both presses and run normally. A sidebar panel closes in place; any full-screen surface (global, workspace, or project tab) closes and reveals the terminal.
 
 You get this for free. Do not implement it yourself, and do not swallow `Esc` at the window level (`stopPropagation` on a `window` capture listener would suppress the gesture inside your panel). See [ADR-026](adr/026-double-escape-extension-exit.md).
+
+---
+
+### Deleted: members no extension called
+
+These members were declared and implemented but no extension ever called them, so they were deleted rather than kept alive by their own tests:
+
+| Removed                                                                         | Use instead                                                         |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `api.app.version`                                                               | nothing needed; `manifest.minAppVersion` gates compatibility        |
+| `api.sidebar.registerItem`, `registerPanel`, `registerGlobalTab`, `togglePanel` | the manifest's `contributes.sidebarPanel` / `contributes.globalTab` |
+| `api.contextMenu.registerItem`                                                  | `api.commands.register`                                             |
+| `api.ui.toast`, `api.ui.layers`                                                 | `api.notifications.showToast`; `--tm-layer-*` tokens in CSS         |
+| `api.fs.watch`                                                                  | none                                                                |
+| `api.commands.setEnabled`                                                       | `requires` on the command                                           |
+| `api.settings.resolveWorktreeBaseDir`                                           | none                                                                |
+| `api.workspace.onDelete`, `onProjectDelete`                                     | none                                                                |
+| `api.issues.linkFor`, `onLinkChange`                                            | none                                                                |
+| `api.pty.spawn`, `attachOnData`, `attachOnExit`                                 | `spawnSession` with `onData` and `onExit`                           |
 
 ---
 
@@ -436,26 +368,6 @@ precedence (Settings → Notifications). Despite the name, `showToast` is not
 guaranteed to produce only a toast; treat both as "notify the user" and don't
 assume a specific delivery mechanism. Errors always include a toast
 regardless of configuration.
-
----
-
-### `api.ui` — Toasts in your own view, and the stacking scale _(v1.3.0)_
-
-```typescript
-api.ui.toast('Committed 3 files', { tone: 'success' })
-api.ui.toast('Could not reach GitHub', { tone: 'error' }) // errors are sticky
-api.ui.layers // { panel: 100, overlay: 200, modal: 300, toast: 400 }
-```
-
-`api.ui.toast` raises a message **in this extension's view**, which is the
-difference from `api.notifications.showToast`: that one asks the application to
-notify the user and the delivery target is resolved from their settings, so it
-may become an OS notification or a notification-centre entry instead. Use
-`api.notifications` for anything the user should learn about while looking
-elsewhere; use `api.ui.toast` for feedback on something they just did here.
-
-`api.ui.layers` is the same scale `--tm-layer-*` publishes to CSS. Style against
-it; a raw `z-index` number in an extension is a lint error.
 
 ---
 
@@ -562,24 +474,6 @@ Items appear in registration order within the View submenu. Disposing removes th
 
 ---
 
-### `api.fs` — File System Watch Events _(v1.1.0)_
-
-Subscribe to file change events for the current project root. Uses OS-level `fs.watch` with polling fallback.
-
-```typescript
-const watcher = api.fs.watch((event) => {
-  // event: { projectRoot, eventType: 'change' | 'rename', filename: string | null }
-  scheduleStatusRefresh(event.projectRoot)
-})
-
-// In deactivate():
-watcher.dispose()
-```
-
-**Note**: `filename` may be `null` on some Linux filesystems when using the polling fallback.
-
----
-
 ### `api.ipc` — Custom IPC Handlers _(v1.1.0)_
 
 Register named IPC handlers in the main process. The renderer side calls these via `window.electronAPI.invoke(channel, payload)`.
@@ -630,7 +524,7 @@ api.pty.setWorkspace(sessionId, 'ws-1') // stamp workspace metadata (null clears
 api.pty.listSessions() // every live session with full SessionInfo
 ```
 
-`onData`/`onExit` support any number of subscribers per session and return disposers; all listeners are cleaned up automatically when the PTY exits. The v1.1.0 methods `spawn(sessionId, cwd, shell, type, onData, onExit)`, `attachOnData`, and `attachOnExit` remain as deprecated aliases.
+`onData`/`onExit` support any number of subscribers per session and return disposers; all listeners are cleaned up automatically when the PTY exits.
 
 #### `openTerminalTab` — a terminal the operator can see _(v2.1.0)_
 
@@ -701,12 +595,6 @@ const issue = await api.issues.get('linear', 'TAV-42')
 
 // A write. It rejects on failure; do not swallow it.
 await api.issues.comment('linear', 'TAV-42', `PR opened: ${prUrl}`)
-
-// The issue attached to a project. Synchronous — it is local state.
-const link = api.issues.linkFor(projectId)
-const off = api.issues.onLinkChange((id, next) => {
-  /* … */
-})
 ```
 
 **Identity is the pair `(tracker, key)`, never the key alone.** Two trackers can both have a
@@ -852,9 +740,8 @@ Calling `dispose()` undoes the registration. If you do not call `dispose()` in `
 const disposables: Array<{ dispose(): void }> = []
 
 export function activate(api: ExtensionAPI): void {
-  disposables.push(api.sidebar.registerItem({ ... }))
+  disposables.push(api.topBar.registerMenuItem({ ... }))
   disposables.push(api.commands.register({ id: 'help', label: 'Help', shortcut: 'CmdOrCtrl+Shift+H' }, () => {}))
-  disposables.push(api.fs.watch((event) => { ... }))
 }
 
 export function deactivate(): void {
@@ -984,11 +871,10 @@ To disable per-workspace, add to `.terminator/settings.json` in your project roo
 1. **No internal imports** — only the `ExtensionAPI` object. Do not import from `src/main/`, `src/renderer/`, or `src/shared/`. Exception: `renderer.tsx` may import `useExtensionRegistry` from `src/renderer/extensions/registry`.
 2. **Shell commands**: `api.shell.exec` only allows `git` and `gh`. Any other command is rejected with `COMMAND_NOT_ALLOWED`.
 3. **CWD scope**: `api.shell.exec` `cwd` must be within the current workspace folder.
-4. **Panel slots**: only one panel per slot per extension.
-5. **Settings key namespacing**: all setting keys must be prefixed with the extension ID (enforced at registration).
-6. **IPC channel namespacing**: all channels registered via `api.ipc.registerHandler` must be prefixed with the extension ID followed by `:` (e.g., `com.acme.my-ext:channel-name`).
-7. **Native menu**: `api.nativeMenu.addViewMenuItem` adds to the View submenu only. Other native menus (File, Edit, Help) are not exposed.
-8. **API versioning**: breaking changes bump the MAJOR version. Additive changes bump MINOR. Check `api.app.version` to feature-detect if needed.
+4. **Settings key namespacing**: all setting keys must be prefixed with the extension ID (enforced at registration).
+5. **IPC channel namespacing**: all channels registered via `api.ipc.registerHandler` must be prefixed with the extension ID followed by `:` (e.g., `com.acme.my-ext:channel-name`).
+6. **Native menu**: `api.nativeMenu.addViewMenuItem` adds to the View submenu only. Other native menus (File, Edit, Help) are not exposed.
+7. **API versioning**: breaking changes bump the MAJOR version. Additive changes bump MINOR.
 
 ---
 
@@ -1007,7 +893,7 @@ npm run create-extension -- <name> [options]
 
 **Exit codes**: `0` success, `1` bad arguments, `2` directory already exists, `3` filesystem error.
 
-The generated `src/index.js` is a complete working hello-world demonstrating all v1.2.0 API surfaces. v1.1.0-specific surfaces (shell, fs, registerPanel, topBar) and v1.2.0-specific surfaces (globalShortcut, registerGlobalTab, workspace, window, createNotification) are included as commented-out stubs with `// TODO:` markers so you can activate them incrementally. The v1.3.0 renderer-registry addition (`registerWorkspaceTab`) must be added manually to your `renderer.tsx`.
+The generated `src/index.js` is a complete working hello-world demonstrating all v1.2.0 API surfaces. v1.1.0-specific surfaces (shell, topBar) and v1.2.0-specific surfaces (globalShortcut, workspace, window, createNotification) are included as commented-out stubs with `// TODO:` markers so you can activate them incrementally. The v1.3.0 renderer-registry addition (`registerWorkspaceTab`) must be added manually to your `renderer.tsx`.
 
 ---
 
@@ -1016,11 +902,9 @@ The generated `src/index.js` is a complete working hello-world demonstrating all
 The pre-bundled git integration extension at `extensions/git-integration/` is the canonical real-world example. It demonstrates:
 
 - `api.ipc.registerHandler` (custom git: and github: IPC channels)
-- `api.sidebar.registerPanel` (right sidebar git status)
 - `api.topBar.registerMenuItem` (Git view in project top bar)
 - `api.shell.exec` (git status, diff, stage, commit; gh pr create)
 - `api.notifications.showToast` (all operation outcomes)
-- `api.fs.watch` (sidebar auto-refresh)
 - `api.settings.register` with `workspaceScoped` settings
 - `renderer.tsx` with a sidebar panel, a project tab, a workspace-scoped tab (Code Reviews — `registerWorkspaceTab`), and renderer keyboard shortcuts
 
@@ -1142,22 +1026,9 @@ Full contract reference: [`specs/003-pr-review/contracts/extension-token-api.md`
 
 These namespaces were added alongside the Task Vault extension (ADR-012).
 
-### `api.sidebar.registerGlobalTab(tab)`
-
-Registers a permanent tab in the top-level tab bar (next to terminal tabs). Survives workspace navigation.
-
-```typescript
-api.sidebar.registerGlobalTab({
-  id: 'my-extension',
-  label: 'My Extension',
-  component: MyViewComponent,
-  permanent: true,
-})
-```
-
 ### `registry.registerWorkspaceTab(tab)` _(v1.3.0, renderer registry only)_
 
-Registers a workspace-scoped tab. Unlike `registerGlobalTab` (which adds an icon to the global sidebar header), workspace tabs appear as hover-reveal icons inside each workspace card header. Clicking one activates the tab's component in the main content area with that workspace set as active.
+Registers a workspace-scoped tab. Unlike a global tab (declared in the manifest, with an icon in the global sidebar header), workspace tabs appear as hover-reveal icons inside each workspace card header. Clicking one activates the tab's component in the main content area with that workspace set as active.
 
 The component receives **no props** — it must read its workspace context from `useWorkspaceStore()` internally.
 
@@ -1198,10 +1069,10 @@ export function MyWorkspaceView() {
 
 **When to use workspace tab vs global tab:**
 
-| Need                                                           | Use                    |
-| -------------------------------------------------------------- | ---------------------- |
-| Feature is scoped to one workspace at a time (e.g. PR reviews) | `registerWorkspaceTab` |
-| Feature is truly app-global (e.g. Task Vault, notifications)   | `registerGlobalTab`    |
+| Need                                                           | Use                     |
+| -------------------------------------------------------------- | ----------------------- |
+| Feature is scoped to one workspace at a time (e.g. PR reviews) | `registerWorkspaceTab`  |
+| Feature is truly app-global (e.g. Task Vault, notifications)   | `contributes.globalTab` |
 
 ### `api.globalShortcut.register(accelerator, handler)`
 
@@ -1216,7 +1087,7 @@ disposables.push(disposable)
 
 ### `api.workspace` — Workspace and Project Access _(v1.2.0)_
 
-Read-only access to the workspace list and per-workspace project list. Also provides delete-event subscriptions.
+Read-only access to the workspace list and per-workspace project list.
 
 ```typescript
 const workspaces = api.workspace.list()
@@ -1224,17 +1095,6 @@ const workspaces = api.workspace.list()
 
 const projects = api.workspace.listProjects(workspaces[0].id)
 // [{ id, workspaceId, name }, ...]
-
-disposables.push(
-  api.workspace.onDelete((workspaceId) => {
-    // Clean up any state keyed to this workspace
-  })
-)
-disposables.push(
-  api.workspace.onProjectDelete((projectId) => {
-    // Clean up any state keyed to this project
-  })
-)
 ```
 
 ---

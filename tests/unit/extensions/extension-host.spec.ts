@@ -102,18 +102,6 @@ describe('ExtensionHost', () => {
     await expect(host.loadBundledExtensions('/nonexistent/bundled')).resolves.toBeUndefined()
   })
 
-  it('isVersionCompatible: version > minVersion is compatible', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-
-    vi.doMock('/compat/ext/main.js', () => ({ activate: vi.fn() }))
-
-    const result = await host.load('/compat/ext')
-    // The manifest read will fail (INVALID_MANIFEST) since there's no real manifest.json
-    // But the important thing is we can test isVersionCompatible indirectly.
-    expect('error' in result).toBe(true)
-  })
-
   it('DUPLICATE_ID error when loading same extension twice', async () => {
     const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
     const host = new ExtensionHost()
@@ -249,75 +237,39 @@ describe('ExtensionHost', () => {
   })
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// isVersionCompatible – tested directly by extracting the function's logic.
-//
-// The function is private to the module (not exported), but its behaviour is
-// fully observable through the public `load()` API which calls it after a
-// successful manifest parse.  Rather than trying to inject manifests via the
-// require cache (which does not work in vitest's ESM-shimmed environment), we
-// re-implement the logic in the test and exercise every branch, then confirm
-// the behaviour against the source code directly.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Local copy of isVersionCompatible that mirrors the source exactly.
-function isVersionCompatible(minVersion: string, appVersion: string): boolean {
-  const cleanMin = minVersion.replace(/^[>=^~]/, '')
-  const min = cleanMin.split('.').map(Number)
-  const cur = appVersion.split('.').map(Number)
-  for (let i = 0; i < 3; i++) {
-    if ((cur[i] ?? 0) > (min[i] ?? 0)) return true
-    if ((cur[i] ?? 0) < (min[i] ?? 0)) return false
+describe('isVersionCompatible', () => {
+  async function isCompatible(minVersion: string, appVersion: string): Promise<boolean> {
+    const { isVersionCompatible } = await import('../../../src/main/extensions/extension-host')
+    return isVersionCompatible(minVersion, appVersion)
   }
-  return true
-}
 
-describe('isVersionCompatible (logic parity with extension-host.ts:L229)', () => {
-  it('returns true when app version is ahead on major segment', () => {
-    expect(isVersionCompatible('0.1.0', '1.0.0')).toBe(true)
+  it.each([
+    ['0.1.0', '1.0.0', true],
+    ['0.0.9', '0.1.0', true],
+    ['0.1.0', '0.1.0', true],
+    ['1.0.0', '0.9.9', false],
+    ['0.2.0', '0.1.0', false],
+    ['0.1.1', '0.1.0', false],
+    ['0.1', '0.1.0', true],
+  ])('requires %s of app %s: %s', async (minVersion, appVersion, expected) => {
+    expect(await isCompatible(minVersion, appVersion)).toBe(expected)
   })
 
-  it('returns true when app minor is ahead', () => {
-    expect(isVersionCompatible('0.0.9', '0.1.0')).toBe(true)
-  })
-
-  it('returns true when versions are equal (exact match)', () => {
-    expect(isVersionCompatible('0.1.0', '0.1.0')).toBe(true)
-  })
-
-  it('returns false when app major is behind', () => {
-    expect(isVersionCompatible('1.0.0', '0.9.9')).toBe(false)
-  })
-
-  it('returns false when app minor is behind', () => {
-    expect(isVersionCompatible('0.2.0', '0.1.0')).toBe(false)
-  })
-
-  it('returns false when app patch is behind', () => {
-    expect(isVersionCompatible('0.1.1', '0.1.0')).toBe(false)
-  })
-
-  it('strips single-char semver prefixes (>, =, ^, ~) before comparing', () => {
-    // The source uses replace(/^[>=^~]/, '') which strips exactly ONE leading char.
-    // Single-char prefix '>' is stripped to '99.0.0'
-    expect(isVersionCompatible('>99.0.0', '0.1.0')).toBe(false)
-    expect(isVersionCompatible('>0.0.1', '0.1.0')).toBe(true)
-    // '=' prefix
-    expect(isVersionCompatible('=0.1.0', '0.1.0')).toBe(true)
-    // Two-char prefix '>=' leaves '=99.0.0' → NaN comparisons → returns true (edge case in source)
-    // Verified: NaN comparisons all false → loop exits → returns true
-    expect(isVersionCompatible('>=99.0.0', '0.1.0')).toBe(true)
-  })
-
-  it('strips ^ semver prefix before comparing', () => {
-    expect(isVersionCompatible('^0.1.0', '0.1.0')).toBe(true)
-    expect(isVersionCompatible('^1.0.0', '0.1.0')).toBe(false)
-  })
-
-  it('handles missing patch segment (defaults to 0)', () => {
-    // '0.1' should behave like '0.1.0'
-    expect(isVersionCompatible('0.1', '0.1.0')).toBe(true)
-  })
+  it.each([
+    ['>=0.1.0', '0.1.0', true],
+    ['>=99.0.0', '0.1.0', false],
+    ['>99.0.0', '0.1.0', false],
+    ['>0.0.1', '0.1.0', true],
+    ['=0.1.0', '0.1.0', true],
+    ['^0.1.0', '0.1.0', true],
+    ['^1.0.0', '0.1.0', false],
+    ['~0.2.0', '0.1.0', false],
+  ])(
+    'treats the range operator in %s as part of the minimum for app %s',
+    async (minVersion, appVersion, expected) => {
+      expect(await isCompatible(minVersion, appVersion)).toBe(expected)
+    }
+  )
 })
 
 describe('ExtensionHost – DUPLICATE_ID after successful first load', () => {
@@ -813,14 +765,14 @@ describe('ExtensionHost – registration disposal on unload', () => {
         minAppVersion: '0.0.1',
       })
     )
-    // Registers a command and a sidebar item WITHOUT a deactivate() — the host
+    // Registers a command and a top-bar item WITHOUT a deactivate() — the host
     // must dispose them through the api's collected disposables.
     writeFileSync(
       join(tmpDir, 'main.js'),
       `module.exports = {
         activate: (api) => {
           api.commands.register({ id: 'disp-cmd', label: 'Disp' }, () => {})
-          api.sidebar.registerItem({ id: 'disp-side', label: 'Side', onClick: () => {} })
+          api.topBar.registerMenuItem({ id: 'disp-top', label: 'Top', onClick: () => {} })
         },
       }`
     )
@@ -842,11 +794,11 @@ describe('ExtensionHost – registration disposal on unload', () => {
     const result = await host.load(tmpDir)
     expect('error' in result).toBe(false)
     expect(globalRegistry.commandContributions.has('com.dispose.command.disp-cmd')).toBe(true)
-    expect(globalRegistry.sidebarItems.has('com.dispose.sidebar.disp-side')).toBe(true)
+    expect(globalRegistry.topBarItems.has('com.dispose.topbar.disp-top')).toBe(true)
 
     await host.unload('com.dispose')
     expect(globalRegistry.commandContributions.has('com.dispose.command.disp-cmd')).toBe(false)
     expect(globalRegistry.commandHandlers.has('com.dispose.command.disp-cmd')).toBe(false)
-    expect(globalRegistry.sidebarItems.has('com.dispose.sidebar.disp-side')).toBe(false)
+    expect(globalRegistry.topBarItems.has('com.dispose.topbar.disp-top')).toBe(false)
   })
 })

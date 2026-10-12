@@ -29,7 +29,6 @@ vi.mock('../../../src/main/git/git-service', () => ({
 }))
 
 vi.mock('../../../src/main/extensions/workspace-events', () => ({
-  emitWorkspaceDelete: vi.fn(),
   emitProjectDelete: vi.fn(),
 }))
 

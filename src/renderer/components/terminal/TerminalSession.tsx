@@ -1,4 +1,4 @@
-import { Terminal, IBufferCell, ILinkProvider, ILink } from 'xterm'
+import { Terminal, ILinkProvider, ILink } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import { previewWindow } from '../../terminal/preview-window'
@@ -10,26 +10,6 @@ export const XTERM_THEMES = {
   light: { background: '#f5f5f5', foreground: '#1a1a1a' },
 } as const
 
-// 16-color ANSI palette matching xterm's default theme
-const ANSI_COLORS = [
-  '#000000',
-  '#cd3131',
-  '#0dbc79',
-  '#e5e510',
-  '#2472c8',
-  '#bc3fbc',
-  '#11a8cd',
-  '#e5e5e5',
-  '#666666',
-  '#f14c4c',
-  '#23d18b',
-  '#f5f543',
-  '#3b8eea',
-  '#d670d6',
-  '#29b8db',
-  '#e5e5e5',
-]
-
 function measureCharWidth(fontSize: number): number {
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')
@@ -38,24 +18,6 @@ function measureCharWidth(fontSize: number): number {
     return ctx.measureText('M').width || 8
   }
   return 8
-}
-
-function ansiColorToCss(color: number, defaultCss: string): string {
-  if (color === -1 || color === undefined) return defaultCss
-  // 0–15: standard ANSI palette
-  if (color < 16) return ANSI_COLORS[color] ?? defaultCss
-  // 16–231: 6×6×6 cube
-  if (color < 232) {
-    const c = color - 16
-    const b = c % 6,
-      g = Math.floor(c / 6) % 6,
-      r = Math.floor(c / 36)
-    const v = (n: number) => (n ? 55 + n * 40 : 0)
-    return `rgb(${v(r)},${v(g)},${v(b)})`
-  }
-  // 232–255: greyscale
-  const grey = 8 + (color - 232) * 10
-  return `rgb(${grey},${grey},${grey})`
 }
 
 /**
@@ -85,8 +47,6 @@ export class TerminalInstance {
   readonly element: HTMLDivElement
   // Underline overlay for hovered links — positioned absolutely inside this.element.
   linkOverlay: HTMLDivElement | null = null
-  // Snapshot captured in unmount() so Overview can display it after the element is detached.
-  lastSnapshot: string | null = null
 
   constructor(sessionId: string, scrollbackLimit: number, hooks?: TerminalInstanceHooks) {
     this.sessionId = sessionId
@@ -493,7 +453,7 @@ export class TerminalInstance {
     const { cols, rows } = this.terminal
     if (!cols || !rows) return null
 
-    // Compute natural pixel dimensions using the same font metrics as captureToDataUrl.
+    // Compute natural pixel dimensions using the same font metrics as the terminal.
     const fontSize = 13
     const lineHeight = Math.ceil(fontSize * 1.2)
     const charW = measureCharWidth(fontSize)
@@ -537,79 +497,8 @@ export class TerminalInstance {
     }
   }
 
-  // Render the terminal buffer to a canvas and return a JPEG data URL.
-  // Uses xterm's buffer API so it works with the DOM renderer (no canvas addon needed).
-  captureToDataUrl(): string | null {
-    if (!this.opened) return null
-    const { cols, rows } = this.terminal
-    if (!cols || !rows) return null
-
-    // Measure character dimensions using the same font xterm uses
-    const fontSize = 13
-    const lineHeight = Math.ceil(fontSize * 1.2)
-    const charW = measureCharWidth(fontSize)
-
-    const padX = 6
-    const padY = 4
-    const w = Math.ceil(cols * charW + padX * 2)
-    const h = rows * lineHeight + padY * 2
-
-    const canvas = document.createElement('canvas')
-    canvas.width = w
-    canvas.height = h
-    const ctx = canvas.getContext('2d')
-    /* v8 ignore start -- getContext('2d') only returns null in headless/unsupported
-       environments; unreachable in the app and under the jsdom canvas mock */
-    if (!ctx) return null
-    /* v8 ignore stop */
-
-    ctx.fillStyle = '#1e1e1e'
-    ctx.fillRect(0, 0, w, h)
-    ctx.font = `${fontSize}px Menlo, Monaco, "Courier New", monospace`
-
-    const buffer = this.terminal.buffer.active
-    const reusableCell: IBufferCell | null =
-      this.terminal.buffer.active.getLine(0)?.getCell(0) ?? null
-
-    for (let row = 0; row < rows; row++) {
-      const line = buffer.getLine(row)
-      if (!line) continue
-      const y = padY + (row + 1) * lineHeight - 2
-
-      for (let col = 0; col < cols; col++) {
-        const cell = line.getCell(col, reusableCell ?? undefined)
-        if (!cell) continue
-
-        // Draw background if not default
-        const bg = cell.getBgColor()
-        if (bg !== -1 && bg !== undefined) {
-          const bgCss = ansiColorToCss(bg, '#1e1e1e')
-          if (bgCss !== '#1e1e1e') {
-            ctx.fillStyle = bgCss
-            ctx.fillRect(padX + col * charW, padY + row * lineHeight, charW, lineHeight)
-          }
-        }
-
-        const chars = cell.getChars()
-        if (!chars || chars === ' ') continue
-
-        const fg = cell.getFgColor()
-        ctx.fillStyle = ansiColorToCss(fg, '#cccccc')
-        if (cell.isBold()) ctx.font = `bold ${fontSize}px Menlo, Monaco, "Courier New", monospace`
-        ctx.fillText(chars, padX + col * charW, y)
-        if (cell.isBold()) ctx.font = `${fontSize}px Menlo, Monaco, "Courier New", monospace`
-      }
-    }
-
-    return canvas.toDataURL('image/jpeg', 0.7)
-  }
-
   // Remove from DOM without destroying the xterm instance.
-  // Captures a snapshot first so Overview can display it while the terminal is unmounted.
-  // Only updates lastSnapshot on success — never overwrites a valid snapshot with null.
   unmount(): void {
-    const snapshot = this.captureToDataUrl()
-    if (snapshot !== null) this.lastSnapshot = snapshot
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
     this.element.parentElement?.removeChild(this.element)

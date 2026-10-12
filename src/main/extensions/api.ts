@@ -23,17 +23,6 @@ export interface SettingDefinition {
   danger?: boolean
 }
 
-// v1.1.0 types
-
-export type PanelSlot = 'right-sidebar' | 'global-tab'
-
-export interface PanelContribution {
-  id: string
-  title: string
-  component: unknown // React.ComponentType — typed as unknown to avoid renderer dependency
-  defaultVisible?: boolean
-}
-
 export interface TopBarMenuContribution {
   id: string
   label: string
@@ -52,38 +41,7 @@ export interface NativeMenuItemContribution {
   panelId?: string
 }
 
-export interface FsChangeEvent {
-  projectRoot: string
-  eventType: 'change' | 'rename'
-  filename: string | null
-}
-
 export type ToastType = 'info' | 'success' | 'warning' | 'error'
-
-export interface SidebarContribution {
-  id: string
-  label: string
-  tooltip?: string
-  /**
-   * A lucide icon name, resolved by the host — the same vocabulary a manifest's
-   * `contributes.globalTab.icon` uses (`git-branch`, `wifi`, `calendar`, …).
-   *
-   * Optional and additive: a contribution that omits it behaves exactly as
-   * before. Before this existed a sidebar item could not supply an icon at all,
-   * so the host drew a placeholder — which said nothing once the app band
-   * dropped its text labels.
-   */
-  icon?: string
-  onClick(): void
-}
-
-export type ContextMenuTarget = 'workspace' | 'project' | 'tab' | 'terminal'
-
-export interface MenuItemContribution {
-  id: string
-  label: string
-  onClick(targetId: string): void
-}
 
 export interface SessionSnapshot {
   readonly id: string
@@ -109,7 +67,7 @@ export interface CommandContribution {
   args?: ZodTypeAny
 }
 
-/** Outcome of running a command by id: `reason` is 'not-registered', 'disabled' or 'invalid-args: …'. */
+/** Outcome of running a command by id: `reason` is 'not-registered' or 'invalid-args: …'. */
 export type CommandRunResult = { ok: true } | { ok: false; reason: string }
 
 /** Core-owned focus context, passed outbound to a command's handler. */
@@ -117,16 +75,6 @@ export interface CommandContext {
   projectId: string | null
   sessionId: string | null
   repoRoot: string | null
-}
-
-// v1.2.0 types
-
-export interface GlobalTabContribution {
-  id: string
-  label: string
-  icon?: string
-  component: unknown
-  permanent?: boolean
 }
 
 export interface WorkspaceSnapshot {
@@ -171,15 +119,6 @@ export type { Issue, IssueLink, IssueListResult, IssueSummary, TrackerConnection
 export type { NewIssueInput, TrackerStateOption, TrackerTeam, TransitionIntent }
 
 export interface PtyManagerAPI {
-  /** @deprecated since v1.4.0 — use spawnSession() plus onData()/onExit(). */
-  spawn(
-    sessionId: string,
-    cwd: string,
-    shell: string,
-    type: 'human' | 'agent',
-    onData: (data: string) => void,
-    onExit: (exitCode: number) => void
-  ): string
   /** v1.4.0 — spawn with metadata; subscribe output/exit separately via onData/onExit. */
   spawnSession(opts: SpawnSessionOptions): SessionInfo
   /**
@@ -212,10 +151,6 @@ export interface PtyManagerAPI {
   resize(sessionId: string, cols: number, rows: number): void
   kill(sessionId: string): void
   listSessions(): SessionInfo[]
-  /** @deprecated since v1.4.0 — alias of onData(). */
-  attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null
-  /** @deprecated since v1.4.0 — alias of onExit(). */
-  attachOnExit(sessionId: string, onExit: (exitCode: number) => void): (() => void) | null
 }
 
 export interface BridgeDeps {
@@ -256,25 +191,8 @@ export interface OpenTerminalTabInput {
   scrollbackLimit?: number
 }
 
-/** Matches the core's existing ToastType so no caller has to relearn it. */
-export type ExtensionToastTone = 'info' | 'success' | 'warning' | 'error'
-
-/**
- * The stacking scale, published so an extension never writes a z-index.
- * Ordering is the contract; these numbers are the implementation.
- */
-export const EXTENSION_UI_LAYERS = Object.freeze({
-  panel: 100,
-  overlay: 200,
-  modal: 300,
-  // Above modal on purpose: a confirmation raised from inside a dialog has to
-  // be readable without dismissing the dialog first.
-  toast: 400,
-})
-
 export interface ExtensionAPI {
   db: import('../db/index.js').ExtensionDB
-  readonly app: { readonly version: string }
   log: {
     debug(message: string, ...meta: unknown[]): void
     info(message: string, ...meta: unknown[]): void
@@ -286,30 +204,11 @@ export interface ExtensionAPI {
     get<T>(key: string): T | undefined
     set(key: string, value: unknown): void
     /**
-     * The resolved worktree base directory for a workspace, matching how the
-     * core app decides where git worktrees go: a workspace-specific override
-     * wins, then the global `git.worktreeBaseDir` setting, then the default
-     * `<workspacePath>/.worktrees`. Always returns an absolute-style path.
-     */
-    resolveWorktreeBaseDir(workspacePath: string): string
-    /**
      * Whether a branch matches Settings → Git → Branch Exclude Patterns: the
      * override of the workspace that owns `repoPath`, else the global list.
      * `*` matches anything, slashes included. Since 2.8.0.
      */
     isBranchExcluded(branch: string, repoPath?: string): boolean
-  }
-  sidebar: {
-    registerItem(item: SidebarContribution): Disposable
-    registerPanel(slot: PanelSlot, panel: PanelContribution): Disposable
-    registerGlobalTab(tab: GlobalTabContribution): Disposable
-    /**
-     * Shows or hides this extension's own sidebar panel. Without this an
-     * extension could contribute a sidebar item but had no way to make it do
-     * anything — which is why the one real contributor showed a hint toast
-     * instead of acting. (v1.1.0)
-     */
-    togglePanel(): void
   }
   globalShortcut: {
     register(accelerator: string, handler: () => void): Disposable
@@ -329,30 +228,9 @@ export interface ExtensionAPI {
      */
     createProject(input: CreateProjectInput): ProjectSnapshot | null
     deleteProject(projectId: string): void
-    onDelete(handler: (workspaceId: string) => void): Disposable
-    onProjectDelete(handler: (projectId: string) => void): Disposable
   }
   topBar: {
     registerMenuItem(item: TopBarMenuContribution): Disposable
-  }
-  /**
-   * The published interface floor (v1.3.0).
-   *
-   * The components themselves — dialog, confirmation, toast, empty state, icon
-   * button — ship as `@terminator/extension-ui`, because React components
-   * cannot cross a contextBridge: it serialises, and a component is a function.
-   * What lives here is what main-process code legitimately needs: raising a
-   * message in a view, and the stacking scale a stylesheet is generated from.
-   *
-   * `dialog` and `confirm` are deliberately absent. A dialog needs a React tree
-   * to render into and a person to answer it; exposing it to main would invite
-   * fire-and-forget prompts with no view guaranteed to be open.
-   */
-  ui: {
-    /** Raise a toast in this extension's view. */
-    toast(message: string, options?: { tone?: ExtensionToastTone; duration?: number }): void
-    /** The stacking order. Extensions style against these, never raw numbers. */
-    readonly layers: Readonly<Record<'panel' | 'overlay' | 'modal' | 'toast', number>>
   }
   shell: {
     exec(options: {
@@ -422,10 +300,6 @@ export interface ExtensionAPI {
     create(tracker: TrackerId, input: NewIssueInput): Promise<Issue>
     /** Whether this tracker can create an issue at all (v2.5.0). Synchronous. */
     supportsCreate(tracker: TrackerId): boolean
-    /** The issue attached to a project, or null. Synchronous: it is local state. */
-    linkFor(projectId: string): IssueLink | null
-    /** Fires when any project's link is set, replaced, cleared or garbage-collected. */
-    onLinkChange(handler: (projectId: string, link: IssueLink | null) => void): Disposable
   }
   notifications: {
     /**
@@ -456,18 +330,11 @@ export interface ExtensionAPI {
   nativeMenu: {
     addViewMenuItem(item: NativeMenuItemContribution): Disposable
   }
-  fs: {
-    watch(handler: (event: FsChangeEvent) => void): Disposable
-  }
-  contextMenu: {
-    registerItem(target: ContextMenuTarget, item: MenuItemContribution): Disposable
-  }
   commands: {
     register(
       command: CommandContribution,
       handler: (ctx: CommandContext, args?: never) => void | Promise<void>
     ): Disposable
-    setEnabled(id: string, enabled: boolean, reason?: string): void
   }
   ipc: {
     /**
@@ -511,14 +378,13 @@ import { join } from 'path'
 import type { ZodTypeAny } from 'zod'
 
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
-import { fsWatcherService } from '../fs/fs-watcher.js'
 import {
   notificationManager,
   setExtensionNotificationSettingReader,
 } from '../notifications/notification-manager.js'
 import type { NotificationTarget } from '../notifications/notification-manager.js'
 import { getExtensionSetting, setExtensionSetting } from '../storage/extension-settings-store.js'
-import { getGlobalSettings, getWorkspaceSettings } from '../storage/settings-store.js'
+import { getGlobalSettings } from '../storage/settings-store.js'
 import { basename } from 'path'
 import { randomUUID } from 'crypto'
 import { makeLogger } from '../logger.js'
@@ -530,14 +396,10 @@ import {
   createProject as createProjectInStore,
   deleteProject as deleteProjectFromStore,
 } from '../storage/workspace-store.js'
-import { onWorkspaceDelete, onProjectDelete, emitProjectDelete } from './workspace-events.js'
+import { emitProjectDelete } from './workspace-events.js'
 import { getIssueService } from '../integrations/index.js'
 import { listConnections as listTrackerConnections } from '../integrations/tracker-store.js'
-import {
-  getLink as getIssueLink,
-  onLinkChange as onIssueLinkChange,
-  setLink as setIssueLink,
-} from '../integrations/issue-link-store.js'
+import { setLink as setIssueLink } from '../integrations/issue-link-store.js'
 import { REMOTE_ACCESSIBLE_CHANNELS } from '../remote/remote-accessible-channels.js'
 
 /**
@@ -561,17 +423,12 @@ interface Registry {
   settingsSections: Map<string, ExtensionSettingsSchema>
   settingsValues: Map<string, unknown>
   workspaceSettingsValues: Map<string, unknown>
-  sidebarItems: Map<string, SidebarContribution>
-  sidebarPanels: Map<string, { slot: PanelSlot; panel: PanelContribution }>
-  globalTabs: Map<string, GlobalTabContribution>
   topBarItems: Map<string, TopBarMenuContribution>
   nativeMenuItems: Map<string, NativeMenuItemContribution>
   /** Maps panel ID → Electron menu item id for checkbox menu items registered by extensions. */
   panelMenuItemIds: Map<string, string>
-  contextMenuItems: Map<string, { target: ContextMenuTarget; item: MenuItemContribution }>
   commandContributions: Map<string, CommandContribution>
   commandHandlers: Map<string, (ctx: CommandContext, args?: unknown) => void | Promise<void>>
-  commandDisabledReasons: Map<string, string>
   sessionCreateHandlers: Set<(session: Readonly<SessionSnapshot>) => void>
   sessionCloseHandlers: Set<(sessionId: string) => void>
 }
@@ -583,16 +440,11 @@ export const globalRegistry: Registry = {
   settingsSections: new Map(),
   settingsValues: new Map(),
   workspaceSettingsValues: new Map(),
-  sidebarItems: new Map(),
-  sidebarPanels: new Map(),
-  globalTabs: new Map(),
   topBarItems: new Map(),
   nativeMenuItems: new Map(),
   panelMenuItemIds: new Map(),
-  contextMenuItems: new Map(),
   commandContributions: new Map(),
   commandHandlers: new Map(),
-  commandDisabledReasons: new Map(),
   sessionCreateHandlers: new Set(),
   sessionCloseHandlers: new Set(),
 }
@@ -666,51 +518,6 @@ export function listExtensionSettingsSections(): Array<{
   }))
 }
 
-export function listExtensionSidebarItems(): Array<{
-  id: string
-  label: string
-  tooltip?: string
-  icon?: string
-}> {
-  return [...globalRegistry.sidebarItems.values()].map((item) => ({
-    id: item.id,
-    label: item.label,
-    tooltip: item.tooltip,
-    icon: item.icon,
-  }))
-}
-
-export function listExtensionContextMenuItems(
-  target: string
-): Array<{ id: string; label: string }> {
-  return [...globalRegistry.contextMenuItems.values()]
-    .filter((entry) => entry.target === target)
-    .map((entry) => ({ id: entry.item.id, label: entry.item.label }))
-}
-
-export function dispatchContextMenuClick(target: string, itemId: string, targetId: string): void {
-  for (const entry of globalRegistry.contextMenuItems.values()) {
-    if (entry.target === target && entry.item.id === itemId) {
-      entry.item.onClick(targetId)
-      break
-    }
-  }
-}
-
-/**
- * Runs a contributed sidebar item's handler. The renderer only ever sees the
- * item's id and label — the onClick closure lives here, in the extension's own
- * main-process code — so the click has to come back over IPC to be invoked.
- */
-export function dispatchSidebarItemClick(itemId: string): void {
-  for (const item of globalRegistry.sidebarItems.values()) {
-    if (item.id === itemId) {
-      item.onClick()
-      return
-    }
-  }
-}
-
 export function listExtensionCommands(): Array<{
   key: string
   extensionId: string
@@ -721,7 +528,6 @@ export function listExtensionCommands(): Array<{
   category?: string
   mnemonic?: string
   requires?: 'repo' | 'session'
-  disabledReason?: string
 }> {
   // A command that takes args needs a caller to supply them; it is not a quick action.
   return [...globalRegistry.commandContributions.entries()]
@@ -736,7 +542,6 @@ export function listExtensionCommands(): Array<{
       category: cmd.category,
       mnemonic: cmd.mnemonic,
       requires: cmd.requires,
-      disabledReason: globalRegistry.commandDisabledReasons.get(key),
     }))
 }
 
@@ -751,7 +556,6 @@ export async function executeExtensionCommand(
 ): Promise<CommandRunResult> {
   const handler = globalRegistry.commandHandlers.get(key)
   if (!handler) return { ok: false, reason: 'not-registered' }
-  if (globalRegistry.commandDisabledReasons.has(key)) return { ok: false, reason: 'disabled' }
   let validated: unknown
   const schema = globalRegistry.commandContributions.get(key)?.args
   if (schema) {
@@ -837,7 +641,6 @@ export function createExtensionAPI(
   }
 
   const api: ExtensionAPI = {
-    app: { version: appVersion },
     db: deps?.db ?? dbStub,
     log: extLogger,
     settings: {
@@ -860,49 +663,8 @@ export function createExtensionAPI(
       set(key: string, value: unknown): void {
         setExtensionSetting(key, value)
       },
-      resolveWorktreeBaseDir(workspacePath: string): string {
-        const globalDir = getGlobalSettings().git?.worktreeBaseDir ?? ''
-        const ws = listWorkspaces().find((w) => w.folderPath === workspacePath)
-        const overrideDir = ws
-          ? (getWorkspaceSettings(ws.id).overrides?.git?.worktreeBaseDir ?? '')
-          : ''
-        const base = (overrideDir || globalDir).trim()
-        return base.length > 0 ? base : join(workspacePath, '.worktrees')
-      },
       isBranchExcluded(branch: string, repoPath?: string): boolean {
         return branchExcludePatternsFor(repoPath).some((p) => matchesBranchPattern(p, branch))
-      },
-    },
-    sidebar: {
-      registerItem(item: SidebarContribution): Disposable {
-        const key = `${extensionId}.sidebar.${item.id}`
-        globalRegistry.sidebarItems.set(key, item)
-        return disposable(() => globalRegistry.sidebarItems.delete(key))
-      },
-      registerPanel(slot: PanelSlot, panel: PanelContribution): Disposable {
-        const slotKey = `${extensionId}.panel.${slot}`
-        if (globalRegistry.sidebarPanels.has(slotKey)) {
-          throw new Error(
-            `SLOT_ALREADY_REGISTERED: "${slot}" is already registered for extension "${extensionId}"`
-          )
-        }
-        globalRegistry.sidebarPanels.set(slotKey, { slot, panel })
-        return disposable(() => globalRegistry.sidebarPanels.delete(slotKey))
-      },
-      registerGlobalTab(tab: GlobalTabContribution): Disposable {
-        const key = `${extensionId}.globaltab.${tab.id}`
-        if (globalRegistry.globalTabs.has(key)) {
-          throw new Error(
-            `GLOBAL_TAB_ALREADY_REGISTERED: tab "${tab.id}" is already registered for extension "${extensionId}"`
-          )
-        }
-        globalRegistry.globalTabs.set(key, tab)
-        return disposable(() => globalRegistry.globalTabs.delete(key))
-      },
-      togglePanel(): void {
-        for (const win of BrowserWindow.getAllWindows()) {
-          sendToWindow(win, 'extension:toggle-panel', extensionId)
-        }
       },
     },
     globalShortcut: {
@@ -973,25 +735,6 @@ export function createExtensionAPI(
         emitProjectDelete(projectId)
         deps?.broadcastToWindows?.('workspace:project-removed', { id: projectId })
       },
-      onDelete(handler: (workspaceId: string) => void): Disposable {
-        const unsub = onWorkspaceDelete(handler)
-        return disposable(unsub)
-      },
-      onProjectDelete(handler: (projectId: string) => void): Disposable {
-        const unsub = onProjectDelete(handler)
-        return disposable(unsub)
-      },
-    },
-    ui: {
-      toast(message: string, options?: { tone?: ExtensionToastTone; duration?: number }): void {
-        deps?.broadcastToWindows?.('extension:toast', {
-          extensionId,
-          message,
-          tone: options?.tone ?? 'info',
-          duration: options?.duration,
-        })
-      },
-      layers: EXTENSION_UI_LAYERS,
     },
     topBar: {
       registerMenuItem(item: TopBarMenuContribution): Disposable {
@@ -1063,12 +806,6 @@ export function createExtensionAPI(
       supportsCreate(tracker: TrackerId): boolean {
         return getIssueService().supportsCreate(tracker)
       },
-      linkFor(projectId: string): IssueLink | null {
-        return getIssueLink(projectId)
-      },
-      onLinkChange(handler: (projectId: string, link: IssueLink | null) => void): Disposable {
-        return disposable(onIssueLinkChange(handler))
-      },
     },
     notifications: {
       showToast(type: ToastType, message: string, key: string): void {
@@ -1105,19 +842,6 @@ export function createExtensionAPI(
         })
       },
     },
-    fs: {
-      watch(handler: (event: FsChangeEvent) => void): Disposable {
-        fsWatcherService.addHandler(handler)
-        return disposable(() => fsWatcherService.removeHandler(handler))
-      },
-    },
-    contextMenu: {
-      registerItem(target: ContextMenuTarget, item: MenuItemContribution): Disposable {
-        const key = `${extensionId}.contextmenu.${target}.${item.id}`
-        globalRegistry.contextMenuItems.set(key, { target, item })
-        return disposable(() => globalRegistry.contextMenuItems.delete(key))
-      },
-    },
     commands: {
       register(
         command: CommandContribution,
@@ -1132,16 +856,7 @@ export function createExtensionAPI(
         return disposable(() => {
           globalRegistry.commandContributions.delete(key)
           globalRegistry.commandHandlers.delete(key)
-          globalRegistry.commandDisabledReasons.delete(key)
         })
-      },
-      setEnabled(id: string, enabled: boolean, reason?: string): void {
-        const key = `${extensionId}.command.${id}`
-        if (enabled) {
-          globalRegistry.commandDisabledReasons.delete(key)
-        } else {
-          globalRegistry.commandDisabledReasons.set(key, reason ?? 'Disabled')
-        }
       },
     },
     ipc: {
@@ -1190,10 +905,6 @@ export function createExtensionAPI(
       },
     },
     pty: {
-      spawn(sessionId, cwd, shell, type, onData, onExit) {
-        if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
-        return deps.ptyManager.spawn(sessionId, cwd, shell, type, onData, onExit)
-      },
       spawnSession(opts) {
         if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
         return deps.ptyManager.spawnSession(opts)
@@ -1263,12 +974,6 @@ export function createExtensionAPI(
       },
       listSessions() {
         return deps?.ptyManager?.listSessions() ?? []
-      },
-      attachOnData(sessionId, onData) {
-        return deps?.ptyManager?.attachOnData(sessionId, onData) ?? null
-      },
-      attachOnExit(sessionId, onExit) {
-        return deps?.ptyManager?.attachOnExit(sessionId, onExit) ?? null
       },
     },
     window: {
