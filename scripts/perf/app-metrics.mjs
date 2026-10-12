@@ -65,17 +65,21 @@ async function cpuSecondsByProcessType(app) {
   return totals
 }
 
+// The dialogs' submit button: the design system's on this branch, the old class on
+// a build from before it, so one script measures both.
+const SUBMIT = '.tmui-dialog__actions .tmui-button--primary, .dialog__btn-primary'
+
 // A fresh profile has no terminal: add a workspace and a branch, which opens one.
 async function openTerminal(page, folder) {
   await page.click('.sidebar-header__add')
   await page.getByPlaceholder('My Workspace').fill('Perf')
   await page.getByPlaceholder('/path/to/folder').fill(folder)
-  await page.click('.dialog__btn-primary')
+  await page.click(SUBMIT)
   const header = page.locator('.repo-header').filter({ hasText: 'Perf' })
   await header.hover()
   await header.locator('.repo-header__action[aria-label="New branch in Perf"]').click()
   await page.getByPlaceholder('My branch').fill('perf')
-  await page.click('.dialog__btn-primary')
+  await page.click(SUBMIT)
   await page.locator('.branch-row').filter({ hasText: 'perf' }).last().click()
   await page.getByRole('textbox', { name: 'Terminal input' }).first().waitFor({ timeout: 30_000 })
 }
