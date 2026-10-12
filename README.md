@@ -220,6 +220,7 @@ The built-in extensions in `extensions/` are the working examples, and `tests/fi
 | One design system, documented in Storybook            | [ADR-098](docs/adr/098-one-design-system-documented-in-storybook.md) |
 | `node:sqlite` replaces PGlite                         | [ADR-099](docs/adr/099-node-sqlite-replaces-pglite.md)               |
 | Remote Control credentials                            | [ADR-100](docs/adr/100-remote-control-credentials.md)                |
+| No native terminal daemon                             | [ADR-101](docs/adr/101-no-terminal-daemon.md)                        |
 
 ## Contributing
 
