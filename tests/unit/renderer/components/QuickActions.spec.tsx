@@ -209,6 +209,16 @@ describe('QuickActions — search mode', () => {
     expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'git.push' }))
   })
 
+  it('puts the highlight back on the first match when the query changes', () => {
+    renderPanel()
+    fireEvent.keyDown(window, { key: '/' })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p' } })
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'push' } })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'git.push' }))
+  })
+
   it('goes back to top level on Backspace when the query is empty', () => {
     renderPanel()
     fireEvent.keyDown(window, { key: '/' })

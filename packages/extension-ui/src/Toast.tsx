@@ -43,7 +43,9 @@ export function Toast({
   onDismiss,
 }: ToastProps): JSX.Element {
   const dismissRef = useRef(onDismiss)
-  dismissRef.current = onDismiss
+  useEffect(() => {
+    dismissRef.current = onDismiss
+  })
 
   useEffect(() => {
     const ms = duration ?? (tone === 'error' ? 0 : DEFAULT_DURATION_MS)

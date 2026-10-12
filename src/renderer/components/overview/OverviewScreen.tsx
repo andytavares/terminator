@@ -15,6 +15,7 @@ import {
 } from '../../terminal/start-session'
 import { answersFor } from '../session/answers'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
+import { useNow } from '../session/useNow'
 import { matchesFilter } from '../../sidebar/session-filter'
 import { placeWall } from '../../sidebar/wall-order'
 import {
@@ -73,7 +74,7 @@ export function OverviewScreen(): JSX.Element {
   const wall = useMemo(() => placeWall(shown, prefs), [shown, prefs])
   const factsById = new Map(shown.map((f) => [f.sessionId, f]))
   const hasRest = wall.placements.length > wall.needsCount
-  const now = Date.now()
+  const now = useNow()
 
   const sessionIdsKey = open.map((f) => f.sessionId).join(',')
   useEffect(() => {

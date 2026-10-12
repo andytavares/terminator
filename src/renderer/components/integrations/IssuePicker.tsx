@@ -32,23 +32,27 @@ export function IssuePicker({ selected, onSelect, onClear }: IssuePickerProps): 
   const [term, setTerm] = useState('')
   const [open, setOpen] = useState(false)
   const [result, setResult] = useState<IssueListResult>({ issues: [], failures: [] })
-  const [loading, setLoading] = useState(false)
+  // The term the current result answers; null until the open list has been filled.
+  const [answeredTerm, setAnsweredTerm] = useState<string | null>(null)
   // Guards against a slow earlier request replacing a faster later one.
   const requestId = useRef(0)
   const rootRef = useRef<HTMLDivElement>(null)
+
+  const trimmedTerm = term.trim()
+  if (!open && answeredTerm !== null) setAnsweredTerm(null)
+  const loading = open && answeredTerm !== trimmedTerm
 
   useEffect(() => {
     if (!open) return
     const id = ++requestId.current
     const trimmed = term.trim()
-    setLoading(true)
 
     const run = async (): Promise<void> => {
       const next =
         trimmed.length === 0 ? await listMine({ limit: 25 }) : await searchIssues(trimmed)
       if (id !== requestId.current) return
       setResult(next)
-      setLoading(false)
+      setAnsweredTerm(trimmed)
     }
 
     if (trimmed.length === 0) {

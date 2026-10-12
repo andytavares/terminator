@@ -129,16 +129,16 @@ function LocalWebContentsPortal({
     }
   }, [extensionId, viewParam, isActive, repoRoot, modalOpen])
 
+  const reportsLoaded =
+    typeof window.electronAPI?.extensionEvents?.onExtensionPanelLoaded === 'function'
+
   useEffect(() => {
-    if (typeof window.electronAPI?.extensionEvents?.onExtensionPanelLoaded !== 'function') {
-      setLoading(false)
-      return
-    }
+    if (!reportsLoaded) return
     const unsubscribe = window.electronAPI.extensionEvents.onExtensionPanelLoaded((id: string) => {
       if (id === extensionId) setLoading(false)
     })
     return unsubscribe
-  }, [extensionId])
+  }, [extensionId, reportsLoaded])
 
   return (
     <div
@@ -147,7 +147,7 @@ function LocalWebContentsPortal({
       data-view-param={viewParam}
       style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}
     >
-      {loading && (
+      {loading && reportsLoaded && (
         <div
           data-testid="extension-loading"
           style={{

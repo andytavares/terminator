@@ -67,18 +67,31 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
     })
   }, [workspace?.folderPath])
 
-  useEffect(() => {
-    if (!gitRoot || branchMode !== 'worktree') return
-    const branch = worktreeIsNewBranch ? newBranchName : selectedBranch
-    if (!branch) {
-      // Show the base directory so users can see where worktrees go by default
+  const worktreeBranch = worktreeIsNewBranch ? newBranchName : selectedBranch
+  const worktreePathInputs = [
+    gitRoot,
+    branchMode,
+    worktreeIsNewBranch,
+    worktreeBranch,
+    worktreeBaseDir,
+  ].join('|')
+  const [pathInputsSeen, setPathInputsSeen] = useState(worktreePathInputs)
+  if (pathInputsSeen !== worktreePathInputs) {
+    setPathInputsSeen(worktreePathInputs)
+    // Show the base directory so users can see where worktrees go by default
+    if (gitRoot && branchMode === 'worktree' && !worktreeBranch) {
       setWorktreePath(worktreeBaseDir ?? `${gitRoot}/.worktrees`)
-      return
     }
-    window.electronAPI.git.suggestWorktreePath(gitRoot, branch, worktreeBaseDir).then((r) => {
-      setWorktreePath(r.path)
-    })
-  }, [gitRoot, branchMode, selectedBranch, worktreeIsNewBranch, newBranchName, worktreeBaseDir])
+  }
+
+  useEffect(() => {
+    if (!gitRoot || branchMode !== 'worktree' || !worktreeBranch) return
+    window.electronAPI.git
+      .suggestWorktreePath(gitRoot, worktreeBranch, worktreeBaseDir)
+      .then((r) => {
+        setWorktreePath(r.path)
+      })
+  }, [gitRoot, branchMode, worktreeBranch, worktreeBaseDir])
 
   async function fetchBranches(): Promise<void> {
     if (!gitRoot) return

@@ -44,6 +44,19 @@ describe('BranchSelect', () => {
     expect(screen.queryByText('feature/b')).toBeNull()
   })
 
+  it('forgets the search text once the dropdown closes', () => {
+    render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
+    const trigger = screen.getByRole('button', { name: /main/i })
+    fireEvent.click(trigger)
+    fireEvent.change(screen.getByPlaceholderText('Search branches…'), {
+      target: { value: 'feature/a' },
+    })
+    fireEvent.click(trigger)
+    fireEvent.click(trigger)
+    expect((screen.getByPlaceholderText('Search branches…') as HTMLInputElement).value).toBe('')
+    expect(screen.getByText('feature/b')).toBeTruthy()
+  })
+
   it('shows no matching branches message when filter has no results', () => {
     render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /main/i }))

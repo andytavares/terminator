@@ -16,6 +16,7 @@ import {
   startSessionInBranch,
 } from '../../terminal/start-session'
 import { answersFor } from '../session/answers'
+import { useNow } from '../session/useNow'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import {
   loadHomePrefs,
@@ -83,7 +84,7 @@ export function HomeScreen({ onOpenQuickActions }: HomeScreenProps = {}): JSX.El
   }
 
   const openCount = facts.filter((f) => !f.isClosed).length
-  const now = Date.now()
+  const now = useNow()
 
   function saveDescription(target: SessionFacts, description: string | null): void {
     void setDescription(target.snapshot, description)

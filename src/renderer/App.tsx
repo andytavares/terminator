@@ -79,6 +79,7 @@ export function App(): JSX.Element {
   const [logOpen, setLogOpen] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [quickActionsOpen, setQuickActionsOpen] = useState(false)
+  const [quickActionsOpenedAt, setQuickActionsOpenedAt] = useState(0)
   const [searchSignal, setSearchSignal] = useState(0)
   const [registeredCommands, setRegisteredCommands] = useState<RegisteredCommand[]>([])
   const {
@@ -167,6 +168,7 @@ export function App(): JSX.Element {
     [logOpen, setLogOpenWithInset]
   )
   const handleOpenQuickActions = useCallback(() => {
+    setQuickActionsOpenedAt(Date.now())
     setQuickActionsOpen((open) => {
       if (open) setSearchSignal((n) => n + 1)
       return true
@@ -615,9 +617,9 @@ export function App(): JSX.Element {
       rankFirstScreen(allQuickActions, {
         pins: quickActionsSettings?.pins ?? [],
         usage: quickActionsSettings?.usage ?? [],
-        now: Date.now(),
+        now: quickActionsOpenedAt,
       }),
-    [allQuickActions, quickActionsSettings]
+    [allQuickActions, quickActionsSettings, quickActionsOpenedAt]
   )
 
   const handleRunQuickAction = useCallback(
@@ -836,7 +838,9 @@ export function App(): JSX.Element {
 
   // Keep a ref so the effect always sees the latest openPanels without re-running on every change
   const openPanelsRef = useRef(openPanels)
-  openPanelsRef.current = openPanels
+  useEffect(() => {
+    openPanelsRef.current = openPanels
+  }, [openPanels])
 
   // Snapshot of panels that were open before switching to an extension tab
   const savedPanelsRef = useRef<Set<string>>(new Set())

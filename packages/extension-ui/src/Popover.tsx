@@ -34,7 +34,9 @@ export function Popover({ label, children, onDismiss, className }: PopoverProps)
   const zIndex = nestedLayerValue('overlay', parentLayer)
 
   const dismissRef = useRef(onDismiss)
-  dismissRef.current = onDismiss
+  useEffect(() => {
+    dismissRef.current = onDismiss
+  })
 
   useEffect(() => {
     const registry = createModalDepthRegistry(window as unknown as Record<string, unknown>)

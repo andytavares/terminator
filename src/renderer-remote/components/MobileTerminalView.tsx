@@ -56,7 +56,9 @@ export function MobileTerminalView({ sessionId, cwd, onBack }: Props) {
   }, [sessionId])
 
   const { status, retry, onOpenWsFailed } = useReconnect(openWs, ws)
-  onOpenWsFailedRef.current = onOpenWsFailed
+  useEffect(() => {
+    onOpenWsFailedRef.current = onOpenWsFailed
+  }, [onOpenWsFailed])
 
   useEffect(() => {
     if (!containerRef.current) return

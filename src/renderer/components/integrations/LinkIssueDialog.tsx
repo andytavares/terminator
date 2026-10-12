@@ -47,7 +47,7 @@ export function LinkIssueDialog({
   const [term, setTerm] = useState('')
   const [result, setResult] = useState<IssueListResult>({ issues: [], failures: [] })
   const [selected, setSelected] = useState<IssueSummary | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [answeredTerm, setAnsweredTerm] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Guards against a slow earlier request landing after a faster later one and
@@ -55,25 +55,22 @@ export function LinkIssueDialog({
   const requestId = useRef(0)
 
   const connected = isAnyConnected()
+  const loading = connected && answeredTerm !== term.trim()
 
   useEffect(() => {
     void loadConnections()
   }, [loadConnections])
 
   useEffect(() => {
-    if (!connected) {
-      setLoading(false)
-      return
-    }
+    if (!connected) return
     const id = ++requestId.current
     const trimmed = term.trim()
-    setLoading(true)
 
     const run = async (): Promise<void> => {
       const next = trimmed.length === 0 ? await listMine() : await searchIssues(trimmed)
       if (id !== requestId.current) return
       setResult(next)
-      setLoading(false)
+      setAnsweredTerm(trimmed)
     }
 
     if (trimmed.length === 0) {
