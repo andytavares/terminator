@@ -827,7 +827,9 @@ export function registerGithubHandlers(
       channel: 'github:sessions-for-repo',
       schema: RepoRootPayload,
       invalid: { sessions: [] },
-      run: ({ repoRoot }) => ({ sessions: sessionsForRepo(repoRoot) }),
+      run: async ({ repoRoot }) => ({
+        sessions: sessionsForRepo((await sessionStore()).store, repoRoot),
+      }),
     })
   )
 
@@ -836,8 +838,8 @@ export function registerGithubHandlers(
       channel: 'github:session-get',
       schema: z.object({ key: z.string().min(1) }),
       invalid: { session: null },
-      run: ({ key }) => {
-        const raw = sessionStore().get(key)
+      run: async ({ key }) => {
+        const raw = (await sessionStore()).get(key)
         if (!raw) return { session: null }
         const result = ReviewSessionSchema.safeParse(raw)
         return result.success ? { session: result.data } : { session: null }
@@ -850,8 +852,9 @@ export function registerGithubHandlers(
       channel: 'github:session-set',
       schema: z.object({ key: z.string().min(1), session: ReviewSessionSchema }),
       invalid: VALIDATION_ERROR,
-      run: ({ key, session }) => {
-        sessionStore().set(key, session)
+      run: async ({ key, session }) => {
+        const sessions = await sessionStore()
+        sessions.set(key, session)
         return { ok: true as const }
       },
       onError: errorEnvelope,
@@ -865,9 +868,9 @@ export function registerGithubHandlers(
       channel: 'github:save-active-review',
       schema: z.object({ repoRoot: RepoRoot, pr: ReviewQueuePRSchema }),
       invalid: VALIDATION_ERROR,
-      run: ({ repoRoot, pr }) => {
-        const key = `${repoRoot}:${pr.number}`
-        activeReviewStore().set(key, { repoRoot, pr })
+      run: async ({ repoRoot, pr }) => {
+        const activeReviews = await activeReviewStore()
+        activeReviews.set(`${repoRoot}:${pr.number}`, { repoRoot, pr })
         return { ok: true as const }
       },
       onError: errorEnvelope,
@@ -879,8 +882,8 @@ export function registerGithubHandlers(
       channel: 'github:active-reviews-for-repo',
       schema: RepoRootPayload,
       invalid: VALIDATION_ERROR,
-      run: ({ repoRoot }) => {
-        const all = activeReviewStore().store
+      run: async ({ repoRoot }) => {
+        const all = (await activeReviewStore()).store
         const prs = Object.values(all)
           .filter(
             (entry): entry is { repoRoot: string; pr: unknown } =>
@@ -902,12 +905,13 @@ export function registerGithubHandlers(
       channel: 'github:remove-active-review',
       schema: PullRequestPayload,
       invalid: VALIDATION_ERROR,
-      run: ({ repoRoot, prNumber }) => {
-        activeReviewStore().delete(`${repoRoot}:${prNumber}`)
+      run: async ({ repoRoot, prNumber }) => {
+        const [activeReviews, sessions] = await Promise.all([activeReviewStore(), sessionStore()])
+        activeReviews.delete(`${repoRoot}:${prNumber}`)
         // Also delete all session store entries for this PR so it won't re-appear as in-progress on next load
         const sessionPrefix = `${repoRoot}:::${prNumber}:::`
-        for (const key of Object.keys(sessionStore().store)) {
-          if (key.startsWith(sessionPrefix)) sessionStore().delete(key)
+        for (const key of Object.keys(sessions.store)) {
+          if (key.startsWith(sessionPrefix)) sessions.delete(key)
         }
         return { ok: true as const }
       },
@@ -942,8 +946,8 @@ export function registerGithubHandlers(
               openNumbers.push(num)
             } else {
               // PR is CLOSED or MERGED — clean up the persisted snapshot
-              const key = `${repoRoot}:${num}`
-              activeReviewStore().delete(key)
+              const activeReviews = await activeReviewStore()
+              activeReviews.delete(`${repoRoot}:${num}`)
             }
           }
         }
@@ -1048,6 +1052,7 @@ export function registerGithubHandlers(
         }
 
         const sessionsByRoot = new Map<string, Map<number, ReviewSession>>()
+        const storedSessions = (await sessionStore()).store
         const excluded = await resolveBranchExclusions(
           isBranchExcluded,
           dashboardBranches(data, localRoots)
@@ -1057,7 +1062,7 @@ export function registerGithubHandlers(
           if (!sessionsByRoot.has(pr.localRepoRoot)) {
             sessionsByRoot.set(
               pr.localRepoRoot,
-              new Map(sessionsForRepo(pr.localRepoRoot).map((s) => [s.prNumber, s]))
+              new Map(sessionsForRepo(storedSessions, pr.localRepoRoot).map((s) => [s.prNumber, s]))
             )
           }
           const session = sessionsByRoot.get(pr.localRepoRoot)!.get(pr.number)
@@ -1248,10 +1253,10 @@ export function registerGithubHandlers(
  * One session per PR. v2 keys are "repo:::pr"; v1 keys are "repo:::pr:::sha".
  * When both exist for the same PR, the new key wins — it's the one v2 code keeps current.
  */
-function sessionsForRepo(repoRoot: string): ReviewSession[] {
+function sessionsForRepo(stored: Record<string, unknown>, repoRoot: string): ReviewSession[] {
   const prefix = `${repoRoot}:::`
   const byPrNumber = new Map<number, { session: ReviewSession; isNewKey: boolean }>()
-  for (const [key, value] of Object.entries(sessionStore().store)) {
+  for (const [key, value] of Object.entries(stored)) {
     if (!key.startsWith(prefix)) continue
     const result = ReviewSessionSchema.safeParse(value)
     if (!result.success) continue

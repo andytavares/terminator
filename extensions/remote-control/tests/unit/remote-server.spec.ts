@@ -507,9 +507,8 @@ describe('RemoteServer', () => {
 
   describe('EADDRINUSE handling', () => {
     it('start() with port in use rejects with PortInUseError', async () => {
-      const { createRemoteServer: create2, PortInUseError } = await import(
-        '../../src/server/remote-server'
-      )
+      const { createRemoteServer: create2 } = await import('../../src/server/remote-server')
+      const { PortInUseError } = await import('../../src/server/port-in-use-error')
       const conflictServer = await create2({
         port: 7683,
         appPath: '/mock/app',

@@ -2,11 +2,8 @@ import { networkInterfaces } from 'os'
 import { randomBytes } from 'crypto'
 import { z } from 'zod'
 import { defineChannel, noPayload, type ExtensionAPI } from '@terminator/extension-sdk'
-import {
-  createRemoteServer,
-  PortInUseError,
-  type RemoteServerHandle,
-} from './server/remote-server.js'
+import type { RemoteServerHandle } from './server/remote-server.js'
+import { PortInUseError } from './server/port-in-use-error.js'
 import { NgrokManager, generateCaddyfile } from './server/ngrok-manager.js'
 import { CredentialStore } from './server/credential-store.js'
 
@@ -82,6 +79,8 @@ export function activate(api: ExtensionAPI): void {
     if (!credentials.hasPassword()) return refuseWithoutPassword()
     const port = getPort()
     try {
+      // fastify and the routes cost the extension host 25 MB: loaded when the server starts.
+      const { createRemoteServer } = await import('./server/remote-server.js')
       remoteServer = await createRemoteServer({
         port,
         appPath: api.paths.app,
