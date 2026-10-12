@@ -450,6 +450,64 @@
   padding-top: var(--tm-space-3, 12px);
 }
 
+/* ── Segmented control ──────────────────────────────────────────────────── */
+
+.tmui-segmented {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm, 6px);
+  background: var(--tm-bg-input);
+  font-family: var(--tm-font-ui);
+}
+
+.tmui-segmented__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tm-space-1, 4px);
+  padding: 3px 10px;
+  border: 0;
+  border-radius: var(--tm-radius-xs, 4px);
+  background: transparent;
+  color: var(--tm-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tmui-segmented--sm .tmui-segmented__option {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.tmui-segmented__option svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tmui-segmented__option:hover:not(:disabled) {
+  color: var(--tm-text-primary);
+}
+
+.tmui-segmented__option[aria-checked='true'] {
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
+  font-weight: 500;
+}
+
+.tmui-segmented__option:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tmui-segmented__option:focus-visible {
+  outline: 2px solid var(--tm-accent);
+  outline-offset: -2px;
+}
+
 /* ── Markdown ───────────────────────────────────────────────────────────── */
 
 /* Every selector is wrapped in :where() so the defaults weigh nothing: a caller
