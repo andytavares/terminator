@@ -251,6 +251,19 @@ describe('interrupting and redirecting', () => {
     expect(runner.send).toHaveBeenCalledWith('session-1', 'try the other approach')
   })
 
+  it('refuses a payload with no message at all, rather than throwing', async () => {
+    // A handler that throws on a missing field takes the channel down for
+    // everyone rather than refusing one call. Found by driving the real app.
+    expect(await call('foundry:run-redirect', { sessionId: 'session-1' })).toEqual({ ok: false })
+  })
+
+  it('refuses an empty redirect rather than ending a turn for nothing', async () => {
+    expect(await call('foundry:run-redirect', { sessionId: 'session-1', message: '   ' })).toEqual({
+      ok: false,
+    })
+    expect(runner.interrupt).not.toHaveBeenCalled()
+  })
+
   it('records the redirect, attributed to the pilot', async () => {
     // The agent did not say this, and a feed that blurs the two is one you stop
     // trusting.
@@ -300,6 +313,13 @@ describe('the Forge view preference', () => {
       view: 'factory',
     })
   })
+
+  it('rejects a value that is not a known view', async () => {
+    expect(await call('foundry:ui.set-view', { view: 'grid' })).toEqual({
+      error: 'Malformed request.',
+    })
+    expect(api.settings.set).not.toHaveBeenCalled()
+  })
 })
 
 describe('toggling the Forge view', () => {
@@ -345,5 +365,12 @@ describe('the model that answers asks', () => {
       selected: 'opus',
     })
     expect(api.settings.set).toHaveBeenCalledWith('terminator.foundry.askModel', 'opus')
+  })
+
+  it('refuses a model that is not Sonnet or Opus', async () => {
+    expect(await handler('foundry:ask-model-set')({ model: 'haiku' })).toEqual({
+      error: 'model must be one of sonnet, opus',
+    })
+    expect(api.settings.set).not.toHaveBeenCalled()
   })
 })
