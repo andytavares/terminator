@@ -368,6 +368,38 @@ describe('task-vault:vault:export-json and import-json', () => {
     })
   })
 
+  it('keeps every project in its area through an export into an empty database', async () => {
+    await seedArea(db, 'a1', 'Work')
+    await seedArea(db, 'a2', 'Home')
+    await seedProject(db, 'p1', 'Alpha', { areaId: 'a1' })
+    await seedProject(db, 'p2', 'Beta', { areaId: 'a2' })
+    await seedProject(db, 'p3', 'Loose')
+    const exported = await invoke('task-vault:vault:export-json')
+
+    const other = await createVaultDb()
+    const otherHarness = createIpcHarness()
+    registerVaultIpcHandlers(otherHarness.api, other)
+    await otherHarness.invoke('task-vault:vault:import-json', exported)
+
+    const projects = await other.query<{ name: string; area_id: string | null }>(
+      `SELECT name, area_id FROM projects ORDER BY name`
+    )
+    expect(projects).toEqual([
+      { name: 'Alpha', area_id: 'a1' },
+      { name: 'Beta', area_id: 'a2' },
+      { name: 'Loose', area_id: null },
+    ])
+  })
+
+  it('places an imported project in the area named by its legacy area field', async () => {
+    await invoke('task-vault:vault:import-json', {
+      areas: [{ id: 'a1', name: 'Work', created_at: now }],
+      projects: [{ id: 'p1', name: 'Alpha', area: 'Work', created_at: now, updated_at: now }],
+    })
+
+    expect(await db.get(`SELECT area_id FROM projects WHERE id = 'p1'`)).toEqual({ area_id: 'a1' })
+  })
+
   it.each([null, 'not-an-object'])('returns INVALID_PAYLOAD for %j', async (payload) => {
     expect(await invoke('task-vault:vault:import-json', payload)).toEqual({
       error: 'INVALID_PAYLOAD',

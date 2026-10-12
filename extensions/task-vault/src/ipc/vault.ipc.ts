@@ -44,6 +44,17 @@ import {
 
 const localDate = _localDate
 
+/** The export writes area_id; older payloads name the area in an area field. */
+async function findImportedProjectAreaId(
+  db: ExtensionDB,
+  project: Record<string, unknown>
+): Promise<string | null> {
+  const [column, value] = project.area_id ? ['id', project.area_id] : ['name', project.area]
+  if (!value) return null
+  const row = await db.get<{ id: string }>(`SELECT id FROM areas WHERE ${column}=?`, [value])
+  return row?.id ?? null
+}
+
 /** One task as written by the JSON export. */
 interface ImportedTask {
   id: string
@@ -1020,10 +1031,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       }
       if (Array.isArray(data.projects)) {
         for (const p of data.projects) {
-          const areaRow = p.area
-            ? await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [p.area])
-            : null
-          const areaId = areaRow?.id ?? null
+          const areaId = await findImportedProjectAreaId(db, p)
           await db.run(
             `INSERT INTO projects (id,name,status,area_id,deadline,outcome,terminator_links,created_at,updated_at)
              VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`,
