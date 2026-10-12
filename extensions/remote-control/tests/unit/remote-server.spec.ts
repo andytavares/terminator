@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'fs'
+import { createServer, type Server } from 'net'
 import { hashPassword } from '../../src/server/password-hash'
 
 const PASSWORD = 'correct-password'
@@ -103,8 +104,9 @@ describe('RemoteServer', () => {
     const storedHash = await hashPassword(PASSWORD)
     mockDeps.getPasswordHash.mockReturnValue(storedHash)
     const { createRemoteServer } = await import('../../src/server/remote-server')
+    // Port 0: the system picks a free port, so runs on one machine never collide.
     remoteServer = await createRemoteServer({
-      port: 7683,
+      port: 0,
       appPath: '/mock/app',
       ptyManager: mockPtyManager as never,
       deps: mockDeps,
@@ -506,12 +508,26 @@ describe('RemoteServer', () => {
   })
 
   describe('EADDRINUSE handling', () => {
+    // A port this test holds itself, so "in use" never depends on another process.
+    let holder: Server
+    let heldPort: number
+
+    beforeEach(async () => {
+      holder = createServer()
+      await new Promise<void>((resolve) => holder.listen(0, '0.0.0.0', resolve))
+      heldPort = (holder.address() as { port: number }).port
+    })
+
+    afterEach(async () => {
+      await new Promise<void>((resolve) => holder.close(() => resolve()))
+    })
+
     it('start() with port in use rejects with PortInUseError', async () => {
       const { createRemoteServer: create2, PortInUseError } = await import(
         '../../src/server/remote-server'
       )
       const conflictServer = await create2({
-        port: 7683,
+        port: heldPort,
         appPath: '/mock/app',
         ptyManager: mockPtyManager as never,
         deps: { ...mockDeps, onPortInUse: vi.fn() },
@@ -523,13 +539,13 @@ describe('RemoteServer', () => {
       const { createRemoteServer: create2 } = await import('../../src/server/remote-server')
       const onPortInUse = vi.fn()
       const conflictServer = await create2({
-        port: 7683,
+        port: heldPort,
         appPath: '/mock/app',
         ptyManager: mockPtyManager as never,
         deps: { ...mockDeps, onPortInUse },
       })
       await conflictServer.start().catch(() => {})
-      expect(onPortInUse).toHaveBeenCalledWith(7683)
+      expect(onPortInUse).toHaveBeenCalledWith(heldPort)
     })
   })
 })
