@@ -179,25 +179,28 @@ async function collectRungOutput(
   // the operator's to decipher — so it is recorded and the rung is not
   // credited with having filed anything.
   if (!result.ok) {
-    await store.record({
-      at: new Date().toISOString(),
-      orderId: order.id,
-      actor: `role:${role}`,
-      action: 'rung.refused',
-      subject: nodeId,
-      reason: result.reason,
-      evidence: [],
-    })
+    await recordRungRefused(context, { role, nodeId, reason: result.reason })
     return null
   }
 
   await store.save(result.order)
-  return {
-    order: result.order,
-    note: result.note,
-    defect: result.defect,
-    document: result.document,
-  }
+  const { note, defect, document } = result
+  return { order: result.order, note, defect, document }
+}
+
+async function recordRungRefused(
+  context: RunContext,
+  refusal: { role: string; nodeId: string; reason: string }
+): Promise<void> {
+  await context.store.record({
+    at: new Date().toISOString(),
+    orderId: context.order.id,
+    actor: `role:${refusal.role}`,
+    action: 'rung.refused',
+    subject: refusal.nodeId,
+    reason: refusal.reason,
+    evidence: [],
+  })
 }
 
 // An agent that only edited leaves nothing to push, and a pull request
