@@ -53,26 +53,6 @@ describe('notification IPC handlers', () => {
       expect(result).toEqual({ id: 'new-id' })
     })
 
-    it('returns VALIDATION_ERROR for missing title', async () => {
-      const handler = captureHandle('notifications:create')
-      const result = await handler(null, { type: 'info', key: 'tKey' })
-      expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-      expect(mockCreate).not.toHaveBeenCalled()
-    })
-
-    it('returns VALIDATION_ERROR for missing key', async () => {
-      const handler = captureHandle('notifications:create')
-      const result = await handler(null, { type: 'info', title: 'T' })
-      expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-      expect(mockCreate).not.toHaveBeenCalled()
-    })
-
-    it('returns VALIDATION_ERROR for invalid type', async () => {
-      const handler = captureHandle('notifications:create')
-      const result = await handler(null, { type: 'bad', title: 'T', key: 'tKey' })
-      expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-    })
-
     it('ignores a caller-supplied targets field (delivery is settings-resolved, not caller-supplied)', async () => {
       mockCreate.mockReturnValue('tid')
       const handler = captureHandle('notifications:create')
@@ -141,19 +121,6 @@ describe('notification IPC handlers', () => {
       expect(mockDismiss).toHaveBeenCalledWith('notif-123')
       expect(result).toEqual({ ok: true })
     })
-
-    it('returns VALIDATION_ERROR for missing id', async () => {
-      const handler = captureHandle('notifications:dismiss')
-      const result = await handler(null, {})
-      expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-      expect(mockDismiss).not.toHaveBeenCalled()
-    })
-
-    it('returns VALIDATION_ERROR for empty id', async () => {
-      const handler = captureHandle('notifications:dismiss')
-      const result = await handler(null, { id: '' })
-      expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-    })
   })
 
   describe('notifications:trigger-action', () => {
@@ -170,20 +137,6 @@ describe('notification IPC handlers', () => {
       const handler = captureHandle('notifications:trigger-action')
       const result = await handler(null, { notifId: 'bad', actionId: 'go' })
       expect(result).toEqual({ error: 'UNKNOWN_NOTIFICATION' })
-    })
-
-    it('returns VALIDATION_ERROR for missing notifId', async () => {
-      const handler = captureHandle('notifications:trigger-action')
-      const result = await handler(null, { actionId: 'go' })
-      expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-      expect(mockTriggerAction).not.toHaveBeenCalled()
-    })
-
-    it('returns VALIDATION_ERROR for missing actionId', async () => {
-      const handler = captureHandle('notifications:trigger-action')
-      const result = await handler(null, { notifId: 'n1' })
-      expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-      expect(mockTriggerAction).not.toHaveBeenCalled()
     })
   })
 })

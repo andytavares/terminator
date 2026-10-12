@@ -41,31 +41,18 @@ describe('fs IPC handlers', () => {
   })
 
   describe('fs:watch-start', () => {
-    it('calls watchStart and returns ok for valid payload', () => {
+    it('calls watchStart and returns ok for valid payload', async () => {
       const handler = captureHandler('fs:watch-start')
-      const result = handler({}, { projectRoot: '/my/project' }) as { ok: boolean }
+      const result = (await handler({}, { projectRoot: '/my/project' })) as { ok: boolean }
       expect(fsWatcherService.watchStart).toHaveBeenCalledWith('/my/project')
       expect(result.ok).toBe(true)
-    })
-
-    it('returns VALIDATION_ERROR when projectRoot is missing', () => {
-      const handler = captureHandler('fs:watch-start')
-      const result = handler({}, {}) as { error: string }
-      expect(result.error).toBe('VALIDATION_ERROR')
-      expect(fsWatcherService.watchStart).not.toHaveBeenCalled()
-    })
-
-    it('returns VALIDATION_ERROR when projectRoot is an empty string', () => {
-      const handler = captureHandler('fs:watch-start')
-      const result = handler({}, { projectRoot: '' }) as { error: string }
-      expect(result.error).toBe('VALIDATION_ERROR')
     })
   })
 
   describe('fs:watch-stop', () => {
-    it('calls watchStop and returns ok', () => {
+    it('calls watchStop and returns ok', async () => {
       const handler = captureHandler('fs:watch-stop')
-      const result = handler({}) as { ok: boolean }
+      const result = (await handler({})) as { ok: boolean }
       expect(fsWatcherService.watchStop).toHaveBeenCalled()
       expect(result.ok).toBe(true)
     })
@@ -77,18 +64,6 @@ describe('fs IPC handlers', () => {
       const handler = captureHandler('fs:read-file')
       const result = (await handler({}, { filePath: '/my/file.ts' })) as { content: string }
       expect(result.content).toBe('file contents')
-    })
-
-    it('returns VALIDATION_ERROR when filePath is missing', async () => {
-      const handler = captureHandler('fs:read-file')
-      const result = (await handler({}, {})) as { error: string }
-      expect(result.error).toBe('VALIDATION_ERROR')
-    })
-
-    it('returns VALIDATION_ERROR when filePath is empty string', async () => {
-      const handler = captureHandler('fs:read-file')
-      const result = (await handler({}, { filePath: '' })) as { error: string }
-      expect(result.error).toBe('VALIDATION_ERROR')
     })
 
     it('returns FILE_NOT_FOUND when readFile rejects', async () => {

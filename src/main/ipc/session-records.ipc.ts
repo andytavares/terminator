@@ -1,6 +1,5 @@
 import type { BrowserWindow } from 'electron'
-import { registerInvokeTable, invokeSpec } from './invoke-table.js'
-import { handleChannel } from './channel-registrar.js'
+import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
 import { sendToWindow } from '../safe-send.js'
 import * as fs from 'node:fs'
 import {
@@ -61,13 +60,17 @@ function byCloseTime(a: { closedAt?: string }, b: { closedAt?: string }): number
 export function registerSessionRecordsHandlers(
   getWindow: () => BrowserWindow | null = () => null
 ): void {
-  handleChannel('session-records:list', () => ({
-    data: pruneRecords(listRecords(), Date.now())
-      .sort(byCloseTime)
-      .map((record) => listing(record)!),
-  }))
-
   registerInvokeTable([
+    invokeSpec({
+      channel: 'session-records:list',
+      schema: noPayload,
+      invalid,
+      run: () => ({
+        data: pruneRecords(listRecords(), Date.now())
+          .sort(byCloseTime)
+          .map((record) => listing(record)!),
+      }),
+    }),
     invokeSpec({
       channel: 'session-records:set-description',
       schema: SetDescriptionInputSchema,

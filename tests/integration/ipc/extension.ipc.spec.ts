@@ -80,11 +80,11 @@ describe('extension IPC handlers', () => {
   })
 
   describe('extension:list', () => {
-    it('returns extensions from host', () => {
+    it('returns extensions from host', async () => {
       const extensions = [{ id: 'com.test', name: 'Test' }]
       mockExtensionHost.listExtensions.mockReturnValue(extensions)
       const handler = captureHandle('extension:list')
-      const result = handler({}) as { extensions: unknown[] }
+      const result = (await handler({})) as { extensions: unknown[] }
       expect(result.extensions).toEqual(extensions)
     })
   })
@@ -183,19 +183,19 @@ describe('extension IPC handlers', () => {
   })
 
   describe('extension:get-settings-schemas', () => {
-    it('returns empty schemas when none registered', () => {
+    it('returns empty schemas when none registered', async () => {
       const handler = captureHandle('extension:get-settings-schemas')
-      const result = handler({}) as { schemas: unknown[] }
+      const result = (await handler({})) as { schemas: unknown[] }
       expect(result.schemas).toEqual([])
     })
 
-    it('returns registered schemas with extensionId derived from key', () => {
+    it('returns registered schemas with extensionId derived from key', async () => {
       ;(globalRegistry.settingsSections as Map<string, unknown>).set('com.test.settings', {
         label: 'Test Extension',
         properties: { 'com.test.key': { type: 'string', label: 'Key', default: '' } },
       })
       const handler = captureHandle('extension:get-settings-schemas')
-      const result = handler({}) as {
+      const result = (await handler({})) as {
         schemas: Array<{ extensionId: string; label: string }>
       }
       expect(result.schemas).toHaveLength(1)
@@ -205,17 +205,19 @@ describe('extension IPC handlers', () => {
   })
 
   describe('extension:get-settings-values', () => {
-    it('returns values from the extension settings store', () => {
+    it('returns values from the extension settings store', async () => {
       const handler = captureHandle('extension:get-settings-values')
-      const result = handler({}) as { values: Record<string, unknown> }
+      const result = (await handler({})) as { values: Record<string, unknown> }
       expect(typeof result.values).toBe('object')
     })
   })
 
   describe('extension:update-setting', () => {
-    it('writes value to the extension settings store and returns ok', () => {
+    it('writes value to the extension settings store and returns ok', async () => {
       const handler = captureHandle('extension:update-setting')
-      const result = handler({}, { key: 'com.test.token', value: 'abc123' }) as { ok: boolean }
+      const result = (await handler({}, { key: 'com.test.token', value: 'abc123' })) as {
+        ok: boolean
+      }
       expect(result.ok).toBe(true)
     })
   })

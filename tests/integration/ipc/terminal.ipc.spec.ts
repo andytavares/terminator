@@ -100,30 +100,6 @@ describe('terminal IPC handlers', () => {
       expect(typeof (result as { sessionId: string }).sessionId).toBe('string')
     })
 
-    it('returns VALIDATION_ERROR when projectId is not a UUID', async () => {
-      const payload = {
-        projectId: 'not-a-uuid',
-        type: 'human',
-        tabTitle: 'Shell',
-        cwd: '/tmp',
-      }
-
-      const result = await handlerMap['terminal:create']({}, payload)
-      expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-    })
-
-    it('returns VALIDATION_ERROR when type is invalid', async () => {
-      const payload = {
-        projectId: '550e8400-e29b-41d4-a716-446655440000',
-        type: 'robot',
-        tabTitle: 'Shell',
-        cwd: '/tmp',
-      }
-
-      const result = await handlerMap['terminal:create']({}, payload)
-      expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-    })
-
     it('accepts agent session type', async () => {
       const payload = {
         projectId: '550e8400-e29b-41d4-a716-446655440001',

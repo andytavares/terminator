@@ -1,5 +1,15 @@
-import { handleChannel } from './channel-registrar.js'
+import { z } from 'zod'
 import { BrowserWindow } from 'electron'
+import { registerInvokeTable, invokeSpec, noPayload, type InvokeSpec } from './invoke-table.js'
+import {
+  CreateProjectInputSchema,
+  CreateWorkspaceInputSchema,
+  RenameProjectSchema,
+  ReorderProjectsSchema,
+  ReorderWorkspacesSchema,
+  UpdateProjectBranchSchema,
+  UpdateWorkspaceInputSchema,
+} from '../../shared/schemas/workspace.schema.js'
 import {
   listWorkspaces,
   createWorkspace,
@@ -37,72 +47,123 @@ export function getActiveWorkspaceContext(): ActiveWorkspaceContext {
   return activeContext
 }
 
+const IdSchema = z.object({ id: z.string().min(1) })
+const failed = { success: false }
+const validationError = (error: z.ZodError) => ({
+  error: 'VALIDATION_ERROR',
+  message: error.message,
+})
+
 export function registerWorkspaceHandlers(): void {
-  handleChannel('workspace:get-active', () => activeContext)
+  registerInvokeTable([...workspaceSpecs(), ...projectSpecs()])
+}
 
-  handleChannel('workspace:list', () => {
-    return { workspaces: listWorkspaces() }
-  })
+function workspaceSpecs(): InvokeSpec[] {
+  return [
+    invokeSpec({
+      channel: 'workspace:get-active',
+      schema: noPayload,
+      invalid: validationError,
+      run: () => activeContext,
+    }),
+    invokeSpec({
+      channel: 'workspace:list',
+      schema: noPayload,
+      invalid: validationError,
+      run: () => ({ workspaces: listWorkspaces() }),
+    }),
+    invokeSpec({
+      channel: 'workspace:create',
+      schema: CreateWorkspaceInputSchema,
+      invalid: validationError,
+      run: (input) => createWorkspace(input),
+    }),
+    invokeSpec({
+      channel: 'workspace:update',
+      schema: UpdateWorkspaceInputSchema,
+      invalid: validationError,
+      run: (input) => updateWorkspace(input),
+    }),
+    invokeSpec({
+      channel: 'workspace:delete',
+      schema: IdSchema,
+      invalid: failed,
+      run: ({ id }) => deleteWorkspace(id),
+    }),
+    invokeSpec({
+      channel: 'workspace:reorder',
+      schema: ReorderWorkspacesSchema,
+      invalid: failed,
+      run: (input) => reorderWorkspaces(input),
+    }),
+  ]
+}
 
-  handleChannel('workspace:create', (_event, payload) => {
-    return createWorkspace(payload)
-  })
-
-  handleChannel('workspace:update', (_event, payload) => {
-    return updateWorkspace(payload)
-  })
-
-  handleChannel('workspace:delete', (_event, { id }) => {
-    return deleteWorkspace(id)
-  })
-
-  handleChannel('workspace:reorder', (_event, payload) => {
-    return reorderWorkspaces(payload)
-  })
-
-  handleChannel('project:list', (_event, { workspaceId }) => {
-    return { projects: listProjects(workspaceId) }
-  })
-
-  handleChannel('project:create', (_event, payload) => {
-    const result = createProject(payload)
-    if ('project' in result) {
-      BrowserWindow.getAllWindows().forEach((win) => {
-        win.webContents.send('workspace:project-added', result.project)
-      })
-    }
-    return result
-  })
-
-  handleChannel('project:update-branch', (_event, payload) => {
-    return updateProjectBranch(payload)
-  })
-
-  handleChannel('project:rename', (_event, payload) => {
-    return renameProject(payload)
-  })
-
-  handleChannel('project:reorder', (_event, payload) => {
-    return reorderProjects(payload)
-  })
-
-  handleChannel('project:delete', async (_event, { id }) => {
-    const project = getProjectById(id)
-    if (project?.isWorktree && project.worktreePath) {
-      const workspace = listWorkspaces().find((w) => w.id === project.workspaceId)
-      if (workspace?.folderPath) {
-        try {
-          await removeWorktree(workspace.folderPath, project.worktreePath)
-        } catch {
-          // proceed with deletion even if worktree removal fails
+function projectSpecs(): InvokeSpec[] {
+  return [
+    invokeSpec({
+      channel: 'project:list',
+      schema: z.object({ workspaceId: z.string().min(1) }),
+      invalid: { projects: [] },
+      run: ({ workspaceId }) => ({ projects: listProjects(workspaceId) }),
+    }),
+    invokeSpec({
+      channel: 'project:create',
+      schema: CreateProjectInputSchema,
+      invalid: validationError,
+      run: (input) => {
+        const result = createProject(input)
+        if ('project' in result) {
+          BrowserWindow.getAllWindows().forEach((win) => {
+            win.webContents.send('workspace:project-added', result.project)
+          })
         }
+        return result
+      },
+    }),
+    invokeSpec({
+      channel: 'project:update-branch',
+      schema: UpdateProjectBranchSchema,
+      invalid: validationError,
+      run: (input) => updateProjectBranch(input),
+    }),
+    invokeSpec({
+      channel: 'project:rename',
+      schema: RenameProjectSchema,
+      invalid: validationError,
+      run: (input) => renameProject(input),
+    }),
+    invokeSpec({
+      channel: 'project:reorder',
+      schema: ReorderProjectsSchema,
+      invalid: failed,
+      run: (input) => reorderProjects(input),
+    }),
+    invokeSpec({
+      channel: 'project:delete',
+      schema: IdSchema,
+      invalid: failed,
+      run: ({ id }) => removeProject(id),
+    }),
+  ]
+}
+
+async function removeProject(id: string): Promise<{ success: boolean }> {
+  const project = getProjectById(id)
+  if (project?.isWorktree && project.worktreePath) {
+    const workspace = listWorkspaces().find((w) => w.id === project.workspaceId)
+    if (workspace?.folderPath) {
+      try {
+        await removeWorktree(workspace.folderPath, project.worktreePath)
+      } catch {
+        // proceed with deletion even if worktree removal fails
       }
     }
-    const result = deleteProject(id)
-    emitProjectDelete(id)
-    BrowserWindow.getAllWindows().forEach((win) => {
-      win.webContents.send('workspace:project-removed', { id })
-    })
-    return result
+  }
+  const result = deleteProject(id)
+  emitProjectDelete(id)
+  BrowserWindow.getAllWindows().forEach((win) => {
+    win.webContents.send('workspace:project-removed', { id })
   })
+  return result
 }

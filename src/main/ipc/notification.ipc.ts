@@ -1,7 +1,6 @@
 import { BrowserWindow } from 'electron'
 import { z } from 'zod'
-import { handleChannel } from './channel-registrar.js'
-import { registerInvokeTable, invokeSpec } from './invoke-table.js'
+import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
 import { notificationManager } from '../notifications/notification-manager'
 import { sendToWindow } from '../safe-send'
 
@@ -24,9 +23,13 @@ function revealSessionOnClick(sessionId: string): void {
 }
 
 export function registerNotificationHandlers(): void {
-  handleChannel('notifications:list', () => notificationManager.list())
-
   registerInvokeTable([
+    invokeSpec({
+      channel: 'notifications:list',
+      schema: noPayload,
+      invalid: validationError,
+      run: () => notificationManager.list(),
+    }),
     invokeSpec({
       channel: 'notifications:create',
       schema: z.object({

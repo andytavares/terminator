@@ -1,11 +1,8 @@
-import { handleChannel } from './channel-registrar.js'
 import type { BrowserWindow } from 'electron'
 import { z } from 'zod'
 import fs from 'node:fs/promises'
+import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
-
-const WatchStartSchema = z.object({ projectRoot: z.string().min(1) })
-const ReadFileSchema = z.object({ filePath: z.string().min(1) })
 
 export function registerFsHandlers(getMainWindow: () => BrowserWindow | null): void {
   fsWatcherService.addHandler((event) => {
@@ -13,26 +10,31 @@ export function registerFsHandlers(getMainWindow: () => BrowserWindow | null): v
     if (win && !win.isDestroyed()) win.webContents.send('fs:changed', event)
   })
 
-  handleChannel('fs:watch-start', (_event, payload) => {
-    const parsed = WatchStartSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    fsWatcherService.watchStart(parsed.data.projectRoot)
-    return { ok: true }
-  })
-
-  handleChannel('fs:watch-stop', () => {
-    fsWatcherService.watchStop()
-    return { ok: true }
-  })
-
-  handleChannel('fs:read-file', async (_event, payload) => {
-    const parsed = ReadFileSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      const content = await fs.readFile(parsed.data.filePath, 'utf-8')
-      return { content }
-    } catch {
-      return { error: 'FILE_NOT_FOUND' }
-    }
-  })
+  registerInvokeTable([
+    invokeSpec({
+      channel: 'fs:watch-start',
+      schema: z.object({ projectRoot: z.string().min(1) }),
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: ({ projectRoot }) => {
+        fsWatcherService.watchStart(projectRoot)
+        return { ok: true }
+      },
+    }),
+    invokeSpec({
+      channel: 'fs:watch-stop',
+      schema: noPayload,
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: () => {
+        fsWatcherService.watchStop()
+        return { ok: true }
+      },
+    }),
+    invokeSpec({
+      channel: 'fs:read-file',
+      schema: z.object({ filePath: z.string().min(1) }),
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: async ({ filePath }) => ({ content: await fs.readFile(filePath, 'utf-8') }),
+      onError: () => ({ error: 'FILE_NOT_FOUND' }),
+    }),
+  ])
 }

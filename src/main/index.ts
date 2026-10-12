@@ -1,5 +1,6 @@
 import './claim-profile.js'
-import { handleChannel, onChannel } from './ipc/channel-registrar.js'
+import { onChannel } from './ipc/channel-registrar.js'
+import { registerAppInfoHandlers, registerDialogHandlers } from './ipc/app.ipc.js'
 import { app, BrowserWindow, dialog, Menu, shell, net, session, protocol } from 'electron'
 import { join } from 'path'
 import { registerWorkspaceHandlers } from './ipc/workspace.ipc.js'
@@ -239,30 +240,7 @@ function registerAppHandlers(): void {
     }
   )
 
-  handleChannel('app:get-info', () => ({
-    appName: app.getName(),
-    version: app.getVersion(),
-    electronVersion: process.versions.electron,
-    nodeVersion: process.versions.node,
-    chromeVersion: process.versions.chrome,
-    platform: process.platform,
-    // Lets the renderer show `~/repos/app` instead of an absolute path that
-    // wraps a sidebar row onto two lines.
-    homeDir: app.getPath('home'),
-  }))
-}
-
-function registerDialogHandlers(): void {
-  handleChannel('dialog:open-directory', async () => {
-    if (!mainWindow) return { cancelled: true }
-    const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openDirectory'],
-    })
-    if (result.canceled || result.filePaths.length === 0) {
-      return { cancelled: true }
-    }
-    return { filePath: result.filePaths[0] }
-  })
+  registerAppInfoHandlers()
 }
 
 app.on('second-instance', () => {
@@ -323,22 +301,10 @@ app.whenReady().then(async () => {
   registerWorkspaceHandlers()
   registerTerminalHandlers(ptyManager, () => mainWindow)
   registerSettingsHandlers()
-  registerExtensionHandlers(extensionHost, (channel, data) =>
-    viewHost?.broadcastToAll(channel, data)
-  )
-
-  handleChannel(
-    'extension:update-panel-bounds',
-    async (_event, { extensionId, viewParam, bounds, visible, repoRoot }) => {
-      await viewHost?.updatePanelBounds(
-        () => extensionHost.listExtensions().find((e) => e.id === extensionId),
-        extensionId,
-        viewParam,
-        bounds,
-        visible,
-        repoRoot
-      )
-    }
+  registerExtensionHandlers(
+    extensionHost,
+    (channel, data) => viewHost?.broadcastToAll(channel, data),
+    () => viewHost
   )
 
   onChannel('extension:set-bottom-inset', (_event, { inset }: { inset: number }) => {
@@ -410,7 +376,7 @@ app.whenReady().then(async () => {
   registerNotificationHandlers()
   registerMetricsHandlers(ptyManager)
   registerDbIpcHandlers()
-  registerDialogHandlers()
+  registerDialogHandlers(() => mainWindow)
   registerAppHandlers()
 
   extensionHost.setDeps({

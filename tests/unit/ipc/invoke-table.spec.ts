@@ -7,7 +7,8 @@ vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, on: vi.fn(), removeHandler: vi.fn() },
 }))
 
-import { registerInvokeTable, invokeSpec } from '../../../src/main/ipc/invoke-table.js'
+import { registerInvokeTable, invokeSpec, noPayload } from '../../../src/main/ipc/invoke-table.js'
+import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry.js'
 
 function capturedHandler(channel: string) {
   return mockHandle.mock.calls.find(([ch]) => ch === channel)![1] as (
@@ -99,5 +100,31 @@ describe('registerInvokeTable', () => {
       }),
     ])
     await expect(capturedHandler('a:throws')({}, {})).rejects.toThrow('unhandled')
+  })
+})
+
+describe('the handler the remote bridge dispatches', () => {
+  it('is the validating handler, not the bare run()', async () => {
+    const run = vi.fn(() => ({ ok: true }))
+    registerInvokeTable([
+      invokeSpec({
+        channel: 'a:bridged',
+        schema: z.object({ id: z.string() }),
+        invalid: { error: 'VALIDATION_ERROR' },
+        run,
+      }),
+    ])
+
+    const reply = await ipcInvokeRegistry.get('a:bridged')!.handler(null as never, { id: 7 })
+
+    expect(reply).toEqual({ error: 'VALIDATION_ERROR' })
+    expect(run).not.toHaveBeenCalled()
+  })
+})
+
+describe('noPayload', () => {
+  it('accepts what the desktop renderer sends (nothing) and what the bridge sends ({})', () => {
+    expect(noPayload.safeParse(undefined).success).toBe(true)
+    expect(noPayload.safeParse({}).success).toBe(true)
   })
 })

@@ -53,7 +53,7 @@ Terminator is an Electron application with two OS processes and one shared code 
 
 All renderer-to-main communication goes through `window.electronAPI`. The surface is declared once as a channel manifest (`src/shared/electron-api/manifest.ts`) — each method's channel, kind (invoke/send/event), payload mapping, and remote behavior — and both adapters are generated from it: `src/main/preload.ts` (native, `contextBridge` over `ipcRenderer`) and `src/renderer-remote/electron-api-shim.ts` (browser, WebSocket bridge). The manifest also derives the core remote allowlist (see [ADR-023](adr/023-channel-manifest-and-declared-remote-access.md)). Every IPC payload is validated with Zod at both ends.
 
-On the main-process side, every channel registers through `src/main/ipc/channel-registrar.ts` (core code) or `api.ipc.registerHandler` (extensions); registration records the channel and its remote-access declaration in the bridge registry — `ipcMain` is never monkey-patched. Terminal session state lives solely in `PtyManager` (see [ADR-024](adr/024-ptymanager-session-authority.md)).
+On the main-process side, every core invoke channel registers through the schema table, `registerInvokeTable` in `src/main/ipc/invoke-table.ts`, where each row carries a required Zod `schema`, the `invalid` response for a payload that fails it, and the `run` handler ([ADR-096](adr/096-every-ipc-channel-has-a-schema.md)); the table is the only caller of `handleChannel` (`src/main/ipc/channel-registrar.ts`) besides the extension API (`api.ipc.registerHandler`), and an ESLint rule keeps it that way. The remote bridge dispatches to that same registered handler, so a payload from a ticket holder is validated exactly as the renderer's is. Registration records the channel and its remote-access declaration in the bridge registry — `ipcMain` is never monkey-patched. Terminal session state lives solely in `PtyManager` (see [ADR-024](adr/024-ptymanager-session-authority.md)).
 
 ### Channel namespaces
 
@@ -81,7 +81,7 @@ and [`specs/031-linear-project-integration/contracts/ipc-channels.md`](../specs/
 ### Type safety
 
 - `src/shared/types/index.ts` — TypeScript interfaces used by both processes.
-- `src/shared/schemas/` — Zod schemas. Validate IPC payloads before use; malformed payloads return `{ error: 'VALIDATION_ERROR' }`.
+- `src/shared/schemas/` — Zod schemas. Validate IPC payloads before use; a payload that fails its schema gets the `invalid` response declared in the channel's table row (usually an `{ error: 'VALIDATION_ERROR' }` envelope shaped like the channel's other responses).
 - `src/renderer/electron.d.ts` — Type declaration for `window.electronAPI`, keeping the renderer call sites type-checked.
 
 ---

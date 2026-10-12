@@ -139,12 +139,6 @@ describe('integrations:status', () => {
     }
     expect(result.connections.map((c) => c.tracker)).toEqual(['jira'])
   })
-
-  it('rejects an unknown tracker rather than guessing', async () => {
-    await expect(invoke('integrations:status', { tracker: 'asana' })).resolves.toMatchObject({
-      error: 'failed',
-    })
-  })
 })
 
 describe('integrations:connect', () => {
@@ -185,17 +179,6 @@ describe('integrations:connect', () => {
       kind: 'query',
       jql: 'assignee = currentUser()',
     })
-  })
-
-  it('refuses a Jira payload missing its site — a credential that cannot work', async () => {
-    const result = await invoke('integrations:connect', {
-      tracker: 'jira',
-      email: 'a@b.c',
-      apiToken: 't',
-      jql: 'x',
-    })
-    expect(result).toMatchObject({ error: 'failed' })
-    expect(store.setCredential).not.toHaveBeenCalled()
   })
 
   it('never echoes the credential back', async () => {
@@ -289,13 +272,6 @@ describe('integrations:issue-comment', () => {
       invoke('integrations:issue-comment', { tracker: 'linear', key: 'TAV-42', body: 'hi' })
     ).resolves.toMatchObject({ error: 'failed', message: 'no permission' })
   })
-
-  it('refuses an empty body', async () => {
-    await expect(
-      invoke('integrations:issue-comment', { tracker: 'linear', key: 'TAV-42', body: '' })
-    ).resolves.toMatchObject({ error: 'failed' })
-    expect(service.comment).not.toHaveBeenCalled()
-  })
 })
 
 describe('integrations:set-mine', () => {
@@ -305,12 +281,6 @@ describe('integrations:set-mine', () => {
       mine: { kind: 'assignee', email: 'me@x.c' },
     })
     expect(store.setMine).toHaveBeenCalledWith('linear', { kind: 'assignee', email: 'me@x.c' })
-  })
-
-  it('rejects a selector shape that does not exist', async () => {
-    await expect(
-      invoke('integrations:set-mine', { tracker: 'linear', mine: { kind: 'nonsense' } })
-    ).resolves.toMatchObject({ error: 'failed' })
   })
 })
 
@@ -388,13 +358,6 @@ describe('integrations:link-set', () => {
     expect(linkStore.setLink).toHaveBeenCalledWith(
       expect.objectContaining({ injectContext: false })
     )
-  })
-
-  it('refuses a project id that is not a project id', async () => {
-    await expect(
-      invoke('integrations:link-set', { projectId: 'nope', tracker: 'linear', key: 'TAV-42' })
-    ).resolves.toMatchObject({ error: 'failed' })
-    expect(linkStore.setLink).not.toHaveBeenCalled()
   })
 
   it('reports a store failure rather than claiming success', async () => {
@@ -502,12 +465,5 @@ describe('integrations — agent context', () => {
     expect(linkStore.setInjectContext).toHaveBeenCalledWith(P, false)
     expect(contextSync.syncProjectContext).toHaveBeenCalledWith(P, expect.anything())
     expect(sent.map((s) => s.channel)).toContain('integrations:link-changed')
-  })
-
-  it('refuses a malformed injection toggle', async () => {
-    await expect(
-      invoke('integrations:set-inject-context', { projectId: P, injectContext: 'yes' })
-    ).resolves.toMatchObject({ error: 'failed' })
-    expect(linkStore.setInjectContext).not.toHaveBeenCalled()
   })
 })

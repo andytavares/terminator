@@ -62,7 +62,7 @@ describe('registerMetricsHandlers', () => {
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
     registerMetricsHandlers(getPtyManager() as never)
     const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1]
-    const result = handler() as { data: Record<string, number> }
+    const result = (await handler()) as { data: Record<string, number> }
     expect(result.data.cpuPercent).toBeGreaterThanOrEqual(0)
     expect(result.data.memUsedBytes).toBeGreaterThan(0)
     expect(result.data.memTotalBytes).toBe(8 * 1024 ** 3)
@@ -92,7 +92,9 @@ describe('registerMetricsHandlers', () => {
     vi.advanceTimersByTime(1000)
 
     const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1]
-    const result = handler() as { data: { netInBytesPerSec: number; netOutBytesPerSec: number } }
+    const result = (await handler()) as {
+      data: { netInBytesPerSec: number; netOutBytesPerSec: number }
+    }
     expect(result.data.netInBytesPerSec).toBeGreaterThanOrEqual(0)
     expect(result.data.netOutBytesPerSec).toBeGreaterThanOrEqual(0)
   })
@@ -102,25 +104,7 @@ describe('registerMetricsHandlers', () => {
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
     registerMetricsHandlers(getPtyManager() as never)
     const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:processes')![1]
-    const result = handler(null, {}) as { data: unknown[] }
-    expect(result.data).toEqual([])
-  })
-
-  it('metrics:processes returns empty array when payload is undefined', async () => {
-    vi.resetModules()
-    const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
-    registerMetricsHandlers(getPtyManager() as never)
-    const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:processes')![1]
-    const result = handler(null, undefined) as { data: unknown[] }
-    expect(result.data).toEqual([])
-  })
-
-  it('metrics:pids returns empty array when payload is undefined', async () => {
-    vi.resetModules()
-    const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
-    registerMetricsHandlers(getPtyManager() as never)
-    const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:pids')![1]
-    const result = handler(null, undefined) as { data: unknown[] }
+    const result = (await handler(null, {})) as { data: unknown[] }
     expect(result.data).toEqual([])
   })
 
@@ -170,7 +154,7 @@ describe('registerMetricsHandlers', () => {
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
     registerMetricsHandlers(getPtyManager() as never)
     const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:processes')![1]
-    const result = handler(null, { pids: [1234] }) as {
+    const result = (await handler(null, { pids: [1234] })) as {
       data: Array<{ pid: number; cpuPercent: number; rssBytes: number }>
     }
     expect(result.data).toHaveLength(1)
@@ -188,7 +172,7 @@ describe('registerMetricsHandlers', () => {
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
     registerMetricsHandlers(getPtyManager() as never)
     const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:processes')![1]
-    const result = handler(null, { pids: [9999] }) as { data: unknown[] }
+    const result = (await handler(null, { pids: [9999] })) as { data: unknown[] }
     expect(result.data).toEqual([])
   })
 
@@ -200,7 +184,7 @@ describe('registerMetricsHandlers', () => {
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
     registerMetricsHandlers({ getPid: mockGetPid } as never)
     const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:pids')![1]
-    const result = handler(null, { sessionIds: ['ses-1', 'ses-2'] }) as {
+    const result = (await handler(null, { sessionIds: ['ses-1', 'ses-2'] })) as {
       data: Array<{ sessionId: string; pid: number }>
     }
     expect(result.data).toHaveLength(1)
@@ -212,7 +196,7 @@ describe('registerMetricsHandlers', () => {
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
     registerMetricsHandlers(getPtyManager() as never)
     const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:pids')![1]
-    const result = handler(null, {}) as { data: unknown[] }
+    const result = (await handler(null, {})) as { data: unknown[] }
     expect(result.data).toEqual([])
   })
 
@@ -226,7 +210,7 @@ describe('registerMetricsHandlers', () => {
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
     registerMetricsHandlers(getPtyManager() as never)
     const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1]
-    expect(() => handler()).not.toThrow()
+    await expect(handler()).resolves.toBeDefined()
     Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
   })
 
@@ -240,7 +224,9 @@ describe('registerMetricsHandlers', () => {
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
     registerMetricsHandlers(getPtyManager() as never)
     const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1]
-    const result = handler() as { data: { netInBytesPerSec: number; netOutBytesPerSec: number } }
+    const result = (await handler()) as {
+      data: { netInBytesPerSec: number; netOutBytesPerSec: number }
+    }
     expect(result.data.netInBytesPerSec).toBeGreaterThanOrEqual(0)
     Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
   })

@@ -62,7 +62,7 @@ beforeEach(() => {
 })
 
 describe('extension:execute-command', () => {
-  it('forwards the key and ctx to executeExtensionCommand', () => {
+  it('forwards the key and ctx to executeExtensionCommand', async () => {
     registerExtensionHandlers(makeExtensionHost())
     const listener = onHandlers.get('extension:execute-command')!
     const ctx = { projectId: 'p1', sessionId: null, repoRoot: '/repo' }
@@ -91,32 +91,32 @@ describe('extension:run-command', () => {
 })
 
 describe('extension:has-command', () => {
-  it('answers from isExtensionCommandRegistered', () => {
+  it('answers from isExtensionCommandRegistered', async () => {
     mockIsRegistered.mockReturnValue(true)
     registerExtensionHandlers(makeExtensionHost())
     const handler = handleHandlers.get('extension:has-command')!
 
-    expect(handler({}, { key: 'ext.command.open' })).toBe(true)
+    expect(await handler({}, { key: 'ext.command.open' })).toBe(true)
     expect(mockIsRegistered).toHaveBeenCalledWith('ext.command.open')
   })
 })
 
 describe('extension:get-commands', () => {
-  it('returns listExtensionCommands()', () => {
+  it('returns listExtensionCommands()', async () => {
     mockListExtensionCommands.mockReturnValue([{ key: 'ext.command.push' }])
     registerExtensionHandlers(makeExtensionHost())
     const handler = handleHandlers.get('extension:get-commands')!
 
-    expect(handler({}, undefined)).toEqual({ commands: [{ key: 'ext.command.push' }] })
+    expect(await handler({}, undefined)).toEqual({ commands: [{ key: 'ext.command.push' }] })
   })
 })
 
 describe('extension:list', () => {
-  it('returns extensionHost.listExtensions()', () => {
+  it('returns extensionHost.listExtensions()', async () => {
     const host = makeExtensionHost({ listExtensions: vi.fn(() => [{ id: 'ext' }] as never) })
     registerExtensionHandlers(host)
 
-    expect(handleHandlers.get('extension:list')!({}, undefined)).toEqual({
+    expect(await handleHandlers.get('extension:list')!({}, undefined)).toEqual({
       extensions: [{ id: 'ext' }],
     })
   })
@@ -195,29 +195,29 @@ describe('extension:reload', () => {
 })
 
 describe('extension settings channels', () => {
-  it('extension:get-settings-schemas returns listExtensionSettingsSections()', () => {
+  it('extension:get-settings-schemas returns listExtensionSettingsSections()', async () => {
     mockListExtensionSettingsSections.mockReturnValue([{ extensionId: 'ext' }])
     registerExtensionHandlers(makeExtensionHost())
 
-    expect(handleHandlers.get('extension:get-settings-schemas')!({}, undefined)).toEqual({
+    expect(await handleHandlers.get('extension:get-settings-schemas')!({}, undefined)).toEqual({
       schemas: [{ extensionId: 'ext' }],
     })
   })
 
-  it('extension:get-settings-values returns getAllExtensionSettings()', () => {
+  it('extension:get-settings-values returns getAllExtensionSettings()', async () => {
     mockGetAllExtensionSettings.mockReturnValue({ 'ext.setting': 1 })
     registerExtensionHandlers(makeExtensionHost())
 
-    expect(handleHandlers.get('extension:get-settings-values')!({}, undefined)).toEqual({
+    expect(await handleHandlers.get('extension:get-settings-values')!({}, undefined)).toEqual({
       values: { 'ext.setting': 1 },
     })
   })
 
-  it('extension:update-setting calls setExtensionSetting', () => {
+  it('extension:update-setting calls setExtensionSetting', async () => {
     registerExtensionHandlers(makeExtensionHost())
 
     expect(
-      handleHandlers.get('extension:update-setting')!({}, { key: 'ext.setting', value: 2 })
+      await handleHandlers.get('extension:update-setting')!({}, { key: 'ext.setting', value: 2 })
     ).toEqual({ ok: true })
     expect(mockSetExtensionSetting).toHaveBeenCalledWith('ext.setting', 2)
   })
