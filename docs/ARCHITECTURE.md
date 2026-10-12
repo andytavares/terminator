@@ -49,6 +49,25 @@ Terminator is an Electron application with two OS processes and one shared code 
 
 ---
 
+## Startup sequence
+
+The window comes first; everything slow happens beside it. `app.whenReady()` in `src/main/index.ts`:
+
+1. Starts the login-shell PATH probe (macOS only; a login shell takes hundreds of milliseconds) without waiting for it.
+2. Opens the database (synchronous `node:sqlite`) and registers the IPC handlers.
+3. Builds the menu and creates the window.
+4. Calls `ExtensionHost.start({ bundledDirectory, beforeActivation, afterActivation })`.
+
+`start` registers every extension synchronously (the stored enabled ones, and any bundled one not yet in the store), so `extension:list` is complete as soon as the renderer can ask. It then activates them **all at once** after `beforeActivation` (the PATH probe, which extension code that spawns tools needs). Activation is isolated per extension: a throwing `activate` marks that extension `error` and nothing else. No extension depends on another's activation: each creates its own tables and registrations, and the one table two of them share (`settings`) is created with `CREATE TABLE IF NOT EXISTS`, which does not care who goes first.
+
+`afterActivation` runs once every extension has activated. It is where the legacy PGlite import (`legacy-pglite-import.ts`) runs, because it copies into tables the extensions create in `activate`.
+
+An extension view is created by `extension:update-panel-bounds`, which first awaits `ExtensionHost.whenActivated(extensionId)`: the extension's own activation, and the import when one is pending. A view therefore never loads before the backend it talks to, and one slow extension delays only its own view.
+
+Because the PATH probe now runs beside the window, a child process started from a core IPC handler in the first moments after launch can still see the app's own PATH on macOS. Extension code is not affected (it waits on `beforeActivation`).
+
+---
+
 ## IPC Contract
 
 All renderer-to-main communication goes through `window.electronAPI`. The surface is declared once as a channel manifest (`src/shared/electron-api/manifest.ts`) — each method's channel, kind (invoke/send/event), payload mapping, and remote behavior — and both adapters are generated from it: `src/main/preload.ts` (native, `contextBridge` over `ipcRenderer`) and `src/renderer-remote/electron-api-shim.ts` (browser, WebSocket bridge). The manifest also derives the core remote allowlist (see [ADR-023](adr/023-channel-manifest-and-declared-remote-access.md)). Every IPC payload is validated with Zod at both ends.
@@ -195,7 +214,7 @@ Extensions are Node.js CommonJS modules loaded in the main process by `Extension
 
 ### Bundled extensions
 
-First-party extensions (like `extensions/git-integration/`) are auto-loaded at startup via `ExtensionHost.loadBundledExtensions(bundledDir)`. This scans the `extensions/` directory for subdirectories containing a `manifest.json` and loads each one. See [ADR-007](adr/007-bundled-first-extension-distribution.md).
+First-party extensions (like `extensions/git-integration/`) are auto-loaded at startup by `ExtensionHost.start` (see [Startup sequence](#startup-sequence)). It scans the `extensions/` directory for subdirectories containing a `manifest.json`, registers each one, and activates them concurrently. See [ADR-007](adr/007-bundled-first-extension-distribution.md).
 
 ### Loading sequence
 

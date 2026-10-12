@@ -262,7 +262,9 @@ protocol.registerSchemesAsPrivileged([
 
 app.whenReady().then(async () => {
   logger.info('App ready', { version: app.getVersion() })
-  if (process.platform === 'darwin') await adoptLoginShellPath()
+  // Slow (a login shell starts) and only extensions need its result, so it runs
+  // while the window and the database come up.
+  const loginShellPath = process.platform === 'darwin' ? adoptLoginShellPath() : Promise.resolve()
 
   const userData = app.getPath('userData')
   const importLegacy = legacyImportPending(userData)
@@ -412,15 +414,7 @@ app.whenReady().then(async () => {
     },
   })
 
-  await extensionHost.loadAll()
-  await extensionHost.loadBundledExtensions(join(__dirname, '../../extensions'))
-  // The extensions' migrations have created their tables by now.
-  if (importLegacy) await importLegacyDatabase(userData, getAppDb())
-  // Build menu after extensions load so extension-contributed items are included from the start
   setupMenu()
-
-  // Window is created after extensions load so the renderer can immediately
-  // query the active extension list and only mount the correct renderers.
   createWindow()
 
   app.on('activate', () => {
@@ -430,6 +424,18 @@ app.whenReady().then(async () => {
       createWindow()
     }
   })
+
+  // The renderer lists the extensions (complete as soon as start is called) and
+  // each extension view waits for its own backend, so none of this holds the
+  // window back. The legacy import needs every extension's tables to exist.
+  extensionHost
+    .start({
+      bundledDirectory: join(__dirname, '../../extensions'),
+      beforeActivation: loginShellPath,
+      afterActivation: importLegacy ? () => importLegacyDatabase(userData, getAppDb()) : undefined,
+    })
+    .then(setupMenu)
+    .catch((error) => logger.error('extension startup failed', { error: String(error) }))
 })
 
 // A rejection in the startup chain above (e.g. database or extension init
