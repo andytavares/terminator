@@ -1,5 +1,11 @@
 # Contract: IPC Channels (SpecKit Pilot Board)
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has the board's `speckit:*` channels. Do not build against it. The
+> current contract lives in:
+>
+> - `extensions/foundry/src/ipc/`: the SpecKit Pilot became Foundry and its `speckit:*` channels became `foundry:*` ([ADR 040](../../../docs/adr/040-the-work-order-is-the-contract.md), `CHANGELOG.md`)
+
 All channels are extension-owned, registered by `extensions/speckit-pilot/src/index.ts`
 via `api.ipc.registerHandler`, and invoked from the renderer via
 `window.electronAPI.extensionBridge.invoke('speckit-pilot:<name>', payload)`. Handlers

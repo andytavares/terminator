@@ -1,5 +1,12 @@
 # Contract: Extension Scaffolding CLI
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `scripts/create-extension.js` and the generated `api.fs.watch` call; the script is now `scripts/create-extension.cjs` and writes a plain-JavaScript `src/index.js`. Do not build against it. The
+> current contract lives in:
+>
+> - `scripts/create-extension.cjs` and [Quick start](../../../docs/EXTENSION-DEVELOPMENT.md#quick-start)
+> - `packages/extension-sdk/types/api.d.ts`: the `ExtensionAPI`, which the core implements in `src/main/extensions/api.ts`
+
 **Version**: 1.0.0
 **Date**: 2026-05-07
 **Branch**: `002-git-github-integration`

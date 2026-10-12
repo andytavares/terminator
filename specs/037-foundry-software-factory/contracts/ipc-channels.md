@@ -1,5 +1,11 @@
 # IPC Channels: Foundry Extension
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `foundry:review-hunks`, `foundry:review-decide-hunk`, `foundry:review-apply`, `foundry:review-intent`, `foundry:supervision-snapshot`, `foundry:feed-digest`, `foundry:auto-hand-off` and `foundry:auto-hand-off-set`. Do not build against it. The
+> current contract lives in:
+>
+> - `extensions/foundry/src/ipc/`: each channel is a `ChannelSpec` whose zod schema is its payload contract ([ADR 096](../../../docs/adr/096-every-ipc-channel-has-a-schema.md))
+
 **Feature**: `037-foundry-software-factory` | **Date**: 2026-09-06
 
 All channels use the `foundry:` namespace, registered by the extension's main-process handler via `api.ipc.registerHandler`. Nothing in `src/` names any of these channels (Constitution II).
