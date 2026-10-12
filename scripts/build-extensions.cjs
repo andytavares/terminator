@@ -2,7 +2,7 @@
 
 const { build } = require('esbuild')
 const { resolve } = require('path')
-const { readdirSync, existsSync } = require('fs')
+const { readdirSync, existsSync, readFileSync } = require('fs')
 const { spawn } = require('child_process')
 
 const root = resolve(__dirname, '..')
@@ -16,6 +16,21 @@ function run(command, args, cwd) {
       code === 0 ? done() : fail(new Error(`${command} ${args.join(' ')} exited ${code} in ${cwd}`))
     )
   })
+}
+
+// esbuild has no `?raw` import; the design system reads its stylesheets that way.
+const rawTextImports = {
+  name: 'raw-text-imports',
+  setup(build) {
+    build.onResolve({ filter: /\?raw$/ }, (args) => ({
+      path: resolve(args.resolveDir, args.path.slice(0, -'?raw'.length)),
+      namespace: 'raw-text',
+    }))
+    build.onLoad({ filter: /.*/, namespace: 'raw-text' }, (args) => ({
+      contents: readFileSync(args.path, 'utf8'),
+      loader: 'text',
+    }))
+  },
 }
 
 async function buildExtension(name) {
@@ -35,6 +50,7 @@ async function buildExtension(name) {
     target: 'node20',
     format: 'cjs',
     outfile,
+    plugins: [rawTextImports],
     external: [
       'electron',
       'electron-store',

@@ -12,7 +12,9 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts"
     },
-    "./styles.css": "./src/extension-ui.css"
+    "./styles.css": "./src/extension-ui.css",
+    "./tokens.css": "./src/tokens.css",
+    "./extension-base-css": "./src/extension-base-css.ts"
   },
   "files": [
     "src"

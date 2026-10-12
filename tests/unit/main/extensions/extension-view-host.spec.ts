@@ -560,10 +560,10 @@ describe('ExtensionViewHost quick-actions leader', () => {
 
 describe('EXTENSION_BASE_CSS', () => {
   // Regression test: these tokens are consumed by extension diff/syntax-highlighting
-  // CSS (e.g. git-integration's FileDiffView/syntax-theme.css) but are only defined
-  // in core's own renderer/styles.css — extension webviews never load that file, so
-  // any --tm-* token used by extension CSS must also be defined here or it silently
-  // resolves to nothing (no diff highlight background, no syntax colors).
+  // CSS (e.g. git-integration's FileDiffView/syntax-theme.css). Extension webviews
+  // never load the core stylesheet, so any --tm-* token used by extension CSS must
+  // be in the injected text or it silently resolves to nothing (no diff highlight
+  // background, no syntax colors).
   const requiredTokens = [
     '--tm-diff-added-bg',
     '--tm-diff-removed-bg',

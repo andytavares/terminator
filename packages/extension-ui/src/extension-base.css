@@ -1,0 +1,224 @@
+/* Icon sizes (Constitution Principle XII).
+   Icons are sized here, never with a size prop on the component. The
+   extensions had 139 such props across seven ad-hoc values in a 6px band —
+   10, 11, 12, 13, 14, 15, 16 — which is not seven decisions, it is one
+   decision made seven times. Three steps carry all of it. Injected rather
+   than exported so an extension gets them without importing anything, the
+   same way it gets the colour tokens. */
+.tm-icon-sm,
+.tm-icon,
+.tm-icon-lg {
+  flex: 0 0 auto;
+}
+.tm-icon-sm {
+  width: 12px;
+  height: 12px;
+}
+.tm-icon {
+  width: 14px;
+  height: 14px;
+}
+.tm-icon-lg {
+  width: 16px;
+  height: 16px;
+}
+
+/* No button renders the browser's native control.
+
+   Nothing in this product wants the UA button look, and relying on every
+   modifier to remember a background is how a caret beside "Commit & push"
+   shipped as a white pill on a dark panel. border:0 rather than a
+   transparent border, so a button that wants an edge states the full
+   shorthand — which every one of them already does. */
+/* One height for every single-line field and select, so controls that share a
+   row line up whatever padding and font size each class picks. :where() keeps
+   it at zero specificity: a class that sets its own height still wins. */
+:where(
+    select:not([multiple], [size]),
+    input:not(
+        [type='checkbox'],
+        [type='radio'],
+        [type='range'],
+        [type='color'],
+        [type='file'],
+        [type='hidden']
+      )
+  ) {
+  height: var(--tm-control-height);
+}
+
+button {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* The default an icon gets when nothing else sizes it.
+
+   lucide renders width/height attributes of 24 when given no size, which is
+   never what a 12px label wants — an icon converted from a text glyph and left
+   without a rule comes out enormous. This makes the default "as tall as the
+   text beside it", which is what the glyph it replaced did. Anything wanting a
+   specific size says so with .tm-icon*, or its own rule; both are more
+   specific than this and win.
+
+   The :has() rule is the other half: a button that used to hold a character
+   laid it out as text, and an inline SVG in the same place sits on the
+   baseline instead of centred. */
+button > svg,
+a > svg,
+label > svg,
+summary > svg {
+  width: 1.08em;
+  height: 1.08em;
+  flex: 0 0 auto;
+}
+
+/* Vertical centring only. Forcing justify-content here re-centred every
+   left-aligned button that happens to contain an icon — a disclosure row,
+   a menu item — which is a layout decision that belongs to the caller. */
+button:has(> svg) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--tm-bg-base);
+  color: var(--tm-text-primary);
+  font-family: var(--tm-font-ui);
+  /* The product's size, not the browser's.
+
+     This set a family, a colour and a background and no size, so anything that
+     forgot one landed on 16px beside a product drawn at 11-13px. Not a rare
+     mistake: an extension's every heading, every bold span inside a button,
+     every label whose rule happened to omit it. One view read as three type
+     scales at once, and every instance had to be found by eye.
+
+     A default that is right is the fix; a rule that wants larger still says
+     so. */
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+#app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+/* Checkboxes — extension views are isolated WebContentsViews and inherit none
+   of the host's CSS, so the same replacement the core applies is injected here.
+   Without it an extension's checkbox is a white OS widget on a dark panel. */
+input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 3px;
+  background: var(--tm-bg-input);
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+input[type='checkbox']:hover:not(:disabled) {
+  border-color: var(--tm-accent);
+}
+input[type='checkbox']:checked,
+input[type='checkbox']:indeterminate {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+}
+input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--tm-on-accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+input[type='checkbox']:indeterminate::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 5px;
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--tm-on-accent);
+}
+input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--tm-accent-glow);
+  outline-offset: 1px;
+}
+input[type='checkbox']:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+/* Radios: same box, circular, dot instead of a tick. left/top 3px centres a 6px
+   dot in the 12px padding box of a 14px border-box with a 1px border. */
+input[type='radio'] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 50%;
+  background: var(--tm-bg-input);
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+input[type='radio']:hover:not(:disabled) {
+  border-color: var(--tm-accent);
+}
+input[type='radio']:checked {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+}
+input[type='radio']:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tm-on-accent);
+}
+input[type='radio']:focus-visible {
+  outline: 2px solid var(--tm-accent-glow);
+  outline-offset: 1px;
+}
+input[type='radio']:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
