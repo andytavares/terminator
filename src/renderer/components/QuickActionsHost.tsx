@@ -26,6 +26,7 @@ import { useToastStore } from '../stores/toast.store'
 import { useExtensionCommandsStore } from '../stores/extension-commands.store'
 import { useExtensionRegistry } from '../extensions/registry'
 import { useTerminalSession } from '../hooks/useTerminalSession'
+import { agentStateOf } from '../sidebar/agent-state'
 
 export interface QuickActionsHostProps {
   openedAt: number
@@ -75,7 +76,7 @@ function useExtensionQuickActions(
       projectId,
       sessionId: focusedSessionId,
       repoRoot,
-      agentState: focusedSession?.agentState ?? null,
+      agentState: focusedSession ? agentStateOf(focusedSession) : null,
       isAgentSession: focusedSession?.type === 'agent',
       surfaceOwner,
     }),
@@ -137,7 +138,7 @@ function useCustomQuickActions(target: QuickActionTarget): QuickAction[] {
         ? {
             sessionId: focusedSession.id,
             isAgent: focusedSession.type === 'agent',
-            agentState: focusedSession.agentState,
+            agentState: agentStateOf(focusedSession),
           }
         : null,
       projectId,

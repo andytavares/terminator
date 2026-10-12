@@ -28,7 +28,7 @@ import {
 import { removeWorktree } from '../git/git-service.js'
 import { emitProjectDelete } from '../extensions/workspace-events.js'
 
-interface ActiveWorkspaceContext {
+export interface ActiveWorkspaceContext {
   workspaceId: string | null
   projectId: string | null
   repoRoot: string | null

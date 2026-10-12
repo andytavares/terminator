@@ -101,12 +101,15 @@ describe('ExtensionHost.start', () => {
   it('activates extensions concurrently: one waits for another to have started', async () => {
     let markPeerStarted = () => {}
     const peerStarted = new Promise<void>((resolve) => (markPeerStarted = resolve))
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('peer never started')), 1000)
-    )
+    // Cleared once the race is decided: left running, it rejected a promise
+    // nothing awaited any more, and vitest failed the run on the stray rejection.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('peer never started')), 1000)
+    })
     const { host, backendHost } = await newHost({
       'com.waiter': async () => {
-        await Promise.race([peerStarted, timeout])
+        await Promise.race([peerStarted, timeout]).finally(() => clearTimeout(timer))
       },
       'com.peer': () => markPeerStarted(),
     })

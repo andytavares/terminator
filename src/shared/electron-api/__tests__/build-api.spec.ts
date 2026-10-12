@@ -113,6 +113,13 @@ describe('buildElectronApi — native mode', () => {
     ['terminal.attach', ['s1'], 'invoke', 'terminal:attach', { sessionId: 's1' }],
     ['git.changeStats', ['/repo'], 'invoke', 'git:change-stats', { path: '/repo' }],
     ['extension.setBottomInset', [280], 'send', 'extension:set-bottom-inset', { inset: 280 }],
+    [
+      'workspace.setActive',
+      [{ workspaceId: 'w1', projectId: 'p1', repoRoot: '/repo' }],
+      'send',
+      'workspace:active-changed',
+      { workspaceId: 'w1', projectId: 'p1', repoRoot: '/repo' },
+    ],
     ['extension.setLeftInset', [44], 'send', 'extension:set-left-inset', { inset: 44 }],
     [
       'extensionEvents.notifyPanelState',

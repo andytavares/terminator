@@ -116,6 +116,7 @@ export async function launchApp(
     const page = await app.firstWindow({ timeout: remaining() })
     await page.waitForLoadState('domcontentloaded', { timeout: remaining() })
     await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
+    await moveWindowOffPointer(app)
     return { app, page, userDataDir }
   } catch (error) {
     await closeApp({ app, page: undefined as unknown as Page, userDataDir })
@@ -125,6 +126,26 @@ export async function launchApp(
       { cause: error }
     )
   }
+}
+
+/**
+ * Moves the app's window so the X server's own pointer is outside it, on Linux.
+ *
+ * Chromium on X11 synthesizes a mousemove at the real pointer whenever a view
+ * under it is added, removed or resized, as an extension view is when its
+ * extension activates. Xvfb parks the pointer at the centre of the screen,
+ * inside the window, and that move carries no pressed button, so it lands
+ * between Playwright's mouse down and mouse move and Chromium abandons the drag:
+ * `dragTo` returned and nothing was dropped. macOS does not synthesize it.
+ */
+async function moveWindowOffPointer(app: ElectronApplication): Promise<void> {
+  if (process.platform !== 'linux') return
+  await app.evaluate(({ BrowserWindow, screen }) => {
+    const pointer = screen.getCursorScreenPoint()
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.setPosition(window.getBounds().x, pointer.y + 1)
+    }
+  })
 }
 
 // How long to wait for a graceful Electron shutdown before force-killing. A
@@ -237,6 +258,65 @@ export async function selectProject(
   projectName: string
 ): Promise<void> {
   await projectGroup(page, projectName).click()
+}
+
+/** The Quick Actions panel. */
+export function quickActionsPanel(page: Page) {
+  return page.getByRole('dialog', { name: 'Quick actions' })
+}
+
+const exactly = (text: string): RegExp =>
+  new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+
+/**
+ * Runs a Quick Action the way an operator finds one they have no key for: the
+ * band's Quick actions button, `/`, its name, then its row. The panel records
+ * the run in `quickActions.usage`, which is how the coverage map counts it.
+ */
+export async function runQuickAction(page: Page, label: string): Promise<void> {
+  await page.locator('.app-band__entry[aria-label="Quick actions (⌘P)"]').click()
+  const panel = quickActionsPanel(page)
+  await expect(panel).toBeFocused({ timeout: 10000 })
+  await page.keyboard.press('/')
+  await page.keyboard.type(label)
+  await panel
+    .locator('.qa-row')
+    .filter({ has: page.locator('.qa-row__label', { hasText: exactly(label) }) })
+    .first()
+    .click()
+  await expect(panel).toBeHidden({ timeout: 15000 })
+}
+
+/** Opens Settings with ⌘, (Ctrl+, off macOS) on the named section. */
+export async function openSettings(page: Page, section: string): Promise<void> {
+  if (!(await page.locator('.settings-panel').isVisible())) {
+    await page.keyboard.press('ControlOrMeta+,')
+  }
+  await expect(page.locator('.settings-panel')).toBeVisible()
+  await page.locator('.settings-panel__nav-item', { hasText: section }).click()
+}
+
+/** Closes Settings with its close button. */
+export async function closeSettings(page: Page): Promise<void> {
+  await page.locator('.settings-panel__close').click()
+  await expect(page.locator('.settings-panel')).toBeHidden()
+}
+
+/**
+ * Runs `script` inside the first extension view whose URL contains `urlPart`:
+ * a WebContentsView of its own, which the page cannot reach.
+ */
+export function inExtensionView<T>(handle: AppHandle, urlPart: string, script: string): Promise<T> {
+  return handle.app.evaluate(
+    async ({ webContents }, { part, source }) => {
+      const view = webContents
+        .getAllWebContents()
+        .find((contents) => !contents.isDestroyed() && contents.getURL().includes(part))
+      if (!view) throw new Error(`no extension view loaded for ${part}`)
+      return view.executeJavaScript(source) as Promise<unknown>
+    },
+    { part: urlPart, source: script }
+  ) as Promise<T>
 }
 
 /** The window as the app sets it up, with `src/renderer/terminal/terminal-rows.ts`. */

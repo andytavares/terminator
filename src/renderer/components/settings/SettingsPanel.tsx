@@ -207,7 +207,9 @@ function ExtensionsSection(): JSX.Element {
     if ('cancelled' in result) return
     const installResult = await window.electronAPI.extension.install(result.filePath)
     if ('extension' in installResult) {
-      setExtensions((prev) => [...prev, installResult.extension])
+      // The list main announced may already hold it.
+      const installed = installResult.extension
+      setExtensions((prev) => [...prev.filter((e) => e.id !== installed.id), installed])
       dispatchNotification({
         type: 'info',
         title: 'Extension installed',

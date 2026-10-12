@@ -510,14 +510,18 @@ describe('TabBar — the terminals the sidebar stopped listing (US3)', () => {
   const tabs = (container: HTMLElement) =>
     Array.from(container.querySelectorAll('.tab-bar__tab--session'))
 
+  // A session's state is never stored: it is derived from these signals, so a
+  // tab is seeded with the signal, not with a stored `agentState` nothing sets.
+  const EACH_STATE = [
+    session('a', { bellCount: 1 }),
+    session('b', { busy: true }),
+    session('c'),
+    session('d', { status: 'closed' }),
+  ]
+
   // FR-021. The sidebar no longer carries per-terminal state, so the tab must.
   it('gives every tab its own state glyph', () => {
-    mockGetSessions.mockReturnValue([
-      session('a', { agentState: 'awaiting-input' }),
-      session('b', { agentState: 'working' }),
-      session('c', { agentState: 'idle' }),
-      session('d', { agentState: 'exited' }),
-    ])
+    mockGetSessions.mockReturnValue(EACH_STATE)
     const { container } = renderTabBar()
     const states = tabs(container).map((t) =>
       t.querySelector('.tab-bar__state svg')?.getAttribute('data-state')
@@ -526,12 +530,7 @@ describe('TabBar — the terminals the sidebar stopped listing (US3)', () => {
   })
 
   it('distinguishes the four states by shape, not by colour', () => {
-    mockGetSessions.mockReturnValue([
-      session('a', { agentState: 'awaiting-input' }),
-      session('b', { agentState: 'working' }),
-      session('c', { agentState: 'idle' }),
-      session('d', { agentState: 'exited' }),
-    ])
+    mockGetSessions.mockReturnValue(EACH_STATE)
     const { container } = renderTabBar()
     const shapes = tabs(container).map((t) => t.querySelector('.tab-bar__state svg')?.innerHTML)
     expect(new Set(shapes).size).toBe(4)
@@ -543,7 +542,7 @@ describe('TabBar — the terminals the sidebar stopped listing (US3)', () => {
   })
 
   it('names the state for a reader, since a shape says nothing aloud', () => {
-    mockGetSessions.mockReturnValue([session('a', { agentState: 'awaiting-input' })])
+    mockGetSessions.mockReturnValue([session('a', { bellCount: 1 })])
     const { container } = renderTabBar()
     expect(container.querySelector('.tab-bar__state')!.getAttribute('aria-label')).toBe(
       'Waiting on you'

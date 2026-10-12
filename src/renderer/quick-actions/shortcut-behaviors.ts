@@ -2,6 +2,7 @@ import { useWorkspaceStore } from '../stores/workspace.store'
 import { useSessionStore } from '../stores/session.store'
 import { useExtensionRegistry } from '../extensions/registry'
 import { dispatchNotification } from '../lib/notifications'
+import { agentStateOf } from '../sidebar/agent-state'
 
 /** Leaves whatever global/workspace/project tab is showing, the way every
  * "go to session" path must (see navigate-to-session.ts's revealSession). */
@@ -56,7 +57,7 @@ export function jumpToNextAwaitingInput(
   deps: SessionNavDeps
 ): void {
   const waiting = [...useSessionStore.getState().sessions.values()].filter(
-    (s) => s.agentState === 'awaiting-input'
+    (s) => agentStateOf(s) === 'awaiting-input'
   )
   if (waiting.length === 0) return
   const currentId = effectiveProjectId ? deps.getActiveSessionForProject(effectiveProjectId) : null

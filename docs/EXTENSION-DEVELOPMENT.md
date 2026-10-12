@@ -322,6 +322,10 @@ useEffect(
 
 `window.electronAPI.workspace.getActive()` answers what the operator has focused in the main window.
 
+A backend brings its own project tab forward with
+`api.window.broadcast('extension:select-project-tab', { tabId: '<your extension id>' })`, and
+toggles its sidebar panel with `api.window.broadcast('extension:toggle-panel', '<your extension id>')`.
+
 ### Running another extension's command
 
 A view can run a command another extension registered with an `args` schema ([ADR 083](adr/083-extension-commands-take-arguments.md)), by its full id `<extensionId>.command.<id>`:
