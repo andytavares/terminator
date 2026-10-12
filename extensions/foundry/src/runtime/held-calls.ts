@@ -8,6 +8,15 @@ import { announceLive, orderStoreAt } from '../state/live-index.js'
 import { runtime, pendingPermissions, raisedNotifications } from './runtime-state.js'
 import { gotoRun } from './palette-commands.js'
 
+/** Something to say, about which event, and what answering or clicking it does. */
+export interface Notice {
+  readonly event: NotifiableEvent
+  readonly message: string
+  readonly actions?: Array<{ id: string; label: string; handler: () => void }>
+  /** Where the row takes you. Without one it is a report, not a link. */
+  readonly onClick?: () => void
+}
+
 /**
  * Says something, through the channel the event's kind is allowed.
  *
@@ -18,14 +27,8 @@ import { gotoRun } from './palette-commands.js'
  * interrupt, everything else that needs a person is an indication, and routine
  * progress goes to the feed and nowhere else.
  */
-export function notify(
-  api: ExtensionAPI,
-  event: NotifiableEvent,
-  message: string,
-  actions?: Array<{ id: string; label: string; handler: () => void }>,
-  /** Where the row takes you. Without one it is a report, not a link. */
-  onClick?: () => void
-): Disposable | null {
+export function notify(api: ExtensionAPI, notice: Notice): Disposable | null {
+  const { event, message, actions, onClick } = notice
   switch (channelFor(event)) {
     case 'modal':
       // The nearest thing an extension has to a modal: it persists until it is
@@ -72,29 +75,26 @@ export function notePending(api: ExtensionAPI, ask: PendingAsk, order?: OrderRef
       evidence: [{ kind: 'stdout', excerpt: ask.summary }],
     })
   }
-  const notification = notify(
-    api,
-    { kind: 'permission_requested', sessionId: ask.sessionId },
-    `${path.basename(ask.featureDir)} is asking: ${ask.summary}`,
-    [
-      {
-        id: 'allow',
-        label: 'Allow',
-        handler: () =>
-          runtime.supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow: true }),
-      },
-      {
-        id: 'deny',
-        label: 'Deny',
-        handler: () =>
-          runtime.supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow: false }),
-      },
-    ],
+  const notification = notify(api, {
+    event: { kind: 'permission_requested', sessionId: ask.sessionId },
+    message: `${path.basename(ask.featureDir)} is asking: ${ask.summary}`,
+    actions: [answerAction(ask, true), answerAction(ask, false)],
     // Opening the thing is not a third answer to the question; it is what
     // clicking the notification should do.
-    () => gotoRun(api, 'run', ask.sessionId)
-  )
+    onClick: () => gotoRun(api, 'run', ask.sessionId),
+  })
   if (notification !== null) raisedNotifications.set(ask.requestId, notification)
+}
+
+function answerAction(
+  ask: PendingAsk,
+  allow: boolean
+): { id: string; label: string; handler: () => void } {
+  return {
+    id: allow ? 'allow' : 'deny',
+    label: allow ? 'Allow' : 'Deny',
+    handler: () => runtime.supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow }),
+  }
 }
 
 /** Which order a held tool call belongs to, so a question can be recorded. */

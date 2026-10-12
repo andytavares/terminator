@@ -88,16 +88,7 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     // Without it, phases fall back to the headless spawn. Said out loud: the
     // difference is whether tool calls are asked about or approved silently.
     api.log.error('supervised runtime unavailable — phases will run unsupervised', error)
-    // Close what was opened. A failure after the control server bound left it
-    // listening on a port nothing would ever answer on, and nothing would ever
-    // close it either.
-    void runtime.control?.close()
-    runtime.control = null
-    runtime.supervisedRunner?.dispose()
-    runtime.supervisedRunner = null
-    runtime.stallWatcher?.stop()
-    runtime.stallWatcher = null
-    runtime.supervision = null
+    closeHalfStartedRuntime()
     api.notifications.showToast(
       'error',
       'Supervision could not start — phases will run unsupervised, approving their own tool calls',
@@ -105,6 +96,19 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     )
     return null
   }
+}
+
+// Close what was opened. A failure after the control server bound left it
+// listening on a port nothing would ever answer on, and nothing would ever
+// close it either.
+function closeHalfStartedRuntime(): void {
+  void runtime.control?.close()
+  runtime.control = null
+  runtime.supervisedRunner?.dispose()
+  runtime.supervisedRunner = null
+  runtime.stallWatcher?.stop()
+  runtime.stallWatcher = null
+  runtime.supervision = null
 }
 
 function watchForStalls(api: ExtensionAPI, runner: SupervisedRunner): StallWatcher {
@@ -175,15 +179,13 @@ function onStallFiring(api: ExtensionAPI, firing: StallFiring, featureDir: strin
   }
   // An indication, not an interruption: a stall is not blocked on an
   // answer the way a held tool call is.
-  notify(
-    api,
-    { kind: 'stalled', sessionId: firing.sessionId },
-    `A run stopped making progress (${firing.signal})`,
-    undefined,
+  notify(api, {
+    event: { kind: 'stalled', sessionId: firing.sessionId },
+    message: `A run stopped making progress (${firing.signal})`,
     // A stall is the notification you most want to act on, and acting on
     // it means reading what the agent was doing when it went quiet.
-    () => gotoRun(api, 'run', firing.sessionId)
-  )
+    onClick: () => gotoRun(api, 'run', firing.sessionId),
+  })
 }
 
 /** Everything `startSupervisionRuntime` brought up, taken down again. */
