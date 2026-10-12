@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { appendEntry, readEntries, queryEntries } from '../../src/ledger/append.js'
+import { appendEntry, readEntries } from '../../src/ledger/append.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 
 // The ledger is the record of every decision, by whom or by what rule, and why
@@ -96,43 +96,6 @@ describe('readEntries', () => {
   })
 })
 
-describe('queryEntries', () => {
-  beforeEach(async () => {
-    await appendEntry(file, entry({ actor: 'operator', action: 'gate.decided', subject: 'G-1' }))
-    await appendEntry(file, entry({ actor: 'rule:risk.p0', action: 'gate.raised', subject: 'G-2' }))
-    await appendEntry(
-      file,
-      entry({
-        actor: 'role:verifier',
-        action: 'verdict',
-        subject: 'U-1',
-        at: '2026-09-07T10:00:00.000Z',
-      })
-    )
-  })
-
-  it('filters by actor', async () => {
-    const r = await queryEntries(file, { actor: 'operator' })
-    expect(r.map((e) => e.subject)).toEqual(['G-1'])
-  })
-
-  it('filters by action', async () => {
-    const r = await queryEntries(file, { action: 'gate.raised' })
-    expect(r.map((e) => e.subject)).toEqual(['G-2'])
-  })
-
-  it('filters by time', async () => {
-    const r = await queryEntries(file, { since: '2026-09-07T00:00:00.000Z' })
-    expect(r.map((e) => e.subject)).toEqual(['U-1'])
-  })
-
-  it('honours a limit, keeping the most recent', async () => {
-    const r = await queryEntries(file, { limit: 1 })
-    expect(r).toHaveLength(1)
-    expect(r[0].subject).toBe('U-1')
-  })
-})
-
 describe('every decision is attributable (FR-078)', () => {
   it('keeps all four of who, what, about what and why', async () => {
     await appendEntry(
@@ -187,6 +150,7 @@ describe('every decision is attributable (FR-078)', () => {
   it('keeps the order every entry belongs to, so one order can be read alone', async () => {
     await appendEntry(file, entry({ orderId: 'WO-1', subject: 'a' }))
     await appendEntry(file, entry({ orderId: 'WO-2', subject: 'b' }))
-    expect((await queryEntries(file, { orderId: 'WO-2' })).map((e) => e.subject)).toEqual(['b'])
+    const own = (await readEntries(file)).filter((e) => e.orderId === 'WO-2')
+    expect(own.map((e) => e.subject)).toEqual(['b'])
   })
 })
