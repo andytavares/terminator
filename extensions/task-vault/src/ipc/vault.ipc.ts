@@ -836,7 +836,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
         )
         const tasks = taskRows.map(rowToTask)
         const projectRows = await db.query<Record<string, unknown>>(
-          `SELECT * FROM projects WHERE area_id=? ORDER BY name`,
+          `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.area_id=? ORDER BY p.name`,
           [areaId]
         )
         const projects = await Promise.all(

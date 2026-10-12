@@ -97,6 +97,15 @@ describe('task-vault:vault:list-areas', () => {
     ])
   })
 
+  it('names the area on each listed project', async () => {
+    await seedArea(db, 'a1', 'Work')
+    await seedProject(db, 'p1', 'Work Project', { areaId: 'a1' })
+
+    const [work] = (await listAreas()).areas
+
+    expect(work.projects).toMatchObject([{ name: 'Work Project', area: 'Work' }])
+  })
+
   it('returns the error when the database fails', async () => {
     await db.exec('DROP TABLE areas')
     expect(await invoke('task-vault:vault:list-areas')).toMatchObject({
