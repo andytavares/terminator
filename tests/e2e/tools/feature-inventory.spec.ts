@@ -50,7 +50,10 @@ test('record the features the running app offers', async () => {
               commands: Array<{ key: string; extensionId: string; label: string }>
             }>
             getSettingsSchemas(): Promise<{
-              schemas: Array<{ extensionId: string; properties: Record<string, { label: string }> }>
+              schemas: Array<{
+                extensionId: string
+                properties: Record<string, { label: string; type: string; channel?: string }>
+              }>
             }>
           }
         }
@@ -66,6 +69,8 @@ test('record the features the running app offers', async () => {
       extensionId: schema.extensionId,
       key,
       label: property.label,
+      type: property.type,
+      channel: property.channel,
     }))
   )
   writeFileSync(

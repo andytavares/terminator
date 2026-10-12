@@ -124,6 +124,16 @@ function coreQuickActions() {
   return [...new Set(fixed)].sort().map((id) => ({ id }))
 }
 
+/**
+ * The specs that drove an extension setting: wrote it through
+ * extension:update-setting, or, for an action setting (a button, which stores
+ * nothing), invoked the channel the button runs.
+ */
+export function settingSpecs(setting, driven) {
+  if (setting.type === 'action' && setting.channel) return driven.channels.get(setting.channel)
+  return driven.extensionSettings.get(setting.key)
+}
+
 const specList = (specs) => (specs ? [...specs].sort().join(', ') : '')
 
 function table(rows, columns) {
@@ -217,7 +227,7 @@ export function coverageReport(inventory, traces) {
       ...section(
         'Extension settings',
         inventory.settings,
-        (s) => driven.extensionSettings.get(s.key),
+        (s) => settingSpecs(s, driven),
         (s) => `\`${s.key}\` — ${s.label}`
       ),
     },

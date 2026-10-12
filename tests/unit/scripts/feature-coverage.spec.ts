@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { coreChannels, drivenFeatures, patchPaths } from '../../../scripts/feature-coverage.mjs'
+import {
+  coreChannels,
+  drivenFeatures,
+  patchPaths,
+  settingSpecs,
+} from '../../../scripts/feature-coverage.mjs'
 
 describe('patchPaths', () => {
   it('lists each leaf a settings patch writes, arrays as leaves', () => {
@@ -49,5 +54,28 @@ describe('drivenFeatures', () => {
     expect([...driven.extensionSettings.keys()]).toEqual(['x.maxFiles'])
     expect([...driven.globalSettings.keys()]).toEqual(['quickActions.usage'])
     expect([...driven.quickActions.keys()]).toEqual(['core.new-tab'])
+  })
+})
+
+describe('settingSpecs', () => {
+  const driven = drivenFeatures([
+    {
+      spec: 'a.spec.ts',
+      entries: [
+        ['invoke', 'extension:update-setting', { key: 'x.maxFiles', value: 3 }],
+        ['invoke', 'x:db.reinit', null],
+      ],
+    },
+  ])
+
+  it('credits a stored setting to the specs that wrote it', () => {
+    expect([...settingSpecs({ key: 'x.maxFiles', type: 'number' }, driven)!]).toEqual(['a.spec.ts'])
+  })
+
+  // An action setting is a button: it stores nothing, it runs its channel.
+  it('credits an action setting to the specs that ran its channel', () => {
+    const action = { key: 'x.db.reinit', type: 'action', channel: 'x:db.reinit' }
+    expect([...settingSpecs(action, driven)!]).toEqual(['a.spec.ts'])
+    expect(settingSpecs({ ...action, channel: 'x:db.reset' }, driven)).toBeUndefined()
   })
 })
