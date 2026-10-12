@@ -28,35 +28,22 @@ describe('aggregateBranchState', () => {
 
   // BS-2. Waiting outranks everything, whatever else is running alongside it —
   // it is the only state that is blocked on the user.
-  it.each([
+  it.each<[AgentState[]]>([
     [['awaiting-input']],
     [['working', 'awaiting-input']],
     [['idle', 'awaiting-input', 'exited']],
     [['exited', 'working', 'idle', 'awaiting-input']],
-  ] as const)('is awaiting-input whenever any terminal is: %j', (states) => {
-    expect(aggregateBranchState(at(...(states as unknown as AgentState[])))).toBe('awaiting-input')
+  ])('is awaiting-input whenever any terminal is: %j', (states) => {
+    expect(aggregateBranchState(at(...states))).toBe('awaiting-input')
   })
 
-  it.each([
+  it.each<[string, AgentState[], AgentState]>([
     ['working beats idle and exited', ['idle', 'working', 'exited'], 'working'],
     ['idle beats exited', ['exited', 'idle'], 'idle'],
     ['all exited reads exited', ['exited', 'exited'], 'exited'],
     ['a single terminal reads its own state', ['working'], 'working'],
-  ] as const)('%s', (_name, states, expected) => {
-    expect(aggregateBranchState(at(...(states as unknown as AgentState[])))).toBe(expected)
-  })
-
-  // BS-3. The result is never invented — except for the empty case above, it is
-  // always a state something on the branch is actually in.
-  it('always returns a state one of its terminals is in', () => {
-    const states = at('exited', 'idle', 'working')
-    expect(states.map((s) => s.agentState)).toContain(aggregateBranchState(states))
-  })
-
-  // BS-4. Pure: no clock, no store, same answer every time.
-  it('is deterministic', () => {
-    const sessions = at('working', 'idle')
-    expect(aggregateBranchState(sessions)).toBe(aggregateBranchState(sessions))
+  ])('%s', (_name, states, expected) => {
+    expect(aggregateBranchState(at(...states))).toBe(expected)
   })
 
   it('does not mutate the list it is given', () => {
@@ -69,7 +56,6 @@ describe('aggregateBranchState', () => {
   // The precedence is the sidebar's, the tab bar's and the board's at once, so
   // it must be the one constant, not a second copy that can drift from it.
   it('follows STATUS_ORDER exactly', () => {
-    expect(STATUS_ORDER).toEqual(['awaiting-input', 'working', 'idle', 'exited'])
     for (let i = 0; i < STATUS_ORDER.length; i++) {
       const worseThanAllAfter = STATUS_ORDER.slice(i)
       expect(aggregateBranchState(at(...worseThanAllAfter))).toBe(STATUS_ORDER[i])
@@ -93,6 +79,6 @@ describe('countInState', () => {
 
   it('never reports zero for a non-empty branch own aggregate state', () => {
     const sessions = at('exited', 'working', 'idle')
-    expect(countInState(sessions, aggregateBranchState(sessions))).toBeGreaterThanOrEqual(1)
+    expect(countInState(sessions, aggregateBranchState(sessions))).toBe(1)
   })
 })

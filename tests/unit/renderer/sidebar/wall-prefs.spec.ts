@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   DEFAULT_WALL_PREFS,
   WALL_PREFS_KEY,
@@ -14,6 +14,10 @@ beforeEach(() => {
     getItem: (k: string) => storage.get(k) ?? null,
     setItem: (k: string, v: string) => storage.set(k, v),
   })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('loadWallPrefs', () => {

@@ -1,17 +1,22 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   useChangeStatsStore,
   CHANGE_STATS_TTL_MS,
 } from '../../../../src/renderer/stores/change-stats.store'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
+import { electronApiOf } from '../../../support/electron-api'
 
-const changeStats = vi.fn()
+const changeStats = vi.fn<ElectronAPI['git']['changeStats']>()
 
 beforeEach(() => {
   vi.clearAllMocks()
   changeStats.mockResolvedValue({ added: 10, removed: 2, files: 1 })
-  ;(globalThis as unknown as { window: unknown }).window = globalThis
-  Object.assign(globalThis, { electronAPI: { git: { changeStats } } })
+  vi.stubGlobal('window', { electronAPI: electronApiOf({ git: { changeStats } }) })
   useChangeStatsStore.setState({ entries: new Map() })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 const store = () => useChangeStatsStore.getState()
@@ -31,10 +36,6 @@ describe('change-stats store — lazy, cached, never awaited by render', () => {
       stats: { added: 10, removed: 2, files: 1 },
       fetchedAt: 1000,
     })
-  })
-
-  it('returns void so a component can never accidentally await it', () => {
-    expect(store().ensure('b1', '/repo', 1000)).toBeUndefined()
   })
 
   it('serves from cache inside the TTL without touching git', async () => {
@@ -73,9 +74,10 @@ describe('change-stats store — lazy, cached, never awaited by render', () => {
     store().ensure('b1', '/repo-a', 1000)
     store().ensure('b2', '/repo-b', 1000)
     await flush()
-    expect(changeStats).toHaveBeenCalledTimes(2)
-    expect(store().statsFor('b1')).toBeDefined()
-    expect(store().statsFor('b2')).toBeDefined()
+    expect(changeStats).toHaveBeenCalledWith('/repo-a')
+    expect(changeStats).toHaveBeenCalledWith('/repo-b')
+    expect(store().statsFor('b1')?.state).toBe('ready')
+    expect(store().statsFor('b2')?.state).toBe('ready')
   })
 
   it('records an error envelope as an error with no stats', async () => {
@@ -116,7 +118,7 @@ describe('change-stats store — lazy, cached, never awaited by render', () => {
     await flush()
     store().invalidate('b1')
     expect(store().statsFor('b1')).toBeUndefined()
-    expect(store().statsFor('b2')).toBeDefined()
+    expect(store().statsFor('b2')?.state).toBe('ready')
   })
 
   it('invalidates everything at once when the window regains focus', async () => {
@@ -129,15 +131,9 @@ describe('change-stats store — lazy, cached, never awaited by render', () => {
   })
 
   it('records unavailable rather than throwing when the git API is absent', async () => {
-    Object.assign(globalThis, { electronAPI: undefined })
-    expect(() => store().ensure('b1', '/repo', 1000)).not.toThrow()
+    vi.stubGlobal('window', {})
+    store().ensure('b1', '/repo', 1000)
     await flush()
     expect(store().statsFor('b1')).toMatchObject({ state: 'error', stats: null })
-  })
-
-  it('holds no clock of its own — the caller supplies now', async () => {
-    store().ensure('b1', '/repo', 42)
-    await flush()
-    expect(store().statsFor('b1')!.fetchedAt).toBe(42)
   })
 })

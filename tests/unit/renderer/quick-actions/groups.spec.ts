@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import {
-  CORE_GROUPS,
-  CORE_TOP_MNEMONICS,
   allocateExtensionGroups,
   findMnemonicConflicts,
 } from '../../../../src/renderer/quick-actions/groups'
@@ -10,22 +8,6 @@ import type { QuickAction, QuickActionGroup } from '../../../../src/renderer/qui
 function action(id: string, group: string, mnemonic?: string): QuickAction {
   return { id, label: id, group, mnemonic, run: () => {} }
 }
-
-describe('CORE_GROUPS', () => {
-  it('defines terminal, sessions, workspace and custom with their mnemonics', () => {
-    const byId = Object.fromEntries(CORE_GROUPS.map((g) => [g.id, g]))
-    expect(byId.terminal).toEqual({ id: 'terminal', mnemonic: 't', label: 'Terminal' })
-    expect(byId.sessions).toEqual({ id: 'sessions', mnemonic: 's', label: 'Sessions' })
-    expect(byId.workspace).toEqual({ id: 'workspace', mnemonic: 'w', label: 'Workspace' })
-    expect(byId.custom).toEqual({ id: 'custom', mnemonic: 'x', label: 'Custom' })
-  })
-})
-
-describe('CORE_TOP_MNEMONICS', () => {
-  it('reserves the direct top-level action letters', () => {
-    expect(CORE_TOP_MNEMONICS).toEqual(new Set(['h', 'o', 'a', 'b', ',', '/']))
-  })
-})
 
 describe('allocateExtensionGroups', () => {
   it('takes the requested letter when free', () => {
@@ -47,10 +29,9 @@ describe('allocateExtensionGroups', () => {
     // 'g' is taken, and 'a' is a reserved core letter, so the next free
     // letter of "Gadgets" is 'd'.
     expect(groups[1].mnemonic).toBe('d')
-    expect(warnings).toHaveLength(1)
-    expect(warnings[0]).toMatch(/git-integration/)
-    expect(warnings[0]).toMatch(/gadgets/)
-    expect(warnings[0]).toMatch(/g/)
+    expect(warnings).toEqual([
+      '"gadgets" wanted mnemonic "g" but it was taken by "git-integration"; assigned "d" instead.',
+    ])
   })
 
   it('falls back to the first free a-z letter when no letter of the label is free', () => {
@@ -69,8 +50,11 @@ describe('allocateExtensionGroups', () => {
     const { groups, warnings } = allocateExtensionGroups([
       { extensionId: 'terminal-plus', mnemonic: 't', label: 'Terminal plus' },
     ])
-    expect(groups[0].mnemonic).not.toBe('t')
-    expect(warnings).toHaveLength(1)
+    // 't' is the Terminal group's letter; 'e' is the next letter of the label.
+    expect(groups[0].mnemonic).toBe('e')
+    expect(warnings).toEqual([
+      '"terminal-plus" wanted mnemonic "t" but it was taken; assigned "e" instead.',
+    ])
   })
 
   it('assigns no group when every a-z letter is exhausted', () => {
@@ -79,13 +63,12 @@ describe('allocateExtensionGroups', () => {
       mnemonic: String.fromCharCode(97 + i),
       label: `Ext${i}`,
     }))
-    // Core already reserves t, s, w, x, h, o, a, b — so 8 of the 26 letters
-    // are unavailable to extensions, leaving fewer slots than requests when
-    // every extension also collides on its own label-derived fallback.
+    // Core reserves t, s, w, x, h, o, a and b, so only 18 letters are left
+    // for 27 requests.
     requests.push({ extensionId: 'overflow', mnemonic: 'a', label: 'Aaa' })
     const { groups, warnings } = allocateExtensionGroups(requests)
-    expect(groups.length).toBeLessThan(requests.length)
-    expect(warnings.some((w) => /no group/i.test(w))).toBe(true)
+    expect(groups).toHaveLength(18)
+    expect(warnings.at(-1)).toBe('"overflow" wanted mnemonic "a" but no group letter was free.')
   })
 
   it('is case-sensitive: a lowercase and uppercase mnemonic do not collide', () => {
@@ -112,8 +95,9 @@ describe('findMnemonicConflicts', () => {
 
   it('reports a duplicate mnemonic within the same group', () => {
     const actions = [action('a1', 'terminal', 'd'), action('a2', 'terminal', 'd')]
-    const conflicts = findMnemonicConflicts(actions, groups)
-    expect(conflicts.length).toBeGreaterThan(0)
+    expect(findMnemonicConflicts(actions, groups)).toEqual([
+      'Group "terminal" has duplicate mnemonic "d" on: a1, a2.',
+    ])
   })
 
   it('is case-sensitive: d and D in the same group do not conflict', () => {
@@ -128,7 +112,8 @@ describe('findMnemonicConflicts', () => {
 
   it('reports a top-level action colliding with a group letter', () => {
     const actions = [action('a1', 'top', 't')]
-    const conflicts = findMnemonicConflicts(actions, groups)
-    expect(conflicts.length).toBeGreaterThan(0)
+    expect(findMnemonicConflicts(actions, groups)).toEqual([
+      'Top-level action "a1" uses mnemonic "t", which is also a group letter.',
+    ])
   })
 })

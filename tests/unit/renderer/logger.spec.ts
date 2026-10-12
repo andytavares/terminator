@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 import { makeRendererLogger, installLogInterceptor } from '../../../src/renderer/logger.js'
 import { useLogStore } from '../../../src/renderer/stores/log.store'
+import type { ElectronAPI } from '../../../src/shared/electron-api/api-type'
+import { electronApiOf } from '../../support/electron-api'
 
 /** What the log window would list, as [level, message]. */
 const logged = () => useLogStore.getState().entries.map((entry) => [entry.level, entry.message])
@@ -10,12 +12,10 @@ beforeEach(() => {
   useLogStore.setState({ entries: [] })
 })
 
-const mockLoggerWrite = vi.fn()
+const mockLoggerWrite = vi.fn<ElectronAPI['logger']['write']>()
 
 function setupWindow() {
-  ;(globalThis as unknown as Record<string, unknown>).window = {
-    electronAPI: { logger: { write: mockLoggerWrite } },
-  }
+  vi.stubGlobal('window', { electronAPI: electronApiOf({ logger: { write: mockLoggerWrite } }) })
 }
 
 describe('makeRendererLogger()', () => {
@@ -25,7 +25,7 @@ describe('makeRendererLogger()', () => {
   })
 
   afterEach(() => {
-    delete (globalThis as unknown as Record<string, unknown>).window
+    vi.unstubAllGlobals()
   })
 
   it('ships debug messages to the log store', () => {
@@ -65,7 +65,7 @@ describe('makeRendererLogger()', () => {
   })
 
   it('does not throw when window.electronAPI is unavailable', () => {
-    delete (globalThis as unknown as Record<string, unknown>).window
+    vi.stubGlobal('window', undefined)
     const log = makeRendererLogger('ns')
     expect(() => log.info('no window')).not.toThrow()
     expect(logged()).toContainEqual(['info', '[ns] no window'])
@@ -92,7 +92,7 @@ describe('installLogInterceptor()', () => {
     console.info = originalInfo
     console.warn = originalWarn
     console.error = originalError
-    delete (globalThis as unknown as Record<string, unknown>).window
+    vi.unstubAllGlobals()
   })
 
   it('wraps console.log to ship to the log store', () => {
