@@ -2,7 +2,7 @@ import { createRequire } from 'node:module'
 import { join } from 'path'
 import { readdirSync, existsSync } from 'fs'
 import { app } from 'electron'
-import Store from 'electron-store'
+import { CachedStore } from '../storage/cached-store.js'
 import type { z } from 'zod'
 import type { Extension } from '../../shared/types/index.js'
 import { ExtensionManifestSchema } from '../../shared/schemas/extension.schema.js'
@@ -28,7 +28,7 @@ interface ExtensionStoreSchema {
   extensions: ExtensionRecord[]
 }
 
-const store = new Store<ExtensionStoreSchema>({
+const store = new CachedStore<ExtensionStoreSchema>({
   name: 'extensions',
   defaults: { extensions: [] },
 })

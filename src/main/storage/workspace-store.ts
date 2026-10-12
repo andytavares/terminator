@@ -1,4 +1,4 @@
-import Store from 'electron-store'
+import { CachedStore } from './cached-store.js'
 import { randomUUID } from 'crypto'
 import type { Workspace, Project } from '../../shared/types/index.js'
 import {
@@ -16,7 +16,7 @@ interface StoreSchema {
   projects: Project[]
 }
 
-const store = new Store<StoreSchema>({
+const store = new CachedStore<StoreSchema>({
   name: 'workspaces',
   defaults: {
     workspaces: [],

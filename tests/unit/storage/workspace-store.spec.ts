@@ -4,6 +4,9 @@ vi.mock('electron-store', () => {
   const data: Record<string, unknown> = { workspaces: [], projects: [] }
   return {
     default: class MockStore {
+      onDidAnyChange() {
+        return () => {}
+      }
       get(key: string) {
         return data[key]
       }

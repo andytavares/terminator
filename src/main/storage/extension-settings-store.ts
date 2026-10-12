@@ -1,10 +1,10 @@
-import Store from 'electron-store'
+import { CachedStore } from './cached-store.js'
 
 interface ExtensionSettingsStoreSchema {
   values: Record<string, unknown>
 }
 
-const store = new Store<ExtensionSettingsStoreSchema>({
+const store = new CachedStore<ExtensionSettingsStoreSchema>({
   name: 'extension-settings',
   defaults: { values: {} },
 })

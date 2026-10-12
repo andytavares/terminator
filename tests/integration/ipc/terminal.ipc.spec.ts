@@ -16,6 +16,9 @@ vi.mock('electron', () => ({
 vi.mock('electron-store', () => {
   return {
     default: class MockStore {
+      onDidAnyChange() {
+        return () => {}
+      }
       private data: Record<string, unknown>
       constructor(opts?: { defaults?: Record<string, unknown> }) {
         this.data = { ...(opts?.defaults ?? {}) }

@@ -4,6 +4,9 @@ vi.mock('electron-store', () => {
   const stores: Record<string, Record<string, unknown>> = {}
   return {
     default: class MockStore {
+      onDidAnyChange() {
+        return () => {}
+      }
       private name: string
       private data: Record<string, unknown>
       constructor({ name, defaults }: { name: string; defaults: Record<string, unknown> }) {

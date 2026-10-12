@@ -69,6 +69,7 @@ Because the PATH probe now runs beside the window, a child process started from 
 ### Loops in the main process
 
 - **System metrics** (`ipc/metrics.ipc.ts`). The sampler (CPU delta, and network bytes through `netstat -ib` on macOS or `/proc/net/dev` on Linux) runs only while the renderer is polling `metrics:system`, which it does only while a metrics view is showing; it stops 5 s after the last poll and restarts, with fresh baselines, on the next. `netstat` runs through `execFile`, asynchronously, never overlapping itself.
+- **Stores** (`storage/cached-store.ts`). The four core electron-store files (workspaces, settings, extension settings, extensions) are read through `CachedStore`, which parses a file once per key. The cache is dropped on the store's own writes and on electron-store's `onDidAnyChange` (the stores are opened with `watch: true`, so another writer is noticed too). Values are returned as copies.
 
 ---
 
@@ -140,7 +141,7 @@ Extension ──── contributes to ──── GlobalSettings.extensions[ext
 
 Sessions do not survive app restart. This is an explicit Phase 1 scope decision. What the operator wrote about a session does: its description and its own work item link are a `SessionRecord`, kept until 30 days after the session closes (see [Home and the Monitor wall](#home-and-the-monitor-wall), ADR 054). So does the agent conversation that ran in it, which can be picked up again afterwards (see [Resuming an agent session](#resuming-an-agent-session), ADR 055).
 
-See [ADR-003](adr/003-electron-store-for-persistence.md) for the storage decision.
+See [ADR-003](adr/003-electron-store-for-persistence.md) for the storage decision. The core stores are read through a per-key cache (see [Loops in the main process](#loops-in-the-main-process)).
 
 **Application database.** `userData/app.sqlite` is the one SQL database of the app, opened through Node's built-in `node:sqlite` (`DatabaseSync`, WAL journal, foreign keys on) in `src/main/db/index.ts`. The core owns no tables; each extension creates its own when it activates and reaches the database only through the injected `ExtensionDB` (`exec`, `query`, `get`, `run`, `transaction`). Statements and transactions run on the one connection in call order; a statement issued while a transaction is open waits for it. `node:sqlite` is a release candidate (stability 1.2) in Node 24, the risk ADR 099 accepts. It replaced PGlite, which added about 250 MB to the main process and about 0.6 s to every start.
 

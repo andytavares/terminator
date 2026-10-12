@@ -1,4 +1,4 @@
-import Store from 'electron-store'
+import { CachedStore } from './cached-store.js'
 import type { GlobalSettings, WorkspaceSettings } from '../../shared/types/index.js'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../shared/schemas/settings.schema.js'
 
@@ -7,7 +7,7 @@ interface StoreSchema {
   workspaces: Record<string, WorkspaceSettings>
 }
 
-const store = new Store<StoreSchema>({
+const store = new CachedStore<StoreSchema>({
   name: 'settings',
   defaults: {
     global: DEFAULT_GLOBAL_SETTINGS,
