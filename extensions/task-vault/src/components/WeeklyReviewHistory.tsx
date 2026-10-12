@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Download, ChevronRight, ChevronDown } from 'lucide-react'
 import { notify } from '../utils/notify'
+import { IconButton } from '@terminator/extension-ui'
 
 export interface ReviewAction {
   id: string
@@ -152,14 +153,12 @@ export function WeeklyReviewHistory(): React.JSX.Element {
                   {review.actionCount} action{review.actionCount === 1 ? '' : 's'}
                 </span>
               </button>
-              <button
-                className="tv-btn tv-btn--ghost"
+              <IconButton
+                icon={Download}
+                label={`Export review from ${formatReviewDate(review.startedAt)}`}
+                size="sm"
                 onClick={() => void exportReview(review.id)}
-                title="Export this review as Markdown"
-                aria-label={`Export review from ${formatReviewDate(review.startedAt)}`}
-              >
-                <Download className="tm-icon" />
-              </button>
+              />
             </div>
 
             {expandedId === review.id && (

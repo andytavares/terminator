@@ -5,7 +5,7 @@ import { DEFAULT_KANBAN_CONFIG } from '../vault/types'
 import { useVaultStore } from '../stores/vault.store'
 import { KanbanLaneEditor } from './KanbanLaneEditor'
 import { TaskDetailPanel } from './TaskDetailPanel'
-import { Markdown } from '@terminator/extension-ui'
+import { Button, Markdown } from '@terminator/extension-ui'
 import { openInBrowser } from '../utils/open-in-browser'
 
 interface KanbanTask {
@@ -348,23 +348,26 @@ export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
         <div className="tv-kanban__swimlane-toggle">
           <span className="tv-kanban__toolbar-label">Swimlanes:</span>
           {(['none', 'project', 'area'] as SwimlaneGrouping[]).map((g) => (
-            <button
+            <Button
               key={g}
-              className={`tv-btn tv-btn--xs${config.swimlaneGrouping === g ? ' tv-btn--primary' : ' tv-btn--ghost'}`}
+              variant={config.swimlaneGrouping === g ? 'primary' : 'ghost'}
+              size="sm"
+              aria-pressed={config.swimlaneGrouping === g}
               onClick={() => void saveConfig({ ...config, swimlaneGrouping: g })}
             >
               {g === 'none' ? 'Off' : g === 'project' ? 'Project' : 'Area'}
-            </button>
+            </Button>
           ))}
         </div>
-        <button
-          className="tv-btn tv-btn--ghost tv-btn--xs tv-kanban__edit-lanes-btn"
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={Settings}
           onClick={() => setShowLaneEditor(true)}
           title="Edit lanes"
         >
-          <Settings className="tm-icon" />
           Lanes
-        </button>
+        </Button>
       </div>
 
       <div className="tv-kanban__body">

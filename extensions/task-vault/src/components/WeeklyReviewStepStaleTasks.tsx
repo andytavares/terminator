@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { notify } from '../utils/notify'
 import type { IndexedTask } from '../vault/types'
 import { logReviewAction, type ReviewActionKind } from '../utils/review-log'
+import { Button } from '@terminator/extension-ui'
 
 interface Props {
   staleTasks: IndexedTask[]
@@ -94,36 +95,32 @@ export function WeeklyReviewStepStaleTasks({
                 )}
               </span>
               <span className="wr-step__project-actions">
-                <button
-                  className="tv-btn tv-btn--secondary"
-                  onClick={() => void handleBacklog(task.id)}
-                  title="Move to backlog"
-                >
+                <Button onClick={() => void handleBacklog(task.id)} title="Move to backlog">
                   Backlog
-                </button>
-                <button
-                  className="tv-btn tv-btn--ghost tv-btn--danger-text"
+                </Button>
+                <Button
+                  variant="danger"
                   onClick={() => void handleDelete(task.id)}
                   title="Cancel task"
                 >
                   Delete
-                </button>
-                <button
-                  className="tv-btn tv-btn--ghost"
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={() => void handleKeep(task.id)}
                   title="Keep rolling over (reset stale timer)"
                 >
                   Keep
-                </button>
+                </Button>
               </span>
             </li>
           ))}
         </ul>
       )}
 
-      <button className="tv-btn tv-btn--primary" onClick={onComplete}>
+      <Button variant="primary" onClick={onComplete}>
         Next: someday
-      </button>
+      </Button>
     </div>
   )
 }

@@ -9,6 +9,7 @@ import {
   Undo2,
 } from 'lucide-react'
 import type { IndexedTask, IndexedProject } from '../vault/types'
+import { Button, IconButton } from '@terminator/extension-ui'
 
 interface ArchivedArea {
   id: string
@@ -264,18 +265,16 @@ export function ArchiveView(): React.JSX.Element {
                   </span>
                 </div>
                 <div className="archive-view__project-actions">
-                  <button
-                    className="archive-view__restore-btn"
-                    onClick={() => restoreProject(project.filePath)}
-                  >
+                  <Button size="sm" onClick={() => restoreProject(project.filePath)}>
                     Restore to active
-                  </button>
-                  <button
-                    className="archive-view__delete-btn"
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
                     onClick={() => deleteProject(project.filePath, project.name)}
                   >
                     Delete permanently
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))
@@ -297,18 +296,16 @@ export function ArchiveView(): React.JSX.Element {
                   </span>
                 </div>
                 <div className="archive-view__project-actions">
-                  <button
-                    className="archive-view__restore-btn"
-                    onClick={() => void handleRestoreArea(area.name)}
-                  >
+                  <Button size="sm" onClick={() => void handleRestoreArea(area.name)}>
                     Restore to active
-                  </button>
-                  <button
-                    className="archive-view__delete-btn"
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
                     onClick={() => void handleDeleteArea(area.name)}
                   >
                     Delete permanently
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))
@@ -345,20 +342,18 @@ function ArchiveTaskRow({
         <span className="archive-task__file">{fileName}</span>
       </span>
       <span className="archive-task__actions">
-        <button
-          className="archive-task__restore-btn"
+        <IconButton
+          icon={Undo2}
+          label="Restore to open"
+          size="sm"
           onClick={() => onRestore(task.id)}
-          title="Restore to open"
-        >
-          <Undo2 className="tm-icon" />
-        </button>
-        <button
-          className="archive-task__delete-btn"
+        />
+        <IconButton
+          icon={Trash2}
+          label="Delete permanently"
+          size="sm"
           onClick={() => onDelete(task.id, task.text)}
-          title="Delete permanently"
-        >
-          <Trash2 className="tm-icon" />
-        </button>
+        />
       </span>
     </div>
   )

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Check } from 'lucide-react'
 import { logReviewAction } from '../utils/review-log'
+import { Button } from '@terminator/extension-ui'
 
 interface Props {
   onComplete: () => void
@@ -56,13 +57,13 @@ export function WeeklyReviewStep1GetClear({ onComplete, reviewId }: Props): Reac
           disabled={adding}
           autoFocus
         />
-        <button
-          className="tv-btn tv-btn--primary"
+        <Button
+          variant="primary"
           onClick={() => void handleAdd()}
           disabled={adding || !text.trim()}
         >
           Add
-        </button>
+        </Button>
       </div>
 
       {captured.length > 0 && (
@@ -80,14 +81,14 @@ export function WeeklyReviewStep1GetClear({ onComplete, reviewId }: Props): Reac
           wizard the one that skips it. Skipping stays available, as a link. */}
       <div className="wr-step__actions">
         {captured.length === 0 && (
-          <button type="button" className="wr-step__skip" onClick={onComplete}>
+          <Button variant="ghost" className="wr-step__skip" onClick={onComplete}>
             Nothing loose — skip
-          </button>
+          </Button>
         )}
         <span className="wr-step__actions-spacer" />
-        <button type="button" className="tv-btn tv-btn--primary" onClick={onComplete}>
+        <Button variant="primary" onClick={onComplete}>
           Next: inbox
-        </button>
+        </Button>
       </div>
     </div>
   )

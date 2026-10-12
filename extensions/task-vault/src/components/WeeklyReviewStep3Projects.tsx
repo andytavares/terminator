@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Check } from 'lucide-react'
 import type { IndexedProject } from '../vault/types'
 import { logReviewAction } from '../utils/review-log'
+import { Button } from '@terminator/extension-ui'
 
 interface Props {
   activeProjects: IndexedProject[]
@@ -50,35 +51,22 @@ export function WeeklyReviewStep3Projects({
             <span className="wr-step__project-actions">
               {project.isStale ? (
                 <>
-                  <button
-                    className="tv-btn tv-btn--secondary"
-                    onClick={() => updateStatus(project, 'someday')}
-                  >
-                    Someday
-                  </button>
-                  <button
-                    className="tv-btn tv-btn--secondary"
-                    onClick={() => updateStatus(project, 'archived')}
-                  >
-                    Archive
-                  </button>
+                  <Button onClick={() => updateStatus(project, 'someday')}>Someday</Button>
+                  <Button onClick={() => updateStatus(project, 'archived')}>Archive</Button>
                 </>
               ) : (
-                <button
-                  className="tv-btn tv-btn--primary"
-                  onClick={() => updateStatus(project, 'active')}
-                >
+                <Button variant="primary" onClick={() => updateStatus(project, 'active')}>
                   Keep <Check className="tm-icon" />
-                </button>
+                </Button>
               )}
             </span>
           </li>
         ))}
       </ul>
 
-      <button className="tv-btn tv-btn--primary" onClick={onComplete}>
+      <Button variant="primary" onClick={onComplete}>
         Next: stale
-      </button>
+      </Button>
     </div>
   )
 }

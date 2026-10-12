@@ -3,6 +3,7 @@ import type { IndexedTask } from '../vault/types'
 import { FileToPicker } from './FileToPicker'
 import { useVaultStore } from '../stores/vault.store'
 import { logReviewAction } from '../utils/review-log'
+import { Button } from '@terminator/extension-ui'
 
 type InboxStep = 'actionable' | 'two-minute' | 'destination'
 
@@ -100,18 +101,13 @@ export function InboxProcessor({
         <div className="inbox-processor__step">
           <p className="inbox-processor__question">Is this actionable?</p>
           <div className="inbox-processor__actions">
-            <button className="tv-btn tv-btn--primary" onClick={() => setStep('two-minute')}>
+            <Button variant="primary" onClick={() => setStep('two-minute')}>
               Yes
-            </button>
-            <button className="tv-btn tv-btn--danger" onClick={() => void processItem('trash')}>
+            </Button>
+            <Button variant="danger" onClick={() => void processItem('trash')}>
               Trash it
-            </button>
-            <button
-              className="tv-btn tv-btn--secondary"
-              onClick={() => void processItem('someday')}
-            >
-              Incubate — Backlog
-            </button>
+            </Button>
+            <Button onClick={() => void processItem('someday')}>Incubate — Backlog</Button>
           </div>
         </div>
       )}
@@ -120,12 +116,10 @@ export function InboxProcessor({
         <div className="inbox-processor__step">
           <p className="inbox-processor__question">Can it be done in &lt;2 minutes?</p>
           <div className="inbox-processor__actions">
-            <button className="tv-btn tv-btn--primary" onClick={() => void processItem('do-now')}>
+            <Button variant="primary" onClick={() => void processItem('do-now')}>
               Do now — Today
-            </button>
-            <button className="tv-btn tv-btn--secondary" onClick={() => setStep('destination')}>
-              No — File it
-            </button>
+            </Button>
+            <Button onClick={() => setStep('destination')}>No — File it</Button>
           </div>
         </div>
       )}
@@ -140,15 +134,8 @@ export function InboxProcessor({
             onClose={() => setStep('two-minute')}
           />
           <div className="inbox-processor__actions" style={{ marginTop: 10 }}>
-            <button
-              className="tv-btn tv-btn--secondary"
-              onClick={() => void processItem('someday')}
-            >
-              Backlog
-            </button>
-            <button className="tv-btn tv-btn--secondary" onClick={() => setStep('two-minute')}>
-              Back
-            </button>
+            <Button onClick={() => void processItem('someday')}>Backlog</Button>
+            <Button onClick={() => setStep('two-minute')}>Back</Button>
           </div>
         </div>
       )}

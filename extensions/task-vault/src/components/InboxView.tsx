@@ -5,6 +5,7 @@ import { InboxProcessor } from './InboxProcessor'
 import { SmartTaskInput } from './SmartTaskInput'
 import { useVaultStore } from '../stores/vault.store'
 import { useVaultDataStore } from '../stores/vault-data.store'
+import { Button, IconButton } from '@terminator/extension-ui'
 
 type InboxOutcome = { tasks?: IndexedTask[] } | { error: string }
 
@@ -104,13 +105,9 @@ export function InboxView(): React.JSX.Element {
           disabled={adding}
           autoFocus
         />
-        <button
-          className="inbox-view__capture-btn"
-          onClick={handleCapture}
-          disabled={adding || !newTaskText.trim()}
-        >
+        <Button variant="primary" onClick={handleCapture} disabled={adding || !newTaskText.trim()}>
           {adding ? '…' : 'Capture'}
-        </button>
+        </Button>
       </div>
 
       {items.length === 0 ? (
@@ -124,30 +121,31 @@ export function InboxView(): React.JSX.Element {
         <div className="inbox-view__processor">
           <div className="inbox-view__processor-header">
             <span>Processing inbox (GTD clarify)…</span>
-            <button
-              className="tv-btn tv-btn--ghost tv-btn--xs"
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={ArrowLeft}
               onClick={() => {
                 setProcessing(false)
                 void load()
               }}
             >
-              <ArrowLeft aria-hidden="true" /> Back to list
-            </button>
+              Back to list
+            </Button>
           </div>
           <InboxProcessor items={items} onDone={handleDone} />
         </div>
       ) : (
         <>
           <div className="inbox-view__actions-bar">
-            <button
-              className="inbox-view__process-btn"
+            <Button
               onClick={async () => {
                 await load()
                 setProcessing(true)
               }}
             >
               Process inbox (GTD clarify)
-            </button>
+            </Button>
           </div>
           <div className="inbox-view__list">
             {items.map((item) => (
@@ -233,12 +231,10 @@ function InboxItem({
             onCancel={() => setEditing(false)}
             autoFocus
           />
-          <button className="tv-btn tv-btn--primary" onClick={saveEdit}>
+          <Button variant="primary" onClick={saveEdit}>
             Save
-          </button>
-          <button className="tv-btn tv-btn--outline" onClick={() => setEditing(false)}>
-            <X className="tm-icon" />
-          </button>
+          </Button>
+          <IconButton icon={X} label="Cancel edit" size="sm" onClick={() => setEditing(false)} />
         </div>
       ) : (
         <div className="inbox-item__row">
@@ -263,27 +259,13 @@ function InboxItem({
             )}
           </span>
           <div className="inbox-item__actions">
-            <button
-              className="tv-btn tv-btn--outline tv-btn--action-icon"
+            <IconButton
+              icon={CalendarDays}
+              label="Move to Today's log"
               onClick={handleMoveToToday}
-              title="Move to Today's log"
-            >
-              <CalendarDays className="tm-icon" />
-            </button>
-            <button
-              className="tv-btn tv-btn--outline tv-btn--action-icon"
-              onClick={handleSomeday}
-              title="Move to backlog"
-            >
-              <Sunset className="tm-icon" />
-            </button>
-            <button
-              className="tv-btn tv-btn--outline tv-btn--action-icon inbox-item__btn--delete"
-              onClick={handleDelete}
-              title="Delete"
-            >
-              <Trash2 className="tm-icon" />
-            </button>
+            />
+            <IconButton icon={Sunset} label="Move to backlog" onClick={handleSomeday} />
+            <IconButton icon={Trash2} label="Delete" onClick={handleDelete} />
           </div>
         </div>
       )}

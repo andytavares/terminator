@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useDismissible } from '@terminator/extension-ui'
+import { Button, IconButton, useDismissible } from '@terminator/extension-ui'
 import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 
 // ── Value format conventions ──────────────────────────────────────
@@ -425,15 +425,21 @@ export function DateTimePicker({
               {showCalendar && (
                 <div className="dtp__calendar">
                   <div className="dtp__cal-header">
-                    <button type="button" className="dtp__cal-nav" onClick={prevMonth}>
-                      <ChevronLeft className="tm-icon" />
-                    </button>
+                    <IconButton
+                      icon={ChevronLeft}
+                      label="Previous month"
+                      size="sm"
+                      onClick={prevMonth}
+                    />
                     <span className="dtp__cal-month-label">
                       {MONTH_NAMES[displayMonth]} {displayYear}
                     </span>
-                    <button type="button" className="dtp__cal-nav" onClick={nextMonth}>
-                      <ChevronRight className="tm-icon" />
-                    </button>
+                    <IconButton
+                      icon={ChevronRight}
+                      label="Next month"
+                      size="sm"
+                      onClick={nextMonth}
+                    />
                   </div>
 
                   <div className="dtp__cal-grid">
@@ -510,23 +516,19 @@ export function DateTimePicker({
 
             {/* Footer */}
             <div className="dtp__footer">
-              <button
-                type="button"
-                className="dtp__btn dtp__btn--clear"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   onChange('')
                   setOpen(false)
                 }}
               >
                 Clear
-              </button>
-              <button
-                type="button"
-                className="dtp__btn dtp__btn--done"
-                onClick={() => setOpen(false)}
-              >
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => setOpen(false)}>
                 Done
-              </button>
+              </Button>
             </div>
           </div>,
           document.body

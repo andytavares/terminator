@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import type { IndexedProject, IndexedTask } from '../vault/types'
 import { logReviewAction } from '../utils/review-log'
+import { Button } from '@terminator/extension-ui'
 
 interface Props {
   somedayProjects: IndexedProject[]
@@ -79,15 +80,10 @@ export function WeeklyReviewStep5Someday({
               <li key={task.id} className="wr-step__item">
                 <span className="wr-step__project-name">{task.text}</span>
                 <span className="wr-step__project-actions">
-                  <button className="tv-btn tv-btn--primary" onClick={() => void promoteTask(task)}>
+                  <Button variant="primary" onClick={() => void promoteTask(task)}>
                     Pick up today
-                  </button>
-                  <button
-                    className="tv-btn tv-btn--secondary"
-                    onClick={() => void archiveTask(task)}
-                  >
-                    Archive
-                  </button>
+                  </Button>
+                  <Button onClick={() => void archiveTask(task)}>Archive</Button>
                 </span>
               </li>
             ))}
@@ -103,18 +99,15 @@ export function WeeklyReviewStep5Someday({
               <li key={project.id} className="wr-step__item">
                 <span className="wr-step__project-name">{project.name}</span>
                 <span className="wr-step__project-actions">
-                  <button
-                    className="tv-btn tv-btn--primary"
+                  <Button
+                    variant="primary"
                     onClick={() => void updateProjectStatus(project, 'active')}
                   >
                     Promote to active
-                  </button>
-                  <button
-                    className="tv-btn tv-btn--secondary"
-                    onClick={() => void updateProjectStatus(project, 'archived')}
-                  >
+                  </Button>
+                  <Button onClick={() => void updateProjectStatus(project, 'archived')}>
                     Archive
-                  </button>
+                  </Button>
                 </span>
               </li>
             ))}
@@ -122,9 +115,9 @@ export function WeeklyReviewStep5Someday({
         </>
       )}
 
-      <button className="tv-btn tv-btn--primary" onClick={onComplete}>
+      <Button variant="primary" onClick={onComplete}>
         Next: reflect
-      </button>
+      </Button>
     </div>
   )
 }
