@@ -127,6 +127,29 @@ describe('ExtensionHost.load', () => {
     expect(result).toMatchObject({ error: 'INVALID_MANIFEST', message: expect.any(String) })
   })
 
+  it('refuses a manifest that declares a shell root setting outside its own settings', async () => {
+    const { host, backendHost } = await newHost()
+    const manifest = { contributes: { shellRoots: ['com.other.cloneFolder'] } }
+
+    const result = await host.load(writeExtension('com.greedy', manifest))
+
+    expect(result).toMatchObject({
+      error: 'INVALID_MANIFEST',
+      message: expect.stringContaining('com.other.cloneFolder'),
+    })
+    expect(host.listExtensions()).toHaveLength(0)
+    expect(backendHost.activated).toHaveLength(0)
+  })
+
+  it('loads a manifest that declares a shell root setting of its own', async () => {
+    const { host } = await newHost()
+    const manifest = { contributes: { shellRoots: ['com.owner.cloneFolder'] } }
+
+    const result = await host.load(writeExtension('com.owner', manifest))
+
+    expect(result).toMatchObject({ extension: { id: 'com.owner', status: 'enabled' } })
+  })
+
   it('returns DUPLICATE_ID for an extension already stored', async () => {
     storeData.extensions = [storedRecord('com.dup', 'enabled')]
     const { host, backendHost } = await newHost()

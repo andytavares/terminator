@@ -136,6 +136,8 @@ export interface ExtensionContributes {
     requires?: 'repo' | 'session'
   }>
   quickActions?: { group?: { mnemonic?: string; label: string } }
+  /** Keys of the extension's own folder settings whose directories its git and gh may run in. */
+  shellRoots?: string[]
 }
 
 export interface Extension {

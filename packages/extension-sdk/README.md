@@ -178,8 +178,14 @@ See `docs/EXTENSION-STYLE.md` for the house rules and
 | Sidebar panel | `sidebarPanel` | `label`, `icon?`, `defaultOpen?`, `view?`  |
 | Window views  | `windowViews`  | `[{ id, view }]`                           |
 | Commands      | `commands`     | `[{ id, label, shortcut?, description? }]` |
+| Shell roots   | `shellRoots`   | `[settingKey]`                             |
 
 The `view` string is passed as `?view=VALUE` in the webview URL, letting one `index.html` serve multiple surfaces.
+
+`shellRoots` lists keys of your own `folder` settings (each starting with your extension id)
+whose directories `api.shell.exec` and `api.github` may run in, besides the workspace folders,
+the project worktrees and `api.paths.userData`. A key outside your id refuses the manifest at
+load; a key you never register with `settings.register` as a `folder` adds nothing (ADR 102).
 
 ## Icon names
 

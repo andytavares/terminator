@@ -109,3 +109,17 @@ describe('ExtensionContributesSchema', () => {
     expect(ExtensionContributesSchema.safeParse(full).success).toBe(true)
   })
 })
+
+describe('ExtensionContributesSchema — shellRoots', () => {
+  it('keeps the setting keys an extension declares as directories its commands may run in', () => {
+    const result = ExtensionContributesSchema.safeParse({
+      shellRoots: ['com.example.tool.cloneFolder'],
+    })
+    expect(result.success && result.data.shellRoots).toEqual(['com.example.tool.cloneFolder'])
+  })
+
+  it('rejects a shell root that is not a setting key', () => {
+    expect(ExtensionContributesSchema.safeParse({ shellRoots: [''] }).success).toBe(false)
+    expect(ExtensionContributesSchema.safeParse({ shellRoots: '/tmp' }).success).toBe(false)
+  })
+})
