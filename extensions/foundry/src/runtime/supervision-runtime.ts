@@ -25,9 +25,10 @@ import { gotoRun, startPaletteRefresh, stopPaletteRefresh } from './palette-comm
 /**
  * A stall, written where the order's history is read.
  *
- * The feature directory *is* the order directory, so its basename is the order
- * id — and `orderDir` refuses anything that is not one, so a firing for a run
- * that is not an order's writes nothing rather than inventing a place for it.
+ * The feature directory *is* the order directory, `<root>/orders/<id>`, so its
+ * basename is the order id. A firing for a run whose feature directory is not
+ * one writes nothing rather than inventing a place for it: reading any
+ * directory's grandparent as the root wrote `<parent>/orders/<name>/ledger.jsonl`.
  */
 export async function recordStall(
   featureDir: string,
@@ -36,7 +37,7 @@ export async function recordStall(
   const orderId = path.basename(featureDir)
   const root = path.dirname(path.dirname(featureDir))
   try {
-    orderDir(root, orderId)
+    if (orderDir(root, orderId) !== path.resolve(featureDir)) return
   } catch {
     return
   }
