@@ -449,8 +449,8 @@ export function runAgentReview(
   let proc: SpawnedProcess | undefined
 
   const done = (async (): Promise<AgentRun> => {
-    let diffText = ''
-    let truncated = false
+    let diffText: string
+    let truncated: boolean
     try {
       const diff = await buildDiffText(
         input.worktreePath,

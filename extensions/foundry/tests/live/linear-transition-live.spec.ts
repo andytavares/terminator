@@ -51,7 +51,7 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
 
   it('reads the real workflow rather than an assumed one', () => {
     expect(states.length).toBeGreaterThan(2)
-    // eslint-disable-next-line no-console
+
     console.log(`workflow: ${states.map((s) => `${s.name}[${s.intent ?? '—'}]`).join(' → ')}`)
   })
 
@@ -82,7 +82,7 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
 
   it('leaves backlog and cancelled states carrying no intent', () => {
     const named = states.filter((state) => state.intent !== null).map((state) => state.name)
-    // eslint-disable-next-line no-console
+
     console.log(`intents landed on: ${named.join(', ')}`)
     expect(named.length).toBeGreaterThan(0)
     expect(named.length).toBeLessThanOrEqual(3)

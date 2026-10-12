@@ -235,7 +235,7 @@ describe.skipIf(LIVE === '')('shipping, for real', () => {
     expect(raised.map((g) => g.rule)).toContain('ready-for-review')
 
     // Left for the reader of the test output.
-    // eslint-disable-next-line no-console
+
     console.log(`live pull request: ${pull.url}`)
   }, 180_000)
 

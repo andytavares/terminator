@@ -249,13 +249,11 @@ test('a lint failure goes back to the builder and the run still ships', async ()
       .map((n) => `${n.id}=${n.state}/a${n.attempts}/r${n.reworks}/f${n.feedback.length}`)
       .join(' ')
     if (line !== previous) {
-      // eslint-disable-next-line no-console
       console.log(`[${new Date().toISOString().slice(11, 19)}] ${line}`)
       previous = line
     }
     const over = finished()
     if (over !== null) {
-      // eslint-disable-next-line no-console
       console.log(`[run over] ${over}`)
       break
     }
@@ -263,10 +261,9 @@ test('a lint failure goes back to the builder and the run still ships', async ()
   }
 
   const ledger = existsSync(ledgerFile) ? readFileSync(ledgerFile, 'utf8') : ''
-  // eslint-disable-next-line no-console
+
   console.log(`ledger:\n${ledger}`)
   if (existsSync(gatesFile)) {
-    // eslint-disable-next-line no-console
     console.log(`gates: ${readFileSync(gatesFile, 'utf8')}`)
   }
 
@@ -314,7 +311,7 @@ test('a lint failure goes back to the builder and the run still ships', async ()
       cwd: repo,
     }).toString()
   ) as { url: string; isDraft: boolean }[]
-  // eslint-disable-next-line no-console
+
   console.log(`pull requests on ${branch}: ${JSON.stringify(pulls)}`)
   expect(pulls).toHaveLength(1)
   expect(pulls[0].isDraft).toBe(true)

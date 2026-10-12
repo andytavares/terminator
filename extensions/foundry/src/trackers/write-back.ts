@@ -140,7 +140,7 @@ export async function checkCapability(
   // A tracker that is momentarily unreachable is not a tracker without the
   // capability. Agreement must not fail on it, and the operator can still set
   // the mapping later.
-  let states: TrackerStateOption[] = []
+  let states: TrackerStateOption[]
   try {
     states = [...(await deps.issues.states(issue.tracker, issue.key))]
   } catch {

@@ -11,7 +11,7 @@ class names, database columns and type names are **not** in scope — they keep
 whatever name they have.
 
 Enforcement: the three vocabulary rules below are `no-restricted-syntax`
-selectors in `.eslintrc.json`, scoped to `extensions/*/src/**/*.tsx` and
+selectors in `eslint.config.mjs`, scoped to `extensions/*/src/**/*.tsx` and
 `packages/extension-ui/src/**/*.tsx`. Their fixture spec is
 `tests/unit/lint/extension-vocabulary.spec.ts`. Everything else here is a
 convention a reviewer applies.

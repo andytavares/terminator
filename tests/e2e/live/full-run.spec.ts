@@ -252,13 +252,11 @@ test('an agent takes an order to a draft pull request', async () => {
     const nodes = last.graph?.nodes ?? []
     const line = nodes.map((n) => `${last.labels?.[n.id] ?? n.id}=${n.state}`).join(' ')
     if (line !== previous) {
-      // eslint-disable-next-line no-console
       console.log(`[${new Date().toISOString().slice(11, 19)}] ${line}`)
       previous = line
     }
     const over = finished()
     if (over !== null) {
-      // eslint-disable-next-line no-console
       console.log(`[run over] ${over}`)
       break
     }
@@ -266,13 +264,12 @@ test('an agent takes an order to a draft pull request', async () => {
     // working — the climb, then the push and the draft. Keep waiting.
     if (nodes.length > 0 && nodes.every((n) => SETTLED.has(n.state)) && settledSince === null) {
       settledSince = Date.now()
-      // eslint-disable-next-line no-console
+
       console.log('[graph settled] waiting on the climb and the draft')
     }
     // The tail is not unbounded: an hour of ladder is a hung rung, not a slow
     // one, and the test should say which.
     if (settledSince !== null && Date.now() - settledSince > 15 * 60_000) {
-      // eslint-disable-next-line no-console
       console.log('[gave up] the graph settled 15 minutes ago and nothing shipped')
       break
     }
@@ -280,7 +277,7 @@ test('an agent takes an order to a draft pull request', async () => {
   }
 
   const nodes = last.graph?.nodes ?? []
-  // eslint-disable-next-line no-console
+
   console.log(`blocked: ${JSON.stringify(last.blocked ?? [])}`)
 
   // A node may legitimately still be `running` — a budget breach halts the run
@@ -294,7 +291,7 @@ test('an agent takes an order to a draft pull request', async () => {
       existsSync(gatesFile),
       `${stillRunning.length} nodes still running and no gate to explain it`
     ).toBe(true)
-    // eslint-disable-next-line no-console
+
     console.log(`gates: ${readFileSync(gatesFile, 'utf8')}`)
   }
 
@@ -305,11 +302,11 @@ test('an agent takes an order to a draft pull request', async () => {
   const committed = execFileSync('git', ['log', '--oneline', 'main..HEAD'], {
     cwd: worktree,
   }).toString()
-  // eslint-disable-next-line no-console
+
   console.log(`worktree changes:\n${changed || '(clean)'}\ncommits:\n${committed || '(none)'}`)
 
   const session = readFileSync(join(worktree, 'src', 'session.js'), 'utf8')
-  // eslint-disable-next-line no-console
+
   console.log(`src/session.js is now:\n${session}`)
   expect(session, 'the builder did not make the change the unit asked for').toContain(
     'SESSION_TTL_MS'
@@ -321,7 +318,7 @@ test('an agent takes an order to a draft pull request', async () => {
 
   // The ledger says what happened, attributably.
   const ledger = readFileSync(join(repo, '.foundry', 'orders', ORDER, 'ledger.jsonl'), 'utf8')
-  // eslint-disable-next-line no-console
+
   console.log(`ledger:\n${ledger}`)
   expect(ledger).toContain('run.started')
 
@@ -335,7 +332,7 @@ test('an agent takes an order to a draft pull request', async () => {
     ['pr', 'list', '--head', branch, '--json', 'url,isDraft,headRefName'],
     { cwd: repo }
   ).toString()
-  // eslint-disable-next-line no-console
+
   console.log(`pull requests on ${branch}: ${listed}`)
   const pulls = JSON.parse(listed) as { url: string; isDraft: boolean }[]
   expect(pulls, `nothing was opened on ${branch}`).toHaveLength(1)
@@ -359,7 +356,7 @@ test('an agent takes an order to a draft pull request', async () => {
     .map((line) => JSON.parse(line) as { action: string; reason: string })
     .find((entry) => entry.action === 'ship.ready_asked')
   expect(shipped, 'nothing asked whether to mark it ready').toBeDefined()
-  // eslint-disable-next-line no-console
+
   console.log(`ship said: ${shipped?.reason}`)
   // These two are the ones this repository declares a command for; the rest
   // genuinely have none and are unmeasured for a real reason.

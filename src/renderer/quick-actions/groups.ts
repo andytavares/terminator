@@ -46,7 +46,7 @@ export function allocateExtensionGroups(requests: ExtensionGroupRequest[]): {
   for (const req of requests) {
     const wanted = req.mnemonic
     const wantedTaken = wanted !== undefined && used.has(wanted)
-    let assigned: string | null = null
+    let assigned: string | null
 
     if (wanted !== undefined && !wantedTaken) {
       assigned = wanted

@@ -3,7 +3,7 @@ import { ESLint } from 'eslint'
 import path from 'node:path'
 
 /**
- * The vocabulary rule, checked against the real `.eslintrc.json`.
+ * The vocabulary rule, checked against the real `eslint.config.mjs`.
  *
  * The "project"/"branch" rule has existed since ADR 032 but was scoped to
  * `src/renderer/components/**`, which is exactly why the extensions drifted:
@@ -20,8 +20,7 @@ let eslint: ESLint
 beforeAll(() => {
   eslint = new ESLint({
     cwd: repoRoot,
-    useEslintrc: false,
-    overrideConfigFile: path.join(repoRoot, '.eslintrc.json'),
+    overrideConfigFile: path.join(repoRoot, 'eslint.config.mjs'),
   })
 })
 

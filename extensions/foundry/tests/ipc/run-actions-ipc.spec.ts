@@ -48,19 +48,11 @@ vi.mock('../../src/runtime/supervised-runner.js', () => ({
   createSupervisedRunner: () => runner,
 }))
 
-// Captured so a test can raise a held tool call the way the runner does.
-let permissionSink: {
-  onPending: (ask: Record<string, unknown>) => void
-  onResolved: (requestId: string) => void
-} | null = null
-
 vi.mock('../../src/runner/agent-runner.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
   return {
     ...actual,
-    setPermissionSink: (sink: typeof permissionSink) => {
-      permissionSink = sink
-    },
+    setPermissionSink: () => undefined,
   }
 })
 

@@ -102,7 +102,7 @@ export async function runGh(
         env: extraEnv ? { ...process.env, ...extraEnv } : undefined,
         ...(output.maxBuffer === undefined ? {} : { maxBuffer: output.maxBuffer }),
       })
-      if (stderr && !stdout) throw new Error(stderr)
+      if (stderr && !stdout) throw new Error(stderr, { cause: e })
       return output.raw ? stdout : stdout.trim()
     }
     throw e

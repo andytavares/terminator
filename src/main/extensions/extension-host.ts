@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import { join } from 'path'
 import { readdirSync, existsSync } from 'fs'
 import { app } from 'electron'
@@ -11,6 +12,9 @@ import {
   type ExtensionAPIDeps,
 } from './api.js'
 import { makeLogger } from '../logger.js'
+
+// Extension bundles and manifests are CommonJS; main is an ES module.
+const loadCommonJs = createRequire(import.meta.url)
 
 const hostLogger = makeLogger('extension-host')
 
@@ -50,9 +54,8 @@ export class ExtensionHost {
   > {
     let manifest: Record<string, unknown>
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      manifest = require(join(directoryPath, 'manifest.json'))
-    } catch (e) {
+      manifest = loadCommonJs(join(directoryPath, 'manifest.json'))
+    } catch {
       hostLogger.warn(`INVALID_MANIFEST: cannot read manifest.json at ${directoryPath}`)
       return { error: 'INVALID_MANIFEST', message: 'Cannot read manifest.json' }
     }
@@ -237,8 +240,7 @@ export class ExtensionHost {
       // before checking this.loaded — directory name and ID differ.
       let extensionId: string | undefined
       try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const manifest = require(manifestPath) as { id?: string }
+        const manifest = loadCommonJs(manifestPath) as { id?: string }
         extensionId = manifest.id
       } catch {
         // fall through and let load() report the invalid manifest
@@ -258,8 +260,7 @@ export class ExtensionHost {
     record: ExtensionRecord
   ): Promise<{ ok: true } | { error: string; message: string }> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const mod = require(record.entryPoint) as {
+      const mod = loadCommonJs(record.entryPoint) as {
         activate?: (api: unknown) => void | Promise<void>
         deactivate?: () => void | Promise<void>
       }

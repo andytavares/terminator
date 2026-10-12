@@ -67,7 +67,6 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     }
 
     prevSessionIdRef.current = nextId
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, layout, getTerminalInstance])
 
   // Cleanup on unmount — useLayoutEffect so snapshot capture precedes browser layout.

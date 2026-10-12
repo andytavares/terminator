@@ -340,8 +340,6 @@ describe('runAgentReview', () => {
 
     const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
     await new Promise((r) => setTimeout(r, 10))
-    fake.stderr.on
-    ;(fake as any)._stdoutEmitter // no-op reference
     ;(fake as any).emitExit(1)
 
     const run = await done

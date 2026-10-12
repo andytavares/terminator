@@ -240,13 +240,11 @@ test('a red CI goes back to the builder and the draft reaches the ready gate gre
     const ci = existsSync(ciFile) ? readFileSync(ciFile, 'utf8') : ''
     const state = ci === '' ? 'no ci yet' : ci.replace(/\s+/g, ' ').slice(0, 300)
     if (state !== previous) {
-      // eslint-disable-next-line no-console
       console.log(`[${new Date().toISOString().slice(11, 19)}] ${state}`)
       previous = state
     }
     const over = finished()
     if (over !== null) {
-      // eslint-disable-next-line no-console
       console.log(`[run over] ${over}`)
       break
     }
@@ -254,12 +252,12 @@ test('a red CI goes back to the builder and the draft reaches the ready gate gre
   }
 
   const ledger = existsSync(ledgerFile) ? readFileSync(ledgerFile, 'utf8') : ''
-  // eslint-disable-next-line no-console
+
   console.log(`ledger:\n${ledger}`)
   const gates = existsSync(gatesFile)
     ? (JSON.parse(readFileSync(gatesFile, 'utf8')) as { rule: string; why: string }[])
     : []
-  // eslint-disable-next-line no-console
+
   console.log(`gates: ${JSON.stringify(gates.map((g) => g.rule))}`)
 
   expect(ledger).toContain('ship.draft_opened')
@@ -279,7 +277,7 @@ test('a red CI goes back to the builder and the draft reaches the ready gate gre
   const checks = JSON.parse(
     execFileSync('gh', ['pr', 'checks', branch, '--json', 'name,bucket'], { cwd: repo }).toString()
   ) as { name: string; bucket: string }[]
-  // eslint-disable-next-line no-console
+
   console.log(`checks on ${branch}: ${JSON.stringify(checks)}`)
   expect(checks.every((c) => c.bucket === 'pass' || c.bucket === 'skipping')).toBe(true)
 })

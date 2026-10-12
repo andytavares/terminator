@@ -106,7 +106,8 @@ export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<
     await closeApp({ app, page: undefined as unknown as Page, userDataDir })
     throw new Error(
       `The app did not finish starting within ${LAUNCH_DEADLINE_MS / 1000}s: ${String(error)}\n` +
-        `--- the app's own output ---\n${output.join('').slice(-6000) || '(nothing)'}`
+        `--- the app's own output ---\n${output.join('').slice(-6000) || '(nothing)'}`,
+      { cause: error }
     )
   }
 }

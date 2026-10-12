@@ -140,12 +140,12 @@ test('a failing branch becomes one ranked signal, and promoting it starts nothin
     recorded?: number
     problem?: string | null
   }
-  // eslint-disable-next-line no-console
+
   console.log(`run-now: ${JSON.stringify(ran)}`)
   expect(ran.problem ?? null).toBeNull()
 
   const listed = (await foundry('foundry:signals.list')) as { signals: SignalRow[] }
-  // eslint-disable-next-line no-console
+
   console.log(`signals: ${JSON.stringify(listed.signals.map((s) => [s.title, s.occurrences]))}`)
   const red = listed.signals.find((s) => s.title.includes(BRANCH))
   expect(red, 'no signal for the failing branch').toBeDefined()

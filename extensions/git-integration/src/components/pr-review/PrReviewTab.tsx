@@ -30,14 +30,13 @@ async function loadAndReconcileSession(
   reconcileHead: ReturnType<typeof usePrReviewStore.getState>['reconcileHead']
 ): Promise<SinceInfo | null> {
   const key = sessionKey(repoRoot, detail.number)
-  let result = await githubAPI.sessionGet(key)
+  const result = await githubAPI.sessionGet(key)
   let raw = (result as { session: unknown }).session
   if (!raw) {
     const legacyResult = await githubAPI.sessionGet(
       legacySessionKey(repoRoot, detail.number, detail.headSHA)
     )
     raw = (legacyResult as { session: unknown }).session
-    result = legacyResult
   }
   if (!raw) return null
 

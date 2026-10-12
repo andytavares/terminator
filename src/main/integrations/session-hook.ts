@@ -137,7 +137,9 @@ async function readSettings(projectDir: string): Promise<SettingsFile | null> {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
     // Malformed is not missing: overwriting settings we cannot parse would
     // destroy whatever the operator put there.
-    throw new Error(`Could not read ${settingsPath(projectDir)}: ${String(error)}`)
+    throw new Error(`Could not read ${settingsPath(projectDir)}: ${String(error)}`, {
+      cause: error,
+    })
   }
 }
 

@@ -78,7 +78,7 @@ export function RichContent({ children, className }: Props) {
             }
             const lang = match[1]
             const text = String(code).replace(/\n$/, '')
-            let highlighted = text
+            let highlighted: string
             try {
               highlighted = hljs.highlight(text, { language: lang }).value
             } catch {

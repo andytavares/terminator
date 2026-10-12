@@ -228,7 +228,7 @@ async function runToDraft(id: string): Promise<string> {
   const pulls = JSON.parse(
     readFileSync(join(repo, '.foundry', 'orders', id, 'pulls.json'), 'utf8')
   ) as { url: string }[]
-  // eslint-disable-next-line no-console
+
   console.log(`${id} drafted ${pulls[0]?.url}`)
   return pulls[0].url
 }
@@ -257,7 +257,7 @@ test('a merge restacks the order queued behind it', async () => {
   const observed = (await foundry('foundry:run.observe', { id: SECOND })) as {
     queue: { position: number; behind: { orderId: string; files: string[] }[] } | null
   }
-  // eslint-disable-next-line no-console
+
   console.log(`queue for ${SECOND}: ${JSON.stringify(observed.queue)}`)
   expect(observed.queue?.behind.map((b) => b.orderId)).toContain(FIRST)
 
@@ -273,7 +273,7 @@ test('a merge restacks the order queued behind it', async () => {
     if (outcome !== '') break
     await handle.page.waitForTimeout(15_000)
   }
-  // eslint-disable-next-line no-console
+
   console.log(`first ledger:\n${ledgerOf(FIRST)}\nsecond ledger:\n${ledgerOf(SECOND)}`)
   expect(ledgerOf(FIRST)).toContain('refinery.merged')
   expect(['rebased', 'conflict']).toContain(outcome)

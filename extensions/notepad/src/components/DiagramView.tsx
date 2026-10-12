@@ -595,7 +595,6 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
             <ExcalidrawComponent
               key={diagramId}
               theme="dark"
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               initialData={{
                 elements: (initialSceneRef.current.elements ?? []) as any,
                 appState: (initialSceneRef.current.appState ?? {}) as any,

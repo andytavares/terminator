@@ -154,7 +154,7 @@ test('an order fits the view it is shown in', async () => {
     })
     .toBeGreaterThan(0)
   const before = await overflow()
-  // eslint-disable-next-line no-console
+
   console.log(`scrollHeight ${before.scroll} vs viewport ${before.view}`)
   expect(before.scroll, 'the Forge needs scrolling to show one order').toBeLessThanOrEqual(
     before.view + 8
@@ -176,7 +176,7 @@ test('no text on any Foundry surface renders at the browser default size', async
     )
     for (const item of await oversized()) found.push({ ...item, cls: `${surface}: ${item.cls}` })
   }
-  // eslint-disable-next-line no-console
+
   console.log(JSON.stringify(found, null, 1))
   expect(found, 'these render at the untouched 16px default').toEqual([])
 })
@@ -201,7 +201,7 @@ test('controls that share a row in the Forge share one height', async () => {
     }
     return out
   })()`)
-  // eslint-disable-next-line no-console
+
   console.log(JSON.stringify(rows))
   for (const [row, heights] of Object.entries(rows)) {
     expect(new Set(heights).size, `${row}: ${heights.join(', ')}`).toBe(1)

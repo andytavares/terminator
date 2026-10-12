@@ -153,7 +153,7 @@ export async function applyNotepadMigrations(db: ExtensionDB): Promise<void> {
     await db.transaction(async (tx) => {
       const rows = await tx.query<{ id: string; tags: string }>(`SELECT id, tags FROM diagrams`)
       for (const row of rows) {
-        let parsed: string[] = []
+        let parsed: string[]
         try {
           parsed = JSON.parse(row.tags ?? '[]') as string[]
         } catch {

@@ -113,7 +113,7 @@ export class MissingCwdError extends Error {
 }
 
 function assertUsableCwd(cwd: string): void {
-  let isDirectory = false
+  let isDirectory: boolean
   try {
     isDirectory = statSync(cwd).isDirectory()
   } catch {
@@ -320,7 +320,7 @@ export class PtyManager {
   cleanupOrphans(): { cleanedCount: number } {
     const registryPath = REGISTRY_FILE()
     if (!existsSync(registryPath)) return { cleanedCount: 0 }
-    let records: SessionRecord[] = []
+    let records: SessionRecord[]
     try {
       records = JSON.parse(readFileSync(registryPath, 'utf-8'))
     } catch {

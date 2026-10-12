@@ -117,7 +117,6 @@ export function App(): JSX.Element {
         if ((result as { pending?: boolean }).pending) openNewOrder()
       })
       .catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // The counts, on the one piece of chrome that is on screen whatever surface

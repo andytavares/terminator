@@ -181,7 +181,7 @@ async function migrateRecurrenceMetadata(db: ExtensionDB): Promise<void> {
 
   await db.transaction(async (tx) => {
     for (const row of rows) {
-      let meta: Record<string, unknown> = {}
+      let meta: Record<string, unknown>
       try {
         meta = JSON.parse(row.metadata) as Record<string, unknown>
       } catch {
@@ -224,7 +224,7 @@ async function migrateMetadataToColumns(db: ExtensionDB): Promise<void> {
 
   await db.transaction(async (tx) => {
     for (const row of rows) {
-      let meta: Record<string, unknown> = {}
+      let meta: Record<string, unknown>
       try {
         meta = JSON.parse(row.metadata) as Record<string, unknown>
       } catch {

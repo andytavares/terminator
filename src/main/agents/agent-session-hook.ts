@@ -180,7 +180,7 @@ async function readSettings(): Promise<SettingsFile | null> {
     // Malformed is not missing. These are the operator's own settings for every
     // agent session they run; overwriting what cannot be parsed would destroy
     // work that has nothing to do with this application.
-    throw new Error(`Could not read ${userSettingsPath()}: ${String(error)}`)
+    throw new Error(`Could not read ${userSettingsPath()}: ${String(error)}`, { cause: error })
   }
 }
 
