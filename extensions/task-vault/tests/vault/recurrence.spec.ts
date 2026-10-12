@@ -3,7 +3,6 @@ import {
   localDate,
   computeNextDueDate,
   parseRecurrenceRule,
-  serializeRecurrenceRule,
   InvalidRecurrenceRuleError,
 } from '../../src/vault/recurrence'
 
@@ -48,20 +47,6 @@ describe('parseRecurrenceRule', () => {
 
   it('throws on empty string', () => {
     expect(() => parseRecurrenceRule('')).toThrow(InvalidRecurrenceRuleError)
-  })
-})
-
-describe('serializeRecurrenceRule', () => {
-  it('serialises daily', () => {
-    expect(serializeRecurrenceRule({ kind: 'daily' })).toBe('daily')
-  })
-
-  it('serialises weekly:1,3 (sorts days)', () => {
-    expect(serializeRecurrenceRule({ kind: 'weekly', days: [3, 1] })).toBe('weekly:1,3')
-  })
-
-  it('serialises plain weekly (no days)', () => {
-    expect(serializeRecurrenceRule({ kind: 'weekly', days: [] })).toBe('weekly')
   })
 })
 

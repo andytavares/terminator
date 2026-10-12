@@ -2,7 +2,7 @@
   "id": "terminator.task-vault",
   "name": "Task Vault",
   "version": "0.1.0",
-  "description": "GTD+BuJo+PARA daily productivity system backed by plain markdown files. Includes MCP server for agent access.",
+  "description": "GTD+BuJo+PARA daily productivity system backed by the shared PGlite database.",
   "main": "src/index.js",
   "renderer": "dist/index.html",
   "minAppVersion": "0.1.0",

@@ -125,13 +125,6 @@ export interface IndexedProject {
   terminatorLinks: string[]
 }
 
-export interface TerminatorLink {
-  targetId: string
-  targetType: 'workspace' | 'project'
-  displayName?: string
-  isBroken: boolean
-}
-
 export interface CalendarEvent {
   uid: string
   summary: string
@@ -140,11 +133,4 @@ export interface CalendarEvent {
   allDay: boolean
   location?: string
   description?: string
-}
-
-export interface IcsFeedCache {
-  feedUrl: string
-  events: CalendarEvent[]
-  lastFetchedAt: string
-  fetchError?: string
 }
