@@ -139,10 +139,10 @@ function graphFor(recipeFile: string, lanes: number[], dir = SHIPPED_RECIPES): R
 }
 
 describe('workAnimFor', () => {
-  it('scans at a rig or bench and types everywhere else', () => {
+  it('scans at a rig and types everywhere else', () => {
     const map = layoutHall(graph())
     for (const prop of map.props) {
-      const expected = prop.kind === 'rig' || prop.kind === 'bench' ? 'scan' : 'type'
+      const expected = prop.kind === 'rig' ? 'scan' : 'type'
       expect(workAnimFor(map, prop.nodeId)).toBe(expected)
     }
     expect(map.props.some((p) => p.kind === 'rig')).toBe(true)

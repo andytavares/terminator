@@ -134,10 +134,10 @@ export function workAnim(kind: StepKind): CrewAnim {
   return kind === 'run' ? 'scan' : 'type'
 }
 
-/** What a crew member does at their station while their step runs: scan at a rig or bench, else type. */
+/** What a crew member does at their station while their step runs: scan at a rig, else type. */
 export function workAnimFor(map: HallMap, nodeId: string): CrewAnim {
   const kind = stationOf(map, nodeId)?.kind
-  return kind === 'rig' || kind === 'bench' ? 'scan' : 'type'
+  return kind === 'rig' ? 'scan' : 'type'
 }
 
 export function tileCenter(tile: Tile): { readonly x: number; readonly y: number } {

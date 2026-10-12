@@ -24,14 +24,13 @@ import type { PaintCall } from './paint-fake.js'
 // The honesty rule under test: a prop's "alive" details (lit screens, a
 // waveform, a flashing beacon, moving treads) exist in the recorded draw
 // calls only when the cause the design names for them is present, and never
-// otherwise — regardless of the clock. Breakroom furniture (bench, sofa,
+// otherwise — regardless of the clock. Breakroom furniture (restbench, sofa,
 // table, fridge, coffeebar, vending, partition) never reads `SceneContext`
 // at all: it draws the same regardless of crew or clock.
 
 const ALL_PROP_KINDS: readonly PropKind[] = [
   'desk',
   'rig',
-  'bench',
   'press',
   'gate',
   'shelves',
@@ -56,7 +55,6 @@ const PROP_DEFAULTS: Readonly<Partial<Record<PropKind, Partial<HallProp>>>> = {
   press: { w: 3, h: 2 },
   gate: { w: 1, h: 1 },
   rig: { w: 2, h: 1 },
-  bench: { w: 2, h: 1 },
   chair: { w: 1, h: 1 },
   partition: { w: 4, h: 2, x: 7, y: 19 },
   sofa: { w: 2, h: 1 },
@@ -177,20 +175,6 @@ describe('factory/art/props drawProp', () => {
     expect(containsColor(idle.calls, HALL.green)).toBe(false)
   })
 
-  it('sweeps a bench cursor only while its crew scans', () => {
-    const scanning = createRecordingPaint()
-    drawProp(
-      scanning,
-      prop('bench'),
-      context({ crew: [crew({ nodeId: 'n1', anim: 'scan' })] }),
-      300
-    )
-    expect(containsColor(scanning.calls, HALL.cyan)).toBe(true)
-
-    const idle = createRecordingPaint()
-    drawProp(idle, prop('bench'), context({ crew: [crew({ nodeId: 'n1', anim: 'idle' })] }), 300)
-    expect(containsColor(idle.calls, HALL.cyan)).toBe(false)
-  })
   it('draws a rest bench identically regardless of crew or clock — it is breakroom furniture, not a station', () => {
     const scanning = createRecordingPaint()
     drawProp(
@@ -213,7 +197,7 @@ describe('factory/art/props drawProp', () => {
     expect(open.calls.length).toBeGreaterThan(0)
   })
 
-  describe.each(['desk', 'rig', 'bench', 'press'] as const)('the %s status lamp', (kind) => {
+  describe.each(['desk', 'rig', 'press'] as const)('the %s status lamp', (kind) => {
     const lamp = (over: Partial<SceneContext>, tMs = 0) => {
       const paint = createRecordingPaint()
       drawProp(paint, prop(kind), context(over), tMs)
@@ -776,38 +760,6 @@ describe('factory/art/props station work', () => {
       const calls = draw('rig', both, 1300)
       expect(containsColor(calls, '#0d2412')).toBe(true)
       expect(containsColor(calls, '#2a0f0b')).toBe(false)
-    })
-  })
-
-  describe('bench', () => {
-    const SHEET = '#d9dde2'
-    const STRIP = '#e9ecef'
-    const scanning = context({ crew: [crew({ anim: 'scan' })] })
-
-    it('lays out the sheet, scan line and report strip only while scanning', () => {
-      for (const t of STAGES) {
-        for (const color of [SHEET, STRIP, 'rgba(114,216,242,.9)']) {
-          expect(containsColor(draw('bench', scanning, t), color)).toBe(true)
-          expect(containsColor(draw('bench', context(), t), color)).toBe(false)
-        }
-      }
-    })
-
-    it('stamps the sheet inside the verdict window, without a report strip', () => {
-      const verdicts = (pass: boolean) => context({ verdicts: [{ nodeId: 'n1', pass, at: 500 }] })
-      for (const [t, shown] of [
-        [499, false],
-        [500, true],
-        [2099, true],
-        [2100, false],
-      ] as const) {
-        expect(containsColor(draw('bench', verdicts(true), t), '#3a8a4a')).toBe(shown)
-        expect(containsColor(draw('bench', verdicts(false), t), '#b04a3c')).toBe(shown)
-      }
-      const stamped = draw('bench', verdicts(true), 600)
-      expect(containsColor(stamped, SHEET)).toBe(true)
-      expect(containsColor(stamped, STRIP)).toBe(false)
-      expect(containsColor(stamped, 'rgba(114,216,242,.9)')).toBe(false)
     })
   })
 

@@ -20,7 +20,7 @@ export interface Tile {
 export type { Side, BeltTileKind, BeltTile } from './belts.js'
 
 /** The five prop kinds that carry a `RunNode`; every other kind is decor. */
-export type StationKind = 'desk' | 'rig' | 'bench' | 'press' | 'gate'
+export type StationKind = 'desk' | 'rig' | 'press' | 'gate'
 
 export type PropKind =
   | StationKind
@@ -176,7 +176,6 @@ export const SIGN_CHARS: Readonly<Record<StationKind, number>> = {
   desk: 12,
   press: 12,
   rig: 8,
-  bench: 8,
   gate: 4,
 }
 
@@ -205,7 +204,6 @@ function stationWidth(kind: StationKind): number {
     case 'desk':
       return 3
     case 'rig':
-    case 'bench':
       return 2
     case 'press':
       return 3

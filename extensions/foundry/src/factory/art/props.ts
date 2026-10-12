@@ -25,8 +25,8 @@ import { tallyChecks } from '../ci-tally.js'
 // The honesty rule lives in what each function reads out of `SceneContext`:
 // nothing on a station moves unless the run reported the cause. A desk's
 // screens ask whether its crew member is typing or its step has a tool call
-// open (and which kind); a rig's and a bench's scan work asks whether a crew
-// member is scanning, and their tick, cross or stamp whether the step just
+// open (and which kind); a rig's scan work asks whether a crew
+// member is scanning, and its tick or cross whether the step just
 // passed or failed; a press asks whether its step is running; a gate's arm
 // swings only for a pass it was just told of; the racks and the shelves work
 // only while somebody stands at them, using them. The cause is always in the
@@ -260,7 +260,7 @@ export function bakeHall(map: HallMap, paint: Paint): void {
   }
 
   // Each station's name, stencilled on the floor — a bake, so belts and crew
-  // walk over it. Desks, rigs and benches wear it in the row above; the press
+  // walk over it. Desks and rigs wear it in the row above; the press
   // and the gate, which the hazard hatch fronts, wear it below.
   for (const prop of map.props) {
     if (prop.sign === null) continue
@@ -789,48 +789,6 @@ function drawRig(paint: Paint, prop: HallProp, context: SceneContext, tMs: numbe
     drawLamp(paint, x + w - 7, y + 8, stationLamp(context, prop.nodeId, tMs))
 }
 
-function drawBench(paint: Paint, prop: HallProp, context: SceneContext, tMs: number): void {
-  const x = prop.x * TILE_PX
-  const y = prop.y * TILE_PX
-  const w = prop.w * TILE_PX
-  const scanning = prop.nodeId !== null && scanningAt(context, prop.nodeId)
-
-  rect(paint, x, y - 2, w, 14, HALL.deskFace)
-  bevel(paint, x, y - 2, w, 14, HALL.deskEdge, '#1c2026')
-  rect(paint, x + 2, y - 8, w - 4, 8, '#1a1f26')
-
-  if (scanning) {
-    const t = tMs / 1000
-    const sweep = Math.floor(((Math.sin(t * 4) + 1) / 2) * Math.max(w - 8, 1))
-    rect(paint, x + 3 + sweep, y - 7, 2, 6, HALL.cyan)
-  }
-
-  const verdict = verdictAt(context, prop.nodeId, tMs)
-  if (scanning || verdict !== null) {
-    // The work under inspection: a sheet on the bench, read by a scan line —
-    // or, once the step has a verdict, stamped.
-    rect(paint, x + 4, y + 1, 9, 9, '#d9dde2')
-    for (let r = 0; r < 4; r++) rect(paint, x + 5, y + 2 + r * 2, 3 + ((r * 3) % 5), 1, '#8a929c')
-    if (verdict !== null) {
-      const ink = verdict.pass ? '#3a8a4a' : '#b04a3c'
-      rect(paint, x + 6, y + 3, 5, 5, ink)
-      rect(paint, x + 7, y + 4, 3, 3, '#d9dde2')
-      rect(paint, x + 8, y + 5, 1, 1, ink)
-    } else {
-      rect(paint, x + 3, y + 1 + (Math.floor(tMs / 120) % 9), 11, 1, 'rgba(114,216,242,.9)')
-    }
-  }
-  if (scanning) {
-    // A report strip feeding out of the side.
-    const feed = Math.floor(tMs / 300) % 8
-    rect(paint, x + w - 11, y + 3, 5, 1 + feed, '#e9ecef')
-    for (let r = 0; r < feed; r += 2) rect(paint, x + w - 10, y + 4 + r, 3, 1, '#9aa2ac')
-  }
-
-  if (prop.nodeId !== null)
-    drawLamp(paint, x + w - 6, y + 2, stationLamp(context, prop.nodeId, tMs))
-}
-
 /**
  * The press is the biggest machine on the floor — the lanes converge here.
  * A join step never has a crew member, so its cause is its own state: it
@@ -1348,8 +1306,6 @@ export function drawProp(paint: Paint, prop: HallProp, context: SceneContext, tM
       return drawDesk(paint, prop, context, tMs)
     case 'rig':
       return drawRig(paint, prop, context, tMs)
-    case 'bench':
-      return drawBench(paint, prop, context, tMs)
     case 'press':
       return drawPress(paint, prop, context, tMs)
     case 'gate':
