@@ -49,7 +49,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 | Layer                  | Technology                                  |
 | ---------------------- | ------------------------------------------- |
-| Framework              | Electron 42.x                               |
+| Framework              | Electron 44.x                               |
 | Language               | TypeScript 5.x (strict)                     |
 | UI                     | React 18.x + Zustand + Lucide React (icons) |
 | Terminal rendering     | xterm.js 5.x + xterm-addon-fit              |
@@ -75,7 +75,7 @@ Extension dependencies (not part of the core app): `@electric-sql/pglite`, `sql.
 
 ## Prerequisites
 
-- **Node.js 20 LTS or newer** (Node.js 24 confirmed working). Use [nvm](https://github.com/nvm-sh/nvm).
+- **Node.js 24.21.0**, the version in `.nvmrc` and the one Electron 44 ships. Use [nvm](https://github.com/nvm-sh/nvm) (`nvm use`).
 - **Python setuptools** — required by node-pty's native compilation. On macOS with Python 3.12+:
   ```bash
   pip3 install setuptools --break-system-packages

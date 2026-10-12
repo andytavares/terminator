@@ -57,7 +57,7 @@ npm install
 npm run dev
 ```
 
-**Prerequisites:** Node.js 20 LTS+, Python setuptools (`pip3 install setuptools --break-system-packages` on macOS with Python 3.12+), and `git` on your `PATH`. The `gh` CLI is optional but required for GitHub PR features.
+**Prerequisites:** Node.js 24.21.0 (`.nvmrc`), Python setuptools for packaging (`pip3 install setuptools --break-system-packages` on macOS with Python 3.12+), and `git` on your `PATH`. The `gh` CLI is optional but required for GitHub PR features.
 
 ---
 

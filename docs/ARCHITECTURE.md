@@ -1,6 +1,6 @@
 # Architecture: Terminator
 
-**Version**: 0.1.68 | **Updated**: 2026-06-22 | **Electron**: 42.4.1 (upgraded from 30.4.0 via node-pty 1.2.x NAPI migration — ADR-021 resolved)
+**Version**: 0.1.68 | **Updated**: 2026-06-22 | **Electron**: 44.7.0
 
 ---
 
