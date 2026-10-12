@@ -12,6 +12,12 @@ const mockNgrokIsInstalled = vi.hoisted(() => vi.fn(() => false))
 
 vi.mock('../../src/server/remote-server', () => ({
   createRemoteServer: mockCreateRemoteServer,
+  PortInUseError: class PortInUseError extends Error {
+    constructor(port: number) {
+      super(`Port ${port} is already in use.`)
+      this.name = 'PortInUseError'
+    }
+  },
 }))
 
 const mockNgrokStart = vi.hoisted(() => vi.fn().mockResolvedValue('https://example.ngrok.app'))
@@ -131,7 +137,7 @@ describe('remote-control extension index', () => {
     })
 
     it('on PortInUseError, does NOT set enabled=false (user intent preserved)', async () => {
-      const { PortInUseError } = await import('../../src/server/port-in-use-error')
+      const { PortInUseError } = await import('../../src/server/remote-server')
       const serverHandle = makeServerHandle(() => Promise.reject(new PortInUseError(7681)))
       const toggleHandler = await setupAndGetToggleHandler(serverHandle)
 

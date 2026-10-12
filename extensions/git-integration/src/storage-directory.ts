@@ -1,5 +1,5 @@
 import { mkdirSync } from 'node:fs'
-import type Store from 'electron-store'
+import Store from 'electron-store'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { moveFromUserData } from '@terminator/extension-sdk/node'
 
@@ -31,20 +31,13 @@ export function openStorageDirectory(api: ExtensionAPI): string {
   return folder
 }
 
-const opened = new Map<StoreName, Promise<Store<Record<string, unknown>>>>()
+const opened = new Map<StoreName, Store<Record<string, unknown>>>()
 
-/**
- * The named store in that directory, opened on first use. electron-store is
- * imported then, not at activation: it costs the extension host 17 MB.
- */
-export function namedStore<T = unknown>(name: StoreName): Promise<Store<Record<string, T>>> {
-  let store = opened.get(name)
-  if (!store) {
-    store = import('electron-store').then(
-      ({ default: ElectronStore }) =>
-        new ElectronStore<Record<string, unknown>>({ name, cwd: directory })
-    )
-    opened.set(name, store)
-  }
-  return store as Promise<Store<Record<string, T>>>
+/** The named store in that directory, opened on first use. */
+export function namedStore<T = unknown>(name: StoreName): Store<Record<string, T>> {
+  const existing = opened.get(name)
+  if (existing) return existing as Store<Record<string, T>>
+  const store = new Store<Record<string, unknown>>({ name, cwd: directory })
+  opened.set(name, store)
+  return store as Store<Record<string, T>>
 }

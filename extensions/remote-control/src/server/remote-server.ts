@@ -16,7 +16,6 @@ import { SessionStore } from './session-store.js'
 import { WsSubscriberManager } from './ws-subscriber-manager.js'
 import { ConnectedDeviceRegistry } from './connected-devices.js'
 import { EXTENSION_BASE_CSS } from '@terminator/extension-ui/extension-base-css'
-import { PortInUseError } from './port-in-use-error.js'
 
 interface RemoteServerDeps {
   getPasswordHash: () => string
@@ -46,6 +45,13 @@ export interface RemoteServerHandle {
   /** Who is connected, and a subscription to changes, for the view. */
   devices: ConnectedDeviceRegistry
   inject: FastifyInstance['inject']
+}
+
+export class PortInUseError extends Error {
+  constructor(port: number) {
+    super(`Port ${port} is already in use. Change the port in Settings.`)
+    this.name = 'PortInUseError'
+  }
 }
 
 function getRemoteRendererDir(appPath: string): string {
