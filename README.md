@@ -134,6 +134,7 @@ Then open the app normally. You only need to run this once.
 | `npm run lint`             | ESLint                                                                           |
 | `npm run lint:deps`        | syncpack: one exact version per dependency                                       |
 | `npm run lint:unused`      | knip: no unused files, exports or dependencies                                   |
+| `npm run lint:duplicates`  | jscpd: no copy-pasted code                                                       |
 | `npm run typecheck`        | TypeScript check of main, renderer, shared, packages and extensions (no emit)    |
 | `npm run format`           | Prettier format                                                                  |
 | `npm run format:check`     | Check formatting without writing files (CI)                                      |
@@ -223,6 +224,7 @@ The built-in extensions in `extensions/` are the working examples, and `tests/fi
 | Remote Control credentials                            | [ADR-100](docs/adr/100-remote-control-credentials.md)                |
 | No native terminal daemon                             | [ADR-101](docs/adr/101-no-terminal-daemon.md)                        |
 | Unused code is a CI gate (knip)                       | [ADR-102](docs/adr/102-unused-code-is-a-ci-gate.md)                  |
+| Duplicate code is a CI gate (jscpd)                   | [ADR-103](docs/adr/103-duplicate-code-is-a-ci-gate.md)               |
 
 ## Contributing
 

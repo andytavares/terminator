@@ -38,6 +38,10 @@ jobs:
       - name: Unused code
         run: npm run lint:unused
 
+      # Copy-pasted code in src, packages and extensions (.jscpd.json, ADR 103).
+      - name: Duplicate code
+        run: npm run lint:duplicates
+
       - name: Lint
         run: npm run lint
 
