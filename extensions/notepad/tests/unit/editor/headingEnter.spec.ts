@@ -6,9 +6,10 @@ import {
   headingTextStart,
   insertNewlineKeepingHeadingMarker,
 } from '../../../src/editor/headingEnter'
+import { parsedState } from '../../support/parsed-state'
 
 function makeState(doc: string, cursor: number, readOnly = false) {
-  return EditorState.create({
+  return parsedState({
     doc,
     selection: { anchor: cursor },
     extensions: [markdown({ extensions: [GFM] }), EditorState.readOnly.of(readOnly)],
@@ -123,7 +124,7 @@ describe('insertNewlineKeepingHeadingMarker', () => {
   })
 
   it('declines when there is a selection rather than a caret', () => {
-    const state = EditorState.create({
+    const state = parsedState({
       doc: '# Hello',
       selection: { anchor: 2, head: 5 },
       extensions: [markdown({ extensions: [GFM] })],

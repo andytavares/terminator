@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import type { Decoration } from '@codemirror/view'
 import { buildDecorations } from '../../../src/editor/livePreview'
+import { parsedState } from '../../support/parsed-state'
 
 // Live preview reveals the raw markdown of whatever line the caret is on, so
 // the construct stays editable. These cover that reveal for every construct
 // that implements it — the counterpart to the "rendered" assertions elsewhere.
 
 function makeState(doc: string) {
-  return EditorState.create({ doc, extensions: [markdown({ extensions: [GFM] })] })
+  return parsedState({ doc, extensions: [markdown({ extensions: [GFM] })] })
 }
 
 function countDecorations(doc: string, cursor: number): number {

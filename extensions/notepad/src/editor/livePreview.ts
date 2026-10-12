@@ -777,7 +777,9 @@ const livePreviewDecorations = StateField.define<DecorationSet>({
   },
   update(decos, tr) {
     const focusChanged = tr.effects.some((e) => e.is(setEditorFocused))
-    if (tr.docChanged || tr.selection || focusChanged) {
+    // The parser finishes in the background; what it reaches later is drawn then.
+    const parsed = syntaxTree(tr.state) !== syntaxTree(tr.startState)
+    if (tr.docChanged || tr.selection || focusChanged || parsed) {
       const focused = tr.state.field(editorFocusedField)
       return buildDecorations(tr.state, tr.state.selection.main, focused)
     }

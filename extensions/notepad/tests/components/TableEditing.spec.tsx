@@ -2,9 +2,10 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
+import { forceParsing } from '@codemirror/language'
 import { GFM } from '@lezer/markdown'
 import { cursorCharRight, cursorCharLeft } from '@codemirror/commands'
-import { livePreviewPlugin } from '../../src/editor/livePreview'
+import { livePreviewPlugin, TableWidget } from '../../src/editor/livePreview'
 
 // Exercises a real EditorView rather than buildDecorations alone, because the
 // reported bug was that the caret could not reach a rendered table by mouse or
@@ -20,7 +21,15 @@ afterEach(() => {
   view = null
 })
 
+/** A view whose document is parsed to the end, however busy the machine is. */
 function mountDoc(doc: string, cursor: number): EditorView {
+  const v = mountUnparsed(doc, cursor)
+  forceParsing(v, v.state.doc.length, 10_000)
+  return v
+}
+
+/** A view as the app opens one: parsed only as far as 20 ms reached. */
+function mountUnparsed(doc: string, cursor: number): EditorView {
   const parent = document.createElement('div')
   document.body.appendChild(parent)
   view = new EditorView({
@@ -48,9 +57,35 @@ function type(v: EditorView, text: string): void {
 
 const tableRendered = (v: EditorView) => v.dom.querySelector('.notepad-table') !== null
 
+function tableDecorated(v: EditorView): boolean {
+  let found = false
+  for (const source of v.state.facet(EditorView.decorations)) {
+    if (typeof source === 'function') continue
+    source.between(0, v.state.doc.length, (_from, _to, decoration) => {
+      if (decoration.spec.widget instanceof TableWidget) found = true
+    })
+  }
+  return found
+}
+
 describe('editing a rendered table', () => {
   it('renders the table while the caret is elsewhere', () => {
     expect(tableRendered(mount(0))).toBe(true)
+  })
+
+  // CodeMirror parses only the first 3000 characters, for at most 20 ms, when
+  // the state is created, and finishes in the background. A table it reaches
+  // later must still be drawn, without the operator having to move the caret.
+  // The table sits past the viewport jsdom gives the editor, so the
+  // decorations are read rather than the DOM.
+  it('renders a table the parser reaches after the editor opened', () => {
+    const filler = `${'word '.repeat(12)}\n`.repeat(100)
+    const v = mountUnparsed(`${filler}\n${TABLE}\n`, 0)
+    expect(tableDecorated(v)).toBe(false)
+
+    forceParsing(v, v.state.doc.length, 10_000)
+
+    expect(tableDecorated(v)).toBe(true)
   })
 
   it('clicking a body cell puts the caret in that cell', () => {

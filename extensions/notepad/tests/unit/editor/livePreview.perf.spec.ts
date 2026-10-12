@@ -16,12 +16,15 @@ describe('livePreview perf (SC-002)', () => {
 
     const state = EditorState.create({ doc, extensions: [markdown()] })
 
+    // CPU time, not wall time: a busy machine deschedules the test, and the
+    // budget is for the work buildDecorations does.
     const runs = 20
     const times: number[] = []
     for (let i = 0; i < runs; i++) {
-      const start = performance.now()
+      const start = process.cpuUsage()
       buildDecorations(state, { anchor: 0 })
-      times.push(performance.now() - start)
+      const used = process.cpuUsage(start)
+      times.push((used.user + used.system) / 1000)
     }
 
     times.sort((a, b) => a - b)
