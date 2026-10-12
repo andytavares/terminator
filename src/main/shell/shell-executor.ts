@@ -1,4 +1,4 @@
-import { execFile as execFileCb, type ExecFileException } from 'child_process'
+import { execFile as execFileCb, type ChildProcess, type ExecFileException } from 'child_process'
 import { loginShellPathReady } from './login-shell-path.js'
 import { relative, isAbsolute } from 'path'
 
@@ -14,6 +14,10 @@ export interface ShellExecInput {
   /** Added over the minimal environment every command gets. */
   env?: Record<string, string>
   encoding?: 'utf8' | 'buffer'
+  /** Written to the command's stdin, which is then closed. */
+  input?: string
+  /** Each chunk of stdout and stderr as it arrives, in text mode. */
+  onOutput?: (chunk: string) => void
 }
 
 export interface ShellExecOutput<Output extends string | Buffer = string> {
@@ -123,5 +127,13 @@ export async function execShell(input: ShellExecInput): Promise<ShellExecOutput<
     child.on('error', () => {
       // handled in callback
     })
+    if (input.onOutput) streamOutput(child, input.onOutput)
+    if (input.input !== undefined) child.stdin?.end(input.input)
   })
+}
+
+function streamOutput(child: ChildProcess, onOutput: (chunk: string) => void): void {
+  const forward = (chunk: Buffer | string) => onOutput(chunk.toString())
+  child.stdout?.on('data', forward)
+  child.stderr?.on('data', forward)
 }

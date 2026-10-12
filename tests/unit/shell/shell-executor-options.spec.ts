@@ -47,6 +47,28 @@ describe('execShell per-call options', () => {
     expect(result.stdout).toBe('  indented\n\n')
   })
 
+  it('writes the input to the command and closes its stdin', async () => {
+    fakeGh('cat')
+
+    const result = await execShell({ command: 'gh', args: [], cwd: scratch, input: '{"a":1}' })
+
+    expect(result.stdout).toBe('{"a":1}')
+  })
+
+  it('hands each chunk of output to onOutput as it arrives', async () => {
+    fakeGh(`printf 'one\\n'; printf 'two\\n' >&2`)
+    const chunks: string[] = []
+
+    await execShell({
+      command: 'gh',
+      args: [],
+      cwd: scratch,
+      onOutput: (chunk) => chunks.push(chunk),
+    })
+
+    expect(chunks.join('').split('\n').sort()).toEqual(['', 'one', 'two'])
+  })
+
   it('returns bytes when asked for a buffer', async () => {
     fakeGh(`printf '\\377\\000A'`)
 

@@ -42,6 +42,7 @@ import { sendToWindow } from '../safe-send.js'
 import { join } from 'path'
 
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
+import { createGithubApi } from '../github/github-api.js'
 import {
   notificationManager,
   setExtensionNotificationSettingReader,
@@ -427,6 +428,7 @@ export function createExtensionAPI(
         return execShell({ ...options, timeoutMs: options.timeoutMs ?? 10000 })
       }) as ExtensionAPI['shell']['exec'],
     },
+    github: createGithubApi((input) => execShell(input)),
     issues: {
       async connections(): Promise<TrackerConnection[]> {
         return listTrackerConnections()

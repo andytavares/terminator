@@ -15,6 +15,7 @@ import type {
   TransitionIntent,
 } from './issues'
 import type { BuiltInExtensionExports } from './extensions'
+import type { GithubAPI } from './github'
 
 export interface Disposable {
   dispose(): void
@@ -229,6 +230,8 @@ export interface ShellExecOptions {
   env?: Record<string, string>
   /** `'buffer'` returns stdout and stderr as bytes. Since 2.1.0. */
   encoding?: 'utf8' | 'buffer'
+  /** Each chunk of stdout and stderr as it arrives, in text mode. Since 2.1.0. */
+  onOutput?: (chunk: string) => void
 }
 
 /** Output is exactly what the command wrote: text is never trimmed. */
@@ -295,6 +298,8 @@ export interface ExtensionAPI {
     exec(options: ShellExecOptions & { encoding: 'buffer' }): Promise<ShellExecResult<Uint8Array>>
     exec(options: ShellExecOptions): Promise<ShellExecResult<string>>
   }
+  /** GitHub pull requests and API through the gh CLI the core runs. Since 2.1.0. */
+  github: GithubAPI
   /**
    * Issue trackers, through the application's single connection (v2.2.0). An
    * extension never holds a tracker credential. Three writes, and only three:
