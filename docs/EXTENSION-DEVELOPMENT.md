@@ -1,48 +1,62 @@
 # Extension Development Guide
 
-Extensions let you add functionality to Terminator without touching its core code. They contribute to the application through the `ExtensionAPI` — a stable, versioned interface. This guide covers everything you need to write, test, and distribute an extension.
+An extension adds a feature to Terminator without touching the core. It has two halves: a **backend** that runs in the extension host process and talks to the core through the `ExtensionAPI` object, and an optional **view**, a web page the core shows in its own `WebContentsView`. The core and an extension meet only through the Extension SDK (Constitution II, [ADR 094](adr/094-extensions-follow-the-vs-code-model.md)).
 
-**Current API version**: SDK 4.0.0 (backends run in the extension host, a separate process, and every member crosses it — see [Where your backend runs](#where-your-backend-runs-sdk-400); 2.8.0: `api.settings.isBranchExcluded` matches a branch against Settings → Git → Branch Exclude Patterns — see [Excluded branches](#excluded-branches-v280); 2.7.0: `api.commands.register` takes an optional `args` schema and the handler an `args` argument; extension views gain `electronAPI.extension.runCommand` and `hasCommand` — see [Commands that take arguments](#commands-that-take-arguments-v270), [ADR-083](adr/083-extension-commands-take-arguments.md); 2.6.0: `pty.closeTerminalTab` closes a tab `openTerminal` opened — see [`closeTerminalTab`](#closeterminaltab--closing-a-tab-you-opened-v260); 2.5.0: `api.issues` gains `teams`, `create` and `supportsCreate`; `workspace.listProjects` reports `worktreePath` and `workspace.deleteProject` tells the sidebar — see [Creating an issue](#creating-an-issue-v250); 2.4.0: `api.commands` gains `mnemonic`, `requires` and a `CommandContext` handler argument, plus `api.commands.setEnabled` and `api.window.showSelf`; `api.keyboard.register` is removed — see [Deleted: `api.keyboard.register`](#deleted-apikeyboardregister-removed-in-v240); an extension can own a supervised agent run — `workspace.addProject` and `pty.openTerminal`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
+The API is declared once, in `packages/extension-sdk/types/api.d.ts`. The core implements that declaration in `src/main/extensions/api.ts`, and the compiler checks the two agree. The SDK's current version is the `version` field of `packages/extension-sdk/package.json`; `packages/extension-sdk/CHANGELOG.md` lists what changed in each version and how to migrate.
+
+The five built-in extensions in `extensions/` (Foundry, git-integration, notepad, remote-control, task-vault) follow every rule in this guide and are the working examples.
 
 ---
 
-## Quick Start: Scaffold a New Extension
-
-The fastest way to start is the scaffolding CLI. It generates a complete, working hello-world extension in seconds:
+## Quick start
 
 ```bash
 npm run create-extension -- my-extension
+npm run create-extension -- my-extension --id com.acme.my-extension --dir /path/to/my-extension
 ```
 
-This creates `extensions/my-extension/` with a `manifest.json` and a `src/index.ts` that demonstrates every API surface. Run `npm run dev` and your extension loads automatically.
+`scripts/create-extension.cjs` writes `extensions/my-extension/` (or `--dir`) with a `package.json`, a `manifest.json` whose `main` is `src/index.js`, and a plain-JavaScript `src/index.js` that registers a setting, a command and a session listener. It does not create a view. Its commented-out examples show the rest of the API, including a channel registered as a spec with a zod schema.
 
-Options:
+| Argument       | Description                                                                           |
+| -------------- | ------------------------------------------------------------------------------------- |
+| `<name>`       | Kebab-case name. Becomes the directory name.                                          |
+| `--id <id>`    | Reverse-domain id, such as `com.acme.my-extension`. Defaults to `com.example.<name>`. |
+| `--dir <path>` | Output directory. Defaults to `extensions/<name>`.                                    |
+| `--help`       | Print usage and exit.                                                                 |
 
-```bash
-npm run create-extension -- <name> [--id <reverse-domain-id>] [--dir <output-dir>]
+Exit codes: `0` success, `1` bad arguments, `2` the directory already exists, `3` a file could not be written.
 
-# Examples:
-npm run create-extension -- git-tools
-npm run create-extension -- git-tools --id com.acme.git-tools
-npm run create-extension -- git-tools --dir /path/to/my/extensions/git-tools
-```
-
-See [Scaffolding CLI Reference](#scaffolding-cli-reference) at the end of this guide for full options.
+Run `npm install` at the repository root so the new workspace is linked, then `npm run dev`. Every directory under `extensions/` that holds a `manifest.json` is registered and activated at startup.
 
 ---
 
-## Extension Structure
+## Anatomy of an extension
 
-An extension is a directory with a manifest and an entry point:
+A built-in extension, such as `extensions/task-vault/`, looks like this:
 
 ```
-my-extension/
-├── manifest.json     # Required: extension metadata
-└── src/
-    └── index.ts      # Required: activate() / deactivate() entry point
+task-vault/
+├── manifest.json            id, entry points, the surfaces it contributes
+├── package.json             its own npm dependencies and the build:renderer script
+├── tsconfig.json            extends ../../tsconfig.extension.json (typecheck only)
+├── src/
+│   ├── index.ts             backend: activate(api) / deactivate()
+│   ├── index.js             esbuild output of index.ts (gitignored, never edited)
+│   └── renderer/
+│       ├── main.tsx         view entry: mountExtension(<App />)
+│       └── App.tsx          routes on the ?view= parameter
+├── index.html               view document with <div id="app">
+├── vite.renderer.config.ts  builds the view into dist/
+└── dist/index.html          the built view, named by manifest.renderer
 ```
 
-### Manifest (`manifest.json`)
+`npm run build:extensions` (`scripts/build-extensions.cjs`) builds both halves of every extension: esbuild bundles `src/index.ts` into the file the manifest's `main` names (CommonJS, `platform: 'node'`), and when `vite.renderer.config.ts` exists it runs the extension's own `npm run build:renderer`. `npm run dev` and `npm run build` run it first. The compiled `src/index.js` is a build artifact: it is gitignored and never edited (Constitution X).
+
+---
+
+## The manifest
+
+`manifest.json` is validated by `ExtensionManifestSchema` (`src/shared/schemas/extension.schema.ts`) when the extension is registered.
 
 ```json
 {
@@ -50,44 +64,61 @@ my-extension/
   "name": "My Extension",
   "version": "1.0.0",
   "description": "A short description of what this extension does.",
-  "main": "dist/main.cjs",
+  "main": "src/index.js",
   "renderer": "dist/index.html",
   "minAppVersion": "0.1.0",
   "contributes": {
-    "globalTab": {
-      "label": "My Extension",
-      "icon": "wrench",
-      "view": "main"
-    }
+    "globalTab": { "label": "My Extension", "icon": "wrench", "view": "main" },
+    "quickActions": { "group": { "mnemonic": "m", "label": "My Extension" } }
   }
 }
 ```
 
-| Field           | Required | Description                                                               |
-| --------------- | -------- | ------------------------------------------------------------------------- |
-| `id`            | Yes      | Reverse-domain identifier, globally unique. Example: `com.acme.git-tools` |
-| `name`          | Yes      | Human-readable name shown in the Extensions panel                         |
-| `version`       | Yes      | Semver string (`X.Y.Z`)                                                   |
-| `description`   | Yes      | Shown in the Extensions panel                                             |
-| `main`          | Yes      | Relative path to the compiled main-process entry (CommonJS)               |
-| `renderer`      | No       | Relative path to the webview HTML entry (`dist/index.html`)               |
-| `minAppVersion` | Yes      | Minimum Terminator version required (semver, e.g. `0.1.0`)                |
-| `contributes`   | No       | UI surface declarations (see [Renderer UI](#renderer-ui) section)         |
+| Field                   | Required | Description                                                                                                        |
+| ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `id`                    | Yes      | Reverse-domain id (`^[a-z0-9]+(\.[a-z0-9-]+)+$`), such as `com.acme.git-tools`                                     |
+| `name`                  | Yes      | Shown in Settings → Extensions                                                                                     |
+| `version`               | Yes      | `X.Y.Z`                                                                                                            |
+| `description`           | Yes      | Shown in Settings → Extensions                                                                                     |
+| `main`                  | Yes      | The backend entry, CommonJS, relative to the extension directory                                                   |
+| `renderer`              | No       | The view document, relative to the extension directory. Without it the extension has no view.                      |
+| `minAppVersion`         | Yes      | The oldest app version it runs on. An older app marks the extension `error` and does not load it.                  |
+| `contributes`           | No       | The surfaces and commands below                                                                                    |
+| `extensionDependencies` | No       | Ids of extensions whose `activate` exports this one reads (see [Another extension's API](#another-extensions-api)) |
 
-### Entry Point
+### `contributes`
 
-The entry point must export an `activate` function and may export `deactivate`:
+Each surface shows the extension's view, with its `view` string passed as `?view=VALUE`, so one `index.html` serves every surface. `src/renderer/extensions/loader.ts` turns these entries into the core's tabs and panels; an extension cannot register a surface any other way.
+
+| Key            | Fields                                                           | Where it appears                                                                           | Default `view` |
+| -------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------- |
+| `globalTab`    | `label`, `icon?`, `view?`                                        | An icon in the sidebar's app band; the view fills the main area                            | `main`         |
+| `workspaceTab` | `label`, `icon?`, `view?`                                        | A tab scoped to the active workspace                                                       | `workspace`    |
+| `projectTab`   | `label`, `view?`                                                 | A tab scoped to the selected project                                                       | `project`      |
+| `sidebarPanel` | `label`, `icon?`, `defaultOpen?`, `view?`                        | A panel beside the terminal                                                                | `sidebar`      |
+| `windowViews`  | `[{ id, view }]`                                                 | Views `api.window.openAuxiliary(id)` opens in their own window                             | —              |
+| `commands`     | `[{ id, label, description?, shortcut?, mnemonic?, requires? }]` | Reserves the command's row in the Quick Actions panel (see [`api.commands`](#apicommands)) | —              |
+| `quickActions` | `{ group: { mnemonic?, label } }`                                | Your group's letter and label in the Quick Actions panel                                   | —              |
+
+`icon` takes one of the names `iconFromName` knows (`src/renderer/extensions/icon-from-name.ts`), such as `puzzle`, `wrench`, `terminal`, `git-branch`, `database`, `list` or `calendar`.
+
+**Quick Actions letters.** Core letters are reserved for the core. Between extensions, load order wins a contested letter; the loser gets the first free letter of its own label and a warning is logged (`allocateExtensionGroups`, `src/renderer/quick-actions/groups.ts`).
+
+---
+
+## The backend
+
+The `main` entry exports `activate` and may export `deactivate`:
 
 ```typescript
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import type { Disposable, ExtensionAPI } from '@terminator/extension-sdk'
 
-const disposables: Array<{ dispose(): void }> = []
+const disposables: Disposable[] = []
 
 export function activate(api: ExtensionAPI): void {
-  // Register your contributions here
   disposables.push(
     api.commands.register({ id: 'hello', label: 'Say hello' }, () =>
-      api.notifications.showToast('info', 'Hello from My Extension!', 'hello')
+      api.notifications.showToast('info', 'Hello from My Extension', 'hello')
     )
   )
 }
@@ -98,29 +129,18 @@ export function deactivate(): void {
 }
 ```
 
-If `activate` throws, the extension transitions to `status: 'error'` and the app remains stable.
+`activate` may be `async`. If it throws or rejects, the extension's status becomes `error` with the message, and nothing else is affected. What `activate` returns is the extension's API for other extensions.
 
-### Where your backend runs _(SDK 4.0.0)_
+### Where your backend runs
 
-Your backend runs in the **extension host**, one Electron `utilityProcess` shared by every
-extension backend (ADR 094), not in the main process. The API reaches the core over a
-`MessagePort`, which shapes it:
+Every backend runs in the **extension host**, one Electron [`utilityProcess`](https://www.electronjs.org/docs/latest/api/utility-process) shared by all extensions and started by `src/main/extensions/host/host-process.ts`. It is never the main process. The API reaches the core over a `MessagePort`, which shapes it:
 
-- A value the core holds is a promise: `settings.isBranchExcluded`, `globalShortcut.register`,
-  `pty.spawnSession` / `getSession` / `setWorkspace` / `listSessions`, `pty.openTerminal`,
-  `workspace.addProject`, `ipc.isRemoteAccessible`, `dialog.*`.
-- `settings.get`, `workspace.list` / `listProjects` and `issues.supportsTransitions` /
-  `supportsCreate` stay synchronous: they read a snapshot the core pushes whenever it changes.
-- A callback you pass (a command handler, a notification's `onClick`, `pty.onData`) stays in the
-  extension host; the core calls it by id. Registrations still return a `Disposable` at once.
-- `pty.onData` delivers output in batches, at most one per frame, every batch before `onExit`.
-- `api.db` is the extension host's own connection, so `transaction(fn)` runs `fn` right here.
-- Values you pass and return must survive structured clone: plain data, no functions or class
-  instances (an `Error` arrives with its `name` and `message`).
-- `electron` is not available: use `api.paths` (`app`, `userData`) for `app.getPath`,
-  `api.dialog` for file dialogs, `api.window.raise()` / `broadcast()` for windows. A store such as
-  electron-store needs `cwd: api.paths.userData`. Node's own modules, `net` and `child_process`
-  work: Remote Control's HTTP server runs here.
+- A value the core holds is a promise: `settings.isBranchExcluded`, `globalShortcut.register`, `pty.spawnSession` / `openTerminal` / `getSession` / `setWorkspace` / `listSessions`, `workspace.addProject`, `ipc.isRemoteAccessible`, `dialog.*`, and every `issues` and `github` call.
+- `settings.get`, `workspace.list` / `listProjects` and `issues.supportsTransitions` / `supportsCreate` are synchronous: they read a snapshot the core pushes on every change.
+- A callback you pass (a command handler, a notification's `onClick`, `pty.onData`) stays in the extension host, and the core calls it by id. Registrations still return a `Disposable` at once.
+- Values you pass and return must survive structured clone: plain data, no functions or class instances. An `Error` arrives with its `name` and `message`.
+- `api.db` is the extension host's own connection to the app database, so `transaction(fn)` runs `fn` in your process.
+- `electron` is not available. Use `api.paths` for `app.getAppPath()` and `app.getPath('userData')`, `api.dialog` for file dialogs, and `api.window` for windows. A store such as electron-store needs `cwd: api.paths.userData`. Node's own modules work: Remote Control's HTTP server runs here.
 
 If the extension host crashes, the app stays up. It is restarted once and every backend activated
 again in the same order as at startup: an extension after those in its `extensionDependencies`, so
@@ -129,32 +149,26 @@ provider does not come back, its dependants fail with it. If the host crashes ag
 extensions show as `error` in Settings → Extensions, with the reason on hover, until the next
 launch.
 
-### What an extension may import _(SDK 2.0.0)_
+---
 
-An extension imports only `@terminator/extension-sdk`, the design system `@terminator/extension-ui`,
-npm packages declared in its own `package.json`, and its own files (Constitution II, ADR 094). Core
-source (`src/**`), another extension and any other workspace package are off limits, and
-`npm run lint` fails on an import that leaves the extension's directory or names another
-`@terminator/*` package.
+## What an extension may import
 
-The SDK has three entries:
+An extension imports only `@terminator/extension-sdk`, the design system `@terminator/extension-ui`, npm packages declared in its own `package.json`, and its own files. Core source (`src/**`), another extension and any other workspace package are off limits. `eslint.config.mjs` enforces it: `npm run lint` fails on a relative import that leaves the extension's directory or on any other `@terminator/*` package.
 
-| Entry                                | What it holds                                                                                                                                                   |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@terminator/extension-sdk`          | The `ExtensionAPI` declaration the core implements, `ExtensionDB`, the issue-tracker types, and `defineChannel` / `ChannelSpec` (the shape core's channels use) |
-| `@terminator/extension-sdk/renderer` | `invoke<T>(channel, payload = {})` for your own channels, and `mountExtension(<App />)`, which renders a view into `#app`                                       |
-| `@terminator/extension-sdk/node`     | `writeJsonAtomic(path, value)`: indented JSON through a temporary file and a rename, so a reader never sees half a file                                         |
+| Entry                                      | What it holds                                                                                                                                    |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@terminator/extension-sdk`                | `ExtensionAPI` and its types, `ExtensionDB`, the issue-tracker and GitHub types, `defineChannel`, `dispatchChannel`, `noPayload`, `TaskVaultAPI` |
+| `@terminator/extension-sdk/renderer`       | `invoke<T>(channel, payload = {})` for your own channels, and `mountExtension(<App />)`, which renders into `#app`                               |
+| `@terminator/extension-sdk/node`           | `writeJsonAtomic(path, value)`: JSON through a temporary file and a rename, so a reader never sees half a file                                   |
+| `@terminator/extension-sdk/types/renderer` | The `window.electronAPI` a view receives. `tsconfig.extension.json` loads it.                                                                    |
 
-`window.electronAPI` in a view is typed by `@terminator/extension-sdk/types/renderer`, which
-`tsconfig.extension.json` loads.
+### Another extension's API
 
-**Another extension** _(SDK 3.0.0)_. An extension's API is what its `activate` returns. A consumer
-lists the provider in its manifest's `extensionDependencies` and reads that returned object with
-`api.extensions.get(id)`, as VS Code's `extensionDependencies` and `exports` work (ADR 094):
+An extension's API is the value its `activate` returns. A consumer lists the provider in its manifest's `extensionDependencies` and reads that object with `api.extensions.get(id)`, the way VS Code's [`extensionDependencies`](https://code.visualstudio.com/api/references/extension-manifest) and `exports` work:
 
 ```jsonc
 // manifest.json
-{ "id": "com.example.planner", "extensionDependencies": ["terminator.task-vault"], ... }
+{ "id": "com.example.planner", "extensionDependencies": ["terminator.task-vault"] }
 ```
 
 ```typescript
@@ -164,153 +178,142 @@ export function activate(api: ExtensionAPI): void {
 }
 ```
 
-The host activates a provider before the extensions that depend on it. A dependency that is not
-installed, failed to activate, is disabled, or is part of a dependency cycle fails the consumer's
-activation with a message naming it. `get` throws for an id the manifest does not declare. The
-built-in providers' APIs are declared in the SDK (`types/extensions.d.ts`: `TaskVaultAPI`), so
-neither side imports the other's source; any other provider is read as `get<T>(id)`. A provider
-reloaded while its dependants run is not handed to them again: reload the dependants too.
+The host activates a provider before the extensions that depend on it. A dependency that is not installed, is disabled, failed to activate, or is part of a cycle fails the consumer's activation with a message naming it, and `get` throws for an id the manifest does not declare (`src/main/extensions/extension-host.ts`). The built-in providers' APIs are declared in the SDK (`types/extensions.d.ts`), so neither side imports the other; any other provider is read as `get<T>(id)`. A provider reloaded while its dependants run is not handed to them again: reload the dependants too.
 
-### Extension Dependencies (`package.json`)
+### Dependencies
 
-If your extension needs npm packages that aren't part of Terminator's core, declare them in an optional `package.json` alongside `manifest.json`. Extensions are registered as npm workspaces so their dependencies are hoisted automatically:
-
-```
-my-extension/
-├── manifest.json
-├── package.json     # Optional: extension-specific npm dependencies
-└── src/
-    └── renderer.tsx
-```
+Declare every npm package the extension needs in its own `package.json`. `extensions/*` are npm workspaces, so `npm install` at the root hoists them. Versions are exact and each package has one version across the repository (Constitution IV, [ADR 097](adr/097-one-version-per-dependency.md)); `npm run lint:deps` (syncpack) checks it.
 
 ```json
 {
   "name": "@terminator/extension-my-extension",
   "version": "0.1.0",
   "private": true,
+  "scripts": { "build:renderer": "vite build --config vite.renderer.config.ts" },
   "dependencies": {
-    "some-library": "^1.0.0"
+    "@terminator/extension-sdk": "4.0.0",
+    "@terminator/extension-ui": "1.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "3.23.8"
   }
 }
 ```
 
-Run `npm install` from the repo root after adding a new `package.json`. Core dependencies (React, Zustand, Zod, etc.) are provided by the host app — do not redeclare them.
+The workspace package versions shown are the ones in `packages/*/package.json` today; copy them from there. Never add an extension-only package to the root `package.json`.
 
 ---
 
-## ExtensionAPI Reference
+## The view
 
-The `api` object passed to `activate` is the sole interface between your extension and the host application. **Do not import from `src/main/`, `src/renderer/`, or `src/shared/` directly.**
+A view is an ordinary web page. `ExtensionViewHost` (`src/main/extensions/extension-view-host.ts`) loads it into a `WebContentsView` placed over the area the core reserves for the surface:
 
-### `api.settings` — Register and Read Settings
+- The URL is `ext://<extension id>/<manifest.renderer>?view=<view>&repoRoot=<path>`. The `ext://` protocol, registered in `src/main/index.ts`, serves only files inside the extension's directory, with `Cache-Control: no-store`.
+- The view runs with `contextIsolation: true` and `nodeIntegration: false`, in the `ext-views` session partition, with the core's webview preload (`src/main/preload-webview.ts`). That preload gives the page `window.electronAPI`, typed by `@terminator/extension-sdk/types/renderer`.
+- On every load the host injects the design system's stylesheet (tokens, icon scale, control resets) and stamps `data-theme` on `<html>`.
+- The view is created the first time its surface is shown, after the extension's backend has activated (`ExtensionHost.whenActivated`), so it never calls a channel that is not registered yet.
+- Reloading an extension from Settings → Extensions sends `extension:renderer-reload`, and the core remounts its views. The app does not need rebuilding.
 
-Register a settings section that appears in the Global and Workspace settings panels. Settings declared as `workspaceScoped: true` can be overridden per workspace.
+### Setting up a view
+
+`src/renderer/main.tsx` mounts the app and imports the fonts once:
+
+```tsx
+import React from 'react'
+import { mountExtension } from '@terminator/extension-sdk/renderer'
+import '@terminator/extension-ui/fonts'
+import { App } from './App'
+
+mountExtension(<App />)
+```
+
+`src/renderer/App.tsx` routes on the surface's `view`:
+
+```tsx
+export function App(): JSX.Element {
+  const view = new URLSearchParams(window.location.search).get('view')
+  return view === 'sidebar' ? <Sidebar /> : <Main />
+}
+```
+
+`index.html`:
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>My Extension</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/renderer/main.tsx"></script>
+  </body>
+</html>
+```
+
+`vite.renderer.config.ts`:
 
 ```typescript
-const disposable = api.settings.register({
-  label: 'My Extension Settings',
-  properties: {
-    'myext.enabled': {
-      type: 'boolean',
-      label: 'Enable feature',
-      default: true,
-      workspaceScoped: true, // Can be overridden per workspace
-    },
-    'myext.apiUrl': {
-      type: 'string',
-      label: 'API URL',
-      description: 'The endpoint to call',
-      default: 'https://example.com',
-    },
-    'myext.timeout': {
-      type: 'number',
-      label: 'Timeout (ms)',
-      default: 5000,
-      min: 100,
-      max: 30000,
-    },
-    'myext.mode': {
-      type: 'enum',
-      label: 'Mode',
-      default: 'fast',
-      options: ['fast', 'safe', 'verbose'],
-    },
+import { resolve } from 'path'
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  root: resolve(__dirname),
+  base: './',
+  plugins: [react()],
+  build: {
+    outDir: resolve(__dirname, 'dist'),
+    emptyOutDir: true,
+    rollupOptions: { input: resolve(__dirname, 'index.html') },
   },
 })
-
-// Read a value (workspace setting takes precedence when in a workspace context)
-const url = api.settings.get<string>('myext.apiUrl')
 ```
 
-**Naming**: prefix all setting keys with your extension ID to avoid collisions. The host enforces this at registration time.
+### Talking to your backend
 
-#### Excluded branches _(v2.8.0)_
-
-`api.settings.isBranchExcluded(branch, repoPath?)` says whether a branch matches Settings → Git → Branch Exclude Patterns. The patterns come from the workspace that owns `repoPath` when it has its own, and from the global list otherwise. `*` matches anything, slashes included. The core owns the patterns and the matching, so a list your extension shows hides the same branches the core's pickers do.
+Call your own channels with `invoke` and listen for what your backend broadcasts with `extensionBridge.on`:
 
 ```typescript
-// A promise since 4.0.0: ask for every candidate, then filter.
-const excluded = await Promise.all(
-  pulls.map((pr) => api.settings.isBranchExcluded(pr.headRefName, repoRoot))
-)
-const visible = pulls.filter((_, i) => !excluded[i])
-```
+import { invoke } from '@terminator/extension-sdk/renderer'
 
-The Git extension uses this to leave pull requests opened from an excluded branch out of its review lists.
+const result = await invoke<{ items: Item[] }>('my-ext:list', { limit: 20 })
 
----
-
-### `api.topBar` — Project View Menu Items _(v1.1.0)_
-
-Register a menu item in the top bar of the project view.
-
-```typescript
-const disposable = api.topBar.registerMenuItem({
-  id: 'git-view-toggle',
-  label: 'Git',
-  tooltip: 'Open Git view',
-  onClick: () => openGitView(),
-})
-```
-
----
-
-### `api.commands` — Quick Actions Commands _(mnemonic, requires and ctx handler since v2.4.0)_
-
-Register a command so it appears in the core quick-actions panel (`⌘P`). The handler receives a `CommandContext` — core-owned focus data, passed outbound — the focus at the moment the action runs:
-
-```typescript
-const disposable = api.commands.register(
-  {
-    id: 'push',
-    label: 'Push',
-    mnemonic: 'p', // one character, shown in the quick-actions panel
-    requires: 'repo', // 'repo' | 'session' — core dims the action with a stock
-    // reason when the focused context lacks this
-  },
-  (ctx: { projectId: string | null; sessionId: string | null; repoRoot: string | null }) => {
-    // ctx.repoRoot is guaranteed non-null here because requires: 'repo' dims
-    // the action otherwise
-  }
+useEffect(
+  () =>
+    window.electronAPI.extensionBridge.on('my-ext:changed', (data) => {
+      setItems((data as { items: Item[] }).items)
+    }),
+  []
 )
 ```
 
-#### Commands that take arguments _(v2.7.0)_
+The backend side is [`api.ipc.registerHandler`](#apiipc) and [`api.window.broadcast`](#apiwindow).
 
-A command may declare a Zod schema for `args`. Another extension's view runs it by full id (`<extensionId>.command.<id>`); core validates the args before the handler runs. A command with no `args` schema never receives any, and is the only kind listed in quick actions.
+### Workspace context
+
+A view reads the repository it was opened for from the URL, and follows changes through `workspace:changed`, which the host also sends once when the view loads:
 
 ```typescript
-// Provider (git-integration)
-api.commands.register(
-  {
-    id: 'review-pull-request',
-    label: 'Review pull request',
-    args: z.object({ repoRoot: z.string().min(1), number: z.number().int().positive() }),
-  },
-  (ctx, args) => openReview(args.repoRoot, args.number)
-)
+const initial = new URLSearchParams(window.location.search).get('repoRoot')
 
-// Caller, in any extension view
+useEffect(
+  () =>
+    window.electronAPI.extensionBridge.on('workspace:changed', (data) => {
+      setRepoRoot((data as { repoRoot?: string | null }).repoRoot ?? null)
+    }),
+  []
+)
+```
+
+`window.electronAPI.workspace.getActive()` answers what the operator has focused in the main window.
+
+### Running another extension's command
+
+A view can run a command another extension registered with an `args` schema ([ADR 083](adr/083-extension-commands-take-arguments.md)), by its full id `<extensionId>.command.<id>`:
+
+```typescript
 const key = 'terminator.git-integration.command.review-pull-request'
 const result = await window.electronAPI.extension.runCommand(key, { repoRoot, number: 42 })
 if (!result.ok && result.reason === 'not-registered') {
@@ -321,200 +324,19 @@ await window.electronAPI.extension.hasCommand(key) // boolean
 
 `runCommand` resolves `{ ok: true }` or `{ ok: false, reason }`; `reason` is `'not-registered'`, `'invalid-args: …'` or `'failed: …'`. It is not reachable over the remote bridge.
 
----
+### Keys the core handles in your view
 
-### `api.window.showSelf` — Bring Your Surface Forward _(v2.4.0)_
-
-Asks core to bring forward whichever surface your extension registered for `view` (global tab, workspace tab, project tab, or sidebar panel) and focus it — the same path core's own generated "Open `<surface>`" quick actions use.
-
-```typescript
-api.window.showSelf() // your 'main' view
-api.window.showSelf('sidebar') // a specific view param
-```
+- **`⌘P` / `Ctrl+P`** opens the core's Quick Actions panel even while focus is in your view: the host watches `before-input-event` on every view (`isQuickActionsOpenShortcut`).
+- **`Esc` twice within 500 ms** leaves your extension and returns the operator to their terminal ([ADR 026](adr/026-double-escape-extension-exit.md)). The listener in the webview preload is passive and bubble-phase, so your own single-`Esc` handlers run as normal. It stands down inside a text field and while a dialog is open; `Dialog` from the design system reports open dialogs over `electronAPI.ui.setModalDepth`, and a modal you write yourself must call it too. Do not stop `Esc` propagation at the window level, or the gesture stops working in your view.
 
 ---
 
-### `contributes.quickActions.group` — Your Group in the Quick-Actions Panel _(v2.4.0)_
+## The design system — `@terminator/extension-ui`
 
-Declare a mnemonic and label for your extension's top-level group in the quick-actions panel (`manifest.json`):
-
-```json
-{
-  "contributes": {
-    "quickActions": { "group": { "mnemonic": "g", "label": "Git" } }
-  }
-}
-```
-
-Core letters (`t s w x h o a b , /`) are reserved and cannot be claimed. Between extensions, load order wins a contested letter; the loser falls back to the first free letter of its own label, and a warning is logged.
-
----
-
-### `Deleted`: `api.keyboard.register` _(removed in v2.4.0)_
-
-`api.keyboard.register` stored a handler nothing ever dispatched — no core surface called it, and no extension used it. To bind a key, add a View-menu item with an `accelerator` through `api.nativeMenu.addViewMenuItem` (fires while Terminator is focused) or use `api.globalShortcut.register` (fires from any app). Register the same action with `api.commands.register` so it also appears in the quick-actions panel.
-
-`shortcut` on a command is a display hint (e.g. `'⌘⇧N'`) shown beside the action in the panel. It does not bind anything.
-
-#### `Esc` and the exit gesture
-
-Your extension keeps `Esc` for its own dismissals — closing a dropdown, cancelling an inline edit, dismissing a dialog. Nothing is intercepted, and no `preventDefault()` call is required or inspected.
-
-Terminator layers one gesture on top: **two `Esc` presses within 500 ms** exit the extension and return the user to their terminal. The listener that detects it lives in the core-owned webview preload, is bubble-phase, and is passive — your handlers still see both presses and run normally. A sidebar panel closes in place; any full-screen surface (global, workspace, or project tab) closes and reveals the terminal.
-
-You get this for free. Do not implement it yourself, and do not swallow `Esc` at the window level (`stopPropagation` on a `window` capture listener would suppress the gesture inside your panel). See [ADR-026](adr/026-double-escape-extension-exit.md).
-
----
-
-### Deleted: members no extension called
-
-These members were declared and implemented but no extension ever called them, so they were deleted rather than kept alive by their own tests:
-
-| Removed                                                                         | Use instead                                                         |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `api.app.version`                                                               | nothing needed; `manifest.minAppVersion` gates compatibility        |
-| `api.sidebar.registerItem`, `registerPanel`, `registerGlobalTab`, `togglePanel` | the manifest's `contributes.sidebarPanel` / `contributes.globalTab` |
-| `api.contextMenu.registerItem`                                                  | `api.commands.register`                                             |
-| `api.ui.toast`, `api.ui.layers`                                                 | `api.notifications.showToast`; `--tm-layer-*` tokens in CSS         |
-| `api.fs.watch`                                                                  | none                                                                |
-| `api.commands.setEnabled`                                                       | `requires` on the command                                           |
-| `api.settings.resolveWorktreeBaseDir`                                           | none                                                                |
-| `api.workspace.onDelete`, `onProjectDelete`                                     | none                                                                |
-| `api.issues.linkFor`, `onLinkChange`                                            | none                                                                |
-| `api.pty.spawn`, `attachOnData`, `attachOnExit`                                 | `spawnSession` with `onData` and `onExit`                           |
-
----
-
-### `api.terminal` — Terminal Session Events
-
-Subscribe to terminal session lifecycle events.
-
-```typescript
-const onCreate = api.terminal.onSessionCreate((session) => {
-  // session: { id, projectId, tabTitle, type: 'human' | 'agent' }
-})
-
-const onClose = api.terminal.onSessionClose((sessionId) => {
-  // sessionId: string
-})
-```
-
----
-
-### `api.shell` — Sandboxed Shell Execution _(v1.1.0)_
-
-Run `git` or `gh` commands; the core runs them in the main process. Execution is sandboxed to the current project directory.
-
-```typescript
-const result = await api.shell.exec({
-  command: 'git', // 'git' or 'gh' only
-  args: ['status', '--porcelain=v1', '-z'],
-  cwd: projectRoot, // Must be within the project root
-  timeoutMs: 5000, // Optional, default: 10000
-})
-
-if (result.exitCode !== 0) {
-  api.notifications.showToast('error', `git status failed: ${result.stderr}`)
-  return
-}
-// result.stdout contains the porcelain output
-```
-
-A command that outlives `timeoutMs` is killed and resolves with `timedOut: true` and a non-zero `exitCode` (124, as `timeout(1)`), so an `exitCode !== 0` check also catches timeouts. The same holds for a command ended by a signal.
-
-Per-call options _(SDK 3.0.0)_:
-
-| Option               | What it does                                                                                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `maxBuffer`          | Most bytes kept per stream (default 1 MiB). Past it the command is stopped: `exceededMaxBuffer: true` and a non-zero `exitCode`. |
-| `env`                | Added to the command's environment, over the minimal one every command gets (PATH, HOME, git and gh credentials).                |
-| `encoding: 'buffer'` | `stdout` and `stderr` come back as bytes.                                                                                        |
-| `onOutput`           | Called with each chunk of stdout and stderr as it arrives, for a long command such as a commit whose hooks print as they run.    |
-
-Output is never trimmed: `stdout` is exactly what the command wrote, which file content needs for its line numbers.
-
-**Security**: `command` must be `'git'` or `'gh'`. `cwd` must be within the workspace folder. Arguments are passed directly to the OS — no shell expansion.
-
-### `api.github` — Pull Requests through gh _(SDK 3.0.0)_
-
-The pull request verbs, run by the core over the `gh` CLI, as `api.issues` holds the tracker verbs. Each takes a `GithubTarget`: the checkout gh runs in (`cwd`), or a repository with no checkout (`repository: 'owner/name'`, gh's `GH_REPO`), and optionally a `token` that is retried without, under gh's own login, when GitHub rejects it.
-
-```typescript
-const target = { cwd: repoRoot }
-const pr = await api.github.pullRequests.view(target, 42, ['number', 'title', 'state'])
-const open = await api.github.pullRequests.list(target, {
-  state: 'open',
-  limit: 50,
-  fields: ['number'],
-})
-const { number, url } = await api.github.pullRequests.create(target, { title, body, base, head })
-await api.github.pullRequests.markReady(target, number)
-await api.github.pullRequests.updateBranch(target, number)
-const repo = await api.github.repositories.view(target, ['owner', 'name'])
-await api.github.repositories.clone({ cwd: folder }, 'owner/name', 'name')
-
-// Anything else in the REST or GraphQL API: the body as gh prints it.
-const raw = await api.github.api(target, {
-  path: 'repos/{owner}/{repo}/pulls/42/reviews',
-  method: 'POST',
-  body: { event: 'APPROVE' },
-})
-```
-
-A failure rejects with a `GithubCommandError`: `message` is gh's own line, `stdout` holds GitHub's JSON error body, and `authenticationFailed`, `timedOut` and `exceededMaxBuffer` say why.
-
----
-
-### `api.notifications` — Toasts _(v1.1.0)_
-
-```typescript
-api.notifications.showToast('info', 'Checking git status...')
-api.notifications.showToast('success', 'Committed 3 files')
-api.notifications.showToast('warning', 'gh CLI not authenticated')
-api.notifications.showToast('error', 'Could not create pull request')
-```
-
-Available types: `'info'` | `'success'` | `'warning'` | `'error'`
-
-`showToast` and `createNotification` resolve identically: the actual delivery
-target(s) (toast, in-app notification center, OS system notification) are
-never decided by the extension — they're resolved from the user's global
-notification settings, with an optional per-extension override taking
-precedence (Settings → Notifications). Despite the name, `showToast` is not
-guaranteed to produce only a toast; treat both as "notify the user" and don't
-assume a specific delivery mechanism. Errors always include a toast
-regardless of configuration.
-
----
-
-## Shared UI components — `@terminator/extension-ui` _(v1.3.0)_
-
-Your extension renders in its own `WebContentsView`, which loads neither the core
-stylesheet nor the core's components. Rather than each extension writing its own
-dialog — which is what happened, four times, with four different answers to what
-Escape does — the shared implementation is published as a package.
-
-```bash
-npm install @terminator/extension-ui
-```
-
-It is source-only (no build step) with `react`, `react-dom` and `lucide-react` as
-**peer** dependencies, so it adds no second copy of React to your bundle.
+The core and every extension build their UI from one design system (Constitution XIII, [ADR 098](adr/098-one-design-system-documented-in-storybook.md)), `packages/extension-ui`. It is source-only TypeScript with `react`, `react-dom` and `lucide-react` as peer dependencies. Every component has Storybook stories in both themes: `npm run storybook`.
 
 ```tsx
-import {
-  Dialog,
-  ConfirmDialog,
-  Popover,
-  ToastRegion,
-  EmptyState,
-  IconButton,
-  Button,
-  Tabs,
-  Markdown,
-  RelativeTime,
-  usePolling,
-} from '@terminator/extension-ui'
+import { Dialog } from '@terminator/extension-ui'
 ;<Dialog
   title="Rename branch"
   onDismiss={close}
@@ -527,102 +349,51 @@ import {
 </Dialog>
 ```
 
-An action with `submit: true` makes the dialog a form: Enter in a field runs that
-action once, and a field with `autoFocus` keeps the focus the dialog opens with.
+An action with `submit: true` makes the dialog a form: Enter in a field runs that action once.
 
-| Export                                       | Use it for                                                      |
-| -------------------------------------------- | --------------------------------------------------------------- |
-| `Dialog`                                     | A modal question or form. Scrim, focus trap, Escape.            |
-| `ConfirmDialog`                              | Yes/no, with the consequence stated.                            |
-| `Popover`                                    | A dropdown or picker — dismissible, **not** modal.              |
-| `ToastRegion` / `Toast`                      | Transient messages. `role="status"`, mount the region once.     |
-| `EmptyState`                                 | Heading, one line of why, and the control that fills it.        |
-| `IconButton`                                 | An icon-only control that still has an accessible name.         |
-| `Button`                                     | Primary, secondary, ghost or danger; an optional lucide icon.   |
-| `Tabs`                                       | An accessible tab list: arrow keys, Home, End, `aria-selected`. |
-| `Markdown`                                   | Sanitised Markdown. Links open through your `onOpenLink`.       |
-| `RelativeTime` / `formatRelativeTime`        | "5 minutes ago"; nothing for a time that does not parse.        |
-| `usePolling`                                 | Read now and on an interval; ignores answers after unmount.     |
-| `everyWhileVisible`                          | Run a tick on an interval only while the view is visible.       |
-| `useDismissible`                             | Outside-click + Escape + focus restore, for your own surface.   |
-| `LAYERS` / `layerValue` / `nestedLayerValue` | Stacking, by name.                                              |
+| Export                                           | Use it for                                                       |
+| ------------------------------------------------ | ---------------------------------------------------------------- |
+| `Dialog`, `ConfirmDialog`                        | A modal question or form; yes/no with the consequence stated     |
+| `Popover`                                        | A dropdown or picker: dismissible, not modal                     |
+| `ToastRegion`, `Toast`                           | Transient messages, `role="status"`; mount the region once       |
+| `EmptyState`                                     | Heading, one line of why, and the control that fills it          |
+| `Button`, `IconButton`                           | Buttons; an icon-only control with an accessible name            |
+| `Tabs`, `TabsRoot`, `TabList`, `Tab`, `TabPanel` | Accessible tabs: arrow keys, Home, End, `aria-selected`          |
+| `SegmentedControl`                               | A small set of mutually exclusive options                        |
+| `Markdown`                                       | Sanitised Markdown; links open through your `onOpenLink`         |
+| `RelativeTime`, `formatRelativeTime`             | "5 minutes ago"; nothing for a time that does not parse          |
+| `usePolling`, `everyWhileVisible`                | Read now and on an interval; tick only while the view is visible |
+| `useDismissible`                                 | Outside-click, Escape and focus restore for your own surface     |
+| `LAYERS`, `layerValue`, `nestedLayerValue`       | Stacking by name                                                 |
 
-Three things the package handles that are easy to get wrong on your own:
+`packages/extension-ui/src/index.ts` is the complete export list.
 
-- **Escape closes only the innermost surface.** Several dialogs in one document
-  would otherwise all close on one keystroke.
-- **The double-Escape exit gesture stands down while a dialog is open.** Depth is
-  mirrored to the host over `electronAPI.ui.setModalDepth`; `Dialog` does this for
-  you. If you write your own modal, call it yourself or a user's Escape will
-  close your extension and lose their draft.
-- **A dialog renders in your view, never in the core.** The core cannot draw over
-  a `WebContentsView` — see [ADR-038](adr/038-dialogs-render-in-the-extension-view.md).
+What the package handles that is easy to get wrong alone:
+
+- **Escape closes only the innermost surface.** Several dialogs in one document would otherwise all close on one keystroke.
+- **A dialog renders in your view, never in the core.** The core cannot draw over a `WebContentsView` ([ADR 038](adr/038-dialogs-render-in-the-extension-view.md)).
+- **Stacking comes from a named scale** (`panel` 100, `overlay` 200, `modal` 300, `toast` 400). A raw `z-index` number in an extension is a lint error.
 
 ### Styling
 
-Every colour, space and radius comes from the `--tm-*` tokens injected into your
-document. They carry both themes; the host sets `data-theme` on your `<html>` and
-restamps it when the user switches. A hardcoded hex cannot follow the theme, and a
-`--tm-*` name that is not published resolves to nothing and drops the whole
-declaration.
+Every colour, space, radius, font and layer comes from the `--tm-*` tokens in `packages/extension-ui/src/tokens.css`, which the host injects into your document. The file holds both themes (`:root` is dark, `[data-theme='light']` light) and the host restamps `data-theme` when the operator switches. A hard-coded colour cannot follow the theme, and a `--tm-*` name that the file does not define makes the whole declaration invalid. Do not define tokens of your own.
 
-`packages/extension-ui/src/tokens.css` defines every `--tm-*` token, and Storybook
-(`npm run storybook`) shows each component in both themes. Do not define a colour
-of your own.
+- Fonts ship with the app: the `@terminator/extension-ui/fonts` import in your view entry bundles IBM Plex Sans and IBM Plex Mono beside your script. Without it your view draws in whatever fonts the machine has.
+- Size lucide icons with the injected classes `tm-icon-sm` (12px), `tm-icon` (14px) and `tm-icon-lg` (16px). The `size` prop is a lint error in `extensions/*/src/**/*.tsx` (Constitution XII).
+- Checkboxes and radios are themed by the injected stylesheet. Do not restyle them; `accent-color` has no effect.
+- Diff and syntax colours (`--tm-diff-*`, `--tm-syntax-*`) clear WCAG AA against their backgrounds in both themes (`tests/unit/renderer/diff-syntax-contrast.spec.ts`).
 
-The tokens name IBM Plex Sans and IBM Plex Mono, but injected CSS cannot carry
-font files, so your view's entry imports them once, next to `createRoot`:
-
-```tsx
-import '@terminator/extension-ui/fonts'
-```
-
-Your bundler copies the font files beside your script; nothing is fetched. Without
-the import your view draws in whatever fonts the machine has.
-
-`docs/EXTENSION-STYLE.md` is the rule set — vocabulary, sentence case, button
-voice, empty states, icons, colour and layering. The vocabulary rules are enforced
-by ESLint on `extensions/*/src/**/*.tsx`.
-
-### Migrating an existing extension
-
-Nothing breaks: the package is additive and the API is backward compatible. When
-you next touch a surface —
-
-1. Replace your own overlay with `Dialog` / `ConfirmDialog` / `Popover`. Pick
-   `Popover` for anything a click outside should close without it being modal —
-   `aria-modal` on a dropdown is a defect, not a detail.
-2. Replace raw `z-index` numbers with `layerValue()` or `var(--tm-layer-*)`.
-3. Replace hardcoded colours with `--tm-*` tokens, and check your surface in both
-   themes.
-4. Replace your own buttons, tabs, Markdown renderer, "time ago" strings and polling
-   timers with `Button`, `Tabs`, `Markdown`, `RelativeTime` and `usePolling`.
-5. Replace `size={n}` on lucide icons with the injected scale —
-   `className="tm-icon-sm"` (12px), `"tm-icon"` (14px), `"tm-icon-lg"` (16px).
-   The `size` prop is a lint error in `extensions/*/src/**/*.tsx`.
+`docs/EXTENSION-STYLE.md` holds the house rules: vocabulary, sentence case, button voice, empty states, icons, colour and layering. Its vocabulary rules are ESLint rules on `extensions/*/src/**/*.tsx`.
 
 ---
 
-### `api.nativeMenu` — Native Application Menu _(v1.1.0)_
+## ExtensionAPI reference
 
-Add items to the application's native **View** menu (macOS menu bar, Windows/Linux system menu).
+The `api` object passed to `activate` is the whole interface between the backend and the core. The namespaces below follow `packages/extension-sdk/types/api.d.ts`; read it for the exact types.
 
-```typescript
-const disposable = api.nativeMenu.addViewMenuItem({
-  id: 'git-sidebar-toggle',
-  label: 'Toggle Git Sidebar',
-  accelerator: 'CmdOrCtrl+Shift+G', // Optional; shown next to label in menu
-  onClick: () => toggleSidebar(),
-})
-```
+### `api.db`
 
-Items appear in registration order within the View submenu. Disposing removes the item and rebuilds the menu. Use this alongside `api.commands.register()` with a `shortcut` for the same action — the native menu item gives discoverability at the OS level; the shortcut gives speed.
-
----
-
-### `api.db` — The Application Database _(v1.5.0, SQLite since the PGlite replacement, ADR 099)_
-
-`api.db` is one shared SQLite database (`<userData>/app.sqlite`, Node's built-in `node:sqlite`, WAL journal, foreign keys on). The core creates no tables: your extension creates its own in `activate`, before it registers handlers that read them. Prefix table names that another extension could also choose; `settings` is shared and keyed `(extension_id, key)`.
+One shared SQLite database, `<userData>/app.sqlite`, through Node's built-in [`node:sqlite`](https://nodejs.org/docs/latest-v24.x/api/sqlite.html) (WAL journal, foreign keys on; [ADR 099](adr/099-node-sqlite-replaces-pglite.md)). The core creates no tables: create yours in `activate`, before you register handlers that read them. Prefix table names another extension could also choose; the `settings` table is shared and keyed `(extension_id, key)`.
 
 ```typescript
 export async function activate(api: ExtensionAPI): Promise<void> {
@@ -646,29 +417,297 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 }
 ```
 
-The methods are `async` although SQLite is synchronous. Statements and transactions run one at a time in call order, so a statement issued while a transaction is open waits for it. Use the `tx` you are given inside a transaction callback, never `api.db`, or the call waits for the transaction that is waiting for it.
+The methods are `async` although SQLite is synchronous. Statements and transactions run one at a time in call order, so a statement issued while a transaction is open waits for it. Inside a transaction callback use the `tx` you are given, never `api.db`, or the call waits for the transaction that is waiting for it.
 
-**Dialect notes.** It is SQLite, not Postgres:
+It is SQLite, not Postgres:
 
-- Parameters are `?`, and each should be a `string`, `number`, `bigint`, `null` or `Uint8Array`. `undefined` throws (`Provided value cannot be bound`); write `value ?? null`. Node's documentation does not list `boolean`, so write `flag ? 1 : 0`.
-- There is no `BOOLEAN`, `jsonb`, `SERIAL` or timestamp type worth using. Store booleans as `INTEGER` 0/1, dates as ISO-8601 `TEXT`, JSON as `TEXT` and read it with `json_extract` / `json_remove`. Use `TEXT PRIMARY KEY` with `crypto.randomUUID()`, or `INTEGER PRIMARY KEY` for a rowid.
-- `STRING_AGG(x, ',')` is `GROUP_CONCAT(x, ',')`. `NOW()` is `datetime('now')`, but prefer passing `new Date().toISOString()` as a parameter.
-- `ILIKE` does not exist. `LIKE` is case-insensitive for ASCII letters only: `'É' LIKE 'é'` is false.
-- `ON CONFLICT (col) DO UPDATE SET v = excluded.v` and `ON CONFLICT DO NOTHING` work as in Postgres. `INSERT OR IGNORE` also silently drops rows that violate `NOT NULL` or `UNIQUE`; prefer `ON CONFLICT`.
-- `COUNT(*)` comes back as a `number`, not a string.
-- `ALTER TABLE ... ADD COLUMN` cannot add a `NOT NULL` column without a default or a `REFERENCES` column with a non-null default. To change anything else, create a new table, copy and rename it.
-- To ask whether a column exists, use `SELECT 1 FROM pragma_table_info(?) WHERE name = ?`; to list tables, `SELECT name FROM sqlite_master WHERE type = 'table'`. There is no `information_schema`.
-- `PRAGMA foreign_keys` is on: deleting a parent row follows your `ON DELETE` clauses. Inside a transaction, `PRAGMA defer_foreign_keys = ON` postpones the checks to commit.
+- Parameters are `?`, each a `string`, `number`, `bigint`, `null` or `Uint8Array`. `undefined` throws (`Provided value cannot be bound`): write `value ?? null`. Write booleans as `flag ? 1 : 0`.
+- Store booleans as `INTEGER` 0/1, dates as ISO-8601 `TEXT`, JSON as `TEXT` read with `json_extract` / `json_remove`. Use `TEXT PRIMARY KEY` with `crypto.randomUUID()`, or `INTEGER PRIMARY KEY` for a rowid.
+- `STRING_AGG(x, ',')` is `GROUP_CONCAT(x, ',')`. Prefer passing `new Date().toISOString()` over `datetime('now')`.
+- There is no `ILIKE`. `LIKE` is case-insensitive for ASCII letters only: `'É' LIKE 'é'` is false.
+- `ON CONFLICT (col) DO UPDATE SET v = excluded.v` and `ON CONFLICT DO NOTHING` work. `INSERT OR IGNORE` also drops rows that violate `NOT NULL` or `UNIQUE`; prefer `ON CONFLICT`.
+- `COUNT(*)` comes back as a `number`.
+- `ALTER TABLE ... ADD COLUMN` cannot add a `NOT NULL` column without a default. To change anything else, create a new table, copy and rename.
+- Ask whether a column exists with `SELECT 1 FROM pragma_table_info(?) WHERE name = ?`, and list tables with `SELECT name FROM sqlite_master WHERE type = 'table'`.
+- Foreign keys are enforced. Inside a transaction, `PRAGMA defer_foreign_keys = ON` postpones the checks to commit.
 
-Test against a real database, not a mock: `wrapDb(new DatabaseSync(':memory:'))` from `src/main/db/index.ts` is the same implementation the app uses.
+Test against a real in-memory database (`new DatabaseSync(':memory:')`), not a mock; `extensions/notepad/tests/unit/db/db.spec.ts` shows how.
 
----
+### `api.paths`
 
-### `api.ipc` — Custom IPC Handlers _(v1.1.0; schema since SDK 3.0.0)_
+`paths.app` (Electron's `app.getAppPath()`) and `paths.userData` (`app.getPath('userData')`), taken when the extension activates.
 
-Register named IPC handlers. The core registers the channel in the main process and hands each payload to your backend in the extension host, where `schema` checks it before `run`. The renderer side calls these with `invoke(channel, payload)` from `@terminator/extension-sdk/renderer`.
+### `api.dialog`
 
-Register each channel as a `ChannelSpec` (ADR 096), the shape the core registers its own channels in: the channel name, a zod `schema` for its payload, the `invalid` response for a payload the schema rejects, and `run`, which receives the parsed payload. The core parses the payload before `run` sees it, so `run` never handles the raw value a caller sent, and its argument type comes from the schema.
+`showOpenDialog(options)` and `showSaveDialog(options)`: the operating system's file dialogs over the focused window, with a subset of Electron's options (`title`, `defaultPath`, `buttonLabel`, `filters`, and `properties` for open).
+
+### `api.log`
+
+`debug`, `info`, `warn` and `error`, written to the app's log under the extension's id.
+
+### `api.settings`
+
+`register(schema)` adds a section to Settings. A property with `workspaceScoped: true` can be overridden per workspace. Property types are `string`, `number`, `boolean`, `enum` (with `options`), `folder` and `action` (a button that invokes `channel`, optionally after `confirmMessage`); `secret` masks the value.
+
+```typescript
+api.settings.register({
+  label: 'My Extension',
+  properties: {
+    'com.example.my-extension.enabled': {
+      type: 'boolean',
+      label: 'Enable feature',
+      default: true,
+      workspaceScoped: true,
+    },
+    'com.example.my-extension.mode': {
+      type: 'enum',
+      label: 'Mode',
+      default: 'fast',
+      options: ['fast', 'safe'],
+    },
+  },
+})
+
+const mode = api.settings.get<string>('com.example.my-extension.mode') // stored value, else the default
+api.settings.set('com.example.my-extension.mode', 'safe')
+```
+
+Prefix every key with your extension id; nothing else keeps two extensions' keys apart.
+
+`isBranchExcluded(branch, repoPath?)` resolves whether a branch matches Settings → Git → Branch Exclude Patterns: the override of the workspace that owns `repoPath`, else the global list. `*` matches anything, slashes included. The core owns the patterns, so your lists hide the same branches the core's pickers do:
+
+```typescript
+const excluded = await Promise.all(
+  pulls.map((pr) => api.settings.isBranchExcluded(pr.headRefName, repoRoot))
+)
+const visible = pulls.filter((_, i) => !excluded[i])
+```
+
+### `api.globalShortcut`
+
+`register(accelerator, handler)` binds a system-wide shortcut through Electron's `globalShortcut`; it fires even when another app is focused. It resolves to a `Disposable`, and rejects with `ACCELERATOR_TAKEN` when the accelerator is already held.
+
+### `api.workspace`
+
+```typescript
+api.workspace.list() // [{ id, name, folderPath }]
+api.workspace.listProjects(workspaceId) // [{ id, workspaceId, name, worktreePath? }]
+```
+
+`addProject(input)` registers a directory, such as a git worktree, as a project in a workspace, so it appears in the sidebar and can hold terminals. It resolves to the existing project when the workspace already has one for that **path**, and to `null` when it cannot be created. A name collision with a different path is disambiguated as `name (directory)`. The sidebar is told, so the project appears without a reload.
+
+```typescript
+const project = await api.workspace.addProject({
+  workspaceId,
+  name: 'feat/session-ulid',
+  worktreePath: '/…/worktrees/feat-session-ulid',
+  gitBranch: 'feat/session-ulid',
+  isWorktree: true,
+  issue: { tracker: 'linear', key: 'TAV-42' }, // optional: attach an issue as it is created
+})
+```
+
+An `issue` is attached best-effort: if the link cannot be written the project is still returned. When the existing project is returned, the issue is attached to it.
+
+`deleteProject(projectId)` removes a project and tells the sidebar; every terminal in it is closed (`src/main/terminal/project-sessions.ts`). Remove the project when you remove its worktree.
+
+### `api.topBar`
+
+`registerMenuItem({ id, label, onClick, tooltip? })` stores a menu item for the project view's top bar. The current renderer does not draw these items.
+
+### `api.extensions`
+
+`get(id)` returns another extension's `activate` exports. See [Another extension's API](#another-extensions-api).
+
+### `api.shell`
+
+`exec(options)` runs `git` or `gh`, never through a shell, and resolves for every outcome: read `exitCode`.
+
+```typescript
+const result = await api.shell.exec({
+  command: 'git', // 'git' or 'gh'; anything else throws COMMAND_NOT_ALLOWED
+  args: ['status', '--porcelain=v1', '-z'],
+  cwd: repoRoot,
+  timeoutMs: 5000, // default 10 000
+})
+if (result.exitCode !== 0) {
+  api.notifications.showToast('error', `git status failed: ${result.stderr}`, 'gitFailed')
+}
+```
+
+| Option               | What it does                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `timeoutMs`          | Past it the command is killed and resolves with `timedOut: true` and `exitCode` 124, as `timeout(1)` does                       |
+| `maxBuffer`          | Most bytes kept per stream (default 1 MiB). Past it the command is stopped: `exceededMaxBuffer: true` and a non-zero `exitCode` |
+| `env`                | Added over the minimal environment every command gets (PATH, HOME, git and gh credentials, `GIT_TERMINAL_PROMPT=0`)             |
+| `encoding: 'buffer'` | `stdout` and `stderr` come back as bytes                                                                                        |
+| `onOutput`           | Each chunk of stdout and stderr as it arrives, in text mode                                                                     |
+
+Output is never trimmed. The core runs the command in the main process (`src/main/shell/shell-executor.ts`); a command that cannot start reports its spawn error as `stderr`. Unlike the renderer's `shell:exec` channel, `api.shell.exec` does not confine `cwd` to a workspace folder: a channel that takes a path from a caller must check it itself, as git-integration's `RepoRoot` schema does (`extensions/git-integration/src/ipc/repo-root.ts`).
+
+### `api.github`
+
+Pull requests and the GitHub API through the `gh` CLI the core runs. Each call takes a `GithubTarget`: the checkout gh runs in (`cwd`), or a repository without a checkout (`repository: 'owner/name'`), and optionally a `token` that is retried under gh's own login when GitHub rejects it.
+
+```typescript
+const target = { cwd: repoRoot }
+const pr = await api.github.pullRequests.view(target, 42, ['number', 'title', 'state'])
+const open = await api.github.pullRequests.list(target, {
+  state: 'open',
+  limit: 50,
+  fields: ['number'],
+})
+const { number, url } = await api.github.pullRequests.create(target, { title, body, base, head })
+await api.github.pullRequests.markReady(target, number)
+await api.github.pullRequests.updateBranch(target, number)
+const repo = await api.github.repositories.view(target, ['owner', 'name'])
+await api.github.repositories.clone({ cwd: folder }, 'owner/name', 'name')
+
+// Anything else in the REST or GraphQL API: the body as gh prints it.
+const raw = await api.github.api(target, {
+  path: 'repos/{owner}/{repo}/pulls/42/reviews',
+  method: 'POST',
+  body: { event: 'APPROVE' },
+})
+```
+
+A failure rejects with a `GithubCommandError`: `message` is gh's own line, `stdout` holds GitHub's JSON error body, and `authenticationFailed`, `timedOut` and `exceededMaxBuffer` say why. `packages/extension-sdk/types/github.d.ts` has the full shape.
+
+### `api.issues`
+
+Linear and Jira are connected once, by the operator, in Settings → Integrations. An extension never holds a tracker credential and never contacts a tracker itself ([ADR 029](adr/029-core-issue-tracker-service.md)).
+
+```typescript
+const { issues, failures } = await api.issues.listMine({ limit: 25 })
+for (const failure of failures) {
+  if (failure.error !== 'not-connected') {
+    api.notifications.showToast('warning', `${failure.tracker}: ${failure.error}`, 'fetchFailed')
+  }
+}
+
+const found = await api.issues.search('session ulid')
+const issue = await api.issues.get('linear', 'TAV-42') // description and comments are markdown
+await api.issues.comment('linear', 'TAV-42', `PR opened: ${prUrl}`) // rejects on failure
+const connected = await api.issues.connections() // never returns a credential
+```
+
+A tracker that fails is reported in `failures`; it does not fail the call. Say what is missing rather than showing a partial list as complete. An issue is identified by the pair `(tracker, key)`: two trackers can both have a `TAV-42`.
+
+**Three writes, and only three**: a comment, a move along the issue's own workflow, and a new issue the operator asked for. There is no way to delete an issue or change a field of an existing one, and a test asserts the shape of that surface.
+
+**Moving an issue** ([ADR 041](adr/041-an-extension-may-move-an-issue.md)):
+
+```typescript
+if (api.issues.supportsTransitions('linear')) {
+  const options = await api.issues.states('linear', 'TAV-42') // what it can move to now
+  await api.issues.transition('linear', 'TAV-42', 'in_review') // the tracker resolves the intent
+  await api.issues.transition('linear', 'TAV-42', 'in_review', options[1].id) // or the operator's choice
+}
+```
+
+The intent is `started`, `in_review` or `done`; the tracker decides which of its states that means. Only Linear implements it: `supportsTransitions('jira')` is `false`, and `states` / `transition` reject with the kind `unsupported`. Retry a failure; record an unsupported capability once and stop asking. Never emulate a move the tracker cannot make.
+
+**Creating an issue** ([ADR 061](adr/061-one-project-per-order.md)), only on the operator's explicit word:
+
+```typescript
+if (api.issues.supportsCreate('linear')) {
+  const teams = await api.issues.teams('linear')
+  const issue = await api.issues.create('linear', {
+    teamId: teams[0].id,
+    title: 'Only list open tickets',
+    description: 'Markdown body',
+  })
+}
+```
+
+Only Linear implements it; `teams` / `create` reject with `unsupported` for Jira. The types (`Issue`, `IssueListResult`, `TrackerConnection`, `TrackerId`, …) are exported from `@terminator/extension-sdk`; do not re-declare them.
+
+### `api.notifications`
+
+```typescript
+api.notifications.showToast('success', 'Committed 3 files', 'committed')
+
+const notification = api.notifications.createNotification({
+  type: 'warning',
+  title: 'Allow this command?',
+  message: 'redis-cli -h prod-cache-01',
+  key: 'permissionRequest',
+  actions: [
+    { id: 'allow', label: 'Allow', handler: () => allow() },
+    { id: 'deny', label: 'Deny', handler: () => deny() },
+  ],
+  onClick: () => goToTheRun(), // where clicking the row goes
+})
+notification.dispose() // removes it
+```
+
+The extension never chooses where a notification appears. The core resolves its targets (system banner, notification centre, toast) from the operator's Settings → Notifications, with an optional per-extension override registered as the settings `<extensionId>.notify.<key>.system` / `.center` / `.toast`. An `error` always includes a toast. `key` names the kind of notification so the operator can configure it on its own.
+
+**`actions` are answers; `onClick` is a destination.** Running an action settles the notification: the handler runs and the record is dropped. `onClick` leaves the row alone and makes it a link.
+
+Navigating from a notification usually takes three calls, because your view may not exist yet:
+
+```typescript
+onClick: () => {
+  api.window.focusSelf() // the window
+  api.window.broadcast('extension:activate-global-tab', 'com.example.my-extension') // creates the view
+  api.window.broadcast('my-ext:navigate', { itemId }) // where to go
+}
+```
+
+The view may be created after that last broadcast, so hold the destination in the backend and let the view ask for it on mount: `extensions/task-vault/src/navigation.ts` is the pattern.
+
+### `api.nativeMenu`
+
+`addViewMenuItem({ id, label, onClick, accelerator?, type?, panelId? })` adds an item to the application's View menu; disposing it removes the item and rebuilds the menu. An `accelerator` here works while Terminator is focused. `type: 'checkbox'` with a `panelId` keeps the check mark in step with your sidebar panel.
+
+### `api.commands`
+
+`register(command, handler)` puts a command in the Quick Actions panel (`⌘P`). The handler receives a `CommandContext`, the core's focus at the moment it runs:
+
+```typescript
+api.commands.register(
+  {
+    id: 'push',
+    label: 'Push',
+    mnemonic: 'p', // one character, shown in the panel
+    requires: 'repo', // 'repo' | 'session': dims the action with a stock reason otherwise
+  },
+  (ctx) => push(ctx.repoRoot!) // ctx: { projectId, sessionId, repoRoot }
+)
+```
+
+A command declared in the manifest's `contributes.commands` but never registered shows dimmed with "Extension did not register this command": the manifest only reserves its row.
+
+A command may declare a zod schema for `args`. Such a command is run by id from a view (see [Running another extension's command](#running-another-extensions-command)); the core validates the arguments before the handler runs, and only commands without `args` are listed in the panel.
+
+```typescript
+api.commands.register(
+  {
+    id: 'review-pull-request',
+    label: 'Review pull request',
+    args: z.object({ repoRoot: z.string().min(1), number: z.number().int().positive() }),
+  },
+  (ctx, args) => openReview(args.repoRoot, args.number)
+)
+```
+
+A handler that needs to change your view broadcasts on your own channel, and brings the view forward:
+
+```typescript
+api.commands.register({ id: 'quick-create', label: 'New note', mnemonic: 'n' }, () => {
+  api.window.broadcast('my-ext:ui.open-quick-create', {})
+  api.window.showSelf('main')
+})
+```
+
+`extensions/notepad/src/index.ts` (`notepad:quick-create`) and `extensions/task-vault/src/index.ts` (`task-vault:capture-to-inbox`) do this end to end, with a pending flag the view reads on mount for a command that fired before the view existed.
+
+**`shortcut` binds nothing on its own.** It is shown beside the action in the panel. The one exception: a manifest command with a `shortcut` in an extension that contributes a `sidebarPanel` toggles that panel when the shortcut is pressed in the main window (`registerWebviewExtension`, `src/renderer/extensions/loader.ts`). To bind a key, use `api.nativeMenu.addViewMenuItem` with an `accelerator` (while Terminator is focused) or `api.globalShortcut.register` (from any app).
+
+### `api.ipc`
+
+`registerHandler(spec, options?)` registers an invoke channel that your view calls with `invoke(channel, payload)`. The core registers it in the main process and hands each call to your backend. Every channel is a `ChannelSpec` ([ADR 096](adr/096-every-ipc-channel-has-a-schema.md)), the same shape the core's own channels use: the channel name, a zod `schema`, the `invalid` response for a payload the schema rejects, and `run`, which receives the parsed payload.
 
 ```typescript
 import { z } from 'zod'
@@ -679,901 +718,107 @@ const handler = api.ipc.registerHandler(
     channel: 'my-ext:do-thing',
     schema: z.object({ id: z.string().min(1) }),
     invalid: { error: 'VALIDATION_ERROR' },
-    run: async ({ id }) => someMainProcessWork(id), // resolved to the renderer's invoke()
+    run: async ({ id }) => doThing(id),
   })
 )
 
-// A channel that takes nothing: the desktop renderer sends nothing, the remote bridge `{}`.
+// A channel that takes nothing: the desktop view sends nothing, the remote bridge `{}`.
 api.ipc.registerHandler(
   defineChannel({ channel: 'my-ext:status', schema: noPayload, invalid: null, run: () => status() })
 )
-
-// In deactivate():
-handler.dispose()
 ```
 
-`invalid` may also be a function of the `ZodError`, e.g. `(error) => ({ error: 'VALIDATION_ERROR', message: error.message })`. An optional `onError(e)` turns an error `run` throws into a response instead of a rejected invoke. Do not re-check the payload inside `run`; the schema is the check. Whether zod rejects bad input is zod's concern, so test that each channel declares a schema (activate the extension, and for every registered spec send a malformed payload through `dispatchChannel` and assert `run` is not called) rather than one rejection case per channel.
+`invalid` may be a function of the `ZodError`. An optional `onError(e)` turns an error `run` throws into a response instead of a rejected invoke. `registerHandler` throws for anything that is not a `ChannelSpec` with a schema, so a channel without one fails at activation. Do not re-check the payload inside `run`. To test, activate the extension and send each registered spec a malformed payload through `dispatchChannel`, asserting `run` is not called, rather than writing one rejection case per channel.
 
-There is no unvalidated form: since SDK 3.0.0 `registerHandler` throws when it is given anything but a `ChannelSpec` with a schema, so an extension without one fails at activation rather than on its first payload.
+Name channels `<your prefix>:<name>` so they do not collide with the core's or another extension's; the core does not enforce a prefix.
 
-**Channel naming**: prefix every channel with your extension ID followed by `:` to avoid collisions with core channels and other extensions. For example `com.acme.my-ext:fetch-data`.
+**Remote access.** A channel is reachable only from the desktop app unless it is registered with `{ remoteAccessible: true }`; the remote-control bridge rejects every other channel. Opt in only the channels your view calls for ordinary use. Keep a channel local if it reads or writes a path the caller chooses, runs a command or arbitrary SQL, opens a native dialog or window, or administers the database: a remote client holds a password, not the desktop session, and the schema is the only check on what it sends. Foundry and git-integration keep their opted-in channels in one list each (`src/remote-access.ts`), and a spec in each extension asserts the list exactly.
 
-**Error handling**: throw or return `{ error: string }` to signal failure. The renderer receives the rejection or error payload.
+`invokeChannel(channel, payload)` and `sendChannel(channel, payload)` call a registered handler from the backend; `onWindowEvent(channel, handler)` subscribes to the events the core pushes to the main window; `isRemoteAccessible(channel)` resolves whether the bridge admits a channel. Never use Electron's `ipcMain` directly.
 
-**Remote access** _(v1.4.0; local-only by default)_: a channel registered through `registerHandler` is reachable only from the local Electron renderer. The remote-control bridge (the `/app/` browser surface) rejects it unless the channel opts in at registration with `{ remoteAccessible: true }`:
+### `api.terminal`
 
-```typescript
-// Read and edit the extension's own data: the remote browser view may call it.
-api.ipc.registerHandler(listItems, { remoteAccessible: true })
+`onSessionCreate(handler)` receives `{ id, projectId, tabTitle, type }` for each new terminal; `onSessionClose(handler)` receives its id.
 
-// Anything else stays local-only without further ceremony.
-api.ipc.registerHandler(runSql)
-```
+### `api.pty`
 
-Opt in only the channels the extension's own view calls for ordinary use. Keep a channel local if it reads or writes a filesystem path the caller chooses, runs a command or arbitrary SQL, opens a native dialog or window, or administers the database. A remote client holds a password, not the desktop session, so each opted-in channel is attack surface and its schema is the check on what a remote client can send. The first-party extensions follow this: Notepad and Task Vault opt in their data channels and keep file import and export, the Task Vault SQL console and database administration local. Foundry and git-integration each keep one `REMOTE_READ_CHANNELS` list (`src/remote-access.ts`) of channels that only read: Foundry's order list, feed, signals and run timeline, and git-integration's status and pull request lists, detail and comments. Anything that writes, fetches, starts or steers a run, opens a terminal, or returns a file's content or diff stays local, and a spec in each extension lists the opted-in set exactly. git-integration's read channels still run git or gh in the checkout the caller names, so their schema confines it: the `RepoRoot` field (`src/ipc/repo-root.ts`) accepts a `gh:owner/name` repository, or a directory that is, or lies inside, a workspace folder, a project root or the review clone folder, after symlinks are resolved. Anything else gets the channel's validation response and runs nothing.
-
-The declaration made at registration is the single authority — a channel that is neither in the core manifest-derived allowlist nor declared `remoteAccessible` at registration is rejected by the bridge. Extensions must never call Electron's `ipcMain` directly: handlers registered that way are invisible to the bridge registry and unreachable remotely.
-
----
-
-### `api.pty` — Terminal Session Authority _(v1.2.0, session authority since v1.4.0)_
-
-`PtyManager` is the single session authority: it owns the PTY processes, their metadata (origin, project, workspace, timestamps), and multi-subscriber output/exit fan-out. Extensions never keep their own session registries.
+The core's `PtyManager` owns every terminal process and its metadata; an extension keeps no session registry of its own.
 
 ```typescript
-// Spawn with metadata; subscribe output/exit separately (v1.4.0)
 const info = await api.pty.spawnSession({
   sessionId,
   cwd: '/repo',
   shell: '/bin/zsh',
   type: 'agent',
-  origin: 'remote', // 'app' sessions belong to the Electron renderer UI
+  origin: 'remote', // 'app' sessions belong to the desktop renderer
 })
-const stopStreaming = api.pty.onData(sessionId, (data) => broadcast(data))
-api.pty.onExit(sessionId, (code) => cleanup(code)) // fires after the session is removed
+const stop = api.pty.onData(sessionId, (data) => send(data)) // batched, at most one per frame
+api.pty.onExit(sessionId, (code) => cleanup(code)) // after the last batch of output
+api.pty.write(sessionId, 'ls\r')
+api.pty.resize(sessionId, 120, 40)
+api.pty.kill(sessionId)
 
-await api.pty.getSession(sessionId) // full SessionInfo or undefined
-await api.pty.setWorkspace(sessionId, 'ws-1') // stamp workspace metadata (null clears)
-await api.pty.listSessions() // every live session with full SessionInfo
+await api.pty.getSession(sessionId) // SessionInfo or undefined
+await api.pty.setWorkspace(sessionId, 'ws-1') // null clears
+await api.pty.listSessions()
 ```
 
-`onData`/`onExit` support any number of subscribers per session and always return disposers (a session that does not exist never calls the listener); all listeners are cleaned up automatically when the PTY exits. `onData` delivers at most one batch per frame (SDK 4.0.0).
+`spawnSession` rejects with an error named `MissingCwdError` when `cwd` is not an existing directory. `onData` and `onExit` take any number of listeners and always return a disposer; a session that does not exist never calls them.
 
-#### `openTerminal` — a terminal the operator can see _(v2.1.0; a promise named `openTerminal` since SDK 4.0.0)_
-
-`spawnSession` gives you a process and a data stream, but nothing on screen: the
-renderer owns the tab list and does not know your session exists. An extension
-that runs an agent this way produces a process nobody can watch or type into.
+**A terminal the operator can see.** `spawnSession` gives a process and a stream but nothing on screen. `openTerminal` spawns a terminal and shows it as an ordinary tab in a project, typically one from `workspace.addProject`:
 
 ```typescript
-const projectId = (
-  await api.workspace.addProject({
-    workspaceId,
-    name: branch,
-    worktreePath,
-    gitBranch: branch,
-  })
-)?.id
-
 const sessionId = await api.pty.openTerminal({
   projectId,
   cwd: worktreePath,
   tabTitle: branch,
-  type: 'agent', // default; a person can still type into it
+  type: 'agent', // a person can still type into it
 })
-// null when this extension context cannot reach the windows at all — nothing
-// is spawned in that case. Note it does not check that a window is *open*: with
-// no renderer listening the PTY runs and its output is held until one attaches.
 ```
 
-Output produced before the tab is mounted is **held, not dropped**. The renderer
-has to be told, adopt the session, render, and mount an xterm before anything is
-listening; delivered live, everything in that window goes to nobody — including
-the command you just typed into it. The hold is released automatically when the
-tab mounts.
+It resolves to `null` when the core cannot reach a window. Output produced before the tab mounts is held, not dropped, and released when it mounts. The tab's output reaches the window through the same batched, flow-controlled path as every terminal; use `api.pty.onData` in the backend to read it.
 
-The tab's output reaches the main window through the same batched, flow-controlled
-path as every other terminal (one message per frame; the process is paused while the
-window is behind). It is no longer broadcast to every window and extension view, so
-an extension view has no `electronAPI.terminal.onOutput` (removed from the SDK in 2.0.0);
-use `api.pty.onData` in the extension backend.
-
-#### `closeTerminalTab` — closing a tab you opened _(v2.6.0)_
-
-`kill` ends the process but leaves the tab on screen marked `[exited]`. An
-extension that opens a tab per agent or per command fills the tab strip that
-way. `closeTerminalTab` removes the tab, ends its process if it still runs,
-and marks its session record closed:
+`closeTerminalTab(sessionId)` removes a tab `openTerminal` opened, ends its process if it still runs, and marks its session record closed. `kill` alone leaves the tab on screen marked `[exited]`:
 
 ```typescript
 api.pty.onExit(sessionId, (exitCode) => {
-  // Keep a failure on screen so the operator can read it.
-  if (exitCode === 0) api.pty.closeTerminalTab(sessionId)
+  if (exitCode === 0) api.pty.closeTerminalTab(sessionId) // keep a failure on screen
 })
 ```
 
-### `api.issues` — the application's tracker connection _(v2.2.0)_
+### `api.window`
 
-Linear and Jira are connected **once**, by the operator, in the application's own
-Settings → Integrations. An extension never holds a tracker credential and never contacts a
-tracker itself — it asks here, the same way it asks for a shell or a PTY.
-
-```typescript
-// "My issues" across every connected tracker.
-const { issues, failures } = await api.issues.listMine({ limit: 25 })
-
-// A tracker that failed does not fail the call. Say what is missing rather
-// than presenting a partial list as complete.
-for (const failure of failures) {
-  if (failure.error !== 'not-connected') {
-    api.notifications.showToast('warning', `${failure.tracker}: ${failure.error}`, 'fetchFailed')
-  }
-}
-
-// One issue. `description` and every comment body are markdown, whichever
-// tracker it came from — Jira's ADF is converted before it reaches you.
-const issue = await api.issues.get('linear', 'TAV-42')
-
-// A write. It rejects on failure; do not swallow it.
-await api.issues.comment('linear', 'TAV-42', `PR opened: ${prUrl}`)
-```
-
-**Identity is the pair `(tracker, key)`, never the key alone.** Two trackers can both have a
-`TAV-42` and they are different issues.
-
-**Three writes, and only three**: a comment, the issue's own position in its own workflow, and a
-new issue the operator asked for (v2.5.0). There is deliberately no way to delete an issue or to
-change any field of an existing one — not the title, not the assignee, not a label. A test asserts the shape of that surface, so
-widening it takes a deliberate edit to a file whose purpose is to make widening conspicuous.
-
-#### Moving an issue along its workflow _(v2.3.0)_
-
-```typescript
-// Ask first. Synchronous, because it is a fact about the tracker rather than
-// about an issue — you can plan around it instead of calling and catching.
-if (api.issues.supportsTransitions('linear')) {
-  // What this issue could be moved to, right now. Per-issue: a tracker's
-  // answer may depend on the issue's current status.
-  const options = await api.issues.states('linear', 'TAV-42')
-
-  // Move it. The third argument is an intent — `started`, `in_review` or
-  // `done` — and the tracker decides which of its own states that means.
-  await api.issues.transition('linear', 'TAV-42', 'in_review')
-
-  // …unless you pass the operator's own choice, from `states()`.
-  await api.issues.transition('linear', 'TAV-42', 'in_review', options[1].id)
-}
-```
-
-**Why an intent and not a state id.** "In review" is not a fact about a tracker; it is a decision
-about which of their states means that. Keeping the resolution behind an intent puts it in one
-place instead of in every caller — and it is the only signature both shipped trackers can satisfy,
-since Linear sets a target state directly and Jira can only perform a transition available from
-the issue's current status.
-
-**Only Linear implements it.** `supportsTransitions('jira')` is `false`, and `states` / `transition`
-reject with the distinguishable kind `unsupported` rather than a generic failure. Handle the two
-differently: retry a failure, record an unsupported capability once and stop asking.
-
-**Never emulate what the tracker cannot do.** A tracker that cannot move an issue does not get a
-comment saying it moved.
-
-See [ADR 041](adr/041-an-extension-may-move-an-issue.md) for the whole decision, including what
-was deliberately not added.
-
-#### Creating an issue _(v2.5.0)_
-
-```typescript
-if (api.issues.supportsCreate('linear')) {
-  // The teams the operator belongs to. Offer a choice only when there is one.
-  const teams = await api.issues.teams('linear')
-  // The whole issue comes back, as `get` would return it — including
-  // `branchName`, the tracker's recommended branch.
-  const issue = await api.issues.create('linear', {
-    teamId: teams[0].id,
-    title: 'Only list open tickets',
-    description: 'Markdown body',
-  })
-}
-```
-
-**Only on the operator's word.** An extension never files an issue on its own judgement; Foundry
-asks first and calls this only on "Create ticket". **Only Linear implements it**:
-`supportsCreate('jira')` is `false`, and `teams` / `create` reject with `unsupported`. See
-[ADR 061](adr/061-one-project-per-order.md).
-
-**Types** — `Issue`, `IssueSummary`, `IssueLink`, `IssueListResult`, `TrackerConnection`,
-`TrackerId` — are exported from the API module. Do not re-declare them locally.
-
-`api.issues.connections()` reports whether each tracker is connected and which account its
-credential proved to belong to. It never returns the credential.
-
-### `api.workspace.addProject` — somewhere to put a worktree _(v2.1.0; a promise named `addProject` since SDK 4.0.0)_
-
-An extension that provisions a git worktree previously had nowhere to put it: the
-checkout existed and nothing in the sidebar showed it.
-
-```typescript
-const project = await api.workspace.addProject({
-  workspaceId,
-  name: 'feat/session-ulid',
-  worktreePath: '/…/worktrees/feat-session-ulid',
-  gitBranch: 'feat/session-ulid',
-  isWorktree: true, // default
-})
-```
-
-#### Attaching an issue at creation _(v2.2.0)_
-
-```typescript
-await api.workspace.addProject({
-  workspaceId,
-  name: branch,
-  worktreePath,
-  gitBranch: branch,
-  issue: { tracker: 'linear', key: 'TAV-42' },
-})
-```
-
-An extension that already knows what a checkout is for should not make the operator attach it
-again. When the **existing** project is returned for the same path, the issue is attached to
-_that_ project — you have just said what that checkout is for.
-
-Best-effort: if the link cannot be written, the project is still returned. Provisioning the
-checkout is the expensive part, and losing it over a link file would be the worse failure.
-
-Returns the **existing** project when the workspace already has one for that
-**path**, so provisioning the same worktree twice lands in the project you were
-already looking at rather than beside it. Matching on the name as well would
-merge two different worktrees whose branches happen to share one; a name
-collision is disambiguated instead, as `name (directory)`. The sidebar is notified, so it appears
-without a reload.
-
-#### Finding and removing it again _(v2.5.0)_
-
-`workspace.listProjects(workspaceId)` reports each project's `worktreePath` (absent when it is the
-workspace folder), so an extension can find the project it registered for a checkout.
-`workspace.deleteProject(projectId)` removes it and tells the sidebar. Remove the project when you
-remove its worktree — a project pointing at a deleted directory is clutter nobody can use.
+| Member                         | What it does                                                                                                                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `openAuxiliary(view, params?)` | Opens a window that loads your view document with `?view=<view>` and `params`. One window per `view`: a second call with params re-navigates it, without params it focuses it. |
+| `broadcast(channel, data)`     | Sends `channel` to every window and every extension view                                                                                                                       |
+| `focusSelf(viewParam?)`        | Focuses your view `viewParam` (default `main`) where it is already open                                                                                                        |
+| `showSelf(view?)`              | Brings forward the surface you contributed for `view` and focuses it, as the core's "Open …" quick actions do                                                                  |
+| `raise()`                      | Restores and focuses every application window                                                                                                                                  |
 
 ---
-
-> **A note on version numbers.** The markers in this document (v1.1.0 … v2.5.0) are the API's own
-> release series. The declaration itself is `packages/extension-sdk/types/api.d.ts`; the core's
-> `src/main/extensions/api.ts` implements it and the compiler checks the two agree.
 
 ## Disposables
 
-Every registration method returns a `Disposable`:
-
-```typescript
-interface Disposable {
-  dispose(): void
-}
-```
-
-Calling `dispose()` undoes the registration. If you do not call `dispose()` in `deactivate()`, the extension host cleans up automatically on unload.
-
-**Best practice** — collect and dispose all registrations:
-
-```typescript
-const disposables: Array<{ dispose(): void }> = []
-
-export function activate(api: ExtensionAPI): void {
-  disposables.push(api.topBar.registerMenuItem({ ... }))
-  disposables.push(api.commands.register({ id: 'help', label: 'Help', shortcut: 'CmdOrCtrl+Shift+H' }, () => {}))
-}
-
-export function deactivate(): void {
-  disposables.forEach(d => d.dispose())
-  disposables.length = 0
-}
-```
+Every registration returns a `Disposable`. `dispose()` undoes it. Registrations you do not dispose in `deactivate` are disposed when the extension is unloaded.
 
 ---
 
-## Renderer Extensions (`renderer.tsx`)
+## Installing, reloading and disabling
 
-Some extensions need to contribute UI directly into the renderer: sidebar panels with React components, additional project tabs, or renderer-side keyboard shortcuts. This is done through a second entry point — `renderer.tsx` — that runs in the renderer process.
-
-### When you need `renderer.tsx`
-
-- Your extension contributes a **sidebar panel** (React component in the right sidebar)
-- Your extension contributes a **project tab** (a new tab in the project view)
-- Your extension needs **renderer-side keyboard shortcuts** — `api.commands.register` does not bind a key at all; its `shortcut` field is a display-only hint shown in the Quick Actions panel (see [Commands and the Quick Actions panel](#commands-and-the-quick-actions-panel))
-
-### Structure
-
-```
-my-extension/
-├── manifest.json
-├── package.json
-└── src/
-    ├── index.ts        # Main process: activate(api), IPC handlers, settings, etc.
-    └── renderer.tsx    # Renderer process: self-registers UI components
-```
-
-### How it works
-
-The host app uses a Vite glob import to discover `extensions/*/src/renderer.tsx` at build time. Each `renderer.tsx` is executed as a side effect on import and self-registers into the extension registry via `useExtensionRegistry`. The core app never imports your extension directly.
-
-### Example `renderer.tsx`
-
-```typescript
-import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
-import { MyPanel } from './components/MyPanel'
-import { MyProjectView } from './components/MyProjectView'
-
-const registry = useExtensionRegistry.getState()
-
-// Register a sidebar panel
-registry.registerSidebarPanel({
-  id: 'my-sidebar-panel',
-  label: 'My Panel',
-  component: MyPanel, // ComponentType<{ repoRoot: string | null; onClose: () => void }>
-  defaultOpen: false,
-})
-
-// Register a project tab
-registry.registerProjectTab({
-  id: 'my-project-tab',
-  label: 'My Tab',
-  component: MyProjectView, // ComponentType<{ repoRoot: string | null }>
-})
-
-// Register a renderer-side keyboard shortcut
-registry.registerKeyboardShortcut({
-  accelerator: 'CmdOrCtrl+Shift+M',
-  description: 'Toggle my panel',
-  action: () => useExtensionRegistry.getState().togglePanel('my-sidebar-panel'),
-})
-```
-
-### Registry API
-
-| Method                               | Description                                                                                                        |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `registerSidebarPanel(panel)`        | Adds a React component to the right sidebar. Returns an unregister function.                                       |
-| `registerProjectTab(tab)`            | Adds a tab to the project view. Returns an unregister function.                                                    |
-| `registerGlobalTab(tab)`             | Adds a persistent tab to the global tab bar (survives workspace/project switches). Returns an unregister function. |
-| `registerWorkspaceTab(tab)`          | _(v1.3.0)_ Adds a workspace-scoped tab icon to every workspace card header. Returns an unregister function.        |
-| `registerKeyboardShortcut(shortcut)` | Binds a renderer-side keyboard shortcut. Returns an unregister function.                                           |
-| `togglePanel(panelId)`               | Opens or closes a registered sidebar panel.                                                                        |
-| `setActiveProjectTab(tabId)`         | Activates a registered project tab.                                                                                |
-| `setActiveWorkspaceTab(tabId)`       | _(v1.3.0)_ Activates a registered workspace tab (or clears it when `null`).                                        |
-
-Component prop shapes:
-
-- Sidebar panel: `{ repoRoot: string | null; onClose: () => void }`
-- Project tab: `{ repoRoot: string | null }`
-- Global tab: `Record<string, never>` (reads state from stores internally)
-- Workspace tab: `Record<string, never>` (reads active workspace from `useWorkspaceStore()` internally)
-
-### Note on the internal import
-
-`renderer.tsx` is the **only** place where importing from `src/renderer/extensions/registry` is permitted. All other extension code (including `index.ts`) must use only the `ExtensionAPI` object.
-
----
-
-## Installing an Extension
-
-**Pre-bundled extensions** (like the git integration) load automatically. No install step needed.
-
-**Local extensions**:
-
-1. Build your extension (compile TypeScript if needed, or use `.js` directly).
-2. Open Terminator → `Cmd+,` → **Extensions**.
-3. Click **Install from Directory** and select your extension directory.
-4. The extension activates immediately.
-
-Extensions persist across restarts.
-
----
-
-## Disabling / Enabling
-
-Toggle in Settings → Extensions. Disabling calls `deactivate()` and removes all contributions without restarting the app.
-
-To disable per-workspace, add to `.terminator/settings.json` in your project root:
-
-```json
-{
-  "com.example.my-extension": {
-    "myext.enabled": false
-  }
-}
-```
+- **Built-in extensions** in `extensions/` load at startup with no install step.
+- **A local extension**: build it, then Settings → Extensions → **Install from Directory**, and pick its directory. The backend activates at once; reload the window to show its surfaces. Installed extensions persist across restarts.
+- **Reload** in Settings → Extensions unloads and activates the backend again and remounts its views, without rebuilding the app.
+- **Disabling** an extension in Settings → Extensions calls its `deactivate` and disposes everything it registered.
 
 ---
 
 ## Constraints
 
-1. **No internal imports** — only the `ExtensionAPI` object. Do not import from `src/main/`, `src/renderer/`, or `src/shared/`. Exception: `renderer.tsx` may import `useExtensionRegistry` from `src/renderer/extensions/registry`.
-2. **Shell commands**: `api.shell.exec` only allows `git` and `gh`. Any other command is rejected with `COMMAND_NOT_ALLOWED`.
-3. **CWD scope**: `api.shell.exec` `cwd` must be within the current workspace folder.
-4. **Settings key namespacing**: all setting keys must be prefixed with the extension ID (enforced at registration).
-5. **IPC channel namespacing**: all channels registered via `api.ipc.registerHandler` must be prefixed with the extension ID followed by `:` (e.g., `com.acme.my-ext:channel-name`).
-6. **Native menu**: `api.nativeMenu.addViewMenuItem` adds to the View submenu only. Other native menus (File, Edit, Help) are not exposed.
-7. **API versioning**: breaking changes bump the MAJOR version. Additive changes bump MINOR.
-
----
-
-## Scaffolding CLI Reference
-
-```bash
-npm run create-extension -- <name> [options]
-```
-
-| Argument / Option | Description                                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------------------- |
-| `<name>`          | Kebab-case extension name (e.g., `my-extension`). Becomes the directory name under `extensions/`. |
-| `--id <id>`       | Reverse-domain extension ID (e.g., `com.acme.my-extension`). Defaults to `com.example.<name>`.    |
-| `--dir <path>`    | Custom output directory. Defaults to `extensions/<name>`.                                         |
-| `--help`          | Print usage and exit.                                                                             |
-
-**Exit codes**: `0` success, `1` bad arguments, `2` directory already exists, `3` filesystem error.
-
-The generated `src/index.js` is a complete working hello-world demonstrating all v1.2.0 API surfaces. v1.1.0-specific surfaces (shell, topBar) and v1.2.0-specific surfaces (globalShortcut, workspace, window, createNotification) are included as commented-out stubs with `// TODO:` markers so you can activate them incrementally. The v1.3.0 renderer-registry addition (`registerWorkspaceTab`) must be added manually to your `renderer.tsx`.
-
----
-
-## Working Example
-
-The pre-bundled git integration extension at `extensions/git-integration/` is the canonical real-world example. It demonstrates:
-
-- `api.ipc.registerHandler` (custom git: and github: IPC channels, each a `ChannelSpec` with its payload schema)
-- `api.topBar.registerMenuItem` (Git view in project top bar)
-- `api.shell.exec` (git status, diff, stage, commit; gh pr create)
-- `api.notifications.showToast` (all operation outcomes)
-- `api.settings.register` with `workspaceScoped` settings
-- `renderer.tsx` with a sidebar panel, a project tab, a workspace-scoped tab (Code Reviews — `registerWorkspaceTab`), and renderer keyboard shortcuts
-
-The Code Reviews tab is registered as a workspace tab (`registerWorkspaceTab`), not a global tab. Its icon appears on hover in each workspace card header; clicking it shows the PR review UI scoped to that workspace's repository root.
-
----
-
-## CSS Token Contract (`--tm-*`)
-
-Extensions MUST use only `--tm-*` CSS custom properties for colors, typography, and spacing. The host application guarantees these tokens are set on `:root` before any extension CSS is evaluated. They are defined in one file, `packages/extension-ui/src/tokens.css`, which the host injects into your document; the defaults below are its dark theme.
-
-**Using internal core tokens (`--bg-*`, `--text-*`, `--border-*`, `--accent`) or hardcoded hex values is a contract violation** and will break when the host design system evolves.
-
-### Surface Backgrounds
-
-| Token                | Default   | Usage                          |
-| -------------------- | --------- | ------------------------------ |
-| `--tm-bg-base`       | `#0C0C0F` | Deepest application background |
-| `--tm-bg-surface`    | `#111116` | Panel and sidebar backgrounds  |
-| `--tm-bg-elevated`   | `#18181F` | Modals, dropdowns, tooltips    |
-| `--tm-bg-card`       | `#1C1C25` | Card and list item backgrounds |
-| `--tm-bg-card-hover` | `#22222E` | Hovered card/list backgrounds  |
-| `--tm-bg-input`      | `#16161C` | Form input backgrounds         |
-
-### Text
-
-| Token                 | Default   | Usage                         |
-| --------------------- | --------- | ----------------------------- |
-| `--tm-text-primary`   | `#E2E2EE` | Primary readable text         |
-| `--tm-text-secondary` | `#9090C4` | Secondary / metadata text     |
-| `--tm-text-muted`     | `#8585B8` | Hints, placeholders, disabled |
-
-### Borders
-
-| Token                | Default                  | Usage                 |
-| -------------------- | ------------------------ | --------------------- |
-| `--tm-border`        | `rgba(255,255,255,0.06)` | Subtle separators     |
-| `--tm-border-strong` | `rgba(255,255,255,0.12)` | High-contrast borders |
-
-### Semantic / Accent
-
-| Token              | Default                 | Usage                                     |
-| ------------------ | ----------------------- | ----------------------------------------- |
-| `--tm-accent`      | `#5C6BC0`               | Primary accent — overridden per-workspace |
-| `--tm-accent-dim`  | `rgba(92,107,192,0.18)` | Tinted accent background                  |
-| `--tm-accent-glow` | `rgba(92,107,192,0.35)` | Glow / shadow effects                     |
-| `--tm-on-accent`   | `#ffffff`               | Foreground on an accent fill              |
-| `--tm-danger`      | `#E46A6A`               | Error / destructive actions               |
-| `--tm-success`     | `#4ade80`               | Success states                            |
-| `--tm-warning`     | `#facc15`               | Warning / caution states                  |
-
-#### Checkboxes and radios
-
-Do not style them. The host injects a themed replacement for `input[type='checkbox']`
-and `input[type='radio']` into every extension view, so a plain `<input type="checkbox" />`
-already matches the app. `accent-color` has no effect on the result — the native
-widget is replaced outright — and a rule of your own is likely to be outranked by
-the injected one anyway, leaving dead CSS behind.
-
-If you need to nudge layout, target `input[type='checkbox'].your-class` so your rule
-actually wins, and set only spacing properties.
-
-### Diff / Syntax Highlighting
-
-WCAG AA verified (≥4.5:1) against both `--tm-bg-base` and the diff-added/removed
-tinted backgrounds, in both themes. Use these instead of hardcoding diff or
-syntax colors — see `tests/unit/renderer/diff-syntax-contrast.spec.ts`.
-
-| Token                   | Default                  | Usage                        |
-| ----------------------- | ------------------------ | ---------------------------- |
-| `--tm-diff-added-bg`    | `rgba(152,195,121,0.12)` | Added diff-line background   |
-| `--tm-diff-removed-bg`  | `rgba(224,108,117,0.12)` | Removed diff-line background |
-| `--tm-syntax-comment`   | `#8585b8`                | Code comments                |
-| `--tm-syntax-keyword`   | `#cf9ee8`                | Keywords / control flow      |
-| `--tm-syntax-string`    | `#4ade80`                | Strings, additions           |
-| `--tm-syntax-tag`       | `#e05c5c`                | Tags, selectors, deletions   |
-| `--tm-syntax-literal`   | `#6cc9d9`                | Literals (booleans, etc.)    |
-| `--tm-syntax-number`    | `#e0a361`                | Numbers, attributes, types   |
-| `--tm-syntax-title`     | `#7fb8f0`                | Titles, links, meta          |
-| `--tm-syntax-attribute` | `#e2c07e`                | Built-ins, class names       |
-
-### Spacing / Shape
-
-| Token            | Default | Usage                              |
-| ---------------- | ------- | ---------------------------------- |
-| `--tm-radius-xs` | `4px`   | Extra-small radius (chips, badges) |
-| `--tm-radius-sm` | `6px`   | Small radius (buttons, inputs)     |
-| `--tm-radius-md` | `10px`  | Medium radius (cards, tiles)       |
-| `--tm-radius-lg` | `16px`  | Large radius (modals, panels)      |
-
-### Typography
-
-| Token            | Usage                                                    |
-| ---------------- | -------------------------------------------------------- |
-| `--tm-font-ui`   | IBM Plex Sans — sidebar chrome, labels, dialogs, buttons |
-| `--tm-font-mono` | IBM Plex Mono — terminals, code, file paths, diffs       |
-
-### Migration from `--color-*`
-
-If your extension was written before this contract existed, use this table:
-
-| Old (remove)                             | New (use instead)         |
-| ---------------------------------------- | ------------------------- |
-| `var(--color-bg, #161b22)`               | `var(--tm-bg-surface)`    |
-| `var(--color-bg-secondary, #1a1a1a)`     | `var(--tm-bg-base)`       |
-| `var(--color-text, #e6edf3)`             | `var(--tm-text-primary)`  |
-| `var(--color-text-muted, #8b949e)`       | `var(--tm-text-muted)`    |
-| `var(--color-border, #333)`              | `var(--tm-border)`        |
-| `var(--color-accent, #58a6ff)`           | `var(--tm-accent)`        |
-| `#98c379` (green, atom-one-dark string)  | `var(--tm-syntax-string)` |
-| `#e06c75` (red, atom-one-dark tag)       | `var(--tm-syntax-tag)`    |
-| `#d19a66` (orange, atom-one-dark number) | `var(--tm-syntax-number)` |
-
-Full contract reference: [`specs/003-pr-review/contracts/extension-token-api.md`](../specs/003-pr-review/contracts/extension-token-api.md)
-
----
-
-## Extension API v1.2.0 — New Namespaces
-
-These namespaces were added alongside the Task Vault extension (ADR-012).
-
-### `registry.registerWorkspaceTab(tab)` _(v1.3.0, renderer registry only)_
-
-Registers a workspace-scoped tab. Unlike a global tab (declared in the manifest, with an icon in the global sidebar header), workspace tabs appear as hover-reveal icons inside each workspace card header. Clicking one activates the tab's component in the main content area with that workspace set as active.
-
-The component receives **no props** — it must read its workspace context from `useWorkspaceStore()` internally.
-
-```typescript
-// In renderer.tsx:
-import React from 'react'
-import { GitPullRequest } from 'lucide-react'
-import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
-import { MyWorkspaceView } from './components/MyWorkspaceView'
-
-const registry = useExtensionRegistry.getState()
-
-registry.registerWorkspaceTab({
-  id: 'my-workspace-view',
-  label: 'My View',
-  icon: React.createElement(GitPullRequest),
-  component: MyWorkspaceView, // ComponentType<Record<string, never>>
-})
-```
-
-Inside `MyWorkspaceView`:
-
-```typescript
-import { useWorkspaceStore } from '../../../src/renderer/stores/workspace.store'
-
-export function MyWorkspaceView() {
-  const { workspaces, activeWorkspaceId } = useWorkspaceStore()
-  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) ?? null
-  // ... render using activeWorkspace
-}
-```
-
-**Tab mutual-exclusion rules:**
-
-- Activating a workspace tab clears any active global tab and active project tab.
-- Activating a global tab clears any active workspace tab.
-- Clicking a project or session row clears any active workspace tab and shows the terminal.
-
-**When to use workspace tab vs global tab:**
-
-| Need                                                           | Use                     |
-| -------------------------------------------------------------- | ----------------------- |
-| Feature is scoped to one workspace at a time (e.g. PR reviews) | `registerWorkspaceTab`  |
-| Feature is truly app-global (e.g. Task Vault, notifications)   | `contributes.globalTab` |
-
-### `api.globalShortcut.register(accelerator, handler)`
-
-Registers a global keyboard shortcut. Resolves to a `Disposable` (a promise since SDK 4.0.0) — call `.dispose()` in `deactivate()`. Rejects with `ACCELERATOR_TAKEN` when another app holds the accelerator.
-
-```typescript
-const disposable = await api.globalShortcut.register('CommandOrControl+Shift+Space', () => {
-  // open overlay
-})
-disposables.push(disposable)
-```
-
-### `api.workspace` — Workspace and Project Access _(v1.2.0)_
-
-Read-only access to the workspace list and per-workspace project list.
-
-```typescript
-const workspaces = api.workspace.list()
-// [{ id, name, folderPath }, ...]
-
-const projects = api.workspace.listProjects(workspaces[0].id)
-// [{ id, workspaceId, name }, ...]
-```
-
----
-
-### `api.window` — Auxiliary Window Management _(v1.2.0)_
-
-Opens a secondary `BrowserWindow` that renders an extension-specific view from the same renderer URL with a `?view=` query param.
-
-```typescript
-api.window.openAuxiliary('my-extension-view', { runId: '123' })
-// The renderer detects the `view` param and renders the corresponding component
-```
-
-Only one auxiliary window per `view` name is kept open at a time. Calling
-`openAuxiliary` again for a view that's already open re-navigates that window
-with the new params (so it reflects the new context) and focuses it — unless
-you call it with no params, in which case it just focuses the existing window
-as-is without resetting its state.
-
-Use `api.ipc.registerHandler` to back the auxiliary window's data needs.
-
----
-
-### `api.notifications.createNotification(opts): Disposable`
-
-Creates a persistent notification in the notification center (without an ephemeral toast). Supports optional action buttons with callbacks that run in your backend (the core calls them by id), and an `onClick` that decides where the row takes you.
-
-```typescript
-const notif = api.notifications.createNotification({
-  type: 'warning',
-  title: 'Allow this command?',
-  message: 'redis-cli -h prod-cache-01',
-  key: 'permissionRequest',
-  actions: [
-    { id: 'allow', label: 'Allow', handler: () => allow() },
-    { id: 'deny', label: 'Deny', handler: () => deny() },
-  ],
-  // Where clicking the row goes. Not a button — opening the thing is not a
-  // third answer to the question.
-  onClick: () => goToTheRun(),
-})
-
-// Remove the notification when the extension is torn down:
-notif.dispose()
-```
-
-Returns a `Disposable` — calling `.dispose()` dismisses the notification.
-
-**`actions` are answers; `onClick` is a destination.** Triggering an action
-settles the notification: the callback runs and the record is dropped, because
-one that survives the decision it asked for teaches people to dismiss without
-reading. `onClick` leaves the row alone — looking at something is not deciding
-about it — and marks it `clickable` so the panel renders it as a link.
-
-**A handler, not a route.** Only the notification's author knows what "the
-thing" is: a card, a task, a review. A route shape general enough to name all
-of them would be a second navigation system. A function cannot cross IPC, so it
-is held in the main process and the renderer asks for it by a reserved id.
-
-**Navigating from a notification usually takes three steps**, because an
-extension's UI is a `WebContentsView` created when its surface is first
-activated:
-
-```typescript
-onClick: () => {
-  api.window.focusSelf() // the window, or nothing you do is visible
-  api.window.broadcast('extension:activate-global-tab', id) // creates the view if this is the first time
-  api.window.broadcast('my-ext:navigate', { taskId }) // and only then, where to go
-}
-```
-
-Because the view may not exist yet when that last broadcast is sent, hold the
-destination in main and let the view claim it on mount — see
-`extensions/task-vault/src/navigation.ts` for the pattern.
-
-### Renderer-side: `registry.registerKeyboardShortcut(shortcut)`
-
-Registers a keyboard shortcut that fires a renderer-side action.
-
-```typescript
-registry.registerKeyboardShortcut({
-  accelerator: 'CmdOrCtrl+R',
-  description: 'Open Weekly Review',
-  action: () => myStore.getState().setView('review'),
-})
-```
-
----
-
-## Renderer UI
-
-Extension UIs run in isolated `WebContentsView` contexts — completely separate from the host renderer. Your extension's `dist/index.html` loads with its own browser process and has `window.electronAPI` injected by a dedicated preload.
-
-### Why isolation matters
-
-- Extensions bundle their own React/framework — no version conflicts with the host.
-- Your renderer cannot crash the host app.
-- No rebuild of the core app ever required when you update extension UI.
-
-### Getting started
-
-Install the SDK for full TypeScript types:
-
-```bash
-npm install --save-dev @terminator/extension-sdk
-```
-
-Create `src/renderer/App.tsx`:
-
-```tsx
-import React from 'react'
-
-export function App(): JSX.Element {
-  const view = new URLSearchParams(window.location.search).get('view')
-  // Route based on ?view= param from manifest.contributes.*.view
-  return <div>Hello from {view} view</div>
-}
-```
-
-Create `src/renderer/main.tsx`:
-
-```tsx
-import React from 'react'
-import { mountExtension } from '@terminator/extension-sdk/renderer'
-import { App } from './App'
-
-mountExtension(<App />)
-```
-
-Create `index.html`:
-
-```html
-<!doctype html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>My Extension</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/renderer/main.tsx"></script>
-  </body>
-</html>
-```
-
-Create `vite.renderer.config.ts`:
-
-```typescript
-import { resolve } from 'path'
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-export default defineConfig({
-  root: resolve(__dirname),
-  plugins: [react()],
-  build: {
-    outDir: resolve(__dirname, 'dist'),
-    emptyOutDir: true, // the esbuild main bundle goes to src/, so nothing else lives in dist/
-    rollupOptions: { input: resolve(__dirname, 'index.html') },
-  },
-})
-```
-
-Add to `package.json`:
-
-```json
-{ "scripts": { "build:renderer": "vite build --config vite.renderer.config.ts" } }
-```
-
-### `manifest.contributes` reference
-
-| Key            | Type                                                       | Description                             |
-| -------------- | ---------------------------------------------------------- | --------------------------------------- |
-| `globalTab`    | `{ label, icon?, view? }`                                  | Top-level tab in the global tab bar     |
-| `workspaceTab` | `{ label, icon?, view? }`                                  | Tab scoped to the active workspace      |
-| `projectTab`   | `{ label, view? }`                                         | Tab scoped to a project                 |
-| `sidebarPanel` | `{ label, icon?, defaultOpen?, view? }`                    | Collapsible sidebar panel               |
-| `windowViews`  | `Array<{ id: string; view: string }>`                      | Auxiliary window views                  |
-| `commands`     | `Array<{ id, label, description?, shortcut?, mnemonic? }>` | Quick Actions panel entries (see below) |
-
-The `view` string is passed as `?view=VALUE` in the webview URL. One `index.html` serves all surfaces.
-
-### Receiving workspace context
-
-URL params on mount:
-
-```typescript
-const view = new URLSearchParams(window.location.search).get('view')
-const repoRoot = new URLSearchParams(window.location.search).get('repoRoot')
-```
-
-Subscribe to live updates:
-
-```typescript
-useEffect(() => {
-  return window.electronAPI.extensionBridge.on('workspace:changed', (data) => {
-    const { repoRoot } = data as { repoRoot?: string | null }
-    setRepoRoot(repoRoot ?? null)
-  })
-}, [])
-```
-
-### Commands and the Quick Actions panel
-
-A manifest `contributes.commands` entry only reserves the action's place in the Quick Actions panel (`⌘P`) — its label, mnemonic and display-only `shortcut`. It does nothing on its own. To make the entry real, register a matching handler from `activate(api)` in your **main-process** entry point:
-
-```typescript
-api.commands.register(
-  { id: 'my-ext:action', label: 'Do the thing', mnemonic: 'd', description: '…' },
-  (ctx: CommandContext) => {
-    // ctx: { projectId, sessionId, repoRoot } — core-owned focus state, read-only.
-    // ...
-  }
-)
-```
-
-A command declared in the manifest with no matching `api.commands.register` call shows dimmed in the panel: "Extension did not register this command". There is no generic `ext:command:<id>` broadcast — the handler runs entirely in your main-process code, exactly like any other `api.commands.register` call. If the handler needs to update your extension's own webview (open an overlay, focus a field), it broadcasts your extension's own channel, the same way any other main-to-renderer notification works:
-
-```typescript
-// main process (activate(api)):
-api.commands.register({ id: 'my-ext:quick-create', label: 'New thing', mnemonic: 'n' }, () => {
-  api.window.broadcast('my-ext:ui.open-quick-create', {})
-  api.window.showSelf('main') // bring your surface forward if it isn't already
-})
-
-// renderer (your webview):
-useEffect(() => {
-  return window.electronAPI.extensionBridge.on('my-ext:ui.open-quick-create', () => {
-    setShowQuickCreate(true)
-  })
-}, [])
-```
-
-See `extensions/notepad/src/index.ts` (`notepad:quick-create`) and `extensions/task-vault/src/index.ts` (`task-vault:capture-to-inbox`) for the pattern working end to end, including the "pending" flag each reads on mount to catch a command that fired before the view existed.
-
-### Calling extension IPC handlers
-
-```typescript
-const result = await window.electronAPI.extensionBridge.invoke('my-ext:my-handler', payload)
-```
-
----
-
-## Migration Guide: v1 → v2
-
-If you have an existing extension using the `renderer.tsx` + registry import pattern:
-
-1. **Create** `src/renderer/App.tsx` — render your existing components, route by `?view=` param.
-2. **Create** `src/renderer/main.tsx` and `index.html` — standard Vite entry.
-3. **Create** `vite.renderer.config.ts` and add `"build:renderer"` to `package.json`.
-4. **Update** `manifest.json` — add `"renderer": "dist/index.html"` and `"contributes": { ... }`.
-5. **Run** `npm run build:renderer` to verify `dist/index.html` is produced.
-6. **Delete** `src/renderer.tsx` (old bundled renderer).
-7. **Replace** `useExtensionRegistry` imports in renderer code with `window.electronAPI.extensionBridge` calls.
-8. **Replace** registry keyboard shortcuts with `contributes.commands` entries in the manifest, each backed by an `api.commands.register` call in your main-process `activate(api)` — the manifest entry alone does nothing (see [Commands and the Quick Actions panel](#commands-and-the-quick-actions-panel)).
-9. **Replace** overlay components with your own `extensionBridge.on('<your-channel>', ...)` handler, wired from the command's `api.commands.register` callback via `api.window.broadcast`.
-
-Key behavioural differences in the webview model:
-
-- `registry.setActiveGlobalTab()` — not available. Navigation between extension surfaces uses URL params.
-- `registry.updateGlobalTab(..., { badge })` — not available. Badge updates require a separate IPC mechanism if needed.
-- Core store imports (`useWorkspaceStore`, etc.) — not available. Use `extensionBridge` and URL params instead.
+1. Only the imports in [What an extension may import](#what-an-extension-may-import). `npm run lint` enforces it.
+2. Reach the core only through `api`. Do not use `electron`, `ipcMain` or child processes for something the API covers; if it does not cover it, the API is extended first (Constitution II).
+3. `api.shell.exec` runs only `git` and `gh`; anything else throws `COMMAND_NOT_ALLOWED`.
+4. Every IPC channel has a schema, and is local-only unless registered `remoteAccessible`.
+5. UI comes from the design system: its components, its tokens, its fonts (Constitution XIII), and `lucide-react` icons (Constitution XII).
+6. `api.nativeMenu` adds to the View menu only.
+7. The SDK follows semantic versioning: a breaking change bumps the major version, and `packages/extension-sdk/CHANGELOG.md` says how to migrate.

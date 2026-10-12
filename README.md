@@ -13,7 +13,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 - **Persistent terminal sessions** — xterm.js `Terminal` instances are never destroyed on tab switch. Buffer, scroll position, and running process survive navigation.
 - **Theme system** — Dark/light themes switch immediately app-wide via CSS custom properties (`[data-theme="light"]` token overrides). Terminal colours re-apply live via a `MutationObserver` — no restart needed. Per-workspace theme overrides are supported.
 - **Settings** — Global and per-workspace configuration for theme, scrollback limit, and default shell.
-- **Quick Actions** — `Cmd+P` opens a leader + which-key panel: a letter acts immediately (`g` opens the Git group, then `p` pushes), `/` (or `Cmd+P` again) switches to fuzzy search over label, category and description, and every action that cannot run right now shows dimmed with its reason instead of being hidden. Pinned actions (`Cmd+.`) sit first, then your most-used actions in a "Pinned & recent" row — both survive a restart. Covers core terminal/session/workspace actions and the v1 extensions (Git, Notepad, Task Vault, Foundry); you can also define your own shell and Claude-prompt actions in Settings, with `{cwd} {branch} {worktree} {repo} {issue} {selection}` variables. See [ADR-057](docs/adr/057-quick-actions-are-a-leader-panel.md) and the [user guide](docs/user-guide/quick-actions.md).
+- **Quick Actions** — `Cmd+P` opens a leader + which-key panel: a letter acts immediately (`g` opens the Git group, then `p` pushes), `/` (or `Cmd+P` again) switches to fuzzy search over label, category and description, and every action that cannot run right now shows dimmed with its reason instead of being hidden. Pinned actions (`Cmd+.`) sit first, then your most-used actions in a "Pinned & recent" row — both survive a restart. Covers core terminal/session/workspace actions and the v1 extensions (Git, Notepad, Task Vault, Foundry); you can also define your own shell and Claude-prompt actions in Settings, with `{cwd} {branch} {worktree} {repo} {issue} {selection}` variables. See [ADR-057](docs/adr/057-quick-actions-are-a-leader-panel.md) and the [user guide](docs/user-guide/USER-GUIDE.md#8-quick-actions).
 - **Extension system** — Extensions install from **any directory on disk** and contribute settings sections, sidebar panels, global tabs, workspace-scoped tabs (hover-reveal icons on repo headers), top-bar menu items, native View menu items, quick-action commands, and terminal event hooks without modifying core code. Extension UIs run in isolated `WebContentsView` contexts — extensions can use any React version or framework; no app rebuild required after updates. See [Extension Development Guide](docs/EXTENSION-DEVELOPMENT.md) and [`packages/extension-sdk/`](packages/extension-sdk/) for type-safe third-party development.
 - **Shared extension UI** — [`packages/extension-ui`](packages/extension-ui/) is the single implementation of the dialog, confirm, popover, toast and empty-state behaviour, published to the bundled extensions, to third parties, and to the core itself. Source-only, React as a peer dependency. Because an extension view is a separate document, a dialog renders inside it ([ADR-038](docs/adr/038-dialogs-render-in-the-extension-view.md)), Escape closes only the innermost surface, and stacking comes from a named four-step scale rather than raw `z-index` numbers. Extension views carry both light and dark themes, and WCAG AA is asserted by rendering every surface in both, not by reading the stylesheet. House rules: [Extension Style Guide](docs/EXTENSION-STYLE.md), with the vocabulary rules enforced by ESLint.
 - **Git Integration** — Built-in first-party extension: a Git tab for staging/committing, and PR creation via `gh` CLI. Configurable per-workspace. Auto-refreshes on file changes.
@@ -21,11 +21,11 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 - **Reviews list** — The global Reviews view lists pull requests that need you (requested of you first, then re-reviews and team requests), your own, and ones you are involved in. **Repositories** in its header opens a picker of every repository your account can reach, grouped by owner with search and select-all per owner; the list then searches only those (empty means all). A section GitHub fails to answer shows its own short error and Retry while the rest still load.
 - **Code Reviews tab** — PR review workflow inside the git-integration extension. Accessed via a hover-reveal icon inside each workspace card header (workspace-scoped tab — the icon appears on hover and is scoped to that workspace's repository). Queue of open/closed PRs with search by title or PR number and a one-line summary — the repository's real waiting count, how many are high risk, and roughly how long the reading is. Pages load on their own; there is no "load more". The list groups itself into Read these first / Quick wins / Larger reviews, so the only filter left is the one the groups cannot express (open more than 3 days). Each row names its risk in words and its action is **Review** — approval happens after the diff, never from the list. PRs are scored across six signals: tests, coverage, CI, lint, churn, and blast radius. Chapter-by-chapter review surface with syntax-highlighted diffs, inline comment threading, and one-click review submission (Approve / Request Changes / Comment) via `gh` CLI. Review sessions (chapter position, file, scroll) persist across restarts. In-progress PRs surface at the top of the queue even when they fall on a later pagination page; closed/merged PRs are automatically pruned from the in-progress list. Hover a paused/in-progress row to reveal a dismiss (×) button that removes it from the list. The pop-out button opens a dedicated focused review window and restores the exact PR, session, and view state. **AI-era enhancements**: universal language-agnostic chapter grouping via git co-change history (works in Go, Python, Ruby, Rust, Java, Swift, and any language), semantic-only diff filter that hides formatting/whitespace-only hunks (in the file header's View menu), DRY violation detection across files with inline chip indicator, large-PR cognitive load warning (>400 LOC) with estimated review time and focus mode showing only medium/high risk files (both in the review header), and issue context section in the overview panel parsing Fixes/Closes/Linear refs from the PR body. **Keyboard**: `]` / `[` move to the next / previous file across chapter boundaries, `}` / `{` jump to the next / previous chapter, `n` goes to the next unviewed file, `v` marks the file viewed, and `?` lists every key; in the chapter list, Up/Down/Home/End move between chapters. The file you are in is a solid accent row, so it reads at a glance in both themes. Diffs are cached per pull request head, so switching files after the first takes milliseconds rather than a network round trip; `npx tsx scripts/perf/git-integration.mts <pr>` measures each step. Requires `gh auth login`.
 - **Foundry** — A software factory. An idea — typed in, or taken from a Linear or Jira issue — is converged with an agent until there is a work order that **compiles**, and then handed to an orchestration that does the work. Two loops, one contract. **The Forge** reads the repository before it asks you anything (its manifests, its house documents, its real commands) and will not hand off until six mechanical checks pass: no open questions, every acceptance criterion falsifiable, coverage complete in both directions, risk graded against _this_ plan, adversarial findings resolved, budgets set. Every failing check carries the move that clears it — the control that answers it, or a redraft carrying the instruction — including the written escape for a criterion nothing here can prove. **The Line** picks a shape of work — a _recipe_, which is a YAML file, not a hardcoded pipeline — and runs it with typed agent roles, verdicts produced by somebody other than whoever did the work, a verification ladder that stops at the first failure, and a security inspection when the change warrants one. A check that fails in the lane — the repository's own lint or test command, run in a terminal tab — sends the work back to its builder once, with the failing output, before it asks you anything (see [ADR-063](docs/adr/063-a-failed-check-sends-the-work-back.md)). Once a draft is open its CI is watched: a red CI goes back to the builder with the failed logs twice before you are asked, and a draft with no checks says "not measured", never green (see [ADR-064](docs/adr/064-ci-is-a-check-with-rounds.md)). Agents can be given Claude Code skills: a role or step names them, and they are mounted for that agent from your data directory, the repository's `.foundry/skills/` or Foundry's own, never written into the repository (see [ADR-065](docs/adr/065-skills-are-mounted-never-installed.md)). **Sensors** watch what the product itself says — CI failing on the base branch, issues piling up under a label, your tracker — while the app is open, and list what they find in the queue across the top of the Forge, under the gates, ranked by how often and how badly. Promoting one seeds a draft order from its evidence; nothing starts until you agree it. They are off until you enable them in Settings (see [ADR-066](docs/adr/066-sensors-propose-never-start.md)). Orders that change the same files **queue** behind each other; when you merge one, the drafts queued behind it are rebased onto the new base and their CI is checked again, or you are told which files conflict (see [ADR-067](docs/adr/067-the-refinery-restacks-it-never-merges.md)). Work ends in a **draft pull request** without being asked, and the decision you are offered is whether to mark it ready. Interruptions come from **named rules**, not from phase boundaries: nought to two decisions on an ordinary change, against nine before, and every one of them says which rule raised it, what it looked at and what happens if you ignore it. Everything that is waiting on a person is counted on the Forge's tab and rendered at the top of the Forge — gates and waiting orders in a band that is there only while something is waiting, the Forge's open questions across the width of the screen above the document, a held tool call above the run graph — so no decision Foundry needs from you sits below a fold. A run that was in flight when you quit is **picked back up**: an agent's terminal is a child of the application and dies with it, so on reopening every step whose agent is gone is named on the Floor, raised in that queue as one row per order — within one poll of opening, not hours later — and restarted from where it stopped, continuing the agent's own conversation rather than starting cold. Stopping a run stops it: the agents are ended, the order is cancelled, and the worktrees are left alone. An **autonomy dial** selects which rules are live; five stay live at every setting, so lights-out never merges anything and never hides a run that has stopped moving. Each order is **one sidebar project** per repository — the architect, the agents and the checks all run in it — named after its Linear ticket's recommended branch and linked to that ticket; a typed idea offers to create the ticket first, and without one the project is `foundry/wo-…` (see [ADR-061](docs/adr/061-one-project-per-order.md)). Deleting an order removes its projects and closes every terminal session in them. The Forge stops you only for what the architect cannot settle: a choice it is at least 90% sure of is taken and shown as an assumption you can strike, and a plan still failing its checks goes back to the architect on its own, up to twice (see [ADR-062](docs/adr/062-the-forge-decides-what-it-is-sure-of.md)). Everything an agent writes is shown as rendered markdown. One order can span several repositories, merged in an order derived from the files they share. The **ledger** records every decision, by whom or by what rule, and why, and the factory measures itself from it: lead time, your time, first-pass yield, reworks, CI rounds, and how often you strike a decision the Forge made for you, shown under the Ledger's **Factory** tab and on the factory's status wall — and, when you ask it and never before, tells you what you keep rejecting and offers a rule for it. Foundry **writes nothing into the repositories it works on**: no scaffolding, no configuration, not even a `.gitignore` entry. Its own records go to `terminator.foundry.dataDir`, or to `<workdir>/.foundry/` if you have not said. A repository _may_ carry its own `.foundry/recipes/…` and those win; none is ever required to. **Factory view** — the Forge's order list and Line can switch to a lit, detailed pixel-art hall where the crew visibly walks to its station, works, calls a tool and carries work down the belt to the next one, drawn live from the same run graph as the list — its front door lists the orders still in play under **Active** and the finished ones, tinted green, under **Completed**, each newest first; nothing moves without a graph transition, a tool call or a gate behind it (see [ADR-060](docs/adr/060-a-factory-is-a-projection.md) and [ADR-079](docs/adr/079-a-station-shows-its-own-work.md)). Status is said inside the hall — each station's name stencilled on the floor beside it, a station that shows the work it is doing (a terminal, a page being read, code being edited, a press stroking), a callout rising where something happened, a station that opens into a pixel-art green-screen monitor showing its agent's transcript live (see [ADR-081](docs/adr/081-a-station-opens-into-its-monitor.md)), and a card pinned over whatever is waiting on you, answerable in place — and a run can be **replayed** afterwards from what was recorded as it went (`run-timeline.jsonl` beside the order's run graph). The toggle sits in the Forge's app bar and as the **Toggle factory view** quick action (`Cmd+P`, then `v`); the preference (`terminator.foundry.view`) is per operator and survives a restart. The queue above it, the Ledger and Settings are unchanged either way.
-- **Notepad** — Markdown notes with live preview, margin comments, full-text search, tags, and import/export. **Folders** — organise notes and diagrams into named folders; create folders via the sidebar header, rename or delete via right-click, and drag items between folders or to the root. **Multi-tag filter** — click the Tags button in the sidebar to open a multi-select dropdown and filter by one or more tags simultaneously (replaces the old single-tag sidebar). **Diagrams** — embed freehand whiteboard diagrams alongside your notes using the [Excalidraw](https://excalidraw.com/) canvas (shapes, arrows, sticky notes, freehand drawing, in-place text editing by double-clicking shapes). Diagrams appear in the same note list as a distinct item type, sorted together by last-updated time; open in a focused pop-out window via the ↗ button. **Diagram export** — diagrams are included in the bulk export dialog (as `.excalidraw.json` files alongside note `.md` files). **Canvas comments** — pin Miro-style comments at any coordinate on a diagram: click the Comment button in the toolbar, click anywhere on the canvas to place a pin, write your comment, and reply or resolve threads inline. Comments follow the canvas when you zoom and pan.
+- **Notepad** — Markdown notes with live preview, margin comments, full-text search, tags, and import/export. **Folders** — organise notes and diagrams into named folders; create folders via the sidebar header, rename or delete via right-click, and drag items between folders or to the root. **Multi-tag filter** — click the Tags button in the sidebar to open a multi-select dropdown and filter by one or more tags simultaneously (replaces the old single-tag sidebar). **Diagrams** — embed freehand whiteboard diagrams alongside your notes using the [Excalidraw](https://excalidraw.com/) canvas (shapes, arrows, sticky notes, freehand drawing, in-place text editing by double-clicking shapes). Diagrams appear in the same note list as a distinct item type, sorted together by last-updated time; open in a focused pop-out window via the ↗ button. **Diagram export** — diagrams are included in the bulk export dialog (as `.excalidraw` files alongside note `.md` files). **Canvas comments** — pin Miro-style comments at any coordinate on a diagram: click the Comment button in the toolbar, click anywhere on the canvas to place a pin, write your comment, and reply or resolve threads inline. Comments follow the canvas when you zoom and pan.
 - **Task Vault** — GTD + Bullet Journal + PARA productivity extension. SQLite-backed vault with daily logs, inbox, projects, areas, and someday list. Global quick-capture hotkey (`Cmd+Shift+Space`). **Recurring tasks** — set daily/weekly/biweekly/monthly recurrence on any task; the engine automatically ensures exactly one future open instance exists at all times (idempotent, UNIQUE INDEX-enforced). 6-step guided weekly review wizard with optional ICS calendar feed integration. Bidirectional links between vault items and terminal sessions. Toggle **kanban view** (grid icon in toolbar) to see all vault tasks in configurable lanes; drag tasks between lanes to change their status; lanes scroll horizontally when there are more lanes than space allows; group tasks into **swimlanes** by project or area; add, rename, reorder, and remove lanes via the Lanes editor; default lanes are Todo / In Progress / In Review / Done; config and view mode persist across restarts. Kanban cards display a markdown-rendered description preview (capped at 2 lines). **Context filter** button always visible in toolbar — click to open a multiselect dropdown to filter all views by one or more `+context` tags; toolbar action buttons are right-aligned. **Task detail panel** — click any task (daily log or kanban card) to open a right-side panel with markdown-capable Description, Acceptance Criteria, and Dev Hints fields (stored in task metadata). **Ghost subtask row** — a faint `· + Add subtask…` row at the bottom of each open task's subtask list expands into an inline input on click.
 - **View menu** — Toggle Sidebar and Open Settings (`Cmd+,`) are in the core View menu. Extensions contribute additional items: Code Reviews in New Window is added by the git-integration extension.
 - **Split panes** — Split the current terminal vertically (`Cmd+D`, side by side) or horizontally (`Cmd+Shift+D`, top/bottom). Splits are recursive — each pane can be split further. Drag the divider bar to resize. Click a pane to focus it; keyboard input goes to the focused pane. `Cmd+W` closes the focused pane (collapsing the split) or the active tab when not in split mode. Each pane shows a blue focus border.
-- **Notification center** — Bell icon in the tab bar opens a panel listing all in-app notifications (toasts, extension events). Unread count badge on the bell. Per-notification dismiss (×), "Mark all read," and "Clear all." ESC or clicking the backdrop closes the panel. Extensions create persistent notifications with action buttons via `api.notifications.createNotification({ type, title, message, actions })` — action callbacks run in the main process. Every toast automatically appears in the center so nothing is lost after auto-dismiss.
+- **Notification center** — Bell icon in the tab bar opens a panel listing all in-app notifications (toasts, extension events). Unread count badge on the bell. Per-notification dismiss (×), "Mark all read," and "Clear all." ESC or clicking the backdrop closes the panel. Extensions create persistent notifications with action buttons via `api.notifications.createNotification({ type, title, message, key, actions })` — action callbacks run in the extension's backend, in the extension host. Every toast automatically appears in the center so nothing is lost after auto-dismiss.
 - **Activity indicators** — Spinning indicator on workspace tiles, project cards, and session tabs while a terminal is running a command or producing output (1.5 s idle debounce). Alert badge (red dot + count) coexists alongside the spinner for sessions awaiting input. OS-level system notification + Dock bounce fires on terminal bell.
 - **Open in your editor** — Right-click a branch to open its working copy in your editor, or a repo header to open the repo. Terminator detects Cursor, VS Code, Windsurf, Zed, Sublime Text, WebStorm, IntelliJ or Xcode, preferring one with a CLI launcher so the folder opens in a window you already have; `ui.editor` pins a specific one. The renderer only ever sends a folder — the command comes from a fixed list in the main process, and is launched with `execFile` rather than a shell, so a directory name can never become a second command.
 
@@ -39,7 +39,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 - **About** — View app version and runtime details (Electron, Node, Chrome, platform) via **Help → About Terminator** (or the **Terminator** app menu on macOS).
 
-- **Remote Control** — Enable a local HTTP/WebSocket server (default port 7681) and optionally an ngrok tunnel so you can access your Terminator terminals from any browser. The password is checked once at login and kept only as a scrypt hash; the browser then holds a session cookie, so the password is never stored in the browser, sent again, or put in the QR code (which carries the address only). Configure via Settings → Remote Control: toggle on/off, choose port, copy the public URL or LAN URL, set or generate the password (a generated password is shown once). Requires `ngrok` for the public tunnel (`brew install ngrok`). **Mobile browser support** — when logged in on a phone (viewport < 768 px), you are redirected to a purpose-built mobile UI at `/mobile/`: a scrollable workspace/terminal list, a full-screen xterm.js terminal view with a control-key toolbar (Ctrl+C, Ctrl+D, Tab, Esc, ↑, ↓), and automatic reconnect via the Page Visibility API (3 attempts × 2 s). Tested on iOS 16+ / Android 12+ (Chrome). Desktop/tablet (≥ 768 px) continues to use the full Electron renderer via `/app/`. Extension views work there only for the channels an extension has declared remote-accessible; every other extension channel (Task Vault's SQL console, Notepad's file import and export, the repository and Foundry channels) stays local to the desktop app.
+- **Remote Control** — Enable a local HTTP/WebSocket server (default port 7681) and optionally an ngrok tunnel so you can access your Terminator terminals from any browser. The password is checked once at login and kept only as a scrypt hash; the browser then holds a session cookie, so the password is never stored in the browser, sent again, or put in the QR code (which carries the address only). Configure it in the Remote Control tab: toggle on/off, choose port, copy the public URL or LAN URL, set or generate the password (a generated password is shown once). Requires `ngrok` for the public tunnel (`brew install ngrok`). **Mobile browser support** — when logged in on a phone (viewport < 768 px), you are redirected to a purpose-built mobile UI at `/mobile/`: a scrollable workspace/terminal list, a full-screen xterm.js terminal view with a control-key toolbar (Ctrl+C, Ctrl+D, Tab, Esc, ↑, ↓), and automatic reconnect via the Page Visibility API (3 attempts × 2 s). Tested on iOS 16+ / Android 12+ (Chrome). Desktop/tablet (≥ 768 px) continues to use the full Electron renderer via `/app/`. Extension views work there only for the channels an extension has declared remote-accessible; every other extension channel (Task Vault's SQL console, Notepad's file import and export, the repository and Foundry channels) stays local to the desktop app.
 
 - **Clickable terminal links** — URLs and file paths in terminal output are underlined on hover. `Cmd+click` a URL to open it in the system browser; `Cmd+click` an absolute path (e.g. `/Users/foo/bar.ts` or `~/project/file.go`) to open it with the default application. Line:col suffixes like `file.go:42:5` are stripped before opening. All links throughout the app (PR comments, CI check links, issue refs) always open in the system browser.
 
@@ -50,6 +50,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 | Layer                  | Technology                                  |
 | ---------------------- | ------------------------------------------- |
 | Framework              | Electron 44.x                               |
+| Extension backends     | Electron `utilityProcess` (extension host)  |
 | Language               | TypeScript 5.x (strict)                     |
 | UI                     | React 18.x + Zustand + Lucide React (icons) |
 | Terminal rendering     | @xterm/xterm 6.x + @xterm/addon-fit         |
@@ -58,14 +59,15 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 | Application database   | `node:sqlite` (SQLite, built into Node 24)  |
 | Schema validation      | Zod 3.x                                     |
 | Remote server          | Fastify 5.x + @fastify/websocket 11.x       |
-| Browser SPA            | xterm.js 6.x (AttachAddon + FitAddon)       |
+| Browser SPA            | @xterm/xterm 6.x + @xterm/addon-fit         |
 | Password hashing       | Node `crypto.scrypt` (random salt)          |
 | Build                  | electron-vite 5.x + vite 7.x (remote SPA)   |
 | Unit/integration tests | Vitest 4.x                                  |
 | E2E tests              | Playwright 1.x                              |
-| UI font                | IBM Plex Sans (@fontsource)                 |
+| Design system          | `@terminator/extension-ui` + Storybook      |
+| Fonts                  | IBM Plex Sans and Mono (@fontsource)        |
 
-Extension dependencies (not part of the core app): `@modelcontextprotocol/sdk`, `gray-matter`, `node-ical` — declared in each extension's own `package.json`.
+Exact versions are in `package.json` (one version per package across the repository, [ADR-097](docs/adr/097-one-version-per-dependency.md)). Each extension declares its own dependencies in its own `package.json`: CodeMirror and Excalidraw in notepad, Fastify in remote-control, web-tree-sitter in git-integration.
 
 ## Documentation
 
@@ -113,144 +115,111 @@ Then open the app normally. You only need to run this once.
 
 ## Available Scripts
 
-| Script                     | Description                                                      |
-| -------------------------- | ---------------------------------------------------------------- |
-| `npm run dev`              | Build extensions + remote SPA + development mode with hot-reload |
-| `npm run build`            | Build extensions + remote SPA + production build                 |
-| `npm run build:extensions` | Compile extension TypeScript → `src/index.js` bundles            |
-| `npm run build:remote`     | Build browser remote-control SPA → `out/renderer-remote/`        |
-| `npm run preview`          | Preview production build                                         |
-| `npm test`                 | Unit + integration tests (Vitest)                                |
-| `npm run test:watch`       | Tests in watch mode                                              |
-| `npm run test:e2e`         | E2E tests (Playwright, launches Electron)                        |
-| `npm run test:coverage`    | Tests with V8 coverage report                                    |
-| `npm run lint`             | ESLint check                                                     |
-| `npm run typecheck`        | TypeScript type check (no emit)                                  |
-| `npm run format`           | Prettier format                                                  |
-| `npm run format:check`     | Check formatting without writing files (CI)                      |
-| `npm run create-extension` | Scaffold a new extension from template                           |
+| Script                     | Description                                                                      |
+| -------------------------- | -------------------------------------------------------------------------------- |
+| `npm run dev`              | Build extensions + remote SPA, then development mode with hot reload             |
+| `npm run build`            | Build extensions + remote SPA + production build                                 |
+| `npm run package`          | Production build packaged as a macOS arm64 app (electron-builder)                |
+| `npm run build:extensions` | Build every extension: backend → `src/index.js` (esbuild), view → `dist/` (Vite) |
+| `npm run build:remote`     | Build the browser remote-control SPA → `out/renderer-remote/`                    |
+| `npm run preview`          | Preview the production build                                                     |
+| `npm test`                 | Unit + integration tests (Vitest) with coverage                                  |
+| `npm run test:watch`       | Tests in watch mode                                                              |
+| `npm run test:coverage`    | Tests with V8 coverage and a JUnit report                                        |
+| `npm run test:live`        | Tests against real services (`vitest.live.config.ts`)                            |
+| `npm run test:e2e`         | E2E tests (Playwright, launches Electron)                                        |
+| `npm run storybook`        | The design system's Storybook                                                    |
+| `npm run test:stories`     | The design system's stories run as tests                                         |
+| `npm run test:visual`      | The design system's screenshot tests (Playwright)                                |
+| `npm run lint`             | ESLint                                                                           |
+| `npm run lint:deps`        | syncpack: one exact version per dependency                                       |
+| `npm run typecheck`        | TypeScript check of main, renderer, shared, packages and extensions (no emit)    |
+| `npm run format`           | Prettier format                                                                  |
+| `npm run format:check`     | Check formatting without writing files (CI)                                      |
+| `npm run create-extension` | Scaffold a new extension                                                         |
 
 ## Project Structure
 
 ```
 src/
-├── main/                     # Electron main process (Node.js)
-│   ├── index.ts              # Entry point: BrowserWindow, app menu, lifecycle
-│   ├── ipc/                  # IPC channel handlers (one file per domain)
-│   ├── terminal/             # PtyManager — node-pty lifecycle
-│   ├── extensions/           # ExtensionHost + ExtensionAPI
-│   └── storage/              # electron-store instances (workspaces, settings)
-├── renderer/                 # React UI (Chromium renderer process)
-│   ├── index.tsx             # Entry point, theme application
-│   ├── components/           # sidebar/, terminal/, settings/
-│   ├── stores/               # Zustand stores (workspace, session, settings)
-│   └── hooks/                # useTerminalSession, useKeyboardShortcuts
-└── shared/
-    ├── types/index.ts        # TypeScript interfaces shared across processes
-    └── schemas/              # Zod schemas (workspace, session, settings, extension)
+├── main/                     # Electron main process
+│   ├── index.ts              # Entry point: window, menu, startup, lifecycle
+│   ├── ipc/                  # IPC handlers, one invoke table per domain
+│   ├── terminal/             # PtyManager, output batching and flow control
+│   ├── extensions/           # ExtensionHost, the Extension API, extension views
+│   │   └── host/             # The extension host process (utilityProcess)
+│   ├── db/                   # app.sqlite (node:sqlite)
+│   └── storage/              # electron-store files (workspaces, settings)
+├── renderer/                 # Desktop UI: React, Zustand stores, sidebar view model
+├── renderer-remote/          # Browser login page and phone client for Remote Control
+└── shared/                   # electron-api manifest, zod schemas, shared types
+
+packages/
+├── extension-sdk/            # @terminator/extension-sdk: the Extension API
+└── extension-ui/             # @terminator/extension-ui: the design system + Storybook
 
 extensions/
-├── git-integration/          # Git status, PR creation, Code Reviews tab
 ├── foundry/                  # The software factory: Forge, Line, ledger
+├── git-integration/          # Git status, pull requests, Code Reviews, MergeFlow
+├── notepad/                  # Markdown notes and diagrams
+├── remote-control/           # Browser and phone access over LAN or ngrok
 └── task-vault/               # GTD+BuJo+PARA productivity vault
 
-tests/
-├── unit/                     # Pure logic: storage, schemas, pty-manager, extensions
-├── integration/              # IPC round-trip tests
-└── e2e/                      # Playwright tests against real Electron app
+tests/                        # Core tests: unit/, integration/, e2e/ (Playwright)
+extensions/*/tests/           # Each extension's own tests
 
 docs/
-├── ARCHITECTURE.md           # Deep-dive: process model, IPC, extension system
+├── ARCHITECTURE.md           # How the app is built
 ├── CONTRIBUTING.md           # Development setup, conventions, PR process
-├── EXTENSION-DEVELOPMENT.md  # Guide for building Terminator extensions
+├── EXTENSION-DEVELOPMENT.md  # Building an extension
+├── EXTENSION-STYLE.md        # UI rules for extensions
 └── adr/                      # Architectural Decision Records
 
-specs/
-├── 001-extension-first-terminal/  # Core terminal + extension system spec & contracts
-├── 002-git-github-integration/    # Git integration spec
-├── 003-pr-review/                 # Code Reviews feature spec & CSS token contract
-├── 004-speckit-pilot-extension/   # SpecKit Pilot spec (superseded by 037)
-├── 005-task-vault-extension/      # Task Vault spec
-├── 006-mergeflow-conflict-resolver/ # MergeFlow conflict resolver spec
-└── 037-foundry-software-factory/  # Foundry spec, contracts and quickstart
+specs/                        # Spec Kit feature specs, plans and contracts
 ```
 
 ## Architecture Overview
 
-Terminator uses Electron's two-process model strictly:
-
-- **Main process** owns all Node.js APIs: PTY processes (`node-pty`), persistent storage (`electron-store`), extension loading, and native dialogs. It communicates with the renderer exclusively through IPC.
-- **Renderer process** (`contextIsolation: true`, `nodeIntegration: false`) runs React + xterm.js. It calls `window.electronAPI.*` (exposed via `preload.ts` contextBridge) for all main-process operations.
-- **Shared layer** (`src/shared/`) contains TypeScript interfaces and Zod schemas used at both ends of the IPC boundary for type-safe, validated communication.
+- **Main process** owns the windows, terminal processes (`node-pty`), the core's settings files and the app database, and answers IPC.
+- **Extension host**, an Electron `utilityProcess`, runs every extension backend, so extension work never shares the event loop that relays terminal output.
+- **Renderers** (`contextIsolation: true`, `nodeIntegration: false`): the main window runs React + xterm.js and calls `window.electronAPI.*` (exposed by `preload.ts`); each extension view is its own `WebContentsView`.
+- **Shared layer** (`src/shared/`) declares `window.electronAPI` once and holds the zod schemas every IPC payload is parsed with.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a full breakdown.
 
 ## Developing an Extension
 
-Extensions install from local directories. Create a directory with a `manifest.json` and a TypeScript entry point:
-
-```json
-{
-  "id": "com.example.my-extension",
-  "name": "My Extension",
-  "version": "1.0.0",
-  "description": "Does something useful",
-  "main": "src/index.ts",
-  "minAppVersion": "0.1.0"
-}
-```
-
-The entry point exports an `activate(api)` function:
-
-```typescript
-// Generated by: npm run create-extension -- my-extension
-// The scaffold produces a correctly typed src/index.js — do not import from src/main/ directly.
-
-'use strict'
-
-const disposables = []
-
-function activate(api) {
-  disposables.push(api.settings.register({ label: 'My Settings', properties: {} }))
-  disposables.push(api.commands.register({ id: 'my-action', label: 'Do Thing' }, () => {}))
-}
-
-function deactivate() {
-  disposables.forEach((d) => d.dispose())
-}
-
-module.exports = { activate, deactivate }
-```
-
-Scaffold a new extension in seconds:
+An extension is a directory under `extensions/` with a `manifest.json`, a backend that exports `activate(api)`, and optionally a view. It imports only `@terminator/extension-sdk`, `@terminator/extension-ui` and its own npm packages.
 
 ```bash
 npm run create-extension -- my-extension
 ```
 
-A production working example is in `extensions/git-integration/`. A minimal test fixture is in `tests/fixtures/sample-extension/`.
-
-See [docs/EXTENSION-DEVELOPMENT.md](docs/EXTENSION-DEVELOPMENT.md) for the full guide including the v1.2.0 API (global tabs, global shortcuts).
+The built-in extensions in `extensions/` are the working examples, and `tests/fixtures/sample-extension/` is a minimal one. See [docs/EXTENSION-DEVELOPMENT.md](docs/EXTENSION-DEVELOPMENT.md) for the full guide.
 
 ## Key Design Decisions
 
-| Decision                                               | Record                                                           |
-| ------------------------------------------------------ | ---------------------------------------------------------------- |
-| PTY processes live in main process only                | [ADR-001](docs/adr/001-pty-in-main-process.md)                   |
-| Extension host lives in main process (Phase 1)         | [ADR-002](docs/adr/002-extension-host-in-main-process.md)        |
-| electron-store for persistence                         | [ADR-003](docs/adr/003-electron-store-for-persistence.md)        |
-| xterm.js instances are never destroyed on tab switch   | [ADR-004](docs/adr/004-xterm-instances-persist-on-tab-switch.md) |
-| Native fs.watch instead of chokidar                    | [ADR-005](docs/adr/005-native-fswatcher-over-chokidar.md)        |
-| Sandboxed shell execution for extensions               | [ADR-006](docs/adr/006-sandboxed-shell-exec-for-extensions.md)   |
-| Bundled-first extension distribution (no marketplace)  | [ADR-007](docs/adr/007-bundled-first-extension-distribution.md)  |
-| Extensions compile to CommonJS with esbuild            | [ADR-008](docs/adr/008-extension-commonjs-compilation.md)        |
-| `gh` CLI for all GitHub PR review operations           | [ADR-009](docs/adr/009-gh-cli-for-review-ops.md)                 |
-| Heuristic file ordering for code review (v1)           | [ADR-010](docs/adr/010-heuristic-file-ordering-v1.md)            |
-| Sanitised HTML in PR comments                          | [ADR-091](docs/adr/091-sanitised-html-in-pr-comments.md)         |
-| The Inbox is a band on the Forge                       | [ADR-092](docs/adr/092-the-inbox-is-a-band-on-the-forge.md)      |
-| ExtensionAPI v1.2.0 additions                          | [ADR-012](docs/adr/012-extension-api-v1.2.0.md)                  |
-| MCP stdio sidecar for Task Vault agent access          | [ADR-013](docs/adr/013-mcp-stdio-sidecar.md)                     |
-| Line-based task IDs (session-scoped, rebuild-on-write) | [ADR-014](docs/adr/014-line-based-task-ids.md)                   |
+| Decision                                              | Record                                                               |
+| ----------------------------------------------------- | -------------------------------------------------------------------- |
+| PTY processes live in main process only               | [ADR-001](docs/adr/001-pty-in-main-process.md)                       |
+| electron-store for persistence                        | [ADR-003](docs/adr/003-electron-store-for-persistence.md)            |
+| xterm.js instances are never destroyed on tab switch  | [ADR-004](docs/adr/004-xterm-instances-persist-on-tab-switch.md)     |
+| Native fs.watch instead of chokidar                   | [ADR-005](docs/adr/005-native-fswatcher-over-chokidar.md)            |
+| Sandboxed shell execution for extensions              | [ADR-006](docs/adr/006-sandboxed-shell-exec-for-extensions.md)       |
+| Bundled-first extension distribution (no marketplace) | [ADR-007](docs/adr/007-bundled-first-extension-distribution.md)      |
+| Extensions compile to CommonJS with esbuild           | [ADR-008](docs/adr/008-extension-commonjs-compilation.md)            |
+| `gh` CLI for all GitHub PR review operations          | [ADR-009](docs/adr/009-gh-cli-for-review-ops.md)                     |
+| Heuristic file ordering for code review (v1)          | [ADR-010](docs/adr/010-heuristic-file-ordering-v1.md)                |
+| Sanitised HTML in PR comments                         | [ADR-091](docs/adr/091-sanitised-html-in-pr-comments.md)             |
+| The Inbox is a band on the Forge                      | [ADR-092](docs/adr/092-the-inbox-is-a-band-on-the-forge.md)          |
+| Stay on Electron and TypeScript                       | [ADR-093](docs/adr/093-stay-on-electron-and-typescript.md)           |
+| Extensions follow the VS Code model (extension host)  | [ADR-094](docs/adr/094-extensions-follow-the-vs-code-model.md)       |
+| Coverage is gated by Codecov                          | [ADR-095](docs/adr/095-coverage-is-gated-by-codecov.md)              |
+| Every IPC channel has a schema                        | [ADR-096](docs/adr/096-every-ipc-channel-has-a-schema.md)            |
+| One version per dependency                            | [ADR-097](docs/adr/097-one-version-per-dependency.md)                |
+| One design system, documented in Storybook            | [ADR-098](docs/adr/098-one-design-system-documented-in-storybook.md) |
+| `node:sqlite` replaces PGlite                         | [ADR-099](docs/adr/099-node-sqlite-replaces-pglite.md)               |
+| Remote Control credentials                            | [ADR-100](docs/adr/100-remote-control-credentials.md)                |
 
 ## Contributing
 

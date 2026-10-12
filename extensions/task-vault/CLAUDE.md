@@ -29,7 +29,7 @@ await window.electronAPI.extensionBridge.invoke('task-vault:vault:list-areas', p
 - **Never** modify `src/main/preload.ts` (core file)
 - **Never** modify `src/shared/electron-api/manifest.ts` (core file)
 - **Never** add extension-only npm deps to the **root** `package.json` — add to `extensions/task-vault/package.json`
-- **Never** import from other extensions (`extensions/git-integration/...`, `extensions/speckit-pilot/...`)
+- **Never** import from other extensions (`extensions/git-integration/...`, `extensions/foundry/...`)
 - **Never** hardcode the extension ID (`terminator.task-vault`) in core app files
 
 ## The API task-vault offers other extensions
@@ -42,4 +42,4 @@ Add deps to `extensions/task-vault/package.json` only. npm workspaces hoist them
 
 ## Terminal Linking
 
-When showing a terminal selector, use `window.electronAPI.extensionBridge` or read session/workspace stores directly. Never expose terminal-link logic through the core preload.
+When showing a terminal selector, list sessions with `window.electronAPI.terminal.listSessions()` in the view or `api.pty.listSessions()` in the backend. Never import the core's stores, and never expose terminal-link logic through the core preload.

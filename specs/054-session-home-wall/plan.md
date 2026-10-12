@@ -15,13 +15,13 @@
 
 ## Technical Context
 
-**Language/Version**: TypeScript 5.5.4, running in the Electron 42.4.1 main and renderer processes.
+**Language/Version**: TypeScript, running in the Electron main and renderer processes. Exact versions are in `package.json` (TypeScript 5.5.4 and Electron 44.7.0 at the time of the architecture work); Node for development is `.nvmrc` (24.21.0).
 
 **Primary Dependencies**:
 
 - React 18.3.1
 - Zustand 4.5.5
-- `xterm` 5.3.0
+- `@xterm/xterm` 6.0.0 (the plan was written against `xterm` 5.3.0, removed by ADR 097)
 - Zod (IPC schemas)
 - lucide-react
 
@@ -29,7 +29,7 @@ No new dependencies.
 
 **Storage**: A new `userData/session-records.json`, in the `issue-link-store` pattern. Preferences are stored in renderer `localStorage`.
 
-**Testing**: Vitest 4.1.9 with jsdom for the renderer. Playwright 1.61.0 with `tests/e2e/helpers.ts` `launchApp` for e2e.
+**Testing**: Vitest with jsdom for the renderer (`npm test`). Playwright with `launchApp` from `tests/e2e/helpers.ts` for e2e (`npm run test:e2e`). Type checks with `npm run typecheck`.
 
 **Target Platform**: macOS arm64 desktop (electron-builder `--mac --arm64`).
 

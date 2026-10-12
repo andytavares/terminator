@@ -1,57 +1,68 @@
 # Architecture: Terminator
 
-**Version**: 0.1.68 | **Updated**: 2026-06-22 | **Electron**: 44.7.0
+This document describes how Terminator is built today, from the processes down to the built-in extensions. Each section names the files that implement it; when the two disagree, the code is right and this document is a bug (Constitution VIII). Decisions and their reasons are in [`docs/adr/`](adr/); this document links to them rather than repeating them.
+
+Read it top to bottom the first time: the process model and the IPC contract are what every later section relies on.
+
+**Versions are not written here, because they drift.** Read them where they are declared:
+
+| What                   | Where                                                                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| The app                | `version` in `package.json`                                                                                                |
+| Electron               | `electron` in `package.json` `devDependencies`                                                                             |
+| Node for development   | `.nvmrc`                                                                                                                   |
+| The Extension SDK      | `version` in `packages/extension-sdk/package.json`; history in its `CHANGELOG.md`                                          |
+| The design system      | `version` in `packages/extension-ui/package.json`                                                                          |
+| Every other dependency | its `package.json`; one exact version per package across the repository ([ADR 097](adr/097-one-version-per-dependency.md)) |
 
 ---
 
-## Process Model
+## Repository layout
 
-Terminator is an Electron application with three kinds of process and one shared code layer: the main process, the renderers, and one extension host (ADR 094).
+| Path                        | What it is                                                                                                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/`                 | The Electron main process: windows, terminals (`terminal/`), IPC handlers (`ipc/`), storage, the extension host's parent side (`extensions/`) |
+| `src/main/extensions/host/` | The extension host process and both ends of its `MessagePort` protocol                                                                        |
+| `src/renderer/`             | The desktop UI: React, Zustand stores (`stores/`), the sidebar view model (`sidebar/`), Quick Actions                                         |
+| `src/renderer-remote/`      | The browser login page and the phone client that Remote Control serves                                                                        |
+| `src/shared/`               | Code both processes use: the `window.electronAPI` manifest (`electron-api/`), zod schemas (`schemas/`), types                                 |
+| `packages/extension-sdk/`   | `@terminator/extension-sdk`: the Extension API declaration the core implements                                                                |
+| `packages/extension-ui/`    | `@terminator/extension-ui`: the design system, used by the core and every extension, with its Storybook                                       |
+| `extensions/*/`             | The built-in extensions: foundry, git-integration, notepad, remote-control, task-vault                                                        |
+| `tests/`                    | Core tests: `unit/`, `integration/`, `e2e/` (Playwright). Each extension keeps its own tests in `extensions/*/tests/`                         |
+| `scripts/`                  | Build and development scripts (`build-extensions.cjs`, `create-extension.cjs`, `perf/`)                                                       |
+| `specs/`                    | Spec Kit feature specs, plans and contracts, one directory per feature                                                                        |
+
+---
+
+## Process model
+
+Terminator is an Electron application with four kinds of process: the main process, the extension host, the main window's renderer, and one renderer per extension view ([ADR 094](adr/094-extensions-follow-the-vs-code-model.md)).
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  Main Process (Node.js)                             │
-│                                                     │
-│  ┌───────────┐  ┌────────────┐  ┌───────────────┐  │
-│  │ PtyManager│  │ Extension  │  │electron-store │  │
-│  │ (node-pty)│  │   Host     │  │  (workspace,  │  │
-│  └─────┬─────┘  └─────┬──────┘  │  settings)    │  │
-│        │              │         └───────────────┘  │
-│  ┌─────▼──────────────▼─────────────────────────┐  │
-│  │           IPC Handlers (ipcMain)              │  │
-│  │  terminal:*  workspace:*  settings:*          │  │
-│  │  extension:*  dialog:*                        │  │
-│  └─────────────────────┬─────────────────────────┘  │
-└──────────┬─────────────┼────────────────────────────┘
-           │ MessagePort (RPC: requests, events, callbacks by id)
-┌──────────▼───────────┐ │
-│ Extension Host       │ │  utilityProcess, out/main/extension-host.js:
-│ every extension      │ │  every backend's activate(), its own
-│ backend              │ │  app.sqlite connection, remote-control's server
-└──────────────────────┘ │
-                         │  contextBridge (preload.ts)
-                         │  window.electronAPI.*
-┌────────────────────────┼────────────────────────────┐
-│  Renderer Process (Chromium + React)                │
-│  contextIsolation: true │ nodeIntegration: false    │
-│                         │                           │
-│  ┌──────────────────────▼─────────────────────────┐ │
-│  │          Zustand Stores                        │ │
-│  │  workspace.store  session.store  settings.store│ │
-│  └──────────────────────┬─────────────────────────┘ │
-│                         │                           │
-│  ┌──────────────────────▼─────────────────────────┐ │
-│  │          React Components                      │ │
-│  │  Sidebar  TabBar  TerminalPane  SettingsPanel  │ │
-│  └────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ Main process (Node.js)                    src/main/index.ts  │
+│  PtyManager (node-pty) · OutputRelay · electron-store files  │
+│  app.sqlite connection · IPC handlers (invoke table)         │
+│  ExtensionHost (manifests, status) · ExtensionViewHost       │
+└───────┬───────────────────────┬──────────────────────┬───────┘
+        │ MessagePort           │ contextBridge         │ WebContentsView
+        │ requests, events,     │ preload.ts            │ preload-webview.ts
+        │ callbacks by id       │ window.electronAPI    │ window.electronAPI
+┌───────▼──────────────┐ ┌──────▼─────────────────┐ ┌───▼──────────────────────┐
+│ Extension host       │ │ Main window renderer   │ │ Extension views          │
+│ utilityProcess       │ │ React · Zustand stores │ │ ext://<id>/<renderer>    │
+│ every extension      │ │ sidebar, tabs, xterm   │ │ one per surface shown    │
+│ backend's activate() │ │ Quick Actions, Settings│ │ the extension's own UI   │
+│ own app.sqlite conn. │ └────────────────────────┘ └──────────────────────────┘
+│ Remote Control server│
+└──────────────────────┘
 ```
 
-**Why this separation?**
-
-- `node-pty` requires native Node.js bindings — unavailable in the sandboxed renderer.
-- `contextIsolation: true` is the Electron security baseline. Disabling it would expose the full Node.js API surface to any XSS vector in the renderer.
-- Extension backends run in a `utilityProcess` so their work never shares the event loop that relays terminal output. It is the only place a backend runs: main never `require()`s an extension's entry point. Native modules (`node-pty`) stay in main; the extension host reaches PTYs through the API. See [ADR-001](adr/001-pty-in-main-process.md) and [ADR 094](adr/094-extensions-follow-the-vs-code-model.md), which supersedes ADR-002.
+- **Main process.** Owns the windows, every terminal process (`src/main/terminal/pty-manager.ts`), the core's settings files and the IPC handlers. `node-pty` is a native module and stays here ([ADR-001](adr/001-pty-in-main-process.md)).
+- **Extension host.** One Electron [`utilityProcess`](https://www.electronjs.org/docs/latest/api/utility-process) that runs every extension backend, so extension work never shares the event loop that relays terminal output. Its entry is `src/main/extensions/host/entry.ts`, built to `out/main/extension-host.js`. It is the only place a backend runs: main never `require()`s an extension's entry point. See [Extension system](#extension-system).
+- **Main window renderer.** The core UI, with `contextIsolation: true` and `nodeIntegration: false`. It reaches main only through `window.electronAPI`, which `src/main/preload.ts` exposes.
+- **Extension views.** Each extension surface is a `WebContentsView` composited over the area the main window reserves for it, loading the extension's own document. It reaches main through `src/main/preload-webview.ts`.
 
 ---
 
@@ -60,17 +71,17 @@ Terminator is an Electron application with three kinds of process and one shared
 The window comes first; everything slow happens beside it. `app.whenReady()` in `src/main/index.ts`:
 
 1. Starts the login-shell PATH probe (macOS only; a login shell takes hundreds of milliseconds) without waiting for it.
-2. Opens the database (synchronous `node:sqlite`) and registers the IPC handlers.
-3. Builds the menu and creates the window.
-4. Calls `ExtensionHost.start({ bundledDirectory, beforeActivation, afterActivation })`.
+2. Opens the database (synchronous `node:sqlite`), registers the `ext://` protocol and the IPC handlers.
+3. Starts the extension host process (`startExtensionHostProcess`), builds the menu and creates the window.
+4. Calls `ExtensionHost.start({ bundledDirectory, beforeActivation, afterActivation })` (`src/main/extensions/extension-host.ts`).
 
-`start` registers every extension synchronously (the stored enabled ones, and any bundled one not yet in the store), so `extension:list` is complete as soon as the renderer can ask. It then activates them **all at once** after `beforeActivation` (the PATH probe, which extension code that spawns tools needs). Activation is isolated per extension: a throwing `activate` marks that extension `error` and nothing else. No extension depends on another's activation: each creates its own tables and registrations, and the one table two of them share (`settings`) is created with `CREATE TABLE IF NOT EXISTS`, which does not care who goes first.
+`start` registers every extension synchronously (the stored enabled ones, and any bundled one not yet in the store), so `extension:list` is complete as soon as the renderer can ask. It then activates them concurrently once `beforeActivation` (the PATH probe, which extension code that spawns tools needs) has resolved. An extension that lists others in its manifest's `extensionDependencies` waits for their activation first; a dependency cycle fails every extension in it. Activation is isolated per extension: a throwing `activate` marks that extension `error` and nothing else. The one table two extensions share (`settings`) is created with `CREATE TABLE IF NOT EXISTS`, so activation order does not matter for it.
 
-`afterActivation` runs once every extension has activated. It is where the legacy PGlite import (`legacy-pglite-import.ts`) runs, because it copies into tables the extensions create in `activate`.
+`afterActivation` runs once every extension has activated. It is where the legacy PGlite import (`src/main/db/legacy-pglite-import.ts`) runs, because it copies into tables the extensions create in `activate`.
 
 An extension view is created by `extension:update-panel-bounds`, which first awaits `ExtensionHost.whenActivated(extensionId)`: the extension's own activation, and the import when one is pending. A view therefore never loads before the backend it talks to, and one slow extension delays only its own view.
 
-Because the PATH probe now runs beside the window, a child process started from a core IPC handler in the first moments after launch can still see the app's own PATH on macOS. Extension code is not affected (it waits on `beforeActivation`).
+Because the PATH probe runs beside the window, a child process started from a core IPC handler in the first moments after launch can still see the app's own PATH on macOS. Extension code is not affected (it waits on `beforeActivation`).
 
 ### Loops in the main process
 
@@ -80,73 +91,90 @@ Because the PATH probe now runs beside the window, a child process started from 
 
 ---
 
-## IPC Contract
+## IPC contract
 
-All renderer-to-main communication goes through `window.electronAPI`. The surface is declared once as a channel manifest (`src/shared/electron-api/manifest.ts`) — each method's channel, kind (invoke/send/event), payload mapping, and remote behavior — and both adapters are generated from it: `src/main/preload.ts` (native, `contextBridge` over `ipcRenderer`) and `src/renderer-remote/electron-api-shim.ts` (browser, WebSocket bridge). The manifest also derives the core remote allowlist (see [ADR-023](adr/023-channel-manifest-and-declared-remote-access.md)). Every IPC payload is validated with Zod at both ends.
+### The renderer side: one manifest
 
-On the main-process side, every core invoke channel registers through the schema table, `registerInvokeTable` in `src/main/ipc/invoke-table.ts`, where each row carries a required Zod `schema`, the `invalid` response for a payload that fails it, and the `run` handler ([ADR-096](adr/096-every-ipc-channel-has-a-schema.md)); the table is the only caller of `handleChannel` (`src/main/ipc/channel-registrar.ts`) besides the extension API (`api.ipc.registerHandler`), and an ESLint rule keeps it that way. The remote bridge dispatches to that same registered handler, so a payload from a ticket holder is validated exactly as the renderer's is. Registration records the channel and its remote-access declaration in the bridge registry — `ipcMain` is never monkey-patched. Terminal session state lives solely in `PtyManager` (see [ADR-024](adr/024-ptymanager-session-authority.md)).
+All renderer-to-main communication goes through `window.electronAPI`. The surface is declared once, in `src/shared/electron-api/manifest.ts`: each method's path, channel, kind (invoke, send or event), payload mapping, remote behaviour and TypeScript `signature`. `src/shared/electron-api/build-api.ts` builds the object from it at run time, for two transports:
 
-### Channel namespaces
+- `src/main/preload.ts`: native, `contextBridge` over `ipcRenderer`.
+- `src/renderer-remote/electron-api-shim.ts`: a browser, over Remote Control's WebSocket bridge.
 
-| Namespace        | Direction        | Description                                                                                                                          |
-| ---------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `terminal:*`     | renderer ↔ main | PTY lifecycle: create, close, input, output, acknowledge, resize, cleanup                                                            |
-| `workspace:*`    | renderer → main  | Workspace and project CRUD                                                                                                           |
-| `project:*`      | renderer → main  | Project CRUD (scoped under workspace)                                                                                                |
-| `settings:*`     | renderer → main  | Global and per-workspace settings                                                                                                    |
-| `dialog:*`       | renderer → main  | Native OS dialogs (folder picker)                                                                                                    |
-| `extension:*`    | renderer → main  | Extension install, toggle, contribution queries                                                                                      |
-| `git:*`          | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create                                                                           |
-| `github:*`       | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence, active-review tracking, prune closed/merged       |
-| `shell:exec`     | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)                                                                                  |
-| `fs:*`           | renderer ↔ main | File watch start/stop; `fs:read-file`; `fs:changed` push events                                                                      |
-| `remote:*`       | main ↔ renderer | Remote control server: `remote:status` (main→renderer), `remote:tunnel-reconnect` (renderer→main), `remote:update-password` (invoke) |
-| `log:push`       | main → renderer  | Forwards main-process log entries to renderer LogWindow                                                                              |
-| `integrations:*` | renderer ↔ main | Issue trackers: connection status, connect/disconnect, issue list/search/get/comment, project↔issue links, agent-context preview    |
+`src/shared/electron-api/api-type.ts` derives the renderer's `ElectronAPI` type from the manifest with mapped types, so a renderer call site type-checks against it. The manifest also derives the core's remote allowlist ([ADR-023](adr/023-channel-manifest-and-declared-remote-access.md)).
 
-Full channel specifications: [`specs/001-extension-first-terminal/contracts/ipc-channels.md`](../specs/001-extension-first-terminal/contracts/ipc-channels.md),
-[`specs/002-git-github-integration/contracts/ipc-channels-git.md`](../specs/002-git-github-integration/contracts/ipc-channels-git.md),
-[`specs/003-pr-review/contracts/ipc-channels-pr-review.md`](../specs/003-pr-review/contracts/ipc-channels-pr-review.md),
-and [`specs/031-linear-project-integration/contracts/ipc-channels.md`](../specs/031-linear-project-integration/contracts/ipc-channels.md).
+Specs marked `extensionView` are what an extension view receives. `src/main/preload-webview.ts` is still written by hand, because two preload entries sharing the builder would make Rollup emit a chunk the sandboxed preload cannot load; `tests/unit/main/preload-webview.spec.ts` fails when it and the manifest disagree on a method, a channel or a payload. electron-vite's `build.preload.isolatedEntries` removes that shared chunk, but in 5.0.0 it crashes when stdout is not a terminal (CI pipes the build); 6.0.0-beta.8 guards it, so the webview preload moves onto `build-api.ts` when electron-vite 6.0.0 is released.
 
-### Type safety
+### The main side: the invoke table and `ChannelSpec`
 
-- `src/shared/types/index.ts` — TypeScript interfaces used by both processes.
-- `src/shared/schemas/` — Zod schemas. Validate IPC payloads before use; a payload that fails its schema gets the `invalid` response declared in the channel's table row (usually an `{ error: 'VALIDATION_ERROR' }` envelope shaped like the channel's other responses).
-- `src/shared/electron-api/manifest.ts` — The one declaration of `window.electronAPI`. Each method is a spec with its path, channel, payload mapping and TypeScript `signature`. `src/main/preload.ts` and the remote shim build the object from it at run time (`build-api.ts`), and `api-type.ts` derives the renderer's `ElectronAPI` type from it with mapped types, so a renderer call site type-checks against the manifest. Specs marked `extensionView` are what an extension view receives; `src/main/preload-webview.ts` is still written by hand, because two preload entries sharing the builder would make Rollup emit a chunk the sandboxed preload cannot load, and `tests/unit/main/preload-webview.spec.ts` fails when it and the manifest disagree on a method, a channel or a payload. electron-vite's `build.preload.isolatedEntries` removes that shared chunk, but in 5.0.0 it crashes when stdout is not a terminal (CI pipes the build); 6.0.0-beta.8 guards it, so the webview preload moves onto `build-api.ts` when electron-vite 6.0.0 is released.
+Every invoke channel, core and extension, is a `ChannelSpec` (declared in `packages/extension-sdk/src/index.ts`): the channel name, a required zod `schema`, the `invalid` response for a payload the schema rejects, `run`, which receives the parsed payload, and an optional `onError` ([ADR-096](adr/096-every-ipc-channel-has-a-schema.md)). `dispatchChannel` is the one parse step both kinds share.
+
+- Core channels are registered by `registerInvokeTable` (`src/main/ipc/invoke-table.ts`), one table per `src/main/ipc/*.ipc.ts` file that has invoke channels (`log.ipc.ts` has only a send channel).
+- Extension channels are registered by `api.ipc.registerHandler(spec, { remoteAccessible? })` in `src/main/extensions/api.ts`. The spec's `schema` and `run` stay in the extension host, which validates the payload before `run`.
+
+Both call `handleChannel` (`src/main/ipc/channel-registrar.ts`); ESLint (`eslint.config.mjs`) forbids any other caller. Registration records the channel and its remote-access declaration in the bridge registry (`src/main/remote/ipc-registry.ts`); `ipcMain` is never patched. The remote bridge dispatches to the same registered handler, so a payload from a remote client is validated exactly as the renderer's is.
+
+Push events (main to renderer) go through `webContents.send`. Everything sent to the main window is also relayed to the extension views, except `terminal:*` and `workspace:changed`, which have their own paths (`src/main/index.ts`).
+
+### Core channel namespaces
+
+These are the channels the core registers or pushes (`src/shared/electron-api/manifest.ts`):
+
+| Namespace                                               | What it carries                                                                                                   |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `terminal:*`                                            | Create, attach, input, output, acknowledge, resize, close, process exit, list, cleanup                            |
+| `workspace:*`                                           | Workspace create, list, update, delete, reorder; the active selection                                             |
+| `project:*`                                             | Project create, list, rename, branch, delete, reorder                                                             |
+| `settings:*`                                            | Global and per-workspace settings                                                                                 |
+| `session-records:*`                                     | Session descriptions, links and agent conversations (see [Home and the Monitor wall](#home-and-the-monitor-wall)) |
+| `integrations:*`                                        | Issue trackers: connection, issue list, search, get, comment, project links, agent context                        |
+| `git:*`                                                 | Branches, worktrees, fetch and change statistics the core sidebar needs                                           |
+| `shell:*`                                               | `shell:exec` (git and gh only; `cwd` confined to `workspaceRoot` when one is given), `open-path`, `open-external` |
+| `fs:*`                                                  | File watch start and stop, `fs:read-file`, `fs:changed` pushes                                                    |
+| `extension:*`                                           | Install, toggle, reload, list, settings, commands, view bounds, insets, theme, exit gesture                       |
+| `notifications:*`                                       | Create, list, dismiss, trigger an action, push                                                                    |
+| `metrics:*`                                             | System and per-process metrics                                                                                    |
+| `menu:*`                                                | Native menu events pushed to the renderer                                                                         |
+| `editor:*`                                              | Detect and open an external editor                                                                                |
+| `app:*`, `db:*`, `dialog:*`, `log:*`, `quick-actions:*` | App info, database health, folder picker, renderer log lines, opening Quick Actions                               |
+
+An extension's channels are its own and the core knows nothing of them: git-integration registers `git:status`, `github:*` and others, Foundry `foundry:*`, task-vault `task-vault:*`. Each extension's spec files and `src/ipc/` directory are their reference.
+
+### Types and schemas
+
+- `src/shared/types/index.ts`: TypeScript interfaces both processes use.
+- `src/shared/schemas/`: zod schemas for core payloads and stored shapes. A payload that fails its schema gets the `invalid` response declared in the channel's table row, usually an `{ error: 'VALIDATION_ERROR' }` envelope shaped like the channel's other responses.
 
 ---
 
-## Data Model
+## Data and persistence
 
 ```
 Workspace ──── (many) ──── Project
                                │
-                               └── (many) ── TerminalSession [in-memory only]
+                               └── (many) ── TerminalSession [in memory only]
 
 GlobalSettings ──── (many) ──── WorkspaceSettings [per-workspace overrides]
 
-Extension ──── contributes to ──── GlobalSettings.extensions[extensionId]
+Extension ──── contributes to ──── extension settings (by key)
 ```
 
-### Persistence boundaries
+| Entity                            | Stored? | Where                                                                            |
+| --------------------------------- | ------- | -------------------------------------------------------------------------------- |
+| Workspace, Project                | Yes     | electron-store `workspaces.json` (`src/main/storage/workspace-store.ts`)         |
+| GlobalSettings, WorkspaceSettings | Yes     | electron-store `settings.json` (`src/main/storage/settings-store.ts`)            |
+| Extension settings                | Yes     | electron-store `extension-settings.json` (`storage/extension-settings-store.ts`) |
+| Extension registry                | Yes     | electron-store `extensions.json` (`src/main/extensions/extension-host.ts`)       |
+| Extension data                    | Yes     | `userData/app.sqlite`, each extension's own tables                               |
+| SessionRecord                     | Yes     | `session-records.json`; kept 30 days past close                                  |
+| AgentConversation                 | Yes     | On its `SessionRecord`; the transcript itself is the agent's                     |
+| Agent session reports             | Yes     | `userData/agent-sessions/<terminal id>.json`, one per terminal                   |
+| Tracker credentials               | Yes     | `integrations.json`, each value `safeStorage`-encrypted                          |
+| Tracker connection config         | Yes     | `integrations.json`, plaintext beside the credential                             |
+| TerminalSession metadata          | No      | Renderer memory (`session.store.ts`) and `PtyManager`                            |
+| xterm.js buffer                   | No      | The xterm.js `Terminal` instance                                                 |
+| PTY process                       | No      | An OS process, killed on tab close or app quit                                   |
 
-| Entity                    | Stored? | Where                                                          |
-| ------------------------- | ------- | -------------------------------------------------------------- |
-| Workspace, Project        | Yes     | electron-store (`workspaces.json`)                             |
-| GlobalSettings            | Yes     | electron-store (`settings.json`)                               |
-| WorkspaceSettings         | Yes     | electron-store (`settings.json`)                               |
-| Extension registry        | Yes     | electron-store (`extensions.json`)                             |
-| TerminalSession metadata  | No      | In-memory (Zustand)                                            |
-| SessionRecord             | Yes     | Main process, `session-records.json`; 30 days past close       |
-| AgentConversation         | Yes     | On its `SessionRecord`; the transcript itself is the agent's   |
-| Agent session reports     | Yes     | `userData/agent-sessions/<terminal id>.json`, one per terminal |
-| xterm.js buffer           | No      | In-memory (xterm.js Terminal instance)                         |
-| PTY process               | No      | OS process (killed on tab close or app quit)                   |
-| Tracker credentials       | Yes     | `safeStorage`-encrypted (`integrations.json`)                  |
-| Tracker connection config | Yes     | Plaintext beside the credential (`integrations.json`)          |
-
-Sessions do not survive app restart. This is an explicit Phase 1 scope decision. What the operator wrote about a session does: its description and its own work item link are a `SessionRecord`, kept until 30 days after the session closes (see [Home and the Monitor wall](#home-and-the-monitor-wall), ADR 054). So does the agent conversation that ran in it, which can be picked up again afterwards (see [Resuming an agent session](#resuming-an-agent-session), ADR 055).
+Terminal sessions do not survive an app restart. What the operator wrote about a session does: its description and its own work item link are a `SessionRecord`, kept until 30 days after the session closes (see [Home and the Monitor wall](#home-and-the-monitor-wall), ADR 054). So does the agent conversation that ran in it, which can be picked up again afterwards (see [Resuming an agent session](#resuming-an-agent-session), ADR 055).
 
 See [ADR-003](adr/003-electron-store-for-persistence.md) for the storage decision. The core stores are read through a per-key cache (see [Loops in the main process](#loops-in-the-main-process)).
 
@@ -158,7 +186,7 @@ See [ADR-003](adr/003-electron-store-for-persistence.md) for the storage decisio
 
 ---
 
-## Terminal Session Lifecycle
+## Terminal sessions
 
 ```
 createSession() called
@@ -224,13 +252,13 @@ process that prints faster than xterm can parse blocks on its own output instead
 memory. Only output actually delivered to a window is counted, output for a session with no subscriber is
 acknowledged on arrival, and `terminal:attach` forgets what an earlier renderer owed, so a reload cannot
 leave a process paused. A browser client (remote) does not acknowledge: its output arrives by its own path. A terminal an extension
-opens (`api.pty.openTerminalTab`) uses the same relay, not a broadcast to every window and view.
+opens (`api.pty.openTerminal`) uses the same relay, not a broadcast to every window and view.
 In the renderer the output router (`src/renderer/terminal/output-router.ts`) holds the one
 `terminal:output` listener and dispatches by session id.
 
 ---
 
-## Settings Resolution
+## Settings resolution
 
 Settings use a two-level hierarchy: global defaults + optional workspace overrides.
 
@@ -246,9 +274,15 @@ The shape is declared once, as zod schemas in `src/shared/schemas/settings.schem
 
 ---
 
-## Extension System
+## Extension system
 
-Extensions are Node.js CommonJS modules. `ExtensionHost` (main) reads and validates their manifests and keeps their status; their backends run in the extension host, one `utilityProcess` that `ExtensionHostProcess` (`src/main/extensions/host/host-process.ts`) starts on the first activation (ADR 094). `ExtensionHost` is constructed with that process (`src/main/index.ts`) and has no other way to load a backend; its unit specs give it a test double of the same `BackendHost` interface.
+The core and the extensions meet only through the Extension SDK, on VS Code's model ([ADR 094](adr/094-extensions-follow-the-vs-code-model.md), Constitution II). `packages/extension-sdk/types/api.d.ts` declares the API; `src/main/extensions/api.ts` implements it and the compiler checks the two agree. The core builds and runs with every extension directory deleted. How to write an extension is in [EXTENSION-DEVELOPMENT.md](EXTENSION-DEVELOPMENT.md); this section is how the core runs one.
+
+Three classes share the work in main:
+
+- `ExtensionHost` (`src/main/extensions/extension-host.ts`) reads and validates manifests, keeps each extension's status in `extensions.json`, and activates, reloads, toggles and unloads extensions.
+- `ExtensionHostProcess` (`src/main/extensions/host/host-process.ts`) starts the extension host `utilityProcess` and restarts it. `ExtensionHost` is constructed with it (`src/main/index.ts`) and has no other way to load a backend; its unit specs give it a test double of the same `BackendHost` interface.
+- `ExtensionViewHost` (`src/main/extensions/extension-view-host.ts`) creates, places and themes the extensions' `WebContentsView`s.
 
 ### The process boundary
 
@@ -261,223 +295,73 @@ Extensions are Node.js CommonJS modules. `ExtensionHost` (main) reads and valida
 | `host/api-server.ts`                           | main           | Runs each call on that extension's `ExtensionAPI` from `api.ts`, for members in `CROSSING_MEMBERS` only; keeps registrations by id     |
 | `host/rpc-endpoint.ts`                         | both           | Requests with answers, events without, errors with their `name`                                                                        |
 
-Values the core holds cross as promises, except `settings.get`, `workspace.list` / `listProjects` and `issues.supports*`, which read a snapshot main pushes on every change (`onExtensionSettingsChanged`, `onWorkspacesChanged`). `pty.onData` arrives batched, one message per frame (`pty-stream.ts`), every batch before the exit. A channel's or command's schema stays in the extension host, which validates the payload before `run`.
+Values the core holds cross as promises, except `settings.get`, `workspace.list` / `listProjects` and `issues.supports*`, which read a snapshot main pushes on every change (`onExtensionSettingsChanged`, `onWorkspacesChanged`). `pty.onData` arrives batched, one message per frame (`src/main/extensions/pty-stream.ts`), every batch before the exit. A channel's or command's schema stays in the extension host, which validates the payload before `run`.
 
-When the extension host exits unasked the app stays up: it is started again once and its backends activated again, each after the extensions it declares in `extensionDependencies`, as at startup, so a consumer's `api.extensions.get` returns its provider's new exports. A backend whose dependency fails to come back fails too. A second exit marks them all failed, and Settings → Extensions shows them as `error` with the reason as the status's tooltip. The failure is not stored, so the next launch tries again.
+When the extension host exits unasked the app stays up: it is started again once (`HOST_RESTARTS`) and its backends activated again, each after the extensions it declares in `extensionDependencies`, as at startup, so a consumer's `api.extensions.get` returns its provider's new exports. A backend whose dependency fails to come back fails too. A second exit marks them all failed, and Settings → Extensions shows them as `error` with the reason as the status's tooltip. The failure is not stored, so the next launch tries again.
 
-### Bundled extensions
+### Loading an extension
 
-First-party extensions (like `extensions/git-integration/`) are auto-loaded at startup by `ExtensionHost.start` (see [Startup sequence](#startup-sequence)). It scans the `extensions/` directory for subdirectories containing a `manifest.json`, registers each one, and activates them concurrently. See [ADR-007](adr/007-bundled-first-extension-distribution.md).
+Every directory under `extensions/` with a `manifest.json` is a bundled extension and is registered at startup ([ADR-007](adr/007-bundled-first-extension-distribution.md)); others are installed from Settings → Extensions → Install from Directory and remembered in `extensions.json`. Loading one:
 
-### Loading sequence
+1. Reads `manifest.json` and validates it with `ExtensionManifestSchema` (`src/shared/schemas/extension.schema.ts`).
+2. Checks `minAppVersion` against the app version (`isVersionCompatible`); an incompatible extension is marked `error`.
+3. Waits for the extensions it lists in `extensionDependencies`; a missing, disabled or failed dependency fails it with a message naming the dependency.
+4. Creates the extension's `ExtensionAPI` in main (`createExtensionAPI` in `api.ts`) and asks the extension host to `require()` the manifest's `main`, a CommonJS file ([ADR-008](adr/008-extension-commonjs-compilation.md)), and call `activate` with the host-side API, whose calls run on main's.
+5. Records what `activate` registered, so unloading disposes all of it. A throwing `activate` marks the extension `error`; the app and the other extensions are unaffected.
 
-```
-ExtensionHost.load(directoryPath)
-      │
-      ├─ reads manifest.json (ADR-008: manifest.json, not extension.json)
-      ├─ validates with ExtensionManifestSchema (Zod)
-      ├─ checks minAppVersion compatibility
-      ├─ creates the extension's ExtensionAPI in main (api.ts)
-      ├─ asks the extension host to require() the entry point (ADR-008) and call
-      │  activate(api) with the host's ExtensionAPI, whose calls run on main's
-      │        │
-      │        └─ api.settings.register()           → globalRegistry.settingsSections
-      │           api.settings.get()               → getExtensionSetting(key)
-      │           api.settings.set()               → setExtensionSetting(key, value) (v1.4.0)
-      │           api.topBar.registerMenuItem()     → globalRegistry.topBarItems (v1.1.0)
-      │           api.nativeMenu.addViewMenuItem()  → globalRegistry.nativeMenuItems + rebuild (v1.1.0)
-      │           api.shell.exec()                  → shell-executor.ts (sandboxed, v1.1.0)
-      │           api.notifications.showToast()     → notificationManager (settings-resolved targets, v1.1.0)
-      │           api.ipc.registerHandler()         → ipcMain.handle() (v1.1.0)
-      │           api.ipc.invokeChannel()           → dispatches to a registered ipcMain handler (v1.4.0)
-      │           api.ipc.sendChannel()             → dispatches to a registered ipcMain send handler (v1.4.0)
-      │           api.ipc.onWindowEvent()           → subscribes to EventEmitter events from renderer (v1.4.0)
-      │           api.commands.register()           → globalRegistry.commandContributions / commandHandlers (v1.1.0)
-      │           api.terminal.onSessionCreate()    → globalRegistry.sessionCreateHandlers
-      │           api.globalShortcut.register()     → electron globalShortcut (v1.2.0)
-      │           api.pty.spawnSession/write/resize/kill() → PtyManager (injected via ExtensionAPIDeps, v1.4.0)
-      │
-      │        Note: registerWorkspaceTab() is a renderer-registry-only surface (v1.3.0).
-      │        It is called from the extension's renderer.tsx, not from activate(api).
-      │           registry.registerWorkspaceTab()   → registry.workspaceTabs Map
-      │           api.workspace.list()              → workspace-store.listWorkspaces() (v1.2.0)
-      │           api.window.openAuxiliary()        → BrowserWindow factory (v1.2.0)
-      │           api.window.broadcast()            → send channel to all BrowserWindows (v1.4.0)
-      │           api.notifications.createNotification() → notificationManager (v1.2.0)
-      │
-      └─ errors in activate() set status: 'error', app stays stable (FR-028)
-```
+The renderer learns the enabled extensions from `extension:list` and turns each manifest's `contributes` into tabs, panels and commands (`initExtensions` in `src/renderer/extensions/loader.ts`), registered in the renderer's extension registry (`src/renderer/extensions/registry.ts`). That registry is internal to the core: an extension contributes surfaces only through its manifest.
 
-### Extension build pipeline
-
-Extension main-process TypeScript (`extensions/*/src/index.ts` and its imports) is compiled to a CommonJS bundle (`extensions/*/src/index.js`) by `scripts/build-extensions.cjs` using esbuild. The compiled bundle is gitignored and must never be committed. `npm run dev` and `npm run build` both invoke this step automatically via the `build:extensions` script. Renderer-side extension code (`renderer.tsx` and React components) is bundled by electron-vite through the main renderer build.
-
-Extension authors must keep main-process entry points free of React/DOM imports — those belong in `renderer.tsx`.
-
-### Pop-out windows
-
-The `window:open-pr-review` IPC handler, registered by the git-integration extension in `extensions/git-integration/src/index.ts` via `api.ipc.registerHandler`, calls `api.window.openAuxiliary('pr-review', params)`. The host creates a new `BrowserWindow` that loads the renderer URL with `?view=pr-review&repoRoot=<path>` (and optionally `&prNumber=<n>&showOverview=<bool>` to restore directly into an active review). The renderer's `src/renderer/index.tsx` detects the `view` query param and renders `PrReviewWindow` instead of `App` — a minimal wrapper around `PrReviewTab` with no workspace/terminal chrome. `PrReviewTab` reads the remaining URL params on mount to auto-navigate to the correct PR and session state. This pattern can be reused for other focused views. Closing a review pauses its session through the store's `setPaused`, which writes the whole session (viewed marks, private notes and unsent draft comments included); a session written without them would replace the stored one and erase them. Every markdown preview in the extension, including the Open Pull Request template preview, goes through the sanitising `RichContent` component (ADR 091); the extension has no other markdown renderer.
-
-The review's cost grows with the PR, so two paths keep it bounded. In the main process, `github:pr-detail` runs `analysePr` (`extensions/git-integration/src/review/analyse.ts`), which parses each file's patch once (`parsePrFiles`) and hands the parsed files to the reading-order, moved-code and insights passes. Every tree-sitter parse goes through `withSyntaxTree` (`review/symbols.ts`), which deletes the tree when its reader returns: web-tree-sitter trees live in WASM memory that garbage collection does not reclaim. In the renderer, `ReviewDiffPane` flattens a file into list entries (`review/diff-items.ts`) and `VirtualDiffList` mounts only those near the viewport with `@tanstack/react-virtual`, measuring each entry so comments keep their place. Code rows are memoised (`DiffLineRows.tsx`), so a drag or a divider move re-renders only the rows whose state changed. Rows off screen are not in the DOM: scroll to a hunk or line by entry index, never by querying rows.
-
-Pop-outs are top-level windows of the same app, so on macOS they are reached like any app's second window, not through Cmd+Tab (which switches apps). The Window menu (`src/main/window-menu.ts`) carries the `window` role, so macOS lists every open window in it, and it leaves Cmd+`unbound so the OS cycles through them. Each pop-out names itself through`document.title`(the note's or diagram's title, or`#<n> <PR title> — Review`) so that list is readable.
-
-### Sandboxed Shell Execution (v1.1.0)
-
-`api.shell.exec()` allows extensions to run `git` and `gh` commands, which main runs through `shell-executor.ts`: the call crosses from the extension host on its port, and `onOutput` chunks come back as callback events before the result. The `shell:exec` IPC channel exists separately for renderer-initiated shell calls.
-
-Commands resolve against `process.env.PATH`. On macOS an app started from the Dock or Finder gets `/usr/bin:/bin:/usr/sbin:/sbin`, which has no Homebrew `gh`, so at startup `login-shell-path.ts` puts the login shell's PATH (`$SHELL -ilc`) ahead of it. A command that cannot be started reports its spawn error (`spawn gh ENOENT`) as stderr, never a bare exit code. A command killed by its timeout resolves with `timedOut: true` and exit code 124, never 0.
-
-Security constraints: command allowlist `['git', 'gh']`, CWD pinned to project root, `shell: false`, sanitized environment. See [ADR-006](adr/006-sandboxed-shell-exec-for-extensions.md).
-
-### File System Watch (v1.1.0)
-
-`FsWatcherService` (`src/main/fs/fs-watcher.ts`) manages OS-level `fs.watch` events with a polling fallback. The service pushes `fs:changed` events to the renderer via `webContents.send`. See [ADR-005](adr/005-native-fswatcher-over-chokidar.md).
-
-### Reserved keyboard shortcuts
-
-There is no extension-facing shortcut registration API. `api.keyboard.register()` existed through feature 056 but was never read by anything and is deleted as of feature 057 (see [ADR-057](adr/057-quick-actions-are-a-leader-panel.md)) — an extension cannot bind a global accelerator. `CommandContribution.shortcut` (`api.commands.register`) is a **display hint only**: it renders next to the action in the Quick Actions panel, and setting it does not make the key combination do anything. The only real key bindings left are core's own, in `useKeyboardShortcuts.ts` and the menu accelerators in `src/main/index.ts` — both are enumerated in `src/renderer/quick-actions/shortcut-behaviors.ts`'s `CORE_SHORTCUTS`, and a unit test fails if either source gains an accelerator with no matching action.
-
-### Webview Renderer System (v2.0.0)
-
-Extension UIs run in isolated Electron `WebContentsView` instances — separate browser contexts completely isolated from the host renderer. This eliminates the dual-React-instance problem and decouples extension rendering from the core app build.
+### Extension views
 
 ```
-Host Renderer (React)
-│
-├─ ExtensionPanelPortal (layout placeholder)
-│    │  reports bounds via extension:update-panel-bounds IPC
-│    ▼
-│  ExtensionViewHost (Main Process)
-│    │  creates / positions WebContentsView over placeholder bounds
-│    ▼
-│  WebContentsView (isolated browser context)
-│    │  loads ext://extension-id/dist/index.html
-│    │  has its own preload (dist-electron/preload/webview.js)
-│    ▼
-│  Extension Renderer (any framework, any React version)
-│    │  window.electronAPI.extensionBridge.invoke(channel, payload)
-│    │  window.electronAPI.extensionBridge.on(channel, handler)
+Main window renderer                         Main process
+  ExtensionPanelPortal (placeholder)  ──►    ExtensionViewHost
+    reports its bounds over                    creates a WebContentsView in the
+    extension:update-panel-bounds              'ext-views' partition, positions it
+                                               over the placeholder, injects the
+                                               design system CSS, stamps data-theme
+                                                     │ loads
+                                                     ▼
+                                     ext://<extension id>/<manifest.renderer>?view=…&repoRoot=…
+                                       preload: out/preload/webview.js (preload-webview.ts)
+                                       window.electronAPI.extensionBridge.invoke / on
 ```
 
-**Key properties:**
+- The extension's bundle is never imported into the main renderer. A view is its own document with its own `webContents`, so it can crash without taking the core down ([ADR-022](adr/022-webview-isolated-extension-renderer.md)).
+- The `ext://` protocol handler in `src/main/index.ts` serves only files inside the extension's directory, with `Cache-Control: no-store`; it is registered on the default session and on `ext-views`.
+- The surface's `view` and the current `repoRoot` arrive as URL parameters; `workspace:changed` is sent on load and on every change.
+- Reloading an extension (`extension:reload`) pushes `extension:renderer-reload`, and the portal remounts the view; the app is not rebuilt.
+- A `WebContentsView` composites above the main window's DOM, so nothing the core draws can cover it. A centred core modal hides every view while it is open (`useModalEffect`, `src/renderer/stores/modal.store.ts`); a drawer moves views aside instead (`extension:set-left-inset`, `extension:set-bottom-inset`). An extension's own dialogs render inside its view ([ADR-038](adr/038-dialogs-render-in-the-extension-view.md)).
+- `⌘P` / `Ctrl+P` pressed inside a view opens the core's Quick Actions: `ExtensionViewHost` watches each view's `before-input-event` (`isQuickActionsOpenShortcut`), focuses the main window and sends `quick-actions:open`.
 
-- Extension bundle is never imported into the host renderer — complete isolation.
-- Extensions can use any React version, any framework, any bundler.
-- `ext://` protocol serves files from the extension directory with `Cache-Control: no-store`.
-- Reload (no app rebuild): `extension:renderer-reload` push event triggers webview remount.
-- Workspace context passed as URL params: `?view=VALUE&repoRoot=PATH`.
-- Live workspace updates via `extensionBridge.on('workspace:changed', handler)`.
+**Pop-out windows.** `api.window.openAuxiliary(view, params)` opens a `BrowserWindow` that loads the extension's own view document with `?view=<view>` and the params, with the main preload and the design system CSS injected. One window is kept per `view`. Pop-outs are ordinary top-level windows: the Window menu (`src/main/window-menu.ts`) has the `window` role, so macOS lists every open window there, and each pop-out names itself through `document.title`.
 
-**Manifest `contributes`** — the only mechanism for declaring UI surfaces:
+### Building extensions
 
-```json
-{
-  "renderer": "dist/index.html",
-  "contributes": {
-    "globalTab": { "label": "My Tool", "icon": "wrench", "view": "main" },
-    "sidebarPanel": { "label": "Panel", "defaultOpen": false, "view": "sidebar" },
-    "projectTab": { "label": "Proj", "view": "project" },
-    "workspaceTab": { "label": "WS", "icon": "layers", "view": "workspace" },
-    "windowViews": [{ "id": "my-detail", "view": "detail" }],
-    "commands": [{ "id": "my-ext:action", "label": "Do Thing", "shortcut": "CmdOrCtrl+Shift+M" }]
-  }
-}
-```
+`scripts/build-extensions.cjs` (`npm run build:extensions`, run first by `npm run dev`, `npm run build` and `npm run package`) builds every extension in parallel:
 
-See [ADR-022](adr/022-webview-isolated-extension-renderer.md) for the full decision record.
+- **Backend:** esbuild bundles `extensions/*/src/index.ts` into the file the manifest's `main` names (CommonJS, `platform: 'node'`). Packages that must be resolved from `node_modules` at run time (`electron-store`, `zod`, `fastify`, `web-tree-sitter` and others in its `external` list) stay outside the bundle. A `?raw` import plugin lets the design system's stylesheet be read as text. The output is gitignored and never edited (Constitution X).
+- **View:** when `vite.renderer.config.ts` exists, the extension's own `npm run build:renderer` builds `index.html` into `dist/`.
 
-### The shared UI layer — `packages/extension-ui` (v1.3.0)
+### Shell execution
 
-Isolation is what makes extension UI safe, and it is also what made every
-extension reinvent the same overlay. A `WebContentsView` loads neither the core
-stylesheet nor the core's components, so before this layer existed there were
-four independent implementations of "a thing over the screen with a scrim",
-disagreeing about Escape, scrim-click, focus and stacking.
+`api.shell.exec()` runs `git` or `gh` for an extension: the call crosses from the extension host on its port, main runs it through `src/main/shell/shell-executor.ts`, and `onOutput` chunks come back as callback events before the result. The renderer's own `shell:exec` channel uses the same executor and, when given a `workspaceRoot`, refuses a `cwd` outside it ([ADR-006](adr/006-sandboxed-shell-exec-for-extensions.md)). Both use `shell: false` and a minimal environment, and allow only `git` and `gh` (`COMMAND_NOT_ALLOWED` otherwise).
 
-`packages/extension-ui` is the single implementation, published outward — to the
-bundled extensions, to third parties, and to the core, which consumes it too
-(`src/renderer/components/ConfirmDialog.tsx` wraps the shared component).
+Commands resolve against `process.env.PATH`. On macOS an app started from the Dock or Finder gets `/usr/bin:/bin:/usr/sbin:/sbin`, which has no Homebrew `gh`, so at startup `src/main/shell/login-shell-path.ts` puts the login shell's PATH (`$SHELL -ilc`) ahead of it. A command that cannot be started reports its spawn error (`spawn gh ENOENT`) as stderr, never a bare exit code. A command killed by its timeout resolves with `timedOut: true` and exit code 124, never 0.
 
-It is a **source-only** workspace package: `main`, `module` and `types` all point
-at `./src/index.ts`, and `react`, `react-dom` and `lucide-react` are peer
-dependencies. No build step, no second copy of React.
+### File system watch
 
-| Export                                      | What it is                                    |
-| ------------------------------------------- | --------------------------------------------- |
-| `Dialog`, `ConfirmDialog`                   | Modal surfaces: scrim, focus trap, Escape     |
-| `Popover`                                   | A dismissible overlay that is **not** a modal |
-| `ToastRegion`, `Toast`                      | Transient messages, `role="status"`           |
-| `EmptyState`, `IconButton`                  | The two shapes every extension had rewritten  |
-| `useDismissible`                            | Outside-click + Escape + focus restore        |
-| `LAYERS`, `layerValue`, `nestedLayerValue`  | The stacking scale                            |
-| `createModalDepthRegistry`, `getModalDepth` | Per-document modal depth                      |
+`FsWatcherService` (`src/main/fs/fs-watcher.ts`) wraps `fs.watch` with a polling fallback and pushes `fs:changed` to the renderer ([ADR-005](adr/005-native-fswatcher-over-chokidar.md)).
 
-A dialog renders **inside the extension's own view**, never in the core — see
-[ADR-038](adr/038-dialogs-render-in-the-extension-view.md). A `WebContentsView`
-composites above the host DOM, so a core-drawn dialog would be invisible, and
-hiding the view (what `useModalEffect` does for core modals) would blank the
-very screen the dialog is asking about.
+### Keyboard shortcuts
 
-Three consequences follow from "many documents, one implementation":
+The core's own key bindings are in `src/renderer/hooks/useKeyboardShortcuts.ts` and the menu accelerators in `src/main/index.ts`; both are listed in `CORE_SHORTCUTS` (`src/renderer/quick-actions/shortcut-behaviors.ts`), and a unit test fails if either gains an accelerator with no matching action. An extension can bind a key three ways:
 
-**Modal depth is per document.** `contextIsolation: true` gives the extension's
-page and its preload different `window` objects, so a counter set by the page is
-not readable by the preload. `Dialog` mirrors depth across the bridge via
-`electronAPI.ui.setModalDepth`, which is how the double-Escape exit gesture
-learns to stand down while a dialog is open.
+- `api.globalShortcut.register`: a system-wide accelerator through Electron's `globalShortcut`.
+- `api.nativeMenu.addViewMenuItem` with an `accelerator`: works while Terminator is focused.
+- A manifest `contributes.commands[].shortcut` in an extension that also contributes a `sidebarPanel`: `registerWebviewExtension` (`src/renderer/extensions/loader.ts`) binds it in the main window to toggle that panel.
 
-**Escape is answered by the innermost surface only.** Several dialogs mounted in
-one document would otherwise all close on one keystroke; each registers its
-depth and `isInnermost()` gates the handler.
-
-**Stacking comes from a named scale**, not from whoever picked the biggest
-number — which is how 38 unmanaged `z-index` values had ordered themselves:
-
-| Layer     | Value | For                               |
-| --------- | ----- | --------------------------------- |
-| `panel`   | 100   | In-flow raised surfaces           |
-| `overlay` | 200   | Popovers, dropdowns, pickers      |
-| `modal`   | 300   | Dialogs and their scrims          |
-| `toast`   | 400   | Above everything, modals included |
-
-`nestedLayerValue(name, containerValue)` places a surface inside another without
-leaving its band. A raw `z-index` number in an extension is a lint error.
-
-### Design tokens and themes in extension views
-
-Tokens cannot travel as an import, because CSS in a separate document has to be
-injected into that document. `packages/extension-ui/src/tokens.css` is the one
-definition of every `--tm-*` name — colour, spacing, radius, fonts and the
-`--tm-layer-*` scale — and `EXTENSION_BASE_CSS` (that file plus
-`extension-base.css`, the icon scale and control resets) is what the host injects.
-A name referenced but not defined there makes its declaration invalid and the
-browser drops it. The core renderer imports the same file; its `--bg-*`,
-`--text-*` and `--space-*` names are aliases of `--tm-*` and hold no value.
-
-The text is read with Vite's `?raw` import, so it is part of the bundle in dev and
-in the packaged app alike (electron-vite bundles the package into main, and
-`scripts/build-extensions.cjs` gives esbuild the same `?raw` rule for Remote
-Control); nothing is looked up on disk at run time.
-
-The file carries **both** palettes: a dark `:root` and a light
-`[data-theme='light']` with AA-verified values. An extension document never sees
-the renderer's `data-theme`, so the host stamps it — `ExtensionViewHost.setTheme`
-restamps every open view and remembers the theme for views created later, driven
-from the renderer over `extension:set-theme`.
-
-`extensions/remote-control/src/server/remote-server.ts` serves the same constant
-to the remote client.
-
-Contrast is verified by rendering, not by reading: `tests/e2e/extension-themes.spec.ts`
-walks every visible text node in each extension view, in both themes, resolves the
-real composited backdrop through the translucent layers above it, and asserts WCAG
-AA. Parsing the stylesheet cannot do this — `color-mix` and layered alpha only
-resolve in a browser.
-
-The written rules are `docs/EXTENSION-STYLE.md`; its vocabulary rules are ESLint
-selectors with a fixture spec. See
-[ADR-039](adr/039-one-ui-layer-published-outward.md).
+Otherwise a command's `shortcut` is a display hint shown in the Quick Actions panel, and binds nothing ([ADR-057](adr/057-quick-actions-are-a-leader-panel.md)).
 
 ### Escape-to-terminal exit
 
@@ -499,84 +383,91 @@ Extension WebContentsView            Host renderer chrome
                           → focusActiveTerminal()
 ```
 
-The listeners are passive and bubble-phase, so an extension's own single-`Esc` dismissals are untouched. Core surfaces (`core.*` ids) are never exited, the host-side listener stands down inside a terminal, a text field, or an open modal, and remote `/app/` clients get the same gesture through a same-origin listener on the extension iframe. See [ADR-026](adr/026-double-escape-extension-exit.md).
+Both detectors share their pairing and guards (`src/shared/double-escape.ts`). The listeners are passive and bubble-phase, so an extension's own single-`Esc` dismissals are untouched. Core surfaces (`core.*` ids) are never exited, the gesture stands down inside a terminal, a text field, or an open modal, and remote `/app/` clients get the same gesture through a same-origin listener on the extension iframe. See [ADR-026](adr/026-double-escape-extension-exit.md).
 
 A click in the sidebar dismisses the same way, and there core surfaces go too: `useDismissSurfaceOnClick` compares the global/workspace/project tab slots across the click and, if the click chose nothing itself, calls `registry.dismissSurfaces()` to clear all three. A click that opened or toggled a surface is left to stand; sidebar panels, which sit beside the terminal, stay open.
 
-Full API surface: [`specs/001-extension-first-terminal/contracts/extension-api.md`](../specs/001-extension-first-terminal/contracts/extension-api.md)
+---
+
+## Design system
+
+The core and every extension are built from one design system, `packages/extension-ui` (`@terminator/extension-ui`), published outward: the core consumes it the way an extension does ([ADR 098](adr/098-one-design-system-documented-in-storybook.md), extending [ADR-039](adr/039-one-ui-layer-published-outward.md); Constitution XIII). It is a source-only workspace package: `main`, `module` and `types` point at `src/index.ts`, and `react`, `react-dom` and `lucide-react` are peer dependencies, so there is no build step and no second copy of React.
+
+**Components.** `src/index.ts` exports `Dialog`, `ConfirmDialog`, `Popover`, `ToastRegion` / `Toast`, `EmptyState`, `Button`, `IconButton`, `Tabs`, `SegmentedControl`, `Markdown`, `RelativeTime`, `usePolling`, `useDismissible`, the layer scale and the modal-depth registry. The core's own dialogs, toast region and empty states use them (`src/renderer/components/ConfirmDialog.tsx` wraps the shared `ConfirmDialog`).
+
+**Storybook.** `packages/extension-ui/stories/` documents each component in both themes (`npm run storybook`). The stories run as tests through the Vitest add-on (`npm run test:stories`), and Playwright screenshot tests guard them (`npm run test:visual`, `packages/extension-ui/playwright.visual.config.ts`).
+
+**Tokens.** `packages/extension-ui/src/tokens.css` is the one definition of every token: colour, spacing, radius, fonts and the `--tm-layer-*` scale, under the `--tm-*` names, for both themes (a dark `:root` and a light `[data-theme='light']`). Tokens reach each document differently:
+
+- The core renderer imports the file in `src/renderer/index.tsx`. `src/renderer/styles.css` defines the core's older names (`--bg-*`, `--text-*`, `--border-*`, `--accent`, `--font-*`) as aliases of `--tm-*`; they hold no value of their own.
+- An extension view is a separate document, so CSS has to be injected into it. `EXTENSION_BASE_CSS` (`src/extension-base-css.ts`: `tokens.css` plus `extension-base.css`, the icon scale and control resets) is read at build time with Vite's `?raw` import, so nothing is looked up on disk at run time. `ExtensionViewHost` inserts it into every view on load, and `extensions/remote-control/src/server/remote-server.ts` serves the same constant to the remote client.
+- An extension document never sees the main renderer's `data-theme`, so `ExtensionViewHost.setTheme` stamps it on every open view and remembers it for views created later, driven by the renderer over `extension:set-theme`.
+
+A `--tm-*` name referenced but not defined makes its declaration invalid, and the browser drops it.
+
+**Fonts** ship with the app. `@terminator/extension-ui/fonts` (`src/fonts.ts`) imports IBM Plex Sans and IBM Plex Mono from `@fontsource`; the core renderer and each extension view import it once in their entry, and the bundler copies the font files beside the script.
+
+**Stacking** comes from a named scale (`src/layers.ts`), not from whoever picked the biggest number:
+
+| Layer     | Value | For                               |
+| --------- | ----- | --------------------------------- |
+| `panel`   | 100   | In-flow raised surfaces           |
+| `overlay` | 200   | Popovers, dropdowns, pickers      |
+| `modal`   | 300   | Dialogs and their scrims          |
+| `toast`   | 400   | Above everything, modals included |
+
+`nestedLayerValue(name, containerValue)` places a surface inside another without leaving its band. A raw `z-index` number in an extension is a lint error.
+
+**Modal depth is per document.** `contextIsolation: true` gives an extension page and its preload different `window` objects, so `Dialog` reports its depth across the bridge with `electronAPI.ui.setModalDepth`; that is how the double-Escape exit stands down while a dialog is open. Within one document, Escape is answered by the innermost surface only (`isInnermost` in `Dialog.tsx`).
+
+**Contrast** is verified by rendering, not by reading the stylesheet: `tests/e2e/extension-themes.spec.ts` walks every visible text node in each extension view, in both themes, resolves the real composited backdrop through the translucent layers above it, and asserts WCAG AA. `color-mix` and layered alpha only resolve in a browser.
+
+The written rules for extension UI are [EXTENSION-STYLE.md](EXTENSION-STYLE.md); its vocabulary rules are ESLint selectors with a fixture spec.
 
 ---
 
-## Quick Actions
+## Renderer state
 
-Feature 057 replaced the command palette (`⌘P`, label-only fuzzy search) with a leader + which-key panel: `⌘P` opens a panel of grouped actions with one-letter mnemonics; a letter acts immediately; `/`, or `⌘P` again, switches to fuzzy search over label, category and description. See [ADR-057](adr/057-quick-actions-are-a-leader-panel.md) for the decision and alternatives considered.
+The main window keeps its state in [Zustand](https://github.com/pmndrs/zustand) stores, one per domain, in `src/renderer/stores/`:
 
-### Data flow: builders → rank → panel
+| Store                          | Holds                                                                                                               | Main actions                                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `workspace.store.ts`           | workspaces, projects by workspace, the active workspace and project, collapse state, scratch                        | `loadWorkspaces`, `createWorkspace`, `setActiveWorkspace`, `createProject`, `reorderProjects`, `deleteProject`  |
+| `session.store.ts`             | terminal sessions, their xterm instances, each project's view (active session, split layout, order), focus requests | `createSession`, `adoptSession`, `closeSession`, `setActiveSessionForProject`, `setSplitLayout`, `requestFocus` |
+| `settings.store.ts`            | global settings, workspace settings, the resolved theme                                                             | `loadSettings`, `resolveSettings`, `updateGlobalTheme`, `updateQuickActions`                                    |
+| `session-records.store.ts`     | session descriptions, links and agent conversations                                                                 | `load`, `setDescription`, `setLink`, `transfer`, `forget`                                                       |
+| `integrations.store.ts`        | tracker connections, project issue links, fetched issues, the link dialog and issue drawer                          | `loadConnections`, `linkIssue`, `listMine`, `searchIssues`, `connect`, `openDrawer`                             |
+| `change-stats.store.ts`        | each branch's `+n/−n` change counts, fetched out of band ([ADR-031](adr/031-change-stats-out-of-band.md))           | `ensure`, `invalidate`, `invalidateAll`                                                                         |
+| `extension-commands.store.ts`  | the commands extensions declared and registered, for Quick Actions                                                  | `refresh`                                                                                                       |
+| `notification.store.ts`        | the notification centre's entries, unread count, panel open                                                         | `markRead`, `markAllRead`, `dismiss`, `togglePanel`                                                             |
+| `toast.store.ts`               | the transient toast queue                                                                                           | `addToast`, `removeToast`                                                                                       |
+| `log.store.ts`                 | the log window's entries                                                                                            | `addEntry`, `clear`                                                                                             |
+| `metrics.store.ts`             | system CPU, memory and network; per-session process metrics                                                         | `enableGlobalMetrics`, `disableGlobalMetrics`, `startPolling`, `stopPolling`                                    |
+| `modal.store.ts`               | how many core modals are open (`useModalEffect`), which hides extension views                                       | `push`, `pop`                                                                                                   |
+| `terminal-open-error.store.ts` | the error and retry count when a project's terminal fails to open                                                   | `setError`, `clearError`, `retry`                                                                               |
 
-```
-core-actions.ts         (terminal/session/workspace/top actions, from CORE_SHORTCUTS)
-surface-actions.ts      ("Open <label>" for every registered global/workspace/project/sidebar surface)
-extension-actions.ts    (manifest `contributes.commands` + api.commands.register, per extension)
-custom-runtime.ts       (user-defined shell/prompt actions from settings)
-        │
-        ▼
-components/QuickActionsHost.tsx: actions = [...core, ...surface, ...extension, ...custom]
-        │
-        ▼
-quick-actions/rank.ts: rankFirstScreen(actions, {pins, usage, now})
-        │            → { pinned, recent } for the "Pinned & recent" row
-        ▼
-components/QuickActions.tsx (role="dialog", aria-label="Quick actions")
-```
+Beside them, `src/renderer/extensions/registry.ts` (`useExtensionRegistry`) holds what the extensions contributed: sidebar panels, global, workspace and project tabs, window views, commands, keyboard shortcuts, the active tab of each kind, and the Quick Actions groups.
 
-Every action is a single `QuickAction` (`quick-actions/types.ts`): `{ id, label, group, mnemonic?, shortcut?, description?, disabledReason?, run(ctx) }`. `disabledReason` renders the row dimmed with the reason in place of its description, and Enter/click sets the footer message instead of running it — an action that cannot run is always visible, never hidden (Constitution-adjacent design decision D5 in the spec). Groups (`quick-actions/groups.ts`) reserve `t`/`s`/`w`/`x` for core and allocate the rest to extensions: an extension names a `mnemonic` in its manifest, and if another extension already holds it, the loser gets the first free letter of its own label (`allocateExtensionGroups` in `groups.ts`, load order decides who wins, a warning goes to the renderer logger), never a core letter.
-
-### The extension command contract
-
-A manifest can declare `contributes.commands[]` (`{ id, label, description?, shortcut?, mnemonic? }`) and `contributes.quickActions.group` (`{ mnemonic, label }`). A declared command that the extension never calls `api.commands.register(...)` for shows dimmed with "Extension did not register this command" — declaring it in the manifest only reserves its place in the panel; the handler is what makes it real. `api.commands.register` takes a `CommandContribution` (`id`, `label`, `mnemonic?`, `shortcut?`, `category?`, `requires?: 'repo' | 'session'`) and a handler `(ctx: CommandContext) => void | Promise<void>`, where `ctx` is core-owned focus state (`projectId`, `sessionId`, `repoRoot`) passed outbound — extensions never reach into core to read it. `requires` dims the action from that context alone ("No repository focused" / "No terminal focused"), so most extensions never call `api.commands.setEnabled` by hand; it exists for cases `requires` cannot express. `shortcut` is a **display hint only** (see "Reserved keyboard shortcuts" above) — it does not bind a key.
-
-### Reaching the panel from an extension's own view
-
-An extension's UI is a separate `WebContentsView` with its own `webContents`; the host window's `⌘P` keydown listener never sees a keystroke that originated there. `extension-view-host.ts` attaches a `before-input-event` listener to every extension view (`isQuickActionsOpenShortcut`, unit-tested for both the mac and non-mac branches); on `⌘P`/`Ctrl+P` it calls `preventDefault()`, focuses the main window, and sends `quick-actions:open`, which `App.tsx` handles the same way as the in-window shortcut. The panel's own Escape closes only the panel — it claims Escape through the `useModalEffect` "modal depth" signal the double-Escape-exit detector already reads, so closing the panel is never counted as the first half of a double-Escape extension exit. The panel also moves DOM focus into itself on mount (a plain `tabIndex={-1}` container), because leaving focus on whatever was focused before `⌘P` — most often a terminal — meant xterm's own capture-phase Escape handler (attached directly to its textarea) could consume Escape and stop it from ever bubbling to the panel's own window-level listener.
-
-### Persistence
-
-Pins, usage (for frecency) and direct-shortcut-use counts live in `GlobalSettings.quickActions: { pins: string[], usage: ActionUsage[], directUse: DirectUse[], custom: CustomAction[] }` — all arrays, not records, because `deepMerge` in `settings-store.ts` replaces arrays wholesale but cannot delete record keys, and pruning entries for an uninstalled extension or a deleted custom action needs deletes. `quick-actions/usage.ts` prunes any entry whose id is no longer a live action before every save. Workspace-scoped custom actions live in `WorkspaceSettings.overrides.quickActions.custom[]`, listed after global ones, not merged by id.
-
----
-
-## State Management
-
-The renderer uses [Zustand](https://github.com/pmndrs/zustand) for all client-side state. Each store maps to a domain:
-
-| Store                    | State                                                                                                                               | Key actions                                                                                                       |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `workspace.store.ts`     | workspaces[], projects by workspace, active IDs, expandedWorkspaceIds                                                               | loadWorkspaces, createWorkspace, setActiveWorkspace, toggleWorkspaceCollapse, setExpandedWorkspaceIds             |
-| `session.store.ts`       | sessions Map, terminalInstances Map, active session per project                                                                     | createSession, closeSession, setActiveSessionForProject                                                           |
-| `settings.store.ts`      | globalSettings, workspaceSettings Map, resolvedTheme                                                                                | loadSettings, updateGlobalTheme, resolveSettings                                                                  |
-| `notification.store.ts`  | notifications[], unreadCount, panelOpen                                                                                             | addNotification, markRead, markAllRead, dismiss, togglePanel                                                      |
-| `toast.store.ts`         | toasts[] (ephemeral queue)                                                                                                          | addToast, removeToast                                                                                             |
-| `log.store.ts`           | logEntries[], console interceptor                                                                                                   | (entries added via installLogInterceptor); clearLogs                                                              |
-| `metrics.store.ts`       | system CPU/memory/network, per-session process metrics                                                                              | enableGlobalMetrics, disableGlobalMetrics, trackSession                                                           |
-| `extensions/registry.ts` | extension registration maps (sidebarPanels, globalTabs, workspaceTabs, commands, overlays); activeGlobalTabId, activeWorkspaceTabId | registerGlobalTab, registerWorkspaceTab, registerCommand, togglePanel, setActiveProjectTab, setActiveWorkspaceTab |
-
-All store actions are async — they call IPC first, then update local state only on success.
+Actions that change stored state call IPC first and update the store only when main answers with success.
 
 Components read a store through a selector — `useStore(useShallow((s) => ({ a: s.a, b: s.b })))` — never the whole store, so a component re-renders only when a field it picked changes. A getter such as `statsFor`, `linkFor` or `resolveSettings` reads state through `get()`, so a selector that picks a getter called during render also picks the state behind it (`entries`, `links`, `globalSettings`); one called only from a handler or effect does not need to.
 
 `session.store` changes about once a second per printing terminal (the activity stamp and latest line), and `metrics.store` on every sample. `App.tsx` therefore subscribes to neither: the parts that draw them — Home's badge and the metrics bar (`components/AppShellParts.tsx`), and Quick Actions (`components/QuickActionsHost.tsx`, mounted only while the panel is open) — subscribe on their own. The sidebar hands its branch rows a clock that moves only when the set of stale sessions changes (`useStalenessClock`), and drops a branch's change statistics when its terminals stop printing, once per burst rather than once per activity stamp.
 
-Surfaces opened on demand — Settings, the Overview wall and the issue drawer — load with `React.lazy` behind a `Suspense` boundary, each as its own chunk, and the renderer build is minified (`electron.vite.config.ts`; electron-vite leaves renderers unminified by default). Quick Actions is not lazy: it is driven by keys typed straight after ⌘P, which would reach the app before a lazily loaded panel mounted. For the same reason the extension commands it offers live in `stores/extension-commands.store.ts`, read once at startup and again on each open, rather than in the panel, which would start from an empty list every time it mounts. The first script is 874 kB (`ls -l out/renderer/assets/index-*.js` after `npx electron-vite build`), down from 1,803 kB.
+Surfaces opened on demand — Settings, the Overview wall and the issue drawer — load with `React.lazy` behind a `Suspense` boundary, each as its own chunk, and the renderer build is minified (`electron.vite.config.ts`; electron-vite leaves renderers unminified by default). Quick Actions is not lazy: it is driven by keys typed straight after ⌘P, which would reach the app before a lazily loaded panel mounted. For the same reason the extension commands it offers live in `stores/extension-commands.store.ts`, read once at startup and again on each open, rather than in the panel, which would start from an empty list every time it mounts. The build warns on any chunk over `chunkSizeWarningLimit` (900 kB, `electron.vite.config.ts`), and CI fails the build on any warning.
 
-### Notification Model
+---
+
+## Notifications
 
 Every notification — core app or extension-originated — goes through one
 main-process dispatcher, `notificationManager.create()`
 (`src/main/notifications/notification-manager.ts`). Callers never choose the
-delivery mechanism: `create()` always resolves it via
-`resolveNotificationTargets()` (`src/shared/notifications/`) against the
-user's global notification settings (Settings → Notifications), with an
-optional per-extension override taking precedence. A notification's type
+delivery mechanism: `create()` always resolves it. A core notification goes
+through `resolveCoreNotificationTargets()` (`src/shared/notifications/resolve-targets.ts`)
+against the user's notification settings (Settings → Notifications); an
+extension's notification reads that extension's own `notify.<key>.*` settings,
+falling back to the global defaults. A notification's type
 (`error`) always forces a toast into the resolved set regardless of
 configuration, so failures can't be silently muted.
 
@@ -623,113 +514,45 @@ disappearing.
 
 ---
 
-## Issue Tracker Integrations
+## Quick Actions
 
-One core-owned service reaches Linear and Jira; nothing else in the application holds a tracker
-credential or contacts a tracker. See [ADR-029](adr/029-core-issue-tracker-service.md).
+Feature 057 replaced the command palette (`⌘P`, label-only fuzzy search) with a leader + which-key panel: `⌘P` opens a panel of grouped actions with one-letter mnemonics; a letter acts immediately; `/`, or `⌘P` again, switches to fuzzy search over label, category and description. See [ADR-057](adr/057-quick-actions-are-a-leader-panel.md) for the decision and alternatives considered.
+
+### Data flow: builders → rank → panel
 
 ```
-  renderer ──integrations:*──▶ ┌────────────────────────────────────────┐
-   (settings, sidebar,         │  src/main/integrations/                │
-    dialogs, drawer)           │    tracker-store    creds (safeStorage)│
-                               │    issue-service    cache, single-     │──▶ Linear (@linear/sdk)
-  extensions ──api.issues────▶ │                     flight, backoff    │──▶ Jira (REST v3)
-   (foundry,                   │    providers/       one per tracker    │
-    git-integration)           │    adf-to-markdown  Jira ADF → md      │
-                               └────────────────────────────────────────┘
+core-actions.ts         (terminal/session/workspace/top actions, from CORE_SHORTCUTS)
+surface-actions.ts      ("Open <label>" for every registered global/workspace/project/sidebar surface)
+extension-actions.ts    (manifest `contributes.commands` + api.commands.register, per extension)
+custom-runtime.ts       (user-defined shell/prompt actions from settings)
+        │
+        ▼
+components/QuickActionsHost.tsx: actions = [...core, ...surface, ...extension, ...custom]
+        │
+        ▼
+quick-actions/rank.ts: rankFirstScreen(actions, {pins, usage, now})
+        │            → { pinned, recent } for the "Pinned & recent" row
+        ▼
+components/QuickActions.tsx (role="dialog", aria-label="Quick actions")
 ```
 
-**The credential boundary.** Secrets live in `integrations.json`, each value encrypted with
-`safeStorage`, written atomically. They are read only by a provider, inside the main process. No
-IPC channel returns one; `integrations:status` reports whether a connection exists and which
-account it proved to belong to, never the secret itself. `integrations:connect` and
-`integrations:disconnect` are the only two core channels deliberately **omitted** from the remote
-bridge — an authenticated LAN client still has no business writing the operator's API keys.
+Every action is a single `QuickAction` (`quick-actions/types.ts`): `{ id, label, group, mnemonic?, shortcut?, description?, disabledReason?, run(ctx) }`. `disabledReason` renders the row dimmed with the reason in place of its description, and Enter/click sets the footer message instead of running it — an action that cannot run is always visible, never hidden (Constitution-adjacent design decision D5 in the spec). Groups (`quick-actions/groups.ts`) reserve `t`/`s`/`w`/`x` and the top-level letters `h`/`o`/`a`/`b` for core and allocate the rest to extensions: an extension names a `mnemonic` in its manifest, and if another extension already holds it, the loser gets the first free letter of its own label (`allocateExtensionGroups` in `groups.ts`, load order decides who wins, a warning goes to the renderer logger), never a core letter.
 
-**One issue shape.** Both trackers produce the same `Issue`, identified by the pair
-(`tracker`, `key`) because two trackers may both use `TAV-42`. Descriptions and comments are
-always markdown: Jira's Atlassian Document Format is converted inside its provider, so exactly one
-renderer and one sanitisation policy exist downstream.
+### The extension command contract
 
-**Policy lives in the facade.** Providers are stateless functions over a credential. The 5-minute
-TTL cache, single-flight, cross-tracker merge and rate-limit backoff are all in `issue-service.ts`,
-so both trackers behave identically and a third would too. A failing or unconnected tracker is
-reported in `failures` rather than silently dropped — an incomplete list must never read as an
-empty one.
+A manifest can declare `contributes.commands[]` (`{ id, label, description?, shortcut?, mnemonic?, requires? }`) and `contributes.quickActions.group` (`{ mnemonic, label }`). A declared command that the extension never calls `api.commands.register(...)` for shows dimmed with "Extension did not register this command" — declaring it in the manifest only reserves its place in the panel; the handler is what makes it real. `api.commands.register` takes a `CommandContribution` (`id`, `label`, `description?`, `mnemonic?`, `shortcut?`, `category?`, `requires?: 'repo' | 'session'`, `args?`) and a handler `(ctx: CommandContext) => void | Promise<void>`, where `ctx` is core-owned focus state (`projectId`, `sessionId`, `repoRoot`) passed outbound — extensions never reach into core to read it. `requires` dims the action from that context alone ("No repository focused" / "No terminal focused"). `shortcut` is a display hint, except in the one case described in [Keyboard shortcuts](#keyboard-shortcuts).
 
-**Three writes: comment, transition, create.** The provider interface exposes no way to change an
-existing issue's assignee or any other field, or to delete one, and a test asserts the shape of that
-surface so it stays true. `transition` moves an issue by intent (ADR-041); `create` files one the
-operator asked for, Linear only (ADR-061).
+### Reaching the panel from an extension's own view
+
+An extension's UI is a separate `WebContentsView` with its own `webContents`; the host window's `⌘P` keydown listener never sees a keystroke that originated there. `extension-view-host.ts` attaches a `before-input-event` listener to every extension view (`isQuickActionsOpenShortcut`, unit-tested for both the mac and non-mac branches); on `⌘P`/`Ctrl+P` it calls `preventDefault()`, focuses the main window, and sends `quick-actions:open`, which `App.tsx` handles the same way as the in-window shortcut. The panel's own Escape closes only the panel — it claims Escape through the `useModalEffect` "modal depth" signal the double-Escape-exit detector already reads, so closing the panel is never counted as the first half of a double-Escape extension exit. The panel also moves DOM focus into itself on mount (a plain `tabIndex={-1}` container), because leaving focus on whatever was focused before `⌘P` — most often a terminal — meant xterm's own capture-phase Escape handler (attached directly to its textarea) could consume Escape and stop it from ever bubbling to the panel's own window-level listener.
+
+### Persistence
+
+Pins, usage (for frecency) and direct-shortcut-use counts live in `GlobalSettings.quickActions: { pins: string[], usage: ActionUsage[], directUse: DirectUse[], custom: CustomAction[] }` — all arrays, not records, because `deepMerge` in `settings-store.ts` replaces arrays wholesale but cannot delete record keys, and pruning entries for an uninstalled extension or a deleted custom action needs deletes. `quick-actions/usage.ts` prunes any entry whose id is no longer a live action before every save. Workspace-scoped custom actions live in `WorkspaceSettings.overrides.quickActions.custom[]`, listed after global ones, not merged by id.
 
 ---
 
-## Remote Control Server
-
-When enabled via Settings → Remote Control, Terminator starts an embedded [Fastify](https://fastify.dev/) 5.x HTTP/WebSocket server. The server binds to `0.0.0.0` so it is reachable directly over the LAN (the `remote:status` payload reports both a `lanUrl` and an optional ngrok `publicUrl`). Access is gated by a password checked once at login (exchanged for a session cookie), a `Host`-header check, and single-use tickets — not by the bind address.
-
-```
-Remote Control Extension (extensions/remote-control/)
-│
-├── RemoteServer (Fastify 5.x, binds 0.0.0.0 — LAN + ngrok)
-│   ├── GET    /health                         → { ok: true }
-│   ├── POST   /api/login                      → checks the password once; sets the remote-session cookie
-│   ├── GET    /api/workspaces                 → workspace list
-│   ├── GET    /api/projects?workspaceId=      → project list
-│   ├── POST   /api/terminals                  → spawn PTY, returns sessionId
-│   ├── GET    /api/terminals/:id              → session metadata
-│   ├── DELETE /api/terminals/:id              → kill PTY
-│   ├── POST   /api/terminals/:id/resize       → resize PTY
-│   ├── POST   /api/terminals/:id/ws-ticket    → single-use WS ticket (30s TTL)
-│   ├── GET    /ws/terminals/:id?ticket=       → WebSocket upgrade → PTY fan-out
-│   ├── POST   /api/bridge-ticket              → single-use bridge WS ticket
-│   ├── GET    /api/bridge?ticket=             → WebSocket IPC bridge (invoke/send/subscribe;
-│   │                                            invoke is rejected unless the channel is
-│   │                                            flagged remote-accessible)
-│   ├── POST   /api/app-ticket                 → single-use ticket to enter /app/
-│   ├── GET    /app/?t=<ticket>                → serves full Electron renderer SPA (session-cookie-gated)
-│   │   Static /app/*                          → 403 unless valid app-session cookie present (8h HttpOnly)
-│   ├── POST   /api/mobile-ticket              → single-use ticket to enter /mobile/
-│   └── GET    /mobile/?t=<ticket>             → serves the mobile remote web client (session-cookie-gated)
-│       Static /mobile/*                       → 403 unless valid mobile-session cookie present (8h HttpOnly)
-│
-├── WsTicketStore        single-use 64-char hex tokens, 30s TTL, 60s cleanup
-├── WsSubscriberManager  per-session subscriber sets; first subscriber = primary
-│                        primary-only input, broadcast output to all
-└── NgrokManager         spawns `ngrok http <port> --web-addr 0.0.0.0:4041`, polls localhost:4041/api/tunnels
-```
-
-**Security constraints**:
-
-- Server binds to `0.0.0.0` so phones/tablets on the same LAN can connect directly; remote (off-LAN) access is via ngrok. Security relies on auth, the `Host`-header check, per-IP rate limiting, and tickets rather than the bind address. See [ADR-017](adr/017-embedded-http-remote-server.md) § Threat Model & Accepted Risk.
-- The password is checked once, by `POST /api/login`, against a scrypt hash with a random salt (`password-hash.ts`, `crypto.timingSafeEqual`). A correct password is exchanged for an HttpOnly, SameSite=Strict `remote-session` cookie (8h TTL, `Path=/`); every other `/api` route (except `/health` and the ticket-authenticated socket routes) requires that cookie. The password is never sent again, never stored by the browser and never put in the QR code. Only the hash is stored (the password is shown once when generated); settings written by earlier versions are migrated at start (plaintext is hashed and erased, a bcrypt hash is cleared and the password must be set again). See [ADR-100](adr/100-remote-control-credentials.md).
-- Failed logins are rate-limited per client IP (`auth-rate-limiter.ts`): after 10 failures within 15 minutes the client is locked out (`429`) until the window drains. This is what makes a single shared password tolerable on a `0.0.0.0`-bound listener.
-- `Host` header is checked against `localhost`, `127.0.0.1`, RFC-1918 private ranges, and the ngrok domain.
-- WebSocket upgrade requires a single-use ticket issued by `POST /api/terminals/:id/ws-ticket`; ticket is consumed on first use and expires after 30 s.
-- Input is accepted from the primary subscriber only (first WS client to connect to a session).
-- `/app/*` and `/mobile/*` static assets are each gated behind a dedicated HttpOnly SameSite=Strict cookie (`app-session` / `mobile-session`, 8h TTL) issued when a valid one-time ticket (`POST /api/app-ticket` / `POST /api/mobile-ticket`) is consumed at `GET /app/` / `GET /mobile/`. Requests to those paths without a valid cookie receive `403 FORBIDDEN`. Session tokens carry an expiry and are purged hourly.
-- The IPC bridge (`GET /api/bridge`) requires a single-use bridge ticket and lets the browser invoke/send/subscribe to IPC channels on behalf of the browser-side SPA. The bridge is **default-deny across all three message types** (`invoke`, `send`, `subscribe`): a message is rejected unless its channel is in the central allowlist `src/main/remote/remote-accessible-channels.ts` (surfaced to the extension via `api.ipc.isRemoteAccessible`). Extension channels are local-only unless they opt in with `registerHandler(channel, handler, { remoteAccessible: true })`; the declaration at registration is recorded in the bridge registry and is the only thing that admits them. That file is the single auditable definition of the remote attack surface, and `remote-accessible-channels.spec.ts` asserts it stays in sync with the channels the `/app/` shim actually uses — so the enforcement and the allowlist can never half-ship independently (the prior `/app/` outage).
-
-**Browser login SPA + mobile client** (`src/renderer-remote/`): A separate Vite build (`npm run build:remote`) produces `out/renderer-remote/` which Fastify serves at `/`. After the login page has posted the password to `POST /api/login` and received the session cookie, it either calls `POST /api/app-ticket` and redirects to `/app/?t=<ticket>` to load the full Electron renderer bundle, or calls `POST /api/mobile-ticket` and redirects to `/mobile/?t=<ticket>` to load the touch-optimised mobile client (`mobile.html` from the same renderer-remote output directory).
-
-**Full Electron renderer in browser** (`out/renderer/`): Fastify also serves the regular Electron renderer bundle under `/app/`. A `remote-shim.js` script is injected into `index.html` to polyfill `window.electronAPI` — all IPC calls are forwarded over the bridge WebSocket instead of the Electron `contextBridge`.
-
-See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural decision.
-
----
-
-## Security Model
-
-- `contextIsolation: true` — renderer cannot access Node.js APIs directly.
-- `nodeIntegration: false` — renderer script cannot `require()` Node modules.
-- All user input that crosses the IPC boundary is Zod-validated before use.
-- Extensions are loaded via `require()` in the main process — they run with full Node.js privileges. Phase 1 does not sandbox extensions. This is a known limitation documented for Phase 2 consideration (see ADR-002).
-- There is no extension-facing keyboard-shortcut API (`api.keyboard.register` is deleted, feature 057) — an extension cannot bind a global accelerator, so there is nothing left to reserve against.
-- The remote-control bridge is default-deny: only channels in `src/main/remote/remote-accessible-channels.ts` are reachable from any browser client. Internal channels (`dialog:*`, `remote:*` server controls, `db:health`, all extension-registered handlers) are unreachable remotely by default; an extension opts a channel in explicitly, and Task Vault's SQL console and Notepad's file import and export never do.
-
----
-
-## Navigation Chrome — UnifiedSidebar
+## Navigation: the sidebar, Home and the wall
 
 The primary navigation is a single resizable sidebar (`UnifiedSidebar`) listing **repos and their branches**. Terminals are not sidebar rows: they are tabs in the tab bar above the terminal, rows on Home, and tiles on the Overview wall (ADR 035, ADR 054).
 
@@ -848,50 +671,176 @@ The sidebar has a `div.unified-sidebar__resize-handle` on its right edge. `mouse
 
 ---
 
-## CSS Token Strategy
+## Issue tracker integrations
 
-The renderer uses two tiers of CSS custom properties:
-
-**Core-private tokens** (`--bg-*`, `--text-*`, `--border-*`, `--accent`, `--radius-*`, `--font-*`) are defined in `src/renderer/styles.css` and consumed only by core app components. Extensions MUST NOT use these directly — they are an implementation detail and may change without notice.
-
-**Published extension tokens** (`--tm-*`) are aliases for the core-private tokens, also defined in `src/renderer/styles.css` `:root`. These are the stable API surface for extensions. The `--tm-` prefix signals a versioned, stable contract. The full contract is documented in `specs/003-pr-review/contracts/extension-token-api.md` and `docs/EXTENSION-DEVELOPMENT.md`.
+One core-owned service reaches Linear and Jira; nothing else in the application holds a tracker
+credential or contacts a tracker. See [ADR-029](adr/029-core-issue-tracker-service.md).
 
 ```
-styles.css :root
-├── --bg-base: #0C0C0F        ← core private
-├── ...
-└── --tm-bg-base: var(--bg-base)  ← extension API alias
+  renderer ──integrations:*──▶ ┌────────────────────────────────────────┐
+   (settings, sidebar,         │  src/main/integrations/                │
+    dialogs, drawer)           │    tracker-store    creds (safeStorage)│
+                               │    issue-service    cache, single-     │──▶ Linear (@linear/sdk)
+  extensions ──api.issues────▶ │                     flight, backoff    │──▶ Jira (REST v3)
+   (foundry,                   │    providers/       one per tracker    │
+    git-integration)           │    adf-to-markdown  Jira ADF → md      │
+                               └────────────────────────────────────────┘
 ```
 
-This alias layer allows the core design system to evolve (rename, restructure tokens) without breaking extensions, as long as the `--tm-*` values remain stable.
+**The credential boundary.** Secrets live in `integrations.json`, each value encrypted with
+`safeStorage`, written atomically. They are read only by a provider, inside the main process. No
+IPC channel returns one; `integrations:status` reports whether a connection exists and which
+account it proved to belong to, never the secret itself. `integrations:connect` and
+`integrations:disconnect` are the only two core channels deliberately **omitted** from the remote
+bridge — an authenticated LAN client still has no business writing the operator's API keys.
 
-**Adding a new extension token** requires a MINOR version bump in `specs/003-pr-review/contracts/extension-token-api.md` and an update to `docs/EXTENSION-DEVELOPMENT.md`.
+**One issue shape.** Both trackers produce the same `Issue`, identified by the pair
+(`tracker`, `key`) because two trackers may both use `TAV-42`. Descriptions and comments are
+always markdown: Jira's Atlassian Document Format is converted inside its provider, so exactly one
+renderer and one sanitisation policy exist downstream.
+
+**Policy lives in the facade.** Providers are stateless functions over a credential. The 5-minute
+TTL cache, single-flight, cross-tracker merge and rate-limit backoff are all in `issue-service.ts`,
+so both trackers behave identically and a third would too. A failing or unconnected tracker is
+reported in `failures` rather than silently dropped — an incomplete list must never read as an
+empty one.
+
+**Three writes: comment, transition, create.** The provider interface exposes no way to change an
+existing issue's assignee or any other field, or to delete one, and a test asserts the shape of that
+surface so it stays true. `transition` moves an issue by intent (ADR-041); `create` files one the
+operator asked for, Linear only (ADR-061).
 
 ---
 
-## Task Vault Extension Architecture
+## Security model
+
+- **Renderers have no Node.** The main window, extension views and pop-out windows run with `contextIsolation: true` and `nodeIntegration: false`; they reach main only through their preload's `window.electronAPI`.
+- **Every invoke payload is parsed by a zod schema in main** before a handler sees it, for core and extension channels alike ([ADR-096](adr/096-every-ipc-channel-has-a-schema.md)), as Electron's [security checklist](https://www.electronjs.org/docs/latest/tutorial/security#17-validate-the-sender-of-all-ipc-messages) asks.
+- **Extensions are not sandboxed.** Their backends run in the extension host, a separate process, with full Node.js privileges. The process boundary protects the terminals and the core from an extension's slow or failing code, not from a malicious extension. Install only extensions you trust.
+- **An extension's view can read only its own files.** The `ext://` handler serves files inside the extension's own directory and answers `403` for any path outside it.
+- **Shell commands are limited.** `api.shell.exec` and `shell:exec` run only `git` and `gh`, without a shell, in a minimal environment (`src/main/shell/shell-executor.ts`).
+- **Tracker credentials never leave main.** They are `safeStorage`-encrypted in `integrations.json`, read only by a provider, and no channel returns one (see [Issue tracker integrations](#issue-tracker-integrations)).
+- **The remote bridge is default-deny.** Only channels in the allowlist `src/main/remote/remote-accessible-channels.ts` (derived from the manifest) and extension channels registered `remoteAccessible: true` are reachable from a browser. Internal channels (`dialog:*`, `db:health`, `integrations:connect` / `disconnect`) and every other extension channel are not; Task Vault's SQL console and Notepad's file import and export are never opted in. See [Remote Control](#remote-control).
+
+---
+
+## Built-in extensions
+
+Five extensions ship with the app in `extensions/`. Each follows the extension rules above with no exception: it imports only the SDK, the design system and its own packages, its backend runs in the extension host, and its channels are its own. Each extension's `CLAUDE.md` or `README.md` holds its development rules.
+
+### Remote Control
+
+When it is turned on in its Remote Control tab, the extension's backend starts an embedded [Fastify](https://fastify.dev/) HTTP and WebSocket server inside the extension host. The server binds to `0.0.0.0` so it is reachable directly over the LAN (the `remote:status` payload reports both a `lanUrl` and an optional ngrok `publicUrl`). Access is gated by a password checked once at login (exchanged for a session cookie), a `Host`-header check, and single-use tickets — not by the bind address.
+
+```
+Remote Control Extension (extensions/remote-control/)
+│
+├── RemoteServer (Fastify, binds 0.0.0.0 — LAN + ngrok)
+│   ├── GET    /health                         → { ok: true }
+│   ├── POST   /api/login                      → checks the password once; sets the remote-session cookie
+│   ├── GET    /api/workspaces                 → workspace list
+│   ├── GET    /api/projects?workspaceId=      → project list
+│   ├── POST   /api/terminals                  → spawn PTY, returns sessionId
+│   ├── GET    /api/terminals/:id              → session metadata
+│   ├── DELETE /api/terminals/:id              → kill PTY
+│   ├── POST   /api/terminals/:id/resize       → resize PTY
+│   ├── POST   /api/terminals/:id/ws-ticket    → single-use WS ticket (30s TTL)
+│   ├── GET    /ws/terminals/:id?ticket=       → WebSocket upgrade → PTY fan-out
+│   ├── POST   /api/bridge-ticket              → single-use bridge WS ticket
+│   ├── GET    /api/bridge?ticket=             → WebSocket IPC bridge (invoke/send/subscribe;
+│   │                                            invoke is rejected unless the channel is
+│   │                                            flagged remote-accessible)
+│   ├── POST   /api/app-ticket                 → single-use ticket to enter /app/
+│   ├── GET    /app/?t=<ticket>                → serves full Electron renderer SPA (session-cookie-gated)
+│   │   Static /app/*                          → 403 unless valid app-session cookie present (8h HttpOnly)
+│   ├── POST   /api/mobile-ticket              → single-use ticket to enter /mobile/
+│   └── GET    /mobile/?t=<ticket>             → serves the mobile remote web client (session-cookie-gated)
+│       Static /mobile/*                       → 403 unless valid mobile-session cookie present (8h HttpOnly)
+│
+├── WsTicketStore        single-use 64-char hex tokens, 30s TTL, 60s cleanup
+├── WsSubscriberManager  per-session subscriber sets; first subscriber = primary
+│                        primary-only input, broadcast output to all
+└── NgrokManager         spawns `ngrok http <port>` (plus `--authtoken` when set), polls localhost:4040/api/tunnels
+```
+
+**Security constraints**:
+
+- Server binds to `0.0.0.0` so phones/tablets on the same LAN can connect directly; remote (off-LAN) access is via ngrok. Security relies on auth, the `Host`-header check, per-IP rate limiting, and tickets rather than the bind address. See [ADR-017](adr/017-embedded-http-remote-server.md) § Threat Model & Accepted Risk.
+- The password is checked once, by `POST /api/login`, against a scrypt hash with a random salt (`password-hash.ts`, `crypto.timingSafeEqual`). A correct password is exchanged for an HttpOnly, SameSite=Strict `remote-session` cookie (8h TTL, `Path=/`); every other `/api` route (except `/health` and the ticket-authenticated socket routes) requires that cookie. The password is never sent again, never stored by the browser and never put in the QR code. Only the hash is stored (the password is shown once when generated); settings written by earlier versions are migrated at start (plaintext is hashed and erased, a bcrypt hash is cleared and the password must be set again). See [ADR-100](adr/100-remote-control-credentials.md).
+- Failed logins are rate-limited per client IP (`auth-rate-limiter.ts`): after 10 failures within 15 minutes the client is locked out (`429`) until the window drains. This is what makes a single shared password tolerable on a `0.0.0.0`-bound listener.
+- `Host` header is checked against `localhost`, `127.0.0.1`, RFC-1918 private ranges, and the ngrok domain.
+- WebSocket upgrade requires a single-use ticket issued by `POST /api/terminals/:id/ws-ticket`; ticket is consumed on first use and expires after 30 s.
+- Input is accepted from the primary subscriber only (first WS client to connect to a session).
+- `/app/*` and `/mobile/*` static assets are each gated behind a dedicated HttpOnly SameSite=Strict cookie (`app-session` / `mobile-session`, 8h TTL) issued when a valid one-time ticket (`POST /api/app-ticket` / `POST /api/mobile-ticket`) is consumed at `GET /app/` / `GET /mobile/`. Requests to those paths without a valid cookie receive `403 FORBIDDEN`. Session tokens carry an expiry and are purged hourly.
+- The IPC bridge (`GET /api/bridge`) requires a single-use bridge ticket and lets the browser invoke/send/subscribe to IPC channels on behalf of the browser-side SPA. The bridge is **default-deny across all three message types** (`invoke`, `send`, `subscribe`): a message is rejected unless its channel is in the central allowlist `src/main/remote/remote-accessible-channels.ts` (surfaced to the extension via `api.ipc.isRemoteAccessible`). Extension channels are local-only unless they opt in with `registerHandler(channel, handler, { remoteAccessible: true })`; the declaration at registration is recorded in the bridge registry and is the only thing that admits them. That file is the single auditable definition of the remote attack surface, and `remote-accessible-channels.spec.ts` asserts it stays in sync with the channels the `/app/` shim actually uses — so the enforcement and the allowlist can never half-ship independently (the prior `/app/` outage).
+
+**Browser login SPA + mobile client** (`src/renderer-remote/`): A separate Vite build (`npm run build:remote`) produces `out/renderer-remote/` which Fastify serves at `/`. After the login page has posted the password to `POST /api/login` and received the session cookie, it either calls `POST /api/app-ticket` and redirects to `/app/?t=<ticket>` to load the full Electron renderer bundle, or calls `POST /api/mobile-ticket` and redirects to `/mobile/?t=<ticket>` to load the touch-optimised mobile client (`mobile.html` from the same renderer-remote output directory).
+
+**Full Electron renderer in browser** (`out/renderer/`): Fastify also serves the regular Electron renderer bundle under `/app/`. A `remote-shim.js` script is injected into `index.html` to polyfill `window.electronAPI` — all IPC calls are forwarded over the bridge WebSocket instead of the Electron `contextBridge`.
+
+See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural decision.
+
+### Git integration (`extensions/git-integration/`)
+
+The Git project tab (status, staging, commit, pull requests), the Code Reviews workspace tab and the Reviews global tab. It runs git and gh through `api.shell.exec` and `api.github`, and is the only git parser in the repository ([ADR 094](adr/094-extensions-follow-the-vs-code-model.md) ended ADR-025's two parsers).
+
+#### The review window
+
+`window:open-pr-review` and the `review-pull-request` command call `openPrReviewWindow` (`src/review-command.ts`), which calls `api.window.openAuxiliary('pr-review', params)` with `repoRoot`, and `prNumber` and `showOverview` to restore straight into a review; the View menu's "Code Reviews in New Window" opens it with no params. The window loads the extension's own view, whose `src/renderer/App.tsx` routes `pr-review` to the review UI. Closing a review pauses its session through the store's `setPaused`, which writes the whole session (viewed marks, private notes and unsent draft comments included); a session written without them would replace the stored one and erase them. Every markdown preview in the extension, including the Open Pull Request template preview, goes through the sanitising `RichContent` component (ADR 091), which renders with the design system's `Markdown`.
+
+The review's cost grows with the PR, so two paths keep it bounded. In the backend, `github:pr-review-detail` runs `analysePr` (`src/review/analyse.ts`), which parses each file's patch once and hands the parsed files to the reading-order, moved-code and insights passes. Every tree-sitter parse goes through `withSyntaxTree` (`src/review/symbols.ts`), which deletes the tree when its reader returns: web-tree-sitter trees live in WASM memory that garbage collection does not reclaim. In the view, `ReviewDiffPane` flattens a file into list entries (`src/review/diff-items.ts`) and `VirtualDiffList` mounts only those near the viewport with `@tanstack/react-virtual`, measuring each entry so comments keep their place. Code rows are memoised (`DiffLineRows.tsx`), so a drag or a divider move re-renders only the rows whose state changed. Rows off screen are not in the DOM: scroll to a hunk or line by entry index, never by querying rows.
+
+#### MergeFlow conflict resolver
+
+MergeFlow is a subsystem of the `git-integration` extension that provides an intent-first, card-based git merge conflict resolution UI. It lives entirely in `extensions/git-integration/src/` with no core file modifications.
+
+##### Entry Points
+
+- `GitFullView.tsx` shows a "Resolve conflicts →" button when `status.hasConflicts === true`, setting `gitStore.view = 'merge-flow'`, and renders `<MergeFlowView>` when `view === 'merge-flow'`.
+
+##### Session Lifecycle
+
+1. **Open**: `MergeFlowView` mounts → checks `electron-store` for a persisted session → if none, calls `git:conflicts-list` to build a fresh `ConflictSession`.
+2. **Resolve**: User resolves conflicts one block at a time → each decision calls `git:resolve-conflict` (writes to working-tree file) and `git:session-persist` (persists undo stack).
+3. **Commit**: `CompletionScreen` calls `git:merge-commit` (stages resolved files + runs `git commit`) → on success: clears electron-store session + closes MergeFlow.
+4. **Undo**: Renderer owns the undo stack (`ResolutionDecision[]` in `merge-flow.store.ts`) → undo calls `git:undo-resolve` to restore conflict markers in the file.
+
+##### IPC channels
+
+All registered in `extensions/git-integration/src/ipc/merge-flow.ipc.ts` and documented in `specs/006-mergeflow-conflict-resolver/contracts/ipc-channels.md`.
+
+##### Files
+
+| File                               | Purpose                                                                                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/schemas/merge-flow.schema.ts` | Zod schemas for all MergeFlow data entities                                                                                                                              |
+| `src/git/conflict-reader.ts`       | Git subprocess helpers: conflict block parsing, REBASE_HEAD detection, author info                                                                                       |
+| `src/ipc/merge-flow.ipc.ts`        | IPC handler registration (9 channels)                                                                                                                                    |
+| `src/api/merge-flow.ts`            | Renderer bridge (extensionBridge wrappers)                                                                                                                               |
+| `src/stores/merge-flow.store.ts`   | Zustand store: session state, navigation, undo stack, modal state                                                                                                        |
+| `src/components/merge-flow/*.tsx`  | UI components: MergeFlowView, ConflictHub, ConflictResolver, ConflictHeader, ConflictPanel, ResultPreviewStrip, ActionBar, KeepBothModal, ManualEditor, CompletionScreen |
+
+### Task Vault (`extensions/task-vault/`)
 
 The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA productivity system. The shared **SQLite** database (`node:sqlite`, see Persistence boundaries) is the datastore for all structured queries and CRUD. Key subsystems:
 
-### Vault Layer (`src/vault/`)
+#### Vault Layer (`src/vault/`)
 
-- **db.ts** — Defines the `settings`, `tasks`, `projects`, `areas`, and `links` schema via `applyTaskVaultSchema()`, which creates the final schema in one idempotent step (`CREATE TABLE IF NOT EXISTS`; no column-by-column migrations, because every SQLite database is created from it). All IPC handlers receive the shared `ExtensionDB` instance (injected by the main-process extension API) and access data exclusively through it. Runs `backfillRecurringTasks` on startup to gap-fill any missing future occurrences. The `settings` table is shared with other extensions and keyed `PRIMARY KEY (extension_id, key)`; Task Vault reads, writes and resets only rows with `extension_id = 'task-vault'`.
+- **db.ts** — Defines the `settings`, `tasks`, `projects`, `areas`, and `links` schema via `applyTaskVaultSchema()`, which creates the final schema in one idempotent step (`CREATE TABLE IF NOT EXISTS`; no column-by-column migrations, because every SQLite database is created from it). All IPC handlers receive the extension's `api.db` and access data exclusively through it. Runs `backfillRecurringTasks` on startup to gap-fill any missing future occurrences. The `settings` table is shared with other extensions and keyed `PRIMARY KEY (extension_id, key)`; Task Vault reads, writes and resets only rows with `extension_id = 'task-vault'`.
 - **recurrence.ts** — `RecurrenceRule` discriminated union, `parseRecurrenceRule` (throws `InvalidRecurrenceRuleError` on unknown input), and `computeNextDueDate` (strict mode: next date = previous + interval, never completion date). Also exports `localDate()` helper.
 - **ensure-next-occurrence.ts** — `ensureNextOccurrence(db, taskId)`: idempotent function that checks whether a future `status='open'` instance already exists and inserts one if not. `backfillRecurringTasks(db)`: called at extension startup to handle days the app was closed.
 - **tags.ts** — Utilities for extracting and normalising `@context`, `+project`, `#area`, and `due:` inline tags from task text.
 - **types.ts** — `TaskStatus`, `IndexedTask`, `IndexedProject`, `KanbanConfig`, and other shared TypeScript types used by both the IPC layer and renderer components.
 
-### IPC Layer (`src/ipc/`)
+#### IPC Layer (`src/ipc/`)
 
 - **vault.ipc.ts** — All vault CRUD handlers. Core task handlers: `capture`, `get-today`, `get-daily`, `add-task`, `add-subtask`, `edit-task`, `delete-task`, `complete-task`, `cancel-task`, `restore-task`, `reopen-task`, `migrate-task`, `block-task`, `unblock-task`, `reorder-tasks`. Recurrence handlers: `set-recurrence`, `clear-recurrence`. View/query handlers: `query`, `process-inbox-item`, `get-inbox`, `list-areas`, `archive-area`, `delete-area`, `create-area`, `list-archive`, `list-someday`, `someday-to-today`, `get-calendar-month`. Detail handlers: `get-task-detail`, `save-task-detail`. Bulk I/O: `export-json`, `import-json`. All handlers validate with Zod; stale IDs return `{ error: 'STALE_ID' }`.
 - **projects.ipc.ts** — project list, update-project-status, and weekly-review payload handler.
 - **links.ipc.ts** — bidirectional link handlers (create/remove/get-for-terminator-target).
+- **kanban.ipc.ts**, **weekly-review.ipc.ts**, **admin.ipc.ts** — the board, the weekly review, and database administration (the SQL console), which stays local-only.
+- **register.ts** — the registrar every file uses: each channel declares its schema, and `handleRemote` opts a channel in to the remote client.
 
-### MCP Sidecar
-
-The MCP stdio sidecar (`src/mcp/server.ts`) was present in earlier Task Vault versions and has since been removed from the codebase. The `extensions/task-vault/src/mcp/` directory no longer exists. AI agent access to vault data is now achieved through the extension's IPC handlers called from the in-app renderer, not a standalone MCP process.
-
-### Recurring Task Engine
+#### Recurring Task Engine
 
 Recurrence state lives in three first-class SQL columns on the `tasks` table (not in the metadata blob):
 
@@ -917,114 +866,51 @@ End conditions (`recurrence_end_type`, `recurrence_end_date`, `recurrence_end_co
 
 A `UNIQUE INDEX` on `(recurrence_template_id, due_date)` enforces the invariant at the database level, preventing duplicate instances even under concurrent writes.
 
-### Task ID Format
+#### Task ID Format
 
 Tasks are identified by a UUID (`crypto.randomUUID()`) assigned at insert time and stored in the `tasks.id` column. IDs are stable across restarts. `{ error: 'STALE_ID' }` is returned when a handler receives an ID that no longer exists in the database (e.g. after a delete or migration).
 
-### Extension API v1.2.0
+### Notepad (`extensions/notepad/`)
 
-New namespaces added in this extension cycle (ADR-012):
+Markdown notes and Excalidraw diagrams, with live preview, margin comments, tags, folders and search. See [ADR-018](adr/018-codemirror6-editor.md) for the editor engine.
 
-- `api.globalShortcut.register` — register global keyboard shortcuts
-- `api.notifications.showToast` — show toast notifications from main process
-
-## MergeFlow Conflict Resolver (git-integration extension)
-
-MergeFlow is a subsystem of the `git-integration` extension that provides an intent-first, card-based git merge conflict resolution UI. It lives entirely in `extensions/git-integration/src/` with no core file modifications.
-
-### Entry Points
-
-- `GitFullView.tsx` shows a "Resolve conflicts →" button when `status.hasConflicts === true`, setting `gitStore.view = 'merge-flow'`, and renders `<MergeFlowView>` when `view === 'merge-flow'`.
-
-### Session Lifecycle
-
-1. **Open**: `MergeFlowView` mounts → checks `electron-store` for a persisted session → if none, calls `git:conflicts-list` to build a fresh `ConflictSession`.
-2. **Resolve**: User resolves conflicts one block at a time → each decision calls `git:resolve-conflict` (writes to working-tree file) and `git:session-persist` (persists undo stack).
-3. **Commit**: `CompletionScreen` calls `git:merge-commit` (stages resolved files + runs `git commit`) → on success: clears electron-store session + closes MergeFlow.
-4. **Undo**: Renderer owns the undo stack (`ResolutionDecision[]` in `merge-flow.store.ts`) → undo calls `git:undo-resolve` to restore conflict markers in the file.
-
-### New IPC Channels (9 total)
-
-All registered in `extensions/git-integration/src/ipc/merge-flow.ipc.ts` and documented in `specs/006-mergeflow-conflict-resolver/contracts/ipc-channels.md`.
-
-### New Files
-
-| File                               | Purpose                                                                                                                                                                  |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/schemas/merge-flow.schema.ts` | Zod schemas for all MergeFlow data entities                                                                                                                              |
-| `src/git/conflict-reader.ts`       | Git subprocess helpers: conflict block parsing, REBASE_HEAD detection, author info                                                                                       |
-| `src/ipc/merge-flow.ipc.ts`        | IPC handler registration (9 channels)                                                                                                                                    |
-| `src/api/merge-flow.ts`            | Renderer bridge (extensionBridge wrappers)                                                                                                                               |
-| `src/stores/merge-flow.store.ts`   | Zustand store: session state, navigation, undo stack, modal state                                                                                                        |
-| `src/components/merge-flow/*.tsx`  | UI components: MergeFlowView, ConflictHub, ConflictResolver, ConflictHeader, ConflictPanel, ResultPreviewStrip, ActionBar, KeepBothModal, ManualEditor, CompletionScreen |
-
----
-
-## Markdown Notepad Extension (`extensions/notepad/`)
-
-See [ADR-018](adr/018-codemirror6-editor.md) for the editor engine decision.
-
-### 3-Process Split
+#### Backend and view
 
 ```
-Main process (Node.js)
-  └─ extensions/notepad/src/index.ts (activate/deactivate)
-       ├─ SQLite (node:sqlite) — shared app DB via src/main/db/index.ts (ExtensionDB interface)
-       ├─ registerNotesIpcHandlers()    — notes.create/list/get/autosave/archive/restore/hardDelete/reorder
-       ├─ registerTagsIpcHandlers()     — tags.list/rename/delete
-       ├─ registerFoldersIpcHandlers()  — folders.create/list/rename/delete/move
-       ├─ registerCommentsIpcHandlers() — comments.create/reply/update/delete/resolve/updateAnchor/markOrphaned/list
-       ├─ registerSearchIpcHandlers()   — search.query (LIKE-based full-text search)
-       └─ registerExportIpcHandlers()   — export.pickFolder/export.run/import.run (notes + diagrams)
+Extension host
+  └─ extensions/notepad/src/index.ts (activate / deactivate)
+       ├─ api.db — the shared app.sqlite; schema in src/db/db.ts
+       └─ channels registered from src/ipc/: notes, tags, folders, comments,
+          diagrams, diagram comments, search, export / import
 
-Renderer process (jsdom + React + CM6)
-  └─ extensions/notepad/src/renderer.tsx
-       ├─ NotepadView (main 3-pane layout)
-       │    ├─ NoteList (sidebar: search bar, multi-tag dropdown, folder tree, note/diagram rows)
-       │    ├─ NoteEditor (CM6 host: livePreviewPlugin + commentAnchorField)
-       │    └─ .notepad-view__rail (right rail; collapses when both its panels are off)
-       │         ├─ NoteOutline (the open note's headings, from editor/outline.ts)
-       │         └─ CommentMargin (comment cards with anchor status)
-       ├─ QuickCreateOverlay (Cmd+Shift+N floating input)
-       ├─ ExportDialog (folder picker + scope selector; exports notes and diagrams)
-       ├─ NoteWindowView (pop-out window for one note; same editor and right rail)
-       └─ DiagramWindowView (pop-out window for focused diagram editing)
+Extension view (ext://terminator.notepad/dist/index.html)
+  └─ src/renderer/main.tsx → App.tsx, routed by ?view=
+       ├─ main    → NotepadView: NoteList, the CodeMirror 6 editor,
+       │            a right rail with NoteOutline and CommentMargin
+       ├─ note    → NoteWindowView (a pop-out for one note)
+       └─ diagram → DiagramWindowView (a pop-out for one diagram)
+     plus QuickCreateOverlay, SearchOverlay and ExportDialog
 ```
 
-### Database Layer
+Channels are named `terminator.notepad:<name>` and register through `createIpcRegistrar` (`src/ipc/register.ts`): `handle` for local-only channels, `handleRemote` for the ones the remote client may call. File import and export stay local.
 
-Notes and diagrams are stored in the **shared SQLite database** at `<userData>/app.sqlite`. The notepad extension never manages its own database file; it receives an `ExtensionDB` instance (defined in `src/main/db/index.ts`) injected into every IPC handler at registration time. `ExtensionDB` exposes `exec`, `query`, `get`, `run`, and `transaction` over `node:sqlite` with `?` placeholders. Nested `transaction()` calls become `SAVEPOINT`s.
+#### Database
 
-**Schema**: `applyNotepadSchema` creates every table and index with `IF NOT EXISTS`, so running it on each launch changes nothing that already exists. The database is created from this schema, which is why there are no column migrations.
+Notes and diagrams are stored in the shared SQLite database at `<userData>/app.sqlite`, reached only through `api.db`. `applyNotepadSchema` (`src/db/db.ts`) creates every table and index with `IF NOT EXISTS`, so running it on each launch changes nothing that already exists; the database is created from this schema, which is why there are no column migrations. The import of the old better-sqlite3 `notepad.db` / `vault.db` files through `sql.js` is removed ([ADR 099](adr/099-node-sqlite-replaces-pglite.md)).
 
-**Legacy migration**: removed. The import of the old better-sqlite3 `notepad.db` / `vault.db` files through `sql.js` is closed (ADR 099).
+**Search** uses `LIKE` rather than an FTS5 table (`src/ipc/search.ipc.ts`). SQLite's `LIKE` folds case for ASCII letters only, so a search for `é` does not match `É`. Tag filters are applied in the same query with `EXISTS` subqueries, and results are returned in `updated_at DESC` order. See [ADR-019](adr/019-ilike-search-over-fts5.md) for the trade-off; its `pg_trgm` upgrade path was PGlite-specific and no longer applies.
 
-**Search**: full-text search uses `LIKE` (case-insensitive pattern match) rather than a dedicated FTS5 virtual table. SQLite's `LIKE` folds case for ASCII letters only, so a search for `é` does not match `É` (PGlite's `ILIKE` matched both). Tag filters are applied in the same query via `EXISTS` subqueries. This simplifies the schema at the cost of FTS5 BM25 ranking — results are returned in `updated_at DESC` order. See [ADR-019](adr/019-ilike-search-over-fts5.md) for the trade-off rationale; its `pg_trgm` upgrade path was PGlite-specific and no longer applies.
+#### Data flow
 
-### Data Flow
+1. **Create and autosave**: view → `notes.autosave` → the `notes` table. Inline `#tag` parsing on autosave reconciles the `note_tags` join table (`reconcileTags`).
+2. **Search**: view → `search.query` → `LIKE '%query%'` across `title` and `body`; `tag:foo` / `-tag:bar` tokens are resolved to tag ids before the main query.
+3. **Folders**: notes and diagrams each carry a nullable `folder_id`. `folders.create/rename/delete` manage the `folders` table; `notes.reorder` and `folders.move` update `sort_order` and `folder_id` through an explicit `{ note: 'notes', diagram: 'diagrams' }` table map, never string interpolation.
+4. **Comment anchoring**: a selection becomes `comments.create` with `startOffset`, `endOffset`, `quote`, `prefix` and `suffix`. On load `reanchorComment()` tries the offsets first and falls back to a text-quote search (the W3C TextQuoteSelector pattern). The CodeMirror `commentAnchorField` remaps positions on every transaction, and anchors that collapse or are not found are listed as orphaned in `CommentMargin`.
+5. **Export and import**: `export.run` writes `.md` files with YAML front matter (`src/ipc/front-matter.ts`, on `js-yaml`) and diagrams as `.excalidraw` files (Excalidraw JSON, in a diagrams folder). Re-export matches existing files by the front matter's `id`, and `import.run` upserts by `id`. `GROUP_CONCAT` aggregates tags in the export query.
 
-1. **Note create/autosave**: Renderer → `notes.autosave` IPC → SQLite `notes` table. Inline `#tag` parsing on autosave reconciles the `note_tags` join table via `reconcileTags()`.
+The channels and their payloads are in `src/ipc/` and the feature's contract, `specs/010-markdown-notepad/contracts/ipc-channels.md`.
 
-2. **Search**: Renderer → `search.query` IPC → `LIKE '%query%'` across `title` and `body`; `tag:foo` / `-tag:bar` tokens resolved to tag IDs before the main query.
-
-3. **Folders**: Notes and diagrams each carry a nullable `folder_id` FK. `folders.create/rename/delete` manage the `folders` table; `notes.reorder` and `folders.move` update `sort_order` and `folder_id` respectively using an explicit `{ note: 'notes', diagram: 'diagrams' }` table map (never dynamic string interpolation).
-
-4. **Comment anchoring lifecycle**:
-
-   - Text selection → `CommentComposer` → `comments.create` IPC (stores `startOffset`, `endOffset`, `quote`, `prefix`, `suffix`)
-   - On note load → `reanchorComment()` tries offset-first, falls back to text-quote search (W3C TextQuoteSelector pattern)
-   - CM6 `commentAnchorField` (`StateField<CommentAnchor[]>`) remaps positions via `tr.changes.mapPos()` on every transaction
-   - Orphaned anchors (collapsed or not found) surface in the "Orphaned" section of `CommentMargin`
-
-5. **Export/Import**: `export.run` → `gray-matter` YAML frontmatter → `.md` files; diagrams exported as `.excalidraw.json`. Re-export matches existing files by frontmatter `id` (idempotent). `import.run` upserts by `id`. `GROUP_CONCAT` aggregates tags in the export query.
-
-### New IPC Channels (22 total)
-
-Documented in `specs/010-markdown-notepad/contracts/ipc-channels.md`. They are extension-owned and reached through `extensionBridge.invoke`.
-
----
-
-## Foundry Extension (`extensions/foundry/`)
+### Foundry (`extensions/foundry/`)
 
 Foundry is a **software factory**: an idea or a tracker issue becomes a **work
 order** that compiles, and the order is executed by an orchestration that
@@ -1035,7 +921,7 @@ ADR-012).
 Two loops, one contract. Nothing but the work order crosses between them — no
 phase name, no state file, no directory layout, no card.
 
-### The work order
+#### The work order
 
 Validated with zod on every read, because it is written by an agent and edited
 through a surface, so nothing about it is trustworthy by construction. It
@@ -1082,7 +968,7 @@ makes the checks a gate rather than a suggestion. It also writes down the
 derived lane ordering, so the Line reads the plan that was agreed rather than
 repeating a derivation it could get differently.
 
-### The Forge (`src/forge/`)
+#### The Forge (`src/forge/`)
 
 Seeds an order from typed text or a tracker issue, having already read the
 repository: the toolchain probe, the house documents, and the past decisions
@@ -1152,7 +1038,7 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
 `recipeLadder` reads first. Unavailable controls are `ReasonButton`s:
 `aria-disabled` plus `aria-describedby`, never the native `disabled`.
 
-### The Line (`src/line/`, `src/recipe/`, `src/verify/`, `src/gates/`)
+#### The Line (`src/line/`, `src/recipe/`, `src/verify/`, `src/gates/`)
 
 - **Recipes** (`recipe/parse.ts`, `recipe/resolve.ts`) are YAML: a list of steps
   over five kinds — `agent`, `run`, `gate`, `fanout`, `join`. There is
@@ -1311,9 +1197,9 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   Questions at ≥ 0.9 confidence are answered with the recommended option and
   recorded as assumptions; low/medium findings may be dismissed with a reason;
   closable failing checks go back to the architect up to twice.
-- **Agent text is markdown** — rendered by `components/Markdown.tsx`
-  (`Markdown`, and `MarkdownInline` for buttons and labels), built as React
-  elements so nothing an agent writes becomes HTML. Tool input stays literal.
+- **Agent text is markdown** — rendered by the design system's `Markdown`
+  (with `inline` for buttons and labels), which sanitises it so nothing an
+  agent writes runs as HTML. Tool input stays literal.
 - **Both order-level controls are always on the Floor.** They used to render
   only inside the "nothing is running this" band, so a live run — or one halted
   at a gate — had no way out on that screen at all, while `order.cancel`
@@ -1392,7 +1278,7 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   it again for a caller that reports none, and a set makes the second one a
   no-op rather than a second start.
 
-### Shipping (`src/line/integrate.ts`, `src/trackers/write-back.ts`)
+#### Shipping (`src/line/integrate.ts`, `src/trackers/write-back.ts`)
 
 Work ends in a draft pull request without being asked, one per repository, in
 merge order, cross-linked. The decision offered afterwards is whether to mark
@@ -1475,7 +1361,7 @@ draft ready writes nothing to the tracker. Each successful write records
 team with a single started state has no review state: the In Review move fails
 and the ledger says the issue stays In Progress for that reason.
 
-### Sensors and signals (`src/sensors/`, ADR-066)
+#### Sensors and signals (`src/sensors/`, ADR-066)
 
 Sensors read the product's signals back into the factory and **propose** work;
 nothing they see starts a run. A sensor is YAML resolved on the three rungs
@@ -1494,7 +1380,7 @@ counts gates only. Dismissing hides a signal until it grows by half again.
 Promoting seeds a draft order whose `source.kind` is `signal`; it still has to
 converge in the Forge and be agreed by a person.
 
-### The ledger (`src/ledger/`)
+#### The ledger (`src/ledger/`)
 
 Append-only JSONL, one file per order, one object per line. A reversal is a new
 entry; nothing rewrites a line. That is what lets several unit writers append
@@ -1528,7 +1414,7 @@ The Ledger shows them under **Factory**, the factory site on its status wall,
 and each hall's status wall draws its own order's time to ship, reworks and CI
 rounds.
 
-### Surfaces
+#### Surfaces
 
 ```
 App
@@ -1550,7 +1436,7 @@ App
                 application's own settings API
 ```
 
-### What it does not do
+#### What it does not do
 
 - **It writes nothing into the repositories it works on** — no scaffolding, no
   configuration, not even a `.gitignore` entry (ADR-042). Records go to
@@ -1577,7 +1463,7 @@ App
   broadcasts `foundry:changed` `{ kind: 'order' | 'graph' | 'gates' | 'ledger' |
 'live', orderId }` through `api.window.broadcast`. The renderer reads once on
   mount and again only for a change it draws (`renderer/use-pushed.ts`), so an
-  open Floor costs the main process nothing while nothing happens. `live` is the
+  open Floor costs the core nothing while nothing happens. `live` is the
   one kind with no file behind it — a held tool call, a stall, a running or
   stranded agent, an open intake, the feed — and carries an empty `orderId` when
   it is not tied to one order. The only polls left read what agents write in
@@ -1591,9 +1477,9 @@ App
 - All `foundry:*` IPC channels are extension-owned. The core app has no
   knowledge of them: delete `extensions/foundry/` and core still builds.
 
-### Where the code lives
+#### Where the code lives
 
-`src/index.ts` is a composition of about 80 lines: `activate` connects the
+`src/index.ts` is a composition of under 80 lines: `activate` connects the
 index, starts the supervision runtime, the sensor tick and the refinery tick,
 and registers each surface's channels from its own module; `deactivate` stops
 each. Process-wide state lives with its owner: the runtime's parts in
@@ -1606,7 +1492,7 @@ conversations in `forge/intake-sessions.ts`, executing and adopted orders in
 `held-calls.ts`, `palette-commands.ts`, `agent-policy.ts`).
 `extensions/foundry/CLAUDE.md` has the full table.
 
-### ADRs
+#### ADRs
 
 - [ADR-007: agent-runner-subprocess](adr/007-agent-runner-subprocess.md) — spawn Claude Code as a child process rather than using the Anthropic API directly.
 - [ADR-026: supervised runs in a terminal](adr/026-supervised-runs-in-a-terminal.md) — work runs `claude` in a visible terminal behind a `PreToolUse` control server; the verified hook contract; why the stall detector ships in shadow mode.

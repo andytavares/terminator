@@ -8,7 +8,7 @@ This is a **fully isolated extension**. The core application knows nothing about
 
 - Import `@terminator/extension-sdk`, `@terminator/extension-ui` and this extension's own dependencies — nothing from the core's `src/` and nothing from another extension (ADR 094; `npm run lint` rejects any other import)
 - Call core IPC via `window.electronAPI.{terminal,workspace,project,git,shell,fs,settings,...}` for **core-owned channels only**
-- Call own IPC via `window.electronAPI.extensionBridge.invoke('git-integration:...')` or `window.electronAPI.extensionBridge.invoke('git:...')` etc.
+- Call own IPC via `window.electronAPI.extensionBridge.invoke('git:...')`, `invoke('github:...')` and the extension's other own channels, through the `src/api/*.ts` bridge modules
 - Register IPC handlers in `src/index.ts` via `api.ipc.registerHandler()`, as a `ChannelSpec` (ADR 096): a zod `schema` for the payload, the `invalid` response (`VALIDATION_ERROR` from `src/ipc/register.ts`), `run` on the parsed payload, and `onError` where a thrown error becomes a response. Never parse the payload by hand; `tests/unit/channel-schemas.spec.ts` checks every channel has a schema
 
 ### Core git channels available to ALL extensions (core-owned)
@@ -65,7 +65,7 @@ PR descriptions, templates and comments are rendered only through `src/component
 - **Never** put extension-specific methods in `src/main/preload.ts` (core file)
 - **Never** modify `src/shared/electron-api/manifest.ts` (core file) or re-declare `window.electronAPI` here. The view API is declared once, in `packages/extension-sdk/types/renderer.d.ts`, which `tsconfig.extension.json` loads; if the extension needs something it lacks, extend the SDK declaration. Extension-owned channels are typed in the `src/api/*.ts` bridge modules through `invokeBridge<T>` (`src/api/bridge.ts`)
 - **Never** add extension-only npm deps to the **root** `package.json` — add them to `extensions/git-integration/package.json`
-- **Never** import from other extensions (`extensions/task-vault/...`, `extensions/speckit-pilot/...`)
+- **Never** import from other extensions (`extensions/task-vault/...`, `extensions/foundry/...`)
 - **Never** hardcode the extension ID in core app files
 
 ## NPM Dependencies

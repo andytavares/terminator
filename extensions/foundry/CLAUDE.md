@@ -136,9 +136,7 @@ Verification commands (`npm test`, `pytest`, …) do **not** run through `api.sh
 
 ## NPM Dependencies
 
-Declared in `extensions/foundry/package.json` only. npm workspaces hoist them. Extension-owned dependencies, in full: **`zod`** (schema validation at every boundary) and **`js-yaml`** (recipes, roles and rules are hand-authored and need comments). That is the whole list.
-
-`react`, `react-dom`, `lucide-react` and `electron` are the application's, not this extension's, and are used through the hoist rather than redeclared.
+Declared in `extensions/foundry/package.json` only, at the one version the repository uses for each (ADR 097). npm workspaces hoist them. Besides the SDK, the design system, `react`, `react-dom` and `lucide-react` for the view, Foundry's own dependencies are **`zod`** (schema validation at every boundary) and **`js-yaml`** (recipes, roles and rules are hand-authored and need comments). The backend runs in the extension host and does not import `electron` (ADR 094); `api.paths`, `api.dialog` and `api.window` cover what it used it for.
 
 ## Build
 
@@ -148,8 +146,6 @@ Extension specs live in `tests/` and are matched by the root `vitest.config.ts`.
 
 ## Typecheck
 
-`npm run typecheck:extensions` — `tsc --noEmit` over `extensions/foundry/tsconfig.json`. **Run it.** Nothing else does.
-
-The root `tsconfig.json` is `files: []` plus project references with no `--build`, so `npm run typecheck` checks nothing; and even under `--build` the extension is in none of the three referenced projects. Neither `npm run build:extensions` (esbuild) nor the vite renderer build typechecks anything either — both strip types.
+`npm run typecheck` checks the core, both packages and every extension (`typecheck:extensions` runs `tsc -p extensions/foundry/tsconfig.json`, which extends `tsconfig.extension.json`). The root `npx tsc --noEmit` checks nothing: the root `tsconfig.json` is `files: []` with project references. Neither `npm run build:extensions` (esbuild) nor the vite renderer build typechecks anything either — both strip types.
 
 A type error the typecheck would catch — a `Record` keyed by a union missing a member, for example — otherwise ships through a green build, clean lint and passing unit tests, and blanks every Foundry surface at runtime.

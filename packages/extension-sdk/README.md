@@ -7,7 +7,7 @@ Since 4.0.0 an extension's backend runs in the extension host, a separate proces
 crosses a `MessagePort`: values the core holds are promises or snapshots it pushes, callbacks are
 called by id, and the backend cannot import `electron` (use `api.paths`, `api.dialog`,
 `api.window`). See `CHANGELOG.md` for the migration from 3.x and
-`docs/EXTENSION-DEVELOPMENT.md#where-your-backend-runs-sdk-400`.
+`docs/EXTENSION-DEVELOPMENT.md#where-your-backend-runs`.
 
 An extension imports only this package, `@terminator/extension-ui` and the npm packages in its
 own `package.json`. `npm run lint` rejects anything else, including core source and other

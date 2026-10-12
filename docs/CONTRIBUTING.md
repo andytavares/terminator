@@ -7,8 +7,9 @@
 ```bash
 git clone <repo-url>
 cd terminator
+nvm use            # Node 24.21.0, from .nvmrc: the Node that Electron 44 ships
 
-# Install all dependencies (versions are pinned — do not use --legacy-peer-deps without cause)
+# Install all dependencies from the root: npm resolves every workspace (versions are pinned — do not use --legacy-peer-deps without cause)
 # node-pty is NAPI-based (ABI-stable), so its `npm install` build works across
 # Electron versions with no separate rebuild step.
 npm install
@@ -35,10 +36,12 @@ A dev run uses its own profile, `…/@andytavares/terminator-dev`, so it can run
 ### Run tests
 
 ```bash
-npm test                # Unit + integration (Vitest)
+npm test                # Unit + integration (Vitest), core and extensions
 npm run test:watch      # Watch mode
 npm run test:e2e        # E2E — launches real Electron app (Playwright)
 npm run test:coverage   # Coverage report in coverage/
+npm run test:stories    # The design system's Storybook stories, run as tests
+npm run test:visual     # The design system's screenshot tests
 ```
 
 Coverage is gated by Codecov on the pull request, not locally ([ADR 095](adr/095-coverage-is-gated-by-codecov.md)). `codecov/patch` needs 80% of the lines your change adds or modifies, and `codecov/project` must not drop. A test covers a scenario the running app can produce; a branch no real caller can reach is deleted, not tested.
@@ -65,7 +68,7 @@ E2E runs with no retries, so a test that fails once fails the build ([ADR 070](a
 
 ### Build extensions
 
-Extension TypeScript is compiled to CommonJS bundles by esbuild. The output is gitignored — never commit `extensions/*/src/index.js`. Always rebuild after changing extension source files:
+Each extension's backend (`src/index.ts`) is bundled to CommonJS by esbuild, and its view by its own Vite config into `dist/` (`scripts/build-extensions.cjs`). The output is gitignored — never commit `extensions/*/src/index.js`. Always rebuild after changing extension source files:
 
 ```bash
 npm run build:extensions   # compile all extensions
@@ -77,11 +80,12 @@ npm run build:extensions   # compile all extensions
 
 ```bash
 npm run lint       # ESLint (zero errors required)
+npm run lint:deps  # syncpack: exact versions, one per package
 npm run typecheck  # TypeScript type check (no emit — zero errors required)
 npm run format     # Prettier (auto-fixes)
 ```
 
-Both `lint` and `typecheck` must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
+The root `npx tsc --noEmit` checks nothing; use `npm run typecheck`, which checks main, renderer, shared, both packages and every extension. Both `lint` and `typecheck` must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
 
 ---
 
@@ -109,38 +113,40 @@ Per the [project constitution](../.specify/memory/constitution.md), **no product
 
 Test location by type:
 
-| Type        | Location             | When to use                                                |
-| ----------- | -------------------- | ---------------------------------------------------------- |
-| Unit        | `tests/unit/`        | Pure logic — schemas, storage, pty-manager, extension host |
-| Integration | `tests/integration/` | IPC round-trips, storage read/write                        |
-| E2E         | `tests/e2e/`         | Full acceptance scenarios against the real Electron app    |
+| Type        | Location                         | When to use                                                |
+| ----------- | -------------------------------- | ---------------------------------------------------------- |
+| Unit        | `tests/unit/`                    | Pure logic — schemas, storage, pty-manager, extension host |
+| Integration | `tests/integration/`             | IPC round-trips, storage read/write                        |
+| E2E         | `tests/e2e/`                     | Full acceptance scenarios against the real Electron app    |
+| Extension   | `extensions/*/tests/`            | Each extension's own unit and integration tests            |
+| Stories     | `packages/extension-ui/stories/` | Design system components, in both themes                   |
 
 ---
 
 ## Documentation Requirements
 
-**Documentation ships in the same PR as the code.** A feature is not complete until docs are updated. This is a hard requirement from the project constitution (Principle VI).
+**Documentation ships in the same PR as the code.** A feature is not complete until docs are updated. This is a hard requirement from the project constitution (Principle VIII).
 
 ### When you add or change something, update:
 
-| Change                              | Documentation to update                                                                                                    |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| New feature or user-facing behavior | `README.md` features list and/or `docs/ARCHITECTURE.md`                                                                    |
-| New IPC channel                     | `specs/001-extension-first-terminal/contracts/ipc-channels.md` (master contract) and `src/shared/electron-api/manifest.ts` |
-| Change to extension API             | `specs/001-extension-first-terminal/contracts/extension-api.md` and `docs/EXTENSION-DEVELOPMENT.md`                        |
-| New npm script                      | `README.md` scripts table and `specs/.../quickstart.md`                                                                    |
-| Architectural decision              | New ADR in `docs/adr/`                                                                                                     |
-| Data model change                   | `specs/.../data-model.md` and `docs/ARCHITECTURE.md`                                                                       |
-| Setup step change                   | `README.md`, `docs/CONTRIBUTING.md`, `specs/.../quickstart.md`                                                             |
-| New keyboard shortcut               | `README.md` features list, `contracts/extension-api.md` reserved list                                                      |
+| Change                              | Documentation to update                                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| New feature or user-facing behavior | `README.md` features list, `docs/user-guide/USER-GUIDE.md` and/or `docs/ARCHITECTURE.md`                     |
+| New core IPC channel                | `src/shared/electron-api/manifest.ts`, and the namespace table in `docs/ARCHITECTURE.md` for a new namespace |
+| Change to the Extension API         | `packages/extension-sdk/types/api.d.ts`, its `CHANGELOG.md` and version, and `docs/EXTENSION-DEVELOPMENT.md` |
+| New npm script                      | `README.md` scripts table                                                                                    |
+| Architectural decision              | New ADR in `docs/adr/`                                                                                       |
+| Data model change                   | The feature's `specs/<feature>/data-model.md` and `docs/ARCHITECTURE.md`                                     |
+| Setup step change                   | `README.md` and `docs/CONTRIBUTING.md`                                                                       |
+| New keyboard shortcut               | `README.md` features list and `CORE_SHORTCUTS` in `src/renderer/quick-actions/shortcut-behaviors.ts`         |
 
 ---
 
 ## IPC Contracts
 
-All IPC channels are defined in `specs/001-extension-first-terminal/contracts/ipc-channels.md`. Before adding a new channel:
+`src/shared/electron-api/manifest.ts` is the one declaration of the core's channels. To add one:
 
-1. Document it in the contracts file first.
+1. Describe it in your feature's `specs/<feature>/contracts/`.
 2. Add the Zod payload schema to `src/shared/schemas/` (or beside the handler for a one-off shape).
 3. Declare it in `src/shared/electron-api/manifest.ts` with its `signature`. The native and remote adapters, the remote allowlist and the renderer's `window.electronAPI` type all come from that one entry. If extension views need it, mark it `extensionView` and add it to `src/main/preload-webview.ts`; its spec fails until the two agree.
 4. Register it in the appropriate `src/main/ipc/*.ipc.ts` file as a row of `registerInvokeTable([...invokeSpec({ channel, schema, invalid, run })])` in `src/main/ipc/invoke-table.ts`.
@@ -208,9 +214,10 @@ Dependency install scripts are blocked by npm unless listed in `allowScripts` in
 Before opening a PR, verify:
 
 - [ ] All tests pass (`npm test`)
-- [ ] `npm run lint` passes with 0 errors
+- [ ] `npm run lint`, `npm run lint:deps` and `npm run typecheck` pass with 0 errors
+- [ ] `npm run format:check` passes
 - [ ] `npm run build:extensions` succeeds (no compile errors)
 - [ ] No unused imports, variables, or dead code introduced
 - [ ] Documentation updated for every changed behavior (see table above)
-- [ ] New IPC channels documented in `ipc-channels.md` and declared in `src/shared/electron-api/manifest.ts`
+- [ ] New core IPC channels declared in `src/shared/electron-api/manifest.ts` and registered through the invoke table
 - [ ] ADR written if a significant architectural decision was made
