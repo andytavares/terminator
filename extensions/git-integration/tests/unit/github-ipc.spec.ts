@@ -1892,6 +1892,44 @@ describe('github:remove-active-review — store side-effects', () => {
     expect(deleteSpy).toHaveBeenCalledWith('/repo:::42:::abc123')
   })
 
+  it("deletes the pull request's own session key, so a refresh does not bring it back as paused", async () => {
+    vi.spyOn(ElectronStore.prototype, 'set').mockImplementation(function (
+      this: { store: Record<string, unknown> },
+      key: string,
+      value: unknown
+    ) {
+      this.store[key] = value
+    })
+    vi.spyOn(ElectronStore.prototype, 'delete').mockImplementation(function (
+      this: { store: Record<string, unknown> },
+      key: string
+    ) {
+      delete this.store[key]
+    })
+    const session = (prNumber: number) => ({
+      repoRoot: '/repo',
+      prNumber,
+      headSHA: 'abc123',
+      currentChapterId: null,
+      currentFilePath: null,
+      viewedFiles: [],
+      fileOrderOverrides: {},
+      scrollPosition: null,
+      pausedAt: '2026-01-01T00:00:00Z',
+      lastAccessedAt: '2026-01-01T00:00:00Z',
+    })
+    await handlers['github:session-set']({ key: '/repo:::42', session: session(42) })
+    await handlers['github:session-set']({ key: '/repo:::420', session: session(420) })
+
+    await handlers['github:remove-active-review']({ repoRoot: '/repo', prNumber: 42 })
+
+    const { sessions } = (await handlers['github:sessions-for-repo']({ repoRoot: '/repo' })) as {
+      sessions: Array<{ prNumber: number }>
+    }
+    expect(sessions.map((s) => s.prNumber)).toEqual([420])
+    delete sessionData['/repo:::420']
+  })
+
   it('returns { error } when activeReviewStore.delete throws (line 846)', async () => {
     vi.spyOn(ElectronStore.prototype, 'delete').mockImplementationOnce(() => {
       throw new Error('store write failed')

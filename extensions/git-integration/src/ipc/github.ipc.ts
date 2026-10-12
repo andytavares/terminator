@@ -939,10 +939,10 @@ export function registerGithubHandlers(
       run: async ({ repoRoot, prNumber }) => {
         const [activeReviews, sessions] = await Promise.all([activeReviewStore(), sessionStore()])
         activeReviews.delete(`${repoRoot}:${prNumber}`)
-        // Also delete all session store entries for this PR so it won't re-appear as in-progress on next load
-        const sessionPrefix = `${repoRoot}:::${prNumber}:::`
+        // Also delete this PR's sessions, "repo:::pr" and v1's "repo:::pr:::sha", so it won't re-appear as in-progress on next load
+        const sessionKey = `${repoRoot}:::${prNumber}`
         for (const key of Object.keys(sessions.store)) {
-          if (key.startsWith(sessionPrefix)) sessions.delete(key)
+          if (key === sessionKey || key.startsWith(`${sessionKey}:::`)) sessions.delete(key)
         }
         return { ok: true as const }
       },
