@@ -385,7 +385,7 @@ Not driven by any spec:
 
 ### terminator.task-vault IPC: 68 of 68 driven
 
-`links:get-for-terminator-target`, `links:remove`, `projects:update-status`, `settings:set-stale-threshold` and `vault:query` are remote-accessible and no view calls them; `task-vault-links.spec.ts` and `task-vault-remote-api.spec.ts` call them as a remote client does and check the effect in the vault's views. `admin:list-tables` was local-only and called by nothing, so it was deleted rather than tested (71f00af). The global capture shortcut (`CommandOrControl+Shift+O`, an `api.globalShortcut`) is pressed at the X server through XTEST in `task-vault-capture.spec.ts`; that test skips on macOS, where synthesising a system-wide key needs Accessibility consent for the runner, and the closest test there opens the same capture overlay from Quick Actions in the same spec.
+`links:get-for-terminator-target`, `links:remove`, `projects:update-status`, `settings:set-stale-threshold` and `vault:query` are remote-accessible and no view calls them; `task-vault-links.spec.ts` and `task-vault-remote-api.spec.ts` call them as a remote client does and check the effect in the vault's views. `admin:list-tables` was local-only and called by nothing, so it was deleted rather than tested (71f00af). The global capture shortcut (`CommandOrControl+Shift+O`, an `api.globalShortcut`) is pressed at the X server through XTEST in `task-vault-capture.spec.ts`; that test skips on macOS, where synthesising a system-wide key needs Accessibility consent for the runner, so CI runs it in the E2E (Linux, X11) job under xvfb. On macOS the closest test opens the same capture overlay from Quick Actions in the same spec.
 
 <details><summary>Driven, and by which specs</summary>
 
