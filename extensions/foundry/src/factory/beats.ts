@@ -86,6 +86,8 @@ export function schedule(
   nodes: readonly BeatNode[],
   nowMs: number
 ): Beats {
+  // Same object back, so a poll that saw nothing re-renders nothing.
+  if (events.length === 0) return beats
   const byId = new Map(nodes.map((n) => [n.id, n]))
   const held = [...beats.held]
   const shown = { ...beats.shown }

@@ -99,6 +99,17 @@ describe('createLiveHall', () => {
     expect(changed).toHaveBeenCalledTimes(3)
   })
 
+  it('does not tell subscribers when the same run is observed again unchanged', () => {
+    const hall = createLiveHall()
+    const g = running()
+    hall.observe(observation(g), {}, 0)
+    const changed = vi.fn()
+    hall.subscribe(changed)
+
+    hall.observe(observation(g), {}, 500)
+    expect(changed).not.toHaveBeenCalled()
+  })
+
   it('stops telling a subscriber that unsubscribed', () => {
     const hall = createLiveHall()
     const changed = vi.fn()

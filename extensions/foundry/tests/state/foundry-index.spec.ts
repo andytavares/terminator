@@ -49,6 +49,24 @@ function setup() {
 }
 
 describe('the Foundry index', () => {
+  it('reads from disk again after a failed read instead of keeping the failure', async () => {
+    const source = disk()
+    let fail = true
+    const orders = source.orders
+    source.orders = async () => {
+      if (fail) throw new Error('disk unavailable')
+      return orders()
+    }
+    const index = createFoundryIndexes(
+      () => source,
+      () => {}
+    ).forRoot('/data')
+
+    await expect(index.orders()).rejects.toThrow('disk unavailable')
+    fail = false
+    expect((await index.orders()).map((o) => o.id)).toEqual(['WO-1'])
+  })
+
   it('reads each kind from disk once and then answers from memory', async () => {
     const { source, index } = setup()
     for (let i = 0; i < 3; i++) {
