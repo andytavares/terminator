@@ -9,7 +9,7 @@ import {
   executeExtensionCommand,
   isExtensionCommandRegistered,
 } from '../extensions/api.js'
-import type { CommandContext } from '../extensions/api.js'
+import type { CommandContext } from '@terminator/extension-sdk'
 import {
   getAllExtensionSettings,
   setExtensionSetting,

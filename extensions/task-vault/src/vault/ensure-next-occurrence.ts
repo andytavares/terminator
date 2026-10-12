@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 import {
   localDate,
   computeNextDueDate,

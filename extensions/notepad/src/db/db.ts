@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { ExtensionDB } from '../../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
 export { randomUUID }
 

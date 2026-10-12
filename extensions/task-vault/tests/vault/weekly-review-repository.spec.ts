@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { wrapDb } from '../../../../src/main/db/index'
 import { applyTaskVaultSchema } from '../../src/vault/db'
-import type { ExtensionDB } from '../../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 import {
   completeReview,
   formatReviewMarkdown,

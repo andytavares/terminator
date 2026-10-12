@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron'
-import type { ExtensionAPI, ExtensionDB, Disposable } from '../../../../src/main/extensions/api.js'
+import type { ExtensionAPI, ExtensionDB, Disposable } from '@terminator/extension-sdk'
 import { openInVault } from '../navigation.js'
 
 let _tick: (() => void) | null = null

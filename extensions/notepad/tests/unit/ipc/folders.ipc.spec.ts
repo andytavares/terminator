@@ -35,7 +35,7 @@ import {
 } from '../../../src/ipc/folders.ipc'
 import { createNote } from '../../../src/ipc/notes.ipc'
 import { createDiagram } from '../../../src/ipc/diagrams.ipc'
-import type { ExtensionDB } from '../../../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
 let db: ExtensionDB
 

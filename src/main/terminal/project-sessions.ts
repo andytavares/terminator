@@ -1,5 +1,5 @@
 import { onProjectDelete } from '../extensions/workspace-events.js'
-import type { SessionInfo } from './pty-manager.js'
+import type { SessionInfo } from '@terminator/extension-sdk'
 
 // A deleted project takes its terminals with it, whoever deleted it — the
 // sidebar, or an extension removing a checkout it made. Left running, a

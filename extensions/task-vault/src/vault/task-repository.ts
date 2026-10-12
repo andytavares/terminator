@@ -1,4 +1,4 @@
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
 /**
  * The one INSERT path for task rows. Eight handlers used to hand-write their

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import type { WorkspaceSnapshot, ProjectSnapshot } from '../../types.js'
+import type { WorkspaceSnapshot, ProjectSnapshot } from '@terminator/extension-sdk'
 
 interface WorkspaceRouteDeps {
   listWorkspaces: () => WorkspaceSnapshot[]

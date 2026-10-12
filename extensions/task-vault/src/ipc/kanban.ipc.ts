@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 import { createIpcRegistrar } from './register'
 import type { KanbanConfig, TaskStatus } from '../vault/types'
 import { DEFAULT_KANBAN_CONFIG } from '../vault/types'

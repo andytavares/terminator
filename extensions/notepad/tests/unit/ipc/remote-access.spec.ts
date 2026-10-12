@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { ExtensionAPI, ExtensionDB } from '../../../../../src/main/extensions/api'
+import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 
 vi.mock('electron', () => ({ dialog: {} }))
 

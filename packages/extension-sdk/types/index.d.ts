@@ -1,5 +1,5 @@
-export type { ExtensionAPI, Disposable } from './api'
-export type { ElectronAPI, NotificationTarget, SerializedNotification } from './renderer'
+export type * from './api'
+export type * from './issues'
 
 /**
  * Curated set of icon names supported by Terminator's `iconFromName` helper.

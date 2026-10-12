@@ -2,6 +2,7 @@ import * as pty from 'node-pty'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
+import type { SessionInfo, SpawnSessionOptions } from '@terminator/extension-sdk'
 
 // PtyManager is the single session authority: it owns the PTY processes, the
 // session metadata (origin, project, workspace, timestamps), and the data/exit
@@ -14,50 +15,6 @@ interface SessionRecord {
   pid: number
   cwd: string
   shell: string
-}
-
-export type SessionOrigin = 'app' | 'remote'
-
-export interface SpawnSessionOptions {
-  sessionId: string
-  cwd: string
-  shell: string
-  type: 'human' | 'agent'
-  origin: SessionOrigin
-  projectId?: string
-  tabTitle?: string
-  /**
-   * Withhold output until someone attaches.
-   *
-   * A terminal spawned by the application rather than by the operator starts
-   * producing output immediately, while the tab that will show it does not
-   * exist yet — the renderer has to be told, adopt it, render, and mount an
-   * xterm first. Delivered live, everything in that window is dropped on the
-   * floor, which for a supervised agent means the launch command and its first
-   * output are simply missing from the terminal the operator opens.
-   */
-  holdOutput?: boolean
-  /**
-   * Added to the child's environment, on top of the parent's.
-   *
-   * Used for the linked issue's key and URL, so scripts and prompts in a
-   * project's terminals can reach them. Not how an agent receives its context
-   * — that is the SessionStart hook, which also covers a session started by
-   * hand outside the application.
-   */
-  env?: Record<string, string>
-}
-
-export interface SessionInfo {
-  sessionId: string
-  cwd: string
-  type: 'human' | 'agent'
-  origin: SessionOrigin
-  createdAt: string
-  pid: number
-  projectId?: string
-  tabTitle?: string
-  workspaceId?: string
 }
 
 interface ActiveSession {

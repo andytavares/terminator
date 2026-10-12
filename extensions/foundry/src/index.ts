@@ -1,6 +1,6 @@
 import { createPassCache } from './verify/pass-cache.js'
 import { z } from 'zod'
-import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
+import type { ExtensionAPI, Disposable } from '@terminator/extension-sdk'
 import { app } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'

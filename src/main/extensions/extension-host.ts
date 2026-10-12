@@ -6,12 +6,8 @@ import { CachedStore } from '../storage/cached-store.js'
 import type { z } from 'zod'
 import type { Extension } from '../../shared/types/index.js'
 import { ExtensionManifestSchema } from '../../shared/schemas/extension.schema.js'
-import {
-  createExtensionAPI,
-  getApiDisposables,
-  type Disposable,
-  type ExtensionAPIDeps,
-} from './api.js'
+import type { Disposable } from '@terminator/extension-sdk'
+import { createExtensionAPI, getApiDisposables, type ExtensionAPIDeps } from './api.js'
 import { makeLogger } from '../logger.js'
 
 // Extension bundles and manifests are CommonJS; main is an ES module.

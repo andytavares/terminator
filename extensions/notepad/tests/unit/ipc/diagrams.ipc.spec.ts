@@ -36,7 +36,7 @@ import {
   registerDiagramsIpcHandlers,
 } from '../../../src/ipc/diagrams.ipc'
 import { reorderItems } from '../../../src/ipc/notes.ipc'
-import type { ExtensionDB } from '../../../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
 let db: ExtensionDB
 

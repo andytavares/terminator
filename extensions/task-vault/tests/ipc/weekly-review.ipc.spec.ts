@@ -19,8 +19,7 @@ vi.mock('node:fs', () => ({
 import { wrapDb } from '../../../../src/main/db/index'
 import { applyTaskVaultSchema } from '../../src/vault/db'
 import { registerWeeklyReviewIpcHandlers } from '../../src/ipc/weekly-review.ipc'
-import type { ExtensionDB } from '../../../../src/main/db/index'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
 
 let db: ExtensionDB
 let handlers: Map<string, (payload: unknown) => Promise<unknown>>

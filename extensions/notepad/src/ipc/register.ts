@@ -1,4 +1,4 @@
-import type { ExtensionAPI, Disposable } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI, Disposable } from '@terminator/extension-sdk'
 
 // All notepad IPC channels register through the ExtensionAPI — never through
 // ipcMain directly (Extension Isolation). Registration records the channel in

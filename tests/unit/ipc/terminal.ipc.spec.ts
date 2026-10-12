@@ -42,7 +42,7 @@ vi.mock('../../../src/main/safe-send.js', () => ({
 import { registerTerminalHandlers, sendToRenderer } from '../../../src/main/ipc/terminal.ipc.js'
 import { OutputRelay } from '../../../src/main/terminal/output-relay.js'
 import { MissingCwdError } from '../../../src/main/terminal/pty-manager.js'
-import type { SessionInfo } from '../../../src/main/terminal/pty-manager.js'
+import type { SessionInfo } from '@terminator/extension-sdk'
 import { OUTPUT_FLUSH_INTERVAL_MS } from '../../../src/main/terminal/output-batcher.js'
 import { HIGH_WATERMARK_CHARS } from '../../../src/main/terminal/flow-control.js'
 

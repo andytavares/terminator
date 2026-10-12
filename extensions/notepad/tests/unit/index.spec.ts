@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },

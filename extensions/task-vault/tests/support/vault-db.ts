@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { wrapDb } from '../../../../src/main/db/index'
-import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 import { applyTaskVaultSchema } from '../../src/vault/db'
 import { insertTask, type NewTaskRow } from '../../src/vault/task-repository'
 

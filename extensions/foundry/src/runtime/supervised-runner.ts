@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { buildLaunchSpec, shellQuote } from './claude-launch.js'
 import { installHookScript } from './hook-script.js'
 import type { ControlServer } from './control-server.js'

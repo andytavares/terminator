@@ -10,7 +10,8 @@ const { mockLogger } = vi.hoisted(() => ({
 }))
 vi.mock('../../../src/main/logger', () => ({ logger: mockLogger }))
 
-import { wrapDb, type ExtensionDB } from '../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
+import { wrapDb } from '../../../src/main/db/index'
 import {
   importLegacyDatabase,
   legacyImportPending,

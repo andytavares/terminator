@@ -5,8 +5,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { parseFrontMatter, stringifyFrontMatter } from './front-matter'
 import { randomUUID } from '../db/db'
-import type { ExtensionDB } from '../../../../src/main/db/index'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
 import { createIpcRegistrar } from './register'
 
 // ──────────────────────────────────────────────────────────────

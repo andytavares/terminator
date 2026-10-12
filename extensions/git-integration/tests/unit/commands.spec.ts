@@ -5,7 +5,7 @@
  * path the extension runs.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { CommandContribution, CommandContext } from '../../../../src/main/extensions/api'
+import type { CommandContribution, CommandContext } from '@terminator/extension-sdk'
 
 vi.mock('../../src/git/git-service', () => ({
   pushBranch: vi.fn(),

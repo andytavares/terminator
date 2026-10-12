@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { wrapDb } from '../../../../src/main/db/index'
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 import { registerKanbanIpcHandlers } from '../../src/ipc/kanban.ipc.js'
 import { DEFAULT_KANBAN_CONFIG } from '../../src/vault/types.js'
 import {

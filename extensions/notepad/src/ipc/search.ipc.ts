@@ -1,6 +1,5 @@
 import { z } from 'zod'
-import type { ExtensionDB } from '../../../../src/main/db/index'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
 import { createIpcRegistrar } from './register'
 import type { SearchResult } from '../db/types'
 

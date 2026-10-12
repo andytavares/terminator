@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { CommandContribution, CommandContext } from '../../../../src/main/extensions/api'
+import type { CommandContribution, CommandContext } from '@terminator/extension-sdk'
 import {
   registerReviewPullRequestCommand,
   registerReviewSubmittedRelay,

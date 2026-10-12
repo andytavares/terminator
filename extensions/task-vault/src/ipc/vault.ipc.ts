@@ -1,5 +1,5 @@
 import * as path from 'node:path'
-import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 import { createIpcRegistrar } from './register'
 import { insertTask } from '../vault/task-repository'
 import { randomUUID } from '../vault/db'

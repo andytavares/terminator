@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api.js'
+import type { ExtensionAPI, Disposable } from '@terminator/extension-sdk'
 
 export interface PrReviewWindowParams {
   repoRoot?: string

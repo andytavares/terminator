@@ -1,6 +1,6 @@
 import { networkInterfaces } from 'os'
 import { randomBytes } from 'crypto'
-import type { ExtensionAPI } from '../../../src/main/extensions/api.js'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 import {
   createRemoteServer,
   PortInUseError,
