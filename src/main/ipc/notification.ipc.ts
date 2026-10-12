@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { z } from 'zod'
-import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { notificationManager } from '../notifications/notification-manager'
 import { sendToWindow } from '../safe-send'
 
@@ -24,13 +25,13 @@ function revealSessionOnClick(sessionId: string): void {
 
 export function registerNotificationHandlers(): void {
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'notifications:list',
       schema: noPayload,
       invalid: validationError,
       run: () => notificationManager.list(),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'notifications:create',
       schema: z.object({
         type: z.enum(['info', 'success', 'warning', 'error']),
@@ -46,7 +47,7 @@ export function registerNotificationHandlers(): void {
         return { id: notificationManager.create(onClick ? { ...payload, onClick } : payload) }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'notifications:dismiss',
       schema: z.object({ id: z.string().min(1) }),
       invalid: validationError,
@@ -55,7 +56,7 @@ export function registerNotificationHandlers(): void {
         return { ok: true }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'notifications:trigger-action',
       schema: z.object({ notifId: z.string().min(1), actionId: z.string().min(1) }),
       invalid: validationError,

@@ -4,6 +4,7 @@ import type { RunGraph } from '../line/run-graph.js'
 import type { Standing } from '../order/standing.js'
 import type { Gate } from '../gates/rules.js'
 import type { CiState } from '../line/ci-state.js'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 /** One repository this order spans, and what it is waiting for. */
 interface LaneRow {
@@ -86,10 +87,6 @@ export interface PendingAsk {
   summary: string
   detail: string | null
   at: number
-}
-
-function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
 async function readPending(): Promise<PendingAsk[]> {

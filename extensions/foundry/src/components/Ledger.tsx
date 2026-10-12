@@ -11,6 +11,7 @@ import { rungLevelInWords } from '../verify/ladder.js'
 import type { Rung } from '../verify/ladder.js'
 import { rungInWords } from '../recipe/rung.js'
 import type { Rung as ResolveRung } from '../recipe/rung.js'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 // The record: every decision, by whom or by what rule, and why.
 //
@@ -52,10 +53,6 @@ function declinedInWords(entry: { id: string; asserts?: string | null }): string
   if (entry.asserts) return entry.asserts
   const words = entry.id.replace(/^curator-/, '').replace(/-/g, ' ')
   return words.charAt(0).toUpperCase() + words.slice(1)
-}
-
-function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
 /** A reply that was an error is `null`, and leaves what is on screen as it was. */

@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { execFile } from 'child_process'
 import * as os from 'os'
 import { readFile } from 'fs/promises'
@@ -190,7 +191,7 @@ function parsePsRows(raw: string): ProcessMetrics[] {
 
 export function registerMetricsHandlers(ptyManager: PtyManager): void {
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'metrics:system',
       schema: noPayload,
       invalid: { error: 'VALIDATION_ERROR' },
@@ -207,7 +208,7 @@ export function registerMetricsHandlers(ptyManager: PtyManager): void {
         }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'metrics:processes',
       schema: z.object({ pids: z.array(z.number().int()).optional() }),
       invalid: { data: [] },
@@ -215,7 +216,7 @@ export function registerMetricsHandlers(ptyManager: PtyManager): void {
         data: await queryProcessMetrics(pids ?? []),
       }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'metrics:pids',
       schema: z.object({ sessionIds: z.array(z.string()).optional() }),
       invalid: { data: [] },

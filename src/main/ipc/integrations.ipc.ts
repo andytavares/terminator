@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { BrowserWindow } from 'electron'
-import { registerInvokeTable, invokeSpec } from './invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable } from './invoke-table.js'
 import { sendToWindow } from '../safe-send.js'
 import { z as zod } from 'zod'
 import {
@@ -87,7 +88,7 @@ export function registerIntegrationsHandlers(
 ): void {
   getWindow = window
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:status',
       schema: StatusInputSchema,
       invalid: VALIDATION,
@@ -101,7 +102,7 @@ export function registerIntegrationsHandlers(
       onError: fail,
     }),
 
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:connect',
       schema: ConnectInputSchema,
       invalid: VALIDATION,
@@ -128,7 +129,7 @@ export function registerIntegrationsHandlers(
       onError: fail,
     }),
 
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:disconnect',
       schema: DisconnectInputSchema,
       invalid: VALIDATION,
@@ -141,7 +142,7 @@ export function registerIntegrationsHandlers(
       onError: fail,
     }),
 
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:set-mine',
       schema: SetMineInputSchema,
       invalid: VALIDATION,
@@ -153,7 +154,7 @@ export function registerIntegrationsHandlers(
       onError: fail,
     }),
 
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:issue-list-mine',
       schema: ListMineInputSchema,
       invalid: VALIDATION,
@@ -162,7 +163,7 @@ export function registerIntegrationsHandlers(
       onError: fail,
     }),
 
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:issue-search',
       schema: SearchInputSchema,
       invalid: VALIDATION,
@@ -171,7 +172,7 @@ export function registerIntegrationsHandlers(
       onError: fail,
     }),
 
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:issue-get',
       schema: IssueGetInputSchema,
       invalid: VALIDATION,
@@ -181,7 +182,7 @@ export function registerIntegrationsHandlers(
       onError: fail,
     }),
 
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:link-set',
       schema: LinkSetInputSchema,
       invalid: VALIDATION,
@@ -204,7 +205,7 @@ export function registerIntegrationsHandlers(
       onError: fail,
     }),
 
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:link-get',
       schema: ProjectIdInputSchema,
       invalid: VALIDATION,
@@ -224,7 +225,7 @@ export function registerIntegrationsHandlers(
       onError: fail,
     }),
 
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:link-clear',
       schema: ProjectIdInputSchema,
       invalid: VALIDATION,
@@ -237,7 +238,7 @@ export function registerIntegrationsHandlers(
       onError: fail,
     }),
 
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:context-preview',
       schema: ProjectIdInputSchema,
       invalid: VALIDATION,
@@ -247,7 +248,7 @@ export function registerIntegrationsHandlers(
       onError: fail,
     }),
 
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:set-inject-context',
       schema: zod.object({
         projectId: zod.string().uuid(),
@@ -265,7 +266,7 @@ export function registerIntegrationsHandlers(
       onError: fail,
     }),
 
-    invokeSpec({
+    defineChannel({
       channel: 'integrations:issue-comment',
       schema: IssueCommentInputSchema,
       invalid: VALIDATION,

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { getFoundryAPI, type ModelChoiceView } from '../types/electron.js'
 import { rungInWords } from '../recipe/rung.js'
 import type { Rung } from '../recipe/rung.js'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 // What is left for a bespoke settings surface.
 //
@@ -37,10 +38,6 @@ const ASK_MODEL_CHOICES = [
   { id: 'sonnet', label: 'Sonnet (latest)', note: 'default — an amendment is a narrow change' },
   { id: 'opus', label: 'Opus (latest)', note: 'for an ask that needs deeper reasoning' },
 ] as const
-
-function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
-}
 
 async function readSensors(): Promise<SensorRow[]> {
   const answer = (await invoke('foundry:sensors.list')) as { sensors?: SensorRow[] }

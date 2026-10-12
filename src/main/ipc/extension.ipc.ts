@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { onChannel } from './channel-registrar.js'
-import { registerInvokeTable, invokeSpec, noPayload, type InvokeSpec } from './invoke-table.js'
+import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 import type { ExtensionHost } from '../extensions/extension-host.js'
 import type { ExtensionViewHost } from '../extensions/extension-view-host.js'
 import {
@@ -38,7 +39,7 @@ export function registerExtensionHandlers(
   registerInvokeTable([
     ...lifecycleSpecs(extensionHost, broadcast),
     ...settingsAndCommandSpecs(),
-    invokeSpec({
+    defineChannel({
       channel: 'extension:update-panel-bounds',
       schema: PanelBoundsSchema,
       invalid,
@@ -68,21 +69,21 @@ export function registerExtensionHandlers(
 function lifecycleSpecs(
   extensionHost: ExtensionHost,
   broadcast?: (channel: string, data: unknown) => void
-): InvokeSpec[] {
+): ChannelSpec[] {
   return [
-    invokeSpec({
+    defineChannel({
       channel: 'extension:list',
       schema: noPayload,
       invalid,
       run: () => ({ extensions: extensionHost.listExtensions() }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'extension:install',
       schema: z.object({ directoryPath: z.string().min(1) }),
       invalid,
       run: ({ directoryPath }) => extensionHost.load(directoryPath),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'extension:toggle',
       schema: z.object({ id: z.string().min(1), enabled: z.boolean() }),
       invalid,
@@ -92,7 +93,7 @@ function lifecycleSpecs(
         return { extension }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'extension:uninstall',
       schema: IdSchema,
       invalid,
@@ -102,7 +103,7 @@ function lifecycleSpecs(
         return { ok: true }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'extension:reload',
       schema: IdSchema,
       invalid,
@@ -115,21 +116,21 @@ function lifecycleSpecs(
   ]
 }
 
-function settingsAndCommandSpecs(): InvokeSpec[] {
+function settingsAndCommandSpecs(): ChannelSpec[] {
   return [
-    invokeSpec({
+    defineChannel({
       channel: 'extension:get-settings-schemas',
       schema: noPayload,
       invalid,
       run: () => ({ schemas: listExtensionSettingsSections() }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'extension:get-settings-values',
       schema: noPayload,
       invalid,
       run: () => ({ values: getAllExtensionSettings() }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'extension:update-setting',
       schema: z.object({ key: z.string().min(1), value: z.unknown() }),
       invalid,
@@ -138,14 +139,14 @@ function settingsAndCommandSpecs(): InvokeSpec[] {
         return { ok: true }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'extension:get-commands',
       schema: noPayload,
       invalid,
       run: () => ({ commands: listExtensionCommands() }),
     }),
     // Not on the remote allowlist: an extension view runs another extension's command locally.
-    invokeSpec({
+    defineChannel({
       channel: 'extension:run-command',
       schema: z.object({
         key: z.string().min(1),
@@ -160,7 +161,7 @@ function settingsAndCommandSpecs(): InvokeSpec[] {
           args
         ),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'extension:has-command',
       schema: z.object({ key: z.string().min(1) }),
       invalid: false,

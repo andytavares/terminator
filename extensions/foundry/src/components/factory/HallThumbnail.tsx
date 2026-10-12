@@ -5,6 +5,7 @@ import { createWorld } from '../../factory/sim.js'
 import type { World } from '../../factory/sim.js'
 import type { RunGraph } from '../../line/run-graph.js'
 import { HallScene } from './HallScene.js'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 // One still frame of an order's own hall, for its card in the Factory grid.
 //
@@ -26,10 +27,6 @@ export interface HallThumbnailProps {
 }
 
 const PLACEHOLDER_TEXT = 'Not started yet — the floor appears when the work starts.'
-
-function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
-}
 
 export function HallThumbnail({
   orderId,

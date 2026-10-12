@@ -31,6 +31,7 @@ import {
   type FloorView,
   type PendingAsk,
 } from '../renderer/use-run-observation.js'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 // Where you watch, not where you act.
 //
@@ -131,10 +132,6 @@ const STATE_LABEL: Record<RunNode['state'], string> = {
 
 /** The git extension's review of one pull request, by its full command id. */
 const REVIEW_COMMAND = 'terminator.git-integration.command.review-pull-request'
-
-function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
-}
 
 /**
  * The repository, where the order names one.

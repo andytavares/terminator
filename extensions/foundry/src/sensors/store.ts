@@ -1,8 +1,8 @@
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 
 import type { Signal } from './types'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // Everything a sensor produces or remembers lives under
 // `<dataRoot>/signals/`, never inside a repository (ADR-066): the data root is
@@ -97,9 +97,7 @@ async function readState(file: string): Promise<Record<string, SensorState>> {
 
 async function writeState(file: string, state: Record<string, SensorState>): Promise<void> {
   await fs.promises.mkdir(path.dirname(file), { recursive: true })
-  const tmp = path.join(os.tmpdir(), `foundry-sensor-state-${process.pid}-${Date.now()}.tmp`)
-  await fs.promises.writeFile(tmp, JSON.stringify(state, null, 2))
-  await fs.promises.rename(tmp, file)
+  await writeJsonAtomic(file, state)
 }
 
 export function createSignalStore(dataRoot: string): SignalStore {

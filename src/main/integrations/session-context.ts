@@ -5,6 +5,7 @@ import type { AgentContext } from '../../shared/types/index.js'
 import { buildAgentContext } from './agent-context.js'
 import type { IssueService } from './issue-service.js'
 import { listRecords } from '../sessions/session-record-store.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // A session's own link, kept in step with what its agent is told.
 //
@@ -28,10 +29,7 @@ function sessionContextFilePath(sessionId: string): string {
 
 export async function writeSessionContext(sessionId: string, context: AgentContext): Promise<void> {
   await fs.mkdir(sessionContextDir(), { recursive: true })
-  const target = sessionContextFilePath(sessionId)
-  const tmp = `${target}.tmp`
-  await fs.writeFile(tmp, JSON.stringify(context, null, 2), 'utf8')
-  await fs.rename(tmp, target)
+  await writeJsonAtomic(sessionContextFilePath(sessionId), context)
 }
 
 /** What was last written, or null. Never throws — a missing file is an answer. */
