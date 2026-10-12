@@ -39,7 +39,6 @@ An audit found the password in plain text on disk (`terminator.remote-control.pa
 ## Consequences
 
 - **Not changed: no TLS.** The cookie and the login password cross the LAN in clear text, as the old header did (ADR-017's accepted risk). The cookie has no `Secure` flag for that reason; behind the ngrok tunnel the browser sees HTTPS and the cookie is protected in transit.
-- **The browser client must change with this.** `src/renderer-remote/` (`App.tsx`, `api/remote-client.ts`, `electron-api-shim.ts`) still sends `Authorization: Bearer <password>` and keeps it in `localStorage`; the server no longer accepts that. The login page must `POST /api/login`, then call the ticket routes and every `/api` route with `credentials: 'same-origin'` and no header, and delete `remote_token`. `tests/e2e/remote-app.spec.ts`, which reads the password from `remote:get-settings`, changes the same way. This ADR's code is in `extensions/remote-control/` only; the client change is a separate unit.
+- **The browser client uses the session.** `src/renderer-remote/` posts the password to `/api/login` once, then sends every request with `credentials: 'same-origin'` and no `Authorization` header. A 401 sends the page back to the login screen. `remote_token` is no longer written, and an older version's value is removed on load.
 - Sessions live in memory: restarting Remote Control signs every browser out, which is also what a password change does.
-- There is no logout route; a session ends at its 8-hour limit, a restart, or a password change.
-- `scripts/build-extensions.cjs` still lists `bcryptjs` as an external; with the dependency gone that entry does nothing and can be deleted.
+- There is no logout route, because the client has no logout control; a session ends at its 8-hour limit, a restart, or a password change.

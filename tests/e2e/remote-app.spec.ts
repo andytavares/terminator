@@ -11,6 +11,7 @@ import { AppHandle, launchApp, closeApp } from './helpers'
 // Requires a built app (`npm run build`) — `/app/` serves `out/renderer/index.html`.
 
 const TEST_PORT = 17682
+const TEST_PASSWORD = 'e2e-remote-password'
 const WS_NAME = 'E2E-Remote-WS'
 
 let handle: AppHandle
@@ -41,46 +42,50 @@ test('/app/ browser remote renderer loads and the IPC bridge serves workspace:li
   await page.click('.dialog__btn-primary')
   await expect(page.locator('.repo-header__name').filter({ hasText: WS_NAME })).toBeVisible()
 
-  // 2. Enable the remote-control server on an isolated port and read its password.
-  const remote = await page.evaluate(async (port) => {
-    const bridge = (
-      window as unknown as {
-        electronAPI: { extensionBridge: { invoke: (c: string, p: unknown) => Promise<unknown> } }
+  // 2. Set a password, then enable the remote-control server on an isolated port.
+  //    The password is stored only as a hash, so the test keeps the one it chose.
+  await page.evaluate(
+    async ({ port, password }) => {
+      const bridge = (
+        window as unknown as {
+          electronAPI: { extensionBridge: { invoke: (c: string, p: unknown) => Promise<unknown> } }
+        }
+      ).electronAPI.extensionBridge
+      await bridge.invoke('remote:update-password', { password })
+      await bridge.invoke('remote:port-change', { port })
+      await bridge.invoke('remote:toggle', { enabled: true })
+      const deadline = Date.now() + 6000
+      while (Date.now() < deadline) {
+        const s = (await bridge.invoke('remote:get-settings', {})) as {
+          lanUrl?: string
+          port: number
+        }
+        if (s.lanUrl) return s
+        await new Promise((r) => requestAnimationFrame(r))
       }
-    ).electronAPI.extensionBridge
-    await bridge.invoke('remote:port-change', { port })
-    await bridge.invoke('remote:toggle', { enabled: true })
-    const deadline = Date.now() + 6000
-    while (Date.now() < deadline) {
-      const s = (await bridge.invoke('remote:get-settings', {})) as {
-        password: string
-        lanUrl?: string
-        port: number
-      }
-      if (s.lanUrl) return s
-      await new Promise((r) => requestAnimationFrame(r))
-    }
-    throw new Error('remote server did not start (no lanUrl after 6s)')
-  }, TEST_PORT)
+      throw new Error('remote server did not start (no lanUrl after 6s)')
+    },
+    { port: TEST_PORT, password: TEST_PASSWORD }
+  )
 
   const baseURL = `http://127.0.0.1:${TEST_PORT}`
 
-  // 3. Authenticate and obtain a single-use ticket to enter /app/.
+  // 3. Log in with the password; the session cookie authorises the ticket request.
   const api = await playwright.request.newContext({ baseURL })
-  const ticketRes = await api.post('/api/app-ticket', {
-    headers: { Authorization: `Bearer ${remote.password}` },
-  })
+  const loginRes = await api.post('/api/login', { data: { password: TEST_PASSWORD } })
+  expect(loginRes.status()).toBe(200)
+  const ticketRes = await api.post('/api/app-ticket')
   expect(ticketRes.status()).toBe(201)
   const { ticket } = (await ticketRes.json()) as { ticket: string }
 
-  // 4. Load /app/ in a real browser. Seed remote_token so the renderer's IPC
-  //    shim can authenticate the bridge WebSocket (the app-session cookie is
-  //    scoped to /app and is not sent to /api/bridge-ticket).
+  // 4. Load /app/ in a real browser that logged in the same way, so its IPC
+  //    shim can get a bridge ticket with the session cookie (no password is
+  //    stored in the page or sent in a header).
   const browser = await playwright.chromium.launch()
   const context = await browser.newContext({ baseURL })
-  await context.addInitScript((pw) => {
-    window.localStorage.setItem('remote_token', pw as string)
-  }, remote.password)
+  expect(
+    (await context.request.post('/api/login', { data: { password: TEST_PASSWORD } })).status()
+  ).toBe(200)
   const remotePage = await context.newPage()
   await remotePage.goto(`/app/?t=${ticket}`)
 

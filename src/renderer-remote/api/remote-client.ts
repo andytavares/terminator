@@ -1,21 +1,20 @@
-const TOKEN_KEY = 'remote_token'
+const LEGACY_TOKEN_KEY = 'remote_token'
 
-function getToken(): string {
-  return localStorage.getItem(TOKEN_KEY) ?? ''
+/** Older versions kept the password here; it must not outlive the upgrade. */
+export function forgetLegacyToken(): void {
+  try {
+    localStorage.removeItem(LEGACY_TOKEN_KEY)
+  } catch {
+    // storage unavailable: nothing was kept
+  }
 }
 
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token)
-}
-
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY)
-}
-
+// The session cookie from POST /api/login authorises the request; a 401 means
+// it ended (expired, or the password changed), so the person logs in again.
 async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  const headers = new Headers(init?.headers)
-  headers.set('Authorization', `Bearer ${getToken()}`)
-  return fetch(path, { ...init, headers })
+  const res = await fetch(path, { ...init, credentials: 'same-origin' })
+  if (res.status === 401) location.replace('/')
+  return res
 }
 
 export interface CreateTerminalOptions {

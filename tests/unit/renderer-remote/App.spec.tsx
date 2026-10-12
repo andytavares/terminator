@@ -60,7 +60,7 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('Could not connect to server')).toBeTruthy())
   })
 
-  it('stores token in localStorage and redirects on success', async () => {
+  it('logs in once with the password in the body, keeps nothing, and redirects on success', async () => {
     Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true })
     mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
       status: 201,
@@ -71,7 +71,32 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'correct' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/app/?t=tok-abc'))
-    expect(localStorage.getItem('remote_token')).toBe('correct')
+
+    const [loginUrl, loginInit] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(loginUrl).toBe('/api/login')
+    expect(loginInit.method).toBe('POST')
+    expect(JSON.parse(loginInit.body as string)).toEqual({ password: 'correct' })
+
+    for (const [, init] of mockFetch.mock.calls as [string, RequestInit][]) {
+      expect(new Headers(init?.headers).has('Authorization')).toBe(false)
+      expect(init?.credentials).toBe('same-origin')
+    }
+    expect(JSON.stringify({ ...localStorage })).not.toContain('correct')
+    expect(localStorage.length).toBe(0)
+  })
+
+  it('removes a password an older version left in localStorage', () => {
+    localStorage.setItem('remote_token', 'old-password')
+    render(<App />)
+    expect(localStorage.getItem('remote_token')).toBeNull()
+  })
+
+  it('says to wait after too many attempts (429)', async () => {
+    mockFetch.mockResolvedValueOnce({ status: 429, ok: false })
+    render(<App />)
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await waitFor(() => expect(screen.getByText(/Too many attempts/)).toBeTruthy())
   })
 
   it('redirects to /mobile/ when viewport is narrower than 1400px', async () => {
