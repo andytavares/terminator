@@ -6,18 +6,13 @@ import { defaultKeymap, indentWithTab, history, historyKeymap } from '@codemirro
 import { javascript } from '@codemirror/lang-javascript'
 import { oneDark } from '@codemirror/theme-one-dark'
 import type { ConflictBlock } from '../../schemas/merge-flow.schema'
+import { stripConflictMarkers } from '../../utils/conflict-markers'
 
 interface Props {
   block: ConflictBlock
   onSave: (text: string) => void
   onCancel: () => void
   suggestedText?: string | null
-}
-
-const CONFLICT_MARKER_RE = /^(<{7}.*|={7}|>{7}.*)\n?/gm
-
-function stripConflictMarkers(text: string): string {
-  return text.replace(CONFLICT_MARKER_RE, '')
 }
 
 function pickInitialText(block: ConflictBlock): string {
