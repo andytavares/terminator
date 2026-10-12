@@ -443,7 +443,13 @@ export function createExtensionAPI(
       register(schema: ExtensionSettingsSchema): Disposable {
         const key = `${extensionId}.settings`
         globalRegistry.settingsSections.set(key, schema)
-        return disposable(() => globalRegistry.settingsSections.delete(key))
+        // Settings → Extensions re-reads on this, as Quick Actions does on
+        // commands-changed: a page registered after the panel opened shows.
+        deps?.broadcastToWindows?.('extension:list-changed', null)
+        return disposable(() => {
+          globalRegistry.settingsSections.delete(key)
+          deps?.broadcastToWindows?.('extension:list-changed', null)
+        })
       },
       get<T>(key: string): T | undefined {
         const stored = getExtensionSetting(key)
