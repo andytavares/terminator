@@ -15,6 +15,7 @@ export interface StoredTask {
   dueDate: string | null
   blockedReason: string | null
   recurrenceRule: string | null
+  todaySince: string | null
   subtasks?: StoredTask[]
 }
 
