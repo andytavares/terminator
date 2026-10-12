@@ -273,6 +273,21 @@ describe('useSessionStore', () => {
       expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
     })
 
+    // A session whose process ended stays ended, whichever tab is selected.
+    it('leaves a closed session closed, selected or not', () => {
+      const ended = makeSession({ id: 'sess-1', status: 'closed' })
+      const other = makeSession({ id: 'sess-2', status: 'closed' })
+      useSessionStore.setState({
+        sessions: new Map([
+          ['sess-1', ended],
+          ['sess-2', other],
+        ]),
+      })
+      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-2')
+      expect(useSessionStore.getState().sessions.get('sess-1')?.status).toBe('closed')
+      expect(useSessionStore.getState().sessions.get('sess-2')?.status).toBe('closed')
+    })
+
     it('sets activeSessionIdByProject for the project', () => {
       const session = makeSession()
       useSessionStore.setState({ sessions: new Map([['sess-1', session]]) })
