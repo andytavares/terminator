@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
 import { MODAL_DEPTH_KEY } from '../../../../packages/extension-ui/src/modal-depth'
+import { layerValue } from '../../../../packages/extension-ui/src/layers'
 
 // A picker, a dropdown, a detail panel. The audit scored these against
 // aria-modal and a focus trap and called them failing; both would be defects
@@ -19,7 +20,7 @@ function renderPopover(onDismiss = vi.fn()) {
 }
 
 beforeEach(() => {
-  delete (window as unknown as Record<string, unknown>)[MODAL_DEPTH_KEY]
+  delete window[MODAL_DEPTH_KEY]
 })
 
 describe('Popover', () => {
@@ -92,15 +93,15 @@ describe('Popover', () => {
 
   it('counts toward the open-surface depth so the exit gesture stands down', () => {
     const { unmount } = renderPopover()
-    expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(1)
+    expect(window[MODAL_DEPTH_KEY]).toBe(1)
     unmount()
-    expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(0)
+    expect(window[MODAL_DEPTH_KEY]).toBe(0)
   })
 
   it('stacks above a plain page, on the published overlay layer', () => {
     const { container } = renderPopover()
     const el = container.querySelector('.tmui-popover') as HTMLElement
-    expect(Number(el.style.zIndex)).toBeGreaterThan(0)
+    expect(Number(el.style.zIndex)).toBe(layerValue('overlay'))
   })
 })
 

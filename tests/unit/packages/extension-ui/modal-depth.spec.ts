@@ -3,6 +3,7 @@ import {
   createModalDepthRegistry,
   getModalDepth,
   MODAL_DEPTH_KEY,
+  type ModalDepthHost,
 } from '../../../../packages/extension-ui/src/modal-depth'
 
 // Depth is tracked per document, not across the process boundary: a dialog and
@@ -10,7 +11,7 @@ import {
 // so the count never has to travel (research R2).
 
 describe('modal depth registry', () => {
-  let host: Record<string, unknown>
+  let host: ModalDepthHost
 
   beforeEach(() => {
     host = {}
@@ -120,17 +121,11 @@ describe('crossing the context bridge', () => {
   it('reports each change to the bridge when one is present', () => {
     const reported: number[] = []
     const host = { electronAPI: { ui: { setModalDepth: (d: number) => reported.push(d) } } }
-    const registry = createModalDepthRegistry(host as unknown as Record<string, unknown>)
+    const registry = createModalDepthRegistry(host)
     registry.push()
     registry.push()
     registry.pop()
     expect(reported).toEqual([1, 2, 1])
-  })
-
-  it('works normally when no bridge is exposed', () => {
-    const registry = createModalDepthRegistry({})
-    registry.push()
-    expect(registry.current()).toBe(1)
   })
 
   it('does not let a throwing bridge take the dialog down with it', () => {
@@ -143,7 +138,7 @@ describe('crossing the context bridge', () => {
         },
       },
     }
-    const registry = createModalDepthRegistry(host as unknown as Record<string, unknown>)
+    const registry = createModalDepthRegistry(host)
     expect(() => registry.push()).not.toThrow()
     expect(registry.current()).toBe(1)
   })

@@ -83,6 +83,8 @@ describe('SegmentedControl', () => {
     const onChange = vi.fn()
     render(<SegmentedControl label="Kind" options={OPTIONS} value="note" onChange={onChange} />)
     expect(option('Folder')).toHaveProperty('disabled', true)
+    fireEvent.click(option('Folder'))
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('names an option whose label is more than words', () => {

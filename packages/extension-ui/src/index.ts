@@ -66,7 +66,7 @@ export {
 export type { LayerName } from './layers'
 
 export { createModalDepthRegistry, getModalDepth, MODAL_DEPTH_KEY } from './modal-depth'
-export type { ModalDepthRegistry } from './modal-depth'
+export type { ModalDepthHost, ModalDepthRegistry } from './modal-depth'
 
 export { useDismissible } from './useDismissible'
 export type { DismissibleOptions } from './useDismissible'

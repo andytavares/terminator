@@ -34,7 +34,24 @@ export interface ModalDepthRegistry {
   release(): () => void
 }
 
-type Host = Record<string, unknown>
+/**
+ * What the count is kept on: the page's `window`, or in a test any object of
+ * the same shape. A window qualifies as it is, through the declaration below.
+ */
+export interface ModalDepthHost {
+  [MODAL_DEPTH_KEY]?: unknown
+  /** The context bridge an extension view's preload exposes, when there is one. */
+  electronAPI?: unknown
+}
+
+declare global {
+  interface Window {
+    /** How many modal surfaces this document has open; see ModalDepthHost. */
+    [MODAL_DEPTH_KEY]?: unknown
+  }
+}
+
+type Host = ModalDepthHost
 
 /** The slice of the bridge this module uses, so nothing else has to be stubbed. */
 interface DepthBridge {
