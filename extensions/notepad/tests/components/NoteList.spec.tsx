@@ -280,3 +280,32 @@ describe('NoteList archived section', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
   })
 })
+
+describe('NoteList drag to reorder', () => {
+  beforeEach(() => {
+    cleanup()
+    mockInvoke.mockClear()
+    useNotesStore.setState({ notes: [note1, note2], selectedNoteId: null, archivedVisible: false })
+    useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
+  })
+
+  it('saves the new order when a note is dropped below another', async () => {
+    render(<NoteList />)
+    const row = (title: string) => screen.getByText(title).closest('button') as HTMLElement
+    const dataTransfer = { effectAllowed: '', dropEffect: '' }
+
+    fireEvent.dragStart(row('First Note'), { dataTransfer })
+    // jsdom drag events carry no pointer position, which reads as the lower half.
+    fireEvent.dragOver(row('Second Note'), { dataTransfer })
+    await act(async () => {
+      fireEvent.drop(row('Second Note'), { dataTransfer })
+    })
+
+    expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:notes.reorder', {
+      items: [
+        { id: 'n2', type: 'note' },
+        { id: 'n1', type: 'note' },
+      ],
+    })
+  })
+})
