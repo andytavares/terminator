@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { buildReadingOrder } from '../../src/review/reading-order'
+import { parsePrFiles } from '../../src/review/parsed-file'
+
+const readingOrderOf = (files: unknown[]) => buildReadingOrder(parsePrFiles(files))
 
 // ─── Acceptance fixture: 7 real paths from this PR's own diff ─────────────────
 // Sizes are tuned so tie-breaking (higher additions+deletions first among free
@@ -110,7 +113,7 @@ const readmeFile = {
 
 describe('buildReadingOrder() — acceptance', () => {
   it('orders the 7 real files by definitions-first reading order, with the unknown-language file still appearing', async () => {
-    const steps = await buildReadingOrder([
+    const steps = await readingOrderOf([
       schemaFile,
       serviceFile,
       specFile,
@@ -173,7 +176,7 @@ describe('buildReadingOrder() — cycles', () => {
         '+}',
       ].join('\n'),
     }
-    const steps = await buildReadingOrder([a, b])
+    const steps = await readingOrderOf([a, b])
     const positions = new Map(steps.map((s) => [s.path, s.step]))
     expect(Math.abs(positions.get('src/a.ts')! - positions.get('src/b.ts')!)).toBe(1)
   })
@@ -181,7 +184,7 @@ describe('buildReadingOrder() — cycles', () => {
 
 describe('buildReadingOrder() — edge cases', () => {
   it('returns [] for no files', async () => {
-    expect(await buildReadingOrder([])).toEqual([])
+    expect(await readingOrderOf([])).toEqual([])
   })
 
   it('still returns a step for a file whose test-reference has no in-PR definer', async () => {
@@ -196,7 +199,7 @@ describe('buildReadingOrder() — edge cases', () => {
         '+})',
       ].join('\n'),
     }
-    const steps = await buildReadingOrder([orphanSpec])
+    const steps = await readingOrderOf([orphanSpec])
     expect(steps).toHaveLength(1)
     expect(steps[0].path).toBe(orphanSpec.path)
   })
@@ -223,7 +226,7 @@ describe('buildReadingOrder() — reference wording', () => {
         ].join('\n'),
       },
     ]
-    const order = await buildReadingOrder(files)
+    const order = await readingOrderOf(files)
     expect(order.find((s) => s.path.endsWith('utils.ts'))?.reason).toBe('Uses Priority (step 1)')
   })
 })

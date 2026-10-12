@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { detectMovedBlocks } from '../../src/review/moved-blocks'
+import { parsePrFiles } from '../../src/review/parsed-file'
+
+const movedBlocksOf = (files: unknown[]) => detectMovedBlocks(parsePrFiles(files))
 
 describe('detectMovedBlocks()', () => {
   it('links a block removed from one file to the same block added, unchanged, in another', () => {
@@ -32,7 +35,7 @@ describe('detectMovedBlocks()', () => {
       },
     ]
 
-    const moved = detectMovedBlocks(files)
+    const moved = movedBlocksOf(files)
     expect(moved).toHaveLength(1)
     expect(moved[0]).toMatchObject({
       fromPath: 'src/github/pr-review-service.ts',
@@ -55,7 +58,7 @@ describe('detectMovedBlocks()', () => {
         patch: ['@@ -1,0 +1,2 @@', '+const x = 1', '+const y = 2'].join('\n'),
       },
     ]
-    expect(detectMovedBlocks(files)).toEqual([])
+    expect(movedBlocksOf(files)).toEqual([])
   })
 
   it('does not match runs whose normalized content differs', () => {
@@ -69,7 +72,7 @@ describe('detectMovedBlocks()', () => {
         patch: ['@@ -1,0 +1,3 @@', '+const x = 1', '+const y = 9', '+const z = 3'].join('\n'),
       },
     ]
-    expect(detectMovedBlocks(files)).toEqual([])
+    expect(movedBlocksOf(files)).toEqual([])
   })
 
   it('treats blank lines inside a run as transparent (ignored, not breaking)', () => {
@@ -83,7 +86,7 @@ describe('detectMovedBlocks()', () => {
         patch: ['@@ -1,0 +1,4 @@', '+const x = 1', '+', '+const y = 2', '+const z = 3'].join('\n'),
       },
     ]
-    const moved = detectMovedBlocks(files)
+    const moved = movedBlocksOf(files)
     expect(moved).toHaveLength(1)
     expect(moved[0].lineCount).toBe(3)
   })
@@ -99,11 +102,11 @@ describe('detectMovedBlocks()', () => {
         patch: ['@@ -1,0 +1,3 @@', '+const x = 1', '+const y = 2', '+const z = 3'].join('\n'),
       },
     ]
-    expect(detectMovedBlocks(files)).toHaveLength(1)
+    expect(movedBlocksOf(files)).toHaveLength(1)
   })
 
   it('returns [] when no patch is present', () => {
-    expect(detectMovedBlocks([{ path: 'a.ts' }, { path: 'b.ts' }])).toEqual([])
+    expect(movedBlocksOf([{ path: 'a.ts' }, { path: 'b.ts' }])).toEqual([])
   })
 
   it('falls back to `filename` when `path` is absent', () => {
@@ -117,7 +120,7 @@ describe('detectMovedBlocks()', () => {
         patch: ['@@ -1,0 +1,3 @@', '+const x = 1', '+const y = 2', '+const z = 3'].join('\n'),
       },
     ]
-    const moved = detectMovedBlocks(files)
+    const moved = movedBlocksOf(files)
     expect(moved).toHaveLength(1)
     expect(moved[0].fromPath).toBe('a.ts')
     expect(moved[0].toPath).toBe('b.ts')
@@ -138,7 +141,7 @@ describe('detectMovedBlocks()', () => {
         ].join('\n'),
       },
     ]
-    expect(detectMovedBlocks(files)).toEqual([])
+    expect(movedBlocksOf(files)).toEqual([])
   })
 
   it('does not reuse an already-matched added run for a second identical removed run', () => {
@@ -162,7 +165,7 @@ describe('detectMovedBlocks()', () => {
         ),
       },
     ]
-    const moved = detectMovedBlocks(files)
+    const moved = movedBlocksOf(files)
     expect(moved).toHaveLength(1)
   })
 })
