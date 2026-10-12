@@ -60,6 +60,15 @@ describe('create-extension.js CLI', () => {
     expect(result.status).toBe(1)
   })
 
+  it('points at the guide for a view, not at the removed renderer.tsx model', () => {
+    const result = run(['view-ext', '--dir', join(tempDir, 'view-ext')])
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('docs/EXTENSION-DEVELOPMENT.md')
+    expect(result.stdout).not.toContain('renderer.tsx')
+    expect(result.stdout).not.toContain('useExtensionRegistry')
+    expect(result.stdout).not.toMatch(/v1\.\d\.\d/)
+  })
+
   it('exits 0 with --help', () => {
     const result = run(['--help'])
     expect(result.status).toBe(0)

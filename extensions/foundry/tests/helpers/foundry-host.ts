@@ -156,8 +156,6 @@ export function fakeHost(dataDir: () => string): FoundryHost {
       deleteProject: vi.fn(),
     },
     issues,
-    // Foundry's fallback records location sits under userData; give it a
-    // throw-away one, beside the records location the spec chose.
     // Foundry keeps its runtime state under userData: a throw-away one per
     // host, so a spec never writes it into the working tree.
     paths: { app: path.resolve(__dirname, '../..'), userData },

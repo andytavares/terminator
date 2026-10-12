@@ -6,7 +6,7 @@ When updating the extension scaffold template (`generateIndex`), enforce these r
 
 ### Extension Isolation Rules (embed in generated template comments)
 
-1. **IPC handlers** belong in `src/index.js` via `api.ipc.registerHandler('${id}:channel', handler)`
+1. **IPC handlers** belong in the backend entry (`src/index.js`) via `api.ipc.registerHandler({ channel: '${id}:channel', schema, invalid, run })`: a `ChannelSpec` with a zod `schema`, the only form the core accepts since SDK 3.0 (ADR 096). zod goes in the extension's own `package.json`
 2. **Renderer calls to own channels** go through `window.electronAPI.extensionBridge.invoke('${id}:channel', payload)` — never through a named method on `window.electronAPI`
 3. **Never add new namespaces to `window.electronAPI`** — the preload is core-only. Extensions use `extensionBridge`
 4. **Never modify core files**: `src/main/preload.ts`, `src/main/preload-webview.ts`, `src/shared/electron-api/manifest.ts`, `src/main/ipc/*.ts`
@@ -21,6 +21,8 @@ When updating the extension scaffold template (`generateIndex`), enforce these r
 
 ### When adding new API stubs to generateIndex
 
-- Use `api.ipc.registerHandler` for main-process handlers
+- Use `api.ipc.registerHandler` with a channel spec for backend handlers
+- Name no API version in a stub heading; the header line carries the SDK version (`SDK_VERSION`)
+- `tests/unit/scripts/create-extension.spec.js` and `tests/integration/scripts/create-extension.spec.js` check the template and the CLI output; change them first
 - Show `extensionBridge.invoke` usage in renderer-side comments
 - Reference `docs/EXTENSION-DEVELOPMENT.md` for full API surface

@@ -84,7 +84,33 @@ describe('generateIndex()', () => {
     expect(index).toContain('deactivate')
   })
 
-  it('includes all v1.1.0 API surface stubs', () => {
+  it('names the SDK version of this repository', () => {
+    const index = generateIndex('my-ext', 'com.example.my-ext')
+    const sdk = JSON.parse(readFileSync(join(ROOT, 'packages/extension-sdk/package.json'), 'utf8'))
+    expect(index).toContain(`// Extension SDK: ${sdk.version}\n`)
+  })
+
+  it('shows a channel registered as a spec with a schema, the only form the core accepts', () => {
+    const index = generateIndex('my-ext', 'com.example.my-ext')
+    expect(index).toContain('api.ipc.registerHandler({')
+    expect(index).toContain("channel: 'com.example.my-ext:my-action'")
+    expect(index).toMatch(/schema: z\./)
+    expect(index).toContain('invalid:')
+    expect(index).toContain('run:')
+    expect(index).not.toMatch(/registerHandler\('/)
+  })
+
+  it("says zod goes in the extension's own package.json", () => {
+    const index = generateIndex('my-ext', 'com.example.my-ext')
+    expect(index).toMatch(/zod[^\n]*package\.json/)
+  })
+
+  it('labels no stub with an API version that no longer describes it', () => {
+    const index = generateIndex('my-ext', 'com.example.my-ext')
+    expect(index).not.toMatch(/v1\.\d\.\d/)
+  })
+
+  it('registers a command and shows a toast', () => {
     const index = generateIndex('my-ext', 'com.example.my-ext')
     expect(index).toContain('commands.register')
     expect(index).toContain('showToast')
@@ -95,15 +121,15 @@ describe('generateIndex()', () => {
     expect(index).not.toContain('api.keyboard')
   })
 
-  it('imports nothing but the Extension SDK', () => {
+  it('imports nothing but the Extension SDK and, in its channel example, zod', () => {
     const index = generateIndex('my-ext', 'com.example.my-ext')
     const specifiers = [...index.matchAll(/(?:require\(|import\(|from )'([^']+)'/g)].map(
       (m) => m[1]
     )
-    expect(specifiers).toEqual(['@terminator/extension-sdk'])
+    expect(specifiers).toEqual(['@terminator/extension-sdk', 'zod'])
   })
 
-  it('includes commented-out stubs for v1.1.0 surfaces', () => {
+  it('includes commented-out stubs for the shell and the top bar', () => {
     const index = generateIndex('my-ext', 'com.example.my-ext')
     expect(index).toContain('shell.exec')
     expect(index).toContain('topBar.registerMenuItem')
