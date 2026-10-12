@@ -3,6 +3,7 @@ import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
 import { registerGithubHandlers } from './ipc/github.ipc.js'
 import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'
 import { registerQuickActionCommands } from './commands.js'
+import { bindShell } from './shell/run-git.js'
 import {
   openPrReviewWindow,
   registerReviewPullRequestCommand,
@@ -60,6 +61,7 @@ const disposables: Disposable[] = []
 export function activate(api: ExtensionAPI): void {
   const enabled = api.settings.get<boolean>('terminator.git-integration.git.enabled') ?? true
   if (!enabled) return
+  bindShell(api.shell)
 
   const registerFn = (
     channel: string,
@@ -74,7 +76,7 @@ export function activate(api: ExtensionAPI): void {
   registerGithubHandlers(
     registerFn,
     {
-      getGhPath: () => api.settings.get<string>('terminator.git-integration.git.ghCliPath') ?? '',
+      github: api.github,
       getToken: () => api.settings.get<string>('terminator.git-integration.git.githubToken') ?? '',
     },
     // Optional: an older host has no issues namespace, and the review view
@@ -142,12 +144,6 @@ export function activate(api: ExtensionAPI): void {
           label: 'Enable Git Integration',
           default: true,
           workspaceScoped: true,
-        },
-        'terminator.git-integration.git.ghCliPath': {
-          type: 'string',
-          label: 'gh CLI path',
-          description: 'Path to the gh binary. Leave empty to auto-detect.',
-          default: '',
         },
         'terminator.git-integration.git.githubToken': {
           type: 'string',

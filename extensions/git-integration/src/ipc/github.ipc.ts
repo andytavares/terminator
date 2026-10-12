@@ -1,10 +1,9 @@
-import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import Store from 'electron-store'
 import { basename, join } from 'path'
 import { existsSync } from 'fs'
-import { readFile, writeFile, unlink } from 'fs/promises'
-import { homedir, tmpdir } from 'os'
+import { readFile } from 'fs/promises'
+import { homedir } from 'os'
 import type {
   ReviewQueuePR,
   PrReviewDetail,
@@ -34,12 +33,11 @@ import {
   mapComment,
   parseDiff,
 } from '../github/pr-review-service.js'
+import type { GithubApiRequest, GithubTarget } from '@terminator/extension-sdk'
+import { runGit, exceededMaxBuffer, type GitRunOptions } from '../shell/run-git.js'
 import {
-  type GhOptions,
-  type ExecOutput,
+  type GithubAccess,
   isAuthError,
-  runGh,
-  runGit,
   getRepoOwnerAndName,
   PR_JSON_FIELDS,
   stateForSearch,
@@ -58,9 +56,25 @@ const activeReviewStore = new Store<Record<string, unknown>>({ name: 'pr-active-
 /** Files past this size are not sent to the renderer for context expansion. */
 const MAX_FILE_CONTENT_BYTES = 2 * 1024 * 1024
 // One byte over the limit, so an oversized file overflows the buffer instead of being read whole.
-const FILE_CONTENT_OUTPUT: ExecOutput = { raw: true, maxBuffer: MAX_FILE_CONTENT_BYTES + 1 }
+const FILE_CONTENT_OUTPUT: GitRunOptions = { raw: true, maxBuffer: MAX_FILE_CONTENT_BYTES + 1 }
 const isOverflow = (e: unknown) =>
-  (e as { code?: string } | null)?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
+  exceededMaxBuffer(e) || (e as { exceededMaxBuffer?: boolean } | null)?.exceededMaxBuffer === true
+
+const PR_DETAIL_FIELDS = [
+  'id',
+  'number',
+  'title',
+  'body',
+  'author',
+  'createdAt',
+  'headRefName',
+  'baseRefName',
+  'headRefOid',
+  'isDraft',
+  'mergeStateStatus',
+  'statusCheckRollup',
+  'assignees',
+]
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
@@ -77,15 +91,12 @@ export function parseRemoteRepo(root: string): { owner: string; name: string } |
   return { owner: parts[0], name: parts[1] }
 }
 
-async function runGhForRemote(
-  owner: string,
-  name: string,
-  args: string[],
-  opts: GhOptions,
-  timeoutMs?: number,
-  output?: ExecOutput
-): Promise<string> {
-  return runGh(homedir(), args, opts, timeoutMs, { GH_REPO: `${owner}/${name}` }, output)
+/** Where gh runs for a repoRoot: the checkout, or the home directory and GH_REPO. */
+function githubTarget(repoRoot: string, token: string): GithubTarget {
+  const remote = parseRemoteRepo(repoRoot)
+  const as = token ? { token } : {}
+  if (remote) return { cwd: homedir(), repository: `${remote.owner}/${remote.name}`, ...as }
+  return { cwd: repoRoot, ...as }
 }
 
 interface AccessibleRepo {
@@ -119,18 +130,16 @@ function lastLine(error: unknown): string {
 
 export function registerGithubHandlers(
   registerRaw: RegisterFn,
-  opts: GhOptions,
+  access: GithubAccess,
   issues?: IssuesApi,
   listProjectRoots?: () => string[],
   getReviewRepos?: () => string[],
   isBranchExcluded: BranchExcluded = () => false
 ): void {
   const register = withTiming(registerRaw)
-  const gh = (cwd: string, args: string[], timeoutMs?: number) => {
-    const remote = parseRemoteRepo(cwd)
-    if (remote) return runGhForRemote(remote.owner, remote.name, args, opts, timeoutMs)
-    return runGh(cwd, args, opts, timeoutMs)
-  }
+  const { github } = access
+  const target = (repoRoot: string) => githubTarget(repoRoot, access.getToken())
+  const api = (repoRoot: string, request: GithubApiRequest) => github.api(target(repoRoot), request)
   // `gh repo view` costs 0.4-0.7 s, so the answer is kept for the life of the process.
   const ownerAndNameCache = new Map<string, Promise<{ owner: string; repo: string }>>()
   const ownerAndName = (repoRoot: string) => {
@@ -138,7 +147,7 @@ export function registerGithubHandlers(
     if (remote) return Promise.resolve({ owner: remote.owner, repo: remote.name })
     const cached = ownerAndNameCache.get(repoRoot)
     if (cached) return cached
-    const lookup = getRepoOwnerAndName(repoRoot, opts)
+    const lookup = getRepoOwnerAndName(target(repoRoot), github)
     ownerAndNameCache.set(repoRoot, lookup)
     lookup.catch(() => ownerAndNameCache.delete(repoRoot))
     return lookup
@@ -146,7 +155,7 @@ export function registerGithubHandlers(
   let viewerLogin: Promise<string> | undefined
   const viewer = (cwd: string) => {
     if (viewerLogin) return viewerLogin
-    const lookup = gh(cwd, ['api', 'user', '--jq', '.login']).then((raw) => raw.trim())
+    const lookup = api(cwd, { path: 'user', jq: '.login' }).then((raw) => raw.trim())
     viewerLogin = lookup
     lookup.catch(() => {
       if (viewerLogin === lookup) viewerLogin = undefined
@@ -189,26 +198,21 @@ export function registerGithubHandlers(
     try {
       // PR number lookup — always finds the PR regardless of state
       if (search && /^\d+$/.test(search.trim())) {
-        const raw = await gh(repoRoot, ['pr', 'view', search.trim(), '--json', PR_JSON_FIELDS])
-        const pr = parseReviewQueuePR(JSON.parse(raw))
+        const view = await github.pullRequests.view(target(repoRoot), search.trim(), PR_JSON_FIELDS)
+        const pr = parseReviewQueuePR(view)
         return { prs: [pr], totalCount: 1, hasMore: false }
       }
 
       // Text search — open PRs unless an is:merged / is:closed / is:all qualifier says otherwise
       if (search && search.trim()) {
         const { state, text } = stateForSearch(search)
-        const raw = await gh(repoRoot, [
-          'pr',
-          'list',
-          '--state',
+        const found = await github.pullRequests.list(target(repoRoot), {
           state,
-          ...(text ? ['--search', text] : []),
-          '--limit',
-          '50',
-          '--json',
-          PR_JSON_FIELDS,
-        ])
-        const prs: ReviewQueuePR[] = (JSON.parse(raw) as unknown[])
+          ...(text ? { search: text } : {}),
+          limit: 50,
+          fields: PR_JSON_FIELDS,
+        })
+        const prs: ReviewQueuePR[] = found
           .map(parseReviewQueuePR)
           .filter((pr) => !isBranchExcluded(pr.headRefName, repoRoot))
         return { prs, totalCount: prs.length, hasMore: false }
@@ -217,19 +221,11 @@ export function registerGithubHandlers(
       // Paginated load via GraphQL
       const { owner, repo } = await ownerAndName(repoRoot)
       const gql = `query($owner:String!,$repo:String!,$cursor:String){repository(owner:$owner,name:$repo){pullRequests(first:20,states:OPEN,after:$cursor,orderBy:{field:CREATED_AT,direction:DESC}){totalCount pageInfo{endCursor hasNextPage}nodes{number title state isDraft additions deletions createdAt headRefName baseRefName changedFiles mergeStateStatus author{login avatarUrl}assignees(first:10){nodes{login}}latestReviews(first:20){nodes{author{login avatarUrl}state submittedAt}}reviewRequests(first:10){nodes{requestedReviewer{...on User{login avatarUrl}...on Team{name}}}}commits(last:1){nodes{commit{statusCheckRollup{contexts(first:20){nodes{...on CheckRun{name conclusion status}...on StatusContext{context state}}}}}}}}}}}`
-      const args = [
-        'api',
-        'graphql',
-        '-f',
-        `query=${gql}`,
-        '-f',
-        `owner=${owner}`,
-        '-f',
-        `repo=${repo}`,
-      ]
-      if (cursor) args.push('-f', `cursor=${cursor}`)
-
-      const raw = await gh(repoRoot, args, 60_000)
+      const raw = await api(repoRoot, {
+        path: 'graphql',
+        fields: { query: gql, owner, repo, ...(cursor ? { cursor } : {}) },
+        timeoutMs: 60_000,
+      })
       type GQLResponse = {
         data: {
           repository: {
@@ -267,22 +263,16 @@ export function registerGithubHandlers(
     const { repoRoot, prNumber } = parsed.data
     try {
       const { owner, repo } = await ownerAndName(repoRoot)
-      const [metaRaw, filesRaw, reviewsRaw, reviewersRaw] = await Promise.all([
-        gh(repoRoot, [
-          'pr',
-          'view',
-          String(prNumber),
-          '--json',
-          'id,number,title,body,author,createdAt,headRefName,baseRefName,headRefOid,isDraft,mergeStateStatus,statusCheckRollup,assignees',
-        ]),
+      const pull = `repos/${owner}/${repo}/pulls/${prNumber}`
+      const [meta, filesRaw, reviewsRaw, reviewersRaw] = await Promise.all([
+        github.pullRequests.view(target(repoRoot), prNumber, PR_DETAIL_FIELDS),
         // Use REST API to get file list with patch content for import-graph grouping
-        gh(repoRoot, ['api', '--paginate', `repos/${owner}/${repo}/pulls/${prNumber}/files`]),
-        gh(repoRoot, ['api', `repos/${owner}/${repo}/pulls/${prNumber}/reviews`]).catch(() => '[]'),
-        gh(repoRoot, ['api', `repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers`]).catch(
+        api(repoRoot, { path: `${pull}/files`, paginate: true }),
+        api(repoRoot, { path: `${pull}/reviews` }).catch(() => '[]'),
+        api(repoRoot, { path: `${pull}/requested_reviewers` }).catch(
           () => '{"users":[],"teams":[]}'
         ),
       ])
-      const meta = JSON.parse(metaRaw) as Record<string, unknown>
       const filesData = JSON.parse(filesRaw) as unknown[]
       const reviewsData = JSON.parse(reviewsRaw) as Array<Record<string, unknown>>
       const reviewersData = JSON.parse(reviewersRaw) as {
@@ -326,12 +316,10 @@ export function registerGithubHandlers(
         try {
           const headSHA = String(meta.headRefOid ?? '')
           if (headSHA) {
-            const suitesRaw = await gh(repoRoot, [
-              'api',
-              `repos/${owner}/${repo}/commits/${headSHA}/check-suites`,
-              '--jq',
-              '[.check_suites[] | {name: .app.name, state: .status, conclusion}]',
-            ])
+            const suitesRaw = await api(repoRoot, {
+              path: `repos/${owner}/${repo}/commits/${headSHA}/check-suites`,
+              jq: '[.check_suites[] | {name: .app.name, state: .status, conclusion}]',
+            })
             const suites = JSON.parse(suitesRaw) as Array<Record<string, unknown>>
             if (suites.length > 0) {
               rollup = suites.map((s) => ({
@@ -399,13 +387,32 @@ export function registerGithubHandlers(
     }
   })
 
+  register('github:pr-create', async (payload) => {
+    const schema = z.object({
+      repoRoot: z.string().min(1),
+      title: z.string().min(1),
+      body: z.string(),
+      base: z.string().min(1),
+      head: z.string().min(1),
+      draft: z.boolean(),
+    })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, ...pullRequest } = parsed.data
+    try {
+      return await github.pullRequests.create(target(repoRoot), pullRequest)
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e) }
+    }
+  })
+
   register('github:pr-mark-ready', async (payload) => {
     const schema = z.object({ repoRoot: z.string().min(1), prNumber: z.number().int().positive() })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber } = parsed.data
     try {
-      await gh(repoRoot, ['pr', 'ready', String(prNumber)])
+      await github.pullRequests.markReady(target(repoRoot), prNumber)
       return { ok: true }
     } catch (e) {
       return catchError(e)
@@ -418,7 +425,7 @@ export function registerGithubHandlers(
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber } = parsed.data
     try {
-      await gh(repoRoot, ['pr', 'update-branch', String(prNumber), '--rebase=false'], 30_000)
+      await github.pullRequests.updateBranch(target(repoRoot), prNumber)
       return { ok: true }
     } catch (e) {
       return catchError(e)
@@ -439,13 +446,11 @@ export function registerGithubHandlers(
     try {
       // No checkout: GitHub's own per-file patch is the diff.
       if (parseRemoteRepo(repoRoot)) {
-        const filesRaw = await gh(repoRoot, [
-          'api',
-          '--paginate',
-          `repos/{owner}/{repo}/pulls/${prNumber}/files`,
-          '--jq',
-          '[.[] | {filename, patch}]',
-        ])
+        const filesRaw = await api(repoRoot, {
+          path: `repos/{owner}/{repo}/pulls/${prNumber}/files`,
+          paginate: true,
+          jq: '[.[] | {filename, patch}]',
+        })
         const files = JSON.parse(filesRaw) as Array<{ filename: string; patch?: string }>
         const file = files.find((f) => f.filename === path)
         return { diff: parseDiff(file?.patch ?? '', path) }
@@ -460,17 +465,10 @@ export function registerGithubHandlers(
         await runGit(repoRoot, ['fetch', '--force', 'origin', `pull/${prNumber}/head:${prRef}`])
         const baseRefName =
           baseRef ??
-          (
-            await gh(repoRoot, [
-              'pr',
-              'view',
-              String(prNumber),
-              '--json',
-              'baseRefName',
-              '--jq',
-              '.baseRefName',
-            ])
-          ).trim()
+          String(
+            (await github.pullRequests.view(target(repoRoot), prNumber, ['baseRefName']))
+              .baseRefName
+          )
         mergeBase = (await runGit(repoRoot, ['merge-base', `origin/${baseRefName}`, prRef])).trim()
         if (headSHA) prDiffBases.set(cacheKey, { headSHA, mergeBase })
       }
@@ -498,19 +496,11 @@ export function registerGithubHandlers(
       const remote = parseRemoteRepo(repoRoot)
       if (remote) {
         const encodedPath = path.split('/').map(encodeURIComponent).join('/')
-        content = await runGhForRemote(
-          remote.owner,
-          remote.name,
-          [
-            'api',
-            '-H',
-            'Accept: application/vnd.github.raw+json',
-            `repos/{owner}/{repo}/contents/${encodedPath}?ref=${ref}`,
-          ],
-          opts,
-          undefined,
-          FILE_CONTENT_OUTPUT
-        )
+        content = await api(repoRoot, {
+          path: `repos/{owner}/{repo}/contents/${encodedPath}?ref=${ref}`,
+          accept: 'application/vnd.github.raw+json',
+          maxBuffer: FILE_CONTENT_OUTPUT.maxBuffer,
+        })
       } else {
         try {
           content = await runGit(repoRoot, ['show', `${ref}:${path}`], FILE_CONTENT_OUTPUT)
@@ -601,13 +591,11 @@ export function registerGithubHandlers(
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber } = parsed.data
     try {
-      const raw = await gh(repoRoot, [
-        'api',
-        `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
-        '--paginate',
-        '--jq',
-        '[.[] | {id,user,body,created_at,updated_at,path,line,start_line,side,diff_hunk,in_reply_to_id,pull_request_review_id}]',
-      ])
+      const raw = await api(repoRoot, {
+        path: `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
+        paginate: true,
+        jq: '[.[] | {id,user,body,created_at,updated_at,path,line,start_line,side,diff_hunk,in_reply_to_id,pull_request_review_id}]',
+      })
       const items = JSON.parse(raw) as unknown[]
       const comments: InlineComment[] = items.map(mapComment)
 
@@ -618,18 +606,11 @@ export function registerGithubHandlers(
         const { owner, repo } = await ownerAndName(repoRoot)
         const gql =
           'query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100){nodes{isResolved comments(first:1){nodes{databaseId}}}}}}}'
-        const threadsRaw = await gh(repoRoot, [
-          'api',
-          'graphql',
-          '-f',
-          `query=${gql}`,
-          '-f',
-          `o=${owner}`,
-          '-f',
-          `r=${repo}`,
-          '-F',
-          `n=${prNumber}`,
-        ])
+        const threadsRaw = await api(repoRoot, {
+          path: 'graphql',
+          fields: { query: gql, o: owner, r: repo },
+          typedFields: { n: prNumber },
+        })
         const threadsData = JSON.parse(threadsRaw) as {
           data?: {
             repository?: {
@@ -669,19 +650,15 @@ export function registerGithubHandlers(
       // Review body comments (submitted via "Submit review" → COMMENT/APPROVE/REQUEST_CHANGES)
       // live at /pulls/{n}/reviews, not /issues/{n}/comments, so they must be merged separately.
       const [issueRaw, reviewsRaw] = await Promise.all([
-        gh(repoRoot, [
-          'api',
-          `repos/{owner}/{repo}/issues/${prNumber}/comments`,
-          '--paginate',
-          '--jq',
-          '[.[] | {id,user,body,created_at,updated_at}]',
-        ]),
-        gh(repoRoot, [
-          'api',
-          `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
-          '--jq',
-          '[.[] | select(.body != null and .body != "") | {id,user,body,submitted_at}]',
-        ]).catch(() => '[]'),
+        api(repoRoot, {
+          path: `repos/{owner}/{repo}/issues/${prNumber}/comments`,
+          paginate: true,
+          jq: '[.[] | {id,user,body,created_at,updated_at}]',
+        }),
+        api(repoRoot, {
+          path: `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
+          jq: '[.[] | select(.body != null and .body != "") | {id,user,body,submitted_at}]',
+        }).catch(() => '[]'),
       ])
       const issueItems = JSON.parse(issueRaw) as unknown[]
       const reviewItems = (JSON.parse(reviewsRaw) as unknown[]).map((r) => {
@@ -708,14 +685,11 @@ export function registerGithubHandlers(
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber, body } = parsed.data
     try {
-      const raw = await gh(repoRoot, [
-        'api',
-        `repos/{owner}/{repo}/issues/${prNumber}/comments`,
-        '--method',
-        'POST',
-        '--field',
-        `body=${body}`,
-      ])
+      const raw = await api(repoRoot, {
+        path: `repos/{owner}/{repo}/issues/${prNumber}/comments`,
+        method: 'POST',
+        fields: { body },
+      })
       const comment = mapIssueComment(JSON.parse(raw))
       return { comment }
     } catch (e) {
@@ -734,14 +708,11 @@ export function registerGithubHandlers(
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber, inReplyToId, body } = parsed.data
     try {
-      const raw = await gh(repoRoot, [
-        'api',
-        `repos/{owner}/{repo}/pulls/${prNumber}/comments/${inReplyToId}/replies`,
-        '--method',
-        'POST',
-        '--field',
-        `body=${body}`,
-      ])
+      const raw = await api(repoRoot, {
+        path: `repos/{owner}/{repo}/pulls/${prNumber}/comments/${inReplyToId}/replies`,
+        method: 'POST',
+        fields: { body },
+      })
       const comment = mapComment(JSON.parse(raw))
       return { comment }
     } catch (e) {
@@ -792,23 +763,14 @@ export function registerGithubHandlers(
           }
           return entry
         })
-        const tmpFile = join(tmpdir(), `pr-review-${randomUUID()}.json`)
-        await writeFile(tmpFile, JSON.stringify(requestBody))
-        try {
-          const raw = await gh(repoRoot, ['api', endpoint, '--method', 'POST', '--input', tmpFile])
-          const data = JSON.parse(raw) as Record<string, unknown>
-          return { reviewId: Number(data.id) }
-        } finally {
-          await unlink(tmpFile).catch(() => {})
-        }
+        const raw = await api(repoRoot, { path: endpoint, method: 'POST', body: requestBody })
+        const data = JSON.parse(raw) as Record<string, unknown>
+        return { reviewId: Number(data.id) }
       }
 
-      const args = ['api', endpoint, '--method', 'POST', '--raw-field', `event=${event}`]
       // Only include body if non-empty; GitHub rejects empty string body for some events.
-      if (body.trim()) {
-        args.push('--raw-field', `body=${body}`)
-      }
-      const raw = await gh(repoRoot, args)
+      const fields: Record<string, string> = body.trim() ? { event, body } : { event }
+      const raw = await api(repoRoot, { path: endpoint, method: 'POST', fields })
       const data = JSON.parse(raw) as Record<string, unknown>
       return { reviewId: Number(data.id) }
     } catch (e) {
@@ -816,7 +778,7 @@ export function registerGithubHandlers(
       // gh api writes the GitHub JSON error body to stdout on failure;
       // stderr only gets the short "gh: Unprocessable Entity (HTTP 422)" summary.
       // Check stdout first so we get the specific error message, not the opaque HTTP status.
-      const ghOutput = (err.stdout ?? err.stderr ?? '').trim()
+      const ghOutput = (err.stdout || err.stderr || '').trim()
       const jsonMatch = ghOutput.match(/\{[\s\S]*?\}/)
       if (jsonMatch) {
         try {
@@ -944,9 +906,8 @@ export function registerGithubHandlers(
     try {
       const results = await Promise.allSettled(
         prNumbers.map(async (num) => {
-          const raw = await gh(repoRoot, ['pr', 'view', String(num), '--json', 'number,state'])
-          const data = JSON.parse(raw) as { number: number; state: string }
-          return { number: data.number, state: data.state }
+          const data = await github.pullRequests.view(target(repoRoot), num, ['number', 'state'])
+          return { number: Number(data.number), state: String(data.state) }
         })
       )
       const openNumbers: number[] = []
@@ -977,20 +938,13 @@ export function registerGithubHandlers(
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     try {
       if (parsed.data.refresh || !accessibleRepos) {
-        const lookup = runGh(
-          homedir(),
-          [
-            'api',
-            'user/repos?affiliation=owner,collaborator,organization_member&per_page=100',
-            '--paginate',
-            '--jq',
-            '.[] | {fullName: .full_name, owner: .owner.login, private: .private, archived: .archived, pushedAt: .pushed_at}',
-          ],
-          opts,
-          60_000,
-          undefined,
-          { maxBuffer: 50 * 1024 * 1024 }
-        ).then(parseAccessibleRepos)
+        const lookup = api(homedir(), {
+          path: 'user/repos?affiliation=owner,collaborator,organization_member&per_page=100',
+          paginate: true,
+          jq: '.[] | {fullName: .full_name, owner: .owner.login, private: .private, archived: .archived, pushedAt: .pushed_at}',
+          timeoutMs: 60_000,
+          maxBuffer: 50 * 1024 * 1024,
+        }).then(parseAccessibleRepos)
         accessibleRepos = lookup
         lookup.catch(() => {
           if (accessibleRepos === lookup) accessibleRepos = undefined
@@ -1013,7 +967,7 @@ export function registerGithubHandlers(
       const requests = buildSectionQueries(login, repos)
       const settled = await Promise.allSettled(
         requests.map(async ({ query }) => {
-          const raw = await gh(cwd, ['api', 'graphql', '-f', `query=${query}`], 60_000)
+          const raw = await api(cwd, { path: 'graphql', fields: { query }, timeoutMs: 60_000 })
           return (
             (
               JSON.parse(raw) as {
@@ -1104,18 +1058,16 @@ export function registerGithubHandlers(
   const pullRequestNodeId = async (repoRoot: string, prNumber: number, nodeId?: string) => {
     if (nodeId) return nodeId
     const { owner, repo } = await ownerAndName(repoRoot)
-    const idRaw = await gh(repoRoot, [
-      'api',
-      'graphql',
-      '-f',
-      'query=query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){id}}}',
-      '-f',
-      `o=${owner}`,
-      '-f',
-      `r=${repo}`,
-      '-F',
-      `n=${prNumber}`,
-    ])
+    const idRaw = await api(repoRoot, {
+      path: 'graphql',
+      fields: {
+        query:
+          'query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){id}}}',
+        o: owner,
+        r: repo,
+      },
+      typedFields: { n: prNumber },
+    })
     const idData = JSON.parse(idRaw) as {
       data: { repository: { pullRequest: { id: string } } }
     }
@@ -1137,16 +1089,10 @@ export function registerGithubHandlers(
       const pullRequestId = await pullRequestNodeId(repoRoot, prNumber, nodeId)
       const mutationName = viewed ? 'markFileAsViewed' : 'unmarkFileAsViewed'
       const gql = `mutation($id:ID!,$p:String!){${mutationName}(input:{pullRequestId:$id,path:$p}){clientMutationId}}`
-      await gh(repoRoot, [
-        'api',
-        'graphql',
-        '-f',
-        `query=${gql}`,
-        '-f',
-        `id=${pullRequestId}`,
-        '-f',
-        `p=${path}`,
-      ])
+      await api(repoRoot, {
+        path: 'graphql',
+        fields: { query: gql, id: pullRequestId, p: path },
+      })
       return { ok: true }
     } catch (e) {
       return catchError(e)
@@ -1174,15 +1120,14 @@ export function registerGithubHandlers(
           (_, i) => `m${i}:${mutationName}(input:{pullRequestId:$id,path:$p${i}}){clientMutationId}`
         )
         .join(' ')
-      await gh(repoRoot, [
-        'api',
-        'graphql',
-        '-f',
-        `query=mutation($id:ID!,${variables}){${mutations}}`,
-        '-f',
-        `id=${pullRequestId}`,
-        ...paths.flatMap((p, i) => ['-f', `p${i}=${p}`]),
-      ])
+      await api(repoRoot, {
+        path: 'graphql',
+        fields: {
+          query: `mutation($id:ID!,${variables}){${mutations}}`,
+          id: pullRequestId,
+          ...Object.fromEntries(paths.map((p, i) => [`p${i}`, p])),
+        },
+      })
       return { ok: true }
     } catch (e) {
       return catchError(e)
@@ -1202,10 +1147,9 @@ export function registerGithubHandlers(
     const { repoRoot, fromSha, toSha } = parsed.data
     try {
       const { owner, repo } = await ownerAndName(repoRoot)
-      const raw = await gh(repoRoot, [
-        'api',
-        `repos/${owner}/${repo}/compare/${fromSha}...${toSha}`,
-      ])
+      const raw = await api(repoRoot, {
+        path: `repos/${owner}/${repo}/compare/${fromSha}...${toSha}`,
+      })
       const data = JSON.parse(raw) as {
         ahead_by?: number
         files?: Array<{ filename: string; status: string; patch?: string }>
@@ -1251,7 +1195,7 @@ export function registerGithubHandlers(
     if (!existsSync(folder)) return { error: 'FOLDER_NOT_FOUND' }
     try {
       const name = repo.split('/')[1] ?? repo
-      await gh(folder, ['repo', 'clone', repo, name])
+      await github.repositories.clone(target(folder), repo, name)
       return { repoRoot: join(folder, name) }
     } catch (e) {
       return catchError(e)

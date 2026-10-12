@@ -1,52 +1,19 @@
-import { execFile } from 'child_process'
-import { promisify } from 'util'
-import { existsSync } from 'fs'
+import type { GithubAPI, GithubTarget } from '@terminator/extension-sdk'
+import { runGit } from '../shell/run-git.js'
 
-const execFileAsync = promisify(execFile)
+// The PR-review surface's gh knowledge (ADR-009): auth-error detection, the
+// repository a checkout belongs to, and the git log co-change signal. The core
+// runs gh itself, through api.github.
 
-// All gh-CLI knowledge for the PR-review surface lives here (ADR-009): binary
-// resolution for packaged apps, GH_TOKEN handling with expired-token retry,
-// auth-error detection, and the git log co-change signal.
-
-export interface GhOptions {
-  getGhPath: () => string
+/** The core's GitHub verbs, and the token this extension's settings may hold. */
+export interface GithubAccess {
+  github: GithubAPI
   getToken: () => string
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Packaged Electron apps don't inherit the shell PATH, so we probe common
-// locations where `gh` is installed on macOS before falling back to the name.
-const GH_CANDIDATE_PATHS = [
-  '/opt/homebrew/bin/gh', // Apple Silicon Homebrew
-  '/usr/local/bin/gh', // Intel Homebrew
-  '/usr/bin/gh',
-]
-
-let autoResolvedGhPath: string | null = null
-
-async function resolveGh(configuredPath: string): Promise<string> {
-  if (configuredPath) return configuredPath
-  if (autoResolvedGhPath) return autoResolvedGhPath
-  for (const p of GH_CANDIDATE_PATHS) {
-    if (existsSync(p)) {
-      autoResolvedGhPath = p
-      return p
-    }
-  }
-  autoResolvedGhPath = 'gh'
-  return autoResolvedGhPath
 }
 
 export function isAuthError(e: unknown): boolean {
   const msg = String(e)
   return msg.includes('gh auth login') || msg.includes('GH_TOKEN') || msg.includes('401')
-}
-
-/** Raw output keeps leading and trailing whitespace, which file content needs for its line numbers. */
-export interface ExecOutput {
-  readonly raw?: boolean
-  readonly maxBuffer?: number
 }
 
 export type RegisterFn = (
@@ -68,71 +35,35 @@ export function withTiming(register: RegisterFn): RegisterFn {
     })
 }
 
-export async function runGh(
-  cwd: string,
-  args: string[],
-  opts: GhOptions,
-  timeoutMs = 30_000,
-  /** Per-call variables, e.g. GH_REPO; never written to the shared process env. */
-  extraEnv?: Record<string, string>,
-  output: ExecOutput = {}
-): Promise<string> {
-  const gh = await resolveGh(opts.getGhPath())
-  const token = opts.getToken()
-  const env =
-    token || extraEnv
-      ? { ...process.env, ...(token ? { GH_TOKEN: token } : {}), ...extraEnv }
-      : undefined
-  try {
-    const { stdout, stderr } = await execFileAsync(gh, args, {
-      cwd,
-      timeout: timeoutMs,
-      env,
-      ...(output.maxBuffer === undefined ? {} : { maxBuffer: output.maxBuffer }),
-    })
-    if (stderr && !stdout) throw new Error(stderr)
-    return output.raw ? stdout : stdout.trim()
-  } catch (e) {
-    // If an explicit token was set but auth failed, retry without it so the
-    // system gh auth / GH_TOKEN env var gets a chance (token may be expired).
-    if (token && isAuthError(e)) {
-      const { stdout, stderr } = await execFileAsync(gh, args, {
-        cwd,
-        timeout: timeoutMs,
-        env: extraEnv ? { ...process.env, ...extraEnv } : undefined,
-        ...(output.maxBuffer === undefined ? {} : { maxBuffer: output.maxBuffer }),
-      })
-      if (stderr && !stdout) throw new Error(stderr, { cause: e })
-      return output.raw ? stdout : stdout.trim()
-    }
-    throw e
-  }
-}
-
 export async function getRepoOwnerAndName(
-  repoRoot: string,
-  opts: GhOptions
+  target: GithubTarget,
+  github: GithubAPI
 ): Promise<{ owner: string; repo: string }> {
-  const raw = await runGh(repoRoot, ['repo', 'view', '--json', 'owner,name'], opts)
-  const data = JSON.parse(raw) as { owner: { login: string }; name: string }
+  const data = (await github.repositories.view(target, ['owner', 'name'])) as {
+    owner: { login: string }
+    name: string
+  }
   return { owner: data.owner.login, repo: data.name }
 }
 
-export async function runGit(
-  cwd: string,
-  args: string[],
-  output: ExecOutput = {}
-): Promise<string> {
-  const { stdout } = await execFileAsync('git', args, {
-    cwd,
-    timeout: 30_000,
-    ...(output.maxBuffer === undefined ? {} : { maxBuffer: output.maxBuffer }),
-  })
-  return output.raw ? stdout : stdout.trim()
-}
-
-export const PR_JSON_FIELDS =
-  'number,title,state,author,createdAt,headRefName,baseRefName,isDraft,mergeStateStatus,statusCheckRollup,files,additions,deletions,reviews,assignees,latestReviews'
+export const PR_JSON_FIELDS = [
+  'number',
+  'title',
+  'state',
+  'author',
+  'createdAt',
+  'headRefName',
+  'baseRefName',
+  'isDraft',
+  'mergeStateStatus',
+  'statusCheckRollup',
+  'files',
+  'additions',
+  'deletions',
+  'reviews',
+  'assignees',
+  'latestReviews',
+]
 
 export type SearchState = 'open' | 'closed' | 'merged' | 'all'
 

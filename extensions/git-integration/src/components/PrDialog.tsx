@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Dialog } from '@terminator/extension-ui'
 import type { PullRequest } from '../schemas/git.schema'
 import { RichContent } from './pr-review/RichContent'
+import { githubAPI } from '../api/github'
 
 interface Branch {
   name: string
@@ -70,20 +71,16 @@ async function ghPrCreate(
   if (pushErr) return pushErr
 
   onStatus('Creating pull request…')
-  const args = ['pr', 'create', '--title', title, '--body', body, '--base', base, '--head', branch]
-  if (isDraft) args.push('--draft')
-  const result = await window.electronAPI.shell.exec({
-    command: 'gh',
-    args,
-    cwd: repoRoot,
-    timeoutMs: 30000,
+  const result = await githubAPI.prCreate({
+    repoRoot,
+    title,
+    body,
+    base,
+    head: branch,
+    draft: isDraft,
   })
   if ('error' in result) return { error: result.error }
-  if (result.exitCode !== 0) return { error: result.stderr || 'gh pr create failed' }
-  // Parse the PR URL from stdout to get number
-  const url = result.stdout.trim()
-  const match = url.match(/\/pull\/(\d+)$/)
-  const number = match ? parseInt(match[1], 10) : 0
+  const { number, url } = result
   return {
     pr: {
       number,

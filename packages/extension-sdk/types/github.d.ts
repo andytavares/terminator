@@ -82,6 +82,8 @@ export interface GithubAPI {
     updateBranch(target: GithubTarget, pullRequest: number): Promise<void>
   }
   repositories: {
+    /** `gh repo view --json` for the target's repository. */
+    view(target: GithubTarget, fields: readonly string[]): Promise<Record<string, unknown>>
     /** Clones `owner/name` into `directory`, relative to `target.cwd`. */
     clone(target: GithubTarget, repository: string, directory: string): Promise<void>
   }

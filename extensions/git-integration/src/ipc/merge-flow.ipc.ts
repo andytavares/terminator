@@ -1,6 +1,4 @@
 import { z } from 'zod'
-import { execFile as execFileCb } from 'child_process'
-import { promisify } from 'util'
 import { readFile, writeFile } from 'fs/promises'
 import Store from 'electron-store'
 import {
@@ -9,8 +7,8 @@ import {
   listConflictedFiles,
 } from '../git/conflict-reader.js'
 import { ResolutionStrategySchema } from '../schemas/merge-flow.schema.js'
+import { runGit } from '../shell/run-git.js'
 
-const execFile = promisify(execFileCb)
 const store = new Store()
 
 const GIT_TIMEOUT = 10_000
@@ -20,13 +18,8 @@ type RegisterFn = (
   handler: (payload: unknown) => Promise<unknown> | unknown
 ) => void
 
-async function git(args: string[], cwd: string): Promise<string> {
-  const { stdout } = await execFile('git', args, {
-    cwd,
-    timeout: GIT_TIMEOUT,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-  })
-  return stdout.trim()
+function git(args: string[], cwd: string): Promise<string> {
+  return runGit(cwd, args, { timeoutMs: GIT_TIMEOUT })
 }
 
 function sessionKey(repoRoot: string): string {

@@ -127,6 +127,15 @@ describe('api.github', () => {
     ])
   })
 
+  it('reads the repository a checkout belongs to', async () => {
+    const { run, github } = fakeGh(result({ stdout: '{"name":"repo","owner":{"login":"octo"}}' }))
+
+    const repository = await github.repositories.view({ cwd: '/repo' }, ['owner', 'name'])
+
+    expect(repository).toEqual({ name: 'repo', owner: { login: 'octo' } })
+    expect(run.mock.calls[0][0].args).toEqual(['repo', 'view', '--json', 'owner,name'])
+  })
+
   it('marks a timeout as a failure', async () => {
     const { github } = fakeGh(result({ exitCode: 124, timedOut: true }))
 

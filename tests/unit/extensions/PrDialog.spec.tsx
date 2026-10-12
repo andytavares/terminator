@@ -7,11 +7,13 @@ import type { PullRequest } from '../../../extensions/git-integration/src/schema
 const mockShellExec = vi.fn()
 const mockListBranches = vi.fn()
 const mockReadFile = vi.fn()
+const mockInvoke = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     shell: { exec: mockShellExec },
+    extensionBridge: { invoke: mockInvoke },
     git: { listBranches: mockListBranches },
     fs: { readFile: mockReadFile },
   }
@@ -145,11 +147,7 @@ describe('PrDialog', () => {
     mockShellExec
       .mockResolvedValueOnce({ exitCode: 0, stdout: '5', stderr: '' }) // checkCommitsAhead
       .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // push
-      .mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: 'https://github.com/foo/bar/pull/99',
-        stderr: '',
-      }) // gh pr create
+    mockInvoke.mockResolvedValueOnce({ number: 99, url: 'https://github.com/foo/bar/pull/99' })
 
     render(<PrDialog {...defaultProps} onCreated={onCreated} />)
     await waitFor(() => screen.getByRole('dialog'))
@@ -157,13 +155,22 @@ describe('PrDialog', () => {
     await waitFor(() => expect(onCreated).toHaveBeenCalled())
     const pr = onCreated.mock.calls[0][0] as PullRequest
     expect(pr.number).toBe(99)
+    // The view asks the main process to open it; it never runs gh itself.
+    expect(mockInvoke).toHaveBeenCalledWith('github:pr-create', {
+      repoRoot: '/repo',
+      title: 'feature/my feature',
+      body: '',
+      base: 'main',
+      head: 'feature/my-feature',
+      draft: false,
+    })
   })
 
   it('shows error when PR creation fails', async () => {
     mockShellExec
       .mockResolvedValueOnce({ exitCode: 0, stdout: '3', stderr: '' })
       .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
-      .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'gh error' })
+    mockInvoke.mockResolvedValueOnce({ error: 'gh error' })
 
     render(<PrDialog {...defaultProps} />)
     await waitFor(() => screen.getByRole('dialog'))

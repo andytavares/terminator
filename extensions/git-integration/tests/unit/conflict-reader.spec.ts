@@ -4,18 +4,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockReadFile = vi.fn()
 vi.mock('fs/promises', () => ({ readFile: (...args: unknown[]) => mockReadFile(...args) }))
 
-// Mock child_process + util so git() calls are interceptable
+import { bindShellToAnswers } from './support/shell'
+
+// Each git command is answered by mockGit(command, args, options).
 const mockGit = vi.fn()
-vi.mock('child_process', () => ({ execFile: vi.fn() }))
-vi.mock('util', () => ({
-  promisify:
-    (_fn: unknown) =>
-    async (...args: unknown[]) => {
-      const result = mockGit(...args)
-      if (result instanceof Error) throw result
-      return { stdout: typeof result === 'string' ? result : '', stderr: '' }
-    },
-}))
+bindShellToAnswers((...args) => mockGit(...args))
 
 import {
   readConflictBlocks,

@@ -1,5 +1,3 @@
-import { execFile as execFileCb } from 'child_process'
-import { promisify } from 'util'
 import { readFile } from 'fs/promises'
 import type {
   ConflictBlock,
@@ -7,19 +5,13 @@ import type {
   ConflictSession,
   GitAuthor,
 } from '../schemas/merge-flow.schema'
-
-const execFile = promisify(execFileCb)
+import { runGit } from '../shell/run-git.js'
 
 const GIT_TIMEOUT = 10_000
 const CONTEXT_LINES = 4
 
-async function git(args: string[], cwd: string): Promise<string> {
-  const { stdout } = await execFile('git', args, {
-    cwd,
-    timeout: GIT_TIMEOUT,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-  })
-  return stdout.trim()
+function git(args: string[], cwd: string): Promise<string> {
+  return runGit(cwd, args, { timeoutMs: GIT_TIMEOUT })
 }
 
 /**

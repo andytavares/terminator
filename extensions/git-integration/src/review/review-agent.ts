@@ -9,27 +9,23 @@ import {
   type AgentRun,
   type AgentScope,
 } from '../schemas/review-agent.schema.js'
+import { runGit } from '../shell/run-git.js'
 
+// Only for finding and running `claude`, which is not a command shell.exec runs.
 const execFileAsync = promisify(execFileCb)
 
-const DIFF_TIMEOUT = 30_000
 const DIFF_CAP_BYTES = 200 * 1024
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
 
 export type ExecFn = (
-  cmd: string,
+  cmd: 'git',
   args: string[],
-  opts: { cwd?: string }
+  opts: { cwd: string }
 ) => Promise<{ stdout: string; stderr?: string }>
 
-async function defaultExec(cmd: string, args: string[], opts: { cwd?: string }) {
-  return execFileAsync(cmd, args, {
-    cwd: opts.cwd,
-    timeout: DIFF_TIMEOUT,
-    maxBuffer: 20 * 1024 * 1024,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-  })
-}
+const defaultExec: ExecFn = async (_cmd, args, opts) => ({
+  stdout: await runGit(opts.cwd, args, { raw: true, maxBuffer: 20 * 1024 * 1024 }),
+})
 
 /** Minimal shape a spawned `claude` child needs — real ChildProcess satisfies this. */
 export interface SpawnedProcess {

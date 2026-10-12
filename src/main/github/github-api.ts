@@ -134,6 +134,8 @@ export function createGithubApi(run: RunCommand): GithubAPI {
       }),
     pullRequests: pullRequestVerbs(gh),
     repositories: {
+      view: async (target, fields) =>
+        JSON.parse(await gh({ target, args: ['repo', 'view', '--json', fields.join(',')] })),
       clone: async (target, repository, directory) => {
         await gh({ target, args: ['repo', 'clone', repository, directory] })
       },

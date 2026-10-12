@@ -31,6 +31,11 @@ vi.mock('fs/promises', () => ({
 }))
 
 import { registerGithubHandlers } from '../../../extensions/git-integration/src/ipc/github.ipc'
+import { bindShell } from '../../../extensions/git-integration/src/shell/run-git'
+import {
+  execOverPromisedStub,
+  githubOverPromisedStub,
+} from '../../../extensions/git-integration/tests/unit/support/shell'
 
 type Handler = (payload: unknown) => Promise<unknown> | unknown
 const handlers = new Map<string, Handler>()
@@ -57,8 +62,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   handlers.clear()
   Object.keys(storeData).forEach((k) => delete storeData[k])
+  const stub = (...args: unknown[]) => customMock()(...args)
+  bindShell({ exec: execOverPromisedStub(stub) })
   registerGithubHandlers(register as Parameters<typeof registerGithubHandlers>[0], {
-    getGhPath: () => '',
+    github: githubOverPromisedStub(stub),
     getToken: () => '',
   })
 })
