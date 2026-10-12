@@ -49,12 +49,15 @@ Starts the app on a fresh profile and passes when the main log says `App ready`,
 npm test                # Unit + integration (Vitest), core and extensions
 npm run test:watch      # Watch mode
 npm run test:e2e        # E2E — launches real Electron app (Playwright)
+npm run test:perf       # Wall-clock budgets (*.perf.spec.ts), one file at a time
 npm run test:coverage   # Coverage report in coverage/
 npm run test:stories    # The design system's Storybook stories, run as tests
 npm run test:visual     # The design system's screenshot tests
 ```
 
 **Temporary directories.** A spec makes one with `makeTempDir(prefix)` from `tests/support/temp-dir.ts`, never with `mkdtempSync` in `os.tmpdir()`: `tests/setup.ts` removes every one after the spec file ends, passed or failed. An E2E spec uses `e2eTempDir(prefix)` from `tests/e2e/helpers.ts`, which `tests/e2e/global-teardown.ts` removes with the run's root. CI runs each unit shard through `node scripts/check-temp-leaks.mjs`, which points `TMPDIR` at an empty directory and fails if anything is left in it; run it locally the same way, `node scripts/check-temp-leaks.mjs npx vitest run`. Specs that skipped this once left ~22,000 folders in `/tmp` in a day and filled the disk.
+
+A spec that asserts a wall-clock budget is named `*.perf.spec.ts`. `npm test` leaves it out, because beside every other spec in parallel it measures the load; `npm run test:perf` (`vitest.perf.config.ts`) runs it alone, and CI's `Perf budgets` job runs that.
 
 Coverage is gated by Codecov on the pull request, not locally ([ADR 095](adr/095-coverage-is-gated-by-codecov.md)). `codecov/patch` needs 80% of the lines your change adds or modifies, and `codecov/project` must not drop. A test covers a scenario the running app can produce; a branch no real caller can reach is deleted, not tested.
 

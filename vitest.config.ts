@@ -55,6 +55,9 @@ export default defineConfig({
             // they would report "skipped", and a skip in a green suite is a
             // check nobody notices is missing.
             'extensions/*/tests/live/**',
+            // Wall-clock budgets run alone, in `npm run test:perf`
+            // (vitest.perf.config.ts): beside every other spec they measure the load.
+            '**/*.perf.spec.ts',
           ],
         },
       },
@@ -82,6 +85,7 @@ export default defineConfig({
       exclude: [
         'vitest.config.ts',
         'vitest.live.config.ts',
+        'vitest.perf.config.ts',
         'playwright.config.ts',
         'packages/*/vite.config.ts',
         'src/renderer/index.tsx',

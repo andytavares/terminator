@@ -170,6 +170,28 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
+  # The wall-clock budgets (`*.perf.spec.ts`), one file at a time in a job of
+  # their own: in the unit shards they share the CPU with every other spec and
+  # measure the load rather than the code.
+  perf:
+    name: Perf budgets
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Perf budgets
+        run: npm run test:perf
+        timeout-minutes: 5
+
   # The required "Test" check. Same OS as the shards, because the blobs carry
   # their absolute source paths and coverage is remapped against them.
   test:
