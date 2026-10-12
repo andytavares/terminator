@@ -100,10 +100,6 @@ export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
 }
 
 export async function applyNotepadMigrations(db: ExtensionDB): Promise<void> {
-  const hasTags = await hasColumn(db, 'diagrams', 'tags')
-  if (!hasTags) {
-    await db.exec(`ALTER TABLE diagrams ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'`)
-  }
   const hasSortOrderNotes = await hasColumn(db, 'notes', 'sort_order')
   if (!hasSortOrderNotes) {
     await db.exec(`ALTER TABLE notes ADD COLUMN sort_order REAL NOT NULL DEFAULT 0`)
