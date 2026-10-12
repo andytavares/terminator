@@ -213,11 +213,19 @@ async function activateWithSettings(initial: Record<string, unknown>) {
   mockCreateRemoteServer.mockResolvedValue(makeServerHandle())
   const { activate } = await import('../../src/index.ts')
   activate(makeApi() as never)
-  // Activation queues the credential migration; hashing takes real time.
-  await new Promise((resolve) => setTimeout(resolve, 300))
   const handler = (channel: string) =>
     registeredHandler(channel) as (payload?: unknown) => Promise<Record<string, unknown>>
   return { values, handler }
+}
+
+/**
+ * Activation queues the credential migration, and hashing takes real time.
+ * deactivate() waits for that queue to drain (and starts nothing), so the
+ * migration has finished when it returns, however slow the machine.
+ */
+async function migrated(): Promise<void> {
+  const { deactivate } = await import('../../src/index.ts')
+  await deactivate()
 }
 
 const EXT = 'terminator.remote-control'
@@ -270,6 +278,7 @@ describe('remote-control credentials', () => {
       [`${EXT}.password`]: 'earlier-version-password',
       [`${EXT}.passwordHash`]: BCRYPT,
     })
+    await migrated()
     expect(JSON.stringify([...values.values()])).not.toContain('earlier-version-password')
     expect(
       await verifyPassword('earlier-version-password', values.get(`${EXT}.passwordHash`) as string)
@@ -281,6 +290,7 @@ describe('remote-control credentials', () => {
       [`${EXT}.enabled`]: true,
       [`${EXT}.passwordHash`]: BCRYPT,
     })
+    await migrated()
     expect(values.get(`${EXT}.enabled`)).toBe(false)
     expect(mockCreateRemoteServer).not.toHaveBeenCalled()
     expect(mockBroadcast).toHaveBeenCalledWith('remote:status', {
