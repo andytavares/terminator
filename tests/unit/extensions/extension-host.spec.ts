@@ -718,7 +718,7 @@ describe('ExtensionHost – registration disposal on unload', () => {
   })
 })
 
-// ADR 094: backends run in the extension host unless the manifest keeps them in main.
+// ADR 094: every backend runs in the extension host.
 describe('ExtensionHost with an extension host process', () => {
   let root: string
 
@@ -730,13 +730,13 @@ describe('ExtensionHost with an extension host process', () => {
 
   afterEach(() => rmSync(root, { recursive: true, force: true }))
 
-  function writeExtension(id: string, manifestExtra: Record<string, unknown> = {}): string {
+  function writeExtension(id: string): string {
     const directory = join(root, id)
     mkdirSync(directory, { recursive: true })
     const manifest = { id, name: id, version: '1.0.0', description: 'd', main: 'main.js' }
     writeFileSync(
       join(directory, 'manifest.json'),
-      JSON.stringify({ ...manifest, minAppVersion: '0.1.0', ...manifestExtra })
+      JSON.stringify({ ...manifest, minAppVersion: '0.1.0' })
     )
     writeFileSync(
       join(directory, 'main.js'),
@@ -766,15 +766,6 @@ describe('ExtensionHost with an extension host process', () => {
     })
     expect(host.hostedApi('com.hosted')).toBeDefined()
     expect((globalThis as { __activatedInMain?: string }).__activatedInMain).toBeUndefined()
-  })
-
-  it('keeps a backend whose manifest asks for the main process there', async () => {
-    const { host, backendHost } = await hostWithBackendHost()
-    await host.load(writeExtension('com.inmain', { mainProcess: true }))
-
-    expect(backendHost.activate).not.toHaveBeenCalled()
-    expect((globalThis as { __activatedInMain?: string }).__activatedInMain).toBe('com.inmain')
-    delete (globalThis as { __activatedInMain?: string }).__activatedInMain
   })
 
   it('shows backends the extension host lost as failed, with why', async () => {

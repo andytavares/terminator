@@ -24,8 +24,8 @@ stays in the extension host and the core calls it by id.
 
 ### Added
 
-- `pty.openTerminal(input)`: `openTerminalTab` as a promise.
-- `workspace.addProject(input)`: `createProject` as a promise.
+- `pty.openTerminal(input)`: replaces `openTerminalTab`, as a promise.
+- `workspace.addProject(input)`: replaces `createProject`, as a promise.
 - `paths.app` and `paths.userData`: the application's directory and the per-user data
   directory, for what used to come from `electron.app`.
 - `dialog.showOpenDialog(options)` / `showSaveDialog(options)`: the file dialogs, for what used
@@ -33,11 +33,10 @@ stays in the extension host and the core calls it by id.
 - `window.raise()`: restores and focuses every application window, for what used to come from
   `BrowserWindow.getAllWindows()`.
 
-### Deprecated
+### Removed
 
-- `pty.openTerminalTab` and `workspace.createProject`, the synchronous forms. They work only in
-  an extension that still runs in the main process (Foundry, until it moves) and throw in the
-  extension host. Removed in 5.0.0.
+- `pty.openTerminalTab` and `workspace.createProject`, the synchronous forms of
+  `pty.openTerminal` and `workspace.addProject`.
 
 ### Migrating from 3.x
 

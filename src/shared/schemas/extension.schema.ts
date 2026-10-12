@@ -76,11 +76,6 @@ export const ExtensionManifestSchema = z.object({
   contributes: ExtensionContributesSchema.optional(),
   /** Extensions activated before this one, whose `activate` exports it may read (ADR 094). */
   extensionDependencies: z.array(ExtensionIdSchema).optional(),
-  /**
-   * Deprecated: run the backend in the main process instead of the extension host
-   * (ADR 094), for a backend not yet on the crossable SDK 4.0.0 contract.
-   */
-  mainProcess: z.boolean().optional(),
 })
 
 export type ExtensionManifestData = z.infer<typeof ExtensionManifestSchema>

@@ -93,13 +93,7 @@ function declaredDependencies(record: ExtensionRecord): string[] {
   return 'data' in manifest ? (manifest.data.extensionDependencies ?? []) : []
 }
 
-/** Whether the manifest keeps the backend in the main process (deprecated, ADR 094). */
-function runsInMainProcess(record: ExtensionRecord): boolean {
-  const manifest = readManifest(record.directoryPath)
-  return 'data' in manifest && manifest.data.mainProcess === true
-}
-
-/** Where backends run when they are not in the main process: the extension host (ADR 094). */
+/** Where backends run: the extension host (ADR 094). */
 export interface BackendHost {
   activate(record: { id: string; entryPoint: string; dependencies: string[] }): Promise<void>
   deactivate(extensionId: string): Promise<void>
@@ -138,7 +132,7 @@ export class ExtensionHost {
     this.deps = deps
   }
 
-  /** Runs every backend whose manifest does not ask for the main process in `host`. */
+  /** Runs every backend in `host`. Without one (unit tests), backends load in this process. */
   useBackendHost(host: BackendHost): void {
     this.backendHost = host
   }
@@ -434,7 +428,7 @@ export class ExtensionHost {
   ): Promise<{ ok: true } | { error: string; message: string }> {
     const inactive = this.inactiveDependency(record)
     if (inactive) return { error: 'DEPENDENCY_ERROR', message: inactive }
-    if (this.backendHost && !runsInMainProcess(record)) {
+    if (this.backendHost) {
       return this.activateInHost(record, this.backendHost)
     }
     try {

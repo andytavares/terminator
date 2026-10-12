@@ -28,13 +28,13 @@ let closed: string[]
 function api() {
   return {
     workspace: {
-      createProject: (input: Record<string, unknown>) => {
+      addProject: async (input: Record<string, unknown>) => {
         created.push(input)
         return projectId === null ? null : { id: projectId, workspaceId: 'ws-1', name: 'p' }
       },
     },
     pty: {
-      openTerminalTab: (input: Record<string, unknown>) => {
+      openTerminal: async (input: Record<string, unknown>) => {
         opened.push(input)
         return terminalId
       },
@@ -49,6 +49,9 @@ function api() {
     },
   } as never
 }
+
+/** Lets the runner's awaits on the core (addProject, openTerminal) finish. */
+const settled = () => new Promise((resolve) => setImmediate(resolve))
 
 function runner(now: () => number = () => 1_000) {
   return createSupervisedRunner({
@@ -814,13 +817,13 @@ describe('running one command in a terminal, with no agent', () => {
 
   it("links the order's ticket to the project a command opens, too", async () => {
     void runner().runCommand({ ...command, issue: { tracker: 'linear', key: 'TAV-15' } })
-    await Promise.resolve()
+    await settled()
     expect(created[0]).toMatchObject({ issue: { tracker: 'linear', key: 'TAV-15' } })
   })
 
   it('opens a plain terminal tab in the worktree project', async () => {
     void runner().runCommand(command)
-    await Promise.resolve()
+    await settled()
     expect(created[0]).toMatchObject({ worktreePath: '/wt/feat-thing', gitBranch: 'feat/thing' })
     expect(opened[0]).toMatchObject({
       projectId: 'project-1',
@@ -832,7 +835,7 @@ describe('running one command in a terminal, with no agent', () => {
 
   it('runs the command from a script and exits the shell with its status', async () => {
     void runner().runCommand(command)
-    await Promise.resolve()
+    await settled()
     expect(launchScriptBody()).toContain('npm run lint')
     expect(written.map((w) => w.data).join('')).toMatch(/; exit \$\?\r$/)
     expect(launchScriptBody()).not.toContain('claude')
@@ -840,7 +843,7 @@ describe('running one command in a terminal, with no agent', () => {
 
   it('closes the tab of a command that passed', async () => {
     const pending = runner().runCommand(command)
-    await Promise.resolve()
+    await settled()
     exitListener!(0)
     await pending
     expect(closed).toEqual(['terminal-1'])
@@ -858,14 +861,14 @@ describe('running one command in a terminal, with no agent', () => {
       stateDir: join(dir, 'state'),
       now: () => 1_000,
     }).runCommand(command)
-    await Promise.resolve()
+    await settled()
     expect(() => exitListener!(0)).not.toThrow()
     await expect(pending).resolves.toBe(0)
   })
 
   it('keeps the tab of a command that failed, with its output on screen', async () => {
     const pending = runner().runCommand(command)
-    await Promise.resolve()
+    await settled()
     exitListener!(1)
     await pending
     expect(closed).toEqual([])
@@ -873,7 +876,7 @@ describe('running one command in a terminal, with no agent', () => {
 
   it("resolves with the terminal's exit status, a failure as much as a pass", async () => {
     const pending = runner().runCommand(command)
-    await Promise.resolve()
+    await settled()
     exitListener!(2)
     await expect(pending).resolves.toBe(2)
   })
@@ -921,7 +924,7 @@ describe('running a command with a log file', () => {
         command: 'false',
         logPath,
       })
-      await Promise.resolve()
+      await settled()
       const result = spawnSync(shell, [scriptPath()])
       expect(result.status).toBe(1)
       expect(existsSync(logPath)).toBe(true)
@@ -938,7 +941,7 @@ describe('running a command with a log file', () => {
         command: 'echo hello; exit 3',
         logPath,
       })
-      await Promise.resolve()
+      await settled()
       const result = spawnSync(shell, [scriptPath()])
       expect(result.status).toBe(3)
       expect(readFileSync(logPath, 'utf8')).toContain('hello')
@@ -953,7 +956,7 @@ describe('running a command with a log file', () => {
       title: 'Check',
       command: 'npm run lint',
     })
-    await Promise.resolve()
+    await settled()
     expect(readFileSync(scriptPath(), 'utf8')).not.toContain('tee')
   })
 })

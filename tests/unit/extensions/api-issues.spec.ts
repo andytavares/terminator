@@ -182,7 +182,7 @@ describe('api.issues — the surface itself (FR-034)', () => {
   })
 })
 
-describe('api.workspace.createProject — attaching an issue (v2.2.0)', () => {
+describe('api.workspace.addProject — attaching an issue (v2.2.0)', () => {
   it('attaches the issue the caller said the project is for', async () => {
     const workspaceStore = await import('../../../src/main/storage/workspace-store')
     vi.spyOn(workspaceStore, 'listProjects').mockReturnValue([])
@@ -191,7 +191,7 @@ describe('api.workspace.createProject — attaching an issue (v2.2.0)', () => {
     } as never)
 
     const api = await makeApi()
-    api.workspace.createProject({
+    await api.workspace.addProject({
       workspaceId: 'w1',
       name: 'n',
       worktreePath: '/wt/a',
@@ -212,7 +212,7 @@ describe('api.workspace.createProject — attaching an issue (v2.2.0)', () => {
     ] as never)
 
     const api = await makeApi()
-    const result = api.workspace.createProject({
+    const result = await api.workspace.addProject({
       workspaceId: 'w1',
       name: 'n',
       worktreePath: '/wt/a',
@@ -235,7 +235,7 @@ describe('api.workspace.createProject — attaching an issue (v2.2.0)', () => {
     } as never)
 
     const api = await makeApi()
-    api.workspace.createProject({ workspaceId: 'w1', name: 'n', worktreePath: '/wt/b' })
+    await api.workspace.addProject({ workspaceId: 'w1', name: 'n', worktreePath: '/wt/b' })
     expect(store.setLink).not.toHaveBeenCalled()
   })
 
@@ -248,7 +248,7 @@ describe('api.workspace.createProject — attaching an issue (v2.2.0)', () => {
     store.setLink.mockRejectedValue(new Error('read-only'))
 
     const api = await makeApi()
-    const result = api.workspace.createProject({
+    const result = await api.workspace.addProject({
       workspaceId: 'w1',
       name: 'n',
       worktreePath: '/wt/c',

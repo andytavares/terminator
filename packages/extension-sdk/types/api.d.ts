@@ -186,7 +186,7 @@ export interface SessionInfo {
 }
 
 export interface OpenTerminalTabInput {
-  /** Where the tab appears. From `workspace.createProject`, normally. */
+  /** Where the tab appears. From `workspace.addProject`, normally. */
   projectId: string
   cwd: string
   tabTitle: string
@@ -209,12 +209,7 @@ export interface PtyManagerAPI {
    */
   openTerminal(input: OpenTerminalTabInput): Promise<string | null>
   /**
-   * @deprecated The synchronous form of `openTerminal`, kept for an extension that still runs
-   * in the main process. The extension host throws for it. Removed in 5.0.0.
-   */
-  openTerminalTab(input: OpenTerminalTabInput): string | null
-  /**
-   * Closes a tab `openTerminalTab` opened, ending its process if it still runs
+   * Closes a tab `openTerminal` opened, ending its process if it still runs
    * (v2.6.0). `kill` alone leaves the tab on screen marked "[exited]".
    */
   closeTerminalTab(sessionId: string): void
@@ -342,11 +337,6 @@ export interface ExtensionAPI {
      * workspace already has one for that path; null when it cannot be created. Since 4.0.0.
      */
     addProject(input: CreateProjectInput): Promise<ProjectSnapshot | null>
-    /**
-     * @deprecated The synchronous form of `addProject`, kept for an extension that still runs
-     * in the main process. The extension host throws for it. Removed in 5.0.0.
-     */
-    createProject(input: CreateProjectInput): ProjectSnapshot | null
     deleteProject(projectId: string): void
   }
   topBar: {

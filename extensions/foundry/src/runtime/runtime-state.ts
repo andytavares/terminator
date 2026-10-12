@@ -1,5 +1,4 @@
 import type { Disposable } from '@terminator/extension-sdk'
-import { app } from 'electron'
 import * as path from 'node:path'
 
 import { type ControlServer } from './control-server.js'
@@ -62,8 +61,8 @@ export const pendingPermissions = createPendingPermissions()
  * Beside the extension's credentials, in userData: this is the pilot's own
  * state, not repository content, and nothing here should ever land in a diff.
  */
-export function runtimeStateDir(): string {
-  return path.join(app.getPath('userData'), 'foundry-runtime')
+export function runtimeStateDir(userData: string): string {
+  return path.join(userData, 'foundry-runtime')
 }
 /**
  * The notification a held tool call raised, so answering it takes the

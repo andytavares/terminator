@@ -447,7 +447,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
 
       // The worktree becomes a project, so the terminal has somewhere to live
       // and the operator can find it in the sidebar rather than only in a card.
-      const project = api.workspace.createProject({
+      const project = await api.workspace.addProject({
         workspaceId: start.workspaceId,
         name: start.branch,
         worktreePath: start.worktreePath,
@@ -459,7 +459,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         return null
       }
 
-      const terminalSessionId = api.pty.openTerminalTab({
+      const terminalSessionId = await api.pty.openTerminal({
         projectId: project.id,
         cwd: start.worktreePath,
         tabTitle: start.title,
@@ -551,23 +551,23 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       }
     },
 
-    runCommand(options: RunCommandOptions): Promise<number | null> {
-      const project = api.workspace.createProject({
+    async runCommand(options: RunCommandOptions): Promise<number | null> {
+      const project = await api.workspace.addProject({
         workspaceId: options.workspaceId,
         name: options.branch,
         worktreePath: options.worktreePath,
         gitBranch: options.branch,
         issue: options.issue,
       })
-      if (project === null) return Promise.resolve(null)
+      if (project === null) return null
 
-      const terminalSessionId = api.pty.openTerminalTab({
+      const terminalSessionId = await api.pty.openTerminal({
         projectId: project.id,
         cwd: options.worktreePath,
         tabTitle: options.title,
         type: 'human',
       })
-      if (terminalSessionId === null) return Promise.resolve(null)
+      if (terminalSessionId === null) return null
 
       return new Promise((resolve) => {
         // The shell exits with the command's status, so the tab's own exit is

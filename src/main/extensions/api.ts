@@ -422,9 +422,6 @@ export function createExtensionAPI(
         )
       },
       async addProject(input): Promise<ProjectSnapshot | null> {
-        return api.workspace.createProject(input)
-      },
-      createProject(input): ProjectSnapshot | null {
         // Reused rather than duplicated: provisioning the same worktree twice
         // should land in the project you were already looking at.
         //
@@ -638,10 +635,7 @@ export function createExtensionAPI(
       async spawnSession(opts) {
         return requirePty().spawnSession(opts)
       },
-      async openTerminal(input) {
-        return api.pty.openTerminalTab(input)
-      },
-      openTerminalTab(input): string | null {
+      async openTerminal(input): Promise<string | null> {
         const ptyManager = requirePty()
         if (!deps?.broadcastToWindows || !deps.terminalRelay) return null
 

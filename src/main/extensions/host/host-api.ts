@@ -108,11 +108,6 @@ function workspaceFor(context: HostContext, main: MainCalls): ExtensionAPI['work
     list: () => context.snapshot.workspaces.workspaces,
     listProjects: (workspaceId) => context.snapshot.workspaces.projects[workspaceId] ?? [],
     addProject: (input) => main.call('workspace.addProject', input),
-    createProject() {
-      throw new Error(
-        'workspace.createProject is synchronous; in the extension host use addProject'
-      )
-    },
     deleteProject: (projectId) => main.fire('workspace.deleteProject', projectId),
   }
 }
@@ -125,9 +120,6 @@ function ptyFor(main: MainCalls): ExtensionAPI['pty'] {
   return {
     spawnSession: (options) => main.call('pty.spawnSession', options),
     openTerminal: (input) => main.call('pty.openTerminal', input),
-    openTerminalTab() {
-      throw new Error('pty.openTerminalTab is synchronous; in the extension host use openTerminal')
-    },
     closeTerminalTab: (sessionId) => main.fire('pty.closeTerminalTab', sessionId),
     onData: (sessionId, callback) => listener('pty.onData', sessionId, callback),
     onExit: (sessionId, callback) => listener('pty.onExit', sessionId, callback),

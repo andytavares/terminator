@@ -29,7 +29,6 @@ vi.mock('electron', () => ({
   // A real directory: the supervision runtime writes its feed, mutes and
   // per-session settings under userData, and a path that does not exist fails
   // at mkdir.
-  app: { getPath: vi.fn().mockReturnValue(USER_DATA) },
 }))
 
 const runner = {
@@ -128,6 +127,7 @@ beforeAll(async () => {
     shell: { exec },
     notifications: { showToast, createNotification },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    paths: { app: '', userData: USER_DATA },
     settings: {
       register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       get: vi.fn(),
