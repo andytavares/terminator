@@ -17,7 +17,7 @@ const USER_DATA = tmpdirForUserData()
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
-import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/index.js'
+import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
 
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
@@ -159,7 +159,8 @@ beforeAll(async () => {
     app: { version: '0.0.0-test' },
   } as unknown as ExtensionAPI
 
-  const { activate, startSupervisionRuntime } = await import('../../src/index.ts')
+  const { activate } = await import('../../src/index.ts')
+  const { startSupervisionRuntime } = await import('../../src/runtime/supervision-runtime.ts')
   activate(api)
   getHandler = (channel) => handlers.get(channel)
   getCommand = (id) => commands.get(id)

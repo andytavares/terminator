@@ -76,6 +76,37 @@ what was there before.
   `document.hidden`. `rg -c "setInterval\(" extensions/foundry/src/components
 extensions/foundry/src/renderer` is the count to keep small.
 
+## Where things live
+
+`src/index.ts` is only the composition: `activate` builds an
+`ActivationContext` (`{ api, dataRoot }`, `src/ipc/register.ts`) and hands it to
+the module that owns each part, and `deactivate` asks each to stop. Add code to
+the owning module, never back into `index.ts`.
+
+| Responsibility                                                                   | Module                                                                                            |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Registering a channel (`reg`), the disposables, `ActivationContext`              | `src/ipc/register.ts`                                                                             |
+| Where the records live, the untracked notice, the three rungs (`resolveSources`) | `src/workspace-root.ts` (at `src/` because `resolveSources` finds the built-ins from `__dirname`) |
+| The in-memory index, `announceLive`, `indexFor`, the store helpers               | `src/state/live-index.ts`                                                                         |
+| Setting readers (autonomy, models, budgets, critical paths, read-only tools)     | `src/state/settings.ts`                                                                           |
+| The settings page contribution                                                   | `src/state/settings-schema.ts`                                                                    |
+| The supervision runtime's parts (`runtime`), held calls, stalls, stranded agents | `src/runtime/runtime-state.ts`                                                                    |
+| Starting and stopping the runtime, the stall watcher                             | `src/runtime/supervision-runtime.ts`                                                              |
+| Notifications for a held call, `notePending` / `noteResolved`                    | `src/runtime/held-calls.ts`                                                                       |
+| The palette's run entries and `gotoRun`                                          | `src/runtime/palette-commands.ts`                                                                 |
+| Workspace trust, the probed-command and read-only decisions                      | `src/runtime/agent-policy.ts`                                                                     |
+| The tracker port and write-back deps                                             | `src/trackers/issues-port.ts`                                                                     |
+| The sensor tick                                                                  | `src/sensors/sensor-tick.ts`                                                                      |
+| One architect turn, one read-only round (red team, scout)                        | `src/forge/intake-turn.ts`, `src/forge/intake-sessions.ts`                                        |
+| The Forge loop: follow-ups, review rounds, hand-off, release                     | `src/forge/forge-loop.ts`                                                                         |
+| The executor's deps (worktrees, sessions, rungs)                                 | `src/line/executor-deps.ts`                                                                       |
+| Running an order to its tail                                                     | `src/line/execute-run.ts`                                                                         |
+| Shipping and CI round deps, settling the ship node                               | `src/line/ship-deps.ts`                                                                           |
+| Stopping an order, adopting runs a previous process left                         | `src/line/run-control.ts`                                                                         |
+| The refinery tick                                                                | `src/line/refinery-run.ts`                                                                        |
+| Standings drawn from this process, "deciding"                                    | `src/ipc/standing.ts`                                                                             |
+| Channel registration per surface                                                 | `src/ipc/{forge,line,inbox,record,supervision,model,ui}-registration.ts`                          |
+
 ## Extension Isolation (MANDATORY)
 
 This is a fully isolated extension. The core application knows nothing about it.
@@ -84,7 +115,7 @@ This is a fully isolated extension. The core application knows nothing about it.
 
 - Call core IPC via `window.electronAPI.{terminal,workspace,project,git,shell,fs,settings,…}` for **core-owned channels only**
 - Call its own IPC via `window.electronAPI.extensionBridge.invoke('foundry:…')`
-- Register IPC channels through `reg` in `src/index.ts`, each a `ChannelSpec` with the zod schema of its payload (`foundryChannel` in `src/ipc/channel.ts`; ADR 096). The schema sits beside the module that answers the channel, the host parses the payload before `run` sees it, and `run` takes the parsed type — never parse or cast a payload by hand. `tests/channel-schemas.spec.ts` checks every registered channel has one; a test of one schema's rules is zod's concern, not this repository's
+- Register IPC channels through `reg` in `src/ipc/register.ts`, each a `ChannelSpec` with the zod schema of its payload (`foundryChannel` in `src/ipc/channel.ts`; ADR 096). The schema sits beside the module that answers the channel, the host parses the payload before `run` sees it, and `run` takes the parsed type — never parse or cast a payload by hand. `tests/channel-schemas.spec.ts` checks every registered channel has one; a test of one schema's rules is zod's concern, not this repository's
 - Use `api.shell.exec` for `git` and `gh` — those are the only two commands the core allowlist admits (`src/main/shell/shell-executor.ts`). Core's default timeout is 10 seconds, so a call that can take longer passes `timeoutMs` (`git commit` 300 s, rebase and push 120 s), and a result with `timedOut` set is a failure that says it timed out
 
 Verification commands (`npm test`, `pytest`, …) do **not** run through `api.shell.exec` and do **not** run as hidden child processes. Each runs in a terminal tab of its own in the lane's checkout (`SupervisedRunner.runCommand`), so its output is visible, and its verdict is that tab's exit status — no agent runs it and no transcript is read back.
