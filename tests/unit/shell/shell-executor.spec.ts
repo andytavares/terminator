@@ -162,26 +162,55 @@ describe('execShell', () => {
     expect(result.stderr).toBe('spawn gh ENOENT')
   })
 
-  it('marks timedOut when SIGTERM close signal fires before callback', async () => {
+  it('reports a command killed by the timeout as failed and timed out', async () => {
+    const killed = Object.assign(new Error('Command failed'), {
+      killed: true,
+      code: null,
+      signal: 'SIGTERM',
+    })
     mockExecFile.mockImplementation(
       (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
-        let closeHandler: ((code: null, signal: string) => void) | null = null
-        const child = {
-          on: (event: string, handler: (...args: unknown[]) => void) => {
-            if (event === 'close') closeHandler = handler
-          },
-        }
-        // Simulate real Node.js timeout: close event fires first, then the callback
-        setTimeout(() => {
-          closeHandler?.(null, 'SIGTERM')
-          callback(Object.assign(new Error('timeout'), { code: null }), '', '')
-        }, 0)
-        return child as unknown as ChildProcess
+        setTimeout(() => callback(killed, '', ''), 0)
+        return { on: vi.fn() } as unknown as ChildProcess
       }
     )
 
     const result = await execShell({ command: 'git', args: ['status'], cwd: '/tmp', timeoutMs: 1 })
     expect(result.timedOut).toBe(true)
+    expect(result.exitCode).not.toBe(0)
+  })
+
+  it('reports a command ended by another signal as failed, not timed out', async () => {
+    const crashed = Object.assign(new Error('Command failed'), {
+      killed: false,
+      code: null,
+      signal: 'SIGSEGV',
+    })
+    mockExecFile.mockImplementation(
+      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
+        callback(crashed, '', '')
+        return { on: vi.fn() } as unknown as ChildProcess
+      }
+    )
+
+    const result = await execShell({ command: 'git', args: ['status'], cwd: '/tmp' })
+    expect(result.exitCode).not.toBe(0)
+    expect(result.timedOut).toBe(false)
+  })
+
+  it('reports a real process that outlives its timeout as failed and timed out', async () => {
+    const actual = await vi.importActual<typeof import('child_process')>('child_process')
+    mockExecFile.mockImplementation(actual.execFile as unknown as typeof execFile)
+
+    // git waits on stdin, which execFile leaves open
+    const result = await execShell({
+      command: 'git',
+      args: ['hash-object', '--stdin'],
+      cwd: '/tmp',
+      timeoutMs: 200,
+    })
+    expect(result.timedOut).toBe(true)
+    expect(result.exitCode).not.toBe(0)
   })
 
   it('passes sanitized env variables to child process', async () => {

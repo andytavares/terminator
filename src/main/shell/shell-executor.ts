@@ -47,10 +47,16 @@ export function assertCwdInScope(cwd: string, workspaceRoot: string): void {
   }
 }
 
+// Matches the exit status of timeout(1).
+const TIMEOUT_EXIT_CODE = 124
+
+function numericExitCode(code: string | number | undefined | null): number {
+  return typeof code === 'number' && code !== 0 ? code : 1
+}
+
 export function execShell(input: ShellExecInput): Promise<ShellExecOutput> {
   const { command, args, cwd, timeoutMs = 10000 } = input
   return new Promise((resolve) => {
-    let timedOut = false
     const child = execFileCb(
       command,
       args,
@@ -79,7 +85,9 @@ export function execShell(input: ShellExecInput): Promise<ShellExecOutput> {
         },
       },
       (error, stdout, stderr) => {
-        const exitCode = error?.code != null ? (typeof error.code === 'number' ? error.code : 1) : 0
+        // The timeout kills the child with a signal, so node reports code null and killed true.
+        const timedOut = error?.killed === true && error.code == null
+        const exitCode = !error ? 0 : timedOut ? TIMEOUT_EXIT_CODE : numericExitCode(error.code)
         // A string code means the command never started (e.g. ENOENT), so it wrote nothing.
         const spawnError = typeof error?.code === 'string' && stderr === '' ? error.message : ''
         resolve({ exitCode, stdout, stderr: spawnError || stderr, timedOut })
@@ -87,11 +95,6 @@ export function execShell(input: ShellExecInput): Promise<ShellExecOutput> {
     )
     child.on('error', () => {
       // handled in callback
-    })
-    // node sets killed=true and emit 'close' with null code when timeout fires
-    child.on('close', (code, signal) => {
-      if (signal === 'SIGTERM' || signal === 'SIGKILL') timedOut = true
-      void code
     })
   })
 }

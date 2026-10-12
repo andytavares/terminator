@@ -345,6 +345,8 @@ if (result.exitCode !== 0) {
 // result.stdout contains the porcelain output
 ```
 
+A command that outlives `timeoutMs` is killed and resolves with `timedOut: true` and a non-zero `exitCode` (124, as `timeout(1)`), so an `exitCode !== 0` check also catches timeouts. The same holds for a command ended by a signal.
+
 **Security**: `command` must be `'git'` or `'gh'`. `cwd` must be within the workspace folder. Arguments are passed directly to the OS — no shell expansion.
 
 ---
