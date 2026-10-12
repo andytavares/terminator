@@ -127,8 +127,11 @@ compares on Linux only, in the Stories job. Generate them on Linux with the
 Chromium build the pinned Playwright installs (`npx playwright install chromium`).
 The Stories job runs with `--update-snapshots=missing`: every committed baseline is
 compared, and a story without one fails and gets one written, which the job uploads
-as the `story-baselines-linux` artifact to review, download into
-`visual/__screenshots__/linux/` and commit.
+as the `story-baselines-linux` artifact. To commit them, add the
+`update-story-baselines` label to the pull request: the Story baselines workflow
+(`.github/workflows/story-baselines.yml`) writes the missing baselines on Linux,
+commits them to the branch and removes the label. It never overwrites an existing
+baseline; review the committed images in the pull request's diff.
 
 Add a component here before using it anywhere else, with a behaviour spec in
 `tests/unit/packages/extension-ui` and a story file in `stories/` (use `inLight`
