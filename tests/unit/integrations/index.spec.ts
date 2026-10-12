@@ -82,10 +82,14 @@ describe('integrations composition root', () => {
       .getIssueService()
       .get('linear', 'TAV-1')
       .catch(() => null)
-    await vi.waitFor(async () =>
-      expect(await trackers.listConnections()).toContainEqual(
-        expect.objectContaining({ tracker: 'linear', lastError: 'auth-failed' })
-      )
+    // The composition root records the error without awaiting it, and the
+    // record is an atomic file write: on a busy disk it outlasts waitFor's 1 s default.
+    await vi.waitFor(
+      async () =>
+        expect(await trackers.listConnections()).toContainEqual(
+          expect.objectContaining({ tracker: 'linear', lastError: 'auth-failed' })
+        ),
+      { timeout: 10_000 }
     )
   })
 
