@@ -12,6 +12,22 @@
 - `noPayload` (main entry): the schema of a channel that takes no payload.
 - `RegisterHandlerOptions`, `RegisterChannel` and `RegisterUnvalidatedChannel` in
   `types/api.d.ts`.
+- Extension APIs (ADR 094): the value an extension's `activate` returns is its API. A manifest's
+  `extensionDependencies` lists the providers it uses; the host activates them first and fails
+  the consumer's activation, naming the dependency, when one is missing, failed, disabled or in a
+  cycle. `api.extensions.get(id)` returns a declared provider's exports and throws for any other
+  id. `types/extensions.d.ts` declares the built-in providers' APIs (`TaskVaultAPI`,
+  `VaultDestination`), and `get` is typed from `BuiltInExtensionExports`.
+- `api.shell.exec` takes `maxBuffer` (past it the command is stopped and `exceededMaxBuffer` is
+  set), `env` (added over the minimal environment every command gets), `encoding: 'buffer'`
+  (stdout and stderr as bytes) and `onOutput` (each chunk as it arrives). `ShellExecOptions`
+  and `ShellExecResult` name the shapes. Output is never trimmed, and a timeout is declared as
+  the failure it always was: `timedOut: true`, `exitCode` 124.
+- `api.github` (`types/github.d.ts`): pull request verbs over the gh CLI the core runs, as
+  `api.issues` holds the tracker verbs. `pullRequests.view/list/create/markReady/updateBranch`,
+  `repositories.view/clone`, and `api(target, request)` for the rest of the REST and GraphQL
+  API. A `GithubTarget` names the checkout or `owner/name`, and an optional token that is
+  retried without on an authentication failure; a failure rejects with `GithubCommandError`.
 
 ### Deprecated
 

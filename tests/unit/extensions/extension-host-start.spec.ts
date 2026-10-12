@@ -224,3 +224,145 @@ describe('ExtensionHost.start', () => {
     await expect(host.whenActivated('com.unknown')).resolves.toBeUndefined()
   })
 })
+
+describe('ExtensionHost.start with extensionDependencies (ADR 094)', () => {
+  const bundles: string[] = []
+
+  interface BundledExtension {
+    activate: string
+    extensionDependencies?: string[]
+  }
+
+  function makeBundle(extensions: Record<string, BundledExtension>): string {
+    const bundle = join(os.tmpdir(), `ext-deps-${Date.now()}-${bundles.length}`)
+    for (const [id, { activate, extensionDependencies }] of Object.entries(extensions)) {
+      const dir = join(bundle, id)
+      mkdirSync(dir, { recursive: true })
+      const manifest = { id, name: id, version: '1.0.0', description: 'Test extension' }
+      writeFileSync(
+        join(dir, 'manifest.json'),
+        JSON.stringify({
+          ...manifest,
+          main: 'main.js',
+          minAppVersion: '0.0.1',
+          extensionDependencies,
+        })
+      )
+      writeFileSync(join(dir, 'main.js'), `exports.activate = ${activate}`)
+    }
+    bundles.push(bundle)
+    return bundle
+  }
+
+  async function startHost(bundle: string) {
+    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+    const host = new ExtensionHost()
+    await host.start({ bundledDirectory: bundle, beforeActivation: Promise.resolve() })
+    return Object.fromEntries(host.listExtensions().map((e) => [e.id, e]))
+  }
+
+  beforeEach(() => {
+    vi.resetModules()
+    storeData.extensions = []
+    probe.__startProbe = { events: [], peerStarted: Promise.resolve(), markPeerStarted: () => {} }
+  })
+
+  afterEach(() => {
+    for (const bundle of bundles.splice(0)) rmSync(bundle, { recursive: true, force: true })
+  })
+
+  it('activates a dependency first and hands its activate() return value to the dependant', async () => {
+    // Directory order would activate the consumer first.
+    const bundle = makeBundle({
+      'com.a-consumer': {
+        extensionDependencies: ['com.z-provider'],
+        activate: `(api) => {
+          globalThis.__startProbe.events.push('consumer:' + api.extensions.get('com.z-provider').greet())
+        }`,
+      },
+      'com.z-provider': {
+        activate: `async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10))
+          globalThis.__startProbe.events.push('provider')
+          return { greet: () => 'hello' }
+        }`,
+      },
+    })
+
+    const byId = await startHost(bundle)
+
+    expect(probe.__startProbe.events).toEqual(['provider', 'consumer:hello'])
+    expect(byId['com.a-consumer'].status).toBe('enabled')
+  })
+
+  it('refuses to hand over the exports of an extension the manifest does not declare', async () => {
+    const bundle = makeBundle({
+      'com.provider': { activate: `() => ({ secret: 1 })` },
+      'com.snoop': { activate: `(api) => { api.extensions.get('com.provider') }` },
+    })
+
+    const byId = await startHost(bundle)
+
+    expect(byId['com.snoop'].status).toBe('error')
+    expect(byId['com.snoop'].errorMessage).toBe(
+      'Extension "com.snoop" did not declare "com.provider" in extensionDependencies'
+    )
+  })
+
+  it('fails activation with a clear message when a dependency is not installed', async () => {
+    const bundle = makeBundle({
+      'com.orphan': {
+        extensionDependencies: ['com.missing'],
+        activate: `() => { globalThis.__startProbe.events.push('orphan') }`,
+      },
+    })
+
+    const byId = await startHost(bundle)
+
+    expect(byId['com.orphan'].status).toBe('error')
+    expect(byId['com.orphan'].errorMessage).toBe('Missing extension dependency "com.missing"')
+    expect(probe.__startProbe.events).toEqual([])
+  })
+
+  it('fails activation when a dependency itself failed to activate', async () => {
+    const bundle = makeBundle({
+      'com.broken': { activate: `() => { throw new Error('boom') }` },
+      'com.dependant': {
+        extensionDependencies: ['com.broken'],
+        activate: `() => { globalThis.__startProbe.events.push('dependant') }`,
+      },
+    })
+
+    const byId = await startHost(bundle)
+
+    expect(byId['com.dependant'].status).toBe('error')
+    expect(byId['com.dependant'].errorMessage).toBe(
+      'Extension dependency "com.broken" failed to activate'
+    )
+    expect(probe.__startProbe.events).toEqual([])
+  })
+
+  it('fails every extension in a dependency cycle, naming the cycle, and activates the rest', async () => {
+    const bundle = makeBundle({
+      'com.one': {
+        extensionDependencies: ['com.two'],
+        activate: `() => { globalThis.__startProbe.events.push('one') }`,
+      },
+      'com.two': {
+        extensionDependencies: ['com.one'],
+        activate: `() => { globalThis.__startProbe.events.push('two') }`,
+      },
+      'com.free': { activate: `() => { globalThis.__startProbe.events.push('free') }` },
+    })
+
+    const byId = await startHost(bundle)
+
+    expect(byId['com.one'].errorMessage).toBe(
+      'Extension dependency cycle: com.one -> com.two -> com.one'
+    )
+    expect(byId['com.two'].errorMessage).toBe(
+      'Extension dependency cycle: com.two -> com.one -> com.two'
+    )
+    expect(probe.__startProbe.events).toEqual(['free'])
+  })
+})

@@ -15,6 +15,8 @@ import type {
   TrackerTeam,
   TransitionIntent,
 } from './issues'
+import type { BuiltInExtensionExports } from './extensions'
+import type { GithubAPI } from './github'
 
 export interface Disposable {
   dispose(): void
@@ -230,6 +232,41 @@ export interface PtyManagerAPI {
   listSessions(): SessionInfo[]
 }
 
+export interface ShellExecOptions {
+  command: 'git' | 'gh'
+  args: string[]
+  cwd: string
+  /**
+   * Default 10 000. When it expires the command is killed and the result is a
+   * failure: `timedOut: true` and `exitCode` 124, timeout(1)'s status.
+   */
+  timeoutMs?: number
+  /**
+   * Most bytes of output kept per stream (default 1 MiB). Past it the command
+   * is stopped: `exceededMaxBuffer: true` and a non-zero `exitCode`. Since 2.1.0.
+   */
+  maxBuffer?: number
+  /**
+   * Added to the command's environment, over the minimal one every command
+   * gets (PATH, HOME, git and gh credentials, `GIT_TERMINAL_PROMPT=0`). Since 2.1.0.
+   */
+  env?: Record<string, string>
+  /** `'buffer'` returns stdout and stderr as bytes. Since 2.1.0. */
+  encoding?: 'utf8' | 'buffer'
+  /** Each chunk of stdout and stderr as it arrives, in text mode. Since 2.1.0. */
+  onOutput?: (chunk: string) => void
+}
+
+/** Output is exactly what the command wrote: text is never trimmed. */
+export interface ShellExecResult<Output extends string | Uint8Array = string> {
+  exitCode: number
+  stdout: Output
+  stderr: Output
+  timedOut: boolean
+  /** Since 2.1.0. */
+  exceededMaxBuffer: boolean
+}
+
 export interface ExtensionAPI {
   /** The extension's database. Throws until the app database is initialised. */
   db: ExtensionDB
@@ -268,14 +305,24 @@ export interface ExtensionAPI {
   topBar: {
     registerMenuItem(item: TopBarMenuContribution): Disposable
   }
-  shell: {
-    exec(options: {
-      command: 'git' | 'gh'
-      args: string[]
-      cwd: string
-      timeoutMs?: number
-    }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut: boolean }>
+  /**
+   * Other extensions' APIs (since 2.1.0). An extension's API is the value its
+   * `activate` returns. List the provider's id in your manifest's
+   * `extensionDependencies`: the host then activates the provider first, and
+   * fails your activation when it is missing, failed, or in a dependency cycle.
+   */
+  extensions: {
+    /** The provider's `activate` return value. Throws for an id the manifest does not declare. */
+    get<K extends keyof BuiltInExtensionExports>(extensionId: K): BuiltInExtensionExports[K]
+    get<T = unknown>(extensionId: string): T
   }
+  shell: {
+    /** Runs git or gh without a shell. Resolves for every outcome; read `exitCode`. */
+    exec(options: ShellExecOptions & { encoding: 'buffer' }): Promise<ShellExecResult<Uint8Array>>
+    exec(options: ShellExecOptions): Promise<ShellExecResult<string>>
+  }
+  /** GitHub pull requests and API through the gh CLI the core runs. Since 2.1.0. */
+  github: GithubAPI
   /**
    * Issue trackers, through the application's single connection (v2.2.0). An
    * extension never holds a tracker credential. Three writes, and only three:

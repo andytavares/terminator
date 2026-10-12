@@ -4,6 +4,7 @@ import { execFileSync } from 'child_process'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { ensureReviewWorktree } from '../../src/review/worktree.js'
+import { bindRealShell } from './support/shell'
 
 describe('ensureReviewWorktree', () => {
   let repoRoot: string
@@ -122,6 +123,7 @@ describe('ensureReviewWorktree against real git', () => {
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'review-worktree-real-'))
+    bindRealShell(env)
   })
 
   afterEach(() => {

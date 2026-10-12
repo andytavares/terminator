@@ -28,17 +28,18 @@ The extension is bundled with Terminator and activates automatically on startup.
 
 Configure under **Settings → Git Integration** or per-workspace:
 
-| Key                     | Type    | Default | Scope     | Description                              |
-| ----------------------- | ------- | ------- | --------- | ---------------------------------------- |
-| `git.enabled`           | boolean | `true`  | workspace | Enable/disable the entire extension      |
-| `git.ghCliPath`         | string  | `""`    | global    | Path to `gh` binary; empty = use `$PATH` |
-| `git.commit.signOff`    | boolean | `false` | workspace | Append `--signoff` to commits            |
-| `git.maxDisplayedFiles` | number  | `500`   | global    | Cap on changed files shown (10–5000)     |
+| Key                     | Type    | Default | Scope     | Description                          |
+| ----------------------- | ------- | ------- | --------- | ------------------------------------ |
+| `git.enabled`           | boolean | `true`  | workspace | Enable/disable the entire extension  |
+| `git.commit.signOff`    | boolean | `false` | workspace | Append `--signoff` to commits        |
+| `git.maxDisplayedFiles` | number  | `500`   | global    | Cap on changed files shown (10–5000) |
 
 ## Requirements
 
 - **git** — must be on `$PATH`.
-- **gh CLI** (optional) — required only for PR creation. [Install gh](https://cli.github.com/), then run `gh auth login`.
+- **gh CLI** (optional) — required for pull requests and reviews. [Install gh](https://cli.github.com/), then run `gh auth login`. The app runs it from your login shell's `PATH`; the "gh CLI path" setting is gone (SDK 2.1.0), because the core runs only the bare `gh` command.
+
+Every git and gh command goes through the core: git through `api.shell.exec` (`src/shell/run-git.ts`, bound in `activate`), gh through `api.github`. The extension starts no process of its own except the review agent's `claude`.
 
 ## How It Works
 

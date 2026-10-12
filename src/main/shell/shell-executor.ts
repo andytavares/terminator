@@ -1,4 +1,4 @@
-import { execFile as execFileCb } from 'child_process'
+import { execFile as execFileCb, type ChildProcess, type ExecFileException } from 'child_process'
 import { loginShellPathReady } from './login-shell-path.js'
 import { relative, isAbsolute } from 'path'
 
@@ -9,13 +9,23 @@ export interface ShellExecInput {
   args: string[]
   cwd: string
   timeoutMs?: number
+  /** Most bytes kept per stream; past it the command is stopped. Node's default is 1 MiB. */
+  maxBuffer?: number
+  /** Added over the minimal environment every command gets. */
+  env?: Record<string, string>
+  encoding?: 'utf8' | 'buffer'
+  /** Written to the command's stdin, which is then closed. */
+  input?: string
+  /** Each chunk of stdout and stderr as it arrives, in text mode. */
+  onOutput?: (chunk: string) => void
 }
 
-export interface ShellExecOutput {
+export interface ShellExecOutput<Output extends string | Buffer = string> {
   exitCode: number
-  stdout: string
-  stderr: string
+  stdout: Output
+  stderr: Output
   timedOut: boolean
+  exceededMaxBuffer: boolean
 }
 
 export class CommandNotAllowedError extends Error {
@@ -55,8 +65,49 @@ function numericExitCode(code: string | number | undefined | null): number {
   return typeof code === 'number' && code !== 0 ? code : 1
 }
 
-export async function execShell(input: ShellExecInput): Promise<ShellExecOutput> {
-  const { command, args, cwd, timeoutMs = 10000 } = input
+function baseEnvironment(): NodeJS.ProcessEnv {
+  return {
+    PATH: process.env.PATH,
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    LOGNAME: process.env.LOGNAME,
+    SHELL: process.env.SHELL,
+    TMPDIR: process.env.TMPDIR,
+    // git credentials
+    GIT_TERMINAL_PROMPT: '0',
+    GIT_ASKPASS: process.env.GIT_ASKPASS,
+    SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK,
+    // gh CLI auth — token takes precedence over config dir auth
+    GH_TOKEN: process.env.GH_TOKEN,
+    GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+    // gh config location (used when no token env var is set)
+    XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
+    XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+    APPDATA: process.env.APPDATA,
+  }
+}
+
+function toOutput(
+  error: ExecFileException | null,
+  stdout: string | Buffer,
+  stderr: string | Buffer
+): ShellExecOutput<string | Buffer> {
+  // The timeout kills the child with a signal, so node reports code null and killed true.
+  const timedOut = error?.killed === true && error.code == null
+  const exceededMaxBuffer = error?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
+  const exitCode = !error ? 0 : timedOut ? TIMEOUT_EXIT_CODE : numericExitCode(error.code)
+  // A string code means the command did not run to completion (e.g. ENOENT); say why.
+  const reason = typeof error?.code === 'string' && stderr.length === 0 ? error.message : ''
+  const failure = typeof stderr === 'string' ? reason : Buffer.from(reason)
+  return { exitCode, stdout, stderr: reason ? failure : stderr, timedOut, exceededMaxBuffer }
+}
+
+export function execShell(
+  input: ShellExecInput & { encoding: 'buffer' }
+): Promise<ShellExecOutput<Buffer>>
+export function execShell(input: ShellExecInput): Promise<ShellExecOutput>
+export async function execShell(input: ShellExecInput): Promise<ShellExecOutput<string | Buffer>> {
+  const { command, args, cwd, timeoutMs = 10000, maxBuffer, env, encoding = 'utf8' } = input
   // The PATH is read at spawn time, after the login shell's has been adopted.
   await loginShellPathReady()
   return new Promise((resolve) => {
@@ -67,37 +118,22 @@ export async function execShell(input: ShellExecInput): Promise<ShellExecOutput>
         cwd,
         shell: false,
         timeout: timeoutMs,
-        env: {
-          PATH: process.env.PATH,
-          HOME: process.env.HOME,
-          USER: process.env.USER,
-          LOGNAME: process.env.LOGNAME,
-          SHELL: process.env.SHELL,
-          TMPDIR: process.env.TMPDIR,
-          // git credentials
-          GIT_TERMINAL_PROMPT: '0',
-          GIT_ASKPASS: process.env.GIT_ASKPASS,
-          SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK,
-          // gh CLI auth — token takes precedence over config dir auth
-          GH_TOKEN: process.env.GH_TOKEN,
-          GITHUB_TOKEN: process.env.GITHUB_TOKEN,
-          // gh config location (used when no token env var is set)
-          XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
-          XDG_DATA_HOME: process.env.XDG_DATA_HOME,
-          APPDATA: process.env.APPDATA,
-        },
+        encoding,
+        ...(maxBuffer === undefined ? {} : { maxBuffer }),
+        env: { ...baseEnvironment(), ...env },
       },
-      (error, stdout, stderr) => {
-        // The timeout kills the child with a signal, so node reports code null and killed true.
-        const timedOut = error?.killed === true && error.code == null
-        const exitCode = !error ? 0 : timedOut ? TIMEOUT_EXIT_CODE : numericExitCode(error.code)
-        // A string code means the command never started (e.g. ENOENT), so it wrote nothing.
-        const spawnError = typeof error?.code === 'string' && stderr === '' ? error.message : ''
-        resolve({ exitCode, stdout, stderr: spawnError || stderr, timedOut })
-      }
+      (error, stdout, stderr) => resolve(toOutput(error, stdout, stderr))
     )
     child.on('error', () => {
       // handled in callback
     })
+    if (input.onOutput) streamOutput(child, input.onOutput)
+    if (input.input !== undefined) child.stdin?.end(input.input)
   })
+}
+
+function streamOutput(child: ChildProcess, onOutput: (chunk: string) => void): void {
+  const forward = (chunk: Buffer | string) => onOutput(chunk.toString())
+  child.stdout?.on('data', forward)
+  child.stderr?.on('data', forward)
 }

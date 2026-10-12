@@ -60,11 +60,13 @@ export const ExtensionContributesSchema = z
 
 export type ExtensionContributes = z.infer<typeof ExtensionContributesSchema>
 
+const ExtensionIdSchema = z
+  .string()
+  .min(1)
+  .regex(/^[a-z0-9]+(\.[a-z0-9-]+)+$/, 'ID must be a reverse-domain identifier')
+
 export const ExtensionManifestSchema = z.object({
-  id: z
-    .string()
-    .min(1)
-    .regex(/^[a-z0-9]+(\.[a-z0-9-]+)+$/, 'ID must be a reverse-domain identifier'),
+  id: ExtensionIdSchema,
   name: z.string().min(1).max(100),
   version: z.string().regex(semverRegex, 'Version must be a valid semver string (X.Y.Z)'),
   description: z.string().min(1),
@@ -72,6 +74,8 @@ export const ExtensionManifestSchema = z.object({
   renderer: z.string().optional(),
   minAppVersion: z.string().regex(semverRangeRegex, 'minAppVersion must be a valid semver range'),
   contributes: ExtensionContributesSchema.optional(),
+  /** Extensions activated before this one, whose `activate` exports it may read (ADR 094). */
+  extensionDependencies: z.array(ExtensionIdSchema).optional(),
 })
 
 export type ExtensionManifestData = z.infer<typeof ExtensionManifestSchema>

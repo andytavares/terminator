@@ -152,6 +152,7 @@ import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
 import { readTranscript } from './runtime/transcript-tailer.js'
 import { recordTools } from './factory/timeline-store.js'
+import { REMOTE_READ_CHANNELS } from './remote-access.js'
 import type { StallFiring } from './runtime/evaluate-stall.js'
 
 const disposables: Disposable[] = []
@@ -164,7 +165,8 @@ function reg(
   channel: string,
   handler: (payload: unknown) => Promise<unknown> | unknown
 ) {
-  disposables.push(api.ipc.registerHandler(channel, handler))
+  const remoteAccessible = REMOTE_READ_CHANNELS.has(channel)
+  disposables.push(api.ipc.registerHandler(channel, handler, { remoteAccessible }))
 }
 
 /** Where the chosen model lives, on the side of the bridge that launches runs. */

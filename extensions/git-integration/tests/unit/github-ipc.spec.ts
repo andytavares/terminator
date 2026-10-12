@@ -31,6 +31,9 @@ import { homedir } from 'os'
 import ElectronStore from 'electron-store'
 import { registerGithubHandlers } from '../../src/ipc/github.ipc'
 import { stateForSearch } from '../../src/github/gh-cli'
+import { bindShellToStub, githubOverStub } from './support/shell'
+
+bindShellToStub(mockExecFile)
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -46,22 +49,11 @@ function captureHandlers(
     (channel, handler) => {
       handlers[channel] = handler as Handler
     },
-    { getGhPath: () => '', getToken: () => '' },
+    { github: githubOverStub(mockExecFile), getToken: () => '' },
     undefined,
     undefined,
     getReviewRepos,
     isBranchExcluded
-  )
-  return handlers
-}
-
-function captureHandlersWithGhPath(ghPath: string): Record<string, Handler> {
-  const handlers: Record<string, Handler> = {}
-  registerGithubHandlers(
-    (channel, handler) => {
-      handlers[channel] = handler as Handler
-    },
-    { getGhPath: () => ghPath, getToken: () => '' }
   )
   return handlers
 }
@@ -72,7 +64,7 @@ function captureHandlersWithToken(token: string): Record<string, Handler> {
     (channel, handler) => {
       handlers[channel] = handler as Handler
     },
-    { getGhPath: () => '', getToken: () => token }
+    { github: githubOverStub(mockExecFile), getToken: () => token }
   )
   return handlers
 }
@@ -615,7 +607,7 @@ describe('github:pr-file-diff', () => {
 
   it('fetches PR ref with --force so stale local refs do not block the diff', async () => {
     mockGitSuccess('') // git fetch
-    mockGitSuccess('main\n') // gh pr view (also goes through execFile)
+    mockGitSuccess('{"baseRefName":"main"}') // gh pr view (also goes through execFile)
     mockGitSuccess('abc123\n') // git merge-base
     mockGitSuccess('') // git diff
 
@@ -656,7 +648,7 @@ describe('github:pr-file-diff', () => {
 
   it('parses a diff with binary file indicator', async () => {
     mockGitSuccess('') // git fetch
-    mockGitSuccess('main\n') // gh pr view
+    mockGitSuccess('{"baseRefName":"main"}') // gh pr view
     mockGitSuccess('abc123\n') // git merge-base
     mockGitSuccess('Binary files a/image.png and b/image.png differ\n') // git diff
 
@@ -681,7 +673,7 @@ describe('github:pr-file-diff', () => {
  export { x }
 `
     mockGitSuccess('') // git fetch
-    mockGitSuccess('main\n') // gh pr view
+    mockGitSuccess('{"baseRefName":"main"}') // gh pr view
     mockGitSuccess('abc123\n') // git merge-base
     mockGitSuccess(diffContent) // git diff
 
@@ -1353,13 +1345,14 @@ describe('github:pr-review-submit', () => {
     })) as { reviewId: number }
     expect(result.reviewId).toBe(555)
 
-    const submitArgs: string[] = mockExecFile.mock.calls[1][1]
-    expect(submitArgs).toContain('--input')
-    const inputFile = submitArgs[submitArgs.indexOf('--input') + 1]
-    expect(inputFile).toMatch(/pr-review-.*\.json$/)
+    const [, submitArgs, submitOptions] = mockExecFile.mock.calls[1] as [
+      string,
+      string[],
+      { input: string },
+    ]
+    expect(submitArgs.slice(submitArgs.indexOf('--input'))).toEqual(['--input', '-'])
 
-    const { writeFile } = await import('fs/promises')
-    const written = JSON.parse(vi.mocked(writeFile).mock.calls[0][1] as string)
+    const written = JSON.parse(submitOptions.input)
     expect(written.event).toBe('COMMENT')
     expect(written.body).toBe('Some findings')
     expect(written.comments).toEqual([
@@ -1598,6 +1591,43 @@ describe('github:pr-review-detail — catchError branches', () => {
       prNumber: 6,
     })) as { error: string }
     expect(result.error).toContain('ENOENT')
+  })
+})
+
+describe('github:pr-create', () => {
+  const input = {
+    repoRoot: '/repo',
+    title: 'Add x',
+    body: 'Why',
+    base: 'main',
+    head: 'feat/x',
+    draft: false,
+  }
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('opens the pull request in the main process and returns its number and URL', async () => {
+    mockGitSuccess('https://github.com/o/r/pull/12\n')
+
+    const result = await handlers['github:pr-create'](input)
+
+    expect(result).toEqual({ number: 12, url: 'https://github.com/o/r/pull/12' })
+    expect(mockExecFile.mock.calls[0].slice(0, 2)).toEqual([
+      'gh',
+      ['pr', 'create', '--title', 'Add x', '--body', 'Why', '--base', 'main', '--head', 'feat/x'],
+    ])
+  })
+
+  it("returns gh's message when GitHub refuses", async () => {
+    mockGitFailure('a pull request for branch "feat/x" already exists')
+
+    const result = await handlers['github:pr-create'](input)
+
+    expect(result).toEqual({ error: 'a pull request for branch "feat/x" already exists' })
   })
 })
 
@@ -1881,18 +1911,6 @@ describe('github:current-user', () => {
     expect(callOpts.env?.GH_TOKEN).toBe('my-secret-token')
   })
 
-  it('treats a stderr-only response (no stdout) as an error', async () => {
-    // Exercises the `if (stderr && !stdout) throw new Error(stderr)` branch in runGh
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
-        cb(null, { stdout: '', stderr: 'gh: command not found' })
-    )
-    const result = (await handlers['github:current-user']({ repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toContain('gh: command not found')
-  })
-
   it('retries without token when token is set but gh returns auth error', async () => {
     const handlersWithToken = captureHandlersWithToken('expired-token')
     // First call with token → auth error
@@ -1904,34 +1922,8 @@ describe('github:current-user', () => {
     }
     expect(result.login).toBe('bob')
     // Second call must have no GH_TOKEN env var
-    const retryOpts = mockExecFile.mock.calls[1][2] as { env?: unknown }
-    expect(retryOpts.env).toBeUndefined()
-  })
-
-  it('throws when retry response is stderr-only (covers retry stderr branch)', async () => {
-    const handlersWithToken = captureHandlersWithToken('expired-token')
-    // First call → auth error triggers retry
-    mockGitFailure('You need to run: gh auth login')
-    // Retry → stderr only, no stdout → runGh throws
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
-        cb(null, { stdout: '', stderr: 'connection refused' })
-    )
-    const result = (await handlersWithToken['github:current-user']({ repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toContain('connection refused')
-  })
-
-  it('uses a non-empty configured gh path directly (covers resolveGh early-return branch)', async () => {
-    const handlersWithPath = captureHandlersWithGhPath('/usr/local/bin/gh')
-    mockGitSuccess('carol\n')
-    const result = (await handlersWithPath['github:current-user']({ repoRoot: '/repo' })) as {
-      login: string
-    }
-    expect(result.login).toBe('carol')
-    // The first execFile call must have received the configured path as the command
-    expect(mockExecFile.mock.calls[0][0]).toBe('/usr/local/bin/gh')
+    const retryOpts = mockExecFile.mock.calls[1][2] as { env?: Record<string, string> }
+    expect(retryOpts.env?.GH_TOKEN).toBeUndefined()
   })
 })
 
@@ -2384,7 +2376,7 @@ describe('review revamp — edge branches', () => {
       (channel, handler) => {
         hs[channel] = handler as Handler
       },
-      { getGhPath: () => '', getToken: () => '' },
+      { github: githubOverStub(mockExecFile), getToken: () => '' },
       undefined,
       () => ['/src/widgets', '/src/gadgets', '/src/broken']
     )
@@ -2433,7 +2425,7 @@ describe('github:dashboard-search', () => {
       (channel, handler) => {
         handlers[channel] = handler as Handler
       },
-      { getGhPath: () => '', getToken: () => '' },
+      { github: githubOverStub(mockExecFile), getToken: () => '' },
       undefined,
       () => ['/Users/me/repos/widgets']
     )
@@ -2576,7 +2568,7 @@ describe('github:dashboard-search', () => {
       (channel, handler) => {
         handlers[channel] = handler as Handler
       },
-      { getGhPath: () => '', getToken: () => '' }
+      { github: githubOverStub(mockExecFile), getToken: () => '' }
     )
     mockGitFailure('boom')
     const result = (await handlers['github:dashboard-search']({})) as { error: string }
@@ -2769,7 +2761,7 @@ describe('github:pr-file-diff caching', () => {
   })
 
   const gitRoute = (a: string[]) => {
-    if (isGhPrView(a)) return 'main\n'
+    if (isGhPrView(a)) return '{"baseRefName":"main"}'
     if (a[0] === 'merge-base') return 'mb111\n'
     return ''
   }
@@ -3108,7 +3100,7 @@ describe('github:dashboard-search sessions and cap', () => {
       (channel, handler) => {
         handlers[channel] = handler as Handler
       },
-      { getGhPath: () => '', getToken: () => '' },
+      { github: githubOverStub(mockExecFile), getToken: () => '' },
       undefined,
       () => ['/Users/me/repos/widgets']
     )

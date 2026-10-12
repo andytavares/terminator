@@ -119,10 +119,28 @@ The SDK has three entries:
 `window.electronAPI` in a view is typed by `@terminator/extension-sdk/types/renderer`, which
 `tsconfig.extension.json` loads.
 
-**Another extension.** An extension's API is what its `activate` returns. A consumer declares the
-provider in its manifest's extension dependencies and uses only that returned object, as VS Code's
-`extensionDependencies` and `exports` work (ADR 094). That is the rule now; the mechanism that hands
-the object over lands in a later change, and until then no extension reaches another at all.
+**Another extension** _(SDK 2.1.0)_. An extension's API is what its `activate` returns. A consumer
+lists the provider in its manifest's `extensionDependencies` and reads that returned object with
+`api.extensions.get(id)`, as VS Code's `extensionDependencies` and `exports` work (ADR 094):
+
+```jsonc
+// manifest.json
+{ "id": "com.example.planner", "extensionDependencies": ["terminator.task-vault"], ... }
+```
+
+```typescript
+export function activate(api: ExtensionAPI): void {
+  const vault = api.extensions.get('terminator.task-vault') // typed as TaskVaultAPI
+  vault.open({ view: 'review' })
+}
+```
+
+The host activates a provider before the extensions that depend on it. A dependency that is not
+installed, failed to activate, is disabled, or is part of a dependency cycle fails the consumer's
+activation with a message naming it. `get` throws for an id the manifest does not declare. The
+built-in providers' APIs are declared in the SDK (`types/extensions.d.ts`: `TaskVaultAPI`), so
+neither side imports the other's source; any other provider is read as `get<T>(id)`. A provider
+reloaded while its dependants run is not handed to them again: reload the dependants too.
 
 ### Extension Dependencies (`package.json`)
 
@@ -371,7 +389,46 @@ if (result.exitCode !== 0) {
 
 A command that outlives `timeoutMs` is killed and resolves with `timedOut: true` and a non-zero `exitCode` (124, as `timeout(1)`), so an `exitCode !== 0` check also catches timeouts. The same holds for a command ended by a signal.
 
+Per-call options _(SDK 2.1.0)_:
+
+| Option               | What it does                                                                                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `maxBuffer`          | Most bytes kept per stream (default 1 MiB). Past it the command is stopped: `exceededMaxBuffer: true` and a non-zero `exitCode`. |
+| `env`                | Added to the command's environment, over the minimal one every command gets (PATH, HOME, git and gh credentials).                |
+| `encoding: 'buffer'` | `stdout` and `stderr` come back as bytes.                                                                                        |
+| `onOutput`           | Called with each chunk of stdout and stderr as it arrives, for a long command such as a commit whose hooks print as they run.    |
+
+Output is never trimmed: `stdout` is exactly what the command wrote, which file content needs for its line numbers.
+
 **Security**: `command` must be `'git'` or `'gh'`. `cwd` must be within the workspace folder. Arguments are passed directly to the OS — no shell expansion.
+
+### `api.github` — Pull Requests through gh _(SDK 2.1.0)_
+
+The pull request verbs, run by the core over the `gh` CLI, as `api.issues` holds the tracker verbs. Each takes a `GithubTarget`: the checkout gh runs in (`cwd`), or a repository with no checkout (`repository: 'owner/name'`, gh's `GH_REPO`), and optionally a `token` that is retried without, under gh's own login, when GitHub rejects it.
+
+```typescript
+const target = { cwd: repoRoot }
+const pr = await api.github.pullRequests.view(target, 42, ['number', 'title', 'state'])
+const open = await api.github.pullRequests.list(target, {
+  state: 'open',
+  limit: 50,
+  fields: ['number'],
+})
+const { number, url } = await api.github.pullRequests.create(target, { title, body, base, head })
+await api.github.pullRequests.markReady(target, number)
+await api.github.pullRequests.updateBranch(target, number)
+const repo = await api.github.repositories.view(target, ['owner', 'name'])
+await api.github.repositories.clone({ cwd: folder }, 'owner/name', 'name')
+
+// Anything else in the REST or GraphQL API: the body as gh prints it.
+const raw = await api.github.api(target, {
+  path: 'repos/{owner}/{repo}/pulls/42/reviews',
+  method: 'POST',
+  body: { event: 'APPROVE' },
+})
+```
+
+A failure rejects with a `GithubCommandError`: `message` is gh's own line, `stdout` holds GitHub's JSON error body, and `authenticationFailed`, `timedOut` and `exceededMaxBuffer` say why.
 
 ---
 
@@ -620,7 +677,7 @@ api.ipc.registerHandler(listItems, { remoteAccessible: true })
 api.ipc.registerHandler(runSql)
 ```
 
-Opt in only the channels the extension's own view calls for ordinary use. Keep a channel local if it reads or writes a filesystem path the caller chooses, runs a command or arbitrary SQL, opens a native dialog or window, or administers the database. A remote client holds a password, not the desktop session, so each opted-in channel is attack surface and its schema is the check on what a remote client can send. The first-party extensions follow this: Notepad and Task Vault opt in their data channels and keep file import and export, the Task Vault SQL console and database administration local; the repository extension and Foundry opt in nothing yet, because their channels take a repository or data-root path.
+Opt in only the channels the extension's own view calls for ordinary use. Keep a channel local if it reads or writes a filesystem path the caller chooses, runs a command or arbitrary SQL, opens a native dialog or window, or administers the database. A remote client holds a password, not the desktop session, so each opted-in channel is attack surface and its schema is the check on what a remote client can send. The first-party extensions follow this: Notepad and Task Vault opt in their data channels and keep file import and export, the Task Vault SQL console and database administration local. Foundry and git-integration each keep one `REMOTE_READ_CHANNELS` list (`src/remote-access.ts`) of channels that only read: Foundry's order list, feed, signals and run timeline, and git-integration's status and pull request lists, detail and comments. Anything that writes, fetches, starts or steers a run, opens a terminal, or returns a file's content or diff stays local, and a spec in each extension lists the opted-in set exactly.
 
 The declaration made at registration is the single authority — a channel that is neither in the core manifest-derived allowlist nor declared `remoteAccessible` at registration is rejected by the bridge. Extensions must never call Electron's `ipcMain` directly: handlers registered that way are invisible to the bridge registry and unreachable remotely.
 

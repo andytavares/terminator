@@ -2,6 +2,8 @@ import { z } from 'zod'
 
 export type * from '../types/api'
 export type * from '../types/issues'
+export type * from '../types/extensions'
+export type * from '../types/github'
 
 /**
  * One invoke channel: its payload schema, the response to a payload the

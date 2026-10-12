@@ -6,6 +6,7 @@ import type {
   ExtensionDB,
   Disposable,
   SettingDefinition,
+  TaskVaultAPI,
 } from '@terminator/extension-sdk'
 import { DEFAULT_CAPTURE_HOTKEY } from './constants.js'
 import { registerVaultIpcHandlers } from './ipc/vault.ipc.js'
@@ -93,7 +94,7 @@ function maybeStartScheduler(db: ExtensionDB): void {
   }
 }
 
-export async function activate(api: ExtensionAPI): Promise<void> {
+export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
   _api = api
   const db: ExtensionDB = api.db
 
@@ -275,6 +276,12 @@ export async function activate(api: ExtensionAPI): Promise<void> {
       () => openCaptureOverlay(api)
     )
   )
+
+  // What other extensions may use, through extensionDependencies (ADR 094).
+  return {
+    open: (destination) => openInVault(api, destination),
+    openCapture: () => openCaptureOverlay(api),
+  }
 }
 
 let reviewNudgeInterval: ReturnType<typeof setInterval> | null = null

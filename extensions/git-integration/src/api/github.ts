@@ -29,8 +29,21 @@ export interface PrCompareResult {
   files: Array<{ path: string; patch: string }>
 }
 
+export interface NewPullRequestInput {
+  repoRoot: string
+  title: string
+  body: string
+  base: string
+  head: string
+  draft: boolean
+}
+
 export const githubAPI = {
   currentUser: (repoRoot: string) => bridge().invoke('github:current-user', { repoRoot }),
+
+  /** Opens a pull request from `head`, which must already be pushed. */
+  prCreate: (input: NewPullRequestInput) =>
+    invoke<BridgeResult<{ number: number; url: string }>>('github:pr-create', input),
 
   listOpenPrs: (repoRoot: string, options?: { cursor?: string; search?: string }) =>
     invoke<BridgeResult<OpenPrsPage>>('github:list-open-prs', { repoRoot, ...options }),

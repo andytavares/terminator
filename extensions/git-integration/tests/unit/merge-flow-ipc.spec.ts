@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { bindShellToAnswers } from './support/shell'
 
 const {
   mockBuildConflictSession,
@@ -44,17 +45,8 @@ vi.mock('electron-store', () => ({
   },
 }))
 
-// --- mock child_process for mergeCommit ---
-vi.mock('child_process', () => ({ execFile: vi.fn() }))
-vi.mock('util', () => ({
-  promisify:
-    (_fn: unknown) =>
-    async (...args: unknown[]) => {
-      const result = mockExecFile(...args)
-      if (result instanceof Error) throw result
-      return { stdout: typeof result === 'string' ? result : '', stderr: '' }
-    },
-}))
+// Each git command is answered by mockExecFile(command, args, options).
+bindShellToAnswers((...args) => mockExecFile(...args))
 
 import { registerMergeFlowHandlers } from '../../src/ipc/merge-flow.ipc'
 

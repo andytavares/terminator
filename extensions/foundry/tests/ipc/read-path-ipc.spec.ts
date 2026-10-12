@@ -103,14 +103,23 @@ function runningOrder(id: string, touches: string[], agreedAt: string): WorkOrde
   }
 }
 
+const remoteChannels: string[] = []
+
 beforeAll(async () => {
   const handlers = new Map<string, (payload: unknown) => Promise<unknown>>()
   const api = {
     ipc: {
-      registerHandler: vi.fn((channel: string, handler: (payload: unknown) => Promise<unknown>) => {
-        handlers.set(channel, handler)
-        return { dispose: vi.fn() }
-      }),
+      registerHandler: vi.fn(
+        (
+          channel: string,
+          handler: (payload: unknown) => Promise<unknown>,
+          opts?: { remoteAccessible?: boolean }
+        ) => {
+          handlers.set(channel, handler)
+          if (opts?.remoteAccessible === true) remoteChannels.push(channel)
+          return { dispose: vi.fn() }
+        }
+      ),
       invokeChannel: vi.fn(),
       sendChannel: vi.fn(),
       onWindowEvent: vi.fn().mockReturnValue(() => {}),
@@ -180,6 +189,30 @@ async function seedTwoRunningOrders(): Promise<void> {
 beforeEach(() => {
   exec.mockClear()
   broadcast.mockClear()
+})
+
+describe('the remote browser client', () => {
+  // A logged-in remote browser reaches only what is opted in (ADR 094); a
+  // channel added here is a decision, so the list is spelled out.
+  it('may call exactly these read-only channels, and nothing that writes or runs', () => {
+    expect([...remoteChannels].sort()).toEqual([
+      'foundry:ask-model',
+      'foundry:factory.metrics',
+      'foundry:feed-list',
+      'foundry:models-list',
+      'foundry:order.list',
+      'foundry:order.states',
+      'foundry:permissions-list',
+      'foundry:rules.inForce',
+      'foundry:run.activity',
+      'foundry:run.recipes',
+      'foundry:run.timeline',
+      'foundry:sensors.list',
+      'foundry:signals.list',
+      'foundry:stalls-list',
+      'foundry:ui.view',
+    ])
+  })
 })
 
 describe('reading the order list and a run', () => {

@@ -6,12 +6,10 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockExecFile } = vi.hoisted(() => ({ mockExecFile: vi.fn() }))
+import { bindShellToStub } from './support/shell'
 
-vi.mock('child_process', () => ({
-  execFile: mockExecFile,
-  spawn: vi.fn(),
-}))
+const mockExecFile = vi.fn()
+bindShellToStub(mockExecFile)
 
 import { pushBranch, pullFastForward } from '../../src/git/git-service'
 

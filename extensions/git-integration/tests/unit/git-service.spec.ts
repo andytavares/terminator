@@ -5,17 +5,12 @@
  * (and, through it, the private stripAnsi helper).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { EventEmitter } from 'events'
+import type { ExtensionAPI, ShellExecResult } from '@terminator/extension-sdk'
+import { bindShell } from '../../src/shell/run-git'
+import { bindShellToStub } from './support/shell'
 
-const { mockExecFile, mockSpawn } = vi.hoisted(() => ({
-  mockExecFile: vi.fn(),
-  mockSpawn: vi.fn(),
-}))
-
-vi.mock('child_process', () => ({
-  execFile: mockExecFile,
-  spawn: mockSpawn,
-}))
+const mockExecFile = vi.fn()
+bindShellToStub(mockExecFile)
 
 import {
   getStatus,
@@ -42,12 +37,6 @@ function mockExecError(message: string, extra: Record<string, unknown> = {}) {
     (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
       cb(Object.assign(new Error(message), extra))
   )
-}
-
-class FakeChildProcess extends EventEmitter {
-  stdout = new EventEmitter()
-  stderr = new EventEmitter()
-  kill = vi.fn()
 }
 
 beforeEach(() => {
@@ -207,48 +196,48 @@ describe('stageFiles / unstageFiles', () => {
 })
 
 describe('commitChanges', () => {
-  let proc: FakeChildProcess
+  type ExecOptions = Parameters<ExtensionAPI['shell']['exec']>[0]
+  let calls: ExecOptions[]
 
-  beforeEach(() => {
-    proc = new FakeChildProcess()
-    mockSpawn.mockReturnValue(proc)
-  })
+  /** The core's shell.exec stand-in: streams `chunks` to onOutput, then resolves `result`. */
+  function commitRuns(chunks: string[], result: Partial<ShellExecResult> = {}): void {
+    calls = []
+    const exec = async (options: ExecOptions): Promise<ShellExecResult> => {
+      calls.push(options)
+      for (const chunk of chunks) options.onOutput?.(chunk)
+      const exitCode = result.exitCode ?? 0
+      const stdout = exitCode === 0 ? chunks.join('') : ''
+      return { exitCode, stdout, stderr: '', timedOut: false, exceededMaxBuffer: false, ...result }
+    }
+    bindShell({ exec: exec as ExtensionAPI['shell']['exec'] })
+  }
 
   afterEach(() => {
-    vi.useRealTimers()
+    bindShellToStub(mockExecFile)
   })
 
   it('passes --signoff and --no-verify only when requested', async () => {
-    const pending = commitChanges('/repo', 'msg', true, true)
-    proc.stdout.emit('data', Buffer.from('[main abc1234] msg\n'))
-    proc.emit('close', 0)
-    await pending
+    commitRuns(['[main abc1234] msg\n'])
+    await commitChanges('/repo', 'msg', true, true)
 
-    expect(mockSpawn).toHaveBeenCalledWith(
-      'git',
-      ['commit', '-m', 'msg', '--signoff', '--no-verify'],
-      expect.objectContaining({ cwd: '/repo' })
-    )
+    expect(calls[0]).toMatchObject({
+      command: 'git',
+      args: ['commit', '-m', 'msg', '--signoff', '--no-verify'],
+      cwd: '/repo',
+    })
   })
 
   it('omits --signoff and --no-verify by default', async () => {
-    const pending = commitChanges('/repo', 'msg')
-    proc.emit('close', 0)
-    await pending
+    commitRuns([])
+    await commitChanges('/repo', 'msg')
 
-    expect(mockSpawn).toHaveBeenCalledWith(
-      'git',
-      ['commit', '-m', 'msg'],
-      expect.objectContaining({ cwd: '/repo' })
-    )
+    expect(calls[0].args).toEqual(['commit', '-m', 'msg'])
   })
 
   it('resolves the commit hash parsed from stdout on success', async () => {
-    const pending = commitChanges('/repo', 'feat: add x')
-    proc.stdout.emit('data', Buffer.from('[main a1b2c3d] feat: add x\n'))
-    proc.emit('close', 0)
+    commitRuns(['[main a1b2c3d] feat: add x\n'])
 
-    await expect(pending).resolves.toEqual({ commitHash: 'a1b2c3d' })
+    await expect(commitChanges('/repo', 'feat: add x')).resolves.toEqual({ commitHash: 'a1b2c3d' })
   })
 
   it.each([
@@ -258,48 +247,44 @@ describe('commitChanges', () => {
     ['the first commit', '[main (root-commit) a1b2c3d] chore: init'],
     ['a detached HEAD', '[detached HEAD a1b2c3d] wip'],
   ])('resolves the commit hash for %s', async (_case, summaryLine) => {
-    const pending = commitChanges('/repo', 'msg')
-    proc.stdout.emit('data', Buffer.from(`${summaryLine}\n 1 file changed, 1 insertion(+)\n`))
-    proc.emit('close', 0)
+    commitRuns([`${summaryLine}\n 1 file changed, 1 insertion(+)\n`])
 
-    await expect(pending).resolves.toEqual({ commitHash: 'a1b2c3d' })
+    await expect(commitChanges('/repo', 'msg')).resolves.toEqual({ commitHash: 'a1b2c3d' })
+  })
+
+  it('resolves an empty commit hash when git prints no summary line', async () => {
+    commitRuns(['done\n'])
+
+    await expect(commitChanges('/repo', 'msg')).resolves.toEqual({ commitHash: '' })
   })
 
   it('strips ANSI escapes from streamed output before handing it to onOutput', async () => {
+    commitRuns(['\x1b[32mrunning hook\x1b[0m\n'])
     const onOutput = vi.fn()
-    const pending = commitChanges('/repo', 'msg', false, false, onOutput)
-    proc.stdout.emit('data', Buffer.from('\x1b[32mrunning hook\x1b[0m\n'))
-    proc.emit('close', 0)
-    await pending
+    await commitChanges('/repo', 'msg', false, false, onOutput)
 
     expect(onOutput).toHaveBeenCalledWith('running hook')
   })
 
   it('does not call onOutput for blank lines', async () => {
+    commitRuns(['\n   \n[main abc] msg\n'])
     const onOutput = vi.fn()
-    const pending = commitChanges('/repo', 'msg', false, false, onOutput)
-    proc.stdout.emit('data', Buffer.from('\n   \n[main abc] msg\n'))
-    proc.emit('close', 0)
-    await pending
+    await commitChanges('/repo', 'msg', false, false, onOutput)
 
     expect(onOutput).toHaveBeenCalledTimes(1)
     expect(onOutput).toHaveBeenCalledWith('[main abc] msg')
   })
 
   it('resolves NOTHING_TO_COMMIT when git reports nothing staged', async () => {
-    const pending = commitChanges('/repo', 'msg')
-    proc.stdout.emit('data', Buffer.from('nothing to commit, working tree clean\n'))
-    proc.emit('close', 1)
+    commitRuns([], { exitCode: 1, stdout: 'nothing to commit, working tree clean\n' })
 
-    await expect(pending).resolves.toEqual({ error: 'NOTHING_TO_COMMIT' })
+    await expect(commitChanges('/repo', 'msg')).resolves.toEqual({ error: 'NOTHING_TO_COMMIT' })
   })
 
   it('detects a pre-commit hook failure and reports the hook output', async () => {
-    const pending = commitChanges('/repo', 'msg')
-    proc.stderr.emit('data', Buffer.from('husky - pre-commit hook exited with code 1\n'))
-    proc.emit('close', 1)
+    commitRuns([], { exitCode: 1, stderr: 'husky - pre-commit hook exited with code 1\n' })
 
-    const result = (await pending) as {
+    const result = (await commitChanges('/repo', 'msg')) as {
       error: string
       hookOutput?: string
       isHookFailure?: boolean
@@ -310,29 +295,28 @@ describe('commitChanges', () => {
   })
 
   it('reports a generic failure with the combined output when no hook pattern matches', async () => {
-    const pending = commitChanges('/repo', 'msg')
-    proc.stderr.emit('data', Buffer.from('fatal: unable to auto-detect email address\n'))
-    proc.emit('close', 1)
+    commitRuns([], { exitCode: 128, stderr: 'fatal: unable to auto-detect email address\n' })
 
-    const result = (await pending) as { error: string; isHookFailure?: boolean }
+    const result = (await commitChanges('/repo', 'msg')) as {
+      error: string
+      isHookFailure?: boolean
+    }
     expect(result.error).toContain('unable to auto-detect email address')
     expect(result.isHookFailure).toBe(false)
   })
 
-  it('resolves TIMEOUT and kills the process when it runs past the hook timeout', async () => {
-    vi.useFakeTimers()
-    const pending = commitChanges('/repo', 'msg')
-    await vi.advanceTimersByTimeAsync(120_000)
-    expect(proc.kill).toHaveBeenCalled()
-    proc.emit('close', null)
+  it('gives hooks two minutes, and resolves TIMEOUT past them', async () => {
+    commitRuns([], { exitCode: 124, timedOut: true })
 
-    await expect(pending).resolves.toEqual({ error: 'TIMEOUT' })
+    await expect(commitChanges('/repo', 'msg')).resolves.toEqual({ error: 'TIMEOUT' })
+    expect(calls[0].timeoutMs).toBe(120_000)
   })
 
-  it('resolves with the error message when the process itself fails to spawn', async () => {
-    const pending = commitChanges('/repo', 'msg')
-    proc.emit('error', new Error('ENOENT'))
+  it('reports why git could not run at all', async () => {
+    commitRuns([], { exitCode: 1, stderr: 'spawn git ENOENT' })
 
-    await expect(pending).resolves.toEqual({ error: 'Error: ENOENT' })
+    await expect(commitChanges('/repo', 'msg')).resolves.toMatchObject({
+      error: 'spawn git ENOENT',
+    })
   })
 })

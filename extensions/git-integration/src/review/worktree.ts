@@ -1,17 +1,13 @@
-import { execFile as execFileCb } from 'child_process'
-import { promisify } from 'util'
 import { existsSync, readdirSync, statSync, utimesSync } from 'fs'
 import { join } from 'path'
+import { runGit } from '../shell/run-git.js'
 
-const execFileAsync = promisify(execFileCb)
-
-const GIT_TIMEOUT = 30_000
 const DEFAULT_MAX_WORKTREES = 5
 
 export type ExecFn = (
-  cmd: string,
+  cmd: 'git',
   args: string[],
-  opts: { cwd?: string }
+  opts: { cwd: string }
 ) => Promise<{ stdout: string }>
 
 export interface WorktreeDeps {
@@ -20,13 +16,9 @@ export interface WorktreeDeps {
   maxWorktrees?: number
 }
 
-async function defaultExec(cmd: string, args: string[], opts: { cwd?: string }) {
-  return execFileAsync(cmd, args, {
-    cwd: opts.cwd,
-    timeout: GIT_TIMEOUT,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-  })
-}
+const defaultExec: ExecFn = async (_cmd, args, opts) => ({
+  stdout: await runGit(opts.cwd, args, { raw: true }),
+})
 
 function reviewBaseDir(repoRoot: string): string {
   return join(repoRoot, '.git', 'terminator-review')

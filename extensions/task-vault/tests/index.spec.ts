@@ -214,3 +214,34 @@ describe('task-vault activate() quick-actions command registration', () => {
     expect(disposable.dispose).toHaveBeenCalled()
   })
 })
+
+describe('task-vault activate() exports (ADR 094)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns an API whose open() takes the operator to the destination it was given', async () => {
+    const { api } = makeApi()
+    const { activate } = await import('../src/index.ts')
+    const { openInVault } = await import('../src/navigation.js')
+
+    const vault = await activate(api)
+    vault.open({ taskId: 'task-1', view: 'daily' })
+
+    expect(openInVault).toHaveBeenCalledWith(api, { taskId: 'task-1', view: 'daily' })
+  })
+
+  it('returns an API whose openCapture() opens the capture overlay, as the command does', async () => {
+    const { api } = makeApi()
+    const { activate } = await import('../src/index.ts')
+
+    const vault = await activate(api)
+    vault.openCapture()
+
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'extension:activate-global-tab',
+      'terminator.task-vault'
+    )
+    expect(api.window.focusSelf).toHaveBeenCalledWith('main')
+  })
+})

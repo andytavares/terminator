@@ -14,6 +14,7 @@ import type {
   ProjectSnapshot,
   RegisterHandlerOptions,
   SessionSnapshot,
+  ShellExecOptions,
   ToastType,
   TopBarMenuContribution,
   TrackerConnection,
@@ -44,6 +45,7 @@ import { sendToWindow } from '../safe-send.js'
 import { join } from 'path'
 
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
+import { createGithubApi } from '../github/github-api.js'
 import {
   notificationManager,
   setExtensionNotificationSettingReader,
@@ -303,6 +305,8 @@ export interface ExtensionAPIDeps {
   focusExtensionView?: (extensionId: string, viewParam: string) => void
   bridge?: BridgeDeps
   db?: ExtensionDB
+  /** Another extension's `activate` exports; throws for an id the manifest does not declare. */
+  extensionExports?: (extensionId: string) => unknown
 }
 
 export function createExtensionAPI(
@@ -435,22 +439,23 @@ export function createExtensionAPI(
         return disposable(() => globalRegistry.topBarItems.delete(key))
       },
     },
-    shell: {
-      async exec(options: {
-        command: 'git' | 'gh'
-        args: string[]
-        cwd: string
-        timeoutMs?: number
-      }) {
-        assertCommandAllowed(options.command)
-        return execShell({
-          command: options.command,
-          args: options.args,
-          cwd: options.cwd,
-          timeoutMs: options.timeoutMs ?? 10000,
-        })
+    extensions: {
+      // The provider's type is the declaration the caller chose; nothing here can check it.
+      get(dependencyId: string): never {
+        if (!deps?.extensionExports) {
+          throw new Error(`Extension "${extensionId}" declares no extensionDependencies`)
+        }
+        return deps.extensionExports(dependencyId) as never
       },
     },
+    shell: {
+      // One implementation for both overloads; the encoding decides which output type it is.
+      exec: (async (options: ShellExecOptions) => {
+        assertCommandAllowed(options.command)
+        return execShell({ ...options, timeoutMs: options.timeoutMs ?? 10000 })
+      }) as ExtensionAPI['shell']['exec'],
+    },
+    github: createGithubApi((input) => execShell(input)),
     issues: {
       async connections(): Promise<TrackerConnection[]> {
         return listTrackerConnections()

@@ -43,6 +43,14 @@ import { githubAPI } from '../api/github'
 await githubAPI.prFileDiff(...)    // NOT window.electronAPI.github.prFileDiff(...)
 ```
 
+### Running git and gh
+
+Every command goes through the core (ADR 094). git runs through `runGit` (`src/shell/run-git.ts`) over `api.shell.exec`, which `activate` binds; gh runs through `api.github` (pull request verbs, `repositories`, and `api` for REST and GraphQL), reached in `src/ipc/github.ipc.ts` through a `GithubTarget` from `githubTarget(repoRoot, token)`. Never import `child_process` for git or gh; the only process this extension starts itself is the review agent's `claude`, which `shell.exec` does not run. A view never runs a command: it invokes a channel (PR creation is `github:pr-create`). Specs bind the runner with `tests/unit/support/shell.ts`.
+
+### Remote access
+
+A channel is local-only unless it is in `REMOTE_READ_CHANNELS` (`src/remote-access.ts`): only channels that read status or pull request data. Adding one is a decision; `tests/unit/remote-access.spec.ts` lists the set exactly.
+
 ### Rendering untrusted text
 
 PR descriptions, templates and comments are rendered only through `src/components/pr-review/RichContent.tsx`, which wraps the design system's `Markdown` (`packages/extension-ui`: react-markdown + rehype-sanitize, ADR 091). Never add a second markdown renderer: this view can run shell commands. The only `dangerouslySetInnerHTML` is RichContent's highlight.js output for fenced code.
