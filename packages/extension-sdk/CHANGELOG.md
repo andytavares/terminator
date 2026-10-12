@@ -20,6 +20,11 @@ stays in the extension host and the core calls it by id.
   session's exit. `pty.onData` and `pty.onExit` always return a disposer: a session that does
   not exist never calls the listener (they returned `null`).
 - `ipc.isRemoteAccessible(channel)` returns `Promise<boolean>`.
+- `shell.exec` and every `github` call reject with an error named `CwdOutOfScopeError`, and run
+  nothing, when `cwd` is outside the extension's shell roots: the workspace folders, the project
+  worktrees, `paths.userData`, and the folder settings `contributes.shellRoots` declares. Both
+  sides are compared after resolving symlinks (ADR 102). A gh call whose `cwd` does not matter,
+  because it names `repository`, passes `paths.userData`; the home directory is not a root.
 - `settings.get` and `workspace.list` / `listProjects` stay synchronous and read a snapshot the
   core pushes on every change. `issues.supportsTransitions` / `supportsCreate` are fixed facts
   of a tracker and stay synchronous.
@@ -34,6 +39,9 @@ stays in the extension host and the core calls it by id.
   to come from `electron.dialog`.
 - `window.raise()`: restores and focuses every application window, for what used to come from
   `BrowserWindow.getAllWindows()`.
+- Manifest `contributes.shellRoots`: keys of the extension's own `folder` settings whose
+  directories git and gh may run in. A key outside the extension's id refuses the manifest at
+  load; a key not registered as a `folder` setting adds nothing.
 
 ### Removed
 

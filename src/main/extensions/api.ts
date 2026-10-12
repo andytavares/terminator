@@ -43,7 +43,13 @@ import { EXTENSION_BASE_CSS } from './extension-view-host.js'
 import { sendToWindow } from '../safe-send.js'
 import { join } from 'path'
 
-import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
+import {
+  execShell,
+  assertCommandAllowed,
+  assertCwdInScope,
+  type ShellExecInput,
+} from '../shell/shell-executor.js'
+import { extensionShellRoots } from './shell-roots.js'
 import { createGithubApi } from '../github/github-api.js'
 import {
   notificationManager,
@@ -289,6 +295,8 @@ export interface ExtensionAPIDeps {
   db?: ExtensionDB
   /** `api.paths`: the application's directory and the per-user data directory. */
   paths?: ExtensionAPI['paths']
+  /** The manifest's `contributes.shellRoots`: settings naming directories git and gh may run in. */
+  shellRootSettings?: readonly string[]
 }
 
 const ptyStreams = new WeakMap<PtyManager, BatchedPtyStream>()
@@ -347,9 +355,22 @@ export function createExtensionAPI(
     return deps.ptyManager
   }
 
+  const paths = deps?.paths ?? { app: '', userData: '' }
+  // Every git and gh this extension runs, through shell or github, starts inside a root (ADR 102).
+  const execInScope = async (input: ShellExecInput) => {
+    const roots = extensionShellRoots({
+      userData: paths.userData,
+      declaredKeys: deps?.shellRootSettings ?? [],
+      schema: globalRegistry.settingsSections.get(`${extensionId}.settings`),
+      readSetting: (key) => api.settings.get(key),
+    })
+    await assertCwdInScope(input.cwd, roots)
+    return execShell(input)
+  }
+
   const api: ExtensionAPI = {
     db: deps?.db ?? dbStub,
-    paths: deps?.paths ?? { app: '', userData: '' },
+    paths,
     dialog: {
       async showOpenDialog(options) {
         const parent = focusedOrFirstWindow()
@@ -470,10 +491,10 @@ export function createExtensionAPI(
       // One implementation for both overloads; the encoding decides which output type it is.
       exec: (async (options: ShellExecOptions) => {
         assertCommandAllowed(options.command)
-        return execShell({ ...options, timeoutMs: options.timeoutMs ?? 10000 })
+        return execInScope({ ...options, timeoutMs: options.timeoutMs ?? 10000 })
       }) as ExtensionAPI['shell']['exec'],
     },
-    github: createGithubApi((input) => execShell(input)),
+    github: createGithubApi(execInScope),
     issues: {
       async connections(): Promise<TrackerConnection[]> {
         return listTrackerConnections()

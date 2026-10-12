@@ -86,6 +86,12 @@ function declaredDependencies(record: ExtensionRecord): string[] {
   return 'data' in manifest ? (manifest.data.extensionDependencies ?? []) : []
 }
 
+/** The manifest's `contributes.shellRoots`, read like `extensionDependencies` (ADR 102). */
+function declaredShellRoots(record: ExtensionRecord): string[] {
+  const manifest = readManifest(record.directoryPath)
+  return 'data' in manifest ? (manifest.data.contributes?.shellRoots ?? []) : []
+}
+
 /** Where backends run: the extension host (ADR 094). */
 export interface BackendHost {
   activate(record: BackendRecord): Promise<void>
@@ -411,7 +417,8 @@ export class ExtensionHost {
   ): Promise<{ ok: true } | { error: string; message: string }> {
     const inactive = this.inactiveDependency(record)
     if (inactive) return { error: 'DEPENDENCY_ERROR', message: inactive }
-    const api = createExtensionAPI(record.id, app.getVersion(), this.deps, record.rendererUrl)
+    const deps = { ...this.deps, shellRootSettings: declaredShellRoots(record) }
+    const api = createExtensionAPI(record.id, app.getVersion(), deps, record.rendererUrl)
     this.hostedApis.set(record.id, api)
     try {
       const dependencies = declaredDependencies(record)

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { RpcEndpoint, type MessageLink } from '../../../../../src/main/extensions/host/rpc-endpoint'
+import { CwdOutOfScopeError } from '../../../../../src/main/shell/shell-executor'
 
 const ports: MessagePort[] = []
 
@@ -40,6 +41,18 @@ describe('RpcEndpoint', () => {
 
     const failure = await host.request('pty.spawnSession').catch((error: Error) => error)
     expect(failure).toMatchObject({ name: 'MissingCwdError', message: 'no such directory' })
+  })
+
+  it('carries a refused cwd across as its name and message, and nothing else', async () => {
+    const { main, host } = pair()
+    main.handle('shell.exec', () => {
+      throw new CwdOutOfScopeError('/elsewhere')
+    })
+
+    const failure = await host.request('shell.exec').catch((error: Error) => error)
+    expect(failure).toMatchObject({ name: 'CwdOutOfScopeError', message: expect.any(String) })
+    expect((failure as Error).message).toContain('/elsewhere')
+    expect(failure).not.toHaveProperty('code')
   })
 
   it('rejects a request for a method nobody handles', async () => {

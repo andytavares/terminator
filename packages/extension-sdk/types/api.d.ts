@@ -228,6 +228,12 @@ export interface PtyManagerAPI {
 export interface ShellExecOptions {
   command: 'git' | 'gh'
   args: string[]
+  /**
+   * Must be, after resolving symlinks, one of the extension's shell roots or
+   * below one: a workspace folder, a project worktree, `api.paths.userData`, or
+   * the directory a folder setting the manifest declares in
+   * `contributes.shellRoots` holds. Since 4.0.0.
+   */
   cwd: string
   /**
    * Default 10 000. When it expires the command is killed and the result is a
@@ -344,7 +350,11 @@ export interface ExtensionAPI {
     get<T = unknown>(extensionId: string): T
   }
   shell: {
-    /** Runs git or gh without a shell. Resolves for every outcome; read `exitCode`. */
+    /**
+     * Runs git or gh without a shell. Resolves for every outcome of the command;
+     * read `exitCode`. Rejects, running nothing, with an error named
+     * 'CwdOutOfScopeError' when `cwd` is outside every shell root (since 4.0.0).
+     */
     exec(options: ShellExecOptions & { encoding: 'buffer' }): Promise<ShellExecResult<Uint8Array>>
     exec(options: ShellExecOptions): Promise<ShellExecResult<string>>
   }
