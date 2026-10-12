@@ -1,9 +1,10 @@
-import bcryptjs from 'bcryptjs'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
-import { AuthRateLimiter } from './auth-rate-limiter.js'
 
 // Routes that require DNS rebinding protection (auth-gated or self-auth WebSocket routes)
 const PROTECTED_PREFIXES = ['/api', '/ws']
+
+// Routes that authenticate themselves: login by password, the bridge socket by ticket.
+const SELF_AUTHENTICATING = new Set(['/api/login', '/api/bridge'])
 
 // Allowed hosts: loopback, private RFC-1918 ranges (LAN), and ngrok tunnel domains
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
@@ -22,16 +23,19 @@ export function isAllowedHost(rawHost: string): boolean {
 }
 
 interface AuthMiddlewareOptions {
-  getPasswordHash: () => string
-  hasValidSession?: (cookieHeader: string) => boolean
+  hasValidSession: (cookieHeader: string) => boolean
 }
 
+/**
+ * Every /api and /ws request must come from an allowed Host. Beyond that,
+ * /api requests need the session cookie that POST /api/login issues; the
+ * password is checked there, once, and never on a later request.
+ */
 export async function registerAuthMiddleware(
   app: FastifyInstance,
   opts: AuthMiddlewareOptions
 ): Promise<void> {
-  const { getPasswordHash, hasValidSession } = opts
-  const rateLimiter = new AuthRateLimiter()
+  const { hasValidSession } = opts
 
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     const isProtected = PROTECTED_PREFIXES.some((p) => request.url.startsWith(p))
@@ -44,38 +48,13 @@ export async function registerAuthMiddleware(
       return reply.status(403).send({ error: 'FORBIDDEN' })
     }
 
-    // WebSocket upgrade routes handle their own auth via ticket — browsers can't send Authorization on WS
+    // Login is where a session starts, and WebSocket upgrades authenticate with a
+    // single-use ticket (browsers cannot send credentials on them).
     const pathname = request.url.split('?')[0]
-    if (pathname === '/api/bridge' || pathname.startsWith('/ws/terminals/')) return
+    if (SELF_AUTHENTICATING.has(pathname) || pathname.startsWith('/ws/terminals/')) return
 
-    // Bridge-ticket requests from a new tab can authenticate via session cookie instead of bearer
-    if (pathname === '/api/bridge-ticket' && hasValidSession) {
-      if (hasValidSession(request.headers.cookie ?? '')) return
-    }
-
-    // Brute-force protection: lock out a client after too many failed attempts.
-    // Checked before bcrypt so locked clients can't extend their own lockout.
-    const clientKey = request.ip
-    if (rateLimiter.isLockedOut(clientKey)) {
-      return reply.status(429).send({ error: 'TOO_MANY_REQUESTS' })
-    }
-
-    const authHeader = request.headers.authorization
-    if (!authHeader?.startsWith('Bearer ')) {
-      rateLimiter.recordFailure(clientKey)
+    if (!hasValidSession(request.headers.cookie ?? '')) {
       return reply.status(401).send({ error: 'UNAUTHORIZED' })
     }
-
-    const password = authHeader.slice(7)
-    const hash = getPasswordHash()
-    if (!hash) {
-      return reply.status(401).send({ error: 'UNAUTHORIZED' })
-    }
-    const valid = await bcryptjs.compare(password, hash)
-    if (!valid) {
-      rateLimiter.recordFailure(clientKey)
-      return reply.status(401).send({ error: 'UNAUTHORIZED' })
-    }
-    rateLimiter.recordSuccess(clientKey)
   })
 }

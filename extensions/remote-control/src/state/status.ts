@@ -8,7 +8,12 @@
  * every transition is testable without a server.
  */
 
-type FailureReason = 'port-in-use' | 'credential-rejected' | 'tunnel-dropped' | 'tunnel-unreachable'
+type FailureReason =
+  | 'port-in-use'
+  | 'password-required'
+  | 'credential-rejected'
+  | 'tunnel-dropped'
+  | 'tunnel-unreachable'
 
 interface RemoteFailure {
   reason: FailureReason
@@ -71,6 +76,18 @@ export function reduceStatus(previous: RemoteStatus, message: StatusBroadcast): 
         message: `Port ${port} is already in use.`,
         resolution:
           'Another program is listening on it. Pick a different port, or quit that program.',
+      },
+    }
+  }
+
+  if (message.error === 'PASSWORD_REQUIRED') {
+    return {
+      kind: 'failed',
+      port,
+      failure: {
+        reason: 'password-required',
+        message: message.message ?? 'Remote Control needs a password before it can start.',
+        resolution: 'Open Settings below and set a password, or generate one.',
       },
     }
   }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { PasswordField } from './PasswordField'
 
 interface RemoteStatus {
   enabled?: boolean
@@ -14,8 +15,7 @@ export function RemoteControlSettings(): React.JSX.Element {
   const [status, setStatus] = useState<RemoteStatus>({})
   const [port, setPort] = useState(7681)
   const [maxSubscribers, setMaxSubscribers] = useState(5)
-  const [passwordInput, setPasswordInput] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
+  const [hasPassword, setHasPassword] = useState(false)
   const [ngrokTokenInput, setNgrokTokenInput] = useState('')
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export function RemoteControlSettings(): React.JSX.Element {
           enabled: boolean
           port: number
           maxSubscribers: number
-          password: string
+          hasPassword: boolean
           ngrokAuthToken: string
           lanUrl?: string
           publicUrl?: string | null
@@ -41,7 +41,7 @@ export function RemoteControlSettings(): React.JSX.Element {
           setPort(s.port ?? 7681)
           setStatus((prev) => ({ ...prev, enabled: s.enabled }))
           setMaxSubscribers(s.maxSubscribers ?? 5)
-          setPasswordInput(s.password ?? '')
+          setHasPassword(s.hasPassword === true)
           setNgrokTokenInput(s.ngrokAuthToken ?? '')
           if (s.lanUrl || s.publicUrl !== undefined) {
             setStatus((prev) => ({
@@ -133,6 +133,8 @@ export function RemoteControlSettings(): React.JSX.Element {
           How many browsers can watch one terminal at once. Extra viewers are turned away.
         </span>
       </div>
+
+      <PasswordField hasPassword={hasPassword} onChanged={() => setHasPassword(true)} />
 
       {status.enabled && (
         <>
@@ -273,61 +275,6 @@ export function RemoteControlSettings(): React.JSX.Element {
               </span>
             </div>
           )}
-
-          <div className="settings-section__field">
-            <label className="settings-section__label">Password</label>
-            <span className="settings-section__hint">
-              Used to authenticate browser access. Set your own or generate a random one.
-            </span>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className="settings-section__input"
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                onBlur={() => {
-                  void window.electronAPI.extensionBridge
-                    .invoke('remote:update-password', { password: passwordInput.trim() })
-                    .then((res) => {
-                      const r = res as { password?: string }
-                      if (r?.password) setPasswordInput(r.password)
-                    })
-                }}
-                placeholder="Enter a password or generate one"
-                style={{ flex: 1 }}
-              />
-              <button
-                className="settings-section__btn"
-                style={{ marginBottom: 0, flexShrink: 0 }}
-                onClick={() => setShowPassword((v) => !v)}
-              >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
-              <button
-                className="settings-section__btn"
-                style={{ marginBottom: 0, flexShrink: 0 }}
-                onClick={() => {
-                  void navigator.clipboard.writeText(passwordInput)
-                }}
-              >
-                Copy
-              </button>
-              <button
-                className="settings-section__btn"
-                style={{ marginBottom: 0, flexShrink: 0 }}
-                onClick={() => {
-                  void window.electronAPI.extensionBridge
-                    .invoke('remote:update-password', { password: '' })
-                    .then((res) => {
-                      const r = res as { password?: string }
-                      if (r?.password) setPasswordInput(r.password)
-                    })
-                }}
-              >
-                Generate new
-              </button>
-            </div>
-          </div>
         </>
       )}
     </div>

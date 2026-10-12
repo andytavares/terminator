@@ -3,6 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, act, fireEvent, waitFor } from '@testing-library/react'
 import { RemoteControlView } from '../../../src/components/RemoteControlView'
 
+const qrValues = vi.hoisted(() => [] as string[])
+vi.mock('qrcode.react', () => ({
+  QRCodeSVG: ({ value }: { value: string }) => {
+    qrValues.push(value)
+    return <svg role="img" />
+  },
+}))
+
 // The screen used to be a settings form and could answer none of the three
 // questions people open it with: is it on, at what address, and who is
 // connected. These assert that it now does.
@@ -19,11 +27,12 @@ function emit(channel: string, data: unknown): void {
 const SETTINGS = {
   enabled: false,
   port: 7681,
-  password: 'yields-brave-otter',
+  hasPassword: true,
   maxSubscribers: 5,
 }
 
 beforeEach(() => {
+  qrValues.length = 0
   handlers.clear()
   invoke.mockReset()
   invoke.mockResolvedValue(SETTINGS)
@@ -86,28 +95,12 @@ describe('RemoteControlView', () => {
   })
 
   describe('the credential', () => {
-    it('is concealed until asked for', async () => {
+    it('is never shown, and there is nothing to reveal or copy', async () => {
       render(<RemoteControlView />)
       await waitFor(() => screen.getByText('Off'))
       emit('remote:status', ON)
-      expect(screen.queryByText('yields-brave-otter')).toBeNull()
-    })
-
-    it('is revealed by a deliberate action', async () => {
-      render(<RemoteControlView />)
-      await waitFor(() => screen.getByText('Off'))
-      emit('remote:status', ON)
-      fireEvent.click(screen.getByRole('button', { name: 'Show password' }))
-      expect(screen.getByText('yields-brave-otter')).toBeTruthy()
-    })
-
-    it('can be copied without being shown', async () => {
-      render(<RemoteControlView />)
-      await waitFor(() => screen.getByText('Off'))
-      emit('remote:status', ON)
-      fireEvent.click(screen.getByRole('button', { name: 'Copy password' }))
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('yields-brave-otter')
-      expect(screen.queryByText('yields-brave-otter')).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Show password' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Copy password' })).toBeNull()
     })
   })
 
@@ -120,14 +113,20 @@ describe('RemoteControlView', () => {
     ).toBeTruthy()
   })
 
-  it('renders a scannable code that carries the credential', async () => {
-    const { container } = render(<RemoteControlView />)
+  it('renders a scannable code that carries the address and nothing else', async () => {
+    render(<RemoteControlView />)
     await waitFor(() => screen.getByText('Off'))
     emit('remote:status', ON)
-    const svg = container.querySelector('svg[role="img"], .rc-code svg')
-    expect(svg).toBeTruthy()
-    // Scanning must not require revealing the password on screen.
-    expect(screen.queryByText('yields-brave-otter')).toBeNull()
+    const address = ON.publicUrl
+    expect(qrValues.length).toBeGreaterThan(0)
+    expect(new Set(qrValues)).toEqual(new Set([address]))
+  })
+
+  it('explains a refusal to start for want of a password', async () => {
+    render(<RemoteControlView />)
+    await waitFor(() => screen.getByText('Off'))
+    emit('remote:status', { enabled: false, error: 'PASSWORD_REQUIRED' })
+    expect(screen.getByRole('alert').textContent).toContain('password')
   })
 
   describe('connected devices', () => {

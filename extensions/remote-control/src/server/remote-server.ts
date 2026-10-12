@@ -9,6 +9,8 @@ import { registerHealthRoute } from './routes/health.route.js'
 import { registerTerminalRoutes } from './routes/terminal.routes.js'
 import { registerWorkspaceRoutes } from './routes/workspace.routes.js'
 import { registerAuthMiddleware } from './auth.middleware.js'
+import { registerLoginRoute } from './routes/login.route.js'
+import { AuthRateLimiter } from './auth-rate-limiter.js'
 import { registerBridgeRoute } from './routes/bridge.route.js'
 import { WsTicketStore } from './ws-ticket-store.js'
 import { SessionStore } from './session-store.js'
@@ -396,15 +398,13 @@ export async function createRemoteServer(
     cookiePath: '/mobile',
     ttlMs: SESSION_TTL_MS,
   })
+  // Issued by POST /api/login; it authorises every /api request after the password check.
+  const loginSessionStore = new SessionStore({
+    cookieName: 'remote-session',
+    cookiePath: '/',
+    ttlMs: SESSION_TTL_MS,
+  })
   let sessionCleanupTimer: ReturnType<typeof setInterval> | null = null
-
-  // hasValidSession is the union of app + mobile sessions (used by auth middleware)
-  function hasValidSession(cookieHeader: string): boolean {
-    return (
-      appSessionStore.hasValidSession(cookieHeader) ||
-      mobileSessionStore.hasValidSession(cookieHeader)
-    )
-  }
 
   const fastify = Fastify({ logger: false })
 
@@ -513,8 +513,12 @@ export async function createRemoteServer(
   })
 
   await registerAuthMiddleware(fastify, {
+    hasValidSession: (cookieHeader) => loginSessionStore.hasValidSession(cookieHeader),
+  })
+  await registerLoginRoute(fastify, {
     getPasswordHash: deps.getPasswordHash,
-    hasValidSession,
+    sessionStore: loginSessionStore,
+    rateLimiter: new AuthRateLimiter(),
   })
 
   await registerHealthRoute(fastify)
@@ -549,6 +553,7 @@ export async function createRemoteServer(
           () => {
             appSessionStore.sweep()
             mobileSessionStore.sweep()
+            loginSessionStore.sweep()
           },
           60 * 60 * 1000
         )
@@ -573,6 +578,7 @@ export async function createRemoteServer(
       }
       appSessionStore.clear()
       mobileSessionStore.clear()
+      loginSessionStore.clear()
       terminalCleanup.cleanup()
       bridgeCleanup.disconnectAll()
       subscriberManager.destroyAll()
@@ -583,6 +589,7 @@ export async function createRemoteServer(
     disconnectAllClients() {
       appSessionStore.clear()
       mobileSessionStore.clear()
+      loginSessionStore.clear()
       // Kill all remote PTYs — password rotation invalidates existing sessions
       terminalCleanup.cleanup()
       bridgeCleanup.disconnectAll()

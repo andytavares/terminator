@@ -1,12 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'fs'
+import { hashPassword } from '../../src/server/password-hash'
 
-vi.mock('bcryptjs', () => ({
-  default: {
-    hash: vi.fn().mockResolvedValue('$2a$10$mocked'),
-    compare: vi.fn().mockResolvedValue(true),
-  },
-}))
+const PASSWORD = 'correct-password'
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>()
@@ -87,7 +83,7 @@ describe('RemoteServer', () => {
   const mockOnPortInUse = vi.fn()
 
   const mockDeps = {
-    getPasswordHash: vi.fn(() => '$2a$10$test'),
+    getPasswordHash: vi.fn(() => ''),
     getMaxSubscribers: vi.fn(() => 5),
     listWorkspaces: vi.fn(() => []),
     listProjects: vi.fn(() => []),
@@ -98,7 +94,18 @@ describe('RemoteServer', () => {
     onPortInUse: mockOnPortInUse,
   }
 
+  async function loginCookie(): Promise<string> {
+    const res = await remoteServer.inject({
+      method: 'POST',
+      url: '/api/login',
+      payload: { password: PASSWORD },
+    })
+    return String(res.headers['set-cookie']).split(';')[0]
+  }
+
   beforeEach(async () => {
+    const storedHash = await hashPassword(PASSWORD)
+    mockDeps.getPasswordHash.mockReturnValue(storedHash)
     const { createRemoteServer } = await import('../../src/server/remote-server')
     remoteServer = await createRemoteServer({
       port: 7683,
@@ -151,7 +158,7 @@ describe('RemoteServer', () => {
         url: '/api/terminals',
         headers: {
           'content-type': 'application/json',
-          authorization: 'Bearer anypassword',
+          cookie: await loginCookie(),
         },
         body,
       })
@@ -293,13 +300,42 @@ describe('RemoteServer', () => {
     })
   })
 
-  describe('auth middleware getPasswordHash is invoked', () => {
-    it('returns 401 when password hash is empty on API request', async () => {
-      mockDeps.getPasswordHash.mockReturnValueOnce('')
+  describe('login', () => {
+    it('returns 401 for every login while no password hash is stored', async () => {
+      mockDeps.getPasswordHash.mockReturnValue('')
+      const res = await remoteServer.inject({
+        method: 'POST',
+        url: '/api/login',
+        payload: { password: PASSWORD },
+      })
+      expect(res.statusCode).toBe(401)
+    })
+
+    it('does not accept the password as a Bearer header on an API request', async () => {
       const res = await remoteServer.inject({
         method: 'GET',
         url: '/api/workspaces',
-        headers: { Authorization: 'Bearer token' },
+        headers: { Authorization: `Bearer ${PASSWORD}` },
+      })
+      expect(res.statusCode).toBe(401)
+    })
+
+    it('authorises an API request with the cookie a correct login issued', async () => {
+      const res = await remoteServer.inject({
+        method: 'GET',
+        url: '/api/workspaces',
+        headers: { cookie: await loginCookie() },
+      })
+      expect(res.statusCode).toBe(200)
+    })
+
+    it('ends every login session when clients are disconnected (password change)', async () => {
+      const cookie = await loginCookie()
+      remoteServer.disconnectAllClients()
+      const res = await remoteServer.inject({
+        method: 'GET',
+        url: '/api/workspaces',
+        headers: { cookie },
       })
       expect(res.statusCode).toBe(401)
     })
@@ -310,7 +346,7 @@ describe('RemoteServer', () => {
       const res = await remoteServer.inject({
         method: 'POST',
         url: '/api/mobile-ticket',
-        headers: { authorization: 'Bearer anypassword' },
+        headers: { cookie: await loginCookie() },
       })
       expect(res.statusCode).toBe(201)
       const body = JSON.parse(res.body) as { ticket: string }

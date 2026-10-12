@@ -1,16 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import {
-  ChevronDown,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  Loader,
-  TriangleAlert,
-  Wifi,
-  WifiOff,
-} from 'lucide-react'
-import { IconButton } from '@terminator/extension-ui'
+import { ChevronDown, ChevronRight, Loader, TriangleAlert, Wifi, WifiOff } from 'lucide-react'
 import { OFF, reduceStatus, tunnelDropped, type RemoteStatus } from '../state/status'
 import type { ConnectedDevice } from '../server/connected-devices'
 import { RemoteControlSettings } from './RemoteControlSettings'
@@ -28,7 +18,6 @@ import './remote-control-view.css'
 export function RemoteControlView(): React.JSX.Element {
   const [status, setStatus] = useState<RemoteStatus>(OFF)
   const [devices, setDevices] = useState<ConnectedDevice[]>([])
-  const [password, setPassword] = useState('')
   const [maxViewers, setMaxViewers] = useState(5)
   const [busy, setBusy] = useState(false)
 
@@ -46,13 +35,11 @@ export function RemoteControlView(): React.JSX.Element {
       const s = res as {
         enabled?: boolean
         port?: number
-        password?: string
         maxSubscribers?: number
         lanUrl?: string
         publicUrl?: string | null
       } | null
       if (!s) return
-      setPassword(s.password ?? '')
       setMaxViewers(s.maxSubscribers ?? 5)
       setStatus((previous) =>
         reduceStatus(previous, {
@@ -86,7 +73,7 @@ export function RemoteControlView(): React.JSX.Element {
 
   return (
     <div className="rc">
-      <StatusBand status={status} busy={busy} onToggle={toggle} password={password} />
+      <StatusBand status={status} busy={busy} onToggle={toggle} />
       {status.kind === 'on' && (
         <ConnectedDevices devices={devices} maxViewers={maxViewers} onDisconnect={disconnect} />
       )}
@@ -100,12 +87,10 @@ export function RemoteControlView(): React.JSX.Element {
 function StatusBand({
   status,
   busy,
-  password,
   onToggle,
 }: {
   status: RemoteStatus
   busy: boolean
-  password: string
   onToggle: (next: boolean) => void
 }): React.JSX.Element {
   if (status.kind === 'off') {
@@ -205,53 +190,27 @@ function StatusBand({
             <code className="rc-address__url">{address}</code>
             <CopyButton value={address} label="Copy address" />
           </div>
-          <Credential password={password} />
           <p className="rc-consequence">
             Anyone with this address and password can type into your terminals.
           </p>
         </div>
-        <ConnectCode url={address} password={password} />
+        <ConnectCode url={address} />
       </div>
     </section>
-  )
-}
-
-// ── The credential, concealed until asked for ───────────────────────────────
-
-function Credential({ password }: { password: string }): React.JSX.Element {
-  const [revealed, setRevealed] = useState(false)
-  if (!password) return <></>
-  return (
-    <div className="rc-credential">
-      <span className="rc-label">Password</span>
-      <code className="rc-credential__value" data-revealed={revealed ? '' : undefined}>
-        {revealed ? password : '•'.repeat(Math.min(password.length, 18))}
-      </code>
-      <IconButton
-        icon={revealed ? EyeOff : Eye}
-        label={revealed ? 'Hide password' : 'Show password'}
-        onClick={() => setRevealed((v) => !v)}
-      />
-      <CopyButton value={password} label="Copy password" />
-    </div>
   )
 }
 
 // ── The scannable form ──────────────────────────────────────────────────────
 
 /**
- * Encodes the address *and* the password, so the everyday path — point a phone
- * at it — never puts the credential on screen at all.
+ * Encodes the address only. The password is never in the code: the phone opens
+ * the login page and the person types it, so a photo of the screen is not a key.
  */
-function ConnectCode({ url, password }: { url: string; password: string }): React.JSX.Element {
-  const value = useMemo(
-    () => (password ? `${url}#p=${encodeURIComponent(password)}` : url),
-    [url, password]
-  )
+function ConnectCode({ url }: { url: string }): React.JSX.Element {
   return (
     <div className="rc-code">
       <QRCodeSVG
-        value={value}
+        value={url}
         size={112}
         // Theme tokens, so the code inverts correctly in light mode rather than
         // being a white tile punched into a dark panel.
