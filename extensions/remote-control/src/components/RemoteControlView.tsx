@@ -218,7 +218,7 @@ function StatusBand({
 
 // ── The credential, concealed until asked for ───────────────────────────────
 
-export function Credential({ password }: { password: string }): React.JSX.Element {
+function Credential({ password }: { password: string }): React.JSX.Element {
   const [revealed, setRevealed] = useState(false)
   if (!password) return <></>
   return (
@@ -243,13 +243,7 @@ export function Credential({ password }: { password: string }): React.JSX.Elemen
  * Encodes the address *and* the password, so the everyday path — point a phone
  * at it — never puts the credential on screen at all.
  */
-export function ConnectCode({
-  url,
-  password,
-}: {
-  url: string
-  password: string
-}): React.JSX.Element {
+function ConnectCode({ url, password }: { url: string; password: string }): React.JSX.Element {
   const value = useMemo(
     () => (password ? `${url}#p=${encodeURIComponent(password)}` : url),
     [url, password]
@@ -273,7 +267,7 @@ export function ConnectCode({
 
 // ── Who is connected ────────────────────────────────────────────────────────
 
-export function ConnectedDevices({
+function ConnectedDevices({
   devices,
   maxViewers,
   onDisconnect,
@@ -373,7 +367,7 @@ function CopyButton({ value, label }: { value: string; label: string }): React.J
 }
 
 /** Elapsed time, never a raw timestamp. */
-export function elapsed(since: number, now: number = Date.now()): string {
+function elapsed(since: number, now: number = Date.now()): string {
   const seconds = Math.max(0, Math.round((now - since) / 1000))
   if (seconds < 60) return 'just now'
   const minutes = Math.round(seconds / 60)

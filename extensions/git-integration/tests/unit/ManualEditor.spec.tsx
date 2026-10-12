@@ -1,91 +1,7 @@
-import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, act } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
 import React from 'react'
-
-// Mock CodeMirror — the real editor requires DOM APIs not present in jsdom
-vi.mock('@codemirror/view', () => ({
-  EditorView: class {
-    state = { doc: { toString: () => '', lines: 1 } }
-    constructor({ state }: { state: { doc: { toString: () => string } } }) {
-      this.state = { doc: state.doc, lines: state.doc.toString().split('\n').length } as never
-    }
-    destroy() {}
-    focus() {}
-  },
-  lineNumbers: () => ({}),
-  keymap: { of: () => ({}) },
-}))
-
-vi.mock('@codemirror/state', () => ({
-  EditorState: {
-    create: ({ doc }: { doc: string }) => ({ doc: { toString: () => doc } }),
-    tabSize: { of: () => ({}) },
-  },
-}))
-
-vi.mock('@codemirror/commands', () => ({
-  defaultKeymap: [],
-  indentWithTab: {},
-  history: () => ({}),
-  historyKeymap: [],
-}))
-
-vi.mock('@codemirror/lang-javascript', () => ({
-  javascript: () => ({}),
-}))
-
-vi.mock('@codemirror/theme-one-dark', () => ({
-  oneDark: {},
-}))
-
-// After mocking CodeMirror, we re-implement ManualEditor via a simple textarea-based shim
-// so the existing behaviour tests (pre-populate, save, cancel) still work.
-vi.mock('../../src/components/merge-flow/ManualEditor', () => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const React = require('react')
-
-  const CONFLICT_MARKER_RE = /^(<{7}.*|={7}|>{7}.*)\n?/gm
-  function strip(t: string) {
-    return t.replace(CONFLICT_MARKER_RE, '')
-  }
-  function pick(block: Record<string, unknown>) {
-    if (block.isResolved && block.resolvedText) return block.resolvedText as string
-    const o = strip(String(block.oursText ?? ''))
-    const t = strip(String(block.theirsText ?? ''))
-    return o.length > t.length ? o : t
-  }
-
-  function ManualEditor({
-    block,
-    onSave,
-    onCancel,
-  }: {
-    block: Record<string, unknown>
-    onSave: (t: string) => void
-    onCancel: () => void
-  }) {
-    const [text, setText] = React.useState(pick(block))
-    return React.createElement(
-      'div',
-      { className: 'manual-editor' },
-      React.createElement('button', { onClick: onCancel }, 'Cancel'),
-      React.createElement('textarea', {
-        value: text,
-        onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => setText(e.target.value),
-      }),
-      React.createElement(
-        'button',
-        {
-          onClick: () => onSave(text),
-          disabled: !text.trim(),
-        },
-        'Save & confirm'
-      )
-    )
-  }
-  return { ManualEditor }
-})
-
+import { EditorView } from '@codemirror/view'
 import { ManualEditor } from '../../src/components/merge-flow/ManualEditor'
 
 function makeBlock(overrides: Record<string, unknown> = {}) {
@@ -103,79 +19,133 @@ function makeBlock(overrides: Record<string, unknown> = {}) {
   }
 }
 
-beforeEach(() => {
-  vi.clearAllMocks()
-})
+function renderEditor(
+  block: Record<string, unknown>,
+  props: { onSave?: () => void; onCancel?: () => void; suggestedText?: string | null } = {}
+) {
+  const onSave = props.onSave ?? vi.fn()
+  const onCancel = props.onCancel ?? vi.fn()
+  const view = render(
+    <ManualEditor
+      block={block as never}
+      onSave={onSave}
+      onCancel={onCancel}
+      suggestedText={props.suggestedText}
+    />
+  )
+  return { ...view, onSave, onCancel }
+}
+
+function editorView(container: HTMLElement): EditorView {
+  const content = container.querySelector('.cm-content') as HTMLElement
+  return EditorView.findFromDOM(content.parentElement!.parentElement as HTMLElement)!
+}
+
+function documentText(container: HTMLElement): string {
+  return editorView(container).state.doc.toString()
+}
+
+function replaceDocument(container: HTMLElement, text: string) {
+  const view = editorView(container)
+  act(() => {
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } })
+  })
+}
 
 describe('ManualEditor', () => {
   it('pre-populates with ours when ours is longer', () => {
-    const block = makeBlock({ oursText: 'longer ours text', theirsText: 'short' })
-    render(<ManualEditor block={block as never} onSave={vi.fn()} onCancel={vi.fn()} />)
-    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
-    expect(textarea.value).toBe('longer ours text')
+    const { container } = renderEditor(
+      makeBlock({ oursText: 'longer ours text', theirsText: 'short' })
+    )
+    expect(documentText(container)).toBe('longer ours text')
   })
 
   it('pre-populates with theirs when theirs is longer', () => {
-    const block = makeBlock({ oursText: 'short', theirsText: 'much longer theirs text here' })
-    render(<ManualEditor block={block as never} onSave={vi.fn()} onCancel={vi.fn()} />)
-    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
-    expect(textarea.value).toBe('much longer theirs text here')
+    const { container } = renderEditor(
+      makeBlock({ oursText: 'short', theirsText: 'much longer theirs text here' })
+    )
+    expect(documentText(container)).toBe('much longer theirs text here')
   })
 
   it('pre-populates with theirs when both are equal length', () => {
-    const block = makeBlock({ oursText: 'abc', theirsText: 'xyz' })
-    render(<ManualEditor block={block as never} onSave={vi.fn()} onCancel={vi.fn()} />)
-    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
-    expect(textarea.value).toBe('xyz')
+    const { container } = renderEditor(makeBlock({ oursText: 'abc', theirsText: 'xyz' }))
+    expect(documentText(container)).toBe('xyz')
   })
 
   it('strips conflict markers from pre-populated content', () => {
-    const block = makeBlock({
-      oursText: '<<<<<<< HEAD\nconst a = 1\n=======',
-      theirsText: 'const b = 2',
-    })
-    render(<ManualEditor block={block as never} onSave={vi.fn()} onCancel={vi.fn()} />)
-    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
-    expect(textarea.value).not.toContain('<<<<<<<')
-    expect(textarea.value).not.toContain('=======')
-    expect(textarea.value).not.toContain('>>>>>>>')
+    const { container } = renderEditor(
+      makeBlock({
+        oursText: '<<<<<<< HEAD\nconst a = 1\n=======',
+        theirsText: 'const b = 2',
+      })
+    )
+    expect(documentText(container)).toBe('const a = 1\n')
   })
 
-  it('user edit changes value passed to onSave', () => {
-    const onSave = vi.fn()
-    render(<ManualEditor block={makeBlock() as never} onSave={onSave} onCancel={vi.fn()} />)
-    const textarea = screen.getByRole('textbox')
-    fireEvent.change(textarea, { target: { value: 'my custom edit' } })
-    fireEvent.click(screen.getByRole('button', { name: /Save/i }))
-    expect(onSave).toHaveBeenCalledWith('my custom edit')
+  it('pre-populates with resolvedText when block is already resolved', () => {
+    const { container } = renderEditor(
+      makeBlock({ isResolved: true, resolvedText: 'previously resolved text' })
+    )
+    expect(documentText(container)).toBe('previously resolved text')
   })
 
-  it('calls onSave with unchanged pre-fill when no edits made', () => {
-    const onSave = vi.fn()
-    const block = makeBlock({ oursText: 'short', theirsText: 'longer theirs text' })
-    render(<ManualEditor block={block as never} onSave={onSave} onCancel={vi.fn()} />)
+  it('passes the unedited pre-fill to onSave', () => {
+    const { onSave } = renderEditor(
+      makeBlock({ oursText: 'short', theirsText: 'longer theirs text' })
+    )
     fireEvent.click(screen.getByRole('button', { name: /Save/i }))
     expect(onSave).toHaveBeenCalledWith('longer theirs text')
   })
 
-  it('calls onCancel when Cancel button clicked', () => {
-    const onCancel = vi.fn()
-    render(<ManualEditor block={makeBlock() as never} onSave={vi.fn()} onCancel={onCancel} />)
-    fireEvent.click(screen.getByText(/Cancel/i))
-    expect(onCancel).toHaveBeenCalledOnce()
+  it('passes the edited document to onSave', () => {
+    const { container, onSave } = renderEditor(makeBlock())
+    replaceDocument(container, 'my custom edit')
+    fireEvent.click(screen.getByRole('button', { name: /Save/i }))
+    expect(onSave).toHaveBeenCalledWith('my custom edit')
   })
 
-  it('does not call onSave when Cancel clicked', () => {
-    const onSave = vi.fn()
-    render(<ManualEditor block={makeBlock() as never} onSave={onSave} onCancel={vi.fn()} />)
+  it('disables save while the document is blank and re-enables it after typing', () => {
+    const { container } = renderEditor(makeBlock())
+    const save = screen.getByRole('button', { name: /Save/i }) as HTMLButtonElement
+    replaceDocument(container, '   \n')
+    expect(save.disabled).toBe(true)
+    replaceDocument(container, 'x')
+    expect(save.disabled).toBe(false)
+  })
+
+  it('shows the line count of the edited document', () => {
+    const { container } = renderEditor(makeBlock())
+    replaceDocument(container, 'a\nb\nc')
+    expect(screen.getByText('3 lines')).toBeTruthy()
+  })
+
+  it('calls onCancel, and not onSave, when Cancel is clicked', () => {
+    const { onSave, onCancel } = renderEditor(makeBlock())
     fireEvent.click(screen.getByText(/Cancel/i))
+    expect(onCancel).toHaveBeenCalledOnce()
     expect(onSave).not.toHaveBeenCalled()
   })
 
-  it('pre-populates with resolvedText when block is already resolved', () => {
-    const block = makeBlock({ isResolved: true, resolvedText: 'previously resolved text' })
-    render(<ManualEditor block={block as never} onSave={vi.fn()} onCancel={vi.fn()} />)
-    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
-    expect(textarea.value).toBe('previously resolved text')
+  it('replaces the document when a suggested text arrives', () => {
+    const block = makeBlock()
+    const { container, rerender, onSave } = renderEditor(block, { suggestedText: null })
+    rerender(
+      <ManualEditor
+        block={block as never}
+        onSave={onSave}
+        onCancel={vi.fn()}
+        suggestedText="kept mine"
+      />
+    )
+    expect(documentText(container)).toBe('kept mine')
+  })
+
+  it.each([
+    ['src/foo.ts#0', 'TypeScript'],
+    ['src/foo.js#0', 'JavaScript'],
+    ['README.md#0', 'Plain text'],
+  ])('labels %s as %s', (blockId, label) => {
+    renderEditor(makeBlock({ blockId }))
+    expect(screen.getByText(label)).toBeTruthy()
   })
 })

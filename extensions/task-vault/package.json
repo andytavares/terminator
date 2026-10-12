@@ -2,7 +2,7 @@
   "name": "@terminator/extension-task-vault",
   "version": "0.1.0",
   "private": true,
-  "description": "Task Vault: GTD+BuJo+PARA daily productivity system backed by SQLite",
+  "description": "Task Vault: GTD+BuJo+PARA daily productivity system backed by the shared PGlite database",
   "scripts": {
     "build:renderer": "vite build --config vite.renderer.config.ts"
   },

@@ -796,30 +796,13 @@ export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
   }
 }
 
-// ─── Force-push changed-file detection ───────────────────────────────────────
+// ─── Chapter risk ─────────────────────────────────────────────────────────────
 
 export function chapterRiskLevel(chapter: Chapter): 'low' | 'medium' | 'high' {
   const scoreable = chapter.files.filter((f) => f.tier !== 3)
   if (scoreable.some((f) => f.riskScore.level === 'high')) return 'high'
   if (scoreable.some((f) => f.riskScore.level === 'medium')) return 'medium'
   return 'low'
-}
-
-export function detectChangedFiles(
-  oldFiles: PrChangedFile[],
-  newFiles: PrChangedFile[]
-): Set<string> {
-  const oldMap = new Map(oldFiles.map((f) => [f.path, f]))
-  const changed = new Set<string>()
-  for (const newFile of newFiles) {
-    const old = oldMap.get(newFile.path)
-    if (!old) {
-      changed.add(newFile.path)
-    } else if (old.additions !== newFile.additions || old.deletions !== newFile.deletions) {
-      changed.add(newFile.path)
-    }
-  }
-  return changed
 }
 
 // ─── Hunk classification (formatting vs semantic) ─────────────────────────────

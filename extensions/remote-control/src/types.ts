@@ -1,4 +1,4 @@
-export type SessionOrigin = 'app' | 'remote'
+type SessionOrigin = 'app' | 'remote'
 
 export interface SpawnSessionOptions {
   sessionId: string

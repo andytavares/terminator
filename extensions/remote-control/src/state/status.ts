@@ -8,13 +8,9 @@
  * every transition is testable without a server.
  */
 
-export type FailureReason =
-  | 'port-in-use'
-  | 'credential-rejected'
-  | 'tunnel-dropped'
-  | 'tunnel-unreachable'
+type FailureReason = 'port-in-use' | 'credential-rejected' | 'tunnel-dropped' | 'tunnel-unreachable'
 
-export interface RemoteFailure {
+interface RemoteFailure {
   reason: FailureReason
   /** What happened, in the reader's language. */
   message: string
@@ -40,7 +36,7 @@ export type RemoteStatus =
   | { kind: 'failed'; port: number; failure: RemoteFailure }
 
 /** The shape `remote:status` arrives in. Every field is optional by history. */
-export interface StatusBroadcast {
+interface StatusBroadcast {
   enabled?: boolean
   port?: number
   lanUrl?: string | null
@@ -128,11 +124,6 @@ export function tunnelDropped(previous: RemoteStatus): RemoteStatus {
         'Anyone connected through it has been disconnected. Turn it off and on to get a new one.',
     },
   }
-}
-
-/** True when this status can serve a browser at all. */
-export function isReachable(status: RemoteStatus): boolean {
-  return status.kind === 'on'
 }
 
 function portOf(status: RemoteStatus): number | null {

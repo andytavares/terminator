@@ -115,30 +115,6 @@ export function activate(api: ExtensionAPI): void {
     },
   })
 
-  // Cross-iframe broadcast: any extension view can invoke this to open the
-  // merge-flow view in the GitFullView iframe (which lives in a separate iframe context).
-  disposables.push(
-    api.ipc.registerHandler('git:request-merge-flow', (payload) => {
-      const { repoRoot } = (payload ?? {}) as { repoRoot?: string }
-      api.window.broadcast('git:merge-flow-open', { repoRoot: repoRoot ?? '' })
-      return { ok: true }
-    })
-  )
-
-  // Same bridge shape, for bringing the Git project tab forward when a file is
-  // picked in the sidebar panel. The panel used to do this by importing the
-  // core renderer's registry and calling setActiveProjectTab — but the panel is
-  // an isolated webview, so that import bundled a second copy of the store and
-  // the call moved nothing. `extension:select-project-tab` is the channel the
-  // host actually listens on.
-  disposables.push(
-    api.ipc.registerHandler('git:focus-project-tab', (payload) => {
-      const { tabId } = (payload ?? {}) as { tabId?: string }
-      api.window.broadcast('extension:select-project-tab', { tabId: tabId ?? 'git' })
-      return { ok: true }
-    })
-  )
-
   disposables.push(...registerReviewSettings(api))
 
   // Bridges this extension's renderer (an isolated webview, no direct access to

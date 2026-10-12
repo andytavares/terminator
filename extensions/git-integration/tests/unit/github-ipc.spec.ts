@@ -27,7 +27,6 @@ vi.mock('fs/promises', () => ({
 
 // ── import after mocks ────────────────────────────────────────────────────────
 
-import { readFile } from 'fs/promises'
 import { homedir } from 'os'
 import ElectronStore from 'electron-store'
 import { registerGithubHandlers } from '../../src/ipc/github.ipc'
@@ -1142,107 +1141,6 @@ describe('github:list-open-prs', () => {
   })
 })
 
-describe('github:file-metrics', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
-
-  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const result = (await handlers['github:file-metrics']({ path: 'src/foo.ts' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns file metrics for a regular source file', async () => {
-    mockGitSuccess('abc1234 fix bug\ndef5678 refactor\n') // git log (churn)
-    mockGitSuccess('src/bar.ts\n') // git grep (importers)
-    mockGitSuccess('src/foo.spec.ts\n') // git ls-files (test file check)
-
-    const result = (await handlers['github:file-metrics']({
-      repoRoot: '/repo',
-      path: 'src/foo.ts',
-    })) as Record<string, unknown>
-    expect(result.churn90d).toBe(2)
-    expect(result.blastRadius).toBe(1) // bar.ts imports foo.ts
-    expect(result.testFilePresent).toBe(true)
-  })
-
-  it('returns testFilePresent=true for a test file itself', async () => {
-    mockGitSuccess('') // git log (churn)
-    mockGitSuccess('') // git grep (importers)
-    // No third call needed because isTestFile = true
-
-    const result = (await handlers['github:file-metrics']({
-      repoRoot: '/repo',
-      path: 'src/foo.spec.ts',
-    })) as Record<string, unknown>
-    expect(result.testFilePresent).toBe(true)
-  })
-
-  it('returns error when git commands fail', async () => {
-    // All three parallel git calls fail
-    mockGitFailure('not a git repo')
-    mockGitFailure('not a git repo')
-    mockGitFailure('not a git repo')
-
-    const result = (await handlers['github:file-metrics']({
-      repoRoot: '/repo',
-      path: 'src/foo.ts',
-    })) as { error: string }
-    expect(result.error).toBeDefined()
-  })
-
-  it('reads coveragePct from Istanbul coverage-summary.json when present', async () => {
-    const summary = { 'src/foo.ts': { lines: { pct: 87.5 } } }
-    vi.mocked(readFile).mockResolvedValueOnce(JSON.stringify(summary) as unknown as Buffer)
-    mockGitSuccess('abc1234 fix\n') // churn
-    mockGitSuccess('') // importers
-    mockGitSuccess('') // test file check
-
-    const result = (await handlers['github:file-metrics']({
-      repoRoot: '/repo',
-      path: 'src/foo.ts',
-    })) as Record<string, unknown>
-    expect(result.patchCoverage).toBe(88)
-  })
-
-  it('reads coveragePct from lcov.info when coverage-summary.json is absent', async () => {
-    vi.mocked(readFile)
-      .mockRejectedValueOnce(new Error('no summary')) // coverage-summary.json fails
-      .mockResolvedValueOnce(
-        // lcov.info succeeds
-        'SF:src/foo.ts\nLF:100\nLH:75\nend_of_record\n' as unknown as Buffer
-      )
-    mockGitSuccess('') // churn
-    mockGitSuccess('') // importers
-    mockGitSuccess('') // test file check
-
-    const result = (await handlers['github:file-metrics']({
-      repoRoot: '/repo',
-      path: 'src/foo.ts',
-    })) as Record<string, unknown>
-    expect(result.patchCoverage).toBe(75)
-  })
-
-  it('uses partial key match in coverage-summary.json', async () => {
-    const summary = { '/absolute/path/src/foo.ts': { lines: { pct: 60 } } }
-    vi.mocked(readFile).mockResolvedValueOnce(JSON.stringify(summary) as unknown as Buffer)
-    mockGitSuccess('') // churn
-    mockGitSuccess('') // importers
-    mockGitSuccess('') // test file check
-
-    const result = (await handlers['github:file-metrics']({
-      repoRoot: '/repo',
-      path: 'src/foo.ts',
-    })) as Record<string, unknown>
-    expect(result.patchCoverage).toBe(60)
-  })
-})
-
 describe('github:pr-inline-comments', () => {
   let handlers: Record<string, Handler>
 
@@ -1337,86 +1235,6 @@ describe('github:pr-inline-comments', () => {
       prNumber: 6,
     })) as { error: string }
     expect(result.error).toBe('NOT_AUTHENTICATED')
-  })
-})
-
-describe('github:pr-comment-add', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
-
-  it('returns VALIDATION_ERROR for missing required fields', async () => {
-    const result = (await handlers['github:pr-comment-add']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('posts a comment without startLine', async () => {
-    const comment = {
-      id: 100,
-      user: { login: 'alice', avatar_url: '' },
-      body: 'LGTM',
-      created_at: '2025-01-01T00:00:00Z',
-      updated_at: '2025-01-01T00:00:00Z',
-      path: 'src/foo.ts',
-      line: 5,
-      start_line: null,
-      side: 'RIGHT',
-      diff_hunk: '',
-      in_reply_to_id: null,
-      pull_request_review_id: 1,
-    }
-    mockGitSuccess(JSON.stringify(comment))
-
-    const result = (await handlers['github:pr-comment-add']({
-      repoRoot: '/repo',
-      prNumber: 6,
-      commitId: 'abc123',
-      path: 'src/foo.ts',
-      line: 5,
-      side: 'RIGHT',
-      body: 'LGTM',
-    })) as { comment: { id: number } }
-    expect(result.comment.id).toBe(100)
-  })
-
-  it('posts a comment with startLine for multi-line comment', async () => {
-    const comment = {
-      id: 101,
-      user: { login: 'alice', avatar_url: '' },
-      body: 'Multi-line',
-      created_at: '2025-01-01T00:00:00Z',
-      updated_at: '2025-01-01T00:00:00Z',
-      path: 'src/foo.ts',
-      line: 10,
-      start_line: 5,
-      side: 'RIGHT',
-      diff_hunk: '',
-      in_reply_to_id: null,
-      pull_request_review_id: 1,
-    }
-    mockGitSuccess(JSON.stringify(comment))
-
-    const result = (await handlers['github:pr-comment-add']({
-      repoRoot: '/repo',
-      prNumber: 6,
-      commitId: 'abc123',
-      path: 'src/foo.ts',
-      line: 10,
-      startLine: 5,
-      side: 'RIGHT',
-      body: 'Multi-line',
-    })) as { comment: { id: number } }
-    expect(result.comment.id).toBe(101)
-
-    // Verify start_line and start_side args were included
-    const args: string[] = mockExecFile.mock.calls[0][1]
-    expect(args).toContain('start_line=5')
   })
 })
 
@@ -2114,41 +1932,6 @@ describe('github:current-user', () => {
     expect(result.login).toBe('carol')
     // The first execFile call must have received the configured path as the command
     expect(mockExecFile.mock.calls[0][0]).toBe('/usr/local/bin/gh')
-  })
-})
-
-describe('github:file-cochange', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
-
-  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const result = (await handlers['github:file-cochange']({ files: ['a.ts'] })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR for empty files array', async () => {
-    const result = (await handlers['github:file-cochange']({
-      repoRoot: '/repo',
-      files: [],
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns affinity map on success', async () => {
-    // computeCoChangeAffinityFromGit calls git log — mock empty output (no cochange history)
-    mockGitSuccess('')
-    const result = (await handlers['github:file-cochange']({
-      repoRoot: '/repo',
-      files: ['src/foo.ts'],
-    })) as { affinity: Record<string, number> }
-    expect(result.affinity).toBeDefined()
-    expect(typeof result.affinity).toBe('object')
   })
 })
 
@@ -2940,26 +2723,6 @@ describe('gh: pseudo-root (uncloned repo)', () => {
     expect(result.diff.hunks[0].lines.map((l) => l.type)).toEqual(['remove', 'add'])
     expect(result.diff.hunks[0].lines[1].content).toContain('s.specs.concat(s.hooks)')
   })
-
-  it('github:file-metrics returns nulls/empty without spawning git for a gh: root', async () => {
-    const result = (await handlers['github:file-metrics']({
-      repoRoot: 'gh:acme/widgets',
-      path: 'src/foo.ts',
-    })) as { churn90d: number; blastRadius: number; patchCoverage: number | null }
-    expect(mockExecFile).not.toHaveBeenCalled()
-    expect(result.churn90d).toBe(0)
-    expect(result.blastRadius).toBe(0)
-    expect(result.patchCoverage).toBeNull()
-  })
-
-  it('github:file-cochange returns an empty affinity map for a gh: root', async () => {
-    const result = (await handlers['github:file-cochange']({
-      repoRoot: 'gh:acme/widgets',
-      files: ['src/foo.ts', 'src/bar.ts'],
-    })) as { affinity: Record<string, unknown> }
-    expect(mockExecFile).not.toHaveBeenCalled()
-    expect(result.affinity).toEqual({})
-  })
 })
 
 // ── repeated-work removal ─────────────────────────────────────────────────────
@@ -2988,10 +2751,10 @@ describe('handler timing', () => {
   it('logs each handler with its duration and passes the result through', async () => {
     const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
     const handlers = captureHandlers()
-    const result = await handlers['github:file-metrics']({ path: 'src/foo.ts' })
+    const result = await handlers['github:files-metrics']({ paths: 'src/foo.ts' })
     expect(result).toEqual({ error: 'VALIDATION_ERROR' })
     expect(debug).toHaveBeenCalledWith(
-      expect.stringMatching(/^\[git-integration\] github:file-metrics \d+ms$/)
+      expect.stringMatching(/^\[git-integration\] github:files-metrics \d+ms$/)
     )
     debug.mockRestore()
   })
@@ -3160,19 +2923,15 @@ describe('github:files-metrics', () => {
     handlers = captureHandlers()
   })
 
-  it('returns what github:file-metrics returns for each path', async () => {
+  it('reports churn, importers and test presence for each path', async () => {
     routeExec(fakeGit)
     const paths = Object.keys(REPO_FILES)
 
-    const perFile: Record<string, unknown> = {}
-    for (const path of paths) {
-      perFile[path] = await handlers['github:file-metrics']({ repoRoot: '/repo', path })
-    }
     const batch = (await handlers['github:files-metrics']({ repoRoot: '/repo', paths })) as {
       metrics: Record<string, unknown>
     }
 
-    expect(batch.metrics).toEqual(perFile)
+    expect(Object.keys(batch.metrics).sort()).toEqual([...paths].sort())
     expect(batch.metrics['src/a.ts']).toMatchObject({
       churn90d: 2,
       importerCount: 3,

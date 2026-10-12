@@ -46,35 +46,6 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
     }
   })
 
-  // git:conflict-blocks
-  register('git:conflict-blocks', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      filePath: z.string().min(1),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      const { repoRoot, filePath } = parsed.data
-      const [baseContent, oursContent, theirsContent, workingTree] = await Promise.all([
-        git(['show', `:1:${filePath}`], repoRoot).catch(() => ''),
-        git(['show', `:2:${filePath}`], repoRoot).catch(() => ''),
-        git(['show', `:3:${filePath}`], repoRoot).catch(() => ''),
-        readFile(`${repoRoot}/${filePath}`, 'utf-8').catch(() => ''),
-      ])
-      const blocks = readConflictBlocks(
-        filePath,
-        workingTree,
-        baseContent,
-        oursContent,
-        theirsContent
-      )
-      return { blocks }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
   // git:resolve-conflict
   register('git:resolve-conflict', async (payload) => {
     const schema = z.object({
@@ -271,53 +242,6 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
       await git(['worktree', 'remove', '--force', worktreePath], repoRoot).catch(() => {})
       return { error: String(e) }
     }
-  })
-
-  // git:prepare-merge-for-pr
-  // Fetches the PR branch, checks it out, and runs git merge <base> to create
-  // local conflict state so the merge-flow view can detect and resolve them.
-  register('git:prepare-merge-for-pr', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      headRefName: z.string().min(1),
-      baseRefName: z.string().min(1),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { repoRoot, headRefName, baseRefName } = parsed.data
-    try {
-      await git(['fetch', 'origin'], repoRoot)
-      await git(['checkout', headRefName], repoRoot)
-      try {
-        await git(['merge', `origin/${baseRefName}`], repoRoot)
-        // Clean merge — no conflicts
-        return { hasConflicts: false }
-      } catch {
-        // git merge exits non-zero when conflicts exist — that is the expected path
-        const conflicted = await listConflictedFiles(repoRoot).catch(() => [])
-        if (conflicted.length > 0) return { hasConflicts: true }
-        // merge failed for a non-conflict reason (permissions, etc.)
-        return { error: 'Merge failed with no conflict markers — check git status.' }
-      }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  // git:merge-ai-suggest (stub — Phase 3)
-  register('git:merge-ai-suggest', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      blockId: z.string().min(1),
-      baseText: z.string(),
-      oursText: z.string(),
-      theirsText: z.string(),
-      contextBefore: z.array(z.string()),
-      contextAfter: z.array(z.string()),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    return { error: 'NOT_IMPLEMENTED' }
   })
 
   // git:session-restore

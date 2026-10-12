@@ -782,12 +782,12 @@ This alias layer allows the core design system to evolve (rename, restructure to
 
 ## Task Vault Extension Architecture
 
-The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA productivity system. Markdown files are the human-editable source of truth for daily logs; the shared **PGlite (PostgreSQL-compatible WASM)** database is the primary datastore for all structured queries and CRUD. Key subsystems:
+The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA productivity system. The shared **PGlite (PostgreSQL-compatible WASM)** database is the datastore for all structured queries and CRUD. Key subsystems:
 
 ### Vault Layer (`src/vault/`)
 
 - **db.ts** — Defines the `settings`, `tasks`, `projects`, `areas`, and `links` schema via `applyTaskVaultSchema()`, and manages incremental schema upgrades via `applyTaskVaultMigrations()`. All IPC handlers receive the shared `ExtensionDB` instance (injected by the main-process extension API) and access data exclusively through it. Runs `backfillRecurringTasks` on startup to gap-fill any missing future occurrences. **Note**: an upcoming migration will add `extension_id TEXT NOT NULL` to `settings` and enforce `PRIMARY KEY (extension_id, key)` for namespace isolation across extensions.
-- **recurrence.ts** — `RecurrenceRule` discriminated union, `parseRecurrenceRule` (throws `InvalidRecurrenceRuleError` on unknown input), `serializeRecurrenceRule`, and `computeNextDueDate` (strict mode: next date = previous + interval, never completion date). Also exports `localDate()` helper.
+- **recurrence.ts** — `RecurrenceRule` discriminated union, `parseRecurrenceRule` (throws `InvalidRecurrenceRuleError` on unknown input), and `computeNextDueDate` (strict mode: next date = previous + interval, never completion date). Also exports `localDate()` helper.
 - **ensure-next-occurrence.ts** — `ensureNextOccurrence(db, taskId)`: idempotent function that checks whether a future `status='open'` instance already exists and inserts one if not. `backfillRecurringTasks(db)`: called at extension startup to handle days the app was closed.
 - **tags.ts** — Utilities for extracting and normalising `@context`, `+project`, `#area`, and `due:` inline tags from task text.
 - **types.ts** — `TaskStatus`, `IndexedTask`, `IndexedProject`, `KanbanConfig`, and other shared TypeScript types used by both the IPC layer and renderer components.
@@ -861,18 +861,14 @@ All registered in `extensions/git-integration/src/ipc/merge-flow.ipc.ts` and doc
 
 ### New Files
 
-| File                               | Purpose                                                                                                                                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/schemas/merge-flow.schema.ts` | Zod schemas for all MergeFlow data entities                                                                                                                                                 |
-| `src/git/conflict-reader.ts`       | Git subprocess helpers: conflict block parsing, REBASE_HEAD detection, author info                                                                                                          |
-| `src/ipc/merge-flow.ipc.ts`        | IPC handler registration (9 channels)                                                                                                                                                       |
-| `src/api/merge-flow.ts`            | Renderer bridge (extensionBridge wrappers)                                                                                                                                                  |
-| `src/stores/merge-flow.store.ts`   | Zustand store: session state, navigation, undo stack, modal state                                                                                                                           |
-| `src/components/merge-flow/*.tsx`  | UI components: MergeFlowView, ConflictHub, ConflictResolver, ConflictHeader, ConflictPanel, ResultPreviewStrip, ActionBar, KeepBothModal, ManualEditor, AiSuggestionPanel, CompletionScreen |
-
-### AI Suggestion
-
-`git:merge-ai-suggest` is stubbed to return `{ error: 'NOT_IMPLEMENTED' }` in this feature scope (Phase 3 PRD work). The channel contract is locked for future implementation.
+| File                               | Purpose                                                                                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/schemas/merge-flow.schema.ts` | Zod schemas for all MergeFlow data entities                                                                                                                              |
+| `src/git/conflict-reader.ts`       | Git subprocess helpers: conflict block parsing, REBASE_HEAD detection, author info                                                                                       |
+| `src/ipc/merge-flow.ipc.ts`        | IPC handler registration (9 channels)                                                                                                                                    |
+| `src/api/merge-flow.ts`            | Renderer bridge (extensionBridge wrappers)                                                                                                                               |
+| `src/stores/merge-flow.store.ts`   | Zustand store: session state, navigation, undo stack, modal state                                                                                                        |
+| `src/components/merge-flow/*.tsx`  | UI components: MergeFlowView, ConflictHub, ConflictResolver, ConflictHeader, ConflictPanel, ResultPreviewStrip, ActionBar, KeepBothModal, ManualEditor, CompletionScreen |
 
 ---
 

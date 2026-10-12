@@ -21,7 +21,5 @@ export const gitAPI = {
 
   prStatus: (repoRoot: string) => bridge().invoke('git:pr-status', { repoRoot }),
 
-  prCreate: (payload: unknown) => bridge().invoke('git:pr-create', payload),
-
   push: (repoRoot: string) => bridge().invoke('git:push', { repoRoot }),
 }

@@ -67,14 +67,11 @@ extensions/git-integration/
 │   │   └── PrDialog.tsx         # Pull request creation dialog
 │   ├── git/
 │   │   └── git-parser.ts        # Pure parsers: parseStatus, parseDiff
-│   ├── github/
-│   │   └── gh-service.ts        # gh CLI wrapper via api.shell.exec
 │   └── stores/
 │       └── git.store.ts         # Zustand store: status, selectedFile, diffCache
 └── tests/
     └── unit/
-        ├── git-parser.spec.ts
-        └── gh-service.spec.ts
+        └── git-parser.spec.ts
 ```
 
 ### Main process vs renderer split

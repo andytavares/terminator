@@ -288,7 +288,7 @@ input[type='radio']:focus-visible { outline: 2px solid var(--tm-accent-glow); ou
 input[type='radio']:disabled { cursor: default; opacity: 0.4; }
 `
 
-export interface RemoteServerDeps {
+interface RemoteServerDeps {
   getPasswordHash: () => string
   getMaxSubscribers: () => number
   listWorkspaces: () => WorkspaceSnapshot[]
@@ -300,7 +300,7 @@ export interface RemoteServerDeps {
   onPortInUse: (port: number) => void
 }
 
-export interface RemoteServerOptions {
+interface RemoteServerOptions {
   port: number
   ptyManager: PtyManagerAPI
   deps: RemoteServerDeps

@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  OFF,
-  isReachable,
-  reduceStatus,
-  tunnelDropped,
-  type RemoteStatus,
-} from '../../src/state/status'
+import { OFF, reduceStatus, tunnelDropped, type RemoteStatus } from '../../src/state/status'
 
 // The old view rendered a settings form and could not say whether Remote Control
 // was on, at what address, or why it had failed — even though the main process
@@ -145,15 +139,5 @@ describe('tunnelDropped', () => {
 
   it('leaves a status that was never on alone', () => {
     expect(tunnelDropped(OFF)).toBe(OFF)
-  })
-})
-
-describe('isReachable', () => {
-  it.each([
-    [OFF, false],
-    [{ kind: 'starting', port: 7681 } as RemoteStatus, false],
-    [ON, true],
-  ])('reports %o as %s', (status, expected) => {
-    expect(isReachable(status as RemoteStatus)).toBe(expected)
   })
 })

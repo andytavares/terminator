@@ -53,14 +53,6 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     ? (diffCache.get(diffCacheKey(selectedFile, selectedStaged)) ?? null)
     : null
 
-  // Listen for cross-iframe broadcast (from sidebar or PR review) requesting merge-flow view.
-  useEffect(() => {
-    return window.electronAPI.extensionBridge.on('git:merge-flow-open', (data) => {
-      const { repoRoot: targetRoot } = (data ?? {}) as { repoRoot?: string }
-      if (!targetRoot || targetRoot === repoRoot) setView('merge-flow')
-    })
-  }, [repoRoot, setView])
-
   // Quick action "Commit…" (extensions/git-integration/src/commands.ts) brings this
   // view forward via api.window.showSelf, then broadcasts this to focus the box.
   useEffect(() => {

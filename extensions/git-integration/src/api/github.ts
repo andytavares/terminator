@@ -28,9 +28,6 @@ export const githubAPI = {
   prFileContent: (repoRoot: string, prNumber: number, path: string, ref: string) =>
     bridge().invoke('github:pr-file-content', { repoRoot, prNumber, path, ref }),
 
-  fileMetrics: (repoRoot: string, path: string) =>
-    bridge().invoke('github:file-metrics', { repoRoot, path }),
-
   filesMetrics: (repoRoot: string, paths: string[]) =>
     bridge().invoke('github:files-metrics', { repoRoot, paths }),
 
@@ -42,8 +39,6 @@ export const githubAPI = {
 
   prIssueCommentAdd: (payload: { repoRoot: string; prNumber: number; body: string }) =>
     bridge().invoke('github:pr-issue-comment-add', payload),
-
-  prCommentAdd: (payload: unknown) => bridge().invoke('github:pr-comment-add', payload),
 
   prCommentReply: (payload: unknown) => bridge().invoke('github:pr-comment-reply', payload),
 
@@ -67,9 +62,6 @@ export const githubAPI = {
 
   pruneActiveReviews: (repoRoot: string, prNumbers: number[]) =>
     bridge().invoke('github:prune-active-reviews', { repoRoot, prNumbers }),
-
-  fileCoChange: (repoRoot: string, files: string[]) =>
-    bridge().invoke('github:file-cochange', { repoRoot, files }),
 
   dashboardSearch: () => bridge().invoke('github:dashboard-search', {}),
 

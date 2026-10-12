@@ -34,14 +34,6 @@ export function parseRecurrenceRule(raw: string): RecurrenceRule {
   throw new InvalidRecurrenceRuleError(raw)
 }
 
-/** Serialise a RecurrenceRule back to its column string representation. */
-export function serializeRecurrenceRule(rule: RecurrenceRule): string {
-  if (rule.kind === 'weekly') {
-    return rule.days.length > 0 ? `weekly:${rule.days.sort((a, b) => a - b).join(',')}` : 'weekly'
-  }
-  return rule.kind
-}
-
 /** Compute the next due date after fromDate using strict recurrence (next occurrence
  *  is always based on fromDate + interval, never on completion date). */
 export function computeNextDueDate(fromDate: string, rule: RecurrenceRule): string {

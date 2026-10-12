@@ -54,15 +54,6 @@ describe('githubAPI bridge', () => {
     })
   })
 
-  it('fileMetrics calls correct channel', async () => {
-    const { githubAPI } = await import('../../src/api/github')
-    await githubAPI.fileMetrics('/repo', 'src/bar.ts')
-    expect(mockInvoke).toHaveBeenCalledWith('github:file-metrics', {
-      repoRoot: '/repo',
-      path: 'src/bar.ts',
-    })
-  })
-
   it('prInlineComments calls correct channel', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.prInlineComments('/repo', 7)
@@ -70,13 +61,6 @@ describe('githubAPI bridge', () => {
       repoRoot: '/repo',
       prNumber: 7,
     })
-  })
-
-  it('prCommentAdd calls correct channel', async () => {
-    const { githubAPI } = await import('../../src/api/github')
-    const payload = { body: 'LGTM', prNumber: 1 }
-    await githubAPI.prCommentAdd(payload)
-    expect(mockInvoke).toHaveBeenCalledWith('github:pr-comment-add', payload)
   })
 
   it('prCommentReply calls correct channel', async () => {
@@ -179,16 +163,6 @@ describe('githubAPI bridge', () => {
     expect(mockInvoke).toHaveBeenCalledWith('github:pr-update-branch', {
       repoRoot: '/repo',
       prNumber: 42,
-    })
-  })
-
-  it('fileCoChange calls correct channel', async () => {
-    const { githubAPI } = await import('../../src/api/github')
-    const files = ['src/a.ts', 'src/b.ts']
-    await githubAPI.fileCoChange('/repo', files)
-    expect(mockInvoke).toHaveBeenCalledWith('github:file-cochange', {
-      repoRoot: '/repo',
-      files,
     })
   })
 

@@ -1322,10 +1322,6 @@ registry.registerKeyboardShortcut({
 })
 ```
 
-### MCP Sidecar Pattern
-
-Extensions can ship a standalone MCP stdio server. See ADR-013. The server reads `TASK_VAULT_PATH` from environment and registers tools via `@modelcontextprotocol/sdk`. Users configure it in their MCP client (Claude Desktop, etc.) pointing to the compiled `src/mcp/server.js` within the extension directory.
-
 ---
 
 ## Renderer UI
