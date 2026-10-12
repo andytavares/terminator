@@ -732,7 +732,12 @@ changes run through one queue, so two at once (a field's blur and a Disconnect c
 channel against stub Linear and Jira at their real addresses: the app runs with
 `NODE_USE_ENV_PROXY=1`, `HTTPS_PROXY` naming a local proxy and `NODE_EXTRA_CA_CERTS` naming a CA made
 for the run, so Node's fetch tunnels to `tests/e2e/tracker-stub.ts`, which answers TLS itself and
-refuses every other host.
+refuses every other host. Verification stays on. The CA and the leaf certificate are made with
+`openssl x509 -req -extfile` and an explicit extension list, so no openssl.cnf default can add a
+second copy of an extension. macOS ships LibreSSL's config, Linux ships OpenSSL's. The leaf's
+SANs name both hosts, it has `extendedKeyUsage=serverAuth`, and its key identifiers link it to the CA.
+The stub records every CONNECT and TLS error, and the spec prints them when a tracker fails to
+connect. `close()` destroys the open tunnels, so a failed test cannot hold up `afterAll`.
 
 ---
 

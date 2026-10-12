@@ -76,7 +76,12 @@ export async function startGithubStub(options: GithubStubOptions): Promise<Githu
     calls,
     openPullRequest: (input) => addPullRequest(context, input),
     pullRequest: (number) => findPullRequest(context, number),
-    close: () => new Promise((resolve) => server.close(() => resolve())),
+    // Drops idle and in-flight connections first, so a call the app left
+    // open when a test failed cannot keep close() pending.
+    close: () => {
+      server.closeAllConnections()
+      return new Promise((resolve) => server.close(() => resolve()))
+    },
   }
 }
 
