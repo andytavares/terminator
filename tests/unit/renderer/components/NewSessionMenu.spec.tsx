@@ -2,21 +2,13 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import type { Project, Workspace } from '../../../../src/shared/types/index'
-
-const workspace = vi.hoisted(() => ({
-  workspaces: [] as Workspace[],
-  projectsByWorkspaceId: new Map<string, Project[]>(),
-}))
-
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: (select: (s: unknown) => unknown) => select(workspace),
-}))
-
 import { NewSessionMenu } from '../../../../src/renderer/components/session/NewSessionMenu'
+import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { projectOf, seedStore, workspaceOf } from '../../../support/renderer-stores'
 
-const repo = (id: string, name: string): Workspace => ({ id, name }) as Workspace
+const repo = (id: string, name: string): Workspace => workspaceOf({ id, name })
 const branch = (id: string, workspaceId: string, name: string): Project =>
-  ({ id, workspaceId, name }) as Project
+  projectOf({ id, workspaceId, name })
 
 let onBranch: ReturnType<typeof vi.fn>
 let onScratch: ReturnType<typeof vi.fn>
@@ -30,11 +22,13 @@ beforeEach(() => {
   vi.clearAllMocks()
   onBranch = vi.fn()
   onScratch = vi.fn()
-  workspace.workspaces = [repo('w1', 'terminator'), repo('w2', 'northwind')]
-  workspace.projectsByWorkspaceId = new Map([
-    ['w1', [branch('p1', 'w1', 'main'), branch('p2', 'w1', 'session-home')]],
-    ['w2', [branch('p3', 'w2', 'rate-limits')]],
-  ])
+  seedStore(useWorkspaceStore, {
+    workspaces: [repo('w1', 'terminator'), repo('w2', 'northwind')],
+    projectsByWorkspaceId: new Map([
+      ['w1', [branch('p1', 'w1', 'main'), branch('p2', 'w1', 'session-home')]],
+      ['w2', [branch('p3', 'w2', 'rate-limits')]],
+    ]),
+  })
 })
 
 describe('NewSessionMenu', () => {
@@ -74,8 +68,7 @@ describe('NewSessionMenu', () => {
   })
 
   it('offers a scratch terminal even with no repos at all', () => {
-    workspace.workspaces = []
-    workspace.projectsByWorkspaceId = new Map()
+    seedStore(useWorkspaceStore, { workspaces: [], projectsByWorkspaceId: new Map() })
     open()
     const menu = screen.getByRole('menu', { name: 'Start a terminal' })
     expect(within(menu).getAllByRole('menuitem')).toHaveLength(1)

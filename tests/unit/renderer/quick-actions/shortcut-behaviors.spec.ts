@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const sessions = new Map<string, Record<string, unknown>>()
+const sessions = new Map<string, TerminalSession>()
 const setActiveProject = vi.fn()
 const dispatchNotification = vi.fn()
 const requestFocus = vi.fn()
@@ -10,12 +10,6 @@ const registry = {
   setActiveProjectTab: vi.fn(),
 }
 
-vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: { getState: () => ({ sessions, requestFocus }) },
-}))
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: { getState: () => ({ setActiveProject }) },
-}))
 vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: { getState: () => registry },
 }))
@@ -32,11 +26,15 @@ import {
   splitPane,
   closeFocusedPane,
 } from '../../../../src/renderer/quick-actions/shortcut-behaviors'
+import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import type { TerminalSession } from '../../../../src/shared/types/index'
+import { seedStore, terminalSessionOf } from '../../../support/renderer-stores'
 
 const input = vi.fn()
 
-function addSession(id: string, projectId: string, extra: Record<string, unknown> = {}): void {
-  sessions.set(id, { id, projectId, status: 'running', agentState: 'idle', ...extra })
+function addSession(id: string, projectId: string, extra: Partial<TerminalSession> = {}): void {
+  sessions.set(id, terminalSessionOf({ id, projectId, ...extra }))
 }
 
 function navDeps(activeId: string | null = null) {
@@ -49,6 +47,8 @@ function navDeps(activeId: string | null = null) {
 beforeEach(() => {
   sessions.clear()
   vi.clearAllMocks()
+  seedStore(useSessionStore, { sessions, requestFocus })
+  seedStore(useWorkspaceStore, { setActiveProject })
   ;(globalThis as unknown as { window: unknown }).window = globalThis
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = { terminal: { input } }
 })
