@@ -104,6 +104,7 @@ const noIssues = (): ExtensionAPI['issues'] =>
 
 /** A host whose records location is `dataDir()` and which has nothing connected. */
 export function fakeHost(dataDir: () => string): FoundryHost {
+  const userData = temporaryDirectory('foundry-user-data')
   const handlers = new Map<string, ChannelSpec>()
   const settings = new Map<string, unknown>()
   const commands = new Map<string, () => void>()
@@ -146,15 +147,20 @@ export function fakeHost(dataDir: () => string): FoundryHost {
       register: vi.fn(disposable),
       get: (key: string) => (key === 'terminator.foundry.dataDir' ? dataDir() : settings.get(key)),
       set: (key: string, value: unknown) => settings.set(key, value),
-      isBranchExcluded: () => false,
+      isBranchExcluded: async () => false,
     },
     workspace: {
       list: () => workspaces,
       listProjects: () => [],
-      createProject: vi.fn(() => null),
+      addProject: vi.fn(async () => null),
       deleteProject: vi.fn(),
     },
     issues,
+    // Foundry's fallback records location sits under userData; give it a
+    // throw-away one, beside the records location the spec chose.
+    // Foundry keeps its runtime state under userData: a throw-away one per
+    // host, so a spec never writes it into the working tree.
+    paths: { app: path.resolve(__dirname, '../..'), userData },
     app: { version: '0.0.0-test' },
   } as unknown as ExtensionAPI
 

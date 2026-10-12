@@ -20,10 +20,8 @@ import { orderDir } from '../../src/data-root.js'
 import { priorArtFor } from '../../src/ipc/forge-registration.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
-const userData = vi.hoisted(() => ({ path: '' }))
 const runner = vi.hoisted(() => ({ current: null as unknown }))
 
-vi.mock('electron', () => ({ app: { getPath: () => userData.path } }))
 vi.mock('../../src/runtime/supervised-runner.js', () => ({
   createSupervisedRunner: () => runner.current,
 }))
@@ -42,7 +40,6 @@ let host: FoundryHost
 
 beforeAll(async () => {
   const outer = temporaryDirectory('fdry-forge-reg')
-  userData.path = path.join(outer, 'user-data')
   vi.stubEnv('HOME', path.join(outer, 'home'))
   host = fakeHost(() => dataDir)
   await activateFoundry(host)

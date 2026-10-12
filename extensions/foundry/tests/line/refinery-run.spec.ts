@@ -15,10 +15,8 @@ import { createGateStore } from '../../src/gates/store.js'
 import { writeObservedFiles } from '../../src/line/observed-files.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 
-const userData = vi.hoisted(() => ({ path: '' }))
 const runner = vi.hoisted(() => ({ current: null as unknown }))
 
-vi.mock('electron', () => ({ app: { getPath: () => userData.path } }))
 vi.mock('../../src/runtime/supervised-runner.js', () => ({
   createSupervisedRunner: () => runner.current,
 }))
@@ -41,7 +39,6 @@ const merged = new Set<string>()
 
 beforeAll(async () => {
   const parent = temporaryDirectory('fdry-refinery')
-  userData.path = path.join(parent, 'user-data')
   vi.stubEnv('HOME', path.join(parent, 'home'))
   host = fakeHost(() => dataDir)
   // Only the minute ticks are held; every agent and git call runs on real time.

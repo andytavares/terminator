@@ -33,9 +33,6 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import type { LadderStep } from '../../src/verify/ladder.js'
 import type { ExecutorDeps } from '../../src/line/executor.js'
 
-const userData = vi.hoisted(() => ({ path: '' }))
-vi.mock('electron', () => ({ app: { getPath: () => userData.path } }))
-
 let root: string
 let repo: string
 let host: FoundryHost
@@ -76,7 +73,6 @@ function agreed(repoPath: string): WorkOrder {
 
 beforeEach(async () => {
   const parent = temporaryDirectory('fdry-executor')
-  userData.path = path.join(parent, 'user-data')
   vi.stubEnv('HOME', path.join(parent, 'home'))
   root = path.join(parent, 'records')
   repo = await seededRepository(parent)
