@@ -1,6 +1,7 @@
 import { execFile as execFileCb, type ChildProcess, type ExecFileException } from 'child_process'
 import { loginShellPathReady } from './login-shell-path.js'
-import { relative, isAbsolute } from 'path'
+import { realpath } from 'fs/promises'
+import { basename, dirname, isAbsolute, join, relative, sep } from 'path'
 
 const ALLOWED_COMMANDS = new Set(['git', 'gh'])
 
@@ -35,10 +36,12 @@ export class CommandNotAllowedError extends Error {
   }
 }
 
+/** Named so it survives the extension host's link, where only `name` and `message` cross. */
 export class CwdOutOfScopeError extends Error {
   readonly code = 'CWD_OUT_OF_SCOPE'
-  constructor(cwd: string, workspaceRoot: string) {
-    super(`cwd "${cwd}" is outside workspace root "${workspaceRoot}"`)
+  constructor(cwd: string) {
+    super(`"${cwd}" is outside every directory git and gh may run in`)
+    this.name = 'CwdOutOfScopeError'
   }
 }
 
@@ -48,14 +51,33 @@ export function assertCommandAllowed(command: string): void {
   }
 }
 
-export function assertCwdInScope(cwd: string, workspaceRoot: string): void {
-  if (!isAbsolute(cwd) || !isAbsolute(workspaceRoot)) {
-    throw new CwdOutOfScopeError(cwd, workspaceRoot)
+/**
+ * Refuses a `cwd` that is not one of `roots` or below one (ADR 102). Both sides
+ * are compared after realpath, so a symlink inside a root cannot lead out of it.
+ */
+export async function assertCwdInScope(cwd: string, roots: readonly string[]): Promise<void> {
+  if (!isAbsolute(cwd)) throw new CwdOutOfScopeError(cwd)
+  const real = await realPathOf(cwd)
+  const realRoots = await Promise.all(roots.filter((root) => isAbsolute(root)).map(realPathOf))
+  if (!realRoots.some((root) => isWithin(real, root))) throw new CwdOutOfScopeError(cwd)
+}
+
+/**
+ * The real path of `target`, or of its nearest existing ancestor with the rest
+ * appended: a directory not created yet (a clone target) is still somewhere.
+ */
+async function realPathOf(target: string): Promise<string> {
+  try {
+    return await realpath(target)
+  } catch {
+    return join(await realPathOf(dirname(target)), basename(target))
   }
-  const rel = relative(workspaceRoot, cwd)
-  if (rel.startsWith('..') || isAbsolute(rel)) {
-    throw new CwdOutOfScopeError(cwd, workspaceRoot)
-  }
+}
+
+/** A path-segment check: `/a/bc` is not within `/a/b`. */
+function isWithin(path: string, root: string): boolean {
+  const rel = relative(root, path)
+  return rel === '' || (!isAbsolute(rel) && rel !== '..' && !rel.startsWith(`..${sep}`))
 }
 
 // Matches the exit status of timeout(1).

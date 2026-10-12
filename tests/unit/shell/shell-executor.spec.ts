@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   assertCommandAllowed,
   assertCwdInScope,
@@ -45,42 +48,87 @@ describe('assertCommandAllowed', () => {
 
 // ─── assertCwdInScope ─────────────────────────────────────────────────────────
 
+// Real directories: the check resolves symlinks, so it is only meaningful on a real disk.
 describe('assertCwdInScope', () => {
-  it('allows cwd exactly equal to workspaceRoot', () => {
-    expect(() => assertCwdInScope('/workspace', '/workspace')).not.toThrow()
-  })
+  let scratch: string
+  let root: string
+  let otherRoot: string
+  let outside: string
 
-  it('allows cwd inside workspaceRoot', () => {
-    expect(() => assertCwdInScope('/workspace/src/components', '/workspace')).not.toThrow()
-  })
-
-  it('allows deeply nested cwd inside workspaceRoot', () => {
-    expect(() => assertCwdInScope('/workspace/a/b/c/d', '/workspace')).not.toThrow()
-  })
-
-  it('throws CwdOutOfScopeError when cwd is outside workspaceRoot', () => {
-    expect(() => assertCwdInScope('/etc/passwd', '/workspace')).toThrow(CwdOutOfScopeError)
-  })
-
-  it('throws CwdOutOfScopeError for path traversal attempt (../escape)', () => {
-    // Even though resolve would handle this, the raw relative check catches it
-    expect(() => assertCwdInScope('/workspace/../etc', '/workspace')).toThrow(CwdOutOfScopeError)
-  })
-
-  it('throws CwdOutOfScopeError when cwd is relative', () => {
-    expect(() => assertCwdInScope('relative/path', '/workspace')).toThrow(CwdOutOfScopeError)
-  })
-
-  it('throws CwdOutOfScopeError when workspaceRoot is relative', () => {
-    expect(() => assertCwdInScope('/workspace/src', 'relative/root')).toThrow(CwdOutOfScopeError)
-  })
-
-  it('thrown error has CWD_OUT_OF_SCOPE code', () => {
-    try {
-      assertCwdInScope('/etc', '/workspace')
-    } catch (e) {
-      expect((e as CwdOutOfScopeError).code).toBe('CWD_OUT_OF_SCOPE')
+  beforeEach(() => {
+    scratch = realpathSync(mkdtempSync(join(tmpdir(), 'cwd-scope-')))
+    root = join(scratch, 'root')
+    otherRoot = join(scratch, 'other')
+    outside = join(scratch, 'outside')
+    for (const directory of [join(root, 'src', 'deep'), otherRoot, outside]) {
+      mkdirSync(directory, { recursive: true })
     }
+  })
+
+  afterEach(() => rmSync(scratch, { recursive: true, force: true }))
+
+  it('allows the root itself and any directory below it', async () => {
+    await expect(assertCwdInScope(root, [root])).resolves.toBeUndefined()
+    await expect(assertCwdInScope(join(root, 'src', 'deep'), [root])).resolves.toBeUndefined()
+  })
+
+  it('allows a directory inside any one of several roots', async () => {
+    await expect(assertCwdInScope(otherRoot, [root, otherRoot])).resolves.toBeUndefined()
+  })
+
+  it('allows a directory below a root that does not exist yet', async () => {
+    const clone = join(root, 'not-cloned-yet')
+    await expect(assertCwdInScope(clone, [root])).resolves.toBeUndefined()
+  })
+
+  it('refuses a directory outside every root', async () => {
+    await expect(assertCwdInScope(outside, [root, otherRoot])).rejects.toThrow(CwdOutOfScopeError)
+  })
+
+  // Written out, not joined: path.join would fold the `..` away before the check saw it.
+  it('refuses a `..` escape out of a root', async () => {
+    await expect(assertCwdInScope(`${root}/src/../../outside`, [root])).rejects.toThrow(
+      CwdOutOfScopeError
+    )
+  })
+
+  it('refuses a symlink inside a root that leads out of it', async () => {
+    const link = join(root, 'escape')
+    symlinkSync(outside, link)
+    await expect(assertCwdInScope(link, [root])).rejects.toThrow(CwdOutOfScopeError)
+  })
+
+  it('refuses `..` taken after a symlink, which the operating system resolves outside', async () => {
+    mkdirSync(join(outside, 'child'))
+    symlinkSync(join(outside, 'child'), join(root, 'into-child'))
+    await expect(assertCwdInScope(`${root}/into-child/..`, [root])).rejects.toThrow(
+      CwdOutOfScopeError
+    )
+  })
+
+  it('refuses a sibling whose name only starts with the root', async () => {
+    const sibling = `${root}-sibling`
+    mkdirSync(sibling)
+    await expect(assertCwdInScope(sibling, [root])).rejects.toThrow(CwdOutOfScopeError)
+  })
+
+  it('allows a root reached through a symlink, compared after resolving both', async () => {
+    const linkedRoot = join(scratch, 'linked-root')
+    symlinkSync(root, linkedRoot)
+    await expect(assertCwdInScope(join(root, 'src'), [linkedRoot])).resolves.toBeUndefined()
+  })
+
+  it('refuses a relative cwd, and ignores a relative or empty root', async () => {
+    await expect(assertCwdInScope('relative/path', [root])).rejects.toThrow(CwdOutOfScopeError)
+    await expect(assertCwdInScope(join(root, 'src'), ['relative/root', ''])).rejects.toThrow(
+      CwdOutOfScopeError
+    )
+  })
+
+  it('rejects with an error named CwdOutOfScopeError that names the directory', async () => {
+    const refusal = await assertCwdInScope(outside, [root]).catch((error: unknown) => error)
+    expect(refusal).toMatchObject({ name: 'CwdOutOfScopeError', code: 'CWD_OUT_OF_SCOPE' })
+    expect((refusal as Error).message).toContain(outside)
   })
 })
 

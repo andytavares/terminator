@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, chmodSync, mkdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, chmodSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ipcMain } from 'electron'
@@ -71,6 +71,17 @@ describe('shell:exec IPC handler', () => {
     const result = await handler(
       {},
       { command: 'git', args: ['status'], cwd: scratch, workspaceRoot: repo }
+    )
+    expect(result).toEqual({ error: 'CWD_OUT_OF_SCOPE' })
+  })
+
+  it('returns CWD_OUT_OF_SCOPE for a symlink in the workspace that leads out, and runs nothing', async () => {
+    const outside = join(scratch, 'outside')
+    mkdirSync(outside)
+    symlinkSync(outside, join(repo, 'escape'))
+    const result = await handler(
+      {},
+      { command: 'git', args: ['status'], cwd: join(repo, 'escape'), workspaceRoot: repo }
     )
     expect(result).toEqual({ error: 'CWD_OUT_OF_SCOPE' })
   })

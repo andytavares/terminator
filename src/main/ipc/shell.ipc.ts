@@ -48,7 +48,7 @@ export function registerShellHandlers(): void {
       invalid: (error: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: error.message }),
       run: async ({ command, args, cwd, timeoutMs = 10000, workspaceRoot }) => {
         assertCommandAllowed(command)
-        if (workspaceRoot) assertCwdInScope(cwd, workspaceRoot)
+        if (workspaceRoot) await assertCwdInScope(cwd, [workspaceRoot])
         return await execShell({ command, args, cwd, timeoutMs })
       },
       onError: (err) => {
