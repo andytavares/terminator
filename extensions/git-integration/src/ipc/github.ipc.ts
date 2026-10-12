@@ -1052,7 +1052,7 @@ export function registerGithubHandlers(
           isBranchExcluded,
           dashboardBranches(data, localRoots)
         )
-        const prs = parseDashboard(data, login, localRoots, excluded).map((pr) => {
+        const prs = parseDashboard(data, { login, localRoots }, excluded).map((pr) => {
           if (!pr.localRepoRoot) return pr
           if (!sessionsByRoot.has(pr.localRepoRoot)) {
             sessionsByRoot.set(
