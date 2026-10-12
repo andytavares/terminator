@@ -6,7 +6,7 @@ import type { Signal } from '../../sensors/types.js'
 import type { CiState } from '../../line/ci-state.js'
 import { HallThumbnail } from './HallThumbnail.js'
 import { ciLabel } from '../../line/ci-label.js'
-import { usePolled } from '../../renderer/use-polled.js'
+import { usePolling } from '@terminator/extension-ui'
 
 // The Factory's front door: every order in the workspace, as a hall card, in
 // place of the list rows `Orders.tsx` draws in List mode.
@@ -246,9 +246,9 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
 
   const refreshSignals = useCallback(() => readSignals().then(showSignals), [showSignals])
 
-  usePolled(readOrders, setRows, POLL_MS)
-  usePolled(readMetricsFor, showMetrics, POLL_MS)
-  usePolled(readSignals, showSignals, POLL_MS)
+  usePolling(readOrders, setRows, POLL_MS)
+  usePolling(readMetricsFor, showMetrics, POLL_MS)
+  usePolling(readSignals, showSignals, POLL_MS)
 
   const startPromote = useCallback(
     (signal: Signal) => {

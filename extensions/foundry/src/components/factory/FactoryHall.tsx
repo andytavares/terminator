@@ -44,7 +44,7 @@ import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
 import { MarkdownInline } from '../Markdown.js'
 import { GateCard } from '../GateCard.js'
 import { OrderLinks } from '../OrderLinks.js'
-import { usePolled } from '../../renderer/use-polled.js'
+import { usePolling } from '@terminator/extension-ui'
 import './hall.css'
 
 /** Half of a gate card's width, `min(360px, 60%)`, plus 16px to the scene's edge. */
@@ -191,7 +191,7 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
     },
     []
   )
-  usePolled(readActivity, showActivity, ACTIVITY_POLL_MS)
+  usePolling(readActivity, showActivity, ACTIVITY_POLL_MS)
 
   // The order's own numbers for the status wall — same cadence as the
   // activity poll, so a rework or a new CI round shows up within one beat.
@@ -206,7 +206,7 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
   const showOrderMetrics = useCallback((read: OrderMetrics | null | undefined) => {
     if (read !== undefined) setOrderMetrics(read)
   }, [])
-  usePolled(readOrderMetrics, showOrderMetrics, ACTIVITY_POLL_MS)
+  usePolling(readOrderMetrics, showOrderMetrics, ACTIVITY_POLL_MS)
 
   // Risen callouts leave on their own; nothing has to happen for them to go.
   useEffect(() => {
@@ -438,7 +438,7 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
   const showTranscript = useCallback((lines: TranscriptLine[] | null): void => {
     if (lines !== null) setTranscript(lines)
   }, [])
-  usePolled(readTranscript, showTranscript, ACTIVITY_POLL_MS)
+  usePolling(readTranscript, showTranscript, ACTIVITY_POLL_MS)
 
   const [transcriptFor, setTranscriptFor] = useState(selectedSessionId)
   if (transcriptFor !== selectedSessionId) {

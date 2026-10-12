@@ -5,7 +5,7 @@ import { useEffect } from 'react'
  * `show`. Reading and showing are separate so that state is only set in the
  * callback of a read — never synchronously in the effect body.
  */
-export function usePolled<T>(
+export function usePolling<T>(
   read: () => Promise<T>,
   show: (answer: T) => void,
   intervalMs: number

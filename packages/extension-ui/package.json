@@ -19,6 +19,12 @@
   "files": [
     "src"
   ],
+  "dependencies": {
+    "react-markdown": "10.1.0",
+    "rehype-raw": "7.0.0",
+    "rehype-sanitize": "6.0.0",
+    "remark-gfm": "4.0.1"
+  },
   "peerDependencies": {
     "lucide-react": "1.21.0",
     "react": "18.3.1"

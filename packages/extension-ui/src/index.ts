@@ -5,11 +5,29 @@
  * one layer scale, used by the core application and by every extension. The
  * Extension API published 31 colour tokens and no components, so all five
  * extensions built their own and disagreed with each other about what a
- * keypress means; this is the piece that was missing.
+ * keypress means; this is the piece that was missing. Since ADR 098 it is the
+ * design system: it also holds the tokens (`tokens.css`), a button, tabs,
+ * Markdown, relative time and polling.
  */
 
 export { Dialog, DialogActionButton, useContainingLayer } from './Dialog'
 export type { DialogAction, DialogProps } from './Dialog'
+
+export { Button } from './Button'
+export type { ButtonProps, ButtonSize, ButtonVariant } from './Button'
+
+export { Tabs } from './Tabs'
+export type { TabItem, TabsProps } from './Tabs'
+
+export { Markdown } from './Markdown'
+export type { MarkdownProps } from './Markdown'
+
+export { RelativeTime } from './RelativeTime'
+export type { RelativeTimeProps } from './RelativeTime'
+export { formatRelativeTime } from './relative-time'
+export type { TimeInput } from './relative-time'
+
+export { usePolling } from './usePolling'
 
 export { Popover } from './Popover'
 export type { PopoverProps } from './Popover'

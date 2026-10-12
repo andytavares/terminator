@@ -23,7 +23,7 @@ import { pullNumber } from '../line/pull-number.js'
 import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { ordinal } from '../factory/format.js'
-import { usePolled } from '../renderer/use-polled.js'
+import { usePolling } from '@terminator/extension-ui'
 import { ExternalLink, Markdown, MarkdownInline } from './Markdown.js'
 import {
   useRunObservation,
@@ -239,7 +239,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
     if (read.transcript !== null) setTranscript(read.transcript)
   }, [])
   const pollLive = useCallback(() => readLive().then(showLive), [readLive, showLive])
-  usePolled(readLive, showLive, LIVE_POLL_MS)
+  usePolling(readLive, showLive, LIVE_POLL_MS)
 
   const answer = useCallback(
     async (ask: PendingAsk, decision: 'allow' | 'deny') => {
@@ -440,7 +440,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
     setLive(tails)
     setTailsReadAt(Date.now())
   }, [])
-  usePolled(readTails, showTails, LIVE_POLL_MS)
+  usePolling(readTails, showTails, LIVE_POLL_MS)
 
   const [polledSessions, setPolledSessions] = useState(runningSessions)
   if (polledSessions !== runningSessions) {

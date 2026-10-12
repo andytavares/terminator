@@ -45,7 +45,7 @@ await githubAPI.prFileDiff(...)    // NOT window.electronAPI.github.prFileDiff(.
 
 ### Rendering untrusted text
 
-PR descriptions, templates and comments are rendered only through `src/components/pr-review/RichContent.tsx` (react-markdown + rehype-sanitize, ADR 091). Never use `dangerouslySetInnerHTML` or a second markdown renderer: this view can run shell commands.
+PR descriptions, templates and comments are rendered only through `src/components/pr-review/RichContent.tsx`, which wraps the design system's `Markdown` (`packages/extension-ui`: react-markdown + rehype-sanitize, ADR 091). Never add a second markdown renderer: this view can run shell commands. The only `dangerouslySetInnerHTML` is RichContent's highlight.js output for fenced code.
 
 ### Lint and typecheck
 
