@@ -30,23 +30,3 @@ export const useLogStore = create<LogState>((set) => ({
   },
   clear: () => set({ entries: [] }),
 }))
-
-/** Call once at app startup to intercept console methods. */
-export function installLogInterceptor(): void {
-  const store = useLogStore.getState
-
-  const wrap =
-    (level: LogLevel, original: (...args: unknown[]) => void) =>
-    (...args: unknown[]): void => {
-      original.apply(console, args)
-      const message = args
-        .map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)))
-        .join(' ')
-      store().addEntry(level, message)
-    }
-
-  console.log = wrap('log', console.log.bind(console))
-  console.info = wrap('info', console.info.bind(console))
-  console.warn = wrap('warn', console.warn.bind(console))
-  console.error = wrap('error', console.error.bind(console))
-}
