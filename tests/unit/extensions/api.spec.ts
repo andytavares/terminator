@@ -75,10 +75,6 @@ import {
   globalRegistry,
   setMenuRebuildCallback,
   listExtensionSettingsSections,
-  listExtensionSidebarItems,
-  listExtensionContextMenuItems,
-  dispatchContextMenuClick,
-  dispatchSidebarItemClick,
   listExtensionCommands,
   executeExtensionCommand,
   listNativeViewMenuItems,
@@ -93,51 +89,9 @@ beforeEach(() => {
     notifications: { defaultTargets: ['system', 'center', 'toast'], extensionOverrides: {} },
   })
   // Reset shared registry state between tests
-  globalRegistry.sidebarPanels.clear()
   globalRegistry.topBarItems.clear()
   globalRegistry.nativeMenuItems.clear()
   globalRegistry.settingsSections.clear()
-})
-
-describe('api.settings.resolveWorktreeBaseDir', () => {
-  beforeEach(() => {
-    mockGetGlobalSettings.mockReturnValue({ git: { worktreeBaseDir: '' } })
-    mockGetWorkspaceSettings.mockReturnValue({ workspaceId: 'w1', overrides: {}, extensions: {} })
-    mockListWorkspaces.mockReturnValue([{ id: 'w1', name: 'WS', folderPath: '/repo' }])
-  })
-
-  it('defaults to <workspacePath>/.worktrees when nothing is configured', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.resolveWorktreeBaseDir('/repo')).toBe('/repo/.worktrees')
-  })
-
-  it('uses the global git.worktreeBaseDir setting when set', () => {
-    mockGetGlobalSettings.mockReturnValue({ git: { worktreeBaseDir: '/global/wt' } })
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.resolveWorktreeBaseDir('/repo')).toBe('/global/wt')
-  })
-
-  it('prefers a workspace override over the global setting', () => {
-    mockGetGlobalSettings.mockReturnValue({ git: { worktreeBaseDir: '/global/wt' } })
-    mockGetWorkspaceSettings.mockReturnValue({
-      workspaceId: 'w1',
-      overrides: { git: { worktreeBaseDir: '/ws/override' } },
-      extensions: {},
-    })
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.resolveWorktreeBaseDir('/repo')).toBe('/ws/override')
-  })
-
-  it('falls back to the default when the workspace path matches no known workspace', () => {
-    mockListWorkspaces.mockReturnValue([])
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.resolveWorktreeBaseDir('/unknown')).toBe('/unknown/.worktrees')
-  })
-
-  it('never returns the legacy .wt directory', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.resolveWorktreeBaseDir('/repo')).not.toContain('.wt/')
-  })
 })
 
 // The Git extension's review lists leave out pull requests whose source
@@ -319,56 +273,6 @@ describe('api.nativeMenu.addViewMenuItem', () => {
   })
 })
 
-describe('api.sidebar.registerPanel', () => {
-  it('registers a panel and returns a disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.sidebar.registerPanel('right-sidebar', {
-      id: 'test-panel',
-      title: 'Test Panel',
-      component: {} as unknown,
-      defaultVisible: false,
-    })
-
-    expect(disposable).toHaveProperty('dispose')
-    expect(globalRegistry.sidebarPanels.has('test.ext.panel.right-sidebar')).toBe(true)
-  })
-
-  it('throws SLOT_ALREADY_REGISTERED when same slot registered twice by same extension', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    api.sidebar.registerPanel('right-sidebar', {
-      id: 'panel-1',
-      title: 'Panel 1',
-      component: {} as unknown,
-    })
-
-    expect(() =>
-      api.sidebar.registerPanel('right-sidebar', {
-        id: 'panel-2',
-        title: 'Panel 2',
-        component: {} as unknown,
-      })
-    ).toThrow('SLOT_ALREADY_REGISTERED')
-  })
-
-  it('allows different extensions to register in same slot', () => {
-    const api1 = createExtensionAPI('ext.one', '0.1.0')
-    const api2 = createExtensionAPI('ext.two', '0.1.0')
-
-    expect(() => {
-      api1.sidebar.registerPanel('right-sidebar', {
-        id: 'p1',
-        title: 'P1',
-        component: {} as unknown,
-      })
-      api2.sidebar.registerPanel('right-sidebar', {
-        id: 'p2',
-        title: 'P2',
-        component: {} as unknown,
-      })
-    }).not.toThrow()
-  })
-})
-
 describe('api.terminal session handlers', () => {
   it('onSessionCreate registers handler and returns disposable', async () => {
     const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
@@ -476,20 +380,6 @@ describe('api.notifications.createNotification', () => {
   })
 })
 
-describe('api.contextMenu.registerItem', () => {
-  it('registers item and returns disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const onClick = vi.fn<[string], void>()
-    const disposable = api.contextMenu.registerItem('workspace', {
-      id: 'ctx-item',
-      label: 'Open',
-      onClick,
-    })
-    expect(disposable).toHaveProperty('dispose')
-    disposable.dispose()
-  })
-})
-
 describe('api.commands.register', () => {
   it('registers command and returns disposable', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
@@ -541,27 +431,6 @@ describe('api.topBar.registerMenuItem', () => {
   })
 })
 
-describe('api.sidebar.registerGlobalTab', () => {
-  it('registers a global tab and returns disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.sidebar.registerGlobalTab({
-      id: 'my-tab',
-      label: 'My Tab',
-      component: {} as unknown,
-    })
-    expect(disposable).toHaveProperty('dispose')
-    disposable.dispose()
-  })
-
-  it('throws GLOBAL_TAB_ALREADY_REGISTERED when same tab registered twice', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    api.sidebar.registerGlobalTab({ id: 'dup-tab', label: 'Dup', component: {} as unknown })
-    expect(() =>
-      api.sidebar.registerGlobalTab({ id: 'dup-tab', label: 'Dup 2', component: {} as unknown })
-    ).toThrow('GLOBAL_TAB_ALREADY_REGISTERED')
-  })
-})
-
 describe('api.pty.listSessions', () => {
   it('delegates to ptyManager.listSessions when deps are provided', () => {
     const mockPtyMgr = {
@@ -570,7 +439,6 @@ describe('api.pty.listSessions', () => {
       resize: vi.fn(),
       kill: vi.fn(),
       listSessions: vi.fn(() => [{ sessionId: 's1', cwd: '/tmp' }]),
-      attachOnData: vi.fn(() => () => {}),
     }
     const api = createExtensionAPI('test.ext', '0.1.0', {
       ptyManager: mockPtyMgr as never,
@@ -583,32 +451,6 @@ describe('api.pty.listSessions', () => {
   it('returns empty array when no ptyManager dep is provided', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
     expect(api.pty.listSessions()).toEqual([])
-  })
-})
-
-describe('api.pty.attachOnData', () => {
-  it('delegates to ptyManager.attachOnData when deps are provided', () => {
-    const mockDispose = vi.fn()
-    const mockPtyMgr = {
-      spawn: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      listSessions: vi.fn(() => []),
-      attachOnData: vi.fn(() => mockDispose),
-    }
-    const api = createExtensionAPI('test.ext', '0.1.0', {
-      ptyManager: mockPtyMgr as never,
-    })
-    const onData = vi.fn()
-    const dispose = api.pty.attachOnData('s1', onData)
-    expect(mockPtyMgr.attachOnData).toHaveBeenCalledWith('s1', onData)
-    expect(dispose).toBe(mockDispose)
-  })
-
-  it('returns null when no ptyManager dep is provided', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.pty.attachOnData('s1', vi.fn())).toBeNull()
   })
 })
 
@@ -626,67 +468,6 @@ describe('registry query functions', () => {
     expect(section!.label).toBe('Query Test')
     expect(section!.properties['com.query.settings.flag']).toBeDefined()
     d.dispose()
-  })
-
-  it('listExtensionSidebarItems returns the renderer-facing shape', () => {
-    const api = createExtensionAPI('com.query.sidebar', '0.1.0')
-    const d = api.sidebar.registerItem({ id: 'q-item', label: 'Q', tooltip: 'tip' })
-    expect(listExtensionSidebarItems()).toContainEqual({ id: 'q-item', label: 'Q', tooltip: 'tip' })
-    d.dispose()
-  })
-
-  it('context menu items are listed per target and dispatched by id', () => {
-    const api = createExtensionAPI('com.query.ctx', '0.1.0')
-    const onClick = vi.fn()
-    const d = api.contextMenu.registerItem('workspace', { id: 'q-ctx', label: 'Do', onClick })
-    expect(listExtensionContextMenuItems('workspace')).toContainEqual({ id: 'q-ctx', label: 'Do' })
-    expect(listExtensionContextMenuItems('project')).toEqual([])
-    dispatchContextMenuClick('workspace', 'q-ctx', 'target-1')
-    expect(onClick).toHaveBeenCalledWith('target-1')
-    dispatchContextMenuClick('workspace', 'nope', 'target-1')
-    expect(onClick).toHaveBeenCalledTimes(1)
-    d.dispose()
-  })
-
-  it('a contributed sidebar item is dispatched by id (FR-028)', () => {
-    const api = createExtensionAPI('com.query.side', '0.1.0')
-    const onClick = vi.fn()
-    const d = api.sidebar.registerItem({ id: 'toggle', label: 'Git Changes', onClick })
-    dispatchSidebarItemClick('toggle')
-    expect(onClick).toHaveBeenCalledOnce()
-    d.dispose()
-  })
-
-  it('dispatching an unknown sidebar item id is a no-op, not a throw', () => {
-    const api = createExtensionAPI('com.query.side2', '0.1.0')
-    const onClick = vi.fn()
-    const d = api.sidebar.registerItem({ id: 'known', label: 'Known', onClick })
-    expect(() => dispatchSidebarItemClick('unknown')).not.toThrow()
-    expect(onClick).not.toHaveBeenCalled()
-    d.dispose()
-  })
-
-  it('a disposed sidebar item is no longer dispatchable', () => {
-    const api = createExtensionAPI('com.query.side3', '0.1.0')
-    const onClick = vi.fn()
-    api.sidebar.registerItem({ id: 'gone', label: 'Gone', onClick }).dispose()
-    dispatchSidebarItemClick('gone')
-    expect(onClick).not.toHaveBeenCalled()
-  })
-
-  it('togglePanel tells every window to toggle this extension panel (FR-028a)', () => {
-    const api = createExtensionAPI('com.query.toggle', '0.1.0')
-    mockSend.mockClear()
-    api.sidebar.togglePanel()
-    expect(mockSend).toHaveBeenCalledWith('extension:toggle-panel', 'com.query.toggle')
-  })
-
-  it('togglePanel drops the send when the window is already gone', () => {
-    const api = createExtensionAPI('com.query.toggle2', '0.1.0')
-    mockWindow.isDestroyed.mockReturnValueOnce(true)
-    mockSend.mockClear()
-    expect(() => api.sidebar.togglePanel()).not.toThrow()
-    expect(mockSend).not.toHaveBeenCalled()
   })
 
   it('commands are listed with their key and executed through it', () => {

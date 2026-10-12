@@ -75,11 +75,6 @@ vi.mock('../../../src/main/storage/workspace-store', () => ({
   listProjects: vi.fn((wsId: string) => mockProjects.filter((p) => p.workspaceId === wsId)),
 }))
 
-// ── FS watcher mock ─────────────────────────────────────────────────────────
-vi.mock('../../../src/main/fs/fs-watcher', () => ({
-  fsWatcherService: { addHandler: vi.fn(), removeHandler: vi.fn() },
-}))
-
 // ── Logger mock ─────────────────────────────────────────────────────────────
 vi.mock('../../../src/main/logger', () => ({
   makeLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
@@ -87,57 +82,13 @@ vi.mock('../../../src/main/logger', () => ({
 
 // ────────────────────────────────────────────────────────────────────────────
 
-import { createExtensionAPI, globalRegistry } from '../../../src/main/extensions/api'
-import {
-  emitWorkspaceDelete,
-  emitProjectDelete,
-} from '../../../src/main/extensions/workspace-events'
+import { createExtensionAPI } from '../../../src/main/extensions/api'
 import { setExtensionSetting } from '../../../src/main/storage/extension-settings-store'
-import { fsWatcherService } from '../../../src/main/fs/fs-watcher'
 import { EventEmitter } from 'events'
 
 beforeEach(() => {
   vi.clearAllMocks()
   registeredGlobalShortcuts.clear()
-  globalRegistry.sidebarPanels.clear()
-  globalRegistry.globalTabs?.clear()
-  globalRegistry.sidebarItems?.clear()
-})
-
-// ── sidebar.registerGlobalTab ────────────────────────────────────────────────
-
-describe('api.sidebar.registerGlobalTab', () => {
-  it('registers a global tab in the registry', () => {
-    const api = createExtensionAPI('test.vault', '0.1.0')
-    const tab = { id: 'task-vault', label: 'Task Vault', component: () => null, permanent: true }
-
-    api.sidebar.registerGlobalTab(tab)
-
-    expect(globalRegistry.globalTabs.size).toBe(1)
-    expect(globalRegistry.globalTabs.get('test.vault.globaltab.task-vault')).toMatchObject({
-      id: 'task-vault',
-      label: 'Task Vault',
-    })
-  })
-
-  it('returns a Disposable that removes the tab on dispose', () => {
-    const api = createExtensionAPI('test.vault2', '0.1.0')
-    const tab = { id: 'task-vault', label: 'Task Vault', component: () => null }
-
-    const d = api.sidebar.registerGlobalTab(tab)
-    expect(globalRegistry.globalTabs.size).toBe(1)
-
-    d.dispose()
-    expect(globalRegistry.globalTabs.size).toBe(0)
-  })
-
-  it('throws if the same tab id is registered twice by the same extension', () => {
-    const api = createExtensionAPI('test.vault3', '0.1.0')
-    const tab = { id: 'task-vault', label: 'Task Vault', component: () => null }
-
-    api.sidebar.registerGlobalTab(tab)
-    expect(() => api.sidebar.registerGlobalTab(tab)).toThrow('GLOBAL_TAB_ALREADY_REGISTERED')
-  })
 })
 
 // ── globalShortcut ───────────────────────────────────────────────────────────
@@ -199,52 +150,6 @@ describe('api.workspace.listProjects', () => {
   })
 })
 
-describe('api.workspace.onDelete', () => {
-  it('calls registered handler when a workspace is deleted', () => {
-    const api = createExtensionAPI('test.ws3', '0.1.0')
-    const handler = vi.fn()
-
-    api.workspace.onDelete(handler)
-    emitWorkspaceDelete('ws-1')
-
-    expect(handler).toHaveBeenCalledWith('ws-1')
-  })
-
-  it('returns a Disposable that stops receiving events', () => {
-    const api = createExtensionAPI('test.ws4', '0.1.0')
-    const handler = vi.fn()
-
-    const d = api.workspace.onDelete(handler)
-    d.dispose()
-    emitWorkspaceDelete('ws-2')
-
-    expect(handler).not.toHaveBeenCalled()
-  })
-})
-
-describe('api.workspace.onProjectDelete', () => {
-  it('calls registered handler when a project is deleted', () => {
-    const api = createExtensionAPI('test.ws5', '0.1.0')
-    const handler = vi.fn()
-
-    api.workspace.onProjectDelete(handler)
-    emitProjectDelete('proj-1')
-
-    expect(handler).toHaveBeenCalledWith('proj-1')
-  })
-
-  it('returns a Disposable that stops receiving events', () => {
-    const api = createExtensionAPI('test.ws6', '0.1.0')
-    const handler = vi.fn()
-
-    const d = api.workspace.onProjectDelete(handler)
-    d.dispose()
-    emitProjectDelete('proj-2')
-
-    expect(handler).not.toHaveBeenCalled()
-  })
-})
-
 // ── settings.set ─────────────────────────────────────────────────────────────
 
 describe('api.settings.set', () => {
@@ -257,41 +162,7 @@ describe('api.settings.set', () => {
 
 // ── sidebar.registerItem ──────────────────────────────────────────────────────
 
-describe('api.sidebar.registerItem', () => {
-  it('registers an item in the global registry', () => {
-    const api = createExtensionAPI('test.sbi', '0.1.0')
-    const item = { id: 'my-item', label: 'My Item' } as never
-    api.sidebar.registerItem(item)
-    expect(globalRegistry.sidebarItems.get('test.sbi.sidebar.my-item')).toBe(item)
-  })
-
-  it('returns a Disposable that removes the item on dispose', () => {
-    const api = createExtensionAPI('test.sbi2', '0.1.0')
-    const item = { id: 'my-item', label: 'My Item' } as never
-    const d = api.sidebar.registerItem(item)
-    d.dispose()
-    expect(globalRegistry.sidebarItems.has('test.sbi2.sidebar.my-item')).toBe(false)
-  })
-})
-
 // ── fs.watch ─────────────────────────────────────────────────────────────────
-
-describe('api.fs.watch', () => {
-  it('registers the handler with fsWatcherService', () => {
-    const api = createExtensionAPI('test.fs', '0.1.0')
-    const handler = vi.fn()
-    api.fs.watch(handler)
-    expect(vi.mocked(fsWatcherService.addHandler)).toHaveBeenCalledWith(handler)
-  })
-
-  it('returns a Disposable that removes the handler on dispose', () => {
-    const api = createExtensionAPI('test.fs2', '0.1.0')
-    const handler = vi.fn()
-    const d = api.fs.watch(handler)
-    d.dispose()
-    expect(vi.mocked(fsWatcherService.removeHandler)).toHaveBeenCalledWith(handler)
-  })
-})
 
 // ── ipc bridge channels ───────────────────────────────────────────────────────
 
@@ -418,7 +289,6 @@ describe('api.pty', () => {
     pid: 1,
   }
   const mockPtyManager = {
-    spawn: vi.fn(() => 'session-xyz'),
     spawnSession: vi.fn(() => sessionInfo),
     onData: vi.fn(() => () => {}),
     onExit: vi.fn(() => () => {}),
@@ -428,8 +298,6 @@ describe('api.pty', () => {
     resize: vi.fn(),
     kill: vi.fn(),
     listSessions: vi.fn(() => ['s1', 's2']),
-    attachOnData: vi.fn(() => () => {}),
-    attachOnExit: vi.fn(() => () => {}),
   }
 
   describe('session authority surface (v1.4.0)', () => {
@@ -480,21 +348,6 @@ describe('api.pty', () => {
   })
 
   describe('with ptyManager', () => {
-    it('spawn delegates to ptyManager.spawn', () => {
-      const api = createExtensionAPI('test.pty', '0.1.0', { ptyManager: mockPtyManager })
-      const onData = vi.fn()
-      const onExit = vi.fn()
-      api.pty.spawn('s1', '/cwd', '/bin/zsh', 'human', onData, onExit)
-      expect(mockPtyManager.spawn).toHaveBeenCalledWith(
-        's1',
-        '/cwd',
-        '/bin/zsh',
-        'human',
-        onData,
-        onExit
-      )
-    })
-
     it('write delegates to ptyManager.write', () => {
       const api = createExtensionAPI('test.pty2', '0.1.0', { ptyManager: mockPtyManager })
       api.pty.write('s1', 'hello')
@@ -517,27 +370,12 @@ describe('api.pty', () => {
       const api = createExtensionAPI('test.pty5', '0.1.0', { ptyManager: mockPtyManager })
       expect(api.pty.listSessions()).toEqual(['s1', 's2'])
     })
-
-    it('attachOnData/attachOnExit return the manager disposers', () => {
-      const api = createExtensionAPI('test.pty6', '0.1.0', { ptyManager: mockPtyManager })
-      expect(typeof api.pty.attachOnData('s1', vi.fn())).toBe('function')
-      expect(typeof api.pty.attachOnExit('s1', vi.fn())).toBe('function')
-    })
   })
 
   describe('without ptyManager', () => {
-    it('listSessions returns [] and attach* return null', () => {
+    it('listSessions returns []', () => {
       const api = createExtensionAPI('test.pty.nopty5', '0.1.0')
       expect(api.pty.listSessions()).toEqual([])
-      expect(api.pty.attachOnData('s1', vi.fn())).toBeNull()
-      expect(api.pty.attachOnExit('s1', vi.fn())).toBeNull()
-    })
-
-    it('spawn throws PTY access not available', () => {
-      const api = createExtensionAPI('test.pty.nopty', '0.1.0')
-      expect(() => api.pty.spawn('s1', '/cwd', '/bin/zsh', 'human', vi.fn(), vi.fn())).toThrow(
-        'PTY access not available'
-      )
     })
 
     it('write is a no-op and does not throw', () => {

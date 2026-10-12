@@ -199,23 +199,18 @@ ExtensionHost.load(directoryPath)
       │        └─ api.settings.register()           → globalRegistry.settingsSections
       │           api.settings.get()               → getExtensionSetting(key)
       │           api.settings.set()               → setExtensionSetting(key, value) (v1.4.0)
-      │           api.sidebar.registerItem()        → globalRegistry.sidebarItems
-      │           api.sidebar.registerPanel(slot)   → globalRegistry.sidebarPanels (v1.1.0)
       │           api.topBar.registerMenuItem()     → globalRegistry.topBarItems (v1.1.0)
       │           api.nativeMenu.addViewMenuItem()  → globalRegistry.nativeMenuItems + rebuild (v1.1.0)
       │           api.shell.exec()                  → shell-executor.ts (sandboxed, v1.1.0)
       │           api.notifications.showToast()     → notificationManager (settings-resolved targets, v1.1.0)
-      │           api.fs.watch()                    → FsWatcherService handlers (v1.1.0)
       │           api.ipc.registerHandler()         → ipcMain.handle() (v1.1.0)
       │           api.ipc.invokeChannel()           → dispatches to a registered ipcMain handler (v1.4.0)
       │           api.ipc.sendChannel()             → dispatches to a registered ipcMain send handler (v1.4.0)
       │           api.ipc.onWindowEvent()           → subscribes to EventEmitter events from renderer (v1.4.0)
       │           api.commands.register()           → globalRegistry.commandContributions / commandHandlers (v1.1.0)
-      │           api.contextMenu.registerItem()    → globalRegistry.contextMenuItems
       │           api.terminal.onSessionCreate()    → globalRegistry.sessionCreateHandlers
-      │           api.sidebar.registerGlobalTab()   → globalRegistry.globalTabs (v1.2.0)
       │           api.globalShortcut.register()     → electron globalShortcut (v1.2.0)
-      │           api.pty.spawn/write/resize/kill() → PtyManager (injected via ExtensionAPIDeps, v1.4.0)
+      │           api.pty.spawnSession/write/resize/kill() → PtyManager (injected via ExtensionAPIDeps, v1.4.0)
       │
       │        Note: registerWorkspaceTab() is a renderer-registry-only surface (v1.3.0).
       │        It is called from the extension's renderer.tsx, not from activate(api).
@@ -250,7 +245,7 @@ Security constraints: command allowlist `['git', 'gh']`, CWD pinned to project r
 
 ### File System Watch (v1.1.0)
 
-`FsWatcherService` (`src/main/fs/fs-watcher.ts`) manages OS-level `fs.watch` events with a polling fallback. Extensions subscribe via `api.fs.watch(handler)`. The service pushes `fs:changed` events to the renderer via `webContents.send`. See [ADR-005](adr/005-native-fswatcher-over-chokidar.md).
+`FsWatcherService` (`src/main/fs/fs-watcher.ts`) manages OS-level `fs.watch` events with a polling fallback. The service pushes `fs:changed` events to the renderer via `webContents.send`. See [ADR-005](adr/005-native-fswatcher-over-chokidar.md).
 
 ### Reserved keyboard shortcuts
 
@@ -413,13 +408,6 @@ Extension WebContentsView            Host renderer chrome
 The listeners are passive and bubble-phase, so an extension's own single-`Esc` dismissals are untouched. Core surfaces (`core.*` ids) are never exited, the host-side listener stands down inside a terminal, a text field, or an open modal, and remote `/app/` clients get the same gesture through a same-origin listener on the extension iframe. See [ADR-026](adr/026-double-escape-extension-exit.md).
 
 A click in the sidebar dismisses the same way, and there core surfaces go too: `useDismissSurfaceOnClick` compares the global/workspace/project tab slots across the click and, if the click chose nothing itself, calls `registry.dismissSurfaces()` to clear all three. A click that opened or toggled a surface is left to stand; sidebar panels, which sit beside the terminal, stay open.
-
-### Contribution rendering
-
-The renderer queries contributions via IPC on mount:
-
-- `extension:get-sidebar-items` → rendered below workspace list in Sidebar
-- `extension:get-context-menu-items(target)` → merged into right-click menus
 
 Full API surface: [`specs/001-extension-first-terminal/contracts/extension-api.md`](../specs/001-extension-first-terminal/contracts/extension-api.md)
 
@@ -650,8 +638,8 @@ The primary navigation is a single resizable sidebar (`UnifiedSidebar`) listing 
 UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 ├── SidebarHeader                     — two bands, and no more (FR-033)
 │   ├── AppBand — every app-level surface as one compact row of icons: core's
-│   │     Home and Overview, the `contributes.globalTab` entries, the items from
-│   │     api.sidebar.registerItem(), and the notification bell pushed to the
+│   │     Home and Overview, the `contributes.globalTab` entries, and the
+│   │     notification bell pushed to the
 │   │     far edge. Icons only; the 8px text label became the accessible name
 │   │     and tooltip it duplicated. Both contribution contracts unchanged —
 │   │     only the render target and density moved (ADR 033, then FR-036).
@@ -836,7 +824,6 @@ Tasks are identified by a UUID (`crypto.randomUUID()`) assigned at insert time a
 
 New namespaces added in this extension cycle (ADR-012):
 
-- `api.sidebar.registerGlobalTab` — register a permanent app-level tab
 - `api.globalShortcut.register` — register global keyboard shortcuts
 - `api.notifications.showToast` — show toast notifications from main process
 

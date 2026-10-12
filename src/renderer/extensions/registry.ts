@@ -62,21 +62,12 @@ export interface CommandRegistration {
   action(): void
 }
 
-export interface SidebarButtonRegistration {
-  id: string
-  label: string
-  icon?: ReactNode
-  /** Called when the user clicks the button in the ProjectsPanel */
-  action(): void
-}
-
 interface ExtensionRegistry {
   sidebarPanels: Map<string, SidebarPanelRegistration>
   projectTabs: Map<string, ProjectTabRegistration>
   globalTabs: Map<string, GlobalTabRegistration>
   workspaceTabs: Map<string, WorkspaceTabRegistration>
   windowViews: Map<string, ComponentType<{ repoRoot: string | null }>>
-  sidebarButtons: SidebarButtonRegistration[]
   activeGlobalTabId: string | null
   activeWorkspaceTabId: string | null
   keyboardShortcuts: KeyboardShortcutRegistration[]
@@ -97,7 +88,6 @@ interface ExtensionRegistry {
   registerOverlay(component: ComponentType): () => void
   registerKeyboardShortcut(shortcut: KeyboardShortcutRegistration): () => void
   registerCommand(command: CommandRegistration): () => void
-  registerSidebarButton(button: SidebarButtonRegistration): () => void
   updateCommand(id: string, patch: Partial<Omit<CommandRegistration, 'id' | 'action'>>): void
   updateGlobalTab(id: string, patch: Partial<Omit<GlobalTabRegistration, 'id' | 'component'>>): void
   togglePanel(panelId: string): void
@@ -134,7 +124,6 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set, get) => ({
   globalTabs: new Map(),
   workspaceTabs: new Map(),
   windowViews: new Map(),
-  sidebarButtons: [],
   activeGlobalTabId: null,
   activeWorkspaceTabId: null,
   keyboardShortcuts: [],
@@ -237,12 +226,6 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set, get) => ({
   registerCommand(command) {
     set((s) => ({ commands: [...s.commands, command] }))
     return () => set((s) => ({ commands: s.commands.filter((c) => c !== command) }))
-  },
-
-  registerSidebarButton(button) {
-    set((s) => ({ sidebarButtons: [...s.sidebarButtons, button] }))
-    return () =>
-      set((s) => ({ sidebarButtons: s.sidebarButtons.filter((b) => b.id !== button.id) }))
   },
 
   updateCommand(id, patch) {

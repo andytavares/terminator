@@ -132,11 +132,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getSettingsValues: () => ipcRenderer.invoke('extension:get-settings-values'),
     updateSetting: (key: string, value: unknown) =>
       ipcRenderer.invoke('extension:update-setting', { key, value }),
-    getSidebarItems: () => ipcRenderer.invoke('extension:get-sidebar-items'),
-    getContextMenuItems: (target: string) =>
-      ipcRenderer.invoke('extension:get-context-menu-items', { target }),
-    contextMenuClick: (target: string, itemId: string, targetId: string) =>
-      ipcRenderer.send('extension:context-menu-click', { target, itemId, targetId }),
     getCommands: () => ipcRenderer.invoke('extension:get-commands'),
     executeCommand: (
       key: string,

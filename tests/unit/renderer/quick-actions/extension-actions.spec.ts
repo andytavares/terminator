@@ -67,17 +67,6 @@ describe('buildExtensionActions', () => {
     expect(actions[0].disabledReason).toBe('No terminal focused')
   })
 
-  it("prefers the command's own disabledReason over the requires-derived one", () => {
-    const actions = buildExtensionActions(
-      [registered({ requires: 'repo', disabledReason: 'Not a git repository' })],
-      [],
-      [gitGroup],
-      ctx({ repoRoot: null }),
-      vi.fn()
-    )
-    expect(actions[0].disabledReason).toBe('Not a git repository')
-  })
-
   it('calls execute with the command key and the given context', () => {
     const execute = vi.fn()
     const c = ctx()

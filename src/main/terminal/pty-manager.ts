@@ -214,21 +214,6 @@ export class PtyManager {
     return { ...session.info }
   }
 
-  /** @deprecated since ExtensionAPI v1.4.0 — use spawnSession() plus onData()/onExit(). */
-  spawn(
-    sessionId: string,
-    cwd: string,
-    shell: string,
-    type: 'human' | 'agent',
-    onData: (data: string) => void,
-    onExit: (exitCode: number) => void
-  ): string {
-    this.spawnSession({ sessionId, cwd, shell, type, origin: 'app' })
-    this.onData(sessionId, onData)
-    this.onExit(sessionId, onExit)
-    return sessionId
-  }
-
   /**
    * Delivers everything held back and resumes live output. Called when a tab is
    * actually on screen and ready to display it; a no-op for a session that was
@@ -277,16 +262,6 @@ export class PtyManager {
     if (!session) return null
     session.exitListeners.add(listener)
     return () => session.exitListeners.delete(listener)
-  }
-
-  /** @deprecated since ExtensionAPI v1.4.0 — alias of onData(). */
-  attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null {
-    return this.onData(sessionId, onData)
-  }
-
-  /** @deprecated since ExtensionAPI v1.4.0 — alias of onExit(). */
-  attachOnExit(sessionId: string, onExit: (exitCode: number) => void): (() => void) | null {
-    return this.onExit(sessionId, onExit)
   }
 
   getSession(sessionId: string): SessionInfo | undefined {

@@ -10,7 +10,6 @@ export interface RegisteredCommand {
   category?: string
   mnemonic?: string
   requires?: 'repo' | 'session'
-  disabledReason?: string
 }
 
 export interface DeclaredCommand {
@@ -66,7 +65,7 @@ export function buildExtensionActions(
       mnemonic: cmd.mnemonic,
       shortcut: cmd.shortcut,
       description: cmd.description,
-      disabledReason: cmd.disabledReason ?? requiresReason(cmd.requires, ctx),
+      disabledReason: requiresReason(cmd.requires, ctx),
       run: () => execute(cmd.key, ctx),
     })
   }

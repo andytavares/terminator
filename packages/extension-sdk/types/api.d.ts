@@ -28,15 +28,6 @@ export interface SettingDefinition {
   danger?: boolean
 }
 
-export type PanelSlot = 'right-sidebar' | 'global-tab'
-
-export interface PanelContribution {
-  id: string
-  title: string
-  component: unknown
-  defaultVisible?: boolean
-}
-
 export interface TopBarMenuContribution {
   id: string
   label: string
@@ -53,38 +44,7 @@ export interface NativeMenuItemContribution {
   panelId?: string
 }
 
-export interface FsChangeEvent {
-  projectRoot: string
-  eventType: 'change' | 'rename'
-  filename: string | null
-}
-
 export type ToastType = 'info' | 'success' | 'warning' | 'error'
-
-export interface SidebarContribution {
-  id: string
-  label: string
-  tooltip?: string
-  /**
-   * A lucide icon name, resolved by the host — the same vocabulary a manifest's
-   * `contributes.globalTab.icon` uses (`git-branch`, `wifi`, `calendar`, …).
-   *
-   * Optional and additive: a contribution that omits it behaves exactly as
-   * before. Before this existed a sidebar item could not supply an icon at all,
-   * so the host drew a placeholder — which said nothing once the app band
-   * dropped its text labels.
-   */
-  icon?: string
-  onClick(): void
-}
-
-export type ContextMenuTarget = 'workspace' | 'project' | 'tab' | 'terminal'
-
-export interface MenuItemContribution {
-  id: string
-  label: string
-  onClick(targetId: string): void
-}
 
 export interface SessionSnapshot {
   readonly id: string
@@ -109,14 +69,6 @@ export interface CommandContext {
   repoRoot: string | null
 }
 
-export interface GlobalTabContribution {
-  id: string
-  label: string
-  icon?: string
-  component: unknown
-  permanent?: boolean
-}
-
 export interface WorkspaceSnapshot {
   readonly id: string
   readonly name: string
@@ -132,24 +84,13 @@ export interface ProjectSnapshot {
 }
 
 export interface PtyManagerAPI {
-  spawn(
-    sessionId: string,
-    cwd: string,
-    shell: string,
-    type: 'human' | 'agent',
-    onData: (data: string) => void,
-    onExit: (exitCode: number) => void
-  ): string
   write(sessionId: string, data: string): void
   resize(sessionId: string, cols: number, rows: number): void
   kill(sessionId: string): void
   listSessions(): Array<{ sessionId: string; cwd: string }>
-  attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null
-  attachOnExit(sessionId: string, onExit: (exitCode: number) => void): (() => void) | null
 }
 
 export interface ExtensionAPI {
-  readonly app: { readonly version: string }
   log: {
     debug(message: string, ...meta: unknown[]): void
     info(message: string, ...meta: unknown[]): void
@@ -161,21 +102,12 @@ export interface ExtensionAPI {
     get<T>(key: string): T | undefined
     set(key: string, value: unknown): void
   }
-  sidebar: {
-    registerItem(item: SidebarContribution): Disposable
-    registerPanel(slot: PanelSlot, panel: PanelContribution): Disposable
-    registerGlobalTab(tab: GlobalTabContribution): Disposable
-    /** Shows or hides this extension's own sidebar panel. (v1.1.0) */
-    togglePanel(): void
-  }
   globalShortcut: {
     register(accelerator: string, handler: () => void): Disposable
   }
   workspace: {
     list(): WorkspaceSnapshot[]
     listProjects(workspaceId: string): ProjectSnapshot[]
-    onDelete(handler: (workspaceId: string) => void): Disposable
-    onProjectDelete(handler: (projectId: string) => void): Disposable
   }
   topBar: {
     registerMenuItem(item: TopBarMenuContribution): Disposable
@@ -209,18 +141,11 @@ export interface ExtensionAPI {
   nativeMenu: {
     addViewMenuItem(item: NativeMenuItemContribution): Disposable
   }
-  fs: {
-    watch(handler: (event: FsChangeEvent) => void): Disposable
-  }
-  contextMenu: {
-    registerItem(target: ContextMenuTarget, item: MenuItemContribution): Disposable
-  }
   commands: {
     register(
       command: CommandContribution,
       handler: (ctx: CommandContext) => void | Promise<void>
     ): Disposable
-    setEnabled(id: string, enabled: boolean, reason?: string): void
   }
   ipc: {
     registerHandler(

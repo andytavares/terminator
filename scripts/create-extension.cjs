@@ -92,20 +92,18 @@ function activate(api) {
     })
   )
 
-  // Register a sidebar item
+  // Register a quick action
   disposables.push(
-    api.sidebar.registerItem({
-      id: '${id}-panel',
-      label: '${name
-        .split('-')
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ')}',
-      tooltip: 'Open ${name}',
-      onClick: () => {
-        const msg = api.settings.get('${id}.message') ?? 'Hello!'
-        api.notifications.showToast('info', msg)
+    api.commands.register(
+      {
+        id: '${id}-hello',
+        label: 'Say hello from ${name}',
       },
-    })
+      () => {
+        const msg = api.settings.get('${id}.message') ?? 'Hello!'
+        api.notifications.showToast('info', msg, 'hello')
+      }
+    )
   )
 
   // Register a keyboard shortcut
@@ -125,19 +123,6 @@ function activate(api) {
 
   // ── v1.1.0 API surfaces (uncomment to activate) ──────────────────────────
 
-  // TODO: Register a full sidebar panel (right-sidebar)
-  // disposables.push(
-  //   api.sidebar.registerPanel('right-sidebar', {
-  //     id: '${id}-right-panel',
-  //     title: '${name
-    .split('-')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')}',
-  //     component: MyPanelComponent,  // React component
-  //     defaultVisible: false,
-  //   })
-  // )
-
   // TODO: Register a top-bar menu item
   // disposables.push(
   //   api.topBar.registerMenuItem({
@@ -153,13 +138,6 @@ function activate(api) {
   // TODO: Run git/gh commands
   // api.shell.exec({ command: 'git', args: ['status'], cwd: '/path/to/repo' })
   //   .then((result) => console.log(result.stdout))
-
-  // TODO: Watch for file system changes
-  // disposables.push(
-  //   api.fs.watch((event) => {
-  //     console.log('[${name}] file changed:', event.filename)
-  //   })
-  // )
 
   // TODO: Register a custom IPC handler (callable from renderer via window.electronAPI.invoke)
   // disposables.push(
@@ -178,23 +156,9 @@ function activate(api) {
   //   })
   // )
 
-  // TODO: Register a permanent global tab in the app tab bar
-  // disposables.push(
-  //   api.sidebar.registerGlobalTab({
-  //     id: '${id}-global-tab',
-  //     label: '${name
-    .split('-')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')}',
-  //     component: MyGlobalTabComponent,  // React component
-  //     permanent: false,
-  //   })
-  // )
-
   // TODO: Read workspace list
   // const workspaces = api.workspace.list()
   // console.log('[${name}] workspaces:', workspaces.map((w) => w.name))
-  // disposables.push(api.workspace.onDelete((id) => console.log('[${name}] workspace deleted:', id)))
 
   // TODO: Open an auxiliary window
   // api.window.openAuxiliary('${id}-view', { param: 'value' })

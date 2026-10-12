@@ -11,9 +11,6 @@ const mockRegisterSidebarPanel = vi.fn()
 const mockRegisterWindowView = vi.fn()
 const mockRegisterKeyboardShortcut = vi.fn()
 const mockTogglePanel = vi.fn()
-const mockRegisterSidebarButton = vi.fn()
-const mockGetSidebarItems = vi.fn()
-const mockSidebarItemClick = vi.fn()
 const mockSetQuickActionGroups = vi.fn()
 
 const mockRegistry = {
@@ -24,7 +21,6 @@ const mockRegistry = {
   registerWindowView: mockRegisterWindowView,
   registerKeyboardShortcut: mockRegisterKeyboardShortcut,
   togglePanel: mockTogglePanel,
-  registerSidebarButton: mockRegisterSidebarButton,
   setQuickActionGroups: mockSetQuickActionGroups,
 }
 
@@ -44,13 +40,10 @@ vi.mock('../../../../src/renderer/extensions/icon-from-name', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockGetSidebarItems.mockResolvedValue({ items: [] })
   ;(globalThis as unknown as Record<string, unknown>).window = {
     electronAPI: {
       extension: {
         list: mockList,
-        getSidebarItems: mockGetSidebarItems,
-        sidebarItemClick: mockSidebarItemClick,
       },
     },
   }
@@ -331,43 +324,6 @@ describe('initExtensions — no __terminatorRegistry global', () => {
     expect(fakeWindow.__terminatorRegistry).toBeUndefined()
     delete (globalThis as unknown as { window?: unknown }).window
     vi.resetModules()
-  })
-})
-
-describe('contributed sidebar items reach the renderer (FR-028)', () => {
-  it('registers one sidebar button per contributed item', async () => {
-    mockGetSidebarItems.mockResolvedValue({
-      items: [
-        { id: 'git-sidebar-toggle', label: 'Git Changes', tooltip: 'Toggle' },
-        { id: 'other', label: 'Other' },
-      ],
-    })
-    await callInit([])
-    expect(mockRegisterSidebarButton).toHaveBeenCalledTimes(2)
-    expect(mockRegisterSidebarButton.mock.calls[0][0]).toMatchObject({
-      id: 'git-sidebar-toggle',
-      label: 'Git Changes',
-    })
-  })
-
-  it('sends the click back to the extension that owns the handler', async () => {
-    mockGetSidebarItems.mockResolvedValue({ items: [{ id: 'git-sidebar-toggle', label: 'Git' }] })
-    await callInit([])
-    mockRegisterSidebarButton.mock.calls[0][0].action()
-    expect(mockSidebarItemClick).toHaveBeenCalledWith('git-sidebar-toggle')
-  })
-
-  it('registers nothing when no extension contributes an item', async () => {
-    await callInit([])
-    expect(mockRegisterSidebarButton).not.toHaveBeenCalled()
-  })
-
-  it('tolerates a host that does not expose the query at all', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(globalThis as unknown as Record<string, any>).window.electronAPI.extension.getSidebarItems =
-      undefined
-    await expect(callInit([])).resolves.toBeUndefined()
-    expect(mockRegisterSidebarButton).not.toHaveBeenCalled()
   })
 })
 

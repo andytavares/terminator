@@ -2,10 +2,6 @@ import { handleChannel, onChannel } from './channel-registrar.js'
 import type { ExtensionHost } from '../extensions/extension-host.js'
 import {
   listExtensionSettingsSections,
-  listExtensionSidebarItems,
-  dispatchSidebarItemClick,
-  listExtensionContextMenuItems,
-  dispatchContextMenuClick,
   listExtensionCommands,
   executeExtensionCommand,
   isExtensionCommandRegistered,
@@ -60,29 +56,6 @@ export function registerExtensionHandlers(
     setExtensionSetting(key, value)
     return { ok: true }
   })
-
-  handleChannel('extension:get-sidebar-items', () => {
-    return { items: listExtensionSidebarItems() }
-  })
-
-  handleChannel('extension:sidebar-item-click', (_event, { itemId }: { itemId: string }) => {
-    dispatchSidebarItemClick(itemId)
-    return { ok: true }
-  })
-
-  handleChannel('extension:get-context-menu-items', (_event, { target }: { target: string }) => {
-    return { items: listExtensionContextMenuItems(target) }
-  })
-
-  onChannel(
-    'extension:context-menu-click',
-    (
-      _event,
-      { target, itemId, targetId }: { target: string; itemId: string; targetId: string }
-    ) => {
-      dispatchContextMenuClick(target, itemId, targetId)
-    }
-  )
 
   handleChannel('extension:get-commands', () => {
     return { commands: listExtensionCommands() }

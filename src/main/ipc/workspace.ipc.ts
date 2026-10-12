@@ -15,7 +15,7 @@ import {
   getProjectById,
 } from '../storage/workspace-store.js'
 import { removeWorktree } from '../git/git-service.js'
-import { emitWorkspaceDelete, emitProjectDelete } from '../extensions/workspace-events.js'
+import { emitProjectDelete } from '../extensions/workspace-events.js'
 
 interface ActiveWorkspaceContext {
   workspaceId: string | null
@@ -53,9 +53,7 @@ export function registerWorkspaceHandlers(): void {
   })
 
   handleChannel('workspace:delete', (_event, { id }) => {
-    const result = deleteWorkspace(id)
-    emitWorkspaceDelete(id)
-    return result
+    return deleteWorkspace(id)
   })
 
   handleChannel('workspace:reorder', (_event, payload) => {

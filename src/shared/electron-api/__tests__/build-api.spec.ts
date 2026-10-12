@@ -110,13 +110,6 @@ describe('buildElectronApi — native mode', () => {
   it.each([
     ['terminal.attach', ['s1'], 'invoke', 'terminal:attach', { sessionId: 's1' }],
     ['git.changeStats', ['/repo'], 'invoke', 'git:change-stats', { path: '/repo' }],
-    [
-      'extension.sidebarItemClick',
-      ['item-1'],
-      'invoke',
-      'extension:sidebar-item-click',
-      { itemId: 'item-1' },
-    ],
     ['extension.setBottomInset', [280], 'send', 'extension:set-bottom-inset', { inset: 280 }],
     ['extension.setLeftInset', [44], 'send', 'extension:set-left-inset', { inset: 44 }],
     [

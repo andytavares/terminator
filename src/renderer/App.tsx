@@ -132,7 +132,6 @@ export function App(): JSX.Element {
     setActiveWorkspaceTab,
     commands: extensionCommands,
     overlays,
-    sidebarButtons,
     quickActionGroups,
   } = useExtensionRegistry()
 
@@ -983,7 +982,6 @@ export function App(): JSX.Element {
               they stay put whether or not the sidebar is showing. */}
           <AppBand
             globalTabs={sortedGlobalTabs}
-            sidebarItems={sidebarButtons}
             activeId={activeGlobalTabId}
             onSelect={(id) => setActiveGlobalTab(id === activeGlobalTabId ? null : id)}
             unreadNotifications={unreadCount}

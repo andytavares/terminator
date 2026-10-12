@@ -7,7 +7,6 @@ import { ExtensionManifestSchema } from '../../shared/schemas/extension.schema.j
 import {
   createExtensionAPI,
   getApiDisposables,
-  globalRegistry,
   type Disposable,
   type ExtensionAPIDeps,
 } from './api.js'
@@ -287,5 +286,3 @@ export function isVersionCompatible(minVersion: string, appVersion: string): boo
   }
   return true
 }
-
-export { globalRegistry }

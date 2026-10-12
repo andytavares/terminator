@@ -74,15 +74,4 @@ export const ExtensionManifestSchema = z.object({
   contributes: ExtensionContributesSchema.optional(),
 })
 
-export const ExtensionSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  version: z.string(),
-  description: z.string(),
-  entryPoint: z.string(),
-  status: z.enum(['enabled', 'disabled', 'error']),
-  installedAt: z.string().datetime(),
-  errorMessage: z.string().optional(),
-})
-
 export type ExtensionManifestData = z.infer<typeof ExtensionManifestSchema>

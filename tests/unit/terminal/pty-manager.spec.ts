@@ -95,12 +95,18 @@ describe('PtyManager', () => {
     })
   })
 
-  it('spawn creates a PTY and returns sessionId', async () => {
+  it('spawnSession creates a PTY and returns the session info', async () => {
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
     const sessionId = 'test-session-1'
-    const result = mgr.spawn(sessionId, '/home', '/bin/bash', 'human', vi.fn(), vi.fn())
-    expect(result).toBe(sessionId)
+    const result = mgr.spawnSession({
+      sessionId,
+      cwd: '/home',
+      shell: '/bin/bash',
+      type: 'human',
+      origin: 'app',
+    })
+    expect(result.sessionId).toBe(sessionId)
     expect(mgr.getSessionIds()).toContain(sessionId)
   })
 
@@ -108,7 +114,7 @@ describe('PtyManager', () => {
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
     const id = 'resize-session'
-    mgr.spawn(id, '/', '/bin/bash', 'human', vi.fn(), vi.fn())
+    mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
     mgr.resize(id, 120, 40)
     expect(mockPty.resize).toHaveBeenCalledWith(120, 40)
   })
@@ -117,7 +123,7 @@ describe('PtyManager', () => {
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
     const id = 'write-session'
-    mgr.spawn(id, '/', '/bin/bash', 'human', vi.fn(), vi.fn())
+    mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
     mgr.write(id, 'ls\n')
     expect(mockPty.write).toHaveBeenCalledWith('ls\n')
   })
@@ -126,7 +132,7 @@ describe('PtyManager', () => {
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
     const id = 'kill-session'
-    mgr.spawn(id, '/', '/bin/bash', 'human', vi.fn(), vi.fn())
+    mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
     mgr.kill(id)
     expect(mockPty.kill).toHaveBeenCalled()
     expect(mgr.getSessionIds()).not.toContain(id)
@@ -135,8 +141,20 @@ describe('PtyManager', () => {
   it('killAll terminates all tracked PTY processes', async () => {
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
-    mgr.spawn('s1', '/', '/bin/bash', 'human', vi.fn(), vi.fn())
-    mgr.spawn('s2', '/', '/bin/bash', 'agent', vi.fn(), vi.fn())
+    mgr.spawnSession({
+      sessionId: 's1',
+      cwd: '/',
+      shell: '/bin/bash',
+      type: 'human',
+      origin: 'app',
+    })
+    mgr.spawnSession({
+      sessionId: 's2',
+      cwd: '/',
+      shell: '/bin/bash',
+      type: 'agent',
+      origin: 'app',
+    })
     await mgr.killAll()
     expect(mgr.getSessionIds()).toHaveLength(0)
   })
@@ -156,7 +174,7 @@ describe('PtyManager', () => {
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
     const id = 'kill-err'
-    mgr.spawn(id, '/', '/bin/bash', 'human', vi.fn(), vi.fn())
+    mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
     expect(() => mgr.kill(id)).not.toThrow()
     expect(mgr.getSessionIds()).not.toContain(id)
   })
@@ -171,7 +189,8 @@ describe('PtyManager', () => {
     const mgr = new PtyManager()
     const onExit = vi.fn()
     const id = 'exit-session'
-    mgr.spawn(id, '/', '/bin/bash', 'human', vi.fn(), onExit)
+    mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
+    mgr.onExit(id, onExit)
 
     expect(mgr.getSessionIds()).toContain(id)
     capturedOnExit?.({ exitCode: 0 })
@@ -288,7 +307,7 @@ describe('PtyManager', () => {
   it('getPid returns the PID of a live session', async () => {
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
-    mgr.spawn('s1', '/', '/bin/sh', 'human', vi.fn(), vi.fn())
+    mgr.spawnSession({ sessionId: 's1', cwd: '/', shell: '/bin/sh', type: 'human', origin: 'app' })
     expect(mgr.getPid('s1')).toBe(12345)
   })
 
@@ -301,8 +320,20 @@ describe('PtyManager', () => {
   it('listSessions returns all active sessions with cwd', async () => {
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
-    mgr.spawn('s1', '/home/user', '/bin/sh', 'human', vi.fn(), vi.fn())
-    mgr.spawn('s2', '/tmp', '/bin/sh', 'agent', vi.fn(), vi.fn())
+    mgr.spawnSession({
+      sessionId: 's1',
+      cwd: '/home/user',
+      shell: '/bin/sh',
+      type: 'human',
+      origin: 'app',
+    })
+    mgr.spawnSession({
+      sessionId: 's2',
+      cwd: '/tmp',
+      shell: '/bin/sh',
+      type: 'agent',
+      origin: 'app',
+    })
     const result = mgr.listSessions()
     expect(result).toHaveLength(2)
     expect(result).toEqual(
@@ -317,30 +348,6 @@ describe('PtyManager', () => {
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
     expect(mgr.listSessions()).toEqual([])
-  })
-
-  it('attachOnData returns a dispose function that detaches the listener', async () => {
-    const onDataCb = vi.fn()
-    let capturedDataCb: ((data: string) => void) | null = null
-    mockPty.onData.mockImplementation((cb: (data: string) => void) => {
-      capturedDataCb = cb
-      return { dispose: vi.fn() }
-    })
-
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
-    mgr.spawn('s1', '/tmp', '/bin/sh', 'human', vi.fn(), vi.fn())
-
-    const dispose = mgr.attachOnData('s1', onDataCb)
-    expect(dispose).toBeTypeOf('function')
-    expect(capturedDataCb).not.toBeNull()
-  })
-
-  it('attachOnData returns null for unknown sessionId', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
-    const result = mgr.attachOnData('no-such', vi.fn())
-    expect(result).toBeNull()
   })
 })
 
@@ -464,18 +471,6 @@ describe('PtyManager session authority (spawnSession)', () => {
       ['sa', 'app'],
       ['sr', 'remote'],
     ])
-  })
-
-  it('legacy spawn() delegates to spawnSession with app origin and wires callbacks', async () => {
-    const mgr = await makeManager()
-    const onData = vi.fn()
-    const onExit = vi.fn()
-    mgr.spawn('legacy', '/l', '/bin/sh', 'human', onData, onExit)
-    expect(mgr.getSession('legacy')?.origin).toBe('app')
-    capturedDataCb!('out')
-    expect(onData).toHaveBeenCalledWith('out')
-    capturedExitCb!({ exitCode: 0 })
-    expect(onExit).toHaveBeenCalledWith(0)
   })
 })
 

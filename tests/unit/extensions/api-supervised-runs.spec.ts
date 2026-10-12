@@ -19,9 +19,6 @@ vi.mock('../../../src/main/shell/shell-executor', () => ({
   execShell: vi.fn(),
   assertCommandAllowed: vi.fn(),
 }))
-vi.mock('../../../src/main/fs/fs-watcher', () => ({
-  fsWatcherService: { addHandler: vi.fn(), removeHandler: vi.fn() },
-}))
 vi.mock('../../../src/main/logger', () => ({
   makeLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }))
@@ -51,6 +48,7 @@ vi.mock('../../../src/main/storage/workspace-store', () => ({
 }))
 
 import { createExtensionAPI } from '../../../src/main/extensions/api'
+import { onProjectDelete } from '../../../src/main/extensions/workspace-events'
 
 interface Spawned {
   sessionId: string
@@ -182,9 +180,9 @@ describe('workspace.listProjects and deleteProject', () => {
   it('announces the deletion, so what hangs off the project is cleaned up too', () => {
     const api = build()
     const heard = vi.fn()
-    const off = api.workspace.onProjectDelete(heard)
+    const off = onProjectDelete(heard)
     api.workspace.deleteProject('proj-1')
-    off.dispose()
+    off()
     expect(heard).toHaveBeenCalledWith('proj-1')
   })
 

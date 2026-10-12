@@ -85,7 +85,6 @@ beforeEach(() => {
   })
   globalRegistry.commandContributions.clear()
   globalRegistry.commandHandlers.clear()
-  globalRegistry.commandDisabledReasons.clear()
 })
 
 describe('api.commands.register', () => {
@@ -128,56 +127,6 @@ describe('api.commands.register', () => {
     await executeExtensionCommand(key, { projectId: null, sessionId: null, repoRoot: null })
 
     expect(handler).toHaveBeenCalledTimes(1)
-  })
-
-  it('a disposed command clears its disabled reason', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.commands.register({ id: 'push', label: 'Push' }, vi.fn())
-    api.commands.setEnabled('push', false, 'No repository focused')
-    disposable.dispose()
-
-    expect(listExtensionCommands().find((c) => c.id === 'push')).toBeUndefined()
-    expect(globalRegistry.commandDisabledReasons.size).toBe(0)
-  })
-})
-
-describe('api.commands.setEnabled', () => {
-  it('sets a disabledReason that listExtensionCommands surfaces', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    api.commands.register({ id: 'push', label: 'Push' }, vi.fn())
-    api.commands.setEnabled('push', false, 'No repository focused')
-
-    const cmd = listExtensionCommands().find((c) => c.id === 'push')
-    expect(cmd?.disabledReason).toBe('No repository focused')
-  })
-
-  it('defaults the reason when none is given', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    api.commands.register({ id: 'push', label: 'Push' }, vi.fn())
-    api.commands.setEnabled('push', false)
-
-    expect(listExtensionCommands().find((c) => c.id === 'push')?.disabledReason).toBe('Disabled')
-  })
-
-  it('clears the reason when re-enabled', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    api.commands.register({ id: 'push', label: 'Push' }, vi.fn())
-    api.commands.setEnabled('push', false, 'No repository focused')
-    api.commands.setEnabled('push', true)
-
-    expect(listExtensionCommands().find((c) => c.id === 'push')?.disabledReason).toBeUndefined()
-  })
-
-  it('a disabled command does not run', async () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const handler = vi.fn()
-    api.commands.register({ id: 'push', label: 'Push' }, handler)
-    api.commands.setEnabled('push', false, 'No repository focused')
-    const key = listExtensionCommands().find((c) => c.id === 'push')!.key
-
-    await executeExtensionCommand(key, { projectId: null, sessionId: null, repoRoot: null })
-
-    expect(handler).not.toHaveBeenCalled()
   })
 })
 
@@ -280,16 +229,6 @@ describe('executeExtensionCommand with args', () => {
   it('keeps a command that takes args out of the quick-actions list', () => {
     register()
     expect(listExtensionCommands().find((c) => c.id === 'review')).toBeUndefined()
-  })
-
-  it('reports disabled for a command dimmed by setEnabled', async () => {
-    const { handler, key } = register()
-    createExtensionAPI('test.ext', '0.1.0').commands.setEnabled('review', false, 'busy')
-
-    const result = await executeExtensionCommand(key, noCtx, { repoRoot: '/r', number: 1 })
-
-    expect(result).toEqual({ ok: false, reason: 'disabled' })
-    expect(handler).not.toHaveBeenCalled()
   })
 })
 
