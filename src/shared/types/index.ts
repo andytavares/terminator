@@ -1,5 +1,24 @@
 export type { NotificationTarget, NotificationType } from '../notifications/resolve-targets'
-import type { NotificationTarget } from '../notifications/resolve-targets'
+import type { NotificationTarget, NotificationType } from '../notifications/resolve-targets'
+
+export interface NotificationAction {
+  id: string
+  label: string
+}
+
+/** A notification as the main process sends it to the renderer. */
+export interface SerializedNotification {
+  id: string
+  type: NotificationType
+  title: string
+  message?: string
+  timestamp: number
+  source?: string
+  actions?: NotificationAction[]
+  /** Whether clicking the row goes anywhere. False for a bare report. */
+  clickable?: boolean
+  targets: NotificationTarget[]
+}
 
 export interface Workspace {
   id: string

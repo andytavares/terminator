@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { buildElectronApi, type ApiTransport } from '../build-api.js'
+import { ELECTRON_API_MANIFEST } from '../manifest.js'
 
 function makeTransport() {
   const listeners = new Map<string, Set<(args: unknown[]) => void>>()
@@ -260,5 +261,46 @@ describe('buildElectronApi — remote mode', () => {
     api.extensionEvents.onTogglePanel(handler)
     t.push('extension:toggle-panel', 'terminator.git-integration')
     expect(handler).toHaveBeenCalledWith('terminator.git-integration')
+  })
+})
+
+// Every method on a built bridge, as a dot path ('terminal.create', 'getFilePath').
+function methodPaths(api: Record<string, unknown>, prefix = ''): string[] {
+  return Object.entries(api).flatMap(([name, value]) =>
+    typeof value === 'function'
+      ? [prefix + name]
+      : methodPaths(value as Record<string, unknown>, `${prefix}${name}.`)
+  )
+}
+
+function manifestPathsWhere(keep: (spec: (typeof ELECTRON_API_MANIFEST)[number]) => boolean) {
+  return ELECTRON_API_MANIFEST.filter(keep)
+    .map((spec) => spec.path)
+    .sort()
+}
+
+describe('buildElectronApi — the manifest is the whole surface', () => {
+  it('gives the app renderer every manifest method not reserved for extension views', () => {
+    const api = buildElectronApi(makeTransport(), { mode: 'native', locals: NATIVE_LOCALS })
+    expect(methodPaths(api).sort()).toEqual(
+      manifestPathsWhere((spec) => spec.extensionView !== 'only')
+    )
+  })
+
+  it('gives the remote client every renderer method except the omitted ones', () => {
+    const api = buildElectronApi(makeTransport(), { mode: 'remote', locals: REMOTE_LOCALS })
+    expect(methodPaths(api).sort()).toEqual(
+      manifestPathsWhere((spec) => spec.extensionView !== 'only' && spec.remote !== 'omit')
+    )
+  })
+
+  it('keeps extension-view-only methods off the app renderer and the remote client', () => {
+    const native = buildElectronApi(makeTransport(), { mode: 'native', locals: NATIVE_LOCALS })
+    const remote = buildElectronApi(makeTransport(), { mode: 'remote', locals: REMOTE_LOCALS })
+    for (const api of [native, remote] as any[]) {
+      expect(api.extension.runCommand).toBeUndefined()
+      expect(api.terminal.listSessions).toBeUndefined()
+      expect(api.ui).toBeUndefined()
+    }
   })
 })

@@ -2,6 +2,7 @@
 // The preload runs in a renderer context: it needs a real `window` to attach
 // the double-Escape exit listener to.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { ELECTRON_API_MANIFEST } from '../../../src/shared/electron-api/manifest.js'
 
 const exposed: Record<string, unknown> = {}
 const mockSend = vi.fn()
@@ -55,6 +56,68 @@ describe('preload-webview', () => {
     for (const ns of required) {
       expect(api, `namespace '${ns}' is missing`).toHaveProperty(ns)
     }
+  })
+
+  it('exposes exactly the methods the manifest declares for extension views', () => {
+    const methodPaths = (api: Record<string, unknown>, prefix = ''): string[] =>
+      Object.entries(api).flatMap(([name, value]) =>
+        typeof value === 'function'
+          ? [prefix + name]
+          : methodPaths(value as Record<string, unknown>, `${prefix}${name}.`)
+      )
+    const declared = ELECTRON_API_MANIFEST.filter((spec) => spec.extensionView !== undefined).map(
+      (spec) => spec.path
+    )
+    const exposedPaths = methodPaths(exposed['electronAPI'] as Record<string, unknown>)
+    expect(exposedPaths.sort()).toEqual(declared.sort())
+  })
+
+  // This preload is still written by hand (see the bundling note in
+  // src/main/preload.ts), so each method must put on the wire what its spec says.
+  it.each(
+    ELECTRON_API_MANIFEST.filter(
+      (spec) => spec.extensionView !== undefined && (spec.kind === 'invoke' || spec.kind === 'send')
+    ).map((spec) => [spec.path, spec] as const)
+  )('%s sends what the manifest declares', async (path, spec) => {
+    const { ipcRenderer } = await import('electron')
+    const [namespace, name] = path.split('.')
+    const api = exposed['electronAPI'] as Record<string, Record<string, (...a: unknown[]) => void>>
+    const callMethod = api[namespace][name]
+    const args = ['first', 'second', 'third'].slice(0, callMethod.length)
+    const wire = spec.kind === 'invoke' ? ipcRenderer.invoke : ipcRenderer.send
+    vi.mocked(wire).mockClear()
+
+    callMethod(...args)
+
+    const toPayload = spec.toPayload as ((...a: unknown[]) => unknown) | undefined
+    const payload = toPayload ? toPayload(...args) : args[0]
+    const sent = vi.mocked(wire).mock.calls[0] as unknown[]
+    expect([sent[0], sent[1]]).toEqual([spec.channel, payload])
+  })
+
+  it.each(
+    ELECTRON_API_MANIFEST.filter(
+      (spec) => spec.extensionView !== undefined && spec.kind === 'event'
+    ).map((spec) => [spec.path, spec] as const)
+  )('%s hands its handler what the manifest declares', async (path, spec) => {
+    const { ipcRenderer } = await import('electron')
+    const [namespace, name] = path.split('.')
+    const api = exposed['electronAPI'] as Record<string, Record<string, (h: unknown) => void>>
+    vi.mocked(ipcRenderer.on).mockClear()
+    const handler = vi.fn()
+
+    api[namespace][name](handler)
+
+    const pushed = { sessionId: 's1', data: 'd', exitCode: 0, id: 'x' }
+    const [channel, listener] = vi.mocked(ipcRenderer.on).mock.calls[0] as unknown as [
+      string,
+      (event: unknown, ...wire: unknown[]) => void,
+    ]
+    listener({}, pushed)
+    expect(channel).toBe(spec.channel)
+    expect(handler).toHaveBeenCalledWith(
+      ...(spec.toHandlerArgs ? spec.toHandlerArgs([pushed]) : [pushed])
+    )
   })
 
   it('exposes extensionBridge.on and extensionBridge.invoke', () => {

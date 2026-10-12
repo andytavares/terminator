@@ -22,16 +22,20 @@ export interface BuildApiOptions {
   locals?: Record<string, (...args: never[]) => unknown>
 }
 
+// Specs for extension views only belong to src/main/preload-webview.ts.
+function belongsToSurface(spec: ChannelSpec, mode: BuildApiOptions['mode']): boolean {
+  if (spec.extensionView === 'only') return false
+  return mode === 'native' || (spec.remote ?? 'same') !== 'omit'
+}
+
 function methodFor(
   spec: ChannelSpec,
   transport: ApiTransport,
   opts: BuildApiOptions
 ): ((...args: unknown[]) => unknown) | undefined {
-  const remote = spec.remote ?? 'same'
-  const needsLocal = spec.kind === 'local' || (opts.mode === 'remote' && remote === 'stub')
+  if (!belongsToSurface(spec, opts.mode)) return undefined
 
-  if (opts.mode === 'remote' && remote === 'omit') return undefined
-
+  const needsLocal = spec.kind === 'local' || (opts.mode === 'remote' && spec.remote === 'stub')
   if (needsLocal) {
     const local = opts.locals?.[spec.path]
     if (!local) {

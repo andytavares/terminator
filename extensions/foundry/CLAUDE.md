@@ -92,7 +92,7 @@ Verification commands (`npm test`, `pytest`, …) do **not** run through `api.sh
 ### What this extension MUST NOT do
 
 - **Never** modify `src/main/preload.ts`
-- **Never** put a `foundry:*` channel in `src/renderer/electron.d.ts`
+- **Never** put a `foundry:*` channel in `src/shared/electron-api/manifest.ts`
 - **Never** add extension-only npm deps to the **root** `package.json` — they go in `extensions/foundry/package.json`
 - **Never** import from another extension
 - **Never** hardcode the extension id (`terminator.foundry`) in core application files

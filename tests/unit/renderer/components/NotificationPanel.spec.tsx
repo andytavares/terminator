@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { useNotificationStore } from '../../../../src/renderer/stores/notification.store'
-import type { SerializedNotification } from '../../../../src/renderer/electron.d'
+import type { SerializedNotification } from '../../../../src/shared/types/index'
 import type { Notification } from '../../../../src/renderer/stores/notification.store'
 
 const mockTriggerAction = vi.fn().mockResolvedValue({ ok: true })
