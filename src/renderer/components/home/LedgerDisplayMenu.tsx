@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React from 'react'
 import { SlidersHorizontal } from 'lucide-react'
-import { closeAllContextMenus } from '../ContextMenu'
-import { useMenuPlacement } from '../use-menu-placement'
+import { MenuChoice, useMenu } from '../sidebar/menu'
 import type { HomePrefs, LedgerColumns, LedgerGroupBy, LedgerSort } from '../../sidebar/home-prefs'
 import '../sidebar/SidebarMenu.css'
 
@@ -31,49 +30,25 @@ interface Props {
 
 /** How the Ledger is arranged, behind one control, in the shape of the sidebar's Display menu. */
 export function LedgerDisplayMenu({ prefs, onChange }: Props): JSX.Element {
-  const [open, setOpen] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const placement = useMenuPlacement(open, buttonRef, panelRef)
-
-  useEffect(() => {
-    if (!open) return
-    const close = (): void => setOpen(false)
-    window.addEventListener('click', close)
-    window.addEventListener('close-context-menus', close)
-    return () => {
-      window.removeEventListener('click', close)
-      window.removeEventListener('close-context-menus', close)
-    }
-  }, [open])
+  const { open, close, toggle, buttonRef, panelRef, placement } = useMenu()
 
   const radio = (checked: boolean, label: string, patch: Partial<HomePrefs>): JSX.Element => (
-    <button
+    <MenuChoice
       key={label}
-      type="button"
-      role="menuitemradio"
-      aria-checked={checked}
-      className={`sidebar-menu__item${checked ? ' sidebar-menu__item--on' : ''}`}
-      onClick={() => {
+      checked={checked}
+      onSelect={() => {
         onChange(patch)
-        setOpen(false)
+        close()
       }}
     >
       {label}
-    </button>
+    </MenuChoice>
   )
 
   const check = (checked: boolean, label: string, patch: Partial<HomePrefs>): JSX.Element => (
-    <button
-      key={label}
-      type="button"
-      role="menuitemcheckbox"
-      aria-checked={checked}
-      className={`sidebar-menu__item${checked ? ' sidebar-menu__item--on' : ''}`}
-      onClick={() => onChange(patch)}
-    >
+    <MenuChoice key={label} kind="checkbox" checked={checked} onSelect={() => onChange(patch)}>
       {label}
-    </button>
+    </MenuChoice>
   )
 
   return (
@@ -84,10 +59,7 @@ export function LedgerDisplayMenu({ prefs, onChange }: Props): JSX.Element {
         className={`sidebar-menu__button${open ? ' sidebar-menu__button--on' : ''}`}
         aria-expanded={open}
         aria-label="Display"
-        onClick={() => {
-          closeAllContextMenus()
-          setOpen((v) => !v)
-        }}
+        onClick={toggle}
       >
         <SlidersHorizontal aria-hidden="true" />
         <span className="sidebar-menu__label">Display</span>

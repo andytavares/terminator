@@ -1,8 +1,7 @@
-import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
-import { useIntegrationsStore } from '../../stores/integrations.store'
-import type { IssueListResult, IssueSummary, TrackerId } from '../../../shared/types/index'
+import { ERROR_TEXT, TRACKER_LABELS, useIssueSearch } from './use-issue-search'
+import type { IssueSummary } from '../../../shared/types/index'
 import './IssuePicker.css'
 
 // Choosing an issue, inline.
@@ -11,17 +10,6 @@ import './IssuePicker.css'
 // owning a modal — the new-project dialog cannot open a second dialog over
 // itself just to pick one row.
 
-const TRACKER_LABELS: Record<TrackerId, string> = { linear: 'Linear', jira: 'Jira' }
-const SEARCH_DEBOUNCE_MS = 250
-
-const ERROR_TEXT: Record<string, string> = {
-  'auth-failed': 'credential rejected',
-  'rate-limited': 'rate limited',
-  unavailable: 'unreachable',
-  'not-found': 'not found',
-  failed: 'failed',
-}
-
 export interface IssuePickerProps {
   selected: IssueSummary | null
   onSelect: (issue: IssueSummary) => void
@@ -29,42 +17,10 @@ export interface IssuePickerProps {
 }
 
 export function IssuePicker({ selected, onSelect, onClear }: IssuePickerProps): JSX.Element {
-  const { listMine, searchIssues } = useIntegrationsStore(
-    useShallow((s) => ({ listMine: s.listMine, searchIssues: s.searchIssues }))
-  )
   const [term, setTerm] = useState('')
   const [open, setOpen] = useState(false)
-  const [result, setResult] = useState<IssueListResult>({ issues: [], failures: [] })
-  // The term the current result answers; null until the open list has been filled.
-  const [answeredTerm, setAnsweredTerm] = useState<string | null>(null)
-  // Guards against a slow earlier request replacing a faster later one.
-  const requestId = useRef(0)
   const rootRef = useRef<HTMLDivElement>(null)
-
-  const trimmedTerm = term.trim()
-  if (!open && answeredTerm !== null) setAnsweredTerm(null)
-  const loading = open && answeredTerm !== trimmedTerm
-
-  useEffect(() => {
-    if (!open) return
-    const id = ++requestId.current
-    const trimmed = term.trim()
-
-    const run = async (): Promise<void> => {
-      const next =
-        trimmed.length === 0 ? await listMine({ limit: 25 }) : await searchIssues(trimmed)
-      if (id !== requestId.current) return
-      setResult(next)
-      setAnsweredTerm(trimmed)
-    }
-
-    if (trimmed.length === 0) {
-      void run()
-      return
-    }
-    const timer = setTimeout(() => void run(), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
-  }, [term, open, listMine, searchIssues])
+  const { result, loading } = useIssueSearch(term, open, { limit: 25 })
 
   // The list is a dropdown, so it goes away the way one does: Escape, or a
   // pointer anywhere else. Without this it stayed open over whatever it was

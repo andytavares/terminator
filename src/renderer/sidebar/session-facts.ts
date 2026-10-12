@@ -49,6 +49,16 @@ export interface SessionFacts {
   snapshot: SessionSnapshot
 }
 
+/** What a Home row or a wall tile can do to the session it shows. */
+export interface SessionActions {
+  onOpen: (sessionId: string) => void
+  onSaveDescription: (facts: SessionFacts, description: string | null) => void
+  onLink?: (facts: SessionFacts) => void
+  onResume?: (facts: SessionFacts) => void
+  onCloseSession?: (facts: SessionFacts) => void
+  onForgetSession?: (facts: SessionFacts) => void
+}
+
 export interface SessionFactsInput {
   sessions: readonly TerminalSession[]
   records: readonly SessionRecordListing[]

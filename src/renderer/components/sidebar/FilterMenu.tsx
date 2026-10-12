@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React from 'react'
 import { ListFilter } from 'lucide-react'
 import type { SessionView } from '../../sidebar/view-model'
-import { closeAllContextMenus } from '../ContextMenu'
-import { useMenuPlacement } from '../use-menu-placement'
+import { MenuChoice, useMenu } from './menu'
 import './SidebarMenu.css'
 
 export interface FilterMenuProps {
@@ -40,23 +39,9 @@ export function FilterMenu({
   total,
   onShowAll,
 }: FilterMenuProps): JSX.Element {
-  const [open, setOpen] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const placement = useMenuPlacement(open, buttonRef, panelRef)
+  const { open, close, toggle, buttonRef, panelRef, placement } = useMenu()
   const active = views.find((v) => v.id === activeViewId) ?? views[0]
   const hidden = Math.max(0, total - shown)
-
-  useEffect(() => {
-    if (!open) return
-    const close = (): void => setOpen(false)
-    window.addEventListener('click', close)
-    window.addEventListener('close-context-menus', close)
-    return () => {
-      window.removeEventListener('click', close)
-      window.removeEventListener('close-context-menus', close)
-    }
-  }, [open])
 
   return (
     <div className="sidebar-menu" onClick={(e) => e.stopPropagation()}>
@@ -66,10 +51,7 @@ export function FilterMenu({
         className={`sidebar-menu__button${hidden > 0 ? ' sidebar-menu__button--on' : ''}`}
         aria-expanded={open}
         aria-label={hidden > 0 ? `Filter — ${hidden} hidden` : 'Filter'}
-        onClick={() => {
-          closeAllContextMenus()
-          setOpen((v) => !v)
-        }}
+        onClick={toggle}
       >
         <ListFilter aria-hidden="true" />
         <span className="sidebar-menu__label">Filter</span>
@@ -79,22 +61,19 @@ export function FilterMenu({
       {open && (
         <div ref={panelRef} className="sidebar-menu__panel" role="menu" style={placement}>
           {views.map((view) => (
-            <button
+            <MenuChoice
               key={view.id}
-              type="button"
-              role="menuitemradio"
-              aria-checked={view.id === activeViewId}
-              className={`sidebar-menu__item${view.id === activeViewId ? ' sidebar-menu__item--on' : ''}`}
-              onClick={() => {
+              checked={view.id === activeViewId}
+              onSelect={() => {
                 onSelectView(view.id)
-                setOpen(false)
+                close()
               }}
             >
               <span>{view.name}</span>
               {counts?.[view.id] ? (
                 <span className="sidebar-menu__count">{counts[view.id]}</span>
               ) : null}
-            </button>
+            </MenuChoice>
           ))}
 
           <div className="sidebar-menu__separator" />
@@ -124,7 +103,7 @@ export function FilterMenu({
                 className="sidebar-menu__item sidebar-menu__item--note"
                 onClick={() => {
                   onShowAll()
-                  setOpen(false)
+                  close()
                 }}
               >
                 Showing {shown} of {total} — show all

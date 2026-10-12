@@ -4,6 +4,7 @@ import { useSettingsStore } from '../../stores/settings.store'
 import type { NotificationTarget } from '../../../shared/types/index'
 import { QuickActionsSettings } from './QuickActionsSettings'
 import './SettingsPanel.css'
+import { ThemeChoices } from './ThemeChoices'
 
 const NOTIFICATION_TARGETS: Array<{ value: NotificationTarget; label: string }> = [
   { value: 'system', label: 'System' },
@@ -75,17 +76,7 @@ export function GlobalSettings(): JSX.Element {
         <div className="settings-section__field">
           <label className="settings-section__label">Theme</label>
           <div className="settings-section__radio-group">
-            {(['dark', 'light'] as const).map((t) => (
-              <label key={t} className="settings-section__radio">
-                <input
-                  type="radio"
-                  value={t}
-                  checked={globalSettings.appearance.theme === t}
-                  onChange={() => updateGlobalTheme(t)}
-                />
-                {t.charAt(0).toUpperCase() + t.slice(1)}
-              </label>
-            ))}
+            <ThemeChoices checked={globalSettings.appearance.theme} onChange={updateGlobalTheme} />
           </div>
         </div>
 

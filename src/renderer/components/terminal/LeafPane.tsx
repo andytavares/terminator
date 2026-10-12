@@ -3,6 +3,7 @@ import React, { useRef, useLayoutEffect, useCallback } from 'react'
 import { X } from 'lucide-react'
 import { useSessionStore } from '../../stores/session.store'
 import './LeafPane.css'
+import { droppedPaths } from './dropped-paths'
 
 interface Props {
   sessionId: string
@@ -83,11 +84,7 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
     e.preventDefault()
     const instance = getTerminalInstance(sessionId)
     if (!instance) return
-    const paths = Array.from(e.dataTransfer.files)
-      .map((file) => window.electronAPI.getFilePath(file))
-      .filter(Boolean)
-      .map((p) => (/\s/.test(p) ? `'${p.replace(/'/g, "'\\''")}'` : p))
-      .join(' ')
+    const paths = droppedPaths(e.dataTransfer.files)
     if (paths) instance.terminal.paste(paths)
   }
 
