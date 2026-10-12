@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { Dialog } from '@terminator/extension-ui'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSettingsStore } from '../../stores/settings.store'
 import type { Branch, WorktreeInfo } from '../../../shared/types/index'
@@ -8,7 +9,7 @@ import { useIntegrationsStore } from '../../stores/integrations.store'
 import { IssuePicker } from '../integrations/IssuePicker'
 import { branchFromIssue } from '../../../shared/integrations/branch-from-issue'
 import type { IssueSummary } from '../../../shared/types/index'
-import './Dialog.css'
+import './dialog-fields.css'
 
 type BranchMode = 'existing' | 'worktree'
 
@@ -160,8 +161,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
     await linkIssue(project.id, issue.tracker, issue.key)
   }
 
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
-    e.preventDefault()
+  async function handleSubmit(): Promise<void> {
     if (busy) return
     setBusy(true)
     try {
@@ -281,169 +281,164 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
 
   return (
     // Dismissing mid-flight would leave git finishing a worktree nothing is
-    // waiting for, so the overlay stops answering until the work is done.
-    <div className="dialog-overlay" onClick={() => !busy && onClose()}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <h2 className="dialog__title">Create Branch</h2>
-        <form onSubmit={handleSubmit}>
-          {isAnyConnected() && (
-            <div className="dialog__field">
-              <label className="dialog__label">Start from an issue</label>
-              <IssuePicker selected={issue} onSelect={applyIssue} onClear={() => setIssue(null)} />
-              {issue !== null && (
-                <span className="dialog__hint">
-                  Branch filled in from {issue.key}. It stays editable.
-                </span>
-              )}
-            </div>
+    // waiting for, so the scrim and Escape stop answering until the work is done.
+    <Dialog
+      title="Create Branch"
+      dismissible={!busy}
+      onDismiss={() => !busy && onClose()}
+      actions={[
+        { label: 'Cancel', disabled: busy, onSelect: onClose },
+        {
+          label: busy ? 'Creating…' : 'Create',
+          tone: 'primary',
+          submit: true,
+          disabled: !!nameError || busy,
+          onSelect: handleSubmit,
+        },
+      ]}
+    >
+      {isAnyConnected() && (
+        <div className="dialog__field">
+          <label className="dialog__label">Start from an issue</label>
+          <IssuePicker selected={issue} onSelect={applyIssue} onClear={() => setIssue(null)} />
+          {issue !== null && (
+            <span className="dialog__hint">
+              Branch filled in from {issue.key}. It stays editable.
+            </span>
           )}
+        </div>
+      )}
 
-          {/* A branch is named by its branch (ADR-034). Only a folder that is
+      {/* A branch is named by its branch (ADR-034). Only a folder that is
               not a repo has no branch to take a name from, and there the
               operator still has to supply one. */}
-          {!gitRoot && (
-            <div className="dialog__field">
-              <label className="dialog__label">Name *</label>
-              <input
-                className={`dialog__input${nameError ? ' dialog__input--error' : ''}`}
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value)
-                  setNameError('')
-                }}
-                onBlur={() => setNameError(validateName(name))}
-                placeholder="My branch"
-                autoFocus
-              />
-              {nameError && <span className="dialog__error">{nameError}</span>}
-            </div>
-          )}
+      {!gitRoot && (
+        <div className="dialog__field">
+          <label className="dialog__label">Name *</label>
+          <input
+            className={`dialog__input${nameError ? ' dialog__input--error' : ''}`}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              setNameError('')
+            }}
+            onBlur={() => setNameError(validateName(name))}
+            placeholder="My branch"
+            autoFocus
+          />
+          {nameError && <span className="dialog__error">{nameError}</span>}
+        </div>
+      )}
 
-          {gitRoot && (
-            <div className="dialog__field">
-              <label className="dialog__label">Branch</label>
-              <div className="dialog__segment">
-                <button
-                  type="button"
-                  className={`dialog__segment-btn${branchMode === 'existing' ? ' dialog__segment-btn--active' : ''}${hasNonWorktreeProject ? ' dialog__segment-btn--disabled' : ''}`}
-                  onClick={() => !hasNonWorktreeProject && setBranchMode('existing')}
-                  disabled={hasNonWorktreeProject}
-                  title={
-                    hasNonWorktreeProject
-                      ? 'A branch-based entry already exists in this repo'
-                      : undefined
-                  }
-                >
-                  Branch
-                </button>
-                <button
-                  type="button"
-                  className={`dialog__segment-btn${branchMode === 'worktree' ? ' dialog__segment-btn--active' : ''}`}
-                  onClick={() => setBranchMode('worktree')}
-                >
-                  Worktree
-                </button>
-              </div>
-            </div>
-          )}
+      {gitRoot && (
+        <div className="dialog__field">
+          <label className="dialog__label">Branch</label>
+          <div className="dialog__segment">
+            <button
+              type="button"
+              className={`dialog__segment-btn${branchMode === 'existing' ? ' dialog__segment-btn--active' : ''}${hasNonWorktreeProject ? ' dialog__segment-btn--disabled' : ''}`}
+              onClick={() => !hasNonWorktreeProject && setBranchMode('existing')}
+              disabled={hasNonWorktreeProject}
+              title={
+                hasNonWorktreeProject
+                  ? 'A branch-based entry already exists in this repo'
+                  : undefined
+              }
+            >
+              Branch
+            </button>
+            <button
+              type="button"
+              className={`dialog__segment-btn${branchMode === 'worktree' ? ' dialog__segment-btn--active' : ''}`}
+              onClick={() => setBranchMode('worktree')}
+            >
+              Worktree
+            </button>
+          </div>
+        </div>
+      )}
 
-          {gitRoot && branchMode === 'existing' && (
-            <div className="dialog__field">
-              <BranchSelect
-                branches={sortedBranches}
-                value={selectedBranch}
-                onChange={(b) => {
-                  setIsNewBranch(false)
-                  setSelectedBranch(b)
-                }}
-                newBranchLabel="+ New branch…"
-                onNewBranch={() => setIsNewBranch(true)}
-                isNewSelected={isNewBranch}
-                onRefresh={() => void fetchBranches()}
-                refreshing={fetching}
-              />
-            </div>
-          )}
+      {gitRoot && branchMode === 'existing' && (
+        <div className="dialog__field">
+          <BranchSelect
+            branches={sortedBranches}
+            value={selectedBranch}
+            onChange={(b) => {
+              setIsNewBranch(false)
+              setSelectedBranch(b)
+            }}
+            newBranchLabel="+ New branch…"
+            onNewBranch={() => setIsNewBranch(true)}
+            isNewSelected={isNewBranch}
+            onRefresh={() => void fetchBranches()}
+            refreshing={fetching}
+          />
+        </div>
+      )}
 
-          {gitRoot && branchMode === 'existing' && isNewBranch && (
+      {gitRoot && branchMode === 'existing' && isNewBranch && (
+        <div className="dialog__field">
+          <input
+            className="dialog__input"
+            value={newBranchName}
+            onChange={(e) => setNewBranchName(sanitizeBranchName(e.target.value))}
+            placeholder="feature/my-feature"
+            autoFocus
+          />
+        </div>
+      )}
+
+      {gitRoot && branchMode === 'worktree' && (
+        <>
+          <div className="dialog__field">
+            <label className="dialog__label">Branch</label>
+            <BranchSelect
+              branches={availableWorktreeBranches}
+              value={selectedBranch}
+              onChange={(b) => {
+                setWorktreeIsNewBranch(false)
+                setSelectedBranch(b)
+              }}
+              newBranchLabel="+ New branch…"
+              onNewBranch={() => setWorktreeIsNewBranch(true)}
+              isNewSelected={worktreeIsNewBranch}
+              onRefresh={() => void fetchBranches()}
+              refreshing={fetching}
+            />
+          </div>
+
+          {worktreeIsNewBranch && (
             <div className="dialog__field">
+              <label className="dialog__label">New branch name</label>
               <input
                 className="dialog__input"
                 value={newBranchName}
                 onChange={(e) => setNewBranchName(sanitizeBranchName(e.target.value))}
                 placeholder="feature/my-feature"
-                autoFocus
               />
             </div>
           )}
 
-          {gitRoot && branchMode === 'worktree' && (
-            <>
-              <div className="dialog__field">
-                <label className="dialog__label">Branch</label>
-                <BranchSelect
-                  branches={availableWorktreeBranches}
-                  value={selectedBranch}
-                  onChange={(b) => {
-                    setWorktreeIsNewBranch(false)
-                    setSelectedBranch(b)
-                  }}
-                  newBranchLabel="+ New branch…"
-                  onNewBranch={() => setWorktreeIsNewBranch(true)}
-                  isNewSelected={worktreeIsNewBranch}
-                  onRefresh={() => void fetchBranches()}
-                  refreshing={fetching}
-                />
-              </div>
-
-              {worktreeIsNewBranch && (
-                <div className="dialog__field">
-                  <label className="dialog__label">New branch name</label>
-                  <input
-                    className="dialog__input"
-                    value={newBranchName}
-                    onChange={(e) => setNewBranchName(sanitizeBranchName(e.target.value))}
-                    placeholder="feature/my-feature"
-                  />
-                </div>
-              )}
-
-              <div className="dialog__field">
-                <label className="dialog__label">Worktree path</label>
-                <div className="dialog__row">
-                  <input
-                    className="dialog__input"
-                    value={worktreePath}
-                    onChange={(e) => setWorktreePath(e.target.value)}
-                    placeholder={
-                      worktreeBranchName
-                        ? `Suggested based on "${worktreeBranchName}"`
-                        : '/path/to/worktree'
-                    }
-                  />
-                </div>
-                <span className="dialog__hint">Directory will be created by git</span>
-              </div>
-            </>
-          )}
-
-          {error && <p className="dialog__error">{error}</p>}
-
-          <div className="dialog__actions">
-            <button
-              type="button"
-              className="dialog__btn-secondary"
-              onClick={onClose}
-              disabled={busy}
-            >
-              Cancel
-            </button>
-            <button type="submit" className="dialog__btn-primary" disabled={!!nameError || busy}>
-              {busy ? 'Creating…' : 'Create'}
-            </button>
+          <div className="dialog__field">
+            <label className="dialog__label">Worktree path</label>
+            <div className="dialog__row">
+              <input
+                className="dialog__input"
+                value={worktreePath}
+                onChange={(e) => setWorktreePath(e.target.value)}
+                placeholder={
+                  worktreeBranchName
+                    ? `Suggested based on "${worktreeBranchName}"`
+                    : '/path/to/worktree'
+                }
+              />
+            </div>
+            <span className="dialog__hint">Directory will be created by git</span>
           </div>
-        </form>
-      </div>
-    </div>
+        </>
+      )}
+
+      {error && <p className="dialog__error">{error}</p>}
+    </Dialog>
   )
 }

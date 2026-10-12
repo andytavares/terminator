@@ -1,51 +1,4 @@
-/* ── Dialog ──────────────────────────────────────────────────── */
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.65);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 500;
-  backdrop-filter: blur(2px);
-}
-
-.dialog {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  padding: 24px 24px 20px;
-  min-width: 380px;
-  max-width: 480px;
-  width: 100%;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
-  animation: dialog-in 0.15s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@keyframes dialog-in {
-  from {
-    opacity: 0;
-    transform: scale(0.97) translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-.dialog__description {
-  color: var(--text-secondary);
-  font-size: 13px;
-  margin-bottom: 20px;
-}
-
-.dialog__title {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 18px;
-  letter-spacing: -0.01em;
-  color: var(--text-primary);
-}
+/* Fields inside the core's dialogs. The dialog itself is the design system's. */
 
 .dialog__field {
   margin-bottom: 14px;
@@ -124,63 +77,6 @@
 .dialog__color-swatch--selected {
   border-color: rgba(255, 255, 255, 0.7);
   transform: scale(1.1);
-}
-
-/* ── Actions ─────────────────────────────────────────────────── */
-.dialog__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 20px;
-}
-
-.dialog__btn-primary {
-  background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: 7px 18px;
-  font-size: 12px;
-  font-family: var(--font-ui);
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.dialog__btn-primary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.dialog__btn-primary:hover:not(:disabled) {
-  opacity: 0.88;
-}
-
-.dialog__btn-secondary {
-  background: none;
-  color: var(--text-secondary);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  padding: 7px 18px;
-  font-size: 12px;
-  font-family: var(--font-ui);
-  cursor: pointer;
-  transition:
-    background 0.12s,
-    color 0.12s;
-}
-
-.dialog__btn-secondary:hover:not(:disabled) {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-}
-
-/* Matches the primary, so a dialog busy with work reads as busy on both
-   buttons rather than on one. */
-.dialog__btn-secondary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 /* ── Toggle label (checkbox) ─────────────────────────────────── */

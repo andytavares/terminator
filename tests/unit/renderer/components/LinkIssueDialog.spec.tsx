@@ -247,10 +247,10 @@ describe('LinkIssueDialog — dismissal', () => {
     const { container } = open({ onClose })
     await screen.findByText('TAV-42')
 
-    fireEvent.click(container.querySelector('.dialog') as Element)
+    fireEvent.click(container.querySelector('.tmui-dialog__panel') as Element)
     expect(onClose).not.toHaveBeenCalled()
 
-    fireEvent.click(container.querySelector('.dialog-overlay') as Element)
+    fireEvent.click(container.querySelector('.tmui-dialog__scrim') as Element)
     expect(onClose).toHaveBeenCalled()
   })
 })

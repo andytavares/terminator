@@ -3,8 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { NameTerminalDialog } from '../../../../src/renderer/components/NameTerminalDialog'
 
-vi.mock('../../../../src/renderer/components/sidebar/Dialog.css', () => ({}))
-
 describe('NameTerminalDialog', () => {
   const defaultName = 'Terminal 1'
   let onConfirm: ReturnType<typeof vi.fn>
@@ -54,7 +52,7 @@ describe('NameTerminalDialog', () => {
 
   it('calls onCancel when overlay is clicked', () => {
     renderDialog()
-    fireEvent.click(document.querySelector('.dialog-overlay')!)
+    fireEvent.click(document.querySelector('.tmui-dialog__scrim')!)
     expect(onCancel).toHaveBeenCalled()
   })
 

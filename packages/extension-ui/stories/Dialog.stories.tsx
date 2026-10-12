@@ -85,8 +85,23 @@ export const CloseControlDismisses: Story = {
   },
 }
 
+export const FormSubmitsOnEnter: Story = {
+  args: {
+    actions: [
+      { label: 'Cancel', onSelect: noop },
+      { label: 'Rename', tone: 'primary', submit: true, onSelect: fn() },
+    ],
+    children: <input aria-label="Name" defaultValue="Standup notes" />,
+  },
+  play: async ({ canvasElement, args }) => {
+    await userEvent.type(within(canvasElement).getByRole('textbox', { name: 'Name' }), '{Enter}')
+    await expect(args.actions[1].onSelect).toHaveBeenCalledTimes(1)
+  },
+}
+
 export const DefaultLight = inLight(Default)
 export const WideLight = inLight(Wide)
 export const DangerActionLight = inLight(DangerAction)
 export const DisabledActionLight = inLight(DisabledAction)
 export const EscapeDismissesLight = inLight(EscapeDismisses)
+export const FormSubmitsOnEnterLight = inLight(FormSubmitsOnEnter)

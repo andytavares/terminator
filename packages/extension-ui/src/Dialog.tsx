@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useId, useRef } from 'react'
+import React, { createContext, useContext, useEffect, useId, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Button } from './Button'
 import { captureFocus, trapTab } from './focus-trap'
@@ -21,6 +21,11 @@ export interface DialogAction {
   disabled?: boolean
   /** Display-only hint, e.g. "⌘↵". */
   shortcut?: string
+  /**
+   * The dialog's form submission: Enter in a field runs it, as in any form.
+   * At most one action submits; the panel becomes a `<form>` when one does.
+   */
+  submit?: boolean
 }
 
 export interface DialogProps {
@@ -78,7 +83,10 @@ export function Dialog({
   size = 'default',
   onDismiss,
 }: DialogProps): JSX.Element {
-  const panelRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
+  // Read during the first render: by the time effects run, a field inside that
+  // uses autoFocus already holds focus and the real opener is lost.
+  const [opener] = useState(() => document.activeElement as HTMLElement | null)
   const titleId = useId()
   const parentLayer = useContainingLayer()
   const zIndex = nestedLayerValue('modal', parentLayer ?? null)
@@ -95,7 +103,7 @@ export function Dialog({
   useEffect(() => {
     const registry = createModalDepthRegistry(window as unknown as Record<string, unknown>)
     const release = registry.release()
-    const restoreFocus = panelRef.current ? captureFocus(panelRef.current) : () => {}
+    const restoreFocus = panelRef.current ? captureFocus(panelRef.current, opener) : () => {}
 
     function onKeyDown(e: KeyboardEvent): void {
       if (e.key !== 'Escape') return
@@ -113,7 +121,10 @@ export function Dialog({
       restoreFocus()
       release()
     }
-  }, [])
+  }, [opener])
+
+  const submitting = actions.find((action) => action.submit === true)
+  const Panel = submitting ? 'form' : 'div'
 
   return (
     <LayerContext.Provider value={zIndex}>
@@ -124,8 +135,8 @@ export function Dialog({
           if (dismissibleRef.current) onDismiss()
         }}
       >
-        <div
-          ref={panelRef}
+        <Panel
+          ref={panelRef as React.RefObject<HTMLFormElement & HTMLDivElement>}
           data-tmui-panel=""
           className="tmui-dialog__panel"
           data-size={size}
@@ -134,6 +145,10 @@ export function Dialog({
           aria-modal="true"
           aria-labelledby={titleId}
           onClick={(e) => e.stopPropagation()}
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (submitting && submitting.disabled !== true) void submitting.onSelect()
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Tab' && panelRef.current && trapTab(panelRef.current, e.shiftKey)) {
               e.preventDefault()
@@ -163,7 +178,7 @@ export function Dialog({
               <DialogActionButton key={action.label} action={action} />
             ))}
           </div>
-        </div>
+        </Panel>
       </div>
     </LayerContext.Provider>
   )
@@ -176,7 +191,9 @@ export function DialogActionButton({ action }: { action: DialogAction }): JSX.El
     <Button
       variant={TONE_VARIANT[action.tone ?? 'default']}
       disabled={action.disabled === true}
-      onClick={() => void action.onSelect()}
+      type={action.submit === true ? 'submit' : 'button'}
+      // A submitting action runs through the form's submit event, once.
+      onClick={action.submit === true ? undefined : () => void action.onSelect()}
     >
       {action.label}
       {action.shortcut !== undefined && <kbd className="tmui-kbd">{action.shortcut}</kbd>}
