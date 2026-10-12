@@ -211,4 +211,6 @@ Storybook, both themes). A change that moves a component's pixels updates its
 baseline in the same commit, generated on Linux with the Playwright version the
 repository pins. Baselines live under `__screenshots__/linux/` in
 `packages/extension-ui/visual/` (the `snapshotPathTemplate` in
-`packages/extension-ui/playwright.visual.config.ts`); none is committed yet.
+`packages/extension-ui/playwright.visual.config.ts`). A story without one gets it
+from the Story baselines workflow (`update-story-baselines` label, see
+`packages/extension-ui/README.md`).
