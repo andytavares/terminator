@@ -12,7 +12,7 @@ import type { DiffSummary } from './review/diff-summary.js'
 // that no longer exist — which is exactly the "session stuck working forever"
 // state the old console kept getting into.
 
-export type RunState =
+type RunState =
   | 'working'
   /** Held on a tool call the operator has to decide. */
   | 'waiting'
@@ -49,7 +49,7 @@ export interface Run {
 }
 
 /** How a phase of work stopped being live. */
-export type RunOutcome = 'approved' | 'stopped' | 'discarded' | 'ended'
+type RunOutcome = 'approved' | 'stopped' | 'discarded' | 'ended'
 
 /**
  * A phase of work that is over, kept so it can be looked back at.

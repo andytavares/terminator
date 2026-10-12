@@ -35,7 +35,7 @@ const FindingsSchema = z
 // The object-valued fields merge key by key, because an amending turn is told
 // to send only what it changed: `plan.units` alone is an edit, not a plan with
 // no lanes.
-export const ProposalSchema = z
+const ProposalSchema = z
   .object({
     intent: orderShape.intent.partial().optional(),
     findings: FindingsSchema.optional(),

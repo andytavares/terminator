@@ -56,7 +56,7 @@ import { invoke } from '@terminator/extension-sdk/renderer'
 // them, and why every control that can be unavailable is unavailable. This
 // component draws what it returns and decides nothing about state itself.
 
-export interface OrderView {
+interface OrderView {
   order: WorkOrder
   compile: CompileResult
   changed?: string[]

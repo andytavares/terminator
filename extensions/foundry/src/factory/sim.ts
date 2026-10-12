@@ -89,7 +89,7 @@ export interface Verdict {
 }
 
 /** What the dispatch tower shows: a round, and each check's own lamp. */
-export interface WorldCi {
+interface WorldCi {
   readonly round: number
   readonly max: number
   readonly checks: Readonly<Record<string, Check['bucket']>>
@@ -130,7 +130,7 @@ function key(tile: Tile): string {
   return `${tile.x},${tile.y}`
 }
 
-export function workAnim(kind: StepKind): CrewAnim {
+function workAnim(kind: StepKind): CrewAnim {
   return kind === 'run' ? 'scan' : 'type'
 }
 

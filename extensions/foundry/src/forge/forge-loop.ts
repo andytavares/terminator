@@ -63,7 +63,7 @@ interface Forge extends ForgeLoopDeps {
 }
 
 /** One architect turn the loop asked for, and where in the loop it sits. */
-export interface ArchitectAsk {
+interface ArchitectAsk {
   readonly order: WorkOrder
   readonly message: string
   readonly autoTurns: number

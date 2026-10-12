@@ -13,7 +13,7 @@ import * as path from 'node:path'
 // directory behind, and Foundry says so once rather than editing a file the
 // order did not ask to change (FR-070).
 
-export const DEFAULT_DIR_NAME = '.foundry'
+const DEFAULT_DIR_NAME = '.foundry'
 
 export class RelativeDataDirError extends Error {
   readonly code = 'RELATIVE_DATA_DIR'

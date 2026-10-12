@@ -13,7 +13,7 @@ import type { CheckName } from '../verify/check-names.js'
 // quietly becomes a different pipeline is one you cannot reason about, and
 // deleting it was half the point of this feature.
 
-export interface RequirementCheck {
+interface RequirementCheck {
   readonly met: boolean
   /** Why not, in words the operator can act on. Empty when met. */
   readonly reason: string

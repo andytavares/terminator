@@ -184,7 +184,7 @@ export class PushRefusedError extends Error {
   }
 }
 
-export class PullRequestFailedError extends Error {
+class PullRequestFailedError extends Error {
   readonly code = 'PR_FAILED'
   constructor(what: string, result: ExecResult) {
     super(`${what}: ${detailFor(result)}`)

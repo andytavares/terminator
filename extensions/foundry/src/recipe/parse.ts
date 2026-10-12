@@ -80,7 +80,7 @@ export type StepKind = (typeof STEP_KINDS)[number]
  * chooses a default: a recipe that declares none launches at whatever the
  * operator's own runtime configuration says.
  */
-export const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 export type EffortLevel = (typeof EFFORT_LEVELS)[number]
 
 const StepSchema = z
@@ -319,8 +319,7 @@ export function parseRole(text: string, file: string): ParseResult<Role> {
 
 // ── rules ────────────────────────────────────────────────────────────────
 
-export const RUNGS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'] as const
-export type Rung = (typeof RUNGS)[number]
+const RUNGS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'] as const
 
 const RuleSchema = z.object({
   schemaVersion: z.number().int().default(RECIPE_SCHEMA_VERSION),

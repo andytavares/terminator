@@ -20,7 +20,7 @@ import type { WatchedRun } from './stall-watcher.js'
  * It was one of ten fixed phase names. It is a string now because the shape of
  * work is chosen per order, so the set of steps is not knowable here.
  */
-export type StepLabel = string
+type StepLabel = string
 
 // Running a phase where the operator can see it.
 //
@@ -114,7 +114,7 @@ export interface StartSupervisedRunOptions {
  * the same conversation: the terminal, the session id and the transcript are
  * the card's, but "which phase finished" is not.
  */
-export interface PhaseCallbacks {
+interface PhaseCallbacks {
   onPending: (pending: PendingPermission) => void
   onResolved: (requestId: string, decision: PermissionOutcome) => void
   /** The ladder refused something without asking. Only refusals are reported. */

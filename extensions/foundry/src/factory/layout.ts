@@ -17,7 +17,7 @@ export interface Tile {
   readonly y: number
 }
 
-export type { Side, BeltTileKind, BeltTile } from './belts.js'
+export type { Side, BeltTile } from './belts.js'
 
 /** The five prop kinds that carry a `RunNode`; every other kind is decor. */
 export type StationKind = 'desk' | 'rig' | 'press' | 'gate'
@@ -64,13 +64,13 @@ export interface HallBelt {
   readonly path: readonly Tile[]
 }
 
-export interface HallLane {
+interface HallLane {
   readonly lane: number
   readonly row: number
   readonly label: string
 }
 
-export interface HallAnchors {
+interface HallAnchors {
   readonly intake: Tile
   readonly exit: Tile
   readonly archive: Tile
@@ -88,7 +88,7 @@ export interface RestSeat {
   readonly propId: string
 }
 
-export interface Breakroom {
+interface Breakroom {
   readonly x: number
   readonly y: number
   readonly w: number

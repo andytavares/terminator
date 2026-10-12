@@ -112,7 +112,7 @@ export class RungOutputRejected extends Error {
   }
 }
 
-export class RungIdEscapesOrderError extends Error {
+class RungIdEscapesOrderError extends Error {
   readonly code = 'RUNG_ID_ESCAPES_ORDER'
   constructor(nodeId: string) {
     super(

@@ -268,7 +268,7 @@ export interface ProposedRecipe {
  * operator asked to accept or override that needs the grounds, not just the
  * answer.
  */
-export function recipeLadder(order: WorkOrder): ProposedRecipe[] {
+function recipeLadder(order: WorkOrder): ProposedRecipe[] {
   if (order.recipe !== null) {
     return [{ name: order.recipe, why: 'the order already names this shape' }]
   }

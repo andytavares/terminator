@@ -28,8 +28,6 @@ export const READABLE = [
   'feedback',
 ] as const
 
-export type Readable = (typeof READABLE)[number]
-
 export interface BriefInput {
   readonly order: WorkOrder
   readonly role: Role | null

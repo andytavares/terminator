@@ -29,7 +29,7 @@ import { gotoRun, startPaletteRefresh, stopPaletteRefresh } from './palette-comm
  * id — and `orderDir` refuses anything that is not one, so a firing for a run
  * that is not an order's writes nothing rather than inventing a place for it.
  */
-export async function recordStall(
+async function recordStall(
   featureDir: string,
   firing: { sessionId: string; signal: string; firedAt: number }
 ): Promise<void> {

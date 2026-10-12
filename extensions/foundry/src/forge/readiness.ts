@@ -59,7 +59,7 @@ export interface ReadinessInput {
   readonly clock: (iso: string) => string
 }
 
-export type RunState = 'Running' | 'Shipped' | 'Cancelled' | 'Shipped · waiting on you'
+type RunState = 'Running' | 'Shipped' | 'Cancelled' | 'Shipped · waiting on you'
 
 function runStateOf(status: WorkOrder['status']): Exclude<RunState, 'Shipped · waiting on you'> {
   return status === 'shipped' ? 'Shipped' : status === 'cancelled' ? 'Cancelled' : 'Running'
@@ -70,10 +70,10 @@ function pillOf(status: WorkOrder['status'], turn: ReadinessInput['turn']): RunS
   return status === 'shipped' && turn === 'you' ? 'Shipped · waiting on you' : runStateOf(status)
 }
 
-export type Holder = 'you' | 'architect' | 'red team' | 'scout' | 'nobody'
+type Holder = 'you' | 'architect' | 'red team' | 'scout' | 'nobody'
 
 /** The status strip's colour: accent while the machine works, then by whose move it is. */
-export type Tone = 'working' | 'you' | 'ready' | 'bad' | 'neutral'
+type Tone = 'working' | 'you' | 'ready' | 'bad' | 'neutral'
 
 export type StripIcon = 'load' | 'user' | 'check' | 'play' | 'alert' | 'pause'
 
@@ -86,7 +86,7 @@ export type StripAction =
   | 'open-run'
   | 'draft'
 
-export interface Strip {
+interface Strip {
   readonly tone: Tone
   readonly icon: StripIcon
   readonly headline: string
@@ -94,7 +94,7 @@ export interface Strip {
   readonly actions: readonly StripAction[]
 }
 
-export type RowState = 'passed' | 'in-progress' | 'needs-you' | 'failing'
+type RowState = 'passed' | 'in-progress' | 'needs-you' | 'failing'
 
 /** One row of "Ready to hand off?": the five checks and whether anyone is changing the plan. */
 export interface Row {
@@ -104,7 +104,7 @@ export interface Row {
   readonly detail: string
 }
 
-export type StepState = 'done' | 'work' | 'you' | 'bad' | 'not-yet'
+type StepState = 'done' | 'work' | 'you' | 'bad' | 'not-yet'
 
 export type StepMark = 'number' | 'check' | 'spin' | 'alert' | 'x'
 
