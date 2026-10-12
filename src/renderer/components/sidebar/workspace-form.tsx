@@ -44,7 +44,7 @@ export function useWorkspaceForm(initial: WorkspaceDraft, nameTaken: (name: stri
   return { draft, update, nameError, setNameError, error, setError, nameIsValid, tagList }
 }
 
-export type WorkspaceForm = ReturnType<typeof useWorkspaceForm>
+type WorkspaceForm = ReturnType<typeof useWorkspaceForm>
 
 interface FieldsProps {
   form: WorkspaceForm
