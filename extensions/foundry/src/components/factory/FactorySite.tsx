@@ -8,6 +8,7 @@ import { HallThumbnail } from './HallThumbnail.js'
 import { ciLabel } from '../../line/ci-label.js'
 import { usePolling } from '@terminator/extension-ui'
 import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 // The Factory's front door: every order in the workspace, as a hall card, in
 // place of the list rows `Orders.tsx` draws in List mode.
@@ -177,10 +178,6 @@ function HallGrid({
 export interface FactorySiteProps {
   readonly repoRoot: string | null
   readonly onOpen: (order: FactoryOrderRow) => void
-}
-
-function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
 /** The CI round in the words every other surface uses (`ciLabel`). A row

@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 import {
   getGlobalSettings,
   updateGlobalSettings,
@@ -19,26 +20,26 @@ function invalidSettings(e: unknown): unknown {
 
 export function registerSettingsHandlers(): void {
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'settings:get-global',
       schema: noPayload,
       invalid,
       run: () => ({ settings: getGlobalSettings() }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'settings:update-global',
       schema: z.object({ patch: PatchSchema }),
       invalid,
       run: ({ patch }) => ({ settings: updateGlobalSettings(patch) }),
       onError: invalidSettings,
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'settings:get-workspace',
       schema: z.object({ workspaceId: z.string().min(1) }),
       invalid,
       run: ({ workspaceId }) => ({ settings: getWorkspaceSettings(workspaceId) }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'settings:update-workspace',
       schema: z.object({ workspaceId: z.string().min(1), patch: PatchSchema }),
       invalid,

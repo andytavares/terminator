@@ -1,9 +1,10 @@
-import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { healthCheck } from '../db/index.js'
 
 export function registerDbIpcHandlers(): void {
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'db:health',
       schema: noPayload,
       invalid: { ok: false, message: 'VALIDATION_ERROR' },

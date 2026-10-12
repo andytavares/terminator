@@ -1,4 +1,4 @@
-import { invokeBridge } from './bridge'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 export type NotifyType = 'info' | 'success' | 'warning' | 'error'
 
@@ -9,5 +9,5 @@ export const notificationsAPI = {
     key: string,
     message?: string
   ): Promise<{ ok: true } | { error: string }> =>
-    invokeBridge('git:notify', { type, title, key, message }),
+    invoke('git:notify', { type, title, key, message }),
 }

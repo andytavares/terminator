@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { app } from 'electron'
 import type { AgentContext, Issue } from '../../shared/types/index.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // What an agent session is told about the issue its project is for.
 //
@@ -129,10 +130,7 @@ export function contextFilePath(projectId: string): string {
 
 export async function writeContextFile(context: AgentContext): Promise<void> {
   await fs.mkdir(contextDir(), { recursive: true })
-  const target = contextFilePath(context.projectId)
-  const tmp = `${target}.tmp`
-  await fs.writeFile(tmp, JSON.stringify(context, null, 2), 'utf8')
-  await fs.rename(tmp, target)
+  await writeJsonAtomic(contextFilePath(context.projectId), context)
 }
 
 /** What was last written, or null. Never throws — a missing file is an answer. */

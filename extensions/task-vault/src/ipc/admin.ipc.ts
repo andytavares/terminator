@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 import { createIpcRegistrar } from './register'
 
 const BLOCKED_DDL = /^\s*(drop|create|alter)\s/i

@@ -1,5 +1,10 @@
 import { BrowserWindow } from 'electron'
-import type { ExtensionAPI, ExtensionDB, Disposable } from '../../../src/main/extensions/api'
+import type {
+  ExtensionAPI,
+  ExtensionDB,
+  Disposable,
+  SettingDefinition,
+} from '@terminator/extension-sdk'
 import { DEFAULT_CAPTURE_HOTKEY } from './constants.js'
 import { registerVaultIpcHandlers } from './ipc/vault.ipc.js'
 import { registerProjectsIpcHandlers } from './ipc/projects.ipc.js'
@@ -11,7 +16,6 @@ import { applyTaskVaultSchema } from './vault/db.js'
 import { backfillRecurringTasks } from './vault/ensure-next-occurrence.js'
 import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
 import { openInVault, popPendingNavigation } from './navigation.js'
-import type { SettingDefinition } from '../../../src/main/extensions/api'
 
 // Every notification kind task-vault ever raises, so the user can independently
 // choose its delivery target(s) (system/in-app/toast) in this extension's own

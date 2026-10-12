@@ -5,6 +5,13 @@ import type {
   TrackerAccount,
   TrackerId,
 } from '../../../shared/types/index.js'
+import type {
+  NewIssueInput,
+  TrackerStateOption,
+  TrackerTeam,
+  TransitionIntent,
+} from '@terminator/extension-sdk'
+export type { NewIssueInput, TrackerStateOption, TrackerTeam, TransitionIntent }
 
 // One interface, two implementations.
 //
@@ -144,39 +151,3 @@ export const PROVIDER_WRITE_OPERATIONS = ['comment', 'transition', 'create'] as 
  * provider *may* expose, not what it must.
  */
 export const PROVIDER_OPTIONAL_OPERATIONS = ['states', 'transition', 'teams', 'create'] as const
-
-/**
- * The workflow positions an issue can be asked to move to.
- *
- * An intent rather than a state identifier because "in review" is not a fact
- * about a tracker — it is a decision about which of their states means that.
- * A `setState(stateId)` signature pushes that resolution onto every caller,
- * so every caller re-implements it.
- */
-export type TransitionIntent = 'started' | 'in_review' | 'done'
-
-/** One position an issue could be moved to, as this tracker describes it. */
-export interface TrackerStateOption {
-  /** Provider-native identifier: a Linear state id, or a Jira transition id. */
-  readonly id: string
-  readonly name: string
-  /** Which intent this option satisfies, as the provider understands it. */
-  readonly intent: TransitionIntent | null
-  /** False when the tracker will not accept it from the issue's current status. */
-  readonly available: boolean
-}
-
-/** A team an issue can be filed in. */
-export interface TrackerTeam {
-  readonly id: string
-  /** The prefix of the team's issue keys, e.g. `TAV`. */
-  readonly key: string
-  readonly name: string
-}
-
-/** What `create` files. The description is markdown. */
-export interface NewIssueInput {
-  readonly teamId: string
-  readonly title: string
-  readonly description: string
-}

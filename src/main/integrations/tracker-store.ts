@@ -9,6 +9,7 @@ import type {
   TrackerId,
 } from '../../shared/types/index.js'
 import type { StoredCredential } from './providers/provider.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // Where tracker credentials live now that they are the application's rather
 // than one extension's.
@@ -79,10 +80,7 @@ async function read(): Promise<StoreFile> {
 }
 
 async function write(data: StoreFile): Promise<void> {
-  const target = filePath()
-  const tmp = `${target}.tmp`
-  await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8')
-  await fs.rename(tmp, target)
+  await writeJsonAtomic(filePath(), data)
 }
 
 async function update(tracker: TrackerId, patch: Partial<StoredTracker>): Promise<void> {

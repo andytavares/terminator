@@ -1,4 +1,4 @@
-import type { ExtensionAPI, Disposable, CommandContext } from '../../../src/main/extensions/api.js'
+import type { ExtensionAPI, Disposable, CommandContext } from '@terminator/extension-sdk'
 import { pushBranch, pullFastForward } from './git/git-service.js'
 
 const PUSH_ERROR_MESSAGES: Record<string, string> = {

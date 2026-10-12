@@ -1,4 +1,4 @@
-import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
+import type { ExtensionAPI, Disposable, SettingDefinition } from '@terminator/extension-sdk'
 import { applyNotepadSchema } from './db/db'
 import { registerNotesIpcHandlers, registerTagsIpcHandlers } from './ipc/notes.ipc'
 import { registerCommentsIpcHandlers } from './ipc/comments.ipc'
@@ -7,7 +7,6 @@ import { registerExportIpcHandlers } from './ipc/export.ipc'
 import { registerDiagramsIpcHandlers } from './ipc/diagrams.ipc'
 import { registerDiagramCommentsIpcHandlers } from './ipc/diagram-comments.ipc'
 import { registerFoldersIpcHandlers } from './ipc/folders.ipc'
-import type { SettingDefinition } from '../../../src/main/extensions/api'
 
 // Every notification kind this extension ever raises, so the user can
 // independently choose its delivery target(s) (system/in-app/toast) in this

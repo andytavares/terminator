@@ -83,7 +83,7 @@ import {
 } from '../../../src/main/extensions/api'
 import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry'
 import { registerAdminIpcHandlers } from '../../../extensions/task-vault/src/ipc/admin.ipc'
-import type { ExtensionDB } from '../../../src/main/extensions/api'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
 
 beforeEach(() => {

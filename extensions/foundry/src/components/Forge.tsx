@@ -45,6 +45,7 @@ import {
   type StripIcon,
   type StepMark,
 } from '../forge/readiness.js'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 // The Forge.
 //
@@ -249,10 +250,6 @@ function goTo(target: string): void {
   if (element === null) return
   element.scrollIntoView({ behavior: 'smooth', block: 'start' })
   element.focus({ preventScroll: true })
-}
-
-function invoke(channel: string, payload: unknown): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
 async function readCompiled(orderId: string): Promise<OrderView | null> {

@@ -18,6 +18,7 @@ import { ExternalLink } from './Markdown.js'
 import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
 import { usePolling } from '@terminator/extension-ui'
 import type { Signal } from '../sensors/types.js'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 // Everything waiting on the operator, as a band above the Forge.
 //
@@ -73,10 +74,6 @@ const RULE_TONE: Record<GateRuleId, string> = {
   'run.interrupted': 'is-warn',
   'ci.red': 'is-warn',
   'refinery.conflict': 'is-warn',
-}
-
-function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
 interface SignalsRead {

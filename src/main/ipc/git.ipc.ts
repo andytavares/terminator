@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { registerInvokeTable, invokeSpec } from './invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable } from './invoke-table.js'
 import {
   isGitRepo,
   getGitRoot,
@@ -23,7 +24,7 @@ const PathAndBranchSchema = z.object({ path: z.string().min(1), branch: z.string
 
 export function registerGitHandlers(): void {
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'git:is-repo',
       schema: PathSchema,
       invalid: { isRepo: false },
@@ -34,21 +35,21 @@ export function registerGitHandlers(): void {
       },
       onError: () => ({ isRepo: false }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'git:change-stats',
       schema: PathSchema,
       invalid: { error: 'VALIDATION_ERROR' },
       run: async ({ path }) => await getChangeStats(path),
       onError: (e) => ({ error: String(e) }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'git:current-branch',
       schema: PathSchema,
       invalid: { error: 'INVALID_PATH' },
       run: async ({ path }) => ({ branch: await getCurrentBranch(path) }),
       onError: (e) => ({ error: String(e) }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'git:list-branches',
       schema: PathSchema,
       invalid: { branches: [] },
@@ -57,7 +58,7 @@ export function registerGitHandlers(): void {
       }),
       onError: () => ({ branches: [] }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'git:fetch',
       schema: PathSchema,
       invalid: { error: 'VALIDATION_ERROR' },
@@ -67,7 +68,7 @@ export function registerGitHandlers(): void {
       },
       onError: (e) => ({ error: String(e) }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'git:checkout',
       schema: PathAndBranchSchema,
       invalid: { error: 'VALIDATION_ERROR' },
@@ -77,7 +78,7 @@ export function registerGitHandlers(): void {
       },
       onError: (e) => ({ error: String(e) }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'git:create-branch',
       schema: PathAndBranchSchema,
       invalid: { error: 'VALIDATION_ERROR' },
@@ -87,7 +88,7 @@ export function registerGitHandlers(): void {
       },
       onError: (e) => ({ error: String(e) }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'git:suggest-worktree-path',
       schema: z.object({
         repoRoot: z.string().min(1),
@@ -99,7 +100,7 @@ export function registerGitHandlers(): void {
         path: suggestWorktreePath(repoRoot, branch, baseDir),
       }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'git:create-worktree',
       schema: z.object({
         repoRoot: z.string().min(1),
@@ -114,7 +115,7 @@ export function registerGitHandlers(): void {
       },
       onError: (e) => ({ error: String(e) }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'git:remove-worktree',
       schema: z.object({ repoRoot: z.string().min(1), worktreePath: z.string().min(1) }),
       invalid: { error: 'VALIDATION_ERROR' },
@@ -124,7 +125,7 @@ export function registerGitHandlers(): void {
       },
       onError: (e) => ({ error: String(e) }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'git:list-worktrees',
       schema: PathSchema,
       invalid: { worktrees: [] },

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Play, RefreshCw, Trash2 } from 'lucide-react'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 interface TableStats {
   [table: string]: number
@@ -64,10 +65,6 @@ const QUICK_ACTIONS = [
 function extractTableName(querySql: string): string | null {
   const match = /\bFROM\s+(\w+)/i.exec(querySql)
   return match ? match[1] : null
-}
-
-async function invoke<T = unknown>(channel: string, payload?: unknown): Promise<T> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload) as Promise<T>
 }
 
 async function fetchStats(): Promise<TableStats | null> {

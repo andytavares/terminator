@@ -1,9 +1,10 @@
 import { app, dialog, type BrowserWindow } from 'electron'
-import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 
 export function registerAppInfoHandlers(): void {
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'app:get-info',
       schema: noPayload,
       invalid: { error: 'VALIDATION_ERROR' },
@@ -24,7 +25,7 @@ export function registerAppInfoHandlers(): void {
 
 export function registerDialogHandlers(getMainWindow: () => BrowserWindow | null): void {
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'dialog:open-directory',
       schema: noPayload,
       invalid: { error: 'VALIDATION_ERROR' },

@@ -1,4 +1,4 @@
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 import { randomUUID } from './db'
 
 // Persistence for the weekly review. Before this existed the review left no

@@ -2,8 +2,7 @@ import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import { rowToComment, type CommentRow } from '../db/mappers'
 import type { Comment } from '../db/types'
-import type { ExtensionDB } from '../../../../src/main/db/index'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
 import { createIpcRegistrar } from './register'
 
 const ListPayload = z.object({

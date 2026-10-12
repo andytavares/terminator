@@ -1,4 +1,4 @@
-import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
+import type { ExtensionAPI, Disposable, SettingDefinition } from '@terminator/extension-sdk'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
 import { registerGithubHandlers } from './ipc/github.ipc.js'
 import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'

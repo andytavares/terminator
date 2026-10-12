@@ -7,7 +7,8 @@ vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, on: vi.fn(), removeHandler: vi.fn() },
 }))
 
-import { registerInvokeTable, invokeSpec, noPayload } from '../../../src/main/ipc/invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from '../../../src/main/ipc/invoke-table.js'
 import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry.js'
 
 function capturedHandler(channel: string) {
@@ -24,8 +25,8 @@ describe('registerInvokeTable', () => {
 
   it('registers one channel per row', () => {
     registerInvokeTable([
-      invokeSpec({ channel: 'a:one', schema: z.object({}), invalid: null, run: () => 'one' }),
-      invokeSpec({ channel: 'a:two', schema: z.object({}), invalid: null, run: () => 'two' }),
+      defineChannel({ channel: 'a:one', schema: z.object({}), invalid: null, run: () => 'one' }),
+      defineChannel({ channel: 'a:two', schema: z.object({}), invalid: null, run: () => 'two' }),
     ])
     expect(mockHandle).toHaveBeenCalledWith('a:one', expect.any(Function))
     expect(mockHandle).toHaveBeenCalledWith('a:two', expect.any(Function))
@@ -33,7 +34,7 @@ describe('registerInvokeTable', () => {
 
   it('dispatches valid payloads to run() and returns its response', async () => {
     registerInvokeTable([
-      invokeSpec({
+      defineChannel({
         channel: 'a:echo',
         schema: z.object({ name: z.string() }),
         invalid: { error: 'VALIDATION_ERROR' },
@@ -45,7 +46,7 @@ describe('registerInvokeTable', () => {
 
   it('returns the static invalid response when validation fails', async () => {
     registerInvokeTable([
-      invokeSpec({
+      defineChannel({
         channel: 'a:strict',
         schema: z.object({ id: z.string().min(1) }),
         invalid: { error: 'VALIDATION_ERROR' },
@@ -59,7 +60,7 @@ describe('registerInvokeTable', () => {
 
   it('passes the zod error to a functional invalid response', async () => {
     registerInvokeTable([
-      invokeSpec({
+      defineChannel({
         channel: 'a:detail',
         schema: z.object({ id: z.string() }),
         invalid: (err) => ({ error: 'VALIDATION_ERROR', message: err.message }),
@@ -73,7 +74,7 @@ describe('registerInvokeTable', () => {
 
   it('maps thrown errors through onError', async () => {
     registerInvokeTable([
-      invokeSpec({
+      defineChannel({
         channel: 'a:boom',
         schema: z.object({}),
         invalid: null,
@@ -90,7 +91,7 @@ describe('registerInvokeTable', () => {
 
   it('lets errors propagate when no onError is declared', async () => {
     registerInvokeTable([
-      invokeSpec({
+      defineChannel({
         channel: 'a:throws',
         schema: z.object({}),
         invalid: null,
@@ -107,7 +108,7 @@ describe('the handler the remote bridge dispatches', () => {
   it('is the validating handler, not the bare run()', async () => {
     const run = vi.fn(() => ({ ok: true }))
     registerInvokeTable([
-      invokeSpec({
+      defineChannel({
         channel: 'a:bridged',
         schema: z.object({ id: z.string() }),
         invalid: { error: 'VALIDATION_ERROR' },

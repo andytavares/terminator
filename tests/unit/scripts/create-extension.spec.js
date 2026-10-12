@@ -2,12 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest'
 
 // We import the pure functions from create-extension.cjs
 // The script uses CommonJS; vitest handles the transform
-let generateManifest, generateIndex, validateName, validateId
+let generateManifest, generateIndex, generatePackageJson, validateName, validateId
 
 beforeEach(async () => {
   const mod = await import('../../../scripts/create-extension.cjs')
   generateManifest = mod.generateManifest
   generateIndex = mod.generateIndex
+  generatePackageJson = mod.generatePackageJson
   validateName = mod.validateName
   validateId = mod.validateId
 })
@@ -63,6 +64,13 @@ describe('generateManifest()', () => {
   })
 })
 
+describe('generatePackageJson()', () => {
+  it('depends on the Extension SDK it is typed against', () => {
+    const pkg = JSON.parse(generatePackageJson('my-ext'))
+    expect(pkg.devDependencies).toEqual({ '@terminator/extension-sdk': '2.0.0' })
+  })
+})
+
 describe('generateIndex()', () => {
   it('generates index with activate and deactivate exports', () => {
     const index = generateIndex('my-ext', 'com.example.my-ext')
@@ -73,8 +81,20 @@ describe('generateIndex()', () => {
   it('includes all v1.1.0 API surface stubs', () => {
     const index = generateIndex('my-ext', 'com.example.my-ext')
     expect(index).toContain('commands.register')
-    expect(index).toContain('keyboard')
     expect(index).toContain('showToast')
+  })
+
+  it('calls no API member the Extension API no longer has', () => {
+    const index = generateIndex('my-ext', 'com.example.my-ext')
+    expect(index).not.toContain('api.keyboard')
+  })
+
+  it('imports nothing but the Extension SDK', () => {
+    const index = generateIndex('my-ext', 'com.example.my-ext')
+    const specifiers = [...index.matchAll(/(?:require\(|import\(|from )'([^']+)'/g)].map(
+      (m) => m[1]
+    )
+    expect(specifiers).toEqual(['@terminator/extension-sdk'])
   })
 
   it('includes commented-out stubs for v1.1.0 surfaces', () => {

@@ -47,6 +47,7 @@ import { OrderLinks } from '../OrderLinks.js'
 import { usePolling, everyWhileVisible } from '@terminator/extension-ui'
 import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
 import './hall.css'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 /** Half of a gate card's width, `min(360px, 60%)`, plus 16px to the scene's edge. */
 const GATE_CARD_INSET = 'calc(min(180px, 30%) + 16px)'
@@ -113,10 +114,6 @@ function clockText(ms: number): string {
 const CALLOUT_BASE_PX = 30
 /** Pixels each level of a callout stack lifts it: a callout's height, plus air. */
 const CALLOUT_PITCH_PX = 26
-
-function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
-}
 
 interface Anchor {
   readonly left: number

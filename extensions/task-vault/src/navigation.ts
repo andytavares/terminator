@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from '../../../src/main/extensions/api.js'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 // Taking someone to a task, from wherever they asked.
 //

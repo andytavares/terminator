@@ -1,7 +1,8 @@
 import { shell } from 'electron'
 import { homedir } from 'os'
 import { z } from 'zod'
-import { registerInvokeTable, invokeSpec } from './invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable } from './invoke-table.js'
 import {
   execShell,
   assertCommandAllowed,
@@ -22,7 +23,7 @@ const invalid = { error: 'VALIDATION_ERROR' }
 
 export function registerShellHandlers(): void {
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'shell:open-path',
       schema: z.object({ filePath: z.string().min(1) }),
       invalid,
@@ -31,7 +32,7 @@ export function registerShellHandlers(): void {
         return errorMsg ? { error: errorMsg } : { ok: true as const }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'shell:open-external',
       schema: z.object({ url: z.string().url() }),
       invalid,
@@ -41,7 +42,7 @@ export function registerShellHandlers(): void {
       },
       onError: (err) => ({ error: String(err) }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'shell:exec',
       schema: ShellExecPayloadSchema,
       invalid: (error: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: error.message }),

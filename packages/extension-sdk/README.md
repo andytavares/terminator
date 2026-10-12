@@ -1,6 +1,21 @@
 # @terminator/extension-sdk
 
-Type definitions for building Terminator extensions.
+The Extension API every Terminator extension is written against, and the helpers they share.
+The core implements `types/api.d.ts`; the compiler checks it does (ADR 094).
+
+An extension imports only this package, `@terminator/extension-ui` and the npm packages in its
+own `package.json`. `npm run lint` rejects anything else, including core source and other
+extensions.
+
+| Entry                                      | What it holds                                                                   |
+| ------------------------------------------ | ------------------------------------------------------------------------------- |
+| `@terminator/extension-sdk`                | `ExtensionAPI`, `ExtensionDB`, the issue-tracker types, `defineChannel`         |
+| `@terminator/extension-sdk/renderer`       | `invoke<T>(channel, payload = {})`, `mountExtension(<App />)`                   |
+| `@terminator/extension-sdk/node`           | `writeJsonAtomic(path, value)`                                                  |
+| `@terminator/extension-sdk/types/renderer` | The `window.electronAPI` an extension view receives (loaded through `tsconfig`) |
+
+Source-only TypeScript, with `react`, `react-dom` and `zod` as peer dependencies. See
+`CHANGELOG.md`.
 
 ## Installation
 
@@ -65,8 +80,9 @@ export function deactivate(): void {}
 ### Renderer (`src/renderer/App.tsx`)
 
 ```typescript
-// window.electronAPI is typed via @terminator/extension-sdk
-const result = await window.electronAPI.extensionBridge.invoke('my-ext:hello', 'World')
+import { invoke } from '@terminator/extension-sdk/renderer'
+
+const result = await invoke<{ greeting: string }>('my-ext:hello', 'World')
 
 // Subscribe to events
 const off = window.electronAPI.extensionBridge.on('my-ext:update', (data) => {
@@ -75,9 +91,9 @@ const off = window.electronAPI.extensionBridge.on('my-ext:update', (data) => {
 // Call off() to unsubscribe
 ```
 
-## Shared UI — `@terminator/extension-ui` _(v1.3.0)_
+## Shared UI — `@terminator/extension-ui`
 
-This package is **types only**. The runtime components live next door:
+UI components live next door:
 
 ```bash
 npm install @terminator/extension-ui
@@ -132,17 +148,11 @@ See `docs/EXTENSION-STYLE.md` for the house rules and
 
 The `view` string is passed as `?view=VALUE` in the webview URL, letting one `index.html` serve multiple surfaces.
 
-## Allowed icon names
+## Icon names
 
-Use any name from `ICON_NAMES` exported by this package:
-
-```typescript
-import { ICON_NAMES } from '@terminator/extension-sdk'
-// "puzzle" | "wrench" | "terminal" | "git-branch" | "git-pull-request" |
-// "database" | "code" | "layers" | "settings" | "file" | "search" |
-// "box" | "star" | "zap" | "globe" | "cpu" | "flask" | "chart-bar" |
-// "list" | "calendar" | "check"
-```
+`contributes.*.icon` takes one of the names `iconFromName` knows
+(`src/renderer/extensions/icon-from-name.ts`), such as `puzzle`, `wrench`, `terminal`,
+`git-branch`, `database`, `list` or `calendar`.
 
 ## Build setup (Vite example)
 

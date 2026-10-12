@@ -1,5 +1,6 @@
 import { onChannel } from './channel-registrar.js'
-import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { getLink } from '../integrations/issue-link-store.js'
 import { readContextFile } from '../integrations/agent-context.js'
 import { notificationManager } from '../notifications/notification-manager.js'
@@ -117,7 +118,7 @@ export function registerTerminalHandlers(
   const sessionIdPayload = z.object({ sessionId: z.string() })
 
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'terminal:create',
       schema: CreateTerminalSchema,
       invalid: (error: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: error.message }),
@@ -130,7 +131,7 @@ export function registerTerminalHandlers(
         throw err
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'terminal:list-sessions',
       schema: noPayload,
       invalid: [],
@@ -148,7 +149,7 @@ export function registerTerminalHandlers(
             type,
           })),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'terminal:attach',
       schema: sessionIdPayload,
       invalid: { released: false },
@@ -160,7 +161,7 @@ export function registerTerminalHandlers(
         return { released: ptyManager.releaseOutput(sessionId) }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'terminal:close',
       schema: sessionIdPayload,
       invalid: { error: 'VALIDATION_ERROR' },
@@ -170,7 +171,7 @@ export function registerTerminalHandlers(
         return { success: true }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'terminal:close-all',
       schema: noPayload,
       invalid: { error: 'VALIDATION_ERROR' },
@@ -180,7 +181,7 @@ export function registerTerminalHandlers(
         return { terminatedCount: count }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'terminal:cleanup-orphans',
       schema: noPayload,
       invalid: { error: 'VALIDATION_ERROR' },

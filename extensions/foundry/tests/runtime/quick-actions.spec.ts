@@ -12,7 +12,7 @@ import { tmpdir as tmpdirForUserData } from 'node:os'
 const USER_DATA = tmpdirForUserData()
 
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
-import type { ExtensionAPI, CommandContribution } from '../../../../src/main/extensions/api.js'
+import type { ExtensionAPI, CommandContribution } from '@terminator/extension-sdk'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/index.js'
 
 vi.mock('electron', () => ({

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import * as path from 'node:path'
 import { logger } from '../logger.js'
-import type { ExtensionDB } from './index.js'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
 // One-time import of the PGlite database used before ADR 099. Removed together
 // with the @electric-sql/pglite dependency one release after it ships.

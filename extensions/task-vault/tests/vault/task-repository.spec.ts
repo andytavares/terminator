@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 import { insertTask } from '../../src/vault/task-repository'
 import { createVaultDb, seedArea, seedProject, seedTask, taskRow } from '../support/vault-db'
 

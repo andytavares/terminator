@@ -6,7 +6,3 @@ export interface BridgeError {
 }
 
 export type BridgeResult<T> = T | BridgeError
-
-export function invokeBridge<T>(channel: string, payload?: unknown): Promise<T> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload) as Promise<T>
-}

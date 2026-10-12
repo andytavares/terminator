@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { wrapDb, type ExtensionDB } from '../../../src/main/db/index'
-import type { ExtensionAPI } from '../../../src/main/extensions/api'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },

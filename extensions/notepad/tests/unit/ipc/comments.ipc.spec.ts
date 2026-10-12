@@ -36,7 +36,7 @@ import {
   markOrphaned,
   registerCommentsIpcHandlers,
 } from '../../../src/ipc/comments.ipc'
-import type { ExtensionDB } from '../../../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
 let db: ExtensionDB
 let noteId: string

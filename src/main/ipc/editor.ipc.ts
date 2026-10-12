@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { detectEditor, openInEditor } from '../editor/open-in-editor.js'
 import { getGlobalSettings } from '../storage/settings-store.js'
 
@@ -12,7 +13,7 @@ import { getGlobalSettings } from '../storage/settings-store.js'
  */
 export function registerEditorHandlers(): void {
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'editor:detect',
       schema: noPayload,
       invalid: { editor: null },
@@ -21,7 +22,7 @@ export function registerEditorHandlers(): void {
         return editor === null ? { editor: null } : { editor: { id: editor.id, name: editor.name } }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'editor:open',
       schema: z.object({ folderPath: z.string().min(1) }),
       invalid: { error: 'VALIDATION_ERROR' },

@@ -3,14 +3,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-  wrapDb,
-  initAppDb,
-  getAppDb,
-  closeAppDb,
-  healthCheck,
-  type ExtensionDB,
-} from '../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
+import { wrapDb, initAppDb, getAppDb, closeAppDb, healthCheck } from '../../../src/main/db/index'
 
 describe('ExtensionDB over node:sqlite', () => {
   let db: ExtensionDB

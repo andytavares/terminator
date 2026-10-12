@@ -1,7 +1,8 @@
 import type { BrowserWindow } from 'electron'
 import { z } from 'zod'
 import fs from 'node:fs/promises'
-import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
 
 export function registerFsHandlers(getMainWindow: () => BrowserWindow | null): void {
@@ -11,7 +12,7 @@ export function registerFsHandlers(getMainWindow: () => BrowserWindow | null): v
   })
 
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'fs:watch-start',
       schema: z.object({ projectRoot: z.string().min(1) }),
       invalid: { error: 'VALIDATION_ERROR' },
@@ -20,7 +21,7 @@ export function registerFsHandlers(getMainWindow: () => BrowserWindow | null): v
         return { ok: true }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'fs:watch-stop',
       schema: noPayload,
       invalid: { error: 'VALIDATION_ERROR' },
@@ -29,7 +30,7 @@ export function registerFsHandlers(getMainWindow: () => BrowserWindow | null): v
         return { ok: true }
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'fs:read-file',
       schema: z.object({ filePath: z.string().min(1) }),
       invalid: { error: 'VALIDATION_ERROR' },

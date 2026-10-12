@@ -1,163 +1,32 @@
-export interface Disposable {
-  dispose(): void
-}
-
-export interface ExtensionSettingsSchema {
-  label: string
-  description?: string
-  properties: Record<string, SettingDefinition>
-}
-
-export interface SettingDefinition {
-  type: 'string' | 'number' | 'boolean' | 'enum' | 'folder' | 'action'
-  label: string
-  description?: string
-  default: unknown
-  options?: string[]
-  min?: number
-  max?: number
-  workspaceScoped?: boolean
-  secret?: boolean
-  channel?: string
-  confirmMessage?: string
-  danger?: boolean
-}
-
-export interface TopBarMenuContribution {
-  id: string
-  label: string
-  onClick(): void
-  tooltip?: string
-}
-
-export interface NativeMenuItemContribution {
-  id: string
-  label: string
-  onClick(): void
-  accelerator?: string
-  /** When set to 'checkbox', renders as a checkable menu item. */
-  type?: 'checkbox'
-  /** Panel ID that this menu item toggles. Used to update the checked state when the panel opens/closes. */
-  panelId?: string
-}
-
-export type ToastType = 'info' | 'success' | 'warning' | 'error'
-
-export interface SessionSnapshot {
-  readonly id: string
-  readonly projectId: string
-  readonly tabTitle: string
-  readonly type: 'human' | 'agent'
-}
-
-export interface CommandContribution {
-  id: string
-  label: string
-  description?: string
-  shortcut?: string
-  category?: string
-  /** One-character mnemonic shown in the quick-actions panel. */
-  mnemonic?: string
-  /** Dims the action, with a stock reason, when the focused context lacks this. */
-  requires?: 'repo' | 'session'
-  /**
-   * Shape of the `args` another surface may pass when it runs this command
-   * (v2.7.0, ADR-083). A command without one never receives args.
-   */
-  args?: ZodTypeAny
-}
-
-/** Outcome of running a command by id: `reason` is 'not-registered' or 'invalid-args: …'. */
-export type CommandRunResult = { ok: true } | { ok: false; reason: string }
-
-/** Core-owned focus context, passed outbound to a command's handler. */
-export interface CommandContext {
-  projectId: string | null
-  sessionId: string | null
-  repoRoot: string | null
-}
-
-export interface WorkspaceSnapshot {
-  readonly id: string
-  readonly name: string
-  readonly folderPath: string
-}
-
-export interface ProjectSnapshot {
-  readonly id: string
-  readonly workspaceId: string
-  readonly name: string
-  /** The directory it points at, when it is not the workspace folder (v2.5.0). */
-  readonly worktreePath?: string
-}
-
-// Canonical session-authority types live with the authority (pty-manager.ts);
-// re-exported here so the ExtensionAPI contract exposes them.
 import type {
-  PtyManager,
-  SessionOrigin,
-  SpawnSessionOptions,
-  SessionInfo,
-} from '../terminal/pty-manager.js'
-export type { SessionOrigin, SpawnSessionOptions, SessionInfo }
-import type { OutputRelay } from '../terminal/output-relay.js'
-
-// Issue-tracker types are re-exported here rather than re-declared by every
-// extension that needs them (Constitution II: shared types come through the
-// API surface).
-import type {
+  CommandContext,
+  CommandContribution,
+  Disposable,
+  ExtensionAPI,
+  ExtensionDB,
+  ExtensionSettingsSchema,
   Issue,
-  IssueLink,
   IssueListResult,
-  IssueSummary,
+  NativeMenuItemContribution,
+  NewIssueInput,
+  ProjectSnapshot,
+  SessionSnapshot,
+  ToastType,
+  TopBarMenuContribution,
   TrackerConnection,
   TrackerId,
-} from '../../shared/types/index.js'
-import type {
-  NewIssueInput,
   TrackerStateOption,
   TrackerTeam,
   TransitionIntent,
-} from '../integrations/providers/provider.js'
+  WorkspaceSnapshot,
+} from '@terminator/extension-sdk'
+import type { PtyManager } from '../terminal/pty-manager.js'
+import type { OutputRelay } from '../terminal/output-relay.js'
 import { matchesBranchPattern } from '../git/branch-exclude.js'
 import { branchExcludePatternsFor } from '../git/branch-exclude-settings.js'
-export type { Issue, IssueLink, IssueListResult, IssueSummary, TrackerConnection, TrackerId }
-export type { NewIssueInput, TrackerStateOption, TrackerTeam, TransitionIntent }
 
-export interface PtyManagerAPI {
-  /** v1.4.0 — spawn with metadata; subscribe output/exit separately via onData/onExit. */
-  spawnSession(opts: SpawnSessionOptions): SessionInfo
-  /**
-   * Spawns a terminal and puts it on screen as an ordinary tab.
-   *
-   * `spawnSession` gives an extension a process and a data stream, but nothing
-   * the operator can see or type into — the renderer owns the tab list and does
-   * not know the session exists. This creates both, and holds the process's
-   * output until the tab is actually mounted, so the first thing it printed is
-   * not delivered to nobody.
-   *
-   * Returns the terminal session id, or null when there is no window to show it
-   * in.
-   */
-  openTerminalTab(input: OpenTerminalTabInput): string | null
-  /**
-   * Closes a tab `openTerminalTab` opened, ending its process if it still runs
-   * (v2.6.0). `kill` alone leaves the tab on screen marked "[exited]".
-   */
-  closeTerminalTab(sessionId: string): void
-  /** v1.4.0 — multi-subscriber output fan-out. Returns a disposer, or null if unknown. */
-  onData(sessionId: string, listener: (data: string) => void): (() => void) | null
-  /** v1.4.0 — multi-subscriber exit fan-out. Listeners fire after the session is removed. */
-  onExit(sessionId: string, listener: (exitCode: number) => void): (() => void) | null
-  /** v1.4.0 */
-  getSession(sessionId: string): SessionInfo | undefined
-  /** v1.4.0 — stamps workspace metadata on the session (null clears it). */
-  setWorkspace(sessionId: string, workspaceId: string | null): boolean
-  write(sessionId: string, data: string): void
-  resize(sessionId: string, cols: number, rows: number): void
-  kill(sessionId: string): void
-  listSessions(): SessionInfo[]
-}
+/** Outcome of running a command by id: `reason` is 'not-registered' or 'invalid-args: …'. */
+export type CommandRunResult = { ok: true } | { ok: false; reason: string }
 
 export interface BridgeDeps {
   invokeRegistry: Map<string, import('../remote/ipc-registry.js').IpcRegistryEntry>
@@ -165,223 +34,11 @@ export interface BridgeDeps {
   eventBus: import('events').EventEmitter
 }
 
-export type { ExtensionDB } from '../db/index.js'
-
-export interface CreateProjectInput {
-  workspaceId: string
-  name: string
-  /** The directory the project points at — a worktree, or any checkout. */
-  worktreePath: string
-  gitBranch?: string
-  /** True when the directory is a git worktree rather than a plain folder. */
-  isWorktree?: boolean
-  /**
-   * Attach this issue to the project as it is created (v2.2.0).
-   *
-   * An extension that already knows what a checkout is for should not have to
-   * make the operator attach it again. When an existing project is returned
-   * for the same path, the issue is attached to *that* project — the caller
-   * has just said what that checkout is for.
-   */
-  issue?: { tracker: TrackerId; key: string }
-}
-
-export interface OpenTerminalTabInput {
-  /** Where the tab appears. From `workspace.createProject`, normally. */
-  projectId: string
-  cwd: string
-  tabTitle: string
-  /** Marks whose terminal it is. A person can still type in an agent's. */
-  type?: 'human' | 'agent'
-  shell?: string
-  scrollbackLimit?: number
-}
-
-export interface ExtensionAPI {
-  db: import('../db/index.js').ExtensionDB
-  log: {
-    debug(message: string, ...meta: unknown[]): void
-    info(message: string, ...meta: unknown[]): void
-    warn(message: string, ...meta: unknown[]): void
-    error(message: string, ...meta: unknown[]): void
-  }
-  settings: {
-    register(schema: ExtensionSettingsSchema): Disposable
-    get<T>(key: string): T | undefined
-    set(key: string, value: unknown): void
-    /**
-     * Whether a branch matches Settings → Git → Branch Exclude Patterns: the
-     * override of the workspace that owns `repoPath`, else the global list.
-     * `*` matches anything, slashes included. Since 2.8.0.
-     */
-    isBranchExcluded(branch: string, repoPath?: string): boolean
-  }
-  globalShortcut: {
-    register(accelerator: string, handler: () => void): Disposable
-  }
-  workspace: {
-    list(): WorkspaceSnapshot[]
-    listProjects(workspaceId: string): ProjectSnapshot[]
-    /**
-     * Registers a directory as a project in a workspace, so it appears in the
-     * sidebar and can hold terminals.
-     *
-     * An extension that provisions a git worktree has, until now, had nowhere
-     * to put it: the checkout existed and nothing on screen ever showed it.
-     * Returns the existing project when the workspace already has one for that
-     * path, so provisioning the same branch twice lands in the project you were
-     * already looking at rather than beside it.
-     */
-    createProject(input: CreateProjectInput): ProjectSnapshot | null
-    deleteProject(projectId: string): void
-  }
-  topBar: {
-    registerMenuItem(item: TopBarMenuContribution): Disposable
-  }
-  shell: {
-    exec(options: {
-      command: 'git' | 'gh'
-      args: string[]
-      cwd: string
-      timeoutMs?: number
-    }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut: boolean }>
-  }
-  /**
-   * Issue trackers, through the application's single connection (v2.2.0).
-   *
-   * An extension never holds a tracker credential and never contacts a tracker
-   * itself — it asks here, the same way it asks for a shell or a PTY.
-   *
-   * Three writes, and only three: a comment, the issue's own position in its
-   * own workflow (v2.3.0, ADR-041), and a new issue the operator asked for
-   * (v2.5.0, ADR-061). There is deliberately no way to delete an issue or to
-   * change any field of an existing one — not the title, not the assignee,
-   * not a label. `transition` is narrow by
-   * construction: it takes an intent, not a field, and an intent the tracker
-   * cannot satisfy is refused rather than approximated.
-   */
-  issues: {
-    /** Connected trackers and whose account each credential proved to be. Never a secret. */
-    connections(): Promise<TrackerConnection[]>
-    /** "My issues" across connected trackers. Per-tracker failures are reported, not thrown. */
-    listMine(opts?: { tracker?: TrackerId; limit?: number }): Promise<IssueListResult>
-    /** Full-text search. An exact issue key resolves directly and sorts first. */
-    search(term: string, opts?: { tracker?: TrackerId; limit?: number }): Promise<IssueListResult>
-    /** One issue; description and comments are markdown whichever tracker it came from. */
-    get(tracker: TrackerId, key: string, opts?: { refresh?: boolean }): Promise<Issue | null>
-    /** Comment on an issue. Rejects on failure — it must not be swallowed. */
-    comment(tracker: TrackerId, key: string, body: string): Promise<void>
-    /**
-     * What this issue can be moved to (v2.3.0). Per-issue: a tracker's answer
-     * may depend on the issue's current status.
-     */
-    states(tracker: TrackerId, key: string): Promise<TrackerStateOption[]>
-    /**
-     * Move it (v2.3.0). `optionId` is the operator's own mapping for this
-     * intent, taken from `states()`; without one the tracker resolves the
-     * intent itself. Rejects when nothing available satisfies it.
-     */
-    transition(
-      tracker: TrackerId,
-      key: string,
-      intent: TransitionIntent,
-      optionId?: string
-    ): Promise<void>
-    /**
-     * Whether this tracker supports being moved at all (v2.3.0).
-     *
-     * Ask before you need to know. Synchronous, because it is a fact about
-     * the tracker rather than about an issue — an extension that has to call
-     * and catch to find out has already committed to a plan that may not
-     * work.
-     */
-    supportsTransitions(tracker: TrackerId): boolean
-    /** Teams the operator can file an issue in (v2.5.0). */
-    teams(tracker: TrackerId): Promise<TrackerTeam[]>
-    /**
-     * File a new issue (v2.5.0, ADR-061). Only on the operator's explicit
-     * word — an extension never files one on its own judgement. Rejects on
-     * failure.
-     */
-    create(tracker: TrackerId, input: NewIssueInput): Promise<Issue>
-    /** Whether this tracker can create an issue at all (v2.5.0). Synchronous. */
-    supportsCreate(tracker: TrackerId): boolean
-  }
-  notifications: {
-    /**
-     * `key` identifies this specific notification kind (unique within this
-     * extension, e.g. 'taskCompleted') so the user can configure its delivery
-     * target(s) independently of every other notification this extension
-     * sends. Register matching settings via api.settings.register() —
-     * `${extensionId}.notify.${key}.system` / `.center` / `.toast` (booleans)
-     * — so they appear in this extension's own settings panel.
-     */
-    showToast(type: ToastType, message: string, key: string): void
-    createNotification(opts: {
-      type: ToastType
-      title: string
-      message?: string
-      key: string
-      actions?: Array<{ id: string; label: string; handler: () => void }>
-      /**
-       * Take me to the thing this is about — the card, the task, the review.
-       *
-       * Only the author knows what that is, so it is a handler rather than a
-       * route. Without one the row is a report: readable, dismissable, and
-       * not clickable.
-       */
-      onClick?: () => void
-    }): Disposable
-  }
-  nativeMenu: {
-    addViewMenuItem(item: NativeMenuItemContribution): Disposable
-  }
-  commands: {
-    register(
-      command: CommandContribution,
-      handler: (ctx: CommandContext, args?: never) => void | Promise<void>
-    ): Disposable
-  }
-  ipc: {
-    /**
-     * Registers a main-process handler for an extension-owned channel.
-     * Extension channels are local-only by default; pass
-     * `remoteAccessible: true` to let the remote-control bridge dispatch one.
-     */
-    registerHandler(
-      channel: string,
-      handler: (payload: unknown) => Promise<unknown> | unknown,
-      opts?: { remoteAccessible?: boolean }
-    ): Disposable
-    invokeChannel(channel: string, payload: unknown): Promise<unknown>
-    sendChannel(channel: string, payload: unknown): void
-    onWindowEvent(channel: string, handler: (...args: unknown[]) => void): () => void
-    isRemoteAccessible(channel: string): boolean
-  }
-  terminal: {
-    onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable
-    onSessionClose(handler: (sessionId: string) => void): Disposable
-  }
-  pty: PtyManagerAPI
-  window: {
-    openAuxiliary(view: string, params?: Record<string, string>): void
-    broadcast(channel: string, data: unknown): void
-    focusSelf(viewParam?: string): void
-    /**
-     * Asks core to bring forward whichever surface this extension registered
-     * for `view` (global, workspace, project tab or sidebar panel) and focus
-     * it. Core's own "Open <surface>" quick actions use this same path.
-     */
-    showSelf(view?: string): void
-  }
-}
-
 import { handleChannel, removeChannel } from '../ipc/channel-registrar.js'
 import { BrowserWindow, globalShortcut as electronGlobalShortcut } from 'electron'
 import { EXTENSION_BASE_CSS } from './extension-view-host.js'
 import { sendToWindow } from '../safe-send.js'
 import { join } from 'path'
-import type { ZodTypeAny } from 'zod'
 
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
 import {
@@ -618,7 +275,7 @@ export interface ExtensionAPIDeps {
   broadcastToWindows?: (channel: string, data: unknown) => void
   focusExtensionView?: (extensionId: string, viewParam: string) => void
   bridge?: BridgeDeps
-  db?: import('../db/index.js').ExtensionDB
+  db?: ExtensionDB
 }
 
 export function createExtensionAPI(
@@ -640,7 +297,7 @@ export function createExtensionAPI(
   const notReady = (): never => {
     throw new Error(`Extension "${extensionId}": AppDB not initialized`)
   }
-  const dbStub: import('../db/index.js').ExtensionDB = {
+  const dbStub: ExtensionDB = {
     exec: notReady,
     query: notReady,
     get: notReady,

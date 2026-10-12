@@ -2,7 +2,7 @@ import { dialog } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { z } from 'zod'
-import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 import { createIpcRegistrar } from './register'
 import {
   completeReview,

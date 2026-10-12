@@ -1,5 +1,6 @@
 import type { BrowserWindow } from 'electron'
-import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { sendToWindow } from '../safe-send.js'
 import * as fs from 'node:fs'
 import {
@@ -61,7 +62,7 @@ export function registerSessionRecordsHandlers(
   getWindow: () => BrowserWindow | null = () => null
 ): void {
   registerInvokeTable([
-    invokeSpec({
+    defineChannel({
       channel: 'session-records:list',
       schema: noPayload,
       invalid,
@@ -71,7 +72,7 @@ export function registerSessionRecordsHandlers(
           .map((record) => listing(record)!),
       }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'session-records:set-description',
       schema: SetDescriptionInputSchema,
       invalid,
@@ -80,7 +81,7 @@ export function registerSessionRecordsHandlers(
       }),
       onError: fail,
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'session-records:set-link',
       schema: SetLinkInputSchema,
       invalid,
@@ -95,14 +96,14 @@ export function registerSessionRecordsHandlers(
       },
       onError: fail,
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'session-records:forget',
       schema: ForgetInputSchema,
       invalid,
       run: async ({ sessionId }) => ({ data: await forget(sessionId) }),
       onError: fail,
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'session-records:transfer',
       schema: TransferInputSchema,
       invalid,

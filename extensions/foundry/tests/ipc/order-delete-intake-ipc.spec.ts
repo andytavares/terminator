@@ -16,7 +16,7 @@ const USER_DATA = tmpdir()
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { vi } from 'vitest'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'

@@ -1,19 +1,6 @@
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import * as path from 'node:path'
-
-export interface ExtensionDB {
-  exec(sql: string): Promise<void>
-  query<T extends Record<string, unknown> = Record<string, unknown>>(
-    sql: string,
-    params?: unknown[]
-  ): Promise<T[]>
-  get<T extends Record<string, unknown> = Record<string, unknown>>(
-    sql: string,
-    params?: unknown[]
-  ): Promise<T | undefined>
-  run(sql: string, params?: unknown[]): Promise<number>
-  transaction<T>(fn: (tx: ExtensionDB) => Promise<T>): Promise<T>
-}
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
 type Statements = Omit<ExtensionDB, 'transaction'>
 

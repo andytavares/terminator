@@ -14,6 +14,7 @@ import { statusInWords } from '../order/render.js'
 import type { OrderStatus } from '../order/schema.js'
 import { gradeInWords } from '../runtime/review/risk-grade.js'
 import type { RiskGrade } from '../runtime/review/risk-grade.js'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 // The way into the Forge: what orders exist, and a way to seed another.
 //
@@ -65,10 +66,6 @@ interface OrderRow {
    * — guessing is what it used to do.
    */
   readonly standing?: Standing
-}
-
-function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
 interface TicketsRead {

@@ -1,4 +1,4 @@
-import type { SessionInfo } from '../terminal/pty-manager.js'
+import type { SessionInfo } from '@terminator/extension-sdk'
 import { getProjectById, listWorkspaces } from '../storage/workspace-store.js'
 import type { SessionSnapshot } from '../../shared/types/index.js'
 import { listRecords } from './session-record-store.js'

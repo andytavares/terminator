@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { BrowserWindow } from 'electron'
-import { registerInvokeTable, invokeSpec, noPayload, type InvokeSpec } from './invoke-table.js'
+import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 import {
   CreateProjectInputSchema,
   CreateWorkspaceInputSchema,
@@ -58,39 +59,39 @@ export function registerWorkspaceHandlers(): void {
   registerInvokeTable([...workspaceSpecs(), ...projectSpecs()])
 }
 
-function workspaceSpecs(): InvokeSpec[] {
+function workspaceSpecs(): ChannelSpec[] {
   return [
-    invokeSpec({
+    defineChannel({
       channel: 'workspace:get-active',
       schema: noPayload,
       invalid: validationError,
       run: () => activeContext,
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'workspace:list',
       schema: noPayload,
       invalid: validationError,
       run: () => ({ workspaces: listWorkspaces() }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'workspace:create',
       schema: CreateWorkspaceInputSchema,
       invalid: validationError,
       run: (input) => createWorkspace(input),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'workspace:update',
       schema: UpdateWorkspaceInputSchema,
       invalid: validationError,
       run: (input) => updateWorkspace(input),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'workspace:delete',
       schema: IdSchema,
       invalid: failed,
       run: ({ id }) => deleteWorkspace(id),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'workspace:reorder',
       schema: ReorderWorkspacesSchema,
       invalid: failed,
@@ -99,15 +100,15 @@ function workspaceSpecs(): InvokeSpec[] {
   ]
 }
 
-function projectSpecs(): InvokeSpec[] {
+function projectSpecs(): ChannelSpec[] {
   return [
-    invokeSpec({
+    defineChannel({
       channel: 'project:list',
       schema: z.object({ workspaceId: z.string().min(1) }),
       invalid: { projects: [] },
       run: ({ workspaceId }) => ({ projects: listProjects(workspaceId) }),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'project:create',
       schema: CreateProjectInputSchema,
       invalid: validationError,
@@ -121,25 +122,25 @@ function projectSpecs(): InvokeSpec[] {
         return result
       },
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'project:update-branch',
       schema: UpdateProjectBranchSchema,
       invalid: validationError,
       run: (input) => updateProjectBranch(input),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'project:rename',
       schema: RenameProjectSchema,
       invalid: validationError,
       run: (input) => renameProject(input),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'project:reorder',
       schema: ReorderProjectsSchema,
       invalid: failed,
       run: (input) => reorderProjects(input),
     }),
-    invokeSpec({
+    defineChannel({
       channel: 'project:delete',
       schema: IdSchema,
       invalid: failed,

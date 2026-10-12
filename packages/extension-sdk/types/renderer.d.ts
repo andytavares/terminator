@@ -17,6 +17,13 @@ export interface SerializedNotification {
 }
 
 export interface ElectronAPI {
+  ui: {
+    /**
+     * How many dialogs the view has open, so the host's double-Escape exit
+     * stands down while one is. @terminator/extension-ui's Dialog reports it.
+     */
+    setModalDepth(depth: number): void
+  }
   terminal: {
     create(payload: unknown): Promise<{ sessionId: string } | { error: string }>
     close(sessionId: string): Promise<{ success: boolean }>
@@ -25,7 +32,6 @@ export interface ElectronAPI {
       Array<{ sessionId: string; projectId: string; tabTitle: string; type: string }>
     >
     resize(sessionId: string, cols: number, rows: number): void
-    onOutput(handler: (sessionId: string, data: string) => void): () => void
     closeAll(): Promise<{ terminatedCount: number }>
     cleanupOrphans(): Promise<{ cleanedCount: number }>
     onProcessExit(handler: (sessionId: string, exitCode: number) => void): () => void
@@ -36,6 +42,12 @@ export interface ElectronAPI {
     update(payload: unknown): Promise<{ workspace: unknown } | { error: string }>
     delete(id: string): Promise<{ success: boolean }>
     reorder(ids: string[]): Promise<{ success: boolean }>
+    /** What the operator has focused in the main window. */
+    getActive(): Promise<{
+      workspaceId: string | null
+      projectId: string | null
+      repoRoot: string | null
+    }>
   }
   project: {
     list(workspaceId: string): Promise<{ projects: Array<{ id: string; name: string }> }>
@@ -130,22 +142,10 @@ export interface ElectronAPI {
     runCommand(key: string, args?: unknown): Promise<{ ok: true } | { ok: false; reason: string }>
     /** Whether a command is registered, by full id: `<extensionId>.command.<id>`. */
     hasCommand(key: string): Promise<boolean>
-    updatePanelBounds(payload: {
-      extensionId: string
-      viewParam: string
-      bounds: { x: number; y: number; width: number; height: number }
-      visible: boolean
-      dpr: number
-    }): Promise<void>
   }
   extensionEvents: {
-    onToast(handler: (payload: { type: string; message: string }) => void): () => void
     onTogglePanel(handler: (panelId: string) => void): () => void
-    onSelectProjectTab(handler: (tabId: string) => void): () => void
     onMenuOpenSettings(handler: () => void): () => void
-    onMenuToggleSidebar(handler: () => void): () => void
-    onMenuCloseTab(handler: () => void): () => void
-    onMenuOpenAbout(handler: () => void): () => void
     notifyPanelState(panelId: string, open: boolean): void
     onExtensionPanelLoaded(handler: (id: string) => void): () => void
     onExtensionRendererReload(handler: (id: string) => void): () => void
@@ -159,9 +159,6 @@ export interface ElectronAPI {
       chromeVersion: string
       platform: string
     }>
-  }
-  notification: {
-    show(title: string, body: string): void
   }
   notifications: {
     create(payload: {

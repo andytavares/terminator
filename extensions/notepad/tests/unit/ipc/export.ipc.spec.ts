@@ -37,7 +37,7 @@ import {
   importNotes,
   registerExportIpcHandlers,
 } from '../../../src/ipc/export.ipc'
-import type { ExtensionDB } from '../../../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
 let db: ExtensionDB
 let exportDir: string

@@ -100,6 +100,30 @@ export function deactivate(): void {
 
 If `activate` throws, the extension transitions to `status: 'error'` and the app remains stable.
 
+### What an extension may import _(SDK 2.0.0)_
+
+An extension imports only `@terminator/extension-sdk`, the design system `@terminator/extension-ui`,
+npm packages declared in its own `package.json`, and its own files (Constitution II, ADR 094). Core
+source (`src/**`), another extension and any other workspace package are off limits, and
+`npm run lint` fails on an import that leaves the extension's directory or names another
+`@terminator/*` package.
+
+The SDK has three entries:
+
+| Entry                                | What it holds                                                                                                                                                   |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@terminator/extension-sdk`          | The `ExtensionAPI` declaration the core implements, `ExtensionDB`, the issue-tracker types, and `defineChannel` / `ChannelSpec` (the shape core's channels use) |
+| `@terminator/extension-sdk/renderer` | `invoke<T>(channel, payload = {})` for your own channels, and `mountExtension(<App />)`, which renders a view into `#app`                                       |
+| `@terminator/extension-sdk/node`     | `writeJsonAtomic(path, value)`: indented JSON through a temporary file and a rename, so a reader never sees half a file                                         |
+
+`window.electronAPI` in a view is typed by `@terminator/extension-sdk/types/renderer`, which
+`tsconfig.extension.json` loads.
+
+**Another extension.** An extension's API is what its `activate` returns. A consumer declares the
+provider in its manifest's extension dependencies and uses only that returned object, as VS Code's
+`extensionDependencies` and `exports` work (ADR 094). That is the rule now; the mechanism that hands
+the object over lands in a later change, and until then no extension reaches another at all.
+
 ### Extension Dependencies (`package.json`)
 
 If your extension needs npm packages that aren't part of Terminator's core, declare them in an optional `package.json` alongside `manifest.json`. Extensions are registered as npm workspaces so their dependencies are hoisted automatically:
@@ -539,7 +563,7 @@ Test against a real database, not a mock: `wrapDb(new DatabaseSync(':memory:'))`
 
 ### `api.ipc` — Custom IPC Handlers _(v1.1.0)_
 
-Register named IPC handlers in the main process. The renderer side calls these via `window.electronAPI.invoke(channel, payload)`.
+Register named IPC handlers in the main process. The renderer side calls these with `invoke(channel, payload)` from `@terminator/extension-sdk/renderer`.
 
 ```typescript
 const handler = api.ipc.registerHandler('my-ext:do-thing', async (payload) => {
@@ -629,7 +653,7 @@ tab mounts.
 The tab's output reaches the main window through the same batched, flow-controlled
 path as every other terminal (one message per frame; the process is paused while the
 window is behind). It is no longer broadcast to every window and extension view, so
-an extension view cannot read a tab's output with `electronAPI.terminal.onOutput`;
+an extension view has no `electronAPI.terminal.onOutput` (removed from the SDK in 2.0.0);
 use `api.pty.onData` in the extension backend.
 
 #### `closeTerminalTab` — closing a tab you opened _(v2.6.0)_
@@ -793,9 +817,8 @@ remove its worktree — a project pointing at a deleted directory is clutter nob
 ---
 
 > **A note on version numbers.** The markers in this document (v1.1.0 … v2.5.0) are the API's own
-> release series. The annotations in `src/main/extensions/api.ts` still use an older v1.x series
-> for some of the same members. The two disagree; this document is the one to follow. Reconciling
-> them is a separate cleanup and was deliberately not folded into the v2.2.0 work.
+> release series. The declaration itself is `packages/extension-sdk/types/api.d.ts`; the core's
+> `src/main/extensions/api.ts` implements it and the compiler checks the two agree.
 
 ## Disposables
 
@@ -1293,11 +1316,10 @@ Create `src/renderer/main.tsx`:
 
 ```tsx
 import React from 'react'
-import { createRoot } from 'react-dom/client'
+import { mountExtension } from '@terminator/extension-sdk/renderer'
 import { App } from './App'
 
-const el = document.getElementById('app')!
-createRoot(el).render(<App />)
+mountExtension(<App />)
 ```
 
 Create `index.html`:

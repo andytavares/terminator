@@ -10,6 +10,7 @@ import type {
 import { pruneRecords } from '../../shared/session-records/retention.js'
 import { DESCRIPTION_MAX_LENGTH } from '../../shared/schemas/session-records.schema.js'
 import { deleteSessionContext } from '../integrations/session-context.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // What the operator wrote about a session, and the ticket they pinned to it.
 //
@@ -51,10 +52,7 @@ async function persist(): Promise<void> {
   for (const id of before) {
     if (!records.has(id)) await deleteSessionContext(id)
   }
-  const target = filePath()
-  const tmp = `${target}.tmp`
-  await fs.writeFile(tmp, JSON.stringify(kept, null, 2), 'utf8')
-  await fs.rename(tmp, target)
+  await writeJsonAtomic(filePath(), kept)
 }
 
 const stringOrNull = (value: unknown): string | null => (typeof value === 'string' ? value : null)
