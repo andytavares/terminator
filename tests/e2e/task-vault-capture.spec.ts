@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
 import { goTo, openVault, storedTask, type StoredTask } from './task-vault-harness'
+import { canPressGlobalKeys, pressGlobalChord } from './x11-keys'
 
 // Capturing into the Task Vault inbox and clarifying what was captured, the
 // GTD loop the inbox exists for. Each test drives the view the way a user does
@@ -137,4 +138,22 @@ test('Capture to inbox from Quick Actions saves what was typed', async () => {
   await expect(dialog).toHaveCount(0)
   expect(await inboxTexts()).toEqual(['Buy stamps'])
   await expect(vault.locator('.vault-sidebar__badge')).toHaveText('1')
+})
+
+test('the global capture shortcut opens the capture overlay from any window', async () => {
+  test.skip(
+    !canPressGlobalKeys,
+    'pressing a system-wide chord needs an X server; macOS needs Accessibility consent for the runner'
+  )
+  // Focus is in the main window, not the vault: the shortcut is global.
+  await handle.page.bringToFront()
+  pressGlobalChord('Control_L', 'Shift_L', 'o')
+
+  const dialog = vault.getByRole('dialog', { name: 'Capture to Inbox' })
+  await expect(dialog).toBeVisible({ timeout: 15_000 })
+  await dialog.getByRole('textbox').fill('Renew the passport')
+  await dialog.getByRole('button', { name: /Capture/ }).click()
+
+  await expect(dialog).toHaveCount(0)
+  expect(await inboxTexts()).toContain('Renew the passport')
 })
