@@ -109,6 +109,42 @@ describe('IconButton', () => {
     expect(onClick).toHaveBeenCalledTimes(1)
   })
 
+  it('hands its handler the click, so a control inside a clickable row can keep the click', () => {
+    const onRowClick = vi.fn()
+    render(
+      <div onClick={onRowClick}>
+        <IconButton
+          icon={FileText}
+          label="Delete comment"
+          onClick={(event) => event.stopPropagation()}
+        />
+      </div>
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Delete comment' }))
+    expect(onRowClick).not.toHaveBeenCalled()
+  })
+
+  it('does nothing while disabled', () => {
+    const onClick = vi.fn()
+    render(<IconButton icon={FileText} label="Send" disabled onClick={onClick} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(onClick).not.toHaveBeenCalled()
+  })
+
+  it('carries the state attributes of a disclosure', () => {
+    render(<IconButton icon={FileText} label="Collapse folder" aria-expanded onClick={noop} />)
+    expect(
+      screen.getByRole('button', { name: 'Collapse folder' }).getAttribute('aria-expanded')
+    ).toBe('true')
+  })
+
+  it('comes in a small size for dense rows and chips', () => {
+    render(<IconButton icon={FileText} label="Remove tag" size="sm" onClick={noop} />)
+    expect(screen.getByRole('button', { name: 'Remove tag' }).className).toContain(
+      'tmui-icon-button--sm'
+    )
+  })
+
   it('sizes the icon by CSS rather than by a size prop', () => {
     const { container } = render(<IconButton icon={FileText} label="List view" onClick={noop} />)
     const svg = container.querySelector('svg')!

@@ -25,7 +25,7 @@ should define a colour.
 | Export                                           | For                                                                                  |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------ |
 | `Button`                                         | primary, secondary, ghost, danger; sm, md; disabled; icon slot                       |
-| `IconButton`                                     | an icon-only control with a required accessible name                                 |
+| `IconButton`                                     | an icon-only control with a required accessible name; sm (20px), md (26px); disabled |
 | `Tabs`; `TabsRoot`, `TabList`, `Tab`, `TabPanel` | WAI-ARIA tabs: arrow keys, Home, End, roving `tabindex`; assembled or in parts       |
 | `Dialog`, `ConfirmDialog`                        | a modal question or form; yes or no                                                  |
 | `Popover`                                        | a dismissible, non-modal surface anchored to a control                               |

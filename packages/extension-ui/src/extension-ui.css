@@ -147,6 +147,13 @@
   font-weight: 500;
 }
 
+/* Without this the base hover's card background won, leaving the light label
+   on a light grey in the light theme. Notepad's own primary had fixed the same. */
+.tmui-button--primary:hover:not(:disabled) {
+  background: var(--tm-accent-hover);
+  border-color: var(--tm-accent-hover);
+}
+
 .tmui-button--danger {
   border-color: var(--tm-danger);
   color: var(--tm-danger);
@@ -177,9 +184,25 @@
   cursor: pointer;
 }
 
-.tmui-icon-button:hover {
+.tmui-icon-button:hover:not(:disabled) {
   background: var(--tm-bg-card-hover);
   color: var(--tm-text-primary);
+}
+
+.tmui-icon-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tmui-icon-button--sm {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--tm-radius-xs, 4px);
+}
+
+.tmui-icon-button.tmui-icon-button--sm svg {
+  width: 12px;
+  height: 12px;
 }
 
 .tmui-icon-button[aria-pressed='true'] {

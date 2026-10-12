@@ -50,7 +50,7 @@ export { EmptyState } from './EmptyState'
 export type { EmptyStateProps } from './EmptyState'
 
 export { IconButton } from './IconButton'
-export type { IconButtonProps } from './IconButton'
+export type { IconButtonProps, IconButtonSize } from './IconButton'
 
 export {
   LAYERS,
