@@ -155,6 +155,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
         // shared with other extensions in the unified app database, so only this
         // extension's own rows go.
         await db.exec(`
+        DELETE FROM area_archive_changes;
         DELETE FROM tasks;
         DELETE FROM projects;
         DELETE FROM areas;

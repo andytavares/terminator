@@ -32,6 +32,7 @@ import {
   ArchiveAreaRequestSchema,
 } from '../schemas/vault.schema'
 import { triggerSchedulerTick, broadcast } from '../notifications/task-scheduler.js'
+import { archiveAreaContents, restoreAreaContents } from '../vault/area-archive'
 import {
   rowToTask,
   rowToProject,
@@ -720,34 +721,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     const area = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [areaName])
     if (!area) return { error: 'NOT_FOUND' }
 
-    const projectRows = await db.query<{ id: string }>(`SELECT id FROM projects WHERE area_id=?`, [
-      area.id,
-    ])
-
-    for (const proj of projectRows) {
-      await db.run(
-        `WITH RECURSIVE subtree(id) AS (
-           SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
-           UNION ALL
-           SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
-         )
-         UPDATE tasks SET status='cancelled', updated_at=?
-         WHERE id IN (SELECT id FROM subtree)
-           AND status IN ('open','in-progress','in-review','blocked')`,
-        [proj.id, now]
-      )
-    }
-
-    await db.run(
-      `UPDATE tasks SET status='cancelled', updated_at=?
-       WHERE area_id=? AND project_id IS NULL
-         AND status IN ('open','in-progress','in-review','blocked')`,
-      [now, area.id]
-    )
-    await db.run(`UPDATE projects SET status='archived', updated_at=? WHERE area_id=?`, [
-      now,
-      area.id,
-    ])
+    await archiveAreaContents(db, area.id, now)
     await db.run(`UPDATE areas SET status='archived', updated_at=? WHERE id=?`, [now, area.id])
 
     api.notifications.createNotification({
@@ -801,24 +775,10 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     const { areaName } = payload as { areaName: string }
     if (!areaName) return { error: 'VALIDATION_ERROR' }
     const now = new Date().toISOString()
-    const area = await db.get<{ id: string; updated_at: string }>(
-      `SELECT id, updated_at FROM areas WHERE name=?`,
-      [areaName]
-    )
+    const area = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [areaName])
     if (!area) return { error: 'NOT_FOUND' }
-    const archivedAt = area.updated_at
     await db.run(`UPDATE areas SET status='active', updated_at=? WHERE id=?`, [now, area.id])
-    await db.run(
-      `UPDATE projects SET status='active', updated_at=? WHERE area_id=? AND status='archived'`,
-      [now, area.id]
-    )
-    await db.run(
-      `UPDATE tasks SET status='open', updated_at=?
-       WHERE status='cancelled' AND updated_at=?
-         AND (area_id=? AND project_id IS NULL
-              OR project_id IN (SELECT id FROM projects WHERE area_id=?))`,
-      [now, archivedAt, area.id, area.id]
-    )
+    await restoreAreaContents(db, area.id, now)
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })

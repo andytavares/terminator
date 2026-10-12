@@ -17,6 +17,7 @@ describe('applyTaskVaultSchema', () => {
       `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
     )
     expect(rows.map((r) => r.name).sort()).toEqual([
+      'area_archive_changes',
       'areas',
       'projects',
       'settings',

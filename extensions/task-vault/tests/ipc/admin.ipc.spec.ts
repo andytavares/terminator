@@ -30,6 +30,7 @@ describe('registerAdminIpcHandlers', () => {
       registerAdminIpcHandlers(harness.api, db)
       const result = (await harness.invoke('task-vault:admin:list-tables')) as { tables: string[] }
       expect(result.tables).toEqual([
+        'area_archive_changes',
         'areas',
         'projects',
         'settings',

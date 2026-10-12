@@ -206,10 +206,49 @@ describe('task-vault:vault:archive-area and restore-area', () => {
 
     expect(await areaRow('Work')).toMatchObject({ status: 'active' })
     expect(await projectRow('p1')).toMatchObject({ status: 'active' })
-    for (const id of ['project-task', 'area-task']) {
-      expect(await taskRow(db, id)).toMatchObject({ status: 'open' })
-    }
+    expect(await taskRow(db, 'project-task')).toMatchObject({ status: 'open' })
+    expect(await taskRow(db, 'area-task')).toMatchObject({ status: 'in-progress' })
     expect(await taskRow(db, 'user-cancelled')).toMatchObject({ status: 'cancelled' })
+  })
+
+  it('restore reopens subtasks the archive cancelled and leaves user-cancelled subtasks cancelled', async () => {
+    await seedTask(db, { id: 'area-sub', parentId: 'area-task' })
+    await seedTask(db, { id: 'area-sub-cancelled', parentId: 'area-task', status: 'cancelled' })
+    await seedTask(db, {
+      id: 'project-sub-cancelled',
+      parentId: 'project-task',
+      status: 'cancelled',
+    })
+    await archive()
+
+    await invoke('task-vault:vault:restore-area', { areaName: 'Work' })
+
+    expect(await taskRow(db, 'project-sub')).toMatchObject({ status: 'blocked' })
+    expect(await taskRow(db, 'area-sub')).toMatchObject({ status: 'open' })
+    expect(await taskRow(db, 'area-sub-cancelled')).toMatchObject({ status: 'cancelled' })
+    expect(await taskRow(db, 'project-sub-cancelled')).toMatchObject({ status: 'cancelled' })
+  })
+
+  it('restore still reopens what archive cancelled after the area was renamed', async () => {
+    await archive()
+    await invoke('task-vault:vault:rename-area', { areaFilePath: 'Work', newName: 'Job' })
+
+    await invoke('task-vault:vault:restore-area', { areaName: 'Job' })
+
+    expect(await taskRow(db, 'area-task')).toMatchObject({ status: 'in-progress' })
+    expect(await taskRow(db, 'project-sub')).toMatchObject({ status: 'blocked' })
+  })
+
+  it('restore keeps a project that was not active before the archive as it was', async () => {
+    await seedProject(db, 'parked', 'Parked', { areaId: 'a1', status: 'someday' })
+    await seedProject(db, 'finished', 'Finished', { areaId: 'a1', status: 'archived' })
+    await archive()
+
+    await invoke('task-vault:vault:restore-area', { areaName: 'Work' })
+
+    expect(await projectRow('p1')).toMatchObject({ status: 'active' })
+    expect(await projectRow('parked')).toMatchObject({ status: 'someday' })
+    expect(await projectRow('finished')).toMatchObject({ status: 'archived' })
   })
 
   it.each(['archive-area', 'restore-area'])(
