@@ -21,7 +21,7 @@ export function parseRemoteRepo(root: string): { owner: string; name: string } |
 }
 
 /** The path with symlinks resolved, so a link inside a project cannot lead out of it. */
-function canonical(path: string): string {
+export function canonical(path: string): string {
   try {
     return realpathSync(path)
   } catch {

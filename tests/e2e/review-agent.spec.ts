@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
@@ -55,13 +55,18 @@ test.beforeAll(async () => {
     ...stub.env,
     E2E_CLAUDE_REVIEW_REPLY: join(replyDir, 'reply.json'),
   })
-  await openRepo(handle, 'Agent Review', repo)
+  // Opened through a symlink, as macOS's temporary folders are (/var -> /private/var):
+  // the workspace names the link, git's top level is the real path.
+  symlinkSync(repo, `${repo}-link`)
+  await openRepo(handle, 'Agent Review', `${repo}-link`)
 })
 
 test.afterAll(async () => {
   await closeApp(handle)
   await stub?.close()
-  for (const dir of [repo, bare, replyDir]) if (dir) rmSync(dir, { recursive: true, force: true })
+  for (const dir of [repo, `${repo}-link`, bare, replyDir]) {
+    if (dir) rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 async function askAgent(): Promise<Page> {
