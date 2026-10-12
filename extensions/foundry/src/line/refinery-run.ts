@@ -10,6 +10,7 @@ import { refineryTick } from './refinery-tick.js'
 import type { RefineryTickDeps } from './refinery-tick.js'
 import { restack } from './restack.js'
 import { writeBack } from '../trackers/write-back.js'
+import type { OrderStore } from '../order/store.js'
 
 import type { ActivationContext } from '../ipc/register.js'
 import { indexFor, orderStoreAt } from '../state/live-index.js'
@@ -53,9 +54,7 @@ async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string
  */
 async function raiseRefineryConflict(
   root: string,
-  orderId: string,
-  why: string,
-  files: readonly string[]
+  { orderId, why, files }: { orderId: string; why: string; files: readonly string[] }
 ): Promise<void> {
   const gate = raiseGate({
     id: `${orderId}-refinery-conflict`,
@@ -69,58 +68,37 @@ async function raiseRefineryConflict(
   await createLiveGateStore(() => root, indexFor).save(gate)
 }
 
+/** Where one refinery pass works: the host, the data root, and its order store. */
+interface RefineryPlace {
+  readonly api: ExtensionAPI
+  readonly root: string
+  readonly store: OrderStore
+}
+
 /**
  * One pass of the refinery: watch for merges, restack what queued behind,
  * recheck it. Built fresh on every tick so it always reads the workspace's
  * current data root, the same reason every other tick function does.
  */
 async function runRefineryTick(api: ExtensionAPI, root: string): Promise<void> {
-  const store = orderStoreAt(root)
+  await refineryTick(refineryDepsFor({ api, root, store: orderStoreAt(root) }))
+}
 
-  const deps: RefineryTickDeps = {
-    candidates: async () => {
-      const orders = await store.list()
-      const inFlight = orders.filter((o) => o.status === 'running' || o.status === 'shipped')
-      return Promise.all(
-        inFlight.map(async (order) => ({
-          order: { id: order.id, title: order.title },
-          pulls: (await readPulls(root, order.id)).map((pull) => ({ url: pull.url })),
-        }))
-      )
-    },
+function refineryDepsFor(place: RefineryPlace): RefineryTickDeps {
+  const { api, root, store } = place
+  return {
+    candidates: () => inFlightCandidates(place),
     readState: (orderId) => readRefineryState(root, orderId),
     writeState: async (orderId, state) => {
       await writeRefineryState(root, orderId, state)
       indexFor(root).announce({ kind: 'graph', orderId })
     },
-    viewPr: async (url) => {
-      const result = await api.shell.exec({
-        command: 'gh',
-        args: ['pr', 'view', url, '--json', 'state,mergedAt,baseRefName'],
-        cwd: root,
-        timeoutMs: 30_000,
-      })
-      if (result.exitCode !== 0) return { merged: false }
-      try {
-        const parsed = JSON.parse(result.stdout) as { state?: unknown }
-        return { merged: parsed.state === 'MERGED' }
-      } catch {
-        return { merged: false }
-      }
-    },
+    viewPr: (url) => viewPullRequest(place, url),
     entries: () => computeQueueEntries(root, orderStoreAt(root)),
-    lanesFor: async (orderId) => {
-      const order = await store.load(orderId)
-      if (order === null) return []
-      return order.context.repos.map((repo) => ({
-        cwd: checkoutPath(root, order, repo.name),
-        branch: branchFor(order, repo.lane),
-        base: repo.baseBranch,
-      }))
-    },
+    lanesFor: (orderId) => lanesOf(place, orderId),
     restack: (lane) => restack(lane, (options) => api.shell.exec(options)),
     watchCi: (orderId) => watchRestackedCi(api, root, orderId),
-    raiseConflict: (orderId, why, files) => raiseRefineryConflict(root, orderId, why, files),
+    raiseConflict: (orderId, why, files) => raiseRefineryConflict(root, { orderId, why, files }),
     record: (orderId, action, subject, reason) =>
       store.record({
         at: new Date().toISOString(),
@@ -132,17 +110,66 @@ async function runRefineryTick(api: ExtensionAPI, root: string): Promise<void> {
         evidence: [],
       }),
     titleOf: async (orderId) => (await store.load(orderId))?.title ?? orderId,
-    // The issue's last move: Done only once the pull requests are merged.
-    onMerged: async (orderId) => {
-      const order = await store.load(orderId)
-      if (order !== null) {
-        await writeBack(order, 'merged', writeBackDepsFor(api, root, order, issuesPortFor(api)))
-      }
-    },
+    onMerged: (orderId) => moveIssueToDone(place, orderId),
     now: () => new Date().toISOString(),
   }
+}
 
-  await refineryTick(deps)
+async function inFlightCandidates({
+  root,
+  store,
+}: RefineryPlace): Promise<Awaited<ReturnType<RefineryTickDeps['candidates']>>> {
+  const orders = await store.list()
+  const inFlight = orders.filter((o) => o.status === 'running' || o.status === 'shipped')
+  return Promise.all(
+    inFlight.map(async (order) => ({
+      order: { id: order.id, title: order.title },
+      pulls: (await readPulls(root, order.id)).map((pull) => ({ url: pull.url })),
+    }))
+  )
+}
+
+async function viewPullRequest(
+  { api, root }: RefineryPlace,
+  url: string
+): Promise<{ merged: boolean }> {
+  const result = await api.shell.exec({
+    command: 'gh',
+    args: ['pr', 'view', url, '--json', 'state,mergedAt,baseRefName'],
+    cwd: root,
+    timeoutMs: 30_000,
+  })
+  if (result.exitCode !== 0) return { merged: false }
+  try {
+    const parsed = JSON.parse(result.stdout) as { state?: unknown }
+    return { merged: parsed.state === 'MERGED' }
+  } catch {
+    return { merged: false }
+  }
+}
+
+async function lanesOf(
+  { root, store }: RefineryPlace,
+  orderId: string
+): Promise<Awaited<ReturnType<RefineryTickDeps['lanesFor']>>> {
+  const order = await store.load(orderId)
+  if (order === null) return []
+  return order.context.repos.map((repo) => ({
+    cwd: checkoutPath(root, order, repo.name),
+    branch: branchFor(order, repo.lane),
+    base: repo.baseBranch,
+  }))
+}
+
+// The issue's last move: Done only once the pull requests are merged.
+async function moveIssueToDone(
+  { api, root, store }: RefineryPlace,
+  orderId: string
+): Promise<void> {
+  const order = await store.load(orderId)
+  if (order !== null) {
+    await writeBack(order, 'merged', writeBackDepsFor(api, root, order, issuesPortFor(api)))
+  }
 }
 
 /** R4: watch for merges, restack what queued behind, recheck it. */
