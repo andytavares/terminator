@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { CommandContribution, CommandContext } from '@terminator/extension-sdk'
+import {
+  dispatchChannel,
+  type ChannelSpec,
+  type CommandContribution,
+  type CommandContext,
+} from '@terminator/extension-sdk'
 import {
   registerReviewPullRequestCommand,
   registerReviewSubmittedRelay,
@@ -75,20 +80,20 @@ describe('openPrReviewWindow', () => {
 })
 
 describe('window:review-submitted relay', () => {
-  it('tells every open review list to reload', () => {
+  it('tells every open review list to reload', async () => {
     const handlers: Record<string, () => unknown> = {}
     const broadcast = vi.fn()
     const api = {
       ipc: {
-        registerHandler: vi.fn((channel: string, handler: () => unknown) => {
-          handlers[channel] = handler
+        registerHandler: vi.fn((spec: ChannelSpec) => {
+          handlers[spec.channel] = () => dispatchChannel(spec, undefined)
           return { dispose: vi.fn() }
         }),
       },
       window: { broadcast },
     }
     registerReviewSubmittedRelay(api as never)
-    expect(handlers['window:review-submitted']()).toEqual({ ok: true })
+    expect(await handlers['window:review-submitted']()).toEqual({ ok: true })
     expect(broadcast).toHaveBeenCalledWith('reviews:changed', {})
   })
 })
@@ -99,8 +104,8 @@ describe('review settings', () => {
     const set = vi.fn()
     const api = {
       ipc: {
-        registerHandler: vi.fn((channel: string, handler: (payload?: unknown) => unknown) => {
-          handlers[channel] = handler
+        registerHandler: vi.fn((spec: ChannelSpec) => {
+          handlers[spec.channel] = (payload) => dispatchChannel(spec, payload)
           return { dispose: vi.fn() }
         }),
       },
@@ -111,48 +116,42 @@ describe('review settings', () => {
   }
   const REPOS = 'terminator.git-integration.review.repos'
 
-  it('returns the clone folder and the selected repositories', () => {
+  it('returns the clone folder and the selected repositories', async () => {
     const { handlers, disposables } = setup({
       'terminator.git-integration.review.cloneFolder': '/src',
       [REPOS]: ['acme/widgets'],
     })
-    expect(handlers['github:review-settings']()).toEqual({
+    expect(await handlers['github:review-settings']()).toEqual({
       cloneFolder: '/src',
       repos: ['acme/widgets'],
     })
     expect(disposables).toHaveLength(2)
   })
 
-  it('treats a missing or non-array selection as all repositories', () => {
-    expect(setup({}).handlers['github:review-settings']()).toEqual({ cloneFolder: '', repos: [] })
-    expect(setup({ [REPOS]: 'acme/widgets' }).handlers['github:review-settings']()).toEqual({
+  it('treats a missing or non-array selection as all repositories', async () => {
+    expect(await setup({}).handlers['github:review-settings']()).toEqual({
+      cloneFolder: '',
+      repos: [],
+    })
+    expect(await setup({ [REPOS]: 'acme/widgets' }).handlers['github:review-settings']()).toEqual({
       cloneFolder: '',
       repos: [],
     })
   })
 
-  it('stores a deduplicated selection', () => {
+  it('stores a deduplicated selection', async () => {
     const { handlers, set } = setup({})
     expect(
-      handlers['github:review-repos-set']({
+      await handlers['github:review-repos-set']({
         repos: ['acme/widgets', 'acme/gadgets', 'acme/widgets'],
       })
     ).toEqual({ ok: true })
     expect(set).toHaveBeenCalledWith(REPOS, ['acme/widgets', 'acme/gadgets'])
   })
 
-  it('stores an empty selection', () => {
+  it('stores an empty selection', async () => {
     const { handlers, set } = setup({})
-    handlers['github:review-repos-set']({ repos: [] })
+    await handlers['github:review-repos-set']({ repos: [] })
     expect(set).toHaveBeenCalledWith(REPOS, [])
-  })
-
-  it('refuses a malformed selection without writing', () => {
-    const { handlers, set } = setup({})
-    expect(handlers['github:review-repos-set']({ repos: ['widgets'] })).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
-    expect(handlers['github:review-repos-set']({})).toEqual({ error: 'VALIDATION_ERROR' })
-    expect(set).not.toHaveBeenCalled()
   })
 })

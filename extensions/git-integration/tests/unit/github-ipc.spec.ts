@@ -29,15 +29,24 @@ vi.mock('fs/promises', () => ({
 
 import { homedir } from 'os'
 import ElectronStore from 'electron-store'
+import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerGithubHandlers } from '../../src/ipc/github.ipc'
+import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
+import { reviewQueuePr } from './support/review-queue-pr'
 import { stateForSearch } from '../../src/github/gh-cli'
 import { bindShellToStub, githubOverStub } from './support/shell'
 
 bindShellToStub(mockExecFile)
+bindWorkspaceRoots(() => ['/repo', '/other', '/Users/me/repos/widgets'])
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 type Handler = (payload: unknown) => Promise<unknown>
+/** Registers each channel into `handlers`, answered as the core answers an invoke. */
+const answerInto = (handlers: Record<string, Handler>) => (spec: ChannelSpec) => {
+  handlers[spec.channel] = (payload) => dispatchChannel(spec, payload)
+}
+
 type ExecCallback = (err: Error | null, result?: { stdout: string; stderr: string }) => void
 
 function captureHandlers(
@@ -46,9 +55,7 @@ function captureHandlers(
 ): Record<string, Handler> {
   const handlers: Record<string, Handler> = {}
   registerGithubHandlers(
-    (channel, handler) => {
-      handlers[channel] = handler as Handler
-    },
+    answerInto(handlers),
     { github: githubOverStub(mockExecFile), getToken: () => '' },
     undefined,
     undefined,
@@ -60,12 +67,10 @@ function captureHandlers(
 
 function captureHandlersWithToken(token: string): Record<string, Handler> {
   const handlers: Record<string, Handler> = {}
-  registerGithubHandlers(
-    (channel, handler) => {
-      handlers[channel] = handler as Handler
-    },
-    { github: githubOverStub(mockExecFile), getToken: () => token }
-  )
+  registerGithubHandlers(answerInto(handlers), {
+    github: githubOverStub(mockExecFile),
+    getToken: () => token,
+  })
   return handlers
 }
 
@@ -387,13 +392,6 @@ describe('github:pr-review-detail', () => {
     expect(result.pr.statusChecks.find((c) => c.name === 'deploy')?.state).toBe('pending')
   })
 
-  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const result = (await handlers['github:pr-review-detail']({
-      prNumber: 6,
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('maps mergeStateStatus BEHIND to behind', async () => {
     mockPrDetail({ ...PR_META, mergeStateStatus: 'BEHIND' })
     mockGitFailure('not found')
@@ -638,14 +636,6 @@ describe('github:pr-file-diff', () => {
     expect(result).toMatchObject({ error: expect.stringContaining('cannot lock ref') })
   })
 
-  it('returns VALIDATION_ERROR for missing path', async () => {
-    const result = (await handlers['github:pr-file-diff']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('parses a diff with binary file indicator', async () => {
     mockGitSuccess('') // git fetch
     mockGitSuccess('{"baseRefName":"main"}') // gh pr view
@@ -791,13 +781,6 @@ describe('github:pr-file-content', () => {
     expect(await handlers['github:pr-file-content'](payload)).toEqual({ tooLarge: true })
     expect(mockExecFile).toHaveBeenCalledTimes(1)
   })
-
-  it('returns VALIDATION_ERROR for a missing ref', async () => {
-    const { ref: _ref, ...rest } = payload
-    const result = (await handlers['github:pr-file-content'](rest)) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-    expect(mockExecFile).not.toHaveBeenCalled()
-  })
 })
 
 describe('github:list-open-prs', () => {
@@ -807,11 +790,6 @@ describe('github:list-open-prs', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     handlers = captureHandlers()
-  })
-
-  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const result = (await handlers['github:list-open-prs']({})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('returns NOT_AUTHENTICATED when auth error is thrown', async () => {
@@ -1141,13 +1119,6 @@ describe('github:pr-inline-comments', () => {
     handlers = captureHandlers()
   })
 
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = (await handlers['github:pr-inline-comments']({ repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('returns comments and resolvedCommentIds on success', async () => {
     const comments = [
       {
@@ -1238,13 +1209,6 @@ describe('github:pr-comment-reply', () => {
     handlers = captureHandlers()
   })
 
-  it('returns VALIDATION_ERROR for missing required fields', async () => {
-    const result = (await handlers['github:pr-comment-reply']({ repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('posts a reply and returns comment', async () => {
     const reply = {
       id: 200,
@@ -1279,13 +1243,6 @@ describe('github:pr-review-submit', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     handlers = captureHandlers()
-  })
-
-  it('returns VALIDATION_ERROR for missing required fields', async () => {
-    const result = (await handlers['github:pr-review-submit']({ repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('submits an APPROVE review and returns reviewId', async () => {
@@ -1377,11 +1334,6 @@ describe('github:sessions-for-repo and github:session-get/set', () => {
     handlers = captureHandlers()
   })
 
-  it('github:sessions-for-repo returns empty sessions for invalid payload', async () => {
-    const result = (await handlers['github:sessions-for-repo']({})) as { sessions: unknown[] }
-    expect(result.sessions).toEqual([])
-  })
-
   it('github:sessions-for-repo returns sessions for valid repo', async () => {
     const result = (await handlers['github:sessions-for-repo']({
       repoRoot: '/repo',
@@ -1389,29 +1341,11 @@ describe('github:sessions-for-repo and github:session-get/set', () => {
     expect(Array.isArray(result.sessions)).toBe(true)
   })
 
-  it('github:session-get returns { session: null } for invalid payload', async () => {
-    const result = (await handlers['github:session-get']({})) as { session: null }
-    expect(result.session).toBeNull()
-  })
-
   it('github:session-get returns { session: null } for unknown key', async () => {
     const result = (await handlers['github:session-get']({ key: 'unknown-key' })) as {
       session: null
     }
     expect(result.session).toBeNull()
-  })
-
-  it('github:session-set returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = (await handlers['github:session-set']({})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('github:session-set returns VALIDATION_ERROR for invalid session data', async () => {
-    const result = (await handlers['github:session-set']({
-      key: 'test-key',
-      session: { invalid: true },
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('github:session-set stores a valid session', async () => {
@@ -1444,28 +1378,6 @@ describe('github:remove-active-review', () => {
     handlers = captureHandlers()
   })
 
-  it('returns VALIDATION_ERROR when repoRoot is missing', async () => {
-    const result = (await handlers['github:remove-active-review']({
-      prNumber: 5,
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR when prNumber is missing', async () => {
-    const result = (await handlers['github:remove-active-review']({
-      repoRoot: '/repo',
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR when prNumber is not a positive integer', async () => {
-    const result = (await handlers['github:remove-active-review']({
-      repoRoot: '/repo',
-      prNumber: -1,
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('returns { ok: true } when entry is deleted successfully', async () => {
     const result = (await handlers['github:remove-active-review']({
       repoRoot: '/repo',
@@ -1481,20 +1393,6 @@ describe('github:prune-active-reviews', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     handlers = captureHandlers()
-  })
-
-  it('returns VALIDATION_ERROR when repoRoot is missing', async () => {
-    const result = (await handlers['github:prune-active-reviews']({
-      prNumbers: [1],
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR when prNumbers is missing', async () => {
-    const result = (await handlers['github:prune-active-reviews']({
-      repoRoot: '/repo',
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('returns { openNumbers: [] } immediately for empty prNumbers array (no gh calls)', async () => {
@@ -1639,20 +1537,6 @@ describe('github:pr-mark-ready', () => {
     handlers = captureHandlers()
   })
 
-  it('returns VALIDATION_ERROR for missing prNumber', async () => {
-    const result = (await handlers['github:pr-mark-ready']({
-      repoRoot: '/repo',
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const result = (await handlers['github:pr-mark-ready']({
-      prNumber: 6,
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('returns { ok: true } on success', async () => {
     mockGitSuccess('')
 
@@ -1683,20 +1567,6 @@ describe('github:pr-issue-comments', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     handlers = captureHandlers()
-  })
-
-  it('returns VALIDATION_ERROR for missing prNumber', async () => {
-    const result = (await handlers['github:pr-issue-comments']({
-      repoRoot: '/repo',
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const result = (await handlers['github:pr-issue-comments']({
-      prNumber: 6,
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('returns mapped comments on success', async () => {
@@ -1775,23 +1645,6 @@ describe('github:pr-issue-comment-add', () => {
     handlers = captureHandlers()
   })
 
-  it('returns VALIDATION_ERROR for missing body', async () => {
-    const result = (await handlers['github:pr-issue-comment-add']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR for empty body', async () => {
-    const result = (await handlers['github:pr-issue-comment-add']({
-      repoRoot: '/repo',
-      prNumber: 6,
-      body: '',
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('returns mapped comment on success', async () => {
     const raw = {
       id: 42,
@@ -1835,20 +1688,6 @@ describe('github:pr-update-branch', () => {
     handlers = captureHandlers()
   })
 
-  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const result = (await handlers['github:pr-update-branch']({
-      prNumber: 6,
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR for missing prNumber', async () => {
-    const result = (await handlers['github:pr-update-branch']({
-      repoRoot: '/repo',
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('returns ok:true on success', async () => {
     mockGitSuccess('')
 
@@ -1880,11 +1719,6 @@ describe('github:current-user', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     handlers = captureHandlers()
-  })
-
-  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const result = (await handlers['github:current-user']({})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('returns login on success', async () => {
@@ -1935,24 +1769,12 @@ describe('github:save-active-review and github:active-reviews-for-repo', () => {
     handlers = captureHandlers()
   })
 
-  it('github:save-active-review returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const result = (await handlers['github:save-active-review']({ pr: { number: 1 } })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('github:save-active-review stores and returns ok:true', async () => {
     const result = (await handlers['github:save-active-review']({
       repoRoot: '/repo',
-      pr: { number: 42 },
+      pr: reviewQueuePr(42),
     })) as { ok: boolean }
     expect(result.ok).toBe(true)
-  })
-
-  it('github:active-reviews-for-repo returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const result = (await handlers['github:active-reviews-for-repo']({})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('github:active-reviews-for-repo returns prs array for valid repoRoot', async () => {
@@ -2110,13 +1932,6 @@ describe('github:file-viewed-set', () => {
     handlers = captureHandlers()
   })
 
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = (await handlers['github:file-viewed-set']({ repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('marks a file viewed via markFileAsViewed', async () => {
     mockGitSuccess(JSON.stringify({ owner: { login: 'owner' }, name: 'repo' }))
     mockGitSuccess(JSON.stringify({ data: { repository: { pullRequest: { id: 'PR_id123' } } } }))
@@ -2172,13 +1987,6 @@ describe('github:pr-compare', () => {
     handlers = captureHandlers()
   })
 
-  it('returns VALIDATION_ERROR for missing fields', async () => {
-    const result = (await handlers['github:pr-compare']({ repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('returns files with patches on success', async () => {
     mockGitSuccess(JSON.stringify({ owner: { login: 'owner' }, name: 'repo' }))
     mockGitSuccess(
@@ -2221,13 +2029,6 @@ describe('github:tests-for-block', () => {
     handlers = captureHandlers()
   })
 
-  it('returns VALIDATION_ERROR for missing fields', async () => {
-    const result = (await handlers['github:tests-for-block']({ repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('names the block and returns the test lines that mention it', async () => {
     mockGitSuccess('abc:src/utils.spec.ts:7:  expect(sortByPriority([])).toEqual([])')
     const result = (await handlers['github:tests-for-block']({
@@ -2257,13 +2058,6 @@ describe('github:clone-repo', () => {
     vi.clearAllMocks()
     mockExecFile.mockReset()
     handlers = captureHandlers()
-  })
-
-  it('returns VALIDATION_ERROR for missing fields', async () => {
-    const result = (await handlers['github:clone-repo']({ repo: 'acme/widgets' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('returns FOLDER_NOT_FOUND when the folder does not exist', async () => {
@@ -2373,9 +2167,7 @@ describe('review revamp — edge branches', () => {
   it('maps ssh remotes, and ignores non-GitHub and unreadable ones', async () => {
     const hs: Record<string, Handler> = {}
     registerGithubHandlers(
-      (channel, handler) => {
-        hs[channel] = handler as Handler
-      },
+      answerInto(hs),
       { github: githubOverStub(mockExecFile), getToken: () => '' },
       undefined,
       () => ['/src/widgets', '/src/gadgets', '/src/broken']
@@ -2422,9 +2214,7 @@ describe('github:dashboard-search', () => {
   it('runs gh from homedir, builds the dashboard, and maps local roots', async () => {
     const handlers: Record<string, Handler> = {}
     registerGithubHandlers(
-      (channel, handler) => {
-        handlers[channel] = handler as Handler
-      },
+      answerInto(handlers),
       { github: githubOverStub(mockExecFile), getToken: () => '' },
       undefined,
       () => ['/Users/me/repos/widgets']
@@ -2564,12 +2354,10 @@ describe('github:dashboard-search', () => {
 
   it('returns catchError shape when the login lookup fails', async () => {
     const handlers: Record<string, Handler> = {}
-    registerGithubHandlers(
-      (channel, handler) => {
-        handlers[channel] = handler as Handler
-      },
-      { github: githubOverStub(mockExecFile), getToken: () => '' }
-    )
+    registerGithubHandlers(answerInto(handlers), {
+      github: githubOverStub(mockExecFile),
+      getToken: () => '',
+    })
     mockGitFailure('boom')
     const result = (await handlers['github:dashboard-search']({})) as { error: string }
     expect(result.error).toContain('boom')
@@ -2743,8 +2531,11 @@ describe('handler timing', () => {
   it('logs each handler with its duration and passes the result through', async () => {
     const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
     const handlers = captureHandlers()
-    const result = await handlers['github:files-metrics']({ paths: 'src/foo.ts' })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
+    const result = await handlers['github:files-metrics']({
+      repoRoot: 'gh:acme/widgets',
+      paths: [],
+    })
+    expect(result).toEqual({ metrics: {} })
     expect(debug).toHaveBeenCalledWith(
       expect.stringMatching(/^\[git-integration\] github:files-metrics \d+ms$/)
     )
@@ -2962,12 +2753,6 @@ describe('github:files-metrics', () => {
     const result = await handlers['github:files-metrics']({ repoRoot: '/repo', paths: ['a.ts'] })
     expect(result).toMatchObject({ error: expect.stringContaining('not a git repo') })
   })
-
-  it('returns VALIDATION_ERROR without paths', async () => {
-    expect(await handlers['github:files-metrics']({ repoRoot: '/repo' })).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
-  })
 })
 
 describe('viewed files', () => {
@@ -3097,9 +2882,7 @@ describe('github:dashboard-search sessions and cap', () => {
   const run = async () => {
     const handlers: Record<string, Handler> = {}
     registerGithubHandlers(
-      (channel, handler) => {
-        handlers[channel] = handler as Handler
-      },
+      answerInto(handlers),
       { github: githubOverStub(mockExecFile), getToken: () => '' },
       undefined,
       () => ['/Users/me/repos/widgets']

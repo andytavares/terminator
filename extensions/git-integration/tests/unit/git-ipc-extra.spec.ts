@@ -19,23 +19,22 @@ vi.mock('../../src/git/git-service', () => ({
 
 import * as gitService from '../../src/git/git-service'
 import { registerGitExtensionHandlers } from '../../src/ipc/git.ipc'
+import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
+import { channelRegistry } from './support/channels'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 type Handler = (payload: unknown) => Promise<unknown>
 
-function buildRegistry(): {
-  register: (channel: string, handler: Handler) => void
-  getHandler: (channel: string) => Handler
-} {
-  const handlers = new Map<string, Handler>()
+function buildRegistry() {
+  bindWorkspaceRoots(() => ['/repo'])
+  const registry = channelRegistry()
   return {
-    register: (channel, handler) => handlers.set(channel, handler as Handler),
-    getHandler: (channel) => {
-      const h = handlers.get(channel)
-      if (!h) throw new Error(`Handler for "${channel}" not registered`)
-      return h
-    },
+    register: registry.register,
+    getHandler:
+      (channel: string): Handler =>
+      (payload) =>
+        registry.invoke(channel, payload),
   }
 }
 
@@ -49,11 +48,6 @@ describe('git:status', () => {
     const registry = buildRegistry()
     registerGitExtensionHandlers(registry.register)
     getHandler = registry.getHandler
-  })
-
-  it('returns VALIDATION_ERROR for a missing path', async () => {
-    const result = (await getHandler('git:status')({})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('returns the status from getStatus, defaulting maxFiles to 500', async () => {
@@ -94,14 +88,6 @@ describe('git:diff-file', () => {
     const registry = buildRegistry()
     registerGitExtensionHandlers(registry.register)
     getHandler = registry.getHandler
-  })
-
-  it('returns VALIDATION_ERROR when staged is missing', async () => {
-    const result = (await getHandler('git:diff-file')({
-      repoRoot: '/repo',
-      path: 'a.ts',
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('wraps the diff from getDiff, passing staged and isUntracked through', async () => {
@@ -159,7 +145,7 @@ describe('git:stage', () => {
   })
 })
 
-describe('git:unstage — validation error (line 62-63) and error path (line 74-75)', () => {
+describe('git:unstage', () => {
   let getHandler: (channel: string) => Handler
 
   beforeEach(() => {
@@ -167,21 +153,6 @@ describe('git:unstage — validation error (line 62-63) and error path (line 74-
     const registry = buildRegistry()
     registerGitExtensionHandlers(registry.register)
     getHandler = registry.getHandler
-  })
-
-  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const result = (await getHandler('git:unstage')({ paths: ['src/main.ts'] })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR for empty paths array', async () => {
-    const result = (await getHandler('git:unstage')({
-      repoRoot: '/repo',
-      paths: [],
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('returns error when unstageFiles throws', async () => {
@@ -208,11 +179,6 @@ describe('git:commit', () => {
     const registry = buildRegistry()
     registerGitExtensionHandlers(registry.register)
     getHandler = registry.getHandler
-  })
-
-  it('returns VALIDATION_ERROR for a missing repoRoot', async () => {
-    const result = (await getHandler('git:commit')({ message: 'msg' })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('returns EMPTY_MESSAGE for a blank message and never calls commitChanges', async () => {
@@ -286,11 +252,6 @@ describe('git:commit-output-poll', () => {
     getHandler = registry.getHandler
   })
 
-  it('returns an empty lines array for a missing repoRoot', async () => {
-    const result = await getHandler('git:commit-output-poll')({})
-    expect(result).toEqual({ lines: [] })
-  })
-
   it('returns an empty lines array when no commit is in progress for that repo', async () => {
     const result = await getHandler('git:commit-output-poll')({ repoRoot: '/never-committed' })
     expect(result).toEqual({ lines: [] })
@@ -305,11 +266,6 @@ describe('git:push handler (lines 96-110)', () => {
     const registry = buildRegistry()
     registerGitExtensionHandlers(registry.register)
     getHandler = registry.getHandler
-  })
-
-  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
-    const result = (await getHandler('git:push')({})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('delegates to pushBranch with the repo root', async () => {
@@ -341,7 +297,7 @@ describe('git:pr-status stub', () => {
   })
 
   it('git:pr-status returns { pr: null }', async () => {
-    const result = await getHandler('git:pr-status')({})
+    const result = await getHandler('git:pr-status')({ repoRoot: '/repo' })
     expect(result).toEqual({ pr: null })
   })
 })

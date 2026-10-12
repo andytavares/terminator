@@ -1,5 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { dispatchChannel } from '@terminator/extension-sdk'
 
 vi.mock('electron-store', () => ({
   default: class {
@@ -12,42 +15,16 @@ vi.mock('electron-store', () => ({
   },
 }))
 
-import { activate, deactivate } from '../../src/index.ts'
-
-function activateCapturingRemoteChannels(): string[] {
-  const remote: string[] = []
-  const disposable = { dispose: () => {} }
-  const api = {
-    ipc: {
-      registerHandler: (
-        channel: string,
-        _handler: unknown,
-        opts?: { remoteAccessible?: boolean }
-      ) => {
-        if (opts?.remoteAccessible === true) remote.push(channel)
-        return disposable
-      },
-    },
-    settings: { get: () => undefined, register: () => disposable, isBranchExcluded: () => false },
-    commands: { register: () => disposable },
-    window: { broadcast: () => {}, openAuxiliary: () => {} },
-    nativeMenu: { addViewMenuItem: () => disposable },
-    topBar: { registerMenuItem: () => disposable },
-    notifications: { showToast: () => {}, createNotification: () => disposable },
-    workspace: { list: () => [], listProjects: () => [] },
-    shell: { exec: vi.fn() },
-    github: {},
-  } as unknown as ExtensionAPI
-  activate(api)
-  deactivate()
-  return remote
-}
+import { activateCapturingChannels } from './support/activate'
 
 describe('the remote browser client', () => {
   // A logged-in remote browser reaches only what is opted in (ADR 094); a
   // channel added here is a decision, so the list is spelled out.
   it('may call exactly these read-only channels, and nothing that writes or runs', () => {
-    expect(activateCapturingRemoteChannels().sort()).toEqual([
+    const remote = activateCapturingChannels()
+      .channels.filter((c) => c.remoteAccessible)
+      .map((c) => c.spec.channel)
+    expect(remote.sort()).toEqual([
       'git:conflicts-list',
       'git:pr-status',
       'git:status',
@@ -66,5 +43,103 @@ describe('the remote browser client', () => {
       'review-agent:list',
       'review-agent:settings',
     ])
+  })
+})
+
+// A valid payload for each remote channel, naming `root` as its checkout; null
+// for a channel that takes no directory.
+const PAYLOAD_AT: Record<string, ((root: string) => unknown) | null> = {
+  'git:conflicts-list': (root) => ({ repoRoot: root }),
+  'git:pr-status': (root) => ({ repoRoot: root }),
+  'git:status': (root) => ({ path: root }),
+  'github:accessible-repos': null,
+  'github:active-reviews-for-repo': (root) => ({ repoRoot: root }),
+  'github:current-user': (root) => ({ repoRoot: root }),
+  'github:dashboard-search': null,
+  'github:list-open-prs': (root) => ({ repoRoot: root }),
+  'github:pr-compare': (root) => ({ repoRoot: root, fromSha: 'a1', toSha: 'b2' }),
+  'github:pr-inline-comments': (root) => ({ repoRoot: root, prNumber: 7 }),
+  'github:pr-issue-comments': (root) => ({ repoRoot: root, prNumber: 7 }),
+  'github:pr-review-detail': (root) => ({ repoRoot: root, prNumber: 7 }),
+  'github:review-settings': null,
+  // A review session's store key: it names no directory and runs nothing.
+  'github:session-get': null,
+  'github:sessions-for-repo': (root) => ({ repoRoot: root }),
+  'review-agent:list': (root) => ({ repoRoot: root, prNumber: 7, headSHA: 'abc' }),
+  'review-agent:settings': null,
+}
+
+describe("a remote-accessible channel's repoRoot", () => {
+  let scratch: string
+  let workspaceFolder: string
+  let project: string
+  let outside: string
+
+  beforeAll(() => {
+    scratch = mkdtempSync(join(tmpdir(), 'gi-roots-'))
+    workspaceFolder = join(scratch, 'workspace')
+    project = join(scratch, 'project-worktree')
+    outside = join(scratch, 'elsewhere')
+    for (const dir of [workspaceFolder, project, outside, join(project, '.worktrees', 'fix')]) {
+      mkdirSync(dir, { recursive: true })
+    }
+    symlinkSync(outside, join(project, 'escape'))
+  })
+
+  afterAll(() => rmSync(scratch, { recursive: true, force: true }))
+
+  const remoteChannels = () =>
+    activateCapturingChannels({ folderPath: workspaceFolder, worktreePaths: [project] })
+      .channels.filter((c) => c.remoteAccessible)
+      .map((c) => c.spec)
+
+  it('is checked for every remote channel that takes a directory', () => {
+    expect(Object.keys(PAYLOAD_AT).sort()).toEqual(
+      remoteChannels()
+        .map((s) => s.channel)
+        .sort()
+    )
+  })
+
+  it('is refused outside the workspace, even through a symlink, before the channel runs', async () => {
+    for (const spec of remoteChannels()) {
+      const payloadAt = PAYLOAD_AT[spec.channel]
+      if (!payloadAt) continue
+      const run = vi.fn()
+      const refused = await dispatchChannel({ ...spec, run }, 42)
+      for (const root of [outside, join(project, 'escape'), '/']) {
+        const answer = await dispatchChannel({ ...spec, run }, payloadAt(root))
+        expect(answer, `${spec.channel} at ${root}`).toEqual(refused)
+      }
+      expect(run, `${spec.channel} ran outside the workspace`).not.toHaveBeenCalled()
+    }
+  })
+
+  it('is accepted at a project, the workspace folder, a worktree inside one, or a gh: repository', async () => {
+    const roots = [project, workspaceFolder, join(project, '.worktrees', 'fix'), 'gh:acme/widgets']
+    for (const spec of remoteChannels()) {
+      const payloadAt = PAYLOAD_AT[spec.channel]
+      if (!payloadAt) continue
+      const run = vi.fn()
+      for (const root of roots) await dispatchChannel({ ...spec, run }, payloadAt(root))
+      expect(run, spec.channel).toHaveBeenCalledTimes(roots.length)
+    }
+  })
+
+  it('outside the workspace runs no git and no gh', async () => {
+    const { channels, exec, githubApi } = activateCapturingChannels({
+      folderPath: workspaceFolder,
+      worktreePaths: [project],
+    })
+    const spec = (name: string) => channels.find((c) => c.spec.channel === name)!.spec
+
+    expect(await dispatchChannel(spec('git:status'), { path: outside })).toEqual({
+      error: 'VALIDATION_ERROR',
+    })
+    expect(await dispatchChannel(spec('github:list-open-prs'), { repoRoot: outside })).toEqual({
+      error: 'VALIDATION_ERROR',
+    })
+    expect(exec).not.toHaveBeenCalled()
+    expect(githubApi).not.toHaveBeenCalled()
   })
 })

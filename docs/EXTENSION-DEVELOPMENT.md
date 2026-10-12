@@ -677,7 +677,7 @@ api.ipc.registerHandler(listItems, { remoteAccessible: true })
 api.ipc.registerHandler(runSql)
 ```
 
-Opt in only the channels the extension's own view calls for ordinary use. Keep a channel local if it reads or writes a filesystem path the caller chooses, runs a command or arbitrary SQL, opens a native dialog or window, or administers the database. A remote client holds a password, not the desktop session, so each opted-in channel is attack surface and its schema is the check on what a remote client can send. The first-party extensions follow this: Notepad and Task Vault opt in their data channels and keep file import and export, the Task Vault SQL console and database administration local. Foundry and git-integration each keep one `REMOTE_READ_CHANNELS` list (`src/remote-access.ts`) of channels that only read: Foundry's order list, feed, signals and run timeline, and git-integration's status and pull request lists, detail and comments. Anything that writes, fetches, starts or steers a run, opens a terminal, or returns a file's content or diff stays local, and a spec in each extension lists the opted-in set exactly.
+Opt in only the channels the extension's own view calls for ordinary use. Keep a channel local if it reads or writes a filesystem path the caller chooses, runs a command or arbitrary SQL, opens a native dialog or window, or administers the database. A remote client holds a password, not the desktop session, so each opted-in channel is attack surface and its schema is the check on what a remote client can send. The first-party extensions follow this: Notepad and Task Vault opt in their data channels and keep file import and export, the Task Vault SQL console and database administration local. Foundry and git-integration each keep one `REMOTE_READ_CHANNELS` list (`src/remote-access.ts`) of channels that only read: Foundry's order list, feed, signals and run timeline, and git-integration's status and pull request lists, detail and comments. Anything that writes, fetches, starts or steers a run, opens a terminal, or returns a file's content or diff stays local, and a spec in each extension lists the opted-in set exactly. git-integration's read channels still run git or gh in the checkout the caller names, so their schema confines it: the `RepoRoot` field (`src/ipc/repo-root.ts`) accepts a `gh:owner/name` repository, or a directory that is, or lies inside, a workspace folder, a project root or the review clone folder, after symlinks are resolved. Anything else gets the channel's validation response and runs nothing.
 
 The declaration made at registration is the single authority — a channel that is neither in the core manifest-derived allowlist nor declared `remoteAccessible` at registration is rejected by the bridge. Extensions must never call Electron's `ipcMain` directly: handlers registered that way are invisible to the bridge registry and unreachable remotely.
 
@@ -1086,7 +1086,7 @@ The generated `src/index.js` is a complete working hello-world demonstrating all
 
 The pre-bundled git integration extension at `extensions/git-integration/` is the canonical real-world example. It demonstrates:
 
-- `api.ipc.registerHandler` (custom git: and github: IPC channels)
+- `api.ipc.registerHandler` (custom git: and github: IPC channels, each a `ChannelSpec` with its payload schema)
 - `api.topBar.registerMenuItem` (Git view in project top bar)
 - `api.shell.exec` (git status, diff, stage, commit; gh pr create)
 - `api.notifications.showToast` (all operation outcomes)
