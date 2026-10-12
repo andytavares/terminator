@@ -119,23 +119,23 @@ Push events (main to renderer) go through `webContents.send`. Everything sent to
 
 These are the channels the core registers or pushes (`src/shared/electron-api/manifest.ts`):
 
-| Namespace                                               | What it carries                                                                                                   |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `terminal:*`                                            | Create, attach, input, output, acknowledge, resize, close, process exit, list, cleanup                            |
-| `workspace:*`                                           | Workspace create, list, update, delete, reorder; the active selection                                             |
-| `project:*`                                             | Project create, list, rename, branch, delete, reorder                                                             |
-| `settings:*`                                            | Global and per-workspace settings                                                                                 |
-| `session-records:*`                                     | Session descriptions, links and agent conversations (see [Home and the Monitor wall](#home-and-the-monitor-wall)) |
-| `integrations:*`                                        | Issue trackers: connection, issue list, search, get, comment, project links, agent context                        |
-| `git:*`                                                 | Branches, worktrees, fetch and change statistics the core sidebar needs                                           |
-| `shell:*`                                               | `shell:exec` (git and gh only; `cwd` confined to `workspaceRoot` when one is given), `open-path`, `open-external` |
-| `fs:*`                                                  | File watch start and stop, `fs:read-file`, `fs:changed` pushes                                                    |
-| `extension:*`                                           | Install, toggle, reload, list, settings, commands, view bounds, insets, theme, exit gesture                       |
-| `notifications:*`                                       | Create, list, dismiss, trigger an action, push                                                                    |
-| `metrics:*`                                             | System and per-process metrics                                                                                    |
-| `menu:*`                                                | Native menu events pushed to the renderer                                                                         |
-| `editor:*`                                              | Detect and open an external editor                                                                                |
-| `app:*`, `db:*`, `dialog:*`, `log:*`, `quick-actions:*` | App info, database health, folder picker, renderer log lines, opening Quick Actions                               |
+| Namespace                                               | What it carries                                                                                                                      |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `terminal:*`                                            | Create, attach, input, output, acknowledge, resize, close, process exit, list, cleanup                                               |
+| `workspace:*`                                           | Workspace create, list, update, delete, reorder; the active selection                                                                |
+| `project:*`                                             | Project create, list, rename, branch, delete, reorder                                                                                |
+| `settings:*`                                            | Global and per-workspace settings                                                                                                    |
+| `session-records:*`                                     | Session descriptions, links and agent conversations (see [Home and the Monitor wall](#home-and-the-monitor-wall))                    |
+| `integrations:*`                                        | Issue trackers: connection, issue list, search, get, comment, project links, agent context                                           |
+| `git:*`                                                 | Branches, worktrees, fetch and change statistics the core sidebar needs                                                              |
+| `shell:*`                                               | `shell:exec` (git and gh only; `cwd` confined to `workspaceRoot`, after `realpath`, when one is given), `open-path`, `open-external` |
+| `fs:*`                                                  | File watch start and stop, `fs:read-file`, `fs:changed` pushes                                                                       |
+| `extension:*`                                           | Install, toggle, reload, list, settings, commands, view bounds, insets, theme, exit gesture                                          |
+| `notifications:*`                                       | Create, list, dismiss, trigger an action, push                                                                                       |
+| `metrics:*`                                             | System and per-process metrics                                                                                                       |
+| `menu:*`                                                | Native menu events pushed to the renderer                                                                                            |
+| `editor:*`                                              | Detect and open an external editor                                                                                                   |
+| `app:*`, `db:*`, `dialog:*`, `log:*`, `quick-actions:*` | App info, database health, folder picker, renderer log lines, opening Quick Actions                                                  |
 
 An extension's channels are its own and the core knows nothing of them: git-integration registers `git:status`, `github:*` and others, Foundry `foundry:*`, task-vault `task-vault:*`. Each extension's spec files and `src/ipc/` directory are their reference.
 
@@ -348,7 +348,7 @@ Main window renderer                         Main process
 
 ### Shell execution
 
-`api.shell.exec()` runs `git` or `gh` for an extension: the call crosses from the extension host on its port, main runs it through `src/main/shell/shell-executor.ts`, and `onOutput` chunks come back as callback events before the result. The renderer's own `shell:exec` channel uses the same executor and, when given a `workspaceRoot`, refuses a `cwd` outside it ([ADR-006](adr/006-sandboxed-shell-exec-for-extensions.md)). Both use `shell: false` and a minimal environment, and allow only `git` and `gh` (`COMMAND_NOT_ALLOWED` otherwise).
+`api.shell.exec()` runs `git` or `gh` for an extension: the call crosses from the extension host on its port, main runs it through `src/main/shell/shell-executor.ts`, and `onOutput` chunks come back as callback events before the result. `api.github` runs gh through the same executor. Before either runs anything, `assertCwdInScope` checks the `cwd` against the extension's shell roots (`src/main/extensions/shell-roots.ts`, [ADR 102](adr/102-shell-exec-runs-in-declared-roots.md)): every workspace folder, every project worktree, `api.paths.userData`, and the folder settings the manifest declares in `contributes.shellRoots`. A `cwd` outside them rejects with `CwdOutOfScopeError`. The renderer's own `shell:exec` channel uses the same check with its single `workspaceRoot`, when given one. Both use `shell: false` and a minimal environment, and allow only `git` and `gh` (`COMMAND_NOT_ALLOWED` otherwise).
 
 Commands resolve against `process.env.PATH`. On macOS an app started from the Dock or Finder gets `/usr/bin:/bin:/usr/sbin:/sbin`, which has no Homebrew `gh`, so at startup `src/main/shell/login-shell-path.ts` puts the login shell's PATH (`$SHELL -ilc`) ahead of it. A command that cannot be started reports its spawn error (`spawn gh ENOENT`) as stderr, never a bare exit code. A command killed by its timeout resolves with `timedOut: true` and exit code 124, never 0.
 
@@ -722,6 +722,7 @@ operator asked for, Linear only (ADR-061).
 - **Extensions are not sandboxed.** Their backends run in the extension host, a separate process, with full Node.js privileges. The process boundary protects the terminals and the core from an extension's slow or failing code, not from a malicious extension. Install only extensions you trust.
 - **An extension's view can read only its own files.** The `ext://` handler serves files inside the extension's own directory and answers `403` for any path outside it.
 - **Shell commands are limited.** `api.shell.exec` and `shell:exec` run only `git` and `gh`, without a shell, in a minimal environment (`src/main/shell/shell-executor.ts`).
+- **Shell commands run only in declared roots.** An extension's `api.shell.exec` and `api.github` run in a workspace folder, a project worktree, `api.paths.userData` or a folder setting its manifest declares in `contributes.shellRoots`, and nowhere else ([ADR 102](adr/102-shell-exec-runs-in-declared-roots.md), superseding ADR-006's workspace-only rule). Both the `cwd` and the roots are compared after `realpath`, by path segment, so neither a symlink nor a `..` nor a sibling sharing a prefix leads out. A manifest that declares another extension's setting is refused at load.
 - **Tracker credentials never leave main.** They are `safeStorage`-encrypted in `integrations.json`, read only by a provider, and no channel returns one (see [Issue tracker integrations](#issue-tracker-integrations)).
 - **The remote bridge is default-deny.** Only channels in the allowlist `src/main/remote/remote-accessible-channels.ts` (derived from the manifest) and extension channels registered `remoteAccessible: true` are reachable from a browser. Internal channels (`dialog:*`, `db:health`, `integrations:connect` / `disconnect`) and every other extension channel are not; Task Vault's SQL console and Notepad's file import and export are never opted in. See [Remote Control](#remote-control).
 

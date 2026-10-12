@@ -90,17 +90,24 @@ task-vault/
 
 Each surface shows the extension's view, with its `view` string passed as `?view=VALUE`, so one `index.html` serves every surface. `src/renderer/extensions/loader.ts` turns these entries into the core's tabs and panels; an extension cannot register a surface any other way.
 
-| Key            | Fields                                                           | Where it appears                                                                           | Default `view` |
-| -------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------- |
-| `globalTab`    | `label`, `icon?`, `view?`                                        | An icon in the sidebar's app band; the view fills the main area                            | `main`         |
-| `workspaceTab` | `label`, `icon?`, `view?`                                        | A tab scoped to the active workspace                                                       | `workspace`    |
-| `projectTab`   | `label`, `view?`                                                 | A tab scoped to the selected project                                                       | `project`      |
-| `sidebarPanel` | `label`, `icon?`, `defaultOpen?`, `view?`                        | A panel beside the terminal                                                                | `sidebar`      |
-| `windowViews`  | `[{ id, view }]`                                                 | Views `api.window.openAuxiliary(id)` opens in their own window                             | —              |
-| `commands`     | `[{ id, label, description?, shortcut?, mnemonic?, requires? }]` | Reserves the command's row in the Quick Actions panel (see [`api.commands`](#apicommands)) | —              |
-| `quickActions` | `{ group: { mnemonic?, label } }`                                | Your group's letter and label in the Quick Actions panel                                   | —              |
+| Key            | Fields                                                           | Where it appears                                                                                 | Default `view` |
+| -------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------- |
+| `globalTab`    | `label`, `icon?`, `view?`                                        | An icon in the sidebar's app band; the view fills the main area                                  | `main`         |
+| `workspaceTab` | `label`, `icon?`, `view?`                                        | A tab scoped to the active workspace                                                             | `workspace`    |
+| `projectTab`   | `label`, `view?`                                                 | A tab scoped to the selected project                                                             | `project`      |
+| `sidebarPanel` | `label`, `icon?`, `defaultOpen?`, `view?`                        | A panel beside the terminal                                                                      | `sidebar`      |
+| `windowViews`  | `[{ id, view }]`                                                 | Views `api.window.openAuxiliary(id)` opens in their own window                                   | —              |
+| `commands`     | `[{ id, label, description?, shortcut?, mnemonic?, requires? }]` | Reserves the command's row in the Quick Actions panel (see [`api.commands`](#apicommands))       | —              |
+| `quickActions` | `{ group: { mnemonic?, label } }`                                | Your group's letter and label in the Quick Actions panel                                         | —              |
+| `shellRoots`   | `[settingKey]`                                                   | Nowhere: directories `api.shell.exec` and `api.github` may run in (see [`api.shell`](#apishell)) | —              |
 
 `icon` takes one of the names `iconFromName` knows (`src/renderer/extensions/icon-from-name.ts`), such as `puzzle`, `wrench`, `terminal`, `git-branch`, `database`, `list` or `calendar`.
+
+**Shell roots.** Each entry of `shellRoots` is the key of one of your own settings, starting with your extension id, that you register with `settings.register` as a `folder` setting. Its current value becomes a directory your git and gh may run in. A key that does not start with your id refuses the manifest at load (`INVALID_MANIFEST`); a key you do not register as a `folder` adds nothing ([ADR 102](adr/102-shell-exec-runs-in-declared-roots.md)). git-integration declares its review clone folder and Foundry its data directory:
+
+```json
+"contributes": { "shellRoots": ["terminator.foundry.dataDir"] }
+```
 
 **Quick Actions letters.** Core letters are reserved for the core. Between extensions, load order wins a contested letter; the loser gets the first free letter of its own label and a warning is logged (`allocateExtensionGroups`, `src/renderer/quick-actions/groups.ts`).
 
@@ -544,11 +551,31 @@ if (result.exitCode !== 0) {
 | `encoding: 'buffer'` | `stdout` and `stderr` come back as bytes                                                                                        |
 | `onOutput`           | Each chunk of stdout and stderr as it arrives, in text mode                                                                     |
 
-Output is never trimmed. The core runs the command in the main process (`src/main/shell/shell-executor.ts`); a command that cannot start reports its spawn error as `stderr`. Unlike the renderer's `shell:exec` channel, `api.shell.exec` does not confine `cwd` to a workspace folder: a channel that takes a path from a caller must check it itself, as git-integration's `RepoRoot` schema does (`extensions/git-integration/src/ipc/repo-root.ts`).
+Output is never trimmed. The core runs the command in the main process (`src/main/shell/shell-executor.ts`); a command that cannot start reports its spawn error as `stderr`.
+
+**`cwd` must be inside one of your shell roots** ([ADR 102](adr/102-shell-exec-runs-in-declared-roots.md)), read on every call:
+
+- a workspace folder (`workspace.list()`'s `folderPath`);
+- a project worktree (`workspace.listProjects(id)`'s `worktreePath`);
+- `api.paths.userData`, the application's per-user data directory (the same directory for every extension);
+- the value of each folder setting your manifest declares in [`contributes.shellRoots`](#contributes).
+
+The `cwd` and each root are compared after `realpath`, by path segment: a symlink or a `..` that leads out of a root, or a sibling such as `/repos/app-old` beside the root `/repos/app`, is outside. A directory that does not exist yet is judged by where it would be. Outside every root, `exec` runs nothing and rejects with an error named `CwdOutOfScopeError`:
+
+```typescript
+try {
+  await api.shell.exec({ command: 'git', args: ['status'], cwd })
+} catch (error) {
+  if ((error as Error).name === 'CwdOutOfScopeError') return { error: 'NOT_IN_A_ROOT' }
+  throw error
+}
+```
+
+When the directory does not matter to the command (`gh api` with an explicit repository, `gh api user`), run it in `api.paths.userData`. The roots bound the core's side; a channel that takes a path from a caller still checks it itself, as git-integration's `RepoRoot` schema does (`extensions/git-integration/src/ipc/repo-root.ts`).
 
 ### `api.github`
 
-Pull requests and the GitHub API through the `gh` CLI the core runs. Each call takes a `GithubTarget`: the checkout gh runs in (`cwd`), or a repository without a checkout (`repository: 'owner/name'`), and optionally a `token` that is retried under gh's own login when GitHub rejects it.
+Pull requests and the GitHub API through the `gh` CLI the core runs. Each call takes a `GithubTarget`: the checkout gh runs in (`cwd`), or a repository without a checkout (`repository: 'owner/name'`, with `cwd: api.paths.userData`), and optionally a `token` that is retried under gh's own login when GitHub rejects it. `cwd` follows the same shell roots as `api.shell.exec` and is refused with `CwdOutOfScopeError` outside them.
 
 ```typescript
 const target = { cwd: repoRoot }
@@ -818,7 +845,7 @@ Every registration returns a `Disposable`. `dispose()` undoes it. Registrations 
 
 1. Only the imports in [What an extension may import](#what-an-extension-may-import). `npm run lint` enforces it.
 2. Reach the core only through `api`. Do not use `electron`, `ipcMain` or child processes for something the API covers; if it does not cover it, the API is extended first (Constitution II).
-3. `api.shell.exec` runs only `git` and `gh`; anything else throws `COMMAND_NOT_ALLOWED`.
+3. `api.shell.exec` runs only `git` and `gh`; anything else throws `COMMAND_NOT_ALLOWED`. It and `api.github` run only inside your shell roots; anywhere else rejects with `CwdOutOfScopeError`.
 4. Every IPC channel has a schema, and is local-only unless registered `remoteAccessible`.
 5. UI comes from the design system: its components, its tokens, its fonts (Constitution XIII), and `lucide-react` icons (Constitution XII).
 6. `api.nativeMenu` adds to the View menu only.
