@@ -13,7 +13,7 @@ export default defineConfig({
     // the build on any warning.
     chunkSizeWarningLimit: 1200,
     outDir: resolve(__dirname, 'dist'),
-    emptyOutDir: false,
+    emptyOutDir: true,
     rollupOptions: {
       input: resolve(__dirname, 'index.html'),
     },

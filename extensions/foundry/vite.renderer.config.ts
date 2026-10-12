@@ -12,7 +12,7 @@ export default defineConfig({
     // 531 kB. A chunk past it warns, and CI fails the build on any warning.
     chunkSizeWarningLimit: 600,
     outDir: resolve(__dirname, 'dist'),
-    emptyOutDir: false,
+    emptyOutDir: true,
     rollupOptions: { input: resolve(__dirname, 'index.html') },
   },
 })

@@ -1255,7 +1255,7 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: resolve(__dirname, 'dist'),
-    emptyOutDir: false,
+    emptyOutDir: true, // the esbuild main bundle goes to src/, so nothing else lives in dist/
     rollupOptions: { input: resolve(__dirname, 'index.html') },
   },
 })

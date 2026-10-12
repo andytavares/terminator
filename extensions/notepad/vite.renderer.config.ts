@@ -13,7 +13,7 @@ export default defineConfig({
     // past it warns, and CI fails the build on any warning.
     chunkSizeWarningLimit: 2600,
     outDir: resolve(__dirname, 'dist'),
-    emptyOutDir: false,
+    emptyOutDir: true,
     rollupOptions: {
       input: resolve(__dirname, 'index.html'),
     },
