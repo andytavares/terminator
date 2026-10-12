@@ -164,9 +164,8 @@ async function runRefineryTick(api: ExtensionAPI, root: string): Promise<void> {
     // The issue's last move: Done only once the pull requests are merged.
     onMerged: async (orderId) => {
       const order = await store.load(orderId)
-      const port = issuesPortFor(api)
-      if (order !== null && port !== null) {
-        await writeBack(order, 'merged', writeBackDepsFor(api, root, order, port))
+      if (order !== null) {
+        await writeBack(order, 'merged', writeBackDepsFor(api, root, order, issuesPortFor(api)))
       }
     },
     now: () => new Date().toISOString(),

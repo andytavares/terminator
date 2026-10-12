@@ -4,7 +4,6 @@ import { disposables } from './ipc/register.js'
 import type { ActivationContext } from './ipc/register.js'
 import { noteUntrackedDataRoot, resolveFoundryDataRoot } from './workspace-root.js'
 import { connectIndexes } from './state/live-index.js'
-import { runtime } from './runtime/runtime-state.js'
 import { startSupervisionRuntime, stopSupervisionRuntime } from './runtime/supervision-runtime.js'
 import { startSensorTick, stopSensorTick } from './sensors/sensor-tick.js'
 import { startRefineryTick, stopRefineryTick } from './line/refinery-run.js'
@@ -18,7 +17,6 @@ import { registerRecordChannels } from './ipc/record-registration.js'
 import { registerSupervisionChannels } from './ipc/supervision-registration.js'
 import { registerModelChannels } from './ipc/model-registration.js'
 import {
-  trackTerminalSessions,
   registerViewChannels,
   registerCommands,
   clearPendingNewOrder,
@@ -34,13 +32,9 @@ import { registerSettings } from './state/settings-schema.js'
  */
 export function activate(api: ExtensionAPI): void {
   connectIndexes(api)
-  // Kept, so a phase can wait for it. Activation cannot be async — the host
-  // calls it synchronously — but a dispatch that arrives in the meantime used
-  // to find no supervised runner and fall back to a headless
-  // `bypassPermissions` spawn: an invisible agent approving its own tool calls,
-  // which is the whole thing this replaced.
-  runtime.runtimeStarting = startSupervisionRuntime(api)
-  void runtime.runtimeStarting
+  // Activation cannot be async — the host calls it synchronously — so the
+  // runtime comes up in the background.
+  void startSupervisionRuntime(api)
 
   const context: ActivationContext = { api, dataRoot: () => resolveFoundryDataRoot(api) }
   // Said once, and only when the default location is in use. Foundry will not
@@ -62,7 +56,6 @@ export function activate(api: ExtensionAPI): void {
   registerSupervisionChannels(api)
   registerModelChannels(api)
 
-  trackTerminalSessions(api)
   registerSettings(api)
   registerViewChannels(api)
   registerCommands(api)

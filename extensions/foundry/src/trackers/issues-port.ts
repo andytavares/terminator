@@ -5,16 +5,9 @@ import type { WorkOrder } from '../order/schema.js'
 
 import { orderStoreAt } from '../state/live-index.js'
 
-/**
- * The application's tracker connection, narrowed to what write-back needs.
- *
- * Null when the host has no `issues` surface at all — an older core, or a test
- * harness with a partial API. Every caller treats that as "no write-back",
- * never as a failure.
- */
-export function issuesPortFor(api: ExtensionAPI): IssuesPort | null {
+/** The application's tracker connection, narrowed to what write-back needs. */
+export function issuesPortFor(api: ExtensionAPI): IssuesPort {
   const issues = api.issues
-  if (issues === undefined || typeof issues.supportsTransitions !== 'function') return null
   return {
     comment: (tracker, key, body) => issues.comment(tracker as never, key, body),
     transition: (tracker, key, intent, optionId) =>

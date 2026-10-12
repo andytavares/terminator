@@ -33,15 +33,12 @@ export const runtime: {
    * complete whether or not it interrupted anyone.
    */
   mutes: MuteStore | null
-  /** Resolves once the supervision runtime is up, or has failed to come up. */
-  runtimeStarting: Promise<unknown> | null
 } = {
   control: null,
   supervisedRunner: null,
   stallWatcher: null,
   supervision: null,
   mutes: null,
-  runtimeStarting: null,
 }
 
 // What is waiting on the operator, across every card. Without somewhere to
