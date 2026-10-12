@@ -3,10 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { SettingsPanel } from '../../../../src/renderer/components/settings/SettingsPanel'
+import { seedStore } from '../../../support/renderer-stores'
 
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: vi.fn(),
-}))
 const { mockDispatchNotification } = vi.hoisted(() => ({ mockDispatchNotification: vi.fn() }))
 vi.mock('../../../../src/renderer/lib/notifications', () => ({
   dispatchNotification: mockDispatchNotification,
@@ -22,9 +20,7 @@ vi.mock('../../../../src/renderer/components/settings/WorkspaceSettings', () => 
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(useWorkspaceStore).mockReturnValue({ activeWorkspaceId: null } as unknown as ReturnType<
-    typeof useWorkspaceStore
-  >)
+  seedStore(useWorkspaceStore, { activeWorkspaceId: null })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     extension: {
       list: vi.fn().mockResolvedValue({ extensions: [] }),
@@ -81,17 +77,17 @@ describe('SettingsPanel', () => {
   })
 
   it('shows Workspace Settings nav when a workspace is active', () => {
-    vi.mocked(useWorkspaceStore).mockReturnValue({
+    seedStore(useWorkspaceStore, {
       activeWorkspaceId: 'ws-1',
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     render(<SettingsPanel onClose={vi.fn()} />)
     expect(screen.getByText('Workspace Settings')).toBeTruthy()
   })
 
   it('switches to workspace section when Workspace Settings is clicked', () => {
-    vi.mocked(useWorkspaceStore).mockReturnValue({
+    seedStore(useWorkspaceStore, {
       activeWorkspaceId: 'ws-1',
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Workspace Settings'))
     expect(screen.getByTestId('workspace-settings')).toBeTruthy()
@@ -700,9 +696,9 @@ describe('ExtensionsSection', () => {
   })
 
   it('switches to global section when Appearance & Terminal is clicked', () => {
-    vi.mocked(useWorkspaceStore).mockReturnValue({
+    seedStore(useWorkspaceStore, {
       activeWorkspaceId: 'ws-1',
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     fireEvent.click(screen.getByText('Appearance & Terminal'))

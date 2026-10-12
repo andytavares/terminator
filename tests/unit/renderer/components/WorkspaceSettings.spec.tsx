@@ -4,13 +4,9 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { WorkspaceSettings } from '../../../../src/renderer/components/settings/WorkspaceSettings'
-
-vi.mock('../../../../src/renderer/stores/settings.store', () => ({
-  useSettingsStore: vi.fn(),
-}))
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: vi.fn(),
-}))
+import { seedStore, workspaceOf } from '../../../support/renderer-stores'
+import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
+import type { GlobalSettings as GlobalSettingsValue } from '../../../../src/shared/types'
 
 const mockUpdateTheme = vi.fn()
 const mockUpdateScrollback = vi.fn()
@@ -20,12 +16,14 @@ const mockLoadSettings = vi.fn()
 const mockUpdateWorkspace = vi.fn()
 const mockUpdateWorkspaceQuickActions = vi.fn()
 
-const globalSettings = {
-  appearance: { theme: 'dark' as const },
-  terminal: { scrollbackLimit: 5000, defaultShell: '/bin/zsh' },
-  git: { worktreeBaseDir: '', branchExcludePatterns: [] as string[] },
-  extensions: {},
-  quickActions: { pins: [], usage: [], directUse: [], custom: [] },
+const globalSettings: GlobalSettingsValue = {
+  ...DEFAULT_GLOBAL_SETTINGS,
+  appearance: { theme: 'dark' },
+  terminal: {
+    ...DEFAULT_GLOBAL_SETTINGS.terminal,
+    scrollbackLimit: 5000,
+    defaultShell: '/bin/zsh',
+  },
 }
 
 beforeEach(() => {
@@ -35,7 +33,7 @@ beforeEach(() => {
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     settings: { updateWorkspace: mockUpdateWorkspace },
   }
-  vi.mocked(useSettingsStore).mockReturnValue({
+  seedStore(useSettingsStore, {
     globalSettings,
     workspaceSettings: new Map(),
     updateWorkspaceTheme: mockUpdateTheme,
@@ -44,10 +42,10 @@ beforeEach(() => {
     updateWorkspaceBranchExcludePatterns: mockUpdateBranchExcludePatterns,
     updateWorkspaceQuickActions: mockUpdateWorkspaceQuickActions,
     loadSettings: mockLoadSettings,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
-  vi.mocked(useWorkspaceStore).mockReturnValue({
-    workspaces: [{ id: 'ws-1', name: 'My Workspace' }],
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+  })
+  seedStore(useWorkspaceStore, {
+    workspaces: [workspaceOf({ id: 'ws-1', name: 'My Workspace' })],
+  })
 })
 
 afterEach(() => {
@@ -56,11 +54,11 @@ afterEach(() => {
 
 describe('WorkspaceSettings', () => {
   it('shows loading when globalSettings is null', () => {
-    vi.mocked(useSettingsStore).mockReturnValue({
+    seedStore(useSettingsStore, {
       globalSettings: null,
       workspaceSettings: new Map(),
       loadSettings: mockLoadSettings,
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     render(<WorkspaceSettings workspaceId="ws-1" />)
     expect(screen.getByText('Loading...')).toBeTruthy()
   })
@@ -71,9 +69,7 @@ describe('WorkspaceSettings', () => {
   })
 
   it('shows workspaceId when workspace not found', () => {
-    vi.mocked(useWorkspaceStore).mockReturnValue({ workspaces: [] } as unknown as ReturnType<
-      typeof useWorkspaceStore
-    >)
+    seedStore(useWorkspaceStore, { workspaces: [] })
     render(<WorkspaceSettings workspaceId="ws-unknown" />)
     expect(screen.getByText(/Settings for: ws-unknown/)).toBeTruthy()
   })
@@ -113,16 +109,23 @@ describe('WorkspaceSettings', () => {
 
   it('calls updateWorkspace to clear theme override when "Use global default" radio is changed', () => {
     // Set a theme override so the "Use global default" radio is not already checked
-    vi.mocked(useSettingsStore).mockReturnValue({
+    seedStore(useSettingsStore, {
       globalSettings,
       workspaceSettings: new Map([
-        ['ws-1', { overrides: { appearance: { theme: 'light' as const } } }],
+        [
+          'ws-1',
+          {
+            workspaceId: 'ws-1',
+            extensions: {},
+            overrides: { appearance: { theme: 'light' as const } },
+          },
+        ],
       ]),
       updateWorkspaceTheme: mockUpdateTheme,
       updateWorkspaceScrollback: mockUpdateScrollback,
       updateWorkspaceWorktreeBaseDir: mockUpdateWorktreeDir,
       loadSettings: mockLoadSettings,
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     render(<WorkspaceSettings workspaceId="ws-1" />)
     // The "Use global default" radio for theme is the third radio in the theme group
     const radios = screen.getAllByRole('radio')
@@ -160,16 +163,23 @@ describe('WorkspaceSettings', () => {
   })
 
   it('shows "Use global default" button for worktree override when override is set', () => {
-    vi.mocked(useSettingsStore).mockReturnValue({
+    seedStore(useSettingsStore, {
       globalSettings,
       workspaceSettings: new Map([
-        ['ws-1', { overrides: { git: { worktreeBaseDir: '/custom' } } }],
+        [
+          'ws-1',
+          {
+            workspaceId: 'ws-1',
+            extensions: {},
+            overrides: { git: { worktreeBaseDir: '/custom' } },
+          },
+        ],
       ]),
       updateWorkspaceTheme: mockUpdateTheme,
       updateWorkspaceScrollback: mockUpdateScrollback,
       updateWorkspaceWorktreeBaseDir: mockUpdateWorktreeDir,
       loadSettings: mockLoadSettings,
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     render(<WorkspaceSettings workspaceId="ws-1" />)
     // When override is set, a second "Use global default" button appears for worktree dir
     const buttons = screen.getAllByRole('button')
@@ -203,17 +213,24 @@ describe('WorkspaceSettings', () => {
   })
 
   it('shows Use global default button for branch exclude when override is set and clicking it calls update with undefined', () => {
-    vi.mocked(useSettingsStore).mockReturnValue({
+    seedStore(useSettingsStore, {
       globalSettings,
       workspaceSettings: new Map([
-        ['ws-1', { overrides: { git: { branchExcludePatterns: ['renovate/*'] } } }],
+        [
+          'ws-1',
+          {
+            workspaceId: 'ws-1',
+            extensions: {},
+            overrides: { git: { branchExcludePatterns: ['renovate/*'] } },
+          },
+        ],
       ]),
       updateWorkspaceTheme: mockUpdateTheme,
       updateWorkspaceScrollback: mockUpdateScrollback,
       updateWorkspaceWorktreeBaseDir: mockUpdateWorktreeDir,
       updateWorkspaceBranchExcludePatterns: mockUpdateBranchExcludePatterns,
       loadSettings: mockLoadSettings,
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     render(<WorkspaceSettings workspaceId="ws-1" />)
     const buttons = screen.getAllByRole('button')
     const globalDefaults = buttons.filter((b) => b.textContent === 'Use global default')

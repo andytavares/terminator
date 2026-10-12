@@ -3,10 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { CreateWorkspaceDialog } from '../../../../src/renderer/components/sidebar/CreateWorkspaceDialog'
-
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: vi.fn(),
-}))
+import { seedStore, workspaceOf } from '../../../support/renderer-stores'
 
 const mockCreateWorkspace = vi.fn()
 const mockCreateProject = vi.fn()
@@ -21,11 +18,11 @@ beforeEach(() => {
     dialog: { openDirectory: mockOpenDirectory },
     git: { isRepo: vi.fn().mockResolvedValue({ isRepo: false }) },
   }
-  vi.mocked(useWorkspaceStore).mockReturnValue({
+  seedStore(useWorkspaceStore, {
     workspaces: [],
     createWorkspace: mockCreateWorkspace,
     createProject: mockCreateProject,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+  })
 })
 
 afterEach(() => {
@@ -56,11 +53,11 @@ describe('CreateWorkspaceDialog', () => {
   })
 
   it('shows duplicate name error', () => {
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [{ id: 'ws-1', name: 'Existing' }],
+    seedStore(useWorkspaceStore, {
+      workspaces: [workspaceOf({ id: 'ws-1', name: 'Existing' })],
       createWorkspace: mockCreateWorkspace,
       createProject: mockCreateProject,
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
     const nameInput = screen.getByPlaceholderText('My Workspace')
     fireEvent.change(nameInput, { target: { value: 'existing' } })

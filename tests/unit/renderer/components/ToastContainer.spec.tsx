@@ -1,24 +1,14 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import { useToastStore } from '../../../../src/renderer/stores/toast.store'
+import { useToastStore, type Toast } from '../../../../src/renderer/stores/toast.store'
 import { ToastContainer } from '../../../../src/renderer/components/ToastContainer'
 
-vi.mock('../../../../src/renderer/stores/toast.store', () => ({
-  useToastStore: vi.fn(),
-}))
-
-const mockRemoveToast = vi.fn()
-
-function withToasts(toasts: { id: string; type: string; message: string }[]): void {
-  vi.mocked(useToastStore).mockReturnValue({
-    toasts,
-    removeToast: mockRemoveToast,
-  } as unknown as ReturnType<typeof useToastStore>)
+function withToasts(toasts: Array<Omit<Toast, 'duration'>>): void {
+  useToastStore.setState({ toasts: toasts.map((toast) => ({ ...toast, duration: 3500 })) })
 }
 
 beforeEach(() => {
-  mockRemoveToast.mockReset()
   withToasts([])
 })
 
@@ -47,7 +37,8 @@ describe('ToastContainer', () => {
     withToasts([{ id: '5', type: 'info', message: 'Test' }])
     render(<ToastContainer />)
     fireEvent.click(screen.getByLabelText('Dismiss'))
-    expect(mockRemoveToast).toHaveBeenCalledWith('5')
+    expect(useToastStore.getState().toasts).toEqual([])
+    expect(screen.queryByText('Test')).toBeNull()
   })
 
   // The store already expires a toast; a second timer in the region would
@@ -59,6 +50,6 @@ describe('ToastContainer', () => {
     act(() => {
       vi.advanceTimersByTime(60_000)
     })
-    expect(mockRemoveToast).not.toHaveBeenCalled()
+    expect(screen.getByText('Saved')).toBeTruthy()
   })
 })

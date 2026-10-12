@@ -4,13 +4,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { MoveSessionDialog } from '../../../../src/renderer/components/sidebar/MoveSessionDialog'
+import type { Project, Workspace } from '../../../../src/shared/types/index'
+import { seedStore, terminalSessionOf } from '../../../support/renderer-stores'
 
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: vi.fn(),
-}))
-vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: vi.fn(),
-}))
 vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () => ({
   CreateWorkspaceDialog: ({ onClose }: { onClose: () => void }) => (
     <div data-testid="create-workspace-dialog">
@@ -21,7 +17,7 @@ vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () 
 
 const SCRATCH = '00000000-0000-0000-0000-000000000000'
 
-const workspace1 = {
+const workspace1: Workspace = {
   id: 'ws-1',
   name: 'Alpha',
   color: '#f00',
@@ -30,7 +26,7 @@ const workspace1 = {
   createdAt: '',
   updatedAt: '',
 }
-const project1 = {
+const project1: Project = {
   id: 'proj-1',
   workspaceId: 'ws-1',
   name: 'Proj One',
@@ -38,7 +34,7 @@ const project1 = {
   createdAt: '',
   updatedAt: '',
 }
-const project2 = {
+const project2: Project = {
   id: 'proj-2',
   workspaceId: 'ws-1',
   name: 'Proj Two',
@@ -58,7 +54,7 @@ const mockOnClose = vi.fn()
 const mockOnMoved = vi.fn()
 
 function setupMocks(sessionProjectId = SCRATCH) {
-  vi.mocked(useWorkspaceStore).mockReturnValue({
+  seedStore(useWorkspaceStore, {
     workspaces: [workspace1],
     projectsByWorkspaceId: new Map([['ws-1', [project1, project2]]]),
     loadProjects: mockLoadProjects,
@@ -66,36 +62,22 @@ function setupMocks(sessionProjectId = SCRATCH) {
     setActiveWorkspace: mockSetActiveWorkspace,
     setActiveProject: mockSetActiveProject,
     deleteProject: mockDeleteProject,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-  const sessions = new Map([
-    [
-      'sess-1',
-      {
-        id: 'sess-1',
-        projectId: sessionProjectId,
-        tabTitle: 'Scratch',
-        status: 'active',
-        type: 'human',
-        scrollbackLimit: 5000,
-        createdAt: '',
-      },
-    ],
-  ])
-
-  vi.mocked(useSessionStore).mockReturnValue({
-    moveSession: mockMoveSession,
-    getSessionsForProject: mockGetSessionsForProject,
-  } as unknown as ReturnType<typeof useSessionStore>)
-
-  // Expose sessions via getState
-  ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
-    sessions,
-    moveSession: mockMoveSession,
-    getSessionsForProject: mockGetSessionsForProject,
   })
-  ;(useWorkspaceStore as unknown as { getState: () => unknown }).getState = () => ({
-    deleteProject: mockDeleteProject,
+
+  seedStore(useSessionStore, {
+    sessions: new Map([
+      [
+        'sess-1',
+        terminalSessionOf({
+          id: 'sess-1',
+          projectId: sessionProjectId,
+          tabTitle: 'Scratch',
+          scrollbackLimit: 5000,
+        }),
+      ],
+    ]),
+    moveSession: mockMoveSession,
+    getSessionsForProject: mockGetSessionsForProject,
   })
 }
 

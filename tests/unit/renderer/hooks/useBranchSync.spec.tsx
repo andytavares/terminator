@@ -2,10 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useBranchSync, type BranchSyncTarget } from '../../../../src/renderer/hooks/useBranchSync'
-
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: vi.fn(),
-}))
+import { seedStore } from '../../../support/renderer-stores'
 
 const mockUpdateProjectBranch = vi.fn()
 const mockCurrentBranch = vi.fn()
@@ -32,9 +29,9 @@ beforeEach(() => {
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     git: { currentBranch: mockCurrentBranch },
   }
-  vi.mocked(useWorkspaceStore).mockReturnValue({
+  seedStore(useWorkspaceStore, {
     updateProjectBranch: mockUpdateProjectBranch,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+  })
   mockCurrentBranch.mockResolvedValue({ branch: 'main' })
   mockUpdateProjectBranch.mockResolvedValue({})
 })

@@ -2,20 +2,15 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, fireEvent } from '@testing-library/react'
 
-vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: vi.fn(),
-}))
-
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { LeafPane } from '../../../../src/renderer/components/terminal/LeafPane'
+import type { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
+import { seedStore, terminalSessionOf, type SeededStore } from '../../../support/renderer-stores'
 
-const mockGetTerminalInstance = vi.fn()
-const mockGetFocusedSession = vi.fn(() => null)
-const mockSetFocusedSession = vi.fn()
-const mockClearBellCount = vi.fn()
 const mockTerminalInput = vi.fn()
-const mockSessions = new Map([['sess-1', { id: 'sess-1', tabTitle: 'Terminal 1' }]])
+let store: SeededStore<typeof useSessionStore>
 
+// xterm does not run in jsdom: the instance is faked down to what LeafPane calls.
 function makeInstance(overrides: Record<string, unknown> = {}) {
   return {
     mount: vi.fn(),
@@ -25,20 +20,18 @@ function makeInstance(overrides: Record<string, unknown> = {}) {
       paste: vi.fn(),
     },
     ...overrides,
-  }
+  } as unknown as TerminalInstance
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(useSessionStore).mockReturnValue({
-    getTerminalInstance: mockGetTerminalInstance,
-    getFocusedSession: mockGetFocusedSession,
-    setFocusedSession: mockSetFocusedSession,
-    clearBellCount: mockClearBellCount,
-    sessions: mockSessions,
-  } as unknown as ReturnType<typeof useSessionStore>)
-  mockGetTerminalInstance.mockReturnValue(undefined)
-  mockGetFocusedSession.mockReturnValue(null)
+  store = seedStore(useSessionStore, {
+    sessions: new Map([
+      ['sess-1', terminalSessionOf({ id: 'sess-1', projectId: 'proj-1', tabTitle: 'Terminal 1' })],
+    ]),
+  })
+  store.getTerminalInstance.mockReturnValue(undefined)
+  store.getFocusedSession.mockReturnValue(null)
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     terminal: { input: mockTerminalInput },
     // Electron 32+ removed File.path; the path is only available through the preload.
@@ -69,34 +62,34 @@ describe('LeafPane', () => {
   })
 
   it('adds focused class when session is focused', () => {
-    mockGetFocusedSession.mockReturnValue('sess-1')
+    store.getFocusedSession.mockReturnValue('sess-1')
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     expect(container.querySelector('.leaf-pane--focused')).toBeTruthy()
   })
 
   it('does not add focused class when session is not focused', () => {
-    mockGetFocusedSession.mockReturnValue('other-sess')
+    store.getFocusedSession.mockReturnValue('other-sess')
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     expect(container.querySelector('.leaf-pane--focused')).toBeNull()
   })
 
   it('calls setFocusedSession and terminal focus on click', () => {
     const instance = makeInstance()
-    mockGetTerminalInstance.mockReturnValue(instance)
+    store.getTerminalInstance.mockReturnValue(instance)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
-    expect(mockSetFocusedSession).toHaveBeenCalledWith('proj-1', 'sess-1')
+    expect(store.setFocusedSession).toHaveBeenCalledWith('proj-1', 'sess-1')
     expect(instance.terminal.focus).toHaveBeenCalled()
   })
 
   it('calls clearBellCount on mousedown', () => {
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
-    expect(mockClearBellCount).toHaveBeenCalledWith('sess-1')
+    expect(store.clearBellCount).toHaveBeenCalledWith('sess-1')
   })
 
   it('does not throw on mousedown when no terminal instance', () => {
-    mockGetTerminalInstance.mockReturnValue(undefined)
+    store.getTerminalInstance.mockReturnValue(undefined)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     expect(() =>
       fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
@@ -105,7 +98,7 @@ describe('LeafPane', () => {
 
   it('pastes file paths into terminal on drop', () => {
     const instance = makeInstance()
-    mockGetTerminalInstance.mockReturnValue(instance)
+    store.getTerminalInstance.mockReturnValue(instance)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     const file = new File([], 'report.pdf')
     fireEvent.drop(container.querySelector('.leaf-pane')!, {
@@ -116,7 +109,7 @@ describe('LeafPane', () => {
 
   it('quotes paths with spaces on drop', () => {
     const instance = makeInstance()
-    mockGetTerminalInstance.mockReturnValue(instance)
+    store.getTerminalInstance.mockReturnValue(instance)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     const file = new File([], 'my file.txt')
     fireEvent.drop(container.querySelector('.leaf-pane')!, {
@@ -136,14 +129,14 @@ describe('LeafPane', () => {
 
   it('mounts the terminal instance on mount', () => {
     const instance = makeInstance()
-    mockGetTerminalInstance.mockReturnValue(instance)
+    store.getTerminalInstance.mockReturnValue(instance)
     render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     expect(instance.mount).toHaveBeenCalled()
   })
 
   it('unmounts the terminal instance on unmount', () => {
     const instance = makeInstance()
-    mockGetTerminalInstance.mockReturnValue(instance)
+    store.getTerminalInstance.mockReturnValue(instance)
     const { unmount } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     unmount()
     expect(instance.unmount).toHaveBeenCalled()
@@ -151,7 +144,7 @@ describe('LeafPane', () => {
 
   it('calls mount with just the container element', () => {
     const instance = makeInstance()
-    mockGetTerminalInstance.mockReturnValue(instance)
+    store.getTerminalInstance.mockReturnValue(instance)
     render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     expect(instance.mount).toHaveBeenCalledWith(expect.any(HTMLDivElement))
     expect(instance.mount).toHaveBeenCalledTimes(1)
@@ -160,19 +153,19 @@ describe('LeafPane', () => {
   it('ignores non-left-button mousedown (button !== 0)', () => {
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 2 })
-    expect(mockSetFocusedSession).not.toHaveBeenCalled()
+    expect(store.setFocusedSession).not.toHaveBeenCalled()
   })
 
   it('focuses the terminal on click', () => {
     const instance = makeInstance()
-    mockGetTerminalInstance.mockReturnValue(instance)
+    store.getTerminalInstance.mockReturnValue(instance)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
     expect(instance.terminal.focus).toHaveBeenCalled()
   })
 
   it('does not throw on drop when no terminal instance', () => {
-    mockGetTerminalInstance.mockReturnValue(undefined)
+    store.getTerminalInstance.mockReturnValue(undefined)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     const file = new File([], 'file.txt')
     expect(() =>

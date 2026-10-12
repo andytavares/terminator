@@ -4,10 +4,9 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useTerminalOpenErrorStore } from '../../../../src/renderer/stores/terminal-open-error.store'
 import { TerminalPane } from '../../../../src/renderer/components/terminal/TerminalPane'
+import { seedStore } from '../../../support/renderer-stores'
+import type { PaneNode } from '../../../../src/shared/types/index'
 
-vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: vi.fn(),
-}))
 const mockModalDepth = vi.fn(() => 0)
 vi.mock('../../../../src/renderer/stores/modal.store', () => ({
   useModalStore: Object.assign(
@@ -72,7 +71,7 @@ const mockGetActive = vi.fn()
 const mockGetInstance = vi.fn()
 const mockClearBell = vi.fn()
 const mockTerminalInput = vi.fn()
-const mockGetPaneLayout = vi.fn(() => null)
+const mockGetPaneLayout = vi.fn<(projectId: string) => PaneNode | null>(() => null)
 const mockSetSplitRatio = vi.fn()
 
 const mockSetFocusedSession = vi.fn()
@@ -80,7 +79,7 @@ const mockSetFocusedSession = vi.fn()
 beforeEach(() => {
   vi.clearAllMocks()
   mockModalDepth.mockReturnValue(0)
-  vi.mocked(useSessionStore).mockReturnValue({
+  seedStore(useSessionStore, {
     getSessionsForProject: mockGetSessions,
     getActiveSessionForProject: mockGetActive,
     getTerminalInstance: mockGetInstance,
@@ -89,7 +88,7 @@ beforeEach(() => {
     setSplitRatio: mockSetSplitRatio,
     setFocusedSession: mockSetFocusedSession,
     focusRequest: null,
-  } as unknown as ReturnType<typeof useSessionStore>)
+  })
   mockGetSessions.mockReturnValue([])
   mockGetActive.mockReturnValue(null)
   mockGetInstance.mockReturnValue(undefined)
@@ -314,7 +313,7 @@ describe('TerminalPane', () => {
         mount: vi.fn(),
         unmount: vi.fn(),
       })
-      vi.mocked(useSessionStore).mockReturnValue({
+      seedStore(useSessionStore, {
         getSessionsForProject: mockGetSessions,
         getActiveSessionForProject: mockGetActive,
         getTerminalInstance: mockGetInstance,
@@ -323,7 +322,7 @@ describe('TerminalPane', () => {
         setSplitRatio: mockSetSplitRatio,
         setFocusedSession: mockSetFocusedSession,
         focusRequest: { sessionId: 'ses-1', nonce: 1 },
-      } as unknown as ReturnType<typeof useSessionStore>)
+      })
       render(<TerminalPane projectId="proj-1" />)
       expect(mockFocus).toHaveBeenCalled()
     })
@@ -331,7 +330,7 @@ describe('TerminalPane', () => {
     it('sets the focused leaf and focuses its instance in split mode', () => {
       withRaf()
       const mockFocus = vi.fn()
-      const layout = {
+      const layout: PaneNode = {
         type: 'split',
         id: 'split-1',
         direction: 'vertical',
@@ -350,7 +349,7 @@ describe('TerminalPane', () => {
         mount: vi.fn(),
         unmount: vi.fn(),
       })
-      vi.mocked(useSessionStore).mockReturnValue({
+      seedStore(useSessionStore, {
         getSessionsForProject: mockGetSessions,
         getActiveSessionForProject: mockGetActive,
         getTerminalInstance: mockGetInstance,
@@ -359,7 +358,7 @@ describe('TerminalPane', () => {
         setSplitRatio: mockSetSplitRatio,
         setFocusedSession: mockSetFocusedSession,
         focusRequest: { sessionId: 'ses-2', nonce: 1 },
-      } as unknown as ReturnType<typeof useSessionStore>)
+      })
       render(<TerminalPane projectId="proj-1" />)
       expect(mockSetFocusedSession).toHaveBeenCalledWith('proj-1', 'ses-2')
       expect(mockFocus).toHaveBeenCalled()
@@ -376,7 +375,7 @@ describe('TerminalPane', () => {
         mount: vi.fn(),
         unmount: vi.fn(),
       })
-      vi.mocked(useSessionStore).mockReturnValue({
+      seedStore(useSessionStore, {
         getSessionsForProject: mockGetSessions,
         getActiveSessionForProject: mockGetActive,
         getTerminalInstance: mockGetInstance,
@@ -385,7 +384,7 @@ describe('TerminalPane', () => {
         setSplitRatio: mockSetSplitRatio,
         setFocusedSession: mockSetFocusedSession,
         focusRequest: { sessionId: 'ses-1', nonce: 1 },
-      } as unknown as ReturnType<typeof useSessionStore>)
+      })
       render(<TerminalPane projectId="proj-1" />)
       expect(mockFocus).not.toHaveBeenCalled()
     })
@@ -403,7 +402,7 @@ describe('TerminalPane', () => {
         mount: vi.fn(),
         unmount: vi.fn(),
       })
-      vi.mocked(useSessionStore).mockReturnValue({
+      seedStore(useSessionStore, {
         getSessionsForProject: mockGetSessions,
         getActiveSessionForProject: mockGetActive,
         getTerminalInstance: mockGetInstance,
@@ -412,7 +411,7 @@ describe('TerminalPane', () => {
         setSplitRatio: mockSetSplitRatio,
         setFocusedSession: mockSetFocusedSession,
         focusRequest: { sessionId: 'ses-1', nonce: 1 },
-      } as unknown as ReturnType<typeof useSessionStore>)
+      })
       render(<TerminalPane projectId="proj-1" />)
       mockFocus.mockClear()
       mockModalDepth.mockReturnValue(1)
@@ -423,7 +422,7 @@ describe('TerminalPane', () => {
 
   describe('split mode (layout present)', () => {
     it('renders split container instead of single pane when layout exists', () => {
-      const layout = {
+      const layout: PaneNode = {
         type: 'split',
         id: 'split-1',
         direction: 'vertical',
@@ -443,7 +442,7 @@ describe('TerminalPane', () => {
 
     it('calls setSplitRatio when ratio changes in split mode', () => {
       const mockSetSplitRatio = vi.fn()
-      vi.mocked(useSessionStore).mockReturnValue({
+      seedStore(useSessionStore, {
         getSessionsForProject: mockGetSessions,
         getActiveSessionForProject: mockGetActive,
         getTerminalInstance: mockGetInstance,
@@ -451,8 +450,8 @@ describe('TerminalPane', () => {
         getPaneLayout: mockGetPaneLayout,
         setSplitRatio: mockSetSplitRatio,
         setFocusedSession: vi.fn(),
-      } as unknown as ReturnType<typeof useSessionStore>)
-      const layout = {
+      })
+      const layout: PaneNode = {
         type: 'split',
         id: 'split-1',
         direction: 'vertical',

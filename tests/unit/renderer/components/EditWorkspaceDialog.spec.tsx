@@ -4,10 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { EditWorkspaceDialog } from '../../../../src/renderer/components/sidebar/EditWorkspaceDialog'
 import type { Workspace } from '../../../../src/shared/types/index'
-
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: vi.fn(),
-}))
+import { seedStore } from '../../../support/renderer-stores'
 
 const mockUpdateWorkspace = vi.fn()
 const mockOpenDirectory = vi.fn()
@@ -29,10 +26,10 @@ beforeEach(() => {
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     dialog: { openDirectory: mockOpenDirectory },
   }
-  vi.mocked(useWorkspaceStore).mockReturnValue({
+  seedStore(useWorkspaceStore, {
     workspaces: [ws],
     updateWorkspace: mockUpdateWorkspace,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+  })
 })
 
 afterEach(() => {
@@ -127,10 +124,10 @@ describe('EditWorkspaceDialog', () => {
 
   it('shows error when duplicate name on blur', () => {
     const otherWs = { ...ws, id: 'ws-2', name: 'Other' }
-    vi.mocked(useWorkspaceStore).mockReturnValue({
+    seedStore(useWorkspaceStore, {
       workspaces: [ws, otherWs],
       updateWorkspace: mockUpdateWorkspace,
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
     const nameInput = screen.getByDisplayValue('My Work')
     fireEvent.change(nameInput, { target: { value: 'Other' } })

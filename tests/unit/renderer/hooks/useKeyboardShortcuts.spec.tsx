@@ -5,14 +5,10 @@ import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useTerminalSession } from '../../../../src/renderer/hooks/useTerminalSession'
+import { seedStore, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
+import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
+import type { TerminalSession, Workspace } from '../../../../src/shared/types/index'
 
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: Object.assign(vi.fn(), { getState: vi.fn() }),
-}))
-vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: Object.assign(vi.fn(), { getState: vi.fn() }),
-}))
-vi.mock('../../../../src/renderer/stores/settings.store', () => ({ useSettingsStore: vi.fn() }))
 vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: Object.assign(vi.fn(), { getState: vi.fn() }),
   matchesAccelerator: vi.fn(),
@@ -34,34 +30,38 @@ const mockGetPaneLayout = vi.fn().mockReturnValue(null)
 const mockGetFocusedSession = vi.fn().mockReturnValue(null)
 const mockCloseSplitLeaf = vi.fn()
 const mockCloseSession = vi.fn().mockResolvedValue(undefined)
-const mockResolveSettings = vi.fn().mockReturnValue({ terminal: { scrollbackLimit: 5000 } })
+const mockResolveSettings = vi.fn().mockReturnValue({
+  ...DEFAULT_GLOBAL_SETTINGS,
+  terminal: { ...DEFAULT_GLOBAL_SETTINGS.terminal, scrollbackLimit: 5000 },
+})
 const mockSetActiveProject = vi.fn()
 const mockRequestFocus = vi.fn()
 const mockSetActiveGlobalTab = vi.fn()
 const mockSetActiveWorkspaceTab = vi.fn()
 const mockSetActiveProjectTab = vi.fn()
-let storeSessions = new Map<string, unknown>()
+let storeSessions = new Map<string, TerminalSession>()
 const { matchesAccelerator } = await import('../../../../src/renderer/extensions/registry')
 
-const workspace1 = { id: 'ws-1', name: 'WS 1', folderPath: '/ws1', color: '#fff', tags: [] }
-const workspace2 = { id: 'ws-2', name: 'WS 2', folderPath: '/ws2', color: '#f00', tags: [] }
+const workspace1 = workspaceOf({ id: 'ws-1', name: 'WS 1', folderPath: '/ws1', color: '#fff' })
+const workspace2 = workspaceOf({ id: 'ws-2', name: 'WS 2', folderPath: '/ws2', color: '#f00' })
 
 function setupMocks(
   overrides: {
     activeWorkspaceId?: string | null
     activeProjectId?: string | null
-    workspaces?: unknown[]
+    workspaces?: Workspace[]
   } = {}
 ) {
-  vi.mocked(useWorkspaceStore).mockReturnValue({
+  seedStore(useWorkspaceStore, {
     workspaces: overrides.workspaces ?? [workspace1, workspace2],
     activeWorkspaceId: overrides.activeWorkspaceId ?? 'ws-1',
     setActiveWorkspace: mockSetActiveWorkspace,
     activeProjectId: overrides.activeProjectId ?? null,
     resolveActiveCwd: vi.fn().mockReturnValue('/workspace/path'),
     setExpandedWorkspaceIds: vi.fn(),
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
-  vi.mocked(useSessionStore).mockReturnValue({
+    setActiveProject: mockSetActiveProject,
+  })
+  seedStore(useSessionStore, {
     getActiveSessionForProject: mockGetActiveSessionForProject,
     setActiveSessionForProject: mockSetActiveSessionForProject,
     getSessionsForProject: mockGetSessionsForProject,
@@ -69,17 +69,12 @@ function setupMocks(
     getFocusedSession: mockGetFocusedSession,
     closeSplitLeaf: mockCloseSplitLeaf,
     closeSession: mockCloseSession,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
-  vi.mocked(useWorkspaceStore.getState).mockReturnValue({
-    setActiveProject: mockSetActiveProject,
-  } as unknown as ReturnType<typeof useWorkspaceStore.getState>)
-  vi.mocked(useSessionStore.getState).mockReturnValue({
     sessions: storeSessions,
     requestFocus: mockRequestFocus,
-  } as unknown as ReturnType<typeof useSessionStore.getState>)
-  vi.mocked(useSettingsStore).mockReturnValue({
+  })
+  seedStore(useSettingsStore, {
     resolveSettings: mockResolveSettings,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+  })
   vi.mocked(useExtensionRegistry).mockReturnValue({
     keyboardShortcuts: [],
   } as unknown as ReturnType<typeof useWorkspaceStore>)
@@ -274,14 +269,14 @@ describe('useKeyboardShortcuts', () => {
 
   it('Cmd+= also calls setExpandedWorkspaceIds on the cycled workspace', async () => {
     const mockSetExpanded = vi.fn()
-    vi.mocked(useWorkspaceStore).mockReturnValue({
+    seedStore(useWorkspaceStore, {
       workspaces: [workspace1, workspace2],
       activeWorkspaceId: 'ws-1',
       setActiveWorkspace: mockSetActiveWorkspace,
       activeProjectId: null,
       resolveActiveCwd: vi.fn().mockReturnValue('/workspace/path'),
       setExpandedWorkspaceIds: mockSetExpanded,
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     const useKeyboardShortcuts = await importHook()
     renderHook(() => useKeyboardShortcuts())
     pressKey('=', { metaKey: true })
@@ -289,14 +284,14 @@ describe('useKeyboardShortcuts', () => {
   })
 
   it('cycleWorkspace does nothing when workspaces list is empty', async () => {
-    vi.mocked(useWorkspaceStore).mockReturnValue({
+    seedStore(useWorkspaceStore, {
       workspaces: [],
       activeWorkspaceId: null,
       setActiveWorkspace: mockSetActiveWorkspace,
       activeProjectId: null,
       resolveActiveCwd: vi.fn().mockReturnValue('/'),
       setExpandedWorkspaceIds: vi.fn(),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     const useKeyboardShortcuts = await importHook()
     renderHook(() => useKeyboardShortcuts())
     pressKey('=', { metaKey: true })
@@ -542,18 +537,8 @@ describe('useKeyboardShortcuts', () => {
 })
 
 describe('session navigation shortcuts (FR-032)', () => {
-  const mkSession = (id: string, projectId: string, patch: Record<string, unknown> = {}) => ({
-    id,
-    projectId,
-    tabTitle: id,
-    status: 'active',
-    type: 'agent',
-    scrollbackLimit: 10000,
-    createdAt: '',
-    lastActivityAt: 0,
-    agentState: 'idle',
-    ...patch,
-  })
+  const mkSession = (id: string, projectId: string, patch: Partial<TerminalSession> = {}) =>
+    terminalSessionOf({ id, projectId, type: 'agent', ...patch })
 
   beforeEach(() => {
     storeSessions = new Map([

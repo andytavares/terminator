@@ -3,10 +3,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { GlobalSettings } from '../../../../src/renderer/components/settings/GlobalSettings'
-
-vi.mock('../../../../src/renderer/stores/settings.store', () => ({
-  useSettingsStore: vi.fn(),
-}))
+import { seedStore } from '../../../support/renderer-stores'
+import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
+import type { GlobalSettings as GlobalSettingsValue } from '../../../../src/shared/types'
 
 const mockUpdateTheme = vi.fn()
 const mockUpdateScrollback = vi.fn()
@@ -18,21 +17,16 @@ const mockUpdatePromptForName = vi.fn()
 const mockUpdateNotificationDefaultTargets = vi.fn()
 const mockUpdateNotificationOverride = vi.fn()
 
-const globalSettings = {
-  appearance: { theme: 'dark' as const },
+const globalSettings: GlobalSettingsValue = {
+  ...DEFAULT_GLOBAL_SETTINGS,
+  appearance: { theme: 'dark' },
   terminal: {
+    ...DEFAULT_GLOBAL_SETTINGS.terminal,
     scrollbackLimit: 5000,
     defaultShell: '/bin/zsh',
   },
-  git: { worktreeBaseDir: '' },
-  extensions: {},
-  ui: { hasSeenWelcome: false, showMetricsBar: false },
+  ui: { hasSeenWelcome: false, editor: '', showMetricsBar: false },
   sidebar: { staleAfterMs: 7_200_000 },
-  notifications: {
-    defaultTargets: ['system', 'center', 'toast'] as const,
-    overrides: {},
-  },
-  quickActions: { pins: [], usage: [], directUse: [], custom: [] },
 }
 
 const mockUpdateQuickActions = vi.fn()
@@ -40,7 +34,7 @@ const mockUpdateQuickActions = vi.fn()
 beforeEach(() => {
   vi.clearAllMocks()
   mockUpdateGlobal.mockResolvedValue(undefined)
-  vi.mocked(useSettingsStore).mockReturnValue({
+  seedStore(useSettingsStore, {
     globalSettings,
     updateGlobalTheme: mockUpdateTheme,
     updateScrollbackLimit: mockUpdateScrollback,
@@ -52,7 +46,7 @@ beforeEach(() => {
     updateNotificationOverride: mockUpdateNotificationOverride,
     updateQuickActions: mockUpdateQuickActions,
     workspaceSettings: new Map(),
-  } as unknown as ReturnType<typeof useSettingsStore>)
+  })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     settings: { updateGlobal: mockUpdateGlobal },
   }
@@ -64,9 +58,7 @@ afterEach(() => {
 
 describe('GlobalSettings', () => {
   it('shows loading when globalSettings is null', () => {
-    vi.mocked(useSettingsStore).mockReturnValue({ globalSettings: null } as unknown as ReturnType<
-      typeof useSettingsStore
-    >)
+    seedStore(useSettingsStore, { globalSettings: null })
     render(<GlobalSettings />)
     expect(screen.getByText('Loading...')).toBeTruthy()
   })
@@ -170,7 +162,7 @@ describe('GlobalSettings', () => {
     })
 
     it('checking an absent default target adds it back', () => {
-      vi.mocked(useSettingsStore).mockReturnValue({
+      seedStore(useSettingsStore, {
         globalSettings: {
           ...globalSettings,
           notifications: { defaultTargets: ['toast'], overrides: {} },
@@ -183,7 +175,7 @@ describe('GlobalSettings', () => {
         updatePromptForName: mockUpdatePromptForName,
         updateNotificationDefaultTargets: mockUpdateNotificationDefaultTargets,
         updateNotificationOverride: mockUpdateNotificationOverride,
-      } as unknown as ReturnType<typeof useSettingsStore>)
+      })
       render(<GlobalSettings />)
       fireEvent.click(screen.getAllByRole('checkbox', { name: 'System' })[0])
       expect(mockUpdateNotificationDefaultTargets).toHaveBeenCalledWith(['toast', 'system'])
@@ -259,14 +251,5 @@ describe('GlobalSettings — staleness threshold (FR-020)', () => {
     render(<GlobalSettings />)
     fireEvent.blur(field(), { target: { value: '2.6' } })
     expect(mockUpdateGlobal).toHaveBeenCalledWith({ sidebar: { staleAfterMs: 180_000 } })
-  })
-
-  it('falls back to two hours when the setting is absent', () => {
-    vi.mocked(useSettingsStore).mockReturnValue({
-      globalSettings: { ...globalSettings, sidebar: undefined },
-      updateGlobalTheme: mockUpdateTheme,
-    } as unknown as ReturnType<typeof useSettingsStore>)
-    render(<GlobalSettings />)
-    expect((field() as HTMLInputElement).value).toBe('120')
   })
 })

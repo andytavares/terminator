@@ -4,23 +4,28 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { QuickActionsSettings } from '../../../../src/renderer/components/settings/QuickActionsSettings'
 import type { CustomAction } from '../../../../src/shared/types'
+import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
+import { seedStore, type SeededStore } from '../../../support/renderer-stores'
 
-vi.mock('../../../../src/renderer/stores/settings.store', () => ({
-  useSettingsStore: vi.fn(),
-}))
-
-const mockUpdateQuickActions = vi.fn()
-const mockUpdateWorkspaceQuickActions = vi.fn()
+let settings: SeededStore<typeof useSettingsStore>
 
 function mockStore(custom: CustomAction[], workspaceCustom: CustomAction[] = []) {
-  vi.mocked(useSettingsStore).mockReturnValue({
-    globalSettings: { quickActions: { pins: [], usage: [], directUse: [], custom } },
+  settings = seedStore(useSettingsStore, {
+    globalSettings: {
+      ...DEFAULT_GLOBAL_SETTINGS,
+      quickActions: { ...DEFAULT_GLOBAL_SETTINGS.quickActions, custom },
+    },
     workspaceSettings: new Map([
-      ['ws-1', { workspaceId: 'ws-1', overrides: { quickActions: { custom: workspaceCustom } } }],
+      [
+        'ws-1',
+        {
+          workspaceId: 'ws-1',
+          overrides: { quickActions: { custom: workspaceCustom } },
+          extensions: {},
+        },
+      ],
     ]),
-    updateQuickActions: mockUpdateQuickActions,
-    updateWorkspaceQuickActions: mockUpdateWorkspaceQuickActions,
-  } as unknown as ReturnType<typeof useSettingsStore>)
+  })
 }
 
 beforeEach(() => {
@@ -65,7 +70,7 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(screen.getByLabelText('Body'), { target: { value: 'npx vitest run' } })
     fireEvent.click(screen.getByText('Save'))
 
-    expect(mockUpdateQuickActions).toHaveBeenCalledWith({
+    expect(settings.updateQuickActions).toHaveBeenCalledWith({
       custom: [
         {
           id: 'new-uuid',
@@ -95,7 +100,7 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Run all tests' } })
     fireEvent.click(screen.getByText('Save'))
 
-    expect(mockUpdateQuickActions).toHaveBeenCalledWith({
+    expect(settings.updateQuickActions).toHaveBeenCalledWith({
       custom: [
         {
           id: 'a1',
@@ -122,7 +127,7 @@ describe('QuickActionsSettings — global scope', () => {
     ])
     render(<QuickActionsSettings scope="global" />)
     fireEvent.click(screen.getByText('Delete'))
-    expect(mockUpdateQuickActions).toHaveBeenCalledWith({ custom: [] })
+    expect(settings.updateQuickActions).toHaveBeenCalledWith({ custom: [] })
   })
 
   it('requires a label', () => {
@@ -132,7 +137,7 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(screen.getByLabelText('Body'), { target: { value: 'echo hi' } })
     fireEvent.click(screen.getByText('Save'))
     expect(screen.getByText('Label is required')).toBeTruthy()
-    expect(mockUpdateQuickActions).not.toHaveBeenCalled()
+    expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
 
   it('requires a body', () => {
@@ -142,7 +147,7 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Run tests' } })
     fireEvent.click(screen.getByText('Save'))
     expect(screen.getByText('Body is required')).toBeTruthy()
-    expect(mockUpdateQuickActions).not.toHaveBeenCalled()
+    expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
 
   it('keeps only the first character typed into Key', () => {
@@ -172,7 +177,7 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(screen.getByLabelText('Body'), { target: { value: 'echo new' } })
     fireEvent.click(screen.getByText('Save'))
     expect(screen.getByText('Key already used by Existing')).toBeTruthy()
-    expect(mockUpdateQuickActions).not.toHaveBeenCalled()
+    expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
 
   it('resets target to the first valid option when kind changes', () => {
@@ -191,7 +196,7 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Draft' } })
     fireEvent.click(screen.getByText('Cancel'))
     expect(screen.queryByLabelText('Label')).toBeNull()
-    expect(mockUpdateQuickActions).not.toHaveBeenCalled()
+    expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
 })
 
@@ -205,7 +210,7 @@ describe('QuickActionsSettings — workspace scope', () => {
     expect(screen.getByText('Workspace action')).toBeTruthy()
 
     fireEvent.click(screen.getByText('Delete'))
-    expect(mockUpdateWorkspaceQuickActions).toHaveBeenCalledWith('ws-1', [])
-    expect(mockUpdateQuickActions).not.toHaveBeenCalled()
+    expect(settings.updateWorkspaceQuickActions).toHaveBeenCalledWith('ws-1', [])
+    expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
 })

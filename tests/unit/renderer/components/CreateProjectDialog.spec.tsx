@@ -4,14 +4,8 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { CreateProjectDialog } from '../../../../src/renderer/components/sidebar/CreateProjectDialog'
-
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: vi.fn(),
-}))
-vi.mock('../../../../src/renderer/stores/settings.store', () => ({
-  useSettingsStore: vi.fn(),
-}))
-vi.mock('../../../../src/renderer/stores/modal.store', () => ({ useModalEffect: () => {} }))
+import { projectOf, seedStore, workspaceOf } from '../../../support/renderer-stores'
+import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
 
 const mockCreateProject = vi.fn()
 
@@ -35,14 +29,14 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockCreateProject.mockResolvedValue({ project: { id: 'proj-1' } })
   setupGitAPI()
-  vi.mocked(useWorkspaceStore).mockReturnValue({
+  seedStore(useWorkspaceStore, {
     createProject: mockCreateProject,
     projectsByWorkspaceId: new Map([['ws-1', []]]),
-    workspaces: [{ id: 'ws-1', name: 'My WS', folderPath: '' }],
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
-  vi.mocked(useSettingsStore).mockReturnValue({
-    resolveSettings: vi.fn().mockReturnValue({ git: { worktreeBaseDir: '' } }),
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+    workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '' })],
+  })
+  seedStore(useSettingsStore, {
+    resolveSettings: vi.fn().mockReturnValue(DEFAULT_GLOBAL_SETTINGS),
+  })
 })
 
 afterEach(() => {
@@ -58,11 +52,11 @@ function setupGitWorkspace(): void {
   ).git.listBranches.mockResolvedValue({
     branches: [{ name: 'main', isCurrent: true, isRemote: false }],
   })
-  vi.mocked(useWorkspaceStore).mockReturnValue({
+  seedStore(useWorkspaceStore, {
     createProject: mockCreateProject,
     projectsByWorkspaceId: new Map([['ws-1', []]]),
-    workspaces: [{ id: 'ws-1', name: 'My WS', folderPath: '/repo' }],
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+    workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
+  })
 }
 
 describe('CreateProjectDialog', () => {
@@ -115,11 +109,13 @@ describe('CreateProjectDialog', () => {
   })
 
   it('shows duplicate project name error on blur', () => {
-    vi.mocked(useWorkspaceStore).mockReturnValue({
+    seedStore(useWorkspaceStore, {
       createProject: mockCreateProject,
-      projectsByWorkspaceId: new Map([['ws-1', [{ id: 'p1', name: 'My App' }]]]),
-      workspaces: [{ id: 'ws-1', name: 'My WS', folderPath: '' }],
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+      projectsByWorkspaceId: new Map([
+        ['ws-1', [projectOf({ workspaceId: 'ws-1', id: 'p1', name: 'My App' })]],
+      ]),
+      workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '' })],
+    })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     const nameInput = screen.getAllByRole('textbox')[0]
     fireEvent.change(nameInput, { target: { value: 'My App' } })
@@ -239,11 +235,13 @@ describe('CreateProjectDialog', () => {
 
   it('disables Branch tab and defaults to worktree when non-worktree project exists', async () => {
     setupGitWorkspace()
-    vi.mocked(useWorkspaceStore).mockReturnValue({
+    seedStore(useWorkspaceStore, {
       createProject: mockCreateProject,
-      projectsByWorkspaceId: new Map([['ws-1', [{ id: 'p1', name: 'Main', isWorktree: false }]]]),
-      workspaces: [{ id: 'ws-1', name: 'My WS', folderPath: '/repo' }],
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+      projectsByWorkspaceId: new Map([
+        ['ws-1', [projectOf({ workspaceId: 'ws-1', id: 'p1', name: 'Main', isWorktree: false })]],
+      ]),
+      workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
+    })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     await vi.waitFor(() => screen.getByRole('button', { name: 'Branch' }))
     const branchBtn = screen.getByRole('button', { name: 'Branch' })
@@ -258,13 +256,16 @@ describe('CreateProjectDialog', () => {
     fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'New Project' } })
     // Simulate a concurrent project being created by updating the store, then force a re-render
     // using rerender so the component sees hasNonWorktreeProject = true in the next render cycle
-    vi.mocked(useWorkspaceStore).mockReturnValue({
+    seedStore(useWorkspaceStore, {
       createProject: mockCreateProject,
       projectsByWorkspaceId: new Map([
-        ['ws-1', [{ id: 'p1', name: 'Existing', isWorktree: false }]],
+        [
+          'ws-1',
+          [projectOf({ workspaceId: 'ws-1', id: 'p1', name: 'Existing', isWorktree: false })],
+        ],
       ]),
-      workspaces: [{ id: 'ws-1', name: 'My WS', folderPath: '' }],
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+      workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '' })],
+    })
     rerender(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Create'))
     await vi.waitFor(() =>
@@ -350,11 +351,11 @@ describe('CreateProjectDialog', () => {
         { name: 'develop', isCurrent: false, isRemote: false },
       ],
     })
-    vi.mocked(useWorkspaceStore).mockReturnValue({
+    seedStore(useWorkspaceStore, {
       createProject: mockCreateProject,
       projectsByWorkspaceId: new Map([['ws-1', []]]),
-      workspaces: [{ id: 'ws-1', name: 'My WS', folderPath: '/repo' }],
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+      workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
+    })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     await vi.waitFor(() => screen.getByText('main'))
     fireEvent.click(screen.getByText('main'))
@@ -379,11 +380,11 @@ describe('CreateProjectDialog', () => {
         { name: 'develop', isCurrent: false, isRemote: false },
       ],
     })
-    vi.mocked(useWorkspaceStore).mockReturnValue({
+    seedStore(useWorkspaceStore, {
       createProject: mockCreateProject,
       projectsByWorkspaceId: new Map([['ws-1', []]]),
-      workspaces: [{ id: 'ws-1', name: 'My WS', folderPath: '/repo' }],
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+      workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
+    })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     await vi.waitFor(() => screen.getByText('Worktree'))
     fireEvent.click(screen.getByText('Worktree'))
@@ -525,7 +526,7 @@ describe('CreateProjectDialog — from an issue', () => {
       listMine,
       searchIssues: vi.fn().mockResolvedValue({ issues: [], failures: [] }),
       linkIssue,
-    } as never)
+    })
 
     setupGitAPI({
       isRepo: vi.fn().mockResolvedValue({ isRepo: true, root: '/repo' }),
@@ -533,14 +534,12 @@ describe('CreateProjectDialog — from an issue', () => {
         .fn()
         .mockResolvedValue({ branches: [{ name: 'main', isCurrent: true, isRemote: false }] }),
     })
-    vi.mocked(useWorkspaceStore).mockReturnValue({
+    seedStore(useWorkspaceStore, {
       createProject: mockCreateProject,
       projectsByWorkspaceId: new Map(),
-      workspaces: [{ id: 'w1', name: 'ws', folderPath: '/repo', color: '#fff', tags: [] }],
-    } as never)
-    vi.mocked(useSettingsStore).mockReturnValue({
-      resolveSettings: () => ({ git: { worktreeBaseDir: '' } }),
-    } as never)
+      workspaces: [workspaceOf({ id: 'w1', name: 'ws', folderPath: '/repo' })],
+    })
+    seedStore(useSettingsStore, { resolveSettings: () => DEFAULT_GLOBAL_SETTINGS })
 
     render(<CreateProjectDialog workspaceId="w1" onClose={vi.fn()} />)
   }

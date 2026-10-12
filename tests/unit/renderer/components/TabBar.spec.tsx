@@ -3,21 +3,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { TabBar } from '../../../../src/renderer/components/terminal/TabBar'
 import type { ComponentType } from 'react'
+import { projectOf, seedStore, workspaceOf } from '../../../support/renderer-stores'
 
-vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: vi.fn(),
-}))
-const records = vi.hoisted(() => ({
+const records = {
   setDescription: vi.fn().mockResolvedValue(true),
   setLink: vi.fn().mockResolvedValue(true),
-}))
-vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
-  useSessionRecordsStore: Object.assign((select: (s: unknown) => unknown) => select(records), {
-    getState: () => records,
-  }),
-}))
+}
 vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => ({
   SessionLinkDialog: ({
     facts,
@@ -49,9 +43,6 @@ vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
         snapshot: { sessionId: s.id },
       })
     ),
-}))
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: vi.fn(),
 }))
 vi.mock('../../../../src/renderer/components/sidebar/MoveSessionDialog', () => ({
   MoveSessionDialog: ({ onClose, onMoved }: { onClose: () => void; onMoved?: () => void }) => (
@@ -87,7 +78,8 @@ function renderTabBar(overrides: Partial<React.ComponentProps<typeof TabBar>> = 
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(useSessionStore).mockReturnValue({
+  seedStore(useSessionRecordsStore, records)
+  seedStore(useSessionStore, {
     getSessionsForProject: mockGetSessions,
     closeSession: mockCloseSession,
     setActiveSessionForProject: mockSetActive,
@@ -97,12 +89,12 @@ beforeEach(() => {
     renameSession: mockRenameSession,
     reorderSessions: mockReorderSessions,
     requestFocus: mockRequestFocus,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
-  vi.mocked(useWorkspaceStore).mockReturnValue({
+  })
+  seedStore(useWorkspaceStore, {
     workspaces: [],
     activeWorkspaceId: null,
     projectsByWorkspaceId: new Map(),
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+  })
   mockGetSessions.mockReturnValue([])
   mockGetActive.mockReturnValue(null)
   mockGetBell.mockReturnValue(0)
@@ -175,11 +167,13 @@ describe('TabBar', () => {
   })
 
   it('applies workspace color css variable when workspace matches', () => {
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [{ id: 'ws-1', color: '#ff0000', name: 'Test', folderPath: '/', tags: [] }],
+    seedStore(useWorkspaceStore, {
+      workspaces: [
+        workspaceOf({ id: 'ws-1', color: '#ff0000', name: 'Test', folderPath: '/', tags: [] }),
+      ],
       activeWorkspaceId: 'ws-1',
       projectsByWorkspaceId: new Map(),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     const { container } = renderTabBar()
     const tabBarStack = container.querySelector('.tab-bar-stack') as HTMLElement
     expect(tabBarStack.style.getPropertyValue('--ws-color')).toBe('#ff0000')
@@ -467,13 +461,16 @@ describe('TabBar', () => {
 
 describe('TabBar — the session bar states whose terminals it shows (US3, FR-013)', () => {
   beforeEach(() => {
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [{ id: 'ws-1', name: 'Terminator' }],
+    seedStore(useWorkspaceStore, {
+      workspaces: [workspaceOf({ id: 'ws-1', name: 'Terminator' })],
       activeWorkspaceId: 'ws-1',
       projectsByWorkspaceId: new Map([
-        ['ws-1', [{ id: 'proj-1', workspaceId: 'ws-1', name: 'main', gitBranch: 'main' }]],
+        [
+          'ws-1',
+          [projectOf({ id: 'proj-1', workspaceId: 'ws-1', name: 'main', gitBranch: 'main' })],
+        ],
       ]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    })
     mockGetSessions.mockReturnValue([
       { id: 's1', projectId: 'proj-1', tabTitle: 'tests', status: 'active', agentState: 'idle' },
     ])
@@ -633,7 +630,7 @@ describe('TabBar — the description, edited from the tab (054 FR-006)', () => {
   })
 
   beforeEach(() => {
-    vi.mocked(useSessionStore).mockReturnValue({
+    seedStore(useSessionStore, {
       getSessionsForProject: mockGetSessions,
       closeSession: mockCloseSession,
       setActiveSessionForProject: mockSetActive,
@@ -643,7 +640,7 @@ describe('TabBar — the description, edited from the tab (054 FR-006)', () => {
       renameSession: mockRenameSession,
       reorderSessions: mockReorderSessions,
       requestFocus: mockRequestFocus,
-    } as unknown as ReturnType<typeof useSessionStore>)
+    })
     mockGetSessions.mockReturnValue([noted()])
     mockGetActive.mockReturnValue('ses-1')
   })

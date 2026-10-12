@@ -8,6 +8,9 @@ import { UnifiedSidebar } from '../../../../src/renderer/components/sidebar/Unif
 import { AppBand } from '../../../../src/renderer/components/sidebar/AppBand'
 import type { GroupKey } from '../../../../src/renderer/sidebar/view-model'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
+import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
+import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
+import { seedStore } from '../../../support/renderer-stores'
 
 // THE MERGE GATE for feature 030.
 //
@@ -16,10 +19,6 @@ import type { Project, TerminalSession, Workspace } from '../../../../src/shared
 // renderer registry alone: reading only the renderer is what produced the
 // wrong "this surface does not exist" conclusion during Phase 0 research.
 
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: vi.fn(),
-}))
-vi.mock('../../../../src/renderer/stores/session.store', () => ({ useSessionStore: vi.fn() }))
 vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: vi.fn(),
 }))
@@ -33,9 +32,6 @@ vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () 
 const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: () => ({ createSession: mockCreateSession }),
-}))
-vi.mock('../../../../src/renderer/stores/settings.store', () => ({
-  useSettingsStore: () => ({ resolveSettings: () => ({ terminal: { scrollbackLimit: 5000 } }) }),
 }))
 vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => [],
@@ -155,12 +151,14 @@ beforeEach(() => {
       }))
     )
   )
-  vi.mocked(useWorkspaceStore).mockReturnValue(
-    mockWorkspaceStore as unknown as ReturnType<typeof useWorkspaceStore>
-  )
-  vi.mocked(useSessionStore).mockReturnValue(
-    mockSessionStore as unknown as ReturnType<typeof useSessionStore>
-  )
+  seedStore(useWorkspaceStore, mockWorkspaceStore)
+  seedStore(useSessionStore, mockSessionStore)
+  seedStore(useSettingsStore, {
+    resolveSettings: () => ({
+      ...DEFAULT_GLOBAL_SETTINGS,
+      terminal: { ...DEFAULT_GLOBAL_SETTINGS.terminal, scrollbackLimit: 5000 },
+    }),
+  })
   vi.mocked(useExtensionRegistry).mockImplementation(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ((selector: any) =>
@@ -169,8 +167,6 @@ beforeEach(() => {
         : mockRegistryState) as unknown as typeof useExtensionRegistry
   )
   Object.assign(useExtensionRegistry, { getState: () => mockRegistryState })
-  Object.assign(useSessionStore, { getState: () => mockSessionStore })
-  Object.assign(useWorkspaceStore, { getState: () => mockWorkspaceStore })
 })
 
 const renderSidebar = (groupBy: GroupKey) =>

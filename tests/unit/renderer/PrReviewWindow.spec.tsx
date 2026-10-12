@@ -4,8 +4,8 @@ import { render, screen } from '@testing-library/react'
 import { useSettingsStore } from '../../../src/renderer/stores/settings.store'
 import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
 import { ExtensionWindowView } from '../../../src/renderer/ExtensionWindowView'
+import { seedStore, type SeededStore } from '../../support/renderer-stores'
 
-vi.mock('../../../src/renderer/stores/settings.store', () => ({ useSettingsStore: vi.fn() }))
 vi.mock('../../../src/renderer/extensions/registry', () => ({ useExtensionRegistry: vi.fn() }))
 vi.mock('../../../src/renderer/components/ToastContainer', () => ({
   ToastContainer: () => <div data-testid="toast-container" />,
@@ -14,13 +14,10 @@ vi.mock('../../../src/renderer/components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
-const mockLoadSettings = vi.fn()
+let settings: SeededStore<typeof useSettingsStore>
 
 function setupMocks(windowViews = new Map()) {
-  vi.mocked(useSettingsStore).mockReturnValue({
-    loadSettings: mockLoadSettings,
-    resolvedTheme: 'dark',
-  } as unknown as ReturnType<typeof useSettingsStore>)
+  settings = seedStore(useSettingsStore, { resolvedTheme: 'dark' })
   vi.mocked(useExtensionRegistry).mockReturnValue(
     windowViews as unknown as ReturnType<typeof useExtensionRegistry>
   )
@@ -90,14 +87,11 @@ describe('ExtensionWindowView', () => {
   it('calls loadSettings on mount', () => {
     setupMocks()
     render(<ExtensionWindowView view="pr-review" />)
-    expect(mockLoadSettings).toHaveBeenCalledTimes(1)
+    expect(settings.loadSettings).toHaveBeenCalledTimes(1)
   })
 
   it('sets data-theme attribute from resolvedTheme', () => {
-    vi.mocked(useSettingsStore).mockReturnValue({
-      loadSettings: mockLoadSettings,
-      resolvedTheme: 'light',
-    } as unknown as ReturnType<typeof useSettingsStore>)
+    seedStore(useSettingsStore, { resolvedTheme: 'light' })
     vi.mocked(useExtensionRegistry).mockReturnValue(
       new Map() as unknown as ReturnType<typeof useExtensionRegistry>
     )
