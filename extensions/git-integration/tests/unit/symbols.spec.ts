@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { Tree } from 'web-tree-sitter'
 import { loadLanguageFor, analyseSnippet, symbolFromHunkHeader } from '../../src/review/symbols'
 
 describe('loadLanguageFor()', () => {
@@ -20,6 +21,14 @@ describe('loadLanguageFor()', () => {
 })
 
 describe('analyseSnippet()', () => {
+  it('frees its syntax tree once the analysis is read', async () => {
+    const free = vi.spyOn(Tree.prototype, 'delete')
+    const result = await analyseSnippet('src/freed.ts', 'export function freed() { return 1 }')
+    expect(result?.definitions).toContain('freed')
+    expect(free).toHaveBeenCalledTimes(1)
+    free.mockRestore()
+  })
+
   it('returns null when there is no grammar for the path', async () => {
     const result = await analyseSnippet('README.md', '# hello')
     expect(result).toBeNull()

@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { Parser, Tree } from 'web-tree-sitter'
 import { computeInsights, type ComputeInsightsOptions } from '../../src/review/insights'
 import type { Chapter, DryViolation, ReadingStep } from '../../src/schemas/pr-review.schema'
 import { parsePrFiles } from '../../src/review/parsed-file'
@@ -217,6 +218,43 @@ describe('computeInsights() — coverage', () => {
 
     const withNeither = await insightsOf(files, baseOpts)
     expect(withNeither.coverage.patchPercent).toBeNull()
+  })
+})
+
+describe('computeInsights() — syntax tree memory', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('frees every tree-sitter tree it parses', async () => {
+    const parse = vi.spyOn(Parser.prototype, 'parse')
+    const free = vi.spyOn(Tree.prototype, 'delete')
+    const files = [
+      {
+        path: 'src/freed.ts',
+        additions: 3,
+        deletions: 1,
+        patch: [
+          '@@ -1,2 +1,4 @@ export function freed',
+          ' export function freed(a: number) {',
+          '-  return a',
+          '+  if (a > 1) return a',
+          '+  return 0',
+          ' }',
+        ].join('\n'),
+      },
+      {
+        path: 'src/freed.spec.ts',
+        additions: 1,
+        deletions: 0,
+        patch: ['@@ -0,0 +1,1 @@', "+it('frees', () => freed(2))"].join('\n'),
+      },
+    ]
+
+    await insightsOf(files, baseOpts)
+
+    expect(parse.mock.calls.length).toBeGreaterThan(0)
+    expect(free).toHaveBeenCalledTimes(parse.mock.calls.length)
   })
 })
 

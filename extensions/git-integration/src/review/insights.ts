@@ -1,11 +1,11 @@
-import { Parser, type Node } from 'web-tree-sitter'
+import type { Node } from 'web-tree-sitter'
 import {
   classifyHunk,
   classifyTier,
   computeFileCyclomaticDelta,
   COVERAGE_CHECK_NAMES,
 } from '../github/pr-review-service'
-import { analyseSnippet, loadLanguageFor } from './symbols'
+import { analyseSnippet, withSyntaxTree } from './symbols'
 import type { ParsedPrFile } from './parsed-file'
 import type {
   Chapter,
@@ -227,6 +227,29 @@ interface HealthFlag {
   path: string
 }
 
+function flagsForFunction(node: Node, path: string): HealthFlag[] {
+  const flags: HealthFlag[] = []
+  const lineSpan = node.endPosition.row - node.startPosition.row + 1
+  if (lineSpan > 80) {
+    flags.push({ kind: 'long-function', label: `Function over 80 lines (${lineSpan})`, path })
+  }
+  const nesting = maxNestingDepth(node)
+  if (nesting > 4) flags.push({ kind: 'deep-nesting', label: `Nesting depth ${nesting}`, path })
+  const params = countParams(node)
+  if (params > 5) flags.push({ kind: 'many-params', label: `${params} parameters`, path })
+  return flags
+}
+
+function collectFunctionFlags(root: Node, path: string): HealthFlag[] {
+  const flags: HealthFlag[] = []
+  const visit = (n: Node): void => {
+    if (FUNCTION_NODE_TYPES.has(n.type)) flags.push(...flagsForFunction(n, path))
+    for (let i = 0; i < n.childCount; i++) visit(n.child(i)!)
+  }
+  visit(root)
+  return flags
+}
+
 async function computeHealthFlags(
   files: ParsedPrFile[],
   dryViolations: DryViolation[]
@@ -253,31 +276,10 @@ async function computeHealthFlags(
       flags.push({ kind: 'any', label: 'New `any` type', path })
     }
 
-    const language = await loadLanguageFor(path)
-    if (!language) continue
-    const parser = new Parser()
-    parser.setLanguage(language)
-    const tree = parser.parse(addedText)
-    if (!tree) continue
-
-    const visit = (n: Node): void => {
-      if (FUNCTION_NODE_TYPES.has(n.type)) {
-        const lineSpan = n.endPosition.row - n.startPosition.row + 1
-        if (lineSpan > 80) {
-          flags.push({ kind: 'long-function', label: `Function over 80 lines (${lineSpan})`, path })
-        }
-        const nesting = maxNestingDepth(n)
-        if (nesting > 4) {
-          flags.push({ kind: 'deep-nesting', label: `Nesting depth ${nesting}`, path })
-        }
-        const params = countParams(n)
-        if (params > 5) {
-          flags.push({ kind: 'many-params', label: `${params} parameters`, path })
-        }
-      }
-      for (let i = 0; i < n.childCount; i++) visit(n.child(i)!)
-    }
-    visit(tree.rootNode)
+    const functionFlags = await withSyntaxTree(path, addedText, (root) =>
+      collectFunctionFlags(root, path)
+    )
+    if (functionFlags) flags.push(...functionFlags)
   }
 
   for (const violation of dryViolations) {
