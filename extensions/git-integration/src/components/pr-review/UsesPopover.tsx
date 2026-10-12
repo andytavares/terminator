@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Popover } from '@terminator/extension-ui'
+import { Button, Popover } from '@terminator/extension-ui'
 import './view-menu.css'
 
 export interface Use {
@@ -25,16 +25,16 @@ export function UsesPopover({ uses, compact, onPeekDefinition }: UsesPopoverProp
 
   return (
     <div className="vm">
-      <button
-        type="button"
-        className="vm-btn"
+      <Button
+        variant="ghost"
+        size="sm"
         aria-haspopup="true"
         aria-expanded={open}
         title={fullText}
         onClick={() => setOpen((v) => !v)}
       >
         {label}
-      </button>
+      </Button>
       {open && (
         <Popover label="Uses" onDismiss={() => setOpen(false)} className="vm-popover">
           <ul className="vm-uses-list">
@@ -47,17 +47,17 @@ export function UsesPopover({ uses, compact, onPeekDefinition }: UsesPopoverProp
               </li>
             ))}
           </ul>
-          <button
-            type="button"
-            className="vm-btn vm-btn--block"
+          <Button
+            size="sm"
+            className="vm-block"
             onClick={() => {
               setOpen(false)
               onPeekDefinition()
             }}
           >
             Peek definition
-            <span className="vm-kbd">g d</span>
-          </button>
+            <kbd className="tmui-kbd">g d</kbd>
+          </Button>
         </Popover>
       )}
     </div>

@@ -1,7 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { CalendarDays, ChevronDown, Download, Kanban, List, Settings, Upload } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import { Button, Dialog, IconButton, useDismissible } from '@terminator/extension-ui'
+import {
+  Button,
+  Dialog,
+  IconButton,
+  Tab,
+  TabList,
+  TabPanel,
+  TabsRoot,
+  useDismissible,
+} from '@terminator/extension-ui'
 import './task-vault.css'
 import { notify } from '../utils/notify'
 import { useVaultStore } from '../stores/vault.store'
@@ -155,82 +164,72 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
       size={tab === 'admin' ? 'wide' : 'default'}
     >
       <div className="tv-data-tools" data-wide={tab === 'admin' ? '' : undefined}>
-        <div className="capture-modal__header">
-          <div className="tv-modal-tabs">
-            <button
-              className={`tv-modal-tab${tab === 'data' ? ' tv-modal-tab--active' : ''}`}
-              onClick={() => setTab('data')}
-            >
-              Export &amp; import
-            </button>
-            <button
-              className={`tv-modal-tab${tab === 'admin' ? ' tv-modal-tab--active' : ''}`}
-              onClick={() => setTab('admin')}
-            >
-              Database
-            </button>
-          </div>
-        </div>
+        <TabsRoot selectedId={tab} onSelect={setTab}>
+          <TabList label="Data tools">
+            <Tab id="data">Export &amp; import</Tab>
+            <Tab id="admin">Database</Tab>
+          </TabList>
 
-        {tab === 'data' && (
-          <div
-            className="capture-modal__body"
-            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-          >
-            <p style={{ fontSize: 12, color: 'var(--tm-text-muted)', margin: 0 }}>
-              Export everything to JSON for backup or migration. Import merges records by ID —
-              existing data is not overwritten.
-            </p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button
-                variant="primary"
-                icon={Download}
-                onClick={handleExport}
-                disabled={exporting}
-                style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-              >
-                {exporting ? 'Exporting…' : 'Export JSON'}
-              </Button>
-              <Button
-                icon={Upload}
-                onClick={handleImportClick}
-                disabled={importing}
-                style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-              >
-                {importing ? 'Importing…' : 'Import JSON'}
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                style={{ display: 'none' }}
-                onChange={handleFileChange}
+          <TabPanel id="data">
+            <div
+              className="capture-modal__body"
+              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            >
+              <p style={{ fontSize: 12, color: 'var(--tm-text-muted)', margin: 0 }}>
+                Export everything to JSON for backup or migration. Import merges records by ID —
+                existing data is not overwritten.
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button
+                  variant="primary"
+                  icon={Download}
+                  onClick={handleExport}
+                  disabled={exporting}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  {exporting ? 'Exporting…' : 'Export JSON'}
+                </Button>
+                <Button
+                  icon={Upload}
+                  onClick={handleImportClick}
+                  disabled={importing}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  {importing ? 'Importing…' : 'Import JSON'}
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  style={{ display: 'none' }}
+                  onChange={handleFileChange}
+                />
+              </div>
+              {status && (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: status.includes('failed') ? 'var(--tm-danger)' : 'var(--tm-success)',
+                    margin: 0,
+                  }}
+                >
+                  {status}
+                </p>
+              )}
+            </div>
+          </TabPanel>
+
+          <TabPanel id="admin">
+            <div className="capture-modal__body" style={{ padding: 0 }}>
+              <DatabaseAdmin
+                onWrite={() => {
+                  void loadToday()
+                  void refreshInboxCount()
+                }}
               />
             </div>
-            {status && (
-              <p
-                style={{
-                  fontSize: 12,
-                  color: status.includes('failed') ? 'var(--tm-danger)' : 'var(--tm-success)',
-                  margin: 0,
-                }}
-              >
-                {status}
-              </p>
-            )}
-          </div>
-        )}
-
-        {tab === 'admin' && (
-          <div className="capture-modal__body" style={{ padding: 0 }}>
-            <DatabaseAdmin
-              onWrite={() => {
-                void loadToday()
-                void refreshInboxCount()
-              }}
-            />
-          </div>
-        )}
+          </TabPanel>
+        </TabsRoot>
       </div>
     </Dialog>,
     document.body

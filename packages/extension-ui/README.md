@@ -27,6 +27,7 @@ should define a colour.
 | `Button`                                         | primary, secondary, ghost, danger; sm, md; disabled; icon slot                       |
 | `IconButton`                                     | an icon-only control with a required accessible name; sm (20px), md (26px); disabled |
 | `Tabs`; `TabsRoot`, `TabList`, `Tab`, `TabPanel` | WAI-ARIA tabs: arrow keys, Home, End, roving `tabindex`; assembled or in parts       |
+| `SegmentedControl`                               | one choice out of a few, as joined buttons: WAI-ARIA radio group; sm, md             |
 | `Dialog`, `ConfirmDialog`                        | a modal question or form; yes or no                                                  |
 | `Popover`                                        | a dismissible, non-modal surface anchored to a control                               |
 | `ToastRegion`, `Toast`                           | transient messages                                                                   |
@@ -61,6 +62,13 @@ the selected tab is in the Tab order. It comes two ways:
   a toolbar row with other controls; each `Tab` (`id`) takes any content; each
   `TabPanel` (`id`) renders, only while its tab is selected, wherever the caller
   puts it, so a loading or error block can sit between the list and the panel.
+
+`SegmentedControl` follows the [WAI-ARIA radio group pattern](https://www.w3.org/WAI/ARIA/apg/patterns/radio/):
+`label`, `options` (`value`, `label`, optional `accessibleName`, `disabled`, `title`),
+`value` and `onChange`. Every arrow key moves focus and the choice together, Home
+and End jump to the ends, disabled options are skipped, and only the chosen option
+is in the Tab order. Use it for a value a form or view reads (a time window, what
+kind of thing to create); use `Tabs` when each choice has a panel of its own.
 
 A tab whose content is more than words, such as a count, takes `accessibleName`
 ("Needs you, 3"), which a screen reader would otherwise read as "Needs you3"; put

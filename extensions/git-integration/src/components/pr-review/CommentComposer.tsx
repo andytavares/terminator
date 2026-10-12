@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Button, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import { RichContent } from './RichContent'
 import { githubAPI } from '../../api/github'
 import { usePrReviewStore } from '../../stores/pr-review.store'
@@ -79,49 +80,42 @@ export function CommentComposer(props: Props) {
           {props.fromFindingId ? ' · edited from agent finding' : ''}
         </div>
       )}
-      <div className="comment-composer-tabs">
-        <button
-          className={`comment-composer-tab${tab === 'write' ? ' comment-composer-tab--active' : ''}`}
-          onClick={() => setTab('write')}
-        >
-          Write
-        </button>
-        <button
-          className={`comment-composer-tab${tab === 'preview' ? ' comment-composer-tab--active' : ''}`}
-          onClick={() => setTab('preview')}
-        >
-          Preview
-        </button>
-      </div>
-
-      {tab === 'write' ? (
-        <textarea
-          className="comment-composer-textarea"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Leave a comment…"
-          rows={4}
-          disabled={submitting}
-        />
-      ) : (
-        <div className="comment-composer-preview">
-          {body.trim() ? <RichContent>{body}</RichContent> : <em>Nothing to preview.</em>}
-        </div>
-      )}
+      <TabsRoot selectedId={tab} onSelect={setTab}>
+        <TabList label="Comment">
+          <Tab id="write">Write</Tab>
+          <Tab id="preview">Preview</Tab>
+        </TabList>
+        <TabPanel id="write">
+          <textarea
+            className="comment-composer-textarea"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Leave a comment…"
+            rows={4}
+            disabled={submitting}
+          />
+        </TabPanel>
+        <TabPanel id="preview">
+          <div className="comment-composer-preview">
+            {body.trim() ? <RichContent>{body}</RichContent> : <em>Nothing to preview.</em>}
+          </div>
+        </TabPanel>
+      </TabsRoot>
 
       {error && <p className="comment-composer-error">{error}</p>}
 
       <div className="comment-composer-actions">
-        <button className="comment-composer-cancel" onClick={props.onCancel} disabled={submitting}>
+        <Button size="sm" onClick={props.onCancel} disabled={submitting}>
           Cancel
-        </button>
-        <button
-          className="comment-composer-submit"
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
           onClick={handleSubmit}
           disabled={submitting || !body.trim()}
         >
           {isReply(props) ? (submitting ? 'Submitting…' : 'Reply') : 'Add to pending review'}
-        </button>
+        </Button>
         {!isReply(props) && <span className="rs-note">Sent when you submit your review</span>}
       </div>
     </div>

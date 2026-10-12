@@ -8,23 +8,6 @@
   font-display: swap;
 }
 
-/* ── Action buttons ──────────────────────────────────────────── */
-
-.sk-btn {
-  padding: 5px 12px;
-  border-radius: var(--tm-radius-xs);
-  font-size: 12px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  font-family: inherit;
-  font-weight: 500;
-}
-
-.sk-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 /* ─── The application chrome the extension inherits ─── */
 .sk-appbar {
   display: flex;
@@ -40,24 +23,8 @@
   font-size: 13px;
 }
 
-.sk-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  font-size: 12px;
-  border-radius: 6px;
-  border: 1px solid var(--tm-border);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-primary);
-  cursor: pointer;
-}
-.sk-btn:hover {
-  background: var(--tm-bg-card-hover);
-}
-.sk-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
+.fdry-settings-open {
+  margin-left: auto;
 }
 
 /* Knowledge search */
@@ -66,20 +33,6 @@
   padding: 10px;
   height: 100%;
   overflow: auto;
-}
-
-/* Chat reply row under the run console. */
-
-.sk-console-reply .sk-btn {
-  flex: none;
-}
-
-/* Principle XII: icons inherit currentColor and are sized here rather than by a
-   size prop on the component. */
-.sk-appbar .sk-btn svg,
-.sk-board__toolbar .sk-btn svg {
-  width: 14px;
-  height: 14px;
 }
 
 /* ─── Foundry: the Forge ──────────────────────────────────────────
@@ -307,48 +260,6 @@
   flex: none;
 }
 
-.fdry-btn {
-  appearance: none;
-  font: inherit;
-  font-size: 12.5px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: var(--tm-radius-sm);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-primary);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.fdry-btn:hover {
-  background: var(--tm-bg-card-hover);
-}
-
-.fdry-btn svg {
-  width: 13px;
-  height: 13px;
-}
-
-.fdry-btn--quiet {
-  background: transparent;
-}
-
-.fdry-btn--primary {
-  border-color: var(--tm-accent);
-  background: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 500;
-}
-
-.fdry-btn--sel {
-  border-color: var(--tm-accent);
-  color: var(--tm-accent-text);
-  box-shadow: inset 0 0 0 1px var(--tm-accent);
-}
-
 /* The status strip: who holds the order, and what happens next. */
 .fdry-strip {
   display: flex;
@@ -566,22 +477,6 @@
   flex-wrap: wrap;
 }
 
-.fdry-chk-moves button {
-  appearance: none;
-  font: inherit;
-  font-size: 12px;
-  padding: 4px 11px;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--tm-text-primary);
-  cursor: pointer;
-}
-
-.fdry-chk-moves button:hover {
-  background: var(--tm-bg-card-hover);
-}
-
 .fdry-pill {
   font-size: 11.5px;
   padding: 1px 8px;
@@ -666,22 +561,6 @@
   gap: 6px;
   flex-wrap: wrap;
   margin-top: 4px;
-}
-
-.fdry-fnd-acts button {
-  appearance: none;
-  font: inherit;
-  font-size: 13px;
-  padding: 6px 12px;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--tm-text-primary);
-  cursor: pointer;
-}
-
-.fdry-fnd-acts button:hover {
-  background: var(--tm-bg-card-hover);
 }
 
 .fdry-fnd input,
@@ -950,41 +829,6 @@
   align-items: flex-start;
 }
 
-/* Allow, Deny, and answering in the terminal instead.
-
-   These had no rule at all, so the base reset rendered all three as bare
-   transparent text — and the `is-primary` the markup has always put on Allow
-   matched nothing. The one row on the Floor that is not read-only looked like
-   a caption. Same shape as the inbox's own gate buttons, because they answer
-   the same kind of question. */
-.fdry-ask-actions button {
-  appearance: none;
-  font-size: 12px;
-  padding: 4px 11px;
-  border-radius: var(--tm-radius-sm);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-secondary);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.fdry-ask-actions button:hover {
-  background: var(--tm-bg-card-hover);
-}
-
-.fdry-ask-actions button.is-primary {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 500;
-}
-
-.fdry-ask-actions button svg {
-  width: 12px;
-  height: 12px;
-}
-
 .fdry-transcript {
   margin: 0 0 8px;
   max-height: 220px;
@@ -1061,16 +905,7 @@
 
 /* A mute you cannot find is a mute you never undo, so each one is a control. */
 .fdry-unmute {
-  appearance: none;
   margin: 0 4px;
-  padding: 1px 6px;
-  font: inherit;
-  font-size: 11px;
-  color: var(--tm-text-secondary);
-  background: var(--tm-bg-elevated);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
-  cursor: pointer;
 }
 
 /* What happened while you were away. */
@@ -1127,22 +962,8 @@
   border-radius: var(--tm-radius-sm);
 }
 
-/* Sized explicitly, like everything else here. The shared extension stylesheet
-   sets `body`'s family, colour and background and no size, so anything that
-   forgets one renders at the browser's 16px — beside labels and a table at
-   11-12px, which is exactly how this shipped. */
 .fdry-propose {
   margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  color: var(--tm-text-secondary);
-}
-
-.fdry-propose svg {
-  width: 13px;
-  height: 13px;
 }
 
 .fdry-ledger {
@@ -1202,41 +1023,6 @@
   align-items: center;
   gap: 8px;
   margin-top: 8px;
-}
-
-/* These had no rule at all, so Accept, Never-propose and Remove rendered as
-   bare text with an icon beside it — no border, no ground, nothing that reads
-   as pressable. Same treatment as the gate's actions, which is the other place
-   a decision is taken. */
-.fdry-proposal-actions button {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  padding: 4px 11px;
-  border-radius: var(--tm-radius-sm);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-secondary);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.fdry-proposal-actions button:hover {
-  color: var(--tm-text-primary);
-}
-
-.fdry-proposal-actions button.is-primary {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 500;
-}
-
-.fdry-proposal-actions button svg {
-  width: 13px;
-  height: 13px;
 }
 
 /* Merge order: one repository per row, in the order they land. */
@@ -1399,24 +1185,11 @@
 /* The written escape from "every criterion must be provable", on the criterion
    itself — the only place an operator can say which one nothing can prove. */
 .fdry-ac-excuse {
-  appearance: none;
   /* Its own line, like the accepted reason it turns into and the form it
      opens. Inline, it sat against the verify kind and read as part of it. */
-  display: block;
-  font: inherit;
-  font-size: 11.5px;
+  display: flex;
+  width: fit-content;
   margin-top: 5px;
-  padding: 2px 9px;
-  border: 1px dashed var(--tm-border-strong);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-}
-
-.fdry-ac-excuse:hover:not(:disabled) {
-  color: var(--tm-text-primary);
-  background: var(--tm-bg-card-hover);
 }
 
 .fdry-ac-excused {
@@ -1524,25 +1297,6 @@
   font-size: 12.5px;
 }
 
-.fdry-input button {
-  appearance: none;
-  height: var(--tm-control-height);
-  border: 1px solid var(--tm-accent);
-  background: var(--tm-accent);
-  color: var(--tm-on-accent);
-  border-radius: var(--tm-radius-sm);
-  padding: 0 14px;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.fdry-input button:disabled {
-  background: var(--tm-bg-elevated);
-  border-color: var(--tm-border-strong);
-  color: var(--tm-text-muted);
-  cursor: not-allowed;
-}
-
 /* ─── Foundry: orders list and shell ─────────────────────────────── */
 
 .fdry-tabs {
@@ -1614,15 +1368,7 @@
      full width of the screen and read as the page's own title bar, above the
      title of the thing it was a way out of. */
   align-self: flex-start;
-  appearance: none;
-  background: var(--tm-bg-elevated);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm);
-  color: var(--tm-text-secondary);
-  font-size: 12px;
-  padding: 4px 10px;
   margin-bottom: 12px;
-  cursor: pointer;
 }
 
 .fdry-seed {
@@ -1642,73 +1388,17 @@
   font-size: 13px;
 }
 
-.fdry-seed button {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  /* The field beside it takes --tm-control-height from the shared sheet. */
-  height: var(--tm-control-height);
-  border: 1px solid var(--tm-accent);
-  background: var(--tm-accent);
-  color: var(--tm-on-accent);
-  border-radius: var(--tm-radius-sm);
-  padding: 0 14px;
-  font-size: 12.5px;
-  cursor: pointer;
+.fdry-seed-from {
+  flex: none;
 }
 
-.fdry-seed button:disabled {
-  background: var(--tm-bg-elevated);
-  border-color: var(--tm-border-strong);
-  color: var(--tm-text-muted);
-  cursor: not-allowed;
-}
-
-.fdry-seed button svg {
-  width: 13px;
-  height: 13px;
-}
-
-/* A segmented control, in the same language as the buttons beside it.
-   After `.fdry-seed button`, and scoped through the group, because that rule
-   paints the accent on every button in the row: at equal specificity it won on
-   source order and coloured the *unselected* half blue while the selected half
-   went quiet. Exactly backwards, and visible the moment anyone looked. */
-.fdry-seed .fdry-seed-from {
-  display: inline-flex;
-  flex: 0 0 auto;
+/* A field sets the row's height (--tm-control-height); the controls beside it
+   match it, or a stretched row leaves the field shorter than its neighbours. */
+.fdry-seed > .tmui-button,
+.fdry-seed > .tmui-segmented,
+.fdry-input .tmui-button {
   box-sizing: border-box;
   height: var(--tm-control-height);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm);
-  overflow: hidden;
-  background: var(--tm-bg-input);
-}
-
-.fdry-seed .fdry-seed-from button {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--tm-text-secondary);
-  height: 100%;
-  padding: 0 14px;
-  font-size: 12.5px;
-}
-
-.fdry-seed .fdry-seed-from button + button {
-  border-left: 1px solid var(--tm-border-strong);
-}
-
-.fdry-seed .fdry-seed-from button[aria-pressed='true'] {
-  background: var(--tm-accent);
-  color: var(--tm-on-accent);
-}
-
-.fdry-seed .fdry-seed-from button:disabled {
-  background: transparent;
-  color: var(--tm-text-muted);
-  cursor: not-allowed;
 }
 
 /* The ticket offered for a typed idea, before it becomes an order. A band
@@ -1741,41 +1431,9 @@
   font-size: 12.5px;
 }
 
-.fdry-ticket-offer button {
-  appearance: none;
-  border: 1px solid var(--tm-border-strong);
-  background: transparent;
-  color: var(--tm-text-secondary);
-  border-radius: var(--tm-radius-sm);
-  padding: 6px 14px;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.fdry-ticket-offer button:first-of-type {
-  border-color: var(--tm-accent);
-  background: var(--tm-accent);
-  color: var(--tm-on-accent);
-}
-
-.fdry-ticket-offer button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 /* Your tickets, listed. */
 .fdry-discard {
   float: right;
-  font-size: 12px;
-  color: var(--tm-text-muted);
-  padding: 4px 8px;
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
-}
-
-.fdry-discard:hover:not(:disabled) {
-  color: var(--tm-text-primary);
-  border-color: var(--tm-border-strong);
 }
 
 /* A ticket's own words, in the shape they were written. */
@@ -2217,20 +1875,7 @@
   cursor: pointer;
 }
 
-.fdry-gate-chevron {
-  appearance: none;
-  display: flex;
-  flex: 0 0 auto;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--tm-text-muted);
-  cursor: pointer;
-}
-
 .fdry-gate-chevron svg {
-  width: 14px;
-  height: 14px;
   transition: transform 0.12s ease;
 }
 
@@ -2290,25 +1935,6 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 6px;
-}
-
-.fdry-gate-actions button {
-  appearance: none;
-  font-size: 12px;
-  padding: 4px 11px;
-  border-radius: var(--tm-radius-sm);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-secondary);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.fdry-gate-actions button.is-primary {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 500;
 }
 
 /* Pushed to the bottom of the surface rather than left floating under a
@@ -2382,25 +2008,6 @@
   flex-shrink: 0;
 }
 
-.fdry-signal-actions button {
-  appearance: none;
-  font-size: 12px;
-  padding: 4px 11px;
-  border-radius: var(--tm-radius-sm);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-secondary);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.fdry-signal-actions button.is-primary {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 500;
-}
-
 .fdry-signal-promote {
   margin-top: 8px;
   display: flex;
@@ -2424,24 +2031,6 @@
   padding: 3px 8px;
   color: var(--tm-text-primary);
   min-width: 220px;
-}
-
-.fdry-signal-promote button {
-  appearance: none;
-  font-size: 12px;
-  padding: 4px 11px;
-  border-radius: var(--tm-radius-sm);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-}
-
-.fdry-signal-promote button.is-primary {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 500;
 }
 
 /* ─── Foundry: the floor ─────────────────────────────────────────── */
@@ -2570,21 +2159,6 @@
 .fdry-unit-feedback ul {
   margin: 4px 0 0;
   padding-left: 16px;
-}
-
-.fdry-unit-attach {
-  appearance: none;
-  background: transparent;
-  border: 0;
-  color: inherit;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-}
-
-.fdry-unit-attach svg {
-  width: 12px;
-  height: 12px;
 }
 
 /* A refusal beside the step that was clicked, on a line of its own. */
@@ -2727,17 +2301,6 @@
   gap: 10px;
 }
 
-.fdry-sensor-actions button {
-  appearance: none;
-  font-size: 12px;
-  padding: 4px 11px;
-  border-radius: var(--tm-radius-sm);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-}
-
 .fdry-sensor-actions span {
   font-size: 12px;
   color: var(--tm-text-secondary);
@@ -2832,20 +2395,6 @@
 .fdry-order-links svg {
   width: 13px;
   height: 13px;
-}
-
-.fdry-order-review {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-secondary);
-  font-size: 12px;
-  cursor: pointer;
 }
 
 .fdry-order-sub {
@@ -3033,33 +2582,6 @@
   flex: 0 1 230px;
 }
 
-.fdry-standing-option button {
-  appearance: none;
-  font-size: 12.5px;
-  font-weight: 500;
-  padding: 6px 13px;
-  border-radius: var(--tm-radius-sm);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-primary);
-  cursor: pointer;
-}
-
-.fdry-standing-option button:hover:not(:disabled) {
-  background: var(--tm-bg-card-hover);
-}
-
-.fdry-standing-option button.is-primary {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-}
-
-.fdry-standing-option button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
 .fdry-standing-option small {
   font-size: 11.5px;
   line-height: 1.45;
@@ -3121,30 +2643,6 @@
   margin-top: 4px;
 }
 
-.fdry-budget-actions button {
-  appearance: none;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  padding: 6px 13px;
-  border-radius: var(--tm-radius-sm);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-primary);
-  cursor: pointer;
-}
-
-.fdry-budget-actions button.is-primary {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-}
-
-.fdry-budget-actions button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
 /* Factory view — the toggle, the hall, the site.
    The world inside the canvas has its own palette (`factory/art/palette.ts`);
    everything here is chrome around it, on the same tokens as the rest of
@@ -3158,28 +2656,6 @@
   border-radius: var(--tm-radius-sm);
   border: 1px solid var(--tm-border-strong);
   background: var(--tm-bg-elevated);
-}
-
-.fdry-view-toggle button {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  padding: 5px 8px;
-  border: none;
-  border-radius: var(--tm-radius-xs);
-  background: transparent;
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-}
-
-.fdry-view-toggle button svg {
-  width: 15px;
-  height: 15px;
-}
-
-.fdry-view-toggle button.is-on {
-  background: var(--tm-accent);
-  color: var(--tm-on-accent);
 }
 
 .fdry-hall-grid {
@@ -3225,23 +2701,8 @@
   color: var(--tm-text-muted);
 }
 
-.fdry-crate button {
-  appearance: none;
+.fdry-crate-action {
   margin-top: 4px;
-  font-size: 12px;
-  padding: 4px 11px;
-  border-radius: var(--tm-radius-sm);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-card);
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-}
-
-.fdry-crate button.is-primary {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 500;
 }
 
 .fdry-crate-promote {
@@ -4314,41 +3775,21 @@
   }
 }
 
-/* Segmented controls: Record · Factory, and the metrics' time window. */
-.fdry-seg,
-.fdry-window-toggle {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
+/* The metrics' time window, and the Record · Factory tabs above everything. */
+.fdry-window-toggle,
+.fdry-ledger-tabs {
   margin-bottom: 12px;
-  width: fit-content;
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
-  background: var(--tm-bg-surface);
 }
 
-.fdry-seg button,
-.fdry-window-toggle button {
-  padding: 4px 12px;
-  border: 0;
-  border-radius: var(--tm-radius-xs);
-  background: transparent;
-  font: inherit;
-  font-size: 12px;
-  color: var(--tm-text-secondary);
-  cursor: pointer;
+.fdry-window-toggle {
+  align-self: flex-start;
 }
 
-.fdry-seg button:hover,
-.fdry-window-toggle button:hover {
-  color: var(--tm-text-primary);
-}
-
-.fdry-seg button[aria-pressed='true'],
-.fdry-window-toggle button[aria-pressed='true'] {
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-primary);
-  font-weight: 600;
+/* A panel stands in for the shell's own column, so the foot still sinks. */
+.fdry-ledger-panel {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
 }
 
 .fdry-metrics-tiles {

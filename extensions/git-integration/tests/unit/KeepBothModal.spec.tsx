@@ -54,7 +54,7 @@ describe('KeepBothModal', () => {
 
   it('"Theirs first" toggle changes preview order', () => {
     render(<KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByLabelText(/Theirs first/i))
+    fireEvent.click(screen.getByRole('radio', { name: /Theirs first/i }))
     const previewEl = document.querySelector('.keep-both-modal__preview') as HTMLElement
     const text = previewEl?.textContent ?? ''
     expect(text.indexOf('const y = 2')).toBeLessThan(text.indexOf('const x = 1'))
@@ -62,8 +62,8 @@ describe('KeepBothModal', () => {
 
   it('"Mine first" toggle restores original order', () => {
     render(<KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByLabelText(/Theirs first/i))
-    fireEvent.click(screen.getByLabelText(/Mine first/i))
+    fireEvent.click(screen.getByRole('radio', { name: /Theirs first/i }))
+    fireEvent.click(screen.getByRole('radio', { name: /Mine first/i }))
     const previewEl = document.querySelector('.keep-both-modal__preview') as HTMLElement
     const text = previewEl?.textContent ?? ''
     expect(text.indexOf('const x = 1')).toBeLessThan(text.indexOf('const y = 2'))
@@ -82,7 +82,7 @@ describe('KeepBothModal', () => {
   it('calls onConfirm with both-theirs-first strategy when confirming theirs-first', () => {
     const onConfirm = vi.fn()
     render(<KeepBothModal block={uniqueBlock} onConfirm={onConfirm} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByLabelText(/Theirs first/i))
+    fireEvent.click(screen.getByRole('radio', { name: /Theirs first/i }))
     fireEvent.click(screen.getByText(/Confirm|Use this order/i))
     expect(onConfirm).toHaveBeenCalledWith(
       expect.stringContaining('const y = 2'),

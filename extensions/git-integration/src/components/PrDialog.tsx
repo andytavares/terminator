@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Dialog } from '@terminator/extension-ui'
+import { Dialog, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import type { PullRequest } from '../schemas/git.schema'
 import { RichContent } from './pr-review/RichContent'
 import { githubAPI } from '../api/github'
@@ -231,36 +231,29 @@ export function PrDialog({
         />
       </div>
 
-      <div className="pr-dialog__field">
-        <div className="pr-dialog__inline pr-dialog__desc-header">
-          <label className="pr-dialog__label">Description</label>
-          <div className="pr-dialog__mode-toggle">
-            <button
-              className={`pr-dialog__mode-btn${descMode === 'write' ? ' pr-dialog__mode-btn--active' : ''}`}
-              onClick={() => setDescMode('write')}
-            >
-              Write
-            </button>
-            <button
-              className={`pr-dialog__mode-btn${descMode === 'preview' ? ' pr-dialog__mode-btn--active' : ''}`}
-              onClick={() => setDescMode('preview')}
-            >
-              Preview
-            </button>
+      <TabsRoot selectedId={descMode} onSelect={setDescMode}>
+        <div className="pr-dialog__field">
+          <div className="pr-dialog__inline pr-dialog__desc-header">
+            <label className="pr-dialog__label">Description</label>
+            <TabList label="Description">
+              <Tab id="write">Write</Tab>
+              <Tab id="preview">Preview</Tab>
+            </TabList>
           </div>
+          <TabPanel id="write">
+            <textarea
+              className="pr-dialog__textarea"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Describe your changes… (Markdown supported)"
+              rows={8}
+            />
+          </TabPanel>
+          <TabPanel id="preview">
+            <RichContent className="pr-dialog__preview">{body || '*No description*'}</RichContent>
+          </TabPanel>
         </div>
-        {descMode === 'write' ? (
-          <textarea
-            className="pr-dialog__textarea"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Describe your changes… (Markdown supported)"
-            rows={8}
-          />
-        ) : (
-          <RichContent className="pr-dialog__preview">{body || '*No description*'}</RichContent>
-        )}
-      </div>
+      </TabsRoot>
 
       <div className="pr-dialog__inline">
         <div className="pr-dialog__field pr-dialog__field--flex">

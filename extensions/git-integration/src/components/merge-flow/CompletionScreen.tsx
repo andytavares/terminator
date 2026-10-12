@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { ArrowRight, Check } from 'lucide-react'
+import { Button } from '@terminator/extension-ui'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import { mergeFlowAPI } from '../../api/merge-flow'
 import { notificationsAPI } from '../../api/notifications'
@@ -226,16 +227,14 @@ export function CompletionScreen({ repoRoot, onBack, onExit }: Props) {
             rows={2}
           />
           <div className="completion-screen__actions">
-            <button className="completion-screen__review-btn" onClick={onBack}>
-              Review changes
-            </button>
-            <button
-              className="completion-screen__commit-btn"
+            <Button onClick={onBack}>Review changes</Button>
+            <Button
+              variant="primary"
               onClick={handleCommit}
               disabled={isCommitting || !commitMessage.trim()}
             >
               {isCommitting ? 'Committing…' : 'Commit merge'}
-            </button>
+            </Button>
           </div>
         </div>
 

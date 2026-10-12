@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { Button } from '@terminator/extension-ui'
 import { getFoundryAPI, type ModelChoiceView } from '../types/electron.js'
 import { rungInWords } from '../recipe/rung.js'
 import type { Rung } from '../recipe/rung.js'
@@ -278,9 +279,9 @@ export function SettingsView(): JSX.Element {
             </div>
 
             <div className="fdry-sensor-actions">
-              <button type="button" onClick={() => void runNow(row.def.id)}>
+              <Button size="sm" onClick={() => void runNow(row.def.id)}>
                 Run now
-              </button>
+              </Button>
               {runNotes[row.def.id] !== undefined ? <span>{runNotes[row.def.id]}</span> : null}
             </div>
           </li>

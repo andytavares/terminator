@@ -4,7 +4,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { UsesPopover, type Use } from '../../src/components/pr-review/UsesPopover'
 
-vi.mock('@terminator/extension-ui', () => ({
+vi.mock('@terminator/extension-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@terminator/extension-ui')>()),
   Popover: ({
     label,
     children,

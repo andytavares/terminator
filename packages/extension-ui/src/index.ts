@@ -6,8 +6,8 @@
  * Extension API published 31 colour tokens and no components, so all five
  * extensions built their own and disagreed with each other about what a
  * keypress means; this is the piece that was missing. Since ADR 098 it is the
- * design system: it also holds the tokens (`tokens.css`), a button, tabs,
- * Markdown, relative time and polling.
+ * design system: it also holds the tokens (`tokens.css`), a button, tabs, a
+ * segmented control, Markdown, relative time and polling.
  */
 
 export { Dialog, DialogActionButton, useContainingLayer } from './Dialog'
@@ -26,6 +26,9 @@ export type {
   TabsProps,
   TabsRootProps,
 } from './Tabs'
+
+export { SegmentedControl } from './SegmentedControl'
+export type { SegmentedControlProps, SegmentedOption } from './SegmentedControl'
 
 export { Markdown } from './Markdown'
 export type { MarkdownProps } from './Markdown'

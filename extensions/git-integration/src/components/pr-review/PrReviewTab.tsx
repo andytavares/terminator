@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { ExternalLink } from 'lucide-react'
+import { Button } from '@terminator/extension-ui'
 import { githubAPI } from '../../api/github'
 import { usePrReviewStore, sessionKey, legacySessionKey } from '../../stores/pr-review.store'
 import { useReviewUiStore } from '../../stores/review-ui.store'
@@ -306,13 +308,15 @@ export function PrReviewTab({ repoRoot }: Props) {
     <div className="pr-review-tab-wrap">
       {!isPoppedOut && (
         <div className="pr-review-tab-toolbar">
-          <button
-            className="pr-review-popout-btn"
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={ExternalLink}
             onClick={handlePopOut}
             title="Open in new window"
           >
-            ⬡ Pop out
-          </button>
+            Pop out
+          </Button>
         </div>
       )}
       <ReviewQueue

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Button } from '@terminator/extension-ui'
 import { githubAPI } from '../../api/github'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 
@@ -68,7 +69,7 @@ export function ReviewSubmitPanel({
     return (
       <div className="review-submit-success">
         <p>Review submitted successfully.</p>
-        <button onClick={onClose}>Close</button>
+        <Button onClick={onClose}>Close</Button>
       </div>
     )
   }
@@ -122,12 +123,12 @@ export function ReviewSubmitPanel({
       {error && <p className="review-submit-error">{error}</p>}
 
       <div className="review-submit-actions">
-        <button className="review-submit-cancel" onClick={onClose} disabled={submitting}>
+        <Button onClick={onClose} disabled={submitting}>
           Cancel
-        </button>
-        <button className="review-submit-btn" onClick={handleSubmit} disabled={submitting}>
+        </Button>
+        <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
           {submitting ? 'Submitting…' : 'Submit review'}
-        </button>
+        </Button>
       </div>
     </div>
   )

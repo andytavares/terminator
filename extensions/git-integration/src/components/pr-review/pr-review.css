@@ -27,24 +27,6 @@
   flex-shrink: 0;
 }
 
-.pr-review-popout-btn {
-  background: none;
-  border: 1px solid var(--tm-border);
-  color: var(--tm-text-muted);
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    border-color 0.15s;
-}
-
-.pr-review-popout-btn:hover {
-  color: var(--tm-text-primary);
-  border-color: var(--tm-text-muted);
-}
-
 /* ─── ReviewQueue ─────────────────────────────────────────────────────────── */
 
 .pr-review-queue {
@@ -68,37 +50,6 @@
   padding: 8px 16px;
   color: var(--tm-text-muted);
   font-size: 12px;
-}
-
-.pr-refresh-btn {
-  padding: 5px 10px;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 6px;
-  background: none;
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-  color: var(--tm-text-muted);
-  transition:
-    color 0.15s,
-    border-color 0.15s,
-    transform 0.15s;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-.pr-refresh-btn svg {
-  width: 14px;
-  height: 14px;
-  display: block;
-}
-
-.pr-refresh-btn:hover:not(:disabled) {
-  color: var(--tm-text-primary);
-  border-color: var(--tm-border-strong);
-}
-.pr-refresh-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 @keyframes pr-spin {
   to {
@@ -180,13 +131,6 @@
   color: var(--tm-text-muted);
   text-align: center;
   font-size: 13px;
-}
-
-/* The retry button inside it carries an icon, not a glyph (Principle XII). */
-.pr-queue-error .pr-refresh-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
 }
 
 .pr-queue-error {
@@ -390,20 +334,6 @@
   gap: 4px;
   flex-shrink: 0;
 }
-.pr-review-close-btn {
-  background: none;
-  border: none;
-  color: var(--tm-text-muted);
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-.pr-review-close-btn:hover {
-  color: var(--tm-text-primary);
-  background: var(--tm-overlay-soft);
-}
 
 .pr-review-view {
   display: flex;
@@ -490,31 +420,6 @@
 }
 
 /* ─── Rail: Files | Chapters ─────────────────────────────────────────────── */
-
-.pr-rail-switch {
-  display: inline-flex;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm);
-  overflow: hidden;
-}
-
-.pr-rail-switch button {
-  background: transparent;
-  border: 0;
-  padding: 3px 10px;
-  font: 500 12px/1.4 var(--tm-font-ui);
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-}
-
-.pr-rail-switch button + button {
-  border-left: 1px solid var(--tm-border-strong);
-}
-
-.pr-rail-switch button[aria-pressed='true'] {
-  background: var(--tm-accent-dim);
-  color: var(--tm-accent-text);
-}
 
 .pr-rail-chapters .chapter-nav-meta {
   margin-left: auto;
@@ -1036,23 +941,6 @@
   overflow-wrap: break-word;
 }
 
-.inline-comment-expand,
-.inline-comment-reply-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--tm-accent-text);
-  padding: 5px 12px;
-  display: block;
-  width: 100%;
-  text-align: left;
-}
-.inline-comment-expand:hover,
-.inline-comment-reply-btn:hover {
-  text-decoration: underline;
-}
-
 /* ─── CommentComposer ─────────────────────────────────────────────────────── */
 
 .comment-composer {
@@ -1061,25 +949,6 @@
   margin: 6px 10px;
   overflow: hidden;
   background: var(--tm-overlay-subtle);
-}
-
-.comment-composer-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--tm-border);
-}
-
-.comment-composer-tab {
-  padding: 7px 14px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--tm-text-muted);
-  border-bottom: 2px solid transparent;
-}
-.comment-composer-tab--active {
-  color: var(--tm-text-primary);
-  border-bottom-color: var(--tm-accent);
 }
 
 .comment-composer-textarea {
@@ -1116,34 +985,6 @@
   gap: 8px;
   padding: 8px 12px;
   border-top: 1px solid var(--tm-border);
-}
-
-.comment-composer-cancel {
-  padding: 5px 12px;
-  background: none;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--tm-text-primary);
-}
-.comment-composer-cancel:hover {
-  background: var(--tm-overlay-soft);
-}
-
-.comment-composer-submit {
-  padding: 5px 14px;
-  background: var(--tm-accent);
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--tm-on-accent);
-}
-.comment-composer-submit:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 /* ─── ReviewSubmitPanel ───────────────────────────────────────────────────── */
@@ -1248,34 +1089,6 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-}
-
-.review-submit-cancel {
-  padding: 7px 16px;
-  background: none;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--tm-text-primary);
-}
-.review-submit-cancel:hover {
-  background: var(--tm-overlay-soft);
-}
-
-.review-submit-btn {
-  padding: 7px 18px;
-  background: var(--tm-accent);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--tm-on-accent);
-}
-.review-submit-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .review-submit-success {
@@ -1450,21 +1263,6 @@
 }
 .risk-importer-btn:hover {
   background: color-mix(in srgb, var(--tm-accent) 10%, transparent);
-  color: var(--tm-text-primary);
-}
-
-.risk-importers-toggle {
-  margin-top: 4px;
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: 11px;
-  color: var(--tm-text-muted);
-  cursor: pointer;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-}
-.risk-importers-toggle:hover {
   color: var(--tm-text-primary);
 }
 
@@ -1976,106 +1774,12 @@
   justify-content: flex-end;
 }
 
-.pr-overview-ready-btn {
-  padding: 8px 16px;
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--tm-text-muted) 50%, transparent);
-  border-radius: 6px;
-  color: var(--tm-text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    color 0.15s;
-}
-.pr-overview-ready-btn:hover:not(:disabled) {
-  border-color: var(--tm-text-primary);
-  color: var(--tm-text-primary);
-}
-.pr-overview-ready-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.pr-overview-update-branch-btn {
-  padding: 8px 16px;
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--tm-warning) 50%, transparent);
-  border-radius: 6px;
-  color: var(--tm-warning);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    color 0.15s;
-}
-.pr-overview-update-branch-btn:hover:not(:disabled) {
-  border-color: var(--tm-warning);
-  color: var(--tm-warning);
-}
-.pr-overview-update-branch-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Principle XII: the → is an icon now, sized here. */
-.pr-overview-resolve-conflicts-btn svg {
-  width: 13px;
-  height: 13px;
-  flex: 0 0 auto;
-}
-
-.pr-overview-resolve-conflicts-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--tm-danger) 50%, transparent);
-  border-radius: 6px;
-  color: var(--tm-danger);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    color 0.15s;
-}
-.pr-overview-resolve-conflicts-btn:hover {
-  border-color: var(--tm-danger);
-  color: var(--tm-danger);
-}
-
 .pr-update-branch-error {
   font-size: 11px;
   color: var(--tm-danger);
   margin: 0;
   flex: 1;
   text-align: left;
-}
-
-.pr-overview-start-btn {
-  padding: 8px 20px;
-  background: var(--tm-accent);
-  border: none;
-  border-radius: 6px;
-  color: var(--tm-on-accent);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    opacity 0.15s,
-    transform 0.1s;
-}
-.pr-overview-start-btn:hover {
-  background: var(--tm-accent-hover, var(--tm-accent));
-  transform: translateY(-1px);
-}
-.pr-overview-start-btn:active {
-  transform: none;
-  opacity: 1;
 }
 
 /* ─── PR Overview Discussion (issue comments) ─────────────────────────────── */
@@ -2103,28 +1807,6 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 6px;
-}
-
-.pr-issue-comment-reply-btn {
-  margin-left: auto;
-  background: none;
-  border: none;
-  padding: 2px 6px;
-  font-size: 11px;
-  color: var(--tm-text-muted);
-  cursor: pointer;
-  border-radius: 3px;
-  opacity: 0;
-  transition:
-    opacity 0.1s,
-    color 0.1s;
-}
-.pr-issue-comment:hover .pr-issue-comment-reply-btn {
-  opacity: 1;
-}
-.pr-issue-comment-reply-btn:hover {
-  color: var(--tm-text-primary);
-  background: var(--tm-bg-card-hover);
 }
 
 .pr-issue-comment-body {

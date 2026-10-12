@@ -53,3 +53,20 @@ describe('QuickCreateOverlay', () => {
     expect(useNotesStore.getState().showQuickCreate).toBe(false)
   })
 })
+
+describe('QuickCreateOverlay kind', () => {
+  it('offers what to create as one choice, Note first', () => {
+    useNotesStore.setState({ showQuickCreate: true })
+    render(<QuickCreateOverlay />)
+    expect(screen.getByRole('radiogroup', { name: 'Create' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'Note' }).getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('moves to the next kind with the arrow keys, and drops the note body for it', () => {
+    useNotesStore.setState({ showQuickCreate: true })
+    const { container } = render(<QuickCreateOverlay />)
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Note' }), { key: 'ArrowRight' })
+    expect(screen.getByRole('radio', { name: 'Diagram' }).getAttribute('aria-checked')).toBe('true')
+    expect(container.querySelector('.notepad-quick-create__body')).toBeNull()
+  })
+})

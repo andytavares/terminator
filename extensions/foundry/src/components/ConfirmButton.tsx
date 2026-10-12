@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { TriangleAlert } from 'lucide-react'
+import { Button } from '@terminator/extension-ui'
 
 // A control that destroys something, and says what, before it does it.
 //
@@ -32,14 +33,15 @@ export function ConfirmButton({
 
   if (!armed) {
     return (
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         className="fdry-discard"
         disabled={disabled}
         onClick={() => setArmed(true)}
       >
         {label}
-      </button>
+      </Button>
     )
   }
 
@@ -49,9 +51,9 @@ export function ConfirmButton({
         <TriangleAlert aria-hidden="true" /> {warning}
       </p>
       <div className="fdry-ask-actions">
-        <button
-          type="button"
-          className="fdry-discard"
+        <Button
+          variant="danger"
+          size="sm"
           disabled={disabled}
           onClick={() => {
             // Disarmed before the work, not after: the second run of a
@@ -62,10 +64,10 @@ export function ConfirmButton({
           }}
         >
           {confirmLabel}
-        </button>
-        <button type="button" disabled={disabled} onClick={() => setArmed(false)}>
+        </Button>
+        <Button size="sm" disabled={disabled} onClick={() => setArmed(false)}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   )

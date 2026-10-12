@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
+import { Button } from '@terminator/extension-ui'
 import './git-integration.css'
 import { useGitStore, diffCacheKey } from '../stores/git.store'
 import { useGitStatus } from '../hooks/useGitStatus'
@@ -234,12 +235,15 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
         {status?.hasConflicts && (
           <div className="git-full-view__conflict-banner">
             <span className="git-full-view__conflict-banner-text">Merge conflicts detected</span>
-            <button
+            <Button
+              variant="danger"
+              size="sm"
+              icon={ArrowRight}
               className="git-full-view__conflict-banner-btn"
               onClick={() => setView('merge-flow')}
             >
-              <ArrowRight aria-hidden="true" /> Resolve conflicts
-            </button>
+              Resolve conflicts
+            </Button>
           </div>
         )}
         <div className="git-full-view__staging">
@@ -276,13 +280,14 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
                 </details>
               )}
               {isHookFailure && (
-                <button
-                  className="git-view__btn git-view__btn--danger git-view__btn--sm"
+                <Button
+                  variant="danger"
+                  size="sm"
                   onClick={() => handleCommit(true)}
                   disabled={isCommitting || isPushing}
                 >
                   Commit without hooks
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -309,23 +314,24 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
               )}
             </div>
             <div className="git-view__buttons">
-              <button className="git-view__btn git-view__btn--secondary" onClick={handleOpenPr}>
+              <Button size="sm" onClick={handleOpenPr}>
                 Open PR
-              </button>
-              <button
-                className="git-view__btn git-view__btn--secondary"
+              </Button>
+              <Button
+                size="sm"
                 onClick={() => handleCommit(false)}
                 disabled={!canCommit || isCommitting || isPushing}
               >
                 Commit
-              </button>
-              <button
-                className="git-view__btn git-view__btn--primary"
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => handleCommitAndPush(false)}
                 disabled={!canCommit || isCommitting || isPushing}
               >
-                {isPushing ? '⟳ Pushing…' : 'Commit & Push'}
-              </button>
+                {isPushing ? 'Pushing…' : 'Commit & Push'}
+              </Button>
             </div>
           </div>
         </div>

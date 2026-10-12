@@ -1,6 +1,6 @@
 import React from 'react'
 import { X } from 'lucide-react'
-import { Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
+import { IconButton, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import type { RiskScore } from '../../schemas/pr-review.schema'
 import { RiskBreakdownPanel } from './RiskBreakdownPanel'
 import { HealthChips } from './HealthChips'
@@ -55,9 +55,7 @@ export function ReviewInspector({
             )}
             {fileAvailable && <Tab id="file">File</Tab>}
           </TabList>
-          <button type="button" className="ri-close" aria-label="Close inspector" onClick={onClose}>
-            <X className="tm-icon-sm" />
-          </button>
+          <IconButton icon={X} size="sm" label="Close inspector" onClick={onClose} />
         </div>
         {agentAvailable && (
           <TabPanel id="agent" className="ri-panel">

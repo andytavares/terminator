@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { Button } from '@terminator/extension-ui'
 import { EditorView, lineNumbers, keymap } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { defaultKeymap, indentWithTab, history, historyKeymap } from '@codemirror/commands'
@@ -132,18 +133,18 @@ export function ManualEditor({ block, onSave, onCancel, suggestedText }: Props) 
             : 'Plain text'}
         </span>
         <span className="manual-editor__line-count">{lineCount} lines</span>
-        <button className="manual-editor__cancel" onClick={onCancel}>
+        <Button size="sm" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
       <div className="manual-editor__body">
         <div ref={containerRef} className="manual-editor__cm-container" />
       </div>
       <div className="manual-editor__actions">
         <span className="manual-editor__hint">Tab inserts 2 spaces</span>
-        <button className="manual-editor__save" onClick={handleSave} disabled={isEmpty}>
+        <Button variant="primary" size="sm" onClick={handleSave} disabled={isEmpty}>
           Save &amp; confirm
-        </button>
+        </Button>
       </div>
     </div>
   )

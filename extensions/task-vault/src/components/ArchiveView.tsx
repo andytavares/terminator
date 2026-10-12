@@ -9,7 +9,15 @@ import {
   Undo2,
 } from 'lucide-react'
 import type { IndexedTask, IndexedProject } from '../vault/types'
-import { Button, IconButton } from '@terminator/extension-ui'
+import {
+  Button,
+  IconButton,
+  SegmentedControl,
+  Tab,
+  TabList,
+  TabPanel,
+  TabsRoot,
+} from '@terminator/extension-ui'
 
 interface ArchivedArea {
   id: string
@@ -70,6 +78,12 @@ async function fetchArchive(windowDays: number): Promise<ArchiveOutcome> {
     return { error: String(err) }
   }
 }
+
+const ARCHIVE_WINDOWS = [
+  { value: '7', label: '7 days' },
+  { value: '30', label: '30 days' },
+  { value: '90', label: '90 days' },
+]
 
 export function ArchiveView(): React.JSX.Element {
   const [data, setData] = useState<ArchiveData>({ tasks: [], projects: [], areas: [] })
@@ -161,157 +175,147 @@ export function ArchiveView(): React.JSX.Element {
     <div className="archive-view">
       <div className="archive-view__header">
         <h2>History</h2>
-        <div className="archive-view__window-picker">
-          <span>Show last:</span>
-          {[7, 30, 90].map((d) => (
-            <button
-              key={d}
-              className={`archive-view__window-btn${days === d ? ' archive-view__window-btn--active' : ''}`}
-              onClick={() => changeWindow(d)}
-            >
-              {d}d
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Show the last"
+          size="sm"
+          options={ARCHIVE_WINDOWS}
+          value={String(days)}
+          onChange={(value) => changeWindow(Number(value))}
+        />
       </div>
 
-      <div className="archive-view__tabs">
-        <button
-          className={`archive-view__tab${tab === 'tasks' ? ' archive-view__tab--active' : ''}`}
-          onClick={() => setTab('tasks')}
-        >
-          Completed Tasks ({data.tasks.length})
-        </button>
-        <button
-          className={`archive-view__tab${tab === 'projects' ? ' archive-view__tab--active' : ''}`}
-          onClick={() => setTab('projects')}
-        >
-          Archived Projects ({data.projects.length})
-        </button>
-        <button
-          className={`archive-view__tab${tab === 'areas' ? ' archive-view__tab--active' : ''}`}
-          onClick={() => setTab('areas')}
-        >
-          Archived Areas ({data.areas.length})
-        </button>
-      </div>
+      <TabsRoot selectedId={tab} onSelect={setTab}>
+        <TabList label="Archive sections" className="archive-view__tabs">
+          <Tab id="tasks" accessibleName={`Completed tasks, ${data.tasks.length}`}>
+            Completed tasks<span className="tmui-tabs__count">{data.tasks.length}</span>
+          </Tab>
+          <Tab id="projects" accessibleName={`Archived projects, ${data.projects.length}`}>
+            Archived projects<span className="tmui-tabs__count">{data.projects.length}</span>
+          </Tab>
+          <Tab id="areas" accessibleName={`Archived areas, ${data.areas.length}`}>
+            Archived areas<span className="tmui-tabs__count">{data.areas.length}</span>
+          </Tab>
+        </TabList>
 
-      {tab === 'tasks' && (
-        <div className="archive-view__tasks">
-          {data.tasks.length === 0 ? (
-            <p className="archive-view__empty">No completed tasks in the last {days} days.</p>
-          ) : (
-            <>
-              {doneTasks.length > 0 && (
-                <section>
-                  <h3 className="archive-view__section-title">Completed ({doneTasks.length})</h3>
-                  {doneTasks.map((task) => (
-                    <ArchiveTaskRow
-                      key={task.id}
-                      task={task}
-                      onRestore={handleRestoreTask}
-                      onDelete={handleDeleteTask}
-                    />
-                  ))}
-                </section>
-              )}
-              {cancelledTasks.length > 0 && (
-                <section>
-                  <h3 className="archive-view__section-title">
-                    Cancelled ({cancelledTasks.length})
-                  </h3>
-                  {cancelledTasks.map((task) => (
-                    <ArchiveTaskRow
-                      key={task.id}
-                      task={task}
-                      onRestore={handleRestoreTask}
-                      onDelete={handleDeleteTask}
-                    />
-                  ))}
-                </section>
-              )}
-              {migratedTasks.length > 0 && (
-                <section>
-                  <h3 className="archive-view__section-title">Migrated ({migratedTasks.length})</h3>
-                  {migratedTasks.map((task) => (
-                    <ArchiveTaskRow
-                      key={task.id}
-                      task={task}
-                      onRestore={handleRestoreTask}
-                      onDelete={handleDeleteTask}
-                    />
-                  ))}
-                </section>
-              )}
-            </>
-          )}
-        </div>
-      )}
+        <TabPanel id="tasks">
+          <div className="archive-view__tasks">
+            {data.tasks.length === 0 ? (
+              <p className="archive-view__empty">No completed tasks in the last {days} days.</p>
+            ) : (
+              <>
+                {doneTasks.length > 0 && (
+                  <section>
+                    <h3 className="archive-view__section-title">Completed ({doneTasks.length})</h3>
+                    {doneTasks.map((task) => (
+                      <ArchiveTaskRow
+                        key={task.id}
+                        task={task}
+                        onRestore={handleRestoreTask}
+                        onDelete={handleDeleteTask}
+                      />
+                    ))}
+                  </section>
+                )}
+                {cancelledTasks.length > 0 && (
+                  <section>
+                    <h3 className="archive-view__section-title">
+                      Cancelled ({cancelledTasks.length})
+                    </h3>
+                    {cancelledTasks.map((task) => (
+                      <ArchiveTaskRow
+                        key={task.id}
+                        task={task}
+                        onRestore={handleRestoreTask}
+                        onDelete={handleDeleteTask}
+                      />
+                    ))}
+                  </section>
+                )}
+                {migratedTasks.length > 0 && (
+                  <section>
+                    <h3 className="archive-view__section-title">
+                      Migrated ({migratedTasks.length})
+                    </h3>
+                    {migratedTasks.map((task) => (
+                      <ArchiveTaskRow
+                        key={task.id}
+                        task={task}
+                        onRestore={handleRestoreTask}
+                        onDelete={handleDeleteTask}
+                      />
+                    ))}
+                  </section>
+                )}
+              </>
+            )}
+          </div>
+        </TabPanel>
 
-      {tab === 'projects' && (
-        <div className="archive-view__projects">
-          {data.projects.length === 0 ? (
-            <p className="archive-view__empty">No archived projects.</p>
-          ) : (
-            data.projects.map((project) => (
-              <div key={project.id} className="archive-view__project-card">
-                <div className="archive-view__project-header">
-                  <span className="archive-view__project-name">{project.name}</span>
-                  {project.area && (
-                    <span className="archive-view__project-area">#{project.area}</span>
-                  )}
-                  <span className="archive-view__project-date">
-                    {new Date(project.lastModified).toLocaleDateString()}
-                  </span>
+        <TabPanel id="projects">
+          <div className="archive-view__projects">
+            {data.projects.length === 0 ? (
+              <p className="archive-view__empty">No archived projects.</p>
+            ) : (
+              data.projects.map((project) => (
+                <div key={project.id} className="archive-view__project-card">
+                  <div className="archive-view__project-header">
+                    <span className="archive-view__project-name">{project.name}</span>
+                    {project.area && (
+                      <span className="archive-view__project-area">#{project.area}</span>
+                    )}
+                    <span className="archive-view__project-date">
+                      {new Date(project.lastModified).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="archive-view__project-actions">
+                    <Button size="sm" onClick={() => restoreProject(project.filePath)}>
+                      Restore to active
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => deleteProject(project.filePath, project.name)}
+                    >
+                      Delete permanently
+                    </Button>
+                  </div>
                 </div>
-                <div className="archive-view__project-actions">
-                  <Button size="sm" onClick={() => restoreProject(project.filePath)}>
-                    Restore to active
-                  </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => deleteProject(project.filePath, project.name)}
-                  >
-                    Delete permanently
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+              ))
+            )}
+          </div>
+        </TabPanel>
 
-      {tab === 'areas' && (
-        <div className="archive-view__projects">
-          {data.areas.length === 0 ? (
-            <p className="archive-view__empty">No archived areas.</p>
-          ) : (
-            data.areas.map((area) => (
-              <div key={area.id} className="archive-view__project-card">
-                <div className="archive-view__project-header">
-                  <span className="archive-view__project-name">{area.name}</span>
-                  <span className="archive-view__project-date">
-                    {new Date(area.updatedAt).toLocaleDateString()}
-                  </span>
+        <TabPanel id="areas">
+          <div className="archive-view__projects">
+            {data.areas.length === 0 ? (
+              <p className="archive-view__empty">No archived areas.</p>
+            ) : (
+              data.areas.map((area) => (
+                <div key={area.id} className="archive-view__project-card">
+                  <div className="archive-view__project-header">
+                    <span className="archive-view__project-name">{area.name}</span>
+                    <span className="archive-view__project-date">
+                      {new Date(area.updatedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="archive-view__project-actions">
+                    <Button size="sm" onClick={() => void handleRestoreArea(area.name)}>
+                      Restore to active
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => void handleDeleteArea(area.name)}
+                    >
+                      Delete permanently
+                    </Button>
+                  </div>
                 </div>
-                <div className="archive-view__project-actions">
-                  <Button size="sm" onClick={() => void handleRestoreArea(area.name)}>
-                    Restore to active
-                  </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => void handleDeleteArea(area.name)}
-                  >
-                    Delete permanently
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+              ))
+            )}
+          </div>
+        </TabPanel>
+      </TabsRoot>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { Markdown } from '@terminator/extension-ui'
+import { Button, Markdown } from '@terminator/extension-ui'
 import { openInBrowser } from './ExternalLink.js'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -613,6 +613,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
       return (
         <div className="fdry-chk-moves">
           <ReasonButton
+            size="sm"
             reason={askReason}
             onClick={() =>
               void converge(
@@ -642,22 +643,22 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
           }
           if (remedy.kind === 'goto') {
             return (
-              <button
+              <Button
                 key={remedy.label}
-                type="button"
-                className="fdry-btn"
+                size="sm"
                 onClick={() => {
                   if (remedy.step !== null) setPicked(remedy.step)
                   setFocusTarget({ target: remedy.target })
                 }}
               >
                 {remedy.label}
-              </button>
+              </Button>
             )
           }
           return (
             <ReasonButton
               key={remedy.label}
+              size="sm"
               reason={askReason}
               onClick={() => void converge(remedy.message)}
             >
@@ -796,29 +797,24 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
           </div>
           <div className="fdry-wiz-actions">
             {intake.kind === 'running' ? (
-              <button
-                type="button"
-                className="fdry-btn fdry-btn--quiet"
+              <Button
+                variant="ghost"
+                icon={Terminal}
                 onClick={() => handleAttach(intake.sessionId)}
               >
-                <Terminal aria-hidden="true" /> {STRIP_ACTION_LABEL.watch}
-              </button>
+                {STRIP_ACTION_LABEL.watch}
+              </Button>
             ) : order.provenance.forgeSession !== null ? (
-              <button
-                type="button"
-                className="fdry-btn fdry-btn--quiet"
+              <Button
+                variant="ghost"
+                icon={Terminal}
                 onClick={() => handleAttach(order.provenance.forgeSession ?? '')}
               >
-                <Terminal aria-hidden="true" /> Attach
-              </button>
+                Attach
+              </Button>
             ) : null}
             {isDraft && !r.strip.actions.includes('draft') ? (
-              <ReasonButton
-                reason={r.locks.redraft}
-                className="fdry-btn"
-                onClick={() => void converge()}
-              >
-                <Wand aria-hidden="true" />
+              <ReasonButton reason={r.locks.redraft} icon={Wand} onClick={() => void converge()}>
                 {order.plan.units.length === 0 ? 'Draft the plan' : 'Redraft'}
               </ReasonButton>
             ) : null}
@@ -838,16 +834,14 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
           {r.strip.actions.length > 0 ? (
             <div className="fdry-strip-acts">
               {r.strip.actions.map((action) => (
-                <button
+                <Button
                   key={action}
-                  type="button"
-                  className={`fdry-btn${action === 'tell-architect' ? ' fdry-btn--primary' : ''}`}
+                  variant={action === 'tell-architect' ? 'primary' : 'secondary'}
+                  icon={action === 'hold' ? Pause : action === 'watch' ? Terminal : undefined}
                   onClick={() => runStripAction(action)}
                 >
-                  {action === 'hold' ? <Pause aria-hidden="true" /> : null}
-                  {action === 'watch' ? <Terminal aria-hidden="true" /> : null}
                   {STRIP_ACTION_LABEL[action]}
-                </button>
+                </Button>
               ))}
             </div>
           ) : null}
@@ -964,12 +958,14 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                         ) : null}
                         <div className="fdry-fnd-acts">
                           {question.options.map((option, optionIndex) => (
-                            <button
+                            <Button
                               key={option}
-                              type="button"
+                              size="sm"
                               aria-pressed={questionChoices[question.id] === optionIndex}
-                              className={
-                                questionChoices[question.id] === optionIndex ? 'fdry-btn--sel' : ''
+                              variant={
+                                questionChoices[question.id] === optionIndex
+                                  ? 'primary'
+                                  : 'secondary'
                               }
                               onClick={() =>
                                 setQuestionChoices((current) => ({
@@ -987,7 +983,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                                 {option}
                               </Markdown>
                               {optionIndex === question.recommended ? ' (recommended)' : ''}
-                            </button>
+                            </Button>
                           ))}
                         </div>
                       </div>
@@ -1024,6 +1020,8 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                               </p>
                             ) : isDraft && unproven !== criterion.id ? (
                               <ReasonButton
+                                variant="ghost"
+                                size="sm"
                                 className="fdry-ac-excuse"
                                 reason={askReason}
                                 onClick={() => setUnproven(criterion.id)}
@@ -1055,6 +1053,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                                 />
                                 <ReasonButton
                                   type="submit"
+                                  size="sm"
                                   reason={
                                     unprovenReason.trim() === ''
                                       ? LOCAL_REASONS.acceptEmpty
@@ -1123,6 +1122,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                       {assumptions.map((assumption) => (
                         <ReasonButton
                           key={assumption.id}
+                          plain
                           reason={askReason}
                           onClick={() => void turn({ strike: assumption.id })}
                         >
@@ -1223,10 +1223,10 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                           </span>
                           <span className="fdry-fnd-meta">{finding.meta}</span>
                           <div className="fdry-fnd-acts">
-                            <button
-                              type="button"
+                            <Button
+                              size="sm"
                               aria-pressed={choice?.mode === 'ask'}
-                              className={choice?.mode === 'ask' ? 'fdry-btn--sel' : ''}
+                              variant={choice?.mode === 'ask' ? 'primary' : 'secondary'}
                               title="Have the architect change the order so this no longer holds"
                               onClick={() =>
                                 setFindingChoice((current) => ({
@@ -1236,11 +1236,11 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                               }
                             >
                               Ask the architect
-                            </button>
-                            <button
-                              type="button"
+                            </Button>
+                            <Button
+                              size="sm"
                               aria-pressed={choice?.mode === 'fix'}
-                              className={choice?.mode === 'fix' ? 'fdry-btn--sel' : ''}
+                              variant={choice?.mode === 'fix' ? 'primary' : 'secondary'}
                               title="Say how, and the architect changes the order that way"
                               onClick={() =>
                                 setFindingChoice((current) => ({
@@ -1253,11 +1253,11 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                               }
                             >
                               Fix it…
-                            </button>
-                            <button
-                              type="button"
+                            </Button>
+                            <Button
+                              size="sm"
                               aria-pressed={choice?.mode === 'accept'}
-                              className={choice?.mode === 'accept' ? 'fdry-btn--sel' : ''}
+                              variant={choice?.mode === 'accept' ? 'primary' : 'secondary'}
                               title="It stands, and here is why"
                               onClick={() =>
                                 setFindingChoice((current) => ({
@@ -1270,7 +1270,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                               }
                             >
                               Accept it
-                            </button>
+                            </Button>
                           </div>
                           {choice?.mode === 'fix' ? (
                             <textarea
@@ -1383,13 +1383,9 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                       ? clockOf(recipes.chosenAt)
                       : ''}
                     : {capitalise(recipes.chosen)}.
-                    <button
-                      type="button"
-                      className="fdry-btn fdry-btn--quiet"
-                      onClick={() => void pickRecipe(null)}
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => void pickRecipe(null)}>
                       Use the proposal
-                    </button>
+                    </Button>
                   </div>
                 ) : null}
                 <div className="fdry-shapes">
@@ -1402,6 +1398,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                       return (
                         <ReasonButton
                           key={option.name}
+                          plain
                           tip="fit"
                           reason={reason}
                           className={`fdry-shape${isSelected ? ' is-on' : ''} fdry-shape--off`}
@@ -1591,6 +1588,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                 />
                 <ReasonButton
                   type="submit"
+                  variant="primary"
                   reason={
                     r.locks.message ?? (draft.trim() === '' ? LOCAL_REASONS.emptyMessage : null)
                   }
@@ -1606,9 +1604,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
           <footer className="fdry-foot">
             {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
             {previous !== undefined ? (
-              <button type="button" className="fdry-btn" onClick={() => openStep(previous.id)}>
-                Back
-              </button>
+              <Button onClick={() => openStep(previous.id)}>Back</Button>
             ) : null}
             {r.handOffWhy !== null && stepView.id === 'handOff' ? (
               <span className="fdry-why">
@@ -1629,11 +1625,11 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
               <>
                 {view.agreed !== undefined && !isDraft ? null : (
                   <ReasonButton
-                    className="fdry-btn fdry-btn--primary"
+                    variant="primary"
+                    icon={r.canHandOff ? Play : Lock}
                     reason={r.locks.handOff}
                     onClick={() => void handOff()}
                   >
-                    {r.canHandOff ? <Play aria-hidden="true" /> : <Lock aria-hidden="true" />}
                     {r.canHandOff
                       ? `Hand off with ${capitalise(shapeName ?? 'the proposed')}`
                       : 'Hand off'}
@@ -1641,23 +1637,15 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                 )}
               </>
             ) : stepNeedsYou.total > 0 ? (
-              <ReasonButton
-                className="fdry-btn fdry-btn--primary"
-                reason={sendReason}
-                onClick={sendDecisionsOnThisStep}
-              >
+              <ReasonButton variant="primary" reason={sendReason} onClick={sendDecisionsOnThisStep}>
                 {stepNeedsYou.decided === 0
                   ? 'Send decisions'
                   : `Send ${stepNeedsYou.decided} decision${stepNeedsYou.decided === 1 ? '' : 's'}`}
               </ReasonButton>
             ) : next !== undefined ? (
-              <button
-                type="button"
-                className="fdry-btn fdry-btn--primary"
-                onClick={() => openStep(next.id)}
-              >
+              <Button variant="primary" onClick={() => openStep(next.id)}>
                 Next: {STEP_LABELS[next.id]}
-              </button>
+              </Button>
             ) : null}
 
             {stepView.id === 'handOff' && view.advisory != null ? (

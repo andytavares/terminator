@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Dialog, formatRelativeTime } from '@terminator/extension-ui'
+import { Button, Dialog, formatRelativeTime } from '@terminator/extension-ui'
 import { Lock } from 'lucide-react'
 import { githubAPI } from '../../api/github'
 
@@ -151,9 +151,9 @@ export function RepoPicker({ initial, onClose, onSaved }: Props): JSX.Element {
         {loaded !== null && 'error' in loaded && (
           <div className="rp-error" role="alert">
             <span>{loaded.error}</span>
-            <button type="button" className="rd-btn" onClick={() => void load(false)}>
+            <Button size="sm" onClick={() => void load(false)}>
               Retry
-            </button>
+            </Button>
           </div>
         )}
 
@@ -169,21 +169,20 @@ export function RepoPicker({ initial, onClose, onSaved }: Props): JSX.Element {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-              <button
-                type="button"
-                className="rd-btn"
+              <Button
+                size="sm"
                 onClick={() =>
                   setSelected((prev) => new Set([...prev, ...groups.shown.map((r) => r.fullName)]))
                 }
               >
                 Select all shown
-              </button>
-              <button type="button" className="rd-btn" onClick={() => setSelected(new Set())}>
+              </Button>
+              <Button size="sm" onClick={() => setSelected(new Set())}>
                 Clear
-              </button>
-              <button type="button" className="rd-btn" onClick={() => void load(true)}>
+              </Button>
+              <Button size="sm" onClick={() => void load(true)}>
                 Refresh list
-              </button>
+              </Button>
             </div>
             <div className="rp-summary" aria-live="polite">
               {summary}

@@ -738,61 +738,11 @@
   color: var(--tm-text-muted);
 }
 
-/* ── Compact edit dialog ────────────────────────────────────────── */
-.notepad-dialog {
-  width: 440px;
-  max-width: calc(100vw - 40px);
-  background: var(--tm-bg-elevated);
-  border: 1px solid var(--tm-border);
-  border-radius: 12px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
-  display: flex;
-  flex-direction: column;
-  z-index: var(--tm-layer-modal);
-  overflow: hidden;
-}
-
-.notepad-dialog__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--tm-border);
-}
-
-.notepad-dialog__title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--tm-text-primary);
-}
-
-.notepad-dialog__body {
+/* ── Edit title and tags (inside the design system's Dialog) ─── */
+.notepad-edit-fields {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px;
-}
-
-.notepad-dialog__label {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--tm-text-muted);
-  margin-bottom: 4px;
-}
-
-.notepad-dialog__footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--tm-border);
-}
-
-.notepad-dialog__hint {
-  flex: 1;
-  font-size: 11px;
-  color: var(--tm-text-muted);
 }
 
 /* ── Quick-create overlay ───────────────────────────────────────── */
@@ -831,39 +781,6 @@
 .notepad-quick-create__heading {
   font-size: 13px;
   font-weight: 600;
-  color: var(--tm-text-primary);
-}
-
-.notepad-quick-create__type-tabs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  background: var(--tm-overlay-soft);
-  border-radius: 6px;
-  padding: 2px;
-}
-
-.notepad-quick-create__type-tab {
-  padding: 3px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  font-family: inherit;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-  transition:
-    background 100ms,
-    color 100ms;
-}
-
-.notepad-quick-create__type-tab:hover {
-  color: var(--tm-text-primary);
-}
-
-.notepad-quick-create__type-tab--active {
-  background: var(--tm-overlay-strong);
   color: var(--tm-text-primary);
 }
 

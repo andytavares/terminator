@@ -54,7 +54,7 @@ describe('SinceBanner', () => {
     expect(useReviewUiStore.getState().diffRange).toBe('since')
   })
 
-  it('marks the active seg button as pressed', () => {
+  it('checks the chosen diff range', () => {
     render(
       <SinceBanner
         commitCount={1}
@@ -64,10 +64,10 @@ describe('SinceBanner', () => {
         historyRewritten={false}
       />
     )
-    const sinceBtn = screen.getByText(/Since my review/).closest('button')!
-    const wholeBtn = screen.getByText('Whole PR').closest('button')!
-    expect(sinceBtn.getAttribute('aria-pressed')).toBe('true')
-    expect(wholeBtn.getAttribute('aria-pressed')).toBe('false')
+    const since = screen.getByRole('radio', { name: 'Since my review' })
+    const whole = screen.getByRole('radio', { name: 'Whole PR' })
+    expect(since.getAttribute('aria-checked')).toBe('true')
+    expect(whole.getAttribute('aria-checked')).toBe('false')
   })
 
   it('uses singular "commit" for a single commit', () => {

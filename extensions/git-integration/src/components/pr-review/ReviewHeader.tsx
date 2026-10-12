@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Sparkles, TriangleAlert, MoreHorizontal, X } from 'lucide-react'
-import { Popover } from '@terminator/extension-ui'
+import { Button, IconButton, Popover } from '@terminator/extension-ui'
 import { StatusChecksBar } from './StatusChecksBar'
 import type { StatusCheck } from '../../schemas/pr-review.schema'
 import './review-header.css'
@@ -120,9 +120,9 @@ export function ReviewHeader(props: ReviewHeaderProps): JSX.Element {
                 Large PR — {largePr.loc.toLocaleString()} LOC, estimated {largePr.minutes} min to
                 review. Consider requesting it be split.
               </p>
-              <button type="button" className="rh-popover-btn" onClick={onDismissLargePr}>
+              <Button size="sm" onClick={onDismissLargePr}>
                 Dismiss
-              </button>
+              </Button>
             </Popover>
           )}
         </div>
@@ -160,26 +160,24 @@ export function ReviewHeader(props: ReviewHeaderProps): JSX.Element {
         </span>
       </div>
 
-      <button
-        type="button"
-        className="rh-btn rh-btn--ask"
+      <Button
+        variant="ghost"
+        size="sm"
+        icon={Sparkles}
         aria-label="Ask agent about this PR"
         onClick={onAskAgent}
       >
-        <Sparkles aria-hidden="true" className="rh-icon" /> Ask agent
-      </button>
+        Ask agent
+      </Button>
 
       <div className="rh-pill-wrap">
-        <button
-          type="button"
-          className="rh-icon-btn"
-          aria-label="More review actions"
+        <IconButton
+          icon={MoreHorizontal}
+          label="More review actions"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
-        >
-          <MoreHorizontal aria-hidden="true" className="rh-icon" />
-        </button>
+        />
         {menuOpen && (
           <Popover
             label="Review actions"
@@ -267,9 +265,7 @@ export function ReviewHeader(props: ReviewHeaderProps): JSX.Element {
         )}
       </div>
 
-      <button type="button" className="rh-icon-btn" aria-label="Close review" onClick={onClose}>
-        <X aria-hidden="true" className="rh-icon" />
-      </button>
+      <IconButton icon={X} label="Close review" onClick={onClose} />
     </div>
   )
 }

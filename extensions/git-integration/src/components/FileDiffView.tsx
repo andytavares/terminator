@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import hljs from '../utils/hljs'
+import { Button, SegmentedControl } from '@terminator/extension-ui'
 import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
 
 type ViewMode = 'unified' | 'split'
@@ -290,29 +291,25 @@ export function FileDiffView({ diff, isStale, onRefresh }: FileDiffViewProps): J
         <span className="file-diff-view__filename">
           {diff.oldPath ? `${diff.oldPath} → ${diff.path}` : diff.path}
         </span>
-        <div className="file-diff-view__view-toggle">
-          <button
-            className={`file-diff-view__toggle-btn${viewMode === 'unified' ? ' file-diff-view__toggle-btn--active' : ''}`}
-            onClick={() => setViewMode('unified')}
-          >
-            Unified
-          </button>
-          <button
-            className={`file-diff-view__toggle-btn${viewMode === 'split' ? ' file-diff-view__toggle-btn--active' : ''}`}
-            onClick={() => setViewMode('split')}
-          >
-            Split
-          </button>
-        </div>
+        <SegmentedControl
+          label="Diff layout"
+          size="sm"
+          options={[
+            { value: 'unified', label: 'Unified' },
+            { value: 'split', label: 'Split' },
+          ]}
+          value={viewMode}
+          onChange={setViewMode}
+        />
       </div>
 
       {isStale && (
         <div className="file-diff-view__stale-banner">
           File changed while viewing.{' '}
           {onRefresh && (
-            <button className="file-diff-view__refresh-btn" onClick={onRefresh}>
+            <Button size="sm" onClick={onRefresh}>
               Refresh
-            </button>
+            </Button>
           )}
         </div>
       )}

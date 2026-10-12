@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Dialog } from '@terminator/extension-ui'
+import { Dialog, SegmentedControl } from '@terminator/extension-ui'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useReviewUiStore } from '../../stores/review-ui.store'
 import { ChapterNav } from './ChapterNav'
@@ -286,22 +286,16 @@ export function PrReviewView({
     <aside className="pr-review-panel pr-review-panel--left" style={{ width: leftWidth }}>
       <div className="pr-review-panel-header">
         {showMultipleChapters ? (
-          <div className="pr-rail-switch" role="group" aria-label="File list mode">
-            <button
-              type="button"
-              aria-pressed={viewMode === 'full'}
-              onClick={() => setViewMode('full')}
-            >
-              Files
-            </button>
-            <button
-              type="button"
-              aria-pressed={viewMode === 'guided'}
-              onClick={() => setViewMode('guided')}
-            >
-              Chapters
-            </button>
-          </div>
+          <SegmentedControl
+            label="File list mode"
+            size="sm"
+            options={[
+              { value: 'full', label: 'Files' },
+              { value: 'guided', label: 'Chapters' },
+            ]}
+            value={viewMode}
+            onChange={setViewMode}
+          />
         ) : (
           <span className="pr-review-chapter-name">Files</span>
         )}

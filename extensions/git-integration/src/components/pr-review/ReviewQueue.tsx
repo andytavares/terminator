@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { RefreshCw, X } from 'lucide-react'
+import { Button, IconButton } from '@terminator/extension-ui'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useReviewUiStore } from '../../stores/review-ui.store'
 import { sortPrs } from '../../review/sort-prs'
@@ -74,9 +75,9 @@ export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr, onRefresh, onDismis
       {queueError && (
         <div className="pr-queue-error">
           Failed to load queue: {queueError}
-          <button className="pr-refresh-btn" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw aria-hidden="true" /> Retry
-          </button>
+          <Button size="sm" icon={RefreshCw} onClick={handleRefresh} disabled={refreshing}>
+            Retry
+          </Button>
         </div>
       )}
 
@@ -96,15 +97,13 @@ export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr, onRefresh, onDismis
           <b>{totalMinutes} min</b> of reading
         </span>
         <span className="rd-sp" />
-        <button
-          className={`pr-refresh-btn${refreshing ? ' pr-refresh-btn--spinning' : ''}`}
+        <IconButton
+          icon={RefreshCw}
+          className={refreshing ? 'pr-refresh-btn--spinning' : undefined}
           onClick={handleRefresh}
           disabled={refreshing}
-          title="Refresh pull requests"
-          aria-label="Refresh pull requests"
-        >
-          <RefreshCw aria-hidden="true" />
-        </button>
+          label="Refresh pull requests"
+        />
       </div>
 
       <div className="pr-search-row">
@@ -220,29 +219,27 @@ function PrRow({
         <span className="rd-num">~{pr.estimatedMinutes} min</span>
       </span>
       <span className="rd-actions">
-        <button
-          type="button"
-          className={isSession ? 'rd-btn rd-pri rd-always' : 'rd-btn'}
+        <Button
+          size="sm"
+          variant={isSession ? 'primary' : 'secondary'}
+          className={isSession ? 'rd-row-action rd-always' : 'rd-row-action'}
           onClick={(e) => {
             e.stopPropagation()
             open()
           }}
         >
           {actionLabel}
-        </button>
+        </Button>
         {onDismiss && pr.sessionStatus !== 'not-started' && (
-          <button
-            type="button"
-            className="rd-btn rd-dismiss"
+          <IconButton
+            icon={X}
+            size="sm"
             onClick={(e) => {
               e.stopPropagation()
               void onDismiss(pr.number)
             }}
-            title="Dismiss from in-progress"
-            aria-label={`Dismiss PR #${pr.number} from in-progress`}
-          >
-            <X aria-hidden="true" />
-          </button>
+            label={`Dismiss PR #${pr.number} from in-progress`}
+          />
         )}
       </span>
     </div>

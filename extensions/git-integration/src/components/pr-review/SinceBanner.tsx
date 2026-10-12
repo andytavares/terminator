@@ -1,5 +1,5 @@
 import React from 'react'
-import { RelativeTime } from '@terminator/extension-ui'
+import { RelativeTime, SegmentedControl } from '@terminator/extension-ui'
 import { useReviewUiStore } from '../../stores/review-ui.store'
 
 interface Props {
@@ -42,22 +42,24 @@ export function SinceBanner({
         {changedCount} files changed · {stillViewedCount} still viewed
       </span>
       <span className="rc-sp" />
-      <div className="rc-seg" role="group" aria-label="Diff range">
-        <button
-          type="button"
-          aria-pressed={diffRange === 'since'}
-          onClick={() => setDiffRange('since')}
-        >
-          Since my review <span className="rc-kbd">s</span>
-        </button>
-        <button
-          type="button"
-          aria-pressed={diffRange === 'whole'}
-          onClick={() => setDiffRange('whole')}
-        >
-          Whole PR
-        </button>
-      </div>
+      <SegmentedControl
+        label="Diff range"
+        size="sm"
+        options={[
+          {
+            value: 'since',
+            label: (
+              <>
+                Since my review <kbd className="tmui-kbd">s</kbd>
+              </>
+            ),
+            accessibleName: 'Since my review',
+          },
+          { value: 'whole', label: 'Whole PR' },
+        ]}
+        value={diffRange}
+        onChange={setDiffRange}
+      />
     </div>
   )
 }

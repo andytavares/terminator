@@ -1,13 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { RelativeTime } from '@terminator/extension-ui'
+import {
+  Button,
+  IconButton,
+  RelativeTime,
+  Tab,
+  TabList,
+  TabPanel,
+  TabsRoot,
+} from '@terminator/extension-ui'
 import {
   ArrowDown,
   ArrowRight,
   ChevronDown,
   ChevronRight,
+  ExternalLink,
   Eye,
   RefreshCw,
   TriangleAlert,
+  X,
 } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useLoadIssueComments } from '../../hooks/usePrReview'
@@ -180,27 +190,25 @@ export function PrOverviewPanel({
           {pr.isDraft && <span className="pr-draft-badge">Draft</span>} {pr.title}
         </span>
         <div className="pr-review-topbar-actions">
-          <button
-            className={`pr-refresh-btn${refreshing ? ' pr-refresh-btn--spinning' : ''}`}
+          <IconButton
+            icon={RefreshCw}
+            className={refreshing ? 'pr-refresh-btn--spinning' : undefined}
             onClick={handleRefresh}
             disabled={refreshing}
-            title="Reload PR"
-            aria-label="Reload pull request"
-          >
-            <RefreshCw aria-hidden="true" />
-          </button>
+            label="Reload pull request"
+          />
           {onPopOut && (
-            <button
-              className="pr-review-popout-btn"
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={ExternalLink}
               onClick={onPopOut}
               title="Open in focused window"
             >
-              ⬡ Pop out
-            </button>
+              Pop out
+            </Button>
           )}
-          <button className="pr-review-close-btn" onClick={onClose} aria-label="Close">
-            ×
-          </button>
+          <IconButton icon={X} label="Close" onClick={onClose} />
         </div>
       </div>
 
@@ -340,54 +348,47 @@ export function PrOverviewPanel({
 
           {discussionOpen && (
             <div className="comment-composer pr-issue-composer">
-              <div className="comment-composer-tabs">
-                <button
-                  className={`comment-composer-tab${commentTab === 'write' ? ' comment-composer-tab--active' : ''}`}
-                  onClick={() => setCommentTab('write')}
-                >
-                  Write
-                </button>
-                <button
-                  className={`comment-composer-tab${commentTab === 'preview' ? ' comment-composer-tab--active' : ''}`}
-                  onClick={() => setCommentTab('preview')}
-                >
-                  Preview
-                </button>
-              </div>
-
-              {commentTab === 'write' ? (
-                <textarea
-                  ref={composerRef}
-                  className="comment-composer-textarea"
-                  value={commentBody}
-                  onChange={(e) => setCommentBody(e.target.value)}
-                  placeholder="Leave a comment…"
-                  rows={4}
-                  disabled={submitting}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCommentSubmit()
-                  }}
-                />
-              ) : (
-                <div className="comment-composer-preview">
-                  {commentBody.trim() ? (
-                    <RichContent>{commentBody}</RichContent>
-                  ) : (
-                    <em>Nothing to preview.</em>
-                  )}
-                </div>
-              )}
+              <TabsRoot selectedId={commentTab} onSelect={setCommentTab}>
+                <TabList label="Comment">
+                  <Tab id="write">Write</Tab>
+                  <Tab id="preview">Preview</Tab>
+                </TabList>
+                <TabPanel id="write">
+                  <textarea
+                    ref={composerRef}
+                    className="comment-composer-textarea"
+                    value={commentBody}
+                    onChange={(e) => setCommentBody(e.target.value)}
+                    placeholder="Leave a comment…"
+                    rows={4}
+                    disabled={submitting}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCommentSubmit()
+                    }}
+                  />
+                </TabPanel>
+                <TabPanel id="preview">
+                  <div className="comment-composer-preview">
+                    {commentBody.trim() ? (
+                      <RichContent>{commentBody}</RichContent>
+                    ) : (
+                      <em>Nothing to preview.</em>
+                    )}
+                  </div>
+                </TabPanel>
+              </TabsRoot>
 
               {commentError && <p className="comment-composer-error">{commentError}</p>}
               <div className="comment-composer-actions">
                 <span className="pr-issue-composer-hint">⌘↵ to submit</span>
-                <button
-                  className="comment-composer-submit"
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={handleCommentSubmit}
                   disabled={submitting || !commentBody.trim()}
                 >
                   {submitting ? 'Submitting…' : 'Comment'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -399,47 +400,32 @@ export function PrOverviewPanel({
         {updateBranchError && <p className="pr-update-branch-error">{updateBranchError}</p>}
         {mergeError && <p className="pr-update-branch-error">{mergeError}</p>}
         {pr.mergeStateStatus === 'behind' && (
-          <button
-            className="pr-overview-update-branch-btn"
+          <Button
+            icon={updatingBranch ? undefined : ArrowDown}
             onClick={handleUpdateBranch}
             disabled={updatingBranch}
           >
-            {updatingBranch ? (
-              'Updating…'
-            ) : (
-              <>
-                <ArrowDown aria-hidden="true" /> Update from {pr.baseRefName}
-              </>
-            )}
-          </button>
+            {updatingBranch ? 'Updating…' : `Update from ${pr.baseRefName}`}
+          </Button>
         )}
         {pr.mergeStateStatus === 'dirty' && (
-          <button
-            className="pr-overview-resolve-conflicts-btn"
+          <Button
+            variant="danger"
+            icon={preparingMerge ? undefined : ArrowRight}
             onClick={handleResolveConflicts}
             disabled={preparingMerge}
           >
-            {preparingMerge ? (
-              'Preparing merge…'
-            ) : (
-              <>
-                <ArrowRight aria-hidden="true" /> Resolve conflicts
-              </>
-            )}
-          </button>
+            {preparingMerge ? 'Preparing merge…' : 'Resolve conflicts'}
+          </Button>
         )}
         {pr.isDraft && (
-          <button
-            className="pr-overview-ready-btn"
-            onClick={handleMarkReady}
-            disabled={markingReady}
-          >
+          <Button onClick={handleMarkReady} disabled={markingReady}>
             {markingReady ? 'Marking ready…' : 'Mark as Ready'}
-          </button>
+          </Button>
         )}
-        <button className="pr-overview-start-btn" onClick={onStartReview}>
+        <Button variant="primary" onClick={onStartReview}>
           {startLabel}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -466,9 +452,9 @@ function IssueCommentItem({
         <time className="inline-comment-time" dateTime={comment.createdAt}>
           <RelativeTime value={comment.createdAt} />
         </time>
-        <button className="pr-issue-comment-reply-btn" onClick={() => onReply(comment)}>
+        <Button variant="ghost" size="sm" onClick={() => onReply(comment)}>
           Reply
-        </button>
+        </Button>
       </div>
       <div className="pr-issue-comment-body">
         <RichContent>{comment.body}</RichContent>
