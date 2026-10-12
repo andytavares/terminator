@@ -68,9 +68,9 @@ function decrypt(encoded: string): string | null {
   }
 }
 
-async function read(): Promise<StoreFile> {
+async function read(file: string): Promise<StoreFile> {
   try {
-    const raw = await fs.readFile(filePath(), 'utf8')
+    const raw = await fs.readFile(file, 'utf8')
     const parsed: unknown = JSON.parse(raw)
     return typeof parsed === 'object' && parsed !== null ? (parsed as StoreFile) : {}
   } catch {
@@ -79,14 +79,29 @@ async function read(): Promise<StoreFile> {
   }
 }
 
-async function write(data: StoreFile): Promise<void> {
-  await writeJsonAtomic(filePath(), data)
+async function write(file: string, data: StoreFile): Promise<void> {
+  await writeJsonAtomic(file, data)
 }
 
-async function update(tracker: TrackerId, patch: Partial<StoredTracker>): Promise<void> {
-  const data = await read()
-  data[tracker] = { ...data[tracker], ...patch }
-  await write(data)
+// Every access to the file waits for the ones asked for before it. Each write
+// reads the whole file and writes it back, so two at once (two trackers
+// answering one listMine) would each drop the other's change, and a read could
+// miss a write already under way.
+let queue: Promise<unknown> = Promise.resolve()
+
+function serialized<T>(op: (file: string) => Promise<T>): Promise<T> {
+  const file = filePath()
+  const run = queue.then(() => op(file))
+  queue = run.catch(() => undefined)
+  return run
+}
+
+function update(tracker: TrackerId, patch: Partial<StoredTracker>): Promise<void> {
+  return serialized(async (file) => {
+    const data = await read(file)
+    data[tracker] = { ...data[tracker], ...patch }
+    await write(file, data)
+  })
 }
 
 function defaultMine(tracker: TrackerId): MineSelector {
@@ -106,7 +121,7 @@ export async function setCredential(cred: StoredCredential): Promise<void> {
 }
 
 export async function getCredential(tracker: TrackerId): Promise<StoredCredential | null> {
-  const entry = (await read())[tracker]
+  const entry = (await serialized(read))[tracker]
   if (entry?.secret === undefined) return null
   const secret = decrypt(entry.secret)
   if (secret === null) return null
@@ -116,14 +131,16 @@ export async function getCredential(tracker: TrackerId): Promise<StoredCredentia
   return { tracker: 'jira', site: entry.site, email: entry.email, apiToken: secret }
 }
 
-export async function clearCredential(tracker: TrackerId): Promise<void> {
-  const data = await read()
-  // The mine selector survives a disconnect: it is the operator's
-  // configuration, not the credential's, and retyping a JQL query because a
-  // token expired is a small insult that adds up.
-  const kept = data[tracker]?.mine
-  data[tracker] = kept === undefined ? {} : { mine: kept }
-  await write(data)
+export function clearCredential(tracker: TrackerId): Promise<void> {
+  return serialized(async (file) => {
+    const data = await read(file)
+    // The mine selector survives a disconnect: it is the operator's
+    // configuration, not the credential's, and retyping a JQL query because a
+    // token expired is a small insult that adds up.
+    const kept = data[tracker]?.mine
+    data[tracker] = kept === undefined ? {} : { mine: kept }
+    await write(file, data)
+  })
 }
 
 export async function setAccount(tracker: TrackerId, account: TrackerAccount): Promise<void> {
@@ -142,7 +159,7 @@ export async function setMine(tracker: TrackerId, mine: MineSelector): Promise<v
 }
 
 export async function getMine(tracker: TrackerId): Promise<MineSelector> {
-  return (await read())[tracker]?.mine ?? defaultMine(tracker)
+  return (await serialized(read))[tracker]?.mine ?? defaultMine(tracker)
 }
 
 /**
@@ -150,7 +167,7 @@ export async function getMine(tracker: TrackerId): Promise<MineSelector> {
  * exists and which account it proved to belong to.
  */
 export async function listConnections(): Promise<TrackerConnection[]> {
-  const data = await read()
+  const data = await serialized(read)
   return TRACKERS.map((tracker) => {
     const entry = data[tracker] ?? {}
     return {
@@ -168,6 +185,34 @@ interface LegacyFile {
   linearKey?: string
   linearEmail?: string
   jiraCreds?: { domain?: string; email?: string; apiToken?: string; jql?: string }
+}
+
+/** Copies the legacy credentials into `data`, never over one already stored here. */
+function adoptLegacy(data: StoreFile, legacy: LegacyFile): void {
+  if (legacy.linearKey !== undefined && data.linear?.secret === undefined) {
+    const key = decrypt(legacy.linearKey)
+    if (key !== null) {
+      data.linear = {
+        ...data.linear,
+        secret: encrypt(key),
+        mine: { kind: 'assignee', email: legacy.linearEmail ?? null },
+      }
+    }
+  }
+
+  const jira = legacy.jiraCreds
+  if (jira?.apiToken !== undefined && data.jira?.secret === undefined) {
+    const token = decrypt(jira.apiToken)
+    if (token !== null && jira.domain !== undefined && jira.email !== undefined) {
+      data.jira = {
+        ...data.jira,
+        secret: encrypt(token),
+        site: jira.domain,
+        email: jira.email,
+        mine: { kind: 'query', jql: jira.jql ?? DEFAULT_JIRA_JQL },
+      }
+    }
+  }
 }
 
 /**
@@ -189,34 +234,11 @@ export async function migrateLegacyCredentials(): Promise<void> {
   }
 
   try {
-    const data = await read()
-
-    if (legacy.linearKey !== undefined && data.linear?.secret === undefined) {
-      const key = decrypt(legacy.linearKey)
-      if (key !== null) {
-        data.linear = {
-          ...data.linear,
-          secret: encrypt(key),
-          mine: { kind: 'assignee', email: legacy.linearEmail ?? null },
-        }
-      }
-    }
-
-    const jira = legacy.jiraCreds
-    if (jira?.apiToken !== undefined && data.jira?.secret === undefined) {
-      const token = decrypt(jira.apiToken)
-      if (token !== null && jira.domain !== undefined && jira.email !== undefined) {
-        data.jira = {
-          ...data.jira,
-          secret: encrypt(token),
-          site: jira.domain,
-          email: jira.email,
-          mine: { kind: 'query', jql: jira.jql ?? DEFAULT_JIRA_JQL },
-        }
-      }
-    }
-
-    await write(data)
+    await serialized(async (file) => {
+      const data = await read(file)
+      adoptLegacy(data, legacy)
+      await write(file, data)
+    })
     await fs.rename(legacyPath(), `${legacyPath()}.bak`)
   } catch {
     // A migration that cannot finish leaves the legacy file in place so it can

@@ -136,6 +136,30 @@ describe('tracker-store — connection view', () => {
   })
 })
 
+describe('tracker-store — concurrent writes', () => {
+  // Two trackers answered at once (listMine across both) record their states
+  // at once; each write must keep the other's.
+  it('keeps both of two errors recorded at the same time', async () => {
+    const store = await load()
+    await Promise.all([
+      store.setLastError('linear', 'auth-failed'),
+      store.setLastError('jira', 'unavailable'),
+    ])
+    const errors = (await store.listConnections()).map((c) => [c.tracker, c.lastError])
+    expect(errors).toEqual([
+      ['linear', 'auth-failed'],
+      ['jira', 'unavailable'],
+    ])
+  })
+
+  it('answers a read after the writes already asked for', async () => {
+    const store = await load()
+    void store.setLastError('linear', 'auth-failed')
+    const linear = (await store.listConnections()).find((c) => c.tracker === 'linear')
+    expect(linear?.lastError).toBe('auth-failed')
+  })
+})
+
 describe('tracker-store — disconnect', () => {
   it('destroys the credential', async () => {
     const store = await load()

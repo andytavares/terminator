@@ -82,10 +82,10 @@ describe('integrations composition root', () => {
       .getIssueService()
       .get('linear', 'TAV-1')
       .catch(() => null)
-    await vi.waitFor(async () =>
-      expect(await trackers.listConnections()).toContainEqual(
-        expect.objectContaining({ tracker: 'linear', lastError: 'auth-failed' })
-      )
+    // The store answers a read after the writes asked for before it, and the
+    // error was recorded before get() rejected.
+    expect(await trackers.listConnections()).toContainEqual(
+      expect.objectContaining({ tracker: 'linear', lastError: 'auth-failed' })
     )
   })
 
