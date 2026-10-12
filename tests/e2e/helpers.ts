@@ -2,6 +2,7 @@ import { _electron as electron, ElectronApplication, Page, expect } from '@playw
 import { mkdtempSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { saveIpcTrace, startIpcTrace } from './ipc-trace'
 
 // Shared e2e harness. Every spec launches the real Electron app in an isolated,
 // throwaway profile (via Chromium's --user-data-dir, which Electron honours for
@@ -98,6 +99,7 @@ export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<
   app.process().stdout?.on('data', keep)
   app.process().stderr?.on('data', keep)
   try {
+    await startIpcTrace(app)
     const page = await app.firstWindow({ timeout: remaining() })
     await page.waitForLoadState('domcontentloaded', { timeout: remaining() })
     await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
@@ -124,6 +126,7 @@ export async function closeApp(handle: AppHandle | undefined): Promise<void> {
   // Capture the OS process up front: once app.close() resolves, Playwright
   // tears down its internal handle and app.process() would throw.
   const proc = handle.app.process()
+  await saveIpcTrace(handle.app)
   // Bound the graceful close: a lingering PTY, git watcher, or extension host
   // can keep the process alive so app.close() never resolves. Race it against a
   // timeout, then force-kill whatever is left. The .catch keeps a close() that
