@@ -80,7 +80,10 @@ export function mainLogPath({ platform, userDataDirectory, appName }) {
   return join(directory, 'terminator.log')
 }
 
-/** The command that starts the app for `mode`, sandbox off on Linux only. */
+/**
+ * The command that starts the app for `mode`, sandbox off on Linux only.
+ * @param {{ mode: string, platform: string, userDataDirectory: string, executable?: string }} options
+ */
 export function startCommand({ mode, platform, userDataDirectory, executable }) {
   const linux = platform === 'linux'
   const appArguments = [`--user-data-dir=${userDataDirectory}`]
