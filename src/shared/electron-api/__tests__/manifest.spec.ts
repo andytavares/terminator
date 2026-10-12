@@ -70,6 +70,7 @@ describe('remoteAccessibleCoreChannels()', () => {
     'git:remove-worktree',
     'git:suggest-worktree-path',
     'extension:list',
+    'extension:list-changed',
     'extension:install',
     'extension:uninstall',
     'extension:toggle',

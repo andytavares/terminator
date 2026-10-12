@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { SettingsPanel } from '../../../../src/renderer/components/settings/SettingsPanel'
 
@@ -35,6 +35,7 @@ beforeEach(() => {
       getSettingsSchemas: vi.fn().mockResolvedValue({ schemas: [] }),
       getSettingsValues: vi.fn().mockResolvedValue({ values: {} }),
       updateSetting: vi.fn().mockResolvedValue({ ok: true }),
+      onListChanged: vi.fn().mockReturnValue(vi.fn()),
     },
     dialog: {
       openDirectory: vi.fn(),
@@ -166,6 +167,43 @@ describe('ExtensionsSection', () => {
     const status = await screen.findByText('error')
     expect(status.getAttribute('title')).toBe('Extension host exited with code 134')
     expect(screen.getByText('Enable')).toBeTruthy()
+  })
+
+  // The host can fail, or a backend come back, while this panel is open.
+  it('reads the list again when main says it changed', async () => {
+    const extension = (
+      window.electronAPI as unknown as {
+        extension: { list: ReturnType<typeof vi.fn>; onListChanged: ReturnType<typeof vi.fn> }
+      }
+    ).extension
+    const running = { id: 'com.lost', name: 'Lost Ext', version: '1.0.0', status: 'enabled' }
+    extension.list.mockResolvedValue({ extensions: [running] })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await screen.findByText('enabled')
+
+    const failed = { ...running, status: 'error', errorMessage: 'Extension host exited' }
+    extension.list.mockResolvedValue({ extensions: [failed] })
+    const announce = extension.onListChanged.mock.calls[0][0] as () => void
+    act(() => announce())
+
+    const status = await screen.findByText('error')
+    expect(status.getAttribute('title')).toBe('Extension host exited')
+  })
+
+  it('stops listening for list changes when it closes', async () => {
+    const unsubscribe = vi.fn()
+    const extension = (
+      window.electronAPI as unknown as { extension: { onListChanged: ReturnType<typeof vi.fn> } }
+    ).extension
+    extension.onListChanged.mockReturnValue(unsubscribe)
+    const { unmount } = render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await screen.findByText('No extensions installed.')
+
+    unmount()
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
   })
 
   it('shows Disable button for enabled extensions', async () => {

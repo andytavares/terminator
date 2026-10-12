@@ -147,7 +147,8 @@ again in the same order as at startup: an extension after those in its `extensio
 `api.extensions.get` hands it the provider's new exports (keep nothing from the old ones). If a
 provider does not come back, its dependants fail with it. If the host crashes again, the
 extensions show as `error` in Settings → Extensions, with the reason on hover, until the next
-launch.
+launch. The panel shows such a change while it is open: it reads the list again each time main
+broadcasts `extension:list-changed`.
 
 Reloading an extension (or disabling and enabling it) runs your backend's code as it is on disk
 then: the host forgets your entry point and every module under your extension directory before it

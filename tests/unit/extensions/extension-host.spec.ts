@@ -270,6 +270,76 @@ describe('ExtensionHost when the extension host loses its backends', () => {
   })
 })
 
+// Settings -> Extensions stays open while a backend fails or comes back, so it
+// re-reads the list on this event rather than only when it opens.
+describe('ExtensionHost tells the windows when the extension list changes', () => {
+  async function watchedHost(backends: Record<string, FakeBackend> = {}) {
+    const created = await newHost(backends)
+    const broadcastToWindows = vi.fn()
+    created.host.setDeps({ broadcastToWindows })
+    const listChanges = () =>
+      broadcastToWindows.mock.calls.filter(([channel]) => channel === 'extension:list-changed')
+    return { ...created, broadcastToWindows, listChanges }
+  }
+
+  it('when the extension host loses its backends for good', async () => {
+    const { host, listChanges } = await watchedHost()
+    await host.load(writeExtension('com.lost'))
+    const before = listChanges().length
+
+    host.failHostedBackends(['com.lost'], 'Extension host exited with code 134')
+
+    expect(listChanges()).toHaveLength(before + 1)
+    expect(listChanges().at(-1)).toEqual(['extension:list-changed', null])
+  })
+
+  it('when a failed backend activates again', async () => {
+    const { host, listChanges } = await watchedHost()
+    await host.load(writeExtension('com.lost'))
+    host.failHostedBackends(['com.lost'], 'Extension host exited with code 134')
+    const before = listChanges().length
+
+    await host.reload('com.lost')
+
+    expect(listChanges().length).toBeGreaterThan(before)
+  })
+
+  it('not when a running backend is reloaded and its status stays the same', async () => {
+    const { host, listChanges } = await watchedHost()
+    await host.load(writeExtension('com.steady'))
+    const before = listChanges().length
+
+    await host.reload('com.steady')
+
+    expect(listChanges()).toHaveLength(before)
+  })
+
+  it('not for an extension the host never had', async () => {
+    const { host, broadcastToWindows } = await watchedHost()
+
+    host.failHostedBackends(['com.unknown'], 'Extension host exited with code 134')
+
+    expect(broadcastToWindows).not.toHaveBeenCalled()
+  })
+
+  it('when an extension is installed, fails to activate, is toggled or uninstalled', async () => {
+    const { host, listChanges } = await watchedHost({ 'com.crash': failing('boom') })
+    const counts: number[] = []
+    const step = async (action: () => Promise<unknown>) => {
+      const before = listChanges().length
+      await action()
+      counts.push(listChanges().length - before)
+    }
+
+    await step(() => host.load(writeExtension('com.crash')))
+    await step(() => host.load(writeExtension('com.toggle')))
+    await step(() => host.toggle('com.toggle', false))
+    await step(() => host.uninstall('com.toggle'))
+
+    expect(counts.every((count) => count > 0)).toBe(true)
+  })
+})
+
 describe('ExtensionHost records', () => {
   it('getExtensionDirectory returns the stored directory, or null for an unknown extension', async () => {
     storeData.extensions = [storedRecord('com.dir', 'enabled')]

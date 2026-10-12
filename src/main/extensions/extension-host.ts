@@ -138,15 +138,31 @@ export class ExtensionHost {
    * why, until they activate again. Not stored, so the next launch retries them.
    */
   failHostedBackends(extensionIds: string[], message: string): void {
-    for (const id of extensionIds) {
+    const lost = extensionIds.flatMap((id) => {
       const loaded = this.loaded.get(id)
-      if (!loaded) continue
+      return loaded ? [{ id, loaded }] : []
+    })
+    for (const { id, loaded } of lost) {
       this.disposeAll(loaded)
       this.loaded.delete(id)
       this.hostedApis.delete(id)
       this.hostFailures.set(id, message)
       hostLogger.error(`Extension ${id} failed: ${message}`)
     }
+    if (lost.length > 0) this.announceListChanged()
+  }
+
+  /**
+   * Tells the windows `listExtensions` changed: Settings -> Extensions re-reads
+   * it, since a backend can fail or come back while the panel is open.
+   */
+  private announceListChanged(): void {
+    this.deps.broadcastToWindows?.('extension:list-changed', null)
+  }
+
+  private saveRecords(records: ExtensionRecord[]): void {
+    store.set('extensions', records)
+    this.announceListChanged()
   }
 
   async load(
@@ -189,16 +205,13 @@ export class ExtensionHost {
 
     hostLogger.info(`Loading extension ${id} v${version} from ${directoryPath}`)
     const record = toRecord(manifest.data, directoryPath)
-    store.set('extensions', [...store.get('extensions'), record])
+    this.saveRecords([...store.get('extensions'), record])
     return { record }
   }
 
   private recordActivationFailure(record: ExtensionRecord, message: string): ExtensionRecord {
     const failed: ExtensionRecord = { ...record, status: 'error', errorMessage: message }
-    store.set(
-      'extensions',
-      store.get('extensions').map((e) => (e.id === record.id ? failed : e))
-    )
+    this.saveRecords(store.get('extensions').map((e) => (e.id === record.id ? failed : e)))
     return failed
   }
 
@@ -234,7 +247,7 @@ export class ExtensionHost {
     const extensions = store.get('extensions')
     const filtered = extensions.filter((e) => e.id !== id)
     if (filtered.length === extensions.length) return false
-    store.set('extensions', filtered)
+    this.saveRecords(filtered)
     return true
   }
 
@@ -265,7 +278,7 @@ export class ExtensionHost {
       extensions[idx] = { ...extensions[idx], status: 'enabled' }
     }
 
-    store.set('extensions', extensions)
+    this.saveRecords(extensions)
     const { directoryPath: _dp, ...ext } = extensions[idx]
     return ext
   }
@@ -409,7 +422,7 @@ export class ExtensionHost {
       this.disposeAll(getApiDisposables(api))
       return { error: 'ACTIVATE_ERROR', message: e instanceof Error ? e.message : String(e) }
     }
-    this.hostFailures.delete(record.id)
+    if (this.hostFailures.delete(record.id)) this.announceListChanged()
     // The live array from the api: registrations made after activate() land in
     // it too, so unload disposes everything the backend ever registered.
     this.loaded.set(record.id, getApiDisposables(api))

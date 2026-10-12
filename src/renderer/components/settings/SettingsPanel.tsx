@@ -156,25 +156,51 @@ function partitionNotificationSettings(properties: Record<string, SettingPropDef
   return { rows: Array.from(rowsByKey.values()), rest }
 }
 
+type ExtensionListing = Array<{
+  id: string
+  name: string
+  version: string
+  status: string
+  errorMessage?: string
+}>
+
+interface ExtensionListingSetters {
+  setExtensions: (extensions: ExtensionListing) => void
+  setSchemas: (schemas: ExtensionSchema[]) => void
+  setSettingValues: (values: Record<string, unknown>) => void
+}
+
+/**
+ * Reads the extensions and their settings when the panel opens, and again
+ * whenever main says the list changed: a backend can fail, or come back with
+ * its settings, while the panel is open.
+ */
+function useExtensionListing(set: ExtensionListingSetters): void {
+  const { setExtensions, setSchemas, setSettingValues } = set
+  React.useEffect(() => {
+    const read = (): void => {
+      window.electronAPI.extension.list().then((r) => setExtensions(r.extensions ?? []))
+      window.electronAPI.extension
+        .getSettingsSchemas()
+        .then((r) => setSchemas(r.schemas ?? []))
+        .catch(() => {})
+      window.electronAPI.extension
+        .getSettingsValues()
+        .then((r) => setSettingValues(r.values ?? {}))
+        .catch(() => {})
+    }
+    read()
+    return window.electronAPI.extension.onListChanged(read)
+  }, [setExtensions, setSchemas, setSettingValues])
+}
+
 function ExtensionsSection(): JSX.Element {
-  const [extensions, setExtensions] = React.useState<
-    Array<{ id: string; name: string; version: string; status: string; errorMessage?: string }>
-  >([])
+  const [extensions, setExtensions] = React.useState<ExtensionListing>([])
   const [schemas, setSchemas] = React.useState<ExtensionSchema[]>([])
   const [settingValues, setSettingValues] = React.useState<Record<string, unknown>>({})
   const [expandedSettings, setExpandedSettings] = React.useState<Set<string>>(new Set())
 
-  React.useEffect(() => {
-    window.electronAPI.extension.list().then((r) => setExtensions(r.extensions ?? []))
-    window.electronAPI.extension
-      .getSettingsSchemas()
-      .then((r) => setSchemas(r.schemas ?? []))
-      .catch(() => {})
-    window.electronAPI.extension
-      .getSettingsValues()
-      .then((r) => setSettingValues(r.values ?? {}))
-      .catch(() => {})
-  }, [])
+  useExtensionListing({ setExtensions, setSchemas, setSettingValues })
 
   async function handleInstall(): Promise<void> {
     const result = await window.electronAPI.dialog.openDirectory()

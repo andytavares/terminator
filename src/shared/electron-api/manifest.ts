@@ -606,6 +606,15 @@ export const ELECTRON_API_MANIFEST = [
     remote: 'omit',
   }),
   method({
+    path: 'extension.onListChanged',
+    kind: 'event',
+    channel: 'extension:list-changed',
+    signature: signature<(handler: () => void) => Unsubscribe>(),
+    toHandlerArgs: () => [],
+    // Remote like extension:list: the remote /app/ shows the same Settings ->
+    // Extensions, which re-reads the list on this while it is open.
+  }),
+  method({
     path: 'extension.getCommands',
     kind: 'invoke',
     channel: 'extension:get-commands',
