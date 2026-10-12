@@ -66,6 +66,24 @@ describe('the rules the channel schemas carry', () => {
       { prNumber: 42, event: 'MERGE', body: '' },
     ],
     [
+      'resolves a block inside the repository, not one reached through ..',
+      'git:resolve-conflict',
+      { blockId: 'src/foo.ts#0', resolvedText: 'x', strategy: 'ours' },
+      { blockId: '../../outside.ts#0', resolvedText: 'x', strategy: 'ours' },
+    ],
+    [
+      'resolves a block inside the repository, not one at an absolute path',
+      'git:resolve-conflict',
+      { blockId: 'src/foo.ts#0', resolvedText: 'x', strategy: 'ours' },
+      { blockId: '/etc/hosts#0', resolvedText: 'x', strategy: 'ours' },
+    ],
+    [
+      'undoes a block inside the repository only',
+      'git:undo-resolve',
+      { blockId: 'src/foo.ts#0', resolvedText: 'x', originalConflictText: 'y' },
+      { blockId: 'src/../../outside.ts#0', resolvedText: 'x', originalConflictText: 'y' },
+    ],
+    [
       'names a pull request by a positive number',
       'github:remove-active-review',
       { prNumber: 3 },

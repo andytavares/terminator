@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { readFile, writeFile } from 'fs/promises'
+import { isAbsolute } from 'path'
 import Store from 'electron-store'
 import { defineChannel } from '@terminator/extension-sdk'
 import {
@@ -26,6 +27,16 @@ function sessionKey(repoRoot: string): string {
 
 const RepoRootPayload = z.object({ repoRoot: RepoRoot })
 
+// "relative/path/file.ts#index". The path is joined onto repoRoot and written,
+// so it must stay inside the repository: relative, and no ".." segment.
+const BlockId = z
+  .string()
+  .regex(/^[^#]+#\d+$/, 'expected path#index')
+  .refine((id) => {
+    const path = id.slice(0, id.lastIndexOf('#'))
+    return !isAbsolute(path) && !path.split(/[\\/]/).includes('..')
+  }, 'the file must be inside the repository')
+
 export function registerMergeFlowHandlers(register: RegisterFn): void {
   register(
     defineChannel({
@@ -42,7 +53,7 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
       channel: 'git:resolve-conflict',
       schema: z.object({
         repoRoot: RepoRoot,
-        blockId: z.string().min(1),
+        blockId: BlockId,
         resolvedText: z.string(),
         strategy: ResolutionStrategySchema,
         currentResolvedText: z.string().optional(),
@@ -101,7 +112,7 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
       channel: 'git:undo-resolve',
       schema: z.object({
         repoRoot: RepoRoot,
-        blockId: z.string().min(1),
+        blockId: BlockId,
         resolvedText: z.string(),
         originalConflictText: z.string().min(1),
       }),
