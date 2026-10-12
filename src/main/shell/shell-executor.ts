@@ -1,4 +1,5 @@
 import { execFile as execFileCb } from 'child_process'
+import { loginShellPathReady } from './login-shell-path.js'
 import { relative, isAbsolute } from 'path'
 
 const ALLOWED_COMMANDS = new Set(['git', 'gh'])
@@ -54,8 +55,10 @@ function numericExitCode(code: string | number | undefined | null): number {
   return typeof code === 'number' && code !== 0 ? code : 1
 }
 
-export function execShell(input: ShellExecInput): Promise<ShellExecOutput> {
+export async function execShell(input: ShellExecInput): Promise<ShellExecOutput> {
   const { command, args, cwd, timeoutMs = 10000 } = input
+  // The PATH is read at spawn time, after the login shell's has been adopted.
+  await loginShellPathReady()
   return new Promise((resolve) => {
     const child = execFileCb(
       command,

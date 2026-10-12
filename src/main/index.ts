@@ -19,7 +19,7 @@ import { makeSnapshotFor } from './sessions/session-snapshot.js'
 import { registerSessionRecordsHandlers } from './ipc/session-records.ipc.js'
 import { ensureHookScript } from './integrations/context-sync.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
-import { adoptLoginShellPath } from './shell/login-shell-path.js'
+import { startAdoptingLoginShellPath } from './shell/login-shell-path.js'
 import { registerEditorHandlers } from './ipc/editor.ipc.js'
 import { registerFsHandlers } from './ipc/fs.ipc.js'
 import { registerLogHandlers } from './ipc/log.ipc.js'
@@ -264,7 +264,8 @@ app.whenReady().then(async () => {
   logger.info('App ready', { version: app.getVersion() })
   // Slow (a login shell starts) and only extensions need its result, so it runs
   // while the window and the database come up.
-  const loginShellPath = process.platform === 'darwin' ? adoptLoginShellPath() : Promise.resolve()
+  const loginShellPath =
+    process.platform === 'darwin' ? startAdoptingLoginShellPath() : Promise.resolve()
 
   const userData = app.getPath('userData')
   const importLegacy = legacyImportPending(userData)
