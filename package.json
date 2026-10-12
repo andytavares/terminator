@@ -25,6 +25,7 @@
     "test:e2e": "playwright test",
     "test:coverage": "vitest run --coverage --reporter=verbose --reporter=junit \"--outputFile.junit=test-report.junit.xml\"",
     "lint": "eslint . --ext .ts,.tsx",
+    "lint:deps": "syncpack lint",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -78,7 +79,7 @@
     "@typescript-eslint/eslint-plugin": "7.18.0",
     "@typescript-eslint/parser": "7.18.0",
     "@vitejs/plugin-react": "5.2.0",
-    "@vitest/coverage-v8": "4.1.9",
+    "@vitest/coverage-v8": "4.1.11",
     "electron": "44.7.0",
     "electron-builder": "26.15.3",
     "electron-vite": "5.0.0",
@@ -94,24 +95,21 @@
     "syncpack": "15.3.3",
     "typescript": "5.5.4",
     "vite": "7.3.5",
-    "vitest": "4.1.9",
+    "vitest": "4.1.11",
     "ws": "8.21.0"
   },
   "overrides": {
-    "fast-uri": "^3.1.6",
-    "find-my-way": "^9.7.0",
-    "postcss": "^8.5.24",
-    "tar": "^7.5.22",
-    "@electron/universal": "^3.0.6",
-    "@electron/asar": "^4.2.1",
-    "filelist": "^2.0.2",
-    "brace-expansion@^5": "^5.0.8",
-    "js-yaml@>=4.0.0 <4.2.1": "^4.3.0"
+    "brace-expansion@^5": "5.0.12",
+    "fast-uri": "3.1.8",
+    "find-my-way": "9.7.0",
+    "js-yaml@4": "4.3.2",
+    "postcss": "8.5.24",
+    "tar": "7.5.22"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,
-    "esbuild@0.27.7": true,
     "node-pty": false,
-    "electron-winstaller": false
+    "electron-winstaller": false,
+    "esbuild@0.27.2": true
   }
 }

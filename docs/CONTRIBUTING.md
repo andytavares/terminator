@@ -177,6 +177,19 @@ Per the constitution (Principle IV):
 - Versions are exact (no `^`, `~`, `*` or `latest`), and each package has one version across every `package.json` in the repository ([ADR 097](adr/097-one-version-per-dependency.md)).
 - The standard library must be used when it covers the need; do not add a package for something Node.js provides.
 
+`npm run lint:deps` (`syncpack lint`) checks both version rules. npm `overrides` in `package.json` are kept only to force a patched version of a transitive dependency, and each one is listed here with its advisories:
+
+| Override             | Patched version | Advisories                                                                                                                                         |
+| -------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brace-expansion@^5` | 5.0.12          | [GHSA-q2hr-2g5m-vwhr](https://github.com/advisories/GHSA-q2hr-2g5m-vwhr), [GHSA-qhr7-859c-m2p7](https://github.com/advisories/GHSA-qhr7-859c-m2p7) |
+| `fast-uri`           | 3.1.8           | [GHSA-hrr3-gc8f-f4qj](https://github.com/advisories/GHSA-hrr3-gc8f-f4qj), [GHSA-qw65-cvwx-89v3](https://github.com/advisories/GHSA-qw65-cvwx-89v3) |
+| `find-my-way`        | 9.7.0           | [GHSA-c96f-x56v-gq3h](https://github.com/advisories/GHSA-c96f-x56v-gq3h)                                                                           |
+| `js-yaml@4`          | 4.3.2           | [GHSA-2883-xcg3-v3hh](https://github.com/advisories/GHSA-2883-xcg3-v3hh)                                                                           |
+| `postcss`            | 8.5.24          | [GHSA-fxqj-rqcc-2cmp](https://github.com/advisories/GHSA-fxqj-rqcc-2cmp), [GHSA-r28c-9q8g-f849](https://github.com/advisories/GHSA-r28c-9q8g-f849) |
+| `tar`                | 7.5.22          | [GHSA-r292-9mhp-454m](https://github.com/advisories/GHSA-r292-9mhp-454m), [GHSA-23hp-3jrh-7fpw](https://github.com/advisories/GHSA-23hp-3jrh-7fpw) |
+
+Dependency install scripts are blocked by npm unless listed in `allowScripts` in `package.json` ([npm docs](https://docs.npmjs.com/cli/v11/commands/npm-install-scripts)). Review a new one with `npm install-scripts ls` before approving it.
+
 ---
 
 ## PR Checklist
