@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { readFile, writeFile } from 'fs/promises'
+import { readFile } from 'fs/promises'
+import { writeFileAtomic } from '../utils/write-atomic.js'
 import { isAbsolute } from 'path'
 import { namedStore } from '../storage-directory.js'
 import { defineChannel } from '@terminator/extension-sdk'
@@ -78,14 +79,14 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
         //    blocks have already been resolved (block indices shift as markers are removed)
         if (originalConflictText && content.includes(originalConflictText)) {
           const updated = content.replace(originalConflictText, resolvedText)
-          await writeFile(fullPath, updated, 'utf-8')
+          await writeFileAtomic(fullPath, updated)
           return { success: true }
         }
 
         // 2. Block already resolved — replace the previously written resolved text
         if (currentResolvedText && content.includes(currentResolvedText)) {
           const updated = content.replace(currentResolvedText, resolvedText)
-          await writeFile(fullPath, updated, 'utf-8')
+          await writeFileAtomic(fullPath, updated)
           return { success: true }
         }
 
@@ -95,7 +96,7 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
         const target = blocks[blockIndex]
         if (target) {
           const updated = content.replace(target.originalConflictText, resolvedText)
-          await writeFile(fullPath, updated, 'utf-8')
+          await writeFileAtomic(fullPath, updated)
           return { success: true }
         }
 
@@ -129,7 +130,7 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
           }
         }
         const updated = content.replace(resolvedText, originalConflictText)
-        await writeFile(fullPath, updated, 'utf-8')
+        await writeFileAtomic(fullPath, updated)
         return { success: true }
       },
       onError: errorEnvelope,

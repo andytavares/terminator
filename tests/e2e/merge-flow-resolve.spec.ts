@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
@@ -47,22 +47,42 @@ function makeConflictedRepo(): string {
   return dir
 }
 
-/** The file's text, or '' while the app is still writing it (writeFile truncates first). */
-function fileText(file: string): string {
+const fileText = (file: string) => readFileSync(join(repo, file), 'utf8')
+
+const markerCount = (file: string) =>
+  fileText(file)
+    .split('\n')
+    .filter((l) => l.startsWith('<<<<<<<')).length
+
+/**
+ * Conflicts left in `file`, or -1 while it is missing. Start over runs
+ * `git checkout --conflict=merge`, and git's checkout removes a file before it
+ * writes the new one, so a read in between finds nothing there.
+ */
+function markersAfterCheckout(file: string): number {
   try {
-    return readFileSync(join(repo, file), 'utf8')
-  } catch {
-    return ''
+    return markerCount(file)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return -1
+    throw error
   }
 }
 
-/** Conflicts left in the file, once it holds text again. */
-const markerCount = (file: string) =>
-  fileText(file) === ''
-    ? -1
-    : fileText(file)
-        .split('\n')
-        .filter((l) => l.startsWith('<<<<<<<')).length
+/**
+ * Reads `file` every few milliseconds, as an editor or git might while the app
+ * writes it, and keeps every read that found it empty or missing.
+ */
+function watchReads(file: string): { stop(): string[] } {
+  const torn: string[] = []
+  const timer = setInterval(() => {
+    try {
+      if (fileText(file) === '') torn.push('empty')
+    } catch (error) {
+      torn.push(String(error))
+    }
+  }, 2)
+  return { stop: () => (clearInterval(timer), torn) }
+}
 
 async function openSolver(): Promise<Page> {
   const view = await openGitTab(handle)
@@ -94,12 +114,20 @@ test('a decision is written to the file, and undo puts the conflict back', async
   await expect(view.locator('.conflict-hub__hero')).toContainText('3')
   await view.getByTestId('conflict-file-row').filter({ hasText: 'app.ts' }).click()
 
+  const inode = statSync(join(repo, 'app.ts')).ino
+  const reads = watchReads('app.ts')
   await decide(view, 'Keep mine')
   await expect.poll(() => markerCount('app.ts')).toBe(1)
-  await expect.poll(() => fileText('app.ts')).toContain('export const greeting = "good day"')
+  expect(fileText('app.ts')).toContain('export const greeting = "good day"')
+  // A new file renamed over the old one. Checked after this one write: the
+  // replacement was created while the original still held its inode, so the
+  // two differ; after a second rename the freed number can come back.
+  expect(statSync(join(repo, 'app.ts')).ino).not.toBe(inode)
 
   await view.getByRole('button', { name: 'Undo last decision' }).click()
   await expect.poll(() => markerCount('app.ts')).toBe(2)
+  // Replaced by rename each time, so no reader ever caught it half written.
+  expect(reads.stop()).toEqual([])
 })
 
 test('Start over restores every conflict marker once a file is fully decided', async () => {
@@ -108,10 +136,10 @@ test('Start over restores every conflict marker once a file is fully decided', a
   await expect.poll(() => markerCount('app.ts')).toBe(1)
   await decide(view, 'Keep theirs')
   await expect.poll(() => markerCount('app.ts')).toBe(0)
-  await expect.poll(() => fileText('app.ts')).toContain('export const count = 2')
+  expect(fileText('app.ts')).toContain('export const count = 2')
 
   await view.getByRole('button', { name: 'Start over' }).click()
-  await expect.poll(() => markerCount('app.ts')).toBe(2)
+  await expect.poll(() => markersAfterCheckout('app.ts')).toBe(2)
   await expect(view.getByText('Merge conflicts need resolving')).toBeVisible()
   await expect(view.locator('.conflict-hub__file-card--resolved')).toHaveCount(0)
 })
