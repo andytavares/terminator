@@ -250,6 +250,42 @@ jobs:
             exit 1
           fi
 
+  # The app started the way a developer starts it, from a clean checkout with no
+  # npm cache: `npm run dev`, and `npm run preview` after `npm run build`. A
+  # fresh install once could not start at all ("Error: Electron uninstall")
+  # while every other job passed, because none of them ran these scripts.
+  # scripts/smoke-start.mjs checks for App ready, every extension activated, and
+  # no error or uncaught exception, then quits the app.
+  start:
+    name: Start (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Electron needs a display on Linux; macOS has one.
+      - name: npm run dev
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}node scripts/smoke-start.mjs dev
+        timeout-minutes: 8
+
+      - name: npm run build
+        run: npm run build
+
+      - name: npm run preview
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}node scripts/smoke-start.mjs preview
+        timeout-minutes: 8
+
   e2e-select:
     name: E2E select
     runs-on: ubuntu-latest

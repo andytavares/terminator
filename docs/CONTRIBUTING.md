@@ -29,6 +29,16 @@ npm run dev        # Electron + hot-reload via electron-vite
 
 A dev run uses its own profile, `…/@andytavares/terminator-dev`, so it can run beside the installed app without sharing its database.
 
+### Check that the app starts
+
+```bash
+node scripts/smoke-start.mjs dev                  # npm run dev
+npm run build && node scripts/smoke-start.mjs preview
+node scripts/smoke-start.mjs exec <executable>    # a packaged app
+```
+
+Starts the app on a fresh profile and passes when the main log says `App ready`, every extension under `extensions/` logs `Extension <id> activated`, and nothing logs an error or an uncaught exception, in main or a renderer (renderer console output reaches it through `ELECTRON_ENABLE_LOGGING`). It then asks Electron to quit and requires exit code 0. On Linux it turns the Chromium sandbox off and needs a display (`xvfb-run -a`). CI's `Start` job runs the first two on macOS and Linux from a clean `npm ci`.
+
 ### Run tests
 
 ```bash
