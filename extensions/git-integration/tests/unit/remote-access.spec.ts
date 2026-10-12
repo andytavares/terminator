@@ -12,7 +12,7 @@ vi.mock('electron-store', () => ({
   },
 }))
 
-import { activate, deactivate } from '../../src/index'
+import { activate, deactivate } from '../../src/index.ts'
 
 function activateCapturingRemoteChannels(): string[] {
   const remote: string[] = []

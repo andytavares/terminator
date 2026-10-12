@@ -6,8 +6,7 @@ This is a **fully isolated extension**. The core application knows nothing about
 
 ### What extensions MAY do
 
-- Import from `../../../../src/renderer/extensions/registry` (the extension registry API)
-- Import from `../../../../src/renderer/stores/` (shared core stores: session, workspace)
+- Import `@terminator/extension-sdk`, `@terminator/extension-ui` and this extension's own dependencies — nothing from the core's `src/` and nothing from another extension (ADR 094; `npm run lint` rejects any other import)
 - Call core IPC via `window.electronAPI.{terminal,workspace,project,git,shell,fs,settings,...}` for **core-owned channels only**
 - Call own IPC via `window.electronAPI.extensionBridge.invoke('git-integration:...')` or `window.electronAPI.extensionBridge.invoke('git:...')` etc.
 - Register IPC handlers in `src/index.ts` via `api.ipc.registerHandler()`
