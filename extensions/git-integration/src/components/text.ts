@@ -1,0 +1,11 @@
+/** `word` when `count` is one, else its plural (`word` + "s" unless `many` is given). */
+export function plural(count: number, word: string, many = `${word}s`): string {
+  if (count === 1) return word
+  return many
+}
+
+/** `yes` when `condition` holds, else `no`. Both are evaluated, so keep them cheap and safe. */
+export function choose<T>(condition: unknown, yes: T, no: T): T {
+  if (condition) return yes
+  return no
+}

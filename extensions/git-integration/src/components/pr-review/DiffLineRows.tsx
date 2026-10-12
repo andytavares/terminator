@@ -1,6 +1,7 @@
 import React, { memo } from 'react'
 import type { DiffLine } from '../../schemas/git.schema'
 import { highlight, type detectLanguage } from '../FileDiffView'
+import { choose } from '../text'
 
 export type Side = 'LEFT' | 'RIGHT'
 type Language = ReturnType<typeof detectLanguage>
@@ -44,10 +45,16 @@ function rowClassName(props: LineRowProps): string {
   const { line, expanded, selected, commented } = props
   return [
     `diff-line diff-line--${line.type}`,
-    expanded ? ' diff-line--expanded' : '',
-    selected ? ' diff-line--selecting rs-line--selected' : '',
-    commented ? ' diff-line--commented' : '',
+    choose(expanded, ' diff-line--expanded', ''),
+    choose(selected, ' diff-line--selecting rs-line--selected', ''),
+    choose(commented, ' diff-line--commented', ''),
   ].join('')
+}
+
+interface GutterButtonProps {
+  lineNum: number
+  side: Side
+  onGutterMouseDown: LineRowProps['onGutterMouseDown']
 }
 
 function GutterButton({ lineNum, side, onGutterMouseDown }: GutterButtonProps) {
@@ -62,17 +69,10 @@ function GutterButton({ lineNum, side, onGutterMouseDown }: GutterButtonProps) {
   )
 }
 
-interface GutterButtonProps {
-  lineNum: number
-  side: Side
-  onGutterMouseDown: LineRowProps['onGutterMouseDown']
-}
+type PipProps = Pick<LineRowProps, 'hiddenThreadCount' | 'findingCount' | 'onShowHiddenComments'>
 
-function GutterPips({
-  hiddenThreadCount,
-  findingCount,
-  onShowHiddenComments,
-}: Pick<LineRowProps, 'hiddenThreadCount' | 'findingCount' | 'onShowHiddenComments'>) {
+function GutterPips(props: PipProps) {
+  const { hiddenThreadCount, findingCount } = props
   return (
     <>
       {hiddenThreadCount > 0 && (
@@ -80,7 +80,7 @@ function GutterPips({
           type="button"
           className="rs-pip"
           aria-label={`${hiddenThreadCount} hidden comments`}
-          onClick={onShowHiddenComments}
+          onClick={props.onShowHiddenComments}
         >
           {hiddenThreadCount}
         </button>
@@ -94,25 +94,34 @@ function GutterPips({
   )
 }
 
-function ChipCell(props: LineRowProps & { gutterWidth: number }) {
+/** The pips for a row, passed on prop by prop. */
+function RowPips({ row }: { row: PipProps }) {
+  return (
+    <GutterPips
+      hiddenThreadCount={row.hiddenThreadCount}
+      findingCount={row.findingCount}
+      onShowHiddenComments={row.onShowHiddenComments}
+    />
+  )
+}
+
+function ChipCell(props: { row: PipProps; chip: GutterChip | null; gutterWidth: number }) {
   const { chip, gutterWidth } = props
   return (
     <td className="rs-gut" style={{ width: gutterWidth, minWidth: gutterWidth }}>
       {chip && <span className={`rs-gutter-chip rs-gutter-chip--${chip.kind}`}>{chip.label}</span>}
-      <GutterPips {...props} />
+      <RowPips row={props.row} />
     </td>
   )
 }
 
-function CodeCells({
-  line,
-  language,
-  prefix,
-}: {
+interface CodeCellsProps {
   line: DiffLine
   language: Language
   prefix: string
-}) {
+}
+
+function CodeCells({ line, language, prefix }: CodeCellsProps) {
   return (
     <>
       <td className="diff-line__prefix">{prefix}</td>
@@ -125,66 +134,100 @@ function CodeCells({
 
 const PREFIX: Record<DiffLine['type'], string> = { add: '+', remove: '-', context: ' ' }
 
+/** The side a unified row's comment lands on: removed lines are on the left. */
+function unifiedSide(line: DiffLine): Side {
+  if (line.type === 'remove') return 'LEFT'
+  return 'RIGHT'
+}
+
+function expandedAttr(expanded: boolean): 'true' | undefined {
+  return choose(expanded, 'true' as const, undefined)
+}
+
+/** A unified row's old and new number cells; the comment button sits on the row's side. */
+function UnifiedNumbers(props: { line: DiffLine; side: Side; button: React.ReactNode }) {
+  const { line, side } = props
+  return (
+    <>
+      <td className="diff-line__old-num diff-line__num-gutter">
+        {line.oldLineNumber ?? ''}
+        {side === 'LEFT' && props.button}
+      </td>
+      <td className="diff-line__new-num diff-line__num-gutter">
+        {line.newLineNumber ?? ''}
+        {side === 'RIGHT' && props.button}
+      </td>
+    </>
+  )
+}
+
 /** One unified-view code row: old and new numbers, the insight gutter, the code. */
 export const UnifiedLineRow = memo(function UnifiedLineRow(
   props: LineRowProps & { gutterWidth: number }
 ) {
-  const { line, onGutterMouseDown } = props
+  const { line } = props
   const lineNum = line.newLineNumber ?? line.oldLineNumber ?? 0
-  const side: Side = line.type === 'remove' ? 'LEFT' : 'RIGHT'
+  const side = unifiedSide(line)
   const button = (
-    <GutterButton lineNum={lineNum} side={side} onGutterMouseDown={onGutterMouseDown} />
+    <GutterButton lineNum={lineNum} side={side} onGutterMouseDown={props.onGutterMouseDown} />
   )
+  const chip = choose(side === 'RIGHT', props.chip, null)
   return (
     <tr
       className={rowClassName(props)}
-      data-expanded={props.expanded ? 'true' : undefined}
+      data-expanded={expandedAttr(props.expanded)}
       data-new-line={line.newLineNumber ?? undefined}
       data-old-line={line.oldLineNumber ?? undefined}
       onMouseEnter={() => props.onRowMouseEnter(lineNum, side)}
     >
-      <td className="diff-line__old-num diff-line__num-gutter">
-        {line.oldLineNumber ?? ''}
-        {side === 'LEFT' && button}
-      </td>
-      <td className="diff-line__new-num diff-line__num-gutter">
-        {line.newLineNumber ?? ''}
-        {side === 'RIGHT' && button}
-      </td>
-      <ChipCell {...props} chip={side === 'RIGHT' ? props.chip : null} />
+      <UnifiedNumbers line={line} side={side} button={button} />
+      <ChipCell row={props} chip={chip} gutterWidth={props.gutterWidth} />
       <CodeCells line={line} language={props.language} prefix={PREFIX[line.type]} />
     </tr>
   )
 })
+
+/** What a split row shows for its side: number, data attributes, number-cell class, prefix. */
+function splitSideView(line: DiffLine, side: Side) {
+  if (side === 'LEFT') {
+    return {
+      lineNum: line.oldLineNumber ?? 0,
+      attrs: { 'data-old-line': line.oldLineNumber ?? undefined },
+      numClass: 'diff-line__old-num diff-line__num-gutter',
+      prefix: choose(line.type === 'remove', PREFIX[line.type], ' '),
+    }
+  }
+  return {
+    lineNum: line.newLineNumber ?? 0,
+    attrs: { 'data-new-line': line.newLineNumber ?? undefined },
+    numClass: 'diff-line__new-num diff-line__num-gutter',
+    prefix: choose(line.type === 'add', PREFIX[line.type], ' '),
+  }
+}
 
 /** One side of a split-view row. The left side carries its pips in the number cell; the right side has the insight gutter. */
 export const SplitLineRow = memo(function SplitLineRow(
   props: LineRowProps & { side: Side; numColWidth: number; gutterWidth: number }
 ) {
   const { line, side, numColWidth } = props
-  const lineNum = (side === 'LEFT' ? line.oldLineNumber : line.newLineNumber) ?? 0
+  const view = splitSideView(line, side)
+  const { lineNum } = view
   return (
     <tr
       className={rowClassName(props)}
-      data-expanded={props.expanded ? 'true' : undefined}
-      data-old-line={side === 'LEFT' ? (line.oldLineNumber ?? undefined) : undefined}
-      data-new-line={side === 'RIGHT' ? (line.newLineNumber ?? undefined) : undefined}
+      data-expanded={expandedAttr(props.expanded)}
+      {...view.attrs}
       onMouseEnter={() => props.onRowMouseEnter(lineNum, side)}
     >
-      <td
-        className={`diff-line__${side === 'LEFT' ? 'old' : 'new'}-num diff-line__num-gutter`}
-        style={{ width: numColWidth, minWidth: numColWidth }}
-      >
+      <td className={view.numClass} style={{ width: numColWidth, minWidth: numColWidth }}>
         {lineNum || ''}
         <GutterButton lineNum={lineNum} side={side} onGutterMouseDown={props.onGutterMouseDown} />
-        {side === 'LEFT' && <GutterPips {...props} />}
+        {side === 'LEFT' && <RowPips row={props} />}
       </td>
-      {side === 'RIGHT' && <ChipCell {...props} />}
-      <CodeCells
-        line={line}
-        language={props.language}
-        prefix={line.type === (side === 'LEFT' ? 'remove' : 'add') ? PREFIX[line.type] : ' '}
-      />
+      {side === 'RIGHT' && (
+        <ChipCell row={props} chip={props.chip} gutterWidth={props.gutterWidth} />
+      )}
+      <CodeCells line={line} language={props.language} prefix={view.prefix} />
     </tr>
   )
 })
