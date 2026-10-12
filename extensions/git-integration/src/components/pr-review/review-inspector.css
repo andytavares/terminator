@@ -13,27 +13,10 @@
   border-bottom: 1px solid var(--tm-border);
 }
 
-.ri-tablist {
-  display: flex;
-}
-
-.ri-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--tm-text-muted);
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-}
-
-.ri-tab--active {
-  color: var(--tm-text-primary);
-  border-bottom-color: var(--tm-accent);
+/* The header draws the line under the tabs, so the list does not draw its own. */
+.ri-header .ri-tablist {
+  align-self: stretch;
+  border-bottom: 0;
 }
 
 .ri-tab-badge {

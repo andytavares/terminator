@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, userEvent, within } from 'storybook/test'
-import { Tabs, type TabItem } from '../src/Tabs'
+import { Button } from '../src/Button'
+import { Tab, TabList, TabPanel, Tabs, TabsRoot, type TabItem } from '../src/Tabs'
 import { inLight } from './in-light'
 
 const TABS: TabItem[] = [
@@ -61,6 +62,75 @@ export const ArrowKeysMoveSelection: Story = {
   },
 }
 
+/** The parts: the list shares a toolbar row, a notice sits between it and the panel. */
+function InToolbar({ initial }: { initial: string }): JSX.Element {
+  const [selectedId, setSelectedId] = useState(initial)
+  return (
+    <TabsRoot selectedId={selectedId} onSelect={setSelectedId}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <TabList label="Dashboard sections">
+          <Tab id="needs" accessibleName="Needs you, 3">
+            Needs you<span className="tmui-tabs__count">3</span>
+          </Tab>
+          <Tab id="mine" accessibleName="My PRs, 1">
+            My PRs<span className="tmui-tabs__count">1</span>
+          </Tab>
+          <Tab id="involved" accessibleName="Involved, 50+">
+            Involved<span className="tmui-tabs__count">50+</span>
+          </Tab>
+        </TabList>
+        <span style={{ flex: 1 }} />
+        <Button size="sm">Refresh</Button>
+      </div>
+      <p>Updated 2 minutes ago.</p>
+      <TabPanel id="needs">Three pull requests need your review.</TabPanel>
+      <TabPanel id="mine">One of yours is open.</TabPanel>
+      <TabPanel id="involved">At least fifty mention you.</TabPanel>
+    </TabsRoot>
+  )
+}
+
+function Vertical(): JSX.Element {
+  const [selectedId, setSelectedId] = useState('setup')
+  return (
+    <TabsRoot selectedId={selectedId} onSelect={setSelectedId}>
+      <div style={{ width: 220 }}>
+        <TabList label="Pull request chapters" orientation="vertical">
+          <Tab id="setup">Setup</Tab>
+          <Tab id="api">API changes</Tab>
+          <Tab id="tests">Tests</Tab>
+        </TabList>
+      </div>
+    </TabsRoot>
+  )
+}
+
+export const PartsInToolbar: Story = {
+  render: () => <InToolbar initial="needs" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    canvas.getByRole('tab', { name: 'Needs you, 3' }).focus()
+    await userEvent.keyboard('{End}')
+    await expect(canvas.getByRole('tab', { name: 'Involved, 50+' })).toHaveFocus()
+    await expect(canvas.getByRole('tabpanel')).toHaveTextContent('At least fifty mention you.')
+  },
+}
+
+export const PartsVertical: Story = {
+  render: () => <Vertical />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    canvas.getByRole('tab', { name: 'Setup' }).focus()
+    await userEvent.keyboard('{ArrowDown}')
+    await expect(canvas.getByRole('tab', { name: 'API changes' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+  },
+}
+
 export const DefaultLight = inLight(Default)
 export const SecondSelectedLight = inLight(SecondSelected)
 export const WithDisabledTabLight = inLight(WithDisabledTab)
+export const PartsInToolbarLight = inLight(PartsInToolbar)
+export const PartsVerticalLight = inLight(PartsVertical)

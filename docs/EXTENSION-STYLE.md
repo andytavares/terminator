@@ -190,7 +190,7 @@ missing one is added there first (ADR 098). Storybook shows each in both themes:
 | ------------------------------ | --------------------------------------------------------------------------------------------------- |
 | A button                       | `Button` (primary, secondary, ghost, danger; sm, md)                                                |
 | An icon-only button            | `IconButton`, which requires its accessible name                                                    |
-| Switching between views        | `Tabs`, the WAI-ARIA tabs pattern                                                                   |
+| Switching between views        | `Tabs`, the WAI-ARIA tabs pattern; its parts when the list shares a row or the panel sits elsewhere |
 | Markdown from a person/agent   | `Markdown`, never `dangerouslySetInnerHTML`; `inline` in a label, `fetchesNothing` for tracker text |
 | "5 minutes ago"                | `RelativeTime` / `formatRelativeTime`, never hand-made                                              |
 | Re-reading something on a tick | `usePolling`                                                                                        |

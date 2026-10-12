@@ -212,4 +212,39 @@ describe('ReviewInspector', () => {
     )
     expect(screen.getByRole('tablist', { name: 'Inspector' })).toBeTruthy()
   })
+
+  it('moves to the File tab with the arrow keys', () => {
+    const onTabChange = vi.fn()
+    render(
+      <ReviewInspector
+        tab="agent"
+        onTabChange={onTabChange}
+        onClose={vi.fn()}
+        agentAvailable
+        agentFindingCount={0}
+        agent={<div data-testid="agent-body" />}
+        file={baseFile}
+      />
+    )
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Agent' }), { key: 'ArrowRight' })
+    expect(onTabChange).toHaveBeenCalledWith('file')
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'File' }))
+  })
+
+  it('names the Agent tab with its finding count and ties the panel to it', () => {
+    render(
+      <ReviewInspector
+        tab="agent"
+        onTabChange={vi.fn()}
+        onClose={vi.fn()}
+        agentAvailable
+        agentFindingCount={3}
+        agent={<div data-testid="agent-body" />}
+        file={baseFile}
+      />
+    )
+    const agentTab = screen.getByRole('tab', { name: 'Agent, 3' })
+    expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe(agentTab.id)
+    expect(agentTab.getAttribute('aria-controls')).toBe(screen.getByRole('tabpanel').id)
+  })
 })

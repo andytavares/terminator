@@ -297,6 +297,32 @@ describe('ReviewDashboard', () => {
     expect(screen.getByRole('tab', { name: /Involved/ })).toBeTruthy()
   })
 
+  it('names each tab with its count, read apart from the words', async () => {
+    mockInvoke({
+      prs: [pr211, pr210, pr212, pr213],
+      login: 'andytavares',
+      fetchedAt: new Date().toISOString(),
+    })
+    render(<ReviewDashboard />)
+    expect(await screen.findByRole('tab', { name: 'Needs you, 3' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'My PRs, 1' })).toBeTruthy()
+  })
+
+  it('moves between sections with the arrow keys and shows the selected one', async () => {
+    mockInvoke({ prs: [pr211, pr213], login: 'andytavares', fetchedAt: new Date().toISOString() })
+    render(<ReviewDashboard />)
+    await screen.findByText('RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED')
+    const needs = screen.getByRole('tab', { name: /Needs you/ })
+    needs.focus()
+    fireEvent.keyDown(needs, { key: 'ArrowRight' })
+    const mine = screen.getByRole('tab', { name: /My PRs/ })
+    expect(document.activeElement).toBe(mine)
+    expect(mine.getAttribute('aria-selected')).toBe('true')
+    const panel = screen.getByRole('tabpanel')
+    expect(panel.getAttribute('aria-labelledby')).toBe(mine.id)
+    expect(within(panel).getByText('YOUR OPEN PRS')).toBeTruthy()
+  })
+
   it('puts the reviews requested of you above every other group', async () => {
     mockInvoke({
       prs: [pr211, pr210, pr212],

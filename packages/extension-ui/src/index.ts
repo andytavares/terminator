@@ -16,8 +16,16 @@ export type { DialogAction, DialogProps } from './Dialog'
 export { Button } from './Button'
 export type { ButtonProps, ButtonSize, ButtonVariant } from './Button'
 
-export { Tabs } from './Tabs'
-export type { TabItem, TabsProps } from './Tabs'
+export { Tab, TabList, TabPanel, Tabs, TabsRoot } from './Tabs'
+export type {
+  TabItem,
+  TabListProps,
+  TabOrientation,
+  TabPanelProps,
+  TabProps,
+  TabsProps,
+  TabsRootProps,
+} from './Tabs'
 
 export { Markdown } from './Markdown'
 export type { MarkdownProps } from './Markdown'

@@ -89,6 +89,17 @@ describe('ChapterNav', () => {
     expect(screen.getByRole('tablist')).toBeTruthy()
   })
 
+  it('names each chapter tab with its name, file count and whether it is viewed', () => {
+    setupStore({ currentChapterId: null, viewedFiles: new Set(['a.ts']) })
+    const chapters = [
+      makeChapter('c1', 'Core', ['a.ts']),
+      makeChapter('c2', 'Tests', ['b.ts', 'c.ts']),
+    ]
+    render(<ChapterNav chapters={chapters} />)
+    expect(screen.getByRole('tab', { name: 'Core, 1 file, viewed' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Tests, 2 files' })).toBeTruthy()
+  })
+
   describe('keyboard model', () => {
     const three = [makeChapter('c1', 'Core'), makeChapter('c2', 'Tests'), makeChapter('c3', 'Docs')]
 
