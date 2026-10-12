@@ -29,6 +29,7 @@ import type { ShellCommands } from './quick-actions/use-core-quick-actions'
 import { useWorkspaceStore } from './stores/workspace.store'
 import { useSettingsStore } from './stores/settings.store'
 import { useSessionRecordsStore } from './stores/session-records.store'
+import { useExtensionCommandsStore } from './stores/extension-commands.store'
 import { useSessionStore } from './stores/session.store'
 import { useTerminalOpenErrorStore } from './stores/terminal-open-error.store'
 import { useTerminalSession } from './hooks/useTerminalSession'
@@ -355,6 +356,14 @@ export function App(): JSX.Element {
     const records = useSessionRecordsStore.getState()
     void records.load()
     return records.subscribe()
+  }, [])
+
+  // Read before the first ⌘P, so the keys typed straight after it find them.
+  useEffect(() => {
+    useExtensionCommandsStore
+      .getState()
+      .refresh()
+      .catch((error: unknown) => console.warn('Could not read extension commands', error))
   }, [])
 
   useEffect(() => {

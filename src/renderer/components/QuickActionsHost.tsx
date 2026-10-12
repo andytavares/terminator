@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { QuickActions } from './QuickActions'
 import type { QuickAction, QuickActionGroup } from '../quick-actions/types'
@@ -23,6 +23,7 @@ import { useIntegrationsStore } from '../stores/integrations.store'
 import { useSessionStore } from '../stores/session.store'
 import { useWorkspaceStore } from '../stores/workspace.store'
 import { useToastStore } from '../stores/toast.store'
+import { useExtensionCommandsStore } from '../stores/extension-commands.store'
 import { useExtensionRegistry } from '../extensions/registry'
 import { useTerminalSession } from '../hooks/useTerminalSession'
 
@@ -35,28 +36,14 @@ export interface QuickActionsHostProps {
   onClose: () => void
 }
 
-/** What every extension declares, read each time the palette opens. */
+/** The extension commands as last read, read again each time the palette opens. */
 function useDeclaredCommands(): { registered: RegisteredCommand[]; declared: DeclaredCommand[] } {
-  const [registered, setRegistered] = useState<RegisteredCommand[]>([])
-  const [declared, setDeclared] = useState<DeclaredCommand[]>([])
+  const { registered, declared, refresh } = useExtensionCommandsStore(
+    useShallow((s) => ({ registered: s.registered, declared: s.declared, refresh: s.refresh }))
+  )
   useEffect(() => {
-    void window.electronAPI.extension.getCommands().then((r) => setRegistered(r.commands))
-    void window.electronAPI.extension.list().then((r) => {
-      setDeclared(
-        r.extensions.flatMap((ext) =>
-          (ext.contributes?.commands ?? []).map((cmd) => ({
-            extensionId: ext.id,
-            id: cmd.id,
-            label: cmd.label,
-            mnemonic: cmd.mnemonic,
-            shortcut: cmd.shortcut,
-            description: cmd.description,
-            requires: cmd.requires,
-          }))
-        )
-      )
-    })
-  }, [])
+    refresh().catch((error: unknown) => console.warn('Could not read extension commands', error))
+  }, [refresh])
   return { registered, declared }
 }
 
