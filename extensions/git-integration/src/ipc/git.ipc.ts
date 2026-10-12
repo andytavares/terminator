@@ -30,11 +30,11 @@ async function commitCollectingOutput(payload: z.infer<typeof CommitPayload>) {
   const { repoRoot, message, signOff, noVerify } = payload
   if (!message.trim()) return { error: 'EMPTY_MESSAGE' }
   commitOutputBuffer.set(repoRoot, [])
-  const onOutput = (line: string) => commitOutputBuffer.get(repoRoot)?.push(line)
+  const appendCommitLine = (line: string) => commitOutputBuffer.get(repoRoot)?.push(line)
   const result = await commitChanges(repoRoot, message, {
     signOff: signOff ?? false,
     noVerify: noVerify ?? false,
-    onOutput,
+    onOutput: appendCommitLine,
   })
   commitOutputBuffer.delete(repoRoot)
   return result

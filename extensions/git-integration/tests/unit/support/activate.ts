@@ -60,10 +60,7 @@ function fakeWorkspaceApi(workspace?: FakeWorkspace) {
   }
 }
 
-/**
- * Activates git-integration against a stand-in API and returns every channel
- * it registered, with the shell and gh entry points as spies.
- */
+/** Activates git-integration on a stand-in API; returns its channels and the shell and gh spies. */
 export function activateCapturingChannels(workspace?: FakeWorkspace) {
   const channels: RegisteredChannel[] = []
   const exec = vi.fn()

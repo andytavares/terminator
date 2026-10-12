@@ -32,14 +32,14 @@ export interface DiffSide {
   isUntracked?: boolean
 }
 
-function git(args: string[], cwd: string, options: { raw?: boolean } = {}): Promise<string> {
+function gitInRepo(args: string[], cwd: string, options: { raw?: boolean } = {}): Promise<string> {
   return runGit(cwd, args, { timeoutMs: GIT_TIMEOUT, ...options })
 }
 
 export async function getStatus(repoRoot: string, maxFiles: number = 500): Promise<GitStatus> {
   const [statusOut, branch] = await Promise.all([
-    git(['status', '--porcelain=v1', '-z'], repoRoot, { raw: true }),
-    git(['branch', '--show-current'], repoRoot).catch(() => 'HEAD'),
+    gitInRepo(['status', '--porcelain=v1', '-z'], repoRoot, { raw: true }),
+    gitInRepo(['branch', '--show-current'], repoRoot).catch(() => 'HEAD'),
   ])
   const partial = parseStatus(statusOut, maxFiles)
   return { ...partial, branch: branch || 'HEAD' }
@@ -79,11 +79,11 @@ export async function getDiff(
 }
 
 export async function stageFiles(repoRoot: string, paths: string[]): Promise<void> {
-  await git(['add', '--', ...paths], repoRoot)
+  await gitInRepo(['add', '--', ...paths], repoRoot)
 }
 
 export async function unstageFiles(repoRoot: string, paths: string[]): Promise<void> {
-  await git(['restore', '--staged', '--', ...paths], repoRoot)
+  await gitInRepo(['restore', '--staged', '--', ...paths], repoRoot)
 }
 
 export interface PushSuccess {
@@ -100,17 +100,17 @@ export interface PushError {
 // (main-process-triggered push), so the git CLI invocation lives once.
 export async function pushBranch(repoRoot: string): Promise<PushSuccess | PushError> {
   try {
-    await git(['push'], repoRoot)
+    await gitInRepo(['push'], repoRoot)
   } catch (e) {
     const msg = String(e)
     if (msg.includes('has no upstream')) return { error: 'NO_UPSTREAM' }
     if (msg.includes('rejected')) return { error: 'REJECTED' }
     return { error: msg }
   }
-  const branch = await git(['branch', '--show-current'], repoRoot).catch(() => '')
+  const branch = await gitInRepo(['branch', '--show-current'], repoRoot).catch(() => '')
   let remote = 'origin'
   try {
-    const upstream = await git(
+    const upstream = await gitInRepo(
       ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
       repoRoot
     )
@@ -125,11 +125,11 @@ export async function pullFastForward(
   repoRoot: string
 ): Promise<{ success: true; branch: string } | { error: string }> {
   try {
-    await git(['pull', '--ff-only'], repoRoot)
+    await gitInRepo(['pull', '--ff-only'], repoRoot)
   } catch (e) {
     return { error: String(e) }
   }
-  const branch = await git(['branch', '--show-current'], repoRoot).catch(() => '')
+  const branch = await gitInRepo(['branch', '--show-current'], repoRoot).catch(() => '')
   return { success: true, branch }
 }
 
