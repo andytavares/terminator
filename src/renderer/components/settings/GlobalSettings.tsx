@@ -3,6 +3,7 @@ import React from 'react'
 import { useSettingsStore } from '../../stores/settings.store'
 import type { NotificationTarget } from '../../../shared/types/index'
 import { QuickActionsSettings } from './QuickActionsSettings'
+import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
 import { ThemeChoices } from './ThemeChoices'
 

@@ -1177,19 +1177,8 @@
 
 .notepad-export-dialog__folder-input {
   flex: 1;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: 6px;
-  color: var(--tm-text-primary);
-  font-size: 13px;
   font-family: var(--font-mono, monospace);
-  padding: 7px 10px;
-  outline: none;
   transition: border-color 100ms ease;
-}
-
-.notepad-export-dialog__folder-input:focus {
-  border-color: var(--tm-accent, color-mix(in srgb, var(--tm-accent) 50%, transparent));
 }
 
 /* Scope segmented tabs */

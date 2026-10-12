@@ -3598,17 +3598,6 @@ h2.daily-log__date {
 
 .wr-step__capture-input {
   flex: 1;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: 6px;
-  color: var(--tm-text-primary);
-  font-size: 13px;
-  padding: 7px 10px;
-  outline: none;
-}
-
-.wr-step__capture-input:focus {
-  border-color: var(--tm-accent);
 }
 
 .wr-step__captured-list {

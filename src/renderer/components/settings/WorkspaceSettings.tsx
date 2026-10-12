@@ -3,6 +3,7 @@ import React, { useEffect } from 'react'
 import { useSettingsStore } from '../../stores/settings.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { QuickActionsSettings } from './QuickActionsSettings'
+import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
 import { ThemeChoices } from './ThemeChoices'
 

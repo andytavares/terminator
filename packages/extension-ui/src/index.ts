@@ -47,6 +47,8 @@ export { ConfirmDialog } from './ConfirmDialog'
 export type { ConfirmDialogProps } from './ConfirmDialog'
 
 export { Toast, ToastRegion } from './Toast'
+export { createToastStore } from './toast-store'
+export type { QueuedToast, ToastQueue } from './toast-store'
 export type { ToastItem, ToastProps, ToastRegionProps, ToastTone } from './Toast'
 
 export { EmptyState } from './EmptyState'
