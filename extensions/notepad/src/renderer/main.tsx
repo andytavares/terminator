@@ -1,5 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
+import '@terminator/extension-ui/fonts'
 import { App } from './App'
 import '../components/notepad.css'
 

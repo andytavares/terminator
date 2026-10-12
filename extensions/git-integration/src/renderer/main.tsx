@@ -1,5 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
+import '@terminator/extension-ui/fonts'
 import { App } from './App'
 import '../components/syntax-theme.css'
 import '../components/git-integration.css'

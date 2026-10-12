@@ -14,7 +14,8 @@
     },
     "./styles.css": "./src/extension-ui.css",
     "./tokens.css": "./src/tokens.css",
-    "./extension-base-css": "./src/extension-base-css.ts"
+    "./extension-base-css": "./src/extension-base-css.ts",
+    "./fonts": "./src/fonts.ts"
   },
   "files": [
     "src"
@@ -25,6 +26,8 @@
     "test:stories": "vitest run --config vitest.stories.config.ts"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "5.2.7",
+    "@fontsource/ibm-plex-sans": "5.2.8",
     "react-markdown": "10.1.0",
     "rehype-raw": "7.0.0",
     "rehype-sanitize": "6.0.0",
@@ -36,8 +39,6 @@
     "react-dom": "18.3.1"
   },
   "devDependencies": {
-    "@fontsource/ibm-plex-mono": "5.2.7",
-    "@fontsource/ibm-plex-sans": "5.2.8",
     "@storybook/addon-vitest": "10.6.1",
     "@storybook/react-vite": "10.6.1",
     "@vitest/browser-playwright": "4.1.11",
