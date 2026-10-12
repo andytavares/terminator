@@ -3,7 +3,7 @@ import { defineChannel } from '@terminator/extension-sdk'
 import type { ExtensionAPI, Disposable } from '@terminator/extension-sdk'
 
 /** What every task-vault channel answers to a payload its schema rejects. */
-export function validationError(error: z.ZodError): { error: string; message: string } {
+function validationError(error: z.ZodError): { error: string; message: string } {
   return { error: 'VALIDATION_ERROR', message: error.message }
 }
 

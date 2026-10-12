@@ -8,7 +8,7 @@ import { IconButton } from '@terminator/extension-ui'
 type DayData = { date: string; status: string; count: number }
 type DayMap = Map<string, DayData[]>
 
-export const STATUS_DOT_CLASS: Record<string, string> = {
+const STATUS_DOT_CLASS: Record<string, string> = {
   open: 'cal-dot--open',
   'in-progress': 'cal-dot--progress',
   'in-review': 'cal-dot--review',
@@ -20,7 +20,7 @@ export const STATUS_DOT_CLASS: Record<string, string> = {
 
 const DOT_ORDER = ['open', 'in-progress', 'in-review', 'blocked', 'done', 'migrated', 'cancelled']
 
-export function statusDotStyle(
+function statusDotStyle(
   status: string,
   lanes: KanbanLane[]
 ): { className: string; style?: React.CSSProperties } {
