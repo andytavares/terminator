@@ -3,7 +3,14 @@ import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from '../helpers'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  terminalRows,
+} from '../helpers'
 
 // Runs a real `claude` in the app's terminal to answer the one question no
 // fixture can: what Claude Code's numbered prompts look like on screen, and
@@ -26,14 +33,6 @@ test.afterAll(async () => {
   if (repo) rmSync(repo, { recursive: true, force: true })
 })
 
-async function visibleRows(page: Page): Promise<string[]> {
-  return page.evaluate(() =>
-    [...document.querySelectorAll('.terminal-pane .xterm-rows > div')].map((row) =>
-      (row.textContent ?? '').replace(/\u00a0/g, ' ').trimEnd()
-    )
-  )
-}
-
 const hasNumberedChoice = (rows: string[]): boolean =>
   rows.some((r) => /^[\s│]*❯\s*1\.\s/.test(r)) && rows.some((r) => /^[\s│]*2\.\s/.test(r))
 
@@ -41,7 +40,7 @@ async function waitForChoice(page: Page): Promise<string[]> {
   let rows: string[] = []
   try {
     await expect
-      .poll(async () => hasNumberedChoice((rows = await visibleRows(page))), {
+      .poll(async () => hasNumberedChoice((rows = await terminalRows(page))), {
         timeout: 90_000,
         intervals: [500],
       })

@@ -448,6 +448,17 @@ describe('ReviewDashboard', () => {
     expect(await screen.findByRole('button', { name: /3 repositories/ })).toBeTruthy()
   })
 
+  it('says "1 repository" for a selection of one', async () => {
+    mockInvoke(
+      { prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() },
+      { repos: ['acme/api'] }
+    )
+    render(<ReviewDashboard />)
+    expect(
+      await screen.findByRole('button', { name: '1 repository, choose repositories' })
+    ).toBeTruthy()
+  })
+
   it('labels the scope button All repositories when nothing is selected', async () => {
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)

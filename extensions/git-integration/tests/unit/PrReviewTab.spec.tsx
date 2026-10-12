@@ -376,3 +376,18 @@ describe('PrReviewTab', () => {
     expect(mockReconcileHead).toHaveBeenCalledWith('/repo', 1, 'newSha', 'all', [])
   })
 })
+
+describe('PrReviewTab — a review submitted in another window', () => {
+  it('reloads the queue, so the pull request shows its new approval and review state', async () => {
+    const loadQueue = vi.fn().mockResolvedValue(undefined)
+    const { useLoadPrQueue } = await import('../../src/hooks/usePrReview')
+    vi.mocked(useLoadPrQueue).mockReturnValue(loadQueue)
+    render(<PrReviewTab repoRoot="/repo" />)
+    const onReviewsChanged = mockOn.mock.calls.find(([channel]) => channel === 'reviews:changed')
+
+    expect(onReviewsChanged).toBeDefined()
+    loadQueue.mockClear()
+    onReviewsChanged![1]({})
+    expect(loadQueue).toHaveBeenCalledTimes(1)
+  })
+})

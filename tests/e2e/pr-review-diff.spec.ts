@@ -1,0 +1,186 @@
+import { test, expect, type Page } from '@playwright/test'
+import { rmSync } from 'node:fs'
+import { closeApp, launchApp, type AppHandle } from './helpers'
+import {
+  git,
+  makeRepoWithRemote,
+  openCodeReviews,
+  openRepo,
+  pushBranch,
+  writeFile,
+} from './git-harness'
+import { startGithubStub, type GithubStub } from './github-stub'
+
+/**
+ * Reviewing a pull request's diff in Code Reviews, against the stub GitHub:
+ * the diff and the context around it, the risk behind a file, the tests that
+ * cover a block, replying to a reviewer's thread, pending comments sent with
+ * the review, files marked viewed on GitHub, and what changed since the last
+ * look after the author pushes again.
+ */
+
+let handle: AppHandle
+let stub: GithubStub
+let repo: string
+let bare: string
+
+const MATH_HEAD = [
+  'export function add(a: number, b: number) {',
+  '  return a + b',
+  '}',
+  '',
+  'export function subtract(a: number, b: number) {',
+  '  return a - b',
+  '}',
+]
+const MATH_TAIL = Array.from({ length: 30 }, (_, i) => `export const step${i} = ${i}`)
+const MATH_SPEC =
+  "import { add, subtract } from '../src/math'\n\n" +
+  "test('add', () => expect(add(1, 2)).toBe(3))\n" +
+  "test('subtract', () => expect(subtract(3, 2)).toBe(1))\n"
+
+test.describe.configure({ mode: 'serial' })
+
+test.beforeAll(async () => {
+  ;({ repo, bare } = makeRepoWithRemote('terminator-e2e-review'))
+  writeFile(repo, 'src/math.ts', [...MATH_HEAD.slice(0, 4), ...MATH_TAIL, ''].join('\n'))
+  writeFile(repo, 'tests/math.spec.ts', MATH_SPEC.replace(/\ntest\('subtract'.*\n/, '\n'))
+  git(repo, 'add', '-A')
+  git(repo, 'commit', '--quiet', '-m', 'math with a tail')
+  git(repo, 'push', '--quiet')
+  pushBranch(repo, 'feat/subtract', {
+    'src/math.ts': [...MATH_HEAD, ...MATH_TAIL, ''].join('\n'),
+    'tests/math.spec.ts': MATH_SPEC,
+  })
+  stub = await startGithubStub({ bareRepo: bare })
+  const pr = stub.openPullRequest({ title: 'Add subtract', headRefName: 'feat/subtract' })
+  pr.reviewComments.push({
+    id: 501,
+    user: { login: 'octo-author' },
+    body: 'Should this guard against NaN?',
+    created_at: '2026-10-01T10:00:00Z',
+    updated_at: '2026-10-01T10:00:00Z',
+    path: 'src/math.ts',
+    line: 6,
+    start_line: null,
+    side: 'RIGHT',
+    diff_hunk: '@@ -1,4 +1,8 @@',
+    in_reply_to_id: null,
+    pull_request_review_id: null,
+  })
+  handle = await launchApp(undefined, stub.env)
+  await openRepo(handle, 'Review Diff', repo)
+})
+
+test.afterAll(async () => {
+  await closeApp(handle)
+  await stub?.close()
+  for (const dir of [repo, bare]) if (dir) rmSync(dir, { recursive: true, force: true })
+})
+
+async function startReview(): Promise<Page> {
+  const view = await openCodeReviews(handle, 'Review Diff')
+  await view.locator('.rd-row').filter({ hasText: 'Add subtract' }).click()
+  await view.getByRole('button', { name: /^(Start|Continue|Resume) Review/ }).click()
+  return view
+}
+
+function fileInList(view: Page, path: string) {
+  return view.locator(`.full-file-row[title="${path}"]`)
+}
+
+test('the diff shows the change, and the context below it on request', async () => {
+  const view = await startReview()
+  await fileInList(view, 'src/math.ts').click()
+  await expect(view.getByRole('main')).toContainText('return a - b')
+  await expect(view.getByRole('main')).not.toContainText('export const step20 = 20')
+
+  await view.getByRole('button', { name: 'Show 20 lines below' }).click()
+  await expect(view.getByRole('main')).toContainText('export const step20 = 20')
+})
+
+test("a file's risk names the files that import it", async () => {
+  const view = await openCodeReviews(handle, 'Review Diff')
+  await view.getByRole('main').getByRole('button', { name: /risk$/ }).first().click()
+  await expect(view.getByText('Importers (1)')).toBeVisible()
+  await expect(view.locator('.risk-importer-btn')).toHaveAttribute('title', 'tests/math.spec.ts')
+  await view.keyboard.press('Escape')
+})
+
+test("a block's tests are found in the pull request", async () => {
+  const view = await openCodeReviews(handle, 'Review Diff')
+  await view.getByRole('button', { name: 'Jump to the tests for this block' }).first().click()
+  const popover = view.getByRole('group', { name: 'Tests for this block' })
+  await expect(popover.locator('.tp-where').first()).toHaveText(/^tests\/math\.spec\.ts:\d+$/)
+  await expect(popover).toContainText('Open in review')
+  await view.keyboard.press('Escape')
+})
+
+test("a reply to a reviewer's thread is posted to GitHub and shown under it", async () => {
+  const view = await openCodeReviews(handle, 'Review Diff')
+  const thread = view.locator('.inline-comment-thread').filter({ hasText: 'guard against NaN' })
+  await thread.getByRole('button', { name: 'Reply' }).click()
+  await view.getByPlaceholder('Leave a comment…').fill('Callers validate first.')
+  await view.getByRole('button', { name: 'Reply', exact: true }).last().click()
+
+  await expect(thread).toContainText('Callers validate first.')
+  const reply = stub.pullRequest(1).reviewComments.find((c) => c.in_reply_to_id === 501)
+  expect(reply?.body).toBe('Callers validate first.')
+})
+
+test('marking a file viewed marks it on GitHub', async () => {
+  const view = await openCodeReviews(handle, 'Review Diff')
+  await fileInList(view, 'tests/math.spec.ts').click()
+  await view.getByRole('checkbox', { name: 'Viewed' }).check()
+  await expect.poll(() => stub.pullRequest(1).viewedPaths).toEqual(['tests/math.spec.ts'])
+})
+
+test('a pending comment goes out with the review, and finishing marks the rest viewed', async () => {
+  const view = await openCodeReviews(handle, 'Review Diff')
+  await fileInList(view, 'src/math.ts').click()
+  const lineFive = view.getByRole('row', { name: /^5 Add comment/ })
+  await lineFive.getByRole('button', { name: 'Add comment' }).click()
+  await view.getByRole('button', { name: /^Comment/ }).click()
+  await view.getByPlaceholder('Leave a comment…').fill('Name the operands minuend and subtrahend.')
+  await view.getByRole('button', { name: 'Add to pending review' }).click()
+  await expect(view.getByRole('button', { name: '1 draft on 1 file' })).toBeVisible()
+
+  // On the last file, finishing marks every file still unviewed (src/math.ts) viewed.
+  await fileInList(view, 'tests/math.spec.ts').click()
+  await view.getByRole('button', { name: 'Submit review…' }).click()
+  const dialog = view.getByRole('dialog', { name: 'Submit review' })
+  await dialog.getByLabel('Request changes').check()
+  await dialog.getByPlaceholder('Leave a summary comment (optional)…').fill('One naming nit.')
+  await dialog.getByRole('button', { name: 'Submit review' }).click()
+  await expect(dialog).toContainText('Review submitted successfully.')
+
+  const pr = stub.pullRequest(1)
+  expect(pr.reviews.at(-1)).toMatchObject({ state: 'CHANGES_REQUESTED', body: 'One naming nit.' })
+  expect(pr.reviewComments.at(-1)).toMatchObject({
+    path: 'src/math.ts',
+    line: 5,
+    side: 'RIGHT',
+    body: 'Name the operands minuend and subtrahend.',
+  })
+  expect([...pr.viewedPaths].sort()).toEqual(['src/math.ts', 'tests/math.spec.ts'])
+  await dialog.getByRole('button', { name: 'Close', exact: true }).last().click()
+})
+
+test('after the author pushes again, the review says what changed since the last look', async () => {
+  const view = await openCodeReviews(handle, 'Review Diff')
+  await view.getByRole('button', { name: 'Pause review' }).click()
+  await expect(view.locator('.rd-row').filter({ hasText: 'Add subtract' })).toBeVisible()
+
+  git(repo, 'checkout', '--quiet', 'feat/subtract')
+  writeFile(
+    repo,
+    'src/math.ts',
+    [...MATH_HEAD, ...MATH_TAIL, 'export const done = true', ''].join('\n')
+  )
+  git(repo, 'commit', '--quiet', '-am', 'mark done')
+  git(repo, 'push', '--quiet', 'origin', 'feat/subtract')
+  git(repo, 'checkout', '--quiet', 'main')
+
+  await startReview()
+  await expect(view.getByText('1 commit since you last looked')).toBeVisible()
+})

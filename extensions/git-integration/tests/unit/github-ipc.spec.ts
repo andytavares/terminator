@@ -1533,6 +1533,58 @@ describe('github:pr-create', () => {
   })
 })
 
+describe('git:pr-status', () => {
+  let handlers: Record<string, Handler>
+  const openPr = {
+    number: 4,
+    title: 'Greet in either order',
+    body: 'Adds a greeting.',
+    url: 'https://github.com/o/r/pull/4',
+    state: 'OPEN',
+    isDraft: true,
+    baseRefName: 'main',
+    headRefName: 'feat/greeting',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it("answers the checkout's branch's open pull request", async () => {
+    mockGitSuccess('feat/greeting\n')
+    mockGitSuccess(JSON.stringify(openPr))
+
+    const result = await handlers['git:pr-status']({ repoRoot: '/repo' })
+
+    expect(result).toEqual({ pr: { ...openPr, state: 'open' } })
+    expect(mockExecFile.mock.calls[0].slice(0, 2)).toEqual(['git', ['branch', '--show-current']])
+    const [command, args] = mockExecFile.mock.calls[1]
+    expect([command, args.slice(0, 3)]).toEqual(['gh', ['pr', 'view', 'feat/greeting']])
+  })
+
+  it('answers null when the branch has no pull request', async () => {
+    mockGitSuccess('feat/greeting\n')
+    mockGitFailure('no pull requests found for branch "feat/greeting"')
+
+    expect(await handlers['git:pr-status']({ repoRoot: '/repo' })).toEqual({ pr: null })
+  })
+
+  it("answers null when the branch's pull request is merged, so a new one can be opened", async () => {
+    mockGitSuccess('feat/greeting\n')
+    mockGitSuccess(JSON.stringify({ ...openPr, state: 'MERGED' }))
+
+    expect(await handlers['git:pr-status']({ repoRoot: '/repo' })).toEqual({ pr: null })
+  })
+
+  it('answers null on a detached HEAD without asking GitHub', async () => {
+    mockGitSuccess('\n')
+
+    expect(await handlers['git:pr-status']({ repoRoot: '/repo' })).toEqual({ pr: null })
+    expect(mockExecFile).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('github:pr-mark-ready', () => {
   let handlers: Record<string, Handler>
 
@@ -1838,6 +1890,44 @@ describe('github:remove-active-review — store side-effects', () => {
     expect(result.ok).toBe(true)
     // Verify sessionStore.delete was called for the matching session key (line 842)
     expect(deleteSpy).toHaveBeenCalledWith('/repo:::42:::abc123')
+  })
+
+  it("deletes the pull request's own session key, so a refresh does not bring it back as paused", async () => {
+    vi.spyOn(ElectronStore.prototype, 'set').mockImplementation(function (
+      this: { store: Record<string, unknown> },
+      key: string,
+      value: unknown
+    ) {
+      this.store[key] = value
+    })
+    vi.spyOn(ElectronStore.prototype, 'delete').mockImplementation(function (
+      this: { store: Record<string, unknown> },
+      key: string
+    ) {
+      delete this.store[key]
+    })
+    const session = (prNumber: number) => ({
+      repoRoot: '/repo',
+      prNumber,
+      headSHA: 'abc123',
+      currentChapterId: null,
+      currentFilePath: null,
+      viewedFiles: [],
+      fileOrderOverrides: {},
+      scrollPosition: null,
+      pausedAt: '2026-01-01T00:00:00Z',
+      lastAccessedAt: '2026-01-01T00:00:00Z',
+    })
+    await handlers['github:session-set']({ key: '/repo:::42', session: session(42) })
+    await handlers['github:session-set']({ key: '/repo:::420', session: session(420) })
+
+    await handlers['github:remove-active-review']({ repoRoot: '/repo', prNumber: 42 })
+
+    const { sessions } = (await handlers['github:sessions-for-repo']({ repoRoot: '/repo' })) as {
+      sessions: Array<{ prNumber: number }>
+    }
+    expect(sessions.map((s) => s.prNumber)).toEqual([420])
+    delete sessionData['/repo:::420']
   })
 
   it('returns { error } when activeReviewStore.delete throws (line 846)', async () => {

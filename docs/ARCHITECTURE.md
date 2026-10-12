@@ -240,6 +240,9 @@ tile) disposes it, so a hidden terminal or a thumbnail never holds a GPU context
 and a terminal past that stays on the DOM renderer. A lost context (`onContextLoss`) or a machine without
 WebGL2 also falls back to the DOM renderer. The DOM renderer clips the last column's glyph on macOS (about
 2px), which WebGL does not do because it has no row boxes to clip. The phone client keeps the DOM renderer.
+Because WebGL leaves no terminal text in the DOM, the renderer sets `window.terminatorE2E.terminalRows()`
+(`src/renderer/terminal/terminal-rows.ts`), which reads every terminal's visible rows from its xterm buffer;
+the end-to-end specs read terminals through it.
 
 **Batching and flow control.** A PTY produces thousands of small chunks a second. `OutputRelay`
 (`src/main/terminal/output-relay.ts`) joins them in an `OutputBatcher` and sends one `terminal:output`
@@ -556,7 +559,7 @@ A manifest can declare `contributes.commands[]` (`{ id, label, description?, sho
 
 ### Reaching the panel from an extension's own view
 
-An extension's UI is a separate `WebContentsView` with its own `webContents`; the host window's `⌘P` keydown listener never sees a keystroke that originated there. `extension-view-host.ts` attaches a `before-input-event` listener to every extension view (`isQuickActionsOpenShortcut`, unit-tested for both the mac and non-mac branches); on `⌘P`/`Ctrl+P` it calls `preventDefault()`, focuses the main window, and sends `quick-actions:open`, which `App.tsx` handles the same way as the in-window shortcut. The panel's own Escape closes only the panel — it claims Escape through the `useModalEffect` "modal depth" signal the double-Escape-exit detector already reads, so closing the panel is never counted as the first half of a double-Escape extension exit. The panel also moves DOM focus into itself on mount (a plain `tabIndex={-1}` container), because leaving focus on whatever was focused before `⌘P` — most often a terminal — meant xterm's own capture-phase Escape handler (attached directly to its textarea) could consume Escape and stop it from ever bubbling to the panel's own window-level listener.
+The leader is `CmdOrCtrl+P`: `⌘P` on macOS, `Ctrl+P` elsewhere, decided in one place, `isQuickActionsLeader` (`src/shared/quick-actions-leader.ts`). A focused terminal hands it on: xterm turns `Ctrl+P` into `^P` for the shell and stops the event, so `TerminalInstance`'s custom key handler returns `false` for the leader, and the keydown reaches the window listener in `useKeyboardShortcuts.ts`. An extension's UI is a separate `WebContentsView` with its own `webContents`; the host window's `⌘P` keydown listener never sees a keystroke that originated there. `extension-view-host.ts` attaches a `before-input-event` listener to every extension view (`isQuickActionsOpenShortcut`, unit-tested for both the mac and non-mac branches); on `⌘P`/`Ctrl+P` it calls `preventDefault()`, focuses the main window, and sends `quick-actions:open`, which `App.tsx` handles the same way as the in-window shortcut. The panel's own Escape closes only the panel — it claims Escape through the `useModalEffect` "modal depth" signal the double-Escape-exit detector already reads, so closing the panel is never counted as the first half of a double-Escape extension exit. The panel also moves DOM focus into itself on mount (a plain `tabIndex={-1}` container), because leaving focus on whatever was focused before `⌘P` — most often a terminal — meant xterm's own capture-phase Escape handler (attached directly to its textarea) could consume Escape and stop it from ever bubbling to the panel's own window-level listener.
 
 ### Persistence
 
@@ -722,6 +725,15 @@ existing issue's assignee or any other field, or to delete one, and a test asser
 surface so it stays true. `transition` moves an issue by intent (ADR-041); `create` files one the
 operator asked for, Linear only (ADR-061).
 
+**One writer at a time.** Every `tracker-store` change reads, edits and writes `integrations.json`;
+changes run through one queue, so two at once (a field's blur and a Disconnect click) both land.
+
+**End to end against stubs.** `tests/e2e/issue-trackers.spec.ts` drives every `integrations:*`
+channel against stub Linear and Jira at their real addresses: the app runs with
+`NODE_USE_ENV_PROXY=1`, `HTTPS_PROXY` naming a local proxy and `NODE_EXTRA_CA_CERTS` naming a CA made
+for the run, so Node's fetch tunnels to `tests/e2e/tracker-stub.ts`, which answers TLS itself and
+refuses every other host.
+
 ---
 
 ## Security model
@@ -796,6 +808,8 @@ See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural deci
 ### Git integration (`extensions/git-integration/`)
 
 The Git project tab (status, staging, commit, pull requests), the Code Reviews workspace tab and the Reviews global tab. It runs git and gh through `api.shell.exec` and `api.github`, and is the only git parser in the repository ([ADR 094](adr/094-extensions-follow-the-vs-code-model.md) ended ADR-025's two parsers).
+
+Its e2e specs run against real local repositories with a bare `origin` and a stub GitHub at the boundary the app has, the gh CLI: `tests/e2e/fixtures/bin/gh`, on the app's PATH beside the `claude` stub, forwards a call to `tests/e2e/github-stub.ts` when the app's `XDG_CONFIG_HOME` holds `gh/e2e-stub-url`, and otherwise runs the real gh. gh itself cannot be pointed at a local server (`GH_HOST` means HTTPS to `<host>/api/v3`, and the core passes no `GH_HOST`). Each extension view is a WebContentsView, which Playwright lists among the app's windows, so `tests/e2e/git-harness.ts` drives it as a page.
 
 #### The review window
 

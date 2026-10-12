@@ -14,13 +14,14 @@ import type { AppHandle } from './helpers'
 // grow shared state of its own by accident.
 
 /** Runs `git` against the fixture repo, with any inherited GIT_* stripped so a
- *  git hook running this suite does not point every command at itself. */
-export function git(repo: string, ...args: string[]): void {
+ *  git hook running this suite does not point every command at itself, and
+ *  returns its trimmed output. */
+export function git(repo: string, ...args: string[]): string {
   const env = { ...process.env }
   delete env.GIT_DIR
   delete env.GIT_INDEX_FILE
   delete env.GIT_WORK_TREE
-  execFileSync('git', args, { cwd: repo, env })
+  return execFileSync('git', args, { cwd: repo, env, encoding: 'utf8' }).trim()
 }
 
 /** A minimal git repository with a real toolchain, exactly what every foundry
@@ -243,7 +244,8 @@ export async function openForge(handle: AppHandle): Promise<void> {
  * scraping a screen an agent's own output may since have scrolled past.
  */
 export function launchScript(handle: AppHandle): string {
-  const dir = join(handle.userDataDir, 'foundry-runtime', 'launch')
+  // Foundry's own folder (ADR 103): <userData>/extensions/<id>/runtime.
+  const dir = join(handle.userDataDir, 'extensions', 'terminator.foundry', 'runtime', 'launch')
   const scripts = readdirSync(dir)
     .filter((name) => name.endsWith('.sh'))
     .map((name) => join(dir, name))

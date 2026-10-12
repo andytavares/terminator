@@ -73,7 +73,8 @@ export function e2eEnv(): NodeJS.ProcessEnv {
 /**
  * `userDataDir` relaunches onto an existing profile, for a spec that proves
  * something survives a restart; `closeApp` never deletes it, so relaunching
- * after a close just works. `env` adds to the environment `e2eEnv` gives.
+ * after a close just works. `env` adds to the app's environment, e.g. the
+ * stub GitHub's (`tests/e2e/github-stub.ts`).
  */
 // Inside the 30s hook timeout, so a launch that hangs fails with the app's own
 // output instead of a bare "hook timeout exceeded" that says nothing about why.
@@ -81,7 +82,7 @@ const LAUNCH_DEADLINE_MS = 25_000
 
 export async function launchApp(
   userDataDir: string = e2eProfileDir(),
-  env: NodeJS.ProcessEnv = {}
+  env: Record<string, string> = {}
 ): Promise<AppHandle> {
   const deadline = Date.now() + LAUNCH_DEADLINE_MS
   const remaining = () => Math.max(1, deadline - Date.now())
@@ -307,4 +308,15 @@ export function inExtensionView<T>(handle: AppHandle, urlPart: string, script: s
     },
     { part: urlPart, source: script }
   ) as Promise<T>
+}
+
+/** The window as the app sets it up, with `src/renderer/terminal/terminal-rows.ts`. */
+export type TerminalRowsWindow = Window & { terminatorE2E: { terminalRows(): string[] } }
+
+/**
+ * The rows every open terminal shows, read from xterm's buffer. Under the
+ * WebGL renderer the terminal is a canvas and the DOM holds none of its text.
+ */
+export function terminalRows(page: Page): Promise<string[]> {
+  return page.evaluate(() => (window as unknown as TerminalRowsWindow).terminatorE2E.terminalRows())
 }

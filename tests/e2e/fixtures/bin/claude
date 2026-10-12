@@ -4,5 +4,18 @@
 # agent (which on a developer machine costs quota and takes real time, and on
 # CI simply isn't there). It announces itself and its argv, then idles until
 # whatever spawned it kills it — a real launch never exits on its own either.
+#
+# The review agent's headless run (`claude -p ... --json-schema ...`) answers
+# with the file E2E_CLAUDE_REVIEW_REPLY names, when a spec has written it, as
+# `--output-format json` prints a result; until then it idles like the rest.
+case " $* " in
+  *" -p "*"--json-schema"*)
+    if [ -n "$E2E_CLAUDE_REVIEW_REPLY" ] && [ -f "$E2E_CLAUDE_REVIEW_REPLY" ]; then
+      cat >/dev/null
+      cat "$E2E_CLAUDE_REVIEW_REPLY"
+      exit 0
+    fi
+    ;;
+esac
 echo "claude-stub $*"
 exec sleep 86400

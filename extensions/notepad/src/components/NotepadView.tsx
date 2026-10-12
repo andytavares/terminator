@@ -484,7 +484,7 @@ export function NotepadView(): React.JSX.Element {
   // Cmd+Shift+F opens search overlay
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
         e.preventDefault()
         setShowSearch(true)
       }

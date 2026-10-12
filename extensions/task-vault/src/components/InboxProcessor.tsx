@@ -19,12 +19,15 @@ export function InboxProcessor({
   onDone,
   reviewId = null,
 }: InboxProcessorProps): React.JSX.Element {
+  // The list it was opened with: the inbox reloads as each item is filed, and
+  // walking the shrinking list by index would skip the item after each one.
+  const [queue] = useState(items)
   const [currentIdx, setCurrentIdx] = useState(0)
   const [step, setStep] = useState<InboxStep>('actionable')
   const [isProcessing, setIsProcessing] = useState(false)
   const { refreshInboxCount } = useVaultStore()
 
-  const current = items[currentIdx]
+  const current = queue[currentIdx]
 
   async function processItem(action: string, dest?: string, newProjectName?: string) {
     if (!current || isProcessing) return
@@ -71,7 +74,7 @@ export function InboxProcessor({
   function advanceToNext() {
     setIsProcessing(false)
     setStep('actionable')
-    if (currentIdx + 1 >= items.length) {
+    if (currentIdx + 1 >= queue.length) {
       onDone()
     } else {
       setCurrentIdx(currentIdx + 1)
@@ -85,7 +88,7 @@ export function InboxProcessor({
   return (
     <div className="inbox-processor">
       <div className="inbox-processor__progress">
-        {currentIdx + 1} of {items.length}
+        {currentIdx + 1} of {queue.length}
       </div>
       <div className="inbox-processor__item">
         <p className="inbox-processor__text">{current.text}</p>

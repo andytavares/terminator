@@ -8,8 +8,10 @@ import './styles.css'
 import { useSettingsStore } from './stores/settings.store'
 import { initExtensions } from './extensions/loader'
 import { installLogInterceptor } from './logger'
+import { exposeTerminalRows } from './terminal/terminal-rows'
 
 installLogInterceptor()
+exposeTerminalRows()
 
 const view = new URLSearchParams(window.location.search).get('view')
 

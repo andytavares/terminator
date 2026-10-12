@@ -116,6 +116,25 @@ describe('searchNotes — basic text query (LIKE)', () => {
     const data = (result as { data: { id: string }[] }).data
     expect(data.some((r) => r.id === 'n1')).toBe(true)
   })
+
+  it('folds the case of non-ASCII letters too', async () => {
+    await insertNote('n1', 'Über den Wolken', 'Die Freiheit wäre grenzenlos')
+    await insertNote('n2', 'Café', 'CRÈME BRÛLÉE')
+
+    const ids = async (query: string) =>
+      ((await searchNotes(db, { query })) as { data: { id: string }[] }).data.map((r) => r.id)
+    expect(await ids('über')).toEqual(['n1'])
+    expect(await ids('WÄRE')).toEqual(['n1'])
+    expect(await ids('crème brûlée')).toEqual(['n2'])
+  })
+
+  it('matches % and _ as the characters typed', async () => {
+    await insertNote('n1', 'Discount', 'save 10% today')
+    await insertNote('n2', 'Other', 'save 100 today')
+
+    const result = await searchNotes(db, { query: '10%' })
+    expect((result as { data: { id: string }[] }).data.map((r) => r.id)).toEqual(['n1'])
+  })
 })
 
 describe('searchNotes — tag: filter', () => {

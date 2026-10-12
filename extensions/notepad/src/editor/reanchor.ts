@@ -25,7 +25,12 @@ export function reanchorComment(comment: Comment, body: string): ReanchorResult 
   }
 
   // 2. Text-quote search fallback
-  const candidate = findByTextQuote(body, quote, prefix ?? '', suffix ?? '')
+  // The context only disambiguates (W3C TextQuoteSelector,
+  // https://www.w3.org/TR/annotation-model/#text-quote-selector): an edit inside
+  // it must not orphan a quote that is still there.
+  const candidate =
+    findByTextQuote(body, quote, prefix ?? '', suffix ?? '') ??
+    nearestOccurrence(body, quote, startOffset)
   if (candidate !== null) {
     return {
       anchor: { id: comment.id, from: candidate, to: candidate + quote.length },
@@ -54,4 +59,12 @@ function findByTextQuote(
     idx = body.indexOf(quote, idx + 1)
   }
   return null
+}
+
+function nearestOccurrence(body: string, quote: string, oldOffset: number): number | null {
+  let nearest: number | null = null
+  for (let idx = body.indexOf(quote); idx !== -1; idx = body.indexOf(quote, idx + 1)) {
+    if (nearest === null || Math.abs(idx - oldOffset) < Math.abs(nearest - oldOffset)) nearest = idx
+  }
+  return nearest
 }

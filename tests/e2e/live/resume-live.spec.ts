@@ -11,7 +11,14 @@ import {
 } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from '../helpers'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  terminalRows,
+} from '../helpers'
 
 // The run that proves the feature: a real Claude Code conversation, ended, then
 // brought back from Home and asked what it was told before it ended.
@@ -44,11 +51,7 @@ test.afterAll(async () => {
 })
 
 async function rows(page: Page): Promise<string> {
-  return page.evaluate(() =>
-    [...document.querySelectorAll('.terminal-pane .xterm-rows > div')]
-      .map((row) => (row.textContent ?? '').split(String.fromCharCode(160)).join(' '))
-      .join('\n')
-  )
+  return (await terminalRows(page)).join('\n')
 }
 
 async function type(page: Page, text: string): Promise<void> {

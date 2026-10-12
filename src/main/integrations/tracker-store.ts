@@ -83,10 +83,25 @@ async function write(data: StoreFile): Promise<void> {
   await writeJsonAtomic(filePath(), data)
 }
 
-async function update(tracker: TrackerId, patch: Partial<StoredTracker>): Promise<void> {
-  const data = await read()
-  data[tracker] = { ...data[tracker], ...patch }
-  await write(data)
+// Each change reads, edits and writes the whole file. Two at once (blurring one
+// tracker's field by clicking the other's Disconnect) would each write over the
+// other's, so changes run one after another.
+let lastChange: Promise<unknown> = Promise.resolve()
+
+function change(edit: (data: StoreFile) => void): Promise<void> {
+  const next = lastChange.then(async () => {
+    const data = await read()
+    edit(data)
+    await write(data)
+  })
+  lastChange = next.catch(() => undefined)
+  return next
+}
+
+function update(tracker: TrackerId, patch: Partial<StoredTracker>): Promise<void> {
+  return change((data) => {
+    data[tracker] = { ...data[tracker], ...patch }
+  })
 }
 
 function defaultMine(tracker: TrackerId): MineSelector {
@@ -116,14 +131,14 @@ export async function getCredential(tracker: TrackerId): Promise<StoredCredentia
   return { tracker: 'jira', site: entry.site, email: entry.email, apiToken: secret }
 }
 
-export async function clearCredential(tracker: TrackerId): Promise<void> {
-  const data = await read()
-  // The mine selector survives a disconnect: it is the operator's
-  // configuration, not the credential's, and retyping a JQL query because a
-  // token expired is a small insult that adds up.
-  const kept = data[tracker]?.mine
-  data[tracker] = kept === undefined ? {} : { mine: kept }
-  await write(data)
+export function clearCredential(tracker: TrackerId): Promise<void> {
+  return change((data) => {
+    // The mine selector survives a disconnect: it is the operator's
+    // configuration, not the credential's, and retyping a JQL query because a
+    // token expired is a small insult that adds up.
+    const kept = data[tracker]?.mine
+    data[tracker] = kept === undefined ? {} : { mine: kept }
+  })
 }
 
 export async function setAccount(tracker: TrackerId, account: TrackerAccount): Promise<void> {
