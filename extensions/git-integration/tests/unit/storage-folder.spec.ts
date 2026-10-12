@@ -7,7 +7,13 @@ import { activateCapturingChannels, freshGlobalStorage } from './support/activat
 // git-integration keeps its stores in its own api.paths.globalStorage. Earlier
 // builds kept them in the shared userData folder, so activation moves them.
 
-const STORES = ['config.json', 'pr-review-sessions.json', 'pr-active-reviews.json']
+// Every store the extension opens with namedStore.
+const STORES = [
+  'config.json',
+  'pr-review-sessions.json',
+  'pr-active-reviews.json',
+  'pr-agent-reviews.json',
+]
 
 let globalStorage: string
 const userData = () => dirname(dirname(globalStorage))

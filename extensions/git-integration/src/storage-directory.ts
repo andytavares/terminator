@@ -3,8 +3,15 @@ import Store from 'electron-store'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { moveFromUserData } from '@terminator/extension-sdk/node'
 
-// Merge flow's `config` (electron-store's default name) and the review stores.
-const STORE_FILES = ['config.json', 'pr-review-sessions.json', 'pr-active-reviews.json']
+// Every store this extension keeps. `config` is merge flow's, electron-store's default name.
+const STORE_NAMES = [
+  'config',
+  'pr-review-sessions',
+  'pr-active-reviews',
+  'pr-agent-reviews',
+] as const
+
+type StoreName = (typeof STORE_NAMES)[number]
 
 let directory: string | undefined
 
@@ -17,17 +24,17 @@ export function openStorageDirectory(api: ExtensionAPI): string {
   const folder = api.paths.globalStorage
   moveFromUserData(
     api,
-    STORE_FILES.map((file) => ({ from: file, to: file }))
+    STORE_NAMES.map((name) => ({ from: `${name}.json`, to: `${name}.json` }))
   )
   mkdirSync(folder, { recursive: true })
   directory = folder
   return folder
 }
 
-const opened = new Map<string, Store<Record<string, unknown>>>()
+const opened = new Map<StoreName, Store<Record<string, unknown>>>()
 
 /** The named store in that directory, opened on first use. */
-export function namedStore<T = unknown>(name: string): Store<Record<string, T>> {
+export function namedStore<T = unknown>(name: StoreName): Store<Record<string, T>> {
   const existing = opened.get(name)
   if (existing) return existing as Store<Record<string, T>>
   const store = new Store<Record<string, unknown>>({ name, cwd: directory })

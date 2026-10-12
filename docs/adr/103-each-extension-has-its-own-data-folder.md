@@ -12,10 +12,10 @@ The name and the contract are VS Code's `ExtensionContext.globalStorageUri` ([AP
 
 The core creates nothing: an extension creates the folder when it first writes. `moveFromUserData` (`@terminator/extension-sdk/node`) moves what an earlier build kept in userData into the folder at activation, each path only while its new location does not exist. When both exist neither is touched and `api.log.warn` names the old copy.
 
-| Extension       | Moved from userData                                                | To, under `globalStorage` |
-| --------------- | ------------------------------------------------------------------ | ------------------------- |
-| Foundry         | `foundry/` (fallback records), `foundry-runtime/`                  | `records/`, `runtime/`    |
-| git-integration | `config.json`, `pr-review-sessions.json`, `pr-active-reviews.json` | the same names            |
+| Extension       | Moved from userData                                                                         | To, under `globalStorage` |
+| --------------- | ------------------------------------------------------------------------------------------- | ------------------------- |
+| Foundry         | `foundry/` (fallback records), `foundry-runtime/`                                           | `records/`, `runtime/`    |
+| git-integration | `config.json`, `pr-review-sessions.json`, `pr-active-reviews.json`, `pr-agent-reviews.json` | the same names            |
 
 A Foundry lane worktree can sit under the fallback records. Its repository records the worktree's path, so after the move Foundry runs `git worktree repair` inside each lane; otherwise `git worktree prune` would delete the lane's metadata.
 

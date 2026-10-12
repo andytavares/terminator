@@ -48,7 +48,7 @@ Every command goes through the core (ADR 094). git runs through `runGit` (`src/s
 
 ### Stores
 
-The electron-store files (`config.json` for merge flow, `pr-review-sessions.json`, `pr-active-reviews.json`) live in `api.paths.globalStorage`. `openStorageDirectory` (`src/storage-directory.ts`) creates the folder at activation and first moves the files earlier builds kept in the shared userData folder, unless the new one exists (ADR 103). A new store goes through `namedStore` and, if an earlier build wrote it to userData, into `STORE_FILES`.
+The electron-store files (`config.json` for merge flow, `pr-review-sessions.json`, `pr-active-reviews.json`, `pr-agent-reviews.json`) live in `api.paths.globalStorage`. `openStorageDirectory` (`src/storage-directory.ts`) creates the folder at activation and first moves the files earlier builds kept in the shared userData folder, unless the new one exists (ADR 103). A store is opened with `namedStore`, whose name must be one of `STORE_NAMES`, the list activation moves.
 
 ### Remote access
 
