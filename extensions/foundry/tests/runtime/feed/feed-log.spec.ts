@@ -206,3 +206,23 @@ describe('a feed that has been running for months', () => {
     expect(newLog().list().length).toBe(log.list().length)
   })
 })
+
+describe('telling a window the feed moved', () => {
+  it('says so after a post, a forget and a dismissal, each once', () => {
+    let told = 0
+    const log = createFeedLog(join(dir, 'feed.jsonl'), () => told++)
+    const posted = log.post(agentEntry)
+    expect(told).toBe(1)
+    log.removeEntry(posted.id)
+    expect(told).toBe(2)
+    log.forget('s1')
+    expect(told).toBe(3)
+  })
+
+  it('says nothing for a read', () => {
+    let told = 0
+    const log = createFeedLog(join(dir, 'feed.jsonl'), () => told++)
+    log.list()
+    expect(told).toBe(0)
+  })
+})

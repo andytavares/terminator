@@ -48,6 +48,8 @@ export interface SupervisionOptions {
   run?: RunCommand
   /** The branch a card's work is measured against. */
   baseBranch?: string
+  /** Told whenever the feed gains or loses a line. */
+  onFeedChange?: () => void
 }
 
 export function createSupervision(options: SupervisionOptions): Supervision {
@@ -64,7 +66,7 @@ export function createSupervision(options: SupervisionOptions): Supervision {
     })
 
   const runs = createRunRegistry()
-  const feed = createFeedLog(path.join(stateDir, 'feed.jsonl'))
+  const feed = createFeedLog(path.join(stateDir, 'feed.jsonl'), options.onFeedChange)
 
   async function measure(sessionId: string): Promise<void> {
     const run = runs.get(sessionId)

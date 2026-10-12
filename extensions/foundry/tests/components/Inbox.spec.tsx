@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { Inbox, SIGNAL_POLL_MS } from '../../src/components/Inbox.js'
+import { createChangeBus } from '../helpers/change-bus.js'
 import { raiseGate, GATE_RULES, ruleInWords } from '../../src/gates/rules.js'
 import type { Signal } from '../../src/sensors/types.js'
 
@@ -11,6 +12,7 @@ import type { Signal } from '../../src/sensors/types.js'
 // click through without reading.
 
 let invoke: ReturnType<typeof vi.fn>
+let bus = createChangeBus()
 const openExternal = vi.fn()
 
 function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
@@ -56,6 +58,7 @@ function mount(over: Record<string, unknown> = {}) {
   // Mutable so a dismiss during the test is reflected the next time the
   // component re-polls the list, the way the real channel would behave.
   let liveSignals = [...((over.signals as Signal[] | undefined) ?? [])]
+  bus = createChangeBus()
   invoke = vi.fn(async (channel: string, payload?: unknown) => {
     if (channel === 'foundry:inbox.list') {
       return {
@@ -89,7 +92,7 @@ function mount(over: Record<string, unknown> = {}) {
     return { ok: true }
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    extensionBridge: { invoke, on: bus.on },
     shell: { openExternal },
   }
   return render(<Inbox onOpenOrder={over.onOpenOrder as ((id: string) => void) | undefined} />)
@@ -440,6 +443,16 @@ describe("from the factory's sensors", () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('reads the inbox again when Foundry says a gate changed, not before', async () => {
+    mount({})
+    const lists = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:inbox.list').length
+    await waitFor(() => expect(lists()).toBeGreaterThan(0))
+    const before = lists()
+
+    bus.emit({ kind: 'gates', orderId: 'WO-1' })
+    await waitFor(() => expect(lists()).toBe(before + 1))
   })
 
   it('does not show the section when there are no open signals', async () => {

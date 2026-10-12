@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
+import { createChangeBus } from '../helpers/change-bus.js'
 import { Orders } from '../../src/components/Orders.js'
 
 // The list is a door, not a board. What it has to carry is which order is
@@ -9,16 +10,17 @@ import { Orders } from '../../src/components/Orders.js'
 // you open them one at a time to find out which two it meant.
 
 function mount(orders: unknown[], props: Record<string, unknown> = {}) {
+  const bus = createChangeBus()
   const invoke = vi.fn(async (channel: string) => {
     if (channel === 'foundry:order.list') return { orders }
     return {}
   })
   const openExternal = vi.fn()
   ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    extensionBridge: { invoke, on: bus.on },
     shell: { openExternal },
   }
-  return { ...render(<Orders repoRoot="/repos/app" {...props} />), invoke, openExternal }
+  return { ...render(<Orders repoRoot="/repos/app" {...props} />), invoke, openExternal, bus }
 }
 
 function row(over: Record<string, unknown> = {}) {
@@ -89,13 +91,23 @@ describe('the orders list', () => {
     await waitFor(() => expect(screen.getByText('Refuse an expired refresh token')).toBeTruthy())
   })
 
-  it('refetches while it is on screen, so an answer given elsewhere lands here', async () => {
+  it('refetches when Foundry says a gate changed, so an answer given elsewhere lands here', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { invoke, bus } = mount([row({ openQuestions: 2 })])
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:order.list', {}))
+    const first = invoke.mock.calls.length
+    bus.emit({ kind: 'gates', orderId: 'WO-1' })
+    await vi.advanceTimersByTimeAsync(200)
+    expect(invoke.mock.calls.length).toBeGreaterThan(first)
+  })
+
+  it('does not refetch just because time passes', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { invoke } = mount([row({ openQuestions: 2 })])
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:order.list', {}))
     const first = invoke.mock.calls.length
-    await vi.advanceTimersByTimeAsync(4100)
-    expect(invoke.mock.calls.length).toBeGreaterThan(first)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(invoke.mock.calls.length).toBe(first)
   })
 })
 

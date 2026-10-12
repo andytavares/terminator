@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useRunObservation } from '../../src/renderer/use-run-observation.js'
+import { createChangeBus } from '../helpers/change-bus.js'
 
-// The polling half of the Floor: fetch the run's observation and the pending
-// asks against it, on mount and on an interval, without the rest of the
-// Floor's own state (review, feed, stalls, transcript) along for the ride.
+// The pushed half of the Floor: fetch the run's observation and the pending
+// asks against it on mount and again when Foundry says they changed, without
+// the rest of the Floor's own state (review, feed, stalls, transcript) along
+// for the ride.
 
 const NODES = [
   {
@@ -42,15 +44,17 @@ const ASK = {
 }
 
 let invoke: ReturnType<typeof vi.fn>
+let bus: ReturnType<typeof createChangeBus>
 
 function mockBridge(observe: unknown, pending: unknown[] = []) {
+  bus = createChangeBus()
   invoke = vi.fn(async (channel: string) => {
     if (channel === 'foundry:run.observe') return observe
     if (channel === 'foundry:permissions-list') return { pending }
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    extensionBridge: { invoke, on: bus.on },
   }
 }
 
@@ -63,7 +67,7 @@ afterEach(() => {
 })
 
 describe('useRunObservation', () => {
-  it('polls the observation and the pending asks on mount', async () => {
+  it('reads the observation and the pending asks on mount', async () => {
     mockBridge(reply(), [ASK])
     const { result } = renderHook(() => useRunObservation('WO-1'))
 
@@ -74,19 +78,44 @@ describe('useRunObservation', () => {
     expect(invoke).toHaveBeenCalledWith('foundry:permissions-list', {})
   })
 
-  it('polls again on the live interval', async () => {
+  const observed = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe').length
+  const asked = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:permissions-list').length
+  const settle = () => act(async () => void (await vi.advanceTimersByTimeAsync(200)))
+
+  it('reads the observation again when a record of this order changes', async () => {
     mockBridge(reply())
     renderHook(() => useRunObservation('WO-1'))
+    await waitFor(() => expect(observed()).toBe(1))
 
-    await waitFor(() =>
-      expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe')).toHaveLength(1)
-    )
+    for (const kind of ['order', 'graph', 'gates', 'ledger'] as const) {
+      const before = observed()
+      bus.emit({ kind, orderId: 'WO-1' })
+      await settle()
+      expect(observed(), kind).toBe(before + 1)
+    }
+  })
+
+  it('does not read again for another order, nor for time passing', async () => {
+    mockBridge(reply())
+    renderHook(() => useRunObservation('WO-1'))
+    await waitFor(() => expect(observed()).toBe(1))
+
+    bus.emit({ kind: 'graph', orderId: 'WO-2' })
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2100)
+      await vi.advanceTimersByTimeAsync(60_000)
     })
-    expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe').length).toBeGreaterThan(
-      1
-    )
+    expect(observed()).toBe(1)
+    expect(asked()).toBe(1)
+  })
+
+  it('reads the pending asks again on a live change, whichever order it names', async () => {
+    mockBridge(reply())
+    renderHook(() => useRunObservation('WO-1'))
+    await waitFor(() => expect(asked()).toBe(1))
+
+    bus.emit({ kind: 'live', orderId: '' })
+    await settle()
+    expect(asked()).toBe(2)
   })
 
   it('keeps the last view and sets a problem when the observe call errors', async () => {
@@ -105,18 +134,17 @@ describe('useRunObservation', () => {
     expect(result.current.view).toBe(lastView)
   })
 
-  it('stops polling once unmounted', async () => {
+  it('stops reading once unmounted', async () => {
     mockBridge(reply())
     const { unmount } = renderHook(() => useRunObservation('WO-1'))
     await waitFor(() =>
       expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe')).toHaveLength(1)
     )
     unmount()
-    const before = invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe').length
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(6000)
-    })
-    expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe').length).toBe(before)
+    const before = observed()
+    bus.emit({ kind: 'graph', orderId: 'WO-1' })
+    await settle()
+    expect(observed()).toBe(before)
   })
 
   it('refetches when the order id changes', async () => {

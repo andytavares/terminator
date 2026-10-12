@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { Ledger } from '../../src/components/Ledger.js'
+import { createChangeBus } from '../helpers/change-bus.js'
 
 // The record, read-only apart from one button. Proposals appear when the
 // operator presses it and at no other time.
@@ -72,8 +73,10 @@ const FACTORY_METRICS = {
 }
 
 let invoke: ReturnType<typeof vi.fn>
+let bus = createChangeBus()
 
 function mount(over: Record<string, unknown> = {}) {
+  bus = createChangeBus()
   invoke = vi.fn(async (channel: string) => {
     if (channel === 'foundry:ledger.query') {
       return {
@@ -95,12 +98,28 @@ function mount(over: Record<string, unknown> = {}) {
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    extensionBridge: { invoke, on: bus.on },
   }
   render(<Ledger />)
 }
 
 beforeEach(() => vi.clearAllMocks())
+
+describe('the record while it is open', () => {
+  const queries = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:ledger.query').length
+
+  it('is read again when an entry is appended, and not when only a gate changes', async () => {
+    mount()
+    await waitFor(() => expect(queries()).toBe(1))
+
+    bus.emit({ kind: 'gates', orderId: 'WO-1' })
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(queries()).toBe(1)
+
+    bus.emit({ kind: 'ledger', orderId: 'WO-1' })
+    await waitFor(() => expect(queries()).toBe(2))
+  })
+})
 
 describe('reading the record', () => {
   /** The rows, not the filter options, which carry the same words. */

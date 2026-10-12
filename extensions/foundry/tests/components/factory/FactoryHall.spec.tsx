@@ -1,3 +1,4 @@
+import { createChangeBus } from '../../helpers/change-bus.js'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
@@ -283,6 +284,7 @@ describe('FactoryHall', () => {
         labels: { 'N-1': 'Build the thing', 'N-2': 'Build the other' },
       })
     let current = two('running')
+    const bus = createChangeBus()
     invoke = vi.fn(async (channel: string) => {
       if (channel === 'foundry:run.observe') return current
       if (channel === 'foundry:permissions-list') return { pending: [] }
@@ -290,11 +292,12 @@ describe('FactoryHall', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
     await screen.findByRole('button', { name: /Build the other/ })
     current = two('passed')
+    bus.emit({ kind: 'graph', orderId: 'WO-1' })
     await waitFor(
       () => expect(document.querySelectorAll('.fdry-hall-overlay .fdry-callout')).toHaveLength(2),
       { timeout: 4000 }
@@ -307,6 +310,7 @@ describe('FactoryHall', () => {
 
   it('raises a callout at the station when its state changes, not a line under the picture', async () => {
     let current = view()
+    const bus = createChangeBus()
     invoke = vi.fn(async (channel: string) => {
       if (channel === 'foundry:run.observe') return current
       if (channel === 'foundry:permissions-list') return { pending: [] }
@@ -314,13 +318,14 @@ describe('FactoryHall', () => {
       return {}
     })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      extensionBridge: { invoke, on: bus.on },
     }
     render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
     current = view({
       graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' })] },
     })
+    bus.emit({ kind: 'graph', orderId: 'WO-1' })
     await waitFor(
       () => {
         const bubble = document.querySelector('.fdry-hall-overlay .fdry-callout') as HTMLElement

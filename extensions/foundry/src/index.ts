@@ -728,6 +728,7 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     supervision = createSupervision({
       api,
       stateDir: runtimeStateDir(),
+      onFeedChange: () => announceLive(''),
     })
     mutes = createMuteStore(path.join(runtimeStateDir(), 'mutes.json'))
 
@@ -3844,6 +3845,7 @@ export function activate(api: ExtensionAPI): void {
     const parsed = FeedMute.safeParse(payload)
     if (!parsed.success) return { error: 'Malformed request.' }
     mutes?.add(parsed.data)
+    announceLive('')
     return { mutes: mutes?.list() ?? [] }
   })
 
@@ -3851,6 +3853,7 @@ export function activate(api: ExtensionAPI): void {
     const parsed = FeedMute.safeParse(payload)
     if (!parsed.success) return { error: 'Malformed request.' }
     mutes?.remove(parsed.data)
+    announceLive('')
     return { mutes: mutes?.list() ?? [] }
   })
 

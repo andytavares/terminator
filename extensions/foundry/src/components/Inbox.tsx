@@ -1,6 +1,6 @@
 import { GateCard } from './GateCard.js'
 import { ruleInWords } from '../gates/rules.js'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import {
   AlertTriangle,
   ShieldAlert,
@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import type { Gate, GateRuleId } from '../gates/rules.js'
 import { ExternalLink } from './Markdown.js'
+import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
+import { usePolled } from '../renderer/use-polled.js'
 import type { Signal } from '../sensors/types.js'
 
 // Everything waiting on the operator, as a band above the Forge.
@@ -125,23 +127,12 @@ export function Inbox({
     await refreshSignals()
   }, [refreshList, refreshSignals])
 
-  useEffect(() => {
-    void (async () => {
-      setView(await readInbox())
-      showSignals(await readSignals())
-    })()
-  }, [showSignals])
+  // An order can start waiting on you at any moment; Foundry says when.
+  usePushed(readInbox, setView, { kinds: ANY_RECORD })
 
-  // Sensors record signals on their own tick, and an order can start waiting
-  // on you at any moment, so both are read again while the band is mounted
-  // rather than only when it mounts.
-  useEffect(() => {
-    const timer = setInterval(() => {
-      void refreshSignals()
-      void refreshList()
-    }, SIGNAL_POLL_MS)
-    return () => clearInterval(timer)
-  }, [refreshList, refreshSignals])
+  // Sensors record signals on their own tick and tell nobody, so this is the
+  // one thing here still asked for on a timer — and not while hidden.
+  usePolled(readSignals, showSignals, SIGNAL_POLL_MS)
 
   const answer = useCallback(
     async (gateId: string, option: string, limit?: number | null) => {

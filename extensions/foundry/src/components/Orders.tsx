@@ -5,6 +5,7 @@ import { OrderLinks } from './OrderLinks.js'
 import { ciLabel } from '../line/ci-label.js'
 import type { CiState } from '../line/ci-state.js'
 import type { Gate, GateOption } from '../gates/rules.js'
+import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
 import { Forge } from './Forge.js'
 import { Floor } from './Floor.js'
 import { ConfirmButton } from './ConfirmButton.js'
@@ -153,16 +154,10 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
     [refresh]
   )
 
-  useEffect(() => {
-    const poll = (): void => void readOrders().then(setRows)
-    poll()
-    // The counts on these rows go stale the moment a question is answered in
-    // another window or a run raises one, and this list is where the tab's
-    // badge sends you — so it refetches while it is on screen rather than
-    // once, on mount.
-    const timer = setInterval(poll, 4000)
-    return () => clearInterval(timer)
-  }, [])
+  // The counts on these rows go stale the moment a question is answered in
+  // another window or a run raises one, and this list is where the tab's
+  // badge sends you — so it is read again when Foundry says any of that changed.
+  usePushed(readOrders, setRows, { kinds: ANY_RECORD })
 
   // Your tickets, listed rather than remembered. Refreshed when the picker
   // opens and when you search, not on every keystroke.

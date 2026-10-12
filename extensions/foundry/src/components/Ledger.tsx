@@ -5,6 +5,7 @@ import type { Proposal } from '../ledger/curator.js'
 import type { FactoryMetrics } from '../factory/metrics.js'
 import { formatDuration } from '../factory/format.js'
 import { MarkdownInline } from './Markdown.js'
+import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
 import { MetricsTiles, WindowToggle } from './MetricsTiles.js'
 import { rungLevelInWords } from '../verify/ladder.js'
 import type { Rung } from '../verify/ladder.js'
@@ -118,9 +119,15 @@ export function Ledger(): JSX.Element {
 
   const refreshRules = useCallback(() => readRules().then(whenRead(setRules)), [])
 
-  useEffect(() => {
-    void readLedger(orderId, actor, action).then(whenRead(setView))
-  }, [orderId, actor, action])
+  // The record grows while it is open; Foundry says when, and for which order.
+  const readEntries = useCallback(
+    () => readLedger(orderId, actor, action),
+    [orderId, actor, action]
+  )
+  const showEntries = useCallback((next: LedgerView | null) => {
+    if (next !== null) setView(next)
+  }, [])
+  usePushed(readEntries, showEntries, { kinds: ['ledger'] })
 
   useEffect(() => {
     void readRules().then(whenRead(setRules))
@@ -129,9 +136,14 @@ export function Ledger(): JSX.Element {
   // Fetched only once the operator asks for the Factory view — the same
   // discipline as the proposals panel: a surface that fetches before it is
   // looked at is a surface whose numbers go stale unnoticed.
-  useEffect(() => {
-    if (tab === 'factory') void readMetrics(metricsWindow).then(whenRead(setMetrics))
-  }, [tab, metricsWindow])
+  const readShownMetrics = useCallback(
+    () => (tab === 'factory' ? readMetrics(metricsWindow) : Promise.resolve(null)),
+    [tab, metricsWindow]
+  )
+  const showMetrics = useCallback((next: FactoryMetrics | null) => {
+    if (next !== null) setMetrics(next)
+  }, [])
+  usePushed(readShownMetrics, showMetrics, { kinds: tab === 'factory' ? ANY_RECORD : [] })
 
   const ask = useCallback(async () => {
     const next = (await invoke('foundry:rules.propose', {})) as { proposals?: Proposal[] }

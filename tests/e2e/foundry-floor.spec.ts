@@ -10,6 +10,7 @@ import {
   inFoundry,
   makeFixtureRepo,
   openFoundry,
+  restartFoundry,
 } from './foundry-harness'
 
 // The Floor's live CI band and the Ledger's Factory metrics: numbers read
@@ -151,6 +152,8 @@ test('a draft’s CI is on the Floor while it is watched', async () => {
       at: new Date().toISOString(),
     })
   )
+
+  handle = await restartFoundry(handle, 'Foundry Floor')
 
   // The order's row says the same as its Floor before it is opened: the pull
   // request, and the CI round with a spinner while the checks run.

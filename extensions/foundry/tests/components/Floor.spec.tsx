@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import React from 'react'
+import { createChangeBus } from '../helpers/change-bus.js'
 import { Floor } from '../../src/components/Floor.js'
 
 // Where you watch, not where you act — with one exception, which is getting
@@ -55,11 +56,13 @@ function reply(over: Record<string, unknown> = {}) {
 }
 
 let invoke: ReturnType<typeof vi.fn>
+let bus = createChangeBus()
 let openExternal: ReturnType<typeof vi.fn>
 let runCommand: ReturnType<typeof vi.fn>
 let hasCommand: ReturnType<typeof vi.fn>
 
 function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}) {
+  bus = createChangeBus()
   invoke = vi.fn(async (channel: string) => {
     if (channel === 'foundry:run.observe') return view
     if (channel === 'foundry:permissions-list') return { pending: live.pending ?? [] }
@@ -89,7 +92,7 @@ function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}
     return { terminalSessionId: 't-1', ok: true }
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    extensionBridge: { invoke, on: bus.on },
     shell: { openExternal },
     extension: { runCommand, hasCommand },
   }
@@ -1325,14 +1328,56 @@ describe('the standing band', () => {
 
   // The graph half of this screen was fetched once, on mount, and never again
   // — so a state chip was a snapshot of whenever the panel happened to open.
-  it('refetches the graph while it is on screen', async () => {
+  it('refetches the graph when Foundry says this order changed, and not for another', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     mount(reply({ standing: standing() }))
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:run.observe', { id: 'WO-1' }))
-    const before = invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe').length
+    const observed = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe').length
+    const before = observed()
+
+    bus.emit({ kind: 'graph', orderId: 'WO-2' })
+    await vi.advanceTimersByTimeAsync(200)
+    expect(observed()).toBe(before)
+
+    bus.emit({ kind: 'graph', orderId: 'WO-1' })
+    await vi.advanceTimersByTimeAsync(200)
+    expect(observed()).toBe(before + 1)
+    vi.useRealTimers()
+  })
+
+  // What the agents are saying is written by their own processes, so it is the
+  // one thing still asked for on a timer.
+  it('keeps reading what the agents are saying, and stops while hidden', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    mount(reply({ standing: standing() }))
+    const transcriptReads = () =>
+      invoke.mock.calls.filter((c) => c[0] === 'foundry:run-transcript').length
+    await waitFor(() => expect(transcriptReads()).toBeGreaterThan(0))
+    const before = transcriptReads()
     await vi.advanceTimersByTimeAsync(2100)
-    const after = invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe').length
-    expect(after).toBeGreaterThan(before)
+    expect(transcriptReads()).toBeGreaterThan(before)
+
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+    document.dispatchEvent(new Event('visibilitychange'))
+    const whileHidden = transcriptReads()
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(transcriptReads()).toBe(whileHidden)
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
+    vi.useRealTimers()
+  })
+
+  it('reads the feed and the stalls when Foundry says live state changed, not on a timer', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    mount(reply({ standing: standing() }))
+    const feedReads = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:feed-list').length
+    await waitFor(() => expect(feedReads()).toBe(1))
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(feedReads()).toBe(1)
+
+    bus.emit({ kind: 'live', orderId: '' })
+    await vi.advanceTimersByTimeAsync(200)
+    expect(feedReads()).toBe(2)
     vi.useRealTimers()
   })
 

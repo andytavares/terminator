@@ -44,7 +44,8 @@ import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
 import { MarkdownInline } from '../Markdown.js'
 import { GateCard } from '../GateCard.js'
 import { OrderLinks } from '../OrderLinks.js'
-import { usePolled } from '../../renderer/use-polled.js'
+import { usePolled, everyWhileVisible } from '../../renderer/use-polled.js'
+import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
 import './hall.css'
 
 /** Half of a gate card's width, `min(360px, 60%)`, plus 16px to the scene's edge. */
@@ -185,16 +186,9 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
     }
     return r.error === undefined ? (r.activity ?? {}) : null
   }, [orderId])
-  const showActivity = useCallback(
-    (read: Readonly<Record<string, readonly ToolActivity[]>> | null) => {
-      if (read !== null) setActivity(read)
-    },
-    []
-  )
-  usePolled(readActivity, showActivity, ACTIVITY_POLL_MS)
 
-  // The order's own numbers for the status wall — same cadence as the
-  // activity poll, so a rework or a new CI round shows up within one beat.
+  // The order's own numbers for the status wall, read again when anything
+  // recorded about this order changes — a rework or a new CI round included.
   const readOrderMetrics = useCallback(async () => {
     const r = (await invoke('foundry:factory.metrics', { window: 'all' })) as {
       orders?: OrderMetrics[]
@@ -206,16 +200,15 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
   const showOrderMetrics = useCallback((read: OrderMetrics | null | undefined) => {
     if (read !== undefined) setOrderMetrics(read)
   }, [])
-  usePolled(readOrderMetrics, showOrderMetrics, ACTIVITY_POLL_MS)
+  usePushed(readOrderMetrics, showOrderMetrics, { kinds: ANY_RECORD, orderId })
 
   // Risen callouts leave on their own; nothing has to happen for them to go.
   useEffect(() => {
     if (callouts.length === 0) return
-    const timer = setInterval(() => {
+    return everyWhileVisible(() => {
       const now = Date.now()
       setCallouts((live) => live.filter((c) => now - c.at < CALLOUT_MS))
     }, 500)
-    return () => clearInterval(timer)
   }, [callouts.length])
 
   // What a batch of events says: callouts at their stations, and one sentence
@@ -267,11 +260,7 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
   // A held beat comes due with no poll to carry it.
   const liveLabels = view?.labels
   useEffect(() => {
-    const timer = setInterval(
-      () => liveHall.releaseDue(liveLabels ?? {}, Date.now()),
-      BEAT_CHECK_MS
-    )
-    return () => clearInterval(timer)
+    return everyWhileVisible(() => liveHall.releaseDue(liveLabels ?? {}, Date.now()), BEAT_CHECK_MS)
   }, [liveHall, liveLabels])
 
   const labelsNow = view?.labels
@@ -425,8 +414,8 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
   const selectedSessionId =
     selected === null ? null : (view?.graph.nodes.find((n) => n.id === selected)?.sessionId ?? null)
 
-  // An open station's transcript is live: read at once, then on the activity
-  // beat, and only for as long as this station stays open.
+  // An open station's transcript is live: read as often as the activity is,
+  // and only for as long as this station stays open.
   const readTranscript = useCallback(async () => {
     if (selectedSessionId === null) return null
     const r = (await invoke('foundry:run-transcript', {
@@ -435,10 +424,25 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
     })) as { lines?: TranscriptLine[] }
     return r.lines ?? []
   }, [selectedSessionId])
-  const showTranscript = useCallback((lines: TranscriptLine[] | null): void => {
-    if (lines !== null) setTranscript(lines)
-  }, [])
-  usePolled(readTranscript, showTranscript, ACTIVITY_POLL_MS)
+
+  // The one poll left on this view. Tool activity and a station's transcript
+  // are both read from the agents' own transcript files, which change in their
+  // processes with nothing Foundry writes to announce it.
+  const readAgentWords = useCallback(
+    async () => ({ activity: await readActivity(), lines: await readTranscript() }),
+    [readActivity, readTranscript]
+  )
+  const showAgentWords = useCallback(
+    (read: {
+      activity: Readonly<Record<string, readonly ToolActivity[]>> | null
+      lines: TranscriptLine[] | null
+    }) => {
+      if (read.activity !== null) setActivity(read.activity)
+      if (read.lines !== null) setTranscript(read.lines)
+    },
+    []
+  )
+  usePolled(readAgentWords, showAgentWords, ACTIVITY_POLL_MS)
 
   const [transcriptFor, setTranscriptFor] = useState(selectedSessionId)
   if (transcriptFor !== selectedSessionId) {

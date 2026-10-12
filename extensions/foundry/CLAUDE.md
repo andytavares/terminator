@@ -4,7 +4,7 @@ Foundry is a software factory: a **Forge** that converges an idea or tracker iss
 
 Design documents: `specs/037-foundry-software-factory/`.
 
-## The three rules that are specific to this extension
+## The rules that are specific to this extension
 
 ### 1. Nothing is written into a target repository
 
@@ -43,6 +43,38 @@ a scratch file in the OS temp directory.
 `shell-split.ts` tracks quoting and escaping. It is not a shell parser and must
 not become one — heredocs are in because a heredoc is quoting, and that is the
 whole of the licence.
+
+### 4. Disk is the truth, memory is the read path, and a change is pushed
+
+`src/state/foundry-index.ts` holds orders, run graphs, gates and ledgers in
+memory, one index per data root. Everything that writes one of them goes through
+a store module (`order/store.ts`, `gates/store.ts`, `writeRunGraph` in
+`ipc/run-channels.ts`), writes to disk **first**, and only then tells the
+index; the index then broadcasts `foundry:changed` `{ kind, orderId }`. A new
+writer of any of these records must do the same, or the surfaces keep showing
+what was there before.
+
+- **Reads come from the index, never from a fresh parse.** Do not read
+  `order.json`, `gates.json`, `run-graph.json` or `ledger.jsonl` directly; use the
+  store. Reads return copies, so a caller may edit what it was given.
+- **A record edited by hand under the data root is not noticed** until the
+  application restarts. A spec that writes records while the app is running
+  restarts it (`restartFoundry` in `tests/e2e/foundry-harness.ts`).
+- **Files the index does not hold still announce.** `ci.json`, `refinery.json`
+  and `observed-files.json` are plain files; the code that writes one calls
+  `indexFor(root).announce({ kind: 'graph', orderId })`. State that lives only in
+  the process (held tool calls, stalls, stranded agents, intake sessions, the
+  feed) calls `announceLive(orderId)` — empty when not tied to one order.
+- **No process in a read path.** The refinery's queue reads the files a checkout
+  changed from `observed-files.json`, written by the executor when a step settles
+  (`recordObservedFiles`). `computeQueueEntries` spawns nothing, and
+  `tests/ipc/read-path-ipc.spec.ts` fails if it does.
+- **The renderer does not poll Foundry's own data.** `usePushed(read, show,
+{ kinds, orderId })` reads on mount and again for a matching change. The one
+  fallback poll a view may keep (`usePolled`) is for what changes without a
+  Foundry write — an agent's transcript, a sensor's signals — and it stops while
+  `document.hidden`. `rg -c "setInterval\(" extensions/foundry/src/components
+extensions/foundry/src/renderer` is the count to keep small.
 
 ## Extension Isolation (MANDATORY)
 
