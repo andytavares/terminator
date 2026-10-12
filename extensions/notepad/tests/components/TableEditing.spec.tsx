@@ -2,9 +2,9 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
+import { forceParsing, syntaxTree } from '@codemirror/language'
 import { GFM } from '@lezer/markdown'
 import { cursorCharRight, cursorCharLeft } from '@codemirror/commands'
-import { forceParsing } from '@codemirror/language'
 import { livePreviewPlugin } from '../../src/editor/livePreview'
 
 // Exercises a real EditorView rather than buildDecorations alone, because the
@@ -201,5 +201,27 @@ describe('writing a fenced code block', () => {
     v.dispatch({ selection: { anchor: v.state.doc.length } })
 
     expect(v.dom.querySelector('.notepad-fence-hidden')).not.toBeNull()
+  })
+})
+
+describe('a table the first parse did not reach', () => {
+  // A new editor parses only its first few thousand characters at once and
+  // the rest in the background, so a table further down arrives later.
+  it('renders once the background parse reaches it', async () => {
+    const doc = `${'filler line\n'.repeat(1500)}\n${TABLE}\n`
+    const v = createView(doc, 0)
+    expect(syntaxTree(v.state).length).toBeLessThan(doc.length)
+
+    await vi.waitFor(() => expect(syntaxTree(v.state).length).toBe(doc.length), {
+      timeout: 10_000,
+    })
+    const widgets: string[] = []
+    for (const source of v.state.facet(EditorView.decorations)) {
+      const set = typeof source === 'function' ? source(v) : source
+      set.between(0, doc.length, (_from, _to, deco) => {
+        widgets.push(deco.spec.widget?.constructor.name ?? '')
+      })
+    }
+    expect(widgets).toContain('TableWidget')
   })
 })
