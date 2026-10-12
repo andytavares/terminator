@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useState } from 'react'
 import type { Workspace } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
@@ -18,7 +19,9 @@ export function EditWorkspaceDialog({ workspace, onClose }: Props): JSX.Element 
   const [tags, setTags] = useState(workspace.tags.join(', '))
   const [nameError, setNameError] = useState('')
   const [error, setError] = useState('')
-  const { updateWorkspace, workspaces } = useWorkspaceStore()
+  const { updateWorkspace, workspaces } = useWorkspaceStore(
+    useShallow((s) => ({ updateWorkspace: s.updateWorkspace, workspaces: s.workspaces }))
+  )
 
   function validateName(value: string): string {
     if (!value.trim()) return 'Name is required'

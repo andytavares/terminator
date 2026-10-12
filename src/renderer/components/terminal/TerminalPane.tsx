@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useSessionStore } from '../../stores/session.store'
 import { useModalStore } from '../../stores/modal.store'
@@ -24,7 +25,21 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     setSplitRatio,
     setFocusedSession,
     focusRequest,
-  } = useSessionStore()
+  } = useSessionStore(
+    useShallow((s) => ({
+      getSessionsForProject: s.getSessionsForProject,
+      getActiveSessionForProject: s.getActiveSessionForProject,
+      getTerminalInstance: s.getTerminalInstance,
+      clearBellCount: s.clearBellCount,
+      getPaneLayout: s.getPaneLayout,
+      setSplitRatio: s.setSplitRatio,
+      setFocusedSession: s.setFocusedSession,
+      focusRequest: s.focusRequest,
+      sessions: s.sessions,
+      projectViews: s.projectViews,
+      terminalInstances: s.terminalInstances,
+    }))
+  )
   const modalOpen = useModalStore((s) => s.depth > 0)
 
   const openError = useTerminalOpenErrorStore((s) => s.errors[projectId])

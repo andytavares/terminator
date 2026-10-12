@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useState, useEffect, useRef } from 'react'
 import { GlobalSettings } from './GlobalSettings'
 import { IntegrationsSettings } from './IntegrationsSettings'
@@ -16,7 +17,9 @@ interface Props {
 export function SettingsPanel({ onClose }: Props): JSX.Element {
   useModalEffect()
   const [section, setSection] = useState<Section>('global')
-  const { activeWorkspaceId } = useWorkspaceStore()
+  const { activeWorkspaceId } = useWorkspaceStore(
+    useShallow((s) => ({ activeWorkspaceId: s.activeWorkspaceId }))
+  )
   const panelRef = useRef<HTMLDivElement>(null)
 
   // The terminal's xterm stops Escape from propagating, so while it holds

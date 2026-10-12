@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import { useEffect } from 'react'
 import { create } from 'zustand'
 
@@ -15,7 +16,7 @@ export const useModalStore = create<ModalStore>((set) => ({
 
 /** Call inside any modal component to suppress extension WebContentsViews while open. */
 export function useModalEffect(): void {
-  const { push, pop } = useModalStore()
+  const { push, pop } = useModalStore(useShallow((s) => ({ push: s.push, pop: s.pop })))
   useEffect(() => {
     push()
     return pop

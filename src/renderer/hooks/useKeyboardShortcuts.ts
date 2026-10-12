@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import { useEffect } from 'react'
 import { useWorkspaceStore } from '../stores/workspace.store'
 import { useSessionStore } from '../stores/session.store'
@@ -51,7 +52,16 @@ export function useKeyboardShortcuts({
     activeProjectId,
     resolveActiveCwd,
     setExpandedWorkspaceIds,
-  } = useWorkspaceStore()
+  } = useWorkspaceStore(
+    useShallow((s) => ({
+      workspaces: s.workspaces,
+      activeWorkspaceId: s.activeWorkspaceId,
+      setActiveWorkspace: s.setActiveWorkspace,
+      activeProjectId: s.activeProjectId,
+      resolveActiveCwd: s.resolveActiveCwd,
+      setExpandedWorkspaceIds: s.setExpandedWorkspaceIds,
+    }))
+  )
   const {
     getActiveSessionForProject,
     setActiveSessionForProject,
@@ -60,9 +70,21 @@ export function useKeyboardShortcuts({
     getFocusedSession,
     closeSplitLeaf,
     closeSession,
-  } = useSessionStore()
+  } = useSessionStore(
+    useShallow((s) => ({
+      getActiveSessionForProject: s.getActiveSessionForProject,
+      setActiveSessionForProject: s.setActiveSessionForProject,
+      getSessionsForProject: s.getSessionsForProject,
+      getPaneLayout: s.getPaneLayout,
+      getFocusedSession: s.getFocusedSession,
+      closeSplitLeaf: s.closeSplitLeaf,
+      closeSession: s.closeSession,
+    }))
+  )
   const { createSession, splitSession } = useTerminalSession()
-  const { resolveSettings } = useSettingsStore()
+  const { resolveSettings } = useSettingsStore(
+    useShallow((s) => ({ resolveSettings: s.resolveSettings }))
+  )
   const { keyboardShortcuts } = useExtensionRegistry()
 
   const effectiveProjectId = scratchProjectId ?? activeProjectId

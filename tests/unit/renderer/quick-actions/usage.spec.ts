@@ -68,6 +68,11 @@ describe('recordDirectUse', () => {
     const directUse: DirectUse[] = [{ id: 'a', count: 2 }]
     expect(recordDirectUse(directUse, 'a')).toEqual([{ id: 'a', count: 3 }])
   })
+
+  it('stops counting once the hint no longer shows, returning the list it was given', () => {
+    const directUse: DirectUse[] = [{ id: 'a', count: HINT_LIMIT }]
+    expect(recordDirectUse(directUse, 'a')).toBe(directUse)
+  })
 })
 
 describe('shouldShowHint', () => {

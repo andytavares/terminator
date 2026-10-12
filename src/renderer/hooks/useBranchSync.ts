@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import { useEffect } from 'react'
 import { useWorkspaceStore } from '../stores/workspace.store'
 
@@ -32,7 +33,9 @@ export interface BranchSyncTarget {
  * is on without one having to tell the other.
  */
 export function useBranchSync(targets: readonly BranchSyncTarget[]): void {
-  const { updateProjectBranch } = useWorkspaceStore()
+  const { updateProjectBranch } = useWorkspaceStore(
+    useShallow((s) => ({ updateProjectBranch: s.updateProjectBranch }))
+  )
   // The caller rebuilds this array every render. Keying the effect on what the
   // targets say — rather than on the array's identity — is what stops the timer
   // being torn down and restarted on every keystroke elsewhere in the app.

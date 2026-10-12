@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useState } from 'react'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
@@ -25,8 +26,24 @@ export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.E
     createProject,
     setActiveWorkspace,
     setActiveProject,
-  } = useWorkspaceStore()
-  const { moveSession, getSessionsForProject } = useSessionStore()
+  } = useWorkspaceStore(
+    useShallow((s) => ({
+      workspaces: s.workspaces,
+      projectsByWorkspaceId: s.projectsByWorkspaceId,
+      loadProjects: s.loadProjects,
+      createProject: s.createProject,
+      setActiveWorkspace: s.setActiveWorkspace,
+      setActiveProject: s.setActiveProject,
+    }))
+  )
+  const { moveSession, getSessionsForProject } = useSessionStore(
+    useShallow((s) => ({
+      moveSession: s.moveSession,
+      getSessionsForProject: s.getSessionsForProject,
+      sessions: s.sessions,
+      projectViews: s.projectViews,
+    }))
+  )
   const [subView, setSubView] = useState<SubView>(null)
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectError, setNewProjectError] = useState('')

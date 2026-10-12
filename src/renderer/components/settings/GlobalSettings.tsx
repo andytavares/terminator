@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React from 'react'
 import { useSettingsStore } from '../../stores/settings.store'
 import type { NotificationTarget } from '../../../shared/types/index'
@@ -43,7 +44,19 @@ export function GlobalSettings(): JSX.Element {
     updatePromptForName,
     updateNotificationDefaultTargets,
     updateNotificationOverride,
-  } = useSettingsStore()
+  } = useSettingsStore(
+    useShallow((s) => ({
+      globalSettings: s.globalSettings,
+      updateGlobalTheme: s.updateGlobalTheme,
+      updateScrollbackLimit: s.updateScrollbackLimit,
+      updateWorktreeBaseDir: s.updateWorktreeBaseDir,
+      updateBranchExcludePatterns: s.updateBranchExcludePatterns,
+      updateShowMetricsBar: s.updateShowMetricsBar,
+      updatePromptForName: s.updatePromptForName,
+      updateNotificationDefaultTargets: s.updateNotificationDefaultTargets,
+      updateNotificationOverride: s.updateNotificationOverride,
+    }))
+  )
 
   if (!globalSettings) return <div>Loading...</div>
 

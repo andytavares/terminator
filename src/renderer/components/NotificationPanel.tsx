@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useCallback, useRef } from 'react'
 import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
 import { useNotificationStore, type Notification } from '../stores/notification.store'
@@ -42,7 +43,9 @@ function NotificationItem({
   notification: Notification
   onNavigate: () => void
 }): JSX.Element {
-  const { dismiss, markRead, remove } = useNotificationStore()
+  const { dismiss, markRead, remove } = useNotificationStore(
+    useShallow((s) => ({ dismiss: s.dismiss, markRead: s.markRead, remove: s.remove }))
+  )
 
   // Either a local handler (core notifications, which are created in the
   // renderer) or a reserved callback in main (everything an extension raises).
@@ -132,7 +135,14 @@ export function BellButton({
 }
 
 function NotificationPanelInner(): JSX.Element {
-  const { closePanel, notifications, markAllRead, clearAll } = useNotificationStore()
+  const { closePanel, notifications, markAllRead, clearAll } = useNotificationStore(
+    useShallow((s) => ({
+      closePanel: s.closePanel,
+      notifications: s.notifications,
+      markAllRead: s.markAllRead,
+      clearAll: s.clearAll,
+    }))
+  )
   const panelRef = useRef<HTMLDivElement>(null)
 
   /**
