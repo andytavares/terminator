@@ -35,11 +35,17 @@ function createView(doc: string, cursor: number): EditorView {
   return view
 }
 
-/** A view whose document is fully parsed, as it is once the background parse has run. */
-function mountDoc(doc: string, cursor: number): EditorView {
-  const v = createView(doc, cursor)
+/**
+ * Finishes the parse now, as the background parse does a moment later. Each
+ * transaction's own parse stops after 20ms, which a loaded machine can hit.
+ */
+function finishParsing(v: EditorView): EditorView {
   forceParsing(v, v.state.doc.length, Infinity)
   return v
+}
+
+function mountDoc(doc: string, cursor: number): EditorView {
+  return finishParsing(createView(doc, cursor))
 }
 
 function mount(cursor: number): EditorView {
@@ -51,6 +57,7 @@ function type(v: EditorView, text: string): void {
   for (const char of text) {
     const at = v.state.selection.main.head
     v.dispatch({ changes: { from: at, insert: char }, selection: { anchor: at + 1 } })
+    finishParsing(v)
   }
 }
 
@@ -160,6 +167,7 @@ describe('editing a rendered table', () => {
   it('reflects an edit in the re-rendered table', () => {
     const v = mount(DOC.indexOf('apples'))
     v.dispatch({ changes: { from: DOC.indexOf('apples'), insert: 'green ' } })
+    finishParsing(v)
     v.dispatch({ selection: { anchor: 0 } })
 
     expect(tableRendered(v)).toBe(true)
