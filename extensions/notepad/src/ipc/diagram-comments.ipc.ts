@@ -2,9 +2,7 @@ import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import type { DiagramComment } from '../db/types'
 import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
-import { createIpcRegistrar } from './register'
-
-const VALIDATION_ERROR = { error: 'VALIDATION_ERROR' }
+import { createIpcRegistrar, IdPayload } from './register'
 
 type DbDiagramComment = {
   id: string
@@ -35,22 +33,20 @@ function mapComment(r: DbDiagramComment, replies: DiagramComment[] = []): Diagra
   }
 }
 
+const CreateDiagramCommentPayload = z.object({
+  diagramId: z.string(),
+  parentId: z.string().optional(),
+  body: z.string().min(1),
+  sceneX: z.number().optional(),
+  sceneY: z.number().optional(),
+})
+
 export async function createDiagramComment(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof CreateDiagramCommentPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({
-    diagramId: z.string(),
-    parentId: z.string().optional(),
-    body: z.string().min(1),
-    sceneX: z.number().optional(),
-    sceneY: z.number().optional(),
-  })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
   const diagramExists = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [
-    parsed.data.diagramId,
+    args.diagramId,
   ])
   if (!diagramExists) return { error: 'DIAGRAM_NOT_FOUND' }
 
@@ -62,11 +58,11 @@ export async function createDiagramComment(
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
-      parsed.data.diagramId,
-      parsed.data.parentId ?? null,
-      parsed.data.body,
-      parsed.data.sceneX ?? 0,
-      parsed.data.sceneY ?? 0,
+      args.diagramId,
+      args.parentId ?? null,
+      args.body,
+      args.sceneX ?? 0,
+      args.sceneY ?? 0,
       now,
       now,
     ]
@@ -75,18 +71,16 @@ export async function createDiagramComment(
   return { data: { id, createdAt: now } }
 }
 
+const ListDiagramCommentsPayload = z.object({
+  diagramId: z.string(),
+  includeResolved: z.boolean().optional(),
+})
+
 export async function listDiagramComments(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof ListDiagramCommentsPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({
-    diagramId: z.string(),
-    includeResolved: z.boolean().optional(),
-  })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const { diagramId, includeResolved = false } = parsed.data
+  const { diagramId, includeResolved = false } = args
 
   const statusFilter = includeResolved ? '' : `AND status = 'open'`
   const rows = await db.query<DbDiagramComment>(
@@ -118,50 +112,42 @@ export async function listDiagramComments(
 
 export async function resolveDiagramComment(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
   const now = new Date().toISOString()
   const existing = await db.get<{ id: string }>('SELECT id FROM diagram_comments WHERE id=?', [
-    parsed.data.id,
+    args.id,
   ])
   if (!existing) return { error: 'COMMENT_NOT_FOUND' }
 
   await db.run(
     `UPDATE diagram_comments SET status='resolved', updated_at=? WHERE id=? OR parent_id=?`,
-    [now, parsed.data.id, parsed.data.id]
+    [now, args.id, args.id]
   )
   return { data: { ok: true } }
 }
 
 export async function deleteDiagramComment(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  await db.run('DELETE FROM diagram_comments WHERE id=?', [parsed.data.id])
+  await db.run('DELETE FROM diagram_comments WHERE id=?', [args.id])
   return { data: { ok: true } }
 }
 
 export function registerDiagramCommentsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handleRemote, cleanup } = createIpcRegistrar(api)
-  handleRemote('terminator.notepad:diagram-comments.create', (payload) =>
-    createDiagramComment(db, payload)
+  handleRemote('terminator.notepad:diagram-comments.create', CreateDiagramCommentPayload, (args) =>
+    createDiagramComment(db, args)
   )
-  handleRemote('terminator.notepad:diagram-comments.list', (payload) =>
-    listDiagramComments(db, payload)
+  handleRemote('terminator.notepad:diagram-comments.list', ListDiagramCommentsPayload, (args) =>
+    listDiagramComments(db, args)
   )
-  handleRemote('terminator.notepad:diagram-comments.resolve', (payload) =>
-    resolveDiagramComment(db, payload)
+  handleRemote('terminator.notepad:diagram-comments.resolve', IdPayload, (args) =>
+    resolveDiagramComment(db, args)
   )
-  handleRemote('terminator.notepad:diagram-comments.delete', (payload) =>
-    deleteDiagramComment(db, payload)
+  handleRemote('terminator.notepad:diagram-comments.delete', IdPayload, (args) =>
+    deleteDiagramComment(db, args)
   )
 
   return cleanup

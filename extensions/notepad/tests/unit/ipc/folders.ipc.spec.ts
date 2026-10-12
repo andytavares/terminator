@@ -7,18 +7,19 @@ vi.mock('electron', () => ({
 }))
 
 import { ipcMain } from 'electron'
+import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 
 // Adapter: registerHandler forwards to the electron ipcMain mocks so existing
 // capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
 const mockApi = {
   ipc: {
-    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+    registerHandler: (spec: ChannelSpec) => {
       ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
-        ch,
-        (_e: unknown, payload: unknown) => fn(payload)
+        spec.channel,
+        (_e: unknown, payload: unknown) => dispatchChannel(spec, payload)
       )
       return {
-        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
+        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(spec.channel),
       }
     },
   },
@@ -67,16 +68,6 @@ describe('createFolder', () => {
     const folders = (listResult as { data: { name: string; sortOrder: number }[] }).data
     expect(folders[0].sortOrder).toBeLessThan(folders[1].sortOrder)
   })
-
-  it('returns VALIDATION_ERROR for empty name', async () => {
-    const result = await createFolder(db, { name: '' })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await createFolder(db, { unexpected: true })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
 })
 
 describe('listFolders', () => {
@@ -118,11 +109,6 @@ describe('renameFolder', () => {
   it('returns FOLDER_NOT_FOUND for unknown id', async () => {
     const result = await renameFolder(db, { id: 'nonexistent', name: 'X' })
     expect(result).toEqual({ error: 'FOLDER_NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR for missing name', async () => {
-    const result = await renameFolder(db, { id: 'abc' })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
   })
 })
 
@@ -167,11 +153,6 @@ describe('deleteFolder', () => {
   it('returns FOLDER_NOT_FOUND for unknown id', async () => {
     const result = await deleteFolder(db, { id: 'nonexistent' })
     expect(result).toEqual({ error: 'FOLDER_NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await deleteFolder(db, {})
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
   })
 })
 
@@ -231,11 +212,6 @@ describe('moveItemsToFolder', () => {
       folderId: 'bad-id',
     })
     expect(result).toEqual({ error: 'FOLDER_NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await moveItemsToFolder(db, { items: 'not-an-array', folderId: null })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
+import type { ChannelSpec, ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 
 vi.mock('electron', () => ({ dialog: {} }))
 
@@ -15,12 +15,8 @@ function registerEverything(): Map<string, boolean> {
   const remoteByChannel = new Map<string, boolean>()
   const api = {
     ipc: {
-      registerHandler: (
-        channel: string,
-        _handler: unknown,
-        opts?: { remoteAccessible?: boolean }
-      ) => {
-        remoteByChannel.set(channel, opts?.remoteAccessible === true)
+      registerHandler: (spec: ChannelSpec, opts?: { remoteAccessible?: boolean }) => {
+        remoteByChannel.set(spec.channel, opts?.remoteAccessible === true)
         return { dispose: () => {} }
       },
     },

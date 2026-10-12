@@ -85,12 +85,9 @@ function escapeRegex(s: string): string {
 
 export async function searchNotes(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof searchSchema>
 ): Promise<{ data: SearchResult[] } | { error: string }> {
-  const parsed = searchSchema.safeParse(payload)
-  if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-
-  const { query, includeArchived = false } = parsed.data
+  const { query, includeArchived = false } = args
   const { textQuery, includeTags, excludeTags } = parseTagFilters(query)
 
   const joinParams: unknown[] = []
@@ -157,7 +154,7 @@ export async function searchNotes(
 
 export function registerSearchIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handleRemote, cleanup } = createIpcRegistrar(api)
-  handleRemote('terminator.notepad:search.query', (payload: unknown) => searchNotes(db, payload))
+  handleRemote('terminator.notepad:search.query', searchSchema, (args) => searchNotes(db, args))
 
   return cleanup
 }

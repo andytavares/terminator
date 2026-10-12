@@ -1,17 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ipcMain } from 'electron'
+import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 
 // Adapter: registerHandler forwards to the electron ipcMain mocks so existing
 // capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
 const mockApi = {
   ipc: {
-    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+    registerHandler: (spec: ChannelSpec) => {
       ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
-        ch,
-        (_e: unknown, payload: unknown) => fn(payload)
+        spec.channel,
+        (_e: unknown, payload: unknown) => dispatchChannel(spec, payload)
       )
       return {
-        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
+        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(spec.channel),
       }
     },
   },
@@ -81,14 +82,6 @@ describe('createNote', () => {
     expect(tagNames).toContain('infra')
     expect(tagNames).toContain('prod')
   })
-
-  it('returns error on invalid payload (unknown field with strict schema)', async () => {
-    const result = await createNote(db, { unknownField: 'bad' } as unknown as Record<
-      string,
-      unknown
-    >)
-    expect(result).toHaveProperty('error')
-  })
 })
 
 describe('listNotes', () => {
@@ -140,11 +133,6 @@ describe('getNote', () => {
     const result = await getNote(db, { id: 'nonexistent' })
     expect(result).toHaveProperty('error')
   })
-
-  it('returns error on invalid payload', async () => {
-    const result = await getNote(db, null as unknown as { id: string })
-    expect(result).toHaveProperty('error')
-  })
 })
 
 describe('autosaveNote', () => {
@@ -178,14 +166,6 @@ describe('autosaveNote', () => {
     const names = noteTags.map((r) => r.name)
     expect(names).toContain('new')
     expect(names).not.toContain('old')
-  })
-
-  it('returns error on invalid payload', async () => {
-    const result = await autosaveNote(
-      db,
-      null as unknown as { id: string; title: string; body: string; tags: string[] }
-    )
-    expect(result).toHaveProperty('error')
   })
 
   // The docked panel and a popped-out note window are separate renderers with
@@ -235,12 +215,6 @@ describe('autosaveNote', () => {
     expect(broadcast).not.toHaveBeenCalled()
   })
 
-  it('does not broadcast on an invalid payload', async () => {
-    const broadcast = vi.fn()
-    await autosaveNote(db, null, broadcast)
-    expect(broadcast).not.toHaveBeenCalled()
-  })
-
   it('saves without a broadcast callback', async () => {
     const created = await createNote(db, { title: 'T', body: 'x' })
     const id = (created as { data: { id: string } }).data.id
@@ -261,11 +235,6 @@ describe('archiveNote', () => {
       [id]
     )
     expect(row?.archived_at).not.toBeNull()
-  })
-
-  it('returns error on invalid payload', async () => {
-    const result = await archiveNote(db, null as unknown as { id: string })
-    expect(result).toHaveProperty('error')
   })
 })
 
@@ -300,21 +269,11 @@ describe('hardDeleteNote', () => {
     const result = await hardDeleteNote(db, { id: 'nonexistent' })
     expect(result).toHaveProperty('error')
   })
-
-  it('returns error on invalid payload', async () => {
-    const result = await hardDeleteNote(db, null as unknown as { id: string })
-    expect(result).toHaveProperty('error')
-  })
 })
 
 describe('restoreNote edge cases', () => {
   it('returns error for missing note', async () => {
     const result = await restoreNote(db, { id: 'nonexistent' })
-    expect(result).toHaveProperty('error')
-  })
-
-  it('returns error on invalid payload', async () => {
-    const result = await restoreNote(db, null as unknown as { id: string })
     expect(result).toHaveProperty('error')
   })
 })
@@ -335,11 +294,6 @@ describe('listNotes with tagId filter', () => {
     const result = await listNotes(db, { sortBy: 'title', sortDir: 'asc' })
     const data = (result as { data: { title: string }[] }).data
     expect(data[0].title).toBe('A Note')
-  })
-
-  it('returns error on invalid payload', async () => {
-    const result = await listNotes(db, { sortBy: 'bad_col' as 'updated_at' })
-    expect(result).toHaveProperty('error')
   })
 })
 
@@ -381,11 +335,6 @@ describe('renameTag', () => {
     const updated = await db.get<{ name: string }>('SELECT name FROM tags WHERE id = ?', [tag!.id])
     expect(updated?.name).toBe('newname')
   })
-
-  it('returns error on validation failure', async () => {
-    const result = await renameTag(db, { id: 123 as unknown as string, name: 'x' })
-    expect(result).toHaveProperty('error')
-  })
 })
 
 describe('deleteTag', () => {
@@ -402,11 +351,6 @@ describe('deleteTag', () => {
 
     const tagRow = await db.get<{ id: string }>('SELECT id FROM tags WHERE id = ?', [tag!.id])
     expect(tagRow).toBeUndefined()
-  })
-
-  it('returns error on validation failure', async () => {
-    const result = await deleteTag(db, { id: 123 as unknown as string })
-    expect(result).toHaveProperty('error')
   })
 })
 
@@ -465,11 +409,6 @@ describe('reorderItems', () => {
     ])
     expect(row2?.sort_order).toBe(0)
     expect(row1?.sort_order).toBe(1)
-  })
-
-  it('returns validation error on bad payload', async () => {
-    const result = await reorderItems(db, { items: 'not-an-array' })
-    expect(result).toHaveProperty('error')
   })
 
   it('listNotes returns items ordered by sort_order asc', async () => {
