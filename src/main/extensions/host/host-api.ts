@@ -239,6 +239,46 @@ function logFor(main: MainCalls): ExtensionAPI['log'] {
   return { debug: level('debug'), info: level('info'), warn: level('warn'), error: level('error') }
 }
 
+function globalShortcutFor(main: MainCalls): ExtensionAPI['globalShortcut'] {
+  return {
+    async register(accelerator, handler) {
+      const { disposable, ready } = main.register(
+        'api',
+        'globalShortcut.register',
+        accelerator,
+        handler
+      )
+      await ready
+      return disposable
+    },
+  }
+}
+
+type ForwardedMember = 'dialog' | 'topBar' | 'shell' | 'notifications' | 'nativeMenu' | 'terminal'
+
+/** The members that are each one call or registration in main, with nothing kept here. */
+function forwardedMembersFor(main: MainCalls): Pick<ExtensionAPI, ForwardedMember> {
+  return {
+    dialog: {
+      showOpenDialog: (options) => main.call('dialog.showOpenDialog', options),
+      showSaveDialog: (options) => main.call('dialog.showSaveDialog', options),
+    },
+    topBar: { registerMenuItem: (item) => main.held('topBar.registerMenuItem', item) },
+    shell: {
+      exec: ((options) => main.call('shell.exec', options)) as ExtensionAPI['shell']['exec'],
+    },
+    notifications: {
+      showToast: (type, message, key) => main.fire('notifications.showToast', type, message, key),
+      createNotification: (options) => main.held('notifications.createNotification', options),
+    },
+    nativeMenu: { addViewMenuItem: (item) => main.held('nativeMenu.addViewMenuItem', item) },
+    terminal: {
+      onSessionCreate: (handler) => main.held('terminal.onSessionCreate', handler),
+      onSessionClose: (handler) => main.held('terminal.onSessionClose', handler),
+    },
+  }
+}
+
 /**
  * The ExtensionAPI an extension receives in the extension host (ADR 094): the
  * same declaration as main's `api.ts`, each member a call across the port, a
@@ -247,45 +287,18 @@ function logFor(main: MainCalls): ExtensionAPI['log'] {
 export function createHostExtensionAPI(context: HostContext): ExtensionAPI {
   const main = new MainCalls(context)
   return {
+    ...forwardedMembersFor(main),
     db: context.db,
     paths: context.snapshot.paths,
-    dialog: {
-      showOpenDialog: (options) => main.call('dialog.showOpenDialog', options),
-      showSaveDialog: (options) => main.call('dialog.showSaveDialog', options),
-    },
+    extensions: { get: (dependencyId: string) => context.exportsOf(dependencyId) as never },
     log: logFor(main),
     settings: settingsFor(context, main),
-    globalShortcut: {
-      async register(accelerator, handler) {
-        const { disposable, ready } = main.register(
-          'api',
-          'globalShortcut.register',
-          accelerator,
-          handler
-        )
-        await ready
-        return disposable
-      },
-    },
+    globalShortcut: globalShortcutFor(main),
     workspace: workspaceFor(context, main),
-    topBar: { registerMenuItem: (item) => main.held('topBar.registerMenuItem', item) },
-    extensions: { get: (dependencyId: string) => context.exportsOf(dependencyId) as never },
-    shell: {
-      exec: ((options) => main.call('shell.exec', options)) as ExtensionAPI['shell']['exec'],
-    },
     github: githubFor(main),
     issues: issuesFor(context, main),
-    notifications: {
-      showToast: (type, message, key) => main.fire('notifications.showToast', type, message, key),
-      createNotification: (options) => main.held('notifications.createNotification', options),
-    },
-    nativeMenu: { addViewMenuItem: (item) => main.held('nativeMenu.addViewMenuItem', item) },
     commands: commandsFor(context, main),
     ipc: ipcFor(context, main),
-    terminal: {
-      onSessionCreate: (handler) => main.held('terminal.onSessionCreate', handler),
-      onSessionClose: (handler) => main.held('terminal.onSessionClose', handler),
-    },
     pty: ptyFor(main),
     window: windowFor(main),
   }
