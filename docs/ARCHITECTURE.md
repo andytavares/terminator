@@ -1479,7 +1479,11 @@ App
   the tab's exit status, with no agent in between (ADR 059). The command's
   script is the tab's own process (`api.pty.runInTerminal`), nothing is typed
   into a shell, and an exit with no status (a signal, or the tab closed
-  first) is "not measured", never a pass.
+  first) is "not measured", never a pass. The tab runs
+  `$SHELL -i -l -c "exec $SHELL <script>"`: an interactive login shell reads
+  the user's startup files, so what they export reaches the check as it did
+  when the command was typed, then `exec` makes the script the process whose
+  exit is reported.
 - **It closes the tabs it opens (ADR 076).** A tab is titled for its agent
   ("Architect", "Red team", "Builder") or its check ("Lint"). An agent is
   stopped once its turn's output is collected, and `SupervisedRunner` closes a

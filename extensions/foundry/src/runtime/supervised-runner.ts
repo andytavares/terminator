@@ -209,6 +209,30 @@ function oneLine(text: string): string {
   return text.replace(/\r?\n/g, ' ').trim()
 }
 
+/**
+ * The shell's arguments for a check: read the user's startup files, then
+ * become the script.
+ *
+ * A check was typed into the tab's interactive login shell, so what the
+ * startup files export (JAVA_HOME, GOPATH, nvm's PATH) reached it; the app
+ * adopts only PATH from them. `-i -l -c` reads the same files that shell did:
+ * zsh reads .zshenv, .zprofile, .zshrc and .zlogin for an interactive login
+ * shell (https://zsh.sourceforge.io/Doc/Release/Files.html), and bash reads
+ * /etc/profile and the first of ~/.bash_profile, ~/.bash_login, ~/.profile,
+ * where ~/.bashrc is usually sourced from
+ * (https://www.gnu.org/software/bash/manual/html_node/Bash-Startup-Files.html).
+ * `-i` makes a shell interactive even with `-c` in both.
+ *
+ * `exec` then replaces that shell with `$SHELL script`, which is what was
+ * typed before: the process the core watches is the script's, so its exit
+ * code is the command's, and the interactive shell is not left in between to
+ * report its own. The paths are single-quoted, which every POSIX shell, zsh
+ * and fish read alike.
+ */
+function startupFilesThen(shell: string, script: string): string[] {
+  return ['-i', '-l', '-c', `exec ${shellQuote(shell)} ${shellQuote(script)}`]
+}
+
 /** Escape. Ends the turn and keeps the session, which is what makes a redirect land. */
 const INTERRUPT = '\x1b'
 
@@ -567,13 +591,14 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       // The script is the tab's own process, so the exit the core reports is
       // the command's, and null when a signal or a closed tab ended it first.
       const script = writeCommandScript(randomUUID(), options.command, options.logPath)
+      const shell = process.env.SHELL ?? '/bin/sh'
       const exit = await api.pty.runInTerminal({
         projectId: project.id,
         cwd: options.worktreePath,
         tabTitle: options.title,
         type: 'human',
-        file: process.env.SHELL ?? '/bin/sh',
-        args: [script],
+        file: shell,
+        args: startupFilesThen(shell, script),
       })
       if (exit === null) return null
       // A failure stays open, exited, as the record of what ran; a pass
