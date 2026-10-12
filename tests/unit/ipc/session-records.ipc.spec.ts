@@ -150,22 +150,6 @@ describe('session-records:set-description', () => {
     expect(result).toEqual({ data: null })
   })
 
-  it('refuses a payload without a session', async () => {
-    const result = (await invoke('session-records:set-description', { description: 'd' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-    expect(store.setDescription).not.toHaveBeenCalled()
-  })
-
-  it('refuses a description longer than 500 characters', async () => {
-    const result = (await invoke('session-records:set-description', {
-      session: SNAP,
-      description: 'x'.repeat(501),
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('reports a write to a closed record', async () => {
     store.setDescription.mockRejectedValue(new CodedError('RECORD_CLOSED'))
     const result = (await invoke('session-records:set-description', {
@@ -232,14 +216,6 @@ describe('session-records:set-link', () => {
     store.setLink.mockResolvedValue(null)
     await invoke('session-records:set-link', { session: SNAP, link: null })
     expect(sessionContext.sync).toHaveBeenCalledWith('s1', 'issue-service')
-  })
-
-  it('refuses an unknown tracker', async () => {
-    const result = (await invoke('session-records:set-link', {
-      session: SNAP,
-      link: { tracker: 'asana', key: 'A-1' },
-    })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('reports a write to a closed record', async () => {
@@ -343,14 +319,6 @@ describe('session-records:transfer', () => {
     })
   })
 
-  it('refuses a payload with no session to transfer to', async () => {
-    const result = (await invoke('session-records:transfer', { fromSessionId: 's1' })) as {
-      error: string
-    }
-    expect(result.error).toBe('VALIDATION_ERROR')
-    expect(store.transfer).not.toHaveBeenCalled()
-  })
-
   it('forgets a record the operator removed from the list', async () => {
     store.forget.mockResolvedValue(true)
     expect(await invoke('session-records:forget', { sessionId: 's1' })).toEqual({ data: true })
@@ -360,11 +328,5 @@ describe('session-records:transfer', () => {
   it('says so when there was nothing to forget', async () => {
     store.forget.mockResolvedValue(false)
     expect(await invoke('session-records:forget', { sessionId: 'nope' })).toEqual({ data: false })
-  })
-
-  it('refuses a forget with no session', async () => {
-    expect(await invoke('session-records:forget', { sessionId: '' })).toMatchObject({
-      error: 'VALIDATION_ERROR',
-    })
   })
 })

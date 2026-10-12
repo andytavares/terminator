@@ -49,6 +49,37 @@ export default defineConfig([
     },
   },
   {
+    // ADR 096: core invoke channels register through the schema table, where a
+    // zod schema is required. Only the table and the extension API call
+    // handleChannel.
+    files: ['src/main/**/*.ts'],
+    ignores: ['src/main/ipc/invoke-table.ts', 'src/main/extensions/api.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: './channel-registrar.js',
+              importNames: ['handleChannel'],
+              message: 'Register invoke channels with registerInvokeTable (ADR 096).',
+            },
+            {
+              name: '../ipc/channel-registrar.js',
+              importNames: ['handleChannel'],
+              message: 'Register invoke channels with registerInvokeTable (ADR 096).',
+            },
+            {
+              name: './ipc/channel-registrar.js',
+              importNames: ['handleChannel'],
+              message: 'Register invoke channels with registerInvokeTable (ADR 096).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['tests/e2e/*.ts'],
     rules: {
       'no-restricted-syntax': [

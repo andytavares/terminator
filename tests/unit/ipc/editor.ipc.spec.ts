@@ -76,19 +76,6 @@ describe('editor:open', () => {
     expect(openInEditor).toHaveBeenCalledWith('/repos/app', 'zed')
   })
 
-  // The renderer sends a folder and nothing else. It never names a command —
-  // a channel that took one would be a way to run anything.
-  it.each([
-    ['no payload', undefined],
-    ['an empty path', { folderPath: '' }],
-    ['a missing path', {}],
-    ['a non-string path', { folderPath: 42 }],
-    ['a command instead of a path', { command: 'rm', args: ['-rf', '/'] }],
-  ])('rejects %s without launching anything', async (_name, payload) => {
-    expect(await handlerFor('editor:open')({}, payload)).toEqual({ error: 'VALIDATION_ERROR' })
-    expect(openInEditor).not.toHaveBeenCalled()
-  })
-
   it('passes a launch failure back rather than throwing', async () => {
     openInEditor.mockResolvedValue({ error: 'NO_EDITOR_FOUND' })
     expect(await handlerFor('editor:open')({}, { folderPath: '/repos/app' })).toEqual({

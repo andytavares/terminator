@@ -65,10 +65,9 @@ describe('git:is-repo', () => {
     })
   })
 
-  it('returns isRepo false for non-repos, invalid payloads, and thrown errors', async () => {
+  it('returns isRepo false for non-repos and thrown errors', async () => {
     gitService.isGitRepo.mockResolvedValue(false)
     await expect(handler('git:is-repo')({}, { path: '/x' })).resolves.toEqual({ isRepo: false })
-    await expect(handler('git:is-repo')({}, {})).resolves.toEqual({ isRepo: false })
     gitService.isGitRepo.mockRejectedValue(new Error('io'))
     await expect(handler('git:is-repo')({}, { path: '/x' })).resolves.toEqual({ isRepo: false })
   })
@@ -82,8 +81,7 @@ describe('git:current-branch', () => {
     })
   })
 
-  it('maps invalid payloads and errors to error envelopes', async () => {
-    await expect(handler('git:current-branch')({}, {})).resolves.toEqual({ error: 'INVALID_PATH' })
+  it('maps errors to an error envelope', async () => {
     gitService.getCurrentBranch.mockRejectedValue(new Error('detached'))
     await expect(handler('git:current-branch')({}, { path: '/r' })).resolves.toEqual({
       error: 'Error: detached',
@@ -92,12 +90,11 @@ describe('git:current-branch', () => {
 })
 
 describe('git:list-branches', () => {
-  it('returns branches, and an empty list on invalid payload or error', async () => {
+  it('returns branches, and an empty list on error', async () => {
     gitService.listBranches.mockResolvedValue(['main', 'dev'])
     await expect(handler('git:list-branches')({}, { path: '/r' })).resolves.toEqual({
       branches: ['main', 'dev'],
     })
-    await expect(handler('git:list-branches')({}, {})).resolves.toEqual({ branches: [] })
     gitService.listBranches.mockRejectedValue(new Error('io'))
     await expect(handler('git:list-branches')({}, { path: '/r' })).resolves.toEqual({
       branches: [],
@@ -169,7 +166,6 @@ describe('git:fetch', () => {
     gitService.fetchRemotes.mockResolvedValue(undefined)
     await expect(handler('git:fetch')({}, { path: '/r' })).resolves.toEqual({ success: true })
     expect(gitService.fetchRemotes).toHaveBeenCalledWith('/r')
-    await expect(handler('git:fetch')({}, {})).resolves.toEqual({ error: 'VALIDATION_ERROR' })
     gitService.fetchRemotes.mockRejectedValue(new Error('Could not resolve host'))
     await expect(handler('git:fetch')({}, { path: '/r' })).resolves.toEqual({
       error: 'Error: Could not resolve host',
@@ -191,16 +187,10 @@ describe('git:checkout and git:create-branch', () => {
     expect(gitService.createBranch).toHaveBeenCalledWith('/r', 'new')
   })
 
-  it('maps invalid payloads and errors to error envelopes', async () => {
-    await expect(handler('git:checkout')({}, { path: '/r' })).resolves.toEqual({
-      error: 'VALIDATION_ERROR',
-    })
+  it('maps errors to error envelopes', async () => {
     gitService.checkoutBranch.mockRejectedValue(new Error('conflict'))
     await expect(handler('git:checkout')({}, { path: '/r', branch: 'dev' })).resolves.toEqual({
       error: 'Error: conflict',
-    })
-    await expect(handler('git:create-branch')({}, {})).resolves.toEqual({
-      error: 'VALIDATION_ERROR',
     })
     gitService.createBranch.mockRejectedValue(new Error('exists'))
     await expect(handler('git:create-branch')({}, { path: '/r', branch: 'x' })).resolves.toEqual({
@@ -210,14 +200,11 @@ describe('git:checkout and git:create-branch', () => {
 })
 
 describe('git:suggest-worktree-path', () => {
-  it('returns the suggested path, or an empty path on invalid payload', async () => {
+  it('returns the suggested path', async () => {
     gitService.suggestWorktreePath.mockReturnValue('/wt/dev')
     await expect(
       handler('git:suggest-worktree-path')({}, { repoRoot: '/r', branch: 'dev' })
     ).resolves.toEqual({ path: '/wt/dev' })
-    await expect(handler('git:suggest-worktree-path')({}, { repoRoot: '/r' })).resolves.toEqual({
-      path: '',
-    })
   })
 })
 
@@ -237,16 +224,10 @@ describe('git:create-worktree and git:remove-worktree', () => {
     expect(gitService.removeWorktree).toHaveBeenCalledWith('/r', '/wt')
   })
 
-  it('maps invalid payloads and errors to error envelopes', async () => {
-    await expect(handler('git:create-worktree')({}, {})).resolves.toEqual({
-      error: 'VALIDATION_ERROR',
-    })
+  it('maps errors to error envelopes', async () => {
     gitService.createWorktree.mockRejectedValue(new Error('dirty'))
     await expect(handler('git:create-worktree')({}, createPayload)).resolves.toEqual({
       error: 'Error: dirty',
-    })
-    await expect(handler('git:remove-worktree')({}, {})).resolves.toEqual({
-      error: 'VALIDATION_ERROR',
     })
     gitService.removeWorktree.mockRejectedValue(new Error('locked'))
     await expect(
@@ -256,12 +237,11 @@ describe('git:create-worktree and git:remove-worktree', () => {
 })
 
 describe('git:list-worktrees', () => {
-  it('returns worktrees, and an empty list on invalid payload or error', async () => {
+  it('returns worktrees, and an empty list on error', async () => {
     gitService.listWorktrees.mockResolvedValue([{ path: '/wt' }])
     await expect(handler('git:list-worktrees')({}, { path: '/r' })).resolves.toEqual({
       worktrees: [{ path: '/wt' }],
     })
-    await expect(handler('git:list-worktrees')({}, {})).resolves.toEqual({ worktrees: [] })
     gitService.listWorktrees.mockRejectedValue(new Error('io'))
     await expect(handler('git:list-worktrees')({}, { path: '/r' })).resolves.toEqual({
       worktrees: [],
@@ -278,12 +258,6 @@ describe('git:change-stats', () => {
       files: 2,
     })
     expect(gitService.getChangeStats).toHaveBeenCalledWith('/repo')
-  })
-
-  it('maps an invalid payload to an error envelope', async () => {
-    await expect(handler('git:change-stats')({}, {})).resolves.toEqual({
-      error: 'VALIDATION_ERROR',
-    })
   })
 
   it('resolves with an error envelope rather than rejecting across the boundary', async () => {

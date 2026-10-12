@@ -1,4 +1,5 @@
-import { handleChannel } from './channel-registrar.js'
+import { z } from 'zod'
+import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
 import {
   getGlobalSettings,
   updateGlobalSettings,
@@ -6,20 +7,34 @@ import {
   updateWorkspaceSettings,
 } from '../storage/settings-store.js'
 
+const PatchSchema = z.record(z.string(), z.unknown())
+const invalid = { error: 'VALIDATION_ERROR' }
+
 export function registerSettingsHandlers(): void {
-  handleChannel('settings:get-global', () => {
-    return { settings: getGlobalSettings() }
-  })
-
-  handleChannel('settings:update-global', (_event, { patch }) => {
-    return { settings: updateGlobalSettings(patch) }
-  })
-
-  handleChannel('settings:get-workspace', (_event, { workspaceId }) => {
-    return { settings: getWorkspaceSettings(workspaceId) }
-  })
-
-  handleChannel('settings:update-workspace', (_event, { workspaceId, patch }) => {
-    return { settings: updateWorkspaceSettings(workspaceId, patch) }
-  })
+  registerInvokeTable([
+    invokeSpec({
+      channel: 'settings:get-global',
+      schema: noPayload,
+      invalid,
+      run: () => ({ settings: getGlobalSettings() }),
+    }),
+    invokeSpec({
+      channel: 'settings:update-global',
+      schema: z.object({ patch: PatchSchema }),
+      invalid,
+      run: ({ patch }) => ({ settings: updateGlobalSettings(patch) }),
+    }),
+    invokeSpec({
+      channel: 'settings:get-workspace',
+      schema: z.object({ workspaceId: z.string().min(1) }),
+      invalid,
+      run: ({ workspaceId }) => ({ settings: getWorkspaceSettings(workspaceId) }),
+    }),
+    invokeSpec({
+      channel: 'settings:update-workspace',
+      schema: z.object({ workspaceId: z.string().min(1), patch: PatchSchema }),
+      invalid,
+      run: ({ workspaceId, patch }) => ({ settings: updateWorkspaceSettings(workspaceId, patch) }),
+    }),
+  ])
 }

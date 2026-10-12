@@ -1,4 +1,5 @@
-import { handleChannel, onChannel } from './channel-registrar.js'
+import { onChannel } from './channel-registrar.js'
+import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
 import { getLink } from '../integrations/issue-link-store.js'
 import { readContextFile } from '../integrations/agent-context.js'
 import { notificationManager } from '../notifications/notification-manager.js'
@@ -100,83 +101,75 @@ export function registerTerminalHandlers(
   ptyManager: PtyManager,
   getWindow: () => BrowserWindow | null
 ): void {
-  handleChannel('terminal:create', (_event, payload) => {
-    const parsed = CreateTerminalSchema.safeParse(payload)
-    if (!parsed.success) {
-      return { error: 'VALIDATION_ERROR', message: parsed.error.message }
-    }
+  const sessionIdPayload = z.object({ sessionId: z.string() })
 
-    const { projectId, tabTitle, type, cwd, shell, initialCommand } = parsed.data
-    const globalSettings = getGlobalSettings()
-    const defaultShell = shell ?? globalSettings.terminal.defaultShell
-    const sessionId = randomUUID()
-    const resolvedCwd = cwd === '~' ? homedir() : cwd
-
-    try {
-      ptyManager.spawnSession({
-        sessionId,
-        cwd: resolvedCwd,
-        shell: defaultShell,
-        type,
-        origin: 'app',
-        projectId,
-        tabTitle,
-        // The terminal names itself, so an agent started in it — by this
-        // application or by hand — can be placed against this session (ADR 055).
-        env: { ...issueEnvFor(projectId), TERMINATOR_SESSION_ID: sessionId },
-      })
-    } catch (err) {
+  registerInvokeTable([
+    invokeSpec({
+      channel: 'terminal:create',
+      schema: CreateTerminalSchema,
+      invalid: (error: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: error.message }),
+      run: (input) => createTerminal(ptyManager, getWindow, input),
       // Reported rather than thrown, so the renderer can say which folder is
       // gone. A branch whose worktree was deleted outside the app otherwise
       // produced a tab that died instantly with nothing written in it.
-      if (err instanceof MissingCwdError) {
-        return { error: 'CWD_MISSING', message: err.message }
-      }
-      throw err
-    }
-    ptyManager.onData(sessionId, (data) => {
-      const win = getWindow()
-      if (win && !win.isDestroyed()) win.webContents.send('terminal:output', { sessionId, data })
-    })
-    ptyManager.onExit(sessionId, (exitCode) => {
-      const win = getWindow()
-      if (win && !win.isDestroyed())
-        win.webContents.send('terminal:process-exit', { sessionId, exitCode })
-    })
-
-    void announceIssueContext(projectId, sessionId, getWindow)
-
-    // Written straight in: the line discipline holds it until the shell reads
-    // it, and a resume command is far inside the 1024-byte canonical limit that
-    // mangled a long launch line before.
-    if (initialCommand !== undefined) ptyManager.write(sessionId, `${initialCommand}\n`)
-
-    return { sessionId, shell: defaultShell }
-  })
-
-  handleChannel('terminal:list-sessions', () => {
-    // Only sessions created through terminal:create carry project metadata;
-    // legacy api.pty.spawn sessions are 'app'-origin too but have no tab in
-    // the renderer, matching the pre-authority registry's contents.
-    return ptyManager
-      .listSessions()
-      .filter((s) => s.origin === 'app' && s.projectId !== undefined)
-      .map(({ sessionId, projectId, tabTitle, type }) => ({ sessionId, projectId, tabTitle, type }))
-  })
-
-  handleChannel('terminal:attach', (_event, payload) => {
-    const parsed = z.object({ sessionId: z.string() }).safeParse(payload)
-    if (!parsed.success) return { released: false }
-    // A terminal is on screen and ready to be written to. Anything the process
-    // printed before now was held back rather than dropped.
-    return { released: ptyManager.releaseOutput(parsed.data.sessionId) }
-  })
-
-  handleChannel('terminal:close', (_event, { sessionId }) => {
-    ptyManager.kill(sessionId)
-    void markClosed(sessionId, new Date())
-    return { success: true }
-  })
+      onError: (err) => {
+        if (err instanceof MissingCwdError) return { error: 'CWD_MISSING', message: err.message }
+        throw err
+      },
+    }),
+    invokeSpec({
+      channel: 'terminal:list-sessions',
+      schema: noPayload,
+      invalid: [],
+      run: () =>
+        // Only sessions created through terminal:create carry project metadata;
+        // legacy api.pty.spawn sessions are 'app'-origin too but have no tab in
+        // the renderer, matching the pre-authority registry's contents.
+        ptyManager
+          .listSessions()
+          .filter((s) => s.origin === 'app' && s.projectId !== undefined)
+          .map(({ sessionId, projectId, tabTitle, type }) => ({
+            sessionId,
+            projectId,
+            tabTitle,
+            type,
+          })),
+    }),
+    invokeSpec({
+      channel: 'terminal:attach',
+      schema: sessionIdPayload,
+      invalid: { released: false },
+      // A terminal is on screen and ready to be written to. Anything the process
+      // printed before now was held back rather than dropped.
+      run: ({ sessionId }) => ({ released: ptyManager.releaseOutput(sessionId) }),
+    }),
+    invokeSpec({
+      channel: 'terminal:close',
+      schema: sessionIdPayload,
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: ({ sessionId }) => {
+        ptyManager.kill(sessionId)
+        void markClosed(sessionId, new Date())
+        return { success: true }
+      },
+    }),
+    invokeSpec({
+      channel: 'terminal:close-all',
+      schema: noPayload,
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: async () => {
+        const count = ptyManager.getSessionIds().length
+        await ptyManager.killAll()
+        return { terminatedCount: count }
+      },
+    }),
+    invokeSpec({
+      channel: 'terminal:cleanup-orphans',
+      schema: noPayload,
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: () => ptyManager.cleanupOrphans(),
+    }),
+  ])
 
   onChannel('terminal:input', (_event, payload) => {
     const parsed = TerminalInputSchema.safeParse(payload)
@@ -191,14 +184,52 @@ export function registerTerminalHandlers(
       ptyManager.resize(parsed.data.sessionId, parsed.data.cols, parsed.data.rows)
     }
   })
+}
 
-  handleChannel('terminal:close-all', async () => {
-    const count = ptyManager.getSessionIds().length
-    await ptyManager.killAll()
-    return { terminatedCount: count }
+function createTerminal(
+  ptyManager: PtyManager,
+  getWindow: () => BrowserWindow | null,
+  input: z.infer<typeof CreateTerminalSchema>
+): { sessionId: string; shell: string } {
+  const { projectId, tabTitle, type, cwd, shell, initialCommand } = input
+  const defaultShell = shell ?? getGlobalSettings().terminal.defaultShell
+  const sessionId = randomUUID()
+
+  ptyManager.spawnSession({
+    sessionId,
+    cwd: cwd === '~' ? homedir() : cwd,
+    shell: defaultShell,
+    type,
+    origin: 'app',
+    projectId,
+    tabTitle,
+    // The terminal names itself, so an agent started in it — by this
+    // application or by hand — can be placed against this session (ADR 055).
+    env: { ...issueEnvFor(projectId), TERMINATOR_SESSION_ID: sessionId },
   })
+  relayTerminalEvents(ptyManager, getWindow, sessionId)
+  void announceIssueContext(projectId, sessionId, getWindow)
 
-  handleChannel('terminal:cleanup-orphans', () => {
-    return ptyManager.cleanupOrphans()
+  // Written straight in: the line discipline holds it until the shell reads
+  // it, and a resume command is far inside the 1024-byte canonical limit that
+  // mangled a long launch line before.
+  if (initialCommand !== undefined) ptyManager.write(sessionId, `${initialCommand}\n`)
+
+  return { sessionId, shell: defaultShell }
+}
+
+function relayTerminalEvents(
+  ptyManager: PtyManager,
+  getWindow: () => BrowserWindow | null,
+  sessionId: string
+): void {
+  ptyManager.onData(sessionId, (data) => {
+    const win = getWindow()
+    if (win && !win.isDestroyed()) win.webContents.send('terminal:output', { sessionId, data })
+  })
+  ptyManager.onExit(sessionId, (exitCode) => {
+    const win = getWindow()
+    if (win && !win.isDestroyed())
+      win.webContents.send('terminal:process-exit', { sessionId, exitCode })
   })
 }

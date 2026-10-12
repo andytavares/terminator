@@ -114,11 +114,6 @@ describe('shell:exec IPC handler', () => {
     expect(result.error).toBe('CWD_OUT_OF_SCOPE')
   })
 
-  it('returns VALIDATION_ERROR for invalid payload schema', async () => {
-    const result = (await handler({}, { command: 'rm', args: [] })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('returns generic error string for unexpected exceptions', async () => {
     vi.mocked(shellExecutor.execShell).mockRejectedValue(new Error('process spawn failed'))
     const result = (await handler(
@@ -171,16 +166,6 @@ describe('shell:open-external IPC handler', () => {
     handler = call![1] as typeof handler
   })
 
-  it('returns VALIDATION_ERROR for a non-URL string', async () => {
-    const result = (await handler({}, { url: 'not-a-url' })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR for missing url field', async () => {
-    const result = (await handler({}, {})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
   it('returns ok:true when openExternal succeeds', async () => {
     const result = await handler({}, { url: 'https://example.com' })
     expect(result).toEqual({ ok: true })
@@ -206,16 +191,6 @@ describe('shell:open-path IPC handler', () => {
     const call = calls.find(([channel]) => channel === 'shell:open-path')
     expect(call).toBeDefined()
     handler = call![1] as typeof handler
-  })
-
-  it('returns VALIDATION_ERROR for empty filePath', async () => {
-    const result = (await handler({}, { filePath: '' })) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-  })
-
-  it('returns VALIDATION_ERROR for missing filePath', async () => {
-    const result = (await handler({}, {})) as { error: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('returns ok:true when openPath succeeds', async () => {

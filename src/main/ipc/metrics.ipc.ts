@@ -1,4 +1,5 @@
-import { handleChannel } from './channel-registrar.js'
+import { z } from 'zod'
+import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
 import { execSync } from 'child_process'
 import * as os from 'os'
 import { readFileSync } from 'fs'
@@ -138,34 +139,37 @@ export function queryProcessMetrics(pids: number[]): ProcessMetrics[] {
 export function registerMetricsHandlers(ptyManager: PtyManager): void {
   startSampler()
 
-  handleChannel('metrics:system', (): { data: SystemMetrics } => ({
-    data: {
-      cpuPercent: Math.min(100, Math.max(0, latestCpuPercent)),
-      memUsedBytes: os.totalmem() - os.freemem(),
-      memTotalBytes: os.totalmem(),
-      netInBytesPerSec: latestNetIn,
-      netOutBytesPerSec: latestNetOut,
-    },
-  }))
-
-  handleChannel(
-    'metrics:processes',
-    (_event, payload: { pids?: number[] }): { data: ProcessMetrics[] } => ({
-      data: queryProcessMetrics(payload?.pids ?? []),
-    })
-  )
-
-  handleChannel(
-    'metrics:pids',
-    (
-      _event,
-      payload: { sessionIds?: string[] }
-    ): { data: Array<{ sessionId: string; pid: number }> } => {
-      const ids = payload?.sessionIds ?? []
-      const data = ids
-        .map((sessionId) => ({ sessionId, pid: ptyManager.getPid(sessionId) }))
-        .filter((r): r is { sessionId: string; pid: number } => r.pid !== undefined)
-      return { data }
-    }
-  )
+  registerInvokeTable([
+    invokeSpec({
+      channel: 'metrics:system',
+      schema: noPayload,
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: (): { data: SystemMetrics } => ({
+        data: {
+          cpuPercent: Math.min(100, Math.max(0, latestCpuPercent)),
+          memUsedBytes: os.totalmem() - os.freemem(),
+          memTotalBytes: os.totalmem(),
+          netInBytesPerSec: latestNetIn,
+          netOutBytesPerSec: latestNetOut,
+        },
+      }),
+    }),
+    invokeSpec({
+      channel: 'metrics:processes',
+      schema: z.object({ pids: z.array(z.number().int()).optional() }),
+      invalid: { data: [] },
+      run: ({ pids }): { data: ProcessMetrics[] } => ({ data: queryProcessMetrics(pids ?? []) }),
+    }),
+    invokeSpec({
+      channel: 'metrics:pids',
+      schema: z.object({ sessionIds: z.array(z.string()).optional() }),
+      invalid: { data: [] },
+      run: ({ sessionIds }) => {
+        const data = (sessionIds ?? [])
+          .map((sessionId) => ({ sessionId, pid: ptyManager.getPid(sessionId) }))
+          .filter((r): r is { sessionId: string; pid: number } => r.pid !== undefined)
+        return { data }
+      },
+    }),
+  ])
 }

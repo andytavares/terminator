@@ -29,25 +29,25 @@ describe('settings IPC handlers (no callback)', () => {
   })
 
   describe('settings:get-global', () => {
-    it('returns global settings from store', () => {
+    it('returns global settings from store', async () => {
       const settings = { appearance: { theme: 'dark' } }
       vi.mocked(settingsStore.getGlobalSettings).mockReturnValue(
         settings as unknown as ReturnType<typeof settingsStore.getGlobalSettings>
       )
       const handler = captureHandler('settings:get-global')
-      const result = handler({}) as { settings: unknown }
+      const result = (await handler({})) as { settings: unknown }
       expect(result.settings).toEqual(settings)
     })
   })
 
   describe('settings:update-global', () => {
-    it('calls updateGlobalSettings with patch and returns updated settings', () => {
+    it('calls updateGlobalSettings with patch and returns updated settings', async () => {
       const updated = { appearance: { theme: 'light' } }
       vi.mocked(settingsStore.updateGlobalSettings).mockReturnValue(
         updated as unknown as ReturnType<typeof settingsStore.updateGlobalSettings>
       )
       const handler = captureHandler('settings:update-global')
-      const result = handler({}, { patch: { appearance: { theme: 'light' } } }) as {
+      const result = (await handler({}, { patch: { appearance: { theme: 'light' } } })) as {
         settings: unknown
       }
       expect(settingsStore.updateGlobalSettings).toHaveBeenCalledWith({
@@ -58,29 +58,29 @@ describe('settings IPC handlers (no callback)', () => {
   })
 
   describe('settings:get-workspace', () => {
-    it('returns workspace-specific settings', () => {
+    it('returns workspace-specific settings', async () => {
       const settings = { overrides: { appearance: { theme: 'light' } } }
       vi.mocked(settingsStore.getWorkspaceSettings).mockReturnValue(
         settings as unknown as ReturnType<typeof settingsStore.getWorkspaceSettings>
       )
       const handler = captureHandler('settings:get-workspace')
-      const result = handler({}, { workspaceId: 'ws-1' }) as { settings: unknown }
+      const result = (await handler({}, { workspaceId: 'ws-1' })) as { settings: unknown }
       expect(settingsStore.getWorkspaceSettings).toHaveBeenCalledWith('ws-1')
       expect(result.settings).toEqual(settings)
     })
   })
 
   describe('settings:update-workspace', () => {
-    it('calls updateWorkspaceSettings with workspaceId and patch', () => {
+    it('calls updateWorkspaceSettings with workspaceId and patch', async () => {
       const updated = { overrides: { terminal: { scrollbackLimit: 5000 } } }
       vi.mocked(settingsStore.updateWorkspaceSettings).mockReturnValue(
         updated as unknown as ReturnType<typeof settingsStore.updateWorkspaceSettings>
       )
       const handler = captureHandler('settings:update-workspace')
-      const result = handler(
+      const result = (await handler(
         {},
         { workspaceId: 'ws-1', patch: { terminal: { scrollbackLimit: 5000 } } }
-      ) as { settings: unknown }
+      )) as { settings: unknown }
       expect(settingsStore.updateWorkspaceSettings).toHaveBeenCalledWith('ws-1', {
         terminal: { scrollbackLimit: 5000 },
       })

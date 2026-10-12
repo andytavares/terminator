@@ -132,9 +132,11 @@ Test location by type:
 All IPC channels are defined in `specs/001-extension-first-terminal/contracts/ipc-channels.md`. Before adding a new channel:
 
 1. Document it in the contracts file first.
-2. Add the Zod validation schema to `src/shared/schemas/`.
-3. Expose it in `src/main/preload.ts` and `src/renderer/electron.d.ts`.
-4. Implement the `ipcMain.handle()` in the appropriate `src/main/ipc/*.ipc.ts` file.
+2. Add the Zod payload schema to `src/shared/schemas/` (or beside the handler for a one-off shape).
+3. Declare it in `src/shared/electron-api/manifest.ts` (both adapters and the remote allowlist are generated from it) and type it in `src/renderer/electron.d.ts`.
+4. Register it in the appropriate `src/main/ipc/*.ipc.ts` file as a row of `registerInvokeTable([...invokeSpec({ channel, schema, invalid, run })])` in `src/main/ipc/invoke-table.ts`.
+
+Core invoke channels are registered **only** through that table ([ADR-096](adr/096-every-ipc-channel-has-a-schema.md)). `schema` is a required field, so a channel without one does not compile; `invalid` is the response returned when the payload fails the schema, and `onError` (optional) maps a throwing `run` to a response. A channel that takes no payload uses `noPayload`. Do not call `handleChannel` from a handler module — ESLint rejects the import outside the table and the extension API. Do not write a "rejects a malformed payload" test for the new channel: `tests/unit/ipc/core-channel-schemas.spec.ts` already asserts that every registered core channel has a schema and rejects a payload of the wrong type.
 
 ---
 

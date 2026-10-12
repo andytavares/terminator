@@ -1,10 +1,16 @@
-import type { z } from 'zod'
+import { z } from 'zod'
 import { handleChannel } from './channel-registrar.js'
 
 // Schema-driven registration for validated invoke channels. Each row declares
 // the channel, its payload schema, the response for invalid payloads, and how
 // to produce the success (and optionally failure) response. The
 // parse → dispatch → error-envelope skeleton lives here, once.
+
+/**
+ * Payload of a channel that takes none: the desktop renderer sends nothing,
+ * the remote bridge sends `{}` in its place.
+ */
+export const noPayload = z.union([z.undefined(), z.object({})])
 
 export interface InvokeSpec<S extends z.ZodType = z.ZodType> {
   channel: string
@@ -22,8 +28,16 @@ export function invokeSpec<S extends z.ZodType>(spec: InvokeSpec<S>): InvokeSpec
   return spec as unknown as InvokeSpec
 }
 
+const registeredSpecs = new Map<string, InvokeSpec>()
+
+/** The table row a channel was registered from; undefined for a channel not registered here. */
+export function registeredInvokeSpec(channel: string): InvokeSpec | undefined {
+  return registeredSpecs.get(channel)
+}
+
 export function registerInvokeTable(specs: ReadonlyArray<InvokeSpec>): void {
   for (const spec of specs) {
+    registeredSpecs.set(spec.channel, spec)
     handleChannel(spec.channel, async (_event, payload) => {
       const parsed = spec.schema.safeParse(payload)
       if (!parsed.success) {

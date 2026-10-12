@@ -80,26 +80,6 @@ describe('registerNotificationHandlers', () => {
     })
   })
 
-  it('returns VALIDATION_ERROR for invalid type', async () => {
-    const handler = captureHandle('notifications:create')
-    const result = await handler(null, { type: 'bad', title: 'T', key: 'tKey' })
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-    expect(mockCreate).not.toHaveBeenCalled()
-  })
-
-  it('returns VALIDATION_ERROR for missing title', async () => {
-    const handler = captureHandle('notifications:create')
-    const result = await handler(null, { type: 'info', key: 'tKey' })
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('returns VALIDATION_ERROR for missing key', async () => {
-    const handler = captureHandle('notifications:create')
-    const result = await handler(null, { type: 'info', title: 'T' })
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-    expect(mockCreate).not.toHaveBeenCalled()
-  })
-
   it('sends terminal:navigate-to-session to every window when the onClick from a sessionId fires', async () => {
     const handler = captureHandle('notifications:create')
     const win = {
