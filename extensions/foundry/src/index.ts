@@ -144,7 +144,7 @@ import { createPendingPermissions } from './runtime/pending-permissions.js'
 import type { PendingAsk } from './runtime/pending-permissions.js'
 import { createStallWatcher, type StallWatcher } from './runtime/stall-watcher.js'
 import { createSupervision, type Supervision } from './runtime/supervision.js'
-import { channelFor, type NotifiableEvent } from './runtime/feed/digest.js'
+import { channelFor, type NotifiableEvent } from './runtime/feed/notification-channel.js'
 import { paletteEntries } from './runtime/palette.js'
 import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
@@ -619,9 +619,6 @@ function notify(
       })
     case 'indicator':
       api.notifications.showToast('warning', message, `foundry.${event.kind}.${event.sessionId}`)
-      return null
-    case 'digest':
-      // Already in the feed. Interrupting for it is how a feed gets muted.
       return null
   }
 }

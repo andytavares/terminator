@@ -4,13 +4,13 @@
 // silence is exactly what a crashed console also looks like.
 //
 // So: modal for a blocking permission request only, non-blocking indication for
-// anything else that needs a person, and routine progress batched into a
-// digest rather than interrupting at all.
+// anything else that needs a person. Routine progress goes to the feed and
+// nowhere else.
 
-export type NotificationChannel = 'modal' | 'indicator' | 'digest'
+export type NotificationChannel = 'modal' | 'indicator'
 
 export interface NotifiableEvent {
-  readonly kind: 'permission_requested' | 'stalled' | 'failed' | 'ready' | 'progress'
+  readonly kind: 'permission_requested' | 'stalled' | 'failed' | 'ready'
   readonly sessionId: string
 }
 
@@ -24,7 +24,5 @@ export function channelFor(event: NotifiableEvent): NotificationChannel {
     case 'failed':
     case 'ready':
       return 'indicator'
-    case 'progress':
-      return 'digest'
   }
 }
