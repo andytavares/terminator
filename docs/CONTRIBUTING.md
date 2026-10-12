@@ -37,7 +37,11 @@ npm run build && node scripts/smoke-start.mjs preview
 node scripts/smoke-start.mjs exec <executable>    # a packaged app
 ```
 
-Starts the app on a fresh profile and passes when the main log says `App ready`, every extension under `extensions/` logs `Extension <id> activated`, and nothing logs an error or an uncaught exception, in main or a renderer (renderer console output reaches it through `ELECTRON_ENABLE_LOGGING`). It then asks Electron to quit and requires exit code 0. On Linux it turns the Chromium sandbox off and needs a display (`xvfb-run -a`). CI's `Start` job runs the first two on macOS and Linux from a clean `npm ci`.
+Starts the app on a fresh profile and passes when the main log says `App ready`, every extension under `extensions/` logs `Extension <id> activated`, and nothing logs an error or an uncaught exception, in main or a renderer (renderer console output reaches it through `ELECTRON_ENABLE_LOGGING`). It then asks Electron to quit and requires exit code 0. On Linux it turns the Chromium sandbox off and needs a display (`xvfb-run -a`). CI's `Start` job runs the first two on macOS and Linux from a clean `npm ci`, and on Linux packages the app (`npx electron-builder --linux dir --publish never`) and runs the third against `dist/linux-unpacked`.
+
+### Packaging
+
+`electron-builder.cjs` is the packaging configuration. electron-builder ships only the root package's production dependencies, so the bundled extensions and the packages their backends require at run time (`scripts/extension-externals.cjs`, closed over `package-lock.json` by `scripts/extension-runtime-modules.cjs`) are copied in explicitly, to `app.asar/extensions` and `app.asar/extensions/node_modules`. A package an extension backend adds to the esbuild `external` list ships by being in `scripts/extension-externals.cjs`; nothing else needs editing.
 
 ### Run tests
 

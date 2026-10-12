@@ -286,6 +286,16 @@ jobs:
         run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}node scripts/smoke-start.mjs preview
         timeout-minutes: 8
 
+      # The packaged app, unsigned, from the same electron-builder.cjs the
+      # release uses. It once started with no extensions at all: they were not
+      # in app.asar. Linux only: macOS packaging signs and notarizes.
+      - name: Packaged app
+        if: runner.os == 'Linux'
+        run: |
+          npx electron-builder --linux dir --publish never
+          xvfb-run -a node scripts/smoke-start.mjs exec "$PWD/dist/linux-unpacked/@andytavaresterminator"
+        timeout-minutes: 15
+
   e2e-select:
     name: E2E select
     runs-on: ubuntu-latest
