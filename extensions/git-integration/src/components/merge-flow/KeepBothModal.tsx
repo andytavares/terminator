@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { ArrowDown, TriangleAlert } from 'lucide-react'
-import { Dialog, RelativeTime } from '@terminator/extension-ui'
+import { Dialog, RelativeTime, SegmentedControl } from '@terminator/extension-ui'
 import type { ConflictBlock, GitAuthor } from '../../schemas/merge-flow.schema'
 import { highlightBlock, langFromBlockId } from '../../utils/syntax'
 
@@ -185,22 +185,15 @@ export function KeepBothModal({
       </p>
 
       {/* Order toggle */}
-      <div className="keep-both-modal__toggle">
-        <button
-          className={`keep-both-modal__toggle-btn${order === 'ours-first' ? ' keep-both-modal__toggle-btn--active' : ''}`}
-          aria-label="Mine first"
-          onClick={() => setOrder('ours-first')}
-        >
-          Mine first
-        </button>
-        <button
-          className={`keep-both-modal__toggle-btn${order === 'theirs-first' ? ' keep-both-modal__toggle-btn--active' : ''}`}
-          aria-label="Theirs first"
-          onClick={() => setOrder('theirs-first')}
-        >
-          Theirs first
-        </button>
-      </div>
+      <SegmentedControl
+        label="Order"
+        options={[
+          { value: 'ours-first', label: 'Mine first' },
+          { value: 'theirs-first', label: 'Theirs first' },
+        ]}
+        value={order}
+        onChange={setOrder}
+      />
 
       {/* First block */}
       <div

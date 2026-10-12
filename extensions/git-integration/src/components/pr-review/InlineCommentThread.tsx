@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Button } from '@terminator/extension-ui'
 import type { Thread } from '../../schemas/pr-review.schema'
 import { RichContent } from './RichContent'
 
@@ -45,15 +46,15 @@ export function InlineCommentThread({ thread, onReply }: Props) {
       ))}
 
       {!expanded && hiddenCount > 0 && (
-        <button className="inline-comment-expand" onClick={() => setExpanded(true)}>
+        <Button variant="ghost" size="sm" onClick={() => setExpanded(true)}>
           Show {hiddenCount} more {hiddenCount === 1 ? 'reply' : 'replies'}
-        </button>
+        </Button>
       )}
 
       {onReply && (
-        <button className="inline-comment-reply-btn" onClick={() => onReply(thread.id)}>
+        <Button variant="ghost" size="sm" onClick={() => onReply(thread.id)}>
           Reply
-        </button>
+        </Button>
       )}
     </div>
   )

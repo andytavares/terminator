@@ -1,5 +1,6 @@
 import React from 'react'
-import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, Undo2, X } from 'lucide-react'
+import { Button, IconButton } from '@terminator/extension-ui'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 
 interface Props {
@@ -54,9 +55,15 @@ export function ConflictHeader({
     <div className="conflict-header">
       {/* Breadcrumb */}
       <div className="conflict-header__breadcrumb">
-        <button className="conflict-header__back" onClick={onBack} aria-label="Back to file list">
-          <ArrowLeft aria-hidden="true" /> All files
-        </button>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={ArrowLeft}
+          onClick={onBack}
+          aria-label="Back to file list"
+        >
+          All files
+        </Button>
         <span className="conflict-header__sep">/</span>
         <span className="conflict-header__filepath">
           <span className="conflict-header__file-dir">{fileDir}</span>
@@ -80,54 +87,44 @@ export function ConflictHeader({
       </span>
 
       <div className="conflict-header__nav">
-        <button
-          className="conflict-header__nav-btn"
+        <Button
+          size="sm"
+          icon={ChevronLeft}
           onClick={onPrev}
           disabled={!canPrev}
           aria-label="Previous conflict"
         >
-          <ChevronLeft aria-hidden="true" /> Prev
-        </button>
-        <button
-          className="conflict-header__nav-btn"
-          onClick={onNext}
-          disabled={!canNext}
-          aria-label="Next conflict"
-        >
-          Next <ChevronRight aria-hidden="true" />
-        </button>
+          Prev
+        </Button>
+        <Button size="sm" onClick={onNext} disabled={!canNext} aria-label="Next conflict">
+          Next <ChevronRight aria-hidden="true" className="tmui-button__icon" />
+        </Button>
       </div>
 
-      <button
-        className="conflict-header__undo"
+      <Button
+        variant="ghost"
+        size="sm"
+        icon={Undo2}
         onClick={onUndo}
         disabled={!canUndo}
         aria-label="Undo last decision"
       >
-        ↩ Undo last
-      </button>
+        Undo last
+      </Button>
 
       {onStartOver && (
-        <button
-          className="conflict-header__start-over"
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={RotateCcw}
           onClick={onStartOver}
-          aria-label="Start over"
           title="Reset all resolutions and start from scratch"
         >
-          <RotateCcw aria-hidden="true" /> Start over
-        </button>
+          Start over
+        </Button>
       )}
 
-      {onExit && (
-        <button
-          className="conflict-header__exit"
-          onClick={onExit}
-          aria-label="Exit merge flow"
-          title="Exit merge flow"
-        >
-          <X aria-hidden="true" />
-        </button>
-      )}
+      {onExit && <IconButton icon={X} label="Exit merge flow" onClick={onExit} />}
     </div>
   )
 }

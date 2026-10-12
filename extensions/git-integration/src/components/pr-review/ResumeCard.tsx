@@ -1,5 +1,5 @@
 import React from 'react'
-import { formatRelativeTime } from '@terminator/extension-ui'
+import { Button, formatRelativeTime } from '@terminator/extension-ui'
 import { ArrowRight } from 'lucide-react'
 import { useReviewUiStore } from '../../stores/review-ui.store'
 import type { PrReviewDetail, ReviewNote, DraftComment } from '../../schemas/pr-review.schema'
@@ -92,9 +92,9 @@ export function ResumeCard({
           {formatResumeTime(lastAccessedAt)} · {viewedCount} of {totalFiles} files viewed
         </span>
         <span className="rc-sp" style={{ flex: 1 }} />
-        <button type="button" className="rc-btn rc-pri" onClick={onContinue}>
-          Continue <span className="rc-kbd">↵</span>
-        </button>
+        <Button variant="primary" size="sm" onClick={onContinue}>
+          Continue <kbd className="tmui-kbd">↵</kbd>
+        </Button>
       </div>
       <ul>
         {currentFilePath && (
@@ -117,9 +117,9 @@ export function ResumeCard({
               {questionNote ? `, 1 is a question: "${questionNote.body}"` : ''}
             </span>
             {questionNote && (
-              <button type="button" className="rc-btn rc-ag" onClick={handleAskAgent}>
+              <Button size="sm" onClick={handleAskAgent}>
                 Ask agent
-              </button>
+              </Button>
             )}
           </li>
         )}
@@ -137,9 +137,7 @@ export function ResumeCard({
           <li>
             <span className="rc-pip">{drafts.length}</span>
             <span>{drafts.length} draft comments not yet submitted</span>
-            <button type="button" className="rc-btn">
-              Review drafts
-            </button>
+            <Button size="sm">Review drafts</Button>
           </li>
         )}
         {changedSinceCount > 0 && (

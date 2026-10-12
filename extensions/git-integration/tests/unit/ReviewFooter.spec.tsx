@@ -74,7 +74,7 @@ describe('ReviewFooter', () => {
     'renders exactly one primary button (last file %s, last chapter %s)',
     (isLastFile, isLastChapter, name) => {
       renderFooter({ isLastFile, isLastChapter })
-      const primary = document.querySelectorAll('.rf-pri')
+      const primary = document.querySelectorAll('.tmui-button--primary')
       expect(primary).toHaveLength(1)
       expect(screen.getByRole('button', { name })).toBe(primary[0])
     }

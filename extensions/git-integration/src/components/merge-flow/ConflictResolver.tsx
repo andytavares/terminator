@@ -145,7 +145,6 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
       else if (e.key === 'Enter' && pendingResolution)
         void handleResolve(pendingResolution.text, pendingResolution.strategy)
       else if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'z') void handleUndo()
-      else if (e.key === 'Escape') closeKeepBoth()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -157,7 +156,6 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
     goToNextBlock,
     goToPrevBlock,
     openKeepBoth,
-    closeKeepBoth,
     handleResolve,
     handleUndo,
   ])

@@ -33,25 +33,6 @@
   color: var(--tm-warning);
 }
 
-.ri-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  margin-right: 6px;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: var(--tm-text-muted);
-  cursor: pointer;
-}
-
-.ri-close:hover {
-  background: color-mix(in srgb, var(--tm-text-muted) 12%, transparent);
-  color: var(--tm-text-primary);
-}
-
 .ri-panel {
   flex: 1;
   min-height: 0;

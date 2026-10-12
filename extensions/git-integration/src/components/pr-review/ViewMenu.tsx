@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { Popover } from '@terminator/extension-ui'
+import { Button, Popover, SegmentedControl } from '@terminator/extension-ui'
 import { useReviewUiStore } from '../../stores/review-ui.store'
 import './view-menu.css'
 
@@ -32,9 +32,9 @@ export function ViewMenu({ sinceNote }: ViewMenuProps) {
 
   return (
     <div className="vm">
-      <button
-        type="button"
-        className="vm-btn"
+      <Button
+        variant="ghost"
+        size="sm"
         aria-haspopup="true"
         aria-expanded={open}
         aria-label={label}
@@ -44,7 +44,7 @@ export function ViewMenu({ sinceNote }: ViewMenuProps) {
         View
         {changed && <span className="vm-dot" aria-hidden="true" />}
         <ChevronDown aria-hidden="true" className="tm-icon-sm" />
-      </button>
+      </Button>
       {open && (
         <Popover label="View" onDismiss={() => setOpen(false)} className="vm-popover">
           <div className="vm-group">
@@ -52,29 +52,17 @@ export function ViewMenu({ sinceNote }: ViewMenuProps) {
               Comments
               <span className="vm-kbd">c</span>
             </div>
-            <div className="vm-seg" role="group" aria-label="Comment visibility">
-              <button
-                type="button"
-                aria-pressed={commentVisibility === 'all'}
-                onClick={() => setCommentVisibility('all')}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                aria-pressed={commentVisibility === 'unresolved'}
-                onClick={() => setCommentVisibility('unresolved')}
-              >
-                Unresolved
-              </button>
-              <button
-                type="button"
-                aria-pressed={commentVisibility === 'hidden'}
-                onClick={() => setCommentVisibility('hidden')}
-              >
-                Hidden
-              </button>
-            </div>
+            <SegmentedControl
+              label="Comment visibility"
+              size="sm"
+              options={[
+                { value: 'all', label: 'All' },
+                { value: 'unresolved', label: 'Unresolved' },
+                { value: 'hidden', label: 'Hidden' },
+              ]}
+              value={commentVisibility}
+              onChange={setCommentVisibility}
+            />
           </div>
 
           <div className="vm-group">
@@ -82,42 +70,30 @@ export function ViewMenu({ sinceNote }: ViewMenuProps) {
               Agent notes
               <span className="vm-kbd">⇧C</span>
             </div>
-            <div className="vm-seg" role="group" aria-label="Agent notes">
-              <button
-                type="button"
-                aria-pressed={agentNotesOn}
-                onClick={() => setAgentNotesOn(true)}
-              >
-                On
-              </button>
-              <button
-                type="button"
-                aria-pressed={!agentNotesOn}
-                onClick={() => setAgentNotesOn(false)}
-              >
-                Off
-              </button>
-            </div>
+            <SegmentedControl
+              label="Agent notes"
+              size="sm"
+              options={[
+                { value: 'on', label: 'On' },
+                { value: 'off', label: 'Off' },
+              ]}
+              value={agentNotesOn ? 'on' : 'off'}
+              onChange={(value) => setAgentNotesOn(value === 'on')}
+            />
           </div>
 
           <div className="vm-group">
             <div className="vm-group-label">Layout</div>
-            <div className="vm-seg" role="group" aria-label="Diff view mode">
-              <button
-                type="button"
-                aria-pressed={diffViewMode === 'unified'}
-                onClick={() => setDiffViewMode('unified')}
-              >
-                Unified
-              </button>
-              <button
-                type="button"
-                aria-pressed={diffViewMode === 'split'}
-                onClick={() => setDiffViewMode('split')}
-              >
-                Split
-              </button>
-            </div>
+            <SegmentedControl
+              label="Diff view mode"
+              size="sm"
+              options={[
+                { value: 'unified', label: 'Unified' },
+                { value: 'split', label: 'Split' },
+              ]}
+              value={diffViewMode}
+              onChange={setDiffViewMode}
+            />
           </div>
 
           <button

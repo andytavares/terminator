@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Button } from '@terminator/extension-ui'
 import type { RiskScore } from '../../schemas/pr-review.schema'
 
 const IMPORTERS_INITIAL = 5
@@ -102,14 +103,14 @@ export function RiskBreakdownPanel({ filePath, riskScore, repoRoot }: Props) {
             ))}
           </ul>
           {hiddenCount > 0 && !importersExpanded && (
-            <button className="risk-importers-toggle" onClick={() => setImportersExpanded(true)}>
+            <Button variant="ghost" size="sm" onClick={() => setImportersExpanded(true)}>
               Show {hiddenCount} more…
-            </button>
+            </Button>
           )}
           {importersExpanded && topImporters.length > IMPORTERS_INITIAL && (
-            <button className="risk-importers-toggle" onClick={() => setImportersExpanded(false)}>
+            <Button variant="ghost" size="sm" onClick={() => setImportersExpanded(false)}>
               Collapse
-            </button>
+            </Button>
           )}
         </div>
       )}

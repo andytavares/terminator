@@ -1,5 +1,6 @@
 import React from 'react'
 import { ArrowRight, Check, Info, RotateCcw, X } from 'lucide-react'
+import { Button, IconButton } from '@terminator/extension-ui'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import type { ConflictFile } from '../../schemas/merge-flow.schema'
 
@@ -167,24 +168,17 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
         </div>
         {session.isRebase && <span className="conflict-hub__rebase-badge">rebase</span>}
         {onStartOver && session.totalResolved > 0 && (
-          <button
-            className="conflict-hub__start-over"
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={RotateCcw}
             onClick={onStartOver}
             title="Reset all resolutions and start over"
           >
-            <RotateCcw aria-hidden="true" /> Start over
-          </button>
+            Start over
+          </Button>
         )}
-        {onExit && (
-          <button
-            className="conflict-hub__exit"
-            onClick={onExit}
-            aria-label="Exit merge flow"
-            title="Exit merge flow"
-          >
-            <X aria-hidden="true" />
-          </button>
-        )}
+        {onExit && <IconButton icon={X} label="Exit merge flow" onClick={onExit} />}
       </div>
 
       {/* Stats hero card */}

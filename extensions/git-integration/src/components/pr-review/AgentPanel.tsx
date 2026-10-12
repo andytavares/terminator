@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, X } from 'lucide-react'
+import { Button, IconButton, SegmentedControl } from '@terminator/extension-ui'
 import { useReviewUiStore } from '../../stores/review-ui.store'
 import { reviewAgentAPI } from '../../api/review-agent'
 import type { PrReviewDetail } from '../../schemas/pr-review.schema'
@@ -240,9 +241,7 @@ export function AgentPanel({ repoRoot, pr }: Props) {
     <aside className="ap-panel" aria-label="Agent panel">
       <div className="ap-header">
         <span className="ap-header-title">Agent</span>
-        <button type="button" className="ap-close" aria-label="Close agent panel" onClick={close}>
-          <X />
-        </button>
+        <IconButton icon={X} size="sm" label="Close agent panel" onClick={close} />
       </div>
 
       {phase === 'ask' && (
@@ -251,29 +250,17 @@ export function AgentPanel({ repoRoot, pr }: Props) {
           <p className="ap-note" style={{ margin: '6px 0' }}>
             Scope: {scopeDescription(agentPanelScope)} · reads the PR head in a private worktree
           </p>
-          <div className="ap-seg" role="group" aria-label="Request">
-            <button
-              type="button"
-              aria-pressed={request === 'review'}
-              onClick={() => setRequest('review')}
-            >
-              Review
-            </button>
-            <button
-              type="button"
-              aria-pressed={request === 'explain'}
-              onClick={() => setRequest('explain')}
-            >
-              Explain
-            </button>
-            <button
-              type="button"
-              aria-pressed={request === 'ask'}
-              onClick={() => setRequest('ask')}
-            >
-              Ask…
-            </button>
-          </div>
+          <SegmentedControl
+            label="Request"
+            size="sm"
+            options={[
+              { value: 'review', label: 'Review' },
+              { value: 'explain', label: 'Explain' },
+              { value: 'ask', label: 'Ask…' },
+            ]}
+            value={request}
+            onChange={setRequest}
+          />
           {request === 'ask' && (
             <textarea
               className="ap-question"
@@ -284,30 +271,20 @@ export function AgentPanel({ repoRoot, pr }: Props) {
           )}
           <div className="ap-model-row">
             <span className="ap-note">Model</span>
-            <div className="ap-seg" role="group" aria-label="Model">
-              <button
-                type="button"
-                aria-pressed={model === 'sonnet'}
-                onClick={() => setModel('sonnet')}
-              >
-                Sonnet
-              </button>
-              <button
-                type="button"
-                aria-pressed={model === 'opus'}
-                onClick={() => setModel('opus')}
-              >
-                Opus
-              </button>
-            </div>
+            <SegmentedControl
+              label="Model"
+              size="sm"
+              options={[
+                { value: 'sonnet', label: 'Sonnet' },
+                { value: 'opus', label: 'Opus' },
+              ]}
+              value={model}
+              onChange={setModel}
+            />
             <span className="ap-sp" />
-            <button
-              type="button"
-              className="ap-btn ap-ag"
-              onClick={() => void handleStart(request)}
-            >
+            <Button variant="primary" size="sm" onClick={() => void handleStart(request)}>
               Run
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -327,20 +304,12 @@ export function AgentPanel({ repoRoot, pr }: Props) {
             startedAt={currentRun.startedAt}
           />
           <div className="ap-actions-row">
-            <button
-              type="button"
-              className="ap-btn"
-              onClick={() => void reviewAgentAPI.cancel(currentRun.id)}
-            >
+            <Button size="sm" onClick={() => void reviewAgentAPI.cancel(currentRun.id)}>
               Cancel
-            </button>
-            <button
-              type="button"
-              className="ap-btn"
-              onClick={() => void reviewAgentAPI.openTerminal(currentRun.id)}
-            >
+            </Button>
+            <Button size="sm" onClick={() => void reviewAgentAPI.openTerminal(currentRun.id)}>
               Continue in terminal
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -379,41 +348,33 @@ export function AgentPanel({ repoRoot, pr }: Props) {
                   <RichContent>{finding.body}</RichContent>
                 </div>
                 <div className="ap-acts">
-                  <button
-                    type="button"
-                    className="ap-btn"
-                    onClick={() => handlePostAsComment(finding)}
-                  >
+                  <Button size="sm" onClick={() => handlePostAsComment(finding)}>
                     Post as comment
-                  </button>
-                  <button type="button" className="ap-btn" onClick={() => handleDismiss(finding)}>
+                  </Button>
+                  <Button size="sm" onClick={() => handleDismiss(finding)}>
                     Dismiss
-                  </button>
-                  <button
-                    type="button"
-                    className="ap-btn"
-                    onClick={() => void reviewAgentAPI.openTerminal(currentRun.id)}
-                  >
+                  </Button>
+                  <Button size="sm" onClick={() => void reviewAgentAPI.openTerminal(currentRun.id)}>
                     Ask follow-up
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
           <p className="ap-note" style={{ margin: 0 }}>
             Private to you. Saved with this PR; marked stale if the lines change.
           </p>
-          <button type="button" className="ap-btn" onClick={() => setForceAsk(true)}>
+          <Button size="sm" onClick={() => setForceAsk(true)}>
             Ask again
-          </button>
+          </Button>
         </div>
       )}
 
       {phase === 'failed' && currentRun && (
         <div>
           <p className="ap-note ap-error">{currentRun.error ?? 'The agent could not finish.'}</p>
-          <button type="button" className="ap-btn" onClick={() => setForceAsk(true)}>
+          <Button size="sm" onClick={() => setForceAsk(true)}>
             Try again
-          </button>
+          </Button>
         </div>
       )}
     </aside>

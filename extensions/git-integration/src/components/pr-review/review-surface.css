@@ -129,16 +129,6 @@
   background: transparent;
 }
 
-.rs-kbd {
-  font: 500 11px/1 var(--tm-font-mono);
-  border: 1px solid var(--tm-border-strong);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  padding: 2px 5px;
-  color: var(--tm-text-secondary);
-  background: var(--tm-bg-elevated);
-}
-
 .rs-btn {
   background: var(--tm-bg-elevated);
   border: 1px solid var(--tm-border-strong);
@@ -153,12 +143,6 @@
   background: var(--tm-accent);
   border-color: var(--tm-accent);
   color: var(--tm-on-accent);
-}
-
-.rs-btn--ag {
-  border-color: var(--tm-agent);
-  color: var(--tm-agent);
-  background: var(--tm-agent-dim);
 }
 
 .rs-pip {

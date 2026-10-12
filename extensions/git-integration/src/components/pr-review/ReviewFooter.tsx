@@ -1,5 +1,6 @@
 import React from 'react'
 import { ChevronLeft } from 'lucide-react'
+import { Button, IconButton } from '@terminator/extension-ui'
 import type { DraftComment } from '../../schemas/pr-review.schema'
 import './review-footer.css'
 
@@ -38,58 +39,46 @@ export function ReviewFooter({
 
   return (
     <div className="rf-bar">
-      <button type="button" className="rf-btn" onClick={onPause}>
+      <Button size="sm" onClick={onPause}>
         Pause review
-      </button>
+      </Button>
 
       {draftsLabel ? (
-        <button type="button" className="rf-btn rf-drafts" onClick={onOpenSubmit}>
+        <Button size="sm" onClick={onOpenSubmit}>
           {draftsLabel}
-        </button>
+        </Button>
       ) : (
-        <button type="button" className="rf-hint" onClick={onOpenShortcuts}>
-          <kbd className="rf-kbd">?</kbd>
+        <Button variant="ghost" size="sm" onClick={onOpenShortcuts}>
+          <kbd className="tmui-kbd">?</kbd>
           <span>Shortcuts</span>
-        </button>
+        </Button>
       )}
 
       <span className="rf-sp" />
 
-      <button
-        type="button"
-        className="rf-btn rf-icon"
-        onClick={onPrevFile}
-        aria-label="Previous file"
-      >
-        <ChevronLeft aria-hidden="true" />
-      </button>
+      <IconButton icon={ChevronLeft} label="Previous file" onClick={onPrevFile} />
 
       {isLastFile && isLastChapter ? (
-        <button
-          type="button"
-          className="rf-btn rf-pri"
-          onClick={onFinishChapter}
-          aria-label="Submit review…"
-        >
+        <Button variant="primary" size="sm" onClick={onFinishChapter} aria-label="Submit review…">
           Submit review…{' '}
-          <kbd className="rf-kbd" aria-hidden="true">
+          <kbd className="tmui-kbd" aria-hidden="true">
             ⌘↵
           </kbd>
-        </button>
+        </Button>
       ) : isLastFile ? (
-        <button type="button" className="rf-btn rf-pri" onClick={onFinishChapter}>
-          Finish chapter ↵
-        </button>
+        <Button variant="primary" size="sm" onClick={onFinishChapter}>
+          Finish chapter <kbd className="tmui-kbd">↵</kbd>
+        </Button>
       ) : (
-        <button
-          type="button"
-          className="rf-btn rf-pri"
+        <Button
+          variant="primary"
+          size="sm"
           onClick={onMarkViewed}
           aria-label="Mark viewed, next file"
         >
           <span className="rf-long">Mark viewed, next file</span>
           <span className="rf-short">Next</span>
-        </button>
+        </Button>
       )}
     </div>
   )

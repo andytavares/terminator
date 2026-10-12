@@ -1,6 +1,13 @@
 import { AlertTriangle, ListFilter } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Tab, TabList, TabPanel, TabsRoot, formatRelativeTime } from '@terminator/extension-ui'
+import {
+  Button,
+  Tab,
+  TabList,
+  TabPanel,
+  TabsRoot,
+  formatRelativeTime,
+} from '@terminator/extension-ui'
 import { z } from 'zod'
 import { githubAPI } from '../../api/github'
 import { DashboardPRSchema, type DashboardPR } from '../../schemas/pr-review.schema'
@@ -184,20 +191,21 @@ function Row({
         <span className="rd-num">~{pr.estimatedMinutes} min</span>
       </span>
       <span className="rd-actions">
-        <button
-          type="button"
-          className={hasSession ? 'rd-btn rd-pri rd-always' : primary ? 'rd-btn rd-pri' : 'rd-btn'}
+        <Button
+          size="sm"
+          variant={hasSession || primary ? 'primary' : 'secondary'}
+          className={hasSession ? 'rd-row-action rd-always' : 'rd-row-action'}
           onClick={(e) => {
             e.stopPropagation()
             handle()
           }}
         >
           {label}
-        </button>
+        </Button>
         {showClone && (
-          <button
-            type="button"
-            className="rd-btn"
+          <Button
+            size="sm"
+            className="rd-row-action"
             disabled={cloneState?.status === 'cloning'}
             onClick={(e) => {
               e.stopPropagation()
@@ -205,7 +213,7 @@ function Row({
             }}
           >
             {cloneState?.status === 'cloning' ? 'Cloning…' : 'Clone and review'}
-          </button>
+          </Button>
         )}
         {cloneState?.status === 'error' && (
           <span className="rd-clone-error">{cloneState.message}</span>
@@ -418,9 +426,9 @@ export function ReviewDashboard(): JSX.Element {
   }
 
   const chooseButton = (
-    <button type="button" className="rd-btn" onClick={() => setPickerOpen(true)}>
+    <Button size="sm" onClick={() => setPickerOpen(true)}>
       Choose repositories
-    </button>
+    </Button>
   )
 
   const updatedText = fetchedAt ? `Updated ${formatRelativeTime(fetchedAt)}` : ''
@@ -431,18 +439,17 @@ export function ReviewDashboard(): JSX.Element {
         <span className="rd-t">Reviews</span>
         <span className="rd-sp" />
         <span className="rd-note">{updatedText}</span>
-        <button
-          type="button"
-          className="rd-btn rd-scope"
+        <Button
+          size="sm"
+          icon={ListFilter}
           onClick={() => setPickerOpen(true)}
           aria-label={`${scopeLabel}, choose repositories`}
         >
-          <ListFilter aria-hidden="true" className="tm-icon-sm" />
           {scopeLabel}
-        </button>
-        <button type="button" className="rd-btn" onClick={load} disabled={loading}>
+        </Button>
+        <Button size="sm" onClick={load} disabled={loading}>
           Refresh
-        </button>
+        </Button>
       </div>
       {pickerOpen && (
         <RepoPicker
@@ -473,9 +480,9 @@ export function ReviewDashboard(): JSX.Element {
         {!loading && error && (
           <div className="rd-error">
             {error}
-            <button type="button" className="rd-btn" onClick={load}>
+            <Button size="sm" onClick={load}>
               Retry
-            </button>
+            </Button>
             {chooseButton}
           </div>
         )}
@@ -485,9 +492,9 @@ export function ReviewDashboard(): JSX.Element {
             <AlertTriangle aria-hidden="true" className="tm-icon" />
             <span>{failedSummary(failed)}</span>
             <span className="rd-sp" />
-            <button type="button" className="rd-btn" onClick={load}>
+            <Button size="sm" onClick={load}>
               Retry
-            </button>
+            </Button>
             {chooseButton}
           </div>
         )}

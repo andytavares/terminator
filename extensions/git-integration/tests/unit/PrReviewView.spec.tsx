@@ -157,7 +157,7 @@ describe('PrReviewView', () => {
       { chapters: [mockChapter, ch2] },
       { currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' }
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Chapters' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
     expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
   })
 
@@ -167,7 +167,7 @@ describe('PrReviewView', () => {
       { chapters: [mockChapter, ch2] },
       { currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' }
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Chapters' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
     expect(screen.getByTestId('chapter-nav')).toBeTruthy()
   })
 
@@ -334,9 +334,9 @@ describe('PrReviewView', () => {
     )
     // Full is default
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Chapters' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
     expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Files' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Files' }))
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
 
@@ -352,7 +352,7 @@ describe('PrReviewView', () => {
         onRefresh={mockRefresh}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Chapters' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
     expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
   })
 
@@ -576,7 +576,7 @@ describe('PrReviewView', () => {
 
     it('] crosses chapters in the Chapters view too', async () => {
       await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
-      fireEvent.click(screen.getByRole('button', { name: 'Chapters' }))
+      fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
       press(']')
       expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
       expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
@@ -606,7 +606,7 @@ describe('PrReviewView', () => {
     it('shows "Chapter 2 of 3" in the Chapters view only', async () => {
       await renderView({ chapters }, { currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
       expect(screen.queryByText('Chapter 2 of 3')).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: 'Chapters' }))
+      fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
       expect(screen.getByText('Chapter 2 of 3')).toBeTruthy()
     })
   })

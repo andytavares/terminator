@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react'
+import { Button } from '@terminator/extension-ui'
 import { useGitStore } from '../stores/git.store'
 import type { GitFileStatus, GitStatus } from '../schemas/git.schema'
 import { gitAPI } from '../api/git'
@@ -158,9 +159,9 @@ export function StagingArea({
         <div className="staging-area__section-header">
           <span>Staged ({stagedFiles.length})</span>
           {stagedFiles.length > 0 && (
-            <button className="staging-area__action-btn" onClick={() => void unstageAll()}>
+            <Button variant="ghost" size="sm" onClick={() => void unstageAll()}>
               Unstage All
-            </button>
+            </Button>
           )}
         </div>
         {stagedFiles.map((f) => (
@@ -179,9 +180,9 @@ export function StagingArea({
         <div className="staging-area__section-header">
           <span>Changes ({unstagedFiles.length})</span>
           {unstagedFiles.length > 0 && (
-            <button className="staging-area__action-btn" onClick={() => void stageAll()}>
+            <Button variant="ghost" size="sm" onClick={() => void stageAll()}>
               Stage All
-            </button>
+            </Button>
           )}
         </div>
         {unstagedFiles.map((f) => (
