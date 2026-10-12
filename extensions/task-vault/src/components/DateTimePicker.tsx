@@ -273,19 +273,25 @@ export function DateTimePicker({
   }
 
   // When datePart changes externally (e.g. shortcut), re-anchor the calendar
-  useEffect(() => {
-    if (!datePart) return
-    const d = new Date(datePart + 'T00:00:00')
-    setDisplayYear(d.getFullYear())
-    setDisplayMonth(d.getMonth())
-  }, [datePart])
+  const [anchoredDate, setAnchoredDate] = useState(datePart)
+  if (anchoredDate !== datePart) {
+    setAnchoredDate(datePart)
+    if (datePart) {
+      const d = new Date(datePart + 'T00:00:00')
+      setDisplayYear(d.getFullYear())
+      setDisplayMonth(d.getMonth())
+    }
+  }
 
   // Sync amPm state when timePart changes externally
-  useEffect(() => {
-    if (!timePart) return
-    const h = parseInt(timePart.split(':')[0] ?? '0', 10)
-    setAmPm(h >= 12 ? 'PM' : 'AM')
-  }, [timePart])
+  const [syncedTime, setSyncedTime] = useState(timePart)
+  if (syncedTime !== timePart) {
+    setSyncedTime(timePart)
+    if (timePart) {
+      const h = parseInt(timePart.split(':')[0] ?? '0', 10)
+      setAmPm(h >= 12 ? 'PM' : 'AM')
+    }
+  }
 
   function selectDate(dateStr: string) {
     if (mode === 'date') {

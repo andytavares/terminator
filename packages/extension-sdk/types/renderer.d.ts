@@ -21,6 +21,9 @@ export interface ElectronAPI {
     create(payload: unknown): Promise<{ sessionId: string } | { error: string }>
     close(sessionId: string): Promise<{ success: boolean }>
     input(sessionId: string, data: string): void
+    listSessions(): Promise<
+      Array<{ sessionId: string; projectId: string; tabTitle: string; type: string }>
+    >
     resize(sessionId: string, cols: number, rows: number): void
     onOutput(handler: (sessionId: string, data: string) => void): () => void
     closeAll(): Promise<{ terminatedCount: number }>
@@ -165,6 +168,8 @@ export interface ElectronAPI {
       type: 'info' | 'success' | 'warning' | 'error'
       title: string
       message?: string
+      source?: string
+      key: string
       targets?: NotificationTarget[]
     }): Promise<{ id: string } | { error: string }>
     list(): Promise<SerializedNotification[]>

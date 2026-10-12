@@ -49,7 +49,7 @@ export interface WeeklyReviewDetail extends WeeklyReview {
   actions: WeeklyReviewAction[]
 }
 
-interface ReviewRow {
+type ReviewRow = {
   id: string
   started_at: string
   completed_at: string | null
@@ -59,7 +59,7 @@ interface ReviewRow {
   try_next: string | null
 }
 
-interface ActionRow {
+type ActionRow = {
   id: string
   review_id: string
   step: string | number

@@ -35,7 +35,7 @@ export function WeeklyReviewStepStaleTasks({
       'task-vault:vault:process-inbox-item',
       { taskId, action: 'someday' }
     )
-    if (result && 'error' in result) {
+    if (typeof result === 'object' && result !== null && 'error' in result) {
       notify('error', `Could not move to backlog: ${result.error}`, 'staleTaskBacklogFailed')
       return
     }
@@ -46,7 +46,7 @@ export function WeeklyReviewStepStaleTasks({
     const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', {
       taskId,
     })
-    if (result && 'error' in result) {
+    if (typeof result === 'object' && result !== null && 'error' in result) {
       notify('error', `Could not delete task: ${result.error}`, 'staleTaskDeleteFailed')
       return
     }
@@ -58,7 +58,7 @@ export function WeeklyReviewStepStaleTasks({
       'task-vault:vault:reset-today-since',
       { taskId }
     )
-    if (result && 'error' in result) {
+    if (typeof result === 'object' && result !== null && 'error' in result) {
       notify('error', `Could not reset task: ${result.error}`, 'staleTaskResetFailed')
       return
     }

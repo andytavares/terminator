@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { X, Eye, Pencil } from 'lucide-react'
 import { renderMarkdown } from '../utils/markdown'
 
@@ -45,10 +45,12 @@ function SectionEditor({ label, value, placeholder, onSave }: SectionEditorProps
   const [saving, setSaving] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
+  const [draftSource, setDraftSource] = useState(value)
+  if (draftSource !== value) {
+    setDraftSource(value)
     setDraft(value)
     setEditing(false)
-  }, [value])
+  }
 
   useEffect(() => {
     if (editing && textareaRef.current) {
@@ -163,43 +165,54 @@ interface TaskDetailPanelProps {
   onClose: () => void
 }
 
+type TaskDetailOutcome = { detail: TaskDetail } | { error: string } | Record<string, never>
+
+async function fetchTaskDetail(taskId: string): Promise<TaskDetailOutcome> {
+  try {
+    const result = await window.electronAPI.extensionBridge.invoke(
+      'task-vault:vault:get-task-detail',
+      { taskId }
+    )
+    if (result && typeof result === 'object' && 'error' in result) {
+      return { error: (result as { error: string }).error }
+    }
+    if (result && typeof result === 'object') {
+      const r = result as { description: string; acceptanceCriteria: string; devHints: string }
+      return {
+        detail: {
+          description: r.description ?? '',
+          acceptanceCriteria: r.acceptanceCriteria ?? '',
+          devHints: r.devHints ?? '',
+        },
+      }
+    }
+    return {}
+  } catch (err) {
+    return { error: String(err) }
+  }
+}
+
 export function TaskDetailPanel({ taskId, taskText, onClose }: TaskDetailPanelProps) {
   const [detail, setDetail] = useState<TaskDetail>({
     description: '',
     acceptanceCriteria: '',
     devHints: '',
   })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const loadDetail = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'task-vault:vault:get-task-detail',
-        { taskId }
-      )
-      if (result && typeof result === 'object' && 'error' in result) {
-        setError((result as { error: string }).error)
-      } else if (result && typeof result === 'object') {
-        const r = result as { description: string; acceptanceCriteria: string; devHints: string }
-        setDetail({
-          description: r.description ?? '',
-          acceptanceCriteria: r.acceptanceCriteria ?? '',
-          devHints: r.devHints ?? '',
-        })
-      }
-    } catch (err) {
-      setError(String(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [taskId])
+  const [loaded, setLoaded] = useState<{ taskId: string; error: string | null } | null>(null)
+  const loading = loaded?.taskId !== taskId
+  const error = loaded && !loading ? loaded.error : null
 
   useEffect(() => {
-    void loadDetail()
-  }, [loadDetail])
+    let current = true
+    void fetchTaskDetail(taskId).then((outcome) => {
+      if (!current) return
+      if ('detail' in outcome) setDetail(outcome.detail)
+      setLoaded({ taskId, error: 'error' in outcome ? outcome.error : null })
+    })
+    return () => {
+      current = false
+    }
+  }, [taskId])
 
   async function handleSaveField(field: keyof TaskDetail, value: string) {
     const updated = { ...detail, [field]: value }

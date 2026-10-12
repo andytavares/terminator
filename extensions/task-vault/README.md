@@ -11,6 +11,10 @@ GTD+BuJo+PARA daily productivity system backed by the shared PGlite (PostgreSQL-
 - **Weekly Review** — full review payload including stale projects and completed tasks. Every review is persisted: each promote, archive, backlog, delete, keep, project status change, and inbox decision is recorded against the review, alongside the reflection answers. Past reviews are browsable from the review's **History** button and exportable as Markdown
 - **Recurring Tasks** — set daily/weekly/biweekly/monthly recurrence on any task; the engine automatically ensures exactly one future open instance exists at all times
 
+## Reset
+
+The **Reset (delete all data)** setting deletes every task, project and area, and Task Vault's own rows in the shared `settings` table (those with `extension_id = 'task-vault'`). Other extensions' settings rows are left untouched.
+
 ## Task ID format
 
 Task IDs are UUIDs assigned at creation and stored in the shared PGlite (PostgreSQL-compatible) database. IDs are stable across restarts. A `{ error: 'STALE_ID' }` response means the task no longer exists (e.g. it was deleted or migrated).

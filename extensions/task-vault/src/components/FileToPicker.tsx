@@ -68,9 +68,11 @@ export function FileToPicker({
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => {
+  const [highlightedFor, setHighlightedFor] = useState(query)
+  if (highlightedFor !== query) {
+    setHighlightedFor(query)
     setHighlighted(0)
-  }, [query])
+  }
 
   const q = query.trim().toLowerCase().replace(/^[@#]/, '')
   const filtered: DestOption[] = baseOptions.filter(
