@@ -9,24 +9,11 @@ import {
   Tag as TagIcon,
   X,
 } from 'lucide-react'
-import { ConfirmDialog, useDismissible } from '@terminator/extension-ui'
+import { ConfirmDialog, RelativeTime, useDismissible } from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
 import { useFilterStore } from '../stores/filter.store'
 import { EmptyState } from './EmptyState'
 import type { NoteListItem, DiagramListItem, SearchResult, Tag } from '../db/types'
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(iso).getDay()]
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
 
 // ── Context menu ──────────────────────────────────────────────────
 
@@ -293,7 +280,9 @@ function NoteRow({
     >
       <div className="notepad-note-row__title">{title}</div>
       <div className="notepad-note-row__meta-line">
-        <span className="notepad-note-row__time">{relativeTime(note.updatedAt)}</span>
+        <span className="notepad-note-row__time">
+          <RelativeTime value={note.updatedAt} />
+        </span>
         {tagList.length > 0 && (
           <>
             <span className="notepad-note-row__dot">·</span>
@@ -358,7 +347,9 @@ function DiagramRow({
         {diagram.title}
       </div>
       <div className="notepad-note-row__meta-line">
-        <span className="notepad-note-row__time">{relativeTime(diagram.updatedAt)}</span>
+        <span className="notepad-note-row__time">
+          <RelativeTime value={diagram.updatedAt} />
+        </span>
         {diagram.tags && diagram.tags.length > 0 && (
           <>
             <span className="notepad-note-row__dot">·</span>

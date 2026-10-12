@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback, useRef } from 'react'
 import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
+import { RelativeTime } from '@terminator/extension-ui'
 import { useNotificationStore, type Notification } from '../stores/notification.store'
 import { AlertBadge } from './AlertBadge'
 import './NotificationPanel.css'
@@ -16,14 +17,6 @@ function TypeIcon({ type }: { type: string }): JSX.Element {
     default:
       return <Info {...props} />
   }
-}
-
-function relativeTime(timestamp: number): string {
-  const diff = Math.floor((Date.now() - timestamp) / 1000)
-  if (diff < 60) return 'just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
 }
 
 /**
@@ -85,7 +78,9 @@ function NotificationItem({
         <div className="notif-item__title">{notification.title}</div>
         {notification.message && <div className="notif-item__message">{notification.message}</div>}
         <div className="notif-item__meta">
-          <span className="notif-item__time">{relativeTime(notification.timestamp)}</span>
+          <span className="notif-item__time">
+            <RelativeTime value={notification.timestamp} />
+          </span>
           {notification.source && notification.source !== 'core' && (
             <span className="notif-item__source">{notification.source}</span>
           )}

@@ -1510,61 +1510,17 @@
 
 /* ─── RichContent ─────────────────────────────────────────────────────────── */
 
-.rich-content {
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--tm-text-primary);
-  word-break: break-word;
-  overflow-wrap: break-word;
-}
-.rich-content a {
-  color: var(--tm-accent-text);
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--tm-accent) 50%, transparent);
-  text-underline-offset: 2px;
-}
+/* The design system's Markdown sets the rest (type, links, code, lists, images);
+   only what it leaves unstyled is here. */
 .rich-content a:hover {
   color: var(--tm-accent-text);
   text-decoration-color: color-mix(in srgb, var(--tm-accent) 80%, transparent);
-}
-.rich-content p {
-  margin: 0 0 8px;
-}
-.rich-content p:last-child {
-  margin-bottom: 0;
-}
-.rich-content code {
-  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
-  background: var(--tm-overlay);
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-size: 12px;
-}
-.rich-content pre {
-  border-radius: 6px;
-  overflow-x: auto;
-  margin: 8px 0;
-}
-.rich-content pre code {
-  background: none;
-  padding: 0;
-}
-.rich-content ul,
-.rich-content ol {
-  padding-left: 20px;
-  margin: 4px 0 8px;
-}
-.rich-content li {
-  margin-bottom: 3px;
 }
 .rich-content details {
   margin: 0 0 8px;
 }
 .rich-content summary {
   cursor: pointer;
-}
-.rich-content img {
-  max-width: 100%;
 }
 
 /* ─── FullFileList ────────────────────────────────────────────────────────── */

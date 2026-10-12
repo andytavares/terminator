@@ -1,4 +1,5 @@
 import React from 'react'
+import { RelativeTime } from '@terminator/extension-ui'
 import { useReviewUiStore } from '../../stores/review-ui.store'
 
 interface Props {
@@ -7,21 +8,6 @@ interface Props {
   stillViewedCount: number
   lastAccessedAt: string | null
   historyRewritten: boolean
-}
-
-/** "2 h ago" / "3 d ago" / "just now", relative to now. */
-export function formatRelativeTime(iso: string | null): string {
-  if (!iso) return ''
-  const then = new Date(iso).getTime()
-  if (Number.isNaN(then)) return ''
-  const diffMs = Date.now() - then
-  const minutes = Math.round(diffMs / 60000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes} m ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours} h ago`
-  const days = Math.round(hours / 24)
-  return `${days} d ago`
 }
 
 /**
@@ -47,7 +33,11 @@ export function SinceBanner({
           {commitCount} commit{commitCount === 1 ? '' : 's'} since you last looked
         </b>
       )}
-      <span className="rc-note">{formatRelativeTime(lastAccessedAt)}</span>
+      {lastAccessedAt && (
+        <span className="rc-note">
+          <RelativeTime value={lastAccessedAt} />
+        </span>
+      )}
       <span className="rc-note">
         {changedCount} files changed · {stillViewedCount} still viewed
       </span>

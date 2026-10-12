@@ -195,32 +195,15 @@ describe('NotificationPanel', () => {
     expect(useNotificationStore.getState().panelOpen).toBe(true)
   })
 
-  it('renders relative time: just now for fresh timestamp', () => {
-    const n = makeNotif({ timestamp: Date.now() })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true })
+  it('says how long ago it happened, keeping the exact moment', () => {
+    const timestamp = Date.now() - 2 * 60 * 1000
+    useNotificationStore.setState({
+      notifications: [makeNotif({ timestamp })],
+      panelOpen: true,
+    })
     render(<NotificationPanel />)
-    expect(screen.getByText('just now')).toBeTruthy()
-  })
-
-  it('renders relative time: minutes ago', () => {
-    const n = makeNotif({ timestamp: Date.now() - 2 * 60 * 1000 })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true })
-    render(<NotificationPanel />)
-    expect(screen.getByText('2m ago')).toBeTruthy()
-  })
-
-  it('renders relative time: hours ago', () => {
-    const n = makeNotif({ timestamp: Date.now() - 2 * 3600 * 1000 })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true })
-    render(<NotificationPanel />)
-    expect(screen.getByText('2h ago')).toBeTruthy()
-  })
-
-  it('renders relative time: days ago', () => {
-    const n = makeNotif({ timestamp: Date.now() - 2 * 86400 * 1000 })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true })
-    render(<NotificationPanel />)
-    expect(screen.getByText('2d ago')).toBeTruthy()
+    const time = screen.getByText('2 minutes ago')
+    expect(time.getAttribute('datetime')).toBe(new Date(timestamp).toISOString())
   })
 })
 

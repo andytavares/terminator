@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { RelativeTime } from '@terminator/extension-ui'
 import {
   ArrowDown,
   ArrowRight,
@@ -71,7 +72,6 @@ export function PrOverviewPanel({
   const [discussionOpen, setDiscussionOpen] = useState(false)
   const [issueRefsExpanded, setIssueRefsExpanded] = useState(true)
 
-  const age = formatAge(pr.openedAt)
   const youAreRequested =
     !!currentUserLogin &&
     (pr.requestedReviewers?.includes(currentUserLogin) ||
@@ -232,7 +232,7 @@ export function PrOverviewPanel({
             <span className="pr-overview-meta-branch">
               {pr.headRefName} → {pr.baseRefName}
             </span>
-            <span>{age}</span>
+            <RelativeTime value={pr.openedAt} />
             {pr.mergeStateStatus === 'behind' && (
               <span className="pr-merge-state-badge pr-merge-state-badge--behind">
                 <ArrowDown aria-hidden="true" /> Behind {pr.baseRefName}
@@ -464,7 +464,7 @@ function IssueCommentItem({
         />
         <strong className="inline-comment-author">{comment.author}</strong>
         <time className="inline-comment-time" dateTime={comment.createdAt}>
-          {formatCommentTime(comment.createdAt)}
+          <RelativeTime value={comment.createdAt} />
         </time>
         <button className="pr-issue-comment-reply-btn" onClick={() => onReply(comment)}>
           Reply
@@ -475,29 +475,4 @@ function IssueCommentItem({
       </div>
     </div>
   )
-}
-
-function formatAge(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime()
-  const days = Math.floor(ms / 86_400_000)
-  if (days === 0) return 'today'
-  if (days === 1) return '1d ago'
-  return `${days}d ago`
-}
-
-function formatCommentTime(iso: string): string {
-  try {
-    const d = new Date(iso)
-    const ms = Date.now() - d.getTime()
-    const mins = Math.floor(ms / 60_000)
-    if (mins < 1) return 'just now'
-    if (mins < 60) return `${mins}m ago`
-    const hours = Math.floor(mins / 60)
-    if (hours < 24) return `${hours}h ago`
-    const days = Math.floor(hours / 24)
-    if (days < 14) return `${days}d ago`
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  } catch {
-    return iso
-  }
 }

@@ -23,7 +23,7 @@ import { pullNumber } from '../line/pull-number.js'
 import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { ordinal } from '../factory/format.js'
-import { usePolling } from '@terminator/extension-ui'
+import { RelativeTime, usePolling } from '@terminator/extension-ui'
 import { usePushed } from '../renderer/use-pushed.js'
 import { ExternalLink, Markdown, MarkdownInline } from './Markdown.js'
 import {
@@ -110,14 +110,6 @@ function byMessage(lines: TranscriptLine[]): TranscriptLine[] {
 /** A node an agent is working on now. An orphan says running and is not. */
 function isLive(node: RunNode, orphaned: readonly string[]): boolean {
   return node.state === 'running' && node.sessionId !== null && !orphaned.includes(node.id)
-}
-
-/** "12s ago", "4m ago": how stale the newest line is, which is the question. */
-function ago(at: number, now: number): string {
-  const seconds = Math.max(0, Math.floor((now - at) / 1000))
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  return minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`
 }
 
 const STATE_LABEL: Record<RunNode['state'], string> = {
@@ -668,9 +660,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                       <div className="fdry-live-head">
                         <b>{view.labels?.[node.id] ?? node.role ?? 'this step'}</b>
                         {last === undefined ? null : (
-                          <time dateTime={new Date(last.at).toISOString()}>
-                            {ago(last.at, tailsReadAt)}
-                          </time>
+                          <RelativeTime value={last.at} now={tailsReadAt} />
                         )}
                       </div>
                       {lines.length === 0 ? (

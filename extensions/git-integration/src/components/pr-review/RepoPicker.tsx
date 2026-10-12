@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Dialog } from '@terminator/extension-ui'
+import { Dialog, formatRelativeTime } from '@terminator/extension-ui'
 import { Lock } from 'lucide-react'
 import { githubAPI } from '../../api/github'
 
@@ -18,18 +18,6 @@ interface Props {
 }
 
 type Loaded = { repos: Repo[] } | { error: string }
-
-function plural(n: number, unit: string): string {
-  return `${n} ${unit}${n === 1 ? '' : 's'}`
-}
-
-function pushedWords(iso: string): string {
-  const days = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000))
-  if (days < 1) return 'pushed today'
-  if (days < 60) return `pushed ${plural(days, 'day')} ago`
-  if (days < 730) return `pushed ${plural(Math.floor(days / 30), 'month')} ago`
-  return `pushed ${plural(Math.floor(days / 365), 'year')} ago`
-}
 
 function GroupCheckbox({
   owner,
@@ -225,7 +213,7 @@ export function RepoPicker({ initial, onClose, onSaved }: Props): JSX.Element {
                           private
                         </span>
                       )}
-                      <span className="rp-pushed">{pushedWords(r.pushedAt)}</span>
+                      <span className="rp-pushed">pushed {formatRelativeTime(r.pushedAt)}</span>
                     </label>
                   ))}
                 </div>
