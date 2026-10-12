@@ -104,9 +104,14 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   // cannot see, so this cannot be keyed off activeSessionId. Only reacts when
   // the requested session belongs to this pane's project: single mode, it is
   // the active session; split mode, it is one of the leaves.
+  // The request this pane last met. A modal closing re-runs the effect so a
+  // request made while it was open is met then; one already met is not met
+  // again, or closing Quick Actions would take focus from what the action
+  // just focused (the note editor of Edit session note).
+  const metNonce = useRef<number | null>(null)
   useEffect(() => {
-    if (!focusRequest || modalOpen) return
-    const { sessionId } = focusRequest
+    if (!focusRequest || modalOpen || metNonce.current === focusRequest.nonce) return
+    const { sessionId, nonce } = focusRequest
     const belongsHere = layout ? leafIds(layout).includes(sessionId) : activeSessionId === sessionId
     if (!belongsHere) return
     if (layout) setFocusedSession(projectId, sessionId)
@@ -114,6 +119,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     // Settings closes); focusing the terminal then would steal its keys.
     requestAnimationFrame(() => {
       if (useModalStore.getState().depth > 0) return
+      metNonce.current = nonce
       getTerminalInstance(sessionId)?.terminal.focus()
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
