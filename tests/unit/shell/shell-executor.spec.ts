@@ -29,20 +29,21 @@ describe('assertCommandAllowed', () => {
     expect(() => assertCommandAllowed('curl')).toThrow(CommandNotAllowedError)
   })
 
-  it('thrown error has COMMAND_NOT_ALLOWED code', () => {
+  /** What assertCommandAllowed throws for `command`; undefined when it lets it through. */
+  function refusalOf(command: string): unknown {
     try {
-      assertCommandAllowed('bash')
-    } catch (e) {
-      expect((e as CommandNotAllowedError).code).toBe('COMMAND_NOT_ALLOWED')
+      assertCommandAllowed(command)
+    } catch (error) {
+      return error
     }
+  }
+
+  it('thrown error has COMMAND_NOT_ALLOWED code', () => {
+    expect(refusalOf('bash')).toMatchObject({ code: 'COMMAND_NOT_ALLOWED' })
   })
 
   it('thrown error message names the disallowed command', () => {
-    try {
-      assertCommandAllowed('node')
-    } catch (e) {
-      expect((e as Error).message).toContain('node')
-    }
+    expect(refusalOf('node')).toMatchObject({ message: expect.stringContaining('"node"') })
   })
 })
 
@@ -235,7 +236,7 @@ describe('execShell', () => {
 
   it('reports a real process that outlives its timeout as failed and timed out', async () => {
     const actual = await vi.importActual<typeof import('child_process')>('child_process')
-    mockExecFile.mockImplementation(actual.execFile as unknown as typeof execFile)
+    mockExecFile.mockImplementation(actual.execFile)
 
     // git waits on stdin, which execFile leaves open
     const result = await execShell({
@@ -249,6 +250,7 @@ describe('execShell', () => {
   })
 
   it('passes sanitized env variables to child process', async () => {
+    vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'in-the-app-environment')
     let capturedOpts: ExecFileOptions | null | undefined
     mockExecFile.mockImplementation((_cmd, _args, opts, callback) => {
       capturedOpts = opts
@@ -260,5 +262,6 @@ describe('execShell', () => {
     expect(capturedOpts?.env).toHaveProperty('GIT_TERMINAL_PROMPT', '0')
     // Should not pass arbitrary env vars (not in allowlist)
     expect(capturedOpts?.env).not.toHaveProperty('AWS_SECRET_ACCESS_KEY')
+    vi.unstubAllEnvs()
   })
 })

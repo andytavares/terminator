@@ -285,8 +285,8 @@ describe('PtyManager', () => {
 
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
-    // Should not throw
-    expect(() => mgr.cleanupOrphans()).not.toThrow()
+    // The process went between the check and the signal: nothing was cleaned.
+    expect(mgr.cleanupOrphans()).toEqual({ cleanedCount: 0 })
     killSpy.mockRestore()
   })
 

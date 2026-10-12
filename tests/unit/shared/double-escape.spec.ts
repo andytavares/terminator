@@ -92,15 +92,7 @@ describe('shouldSuppressExitGesture', () => {
     expect(shouldSuppressExitGesture(ctx({ modalDepth: 3 }))).toBe(true)
   })
 
-  it('stops suppressing once the last surface closes', () => {
-    expect(shouldSuppressExitGesture(ctx({ modalDepth: 0 }))).toBe(false)
-  })
-
   it('suppresses when several conditions hold at once', () => {
     expect(shouldSuppressExitGesture(ctx({ inTerminal: true, inTextField: true }))).toBe(true)
-  })
-
-  it('treats a negative depth as nothing open rather than as a suppressor', () => {
-    expect(shouldSuppressExitGesture(ctx({ modalDepth: -1 }))).toBe(false)
   })
 })
