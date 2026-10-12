@@ -33,6 +33,8 @@ interface LoadedExtension {
   record: ExtensionRecord
   disposables: Disposable[]
   module: { activate?: unknown; deactivate?: () => void | Promise<void> }
+  /** What `activate` returned: the API this extension offers its dependants (ADR 094). */
+  exports: unknown
 }
 
 interface StartOptions {
@@ -80,6 +82,29 @@ function toRecord(manifest: ParsedManifest, directoryPath: string): ExtensionRec
     rendererUrl: renderer ? `ext://${id}/${renderer}` : undefined,
     contributes,
   }
+}
+
+/**
+ * Read from the manifest, not the stored record: a bundled extension stays
+ * registered across updates, so its record can predate the field.
+ */
+function declaredDependencies(record: ExtensionRecord): string[] {
+  const manifest = readManifest(record.directoryPath)
+  return 'data' in manifest ? (manifest.data.extensionDependencies ?? []) : []
+}
+
+/** The dependency path from `id` back to itself, or null when `id` is in no cycle. */
+function cycleThrough(id: string, dependenciesOf: (id: string) => string[]): string[] | null {
+  const visit = (path: string[]): string[] | null => {
+    for (const dependency of dependenciesOf(path[path.length - 1])) {
+      if (dependency === id) return [...path, dependency]
+      if (path.includes(dependency)) continue
+      const cycle = visit([...path, dependency])
+      if (cycle) return cycle
+    }
+    return null
+  }
+  return visit([id])
 }
 
 function toExtension(record: ExtensionRecord): Extension {
@@ -257,8 +282,15 @@ export class ExtensionHost {
         .map((record) => ({ record, isNew: false })),
       ...this.registerBundled(options.bundledDirectory).map((record) => ({ record, isNew: true })),
     ]
+    const dependencies = new Map(
+      registered.map(({ record }) => [record.id, declaredDependencies(record)])
+    )
+    const dependenciesOf = (id: string) => dependencies.get(id) ?? []
     for (const { record, isNew } of registered) {
-      const activation = this.activateAtStartup(record, isNew, options.beforeActivation)
+      const cycle = cycleThrough(record.id, dependenciesOf)
+      const activation = cycle
+        ? this.failAtStartup(record, isNew, `Extension dependency cycle: ${cycle.join(' -> ')}`)
+        : this.activateAtStartup(record, isNew, options.beforeActivation)
       this.activations.set(record.id, activation)
     }
     const allActivated = Promise.all(this.activations.values())
@@ -310,26 +342,60 @@ export class ExtensionHost {
     beforeActivation: Promise<void>
   ): Promise<void> {
     await beforeActivation
+    // Every activation is in the map by now: start() fills it before anything awaits.
+    await Promise.all(declaredDependencies(record).map((id) => this.activations.get(id)))
     const result = await this.activate(record)
-    if (!('error' in result)) return
-    hostLogger.error(`Extension ${record.id} failed to load: ${result.message}`)
+    if ('error' in result) await this.failAtStartup(record, isNew, result.message)
+  }
+
+  private async failAtStartup(record: ExtensionRecord, isNew: boolean, message: string) {
+    hostLogger.error(`Extension ${record.id} failed to load: ${message}`)
     // A stored extension stays enabled so the next start retries it.
-    if (isNew) this.recordActivationFailure(record, result.message)
+    if (isNew) this.recordActivationFailure(record, message)
+  }
+
+  /** Why a declared dependency is not active, or null when every one is. */
+  private inactiveDependency(record: ExtensionRecord): string | null {
+    for (const id of declaredDependencies(record)) {
+      if (this.loaded.has(id)) continue
+      const stored = store.get('extensions').find((e) => e.id === id)
+      if (!stored) return `Missing extension dependency "${id}"`
+      if (stored.status === 'disabled') return `Extension dependency "${id}" is disabled`
+      return `Extension dependency "${id}" failed to activate`
+    }
+    return null
+  }
+
+  /** The exports of `dependencyId`, for an extension that declared it. */
+  private exportsFor(record: ExtensionRecord, dependencyId: string): unknown {
+    if (!declaredDependencies(record).includes(dependencyId)) {
+      throw new Error(
+        `Extension "${record.id}" did not declare "${dependencyId}" in extensionDependencies`
+      )
+    }
+    return this.loaded.get(dependencyId)?.exports
   }
 
   private async activate(
     record: ExtensionRecord
   ): Promise<{ ok: true } | { error: string; message: string }> {
+    const inactive = this.inactiveDependency(record)
+    if (inactive) return { error: 'DEPENDENCY_ERROR', message: inactive }
     try {
       const mod = loadCommonJs(record.entryPoint) as {
-        activate?: (api: unknown) => void | Promise<void>
+        activate?: (api: unknown) => unknown
         deactivate?: () => void | Promise<void>
       }
-      const api = createExtensionAPI(record.id, app.getVersion(), this.deps, record.rendererUrl)
-      await mod.activate?.(api)
+      const deps: ExtensionAPIDeps = {
+        ...this.deps,
+        extensionExports: (dependencyId) => this.exportsFor(record, dependencyId),
+      }
+      const api = createExtensionAPI(record.id, app.getVersion(), deps, record.rendererUrl)
+      const exports = await mod.activate?.(api)
       // The live array from the api: registrations made after activate() land in
       // it too, so unload disposes everything the extension ever registered.
-      this.loaded.set(record.id, { record, disposables: getApiDisposables(api), module: mod })
+      const disposables = getApiDisposables(api)
+      this.loaded.set(record.id, { record, disposables, module: mod, exports })
       return { ok: true }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)

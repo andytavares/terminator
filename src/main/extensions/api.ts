@@ -276,6 +276,8 @@ export interface ExtensionAPIDeps {
   focusExtensionView?: (extensionId: string, viewParam: string) => void
   bridge?: BridgeDeps
   db?: ExtensionDB
+  /** Another extension's `activate` exports; throws for an id the manifest does not declare. */
+  extensionExports?: (extensionId: string) => unknown
 }
 
 export function createExtensionAPI(
@@ -406,6 +408,14 @@ export function createExtensionAPI(
         const key = `${extensionId}.topbar.${item.id}`
         globalRegistry.topBarItems.set(key, item)
         return disposable(() => globalRegistry.topBarItems.delete(key))
+      },
+    },
+    extensions: {
+      get<T = unknown>(dependencyId: string): T {
+        if (!deps?.extensionExports) {
+          throw new Error(`Extension "${extensionId}" declares no extensionDependencies`)
+        }
+        return deps.extensionExports(dependencyId) as T
       },
     },
     shell: {

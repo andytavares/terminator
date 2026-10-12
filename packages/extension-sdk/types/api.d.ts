@@ -245,6 +245,16 @@ export interface ExtensionAPI {
   topBar: {
     registerMenuItem(item: TopBarMenuContribution): Disposable
   }
+  /**
+   * Other extensions' APIs (since 2.1.0). An extension's API is the value its
+   * `activate` returns. List the provider's id in your manifest's
+   * `extensionDependencies`: the host then activates the provider first, and
+   * fails your activation when it is missing, failed, or in a dependency cycle.
+   */
+  extensions: {
+    /** The provider's `activate` return value. Throws for an id the manifest does not declare. */
+    get<T = unknown>(extensionId: string): T
+  }
   shell: {
     exec(options: {
       command: 'git' | 'gh'
