@@ -150,8 +150,12 @@ jobs:
       - name: Install zsh
         run: command -v zsh || (sudo apt-get update -qq && sudo apt-get install -y -qq zsh)
 
+      # TMPDIR is an empty directory for the run, and the step fails if a spec
+      # leaves anything in it (scripts/check-temp-leaks.mjs): specs that never
+      # removed their temporary directories once filled a disk with ~22,000.
       - name: Test
         run: >-
+          node scripts/check-temp-leaks.mjs
           npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=blob --reporter=dot
           --coverage.thresholds.lines=0 --coverage.thresholds.functions=0
           --coverage.thresholds.branches=0 --coverage.thresholds.statements=0

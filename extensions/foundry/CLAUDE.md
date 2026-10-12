@@ -152,6 +152,8 @@ Declared in `extensions/foundry/package.json` only, at the one version the repos
 
 Extension specs live in `tests/` and are matched by the root `vitest.config.ts`. Note that `vi.mock` cannot intercept a module esbuild has inlined — any spec that calls `activate()` must import `../../src/index.ts`, not the bundle. `tests/helpers/foundry-host.ts` activates Foundry over a host with real files, real `git` and a `gh` the spec answers for; `tests/helpers/line-run.ts` adds an agreed order and agents that do its work. Reuse them rather than writing another host.
 
+A spec's temporary directory comes from `temporaryDirectory` in `tests/helpers/foundry-host.ts` (or `makeTempDir` from the root `tests/support/temp-dir.ts`), which the root `tests/setup.ts` removes when the spec file ends, passed or failed. Never `mkdtempSync` in `os.tmpdir()` directly: the CI unit job fails a run that leaves anything in the temporary directory (`scripts/check-temp-leaks.mjs`). `tests/live/` runs without `tests/setup.ts` and removes its own.
+
 ## Typecheck
 
 `npm run typecheck` checks the core, both packages and every extension (`typecheck:extensions` runs `tsc -p extensions/foundry/tsconfig.json`, which extends `tsconfig.extension.json`). The root `npx tsc --noEmit` checks nothing: the root `tsconfig.json` is `files: []` with project references. Neither `npm run build:extensions` (esbuild) nor the vite renderer build typechecks anything either — both strip types.

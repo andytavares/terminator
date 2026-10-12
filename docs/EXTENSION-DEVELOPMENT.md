@@ -479,6 +479,8 @@ export function activate(api: ExtensionAPI): void {
 }
 ```
 
+A spec that hands `activate` a `globalStorage` makes it with `makeTempDir(prefix)` from `tests/support/temp-dir.ts`, which the root `tests/setup.ts` removes when the spec file ends. CI fails a unit run that leaves anything in the temporary directory (`scripts/check-temp-leaks.mjs`).
+
 ### `api.dialog`
 
 `showOpenDialog(options)` and `showSaveDialog(options)`: the operating system's file dialogs over the focused window, with a subset of Electron's options (`title`, `defaultPath`, `buttonLabel`, `filters`, and `properties` for open).
