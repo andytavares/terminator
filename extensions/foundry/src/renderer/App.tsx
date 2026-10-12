@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Settings, ArrowLeft, List, Factory } from 'lucide-react'
+import { Button, IconButton } from '@terminator/extension-ui'
 import { Inbox } from '../components/Inbox.js'
 import { usePushed, ANY_RECORD } from './use-pushed.js'
 import { Orders } from '../components/Orders.js'
@@ -191,43 +192,35 @@ export function App(): JSX.Element {
         </nav>
         {!settingsOpen && surface === 'forge' ? (
           <div className="fdry-view-toggle" role="group" aria-label="Forge view">
-            <button
-              type="button"
-              aria-label="List view"
-              aria-pressed={factoryView === 'list'}
-              className={factoryView === 'list' ? 'is-on' : ''}
+            <IconButton
+              icon={List}
+              label="List view"
+              pressed={factoryView === 'list'}
               onClick={() => setForgeView('list')}
-            >
-              <List aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              aria-label="Factory view"
-              aria-pressed={factoryView === 'factory'}
-              className={factoryView === 'factory' ? 'is-on' : ''}
+            />
+            <IconButton
+              icon={Factory}
+              label="Factory view"
+              pressed={factoryView === 'factory'}
               onClick={() => setForgeView('factory')}
-            >
-              <Factory aria-hidden="true" />
-            </button>
+            />
           </div>
         ) : null}
-        <button
-          aria-label="Settings"
-          className="sk-btn"
-          aria-pressed={settingsOpen}
-          style={{ marginLeft: 'auto' }}
+        <IconButton
+          icon={Settings}
+          label="Settings"
+          className="fdry-settings-open"
+          pressed={settingsOpen}
           onClick={() => setSettingsOpen(true)}
-        >
-          <Settings aria-hidden="true" />
-        </button>
+        />
       </header>
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {settingsOpen ? (
           <div className="sk-settings-wrap">
-            <button aria-label="Back" className="sk-btn" onClick={() => setSettingsOpen(false)}>
-              <ArrowLeft aria-hidden="true" /> Back
-            </button>
+            <Button variant="ghost" icon={ArrowLeft} onClick={() => setSettingsOpen(false)}>
+              Back
+            </Button>
             <SettingsView />
           </div>
         ) : surface === 'ledger' ? (

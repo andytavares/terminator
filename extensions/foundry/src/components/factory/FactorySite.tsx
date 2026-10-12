@@ -6,7 +6,7 @@ import type { Signal } from '../../sensors/types.js'
 import type { CiState } from '../../line/ci-state.js'
 import { HallThumbnail } from './HallThumbnail.js'
 import { ciLabel } from '../../line/ci-label.js'
-import { usePolling } from '@terminator/extension-ui'
+import { Button, usePolling } from '@terminator/extension-ui'
 import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
 import { invoke } from '@terminator/extension-sdk/renderer'
 
@@ -316,26 +316,27 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
                           onChange={(event) => setRepoDraft(event.target.value)}
                         />
                       </label>
-                      <button
-                        type="button"
-                        className="is-primary"
+                      <Button
+                        variant="primary"
+                        size="sm"
                         disabled={repoDraft.trim() === ''}
                         onClick={() => void confirmPromote(signal.id)}
                       >
                         Confirm promote
-                      </button>
-                      <button type="button" onClick={() => setPromoting(null)}>
+                      </Button>
+                      <Button size="sm" onClick={() => setPromoting(null)}>
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      className="is-primary"
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="fdry-crate-action"
                       onClick={() => startPromote(signal)}
                     >
                       Promote
-                    </button>
+                    </Button>
                   )}
                 </div>
               ))}

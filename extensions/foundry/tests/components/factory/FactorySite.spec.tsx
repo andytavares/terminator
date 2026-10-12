@@ -271,7 +271,7 @@ describe('FactorySite status wall', () => {
   it('refetches with the chosen window when the toggle is switched', async () => {
     const { invoke } = mount([])
     await waitFor(() => screen.getByText('Status wall'))
-    fireEvent.click(screen.getByRole('button', { name: 'All time' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'All time' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )

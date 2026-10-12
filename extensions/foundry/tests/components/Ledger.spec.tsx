@@ -397,7 +397,7 @@ describe('the Factory view (FR: the factory’s numbers)', () => {
   it('shows the 30-day tiles and a per-order row when switched to Factory', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
-    fireEvent.click(screen.getByRole('button', { name: 'Factory' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Factory' }))
     await waitFor(() => screen.getByText('Ship the thing'))
 
     expect(tileValue('Shipped')).toBe('1')
@@ -419,7 +419,7 @@ describe('the Factory view (FR: the factory’s numbers)', () => {
       },
     })
     await waitFor(() => screen.getByText('G-1'))
-    fireEvent.click(screen.getByRole('button', { name: 'Factory' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Factory' }))
     await waitFor(() => screen.getByText('Ship the thing'))
 
     expect(tileValue('Median lead time')).toBe('—')
@@ -431,9 +431,9 @@ describe('the Factory view (FR: the factory’s numbers)', () => {
   it('refetches with the chosen window', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
-    fireEvent.click(screen.getByRole('button', { name: 'Factory' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Factory' }))
     await waitFor(() => screen.getByText('Ship the thing'))
-    fireEvent.click(screen.getByRole('button', { name: 'All time' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'All time' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )

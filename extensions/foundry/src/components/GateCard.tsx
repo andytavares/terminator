@@ -5,7 +5,7 @@ import type { Gate } from '../gates/rules.js'
 import { gradeInWords } from '../runtime/review/risk-grade.js'
 import { GateEvidence } from './GateEvidence.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
-import { Markdown } from '@terminator/extension-ui'
+import { Button, IconButton, Markdown } from '@terminator/extension-ui'
 import { openInBrowser } from './ExternalLink.js'
 import { OrderLinks } from './OrderLinks.js'
 
@@ -62,16 +62,16 @@ export function GateAnswers({
         const raise = option.id === 'raise' && Boolean(gate.breach)
         if (raise && onRaise === undefined) return null
         return (
-          <button
+          <Button
             key={option.id}
-            type="button"
+            size="sm"
+            variant={index === 0 ? 'primary' : 'secondary'}
             title={option.consequence}
             disabled={busy}
-            className={index === 0 ? 'is-primary' : undefined}
             onClick={() => (raise ? onRaise?.() : onDecide(option.id))}
           >
             {option.label}
-          </button>
+          </Button>
         )
       })}
     </div>
@@ -108,15 +108,14 @@ export function GateCard({
           }
         }}
       >
-        <button
-          type="button"
+        <IconButton
+          icon={ChevronRight}
+          size="sm"
           className="fdry-gate-chevron"
           aria-expanded={open}
-          aria-label={open ? 'Hide the reason' : 'Show the reason'}
+          label={open ? 'Hide the reason' : 'Show the reason'}
           onClick={() => setOpen((was) => !was)}
-        >
-          <ChevronRight aria-hidden="true" />
-        </button>
+        />
         {lead}
         <div className="fdry-gate-text">
           <b className="fdry-gate-summary" title={gate.summary}>

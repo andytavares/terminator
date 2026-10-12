@@ -4,7 +4,7 @@ import type { LedgerEntry } from '../ledger/append.js'
 import type { Proposal } from '../ledger/curator.js'
 import type { FactoryMetrics } from '../factory/metrics.js'
 import { formatDuration } from '../factory/format.js'
-import { Markdown } from '@terminator/extension-ui'
+import { Button, Markdown, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import { openInBrowser } from './ExternalLink.js'
 import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
 import { MetricsTiles, WindowToggle } from './MetricsTiles.js'
@@ -196,19 +196,20 @@ export function Ledger(): JSX.Element {
 
   return (
     <div className="fdry-shell">
-      <div className="fdry-seg" role="group" aria-label="Record or Factory">
-        <button type="button" aria-pressed={tab === 'record'} onClick={() => setTab('record')}>
-          Record
-        </button>
-        <button type="button" aria-pressed={tab === 'factory'} onClick={() => setTab('factory')}>
-          Factory
-        </button>
-      </div>
+      <TabsRoot selectedId={tab} onSelect={setTab}>
+        <TabList label="Record or Factory" className="fdry-ledger-tabs">
+          <Tab id="record">Record</Tab>
+          <Tab id="factory">Factory</Tab>
+        </TabList>
 
-      {tab === 'factory' ? (
-        <FactoryView metrics={metrics} metricsWindow={metricsWindow} onWindow={setMetricsWindow} />
-      ) : (
-        <>
+        <TabPanel id="factory" className="fdry-ledger-panel">
+          <FactoryView
+            metrics={metrics}
+            metricsWindow={metricsWindow}
+            onWindow={setMetricsWindow}
+          />
+        </TabPanel>
+        <TabPanel id="record" className="fdry-ledger-panel">
           <div className="fdry-ledger-bar">
             <label>
               Order
@@ -243,9 +244,15 @@ export function Ledger(): JSX.Element {
                 ))}
               </select>
             </label>
-            <button type="button" className="fdry-propose" onClick={() => void ask()}>
-              <Sparkles aria-hidden="true" /> What do I keep rejecting?
-            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={Sparkles}
+              className="fdry-propose"
+              onClick={() => void ask()}
+            >
+              What do I keep rejecting?
+            </Button>
           </div>
 
           {note !== null ? <p className="fdry-note">{note}</p> : null}
@@ -282,16 +289,17 @@ export function Ledger(): JSX.Element {
                       ))}
                     </ul>
                     <div className="fdry-proposal-actions">
-                      <button
-                        type="button"
-                        className="is-primary"
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={Check}
                         onClick={() => void decide(proposal, true)}
                       >
-                        <Check aria-hidden="true" /> Accept
-                      </button>
-                      <button type="button" onClick={() => void decide(proposal, false)}>
-                        <X aria-hidden="true" /> Never propose this
-                      </button>
+                        Accept
+                      </Button>
+                      <Button size="sm" icon={X} onClick={() => void decide(proposal, false)}>
+                        Never propose this
+                      </Button>
                     </div>
                   </article>
                 ))
@@ -312,9 +320,9 @@ export function Ledger(): JSX.Element {
                       from {rungInWords(rule.rung as ResolveRung)} · origin {rule.origin}
                     </p>
                     <div className="fdry-proposal-actions">
-                      <button type="button" onClick={() => void remove(rule)}>
-                        <Trash2 aria-hidden="true" /> Remove this check
-                      </button>
+                      <Button size="sm" icon={Trash2} onClick={() => void remove(rule)}>
+                        Remove this check
+                      </Button>
                     </div>
                   </article>
                 ))
@@ -412,8 +420,8 @@ export function Ledger(): JSX.Element {
               showing <b>{view.entries.length}</b> of <b>{view.total}</b>
             </span>
           </footer>
-        </>
-      )}
+        </TabPanel>
+      </TabsRoot>
     </div>
   )
 }

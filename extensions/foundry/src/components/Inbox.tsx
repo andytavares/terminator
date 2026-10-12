@@ -16,7 +16,7 @@ import {
 import type { Gate, GateRuleId } from '../gates/rules.js'
 import { ExternalLink } from './ExternalLink.js'
 import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
-import { usePolling } from '@terminator/extension-ui'
+import { Button, usePolling } from '@terminator/extension-ui'
 import type { Signal } from '../sensors/types.js'
 import { invoke } from '@terminator/extension-sdk/renderer'
 
@@ -219,14 +219,14 @@ export function Inbox({
                   <p>{row.detail}</p>
                 </div>
                 <div className="fdry-gate-actions">
-                  <button
-                    type="button"
-                    className="is-primary"
+                  <Button
+                    variant="primary"
+                    size="sm"
                     aria-label={`Open ${row.title} in the Forge`}
                     onClick={() => onOpenOrder?.(row.orderId)}
                   >
                     Open
-                  </button>
+                  </Button>
                 </div>
               </div>
             </li>
@@ -303,32 +303,28 @@ export function Inbox({
                             onChange={(event) => setRepoDraft(event.target.value)}
                           />
                         </label>
-                        <button
-                          type="button"
-                          className="is-primary"
+                        <Button
+                          variant="primary"
+                          size="sm"
                           disabled={repoDraft.trim() === ''}
                           onClick={() => void confirmPromote(signal.id)}
                         >
                           Confirm promote
-                        </button>
-                        <button type="button" onClick={() => setPromoting(null)}>
+                        </Button>
+                        <Button size="sm" onClick={() => setPromoting(null)}>
                           Cancel
-                        </button>
+                        </Button>
                       </div>
                     ) : null}
                   </div>
                   {promoting === signal.id ? null : (
                     <div className="fdry-signal-actions">
-                      <button
-                        type="button"
-                        className="is-primary"
-                        onClick={() => startPromote(signal)}
-                      >
+                      <Button variant="primary" size="sm" onClick={() => startPromote(signal)}>
                         Promote
-                      </button>
-                      <button type="button" onClick={() => void dismissSignal(signal.id)}>
+                      </Button>
+                      <Button size="sm" onClick={() => void dismissSignal(signal.id)}>
                         Dismiss
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </li>

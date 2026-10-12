@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Plus, CheckCircle2, AlertCircle, Loader } from 'lucide-react'
+import { ArrowLeft, Plus, CheckCircle2, AlertCircle, Loader } from 'lucide-react'
+import { Button, SegmentedControl } from '@terminator/extension-ui'
 import { GateAnswers } from './GateCard.js'
 import { OrderLinks } from './OrderLinks.js'
 import { ciLabel } from '../line/ci-label.js'
@@ -291,8 +292,9 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
          a rail that came out twice the height of the document — and finding
          them meant scrolling past 714px of empty column. */
       <div className="fdry-shell is-open">
-        <button
-          type="button"
+        <Button
+          size="sm"
+          icon={ArrowLeft}
           className="fdry-back"
           onClick={() => {
             setOpen(null)
@@ -300,7 +302,7 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
           }}
         >
           All orders
-        </button>
+        </Button>
         {/* An order that has a run, shipped or not, is watched on the Floor, where its
             open gates are answered; one that is still
             being agreed is worked on in the Forge. */}
@@ -328,8 +330,9 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
             the channel and says why. */}
         <div className="fdry-order-controls">
           {running ? null : (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               className="fdry-discard"
               disabled={busy}
               onClick={() => {
@@ -352,7 +355,7 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
               }}
             >
               Discard this order
-            </button>
+            </Button>
           )}
           {/* The other answer, and the one `cancelled` never was: an order
               that is hidden still owns a worktree, a branch and a directory.
@@ -401,24 +404,16 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
           void seed()
         }}
       >
-        <div className="fdry-seed-from" role="group" aria-label="Start from">
-          <button
-            type="button"
-            aria-pressed={from === 'typed'}
-            disabled={busy || repoRoot === null}
-            onClick={() => setFrom('typed')}
-          >
-            Idea
-          </button>
-          <button
-            type="button"
-            aria-pressed={from === 'tracker'}
-            disabled={busy || repoRoot === null}
-            onClick={() => setFrom('tracker')}
-          >
-            Ticket
-          </button>
-        </div>
+        <SegmentedControl
+          label="Start from"
+          className="fdry-seed-from"
+          options={[
+            { value: 'typed', label: 'Idea', disabled: busy || repoRoot === null },
+            { value: 'tracker', label: 'Ticket', disabled: busy || repoRoot === null },
+          ]}
+          value={from}
+          onChange={setFrom}
+        />
 
         {from === 'typed' ? (
           <input
@@ -445,17 +440,23 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
           />
         )}
         {from === 'typed' ? (
-          <button type="submit" disabled={busy || !ready || repoRoot === null}>
-            <Plus aria-hidden="true" /> New order
-          </button>
+          <Button
+            type="submit"
+            variant="primary"
+            icon={Plus}
+            disabled={busy || !ready || repoRoot === null}
+          >
+            New order
+          </Button>
         ) : (
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            icon={Plus}
             disabled={busy || repoRoot === null}
             onClick={() => void loadTickets(term)}
           >
-            <Plus aria-hidden="true" /> Find
-          </button>
+            Find
+          </Button>
         )}
       </form>
       {offer !== null ? (
@@ -478,12 +479,12 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
               ))}
             </select>
           ) : null}
-          <button type="button" disabled={busy} onClick={() => void answerOffer(true)}>
+          <Button variant="primary" disabled={busy} onClick={() => void answerOffer(true)}>
             Create ticket
-          </button>
-          <button type="button" disabled={busy} onClick={() => void answerOffer(false)}>
+          </Button>
+          <Button disabled={busy} onClick={() => void answerOffer(false)}>
             No ticket
-          </button>
+          </Button>
         </div>
       ) : null}
       {problem !== null ? <p className="fdry-problem">{problem}</p> : null}

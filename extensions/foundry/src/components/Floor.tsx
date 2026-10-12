@@ -23,7 +23,7 @@ import { pullNumber } from '../line/pull-number.js'
 import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { ordinal } from '../factory/format.js'
-import { Markdown, RelativeTime, usePolling } from '@terminator/extension-ui'
+import { Button, IconButton, Markdown, RelativeTime, usePolling } from '@terminator/extension-ui'
 import { usePushed } from '../renderer/use-pushed.js'
 import { ExternalLink, openInBrowser } from './ExternalLink.js'
 import {
@@ -507,17 +507,25 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             value={redirect}
             onChange={(event) => setRedirect(event.target.value)}
           />
-          <button type="submit" disabled={redirect.trim() === ''}>
-            <CornerDownLeft aria-hidden="true" /> Redirect
-          </button>
-          <button
-            type="button"
+          <Button
+            type="submit"
+            size="sm"
+            variant="primary"
+            icon={CornerDownLeft}
+            disabled={redirect.trim() === ''}
+          >
+            Redirect
+          </Button>
+          <Button
+            size="sm"
             onClick={() => void control('foundry:run-interrupt', { sessionId: watching })}
           >
             Interrupt
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            icon={Square}
             onClick={() =>
               void control('foundry:run-stop', {
                 sessionId: watching,
@@ -525,8 +533,8 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
               })
             }
           >
-            <Square aria-hidden="true" /> Stop
-          </button>
+            Stop
+          </Button>
         </form>
       </section>
     )
@@ -561,23 +569,18 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             </ExternalLink>
           )}
           {pulls.map((pull) => (
-            <button
+            <Button
               key={pull.url}
-              type="button"
-              className="fdry-order-review"
+              size="sm"
+              icon={reviewable === false ? OpenOutside : Eye}
               onClick={() => void review(pull)}
             >
-              {reviewable === false ? (
-                <OpenOutside aria-hidden="true" />
-              ) : (
-                <Eye aria-hidden="true" />
-              )}
               {reviewable === false
                 ? 'Open on GitHub'
                 : pulls.length > 1
                   ? `Review #${pull.number}`
                   : 'Review'}
-            </button>
+            </Button>
           ))}
         </p>
       ) : null}
@@ -690,14 +693,14 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
               <div className="fdry-standing-options">
                 {stranded.map((session) => (
                   <div key={session} className="fdry-standing-option">
-                    <button
-                      type="button"
-                      className="is-primary"
+                    <Button
+                      variant="primary"
+                      icon={Terminal}
                       disabled={busy}
                       onClick={() => void control('foundry:run-terminal', { sessionId: session })}
                     >
-                      <Terminal aria-hidden="true" /> Go to its terminal
-                    </button>
+                      Go to its terminal
+                    </Button>
                     <small>
                       {view.graph.nodes.find((n) => n.sessionId === session) === undefined
                         ? session
@@ -723,14 +726,13 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
               </p>
               <div className="fdry-standing-options">
                 <div className="fdry-standing-option">
-                  <button
-                    type="button"
-                    className="is-primary"
+                  <Button
+                    variant="primary"
                     disabled={busy}
                     onClick={() => void decideRun('foundry:run.resume')}
                   >
                     Pick it back up
-                  </button>
+                  </Button>
                   <small>Every step that stopped is started again where it left off.</small>
                 </div>
               </div>
@@ -745,14 +747,13 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             <div className="fdry-standing-gate">
               <div className="fdry-standing-options">
                 <div className="fdry-standing-option">
-                  <button
-                    type="button"
-                    className="is-primary"
+                  <Button
+                    variant="primary"
                     disabled={busy}
                     onClick={() => void decideRun('foundry:run.resume')}
                   >
                     Try again
-                  </button>
+                  </Button>
                   <small>
                     Finished steps stay finished. Once every step has passed, Foundry checks the
                     work again and tries to open the pull request.
@@ -840,23 +841,20 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                   )}
                 </div>
                 <div className="fdry-ask-actions">
-                  <button
-                    type="button"
-                    className="is-primary"
-                    onClick={() => void answer(ask, 'allow')}
-                  >
+                  <Button variant="primary" size="sm" onClick={() => void answer(ask, 'allow')}>
                     Allow
-                  </button>
-                  <button type="button" onClick={() => void answer(ask, 'deny')}>
+                  </Button>
+                  <Button size="sm" onClick={() => void answer(ask, 'deny')}>
                     Deny
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
+                    icon={Terminal}
                     title="Answer it in the terminal instead"
                     onClick={() => void handBack(ask)}
                   >
-                    <Terminal aria-hidden="true" /> In the terminal
-                  </button>
+                    In the terminal
+                  </Button>
                 </div>
               </div>
             ))}
@@ -974,26 +972,21 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                       ) : null}
                       {node.sessionId !== null && !gone ? (
                         <>
-                          <button
-                            type="button"
-                            className="fdry-unit-attach"
-                            aria-label="Transcript"
-                            title="Transcript"
+                          <IconButton
+                            icon={ScrollText}
+                            size="sm"
+                            label="Transcript"
                             onClick={() => setWatching(node.sessionId)}
-                          >
-                            <ScrollText aria-hidden="true" />
-                          </button>
+                          />
                           {/* A finished step's session is closed (ADR 076), so
                               there is nothing to go to. */}
                           {node.state === 'running' ? (
-                            <button
-                              type="button"
-                              className="fdry-unit-attach"
-                              aria-label={`Attach to ${name}`}
+                            <IconButton
+                              icon={Terminal}
+                              size="sm"
+                              label={`Attach to ${name}`}
                               onClick={() => void attach(node.id)}
-                            >
-                              <Terminal aria-hidden="true" />
-                            </button>
+                            />
                           ) : null}
                         </>
                       ) : null}
@@ -1044,15 +1037,17 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             <p className="fdry-note">
               Silenced:{' '}
               {mutes.map((rule) => (
-                <button
+                <Button
                   key={`${rule.sessionId ?? ''}-${rule.author ?? ''}`}
-                  type="button"
+                  variant="ghost"
+                  size="sm"
                   className="fdry-unmute"
                   aria-label={`Unmute ${rule.sessionId ?? rule.author ?? 'everything'}`}
                   onClick={() => void unmute(rule)}
                 >
-                  {rule.sessionId ?? rule.author ?? 'everything'} ✕
-                </button>
+                  {rule.sessionId ?? rule.author ?? 'everything'}
+                  <X aria-hidden="true" className="tm-icon-sm" />
+                </Button>
               ))}
             </p>
           ) : null}
@@ -1069,21 +1064,18 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                   {entry.summary}
                 </Markdown>
               </span>
-              <button
-                type="button"
-                aria-label={`Dismiss: ${entry.summary}`}
+              <IconButton
+                icon={X}
+                size="sm"
+                label={`Dismiss: ${entry.summary}`}
                 onClick={() => void dismiss(entry, false)}
-              >
-                <X aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                aria-label={`Mute ${entry.sessionId}`}
-                title="Stop this run interrupting, without hiding what it does"
+              />
+              <IconButton
+                icon={BellOff}
+                size="sm"
+                label={`Mute ${entry.sessionId}`}
                 onClick={() => void dismiss(entry, true)}
-              >
-                <BellOff aria-hidden="true" />
-              </button>
+              />
             </div>
           ))}
         </section>
@@ -1120,17 +1112,20 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                     These are the three things you do about one, and every
                     channel behind them already existed. */}
                 <div className="fdry-ask-actions">
-                  <button type="button" onClick={() => setWatching(session)}>
-                    <ScanEye aria-hidden="true" /> Read what it was saying
-                  </button>
-                  <button
-                    type="button"
+                  <Button size="sm" icon={ScanEye} onClick={() => setWatching(session)}>
+                    Read what it was saying
+                  </Button>
+                  <Button
+                    size="sm"
+                    icon={Terminal}
                     onClick={() => void control('foundry:run-terminal', { sessionId: session })}
                   >
-                    <Terminal aria-hidden="true" /> Take it over
-                  </button>
-                  <button
-                    type="button"
+                    Take it over
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    icon={Square}
                     onClick={() =>
                       void control('foundry:run-stop', {
                         sessionId: session,
@@ -1138,8 +1133,8 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                       })
                     }
                   >
-                    <Square aria-hidden="true" /> End this agent
-                  </button>
+                    End this agent
+                  </Button>
                 </div>
               </div>
             )

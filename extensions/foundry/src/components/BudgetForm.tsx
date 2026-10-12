@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Button } from '@terminator/extension-ui'
 import type { BudgetBreach } from '../line/scheduler.js'
 
 // A budget is a whole number or no limit. Used to set an order's budgets in the
@@ -99,13 +100,13 @@ export function BudgetForm({
         )
       })}
       <div className="fdry-budget-actions">
-        <button type="submit" className="is-primary" disabled={disabled || !valid}>
+        <Button type="submit" variant="primary" size="sm" disabled={disabled || !valid}>
           {submitLabel}
-        </button>
+        </Button>
         {onCancel === undefined ? null : (
-          <button type="button" disabled={disabled} onClick={onCancel}>
+          <Button size="sm" disabled={disabled} onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         )}
       </div>
     </form>

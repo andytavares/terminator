@@ -124,7 +124,7 @@ describe('the New work order quick action', () => {
     const { rerender } = mount([], { focusIdeaSignal: 0 })
     await waitFor(() => screen.getByLabelText('Describe what you want built or fixed'))
     // Leave the "typed" tab so the effect is proven to switch back to it.
-    screen.getByRole('button', { name: 'Ticket' }).click()
+    screen.getByRole('radio', { name: 'Ticket' }).click()
     await waitFor(() => screen.getByLabelText('Search your tickets'))
 
     rerender(<Orders repoRoot="/repos/app" focusIdeaSignal={1} />)
@@ -397,7 +397,7 @@ describe('the ticket picker beside the orders', () => {
 
   it('names each list and counts it', async () => {
     mountWithTickets([row()])
-    screen.getByRole('button', { name: 'Ticket' }).click()
+    screen.getByRole('radio', { name: 'Ticket' }).click()
     const tickets = await screen.findByRole('heading', { name: /Tickets/ })
     expect(tickets.textContent).toBe('Tickets2')
     expect(screen.getByRole('heading', { name: /Orders/ }).textContent).toBe('Orders1')
