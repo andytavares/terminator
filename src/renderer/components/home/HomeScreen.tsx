@@ -8,7 +8,7 @@ import { StateChip } from '../session/StateChip'
 import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
-import { navigateToSession } from '../../terminal/navigate-to-session'
+import { revealSession } from '../../terminal/navigate-to-session'
 import { closeSessionFromFacts } from '../../terminal/close-session'
 import {
   resumeSession,
@@ -197,7 +197,7 @@ export function HomeScreen({ onOpenQuickActions }: HomeScreenProps = {}): JSX.El
               titles={titles}
               now={now}
               onSelect={setSelectedId}
-              onOpen={navigateToSession}
+              onOpen={revealSession}
               onSaveDescription={saveDescription}
               onLinkIssue={linkIssue}
               onLink={setLinking}
@@ -214,7 +214,7 @@ export function HomeScreen({ onOpenQuickActions }: HomeScreenProps = {}): JSX.El
               selectedId={selectedId}
               now={now}
               onSelect={setSelectedId}
-              onOpen={navigateToSession}
+              onOpen={revealSession}
               onSaveDescription={saveDescription}
               onLink={setLinking}
               onResume={(facts) => void resumeSession(facts)}

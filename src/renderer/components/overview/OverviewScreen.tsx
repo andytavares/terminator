@@ -6,7 +6,7 @@ import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
 import { useMetricsStore } from '../../stores/metrics.store'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
-import { navigateToSession } from '../../terminal/navigate-to-session'
+import { revealSession } from '../../terminal/navigate-to-session'
 import { closeSessionFromFacts } from '../../terminal/close-session'
 import { NewSessionMenu } from '../session/NewSessionMenu'
 import {
@@ -208,7 +208,7 @@ export function OverviewScreen(): JSX.Element {
                 placement={placement}
                 metrics={processesBySessionId.get(placement.sessionId) ?? null}
                 now={now}
-                onOpen={navigateToSession}
+                onOpen={revealSession}
                 onSaveDescription={saveDescription}
                 onLink={setLinking}
                 onResume={(facts) => void resumeSession(facts)}

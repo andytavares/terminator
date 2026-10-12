@@ -53,7 +53,7 @@ vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
     }),
 }))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
-  navigateToSession: navigate,
+  revealSession: navigate,
 }))
 vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: { getState: () => ({ setActiveGlobalTab }) },

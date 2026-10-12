@@ -35,7 +35,7 @@ vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
     select({ setDescription, forget: forgetRecord }),
 }))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
-  navigateToSession: navigate,
+  revealSession: navigate,
 }))
 vi.mock('../../../../src/renderer/terminal/start-session', () => ({
   resumeSession: vi.fn(),

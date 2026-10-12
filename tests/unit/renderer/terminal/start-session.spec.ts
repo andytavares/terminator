@@ -43,7 +43,7 @@ vi.mock('../../../../src/renderer/stores/session.store', () => ({
   useSessionStore: { getState: () => sessions },
 }))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
-  navigateToSession: navigate,
+  revealSession: navigate,
 }))
 vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: { getState: () => registry },
