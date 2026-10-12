@@ -9,13 +9,13 @@ const CARD_HEIGHT_EST = 110
 const CARD_GAP = 8
 
 /** What re-finding the comments' quotes in a body changed. */
-export interface AnchorChanges {
+interface AnchorChanges {
   orphanIds: string[]
   anchorUpdates: { id: string; newFrom: number; newTo: number }[]
 }
 
 /** Re-find each open top-level comment's quote in `body`: moved, or lost (orphaned). */
-export function reanchorAll(comments: Comment[], body: string): AnchorChanges {
+function reanchorAll(comments: Comment[], body: string): AnchorChanges {
   const changes: AnchorChanges = { orphanIds: [], anchorUpdates: [] }
   for (const comment of comments) {
     if (comment.parentId !== null || comment.status === 'orphaned') continue
@@ -29,12 +29,12 @@ export function reanchorAll(comments: Comment[], body: string): AnchorChanges {
   return changes
 }
 
-export function hasAnchorChanges(changes: AnchorChanges): boolean {
+function hasAnchorChanges(changes: AnchorChanges): boolean {
   return changes.orphanIds.length > 0 || changes.anchorUpdates.length > 0
 }
 
 /** The comments with the changes applied: orphans marked, moved anchors at their new offsets. */
-export function applyAnchorChanges(comments: Comment[], changes: AnchorChanges): Comment[] {
+function applyAnchorChanges(comments: Comment[], changes: AnchorChanges): Comment[] {
   const moved = new Map(changes.anchorUpdates.map((u) => [u.id, u]))
   const orphans = new Set(changes.orphanIds)
   return comments.map((c) => {
@@ -45,7 +45,7 @@ export function applyAnchorChanges(comments: Comment[], changes: AnchorChanges):
 }
 
 /** Stores the changes. A write that fails is logged; the next re-anchor retries it. */
-export async function persistAnchorChanges(changes: AnchorChanges): Promise<void> {
+async function persistAnchorChanges(changes: AnchorChanges): Promise<void> {
   const bridge = window.electronAPI.extensionBridge
   await Promise.all([
     ...changes.orphanIds.map((id) =>

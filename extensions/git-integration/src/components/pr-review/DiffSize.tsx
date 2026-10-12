@@ -1,7 +1,7 @@
 import React from 'react'
 import { Button } from '@terminator/extension-ui'
 
-export function DiffSize({
+function DiffSize({
   additions,
   deletions,
   fileCount,
@@ -28,7 +28,7 @@ export interface MetaPart {
 const TONE_CLASS = { warning: 'rd-warn', danger: 'rd-bad', success: 'rd-good' } as const
 
 /** The second line of a row: only the states that need attention, joined by dots. */
-export function RowMeta({ parts }: { parts: (MetaPart | null | false)[] }): JSX.Element {
+function RowMeta({ parts }: { parts: (MetaPart | null | false)[] }): JSX.Element {
   const shown = parts.filter((p): p is MetaPart => Boolean(p))
   return (
     <small>
