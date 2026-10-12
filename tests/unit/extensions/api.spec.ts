@@ -181,6 +181,29 @@ describe('api.shell.exec', () => {
     expect(result.stdout).toBe('output')
   })
 
+  it('hands the per-call buffer limit, environment and encoding to the command', async () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    await api.shell.exec({
+      command: 'gh',
+      args: ['api', 'user'],
+      cwd: '/tmp/repo',
+      timeoutMs: 500,
+      maxBuffer: 2048,
+      env: { GH_REPO: 'octo/repo' },
+      encoding: 'buffer',
+    })
+
+    expect(shellExecutor.execShell).toHaveBeenCalledWith({
+      command: 'gh',
+      args: ['api', 'user'],
+      cwd: '/tmp/repo',
+      timeoutMs: 500,
+      maxBuffer: 2048,
+      env: { GH_REPO: 'octo/repo' },
+      encoding: 'buffer',
+    })
+  })
+
   it('rejects with COMMAND_NOT_ALLOWED for non-allowlisted commands', async () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
     vi.mocked(shellExecutor.assertCommandAllowed).mockImplementationOnce((cmd) => {

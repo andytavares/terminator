@@ -208,6 +208,39 @@ export interface PtyManagerAPI {
   listSessions(): SessionInfo[]
 }
 
+export interface ShellExecOptions {
+  command: 'git' | 'gh'
+  args: string[]
+  cwd: string
+  /**
+   * Default 10 000. When it expires the command is killed and the result is a
+   * failure: `timedOut: true` and `exitCode` 124, timeout(1)'s status.
+   */
+  timeoutMs?: number
+  /**
+   * Most bytes of output kept per stream (default 1 MiB). Past it the command
+   * is stopped: `exceededMaxBuffer: true` and a non-zero `exitCode`. Since 2.1.0.
+   */
+  maxBuffer?: number
+  /**
+   * Added to the command's environment, over the minimal one every command
+   * gets (PATH, HOME, git and gh credentials, `GIT_TERMINAL_PROMPT=0`). Since 2.1.0.
+   */
+  env?: Record<string, string>
+  /** `'buffer'` returns stdout and stderr as bytes. Since 2.1.0. */
+  encoding?: 'utf8' | 'buffer'
+}
+
+/** Output is exactly what the command wrote: text is never trimmed. */
+export interface ShellExecResult<Output extends string | Uint8Array = string> {
+  exitCode: number
+  stdout: Output
+  stderr: Output
+  timedOut: boolean
+  /** Since 2.1.0. */
+  exceededMaxBuffer: boolean
+}
+
 export interface ExtensionAPI {
   /** The extension's database. Throws until the app database is initialised. */
   db: ExtensionDB
@@ -258,12 +291,9 @@ export interface ExtensionAPI {
     get<T = unknown>(extensionId: string): T
   }
   shell: {
-    exec(options: {
-      command: 'git' | 'gh'
-      args: string[]
-      cwd: string
-      timeoutMs?: number
-    }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut: boolean }>
+    /** Runs git or gh without a shell. Resolves for every outcome; read `exitCode`. */
+    exec(options: ShellExecOptions & { encoding: 'buffer' }): Promise<ShellExecResult<Uint8Array>>
+    exec(options: ShellExecOptions): Promise<ShellExecResult<string>>
   }
   /**
    * Issue trackers, through the application's single connection (v2.2.0). An

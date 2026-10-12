@@ -11,6 +11,7 @@ import type {
   NewIssueInput,
   ProjectSnapshot,
   SessionSnapshot,
+  ShellExecOptions,
   ToastType,
   TopBarMenuContribution,
   TrackerConnection,
@@ -420,20 +421,11 @@ export function createExtensionAPI(
       },
     },
     shell: {
-      async exec(options: {
-        command: 'git' | 'gh'
-        args: string[]
-        cwd: string
-        timeoutMs?: number
-      }) {
+      // One implementation for both overloads; the encoding decides which output type it is.
+      exec: (async (options: ShellExecOptions) => {
         assertCommandAllowed(options.command)
-        return execShell({
-          command: options.command,
-          args: options.args,
-          cwd: options.cwd,
-          timeoutMs: options.timeoutMs ?? 10000,
-        })
-      },
+        return execShell({ ...options, timeoutMs: options.timeoutMs ?? 10000 })
+      }) as ExtensionAPI['shell']['exec'],
     },
     issues: {
       async connections(): Promise<TrackerConnection[]> {
