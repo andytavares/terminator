@@ -417,7 +417,10 @@ export function ReviewDashboard(): JSX.Element {
     )
 
   const scopeCount = selectedRepos.length || scopedTo
-  const scopeLabel = scopeCount > 0 ? `${scopeCount} repositories` : 'All repositories'
+  const scopeLabel =
+    scopeCount === 0
+      ? 'All repositories'
+      : `${scopeCount} ${scopeCount === 1 ? 'repository' : 'repositories'}`
 
   const handleSaved = () => {
     setPickerOpen(false)
