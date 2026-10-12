@@ -6,6 +6,44 @@ const PUSH_ERROR_MESSAGES: Record<string, string> = {
   REJECTED: 'Push rejected — pull changes first.',
 }
 
+/** What a command asked the Git view to do, kept for a view that does not exist yet. */
+export interface ViewRequest {
+  kind: 'commit' | 'pull-request'
+  repoRoot: string
+}
+
+const VIEW_REQUEST_CHANNEL: Record<ViewRequest['kind'], string> = {
+  commit: 'git:focus-commit-message',
+  'pull-request': 'git:open-pr-dialog',
+}
+const PENDING_REQUEST_MS = 5000
+let pendingRequest: ViewRequest | null = null
+let pendingTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Brings the Git tab forward and asks its view to act. A view that is already
+ * open hears the broadcast; one the tab is only now creating collects the
+ * request on mount (consumePendingViewRequest), within five seconds, the shape
+ * Notepad and Foundry use for the same race.
+ */
+function requestOfView(api: ExtensionAPI, request: ViewRequest): void {
+  api.window.showSelf('project')
+  api.window.broadcast(VIEW_REQUEST_CHANNEL[request.kind], { repoRoot: request.repoRoot })
+  pendingRequest = request
+  if (pendingTimer !== null) clearTimeout(pendingTimer)
+  pendingTimer = setTimeout(() => {
+    pendingRequest = null
+    pendingTimer = null
+  }, PENDING_REQUEST_MS)
+}
+
+/** The request a command left for the Git view, once. */
+export function consumePendingViewRequest(): ViewRequest | null {
+  const request = pendingRequest
+  pendingRequest = null
+  return request
+}
+
 export function registerQuickActionCommands(api: ExtensionAPI): Disposable[] {
   const disposables: Disposable[] = []
 
@@ -13,9 +51,7 @@ export function registerQuickActionCommands(api: ExtensionAPI): Disposable[] {
     api.commands.register(
       { id: 'commit', label: 'Commit…', mnemonic: 'c', requires: 'repo', category: 'Git' },
       (ctx: CommandContext) => {
-        if (!ctx.repoRoot) return
-        api.window.showSelf('project')
-        api.window.broadcast('git:focus-commit-message', { repoRoot: ctx.repoRoot })
+        if (ctx.repoRoot) requestOfView(api, { kind: 'commit', repoRoot: ctx.repoRoot })
       }
     )
   )
@@ -62,9 +98,7 @@ export function registerQuickActionCommands(api: ExtensionAPI): Disposable[] {
     api.commands.register(
       { id: 'create-pr', label: 'Create PR…', mnemonic: 'r', requires: 'repo', category: 'Git' },
       (ctx: CommandContext) => {
-        if (!ctx.repoRoot) return
-        api.window.showSelf('project')
-        api.window.broadcast('git:open-pr-dialog', { repoRoot: ctx.repoRoot })
+        if (ctx.repoRoot) requestOfView(api, { kind: 'pull-request', repoRoot: ctx.repoRoot })
       }
     )
   )

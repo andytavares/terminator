@@ -63,6 +63,21 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     })
   }, [repoRoot])
 
+  // A Commit… or Create PR… run before this view existed broadcast to nobody;
+  // the request waits in the backend for the view to collect it on mount.
+  useEffect(() => {
+    if (!repoRoot) return
+    void window.electronAPI.extensionBridge
+      .invoke('git:ui.consume-pending-request', {})
+      .then((result) => {
+        const request = (result as { request?: { kind: string; repoRoot: string } | null })?.request
+        if (!request || request.repoRoot !== repoRoot) return
+        if (request.kind === 'commit') commitMessageRef.current?.focus()
+        else setShowPrDialog(true)
+      })
+      .catch(() => {})
+  }, [repoRoot])
+
   // Quick action "Create PR…" — same broadcast pattern as focus-commit-message.
   useEffect(() => {
     return window.electronAPI.extensionBridge.on('git:open-pr-dialog', (data) => {
