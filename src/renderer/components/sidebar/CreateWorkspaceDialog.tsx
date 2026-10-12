@@ -53,6 +53,10 @@ export function CreateWorkspaceDialog({ onClose }: Props): JSX.Element {
       setNameError(nameErr)
       return
     }
+    if (!folderPath.trim()) {
+      setError('Choose a folder for the workspace')
+      return
+    }
 
     const tagList = tags
       .split(',')
@@ -67,21 +71,18 @@ export function CreateWorkspaceDialog({ onClose }: Props): JSX.Element {
       return
     }
 
-    if (folderPath && 'workspace' in result) {
-      const wsId = result.workspace.id
-      const gitInfo = await window.electronAPI.git.isRepo(folderPath)
-      if (gitInfo.isRepo) {
-        const root = gitInfo.root ?? folderPath
-        const branchInfo = await window.electronAPI.git.currentBranch(root)
-        const branch = 'branch' in branchInfo ? branchInfo.branch : 'main'
-        await createProject({
-          workspaceId: wsId,
-          name: branch,
-          gitBranch: branch,
-          worktreePath: root,
-          isWorktree: false,
-        })
-      }
+    const gitInfo = await window.electronAPI.git.isRepo(folderPath)
+    if (gitInfo.isRepo) {
+      const root = gitInfo.root ?? folderPath
+      const branchInfo = await window.electronAPI.git.currentBranch(root)
+      const branch = 'branch' in branchInfo ? branchInfo.branch : 'main'
+      await createProject({
+        workspaceId: result.workspace.id,
+        name: branch,
+        gitBranch: branch,
+        worktreePath: root,
+        isWorktree: false,
+      })
     }
 
     onClose()
