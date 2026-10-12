@@ -24,6 +24,11 @@ export class CachedStore<Schema extends Record<string, any>> {
     return structuredClone(this.cache.get(key)) as Schema[Key]
   }
 
+  /** Calls `listener` after any change, this store's own writes and other processes' alike. */
+  onChange(listener: () => void): () => void {
+    return this.store.onDidAnyChange(() => listener())
+  }
+
   set<Key extends keyof Schema & string>(key: Key, value: Schema[Key]): void {
     this.cache.clear()
     this.store.set(key, value)

@@ -18,6 +18,10 @@ export function setExtensionSetting(key: string, value: unknown): void {
   store.set('values', { ...values, [key]: value })
 }
 
+export function onExtensionSettingsChanged(listener: () => void): () => void {
+  return store.onChange(listener)
+}
+
 export function getAllExtensionSettings(): Record<string, unknown> {
   return store.get('values')
 }

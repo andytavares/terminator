@@ -6,7 +6,7 @@
 
 ## Process Model
 
-Terminator is an Electron application with two OS processes and one shared code layer.
+Terminator is an Electron application with three kinds of process and one shared code layer: the main process, the renderers, and one extension host (ADR 094).
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -22,7 +22,13 @@ Terminator is an Electron application with two OS processes and one shared code 
 │  │  terminal:*  workspace:*  settings:*          │  │
 │  │  extension:*  dialog:*                        │  │
 │  └─────────────────────┬─────────────────────────┘  │
-└────────────────────────┼────────────────────────────┘
+└──────────┬─────────────┼────────────────────────────┘
+           │ MessagePort (RPC: requests, events, callbacks by id)
+┌──────────▼───────────┐ │
+│ Extension Host       │ │  utilityProcess, out/main/extension-host.js:
+│ every extension      │ │  every backend's activate(), its own
+│ backend              │ │  app.sqlite connection, remote-control's server
+└──────────────────────┘ │
                          │  contextBridge (preload.ts)
                          │  window.electronAPI.*
 ┌────────────────────────┼────────────────────────────┐
@@ -45,7 +51,7 @@ Terminator is an Electron application with two OS processes and one shared code 
 
 - `node-pty` requires native Node.js bindings — unavailable in the sandboxed renderer.
 - `contextIsolation: true` is the Electron security baseline. Disabling it would expose the full Node.js API surface to any XSS vector in the renderer.
-- See [ADR-001](adr/001-pty-in-main-process.md) and [ADR-002](adr/002-extension-host-in-main-process.md).
+- Extension backends run in a `utilityProcess` so their work never shares the event loop that relays terminal output. Native modules (`node-pty`) stay in main; the extension host reaches PTYs through the API. See [ADR-001](adr/001-pty-in-main-process.md) and [ADR 094](adr/094-extensions-follow-the-vs-code-model.md), which supersedes ADR-002.
 
 ---
 
@@ -144,7 +150,7 @@ Sessions do not survive app restart. This is an explicit Phase 1 scope decision.
 
 See [ADR-003](adr/003-electron-store-for-persistence.md) for the storage decision. The core stores are read through a per-key cache (see [Loops in the main process](#loops-in-the-main-process)).
 
-**Application database.** `userData/app.sqlite` is the one SQL database of the app, opened through Node's built-in `node:sqlite` (`DatabaseSync`, WAL journal, foreign keys on) in `src/main/db/index.ts`. The core owns no tables; each extension creates its own when it activates and reaches the database only through the injected `ExtensionDB` (`exec`, `query`, `get`, `run`, `transaction`). Statements and transactions run on the one connection in call order; a statement issued while a transaction is open waits for it. `node:sqlite` is a release candidate (stability 1.2) in Node 24, the risk ADR 099 accepts. It replaced PGlite, which added about 250 MB to the main process and about 0.6 s to every start.
+**Application database.** `userData/app.sqlite` is the one SQL database of the app, opened through Node's built-in `node:sqlite` (`DatabaseSync`, WAL journal, foreign keys on) in `src/main/db/index.ts`. The core owns no tables; each extension creates its own when it activates and reaches the database only through the injected `ExtensionDB` (`exec`, `query`, `get`, `run`, `transaction`). The extension host opens its own connection (WAL, `busy_timeout` 5 s), which every backend shares, so `transaction(fn)` runs `fn` in the extension's own process; main keeps one for the health check and the legacy import. On each connection statements and transactions run in call order; a statement issued while a transaction is open waits for it. `node:sqlite` is a release candidate (stability 1.2) in Node 24, the risk ADR 099 accepts. It replaced PGlite, which added about 250 MB to the main process and about 0.6 s to every start.
 
 **Import from PGlite.** Up to and including the release before this one, the database was `userData/app.pglite`. On the first start where `app.sqlite` does not exist and `app.pglite` does, `src/main/db/legacy-pglite-import.ts` opens the old database once (PGlite is imported dynamically, on this path only, so a normal start never loads it) and, after the extensions have run their schema setup in `activate`, copies every row of each table that exists in both databases, in one transaction with foreign keys deferred. `app.pglite` is left untouched as the backup. If the import fails, the error is logged (`Legacy PGlite import failed`), the transaction is rolled back and the app starts with an empty database instead of refusing to start; the backup stays, and deleting `app.sqlite` makes the next start import again. Only tables of extensions that were activated on that start are imported. The import, the `@electric-sql/pglite` dependency and the `asarUnpack` entries for `postgres.wasm` and `postgres.data` are removed one release later (ADR 099).
 
@@ -242,7 +248,22 @@ The shape is declared once, as zod schemas in `src/shared/schemas/settings.schem
 
 ## Extension System
 
-Extensions are Node.js CommonJS modules loaded in the main process by `ExtensionHost`.
+Extensions are Node.js CommonJS modules. `ExtensionHost` (main) reads and validates their manifests and keeps their status; their backends run in the extension host, one `utilityProcess` that `ExtensionHostProcess` (`src/main/extensions/host/host-process.ts`) starts on the first activation (ADR 094).
+
+### The process boundary
+
+| Piece                                          | Where          | What it does                                                                                                                           |
+| ---------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `host/entry.ts` → `out/main/extension-host.js` | extension host | Receives a `MessagePort` and the snapshot, opens its own WAL connection to `app.sqlite`, runs `HostRuntime`                            |
+| `host/host-runtime.ts`                         | extension host | `require()`s each backend, calls `activate(api)`, answers main's `channel.dispatch`, `command.run` and `callback`                      |
+| `host/host-api.ts`                             | extension host | The `ExtensionAPI` a backend receives: each member a request or event to main, a snapshot read, or local (`db`, `extensions`, `paths`) |
+| `host/callbacks.ts`                            | both           | A function argument becomes `{ $callback: id }`; main calls it back with a `callback` event                                            |
+| `host/api-server.ts`                           | main           | Runs each call on that extension's `ExtensionAPI` from `api.ts`, for members in `CROSSING_MEMBERS` only; keeps registrations by id     |
+| `host/rpc-endpoint.ts`                         | both           | Requests with answers, events without, errors with their `name`                                                                        |
+
+Values the core holds cross as promises, except `settings.get`, `workspace.list` / `listProjects` and `issues.supports*`, which read a snapshot main pushes on every change (`onExtensionSettingsChanged`, `onWorkspacesChanged`). `pty.onData` arrives batched, one message per frame (`pty-stream.ts`), every batch before the exit. A channel's or command's schema stays in the extension host, which validates the payload before `run`.
+
+When the extension host exits unasked the app stays up: it is started again once and its backends activated again; a second exit marks them failed, and Settings → Extensions shows them as `error` with the reason. The failure is not stored, so the next launch tries again.
 
 ### Bundled extensions
 
@@ -256,8 +277,9 @@ ExtensionHost.load(directoryPath)
       ├─ reads manifest.json (ADR-008: manifest.json, not extension.json)
       ├─ validates with ExtensionManifestSchema (Zod)
       ├─ checks minAppVersion compatibility
-      ├─ require()s entry point (compiled .js, see ADR-008)
-      ├─ calls activate(api) with ExtensionAPI instance
+      ├─ creates the extension's ExtensionAPI in main (api.ts)
+      ├─ asks the extension host to require() the entry point (ADR-008) and call
+      │  activate(api) with the host's ExtensionAPI, whose calls run on main's
       │        │
       │        └─ api.settings.register()           → globalRegistry.settingsSections
       │           api.settings.get()               → getExtensionSetting(key)
@@ -302,7 +324,7 @@ Pop-outs are top-level windows of the same app, so on macOS they are reached lik
 
 ### Sandboxed Shell Execution (v1.1.0)
 
-`api.shell.exec()` allows extensions to run `git` and `gh` commands in the main process. Since extensions run in the main process (not the renderer), this is a direct call to `shell-executor.ts` — not an IPC round-trip. The `shell:exec` IPC channel exists separately for renderer-initiated shell calls.
+`api.shell.exec()` allows extensions to run `git` and `gh` commands, which main runs through `shell-executor.ts`: the call crosses from the extension host on its port, and `onOutput` chunks come back as callback events before the result. The `shell:exec` IPC channel exists separately for renderer-initiated shell calls.
 
 Commands resolve against `process.env.PATH`. On macOS an app started from the Dock or Finder gets `/usr/bin:/bin:/usr/sbin:/sbin`, which has no Homebrew `gh`, so at startup `login-shell-path.ts` puts the login shell's PATH (`$SHELL -ilc`) ahead of it. A command that cannot be started reports its spawn error (`spawn gh ENOENT`) as stderr, never a bare exit code. A command killed by its timeout resolves with `timedOut: true` and exit code 124, never 0.
 

@@ -1,4 +1,3 @@
-import { dialog } from 'electron'
 import { z } from 'zod'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
@@ -271,7 +270,7 @@ export async function importNotes(
 export function registerExportIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handle, cleanup } = createIpcRegistrar(api)
   handle('terminator.notepad:export.pickFolder', noPayload, async () => {
-    const result = await dialog.showOpenDialog({
+    const result = await api.dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],
     })
     if (result.canceled) return { data: null }

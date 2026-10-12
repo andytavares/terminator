@@ -2,7 +2,7 @@
 
 Extensions let you add functionality to Terminator without touching its core code. They contribute to the application through the `ExtensionAPI` — a stable, versioned interface. This guide covers everything you need to write, test, and distribute an extension.
 
-**Current API version**: 2.8.0 (`api.settings.isBranchExcluded` matches a branch against Settings → Git → Branch Exclude Patterns — see [Excluded branches](#excluded-branches-v280); 2.7.0: `api.commands.register` takes an optional `args` schema and the handler an `args` argument; extension views gain `electronAPI.extension.runCommand` and `hasCommand` — see [Commands that take arguments](#commands-that-take-arguments-v270), [ADR-083](adr/083-extension-commands-take-arguments.md); 2.6.0: `pty.closeTerminalTab` closes a tab `openTerminalTab` opened — see [`closeTerminalTab`](#closeterminaltab--closing-a-tab-you-opened-v260); 2.5.0: `api.issues` gains `teams`, `create` and `supportsCreate`; `workspace.listProjects` reports `worktreePath` and `workspace.deleteProject` tells the sidebar — see [Creating an issue](#creating-an-issue-v250); 2.4.0: `api.commands` gains `mnemonic`, `requires` and a `CommandContext` handler argument, plus `api.commands.setEnabled` and `api.window.showSelf`; `api.keyboard.register` is removed — see [Deleted: `api.keyboard.register`](#deleted-apikeyboardregister-removed-in-v240); an extension can own a supervised agent run — `workspace.createProject` and `pty.openTerminalTab`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
+**Current API version**: SDK 4.0.0 (backends run in the extension host, a separate process, and every member crosses it — see [Where your backend runs](#where-your-backend-runs-sdk-400); 2.8.0: `api.settings.isBranchExcluded` matches a branch against Settings → Git → Branch Exclude Patterns — see [Excluded branches](#excluded-branches-v280); 2.7.0: `api.commands.register` takes an optional `args` schema and the handler an `args` argument; extension views gain `electronAPI.extension.runCommand` and `hasCommand` — see [Commands that take arguments](#commands-that-take-arguments-v270), [ADR-083](adr/083-extension-commands-take-arguments.md); 2.6.0: `pty.closeTerminalTab` closes a tab `openTerminal` opened — see [`closeTerminalTab`](#closeterminaltab--closing-a-tab-you-opened-v260); 2.5.0: `api.issues` gains `teams`, `create` and `supportsCreate`; `workspace.listProjects` reports `worktreePath` and `workspace.deleteProject` tells the sidebar — see [Creating an issue](#creating-an-issue-v250); 2.4.0: `api.commands` gains `mnemonic`, `requires` and a `CommandContext` handler argument, plus `api.commands.setEnabled` and `api.window.showSelf`; `api.keyboard.register` is removed — see [Deleted: `api.keyboard.register`](#deleted-apikeyboardregister-removed-in-v240); an extension can own a supervised agent run — `workspace.addProject` and `pty.openTerminal`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
 
 ---
 
@@ -99,6 +99,32 @@ export function deactivate(): void {
 ```
 
 If `activate` throws, the extension transitions to `status: 'error'` and the app remains stable.
+
+### Where your backend runs _(SDK 4.0.0)_
+
+Your backend runs in the **extension host**, one Electron `utilityProcess` shared by every
+extension backend (ADR 094), not in the main process. The API reaches the core over a
+`MessagePort`, which shapes it:
+
+- A value the core holds is a promise: `settings.isBranchExcluded`, `globalShortcut.register`,
+  `pty.spawnSession` / `getSession` / `setWorkspace` / `listSessions`, `pty.openTerminal`,
+  `workspace.addProject`, `ipc.isRemoteAccessible`, `dialog.*`.
+- `settings.get`, `workspace.list` / `listProjects` and `issues.supportsTransitions` /
+  `supportsCreate` stay synchronous: they read a snapshot the core pushes whenever it changes.
+- A callback you pass (a command handler, a notification's `onClick`, `pty.onData`) stays in the
+  extension host; the core calls it by id. Registrations still return a `Disposable` at once.
+- `pty.onData` delivers output in batches, at most one per frame, every batch before `onExit`.
+- `api.db` is the extension host's own connection, so `transaction(fn)` runs `fn` right here.
+- Values you pass and return must survive structured clone: plain data, no functions or class
+  instances (an `Error` arrives with its `name` and `message`).
+- `electron` is not available: use `api.paths` (`app`, `userData`) for `app.getPath`,
+  `api.dialog` for file dialogs, `api.window.raise()` / `broadcast()` for windows. A store such as
+  electron-store needs `cwd: api.paths.userData`. Node's own modules, `net` and `child_process`
+  work: Remote Control's HTTP server runs here.
+
+If the extension host crashes, the app stays up. It is restarted once and every backend activated
+again; if it crashes again, the extensions show as `error` in Settings → Extensions with the
+reason, until the next launch.
 
 ### What an extension may import _(SDK 2.0.0)_
 
@@ -220,7 +246,11 @@ const url = api.settings.get<string>('myext.apiUrl')
 `api.settings.isBranchExcluded(branch, repoPath?)` says whether a branch matches Settings → Git → Branch Exclude Patterns. The patterns come from the workspace that owns `repoPath` when it has its own, and from the global list otherwise. `*` matches anything, slashes included. The core owns the patterns and the matching, so a list your extension shows hides the same branches the core's pickers do.
 
 ```typescript
-const visible = pulls.filter((pr) => !api.settings.isBranchExcluded(pr.headRefName, repoRoot))
+// A promise since 4.0.0: ask for every candidate, then filter.
+const excluded = await Promise.all(
+  pulls.map((pr) => api.settings.isBranchExcluded(pr.headRefName, repoRoot))
+)
+const visible = pulls.filter((_, i) => !excluded[i])
 ```
 
 The Git extension uses this to leave pull requests opened from an excluded branch out of its review lists.
@@ -370,7 +400,7 @@ const onClose = api.terminal.onSessionClose((sessionId) => {
 
 ### `api.shell` — Sandboxed Shell Execution _(v1.1.0)_
 
-Run `git` or `gh` commands in the main process. Execution is sandboxed to the current project directory.
+Run `git` or `gh` commands; the core runs them in the main process. Execution is sandboxed to the current project directory.
 
 ```typescript
 const result = await api.shell.exec({
@@ -633,7 +663,7 @@ Test against a real database, not a mock: `wrapDb(new DatabaseSync(':memory:'))`
 
 ### `api.ipc` — Custom IPC Handlers _(v1.1.0; schema since SDK 3.0.0)_
 
-Register named IPC handlers in the main process. The renderer side calls these with `invoke(channel, payload)` from `@terminator/extension-sdk/renderer`.
+Register named IPC handlers. The core registers the channel in the main process and hands each payload to your backend in the extension host, where `schema` checks it before `run`. The renderer side calls these with `invoke(channel, payload)` from `@terminator/extension-sdk/renderer`.
 
 Register each channel as a `ChannelSpec` (ADR 096), the shape the core registers its own channels in: the channel name, a zod `schema` for its payload, the `invalid` response for a payload the schema rejects, and `run`, which receives the parsed payload. The core parses the payload before `run` sees it, so `run` never handles the raw value a caller sent, and its argument type comes from the schema.
 
@@ -689,7 +719,7 @@ The declaration made at registration is the single authority — a channel that 
 
 ```typescript
 // Spawn with metadata; subscribe output/exit separately (v1.4.0)
-const info = api.pty.spawnSession({
+const info = await api.pty.spawnSession({
   sessionId,
   cwd: '/repo',
   shell: '/bin/zsh',
@@ -699,28 +729,30 @@ const info = api.pty.spawnSession({
 const stopStreaming = api.pty.onData(sessionId, (data) => broadcast(data))
 api.pty.onExit(sessionId, (code) => cleanup(code)) // fires after the session is removed
 
-api.pty.getSession(sessionId) // full SessionInfo or undefined
-api.pty.setWorkspace(sessionId, 'ws-1') // stamp workspace metadata (null clears)
-api.pty.listSessions() // every live session with full SessionInfo
+await api.pty.getSession(sessionId) // full SessionInfo or undefined
+await api.pty.setWorkspace(sessionId, 'ws-1') // stamp workspace metadata (null clears)
+await api.pty.listSessions() // every live session with full SessionInfo
 ```
 
-`onData`/`onExit` support any number of subscribers per session and return disposers; all listeners are cleaned up automatically when the PTY exits.
+`onData`/`onExit` support any number of subscribers per session and always return disposers (a session that does not exist never calls the listener); all listeners are cleaned up automatically when the PTY exits. `onData` delivers at most one batch per frame (SDK 4.0.0).
 
-#### `openTerminalTab` — a terminal the operator can see _(v2.1.0)_
+#### `openTerminal` — a terminal the operator can see _(v2.1.0; a promise named `openTerminal` since SDK 4.0.0)_
 
 `spawnSession` gives you a process and a data stream, but nothing on screen: the
 renderer owns the tab list and does not know your session exists. An extension
 that runs an agent this way produces a process nobody can watch or type into.
 
 ```typescript
-const projectId = api.workspace.createProject({
-  workspaceId,
-  name: branch,
-  worktreePath,
-  gitBranch: branch,
-})?.id
+const projectId = (
+  await api.workspace.addProject({
+    workspaceId,
+    name: branch,
+    worktreePath,
+    gitBranch: branch,
+  })
+)?.id
 
-const sessionId = api.pty.openTerminalTab({
+const sessionId = await api.pty.openTerminal({
   projectId,
   cwd: worktreePath,
   tabTitle: branch,
@@ -853,13 +885,13 @@ asks first and calls this only on "Create ticket". **Only Linear implements it**
 `api.issues.connections()` reports whether each tracker is connected and which account its
 credential proved to belong to. It never returns the credential.
 
-### `api.workspace.createProject` — somewhere to put a worktree _(v2.1.0)_
+### `api.workspace.addProject` — somewhere to put a worktree _(v2.1.0; a promise named `addProject` since SDK 4.0.0)_
 
 An extension that provisions a git worktree previously had nowhere to put it: the
 checkout existed and nothing in the sidebar showed it.
 
 ```typescript
-const project = api.workspace.createProject({
+const project = await api.workspace.addProject({
   workspaceId,
   name: 'feat/session-ulid',
   worktreePath: '/…/worktrees/feat-session-ulid',
@@ -871,7 +903,7 @@ const project = api.workspace.createProject({
 #### Attaching an issue at creation _(v2.2.0)_
 
 ```typescript
-api.workspace.createProject({
+await api.workspace.addProject({
   workspaceId,
   name: branch,
   worktreePath,
@@ -1261,10 +1293,10 @@ export function MyWorkspaceView() {
 
 ### `api.globalShortcut.register(accelerator, handler)`
 
-Registers a global keyboard shortcut. Returns a `Disposable` — call `.dispose()` in `deactivate()`.
+Registers a global keyboard shortcut. Resolves to a `Disposable` (a promise since SDK 4.0.0) — call `.dispose()` in `deactivate()`. Rejects with `ACCELERATOR_TAKEN` when another app holds the accelerator.
 
 ```typescript
-const disposable = api.globalShortcut.register('CommandOrControl+Shift+Space', () => {
+const disposable = await api.globalShortcut.register('CommandOrControl+Shift+Space', () => {
   // open overlay
 })
 disposables.push(disposable)
@@ -1305,7 +1337,7 @@ Use `api.ipc.registerHandler` to back the auxiliary window's data needs.
 
 ### `api.notifications.createNotification(opts): Disposable`
 
-Creates a persistent notification in the notification center (without an ephemeral toast). Supports optional action buttons with callbacks that run in the main process, and an `onClick` that decides where the row takes you.
+Creates a persistent notification in the notification center (without an ephemeral toast). Supports optional action buttons with callbacks that run in your backend (the core calls them by id), and an `onClick` that decides where the row takes you.
 
 ```typescript
 const notif = api.notifications.createNotification({

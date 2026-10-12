@@ -1,4 +1,3 @@
-import { BrowserWindow } from 'electron'
 import { z } from 'zod'
 import { noPayload } from '@terminator/extension-sdk'
 import type {
@@ -18,7 +17,11 @@ import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { registerWeeklyReviewIpcHandlers } from './ipc/weekly-review.ipc.js'
 import { applyTaskVaultSchema } from './vault/db.js'
 import { backfillRecurringTasks } from './vault/ensure-next-occurrence.js'
-import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
+import {
+  bindBroadcast,
+  startTaskScheduler,
+  setSchedulerTick,
+} from './notifications/task-scheduler.js'
 import { openInVault, popPendingNavigation } from './navigation.js'
 
 // Every notification kind task-vault ever raises, so the user can independently
@@ -96,6 +99,7 @@ function maybeStartScheduler(db: ExtensionDB): void {
 
 export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
   _api = api
+  bindBroadcast((channel, data) => api.window.broadcast(channel, data))
   const db: ExtensionDB = api.db
 
   disposables.push(
@@ -246,7 +250,7 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
   })
 
   try {
-    const hotkeyDisposable = api.globalShortcut.register(DEFAULT_CAPTURE_HOTKEY, () => {
+    const hotkeyDisposable = await api.globalShortcut.register(DEFAULT_CAPTURE_HOTKEY, () => {
       openCaptureOverlay(api)
     })
     disposables.push(hotkeyDisposable)
@@ -315,14 +319,9 @@ function scheduleWeeklyReviewNudge(api: ExtensionAPI, reviewDay: number): void {
 }
 
 function openCaptureOverlay(api: ExtensionAPI): void {
-  // Broadcast to any already-running extension view immediately.
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (win.isDestroyed()) continue
-    if (win.isMinimized()) win.restore()
-    win.show()
-    win.focus()
-    win.webContents.send('task-vault:push:open-capture')
-  }
+  // Bring the app forward and tell any already-running extension view immediately.
+  api.window.raise()
+  api.window.broadcast('task-vault:push:open-capture', undefined)
   // Activate the global tab — this creates the WebContentsView if it doesn't exist yet.
   api.window.broadcast('extension:activate-global-tab', 'terminator.task-vault')
   // Transfer keyboard focus to the task-vault WebContentsView so Escape works immediately.

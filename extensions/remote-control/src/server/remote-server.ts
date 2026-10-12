@@ -3,7 +3,6 @@ import websocketPlugin from '@fastify/websocket'
 import staticPlugin from '@fastify/static'
 import { join, resolve, dirname } from 'path'
 import { readFileSync, existsSync, readdirSync } from 'fs'
-import { app as electronApp } from 'electron'
 import type { PtyManagerAPI, WorkspaceSnapshot, ProjectSnapshot } from '@terminator/extension-sdk'
 import { registerHealthRoute } from './routes/health.route.js'
 import { registerTerminalRoutes } from './routes/terminal.routes.js'
@@ -26,12 +25,14 @@ interface RemoteServerDeps {
   invokeChannel: (channel: string, payload: unknown) => Promise<unknown>
   sendChannel: (channel: string, payload: unknown) => void
   onWindowEvent: (channel: string, handler: (...args: unknown[]) => void) => () => void
-  isRemoteAccessible: (channel: string) => boolean
+  isRemoteAccessible: (channel: string) => Promise<boolean>
   onPortInUse: (port: number) => void
 }
 
 interface RemoteServerOptions {
   port: number
+  /** `api.paths.app`: where the built renderers and extensions are found. */
+  appPath: string
   ptyManager: PtyManagerAPI
   deps: RemoteServerDeps
 }
@@ -53,26 +54,28 @@ export class PortInUseError extends Error {
   }
 }
 
-function getRemoteRendererDir(): string {
+function getRemoteRendererDir(appPath: string): string {
   const candidates = [
-    join(electronApp.getAppPath(), 'out', 'renderer-remote'),
+    join(appPath, 'out', 'renderer-remote'),
     resolve(__dirname, '..', '..', '..', '..', 'out', 'renderer-remote'),
   ]
   return candidates.find(existsSync) ?? candidates[0]
 }
 
-function getRendererDir(): string {
+function getRendererDir(appPath: string): string {
   const candidates = [
-    join(electronApp.getAppPath(), 'out', 'renderer'),
+    join(appPath, 'out', 'renderer'),
     resolve(__dirname, '..', '..', '..', '..', 'out', 'renderer'),
   ]
   return candidates.find(existsSync) ?? candidates[0]
 }
 
-function getExtensionRendererDirs(): Array<{ id: string; dir: string; rendererRelPath: string }> {
+function getExtensionRendererDirs(
+  appPath: string
+): Array<{ id: string; dir: string; rendererRelPath: string }> {
   const results: Array<{ id: string; dir: string; rendererRelPath: string }> = []
   const candidates = [
-    join(electronApp.getAppPath(), 'extensions'),
+    join(appPath, 'extensions'),
     resolve(__dirname, '..', '..', '..', '..', 'extensions'),
   ]
   const extensionsRoot = candidates.find(existsSync)
@@ -108,7 +111,7 @@ function getExtensionRendererDirs(): Array<{ id: string; dir: string; rendererRe
 export async function createRemoteServer(
   options: RemoteServerOptions
 ): Promise<RemoteServerHandle> {
-  const { port, ptyManager, deps } = options
+  const { port, appPath, ptyManager, deps } = options
 
   const ticketStore = new WsTicketStore()
   const subscriberManager = new WsSubscriberManager()
@@ -155,14 +158,14 @@ export async function createRemoteServer(
 
   await fastify.register(websocketPlugin)
 
-  const loginStaticDir = getRemoteRendererDir()
+  const loginStaticDir = getRemoteRendererDir(appPath)
   await fastify.register(staticPlugin, { root: loginStaticDir, prefix: '/', decorateReply: false })
 
-  const rendererDir = getRendererDir()
+  const rendererDir = getRendererDir(appPath)
   await fastify.register(staticPlugin, { root: rendererDir, prefix: '/app', decorateReply: false })
 
   // Serve each installed extension's renderer under /ext/<extensionId>/
-  const extensionDirs = getExtensionRendererDirs()
+  const extensionDirs = getExtensionRendererDirs(appPath)
   for (const { id, dir } of extensionDirs) {
     await fastify.register(staticPlugin, {
       root: dir,
@@ -307,7 +310,7 @@ export async function createRemoteServer(
       appSessionStore.clear()
       mobileSessionStore.clear()
       loginSessionStore.clear()
-      terminalCleanup.cleanup()
+      await terminalCleanup.cleanup()
       bridgeCleanup.disconnectAll()
       subscriberManager.destroyAll()
       await fastify.close()
@@ -319,7 +322,7 @@ export async function createRemoteServer(
       mobileSessionStore.clear()
       loginSessionStore.clear()
       // Kill all remote PTYs — password rotation invalidates existing sessions
-      terminalCleanup.cleanup()
+      void terminalCleanup.cleanup()
       bridgeCleanup.disconnectAll()
       subscriberManager.destroyAll()
     },

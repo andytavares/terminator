@@ -7,10 +7,6 @@ const { mockShowSaveDialog, mockWriteFileSync, mockMkdirSync } = vi.hoisted(() =
   mockMkdirSync: vi.fn(),
 }))
 
-vi.mock('electron', () => ({
-  dialog: { showSaveDialog: mockShowSaveDialog },
-}))
-
 vi.mock('node:fs', () => ({
   writeFileSync: mockWriteFileSync,
   mkdirSync: mockMkdirSync,
@@ -27,6 +23,7 @@ let handlers: Map<string, ChannelSpec>
 let dispose: () => void
 
 const mockApi = {
+  dialog: { showSaveDialog: mockShowSaveDialog },
   ipc: {
     registerHandler: (spec: ChannelSpec) => {
       handlers.set(spec.channel, spec)

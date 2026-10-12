@@ -1,5 +1,4 @@
 import type { ExtensionAPI } from '@terminator/extension-sdk'
-import { app } from 'electron'
 import * as path from 'node:path'
 
 import type { ResolveSources } from './recipe/resolve.js'
@@ -61,8 +60,8 @@ export function resolveSources(api: ExtensionAPI, root: string): ResolveSources 
   }
 }
 
-function fallbackDataRoot(): string {
-  return path.join(app.getPath('userData'), 'foundry')
+function fallbackDataRoot(userData: string): string {
+  return path.join(userData, 'foundry')
 }
 
 /**
@@ -98,7 +97,7 @@ export function resolveFoundryDataRoot(api: ExtensionAPI): string {
   const memo = dataRootMemo.get(key)
   if (memo !== undefined) return memo
 
-  const base = workdir ?? fallbackDataRoot()
+  const base = workdir ?? fallbackDataRoot(api.paths.userData)
   let root: string
   try {
     root = resolveDataRoot(configured, base).root

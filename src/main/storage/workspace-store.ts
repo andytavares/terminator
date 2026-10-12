@@ -28,6 +28,10 @@ function now(): string {
   return new Date().toISOString()
 }
 
+export function onWorkspacesChanged(listener: () => void): () => void {
+  return store.onChange(listener)
+}
+
 export function listWorkspaces(): Workspace[] {
   return store.get('workspaces')
 }

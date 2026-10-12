@@ -1,6 +1,10 @@
 /**
- * ExtensionAPI — the object passed to `activate(api)` in your extension's main process entry.
+ * ExtensionAPI — the object passed to `activate(api)` in your extension's backend entry.
  * The core implements exactly this declaration (`src/main/extensions/api.ts`).
+ *
+ * Since 4.0.0 a backend runs in the extension host, a separate process (ADR 094), and every
+ * member crosses a MessagePort: a value the core holds is returned as a promise or kept in a
+ * snapshot the core pushes, and a callback is held by the extension host and called by id.
  */
 
 import type { ZodTypeAny } from 'zod'
@@ -182,7 +186,7 @@ export interface SessionInfo {
 }
 
 export interface OpenTerminalTabInput {
-  /** Where the tab appears. From `workspace.createProject`, normally. */
+  /** Where the tab appears. From `workspace.addProject`, normally. */
   projectId: string
   cwd: string
   tabTitle: string
@@ -197,29 +201,35 @@ export interface PtyManagerAPI {
    * Spawns a process and a data stream. Throws an error whose `name` is
    * 'MissingCwdError' when `cwd` is not an existing directory.
    */
-  spawnSession(opts: SpawnSessionOptions): SessionInfo
+  spawnSession(opts: SpawnSessionOptions): Promise<SessionInfo>
   /**
    * Spawns a terminal and puts it on screen as an ordinary tab, holding the
-   * process's output until the tab is mounted. Returns the session id, or
-   * null when there is no window to show it in.
+   * process's output until the tab is mounted. Resolves to the session id, or
+   * null when there is no window to show it in. Since 4.0.0.
    */
-  openTerminalTab(input: OpenTerminalTabInput): string | null
+  openTerminal(input: OpenTerminalTabInput): Promise<string | null>
   /**
-   * Closes a tab `openTerminalTab` opened, ending its process if it still runs
+   * Closes a tab `openTerminal` opened, ending its process if it still runs
    * (v2.6.0). `kill` alone leaves the tab on screen marked "[exited]".
    */
   closeTerminalTab(sessionId: string): void
-  /** Multi-subscriber output fan-out. Returns a disposer, or null if unknown. */
-  onData(sessionId: string, listener: (data: string) => void): (() => void) | null
-  /** Multi-subscriber exit fan-out. Listeners fire after the session is removed. */
-  onExit(sessionId: string, listener: (exitCode: number) => void): (() => void) | null
-  getSession(sessionId: string): SessionInfo | undefined
-  /** Stamps workspace metadata on the session (null clears it). */
-  setWorkspace(sessionId: string, workspaceId: string | null): boolean
+  /**
+   * The session's output, in batches of at most one per frame (4.0.0). Returns a disposer; a
+   * session that does not exist never calls the listener.
+   */
+  onData(sessionId: string, listener: (data: string) => void): () => void
+  /**
+   * Multi-subscriber exit fan-out. Listeners fire after the session is removed, and after the
+   * last batch of its output. Returns a disposer.
+   */
+  onExit(sessionId: string, listener: (exitCode: number) => void): () => void
+  getSession(sessionId: string): Promise<SessionInfo | undefined>
+  /** Stamps workspace metadata on the session (null clears it). False for an unknown session. */
+  setWorkspace(sessionId: string, workspaceId: string | null): Promise<boolean>
   write(sessionId: string, data: string): void
   resize(sessionId: string, cols: number, rows: number): void
   kill(sessionId: string): void
-  listSessions(): SessionInfo[]
+  listSessions(): Promise<SessionInfo[]>
 }
 
 export interface ShellExecOptions {
@@ -257,9 +267,41 @@ export interface ShellExecResult<Output extends string | Uint8Array = string> {
   exceededMaxBuffer: boolean
 }
 
+/** Options for `dialog.showOpenDialog`, a subset of Electron's. Since 4.0.0. */
+export interface OpenDialogOptions {
+  title?: string
+  defaultPath?: string
+  buttonLabel?: string
+  filters?: Array<{ name: string; extensions: string[] }>
+  properties?: Array<'openFile' | 'openDirectory' | 'multiSelections' | 'createDirectory'>
+}
+
+/** Options for `dialog.showSaveDialog`, a subset of Electron's. Since 4.0.0. */
+export interface SaveDialogOptions {
+  title?: string
+  defaultPath?: string
+  buttonLabel?: string
+  filters?: Array<{ name: string; extensions: string[] }>
+}
+
 export interface ExtensionAPI {
-  /** The extension's database. Throws until the app database is initialised. */
+  /**
+   * The extension's database. Throws until the app database is initialised. The extension host
+   * holds its own connection, so `transaction(fn)` runs `fn` in the extension's own process.
+   */
   db: ExtensionDB
+  /** Where the application lives on disk. A snapshot taken at activation. Since 4.0.0. */
+  paths: {
+    /** The application's own directory (Electron's `app.getAppPath()`). */
+    readonly app: string
+    /** The per-user data directory (Electron's `app.getPath('userData')`). */
+    readonly userData: string
+  }
+  /** The operating system's file dialogs, over the focused window. Since 4.0.0. */
+  dialog: {
+    showOpenDialog(options: OpenDialogOptions): Promise<{ canceled: boolean; filePaths: string[] }>
+    showSaveDialog(options: SaveDialogOptions): Promise<{ canceled: boolean; filePath?: string }>
+  }
   log: {
     debug(message: string, ...meta: unknown[]): void
     info(message: string, ...meta: unknown[]): void
@@ -268,28 +310,33 @@ export interface ExtensionAPI {
   }
   settings: {
     register(schema: ExtensionSettingsSchema): Disposable
+    /**
+     * Read from a snapshot of the settings the core pushes on every change, so it stays
+     * synchronous; `set` updates the snapshot at once.
+     */
     get<T>(key: string): T | undefined
     set(key: string, value: unknown): void
     /**
      * Whether a branch matches Settings → Git → Branch Exclude Patterns: the
      * override of the workspace that owns `repoPath`, else the global list.
-     * `*` matches anything, slashes included. Since 2.8.0.
+     * `*` matches anything, slashes included. Since 2.8.0; a promise since 4.0.0.
      */
-    isBranchExcluded(branch: string, repoPath?: string): boolean
+    isBranchExcluded(branch: string, repoPath?: string): Promise<boolean>
   }
   globalShortcut: {
-    /** Throws `ACCELERATOR_TAKEN` when the accelerator is already in use. */
-    register(accelerator: string, handler: () => void): Disposable
+    /** Rejects with `ACCELERATOR_TAKEN` when the accelerator is already in use (4.0.0). */
+    register(accelerator: string, handler: () => void): Promise<Disposable>
   }
+  /** Read from a snapshot the core pushes whenever a workspace or project changes. */
   workspace: {
     list(): WorkspaceSnapshot[]
     listProjects(workspaceId: string): ProjectSnapshot[]
     /**
      * Registers a directory as a project in a workspace, so it appears in the
-     * sidebar and can hold terminals. Returns the existing project when the
-     * workspace already has one for that path; null when it cannot be created.
+     * sidebar and can hold terminals. Resolves to the existing project when the
+     * workspace already has one for that path; null when it cannot be created. Since 4.0.0.
      */
-    createProject(input: CreateProjectInput): ProjectSnapshot | null
+    addProject(input: CreateProjectInput): Promise<ProjectSnapshot | null>
     deleteProject(projectId: string): void
   }
   topBar: {
@@ -343,7 +390,7 @@ export interface ExtensionAPI {
       intent: TransitionIntent,
       optionId?: string
     ): Promise<void>
-    /** Whether this tracker supports being moved at all. */
+    /** Whether this tracker supports being moved at all. A fixed fact of the tracker. */
     supportsTransitions(tracker: TrackerId): boolean
     /** Teams the operator can file an issue in. */
     teams(tracker: TrackerId): Promise<TrackerTeam[]>
@@ -386,7 +433,8 @@ export interface ExtensionAPI {
     invokeChannel(channel: string, payload: unknown): Promise<unknown>
     sendChannel(channel: string, payload: unknown): void
     onWindowEvent(channel: string, handler: (...args: unknown[]) => void): () => void
-    isRemoteAccessible(channel: string): boolean
+    /** A promise since 4.0.0. */
+    isRemoteAccessible(channel: string): Promise<boolean>
   }
   terminal: {
     onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable
@@ -404,5 +452,7 @@ export interface ExtensionAPI {
      * it. Core's own "Open <surface>" quick actions use this same path.
      */
     showSelf(view?: string): void
+    /** Restores and focuses every application window. Since 4.0.0. */
+    raise(): void
   }
 }

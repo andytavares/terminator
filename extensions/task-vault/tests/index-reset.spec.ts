@@ -22,6 +22,7 @@ vi.mock('../src/ipc/weekly-review.ipc.js', () => ({
 vi.mock('../src/notifications/task-scheduler.js', () => ({
   startTaskScheduler: vi.fn(() => ({ dispose: vi.fn(), tick: vi.fn() })),
   setSchedulerTick: vi.fn(),
+  bindBroadcast: vi.fn(),
 }))
 
 type Handler = () => Promise<unknown>

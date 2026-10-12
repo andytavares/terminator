@@ -5,8 +5,6 @@ import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  globalShortcut: { register: vi.fn(), unregister: vi.fn() },
 }))
 
 vi.mock('../src/ipc/vault.ipc.js', () => ({ registerVaultIpcHandlers: vi.fn(() => vi.fn()) }))
@@ -28,6 +26,7 @@ vi.mock('../src/vault/ensure-next-occurrence.js', () => ({
 vi.mock('../src/notifications/task-scheduler.js', () => ({
   startTaskScheduler: vi.fn(() => ({ dispose: vi.fn(), tick: vi.fn() })),
   setSchedulerTick: vi.fn(),
+  bindBroadcast: vi.fn(),
 }))
 vi.mock('../src/navigation.js', () => ({
   openInVault: vi.fn(),
@@ -36,12 +35,12 @@ vi.mock('../src/navigation.js', () => ({
 
 function makeApi() {
   const commandsRegister = vi.fn(() => ({ dispose: vi.fn() }))
-  const globalShortcutRegister = vi.fn(() => ({ dispose: vi.fn() }))
+  const globalShortcutRegister = vi.fn(async () => ({ dispose: vi.fn() }))
   const api = {
     db: {},
     ipc: { registerHandler: vi.fn(() => ({ dispose: vi.fn() })) },
     settings: { register: vi.fn(() => ({ dispose: vi.fn() })), get: vi.fn(() => '0') },
-    window: { broadcast: vi.fn(), focusSelf: vi.fn() },
+    window: { broadcast: vi.fn(), focusSelf: vi.fn(), raise: vi.fn() },
     notifications: { showToast: vi.fn(), createNotification: vi.fn() },
     nativeMenu: { addViewMenuItem: vi.fn(() => ({ dispose: vi.fn() })) },
     globalShortcut: { register: globalShortcutRegister },
@@ -177,9 +176,7 @@ describe('task-vault activate() quick-actions command registration', () => {
 
   it('registers the command even when the global shortcut registration throws', async () => {
     const { api, globalShortcutRegister, commandsRegister } = makeApi()
-    globalShortcutRegister.mockImplementation(() => {
-      throw new Error('shortcut claimed by another app')
-    })
+    globalShortcutRegister.mockRejectedValue(new Error('shortcut claimed by another app'))
     const { activate } = await import('../src/index.ts')
 
     await activate(api)
@@ -238,6 +235,8 @@ describe('task-vault activate() exports (ADR 094)', () => {
     const vault = await activate(api)
     vault.openCapture()
 
+    expect(api.window.raise).toHaveBeenCalled()
+    expect(api.window.broadcast).toHaveBeenCalledWith('task-vault:push:open-capture', undefined)
     expect(api.window.broadcast).toHaveBeenCalledWith(
       'extension:activate-global-tab',
       'terminator.task-vault'

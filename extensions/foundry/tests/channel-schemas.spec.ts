@@ -15,7 +15,6 @@ import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminato
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
   safeStorage: { isEncryptionAvailable: vi.fn().mockReturnValue(false) },
-  app: { getPath: vi.fn().mockReturnValue(USER_DATA) },
 }))
 
 vi.mock('../src/runtime/supervised-runner.js', () => ({
@@ -64,6 +63,7 @@ beforeAll(async () => {
     shell: { exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }) },
     notifications: { showToast: vi.fn(), createNotification: () => disposable },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    paths: { app: '', userData: USER_DATA },
     settings: {
       register: () => disposable,
       get: vi.fn(),

@@ -46,7 +46,7 @@ interface TerminalRouteOptions {
 export async function registerTerminalRoutes(
   app: FastifyInstance,
   opts: TerminalRouteOptions
-): Promise<{ cleanup: () => void }> {
+): Promise<{ cleanup: () => Promise<void> }> {
   const { ptyManager, ticketStore, subscriberManager, getMaxSubscribers, deviceRegistry } = opts
 
   // One output-broadcast listener per session this surface is streaming.
@@ -57,7 +57,6 @@ export async function registerTerminalRoutes(
     const disposeData = ptyManager.onData(sessionId, (data) =>
       subscriberManager.broadcast(sessionId, data)
     )
-    if (!disposeData) return
     const disposeExit = ptyManager.onExit(sessionId, () => {
       broadcastDisposers.delete(sessionId)
       subscriberManager.destroySession(sessionId)
@@ -66,12 +65,12 @@ export async function registerTerminalRoutes(
     // stack a second exit listener on a still-live app session.
     broadcastDisposers.set(sessionId, () => {
       disposeData()
-      disposeExit?.()
+      disposeExit()
     })
   }
 
   app.get('/api/terminals', async () => {
-    return ptyManager.listSessions().map((s) => ({
+    return (await ptyManager.listSessions()).map((s) => ({
       sessionId: s.sessionId,
       cwd: s.cwd,
       createdAt: s.createdAt,
@@ -90,7 +89,7 @@ export async function registerTerminalRoutes(
     const resolvedCwd = cwd.startsWith('~') ? cwd.replace(/^~/, homedir()) : cwd
 
     try {
-      ptyManager.spawnSession({
+      await ptyManager.spawnSession({
         sessionId,
         cwd: resolvedCwd,
         shell: process.env.SHELL || '/bin/zsh',
@@ -113,7 +112,7 @@ export async function registerTerminalRoutes(
   app.get<{ Params: { sessionId: string } }>(
     '/api/terminals/:sessionId',
     async (request, reply) => {
-      const session = ptyManager.getSession(request.params.sessionId)
+      const session = await ptyManager.getSession(request.params.sessionId)
       if (!session) return reply.status(404).send({ error: 'NOT_FOUND' })
       return {
         sessionId: session.sessionId,
@@ -129,7 +128,7 @@ export async function registerTerminalRoutes(
     '/api/terminals/:sessionId',
     async (request, reply) => {
       const { sessionId } = request.params
-      const session = ptyManager.getSession(sessionId)
+      const session = await ptyManager.getSession(sessionId)
       if (!session) return reply.status(404).send({ error: 'NOT_FOUND' })
       // App-owned sessions keep running in Electron; only stop streaming them.
       if (session.origin === 'remote') {
@@ -149,7 +148,9 @@ export async function registerTerminalRoutes(
     '/api/terminals/:sessionId/resize',
     async (request, reply) => {
       const { sessionId } = request.params
-      if (!ptyManager.getSession(sessionId)) return reply.status(404).send({ error: 'NOT_FOUND' })
+      if (!(await ptyManager.getSession(sessionId))) {
+        return reply.status(404).send({ error: 'NOT_FOUND' })
+      }
       const result = ResizeSchema.safeParse(request.body)
       if (!result.success) {
         return reply.status(400).send({ error: 'VALIDATION_ERROR', message: result.error.message })
@@ -167,7 +168,7 @@ export async function registerTerminalRoutes(
       if (!result.success) {
         return reply.status(400).send({ error: 'VALIDATION_ERROR', message: result.error.message })
       }
-      if (!ptyManager.setWorkspace(sessionId, result.data.workspaceId)) {
+      if (!(await ptyManager.setWorkspace(sessionId, result.data.workspaceId))) {
         return reply.status(404).send({ error: 'NOT_FOUND' })
       }
       return { ok: true }
@@ -178,7 +179,9 @@ export async function registerTerminalRoutes(
     '/api/terminals/:sessionId/ws-ticket',
     async (request, reply) => {
       const { sessionId } = request.params
-      if (!ptyManager.getSession(sessionId)) return reply.status(404).send({ error: 'NOT_FOUND' })
+      if (!(await ptyManager.getSession(sessionId))) {
+        return reply.status(404).send({ error: 'NOT_FOUND' })
+      }
       const ticket = ticketStore.createTicket(sessionId, 'terminal')
       return reply.status(201).send({ ticket })
     }
@@ -187,6 +190,21 @@ export async function registerTerminalRoutes(
   // Track pending grace-period teardown timers per session so they can be
   // cancelled if the same session reconnects before the window expires.
   const gracePeriodTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+  // Grace period: mobile clients navigate away (unmounting the view) without
+  // intending to end the session. Wait 30s before tearing down the PTY so
+  // navigating back reconnects to the live process.
+  function scheduleTeardown(sessionId: string): void {
+    if (gracePeriodTimers.has(sessionId)) return
+    const timer = setTimeout(async () => {
+      gracePeriodTimers.delete(sessionId)
+      if (subscriberManager.getCount(sessionId) !== 0) return
+      const session = await ptyManager.getSession(sessionId)
+      // App-owned sessions keep running in Electron — never kill them here.
+      if (session?.origin === 'remote') ptyManager.kill(sessionId)
+    }, 30_000)
+    gracePeriodTimers.set(sessionId, timer)
+  }
 
   app.get<{ Params: { sessionId: string }; Querystring: { ticket?: string } }>(
     '/ws/terminals/:sessionId',
@@ -206,34 +224,10 @@ export async function registerTerminalRoutes(
         return
       }
 
-      if (!ptyManager.getSession(sessionId)) {
-        ws.close(4002, 'session not found')
-        return
-      }
+      let deviceId: string | null = null
 
-      const accepted = subscriberManager.addSubscriber(sessionId, ws, getMaxSubscribers())
-      if (!accepted) return
-
-      // The socket is the device's identity for as long as it is open, which is
-      // exactly as long as the view should list it.
-      const deviceId = `${sessionId}:${randomUUID()}`
-      deviceRegistry?.add(deviceId, request.headers['user-agent'], sessionId, () =>
-        ws.close(4004, 'disconnected from the app')
-      )
-
-      // First remote viewer of an app-owned session starts the broadcast; the
-      // listener stays attached across reconnects and dies with the session.
-      // Attached only after acceptance so a rejected connection leaves no
-      // listener broadcasting to zero subscribers.
-      attachBroadcast(sessionId)
-
-      // Cancel any pending grace-period teardown — client reconnected in time
-      const pending = gracePeriodTimers.get(sessionId)
-      if (pending !== undefined) {
-        clearTimeout(pending)
-        gracePeriodTimers.delete(sessionId)
-      }
-
+      // Attached before the session is looked up, so nothing the socket says is
+      // missed; only the primary subscriber's keystrokes reach the PTY.
       ws.on('message', (msg) => {
         if (subscriberManager.isPrimary(sessionId, ws)) {
           ptyManager.write(sessionId, msg.toString())
@@ -241,41 +235,54 @@ export async function registerTerminalRoutes(
       })
 
       ws.on('close', () => {
-        deviceRegistry?.remove(deviceId)
+        if (deviceId !== null) deviceRegistry?.remove(deviceId)
         subscriberManager.removeSubscriber(sessionId, ws)
-        if (subscriberManager.getCount(sessionId) === 0 && ptyManager.getSession(sessionId)) {
-          // Grace period: mobile clients navigate away (unmounting the view) without
-          // intending to end the session. Wait 30s before tearing down the PTY so
-          // navigating back reconnects to the live process.
-          const timer = setTimeout(() => {
-            gracePeriodTimers.delete(sessionId)
-            if (subscriberManager.getCount(sessionId) !== 0) return
-            const session = ptyManager.getSession(sessionId)
-            // App-owned sessions keep running in Electron — never kill them here.
-            if (session?.origin === 'remote') {
-              ptyManager.kill(sessionId)
-            }
-          }, 30_000)
-          gracePeriodTimers.set(sessionId, timer)
+        if (subscriberManager.getCount(sessionId) === 0) scheduleTeardown(sessionId)
+      })
+
+      void ptyManager.getSession(sessionId).then((session) => {
+        if (ws.readyState !== ws.OPEN) return
+        if (!session) {
+          ws.close(4002, 'session not found')
+          return
+        }
+        if (!subscriberManager.addSubscriber(sessionId, ws, getMaxSubscribers())) return
+
+        // The socket is the device's identity for as long as it is open, which is
+        // exactly as long as the view should list it.
+        deviceId = `${sessionId}:${randomUUID()}`
+        deviceRegistry?.add(deviceId, request.headers['user-agent'], sessionId, () =>
+          ws.close(4004, 'disconnected from the app')
+        )
+
+        // First remote viewer of an app-owned session starts the broadcast; the
+        // listener stays attached across reconnects and dies with the session.
+        // Attached only after acceptance so a rejected connection leaves no
+        // listener broadcasting to zero subscribers.
+        attachBroadcast(sessionId)
+
+        // Cancel any pending grace-period teardown — client reconnected in time
+        const pending = gracePeriodTimers.get(sessionId)
+        if (pending !== undefined) {
+          clearTimeout(pending)
+          gracePeriodTimers.delete(sessionId)
         }
       })
     }
   )
 
   return {
-    cleanup() {
+    async cleanup() {
       for (const timer of gracePeriodTimers.values()) clearTimeout(timer)
       gracePeriodTimers.clear()
-      for (const session of ptyManager.listSessions()) {
-        if (session.origin === 'remote') {
-          ptyManager.kill(session.sessionId)
-        }
-      }
       for (const [sessionId, dispose] of broadcastDisposers) {
         dispose()
         subscriberManager.destroySession(sessionId)
       }
       broadcastDisposers.clear()
+      for (const session of await ptyManager.listSessions()) {
+        if (session.origin === 'remote') ptyManager.kill(session.sessionId)
+      }
     },
   }
 }

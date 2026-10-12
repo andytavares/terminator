@@ -14,10 +14,6 @@ vi.mock('fs', async (importOriginal) => {
   }
 })
 
-vi.mock('electron', () => ({
-  app: { getAppPath: vi.fn(() => '/mock/app') },
-}))
-
 const mockTicketStore = vi.hoisted(() => ({
   createTicket: vi.fn(() => 'a'.repeat(64)),
   consumeTicket: vi.fn(() => null as string | null),
@@ -57,16 +53,16 @@ describe('RemoteServer', () => {
   const ptySessions = new Map<string, Record<string, unknown>>()
   const mockPtyManager = {
     spawnSession: vi.fn(
-      (opts: { sessionId: string; cwd: string; type: string; origin: string }) => {
+      async (opts: { sessionId: string; cwd: string; type: string; origin: string }) => {
         const info = { ...opts, createdAt: new Date().toISOString(), pid: 1 }
         ptySessions.set(opts.sessionId, info)
         return { ...info }
       }
     ),
-    onData: vi.fn((id: string) => (ptySessions.has(id) ? () => {} : null)),
-    onExit: vi.fn((id: string) => (ptySessions.has(id) ? () => {} : null)),
-    getSession: vi.fn((id: string) => ptySessions.get(id)),
-    setWorkspace: vi.fn((id: string, ws: string | null) => {
+    onData: vi.fn(() => () => {}),
+    onExit: vi.fn(() => () => {}),
+    getSession: vi.fn(async (id: string) => ptySessions.get(id)),
+    setWorkspace: vi.fn(async (id: string, ws: string | null) => {
       const info = ptySessions.get(id)
       if (!info) return false
       info.workspaceId = ws ?? undefined
@@ -77,7 +73,7 @@ describe('RemoteServer', () => {
       ptySessions.delete(id)
     }),
     resize: vi.fn(),
-    listSessions: vi.fn(() => [...ptySessions.values()]),
+    listSessions: vi.fn(async () => [...ptySessions.values()]),
   }
 
   const mockOnPortInUse = vi.fn()
@@ -109,6 +105,7 @@ describe('RemoteServer', () => {
     const { createRemoteServer } = await import('../../src/server/remote-server')
     remoteServer = await createRemoteServer({
       port: 7683,
+      appPath: '/mock/app',
       ptyManager: mockPtyManager as never,
       deps: mockDeps,
     })
@@ -166,7 +163,7 @@ describe('RemoteServer', () => {
       const { sessionId } = JSON.parse(createRes.body) as { sessionId: string }
 
       remoteServer.disconnectAllClients()
-      expect(mockPtyManager.kill).toHaveBeenCalledWith(sessionId)
+      await vi.waitFor(() => expect(mockPtyManager.kill).toHaveBeenCalledWith(sessionId))
     })
   })
 
@@ -467,6 +464,7 @@ describe('RemoteServer', () => {
       const { createRemoteServer } = await import('../../src/server/remote-server')
       extServer = await createRemoteServer({
         port: 7685,
+        appPath: '/mock/app',
         ptyManager: mockPtyManager as never,
         deps: mockDeps,
       })
@@ -514,6 +512,7 @@ describe('RemoteServer', () => {
       )
       const conflictServer = await create2({
         port: 7683,
+        appPath: '/mock/app',
         ptyManager: mockPtyManager as never,
         deps: { ...mockDeps, onPortInUse: vi.fn() },
       })
@@ -525,6 +524,7 @@ describe('RemoteServer', () => {
       const onPortInUse = vi.fn()
       const conflictServer = await create2({
         port: 7683,
+        appPath: '/mock/app',
         ptyManager: mockPtyManager as never,
         deps: { ...mockDeps, onPortInUse },
       })

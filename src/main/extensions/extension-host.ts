@@ -6,7 +6,7 @@ import { CachedStore } from '../storage/cached-store.js'
 import type { z } from 'zod'
 import type { Extension } from '../../shared/types/index.js'
 import { ExtensionManifestSchema } from '../../shared/schemas/extension.schema.js'
-import type { Disposable } from '@terminator/extension-sdk'
+import type { Disposable, ExtensionAPI } from '@terminator/extension-sdk'
 import { createExtensionAPI, getApiDisposables, type ExtensionAPIDeps } from './api.js'
 import { makeLogger } from '../logger.js'
 
@@ -93,6 +93,12 @@ function declaredDependencies(record: ExtensionRecord): string[] {
   return 'data' in manifest ? (manifest.data.extensionDependencies ?? []) : []
 }
 
+/** Where backends run: the extension host (ADR 094). */
+export interface BackendHost {
+  activate(record: { id: string; entryPoint: string; dependencies: string[] }): Promise<void>
+  deactivate(extensionId: string): Promise<void>
+}
+
 /** The dependency path from `id` back to itself, or null when `id` is in no cycle. */
 function cycleThrough(id: string, dependenciesOf: (id: string) => string[]): string[] | null {
   const visit = (path: string[]): string[] | null => {
@@ -117,9 +123,39 @@ export class ExtensionHost {
   private activations = new Map<string, Promise<void>>()
   private afterActivation: Promise<void> = Promise.resolve()
   private deps: ExtensionAPIDeps = {}
+  private backendHost: BackendHost | null = null
+  /** The main-side API of each backend in the extension host, which its calls run on. */
+  private readonly hostedApis = new Map<string, ExtensionAPI>()
+  private readonly hostFailures = new Map<string, string>()
 
   setDeps(deps: ExtensionAPIDeps): void {
     this.deps = deps
+  }
+
+  /** Runs every backend in `host`. Without one (unit tests), backends load in this process. */
+  useBackendHost(host: BackendHost): void {
+    this.backendHost = host
+  }
+
+  /** The API a backend in the extension host calls into, while it is active. */
+  hostedApi(extensionId: string): ExtensionAPI | undefined {
+    return this.hostedApis.get(extensionId)
+  }
+
+  /**
+   * The extension host lost these backends for good: they show as failed, with
+   * why, until they activate again. Not stored, so the next launch retries them.
+   */
+  failHostedBackends(extensionIds: string[], message: string): void {
+    for (const id of extensionIds) {
+      const loaded = this.loaded.get(id)
+      if (!loaded) continue
+      this.disposeAll(loaded.disposables)
+      this.loaded.delete(id)
+      this.hostedApis.delete(id)
+      this.hostFailures.set(id, message)
+      hostLogger.error(`Extension ${id} failed: ${message}`)
+    }
   }
 
   async load(
@@ -186,14 +222,19 @@ export class ExtensionHost {
           `Extension ${id} deactivate error: ${e instanceof Error ? e.message : String(e)}`
         )
       }
-      for (const d of loaded.disposables) {
-        try {
-          d.dispose()
-        } catch {
-          /* ignore */
-        }
-      }
+      this.disposeAll(loaded.disposables)
       this.loaded.delete(id)
+      this.hostedApis.delete(id)
+    }
+  }
+
+  private disposeAll(disposables: Disposable[]): void {
+    for (const d of disposables) {
+      try {
+        d.dispose()
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -253,9 +294,12 @@ export class ExtensionHost {
   }
 
   listExtensions(): Extension[] {
-    return store
-      .get('extensions')
-      .map(({ directoryPath: _dp, rendererRelPath: _rrp, ...ext }) => ext)
+    return store.get('extensions').map(({ directoryPath: _dp, rendererRelPath: _rrp, ...ext }) => {
+      const failure = this.hostFailures.get(ext.id)
+      return failure === undefined
+        ? ext
+        : { ...ext, status: 'error' as const, errorMessage: failure }
+    })
   }
 
   getExtensionContributes(id: string) {
@@ -373,6 +417,9 @@ export class ExtensionHost {
         `Extension "${record.id}" did not declare "${dependencyId}" in extensionDependencies`
       )
     }
+    if (this.hostedApis.has(dependencyId)) {
+      throw new Error(`Extension "${dependencyId}" runs in the extension host; its API is not here`)
+    }
     return this.loaded.get(dependencyId)?.exports
   }
 
@@ -381,6 +428,9 @@ export class ExtensionHost {
   ): Promise<{ ok: true } | { error: string; message: string }> {
     const inactive = this.inactiveDependency(record)
     if (inactive) return { error: 'DEPENDENCY_ERROR', message: inactive }
+    if (this.backendHost) {
+      return this.activateInHost(record, this.backendHost)
+    }
     try {
       const mod = loadCommonJs(record.entryPoint) as {
         activate?: (api: unknown) => unknown
@@ -401,6 +451,27 @@ export class ExtensionHost {
       const message = e instanceof Error ? e.message : String(e)
       return { error: 'ACTIVATE_ERROR', message }
     }
+  }
+
+  private async activateInHost(
+    record: ExtensionRecord,
+    host: BackendHost
+  ): Promise<{ ok: true } | { error: string; message: string }> {
+    const api = createExtensionAPI(record.id, app.getVersion(), this.deps, record.rendererUrl)
+    this.hostedApis.set(record.id, api)
+    try {
+      const dependencies = declaredDependencies(record)
+      await host.activate({ id: record.id, entryPoint: record.entryPoint, dependencies })
+    } catch (e) {
+      this.hostedApis.delete(record.id)
+      this.disposeAll(getApiDisposables(api))
+      return { error: 'ACTIVATE_ERROR', message: e instanceof Error ? e.message : String(e) }
+    }
+    this.hostFailures.delete(record.id)
+    const deactivate = () => host.deactivate(record.id)
+    const disposables = getApiDisposables(api)
+    this.loaded.set(record.id, { record, disposables, module: { deactivate }, exports: undefined })
+    return { ok: true }
   }
 }
 

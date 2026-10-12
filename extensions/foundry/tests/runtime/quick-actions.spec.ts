@@ -22,7 +22,6 @@ vi.mock('electron', () => ({
     encryptString: vi.fn(),
     decryptString: vi.fn(),
   },
-  app: { getPath: vi.fn().mockReturnValue(USER_DATA) },
 }))
 
 const runner = {
@@ -127,6 +126,7 @@ beforeAll(async () => {
       createNotification: vi.fn().mockReturnValue({ dispose: vi.fn() }),
     },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    paths: { app: '', userData: USER_DATA },
     settings: {
       register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       get: vi.fn(),

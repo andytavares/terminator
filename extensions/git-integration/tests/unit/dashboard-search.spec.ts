@@ -1,8 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   DASHBOARD_QUERIES,
   buildSectionQueries,
+  dashboardBranches,
   parseDashboard,
+  resolveBranchExclusions,
 } from '../../src/github/dashboard-search'
 
 function prNode(overrides: Record<string, unknown> = {}) {
@@ -335,5 +337,43 @@ describe('parseDashboard', () => {
     const [pr] = parseDashboard(raw, 'alice', new Map())
     expect(pr.riskLevel).toBe('high')
     expect(pr.estimatedMinutes).toBe(9) // ceil(500/60)
+  })
+})
+
+// The core answers whether a branch is excluded across the extension host's
+// port (SDK 4.0.0), so the answers are gathered before the pure filter runs.
+describe('resolveBranchExclusions', () => {
+  it('asks once per distinct branch and checkout, and answers from the replies', async () => {
+    const query = vi.fn(async (branch: string, repoPath?: string) =>
+      repoPath === '/repo' ? branch.startsWith('renovate/') : false
+    )
+    const excluded = await resolveBranchExclusions(query, [
+      { branch: 'renovate/x', repoPath: '/repo' },
+      { branch: 'renovate/x', repoPath: '/repo' },
+      { branch: 'renovate/x', repoPath: '/other' },
+      { branch: 'feat/y', repoPath: '/repo' },
+    ])
+
+    expect(query).toHaveBeenCalledTimes(3)
+    expect(excluded('renovate/x', '/repo')).toBe(true)
+    expect(excluded('renovate/x', '/other')).toBe(false)
+    expect(excluded('feat/y', '/repo')).toBe(false)
+  })
+})
+
+describe('dashboardBranches', () => {
+  it('lists the pull requests of every section with the checkout of their repository', () => {
+    const raw = {
+      data: {
+        requested: { nodes: [prNode({ headRefName: 'renovate/x' }), null] },
+        mine: { nodes: [prNode({ repository: { nameWithOwner: 'acme/other' } })] },
+      },
+    }
+    const roots = new Map([['acme/widgets', '/widgets']])
+
+    expect(dashboardBranches(raw, roots)).toEqual([
+      { branch: 'renovate/x', repoPath: '/widgets' },
+      { branch: 'fix/bug', repoPath: undefined },
+    ])
   })
 })

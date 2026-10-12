@@ -39,7 +39,7 @@ export interface BridgeDeps {
 }
 
 import { handleChannel, removeChannel } from '../ipc/channel-registrar.js'
-import { BrowserWindow, globalShortcut as electronGlobalShortcut } from 'electron'
+import { BrowserWindow, dialog, globalShortcut as electronGlobalShortcut } from 'electron'
 import { EXTENSION_BASE_CSS } from './extension-view-host.js'
 import { sendToWindow } from '../safe-send.js'
 import { join } from 'path'
@@ -69,6 +69,7 @@ import { getIssueService } from '../integrations/index.js'
 import { listConnections as listTrackerConnections } from '../integrations/tracker-store.js'
 import { setLink as setIssueLink } from '../integrations/issue-link-store.js'
 import { REMOTE_ACCESSIBLE_CHANNELS } from '../remote/remote-accessible-channels.js'
+import { BatchedPtyStream } from './pty-stream.js'
 
 // Extension bundles are plain JavaScript at run time; a handler without a
 // schema would otherwise fail only when its first payload arrives (ADR 096).
@@ -291,6 +292,32 @@ export interface ExtensionAPIDeps {
   db?: ExtensionDB
   /** Another extension's `activate` exports; throws for an id the manifest does not declare. */
   extensionExports?: (extensionId: string) => unknown
+  /** `api.paths`: the application's directory and the per-user data directory. */
+  paths?: ExtensionAPI['paths']
+}
+
+const ptyStreams = new WeakMap<PtyManager, BatchedPtyStream>()
+
+/** One batched stream per PTY manager, shared by every extension's api. */
+function ptyStreamOf(ptyManager: PtyManager): BatchedPtyStream {
+  const existing = ptyStreams.get(ptyManager)
+  if (existing) return existing
+  const stream = new BatchedPtyStream(ptyManager)
+  ptyStreams.set(ptyManager, stream)
+  return stream
+}
+
+function focusedOrFirstWindow(): BrowserWindow | undefined {
+  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+}
+
+function raiseAllWindows(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed()) continue
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+  }
 }
 
 export function createExtensionAPI(
@@ -320,8 +347,30 @@ export function createExtensionAPI(
     transaction: notReady,
   }
 
+  const requirePty = (): PtyManager => {
+    if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
+    return deps.ptyManager
+  }
+
   const api: ExtensionAPI = {
     db: deps?.db ?? dbStub,
+    paths: deps?.paths ?? { app: '', userData: '' },
+    dialog: {
+      async showOpenDialog(options) {
+        const parent = focusedOrFirstWindow()
+        const result = parent
+          ? await dialog.showOpenDialog(parent, options)
+          : await dialog.showOpenDialog(options)
+        return { canceled: result.canceled, filePaths: result.filePaths }
+      },
+      async showSaveDialog(options) {
+        const parent = focusedOrFirstWindow()
+        const result = parent
+          ? await dialog.showSaveDialog(parent, options)
+          : await dialog.showSaveDialog(options)
+        return { canceled: result.canceled, filePath: result.filePath }
+      },
+    },
     log: extLogger,
     settings: {
       register(schema: ExtensionSettingsSchema): Disposable {
@@ -343,12 +392,12 @@ export function createExtensionAPI(
       set(key: string, value: unknown): void {
         setExtensionSetting(key, value)
       },
-      isBranchExcluded(branch: string, repoPath?: string): boolean {
+      async isBranchExcluded(branch: string, repoPath?: string): Promise<boolean> {
         return branchExcludePatternsFor(repoPath).some((p) => matchesBranchPattern(p, branch))
       },
     },
     globalShortcut: {
-      register(accelerator: string, handler: () => void): Disposable {
+      async register(accelerator: string, handler: () => void): Promise<Disposable> {
         const registered = electronGlobalShortcut.register(accelerator, handler)
         if (!registered) {
           throw new Error(
@@ -372,7 +421,7 @@ export function createExtensionAPI(
           })
         )
       },
-      createProject(input): ProjectSnapshot | null {
+      async addProject(input): Promise<ProjectSnapshot | null> {
         // Reused rather than duplicated: provisioning the same worktree twice
         // should land in the project you were already looking at.
         //
@@ -553,7 +602,7 @@ export function createExtensionAPI(
         if (!entry) return undefined
         return entry.handler(null as never, payload)
       },
-      isRemoteAccessible(channel: string): boolean {
+      async isRemoteAccessible(channel: string): Promise<boolean> {
         // Core channels (invoke, send, and push/subscribe) are declared in the
         // channel manifest, which REMOTE_ACCESSIBLE_CHANNELS is derived from.
         if (REMOTE_ACCESSIBLE_CHANNELS.has(channel)) return true
@@ -583,16 +632,15 @@ export function createExtensionAPI(
       },
     },
     pty: {
-      spawnSession(opts) {
-        if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
-        return deps.ptyManager.spawnSession(opts)
+      async spawnSession(opts) {
+        return requirePty().spawnSession(opts)
       },
-      openTerminalTab(input): string | null {
-        if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
-        if (!deps.broadcastToWindows || !deps.terminalRelay) return null
+      async openTerminal(input): Promise<string | null> {
+        const ptyManager = requirePty()
+        if (!deps?.broadcastToWindows || !deps.terminalRelay) return null
 
         const sessionId = randomUUID()
-        deps.ptyManager.spawnSession({
+        ptyManager.spawnSession({
           sessionId,
           cwd: input.cwd,
           shell: input.shell ?? getGlobalSettings().terminal.defaultShell,
@@ -625,15 +673,17 @@ export function createExtensionAPI(
         deps?.ptyManager?.kill(sessionId)
       },
       onData(sessionId, listener) {
-        return deps?.ptyManager?.onData(sessionId, listener) ?? null
+        if (!deps?.ptyManager) return () => {}
+        return ptyStreamOf(deps.ptyManager).onData(sessionId, listener)
       },
       onExit(sessionId, listener) {
-        return deps?.ptyManager?.onExit(sessionId, listener) ?? null
+        if (!deps?.ptyManager) return () => {}
+        return ptyStreamOf(deps.ptyManager).onExit(sessionId, listener)
       },
-      getSession(sessionId) {
+      async getSession(sessionId) {
         return deps?.ptyManager?.getSession(sessionId)
       },
-      setWorkspace(sessionId, workspaceId) {
+      async setWorkspace(sessionId, workspaceId) {
         return deps?.ptyManager?.setWorkspace(sessionId, workspaceId) ?? false
       },
       write(sessionId, data) {
@@ -645,7 +695,7 @@ export function createExtensionAPI(
       kill(sessionId) {
         deps?.ptyManager?.kill(sessionId)
       },
-      listSessions() {
+      async listSessions() {
         return deps?.ptyManager?.listSessions() ?? []
       },
     },
@@ -712,6 +762,9 @@ export function createExtensionAPI(
       },
       showSelf(view = 'main'): void {
         api.window.broadcast('extension:show-surface', { extensionId, view })
+      },
+      raise(): void {
+        raiseAllWindows()
       },
     },
   }

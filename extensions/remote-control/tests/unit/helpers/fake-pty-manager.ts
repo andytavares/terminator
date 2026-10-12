@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 import type { SessionInfo, SpawnSessionOptions } from '../../../src/types'
 
-// Stateful fake of the v1.4.0 PtyManagerAPI session authority: real session
+// Stateful fake of the SDK 4.0.0 PtyManagerAPI session authority: real session
 // map + data/exit fan-out, with vi.fn spies on every method so tests can both
 // drive realistic flows (emitData/emitExit) and assert call shapes.
 export function createFakePtyManager() {
@@ -47,7 +47,7 @@ export function createFakePtyManager() {
       return dataListeners.get(sessionId)?.size ?? 0
     },
 
-    spawnSession: vi.fn((opts: SpawnSessionOptions): SessionInfo => {
+    spawnSession: vi.fn(async (opts: SpawnSessionOptions): Promise<SessionInfo> => {
       const info: SessionInfo = {
         sessionId: opts.sessionId,
         cwd: opts.cwd,
@@ -62,22 +62,22 @@ export function createFakePtyManager() {
       return { ...info }
     }),
     onData: vi.fn((sessionId: string, listener: (data: string) => void) => {
-      if (!sessions.has(sessionId)) return null
+      if (!sessions.has(sessionId)) return () => {}
       const set = listenerSet(dataListeners, sessionId)
       set.add(listener)
       return () => set.delete(listener)
     }),
     onExit: vi.fn((sessionId: string, listener: (code: number) => void) => {
-      if (!sessions.has(sessionId)) return null
+      if (!sessions.has(sessionId)) return () => {}
       const set = listenerSet(exitListeners, sessionId)
       set.add(listener)
       return () => set.delete(listener)
     }),
-    getSession: vi.fn((sessionId: string): SessionInfo | undefined => {
+    getSession: vi.fn(async (sessionId: string): Promise<SessionInfo | undefined> => {
       const info = sessions.get(sessionId)
       return info ? { ...info } : undefined
     }),
-    setWorkspace: vi.fn((sessionId: string, workspaceId: string | null): boolean => {
+    setWorkspace: vi.fn(async (sessionId: string, workspaceId: string | null): Promise<boolean> => {
       const info = sessions.get(sessionId)
       if (!info) return false
       info.workspaceId = workspaceId ?? undefined
@@ -88,7 +88,9 @@ export function createFakePtyManager() {
     kill: vi.fn((sessionId: string) => {
       fake.emitExit(sessionId, 0)
     }),
-    listSessions: vi.fn((): SessionInfo[] => [...sessions.values()].map((s) => ({ ...s }))),
+    listSessions: vi.fn(
+      async (): Promise<SessionInfo[]> => [...sessions.values()].map((s) => ({ ...s }))
+    ),
   }
   return fake
 }

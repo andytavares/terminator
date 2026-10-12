@@ -100,10 +100,10 @@ beforeEach(() => {
   projects.length = 0
 })
 
-describe('workspace.createProject', () => {
-  it('registers the directory so it appears in the sidebar', () => {
+describe('workspace.addProject', () => {
+  it('registers the directory so it appears in the sidebar', async () => {
     const api = build()
-    const project = api.workspace.createProject({
+    const project = await api.workspace.addProject({
       workspaceId: 'ws-1',
       name: 'feat/session-ulid',
       worktreePath: '/wt/feat-session-ulid',
@@ -118,20 +118,20 @@ describe('workspace.createProject', () => {
   })
 
   it('treats the directory as a worktree unless told otherwise', () => {
-    build().workspace.createProject({ workspaceId: 'ws-1', name: 'a', worktreePath: '/wt/a' })
+    build().workspace.addProject({ workspaceId: 'ws-1', name: 'a', worktreePath: '/wt/a' })
     expect(projects[0].isWorktree).toBe(true)
   })
 
-  it('reuses the project already pointing at that directory', () => {
+  it('reuses the project already pointing at that directory', async () => {
     // Provisioning the same branch twice should land in the project you were
     // already looking at, not beside it.
     const api = build()
-    const first = api.workspace.createProject({
+    const first = await api.workspace.addProject({
       workspaceId: 'ws-1',
       name: 'feat/x',
       worktreePath: '/wt/x',
     })
-    const second = api.workspace.createProject({
+    const second = await api.workspace.addProject({
       workspaceId: 'ws-1',
       name: 'renamed',
       worktreePath: '/wt/x',
@@ -140,18 +140,18 @@ describe('workspace.createProject', () => {
     expect(projects).toHaveLength(1)
   })
 
-  it('does not merge two worktrees that happen to share a name', () => {
+  it('does not merge two worktrees that happen to share a name', async () => {
     // Matching on the name as well meant two cards whose branches were called
     // the same thing got one project, pointing at whichever was registered
     // first — and the snapshot handed back described a directory the caller
     // had not asked for.
     const api = build()
-    const first = api.workspace.createProject({
+    const first = await api.workspace.addProject({
       workspaceId: 'ws-1',
       name: 'fix/login',
       worktreePath: '/wt/one',
     })
-    const second = api.workspace.createProject({
+    const second = await api.workspace.addProject({
       workspaceId: 'ws-1',
       name: 'fix/login',
       worktreePath: '/wt/two',
@@ -160,9 +160,9 @@ describe('workspace.createProject', () => {
     expect(projects).toHaveLength(2)
   })
 
-  it('tells the sidebar, which otherwise only learns on a reload', () => {
+  it('tells the sidebar, which otherwise only learns on a reload', async () => {
     const api = build()
-    api.workspace.createProject({ workspaceId: 'ws-1', name: 'a', worktreePath: '/wt/a' })
+    await api.workspace.addProject({ workspaceId: 'ws-1', name: 'a', worktreePath: '/wt/a' })
     expect(broadcasts.map((b) => b.channel)).toContain('workspace:project-added')
   })
 })
@@ -170,9 +170,9 @@ describe('workspace.createProject', () => {
 // v2.5.0 — an extension that registered a worktree can find and remove it
 // again when the worktree goes (ADR-061).
 describe('workspace.listProjects and deleteProject', () => {
-  it('says which directory each project points at', () => {
+  it('says which directory each project points at', async () => {
     const api = build()
-    api.workspace.createProject({ workspaceId: 'ws-1', name: 'a', worktreePath: '/wt/a' })
+    await api.workspace.addProject({ workspaceId: 'ws-1', name: 'a', worktreePath: '/wt/a' })
     expect(api.workspace.listProjects('ws-1')).toEqual([
       expect.objectContaining({ name: 'a', worktreePath: '/wt/a' }),
     ])
@@ -197,71 +197,71 @@ describe('workspace.listProjects and deleteProject', () => {
   })
 })
 
-describe('pty.openTerminalTab', () => {
+describe('pty.openTerminal', () => {
   const input = { projectId: 'proj-1', cwd: '/wt/a', tabTitle: 'feat/x' }
 
   it('spawns in the directory it was given', () => {
-    build().pty.openTerminalTab(input)
+    build().pty.openTerminal(input)
     expect(spawned[0]).toMatchObject({ cwd: '/wt/a', projectId: 'proj-1', tabTitle: 'feat/x' })
   })
 
   it('marks it an agent terminal by default, though a person can still type in it', () => {
-    build().pty.openTerminalTab(input)
+    build().pty.openTerminal(input)
     expect(spawned[0].type).toBe('agent')
   })
 
   it('holds output until a tab is mounted to receive it', () => {
     // The renderer has to be told, adopt it, render and mount an xterm first.
     // Delivered live, everything in that window goes to nobody.
-    build().pty.openTerminalTab(input)
+    build().pty.openTerminal(input)
     expect(spawned[0].holdOutput).toBe(true)
   })
 
-  it('tells the renderer to adopt it, or the process runs with no tab showing it', () => {
+  it('tells the renderer to adopt it, or the process runs with no tab showing it', async () => {
     const api = build()
-    const sessionId = api.pty.openTerminalTab(input)
+    const sessionId = await api.pty.openTerminal(input)
     expect(broadcasts).toContainEqual({
       channel: 'terminal:adopt',
       payload: { sessionId, projectId: 'proj-1', tabTitle: 'feat/x', scrollbackLimit: 5000 },
     })
   })
 
-  it('returns the session id, so the caller can write to it', () => {
-    expect(build().pty.openTerminalTab(input)).toEqual(expect.any(String))
+  it('returns the session id, so the caller can write to it', async () => {
+    expect(await build().pty.openTerminal(input)).toEqual(expect.any(String))
   })
 
-  it('sends its output and exit through the shared batched, flow-controlled relay', () => {
-    const sessionId = build().pty.openTerminalTab(input)
+  it('sends its output and exit through the shared batched, flow-controlled relay', async () => {
+    const sessionId = await build().pty.openTerminal(input)
     expect(relayed).toEqual([sessionId])
   })
 
   it('does not broadcast its output or exit to every window and view', () => {
     // Each chunk used to go to every window and extension view, unbatched and
     // unacknowledged, so a chatty agent cost every one of them a message per chunk.
-    build().pty.openTerminalTab(input)
+    build().pty.openTerminal(input)
     expect(subscribedToPty).toEqual([])
     expect(broadcasts.map((b) => b.channel)).toEqual(['terminal:adopt'])
   })
 
-  it('uses the shell and scrollback it is given over the defaults', () => {
+  it('uses the shell and scrollback it is given over the defaults', async () => {
     const api = build()
-    api.pty.openTerminalTab({ ...input, shell: '/bin/bash', scrollbackLimit: 99 })
+    await api.pty.openTerminal({ ...input, shell: '/bin/bash', scrollbackLimit: 99 })
     expect(spawned[0]).toMatchObject({ shell: '/bin/bash' })
     const adopt = broadcasts.find((b) => b.channel === 'terminal:adopt')
     expect(adopt?.payload.scrollbackLimit).toBe(99)
   })
 
-  it('opens nothing when there is no window to show it in', () => {
+  it('opens nothing when there is no window to show it in', async () => {
     // A terminal nobody can see is the thing this exists to prevent.
-    expect(build(false).pty.openTerminalTab(input)).toBeNull()
+    expect(await build(false).pty.openTerminal(input)).toBeNull()
     expect(spawned).toEqual([])
   })
 })
 
 describe('pty.closeTerminalTab', () => {
-  it('tells the renderer to close the tab, which ends the process and its record', () => {
+  it('tells the renderer to close the tab, which ends the process and its record', async () => {
     const api = build()
-    const sessionId = api.pty.openTerminalTab({
+    const sessionId = await api.pty.openTerminal({
       projectId: 'proj-1',
       cwd: '/wt/a',
       tabTitle: 'Architect',

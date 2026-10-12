@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { readFile, writeFile } from 'fs/promises'
 import { isAbsolute } from 'path'
-import Store from 'electron-store'
+import { namedStore } from '../storage-directory.js'
 import { defineChannel } from '@terminator/extension-sdk'
 import {
   buildConflictSession,
@@ -13,7 +13,8 @@ import { runGit } from '../shell/run-git.js'
 import { RepoRoot } from './repo-root.js'
 import { VALIDATION_ERROR, errorEnvelope, type RegisterFn } from './register.js'
 
-const store = new Store()
+// electron-store's default name, kept so stored sessions survive the move.
+const store = () => namedStore('config')
 
 const GIT_TIMEOUT = 10_000
 
@@ -254,20 +255,20 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
       schema: RepoRootPayload,
       invalid: VALIDATION_ERROR,
       run: async ({ repoRoot }) => {
-        const stored = store.get(sessionKey(repoRoot)) as unknown
+        const stored = store().get(sessionKey(repoRoot)) as unknown
         if (!stored) return { session: null }
 
         // Validate that conflicts still exist in the working tree
         const conflicted = await listConflictedFiles(repoRoot).catch(() => [])
         if (conflicted.length === 0) {
-          store.delete(sessionKey(repoRoot))
+          store().delete(sessionKey(repoRoot))
           return { session: null }
         }
 
         // Reject stale empty sessions (e.g., from a broken Start Over)
         const sessionObj = stored as { totalConflicts?: number; files?: unknown[] }
         if (!sessionObj.totalConflicts || sessionObj.totalConflicts === 0) {
-          store.delete(sessionKey(repoRoot))
+          store().delete(sessionKey(repoRoot))
           return { session: null }
         }
 
@@ -283,7 +284,7 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
       schema: z.object({ repoRoot: RepoRoot, session: z.unknown() }),
       invalid: VALIDATION_ERROR,
       run: ({ repoRoot, session }) => {
-        store.set(sessionKey(repoRoot), session)
+        store().set(sessionKey(repoRoot), session)
         return { success: true }
       },
       onError: errorEnvelope,
@@ -297,7 +298,7 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
       schema: RepoRootPayload,
       invalid: { success: true },
       run: ({ repoRoot }) => {
-        store.delete(sessionKey(repoRoot))
+        store().delete(sessionKey(repoRoot))
         return { success: true }
       },
       onError: () => ({ success: true }),
@@ -319,7 +320,7 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
           // regardless of whether block.resolvedText is populated in persisted sessions
           await git(['checkout', '--conflict=merge', '--', file.filePath], repoRoot)
         }
-        store.delete(sessionKey(repoRoot))
+        store().delete(sessionKey(repoRoot))
         return { success: true }
       },
       onError: errorEnvelope,

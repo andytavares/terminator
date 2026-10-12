@@ -3,6 +3,12 @@
 The Extension API every Terminator extension is written against, and the helpers they share.
 The core implements `types/api.d.ts`; the compiler checks it does (ADR 094).
 
+Since 4.0.0 an extension's backend runs in the extension host, a separate process, and the API
+crosses a `MessagePort`: values the core holds are promises or snapshots it pushes, callbacks are
+called by id, and the backend cannot import `electron` (use `api.paths`, `api.dialog`,
+`api.window`). See `CHANGELOG.md` for the migration from 3.x and
+`docs/EXTENSION-DEVELOPMENT.md#where-your-backend-runs-sdk-400`.
+
 An extension imports only this package, `@terminator/extension-ui` and the npm packages in its
 own `package.json`. `npm run lint` rejects anything else, including core source and other
 extensions.
@@ -51,7 +57,7 @@ npm install --save-dev @terminator/extension-sdk
 my-extension/
 ├── manifest.json          ← declares id, main, renderer, contributes
 ├── dist/
-│   ├── main.cjs           ← Node.js entry (activate/deactivate)
+│   ├── main.cjs           ← backend entry (activate/deactivate), run in the extension host
 │   └── index.html         ← webview entry (renderer UI)
 └── src/
     ├── index.ts           ← main process source
@@ -81,7 +87,7 @@ my-extension/
 }
 ```
 
-### Main process (`src/index.ts`)
+### Backend (`src/index.ts`)
 
 ```typescript
 import { z } from 'zod'

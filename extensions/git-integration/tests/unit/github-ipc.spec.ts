@@ -51,7 +51,7 @@ type ExecCallback = (err: Error | null, result?: { stdout: string; stderr: strin
 
 function captureHandlers(
   getReviewRepos?: () => string[],
-  isBranchExcluded?: (branch: string, repoPath?: string) => boolean
+  isBranchExcluded?: (branch: string, repoPath?: string) => Promise<boolean>
 ): Record<string, Handler> {
   const handlers: Record<string, Handler> = {}
   registerGithubHandlers(
@@ -870,7 +870,7 @@ describe('github:list-open-prs', () => {
   // Settings → Git → Branch Exclude Patterns: the queue leaves out pull
   // requests opened from an excluded branch, and does not count them.
   it('leaves out pull requests opened from an excluded branch', async () => {
-    handlers = captureHandlers(undefined, (branch, repoPath) =>
+    handlers = captureHandlers(undefined, async (branch, repoPath) =>
       repoPath === '/repo' ? branch.startsWith('renovate/') : false
     )
     mockGitSuccess(JSON.stringify(REPO_VIEW))
@@ -899,7 +899,7 @@ describe('github:list-open-prs', () => {
   })
 
   it('leaves excluded branches out of a text search too', async () => {
-    handlers = captureHandlers(undefined, (branch) => branch.startsWith('renovate/'))
+    handlers = captureHandlers(undefined, async (branch) => branch.startsWith('renovate/'))
     mockGitSuccess(
       JSON.stringify([
         { number: 1, title: 'bump', headRefName: 'renovate/x', author: { login: 'bot' } },
