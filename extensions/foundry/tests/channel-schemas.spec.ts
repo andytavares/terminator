@@ -81,7 +81,8 @@ beforeAll(async () => {
     app: { version: '0.0.0-test' },
   } as unknown as ExtensionAPI
 
-  const { activate, startSupervisionRuntime } = await import('../src/index.ts')
+  const { activate } = await import('../src/index.ts')
+  const { startSupervisionRuntime } = await import('../src/runtime/supervision-runtime.ts')
   activate(api)
   await startSupervisionRuntime(api)
 })

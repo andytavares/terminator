@@ -4,7 +4,25 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const src = fs.readFileSync(path.join(here, '..', 'src', 'index.ts'), 'utf8')
+// The modules `activate` composes, read as one text: what these specs look for
+// lives in whichever of them owns it.
+const src = [
+  'index.ts',
+  'workspace-root.ts',
+  'state/settings.ts',
+  'state/settings-schema.ts',
+  'runtime/agent-policy.ts',
+  'runtime/held-calls.ts',
+  'runtime/supervision-runtime.ts',
+  'line/executor-deps.ts',
+  'line/ship-deps.ts',
+  'line/execute-run.ts',
+  'forge/intake-turn.ts',
+  'ipc/inbox-registration.ts',
+  'ipc/ui-registration.ts',
+]
+  .map((file) => fs.readFileSync(path.join(here, '..', 'src', file), 'utf8'))
+  .join('\n')
 
 /** Every setting key the extension declares to the host. */
 function declaredSettings(): string[] {

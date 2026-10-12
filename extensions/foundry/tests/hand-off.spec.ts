@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 // (tests/forge/release-again.spec.ts).
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const src = fs.readFileSync(path.join(here, '..', 'src', 'index.ts'), 'utf8')
+const src = fs.readFileSync(path.join(here, '..', 'src', 'forge', 'forge-loop.ts'), 'utf8')
 const runChannels = fs.readFileSync(path.join(here, '..', 'src', 'ipc', 'run-channels.ts'), 'utf8')
 
 describe('hand-off', () => {
