@@ -3,7 +3,6 @@ import { namedStore } from '../storage-directory.js'
 import { basename, join } from 'path'
 import { existsSync } from 'fs'
 import { readFile } from 'fs/promises'
-import { homedir } from 'os'
 import type {
   ReviewQueuePR,
   PrReviewDetail,
@@ -86,12 +85,13 @@ const PR_DETAIL_FIELDS = [
 /** The application's tracker connection, when this build's host offers one. */
 type IssuesApi = Parameters<typeof enrichIssueRefs>[1]
 
-/** Where gh runs for a repoRoot: the checkout, or the home directory and GH_REPO. */
-function githubTarget(repoRoot: string, token: string): GithubTarget {
+/** Where gh runs for a repoRoot: the checkout, or the no-checkout directory and GH_REPO. */
+function githubTarget(repoRoot: string, access: GithubAccess): GithubTarget {
   const remote = parseRemoteRepo(repoRoot)
+  const token = access.getToken()
   const as = token ? { token } : {}
-  if (remote) return { cwd: homedir(), repository: `${remote.owner}/${remote.name}`, ...as }
-  return { cwd: repoRoot, ...as }
+  if (!remote) return { cwd: repoRoot, ...as }
+  return { cwd: access.noCheckoutCwd, repository: `${remote.owner}/${remote.name}`, ...as }
 }
 
 interface AccessibleRepo {
@@ -174,7 +174,7 @@ export function registerGithubHandlers(
       prs.map((pr) => ({ branch: pr.headRefName, repoPath }))
     )
   const { github } = access
-  const target = (repoRoot: string) => githubTarget(repoRoot, access.getToken())
+  const target = (repoRoot: string) => githubTarget(repoRoot, access)
   const api = (repoRoot: string, request: GithubApiRequest) => github.api(target(repoRoot), request)
   // `gh repo view` costs 0.4-0.7 s, so the answer is kept for the life of the process.
   const ownerAndNameCache = new Map<string, Promise<{ owner: string; repo: string }>>()
@@ -964,7 +964,7 @@ export function registerGithubHandlers(
       invalid: VALIDATION_ERROR,
       run: async (args) => {
         if (args?.refresh || !accessibleRepos) {
-          const lookup = api(homedir(), {
+          const lookup = api(access.noCheckoutCwd, {
             path: 'user/repos?affiliation=owner,collaborator,organization_member&per_page=100',
             paginate: true,
             jq: '.[] | {fullName: .full_name, owner: .owner.login, private: .private, archived: .archived, pushedAt: .pushed_at}',
@@ -988,7 +988,7 @@ export function registerGithubHandlers(
       schema: noPayload,
       invalid: VALIDATION_ERROR,
       run: async () => {
-        const cwd = homedir()
+        const cwd = access.noCheckoutCwd
         const login = await viewer(cwd)
         const repos = getReviewRepos?.() ?? []
         const requests = buildSectionQueries(login, repos)

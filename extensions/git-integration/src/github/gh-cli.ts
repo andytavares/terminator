@@ -9,6 +9,11 @@ import { runGit } from '../shell/run-git.js'
 export interface GithubAccess {
   github: GithubAPI
   getToken: () => string
+  /**
+   * Where gh runs when it needs no checkout (`GH_REPO`, `gh api user`):
+   * `api.paths.userData`, a directory the core lets gh run in (ADR 102).
+   */
+  noCheckoutCwd: string
 }
 
 export function isAuthError(e: unknown): boolean {

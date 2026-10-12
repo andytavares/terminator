@@ -105,6 +105,7 @@ export function activate(api: ExtensionAPI): void {
     {
       github: api.github,
       getToken: () => api.settings.get<string>('terminator.git-integration.git.githubToken') ?? '',
+      noCheckoutCwd: api.paths.userData,
     },
     // Optional: an older host has no issues namespace, and the review view
     // then renders references exactly as it does today.
