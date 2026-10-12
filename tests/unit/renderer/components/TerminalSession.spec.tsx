@@ -278,7 +278,7 @@ describe('TerminalInstance', () => {
   it('reads the visible screen as one string per row, trailing spaces trimmed', () => {
     const instance = new TerminalInstance('ses-1', 1000)
     const translate = vi.fn((trimRight?: boolean) => (trimRight ? 'row' : 'row   '))
-    const getLine = vi.fn(() => ({ translateToString: translate }))
+    const getLine = vi.fn((_line: number) => ({ translateToString: translate }))
     ;(instance.terminal as unknown as { rows: number }).rows = 3
     ;(instance.terminal as unknown as { buffer: unknown }).buffer = {
       active: { viewportY: 40, getLine },

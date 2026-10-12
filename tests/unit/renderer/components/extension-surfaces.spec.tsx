@@ -169,12 +169,12 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
 
 describe('scope actions are reachable from the command palette (FR-027)', () => {
   it('registers a new-terminal command per project', () => {
-    renderSidebar('project')
+    renderSidebar('workspace')
     expect(commandLabels()).toContain('New terminal — Backend · main')
   })
 
   it('creates the session when the palette command runs', () => {
-    renderSidebar('project')
+    renderSidebar('workspace')
     const command = useExtensionRegistry
       .getState()
       .commands.find((c) => c.label === 'New terminal — Backend · main')!
@@ -183,7 +183,7 @@ describe('scope actions are reachable from the command palette (FR-027)', () => 
   })
 
   it('disposes its commands on unmount so they cannot outlive the sidebar', () => {
-    const { unmount } = renderSidebar('project')
+    const { unmount } = renderSidebar('workspace')
     unmount()
     expect(commandLabels()).not.toContain('New terminal — Backend · main')
   })

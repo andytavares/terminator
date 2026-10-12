@@ -86,7 +86,7 @@ function setupMocks(
   vi.mocked(useTerminalSession).mockReturnValue({
     createSession: mockCreateSession,
     splitSession: mockSplitSession,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+  })
 }
 
 beforeEach(() => {

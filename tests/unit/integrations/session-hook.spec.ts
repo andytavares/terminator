@@ -211,7 +211,7 @@ describe('installProjectHook', () => {
     const mod = await load()
     await mod.installProjectHook(projectDir, options)
 
-    const settings = readSettings() as Record<string, never>
+    const settings = readSettings() as { permissions: unknown; hooks: { PostToolUse: unknown } }
     expect(settings.permissions).toEqual({ allow: ['Bash(npm test *)'] })
     expect(settings.hooks.PostToolUse).toEqual([{ matcher: 'Edit' }])
   })

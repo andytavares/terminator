@@ -140,9 +140,8 @@ vi.mock('child_process', async () => {
 })
 
 import { execFile } from 'child_process'
-import type { ExecFileOptions, ChildProcess, ExecException } from 'child_process'
-
-type ExecFileCallback = (error: ExecException | null, stdout: string, stderr: string) => void
+import type { ExecFileOptions, ChildProcess } from 'child_process'
+import { partialFake } from '../../support/fakes'
 
 const mockExecFile = vi.mocked(execFile)
 
@@ -152,12 +151,10 @@ describe('execShell', () => {
   })
 
   it('resolves with exitCode 0 and stdout on success', async () => {
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
-        callback(null, 'hello\n', '')
-        return { on: vi.fn() } as unknown as ChildProcess
-      }
-    )
+    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+      callback?.(null, 'hello\n', '')
+      return partialFake<ChildProcess>({ on: vi.fn() })
+    })
 
     const result = await execShell({ command: 'git', args: ['--version'], cwd: '/tmp' })
     expect(result.exitCode).toBe(0)
@@ -168,12 +165,10 @@ describe('execShell', () => {
 
   it('resolves with non-zero exitCode when process fails', async () => {
     const err = Object.assign(new Error('exit 1'), { code: 1 })
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
-        callback(err, '', 'error output')
-        return { on: vi.fn() } as unknown as ChildProcess
-      }
-    )
+    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+      callback?.(err, '', 'error output')
+      return partialFake<ChildProcess>({ on: vi.fn() })
+    })
 
     const result = await execShell({ command: 'git', args: ['fail'], cwd: '/tmp' })
     expect(result.exitCode).toBe(1)
@@ -183,12 +178,10 @@ describe('execShell', () => {
 
   it('resolves with exitCode 1 when error code is non-numeric', async () => {
     const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
-        callback(err, '', '')
-        return { on: vi.fn() } as unknown as ChildProcess
-      }
-    )
+    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+      callback?.(err, '', '')
+      return partialFake<ChildProcess>({ on: vi.fn() })
+    })
 
     const result = await execShell({ command: 'git', args: ['status'], cwd: '/tmp' })
     expect(result.exitCode).toBe(1)
@@ -198,12 +191,10 @@ describe('execShell', () => {
   // the spawn error a caller could only report "exit code 1".
   it('reports the spawn error as stderr when the command could not be started', async () => {
     const err = Object.assign(new Error('spawn gh ENOENT'), { code: 'ENOENT' })
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
-        callback(err, '', '')
-        return { on: vi.fn() } as unknown as ChildProcess
-      }
-    )
+    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+      callback?.(err, '', '')
+      return partialFake<ChildProcess>({ on: vi.fn() })
+    })
 
     const result = await execShell({ command: 'gh', args: ['pr', 'create'], cwd: '/tmp' })
     expect(result.exitCode).toBe(1)
@@ -214,14 +205,12 @@ describe('execShell', () => {
     const killed = Object.assign(new Error('Command failed'), {
       killed: true,
       code: null,
-      signal: 'SIGTERM',
+      signal: 'SIGTERM' as const,
     })
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
-        setTimeout(() => callback(killed, '', ''), 0)
-        return { on: vi.fn() } as unknown as ChildProcess
-      }
-    )
+    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+      setTimeout(() => callback?.(killed, '', ''), 0)
+      return partialFake<ChildProcess>({ on: vi.fn() })
+    })
 
     const result = await execShell({ command: 'git', args: ['status'], cwd: '/tmp', timeoutMs: 1 })
     expect(result.timedOut).toBe(true)
@@ -232,14 +221,12 @@ describe('execShell', () => {
     const crashed = Object.assign(new Error('Command failed'), {
       killed: false,
       code: null,
-      signal: 'SIGSEGV',
+      signal: 'SIGSEGV' as const,
     })
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
-        callback(crashed, '', '')
-        return { on: vi.fn() } as unknown as ChildProcess
-      }
-    )
+    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+      callback?.(crashed, '', '')
+      return partialFake<ChildProcess>({ on: vi.fn() })
+    })
 
     const result = await execShell({ command: 'git', args: ['status'], cwd: '/tmp' })
     expect(result.exitCode).not.toBe(0)
@@ -262,18 +249,16 @@ describe('execShell', () => {
   })
 
   it('passes sanitized env variables to child process', async () => {
-    let capturedOpts: ExecFileOptions | null = null
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], opts: ExecFileOptions, callback: ExecFileCallback) => {
-        capturedOpts = opts
-        callback(null, '', '')
-        return { on: vi.fn() } as unknown as ChildProcess
-      }
-    )
+    let capturedOpts: ExecFileOptions | null | undefined
+    mockExecFile.mockImplementation((_cmd, _args, opts, callback) => {
+      capturedOpts = opts
+      callback?.(null, '', '')
+      return partialFake<ChildProcess>({ on: vi.fn() })
+    })
 
     await execShell({ command: 'git', args: ['status'], cwd: '/tmp' })
-    expect(capturedOpts.env).toHaveProperty('GIT_TERMINAL_PROMPT', '0')
+    expect(capturedOpts?.env).toHaveProperty('GIT_TERMINAL_PROMPT', '0')
     // Should not pass arbitrary env vars (not in allowlist)
-    expect(capturedOpts.env).not.toHaveProperty('AWS_SECRET_ACCESS_KEY')
+    expect(capturedOpts?.env).not.toHaveProperty('AWS_SECRET_ACCESS_KEY')
   })
 })

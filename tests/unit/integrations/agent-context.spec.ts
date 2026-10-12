@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import type { Issue } from '../../../src/shared/types/index'
+import type { AgentContext, Issue } from '../../../src/shared/types/index'
 
 let userData: string
 vi.mock('electron', () => ({ app: { getPath: () => userData } }))
@@ -36,9 +36,16 @@ function issue(over: Partial<Issue> = {}): Issue {
   }
 }
 
+/** The context for an issue that exists, which is never null. */
+function contextOf(linked: Issue): AgentContext {
+  const context = buildAgentContext('p1', linked)
+  if (context === null) throw new Error('an issue always yields a context')
+  return context
+}
+
 describe('buildAgentContext — composition', () => {
   it('leads with the identity, so a truncation never costs it', () => {
-    const context = buildAgentContext('p1', issue())
+    const context = contextOf(issue())
     const [first] = context.markdown.split('\n')
     expect(first).toBe('# Linked issue: TAV-42')
     expect(context.markdown.indexOf('TAV-42')).toBeLessThan(
@@ -47,7 +54,7 @@ describe('buildAgentContext — composition', () => {
   })
 
   it('names the title, state, assignee and URL', () => {
-    const { markdown } = buildAgentContext('p1', issue())
+    const { markdown } = contextOf(issue())
     expect(markdown).toContain('Unify Linear connections behind one core service')
     expect(markdown).toContain('In Progress')
     expect(markdown).toContain('Andrew')
@@ -55,66 +62,65 @@ describe('buildAgentContext — composition', () => {
   })
 
   it('carries the description', () => {
-    expect(buildAgentContext('p1', issue()).markdown).toContain('Reached from three places today.')
+    expect(contextOf(issue()).markdown).toContain('Reached from three places today.')
   })
 
   it('carries recent comments with their authors', () => {
-    const { markdown } = buildAgentContext('p1', issue())
+    const { markdown } = contextOf(issue())
     expect(markdown).toContain('andrew')
     expect(markdown).toContain('Fold the migration into P0.')
   })
 
   it('says which tracker it came from — two trackers can share a key', () => {
-    expect(buildAgentContext('p1', issue({ tracker: 'jira' })).markdown).toContain('Jira')
-    expect(buildAgentContext('p1', issue()).markdown).toContain('Linear')
+    expect(contextOf(issue({ tracker: 'jira' })).markdown).toContain('Jira')
+    expect(contextOf(issue()).markdown).toContain('Linear')
   })
 
   it('records the project, key and tracker on the context itself', () => {
-    const context = buildAgentContext('p1', issue())
+    const context = contextOf(issue())
     expect(context).toMatchObject({ projectId: 'p1', key: 'TAV-42', tracker: 'linear' })
     expect(Date.parse(context.builtAt)).not.toBeNaN()
   })
 
   it('reports its own size', () => {
-    const context = buildAgentContext('p1', issue())
+    const context = contextOf(issue())
     expect(context.chars).toBe(context.markdown.length)
   })
 })
 
 describe('buildAgentContext — sparse issues', () => {
   it('reads sensibly with no description', () => {
-    const { markdown } = buildAgentContext('p1', issue({ description: '' }))
+    const { markdown } = contextOf(issue({ description: '' }))
     expect(markdown).toContain('TAV-42')
     expect(markdown).not.toContain('undefined')
     expect(markdown).not.toMatch(/##\s+Description\s*\n\s*\n\s*##/)
   })
 
   it('omits the comments section entirely when there are none', () => {
-    const { markdown } = buildAgentContext('p1', issue({ comments: [] }))
+    const { markdown } = contextOf(issue({ comments: [] }))
     expect(markdown).not.toContain('Recent comments')
   })
 
   it('copes with no assignee', () => {
-    const { markdown } = buildAgentContext('p1', issue({ assignee: null }))
+    const { markdown } = contextOf(issue({ assignee: null }))
     expect(markdown).toContain('Unassigned')
   })
 
   it('includes labels when there are any, and omits the line when there are not', () => {
-    expect(buildAgentContext('p1', issue()).markdown).toContain('Improvement')
-    expect(buildAgentContext('p1', issue({ labels: [] })).markdown).not.toContain('Labels:')
+    expect(contextOf(issue()).markdown).toContain('Improvement')
+    expect(contextOf(issue({ labels: [] })).markdown).not.toContain('Labels:')
   })
 })
 
 describe('buildAgentContext — budget (FR-022)', () => {
   it('is well within the runtime cap for an ordinary issue', () => {
-    const context = buildAgentContext('p1', issue())
+    const context = contextOf(issue())
     expect(context.truncated).toBe(false)
     expect(context.chars).toBeLessThan(MAX_CONTEXT_CHARS)
   })
 
   it('never exceeds the runtime cap, however large the issue', () => {
-    const context = buildAgentContext(
-      'p1',
+    const context = contextOf(
       issue({
         description: 'x'.repeat(50_000),
         comments: Array.from({ length: 5 }, (_, i) => ({
@@ -129,14 +135,14 @@ describe('buildAgentContext — budget (FR-022)', () => {
   })
 
   it('says it was shortened, and points at the full issue', () => {
-    const context = buildAgentContext('p1', issue({ description: 'x'.repeat(50_000) }))
+    const context = contextOf(issue({ description: 'x'.repeat(50_000) }))
     expect(context.truncated).toBe(true)
     expect(context.markdown).toContain('truncated')
     expect(context.markdown).toContain('https://linear.app/tav/issue/TAV-42')
   })
 
   it('keeps the identity even when the description swamps everything', () => {
-    const { markdown } = buildAgentContext('p1', issue({ description: 'x'.repeat(50_000) }))
+    const { markdown } = contextOf(issue({ description: 'x'.repeat(50_000) }))
     expect(markdown).toContain('# Linked issue: TAV-42')
     expect(markdown).toContain('In Progress')
   })
@@ -149,7 +155,7 @@ describe('buildAgentContext — budget (FR-022)', () => {
       body: `comment ${8 - i}`,
       createdAt: `2026-08-1${8 - i}T00:00:00Z`,
     }))
-    const { markdown } = buildAgentContext('p1', issue({ comments }))
+    const { markdown } = contextOf(issue({ comments }))
     const included = comments.filter((c) => markdown.includes(c.body))
     expect(included).toHaveLength(5)
     expect(markdown).toContain('comment 8')
@@ -158,14 +164,14 @@ describe('buildAgentContext — budget (FR-022)', () => {
 
   it('never cuts a fenced code block open', () => {
     const description = ['prose', '```ts', 'const a = 1', '```', 'x'.repeat(20_000)].join('\n')
-    const { markdown } = buildAgentContext('p1', issue({ description }))
+    const { markdown } = contextOf(issue({ description }))
     const fences = (markdown.match(/```/g) ?? []).length
     expect(fences % 2).toBe(0)
   })
 
   it('drops whole blocks rather than mid-sentence where it can', () => {
     const description = Array.from({ length: 400 }, (_, i) => `Paragraph ${i}.`).join('\n\n')
-    const { markdown } = buildAgentContext('p1', issue({ description }))
+    const { markdown } = contextOf(issue({ description }))
     expect(markdown).toContain('Paragraph 0.')
     // Whatever survived ends at a block boundary, not halfway through a word.
     expect(markdown).not.toMatch(/Paragrap$/)

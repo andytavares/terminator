@@ -2,7 +2,6 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { useNotificationStore } from '../../../../src/renderer/stores/notification.store'
-import type { SerializedNotification } from '../../../../src/shared/types/index'
 import type { Notification } from '../../../../src/renderer/stores/notification.store'
 
 const mockTriggerAction = vi.fn().mockResolvedValue({ ok: true })
@@ -23,12 +22,13 @@ import {
   BellButton,
 } from '../../../../src/renderer/components/NotificationPanel'
 
-function makeNotif(overrides: Partial<SerializedNotification> = {}): Notification {
+function makeNotif(overrides: Partial<Notification> = {}): Notification {
   return {
     id: crypto.randomUUID(),
     type: 'info',
     title: 'Test notification',
     timestamp: Date.now(),
+    targets: ['center'],
     read: false,
     ...overrides,
   }

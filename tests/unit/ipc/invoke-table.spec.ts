@@ -62,7 +62,7 @@ describe('registerInvokeTable', () => {
       defineChannel({
         channel: 'a:detail',
         schema: z.object({ id: z.string() }),
-        invalid: (err) => ({ error: 'VALIDATION_ERROR', message: err.message }),
+        invalid: (err: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: err.message }),
         run: () => ({ ok: true }),
       }),
     ])

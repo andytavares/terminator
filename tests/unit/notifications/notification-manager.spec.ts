@@ -4,10 +4,12 @@ const { mockNotificationShow, mockNotificationOn, MockNotification, mockDockBoun
   vi.hoisted(() => {
     const mockNotificationShow = vi.fn()
     const mockNotificationOn = vi.fn()
-    const MockNotification = vi.fn().mockImplementation(function () {
-      return { show: mockNotificationShow, on: mockNotificationOn }
-    })
-    Object.assign(MockNotification, { isSupported: vi.fn(() => true) })
+    const MockNotification = Object.assign(
+      vi.fn().mockImplementation(function () {
+        return { show: mockNotificationShow, on: mockNotificationOn }
+      }),
+      { isSupported: vi.fn(() => true) }
+    )
     const mockDockBounce = vi.fn()
     const mockSend = vi.fn()
     return { mockNotificationShow, mockNotificationOn, MockNotification, mockDockBounce, mockSend }

@@ -81,7 +81,7 @@ npm run typecheck  # TypeScript type check (no emit — zero errors required)
 npm run format     # Prettier (auto-fixes)
 ```
 
-The root `npx tsc --noEmit` checks nothing; use `npm run typecheck`, which checks main, renderer, shared, both packages and every extension. Both `lint` and `typecheck` must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
+The root `npx tsc --noEmit` checks nothing; use `npm run typecheck`, which checks main, renderer, shared, the core's specs (`tsconfig.test.json`: `tests/unit` and `tests/integration` outside the extension and package directories), both packages and every extension. Both `lint` and `typecheck` must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
 
 ---
 

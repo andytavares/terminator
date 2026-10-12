@@ -69,6 +69,10 @@ import { registerSettingsHandlers } from '../../../src/main/ipc/settings.ipc.js'
 import { registerShellHandlers } from '../../../src/main/ipc/shell.ipc.js'
 import { registerTerminalHandlers } from '../../../src/main/ipc/terminal.ipc.js'
 import { registerWorkspaceHandlers } from '../../../src/main/ipc/workspace.ipc.js'
+import type { ExtensionHost } from '../../../src/main/extensions/extension-host.js'
+import type { PtyManager } from '../../../src/main/terminal/pty-manager.js'
+import type { OutputRelay } from '../../../src/main/terminal/output-relay.js'
+import { partialFake } from '../../support/fakes'
 
 function registerEveryCoreHandler(): void {
   vi.useFakeTimers()
@@ -77,16 +81,16 @@ function registerEveryCoreHandler(): void {
   registerDialogHandlers(noWindow)
   registerDbIpcHandlers()
   registerEditorHandlers()
-  registerExtensionHandlers({} as never, vi.fn(), () => null)
+  registerExtensionHandlers(partialFake<ExtensionHost>({}), vi.fn(), () => null)
   registerFsHandlers(noWindow)
   registerGitHandlers()
   registerIntegrationsHandlers(noWindow)
-  registerMetricsHandlers({} as never)
+  registerMetricsHandlers(partialFake<PtyManager>({}))
   registerNotificationHandlers()
   registerSessionRecordsHandlers(noWindow)
   registerSettingsHandlers()
   registerShellHandlers()
-  registerTerminalHandlers({} as never, noWindow)
+  registerTerminalHandlers(partialFake<PtyManager>({}), noWindow, partialFake<OutputRelay>({}))
   registerWorkspaceHandlers()
 }
 registerEveryCoreHandler()

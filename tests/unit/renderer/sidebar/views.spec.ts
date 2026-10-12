@@ -21,12 +21,13 @@ import {
   loadViews,
   saveViews,
 } from '../../../../src/renderer/sidebar/views'
+import type { SessionView } from '../../../../src/renderer/sidebar/view-model'
 
-const custom = {
+const custom: SessionView = {
   id: 'mine',
   name: 'Mine',
-  groupBy: 'status' as const,
-  sortBy: 'recent' as const,
+  groupBy: 'none',
+  sortBy: 'recent',
   filters: { hideStale: true },
 }
 

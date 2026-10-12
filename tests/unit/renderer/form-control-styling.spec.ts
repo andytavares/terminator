@@ -193,7 +193,7 @@ function filesUnder(roots: string[], exts: string[]): string[] {
     for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
       if (!entry.isFile()) continue
       if (!exts.some((e) => entry.name.endsWith(e))) continue
-      const dir = entry.parentPath ?? entry.path
+      const dir = entry.parentPath
       if (/(^|\/)(dist|node_modules|coverage)(\/|$)/.test(dir)) continue
       out.push(join(dir, entry.name))
     }

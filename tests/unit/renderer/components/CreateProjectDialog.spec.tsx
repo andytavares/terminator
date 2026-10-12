@@ -4,7 +4,8 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { CreateProjectDialog } from '../../../../src/renderer/components/sidebar/CreateProjectDialog'
-import { projectOf, seedStore, workspaceOf } from '../../../support/renderer-stores'
+import { issueSummaryOf, projectOf, seedStore, workspaceOf } from '../../../support/renderer-stores'
+import type { IssueSummary } from '../../../../src/shared/types/index'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
 
 const mockCreateProject = vi.fn()
@@ -489,22 +490,17 @@ describe('CreateProjectDialog', () => {
 // ── Starting from an issue (US5) ────────────────────────────────────────────
 
 describe('CreateProjectDialog — from an issue', () => {
-  const ISSUE = {
-    tracker: 'linear' as const,
-    id: 'id-1',
+  const ISSUE = issueSummaryOf({
     key: 'TAV-42',
     title: 'Unify Linear connections behind one core service',
-    url: 'https://linear.app/tav/issue/TAV-42',
-    state: { name: 'In Progress', type: 'started' as const },
-    assignee: null,
     branchName: 'andrew/tav-42-unify-linear',
-  }
-  const JIRA_ISSUE = { ...ISSUE, tracker: 'jira' as const, key: 'TAV-7', branchName: null }
+  })
+  const JIRA_ISSUE = issueSummaryOf({ ...ISSUE, tracker: 'jira', key: 'TAV-7', branchName: null })
 
   const listMine = vi.fn()
   const linkIssue = vi.fn()
 
-  async function openWithIssues(connected = true, issues = [ISSUE]) {
+  async function openWithIssues(connected = true, issues: IssueSummary[] = [ISSUE]) {
     const { useIntegrationsStore } = await import(
       '../../../../src/renderer/stores/integrations.store'
     )

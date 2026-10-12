@@ -9,7 +9,7 @@ const api = {
   connect: vi.fn(),
   disconnect: vi.fn(),
   setMine: vi.fn(),
-  onStatusChanged: vi.fn(() => () => {}),
+  onStatusChanged: vi.fn((_handler: (payload: unknown) => void): (() => void) => () => {}),
 }
 
 function connection(over: Partial<TrackerConnection> = {}): TrackerConnection {

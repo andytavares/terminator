@@ -14,6 +14,8 @@ Object.defineProperty(globalThis, 'window', {
 
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import type { TerminalSession } from '../../../../src/shared/types/index'
+import type { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
+import { partialFake } from '../../../support/fakes'
 
 function makeSession(overrides: Partial<TerminalSession> = {}): TerminalSession {
   return {
@@ -160,7 +162,7 @@ describe('useSessionStore', () => {
       const dispose = vi.fn()
       useSessionStore.setState({
         sessions: new Map([['sess-1', session]]),
-        terminalInstances: new Map([['sess-1', { dispose }]]),
+        terminalInstances: new Map([['sess-1', partialFake<TerminalInstance>({ dispose })]]),
       })
       mockElectronAPI.terminal.close.mockResolvedValue({})
       await useSessionStore.getState().closeSession('sess-1')

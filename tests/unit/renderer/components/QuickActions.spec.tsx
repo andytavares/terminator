@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { QuickActions } from '../../../../src/renderer/components/QuickActions'
 import type { QuickAction, QuickActionGroup } from '../../../../src/renderer/quick-actions/types'
@@ -55,9 +55,9 @@ function makeActions(): QuickAction[] {
   ]
 }
 
-let onRun: ReturnType<typeof vi.fn>
-let onTogglePin: ReturnType<typeof vi.fn>
-let onClose: ReturnType<typeof vi.fn>
+let onRun: Mock<(action: QuickAction) => void>
+let onTogglePin: Mock<(id: string) => void>
+let onClose: Mock<() => void>
 
 beforeEach(() => {
   onRun = vi.fn()

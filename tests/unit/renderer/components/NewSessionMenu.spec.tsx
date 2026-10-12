@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import type { Project, Workspace } from '../../../../src/shared/types/index'
 import { NewSessionMenu } from '../../../../src/renderer/components/session/NewSessionMenu'
@@ -10,8 +10,8 @@ const repo = (id: string, name: string): Workspace => workspaceOf({ id, name })
 const branch = (id: string, workspaceId: string, name: string): Project =>
   projectOf({ id, workspaceId, name })
 
-let onBranch: ReturnType<typeof vi.fn>
-let onScratch: ReturnType<typeof vi.fn>
+let onBranch: Mock<(projectId: string) => void>
+let onScratch: Mock<() => void>
 
 function open() {
   render(<NewSessionMenu onStartInBranch={onBranch} onStartScratch={onScratch} />)

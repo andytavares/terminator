@@ -1,9 +1,9 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { ContextMenu, closeAllContextMenus } from '../../../../src/renderer/components/ContextMenu'
 
-let onDismiss: ReturnType<typeof vi.fn>
+let onDismiss: Mock<() => void>
 
 const items = [
   { label: 'Rename', onSelect: vi.fn() },

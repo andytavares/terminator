@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { AppBand } from '../../../../src/renderer/components/sidebar/AppBand'
 
@@ -11,7 +11,7 @@ const globalTabs = [
   { id: 'vault', label: 'Task Vault', component: noop },
 ]
 
-let onSelect: ReturnType<typeof vi.fn>
+let onSelect: Mock<(id: string) => void>
 
 beforeEach(() => {
   vi.clearAllMocks()

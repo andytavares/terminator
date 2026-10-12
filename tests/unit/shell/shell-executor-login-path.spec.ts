@@ -36,7 +36,7 @@ describe('execShell while the login-shell PATH is still being read', () => {
     process.env.SHELL = shell
 
     void startAdoptingLoginShellPath(process.env)
-    const result = await execShell({ command: 'gh', args: [] })
+    const result = await execShell({ command: 'gh', args: [], cwd: scratch })
 
     expect(result.stdout.trim()).toBe('from-login-path')
     expect(result.exitCode).toBe(0)

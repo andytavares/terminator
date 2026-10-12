@@ -53,7 +53,11 @@ const projectIds = (): string[] =>
 
 function setupMocks(sessionProjectId = SCRATCH) {
   stored = [project1, project2]
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = { project: projectApi }
+  Object.defineProperty(window, 'electronAPI', {
+    value: { project: projectApi },
+    writable: true,
+    configurable: true,
+  })
   useWorkspaceStore.setState({
     ...useWorkspaceStore.getInitialState(),
     workspaces: [workspace1],
