@@ -20,7 +20,15 @@ beforeEach(async () => {
 
 const capture = (payload: unknown) => harness.invoke('task-vault:vault:capture', payload)
 
-describe('task-vault:vault:capture IPC handler', () => {
+describe('task-vault:vault:capture IPC handler', taskVaultVaultCaptureIPCTests)
+
+function taskVaultVaultCaptureIPCTests() {
+  describe('storing', taskVaultVaultCaptureIPCStoringTests)
+  describe('tags', taskVaultVaultCaptureIPCTagsTests)
+  describe('hints and errors', taskVaultVaultCaptureIPCHintsErrorsTests)
+}
+
+function taskVaultVaultCaptureIPCStoringTests() {
   it('registers the capture handler', () => {
     expect(harness.channels()).toContain('task-vault:vault:capture')
   })
@@ -36,7 +44,14 @@ describe('task-vault:vault:capture IPC handler', () => {
       area_id: null,
     })
   })
+}
 
+function taskVaultVaultCaptureIPCTagsTests() {
+  describe('creates the project', taskVaultVaultCaptureIPCTagsCreatesTheProjectTests)
+  describe('reuses an existing', taskVaultVaultCaptureIPCTagsReusesAnExistingTests)
+}
+
+function taskVaultVaultCaptureIPCTagsCreatesTheProjectTests() {
   it('creates the project and area named by inline tags and links the task to them', async () => {
     const { taskId } = (await capture({
       text: 'Plan launch @website #work +computer due:2026-03-01',
@@ -58,7 +73,9 @@ describe('task-vault:vault:capture IPC handler', () => {
       area: 'Work',
     })
   })
+}
 
+function taskVaultVaultCaptureIPCTagsReusesAnExistingTests() {
   it('reuses an existing project instead of creating a second one', async () => {
     await capture({ text: 'First @website' })
     await capture({ text: 'Second @website' })
@@ -66,7 +83,9 @@ describe('task-vault:vault:capture IPC handler', () => {
     expect(await db.query('SELECT id FROM projects')).toHaveLength(1)
     expect(await db.query('SELECT id FROM tasks WHERE project_id IS NOT NULL')).toHaveLength(2)
   })
+}
 
+function taskVaultVaultCaptureIPCHintsErrorsTests() {
   it('applies the project and area hints as tags', async () => {
     const { taskId } = (await capture({
       text: 'Call',
@@ -88,4 +107,4 @@ describe('task-vault:vault:capture IPC handler', () => {
     await db.exec('DROP TABLE tasks')
     expect(await capture({ text: 'Doomed' })).toMatchObject({ error: expect.any(String) })
   })
-})
+}

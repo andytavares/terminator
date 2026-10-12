@@ -1,6 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import { rowToTask, rowToProject } from '../../src/vault/mappers'
 
+/** The promoted recurrence and blocked columns, all unset. */
+const EMPTY_PROMOTED_COLUMNS = {
+  recurrence_rule: null,
+  recurrence_template_id: null,
+  recurrence_notify_at: null,
+  blocked_reason: null,
+  blocked_check_interval: null,
+  recurrence_end_type: null,
+  recurrence_end_date: null,
+  recurrence_end_count: null,
+  recurrence_completed_count: null,
+}
+
 function baseTaskRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'task-1',
@@ -22,20 +35,24 @@ function baseTaskRow(overrides: Record<string, unknown> = {}): Record<string, un
     updated_at: '2099-01-01T00:00:00.000Z',
     project_id: 'proj-1',
     area_id: 'area-1',
-    recurrence_rule: null,
-    recurrence_template_id: null,
-    recurrence_notify_at: null,
-    blocked_reason: null,
-    blocked_check_interval: null,
-    recurrence_end_type: null,
-    recurrence_end_date: null,
-    recurrence_end_count: null,
-    recurrence_completed_count: null,
+    ...EMPTY_PROMOTED_COLUMNS,
     ...overrides,
   }
 }
 
-describe('rowToTask', () => {
+describe('rowToTask', rowToTaskTests)
+describe('rowToProject', rowToProjectTests)
+
+function rowToTaskTests() {
+  describe('basic fields', rowToTaskBasicFieldsTests)
+  describe('blocked columns', rowToTaskBlockedColumnsTests)
+  describe('recurrence columns', rowToTaskRecurrenceColumnsTests)
+  describe('metadata fallbacks', rowToTaskMetadataFallbacksTests)
+  describe('explicit none', rowToTaskExplicitNoneTests)
+  describe('rules and links', rowToTaskRulesLinksTests)
+}
+
+function rowToTaskBasicFieldsTests() {
   it('maps a minimal task row correctly', () => {
     const task = rowToTask(baseTaskRow())
     expect(task.id).toBe('task-1')
@@ -54,7 +71,9 @@ describe('rowToTask', () => {
     const task = rowToTask(baseTaskRow({ source: 'inbox', source_ref: null }))
     expect(task.filePath).toBe('inbox')
   })
+}
 
+function rowToTaskBlockedColumnsTests() {
   it('reads blocked_reason from promoted column', () => {
     const task = rowToTask(baseTaskRow({ blocked_reason: 'waiting on PR' }))
     expect(task.blockedReason).toBe('waiting on PR')
@@ -64,7 +83,9 @@ describe('rowToTask', () => {
     const task = rowToTask(baseTaskRow({ blocked_check_interval: '1d' }))
     expect(task.blockedCheckInterval).toBe('1d')
   })
+}
 
+function rowToTaskRecurrenceColumnsTests() {
   it('reads recurrence end fields from promoted columns', () => {
     const task = rowToTask(
       baseTaskRow({
@@ -91,7 +112,14 @@ describe('rowToTask', () => {
     expect(task.blockedReason).toBe('from meta')
     expect(task.blockedCheckInterval).toBe('2d')
   })
+}
 
+function rowToTaskMetadataFallbacksTests() {
+  describe('end fields', rowToTaskMetadataFallbacksEndFieldsTests)
+  describe('malformed metadata', rowToTaskMetadataFallbacksMalformedMetadataTests)
+}
+
+function rowToTaskMetadataFallbacksEndFieldsTests() {
   it('falls back to metadata for recurrence end fields when columns are null', () => {
     const task = rowToTask(
       baseTaskRow({
@@ -114,7 +142,9 @@ describe('rowToTask', () => {
     expect(task.recurrenceEndCount).toBe(10)
     expect(task.recurrenceCompletedCount).toBe(3)
   })
+}
 
+function rowToTaskMetadataFallbacksMalformedMetadataTests() {
   it('handles malformed metadata gracefully (fallback path)', () => {
     const task = rowToTask(
       baseTaskRow({
@@ -128,7 +158,9 @@ describe('rowToTask', () => {
     expect(task.blockedCheckInterval).toBeUndefined()
     expect(task.recurrenceEndType).toBeUndefined()
   })
+}
 
+function rowToTaskExplicitNoneTests() {
   it('keeps an explicit none end type, with the counts its columns hold', () => {
     const task = rowToTask(
       baseTaskRow({
@@ -148,7 +180,9 @@ describe('rowToTask', () => {
     expect(task.recurrenceEndType).toBeUndefined()
     expect(task.recurrenceEndCount).toBeUndefined()
   })
+}
 
+function rowToTaskRulesLinksTests() {
   it('reads recurrence rule columns', () => {
     const task = rowToTask(
       baseTaskRow({
@@ -166,9 +200,14 @@ describe('rowToTask', () => {
     const task = rowToTask(baseTaskRow({ terminator_links: '["link-1","link-2"]' }))
     expect(task.terminatorLinks).toEqual(['link-1', 'link-2'])
   })
-})
+}
 
-describe('rowToProject', () => {
+function rowToProjectTests() {
+  describe('mapping', rowToProjectMappingTests)
+  describe('missing fields', rowToProjectMissingFieldsTests)
+}
+
+function rowToProjectMappingTests() {
   it('maps a basic project row', () => {
     const row: Record<string, unknown> = {
       id: 'proj-1',
@@ -193,7 +232,9 @@ describe('rowToProject', () => {
     expect(project.lastModified).toBe('2099-01-02T00:00:00.000Z')
     expect(project.terminatorLinks).toEqual(['link-a'])
   })
+}
 
+function rowToProjectMissingFieldsTests() {
   it('handles null area and deadline gracefully', () => {
     const row: Record<string, unknown> = {
       id: 'proj-2',
@@ -210,4 +251,4 @@ describe('rowToProject', () => {
     expect(project.area).toBeUndefined()
     expect(project.deadline).toBeUndefined()
   })
-})
+}
