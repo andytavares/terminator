@@ -9,6 +9,9 @@ import { modelCatalog } from './state/model-catalog.js'
 
 import { createForgeChannels } from './ipc/forge-channels.js'
 import { createRunChannels, writeRunGraph, readRunGraph } from './ipc/run-channels.js'
+import { createFoundryIndexes } from './state/foundry-index.js'
+import type { FoundryIndex, FoundryIndexes } from './state/foundry-index.js'
+import { diskSourceFor } from './state/disk-source.js'
 import { createInboxChannels } from './ipc/inbox-channels.js'
 import { createLedgerChannels } from './ipc/ledger-channels.js'
 import { createSensorChannels } from './ipc/sensor-channels.js'
@@ -57,7 +60,8 @@ import {
 } from './line/worktree.js'
 import type { Checkout } from './line/worktree.js'
 import { installCommandFor } from './verify/toolchain-probe.js'
-import { queueEntries } from './line/refinery-entries.js'
+import { computeQueueEntries } from './line/refinery-entries.js'
+import { writeObservedFiles } from './line/observed-files.js'
 import {
   readRefineryState,
   writeRefineryState,
@@ -66,7 +70,6 @@ import {
 } from './line/refinery-state.js'
 import { refineryTick } from './line/refinery-tick.js'
 import type { RefineryTickDeps } from './line/refinery-tick.js'
-import type { QueueEntry } from './line/refinery.js'
 import { restack } from './line/restack.js'
 import { issueOf, projectRemover, workspaceFor } from './line/order-project.js'
 import { resumableIn } from './runtime/claude-launch.js'
@@ -136,8 +139,7 @@ import type { IssuesPort, WriteBackDeps } from './trackers/write-back.js'
 import type { Budgets, WorkOrder, WriteBack } from './order/schema.js'
 import { isBlocking } from './order/schema.js'
 import { budgetFromSetting } from './order/budget-setting.js'
-import { resolveDataRoot, untrackedNotice, ledgerPath, orderDir } from './data-root.js'
-import { queryEntries } from './ledger/append.js'
+import { resolveDataRoot, untrackedNotice, orderDir } from './data-root.js'
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
 import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervised-runner.js'
 import { createPendingPermissions } from './runtime/pending-permissions.js'
@@ -240,6 +242,39 @@ function fallbackDataRoot(): string {
  * notice is decided from the same answer the writers use.
  */
 const dataRootMemo = new Map<string, string>()
+
+/**
+ * What Foundry holds of its own records in memory, one index per data root.
+ *
+ * Every store call below goes through it, so a write reaches disk first and
+ * the index second, and a read after that is a lookup. Replaced on activation
+ * with one that tells the windows (`foundry:changed`); until then a change
+ * goes nowhere, which is what a call made outside a running extension wants.
+ */
+let indexes: FoundryIndexes = createFoundryIndexes(diskSourceFor, () => {})
+
+/**
+ * Something only this process knows has changed — a held tool call, a stall, a
+ * running or stranded agent, an open intake — and a standing is drawn from it.
+ * No file records these, so the windows are told directly. `orderId` is empty
+ * when the change is not tied to one order.
+ */
+function announceLive(orderId: string): void {
+  indexes.announce({ kind: 'live', orderId })
+}
+
+function indexFor(root: string): FoundryIndex {
+  return indexes.forRoot(root)
+}
+
+const orderStoreAt = (root: string): ReturnType<typeof createOrderStore> =>
+  createOrderStore(root, indexFor(root))
+const gateStoreAt = (root: string): ReturnType<typeof createGateStore> =>
+  createGateStore(root, indexFor(root))
+const readGraph = (root: string, orderId: string): ReturnType<typeof readRunGraph> =>
+  readRunGraph(root, orderId, indexFor(root))
+const writeGraph = (root: string, graph: RunGraph): Promise<void> =>
+  writeRunGraph(root, graph, indexFor(root))
 
 /**
  * The architect's open conversation, per order.
@@ -436,7 +471,7 @@ async function recordStall(
     return
   }
   try {
-    await createOrderStore(root).record({
+    await orderStoreAt(root).record({
       at: new Date(firing.firedAt).toISOString(),
       orderId,
       actor: 'rule:line',
@@ -746,6 +781,7 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
           summary: `stopped making progress (${firing.signal}) in ${path.basename(featureDir)}`,
         })
         api.window.broadcast('foundry:stall-fired', { firing, featureDir, shadow })
+        announceLive('')
         if (shadow) return
         // Muted runs are recorded and shown, never surfaced — which is the only
         // alternative to turning the detector off wholesale when one run is
@@ -906,10 +942,9 @@ async function tickSensors(api: ExtensionAPI, root: string, store: SignalStore):
  * the Architect "this was decided before", not to hand it the whole ledger.
  */
 async function priorArtFor(root: string, paths: readonly string[]): Promise<string[]> {
-  const orders = await createOrderStore(root).list()
-  const entries = (
-    await Promise.all(orders.map((order) => queryEntries(ledgerPath(root, order.id))))
-  ).flat()
+  const store = orderStoreAt(root)
+  const orders = await store.list()
+  const entries = (await Promise.all(orders.map((order) => store.entries(order.id)))).flat()
 
   return entries
     .filter((entry) => paths.some((p) => entry.subject.includes(p) || entry.reason.includes(p)))
@@ -972,7 +1007,7 @@ function writeBackDepsFor(
       Object.entries(order.stateMapping).filter(([, value]) => value !== null)
     ) as WriteBackDeps['mapping'],
     record: async (action, subject, reason) => {
-      await createOrderStore(root).record({
+      await orderStoreAt(root).record({
         at: new Date().toISOString(),
         orderId: order.id,
         actor: 'rule:writeback',
@@ -1011,7 +1046,7 @@ function integrateDepsFor(api: ExtensionAPI, root: string, orderId: string): Int
     // raised, and holding is the only safe reading of that.
     decide: async () => 'hold',
     record: async (action, subject, reason) => {
-      await createOrderStore(root).record({
+      await orderStoreAt(root).record({
         at: new Date().toISOString(),
         orderId,
         actor: 'rule:ship',
@@ -1022,46 +1057,6 @@ function integrateDepsFor(api: ExtensionAPI, root: string, orderId: string): Int
       })
     },
   }
-}
-
-/**
- * Every in-flight order's queue entries, for the refinery's file-overlap
- * queue: the observe/list channels' `queue` field, and the advisory shown on
- * agreement.
- *
- * `merged` is read up front into a plain set, because `queueEntries` asks for
- * it synchronously — every candidate order's `refinery.json` is small and
- * this runs at most once per channel call, never per tick.
- */
-async function computeQueueEntries(api: ExtensionAPI, root: string): Promise<QueueEntry[]> {
-  const orders = await createOrderStore(root).list()
-  const inFlight = orders.filter((o) => o.status === 'running' || o.status === 'shipped')
-  const merged = new Set<string>()
-  for (const order of inFlight) {
-    const state = await readRefineryState(root, order.id)
-    if (state.mergedAt !== null) merged.add(order.id)
-  }
-
-  const diffCommand: RunCommand = async (command, args, cwd) => {
-    if (command !== 'git' && command !== 'gh') return { ok: false, stdout: '' }
-    const result = await api.shell.exec({ command, args, cwd })
-    return { ok: result.exitCode === 0, stdout: result.stdout }
-  }
-
-  return queueEntries(orders, {
-    readPulls: (orderId) => readPulls(root, orderId),
-    changedFiles: async (order) => {
-      const files: string[] = []
-      for (const repo of order.context.repos) {
-        const path = checkoutPath(root, order, repo.name)
-        if (!fs.existsSync(path)) continue
-        files.push(...(await readChangedFiles(path, repo.baseBranch, diffCommand)))
-      }
-      return files
-    },
-    merged: (orderId) => merged.has(orderId),
-    agreedAt: (order) => order.agreedAt ?? '',
-  })
 }
 
 /**
@@ -1097,7 +1092,7 @@ function ciRoundDepsFor(
       }),
     failedLogs: (checks, cwd) => failedLogs(checks, cwd, exec),
     record: async (action, subject, reason) => {
-      await createOrderStore(root).record({
+      await orderStoreAt(root).record({
         at: new Date().toISOString(),
         orderId,
         actor: 'rule:ci',
@@ -1107,7 +1102,10 @@ function ciRoundDepsFor(
         evidence: [],
       })
     },
-    state: (state) => writeCiState(root, orderId, { ...state, at: new Date().toISOString() }),
+    state: async (state) => {
+      await writeCiState(root, orderId, { ...state, at: new Date().toISOString() })
+      indexFor(root).announce({ kind: 'graph', orderId })
+    },
   }
 }
 
@@ -1135,11 +1133,11 @@ function ciSendBackFor(
     if (target === null || shipId === null) return false
 
     graphRef.current = rework(graphRef.current, shipId, target, feedback)
-    await writeRunGraph(root, graphRef.current)
+    await writeGraph(root, graphRef.current)
 
     const outcome = await execute(order, recipe, graphRef.current, executorDeps)
     graphRef.current = outcome.graph
-    await writeRunGraph(root, graphRef.current)
+    await writeGraph(root, graphRef.current)
 
     if (!outcome.shippable) return false
     await pushLanes(order, integrateDeps)
@@ -1158,12 +1156,12 @@ function ciSendBackFor(
  * attempt at a failure the operator already saw.
  */
 async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string): Promise<void> {
-  const order = await createOrderStore(root).load(orderId)
+  const order = await orderStoreAt(root).load(orderId)
   if (order === null || order.recipe === null) return
   const resolved = resolveRecipe(order.recipe, resolveSources(api, root))
   if (!resolved.ok) return
   const recipe = resolved.resolved.value
-  const graph = await readRunGraph(root, orderId)
+  const graph = await readGraph(root, orderId)
   if (graph === null) return
   const pulls = await readPulls(root, orderId)
   if (pulls.length === 0) return
@@ -1177,7 +1175,7 @@ async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string
     ...ciRoundDepsFor(root, orderId, exec),
     sendBack: ciSendBackFor(root, order, recipe, executorDeps, integrateDeps, graphRef),
   })
-  const gates = createLiveGateStore(() => root)
+  const gates = createLiveGateStore(() => root, indexFor)
   const finished = await finishShipping(
     order,
     { verdicts: [], findings: [] },
@@ -1215,7 +1213,7 @@ async function raiseRefineryConflict(
     evidence: files.map((file) => ({ kind: 'diff' as const, path: file })),
     at: new Date().toISOString(),
   })
-  await createLiveGateStore(() => root).save(gate)
+  await createLiveGateStore(() => root, indexFor).save(gate)
 }
 
 /**
@@ -1224,7 +1222,7 @@ async function raiseRefineryConflict(
  * current data root, the same reason every other tick function does.
  */
 async function runRefineryTick(api: ExtensionAPI, root: string): Promise<void> {
-  const store = createOrderStore(root)
+  const store = orderStoreAt(root)
 
   const deps: RefineryTickDeps = {
     candidates: async () => {
@@ -1238,7 +1236,10 @@ async function runRefineryTick(api: ExtensionAPI, root: string): Promise<void> {
       )
     },
     readState: (orderId) => readRefineryState(root, orderId),
-    writeState: (orderId, state) => writeRefineryState(root, orderId, state),
+    writeState: async (orderId, state) => {
+      await writeRefineryState(root, orderId, state)
+      indexFor(root).announce({ kind: 'graph', orderId })
+    },
     viewPr: async (url) => {
       const result = await api.shell.exec({
         command: 'gh',
@@ -1254,7 +1255,7 @@ async function runRefineryTick(api: ExtensionAPI, root: string): Promise<void> {
         return { merged: false }
       }
     },
-    entries: () => computeQueueEntries(api, root),
+    entries: () => computeQueueEntries(root, orderStoreAt(root)),
     lanesFor: async (orderId) => {
       const order = await store.load(orderId)
       if (order === null) return []
@@ -1306,8 +1307,8 @@ async function runRefineryTick(api: ExtensionAPI, root: string): Promise<void> {
  * is a different decision, and nothing here is entitled to take it silently.
  */
 async function stopOrder(root: string, orderId: string, reason: string): Promise<void> {
-  const store = createOrderStore(root)
-  const graph = await readRunGraph(root, orderId)
+  const store = orderStoreAt(root)
+  const graph = await readGraph(root, orderId)
   const stopped: string[] = []
   for (const node of graph?.nodes ?? []) {
     if (node.sessionId === null || !isLiveSession(node.sessionId)) continue
@@ -1355,13 +1356,13 @@ async function adoptInterruptedRuns(root: string): Promise<void> {
   if (adoptedRoots.has(root)) return
   adoptedRoots.add(root)
 
-  const store = createOrderStore(root)
+  const store = orderStoreAt(root)
   const orders = await store.list()
   const onDisk = await Promise.all(
-    orders.map(async (order) => ({ order, graph: await readRunGraph(root, order.id) }))
+    orders.map(async (order) => ({ order, graph: await readGraph(root, order.id) }))
   )
 
-  const gates = createGateStore(root)
+  const gates = gateStoreAt(root)
   const at = new Date().toISOString()
   for (const run of interruptedRuns(onDisk, isLiveSession)) {
     // Keyed on the order, so opening the application five times over a run
@@ -1424,6 +1425,29 @@ async function buildExecutorDeps(
     return { exitCode: result.exitCode, stdout: result.stdout }
   })
 
+  const baseOf = (checkout: Checkout): string => {
+    const declared = order.context.repos.find((repo) => repo.name === checkout.repo)?.baseBranch
+    return declared === undefined || declared === '' ? 'main' : declared
+  }
+
+  /**
+   * Written down when a step settles, so reading the refinery's queue never
+   * has to ask git what a checkout has changed. Git reporting nothing means
+   * it could not be read, so an empty answer keeps what was recorded before.
+   */
+  const recordObservedFiles = async (): Promise<void> => {
+    const files: string[] = []
+    for (const checkout of checkouts.values()) {
+      files.push(...(await readChangedFiles(checkout.path, baseOf(checkout), diffCommand)))
+    }
+    if (files.length === 0) return
+    await writeObservedFiles(root, order.id, files)
+    indexFor(root).announce({ kind: 'graph', orderId: order.id })
+  }
+  const settledIn = (g: RunGraph): number =>
+    g.nodes.filter((n) => n.state !== 'waiting' && n.state !== 'running').length
+  let settledSeen = settledIn(graph)
+
   /** What the working copies have actually changed, against their base. */
   const readObservedChange = async (): Promise<{
     changedFiles: string[]
@@ -1432,8 +1456,7 @@ async function buildExecutorDeps(
     const changedFiles: string[] = []
     let linesChanged = 0
     for (const checkout of checkouts.values()) {
-      const declared = order.context.repos.find((repo) => repo.name === checkout.repo)?.baseBranch
-      const against = declared === undefined || declared === '' ? 'main' : declared
+      const against = baseOf(checkout)
       changedFiles.push(...(await readChangedFiles(checkout.path, against, diffCommand)))
       // A lockfile's lines would turn every new dependency into a "large change".
       const summary = await readDiffSummary(
@@ -1449,7 +1472,7 @@ async function buildExecutorDeps(
 
   const workspaceOf = (checkout: { origin: string }): string =>
     workspaceFor(api.workspace?.list() ?? [], checkout.origin)
-  const store = createOrderStore(root)
+  const store = orderStoreAt(root)
   const featureDir = orderDir(root, order.id)
 
   // One conversation per role, per lane. A fresh agent per node is a terminal
@@ -1606,6 +1629,7 @@ async function buildExecutorDeps(
             // An agent that is asking again is an agent that got past the
             // prompt somebody answered for it.
             strandedAgents.delete(pending.sessionId)
+            announceLive(order.id)
             notePending(api, { ...pending, featureDir }, { id: order.id, root })
           },
           onResolved: (requestId, outcome) => {
@@ -1624,6 +1648,7 @@ async function buildExecutorDeps(
               // what lets the order say it is waiting on a person rather than
               // building, which is what it said for the two hours after.
               strandedAgents.set(sessionId, { orderId: order.id, sessionId, at: Date.now() })
+              announceLive(order.id)
             }
             noteResolved(requestId)
           },
@@ -1717,7 +1742,7 @@ async function buildExecutorDeps(
     repoPaths: sources.repoPaths,
     houseDocs: [...order.context.houseDocs],
   }).rules
-  const gates = createLiveGateStore(() => root)
+  const gates = createLiveGateStore(() => root, indexFor)
   return {
     deps: {
       now: () => new Date().toISOString(),
@@ -1950,7 +1975,13 @@ async function buildExecutorDeps(
       // Written on every change rather than only at the end. `run.observe` reads
       // this file, so without it the Floor shows the graph the run started with
       // for the whole of the run.
-      persist: (graph) => writeRunGraph(root, graph),
+      persist: async (next) => {
+        await writeGraph(root, next)
+        if (settledIn(next) === settledSeen) return
+        settledSeen = settledIn(next)
+        // A record the queue reads is not worth failing the run over.
+        await recordObservedFiles().catch(() => undefined)
+      },
       // What the work actually changed, so the regrade answers for the change
       // rather than for the plan that predicted it. Without this the executor
       // was handed the units' own `touches` list and a hardcoded zero lines, so
@@ -1988,7 +2019,7 @@ async function executeRun(
     await writeBack(order, 'started', writeBackDepsFor(api, root, order, issuesPort))
   }
 
-  const gates = createLiveGateStore(() => root)
+  const gates = createLiveGateStore(() => root, indexFor)
   const graphRef = { current: graph }
   // Shipped against the grade the change turned out to deserve, not the one
   // the plan predicted — which is the whole reason the executor regrades. The
@@ -2080,7 +2111,7 @@ async function executeRun(
   finalCheck.settle(outcome.ladder?.ok ?? false)
   graphRef.current = outcome.graph
 
-  await writeRunGraph(root, outcome.graph)
+  await writeGraph(root, outcome.graph)
   await store.record({
     at: new Date().toISOString(),
     orderId: order.id,
@@ -2187,7 +2218,7 @@ async function settleShipNode(
   const settled = settleShip(graphRef.current, shipId, asked, new Date().toISOString())
   if (settled === graphRef.current) return
   graphRef.current = settled
-  await writeRunGraph(root, graphRef.current)
+  await writeGraph(root, graphRef.current)
 }
 
 /**
@@ -2288,11 +2319,12 @@ async function convergeOnce(
   let remembering: Promise<void> = Promise.resolve()
   const rememberSession = (sessionId: string): void => {
     intakeSessions.set(order.id, sessionId)
+    announceLive(order.id)
     remembering = remembering
       .then(async () => {
-        const current = await createOrderStore(root).load(order.id)
+        const current = await orderStoreAt(root).load(order.id)
         if (current === null || current.provenance.forgeSession === sessionId) return
-        await createOrderStore(root).save({
+        await orderStoreAt(root).save({
           ...current,
           provenance: { ...current.provenance, forgeSession: sessionId },
         })
@@ -2332,7 +2364,10 @@ async function convergeOnce(
       // The session is over either way, so it must not be resumed: `--resume`
       // on one the runtime has forgotten silently starts a fresh agent that
       // believes it is continuing.
-      if (deadline) intakeSessions.delete(order.id)
+      if (deadline) {
+        intakeSessions.delete(order.id)
+        announceLive(order.id)
+      }
       const outcome =
         !deadline || code !== null
           ? readProposal(order, plan.proposalPath, new Date().toISOString())
@@ -2341,7 +2376,7 @@ async function convergeOnce(
       answer({ ok: false, reason: 'The architect ended before it started.' })
     }
 
-    trustRepository(api, plan.cwd, order.id, createOrderStore(root))
+    trustRepository(api, plan.cwd, order.id, orderStoreAt(root))
 
     void runner
       .start({
@@ -2393,6 +2428,7 @@ async function convergeOnce(
       .catch((error: unknown) => {
         done = true
         intakeSessions.delete(order.id)
+        announceLive(order.id)
         answer({
           ok: false,
           reason: error instanceof Error ? error.message : 'The architect could not be started.',
@@ -2433,7 +2469,7 @@ async function readOnlyRound(input: {
   const { api, root, order, roleId, nodeId, startedAction, startedReason, onFinished } = input
   if (deletedOrders.has(order.id)) return
   const runner = supervisedRunner
-  const store = createOrderStore(root)
+  const store = orderStoreAt(root)
   const record = (action: string, reason: string, subject: string): Promise<void> =>
     store.record({
       at: new Date().toISOString(),
@@ -2572,6 +2608,7 @@ async function readOnlyRound(input: {
  */
 function notePending(api: ExtensionAPI, ask: PendingAsk, order?: OrderRef): void {
   pendingPermissions.add(ask)
+  announceLive('')
 
   // A question asked *during execution* is a defect of intake (FR-083): the
   // Forge is where questions are supposed to be settled, and one arriving now
@@ -2579,7 +2616,7 @@ function notePending(api: ExtensionAPI, ask: PendingAsk, order?: OrderRef): void
   // against the order as well as answered — answering it alone loses the fact
   // that it should never have been asked here.
   if (order !== undefined && (ask.questions?.length ?? 0) > 0) {
-    void createOrderStore(order.root).record({
+    void orderStoreAt(order.root).record({
       at: new Date().toISOString(),
       orderId: order.id,
       actor: 'rule:forge-defect',
@@ -2623,6 +2660,7 @@ interface OrderRef {
 /** Answered, by whoever. The notification goes with the request. */
 function noteResolved(requestId: string): void {
   pendingPermissions.remove(requestId)
+  announceLive('')
   // A notification left behind after the thing it was about is answered
   // teaches you to dismiss without reading.
   raisedNotifications.get(requestId)?.dispose()
@@ -2630,6 +2668,15 @@ function noteResolved(requestId: string): void {
 }
 
 export function activate(api: ExtensionAPI): void {
+  indexes = createFoundryIndexes(diskSourceFor, (change) => {
+    try {
+      api.window.broadcast('foundry:changed', change)
+    } catch (error) {
+      // The write that caused this already succeeded; a window that cannot be
+      // told is not a reason to fail it.
+      api.log.error('foundry:changed could not be broadcast', error)
+    }
+  })
   // Kept, so a phase can wait for it. Activation cannot be async — the host
   // calls it synchronously — but a dispatch that arrives in the meantime used
   // to find no supervised runner and fall back to a headless
@@ -2694,14 +2741,13 @@ export function activate(api: ExtensionAPI): void {
   }
 
   const standingSources = {
-    graphFor: (orderId) => readRunGraph(dataRoot(), orderId),
+    graphFor: (orderId) => readGraph(dataRoot(), orderId),
     shapingFor: async (orderId) => {
       if (deciding.has(orderId)) return true
-      const last = lastIntake(await createOrderStore(dataRoot()).entries(orderId))
+      const last = lastIntake(await orderStoreAt(dataRoot()).entries(orderId))
       return last.kind === 'running' && isLiveSession(last.sessionId)
     },
-    gatesFor: async (orderId) =>
-      (await createGateStore(dataRoot()).list()).filter((gate) => gate.orderId === orderId),
+    gatesFor: (orderId) => indexFor(dataRoot()).gatesOf(orderId),
     // A run belongs to a card whose directory is named for the order, which is
     // the join between the runtime's bookkeeping and the records'.
     asksFor: (orderId) =>
@@ -2724,7 +2770,7 @@ export function activate(api: ExtensionAPI): void {
   } satisfies StandingSources
 
   const nextReviewRound = async (orderId: string): Promise<number> =>
-    nextRound(loopFacts(await createOrderStore(dataRoot()).entries(orderId)))
+    nextRound(loopFacts(await orderStoreAt(dataRoot()).entries(orderId)))
 
   /**
    * One architect turn, and the ones the Forge starts on its own after it.
@@ -2750,7 +2796,7 @@ export function activate(api: ExtensionAPI): void {
       next: string,
       why: string
     ): Promise<void> => {
-      const store = createOrderStore(dataRoot())
+      const store = orderStoreAt(dataRoot())
       // The finished turn's process is still at its prompt; the follow-up
       // resumes the same conversation, so end it first.
       const previous = intakeSessions.get(order.id)
@@ -2783,7 +2829,7 @@ export function activate(api: ExtensionAPI): void {
       message,
       (outcome) =>
         whileDeciding(order.id, async () => {
-          const store = createOrderStore(dataRoot())
+          const store = orderStoreAt(dataRoot())
           if (!outcome.ok) {
             await store.record({
               at: new Date().toISOString(),
@@ -2880,7 +2926,7 @@ export function activate(api: ExtensionAPI): void {
     if (skipReason !== null) {
       // Recorded rather than silent: the Forge reads this as the red team
       // step passed, with the reason, instead of a step still owed.
-      await createOrderStore(root).record({
+      await orderStoreAt(root).record({
         at: new Date().toISOString(),
         orderId: order.id,
         actor: 'rule:forge',
@@ -2895,7 +2941,7 @@ export function activate(api: ExtensionAPI): void {
     // The scout runs beside the first draft, so what it found reaches the red
     // team from the store rather than from the draft it is attacking.
     await waitForScout(order.id)
-    const attacked = withScoutContext(order, (await createOrderStore(root).load(order.id)) ?? null)
+    const attacked = withScoutContext(order, (await orderStoreAt(root).load(order.id)) ?? null)
     await readOnlyRound({
       api,
       root,
@@ -2926,7 +2972,7 @@ export function activate(api: ExtensionAPI): void {
           // reads it — nothing more to decide here.
           if (updated === null) return
 
-          const store = createOrderStore(root)
+          const store = orderStoreAt(root)
           // Only what is still open: a finding the architect already fixed or
           // the operator already accepted this same round is not what the
           // operator needs counted as still standing.
@@ -3009,7 +3055,7 @@ export function activate(api: ExtensionAPI): void {
    * again and restarted (`forge/release-again.ts`).
    */
   const handOffWhenReady = async (order: WorkOrder): Promise<void> => {
-    const store = createOrderStore(dataRoot())
+    const store = orderStoreAt(dataRoot())
     await readyToHandOff(order, {
       entries: (orderId) => store.entries(orderId),
       agree: async (o) => {
@@ -3077,7 +3123,7 @@ export function activate(api: ExtensionAPI): void {
   const onReleased = (order: WorkOrder): void => {
     void (async () => {
       if (order.status !== 'draft') return
-      const store = createOrderStore(dataRoot())
+      const store = orderStoreAt(dataRoot())
       const entries = await store.entries(order.id)
       if (lastIntake(entries).kind === 'running') return
 
@@ -3162,7 +3208,7 @@ export function activate(api: ExtensionAPI): void {
                 // A failure or an empty write was already recorded as
                 // `scout.refused`; the architect never waited on it.
                 if (updated === null) return settled()
-                await createOrderStore(root).record({
+                await orderStoreAt(root).record({
                   at: new Date().toISOString(),
                   orderId: scoutOrder.id,
                   actor: 'role:scout',
@@ -3186,7 +3232,7 @@ export function activate(api: ExtensionAPI): void {
   }
 
   const forge = createForgeChannels({
-    store: createLiveOrderStore(dataRoot),
+    store: createLiveOrderStore(dataRoot, indexFor),
     dataRoot,
     now: () => new Date().toISOString(),
     standingSources,
@@ -3223,7 +3269,7 @@ export function activate(api: ExtensionAPI): void {
         branchName: (issue as { branchName?: string | null }).branchName ?? null,
       }
     },
-    queueEntries: () => computeQueueEntries(api, dataRoot()),
+    queueEntries: () => computeQueueEntries(dataRoot(), orderStoreAt(dataRoot())),
     onReleased,
   })
   // Your tickets, so a ticket can be picked rather than typed from memory.
@@ -3301,7 +3347,7 @@ export function activate(api: ExtensionAPI): void {
     if (typeof id !== 'string' || id === '') return { error: 'Malformed request.' }
 
     const root = dataRoot()
-    const order = await createOrderStore(root).load(id)
+    const order = await orderStoreAt(root).load(id)
     if (order === null) return { error: `No order ${id}.` }
 
     deletedOrders.add(id)
@@ -3314,12 +3360,14 @@ export function activate(api: ExtensionAPI): void {
     if (intake !== undefined) {
       supervisedRunner?.stop(intake, 'the order was deleted')
       intakeSessions.delete(id)
+      announceLive(id)
     }
     const result = await deleteOrder(order, {
       exec: (o) => api.shell.exec(o),
       root,
       removeProjectAt: projectRemover(api.workspace),
     })
+    indexFor(root).orderRemoved(id)
     return { ok: result.failed.length === 0, removed: result.removed, failed: result.failed }
   })
 
@@ -3330,18 +3378,21 @@ export function activate(api: ExtensionAPI): void {
   // the shape has to be one this repository can actually support, and the
   // records location has to be writable.
   const runs = createRunChannels({
-    store: createLiveOrderStore(dataRoot),
+    store: createLiveOrderStore(dataRoot, indexFor),
     dataRoot,
+    index: indexFor,
     sources: () => resolveSources(api, dataRoot()),
     now: () => new Date().toISOString(),
     // Marked while it runs, so nothing reclaims a node out from under an
     // executor that is part way through starting it.
     execute: async (order, recipe, graph) => {
       executingOrders.add(order.id)
+      announceLive(order.id)
       try {
         await executeRun(api, dataRoot(), order, recipe, graph)
       } finally {
         executingOrders.delete(order.id)
+        announceLive(order.id)
       }
     },
     isLive: isLiveSession,
@@ -3363,7 +3414,7 @@ export function activate(api: ExtensionAPI): void {
       const run = supervision?.runs.get(sessionId)
       return run ? readTranscript(run.transcriptPath) : []
     },
-    queueEntries: () => computeQueueEntries(api, dataRoot()),
+    queueEntries: () => computeQueueEntries(dataRoot(), orderStoreAt(dataRoot())),
   })
   reg(api, 'foundry:run.start', (payload) => runs.start(payload))
   reg(api, 'foundry:run.resume', (payload) => runs.resume(payload))
@@ -3391,7 +3442,7 @@ export function activate(api: ExtensionAPI): void {
     if (typeof id !== 'string' || id === '') return { error: 'Malformed request.' }
 
     const root = dataRoot()
-    const store = createOrderStore(root)
+    const store = orderStoreAt(root)
     const order = await store.load(id)
     if (order === null) return { error: `No order ${id}.` }
 
@@ -3401,6 +3452,7 @@ export function activate(api: ExtensionAPI): void {
       root,
       removeProjectAt: projectRemover(api.workspace),
     })
+    indexFor(root).runReset(id)
 
     // Read back rather than reused: `stopOrder` saves, and writing the order
     // we loaded before it would put `running` back.
@@ -3438,10 +3490,10 @@ export function activate(api: ExtensionAPI): void {
   // state worth trusting rather than a state worth double-checking.
   // Every live order's standing, read the way every surface reads it.
   const liveStandings = async (): Promise<{ orders: WorkOrder[]; waiting: WaitingOrder[] }> => {
-    const orders = (await createLiveOrderStore(dataRoot).list()).filter(
+    const orders = (await createLiveOrderStore(dataRoot, indexFor).list()).filter(
       (order) => order.status !== 'cancelled'
     )
-    const sources = { ...standingSources, ...orderStandingSources(createOrderStore(dataRoot())) }
+    const sources = { ...standingSources, ...orderStandingSources(orderStoreAt(dataRoot())) }
     const waiting = await Promise.all(
       orders.map(async (order) => ({
         orderId: order.id,
@@ -3452,8 +3504,8 @@ export function activate(api: ExtensionAPI): void {
   }
 
   const inbox = createInboxChannels({
-    gates: createLiveGateStore(dataRoot),
-    orders: createLiveOrderStore(dataRoot),
+    gates: createLiveGateStore(dataRoot, indexFor),
+    orders: createLiveOrderStore(dataRoot, indexFor),
     waiting: async () => {
       const { orders, waiting } = await liveStandings()
       return ordersWaiting(waiting, questionsByOrder(orders)).map(({ orderId, standing }) => ({
@@ -3467,7 +3519,7 @@ export function activate(api: ExtensionAPI): void {
     readPulls: (orderId) => readPulls(dataRoot(), orderId),
     now: () => new Date().toISOString(),
     record: async (orderId, action, subject, reason) => {
-      await createOrderStore(dataRoot()).record({
+      await orderStoreAt(dataRoot()).record({
         at: new Date().toISOString(),
         orderId,
         actor: 'operator',
@@ -3500,12 +3552,12 @@ export function activate(api: ExtensionAPI): void {
       if (gate.rule === 'ci.red') {
         if (option !== 'send_back') return
         const root = dataRoot()
-        const order = await createOrderStore(root).load(gate.orderId)
+        const order = await orderStoreAt(root).load(gate.orderId)
         if (order === null || order.recipe === null) return
         const resolved = resolveRecipe(order.recipe, resolveSources(api, root))
         if (!resolved.ok) return
         const recipe = resolved.resolved.value
-        const graph = await readRunGraph(root, gate.orderId)
+        const graph = await readGraph(root, gate.orderId)
         if (graph === null) return
         const pulls = await readPulls(root, gate.orderId)
         const { deps: executorDeps, exec } = await buildExecutorDeps(
@@ -3523,7 +3575,7 @@ export function activate(api: ExtensionAPI): void {
           ...ciRoundDepsFor(root, order.id, exec),
           sendBack: ciSendBackFor(root, order, recipe, executorDeps, integrateDeps, graphRef),
         })
-        const gates = createLiveGateStore(dataRoot)
+        const gates = createLiveGateStore(dataRoot, indexFor)
         const finished = await finishShipping(
           order,
           { verdicts: [], findings: [] },
@@ -3563,7 +3615,7 @@ export function activate(api: ExtensionAPI): void {
       // first: a drafted order gets the architect, in one turn, on every open
       // blocking finding; a still-running order resumes as it always did.
       if (gate.rule === 'forge-defect' && option === 'answer') {
-        const order = await createOrderStore(dataRoot()).load(gate.orderId)
+        const order = await orderStoreAt(dataRoot()).load(gate.orderId)
         const decision = forgeDefectAnswer({
           order,
           fixMessage: order === null ? null : fixMessage(order),
@@ -3573,7 +3625,7 @@ export function activate(api: ExtensionAPI): void {
           // Recorded, or the ledger shows no turn running while the architect
           // amends the order and every surface reads it as idle.
           const started = await convergeWithFollowUps(order, decision.message, 0, 1)
-          await createOrderStore(dataRoot()).record({
+          await orderStoreAt(dataRoot()).record({
             at: new Date().toISOString(),
             orderId: order.id,
             actor: 'role:architect',
@@ -3592,20 +3644,20 @@ export function activate(api: ExtensionAPI): void {
       // same failing check.
       if (sendsBackFinalCheck(gate, option)) {
         const root = dataRoot()
-        const graph = await readRunGraph(root, gate.orderId)
+        const graph = await readGraph(root, gate.orderId)
         if (graph !== null) {
           const roles = createRoleRegistry(resolveSources(api, root))
           const writers = graph.nodes
             .filter((n) => n.role !== null && roles.mayWrite(n.role))
             .map((n) => n.id)
           const output = gate.evidence.find((e) => e.kind === 'stdout')
-          await writeRunGraph(
+          await writeGraph(
             root,
             sendBack(graph, writers, {
               from: 'final check',
               // Counts this decision too: it is saved before it is acted on.
               attempt: finalCheckSendBacks(
-                (await createGateStore(root).list()).filter((g) => g.orderId === gate.orderId)
+                (await gateStoreAt(root).list()).filter((g) => g.orderId === gate.orderId)
               ),
               source: 'check',
               command: null,
@@ -3641,7 +3693,7 @@ export function activate(api: ExtensionAPI): void {
   // announce it on none of them: an open question sat third down the Forge's
   // rail and a held tool call sat under a whole run graph, so the only way to
   // find either was to already be looking at it.
-  const attentionGates = createLiveGateStore(dataRoot)
+  const attentionGates = createLiveGateStore(dataRoot, indexFor)
   reg(api, 'foundry:attention', async () => {
     // The chrome polls this from the moment the application opens, which makes
     // it the earliest place a run the last one left behind can be noticed. A
@@ -3665,8 +3717,9 @@ export function activate(api: ExtensionAPI): void {
   // channel the operator's own button reaches, never a subscription and never
   // anything the append path can trigger.
   const ledger = createLedgerChannels({
-    store: createLiveOrderStore(dataRoot),
+    store: createLiveOrderStore(dataRoot, indexFor),
     dataRoot,
+    index: indexFor,
     existingRuleIds: () => {
       const sources = resolveSources(api, dataRoot())
       return rulesFor(sources, { repoPaths: sources.repoPaths, houseDocs: [] }).rules.map(
@@ -3704,7 +3757,7 @@ export function activate(api: ExtensionAPI): void {
   // ── Signals (ADR-066) ────────────────────────────────────────────────────
   const sensors = createSensorChannels({
     store: signalStore,
-    orderStore: createLiveOrderStore(dataRoot),
+    orderStore: createLiveOrderStore(dataRoot, indexFor),
     availableSensors: () => availableSensors(resolveSources(api, dataRoot())),
     collectDepsFor: (repoPath) => sensorCollectDepsFor(api, repoPath),
     now: () => new Date().toISOString(),
@@ -3823,6 +3876,7 @@ export function activate(api: ExtensionAPI): void {
       // in the terminal, handed back, or the run ended. Saying "ok" left a card
       // showing a request nobody could clear.
       pendingPermissions.remove(requestId)
+      announceLive('')
       return { ok: false, reason: 'that request is no longer waiting' }
     }
     return { ok: true }

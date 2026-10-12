@@ -27,6 +27,7 @@ import type { Gate } from '../gates/rules.js'
 import type { ToolActivity } from '../runtime/transcript-tailer.js'
 import { recordGraph, readTimeline } from '../factory/timeline-store.js'
 import { pullNumber } from '../line/pull-number.js'
+import type { FoundryIndex } from '../state/foundry-index.js'
 
 // Starting a run.
 //
@@ -125,6 +126,8 @@ export interface RunDeps {
    * queue.
    */
   readonly queueEntries: () => Promise<readonly QueueEntry[]>
+  /** The in-memory index over this root's records; absent, every read parses the files. */
+  readonly index?: (root: string) => FoundryIndex
 }
 
 export interface RunChannels {
@@ -166,13 +169,15 @@ function graphPath(dataRoot: string, orderId: string): string {
  * two files claiming to be the run's state is worse than one written from two
  * places.
  */
-export async function writeRunGraph(dataRoot: string, graph: RunGraph): Promise<void> {
+export async function writeRunGraph(
+  dataRoot: string,
+  graph: RunGraph,
+  index?: FoundryIndex
+): Promise<void> {
+  const json = `${JSON.stringify(graph, null, 2)}\n`
   await fs.promises.mkdir(orderDir(dataRoot, graph.orderId), { recursive: true })
-  await fs.promises.writeFile(
-    graphPath(dataRoot, graph.orderId),
-    `${JSON.stringify(graph, null, 2)}\n`,
-    'utf8'
-  )
+  await fs.promises.writeFile(graphPath(dataRoot, graph.orderId), json, 'utf8')
+  index?.graphSaved(withUnitIdsOnNodes(JSON.parse(json) as RunGraph))
   // The replay's record of the run. Best effort: the graph just written is
   // the truth, and a timeline that cannot be appended to must not undo it.
   try {
@@ -189,16 +194,25 @@ export async function writeRunGraph(dataRoot: string, graph: RunGraph): Promise<
  * files claiming to be the run's state is worse than one, and two functions
  * disagreeing about where that file lives is how it would happen.
  */
-export async function readRunGraph(dataRoot: string, orderId: string): Promise<RunGraph | null> {
+export async function readRunGraph(
+  dataRoot: string,
+  orderId: string,
+  index?: FoundryIndex
+): Promise<RunGraph | null> {
+  if (index !== undefined) return index.graph(orderId)
   try {
     const raw = JSON.parse(
       await fs.promises.readFile(graphPath(dataRoot, orderId), 'utf8')
     ) as RunGraph
-    return { ...raw, nodes: raw.nodes.map(withUnitIds) }
+    return withUnitIdsOnNodes(raw)
   } catch {
     // A missing or unreadable graph is "no run", never a thrown surface.
     return null
   }
+}
+
+function withUnitIdsOnNodes(graph: RunGraph): RunGraph {
+  return { ...graph, nodes: graph.nodes.map(withUnitIds) }
 }
 
 /**
@@ -335,11 +349,11 @@ export function createRunChannels(deps: RunDeps): RunChannels {
   }
 
   async function saveGraph(graph: RunGraph): Promise<void> {
-    await writeRunGraph(deps.dataRoot(), graph)
+    await writeRunGraph(deps.dataRoot(), graph, deps.index?.(deps.dataRoot()))
   }
 
   async function loadGraph(orderId: string): Promise<RunGraph | null> {
-    return readRunGraph(deps.dataRoot(), orderId)
+    return readRunGraph(deps.dataRoot(), orderId, deps.index?.(deps.dataRoot()))
   }
 
   async function start(raw: unknown): Promise<unknown> {
