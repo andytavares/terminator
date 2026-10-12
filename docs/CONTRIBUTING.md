@@ -41,6 +41,8 @@ npm run test:e2e        # E2E — launches real Electron app (Playwright)
 npm run test:coverage   # Coverage report in coverage/
 ```
 
+Coverage is gated by Codecov on the pull request, not locally ([ADR 095](adr/095-coverage-is-gated-by-codecov.md)). `codecov/patch` needs 80% of the lines your change adds or modifies, and `codecov/project` must not drop. A test covers a scenario the running app can produce; a branch no real caller can reach is deleted, not tested.
+
 ### E2E rules
 
 E2E runs with no retries, so a test that fails once fails the build ([ADR 070](adr/070-e2e-is-deterministic-and-selective.md)).
@@ -169,10 +171,10 @@ ADRs are **immutable**. If a decision is reversed, write a new ADR that supersed
 
 ## Dependency Policy
 
-Per the constitution (Principle II):
+Per the constitution (Principle IV):
 
 - New dependencies require a brief justification in the PR: community health signal and official docs link.
-- Versions must be pinned (no `^`, no `latest`).
+- Versions are exact (no `^`, `~`, `*` or `latest`), and each package has one version across every `package.json` in the repository ([ADR 097](adr/097-one-version-per-dependency.md)).
 - The standard library must be used when it covers the need; do not add a package for something Node.js provides.
 
 ---

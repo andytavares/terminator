@@ -152,7 +152,7 @@ jobs:
           path: .vitest-reports
           merge-multiple: true
 
-      - name: Merge reports and enforce coverage
+      - name: Merge reports and write coverage
         run: >-
           npx vitest run --merge-reports --coverage --reporter=dot --reporter=junit
           --outputFile.junit=test-report.junit.xml
