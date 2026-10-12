@@ -1,0 +1,491 @@
+/**
+ * Where the Line's executor meets the application: real checkouts cut from a
+ * real repository, a runner that answers the way the supervised runner does,
+ * and the records the run leaves behind.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+
+import {
+  fakeHost,
+  fakeRunner,
+  realGit,
+  seededRepository,
+  temporaryDirectory,
+  type FoundryHost,
+} from '../helpers/foundry-host.js'
+import { buildExecutorDeps } from '../../src/line/executor-deps.js'
+import { runtime, strandedAgents, pendingPermissions } from '../../src/runtime/runtime-state.js'
+import { createSupervision } from '../../src/runtime/supervision.js'
+import { createOrderStore } from '../../src/order/store.js'
+import { createGateStore } from '../../src/gates/store.js'
+import { raiseGate } from '../../src/gates/rules.js'
+import { draftOrder } from '../../src/order/draft.js'
+import { buildRunGraph, withNode, type RunGraph, type RunNode } from '../../src/line/run-graph.js'
+import { resolveRecipe } from '../../src/recipe/resolve.js'
+import { resolveSources } from '../../src/workspace-root.js'
+import { checkoutPath } from '../../src/line/worktree.js'
+import { readObservedFiles } from '../../src/line/observed-files.js'
+import { orderDir } from '../../src/data-root.js'
+import type { Recipe } from '../../src/recipe/parse.js'
+import type { WorkOrder } from '../../src/order/schema.js'
+import type { LadderStep } from '../../src/verify/ladder.js'
+import type { ExecutorDeps } from '../../src/line/executor.js'
+
+const userData = vi.hoisted(() => ({ path: '' }))
+vi.mock('electron', () => ({ app: { getPath: () => userData.path } }))
+
+let root: string
+let repo: string
+let host: FoundryHost
+let runner: ReturnType<typeof fakeRunner>
+let order: WorkOrder
+let recipe: Recipe
+let graph: RunGraph
+
+function agreed(repoPath: string): WorkOrder {
+  const base = draftOrder({
+    id: 'WO-1',
+    title: 'Make it red',
+    source: { kind: 'typed', tracker: null, key: null, url: null },
+    repoPaths: [repoPath],
+    now: '2026-10-12T10:00:00.000Z',
+  })
+  return {
+    ...base,
+    status: 'running',
+    recipe: 'direct',
+    plan: {
+      ...base.plan,
+      units: [
+        {
+          id: 'U-1',
+          title: 'red text',
+          role: 'builder',
+          lane: 1,
+          dependsOn: [],
+          satisfies: [],
+          touches: ['src/a.ts'],
+          verify: [],
+        },
+      ],
+    },
+  }
+}
+
+beforeEach(async () => {
+  const parent = temporaryDirectory('fdry-executor')
+  userData.path = path.join(parent, 'user-data')
+  vi.stubEnv('HOME', path.join(parent, 'home'))
+  root = path.join(parent, 'records')
+  repo = await seededRepository(parent)
+  host = fakeHost(() => root)
+  runner = fakeRunner()
+  runtime.supervisedRunner = runner as never
+  runtime.supervision = createSupervision({
+    api: host.api,
+    stateDir: path.join(parent, 'state'),
+    onFeedChange: () => undefined,
+  })
+  order = agreed(repo)
+  await createOrderStore(root).save(order)
+  const resolved = resolveRecipe('direct', resolveSources(host.api, root))
+  if (!resolved.ok) throw new Error(resolved.reason)
+  recipe = resolved.resolved.value
+  graph = buildRunGraph(order, recipe)
+})
+
+afterEach(() => {
+  runtime.supervisedRunner = null
+  runtime.supervision = null
+  strandedAgents.clear()
+  vi.unstubAllEnvs()
+})
+
+const builderNode = (): RunNode => graph.nodes.find((node) => node.role === 'builder') as RunNode
+
+function runInput(over: Partial<Parameters<ExecutorDeps['run']>[0]> = {}) {
+  return {
+    node: builderNode(),
+    role: 'builder',
+    prompt: 'make the text red',
+    resumeSessionId: undefined,
+    readOnly: false,
+    modelTier: 'deep' as const,
+    effort: null,
+    mayUseTool: () => true,
+    outputPath: null,
+    outputsDir: null,
+    skillsMount: null,
+    ...over,
+  }
+}
+
+type StartInput = {
+  worktreePath: string
+  model: string
+  autoDecide: (tool: string, input: unknown) => { allow: boolean } | 'mode' | null
+  onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
+  onTurnEnd: (turns: number) => void
+  onEnd: (exitCode: number | null) => void
+  onPending: (pending: Record<string, unknown>) => void
+  onResolved: (requestId: string, outcome: string) => void
+  onAutoDenied: (tool: string, reason: string) => void
+}
+
+/** The runner starts the agent and hands back the callbacks it was given. */
+function agentStarts(sessionId: string): { started: Promise<StartInput> } {
+  let give: (input: StartInput) => void = () => undefined
+  const started = new Promise<StartInput>((resolve) => (give = resolve))
+  runner.start.mockImplementation((async (input: StartInput) => {
+    input.onRegistered({ sessionId, transcriptFrom: 0 })
+    give(input)
+    return {
+      sessionId,
+      transcriptFrom: 0,
+      terminalSessionId: `term-${sessionId}`,
+      transcriptPath: path.join(root, `${sessionId}.jsonl`),
+    }
+  }) as never)
+  return { started }
+}
+
+async function ledger(): Promise<string[]> {
+  return (await createOrderStore(root).entries('WO-1')).map((entry) => entry.action)
+}
+
+function git(cwd: string, ...args: string[]) {
+  return realGit({ command: 'git', args, cwd })
+}
+
+describe('an agent node', () => {
+  it('runs in the lane checkout under the records location, and is over when its turn ends', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { started } = agentStarts('builder-1')
+    const onStarted = vi.fn()
+    const running = deps.run(runInput({ onStarted }))
+    const input = await started
+    expect(input.worktreePath).toBe(checkoutPath(root, order, 'app'))
+    expect(onStarted).toHaveBeenCalledWith('builder-1')
+
+    input.onTurnEnd(1)
+    expect(await running).toEqual({ sessionId: 'builder-1', exitCode: 0, transcriptFrom: 0 })
+    expect(runner.stop).toHaveBeenCalledWith('builder-1')
+    // The lane's conversation is offered to the next node of the same role, never another.
+    await vi.waitFor(() => expect(deps.sessionFor(1, 'builder')).toBe('builder-1'))
+    expect(deps.sessionFor(1, 'verifier')).toBeUndefined()
+    expect(runtime.supervision?.runs.get('builder-1')?.worktreePath).toBe(input.worktreePath)
+  })
+
+  it('launches a fast role on the small model', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { started } = agentStarts('scribe-1')
+    void deps.run(runInput({ role: 'scribe', modelTier: 'fast' }))
+    expect((await started).model).toBe('haiku')
+  })
+
+  it('that ends with a failure is archived as stopped and reports its exit status', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { started } = agentStarts('builder-2')
+    const running = deps.run(runInput())
+    const input = await started
+    await vi.waitFor(() => expect(runtime.supervision?.runs.get('builder-2')).not.toBeNull())
+    input.onEnd(3)
+    expect((await running).exitCode).toBe(3)
+    expect(runtime.supervision?.snapshot().history[0]).toMatchObject({
+      sessionId: 'builder-2',
+      outcome: 'stopped',
+    })
+  })
+
+  it('reports nothing measured when the agent never started, or the runtime is not running', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    runner.start.mockResolvedValueOnce(null)
+    expect((await deps.run(runInput())).exitCode).toBeNull()
+    runner.start.mockRejectedValueOnce(new Error('no terminal'))
+    expect((await deps.run(runInput())).exitCode).toBeNull()
+    runtime.supervisedRunner = null
+    expect(await deps.run(runInput())).toEqual({
+      sessionId: `${builderNode().id}-unstarted`,
+      exitCode: null,
+    })
+  })
+
+  it('that asks about a tool is held for the operator and said so in the feed', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { started } = agentStarts('builder-3')
+    void deps.run(runInput())
+    const input = await started
+    strandedAgents.set('builder-3', { orderId: 'WO-1', sessionId: 'builder-3', at: 0 })
+    input.onPending({
+      sessionId: 'builder-3',
+      requestId: 'req-1',
+      toolName: 'Bash',
+      summary: 'curl example.com',
+      detail: null,
+      at: Date.now(),
+    })
+    expect(pendingPermissions.sessionFor('req-1')).toBe('builder-3')
+    expect(strandedAgents.has('builder-3')).toBe(false)
+    const feed = runtime.supervision?.feed.list().map((entry) => entry.summary)
+    expect(feed).toContain('asked about Bash: waiting for a decision')
+
+    // Nobody answered: the call went to the terminal's own prompt, and the agent waits there.
+    input.onResolved('req-1', 'handback')
+    expect(pendingPermissions.sessionFor('req-1')).toBeNull()
+    expect(strandedAgents.get('builder-3')).toMatchObject({ orderId: 'WO-1' })
+  })
+
+  it('that is refused a tool says so in the feed', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const { started } = agentStarts('verifier-1')
+    void deps.run(runInput({ role: 'verifier', readOnly: true }))
+    const input = await started
+    expect(
+      input.autoDecide('Write', { file_path: path.join(input.worktreePath, 'src/a.ts') })
+    ).toMatchObject({ allow: false })
+    input.onAutoDenied('Write', 'a verifier does not edit')
+    expect(runtime.supervision?.feed.list().map((entry) => entry.summary)).toContain(
+      'refused Write: a verifier does not edit'
+    )
+  })
+
+  it('carries on the conversation a resumed run recorded on its graph', async () => {
+    const resumed = withNode(graph, builderNode().id, { sessionId: 'earlier-builder' })
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, resumed)
+    expect(deps.sessionFor(1, 'builder')).toBe('earlier-builder')
+  })
+
+  it('ends the previous process of a conversation before it is resumed', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    let live = true
+    runner.terminalFor.mockImplementation(() =>
+      live ? { terminalSessionId: 'tab-1', projectId: 'p-1' } : null
+    )
+    runner.stop.mockImplementation(() => {
+      live = false
+      return true
+    })
+    await deps.endSession('builder-old')
+    expect(runner.stop).toHaveBeenCalledWith('builder-old', 'continuing the lane in its next step')
+  })
+})
+
+describe('a check rung', () => {
+  const step: LadderStep = {
+    rung: 'L2',
+    name: 'test',
+    command: 'npm test',
+    status: 'runnable',
+    reason: '',
+    check: 'test',
+  }
+
+  it('runs in a terminal of its own, and is not run again on the same commit once it passed', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const log = path.join(root, 'logs', 'test.log')
+    expect(await deps.runStep(step, log)).toBe(0)
+    expect(runner.runCommand).toHaveBeenCalledTimes(1)
+    expect(await deps.runStep(step, log)).toBe(0)
+    expect(runner.runCommand).toHaveBeenCalledTimes(1)
+    expect(fs.readFileSync(log, 'utf8')).toContain('already passed on this exact commit')
+  })
+
+  it('runs again once the checkout changed', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    await deps.runStep(step, path.join(root, 'test.log'))
+    fs.writeFileSync(path.join(checkoutPath(root, order, 'app'), 'new.txt'), 'x')
+    await deps.runStep(step, path.join(root, 'test.log'))
+    expect(runner.runCommand).toHaveBeenCalledTimes(2)
+  })
+
+  it('measures nothing when there is no command or no runtime', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    expect(await deps.runStep({ ...step, command: null }, '/x.log')).toBeNull()
+    expect(await deps.runStepOnBase({ ...step, command: null }, '/x.log')).toBeNull()
+    runtime.supervisedRunner = null
+    expect(await deps.runStep(step, '/x.log')).toBeNull()
+    expect(await deps.runStepOnBase(step, '/x.log')).toBeNull()
+    expect(await deps.reinstall('change', '/x.log')).toBeNull()
+    expect(
+      await deps.runCommand({ node: builderNode(), command: 'make', title: 't', logPath: '/x' })
+    ).toBeNull()
+  })
+
+  it('runs on the base branch in a checkout of its own, which is taken away again', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    runner.runCommand.mockResolvedValueOnce(1)
+    expect(await deps.runStepOnBase(step, path.join(root, 'base.log'))).toBe(1)
+    const ran = runner.runCommand.mock.calls[0][0] as unknown as {
+      worktreePath: string
+      title: string
+    }
+    expect(ran.title).toBe('test on main')
+    expect(ran.worktreePath).not.toBe(checkoutPath(root, order, 'app'))
+    expect(fs.existsSync(ran.worktreePath)).toBe(true)
+    await deps.releaseBase()
+    expect(fs.existsSync(ran.worktreePath)).toBe(false)
+  })
+})
+
+describe('a recipe command and a reinstall', () => {
+  it('runs a recipe command in the lane checkout', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    runner.runCommand.mockResolvedValueOnce(2)
+    expect(
+      await deps.runCommand({
+        node: builderNode(),
+        command: 'make lint',
+        title: 'lint',
+        logPath: path.join(root, 'lint.log'),
+      })
+    ).toBe(2)
+    expect(runner.runCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'make lint',
+        worktreePath: checkoutPath(root, order, 'app'),
+      })
+    )
+  })
+
+  it('reinstalls with the lockfile the checkout has, and does nothing without one', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    expect(await deps.reinstall('change', path.join(root, 'install.log'))).toBeNull()
+    expect(await deps.reinstall('base', path.join(root, 'install.log'))).toBeNull()
+    fs.writeFileSync(path.join(checkoutPath(root, order, 'app'), 'package-lock.json'), '{}')
+    expect(await deps.reinstall('change', path.join(root, 'install.log'))).toBe(0)
+    expect(runner.runCommand).toHaveBeenCalledWith(expect.objectContaining({ command: 'npm ci' }))
+  })
+})
+
+describe('committing a node', () => {
+  it('commits what the agent left, and calls an untouched tree clean', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const node = { ...builderNode(), startedAt: new Date(Date.now() + 60_000).toISOString() }
+    expect(await deps.commitNode({ node, message: 'nothing' })).toEqual({ kind: 'clean' })
+    fs.writeFileSync(path.join(checkoutPath(root, order, 'app'), 'red.css'), 'a { color: red }')
+    expect((await deps.commitNode({ node, message: 'red' })).kind).toBe('committed')
+  })
+
+  it('counts a commit the agent made itself as a change', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const checkout = checkoutPath(root, order, 'app')
+    const node = { ...builderNode(), startedAt: new Date(Date.now() - 60_000).toISOString() }
+    fs.writeFileSync(path.join(checkout, 'red.css'), 'a { color: red }')
+    await git(checkout, 'add', '-A')
+    await git(checkout, 'commit', '-q', '-m', 'agent did it')
+    expect(await deps.commitNode({ node, message: 'red' })).toEqual({ kind: 'committed' })
+  })
+})
+
+describe('what a rung hands back', () => {
+  const outputPath = (): string => path.join(orderDir(root, 'WO-1'), 'scout.json')
+
+  it('is nothing when the rung wrote nothing', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    expect(
+      await deps.collect({ nodeId: 'scout', role: 'scout', outputPath: outputPath() })
+    ).toBeNull()
+  })
+
+  it('goes onto the order when it is readable', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    fs.writeFileSync(
+      outputPath(),
+      JSON.stringify({ findings: { entryPoints: ['src/theme.ts'] }, note: 'read it' })
+    )
+    const collected = await deps.collect({
+      nodeId: 'scout',
+      role: 'scout',
+      outputPath: outputPath(),
+    })
+    expect(collected?.note).toBe('read it')
+    expect((await createOrderStore(root).load('WO-1'))?.context.entryPoints).toEqual([
+      'src/theme.ts',
+    ])
+  })
+
+  it('is refused on the record when it is not readable', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    fs.writeFileSync(outputPath(), 'not json')
+    expect(
+      await deps.collect({ nodeId: 'scout', role: 'scout', outputPath: outputPath() })
+    ).toBeNull()
+    expect(await ledger()).toContain('rung.refused')
+  })
+})
+
+describe('the run’s records', () => {
+  it('raises a gate on the inbox and names it on the ledger', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    await deps.raise(
+      raiseGate({
+        id: 'WO-1-conflict',
+        rule: 'refinery.conflict',
+        orderId: 'WO-1',
+        summary: 's',
+        why: 'it no longer rebases',
+        evidence: [],
+        at: '2026-10-12T10:00:00.000Z',
+      })
+    )
+    expect((await createGateStore(root).list()).map((gate) => gate.id)).toEqual(['WO-1-conflict'])
+    expect(await ledger()).toContain('gate.raised')
+  })
+
+  it('records a verdict and nothing for any other event', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    deps.onEvent({
+      type: 'verdict',
+      verdict: {
+        criterionId: 'AC-1',
+        result: 'fail',
+        reason: 'still blue',
+        evidence: [],
+        producedBy: { role: 'verifier' },
+      },
+    } as never)
+    deps.onEvent({ type: 'wave', nodes: [] } as never)
+    await deps.record('run.note', 'WO-1', 'a line')
+    await vi.waitFor(async () =>
+      expect((await ledger()).sort()).toEqual(['run.note', 'verify.verdict'])
+    )
+    const entries = await createOrderStore(root).entries('WO-1')
+    expect(entries.find((entry) => entry.action === 'verify.verdict')?.reason).toBe(
+      'fail: still blue'
+    )
+  })
+
+  it('writes the graph on every change, and the files a checkout changed once a step settles', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const checkout = checkoutPath(root, order, 'app')
+    fs.mkdirSync(path.join(checkout, 'src'))
+    fs.writeFileSync(path.join(checkout, 'src', 'a.ts'), 'export const red = 1\n')
+    await git(checkout, 'add', '-A')
+    await git(checkout, 'commit', '-q', '-m', 'red')
+
+    await deps.persist(graph)
+    expect(await readObservedFiles(root, 'WO-1')).toEqual([])
+    await deps.persist(withNode(graph, builderNode().id, { state: 'passed' }))
+    expect(await readObservedFiles(root, 'WO-1')).toEqual(['src/a.ts'])
+    expect(
+      JSON.parse(
+        fs.readFileSync(path.join(orderDir(root, 'WO-1'), 'run-graph.json'), 'utf8')
+      ).nodes.find((node: RunNode) => node.role === 'builder').state
+    ).toBe('passed')
+  })
+
+  it('measures what the work changed, leaving lockfiles out of the line count', async () => {
+    const { deps } = await buildExecutorDeps(host.api, root, order, recipe, graph)
+    const checkout = checkoutPath(root, order, 'app')
+    fs.writeFileSync(path.join(checkout, 'a.ts'), 'one\ntwo\n')
+    fs.writeFileSync(path.join(checkout, 'package-lock.json'), '{\n}\n')
+    await git(checkout, 'add', '-A')
+    await git(checkout, 'commit', '-q', '-m', 'work')
+    const change = await deps.observedChange()
+    expect([...change.changedFiles].sort()).toEqual(['a.ts', 'package-lock.json'])
+    expect(change.linesChanged).toBe(2)
+    expect((await deps.observe()).elapsedMinutes).toBeLessThan(1)
+  })
+})

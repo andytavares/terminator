@@ -144,7 +144,7 @@ Declared in `extensions/foundry/package.json` only. npm workspaces hoist them. E
 
 `npm run build:extensions` bundles `src/index.ts` to `src/index.js` with esbuild. That output is a **build artefact**: gitignored, never edited by hand. Change the TypeScript and rebuild.
 
-Extension specs live in `tests/` and are matched by the root `vitest.config.ts`. Note that `vi.mock` cannot intercept a module esbuild has inlined — any spec that calls `activate()` must import `../../src/index.ts`, not the bundle.
+Extension specs live in `tests/` and are matched by the root `vitest.config.ts`. Note that `vi.mock` cannot intercept a module esbuild has inlined — any spec that calls `activate()` must import `../../src/index.ts`, not the bundle. `tests/helpers/foundry-host.ts` activates Foundry over a host with real files, real `git` and a `gh` the spec answers for; `tests/helpers/line-run.ts` adds an agreed order and agents that do its work. Reuse them rather than writing another host.
 
 ## Typecheck
 
