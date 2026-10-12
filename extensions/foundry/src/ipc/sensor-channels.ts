@@ -7,6 +7,8 @@ import type { SignalStore, SensorState } from '../sensors/store.js'
 import type { SensorDef } from '../sensors/types.js'
 import type { CollectDeps } from '../sensors/collect.js'
 import type { OrderStore } from '../order/store.js'
+import type { ChannelSpec } from '@terminator/extension-sdk'
+import { foundryChannel } from './channel.js'
 
 // The sensor surface (ADR-066): what the operator sees of a signal, and the
 // two moves they have over one — dismiss it, or promote it into a draft the
@@ -46,12 +48,12 @@ export interface SensorChannelDeps {
 }
 
 export interface SensorChannels {
-  list(payload: unknown): Promise<unknown>
-  dismiss(payload: unknown): Promise<unknown>
-  promote(payload: unknown): Promise<unknown>
-  sensorsList(payload: unknown): Promise<unknown>
-  sensorsSet(payload: unknown): Promise<unknown>
-  sensorsRunNow(payload: unknown): Promise<unknown>
+  list(): Promise<unknown>
+  dismiss(payload: z.infer<typeof IdPayload>): Promise<unknown>
+  promote(payload: z.infer<typeof PromotePayload>): Promise<unknown>
+  sensorsList(): Promise<unknown>
+  sensorsSet(payload: z.infer<typeof SetPayload>): Promise<unknown>
+  sensorsRunNow(payload: z.infer<typeof IdPayload>): Promise<unknown>
 }
 
 function nextDueAt(state: SensorState, def: SensorDef, now: string): string | null {
@@ -61,30 +63,22 @@ function nextDueAt(state: SensorState, def: SensorDef, now: string): string | nu
 }
 
 export function createSensorChannels(deps: SensorChannelDeps): SensorChannels {
-  async function list(raw: unknown): Promise<unknown> {
-    const parsed = EmptyPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
+  async function list(): Promise<unknown> {
     const signals = ranked(await deps.store.list())
     return { signals, counts: { open: signals.length } }
   }
 
-  async function dismissSignal(raw: unknown): Promise<unknown> {
-    const parsed = IdPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const signal = await deps.store.get(parsed.data.id)
-    if (signal === null) return { error: `No signal ${parsed.data.id}.` }
+  async function dismissSignal(payload: z.infer<typeof IdPayload>): Promise<unknown> {
+    const signal = await deps.store.get(payload.id)
+    if (signal === null) return { error: `No signal ${payload.id}.` }
 
     const dismissed = dismiss(signal)
     await deps.store.save([dismissed])
     return { signal: dismissed }
   }
 
-  async function promoteSignal(raw: unknown): Promise<unknown> {
-    const parsed = PromotePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const { id, repoPaths } = parsed.data
+  async function promoteSignal(payload: z.infer<typeof PromotePayload>): Promise<unknown> {
+    const { id, repoPaths } = payload
 
     const signal = await deps.store.get(id)
     if (signal === null) return { error: `No signal ${id}.` }
@@ -116,10 +110,7 @@ export function createSensorChannels(deps: SensorChannelDeps): SensorChannels {
     return { order: seeded.order }
   }
 
-  async function sensorsList(raw: unknown): Promise<unknown> {
-    const parsed = EmptyPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
+  async function sensorsList(): Promise<unknown> {
     const states = await deps.store.sensorState()
     const now = deps.now()
     return {
@@ -130,10 +121,8 @@ export function createSensorChannels(deps: SensorChannelDeps): SensorChannels {
     }
   }
 
-  async function sensorsSet(raw: unknown): Promise<unknown> {
-    const parsed = SetPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const { id, enabled, repoPath } = parsed.data
+  async function sensorsSet(payload: z.infer<typeof SetPayload>): Promise<unknown> {
+    const { id, enabled, repoPath } = payload
 
     const states = await deps.store.sensorState()
     // The store keeps only what was ever patched — an id absent from
@@ -155,12 +144,9 @@ export function createSensorChannels(deps: SensorChannelDeps): SensorChannels {
     return { state: updated[id] }
   }
 
-  async function sensorsRunNow(raw: unknown): Promise<unknown> {
-    const parsed = IdPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const found = deps.availableSensors().find(({ def }) => def.id === parsed.data.id)
-    if (found === undefined) return { error: `No sensor ${parsed.data.id}.` }
+  async function sensorsRunNow(payload: z.infer<typeof IdPayload>): Promise<unknown> {
+    const found = deps.availableSensors().find(({ def }) => def.id === payload.id)
+    if (found === undefined) return { error: `No sensor ${payload.id}.` }
 
     const states = await deps.store.sensorState()
     const state = states[found.def.id] ?? DEFAULT_STATE
@@ -182,4 +168,16 @@ export function createSensorChannels(deps: SensorChannelDeps): SensorChannels {
     sensorsSet,
     sensorsRunNow,
   }
+}
+
+/** The sensor surface's channels, each with the schema its payload is parsed with (ADR 096). */
+export function sensorChannelSpecs(sensors: SensorChannels): ChannelSpec[] {
+  return [
+    foundryChannel('foundry:signals.list', EmptyPayload, sensors.list),
+    foundryChannel('foundry:signals.dismiss', IdPayload, sensors.dismiss),
+    foundryChannel('foundry:signals.promote', PromotePayload, sensors.promote),
+    foundryChannel('foundry:sensors.list', EmptyPayload, sensors.sensorsList),
+    foundryChannel('foundry:sensors.set', SetPayload, sensors.sensorsSet),
+    foundryChannel('foundry:sensors.run-now', IdPayload, sensors.sensorsRunNow),
+  ]
 }

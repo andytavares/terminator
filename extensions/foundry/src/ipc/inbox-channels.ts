@@ -15,7 +15,7 @@ import { pullNumber } from '../line/pull-number.js'
 // row names the rule that raised it. Nothing reaches this list that a rule did
 // not produce, which is what makes "nothing needs you" a state worth trusting.
 
-const DecidePayload = z.object({
+export const DecidePayload = z.object({
   gateId: z.string(),
   option: z.string(),
   note: z.string().optional(),
@@ -66,7 +66,7 @@ export interface WaitingRow {
 
 export interface InboxChannels {
   list(): Promise<unknown>
-  decide(payload: unknown): Promise<unknown>
+  decide(payload: z.infer<typeof DecidePayload>): Promise<unknown>
 }
 
 export function createInboxChannels(deps: InboxDeps): InboxChannels {
@@ -148,22 +148,19 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
     }
   }
 
-  async function decideGate(raw: unknown): Promise<unknown> {
-    const parsed = DecidePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const gate = await deps.gates.get(parsed.data.gateId)
-    if (gate === null) return { error: `No gate ${parsed.data.gateId}.` }
+  async function decideGate(payload: z.infer<typeof DecidePayload>): Promise<unknown> {
+    const gate = await deps.gates.get(payload.gateId)
+    if (gate === null) return { error: `No gate ${payload.gateId}.` }
     if (gate.decision !== null) {
       return { error: `Gate ${gate.id} was already decided (${gate.decision.option}).` }
     }
 
     // A gate without a breach predates it being recorded; resuming raises a
     // fresh one that has it.
-    const breach = parsed.data.option === 'raise' ? (gate.breach ?? null) : null
+    const breach = payload.option === 'raise' ? (gate.breach ?? null) : null
     const order = breach === null ? null : await deps.orders.load(gate.orderId)
     if (breach !== null) {
-      const { limit } = parsed.data
+      const { limit } = payload
       if (limit === undefined) return { error: 'Say what the new limit is, or choose no limit.' }
       const problem = raisedLimitProblem(breach, limit)
       if (problem !== null) return { error: problem }
@@ -172,7 +169,7 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
 
     let decided
     try {
-      decided = decide(gate, parsed.data.option, parsed.data.note ?? '', deps.now())
+      decided = decide(gate, payload.option, payload.note ?? '', deps.now())
     } catch (error) {
       return { error: (error as Error).message }
     }
@@ -183,12 +180,12 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
       gate.orderId,
       'gate.decided',
       gate.id,
-      `${ruleInWords(gate.rule)} -> ${parsed.data.option}${parsed.data.note === undefined ? '' : `: ${parsed.data.note}`}`
+      `${ruleInWords(gate.rule)} -> ${payload.option}${payload.note === undefined ? '' : `: ${payload.note}`}`
     )
     await deps.gates.save(decided)
 
-    if (breach !== null && order !== null && parsed.data.limit !== undefined) {
-      const { limit } = parsed.data
+    if (breach !== null && order !== null && payload.limit !== undefined) {
+      const { limit } = payload
       await deps.orders.save({ ...order, budgets: withLimit(order.budgets, breach.kind, limit) })
       await deps.record(
         gate.orderId,
@@ -199,7 +196,7 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
     }
 
     try {
-      await deps.act(decided, parsed.data.option)
+      await deps.act(decided, payload.option)
     } catch (error) {
       const reason = (error as Error).message
       await deps.record(gate.orderId, 'gate.action_failed', gate.id, reason)

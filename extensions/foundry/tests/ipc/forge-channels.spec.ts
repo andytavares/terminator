@@ -102,11 +102,6 @@ describe('foundry:order.create', () => {
     })) as { existing: { id: string } }
     expect(second.existing.id).toBe(first.order.id)
   })
-
-  it('rejects a malformed request without touching the store', async () => {
-    expect(await channels().create({ nonsense: true })).toEqual({ error: 'Malformed request.' })
-    expect(await store.list()).toEqual([])
-  })
 })
 
 describe('foundry:order.turn', () => {
@@ -596,14 +591,6 @@ describe('channel edge cases', () => {
     expect(readIssue).toHaveBeenCalledWith('linear', 'TAV-1')
   })
 
-  it('rejects a malformed turn', async () => {
-    expect(await channels().turn({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
-
-  it('rejects a malformed compile request', async () => {
-    expect(await channels().compile({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
-
   it('treats a compile with no commit flag as a preview', async () => {
     const seeded = (await channels().create({
       source: { kind: 'typed', text: 'x' },
@@ -826,29 +813,12 @@ describe('the intent-to-state mapping (FR-060)', () => {
     expect((await store.load('WO-1'))?.stateMapping.done).toBeNull()
   })
 
-  it('refuses an intent that is not one of the three', async () => {
-    const store = createOrderStore(root)
-    await store.save(await agreeable())
-    expect(
-      await createForgeChannels(forgeDeps()).mapState({
-        id: 'WO-1',
-        intent: 'shipped',
-        optionId: 'x',
-      })
-    ).toEqual({ error: 'Malformed request.' })
-  })
-
   it('reports an order it cannot find', async () => {
     const channels = createForgeChannels(forgeDeps({ store: createOrderStore(root) }))
     expect(await channels.mapState({ id: 'WO-nope', intent: 'done', optionId: null })).toEqual({
       error: 'No order WO-nope.',
     })
     expect(await channels.states({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
-  })
-
-  it('rejects a malformed states request', async () => {
-    const channels = createForgeChannels(forgeDeps({ store: createOrderStore(root) }))
-    expect(await channels.states({ nope: true })).toEqual({ error: 'Malformed request.' })
   })
 })
 
@@ -1184,18 +1154,6 @@ describe('clearing an adversarial finding — the other thing that blocked the g
     return seed.order
   }
 
-  // Fixing one is the architect's, told how: an operator "Fixed" with nothing
-  // behind it cleared the gate without changing the order.
-  it('refuses to mark one fixed by decree', async () => {
-    const o = await withFinding()
-    const r = (await channels().turn({
-      id: o.id,
-      finding: { id: o.redTeam[0].id, decision: 'resolved' },
-    })) as { error?: string }
-    expect(r.error).toBeDefined()
-    expect((await store.load(o.id))?.redTeam[0].status).toBe('open')
-  })
-
   it('accepts one, with the reason it stands', async () => {
     const o = await withFinding()
     const r = (await channels().turn({
@@ -1403,16 +1361,6 @@ describe('turning a write-back off for one order (FR-062)', () => {
     expect(ledger).toContain('nothing is written back')
   })
 
-  it('refuses a write-back this build does not have', async () => {
-    const seed = (await channels().create({
-      source: { kind: 'typed', text: 'x' },
-      repoPaths: [repo],
-    })) as OrderView
-    expect(await channels().setWriteBack({ id: seed.order.id, writeBack: ['everything'] })).toEqual(
-      { error: 'Malformed request.' }
-    )
-  })
-
   it('reports an order it cannot find', async () => {
     expect(await channels().setWriteBack({ id: 'WO-nope', writeBack: [] })).toEqual({
       error: 'No order WO-nope.',
@@ -1441,17 +1389,6 @@ describe('setting one order’s budgets', () => {
     expect((await store.load(order.id))?.budgets).toEqual(expected)
   })
 
-  // ADR 056: there is no files budget to set.
-  it('refuses a files budget', async () => {
-    const { order } = await seed()
-    expect(
-      await channels().setBudgets({
-        id: order.id,
-        budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25 },
-      })
-    ).toEqual({ error: 'Malformed request.' })
-  })
-
   it('records the choice in words', async () => {
     const { order } = await seed()
     await channels().setBudgets({
@@ -1461,16 +1398,6 @@ describe('setting one order’s budgets', () => {
     const ledger = fs.readFileSync(path.join(root, 'orders', order.id, 'ledger.jsonl'), 'utf8')
     expect(ledger).toContain('budgets.configured')
     expect(ledger).toContain('2 agents · 30 minutes')
-  })
-
-  it('refuses a limit of zero', async () => {
-    const { order } = await seed()
-    expect(
-      await channels().setBudgets({
-        id: order.id,
-        budgets: { agents: 0, wallClockMinutes: 45 },
-      })
-    ).toEqual({ error: 'Malformed request.' })
   })
 
   // A running order's budgets change at its budget gate, where the run is

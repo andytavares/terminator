@@ -16,6 +16,8 @@ import { factoryMetrics as computeFactoryMetrics } from '../factory/metrics.js'
 import type { OrderRecords } from '../factory/metrics.js'
 import { availableSkills } from '../recipe/resolve.js'
 import type { ResolveSources } from '../recipe/resolve.js'
+import { noPayload, type ChannelSpec } from '@terminator/extension-sdk'
+import { foundryChannel } from './channel.js'
 
 // The record, and what the operator can ask it for.
 //
@@ -76,12 +78,12 @@ export interface LedgerDeps {
 }
 
 export interface LedgerChannels {
-  query(payload: unknown): Promise<unknown>
-  proposeRules(payload: unknown): Promise<unknown>
-  decideProposal(payload: unknown): Promise<unknown>
-  rulesInForce(payload: unknown): Promise<unknown>
-  removeAcceptedRule(payload: unknown): Promise<unknown>
-  factoryMetrics(payload: unknown): Promise<unknown>
+  query(payload: z.infer<typeof QueryPayload>): Promise<unknown>
+  proposeRules(payload: z.infer<typeof ProposePayload>): Promise<unknown>
+  decideProposal(payload: z.infer<typeof DecidePayload>): Promise<unknown>
+  rulesInForce(): Promise<unknown>
+  removeAcceptedRule(payload: z.infer<typeof RemovePayload>): Promise<unknown>
+  factoryMetrics(payload: z.infer<typeof FactoryMetricsPayload>): Promise<unknown>
 }
 
 export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
@@ -100,10 +102,8 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     return perOrder.flat().sort((a, b) => a.at.localeCompare(b.at))
   }
 
-  async function query(raw: unknown): Promise<unknown> {
-    const parsed = QueryPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const { orderId, actor, action, since, limit } = parsed.data
+  async function query(payload: z.infer<typeof QueryPayload>): Promise<unknown> {
+    const { orderId, actor, action, since, limit } = payload
 
     const all = await entriesFor(orderId)
     const matched = all.filter((entry) => {
@@ -126,22 +126,17 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     }
   }
 
-  async function proposeRules(raw: unknown): Promise<unknown> {
-    const parsed = ProposePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
+  async function proposeRules(payload: z.infer<typeof ProposePayload>): Promise<unknown> {
     const proposals = propose({
-      entries: await entriesFor(parsed.data.orderId),
+      entries: await entriesFor(payload.orderId),
       existingRuleIds: deps.existingRuleIds(),
       rejectedIds: await declinedProposals(deps.dataRoot()),
     })
     return { proposals }
   }
 
-  async function decideProposal(raw: unknown): Promise<unknown> {
-    const parsed = DecidePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const { proposalId, accept, reason } = parsed.data
+  async function decideProposal(payload: z.infer<typeof DecidePayload>): Promise<unknown> {
+    const { proposalId, accept, reason } = payload
 
     // Re-derived rather than carried in from the surface: a proposal the
     // renderer held onto could name citations the ledger no longer supports,
@@ -188,10 +183,8 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
    * would leave the tool quietly weaker than the one it ships as, and a
    * removal that silently did nothing is worse than a refusal that says why.
    */
-  async function removeAcceptedRule(raw: unknown): Promise<unknown> {
-    const parsed = RemovePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const { ruleId } = parsed.data
+  async function removeAcceptedRule(payload: z.infer<typeof RemovePayload>): Promise<unknown> {
+    const { ruleId } = payload
 
     const accepted = deps.acceptedRules().find((rule) => rule.id === ruleId)
     if (accepted === undefined) {
@@ -200,7 +193,7 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
       }
     }
 
-    const reason = parsed.data.reason ?? 'removed by the operator'
+    const reason = payload.reason ?? 'removed by the operator'
     const removed = await removeRule(deps.dataRoot(), ruleId, reason, accepted.asserts)
     return { ok: true, removed, reason, at: deps.now() }
   }
@@ -210,10 +203,8 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
    * reduced by `factoryMetrics`. Nothing here is stored — it is recomputed on
    * every call from the same records the order screens already read.
    */
-  async function factoryMetrics(raw: unknown): Promise<unknown> {
-    const parsed = FactoryMetricsPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const window = parsed.data.window ?? '30d'
+  async function factoryMetrics(payload: z.infer<typeof FactoryMetricsPayload>): Promise<unknown> {
+    const window = payload.window ?? '30d'
 
     const orders = await deps.store.list()
     const root = deps.dataRoot()
@@ -245,4 +236,16 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     removeAcceptedRule,
     factoryMetrics,
   }
+}
+
+/** The record's channels, each with the schema its payload is parsed with (ADR 096). */
+export function ledgerChannelSpecs(ledger: LedgerChannels): ChannelSpec[] {
+  return [
+    foundryChannel('foundry:ledger.query', QueryPayload, ledger.query),
+    foundryChannel('foundry:factory.metrics', FactoryMetricsPayload, ledger.factoryMetrics),
+    foundryChannel('foundry:rules.propose', ProposePayload, ledger.proposeRules),
+    foundryChannel('foundry:rules.decide', DecidePayload, ledger.decideProposal),
+    foundryChannel('foundry:rules.inForce', noPayload, ledger.rulesInForce),
+    foundryChannel('foundry:rules.remove', RemovePayload, ledger.removeAcceptedRule),
+  ]
 }

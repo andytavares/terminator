@@ -12,12 +12,13 @@ import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const src = fs.readFileSync(path.join(here, '..', 'src', 'index.ts'), 'utf8')
+const runChannels = fs.readFileSync(path.join(here, '..', 'src', 'ipc', 'run-channels.ts'), 'utf8')
 
 describe('hand-off', () => {
   it('starts a run only from the operator\u2019s channel, or to restart one they released', () => {
-    const starts = [...src.matchAll(/runs\.start\(/g)]
-    expect(starts).toHaveLength(2)
-    expect(src).toContain("reg(api, 'foundry:run.start', (payload) => runs.start(payload))")
+    const starts = [...src.matchAll(/runs\.start\b/g)]
+    expect(starts).toHaveLength(1)
+    expect(runChannels).toContain("foundryChannel('foundry:run.start', StartPayload, runs.start)")
     const restart = src.indexOf('runs.start({')
     expect(src.lastIndexOf('await readyToHandOff(order, {', restart)).toBeGreaterThan(
       src.lastIndexOf('const handOffWhenReady', restart)
