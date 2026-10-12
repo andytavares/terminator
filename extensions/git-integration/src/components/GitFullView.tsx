@@ -82,7 +82,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
         try {
           const fileStatus = status?.files.find((f) => f.path === path)
           const isUntracked = fileStatus?.status === 'untracked'
-          const result = (await gitAPI.diffFile(repoRoot, path, staged, isUntracked)) as
+          const result = (await gitAPI.diffFile({ repoRoot, path, staged, isUntracked })) as
             | { diff: FileDiff }
             | { error: string }
           if ('diff' in result) setDiff(cacheKey, result.diff)
@@ -157,7 +157,12 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       setIsHookFailure(false)
       startCommitPhase(repoRoot)
       try {
-        const result = await gitAPI.commit(repoRoot, commitMessage.trim(), false, noVerify)
+        const result = await gitAPI.commit({
+          repoRoot,
+          message: commitMessage.trim(),
+          signOff: false,
+          noVerify,
+        })
         applyCommitResult(result)
       } finally {
         setIsCommitting(false)
@@ -186,7 +191,12 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       setIsHookFailure(false)
       startCommitPhase(repoRoot)
       try {
-        const result = await gitAPI.commit(repoRoot, commitMessage.trim(), false, noVerify)
+        const result = await gitAPI.commit({
+          repoRoot,
+          message: commitMessage.trim(),
+          signOff: false,
+          noVerify,
+        })
         if (!applyCommitResult(result)) return
         setIsCommitting(false)
         endCommitPhase()

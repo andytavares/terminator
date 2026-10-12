@@ -65,21 +65,23 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
       if (!activeBlock || !session) return
       const wasAlreadyResolved = activeBlock.isResolved
       try {
-        const result = await mergeFlowAPI.resolveConflict(
+        const result = await mergeFlowAPI.resolveConflict({
           repoRoot,
-          activeBlock.blockId,
+          blockId: activeBlock.blockId,
           resolvedText,
           strategy,
-          wasAlreadyResolved ? (activeBlock.resolvedText ?? undefined) : undefined,
-          activeBlock.originalConflictText
-        )
+          currentResolvedText: wasAlreadyResolved
+            ? (activeBlock.resolvedText ?? undefined)
+            : undefined,
+          originalConflictText: activeBlock.originalConflictText,
+        })
         if ('error' in result) {
-          void notificationsAPI.notify(
-            'error',
-            'Could not resolve conflict',
-            'conflictResolveFailed',
-            result.error
-          )
+          void notificationsAPI.notify({
+            type: 'error',
+            title: 'Could not resolve conflict',
+            key: 'conflictResolveFailed',
+            message: result.error,
+          })
           return
         }
         confirmDecision(activeBlock.blockId, {
@@ -100,12 +102,12 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
         // can continue reviewing — setPendingResolution will be cleared below
         setPendingResolution(null)
       } catch (e) {
-        void notificationsAPI.notify(
-          'error',
-          'Could not resolve conflict',
-          'conflictResolveFailed',
-          String(e)
-        )
+        void notificationsAPI.notify({
+          type: 'error',
+          title: 'Could not resolve conflict',
+          key: 'conflictResolveFailed',
+          message: String(e),
+        })
       }
     },
     [activeBlock, session, repoRoot, confirmDecision, goToNextBlock, onComplete]
@@ -115,17 +117,27 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
     const decision = undoLastDecision()
     if (!decision) return
     try {
-      const result = await mergeFlowAPI.undoResolve(
+      const result = await mergeFlowAPI.undoResolve({
         repoRoot,
-        decision.blockId,
-        decision.resolvedText,
-        decision.originalConflictText
-      )
+        blockId: decision.blockId,
+        resolvedText: decision.resolvedText,
+        originalConflictText: decision.originalConflictText,
+      })
       if ('error' in result) {
-        void notificationsAPI.notify('error', 'Could not undo', 'conflictUndoFailed', result.error)
+        void notificationsAPI.notify({
+          type: 'error',
+          title: 'Could not undo',
+          key: 'conflictUndoFailed',
+          message: result.error,
+        })
       }
     } catch (e) {
-      void notificationsAPI.notify('error', 'Could not undo', 'conflictUndoFailed', String(e))
+      void notificationsAPI.notify({
+        type: 'error',
+        title: 'Could not undo',
+        key: 'conflictUndoFailed',
+        message: String(e),
+      })
     }
   }, [undoLastDecision, repoRoot])
 

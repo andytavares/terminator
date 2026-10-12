@@ -43,17 +43,21 @@ export function MergeFlowView({ repoRoot, onExit }: Props) {
         // No valid persisted session — build a fresh one from the actual conflict state
         const result = await mergeFlowAPI.listConflicts(repoRoot)
         if ('error' in result) {
-          void notificationsAPI.notify(
-            'error',
-            'Could not load conflicts',
-            'loadConflictsFailed',
-            result.error
-          )
+          void notificationsAPI.notify({
+            type: 'error',
+            title: 'Could not load conflicts',
+            key: 'loadConflictsFailed',
+            message: result.error,
+          })
           onExit()
           return
         }
         if (result.files.length === 0) {
-          void notificationsAPI.notify('info', 'No merge conflicts found.', 'noConflictsFound')
+          void notificationsAPI.notify({
+            type: 'info',
+            title: 'No merge conflicts found.',
+            key: 'noConflictsFound',
+          })
           onExit()
           return
         }
@@ -61,12 +65,12 @@ export function MergeFlowView({ repoRoot, onExit }: Props) {
         void mergeFlowAPI.persistSession(repoRoot, result)
       } catch (e) {
         setError(String(e))
-        void notificationsAPI.notify(
-          'error',
-          'Could not open conflict resolver',
-          'openResolverFailed',
-          String(e)
-        )
+        void notificationsAPI.notify({
+          type: 'error',
+          title: 'Could not open conflict resolver',
+          key: 'openResolverFailed',
+          message: String(e),
+        })
         onExit()
       } finally {
         setLoading(false)
@@ -88,7 +92,12 @@ export function MergeFlowView({ repoRoot, onExit }: Props) {
         }))
       )
       if ('error' in result) {
-        void notificationsAPI.notify('error', 'Could not reset', 'resetFailed', result.error)
+        void notificationsAPI.notify({
+          type: 'error',
+          title: 'Could not reset',
+          key: 'resetFailed',
+          message: result.error,
+        })
         return
       }
       clearSession()
@@ -98,19 +107,24 @@ export function MergeFlowView({ repoRoot, onExit }: Props) {
       setLoading(true)
       const fresh = await mergeFlowAPI.listConflicts(repoRoot)
       if ('error' in fresh) {
-        void notificationsAPI.notify(
-          'error',
-          'Could not reload conflicts',
-          'reloadConflictsFailed',
-          fresh.error
-        )
+        void notificationsAPI.notify({
+          type: 'error',
+          title: 'Could not reload conflicts',
+          key: 'reloadConflictsFailed',
+          message: fresh.error,
+        })
         onExit()
         return
       }
       startSession(fresh)
       void mergeFlowAPI.persistSession(repoRoot, fresh)
     } catch (e) {
-      void notificationsAPI.notify('error', 'Start over failed', 'startOverFailed', String(e))
+      void notificationsAPI.notify({
+        type: 'error',
+        title: 'Start over failed',
+        key: 'startOverFailed',
+        message: String(e),
+      })
     } finally {
       setLoading(false)
     }

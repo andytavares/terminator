@@ -24,7 +24,14 @@ describe('mergeFlowAPI bridge', () => {
 
   it('resolveConflict calls correct channel with all args', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
-    await mergeFlowAPI.resolveConflict('/repo', 'src/foo.ts#0', 'resolved', 'ours', 'prev', 'orig')
+    await mergeFlowAPI.resolveConflict({
+      repoRoot: '/repo',
+      blockId: 'src/foo.ts#0',
+      resolvedText: 'resolved',
+      strategy: 'ours',
+      currentResolvedText: 'prev',
+      originalConflictText: 'orig',
+    })
     expect(mockInvoke).toHaveBeenCalledWith('git:resolve-conflict', {
       repoRoot: '/repo',
       blockId: 'src/foo.ts#0',
@@ -39,7 +46,12 @@ describe('mergeFlowAPI bridge', () => {
 describe('mergeFlowAPI bridge — resolveConflict calls correct channel without optional args', () => {
   it('resolveConflict calls correct channel without optional args', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
-    await mergeFlowAPI.resolveConflict('/repo', 'src/foo.ts#0', 'resolved', 'theirs')
+    await mergeFlowAPI.resolveConflict({
+      repoRoot: '/repo',
+      blockId: 'src/foo.ts#0',
+      resolvedText: 'resolved',
+      strategy: 'theirs',
+    })
     expect(mockInvoke).toHaveBeenCalledWith('git:resolve-conflict', {
       repoRoot: '/repo',
       blockId: 'src/foo.ts#0',
@@ -52,7 +64,12 @@ describe('mergeFlowAPI bridge — resolveConflict calls correct channel without 
 
   it('undoResolve calls correct channel', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
-    await mergeFlowAPI.undoResolve('/repo', 'src/foo.ts#0', 'resolved', 'original')
+    await mergeFlowAPI.undoResolve({
+      repoRoot: '/repo',
+      blockId: 'src/foo.ts#0',
+      resolvedText: 'resolved',
+      originalConflictText: 'original',
+    })
     expect(mockInvoke).toHaveBeenCalledWith('git:undo-resolve', {
       repoRoot: '/repo',
       blockId: 'src/foo.ts#0',
@@ -115,7 +132,12 @@ describe('mergeFlowAPI bridge — resetSession calls correct channel', () => {
 
   it('preparePrWorktree calls correct channel', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
-    await mergeFlowAPI.preparePrWorktree('/repo', '/tmp/wt', 'feature/branch', 'main')
+    await mergeFlowAPI.preparePrWorktree({
+      repoRoot: '/repo',
+      worktreePath: '/tmp/wt',
+      headRefName: 'feature/branch',
+      baseRefName: 'main',
+    })
     expect(mockInvoke).toHaveBeenCalledWith('git:prepare-pr-worktree', {
       repoRoot: '/repo',
       worktreePath: '/tmp/wt',

@@ -126,12 +126,12 @@ export function PrOverviewPanel({
         pr.headRefName
       )
 
-      const mergeResult = await mergeFlowAPI.preparePrWorktree(
+      const mergeResult = await mergeFlowAPI.preparePrWorktree({
         repoRoot,
         worktreePath,
-        pr.headRefName,
-        pr.baseRefName
-      )
+        headRefName: pr.headRefName,
+        baseRefName: pr.baseRefName,
+      })
       if ('error' in mergeResult) {
         setMergeError(`Could not prepare merge: ${mergeResult.error}`)
         return

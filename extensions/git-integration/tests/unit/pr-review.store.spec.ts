@@ -94,7 +94,12 @@ describe('pr-review store — session v2 — treats every viewed file as changed
     expect(s.changedSince.has('scripts/e2e-shard.ts')).toBe(false)
     expect(s.viewedFiles.has('scripts/e2e-shard.ts')).toBe(true)
     expect(s.viewedAt['scripts/e2e-shard.ts']).toBe('bbb222')
-    expect(fileViewedSet).toHaveBeenCalledWith(REPO, 211, 'scripts/e2e-shard.ts', true, undefined)
+    expect(fileViewedSet).toHaveBeenCalledWith({
+      repoRoot: REPO,
+      prNumber: 211,
+      path: 'scripts/e2e-shard.ts',
+      viewed: true,
+    })
     const [key, persisted] = sessionSet.mock.calls.at(-1)!
     expect(key).toBe(`${REPO}:::211`)
     expect((persisted as ReviewSession).viewedAt['scripts/e2e-shard.ts']).toBe('bbb222')
@@ -112,7 +117,12 @@ describe('pr-review store — session v2 — unmarking forgets the viewed SHA an
     const s = usePrReviewStore.getState()
     expect(s.viewedFiles.has('playwright.config.ts')).toBe(false)
     expect(s.viewedAt['playwright.config.ts']).toBeUndefined()
-    expect(fileViewedSet).toHaveBeenCalledWith(REPO, 211, 'playwright.config.ts', false, undefined)
+    expect(fileViewedSet).toHaveBeenCalledWith({
+      repoRoot: REPO,
+      prNumber: 211,
+      path: 'playwright.config.ts',
+      viewed: false,
+    })
   })
 })
 
@@ -198,7 +208,13 @@ describe('pr-review store — session v2 (continued) — viewed marks and risk s
     usePrReviewStore
       .getState()
       .markFileViewed({ repoRoot: REPO, prNumber: 211, headSHA: 'aaa111' }, 'a.ts')
-    expect(fileViewedSet).toHaveBeenCalledWith(REPO, 211, 'a.ts', true, 'PR_node_211')
+    expect(fileViewedSet).toHaveBeenCalledWith({
+      repoRoot: REPO,
+      prNumber: 211,
+      path: 'a.ts',
+      viewed: true,
+      nodeId: 'PR_node_211',
+    })
   })
 
   it('marks several files with one session write and one GitHub request', () => {
@@ -212,7 +228,13 @@ describe('pr-review store — session v2 (continued) — viewed marks and risk s
     expect(sessionSet).toHaveBeenCalledTimes(1)
     expect(fileViewedSet).not.toHaveBeenCalled()
     expect(filesViewedSet).toHaveBeenCalledTimes(1)
-    expect(filesViewedSet).toHaveBeenCalledWith(REPO, 211, 'PR_node_211', ['a.ts', 'b.ts'], true)
+    expect(filesViewedSet).toHaveBeenCalledWith({
+      repoRoot: REPO,
+      prNumber: 211,
+      nodeId: 'PR_node_211',
+      paths: ['a.ts', 'b.ts'],
+      viewed: true,
+    })
   })
 
   it('does nothing for an empty batch', () => {

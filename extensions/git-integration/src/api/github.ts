@@ -38,6 +38,21 @@ export interface NewPullRequestInput {
   draft: boolean
 }
 
+/** One file of a pull request. */
+interface PrFileRef {
+  repoRoot: string
+  prNumber: number
+  path: string
+}
+
+/** A viewed (or unviewed) mark for a pull request, with its node id when known. */
+interface ViewedMark {
+  repoRoot: string
+  prNumber: number
+  viewed: boolean
+  nodeId?: string
+}
+
 export const githubAPI = {
   currentUser: (repoRoot: string) => bridge().invoke('github:current-user', { repoRoot }),
 
@@ -57,21 +72,12 @@ export const githubAPI = {
   prUpdateBranch: (repoRoot: string, prNumber: number) =>
     bridge().invoke('github:pr-update-branch', { repoRoot, prNumber }),
 
-  prFileDiff: (
-    repoRoot: string,
-    prNumber: number,
-    path: string,
-    known?: { baseRef?: string; headSHA?: string }
-  ) =>
-    invoke<BridgeResult<{ diff: unknown }>>('github:pr-file-diff', {
-      repoRoot,
-      prNumber,
-      path,
-      ...known,
-    }),
+  /** A file's diff; `baseRef` and `headSHA`, when known, spare a lookup and a fetch. */
+  prFileDiff: (file: PrFileRef & { baseRef?: string; headSHA?: string }) =>
+    invoke<BridgeResult<{ diff: unknown }>>('github:pr-file-diff', file),
 
-  prFileContent: (repoRoot: string, prNumber: number, path: string, ref: string) =>
-    bridge().invoke('github:pr-file-content', { repoRoot, prNumber, path, ref }),
+  prFileContent: (file: PrFileRef & { ref: string }) =>
+    bridge().invoke('github:pr-file-content', file),
 
   filesMetrics: (repoRoot: string, paths: string[]) =>
     invoke<BridgeResult<{ metrics: Record<string, RawFileMetrics> }>>('github:files-metrics', {
@@ -125,33 +131,12 @@ export const githubAPI = {
 
   dashboardSearch: () => bridge().invoke('github:dashboard-search', {}),
 
-  fileViewedSet: (
-    repoRoot: string,
-    prNumber: number,
-    path: string,
-    viewed: boolean,
-    nodeId?: string
-  ) =>
-    bridge().invoke('github:file-viewed-set', {
-      repoRoot,
-      prNumber,
-      path,
-      viewed,
-      ...(nodeId ? { nodeId } : {}),
-    }),
+  fileViewedSet: ({ nodeId, ...mark }: ViewedMark & { path: string }) =>
+    bridge().invoke('github:file-viewed-set', { ...mark, ...(nodeId ? { nodeId } : {}) }),
 
-  filesViewedSet: (
-    repoRoot: string,
-    prNumber: number,
-    nodeId: string | undefined,
-    paths: string[],
-    viewed: boolean
-  ) =>
+  filesViewedSet: ({ nodeId, ...mark }: ViewedMark & { paths: string[] }) =>
     bridge().invoke('github:files-viewed-set', {
-      repoRoot,
-      prNumber,
-      paths,
-      viewed,
+      ...mark,
       ...(nodeId ? { nodeId } : {}),
     }),
 

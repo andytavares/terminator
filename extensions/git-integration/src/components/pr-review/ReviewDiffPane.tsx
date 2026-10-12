@@ -295,7 +295,10 @@ export function ReviewDiffPane({
 
     const loadFull = (note: string | null) =>
       githubAPI
-        .prFileDiff(repoRoot, pr.number, file.path, {
+        .prFileDiff({
+          repoRoot,
+          prNumber: pr.number,
+          path: file.path,
           baseRef: pr.baseRefName,
           headSHA: pr.headSHA,
         })
@@ -449,7 +452,7 @@ export function ReviewDiffPane({
     setFileText({ status: 'loading' })
     const isCurrent = () => fileTextKeyRef.current === key
     githubAPI
-      .prFileContent(repoRoot, pr.number, file.path, pr.headSHA)
+      .prFileContent({ repoRoot, prNumber: pr.number, path: file.path, ref: pr.headSHA })
       .then((raw: unknown) => {
         if (!isCurrent()) return
         const result = raw as ContentResult

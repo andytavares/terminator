@@ -95,22 +95,32 @@ export function CompletionScreen({ repoRoot, onBack, onExit }: Props) {
       const resolvedPaths = session.files.map((f) => f.filePath)
       const result = await mergeFlowAPI.mergeCommit(repoRoot, resolvedPaths, commitMessage)
       if ('error' in result) {
-        void notificationsAPI.notify('error', 'Commit failed', 'commitFailed', result.error)
+        void notificationsAPI.notify({
+          type: 'error',
+          title: 'Commit failed',
+          key: 'commitFailed',
+          message: result.error,
+        })
         return
       }
       if (result.pushError) {
-        void notificationsAPI.notify(
-          'warning',
-          'Committed but push failed',
-          'commitPushFailed',
-          `Push manually: ${result.pushError}`
-        )
+        void notificationsAPI.notify({
+          type: 'warning',
+          title: 'Committed but push failed',
+          key: 'commitPushFailed',
+          message: `Push manually: ${result.pushError}`,
+        })
       }
       await mergeFlowAPI.clearSession(repoRoot)
       clearSession()
       onExit()
     } catch (e) {
-      void notificationsAPI.notify('error', 'Commit failed', 'commitFailed', String(e))
+      void notificationsAPI.notify({
+        type: 'error',
+        title: 'Commit failed',
+        key: 'commitFailed',
+        message: String(e),
+      })
     } finally {
       setIsCommitting(false)
     }

@@ -115,14 +115,13 @@ describe('ConflictResolver — resolves with the chosen side and moves to the ne
     fireEvent.click(screen.getByText(/Keep mine/))
     fireEvent.click(screen.getByText(/Confirm/))
     await waitFor(() => expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1))
-    expect(mockResolveConflict).toHaveBeenCalledWith(
-      '/repo',
-      'src/foo.ts#0',
-      'const x = 0',
-      'ours',
-      undefined,
-      makeBlock(0).originalConflictText
-    )
+    expect(mockResolveConflict).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      blockId: 'src/foo.ts#0',
+      resolvedText: 'const x = 0',
+      strategy: 'ours',
+      originalConflictText: makeBlock(0).originalConflictText,
+    })
     expect(mockPersistSession).toHaveBeenCalledOnce()
     expect(useMergeFlowStore.getState().session!.files[0].blocks[0].isResolved).toBe(true)
   })
@@ -132,7 +131,7 @@ describe('ConflictResolver — resolves with the chosen side and moves to the ne
     fireEvent.click(screen.getByText(/Keep theirs/))
     fireEvent.click(screen.getByText(/Confirm/))
     await waitFor(() => expect(onComplete).toHaveBeenCalledOnce())
-    expect(mockResolveConflict.mock.calls[0][2]).toBe('const x = 100')
+    expect(mockResolveConflict.mock.calls[0][0].resolvedText).toBe('const x = 100')
   })
 })
 
@@ -143,12 +142,12 @@ describe('ConflictResolver — keeps the conflict unresolved and reports the err
     fireEvent.click(screen.getByText(/Keep mine/))
     fireEvent.click(screen.getByText(/Confirm/))
     await waitFor(() => expect(mockNotify).toHaveBeenCalled())
-    expect(mockNotify).toHaveBeenCalledWith(
-      'error',
-      'Could not resolve conflict',
-      'conflictResolveFailed',
-      'git add failed'
-    )
+    expect(mockNotify).toHaveBeenCalledWith({
+      type: 'error',
+      title: 'Could not resolve conflict',
+      key: 'conflictResolveFailed',
+      message: 'git add failed',
+    })
     expect(activeBlock().isResolved).toBe(false)
     expect(onComplete).not.toHaveBeenCalled()
   })
@@ -159,7 +158,10 @@ describe('ConflictResolver — keeps the conflict unresolved and reports the err
     fireEvent.keyDown(window, { key: 't' })
     fireEvent.keyDown(window, { key: 'Enter' })
     await waitFor(() => expect(mockResolveConflict).toHaveBeenCalledOnce())
-    expect(mockResolveConflict.mock.calls[0].slice(2, 4)).toEqual(['const x = 100', 'theirs'])
+    expect(mockResolveConflict.mock.calls[0][0]).toMatchObject({
+      resolvedText: 'const x = 100',
+      strategy: 'theirs',
+    })
   })
 })
 
@@ -192,7 +194,10 @@ describe('ConflictResolver — resolves with the edited text and strategy manual
     })
     fireEvent.click(screen.getByRole('button', { name: /Save/ }))
     await waitFor(() => expect(mockResolveConflict).toHaveBeenCalledOnce())
-    expect(mockResolveConflict.mock.calls[0].slice(2, 4)).toEqual(['const x = 42', 'manual'])
+    expect(mockResolveConflict.mock.calls[0][0]).toMatchObject({
+      resolvedText: 'const x = 42',
+      strategy: 'manual',
+    })
   })
 
   it('pushes the other side into the open editor on Keep theirs, without resolving', () => {
@@ -214,12 +219,12 @@ describe('ConflictResolver — undoes the last decision and tells the main proce
     await waitFor(() => expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1))
     fireEvent.click(screen.getByText(/Undo/))
     await waitFor(() => expect(mockUndoResolve).toHaveBeenCalledOnce())
-    expect(mockUndoResolve).toHaveBeenCalledWith(
-      '/repo',
-      'src/foo.ts#0',
-      'const x = 0',
-      makeBlock(0).originalConflictText
-    )
+    expect(mockUndoResolve).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      blockId: 'src/foo.ts#0',
+      resolvedText: 'const x = 0',
+      originalConflictText: makeBlock(0).originalConflictText,
+    })
     expect(useMergeFlowStore.getState().session!.files[0].blocks[0].isResolved).toBe(false)
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(0)
   })
@@ -229,9 +234,9 @@ describe('ConflictResolver — undoes the last decision and tells the main proce
     fireEvent.click(screen.getByText(/Keep both/))
     fireEvent.click(screen.getByText(/Use this order/))
     await waitFor(() => expect(mockResolveConflict).toHaveBeenCalledOnce())
-    expect(mockResolveConflict.mock.calls[0][3]).toBe('both-ours-first')
-    expect(mockResolveConflict.mock.calls[0][2]).toContain('const x = 0')
-    expect(mockResolveConflict.mock.calls[0][2]).toContain('const x = 100')
+    expect(mockResolveConflict.mock.calls[0][0].strategy).toBe('both-ours-first')
+    expect(mockResolveConflict.mock.calls[0][0].resolvedText).toContain('const x = 0')
+    expect(mockResolveConflict.mock.calls[0][0].resolvedText).toContain('const x = 100')
   })
 })
 

@@ -642,12 +642,12 @@ describe('PrOverviewPanel — resolve conflicts button prepares worktree then ca
     )
     fireEvent.click(screen.getByText(/Resolve conflicts/i))
     await waitFor(() => {
-      expect(mockPreparePrWorktree).toHaveBeenCalledWith(
-        '/repo',
-        '/tmp/worktree/branch',
-        basePr.headRefName,
-        basePr.baseRefName
-      )
+      expect(mockPreparePrWorktree).toHaveBeenCalledWith({
+        repoRoot: '/repo',
+        worktreePath: '/tmp/worktree/branch',
+        headRefName: basePr.headRefName,
+        baseRefName: basePr.baseRefName,
+      })
       expect(onStartMergeFlow).toHaveBeenCalledWith('/tmp/worktree/branch')
     })
   })

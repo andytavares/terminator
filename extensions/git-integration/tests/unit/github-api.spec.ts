@@ -37,7 +37,7 @@ describe('githubAPI bridge', () => {
 describe('githubAPI bridge — prFileDiff calls correct channel', () => {
   it('prFileDiff calls correct channel', async () => {
     const { githubAPI } = await import('../../src/api/github')
-    await githubAPI.prFileDiff('/repo', 42, 'src/foo.ts')
+    await githubAPI.prFileDiff({ repoRoot: '/repo', prNumber: 42, path: 'src/foo.ts' })
     expect(mockInvoke).toHaveBeenCalledWith('github:pr-file-diff', {
       repoRoot: '/repo',
       prNumber: 42,
@@ -47,7 +47,12 @@ describe('githubAPI bridge — prFileDiff calls correct channel', () => {
 
   it('prFileContent calls correct channel', async () => {
     const { githubAPI } = await import('../../src/api/github')
-    await githubAPI.prFileContent('/repo', 42, 'src/foo.ts', 'abc123')
+    await githubAPI.prFileContent({
+      repoRoot: '/repo',
+      prNumber: 42,
+      path: 'src/foo.ts',
+      ref: 'abc123',
+    })
     expect(mockInvoke).toHaveBeenCalledWith('github:pr-file-content', {
       repoRoot: '/repo',
       prNumber: 42,
@@ -183,7 +188,12 @@ describe('githubAPI bridge — review revamp channels send the payloads their ha
   it('review revamp channels send the payloads their handlers validate', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.dashboardSearch()
-    await githubAPI.fileViewedSet('/repo', 211, 'scripts/e2e-shard.ts', true)
+    await githubAPI.fileViewedSet({
+      repoRoot: '/repo',
+      prNumber: 211,
+      path: 'scripts/e2e-shard.ts',
+      viewed: true,
+    })
     await githubAPI.prCompare('/repo', 'aaa111', 'bbb222')
     await githubAPI.cloneRepo('andytavares/terminator', '/Users/me/src')
     await githubAPI.reviewSettings()
@@ -212,9 +222,26 @@ describe('githubAPI bridge — batch channels send the payloads their handlers v
   it('batch channels send the payloads their handlers validate', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.filesMetrics('/repo', ['a.ts', 'b.ts'])
-    await githubAPI.filesViewedSet('/repo', 211, 'PR_node1', ['a.ts'], true)
-    await githubAPI.prFileDiff('/repo', 211, 'a.ts', { baseRef: 'main', headSHA: 'abc' })
-    await githubAPI.fileViewedSet('/repo', 211, 'a.ts', true, 'PR_node1')
+    await githubAPI.filesViewedSet({
+      repoRoot: '/repo',
+      prNumber: 211,
+      nodeId: 'PR_node1',
+      paths: ['a.ts'],
+      viewed: true,
+    })
+    await githubAPI.prFileDiff({
+      repoRoot: '/repo',
+      prNumber: 211,
+      path: 'a.ts',
+      ...{ baseRef: 'main', headSHA: 'abc' },
+    })
+    await githubAPI.fileViewedSet({
+      repoRoot: '/repo',
+      prNumber: 211,
+      path: 'a.ts',
+      viewed: true,
+      nodeId: 'PR_node1',
+    })
     expect(mockInvoke.mock.calls).toEqual([
       ['github:files-metrics', { repoRoot: '/repo', paths: ['a.ts', 'b.ts'] }],
       [
@@ -236,7 +263,12 @@ describe('githubAPI bridge — batch channels send the payloads their handlers v
 describe('githubAPI bridge — leaves nodeId out of a batch viewed mark when the PR has none', () => {
   it('leaves nodeId out of a batch viewed mark when the PR has none', async () => {
     const { githubAPI } = await import('../../src/api/github')
-    await githubAPI.filesViewedSet('/repo', 211, undefined, ['a.ts'], false)
+    await githubAPI.filesViewedSet({
+      repoRoot: '/repo',
+      prNumber: 211,
+      paths: ['a.ts'],
+      viewed: false,
+    })
     expect(mockInvoke.mock.calls).toEqual([
       [
         'github:files-viewed-set',

@@ -219,13 +219,13 @@ function bestEffort(call: () => unknown): void {
 
 function syncViewedMany(target: ViewedTarget, paths: string[]): void {
   const { repoRoot, prNumber, nodeId } = target
-  bestEffort(() => githubAPI.filesViewedSet(repoRoot, prNumber, nodeId, paths, true))
+  bestEffort(() => githubAPI.filesViewedSet({ repoRoot, prNumber, nodeId, paths, viewed: true }))
 }
 
 /** Mirrors a viewed mark onto GitHub (S1). */
 function syncViewed(target: ViewedTarget, path: string, viewed: boolean): void {
   const { repoRoot, prNumber, nodeId } = target
-  bestEffort(() => githubAPI.fileViewedSet(repoRoot, prNumber, path, viewed, nodeId))
+  bestEffort(() => githubAPI.fileViewedSet({ repoRoot, prNumber, path, viewed, nodeId }))
 }
 
 function withViewedCount(
