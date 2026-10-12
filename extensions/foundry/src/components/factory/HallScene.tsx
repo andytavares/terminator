@@ -243,10 +243,26 @@ function draw(
   paint.globalCompositeOperation = 'source-over'
 }
 
+/**
+ * The previous record when the next one holds the same entries.
+ *
+ * Callers build `states` afresh on every render; an effect that depends on the
+ * object itself would restart on each of them.
+ */
+function useStableRecord<T>(next: Readonly<Record<string, T>>): Readonly<Record<string, T>> {
+  const held = useRef(next)
+  const keys = Object.keys(next)
+  const same =
+    keys.length === Object.keys(held.current).length &&
+    keys.every((key) => key in held.current && held.current[key] === next[key])
+  if (!same) held.current = next
+  return held.current
+}
+
 export function HallScene({
   map,
   worldRef,
-  states,
+  states: statesThisRender,
   reducedMotion,
   speed = 1,
   metrics = null,
@@ -254,6 +270,7 @@ export function HallScene({
   orphaned = [],
 }: HallSceneProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const states = useStableRecord(statesThisRender)
   // Read by the running loop each frame, so a speed change does not restart it.
   const speedRef = useRef(speed)
   speedRef.current = speed

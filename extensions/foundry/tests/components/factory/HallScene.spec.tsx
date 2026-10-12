@@ -90,6 +90,29 @@ describe('components/factory/HallScene', () => {
     expect(cancelSpy).toHaveBeenCalledWith(scheduledId)
   })
 
+  it('keeps its frame loop running when re-rendered with equal props', () => {
+    const map = fakeMap()
+    const worldRef = { current: fakeWorld(map) }
+    const { rerender } = render(
+      <HallScene map={map} worldRef={worldRef} states={{ 'n-1': 'running' }} />
+    )
+    rerender(<HallScene map={map} worldRef={worldRef} states={{ 'n-1': 'running' }} />)
+
+    expect(cancelSpy).not.toHaveBeenCalled()
+    expect(rafSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('restarts its frame loop when a node changes state', () => {
+    const map = fakeMap()
+    const worldRef = { current: fakeWorld(map) }
+    const { rerender } = render(
+      <HallScene map={map} worldRef={worldRef} states={{ 'n-1': 'running' }} />
+    )
+    rerender(<HallScene map={map} worldRef={worldRef} states={{ 'n-1': 'passed' }} />)
+
+    expect(cancelSpy).toHaveBeenCalledTimes(1)
+  })
+
   it('draws the bake and the frame at least once on mount', () => {
     const map = fakeMap()
     const worldRef = { current: fakeWorld(map) }
