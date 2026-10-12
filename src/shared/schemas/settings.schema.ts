@@ -109,8 +109,8 @@ export const WorkspaceSettingsSchema = z.object({
   extensions: z.record(z.string(), z.record(z.string(), z.unknown())).default({}),
 })
 
-export const DEFAULT_GLOBAL_SETTINGS = {
-  appearance: { theme: 'dark' as const },
+export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
+  appearance: { theme: 'dark' },
   terminal: {
     scrollbackLimit: 10000,
     defaultShell: process.env.SHELL || '/bin/zsh',
@@ -121,16 +121,22 @@ export const DEFAULT_GLOBAL_SETTINGS = {
   ui: { hasSeenWelcome: false, editor: '' },
   sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
   notifications: {
-    defaultTargets: ['system', 'center', 'toast'] as ('system' | 'center' | 'toast')[],
-    overrides: {} as Record<string, ('system' | 'center' | 'toast')[]>,
+    defaultTargets: ['system', 'center', 'toast'],
+    overrides: {},
   },
   quickActions: {
-    pins: [] as string[],
-    usage: [] as { id: string; count: number; lastUsedAt: number }[],
-    directUse: [] as { id: string; count: number }[],
-    custom: [] as z.infer<typeof CustomActionSchema>[],
+    pins: [],
+    usage: [],
+    directUse: [],
+    custom: [],
   },
 }
 
-export type GlobalSettingsData = z.infer<typeof GlobalSettingsSchema>
-export type WorkspaceSettingsData = z.infer<typeof WorkspaceSettingsSchema>
+export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
+export type WorkspaceSettings = z.infer<typeof WorkspaceSettingsSchema>
+export type QuickActionsSettings = GlobalSettings['quickActions']
+export type CustomAction = z.infer<typeof CustomActionSchema>
+export type CustomActionKind = z.infer<typeof CustomActionKindSchema>
+export type CustomActionTarget = z.infer<typeof CustomActionTargetSchema>
+export type ActionUsage = QuickActionsSettings['usage'][number]
+export type DirectUse = QuickActionsSettings['directUse'][number]

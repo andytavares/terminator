@@ -236,6 +236,8 @@ The `resolveSettings(workspaceId?)` selector in `settings.store.ts` performs thi
 
 Theme changes take effect immediately — no restart needed — because the CSS variable system responds to the attribute change.
 
+The shape is declared once, as zod schemas in `src/shared/schemas/settings.schema.ts`; `GlobalSettings`, `WorkspaceSettings` and the quick-action types are inferred from them. `settings-store.ts` merges a patch into what is stored and parses the result with the schema before saving, so a write that would break the shape stores nothing and `settings:update-global` / `settings:update-workspace` answer `{ error: 'VALIDATION_ERROR' }`.
+
 ---
 
 ## Extension System

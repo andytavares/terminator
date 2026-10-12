@@ -1,5 +1,4 @@
 export type { NotificationTarget, NotificationType } from '../notifications/resolve-targets'
-import type { NotificationTarget } from '../notifications/resolve-targets'
 
 export interface Workspace {
   id: string
@@ -144,82 +143,16 @@ export interface ExtensionManifest {
   minAppVersion: string
 }
 
-export type CustomActionKind = 'shell' | 'prompt'
-export type CustomActionTarget = 'focused' | 'new-tab' | 'agent'
-
-export interface CustomAction {
-  id: string
-  label: string
-  mnemonic?: string
-  kind: CustomActionKind
-  target: CustomActionTarget
-  body: string
-}
-
-export interface ActionUsage {
-  id: string
-  count: number
-  lastUsedAt: number
-}
-
-export interface DirectUse {
-  id: string
-  count: number
-}
-
-export interface QuickActionsSettings {
-  pins: string[]
-  usage: ActionUsage[]
-  directUse: DirectUse[]
-  custom: CustomAction[]
-}
-
-export interface GlobalSettings {
-  appearance: {
-    theme: 'dark' | 'light'
-  }
-  terminal: {
-    scrollbackLimit: number
-    defaultShell: string
-    promptForName: boolean
-  }
-  git: {
-    /** Base directory for new worktrees. Empty string means <repoRoot>/.worktrees. */
-    worktreeBaseDir: string
-    branchExcludePatterns: string[]
-  }
-  extensions: {
-    [extensionId: string]: Record<string, unknown>
-  }
-  ui: {
-    hasSeenWelcome: boolean
-    showMetricsBar?: boolean
-    /** Which editor "Open in editor" launches, by id. Empty means detect. */
-    editor: string
-  }
-  sidebar?: {
-    /** How long a quiet session waits before the sidebar treats it as stale. */
-    staleAfterMs: number
-  }
-  notifications: {
-    defaultTargets: NotificationTarget[]
-    overrides: {
-      [notificationKey: string]: NotificationTarget[]
-    }
-  }
-  quickActions: QuickActionsSettings
-}
-
-export interface WorkspaceSettings {
-  workspaceId: string
-  overrides: Partial<Omit<GlobalSettings, 'extensions' | 'quickActions'>> & {
-    /** A workspace override carries only its own custom actions, never usage or pins. */
-    quickActions?: { custom: CustomAction[] }
-  }
-  extensions: {
-    [extensionId: string]: Record<string, unknown>
-  }
-}
+export type {
+  ActionUsage,
+  CustomAction,
+  CustomActionKind,
+  CustomActionTarget,
+  DirectUse,
+  GlobalSettings,
+  QuickActionsSettings,
+  WorkspaceSettings,
+} from '../schemas/settings.schema'
 
 export type SettingsScope = 'global' | 'workspace'
 
