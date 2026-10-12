@@ -47,10 +47,22 @@ function makeConflictedRepo(): string {
   return dir
 }
 
+/** The file's text, or '' while the app is still writing it (writeFile truncates first). */
+function fileText(file: string): string {
+  try {
+    return readFileSync(join(repo, file), 'utf8')
+  } catch {
+    return ''
+  }
+}
+
+/** Conflicts left in the file, once it holds text again. */
 const markerCount = (file: string) =>
-  readFileSync(join(repo, file), 'utf8')
-    .split('\n')
-    .filter((l) => l.startsWith('<<<<<<<')).length
+  fileText(file) === ''
+    ? -1
+    : fileText(file)
+        .split('\n')
+        .filter((l) => l.startsWith('<<<<<<<')).length
 
 async function openSolver(): Promise<Page> {
   const view = await openGitTab(handle)
@@ -84,7 +96,7 @@ test('a decision is written to the file, and undo puts the conflict back', async
 
   await decide(view, 'Keep mine')
   await expect.poll(() => markerCount('app.ts')).toBe(1)
-  expect(readFileSync(join(repo, 'app.ts'), 'utf8')).toContain('export const greeting = "good day"')
+  await expect.poll(() => fileText('app.ts')).toContain('export const greeting = "good day"')
 
   await view.getByRole('button', { name: 'Undo last decision' }).click()
   await expect.poll(() => markerCount('app.ts')).toBe(2)
@@ -96,7 +108,7 @@ test('Start over restores every conflict marker once a file is fully decided', a
   await expect.poll(() => markerCount('app.ts')).toBe(1)
   await decide(view, 'Keep theirs')
   await expect.poll(() => markerCount('app.ts')).toBe(0)
-  expect(readFileSync(join(repo, 'app.ts'), 'utf8')).toContain('export const count = 2')
+  await expect.poll(() => fileText('app.ts')).toContain('export const count = 2')
 
   await view.getByRole('button', { name: 'Start over' }).click()
   await expect.poll(() => markerCount('app.ts')).toBe(2)

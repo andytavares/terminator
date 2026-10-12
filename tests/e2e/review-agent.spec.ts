@@ -92,7 +92,7 @@ test('a running review can be continued in a terminal, then cancelled', async ()
     { timeout: 15000 }
   )
 
-  await view.bringToFront()
+  await openCodeReviews(handle, 'Agent Review')
   await panel(view).getByRole('button', { name: 'Cancel' }).click()
   await expect(panel(view)).not.toContainText('Reviewing')
 })
