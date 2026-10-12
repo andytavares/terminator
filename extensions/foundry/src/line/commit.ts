@@ -1,4 +1,9 @@
+import { timeoutNotice } from './integrate.js'
 import type { ExecResult, ShellExec } from './integrate.js'
+
+// The commit runs the repository's own hooks, which may lint and test.
+const COMMIT_TIMEOUT_MS = 300_000
+const LOCAL_STEP_TIMEOUT_MS = 30_000
 
 /**
  * What committing a checkout came to.
@@ -18,15 +23,17 @@ export type CommitOutcome =
       readonly output: string
     }
 
-function refused(command: string, result: ExecResult): CommitOutcome {
+function refused(command: string, result: ExecResult, timeoutMs: number): CommitOutcome {
   return {
     kind: 'refused',
     command,
     exitCode: result.exitCode,
-    output: [result.stdout, result.stderr]
-      .map((text) => text.trim())
-      .filter(Boolean)
-      .join('\n'),
+    output: result.timedOut
+      ? timeoutNotice(command, timeoutMs)
+      : [result.stdout, result.stderr]
+          .map((text) => text.trim())
+          .filter(Boolean)
+          .join('\n'),
   }
 }
 
@@ -41,15 +48,36 @@ export async function commitWorktree(
   message: string,
   exec: ShellExec
 ): Promise<CommitOutcome> {
-  const status = await exec({ command: 'git', args: ['status', '--porcelain'], cwd })
-  if (status.exitCode !== 0) return refused('git status', status)
+  const status = await exec({
+    command: 'git',
+    args: ['status', '--porcelain'],
+    cwd,
+    timeoutMs: LOCAL_STEP_TIMEOUT_MS,
+  })
+  if (status.exitCode !== 0 || status.timedOut) {
+    return refused('git status', status, LOCAL_STEP_TIMEOUT_MS)
+  }
   if (status.stdout.trim() === '') return { kind: 'clean' }
 
-  const added = await exec({ command: 'git', args: ['add', '-A'], cwd })
-  if (added.exitCode !== 0) return refused('git add', added)
+  const added = await exec({
+    command: 'git',
+    args: ['add', '-A'],
+    cwd,
+    timeoutMs: LOCAL_STEP_TIMEOUT_MS,
+  })
+  if (added.exitCode !== 0 || added.timedOut) {
+    return refused('git add', added, LOCAL_STEP_TIMEOUT_MS)
+  }
 
-  const committed = await exec({ command: 'git', args: ['commit', '-m', message], cwd })
-  if (committed.exitCode !== 0) return refused('git commit', committed)
+  const committed = await exec({
+    command: 'git',
+    args: ['commit', '-m', message],
+    cwd,
+    timeoutMs: COMMIT_TIMEOUT_MS,
+  })
+  if (committed.exitCode !== 0 || committed.timedOut) {
+    return refused('git commit', committed, COMMIT_TIMEOUT_MS)
+  }
   return { kind: 'committed' }
 }
 

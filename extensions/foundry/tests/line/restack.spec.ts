@@ -139,6 +139,41 @@ describe('restack', () => {
   })
 })
 
+describe('restack when a step does not finish', () => {
+  const timingOut =
+    (verb: string, calls: string[][]): ShellExec =>
+    async ({ args }) => {
+      calls.push(args)
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: args[0] === verb }
+    }
+  const laneToRestack = { cwd: '/work', branch: 'lane/1', base: 'main' }
+
+  it('reports a rebase that timed out as a failure, not a conflict, and abandons the rebase', async () => {
+    const calls: string[][] = []
+    const result = await restack(laneToRestack, timingOut('rebase', calls))
+
+    expect(result).toEqual({ kind: 'failed', reason: 'git rebase timed out after 120 seconds' })
+    expect(calls).toContainEqual(['rebase', '--abort'])
+  })
+
+  it('reports a push that timed out as a failure', async () => {
+    const result = await restack(laneToRestack, timingOut('push', []))
+
+    expect(result).toEqual({ kind: 'failed', reason: 'git push timed out after 120 seconds' })
+  })
+
+  it('gives the rebase and the push an explicit timeout', async () => {
+    const seen: Array<[string, number | undefined]> = []
+    await restack(laneToRestack, async ({ args, timeoutMs }) => {
+      seen.push([args[0], timeoutMs])
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+    })
+
+    expect(seen).toContainEqual(['rebase', 120_000])
+    expect(seen).toContainEqual(['push', 120_000])
+  })
+})
+
 function gitRevParse(cwd: string, ref: string): string {
   return execIn(cwd, ['rev-parse', ref]).trim()
 }

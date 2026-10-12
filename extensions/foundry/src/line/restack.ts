@@ -1,3 +1,4 @@
+import { NETWORK_STEP_TIMEOUT_MS, timeoutNotice } from './integrate.js'
 import type { ShellExec } from './integrate.js'
 
 // Rebasing a lane back onto its base after a predecessor merged (or the base
@@ -28,8 +29,13 @@ export async function restack(
     command: 'git',
     args: ['rebase', `origin/${lane.base}`],
     cwd: lane.cwd,
+    timeoutMs: NETWORK_STEP_TIMEOUT_MS,
   })
 
+  if (rebase.timedOut) {
+    await exec({ command: 'git', args: ['rebase', '--abort'], cwd: lane.cwd })
+    return { kind: 'failed', reason: timeoutNotice('git rebase', NETWORK_STEP_TIMEOUT_MS) }
+  }
   if (rebase.exitCode !== 0) {
     const diff = await exec({
       command: 'git',
@@ -48,9 +54,13 @@ export async function restack(
     command: 'git',
     args: ['push', '--force-with-lease', 'origin', `HEAD:${lane.branch}`],
     cwd: lane.cwd,
+    timeoutMs: NETWORK_STEP_TIMEOUT_MS,
   })
+  if (push.timedOut) {
+    return { kind: 'failed', reason: timeoutNotice('git push', NETWORK_STEP_TIMEOUT_MS) }
+  }
   if (push.exitCode !== 0) {
     return { kind: 'failed', reason: push.stderr }
   }
-  return { kind: 'rebased', pushed: push.exitCode === 0 }
+  return { kind: 'rebased', pushed: true }
 }

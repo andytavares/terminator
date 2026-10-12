@@ -36,6 +36,14 @@ export interface ExecResult {
   readonly timedOut: boolean
 }
 
+/** What to say when a step ran out of time, so it is never read as a refusal or a pass. */
+export function timeoutNotice(what: string, timeoutMs: number): string {
+  return `${what} timed out after ${Math.round(timeoutMs / 1000)} seconds`
+}
+
+/** Long enough for a slow remote, short enough that a hung one is noticed. */
+export const NETWORK_STEP_TIMEOUT_MS = 120_000
+
 export interface ShellExec {
   (options: {
     command: 'git' | 'gh'
@@ -158,6 +166,7 @@ function ruleBullet(rule: string): string {
  * message ending in ": " and no reason.
  */
 function detailFor(result: ExecResult): string {
+  if (result.timedOut) return timeoutNotice('the command', NETWORK_STEP_TIMEOUT_MS)
   const stderr = result.stderr.trim()
   if (stderr !== '') return stderr
   const stdout = result.stdout.trim()
@@ -168,7 +177,9 @@ function detailFor(result: ExecResult): string {
 export class PushRefusedError extends Error {
   readonly code = 'PUSH_REFUSED'
   constructor(repo: string, result: ExecResult) {
-    super(`Pushing ${repo} was refused, so no pull request was opened: ${detailFor(result)}`)
+    super(
+      `Pushing ${repo} ${result.timedOut ? 'failed' : 'was refused'}, so no pull request was opened: ${detailFor(result)}`
+    )
     this.name = 'PushRefusedError'
   }
 }
@@ -427,9 +438,9 @@ async function pushLane(
     command: 'git',
     args: ['push', '--set-upstream', 'origin', `HEAD:${repo.headBranch}`],
     cwd: repo.path,
-    timeoutMs: 120_000,
+    timeoutMs: NETWORK_STEP_TIMEOUT_MS,
   })
-  if (result.exitCode !== 0) throw new PushRefusedError(repo.name, result)
+  if (result.exitCode !== 0 || result.timedOut) throw new PushRefusedError(repo.name, result)
 }
 
 async function openDraft(

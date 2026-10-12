@@ -1059,7 +1059,9 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   (`SupervisedRunner.runCommand`), with `${toolchain.<check>}` resolved by
   `resolveCommand`; a check the repository has no command for is `skipped` and
   recorded as `step.not_measured`. Its output is tee'd to
-  `<order>/runs/<node>.<attempt>.log`. A step with
+  `<order>/runs/<node>.<attempt>.log`. The executor's `runCommand` and
+  `collect` seams are required, so a `run` step never falls back to an agent
+  because nothing could run it. A step with
   `onFail: { rework, max }` that fails while `reworks < max` calls
   `scheduler.rework`: the target's node in the checked lane, everything between
   it and the check, and the check go back to `waiting`, and the target's
@@ -1124,7 +1126,9 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   `refused` with what git printed, the step fails with "changed the checkout,
   but `git commit` exited 1" (`step.commit_refused`), that output is added to
   the node's `feedback` for its next attempt, and the repeat-fail gate carries
-  it as evidence.
+  it as evidence. `git commit` has five minutes (the repository's hooks run
+  in it), and a commit that timed out is `refused` with "git commit timed out
+  after 300 seconds", never read as a clean tree.
 - **The author hands back a document** (ADR 086). `writes: [docs, document]`:
   the author writes `{ path, url?, location }` to its rung file, collected
   like the other artefacts onto `order.document` and recorded as
@@ -1336,7 +1340,10 @@ files intersect, and the Forge says so at agreement. A 60-second tick asks
 GitHub whether each draft merged; when one has, each later overlapping order
 is rebased lane by lane and pushed with lease, and its CI is watched again. A
 conflicting rebase is aborted and raises `refinery.conflict`. `refinery.json`
-records each merge acted on.
+records each merge acted on. The rebase and the push each have 120 seconds; one
+that timed out is a `failed` restack ("git push timed out after 120 seconds"),
+not a conflict, and a timed-out rebase is aborted. Shipping's push has the same
+120 seconds and throws `PushRefusedError` on a timeout.
 
 **Every command runs in the lane's worktree**, derived per lane by
 `checkoutPath` exactly as the branch is derived by `branchFor`. Both were once

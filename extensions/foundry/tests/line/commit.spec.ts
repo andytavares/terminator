@@ -63,6 +63,23 @@ describe('commitWorktree', () => {
   })
 })
 
+describe('commitWorktree when the commit does not finish', () => {
+  it('waits long enough for the commit hooks, and refuses a commit that timed out', async () => {
+    const run = vi.fn(async (options: { args: string[]; timeoutMs?: number }) => ({
+      exitCode: 0,
+      stdout: options.args[0] === 'status' ? 'M a' : '',
+      stderr: '',
+      timedOut: options.args[0] === 'commit',
+    }))
+    const outcome = await commitWorktree('/work', 'm', run as unknown as ShellExec)
+
+    expect(outcome).toMatchObject({ kind: 'refused', command: 'git commit' })
+    expect((outcome as { output: string }).output).toMatch(/timed out after 300 seconds/)
+    const commitCall = run.mock.calls.find((call) => call[0].args[0] === 'commit')
+    expect(commitCall?.[0].timeoutMs).toBe(300_000)
+  })
+})
+
 // A builder that commits its own work leaves a clean tree; that is a change,
 // and reading it as "made no change" halted WO-1008-6fe on finished work.
 describe('committedSince', () => {

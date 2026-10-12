@@ -207,6 +207,15 @@ describe('the command line', () => {
     expect(callsTo(exec, 'gh')).toHaveLength(0)
   })
 
+  it('fails the push that timed out, saying so, and opens no pull request', async () => {
+    const exec = vi.fn(async () => ({ exitCode: 0, stdout: '', stderr: '', timedOut: true }))
+    const d = deps({ exec: exec as never })
+    await expect(shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)).rejects.toThrow(
+      /timed out/
+    )
+    expect(callsTo(exec, 'gh')).toHaveLength(0)
+  })
+
   it('carries the push failure through rather than summarising it away', async () => {
     const exec = vi.fn(async () => ({
       exitCode: 1,
