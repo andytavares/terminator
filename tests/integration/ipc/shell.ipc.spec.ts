@@ -64,7 +64,7 @@ describe('shell:exec IPC handler', () => {
       {},
       { command: 'git', args: ['status'], cwd: repo, workspaceRoot: scratch }
     )
-    expect(result).toMatchObject({ exitCode: 0 })
+    expect(result).toMatchObject({ exitCode: 0, stdout: `status\n${repo}\n` })
   })
 
   it('returns CWD_OUT_OF_SCOPE when cwd escapes the workspace, and runs nothing', async () => {
@@ -114,6 +114,7 @@ describe('shell:open-external IPC handler', () => {
   it('returns ok:true when openExternal succeeds', async () => {
     const result = await handler({}, { url: 'https://example.com' })
     expect(result).toEqual({ ok: true })
+    expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
   })
 
   it('returns error string when openExternal throws', async () => {
@@ -141,6 +142,7 @@ describe('shell:open-path IPC handler', () => {
   it('returns ok:true when openPath succeeds', async () => {
     const result = await handler({}, { filePath: '/some/file.txt' })
     expect(result).toEqual({ ok: true })
+    expect(mockOpenPath).toHaveBeenCalledWith('/some/file.txt')
   })
 
   it('returns error when openPath returns a non-empty error message', async () => {

@@ -171,7 +171,8 @@ describe('the capture script, executed', () => {
 
 describe('installing the hook in the operator’s Claude settings', () => {
   const settingsPath = (): string => path.join(home, '.claude', 'settings.json')
-  const read = (): Record<string, never> => JSON.parse(fs.readFileSync(settingsPath(), 'utf8'))
+  /** The settings file as JSON, read as the shape the case expects. */
+  const read = <T = { hooks: unknown }>(): T => JSON.parse(fs.readFileSync(settingsPath(), 'utf8'))
 
   async function install(): Promise<void> {
     const mod = await load()
@@ -205,10 +206,7 @@ describe('installing the hook in the operator’s Claude settings', () => {
       })
     )
     await install()
-    const settings = read() as unknown as {
-      model: string
-      hooks: { SessionStart: unknown[]; Stop: unknown[] }
-    }
+    const settings = read<{ model: string; hooks: { SessionStart: unknown[]; Stop: unknown[] } }>()
     expect(settings.model).toBe('opus')
     expect(settings.hooks.Stop).toHaveLength(1)
     expect(settings.hooks.SessionStart).toHaveLength(2)
@@ -278,6 +276,7 @@ describe('installing the hook in the operator’s Claude settings', () => {
     const command = hooks.SessionStart[0].hooks[0].command
     fs.rmSync(scriptPath)
     // Exactly as a shell would run it from the settings file.
-    expect(() => execFileSync('/bin/sh', ['-c', command], { encoding: 'utf8' })).not.toThrow()
+    // execFileSync throws on a non-zero exit.
+    expect(execFileSync('/bin/sh', ['-c', command], { encoding: 'utf8' })).toBe('')
   })
 })

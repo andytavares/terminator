@@ -1,21 +1,19 @@
 import { describe, it, expect } from 'vitest'
 
+type Namer = (chunk: { name: string }) => string
+
+async function entryFileNames(): Promise<Namer> {
+  const mod = await import('../../../vite.config.remote')
+  const config = mod.default as { build: { rollupOptions: { output: { entryFileNames: Namer } } } }
+  return config.build.rollupOptions.output.entryFileNames
+}
+
 describe('vite.config.remote', () => {
-  it('entryFileNames returns remote-shim.js for shim chunk', async () => {
-    const mod = await import('../../../vite.config.remote')
-    const config = mod.default as {
-      build: { rollupOptions: { output: { entryFileNames: (chunk: { name: string }) => string } } }
-    }
-    const namer = config.build.rollupOptions.output.entryFileNames
-    expect(namer({ name: 'shim' })).toBe('remote-shim.js')
+  it('names the shim chunk remote-shim.js, the name the server serves it by', async () => {
+    expect((await entryFileNames())({ name: 'shim' })).toBe('remote-shim.js')
   })
 
-  it('entryFileNames returns hashed path for non-shim chunks', async () => {
-    const mod = await import('../../../vite.config.remote')
-    const config = mod.default as {
-      build: { rollupOptions: { output: { entryFileNames: (chunk: { name: string }) => string } } }
-    }
-    const namer = config.build.rollupOptions.output.entryFileNames
-    expect(namer({ name: 'index' })).toContain('assets/')
+  it('gives every other chunk a hashed name under assets/', async () => {
+    expect((await entryFileNames())({ name: 'index' })).toBe('assets/[name]-[hash].js')
   })
 })

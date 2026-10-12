@@ -4,6 +4,7 @@ import { existsSync, readFileSync, rmSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomBytes } from 'crypto'
+import { runInNewContext } from 'vm'
 
 const SCRIPT = join(process.cwd(), 'scripts', 'create-extension.cjs')
 
@@ -75,12 +76,15 @@ describe('create-extension.js CLI', () => {
     expect(result.stdout).toContain('Usage')
   })
 
-  it('generated src/index.js is valid JavaScript with activate/deactivate', () => {
+  it('writes a src/index.js that runs and exports activate and deactivate', () => {
     run(['hello-world', '--dir', join(tempDir, 'hello-world')])
     const index = readFileSync(join(tempDir, 'hello-world', 'src', 'index.js'), 'utf8')
-    // Should not have syntax errors — we check by verifying key exports exist
-    expect(index).toContain('activate')
-    expect(index).toContain('deactivate')
-    expect(index).toContain('module.exports')
+    // Evaluated as CommonJS, with the SDK it requires standing in empty.
+    const module = { exports: {} }
+    runInNewContext(index, { module, exports: module.exports, require: () => ({}), console })
+    expect(module.exports).toEqual({
+      activate: expect.any(Function),
+      deactivate: expect.any(Function),
+    })
   })
 })
