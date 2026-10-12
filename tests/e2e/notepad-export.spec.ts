@@ -105,3 +105,32 @@ test('export saves each diagram as an .excalidraw file Excalidraw can open', asy
     elements: [RECTANGLE],
   })
 })
+
+test('the dialog starts on the folder and comment format chosen in Settings', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'notepad-configured-'))
+  const { page } = handle
+  await page.bringToFront()
+  await page.keyboard.press('ControlOrMeta+,')
+  await page.locator('.settings-panel__nav-item').filter({ hasText: 'Extensions' }).click()
+  const notepadSettings = page.locator('.extension-item-wrapper').filter({
+    has: page.locator('.extension-item__name', { hasText: 'Notepad' }),
+  })
+  await notepadSettings.getByTitle('Configure').click()
+  const row = (label: string) =>
+    notepadSettings.locator('.extension-setting-row').filter({ hasText: label })
+  await row('Export comments as').getByRole('button', { name: 'Inline' }).click()
+  await answerNextOpenDialog(handle, folder)
+  await row('Export folder').getByRole('button', { name: 'Choose…' }).click()
+  await expect(row('Export folder')).toContainText(folder)
+  await page.keyboard.press('Escape')
+
+  await notepad.bringToFront()
+  await notepad.getByRole('button', { name: 'Export', exact: true }).first().click()
+  const dialog = notepad.getByRole('dialog', { name: 'Export to markdown' })
+  await expect(dialog.getByLabel('Destination folder')).toHaveValue(folder)
+  await expect(dialog.getByRole('button', { name: 'Inline HTML' })).toHaveClass(/--active/)
+  await dialog.getByRole('button', { name: 'Export 1 note' }).click()
+  await expect(dialog).toContainText('Last export:')
+
+  expect(markdownIn(folder)).toContain('<!-- comment on "ferry": Which day? -->')
+})

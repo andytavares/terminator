@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { Button, Dialog } from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
 
@@ -18,6 +18,27 @@ function previewSlug(title: string, id: string): string {
   )
 }
 
+const COMMENT_FORMATS: readonly CommentFormat[] = ['sidecar', 'inline', 'both']
+
+/** Calls back with the export folder and comment format chosen in Notepad's settings, once read. */
+function useExportSettings(
+  onFolder: (folder: string) => void,
+  onCommentFormat: (format: CommentFormat) => void
+): void {
+  useEffect(() => {
+    void window.electronAPI.extension
+      .getSettingsValues()
+      .then(({ values }) => {
+        const folder = values['terminator.notepad.exportPath']
+        const format = values['terminator.notepad.commentExportFormat']
+        if (typeof folder === 'string' && folder.trim()) onFolder(folder)
+        if (COMMENT_FORMATS.includes(format as CommentFormat))
+          onCommentFormat(format as CommentFormat)
+      })
+      .catch(() => {})
+  }, [onFolder, onCommentFormat])
+}
+
 interface ExportDialogProps {
   onClose: () => void
   noteId?: string
@@ -32,6 +53,7 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
   const [commentFormat, setCommentFormat] = useState<CommentFormat>('sidecar')
   const [overwriteById, setOverwriteById] = useState(true)
   const [includeDiagrams, setIncludeDiagrams] = useState(true)
+  useExportSettings(setFolder, setCommentFormat)
   const [running, setRunning] = useState(false)
   const [exportResult, setExportResult] = useState<{
     notes: number
