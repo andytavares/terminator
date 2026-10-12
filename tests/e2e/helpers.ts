@@ -73,13 +73,17 @@ export function e2eEnv(): NodeJS.ProcessEnv {
 /**
  * `userDataDir` relaunches onto an existing profile, for a spec that proves
  * something survives a restart; `closeApp` never deletes it, so relaunching
- * after a close just works.
+ * after a close just works. `env` adds to the app's environment, e.g. the
+ * stub GitHub's (`tests/e2e/github-stub.ts`).
  */
 // Inside the 30s hook timeout, so a launch that hangs fails with the app's own
 // output instead of a bare "hook timeout exceeded" that says nothing about why.
 const LAUNCH_DEADLINE_MS = 25_000
 
-export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<AppHandle> {
+export async function launchApp(
+  userDataDir: string = e2eProfileDir(),
+  env: Record<string, string> = {}
+): Promise<AppHandle> {
   const deadline = Date.now() + LAUNCH_DEADLINE_MS
   const remaining = () => Math.max(1, deadline - Date.now())
   const app = await electron.launch({
@@ -88,7 +92,7 @@ export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<
     // which blocks startup until firstWindow times out. The argument domain
     // turns that restore off for this process only.
     args: ['.', `--user-data-dir=${userDataDir}`, '-ApplePersistenceIgnoreState', 'YES'],
-    env: e2eEnv(),
+    env: { ...e2eEnv(), ...env },
     timeout: remaining(),
   })
   const output: string[] = []
