@@ -777,7 +777,9 @@ const livePreviewDecorations = StateField.define<DecorationSet>({
   },
   update(decos, tr) {
     const focusChanged = tr.effects.some((e) => e.is(setEditorFocused))
-    if (tr.docChanged || tr.selection || focusChanged) {
+    // The first parse is time-boxed; the rest of the tree arrives later on its own.
+    const treeChanged = syntaxTree(tr.state) !== syntaxTree(tr.startState)
+    if (tr.docChanged || tr.selection || focusChanged || treeChanged) {
       const focused = tr.state.field(editorFocusedField)
       return buildDecorations(tr.state, tr.state.selection.main, focused)
     }

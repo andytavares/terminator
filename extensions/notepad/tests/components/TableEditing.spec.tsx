@@ -1,9 +1,10 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import { cursorCharRight, cursorCharLeft } from '@codemirror/commands'
+import { forceParsing } from '@codemirror/language'
 import { livePreviewPlugin } from '../../src/editor/livePreview'
 
 // Exercises a real EditorView rather than buildDecorations alone, because the
@@ -20,7 +21,7 @@ afterEach(() => {
   view = null
 })
 
-function mountDoc(doc: string, cursor: number): EditorView {
+function createView(doc: string, cursor: number): EditorView {
   const parent = document.createElement('div')
   document.body.appendChild(parent)
   view = new EditorView({
@@ -32,6 +33,13 @@ function mountDoc(doc: string, cursor: number): EditorView {
     parent,
   })
   return view
+}
+
+/** A view whose document is fully parsed, as it is once the background parse has run. */
+function mountDoc(doc: string, cursor: number): EditorView {
+  const v = createView(doc, cursor)
+  forceParsing(v, v.state.doc.length, Infinity)
+  return v
 }
 
 function mount(cursor: number): EditorView {
@@ -48,9 +56,40 @@ function type(v: EditorView, text: string): void {
 
 const tableRendered = (v: EditorView) => v.dom.querySelector('.notepad-table') !== null
 
+// CodeMirror's first parse of a new state stops once 20ms have passed
+// (Work.Apply in @codemirror/language) and the rest is parsed in the
+// background. A clock that jumps that far on every reading is a machine too
+// loaded to finish the first parse.
+const FIRST_PARSE_BUDGET_MS = 20
+
+function mountOnALoadedMachine(cursor: number): EditorView {
+  let now = Date.now()
+  const clock = vi.spyOn(Date, 'now').mockImplementation(() => (now += FIRST_PARSE_BUDGET_MS + 1))
+  try {
+    return createView(DOC, cursor)
+  } finally {
+    clock.mockRestore()
+  }
+}
+
 describe('editing a rendered table', () => {
   it('renders the table while the caret is elsewhere', () => {
     expect(tableRendered(mount(0))).toBe(true)
+  })
+
+  it('renders the table once the background parse reaches it', () => {
+    // The background parse is scheduled with setTimeout where there is no requestIdleCallback.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const v = mountOnALoadedMachine(0)
+      expect(tableRendered(v)).toBe(false)
+
+      vi.runAllTimers()
+
+      expect(tableRendered(v)).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('clicking a body cell puts the caret in that cell', () => {
