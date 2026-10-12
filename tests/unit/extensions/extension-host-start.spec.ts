@@ -91,12 +91,20 @@ describe('ExtensionHost.start', () => {
   it('activates extensions concurrently: one waits for another to have started', async () => {
     let markPeerStarted = () => {}
     const peerStarted = new Promise<void>((resolve) => (markPeerStarted = resolve))
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('peer never started')), 1000)
-    )
     const { host, backendHost } = await newHost({
+      // The second starts when the wait does, not when the case does: loading
+      // the host module can itself take a second, and a timeout that had
+      // already fired was an unhandled rejection although the case passed.
       'com.waiter': async () => {
-        await Promise.race([peerStarted, timeout])
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const timeout = new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('peer never started')), 1000)
+        })
+        try {
+          await Promise.race([peerStarted, timeout])
+        } finally {
+          clearTimeout(timer)
+        }
       },
       'com.peer': () => markPeerStarted(),
     })
