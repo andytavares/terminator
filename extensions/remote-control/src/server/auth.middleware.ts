@@ -22,6 +22,13 @@ export function isAllowedHost(rawHost: string): boolean {
   return LOOPBACK_HOSTS.has(host) || NGROK_PATTERN.test(host) || PRIVATE_IP_PATTERN.test(host)
 }
 
+// Login is where a session starts, and WebSocket upgrades authenticate with a
+// single-use ticket (browsers cannot send credentials on them).
+function authenticatesItself(url: string): boolean {
+  const pathname = url.split('?')[0]
+  return SELF_AUTHENTICATING.has(pathname) || pathname.startsWith('/ws/terminals/')
+}
+
 interface AuthMiddlewareOptions {
   hasValidSession: (cookieHeader: string) => boolean
 }
@@ -48,10 +55,7 @@ export async function registerAuthMiddleware(
       return reply.status(403).send({ error: 'FORBIDDEN' })
     }
 
-    // Login is where a session starts, and WebSocket upgrades authenticate with a
-    // single-use ticket (browsers cannot send credentials on them).
-    const pathname = request.url.split('?')[0]
-    if (SELF_AUTHENTICATING.has(pathname) || pathname.startsWith('/ws/terminals/')) return
+    if (authenticatesItself(request.url)) return
 
     if (!hasValidSession(request.headers.cookie ?? '')) {
       return reply.status(401).send({ error: 'UNAUTHORIZED' })
