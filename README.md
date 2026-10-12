@@ -55,6 +55,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 | Terminal rendering     | xterm.js 5.x + xterm-addon-fit              |
 | PTY management         | node-pty 1.x (main process only)            |
 | Persistence            | electron-store 8.x                          |
+| Application database   | `node:sqlite` (SQLite, built into Node 24)  |
 | Schema validation      | Zod 3.x                                     |
 | Remote server          | Fastify 5.x + @fastify/websocket 11.x       |
 | Browser SPA            | xterm.js 6.x (AttachAddon + FitAddon)       |
@@ -64,7 +65,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 | E2E tests              | Playwright 1.x                              |
 | UI font                | IBM Plex Sans (@fontsource)                 |
 
-Extension dependencies (not part of the core app): `@electric-sql/pglite`, `sql.js`, `@modelcontextprotocol/sdk`, `gray-matter`, `node-ical` — declared in each extension's own `package.json`.
+Extension dependencies (not part of the core app): `@modelcontextprotocol/sdk`, `gray-matter`, `node-ical` — declared in each extension's own `package.json`.
 
 ## Documentation
 

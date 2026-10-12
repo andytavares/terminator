@@ -52,6 +52,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- The application database is `userData/app.sqlite`, opened through Node's built-in `node:sqlite`, instead of PGlite (`app.pglite`). A start no longer loads about 250 MB of WebAssembly Postgres or spends about 0.6 s opening it. On the first start after the upgrade, the notes and tasks in `app.pglite` are copied across once; `app.pglite` is left in place as a backup, and a failed import is logged and starts the app with an empty database. Notepad search matches with `LIKE`, which ignores case for ASCII letters only. `node:sqlite` is a release candidate in Node 24 (ADR-099)
+
 - Electron 30.4.0 → 42.4.1; `node-pty@1.0.0` → `node-pty@1.2.0-beta.13` (NAN → NAPI migration). NAPI is ABI-stable, so `electron-rebuild` and the `npm run rebuild` script were removed — ADR-021 resolved
 - Fastify 4 → 5 and `@fastify/websocket` 8 → 11 (websocket handlers now receive the socket directly instead of `connection.socket`)
 - Vitest 2 → 4, Vite 5 → 7, electron-vite 2 → 5, electron-builder 24 → 26, Playwright 1.45 → 1.61; `vitest.config.ts` migrated from `environmentMatchGlobs` to `test.projects` (node/jsdom split) — the removed `vitest.workspace.ts` is superseded by it

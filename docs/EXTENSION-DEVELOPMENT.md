@@ -474,6 +474,50 @@ Items appear in registration order within the View submenu. Disposing removes th
 
 ---
 
+### `api.db` — The Application Database _(v1.5.0, SQLite since the PGlite replacement, ADR 099)_
+
+`api.db` is one shared SQLite database (`<userData>/app.sqlite`, Node's built-in `node:sqlite`, WAL journal, foreign keys on). The core creates no tables: your extension creates its own in `activate`, before it registers handlers that read them. Prefix table names that another extension could also choose; `settings` is shared and keyed `(extension_id, key)`.
+
+```typescript
+export async function activate(api: ExtensionAPI): Promise<void> {
+  await api.db.exec(`CREATE TABLE IF NOT EXISTS my_notes (
+    id TEXT PRIMARY KEY, body TEXT NOT NULL, created_at TEXT NOT NULL
+  )`)
+
+  const rows = await api.db.query<{ id: string; body: string }>(
+    'SELECT id, body FROM my_notes WHERE body LIKE ? ORDER BY created_at DESC',
+    ['%todo%']
+  )
+  const first = await api.db.get('SELECT id FROM my_notes WHERE id = ?', ['a'])
+  const changed = await api.db.run('DELETE FROM my_notes WHERE id = ?', ['a']) // rows changed
+
+  await api.db.transaction(async (tx) => {
+    await tx.run('INSERT INTO my_notes (id, body, created_at) VALUES (?, ?, ?)', [id, body, now])
+    await tx.transaction(async (inner) => {
+      // a nested call is a SAVEPOINT: if it throws and you catch it, only its writes are undone
+    })
+  })
+}
+```
+
+The methods are `async` although SQLite is synchronous. Statements and transactions run one at a time in call order, so a statement issued while a transaction is open waits for it. Use the `tx` you are given inside a transaction callback, never `api.db`, or the call waits for the transaction that is waiting for it.
+
+**Dialect notes.** It is SQLite, not Postgres:
+
+- Parameters are `?`, and each should be a `string`, `number`, `bigint`, `null` or `Uint8Array`. `undefined` throws (`Provided value cannot be bound`); write `value ?? null`. Node's documentation does not list `boolean`, so write `flag ? 1 : 0`.
+- There is no `BOOLEAN`, `jsonb`, `SERIAL` or timestamp type worth using. Store booleans as `INTEGER` 0/1, dates as ISO-8601 `TEXT`, JSON as `TEXT` and read it with `json_extract` / `json_remove`. Use `TEXT PRIMARY KEY` with `crypto.randomUUID()`, or `INTEGER PRIMARY KEY` for a rowid.
+- `STRING_AGG(x, ',')` is `GROUP_CONCAT(x, ',')`. `NOW()` is `datetime('now')`, but prefer passing `new Date().toISOString()` as a parameter.
+- `ILIKE` does not exist. `LIKE` is case-insensitive for ASCII letters only: `'É' LIKE 'é'` is false.
+- `ON CONFLICT (col) DO UPDATE SET v = excluded.v` and `ON CONFLICT DO NOTHING` work as in Postgres. `INSERT OR IGNORE` also silently drops rows that violate `NOT NULL` or `UNIQUE`; prefer `ON CONFLICT`.
+- `COUNT(*)` comes back as a `number`, not a string.
+- `ALTER TABLE ... ADD COLUMN` cannot add a `NOT NULL` column without a default or a `REFERENCES` column with a non-null default. To change anything else, create a new table, copy and rename it.
+- To ask whether a column exists, use `SELECT 1 FROM pragma_table_info(?) WHERE name = ?`; to list tables, `SELECT name FROM sqlite_master WHERE type = 'table'`. There is no `information_schema`.
+- `PRAGMA foreign_keys` is on: deleting a parent row follows your `ON DELETE` clauses. Inside a transaction, `PRAGMA defer_foreign_keys = ON` postpones the checks to commit.
+
+Test against a real database, not a mock: `wrapDb(new DatabaseSync(':memory:'))` from `src/main/db/index.ts` is the same implementation the app uses.
+
+---
+
 ### `api.ipc` — Custom IPC Handlers _(v1.1.0)_
 
 Register named IPC handlers in the main process. The renderer side calls these via `window.electronAPI.invoke(channel, payload)`.
