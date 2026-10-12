@@ -1,11 +1,12 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { GlobalSettings } from '../../../../src/renderer/components/settings/GlobalSettings'
 import { seedStore } from '../../../support/renderer-stores'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
 import type { GlobalSettings as GlobalSettingsValue } from '../../../../src/shared/types'
+import { installElectronApi } from '../../../support/electron-api'
 
 const mockUpdateTheme = vi.fn()
 const mockUpdateScrollback = vi.fn()
@@ -47,13 +48,9 @@ beforeEach(() => {
     updateQuickActions: mockUpdateQuickActions,
     workspaceSettings: new Map(),
   })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+  installElectronApi({
     settings: { updateGlobal: mockUpdateGlobal },
-  }
-})
-
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  })
 })
 
 describe('GlobalSettings', () => {
