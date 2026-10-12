@@ -4,6 +4,7 @@ import {
   TerminalInstance,
   XTERM_THEMES,
 } from '../../../../src/renderer/components/terminal/TerminalSession'
+import { MAX_WEBGL_CONTEXTS } from '../../../../src/renderer/terminal/webgl-contexts'
 
 const mockResizeObserver = vi.fn().mockImplementation(function () {
   return {
@@ -63,6 +64,39 @@ vi.mock('@xterm/addon-fit', () => {
   return { FitAddon }
 })
 
+const webglAddons = vi.hoisted(() => [] as { dispose: () => void; loseContext: () => void }[])
+vi.mock('@xterm/addon-webgl', () => {
+  const WebglAddon = vi.fn().mockImplementation(function () {
+    let onLoss: () => void = () => {}
+    const addon = {
+      onContextLoss: (listener: () => void) => {
+        onLoss = listener
+        return { dispose: vi.fn() }
+      },
+      dispose: vi.fn(),
+      loseContext: () => onLoss(),
+    }
+    webglAddons.push(addon)
+    return addon
+  })
+  return { WebglAddon }
+})
+
+// Each test gets an empty context budget, so terminals other tests leave mounted
+// do not use up the contexts these tests count.
+const budgetHolder = vi.hoisted(() => ({ current: null as unknown }))
+vi.mock('../../../../src/renderer/terminal/webgl-contexts', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../../../src/renderer/terminal/webgl-contexts')>()
+  budgetHolder.current = new actual.WebglContextBudget(actual.MAX_WEBGL_CONTEXTS)
+  return {
+    ...actual,
+    get webglContexts() {
+      return budgetHolder.current
+    },
+  }
+})
+
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}))
 
 // TerminalInstance is a pure view object: busy/idle/bell reach the outside
@@ -95,7 +129,11 @@ const mockOpenPath = vi.fn().mockResolvedValue({ ok: true })
 let mockPlatform = 'MacIntel'
 Object.defineProperty(navigator, 'platform', { get: () => mockPlatform, configurable: true })
 
-beforeEach(() => {
+beforeEach(async () => {
+  const { WebglContextBudget, MAX_WEBGL_CONTEXTS } = await import(
+    '../../../../src/renderer/terminal/webgl-contexts'
+  )
+  budgetHolder.current = new WebglContextBudget(MAX_WEBGL_CONTEXTS)
   mockPlatform = 'MacIntel'
   vi.clearAllMocks()
   mockMeasureText.mockReturnValue({ width: 8 })
@@ -287,6 +325,71 @@ describe('TerminalInstance', () => {
       instance.mount(container)
       expect(instance.terminal.open).toHaveBeenCalledTimes(1)
       document.body.removeChild(container)
+    })
+  })
+
+  describe('WebGL renderer', () => {
+    function mounted(sessionId: string): TerminalInstance {
+      const instance = new TerminalInstance(sessionId, 1000)
+      instance.mount(document.createElement('div'))
+      return instance
+    }
+
+    beforeEach(() => {
+      webglAddons.length = 0
+    })
+
+    it('loads the WebGL renderer into a terminal that becomes visible', () => {
+      const instance = mounted('webgl-visible')
+      const terminal = vi.mocked(Terminal).mock.results.at(-1)!.value
+      expect(webglAddons).toHaveLength(1)
+      expect(terminal.loadAddon).toHaveBeenCalledWith(webglAddons[0])
+      instance.unmount()
+    })
+
+    it('releases the WebGL context when the terminal is hidden', () => {
+      const instance = mounted('webgl-hidden')
+      instance.unmount()
+      expect(webglAddons[0].dispose).toHaveBeenCalled()
+    })
+
+    it('hands the context back so the same terminal gets one again when shown', () => {
+      const instance = mounted('webgl-reshown')
+      instance.unmount()
+      instance.mount(document.createElement('div'))
+      expect(webglAddons).toHaveLength(2)
+      instance.unmount()
+    })
+
+    it('uses the DOM renderer for a terminal shown as a preview tile', () => {
+      const instance = mounted('webgl-tile')
+      Object.defineProperty(instance.terminal, 'cols', { value: 80, configurable: true })
+      Object.defineProperty(instance.terminal, 'rows', { value: 24, configurable: true })
+      const cleanup = instance.mountPreview(document.createElement('div'))
+      expect(webglAddons[0].dispose).toHaveBeenCalled()
+      cleanup?.()
+      instance.unmount()
+    })
+
+    it('falls back to the DOM renderer when the GPU context is lost', () => {
+      const instance = mounted('webgl-lost')
+      webglAddons[0].loseContext()
+      expect(webglAddons[0].dispose).toHaveBeenCalled()
+      instance.unmount()
+    })
+
+    it('leaves terminals beyond the context limit on the DOM renderer', () => {
+      const visible = Array.from({ length: MAX_WEBGL_CONTEXTS + 1 }, (_, i) => mounted(`cap-${i}`))
+      expect(webglAddons).toHaveLength(MAX_WEBGL_CONTEXTS)
+      visible.forEach((instance) => instance.unmount())
+    })
+
+    it('gives a freed context to a terminal that was left on the DOM renderer', () => {
+      const visible = Array.from({ length: MAX_WEBGL_CONTEXTS + 1 }, (_, i) => mounted(`free-${i}`))
+      visible[0].unmount()
+      visible[MAX_WEBGL_CONTEXTS].mount(document.createElement('div'))
+      expect(webglAddons).toHaveLength(MAX_WEBGL_CONTEXTS + 1)
+      visible.forEach((instance) => instance.unmount())
     })
   })
 

@@ -169,6 +169,14 @@ CSS. Its width is fixed (14px) and `FitAddon` reserves it, whatever the OS scrol
 tests that need the scroll position read the xterm buffer or the scrollbar slider, never the
 `.xterm-viewport` element's `scrollTop`.
 
+**Renderer choice.** A visible desktop terminal draws with `@xterm/addon-webgl`; the DOM renderer is the
+fallback. `TerminalInstance.mount()` loads the add-on, and `unmount()` or `mountPreview()` (an Overview
+tile) disposes it, so a hidden terminal or a thumbnail never holds a GPU context. Chromium keeps at most
+16 live WebGL contexts, so `WebglContextBudget` (`src/renderer/terminal/webgl-contexts.ts`) hands out 12
+and a terminal past that stays on the DOM renderer. A lost context (`onContextLoss`) or a machine without
+WebGL2 also falls back to the DOM renderer. The DOM renderer clips the last column's glyph on macOS (about
+2px), which WebGL does not do because it has no row boxes to clip. The phone client keeps the DOM renderer.
+
 ---
 
 ## Settings Resolution
