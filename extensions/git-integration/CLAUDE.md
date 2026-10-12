@@ -54,7 +54,7 @@ PR descriptions, templates and comments are rendered only through `src/component
 ### What extensions MUST NOT do
 
 - **Never** put extension-specific methods in `src/main/preload.ts` (core file)
-- **Never** modify `src/renderer/electron.d.ts` (core file) or re-declare `window.electronAPI` here. The view API is declared once, in `packages/extension-sdk/types/renderer.d.ts`, which `tsconfig.extension.json` loads; if the extension needs something it lacks, extend the SDK declaration. Extension-owned channels are typed in the `src/api/*.ts` bridge modules through `invokeBridge<T>` (`src/api/bridge.ts`)
+- **Never** modify `src/shared/electron-api/manifest.ts` (core file) or re-declare `window.electronAPI` here. The view API is declared once, in `packages/extension-sdk/types/renderer.d.ts`, which `tsconfig.extension.json` loads; if the extension needs something it lacks, extend the SDK declaration. Extension-owned channels are typed in the `src/api/*.ts` bridge modules through `invokeBridge<T>` (`src/api/bridge.ts`)
 - **Never** add extension-only npm deps to the **root** `package.json` — add them to `extensions/git-integration/package.json`
 - **Never** import from other extensions (`extensions/task-vault/...`, `extensions/speckit-pilot/...`)
 - **Never** hardcode the extension ID in core app files

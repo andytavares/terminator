@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { WallTile } from './WallTile'
@@ -52,7 +53,13 @@ export function OverviewScreen(): JSX.Element {
   const titles = useIssueTitles()
   const setDescription = useSessionRecordsStore((s) => s.setDescription)
   const forgetSession = useSessionRecordsStore((s) => s.forget)
-  const { processesBySessionId, startPolling, stopPolling } = useMetricsStore()
+  const { processesBySessionId, startPolling, stopPolling } = useMetricsStore(
+    useShallow((s) => ({
+      processesBySessionId: s.processesBySessionId,
+      startPolling: s.startPolling,
+      stopPolling: s.stopPolling,
+    }))
+  )
 
   const [prefs, setPrefs] = useState<WallPrefs>(loadWallPrefs)
   const [text, setText] = useState('')

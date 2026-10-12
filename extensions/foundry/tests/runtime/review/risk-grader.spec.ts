@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  gradeRisk,
-  type ChangeSummary,
-} from '../../../src/runtime/review/risk-grader.js'
+import { gradeRisk, type ChangeSummary } from '../../../src/runtime/review/risk-grader.js'
 
 // Grading is evaluated strictly top-down, first match wins. The order is the
 // point: a lockfile change that also touches a critical path is P0, not P3.

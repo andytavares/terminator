@@ -881,7 +881,12 @@ describe('App', () => {
         projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'ses-active' }]]),
         setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
-      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+      // The menu reads the store when it fires, not what the last render saw.
+      setupMocks({
+        activeProjectId: 'proj-1',
+        activeWorkspaceId: 'ws-1',
+        projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'ses-active' }]]),
+      })
       vi.mocked(useSessionStore).mockReturnValue({
         handleProcessExit: mockHandleProcessExit,
         getSessionsForProject: vi.fn().mockReturnValue([]),
@@ -974,7 +979,14 @@ describe('App', () => {
       const mockCloseSession = vi.fn().mockResolvedValue(undefined)
       const mockCreateSession = vi.fn().mockResolvedValue('ses-scratch')
       vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
-      setupMocks({ activeProjectId: null, activeWorkspaceId: 'ws-1', scratchActive: true })
+      setupMocks({
+        activeProjectId: null,
+        activeWorkspaceId: 'ws-1',
+        scratchActive: true,
+        projectViews: new Map([
+          [SCRATCH_PROJECT_ID, { terminalCounter: 0, activeSessionId: 'ses-scratch' }],
+        ]),
+      })
       vi.mocked(useSessionStore).mockReturnValue({
         handleProcessExit: mockHandleProcessExit,
         getSessionsForProject: vi.fn().mockReturnValue([]),
@@ -2299,6 +2311,26 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
 
     act(() => onMenuCloseTab?.())
     expect(directUseIds()).toContain('core.close-tab')
+  })
+
+  it('writes no settings for a shortcut whose hint has already stopped showing', () => {
+    setupMocks({
+      globalSettings: {
+        ui: { hasSeenWelcome: true },
+        quickActions: {
+          pins: [],
+          usage: [],
+          directUse: [{ id: 'core.new-tab', count: 3 }],
+          custom: [],
+        },
+      },
+    })
+    render(<App />)
+    const onDirectShortcut = (
+      capturedShortcutCallbacks as { onDirectShortcut?: (id: string) => void }
+    ).onDirectShortcut
+    for (let press = 0; press < 5; press++) act(() => onDirectShortcut?.('core.new-tab'))
+    expect(useSettingsStore.getState().updateQuickActions).not.toHaveBeenCalled()
   })
 
   it('exercises the remaining core-action edge branches with no project, no sessions and no workspaces', async () => {

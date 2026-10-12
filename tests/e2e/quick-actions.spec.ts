@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
@@ -420,7 +420,10 @@ test.describe('git push and a custom shell action', () => {
     await page.locator('#qa-action-label').fill('Echo branch')
     await page.locator('#qa-action-key').fill('e')
     await page.locator('#qa-action-target').selectOption('new-tab')
-    await page.locator('#qa-action-body').fill('echo {branch}')
+    // tee: the branch goes to the terminal and to a file the test can read. The
+    // WebGL renderer draws to a canvas, so the terminal has no DOM text to read.
+    const echoed = join(workDir, 'echoed-branch.txt')
+    await page.locator('#qa-action-body').fill(`echo {branch} | tee '${echoed}'`)
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.locator('.qa-settings-list__label', { hasText: 'Echo branch' })).toBeVisible()
     await page.keyboard.press('Escape')
@@ -437,16 +440,11 @@ test.describe('git push and a custom shell action', () => {
       timeout: 15000,
     })
     await expect
-      .poll(
-        async () =>
-          page
-            .locator('.xterm-rows')
-            .last()
-            .innerText()
-            .catch(() => ''),
-        { timeout: 15000, message: 'the new tab never echoed the branch name' }
-      )
-      .toContain('main')
+      .poll(() => (existsSync(echoed) ? readFileSync(echoed, 'utf8').trim() : ''), {
+        timeout: 15000,
+        message: 'the new tab never echoed the branch name',
+      })
+      .toBe('main')
   })
 })
 

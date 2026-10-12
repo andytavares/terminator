@@ -78,6 +78,23 @@ describe('settings-store', () => {
     expect(settings.appearance.theme).toBe('light')
   })
 
+  it('updateGlobalSettings refuses a value the settings schema rejects and keeps what was stored', async () => {
+    const { getGlobalSettings, updateGlobalSettings } = await import(
+      '../../../src/main/storage/settings-store'
+    )
+    const before = getGlobalSettings().terminal.scrollbackLimit
+    expect(() => updateGlobalSettings({ terminal: { scrollbackLimit: 5 } })).toThrow()
+    expect(getGlobalSettings().terminal.scrollbackLimit).toBe(before)
+  })
+
+  it('updateWorkspaceSettings refuses an override the settings schema rejects', async () => {
+    const { getWorkspaceSettings, updateWorkspaceSettings } = await import(
+      '../../../src/main/storage/settings-store'
+    )
+    expect(() => updateWorkspaceSettings('ws-bad', { appearance: { theme: 'purple' } })).toThrow()
+    expect(getWorkspaceSettings('ws-bad').overrides).toEqual({})
+  })
+
   it('getWorkspaceSettings returns global defaults when no override', async () => {
     const { getWorkspaceSettings } = await import('../../../src/main/storage/settings-store')
     const ws = getWorkspaceSettings('non-existent-id')

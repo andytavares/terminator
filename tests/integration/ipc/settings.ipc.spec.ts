@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ipcMain } from 'electron'
+import { z } from 'zod'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn() },
@@ -54,6 +55,26 @@ describe('settings IPC handlers (no callback)', () => {
         appearance: { theme: 'light' },
       })
       expect(result.settings).toEqual(updated)
+    })
+  })
+
+  describe('settings the schema rejects', () => {
+    it('answers VALIDATION_ERROR when the merged global settings are invalid', async () => {
+      vi.mocked(settingsStore.updateGlobalSettings).mockImplementation(() => {
+        throw new z.ZodError([])
+      })
+      const handler = captureHandler('settings:update-global')
+      const result = await handler({}, { patch: { terminal: { scrollbackLimit: 5 } } })
+      expect(result).toEqual({ error: 'VALIDATION_ERROR' })
+    })
+
+    it('answers VALIDATION_ERROR when the merged workspace override is invalid', async () => {
+      vi.mocked(settingsStore.updateWorkspaceSettings).mockImplementation(() => {
+        throw new z.ZodError([])
+      })
+      const handler = captureHandler('settings:update-workspace')
+      const result = await handler({}, { workspaceId: 'ws-1', patch: { appearance: 1 } })
+      expect(result).toEqual({ error: 'VALIDATION_ERROR' })
     })
   })
 

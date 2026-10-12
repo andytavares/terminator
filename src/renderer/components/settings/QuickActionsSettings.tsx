@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useState } from 'react'
 import { useSettingsStore } from '../../stores/settings.store'
 import type { CustomAction, CustomActionKind, CustomActionTarget } from '../../../shared/types'
@@ -54,7 +55,14 @@ function draftFrom(a: CustomAction): Draft {
 
 export function QuickActionsSettings(props: Props): JSX.Element {
   const { globalSettings, workspaceSettings, updateQuickActions, updateWorkspaceQuickActions } =
-    useSettingsStore()
+    useSettingsStore(
+      useShallow((s) => ({
+        globalSettings: s.globalSettings,
+        workspaceSettings: s.workspaceSettings,
+        updateQuickActions: s.updateQuickActions,
+        updateWorkspaceQuickActions: s.updateWorkspaceQuickActions,
+      }))
+    )
   const [draft, setDraft] = useState<Draft | null>(null)
   const [error, setError] = useState<string | null>(null)
 

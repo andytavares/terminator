@@ -1,5 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { SessionView } from '../../sidebar/view-model'
+import { useShallow } from 'zustand/react/shallow'
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { busyBranchIds, type SessionView } from '../../sidebar/view-model'
+import { useStalenessClock } from './useStalenessClock'
 import type { Workspace } from '../../../shared/types/index'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { useWorkspaceStore } from '../../stores/workspace.store'
@@ -34,7 +36,6 @@ import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { SidebarHeader } from './SidebarHeader'
 import { LinkIssueDialog } from '../integrations/LinkIssueDialog'
-import { IssueDrawer } from '../integrations/IssueDrawer'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useSessionFacts } from '../session/useSessionFacts'
 import { useNow } from '../session/useNow'
@@ -46,6 +47,10 @@ import { DisplayMenu } from './DisplayMenu'
 import { RepoHeader } from './RepoHeader'
 import { BranchRow } from './BranchRow'
 import './UnifiedSidebar.css'
+
+const IssueDrawer = lazy(() =>
+  import('../integrations/IssueDrawer').then((m) => ({ default: m.IssueDrawer }))
+)
 
 interface UnifiedSidebarProps {
   activeWorkspaceTabId: string | null
@@ -115,18 +120,55 @@ export function UnifiedSidebar({
     deleteWorkspace,
     renameProject,
     resolveActiveCwd,
-  } = useWorkspaceStore()
-  const sessionStore = useSessionStore()
-  const { sessions, projectViews } = sessionStore
-  const { resolveSettings } = useSettingsStore()
+  } = useWorkspaceStore(
+    useShallow((s) => ({
+      workspaces: s.workspaces,
+      activeProjectId: s.activeProjectId,
+      activeWorkspaceId: s.activeWorkspaceId,
+      projectsByWorkspaceId: s.projectsByWorkspaceId,
+      setActiveProject: s.setActiveProject,
+      setActiveWorkspace: s.setActiveWorkspace,
+      loadProjects: s.loadProjects,
+      reorderWorkspaces: s.reorderWorkspaces,
+      reorderProjects: s.reorderProjects,
+      deleteProject: s.deleteProject,
+      deleteWorkspace: s.deleteWorkspace,
+      renameProject: s.renameProject,
+      resolveActiveCwd: s.resolveActiveCwd,
+    }))
+  )
+  const { sessions, projectViews, closeSplitLeaf, closeSession, renameSession } = useSessionStore(
+    useShallow((s) => ({
+      sessions: s.sessions,
+      projectViews: s.projectViews,
+      closeSplitLeaf: s.closeSplitLeaf,
+      closeSession: s.closeSession,
+      renameSession: s.renameSession,
+    }))
+  )
+  const { resolveSettings } = useSettingsStore(
+    useShallow((s) => ({
+      resolveSettings: s.resolveSettings,
+      globalSettings: s.globalSettings,
+      workspaceSettings: s.workspaceSettings,
+    }))
+  )
   const {
     statsFor,
     ensure: ensureChangeStats,
     invalidate: invalidateStats,
     invalidateAll: invalidateAllStats,
-  } = useChangeStatsStore()
-  /** Last activity seen per branch, so work in a terminal refreshes its statistics. */
-  const lastActivityByBranch = useRef(new Map<string, number>())
+  } = useChangeStatsStore(
+    useShallow((s) => ({
+      statsFor: s.statsFor,
+      ensure: s.ensure,
+      invalidate: s.invalidate,
+      invalidateAll: s.invalidateAll,
+      entries: s.entries,
+    }))
+  )
+  /** Branches that were printing at the last render, so one settling refreshes its statistics. */
+  const busyBranches = useRef(new Set<string>())
   const staleAfterMs = resolveSettings().sidebar?.staleAfterMs ?? DEFAULT_STALE_AFTER_MS
   const { createSession } = useTerminalSession()
   const workspaceTabs = useExtensionRegistry((s) => s.workspaceTabs)
@@ -164,7 +206,24 @@ export function UnifiedSidebar({
     drawerProjectId,
     openDrawer,
     closeDrawer,
-  } = useIntegrationsStore()
+  } = useIntegrationsStore(
+    useShallow((s) => ({
+      linkFor: s.linkFor,
+      issueFor: s.issueFor,
+      loadLink: s.loadLink,
+      unlinkIssue: s.unlinkIssue,
+      subscribe: s.subscribe,
+      loadConnections: s.loadConnections,
+      linkDialogProjectId: s.linkDialogProjectId,
+      openLinkDialog: s.openLinkDialog,
+      closeLinkDialog: s.closeLinkDialog,
+      drawerProjectId: s.drawerProjectId,
+      openDrawer: s.openDrawer,
+      closeDrawer: s.closeDrawer,
+      links: s.links,
+      issues: s.issues,
+    }))
+  )
 
   /** Home directory, so a repo's path reads as `~/repos/app` rather than in full. */
   const [homeDir, setHomeDir] = useState<string | undefined>(undefined)
@@ -329,24 +388,22 @@ export function UnifiedSidebar({
       .filter((s) => s.status !== 'closed' || s.agentState === 'exited')
   }, [sessions])
 
-  // Work in a terminal changes the tree under it, so a branch whose sessions
-  // just did something gets its statistics dropped rather than waiting out the
-  // TTL. Tracked here rather than in the session store: making the session
-  // store import the stats store would couple two things that have no other
-  // reason to know about each other.
+  // Work in a terminal changes the tree under it, so a branch whose terminals
+  // just stopped printing gets its statistics dropped rather than waiting out
+  // the TTL: once per burst, not once per activity stamp. Tracked here rather
+  // than in the session store: making the session store import the stats store
+  // would couple two things that have no other reason to know about each other.
   useEffect(() => {
-    const seen = lastActivityByBranch.current
-    for (const session of sessionList) {
-      const previous = seen.get(session.projectId) ?? 0
-      if (session.lastActivityAt > previous) {
-        seen.set(session.projectId, session.lastActivityAt)
-        if (previous !== 0) invalidateStats(session.projectId)
-      }
+    const busyNow = busyBranchIds(sessionList)
+    for (const projectId of busyBranches.current) {
+      if (!busyNow.has(projectId)) invalidateStats(projectId)
     }
+    busyBranches.current = busyNow
   }, [sessionList, invalidateStats])
 
   const currentTime = useNow()
   const clock = now ?? currentTime
+  const rowsClock = useStalenessClock(sessionList, clock, staleAfterMs)
 
   // A session's own link, keyed by session id, so a terminal row can draw it
   // without the pure branch-rows layer knowing trackers exist (ADR-031).
@@ -391,11 +448,11 @@ export function UnifiedSidebar({
         allProjects,
         workspaces,
         view,
-        clock,
+        rowsClock,
         staleAfterMs,
         workItemsBySession
       ),
-    [sessionList, allProjects, workspaces, view, clock, staleAfterMs, workItemsBySession]
+    [sessionList, allProjects, workspaces, view, rowsClock, staleAfterMs, workItemsBySession]
   )
 
   // What each view would show, so a chip can say "Needs me · 6" without the
@@ -408,12 +465,12 @@ export function UnifiedSidebar({
         allProjects,
         workspaces,
         v,
-        clock,
+        rowsClock,
         staleAfterMs
       ).shown
     }
     return out
-  }, [views, sessionList, allProjects, workspaces, clock, staleAfterMs])
+  }, [views, sessionList, allProjects, workspaces, rowsClock, staleAfterMs])
 
   // ── Dragging is how the manual order is written ───────────────────────────
   //
@@ -502,8 +559,8 @@ export function UnifiedSidebar({
 
   /** Leaves the split layout first, then ends the session — as Cmd+W does. */
   function closeTerminal(projectId: string, sessionId: string): void {
-    sessionStore.closeSplitLeaf(projectId, sessionId)
-    void sessionStore.closeSession(sessionId)
+    closeSplitLeaf(projectId, sessionId)
+    void closeSession(sessionId)
   }
 
   /**
@@ -835,7 +892,7 @@ export function UnifiedSidebar({
                   selected={activeScratchSessionId === session.id}
                   now={clock}
                   onSelect={() => onSelectScratchSession(session.id)}
-                  onRename={(title) => sessionStore.renameSession(session.id, title)}
+                  onRename={(title) => renameSession(session.id, title)}
                   sessionIssueKeys={scratchIssueKeys(session.id)}
                 />
               ))}
@@ -882,11 +939,13 @@ export function UnifiedSidebar({
           if (!project) return null
           return (
             <div className="issue-drawer-host">
-              <IssueDrawer
-                projectId={project.id}
-                projectName={branchLabel(project)}
-                onClose={closeDrawer}
-              />
+              <Suspense fallback={null}>
+                <IssueDrawer
+                  projectId={project.id}
+                  projectName={branchLabel(project)}
+                  onClose={closeDrawer}
+                />
+              </Suspense>
             </div>
           )
         })()}

@@ -107,7 +107,7 @@ and [`specs/031-linear-project-integration/contracts/ipc-channels.md`](../specs/
 
 - `src/shared/types/index.ts` — TypeScript interfaces used by both processes.
 - `src/shared/schemas/` — Zod schemas. Validate IPC payloads before use; a payload that fails its schema gets the `invalid` response declared in the channel's table row (usually an `{ error: 'VALIDATION_ERROR' }` envelope shaped like the channel's other responses).
-- `src/renderer/electron.d.ts` — Type declaration for `window.electronAPI`, keeping the renderer call sites type-checked.
+- `src/shared/electron-api/manifest.ts` — The one declaration of `window.electronAPI`. Each method is a spec with its path, channel, payload mapping and TypeScript `signature`. `src/main/preload.ts` and the remote shim build the object from it at run time (`build-api.ts`), and `api-type.ts` derives the renderer's `ElectronAPI` type from it with mapped types, so a renderer call site type-checks against the manifest. Specs marked `extensionView` are what an extension view receives; `src/main/preload-webview.ts` is still written by hand, because two preload entries sharing the builder would make Rollup emit a chunk the sandboxed preload cannot load, and `tests/unit/main/preload-webview.spec.ts` fails when it and the manifest disagree on a method, a channel or a payload. electron-vite's `build.preload.isolatedEntries` removes that shared chunk, but in 5.0.0 it crashes when stdout is not a terminal (CI pipes the build); 6.0.0-beta.8 guards it, so the webview preload moves onto `build-api.ts` when electron-vite 6.0.0 is released.
 
 ---
 
@@ -235,6 +235,8 @@ Resolved settings = GlobalSettings merged with WorkspaceSettings.overrides
 The `resolveSettings(workspaceId?)` selector in `settings.store.ts` performs this merge. The result determines the `data-theme` attribute on `document.documentElement` (for CSS custom properties) and the `scrollback` value passed to new `Terminal` instances.
 
 Theme changes take effect immediately — no restart needed — because the CSS variable system responds to the attribute change.
+
+The shape is declared once, as zod schemas in `src/shared/schemas/settings.schema.ts`; `GlobalSettings`, `WorkspaceSettings` and the quick-action types are inferred from them. `settings-store.ts` merges a patch into what is stored and parses the result with the schema before saving, so a write that would break the shape stores nothing and `settings:update-global` / `settings:update-workspace` answer `{ error: 'VALIDATION_ERROR' }`.
 
 ---
 
@@ -494,7 +496,7 @@ extension-actions.ts    (manifest `contributes.commands` + api.commands.register
 custom-runtime.ts       (user-defined shell/prompt actions from settings)
         │
         ▼
-App.tsx: allQuickActions = [...core, ...surface, ...extension, ...custom]
+components/QuickActionsHost.tsx: actions = [...core, ...surface, ...extension, ...custom]
         │
         ▼
 quick-actions/rank.ts: rankFirstScreen(actions, {pins, usage, now})
@@ -535,6 +537,12 @@ The renderer uses [Zustand](https://github.com/pmndrs/zustand) for all client-si
 | `extensions/registry.ts` | extension registration maps (sidebarPanels, globalTabs, workspaceTabs, commands, overlays); activeGlobalTabId, activeWorkspaceTabId | registerGlobalTab, registerWorkspaceTab, registerCommand, togglePanel, setActiveProjectTab, setActiveWorkspaceTab |
 
 All store actions are async — they call IPC first, then update local state only on success.
+
+Components read a store through a selector — `useStore(useShallow((s) => ({ a: s.a, b: s.b })))` — never the whole store, so a component re-renders only when a field it picked changes. A getter such as `statsFor`, `linkFor` or `resolveSettings` reads state through `get()`, so a selector that picks a getter called during render also picks the state behind it (`entries`, `links`, `globalSettings`); one called only from a handler or effect does not need to.
+
+`session.store` changes about once a second per printing terminal (the activity stamp and latest line), and `metrics.store` on every sample. `App.tsx` therefore subscribes to neither: the parts that draw them — Home's badge and the metrics bar (`components/AppShellParts.tsx`), and Quick Actions (`components/QuickActionsHost.tsx`, mounted only while the panel is open) — subscribe on their own. The sidebar hands its branch rows a clock that moves only when the set of stale sessions changes (`useStalenessClock`), and drops a branch's change statistics when its terminals stop printing, once per burst rather than once per activity stamp.
+
+Surfaces opened on demand — Settings, Quick Actions, the Overview wall and the issue drawer — load with `React.lazy` behind a `Suspense` boundary, each as its own chunk, and the renderer build is minified (`electron.vite.config.ts`; electron-vite leaves renderers unminified by default). The first script is 851 kB, down from 1,803 kB.
 
 ### Notification Model
 
@@ -776,7 +784,7 @@ Clicking a branch resolves to exactly one terminal: one that is waiting on you, 
 Two core global tabs draw every session from one view model. `useSessionFacts` builds `SessionFacts` from the session, workspace, session-records and integrations stores through `buildSessionFacts`, which is pure.
 
 - **Ending and starting** are on the surfaces themselves: `CloseSessionButton` ends a live session through `closeSessionFromFacts` (leave the split, then close, as Cmd+W does) and removes a closed one through `session-records:forget`; `NewSessionMenu` starts one on Home and on the wall. Both live in `components/session/`, since Home and Overview share them.
-- **Home** (`core.home`, `components/home/`) is the launch view: `App.tsx` activates it on mount and keeps its app-band badge at the count of sessions waiting on you. `HomeScreen` switches between `LedgerView` (rows from `buildLedger`, arranged by `LedgerDisplayMenu`) and `LogbookView` (a list from `buildLogbook` and one session's detail). The layout and the Ledger's arrangement persist; the text and Needs you filters do not.
+- **Home** (`core.home`, `components/home/`) is the launch view: `App.tsx` activates it on mount, and `HomeBadge` (`components/AppShellParts.tsx`) keeps its app-band badge at the count of sessions waiting on you. `HomeScreen` switches between `LedgerView` (rows from `buildLedger`, arranged by `LedgerDisplayMenu`) and `LogbookView` (a list from `buildLogbook` and one session's detail). The layout and the Ledger's arrangement persist; the text and Needs you filters do not.
 - **The Monitor wall** (`core.overview`, `OverviewScreen`) draws a `WallTile` per open session. **Every tile and both band headings are direct children of one grid**, and `placeWall` emits placements in session id order with position carried by CSS `order` and `grid-column: span`. That is load-bearing: `LivePreview` calls `mountPreview`, which moves the session's single xterm element into the tile, and a re-parented or reordered tile would tear the live terminal out. ADR 036's invariant, kept by ADR 054.
 - **Live previews** fill their box's width and follow the cursor (`terminal/preview-window.ts`), re-placed on every xterm render.
 - **Descriptions and session links** live in `src/main/sessions/session-record-store.ts`, beside `issue-link-store` and in its shape: in memory, mirrored to `userData/session-records.json` with a tmp-then-rename write, exposed as `session-records:*` on `window.electronAPI.sessionRecords`. A record exists only while a session has a description or its own link. `terminal:close` closes it, a startup sweep closes anything the last run left open (a quit closes no terminals one by one), and `pruneRecords` drops records 30 days after close. A session's work item is its own link, else its branch's. The branch link, and the agent context injected from it, are untouched. `forget` deletes a **closed** record outright, which is how the operator clears one from Home before retention does; it refuses an open one, whose record is what Home draws the session from.
@@ -988,7 +996,7 @@ Notes and diagrams are stored in the **shared SQLite database** at `<userData>/a
 
 ### New IPC Channels (22 total)
 
-Documented in `specs/010-markdown-notepad/contracts/ipc-channels.md` and typed in `src/renderer/electron.d.ts`.
+Documented in `specs/010-markdown-notepad/contracts/ipc-channels.md`. They are extension-owned and reached through `extensionBridge.invoke`.
 
 ---
 

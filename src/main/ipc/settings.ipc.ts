@@ -11,6 +11,13 @@ import {
 const PatchSchema = z.record(z.string(), z.unknown())
 const invalid = { error: 'VALIDATION_ERROR' }
 
+// The payload schema only says "a patch"; whether the merged result is valid
+// settings is known after the merge, so the store's ZodError means the same.
+function invalidSettings(e: unknown): unknown {
+  if (e instanceof z.ZodError) return invalid
+  throw e
+}
+
 export function registerSettingsHandlers(): void {
   registerInvokeTable([
     defineChannel({
@@ -24,6 +31,7 @@ export function registerSettingsHandlers(): void {
       schema: z.object({ patch: PatchSchema }),
       invalid,
       run: ({ patch }) => ({ settings: updateGlobalSettings(patch) }),
+      onError: invalidSettings,
     }),
     defineChannel({
       channel: 'settings:get-workspace',
@@ -36,6 +44,7 @@ export function registerSettingsHandlers(): void {
       schema: z.object({ workspaceId: z.string().min(1), patch: PatchSchema }),
       invalid,
       run: ({ workspaceId, patch }) => ({ settings: updateWorkspaceSettings(workspaceId, patch) }),
+      onError: invalidSettings,
     }),
   ])
 }

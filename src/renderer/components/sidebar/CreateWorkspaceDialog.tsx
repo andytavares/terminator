@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useState } from 'react'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import {
@@ -19,7 +20,13 @@ export function CreateWorkspaceDialog({ onClose }: Props): JSX.Element {
   const [tags, setTags] = useState('')
   const [error, setError] = useState('')
   const [nameError, setNameError] = useState('')
-  const { createWorkspace, createProject, workspaces } = useWorkspaceStore()
+  const { createWorkspace, createProject, workspaces } = useWorkspaceStore(
+    useShallow((s) => ({
+      createWorkspace: s.createWorkspace,
+      createProject: s.createProject,
+      workspaces: s.workspaces,
+    }))
+  )
 
   function validateName(value: string): string {
     if (!value.trim()) return 'Name is required'

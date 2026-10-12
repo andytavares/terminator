@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import { useIntegrationsStore } from '../../stores/integrations.store'
@@ -42,7 +43,16 @@ export function LinkIssueDialog({
 }: LinkIssueDialogProps): JSX.Element {
   useModalEffect()
   const { listMine, searchIssues, linkIssue, isAnyConnected, loadConnections } =
-    useIntegrationsStore()
+    useIntegrationsStore(
+      useShallow((s) => ({
+        listMine: s.listMine,
+        searchIssues: s.searchIssues,
+        linkIssue: s.linkIssue,
+        isAnyConnected: s.isAnyConnected,
+        loadConnections: s.loadConnections,
+        connections: s.connections,
+      }))
+    )
 
   const [term, setTerm] = useState('')
   const [result, setResult] = useState<IssueListResult>({ issues: [], failures: [] })

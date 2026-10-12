@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React from 'react'
 import { useToastStore } from '../stores/toast.store'
 import './ToastContainer.css'
@@ -10,7 +11,9 @@ const ICONS: Record<string, string> = {
 }
 
 export function ToastContainer(): JSX.Element {
-  const { toasts, removeToast } = useToastStore()
+  const { toasts, removeToast } = useToastStore(
+    useShallow((s) => ({ toasts: s.toasts, removeToast: s.removeToast }))
+  )
 
   return (
     <div className="toast-container" aria-live="polite">

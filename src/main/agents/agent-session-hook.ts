@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { app } from 'electron'
 import { sessionContextDirectory } from '../integrations/session-context.js'
+import { putSessionStartHook, shellQuote } from '../integrations/claude-settings.js'
 
 // How a conversation comes to be known.
 //
@@ -110,16 +111,6 @@ export async function installCaptureScript(directory: string): Promise<string> {
 
 // ── The owned entry in the operator's Claude settings ────────────────────────
 
-interface SettingsFile {
-  hooks?: { SessionStart?: unknown[] } & Record<string, unknown>
-  [key: string]: unknown
-}
-
-interface HookEntry {
-  matcher?: string
-  hooks?: Array<{ type?: string; command?: string; timeout?: number }>
-}
-
 export interface CaptureHookOptions {
   /** Electron's own binary, run in node mode. */
   execPath: string
@@ -128,11 +119,6 @@ export interface CaptureHookOptions {
 
 function userSettingsPath(): string {
   return path.join(app.getPath('home'), '.claude', 'settings.json')
-}
-
-/** Single-quoted for a POSIX shell, which is what runs this. */
-function quote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
 /**
@@ -145,43 +131,16 @@ function quote(value: string): string {
 function captureCommand(options: CaptureHookOptions): string {
   const run = [
     'ELECTRON_RUN_AS_NODE=1',
-    quote(options.execPath),
-    quote(options.scriptPath),
-    quote(reportDirectory()),
-    quote(sessionContextDirectory()),
+    shellQuote(options.execPath),
+    shellQuote(options.scriptPath),
+    shellQuote(reportDirectory()),
+    shellQuote(sessionContextDirectory()),
   ].join(' ')
   // Guarded by the script's own existence. This entry lives in the operator's
   // settings and outlives any particular install of this application — a
   // development profile, a moved app — and a hook whose script has gone must do
   // nothing at all rather than fail before every agent session on the machine.
-  return `test -f ${quote(options.scriptPath)} && ${run} || true`
-}
-
-/**
- * Ours, whichever install wrote it.
- *
- * Matched on the script's name rather than its full path: the path contains the
- * application's data directory, which differs between a packaged app, a
- * development run and a test profile. Matching the path would leave one stale
- * entry per profile stacked in the operator's settings.
- */
-function isOurs(entry: unknown): boolean {
-  const hooks = (entry as HookEntry | null)?.hooks
-  if (!Array.isArray(hooks)) return false
-  return hooks.some((h) => typeof h?.command === 'string' && h.command.includes(SCRIPT_NAME))
-}
-
-async function readSettings(): Promise<SettingsFile | null> {
-  try {
-    const parsed: unknown = JSON.parse(await fs.readFile(userSettingsPath(), 'utf8'))
-    return typeof parsed === 'object' && parsed !== null ? (parsed as SettingsFile) : {}
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
-    // Malformed is not missing. These are the operator's own settings for every
-    // agent session they run; overwriting what cannot be parsed would destroy
-    // work that has nothing to do with this application.
-    throw new Error(`Could not read ${userSettingsPath()}: ${String(error)}`, { cause: error })
-  }
+  return `test -f ${shellQuote(options.scriptPath)} && ${run} || true`
 }
 
 /**
@@ -193,31 +152,7 @@ async function readSettings(): Promise<SettingsFile | null> {
  * and the user guide says which.
  */
 export async function installUserHook(options: CaptureHookOptions): Promise<void> {
-  const existing = await readSettings()
-  const settings: SettingsFile = existing ?? {}
-  const hooks = (settings.hooks ?? {}) as NonNullable<SettingsFile['hooks']>
-  const sessionStart = Array.isArray(hooks.SessionStart) ? [...hooks.SessionStart] : []
-
-  const ours = {
-    matcher: '*',
-    hooks: [
-      {
-        type: 'command',
-        command: captureCommand(options),
-        // Seconds. Writing one small file; a hook that hung here would hold up
-        // the start of every agent session on this machine.
-        timeout: 10,
-      },
-    ],
-  }
-
-  // Every entry of ours goes, then one comes back. Replacing only the first
-  // would leave the rest stacked, and they do stack: each install writes a path
-  // into its own data directory, and development and test profiles make a new
-  // one every run.
-  const theirs = sessionStart.filter((entry) => !isOurs(entry))
-  settings.hooks = { ...hooks, SessionStart: [...theirs, ours] }
-
-  await fs.mkdir(path.dirname(userSettingsPath()), { recursive: true })
-  await fs.writeFile(userSettingsPath(), `${JSON.stringify(settings, null, 2)}\n`, 'utf8')
+  // Matched on the script's name, not its path: the path holds the data
+  // directory, which differs per profile, and each would leave a stale entry.
+  await putSessionStartHook(userSettingsPath(), SCRIPT_NAME, captureCommand(options))
 }

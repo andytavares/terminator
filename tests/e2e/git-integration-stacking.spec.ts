@@ -8,11 +8,12 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
+// The stylesheet core injects into every extension view (EXTENSION_BASE_CSS).
 function baseCss(): string {
-  const src = readFileSync(join(ROOT, 'src/main/extensions/extension-view-host.ts'), 'utf8')
-  const m = src.match(/export const EXTENSION_BASE_CSS = `([\s\S]*?)\n`/)
-  if (!m) throw new Error('EXTENSION_BASE_CSS not found')
-  return m[1]
+  const ui = join(ROOT, 'packages/extension-ui/src')
+  return ['tokens.css', 'extension-base.css']
+    .map((f) => readFileSync(join(ui, f), 'utf8'))
+    .join('\n')
 }
 
 function cssFiles(dir: string): string[] {

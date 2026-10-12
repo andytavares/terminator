@@ -28,7 +28,7 @@ await window.electronAPI.extensionBridge.invoke('task-vault:vault:list-areas', p
 ### What extensions MUST NOT do
 
 - **Never** modify `src/main/preload.ts` (core file)
-- **Never** modify `src/renderer/electron.d.ts` (core file)
+- **Never** modify `src/shared/electron-api/manifest.ts` (core file)
 - **Never** add extension-only npm deps to the **root** `package.json` — add to `extensions/task-vault/package.json`
 - **Never** import from other extensions (`extensions/git-integration/...`, `extensions/speckit-pilot/...`)
 - **Never** hardcode the extension ID (`terminator.task-vault`) in core app files

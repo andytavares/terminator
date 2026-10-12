@@ -7,6 +7,8 @@ import { useExtensionRegistry } from '../../../../src/renderer/extensions/regist
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { UnifiedSidebar } from '../../../../src/renderer/components/sidebar/UnifiedSidebar'
 import { useToastStore } from '../../../../src/renderer/stores/toast.store'
+import { useChangeStatsStore } from '../../../../src/renderer/stores/change-stats.store'
+import { buildBranchRows } from '../../../../src/renderer/sidebar/branch-rows'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
 
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
@@ -19,6 +21,10 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: vi.fn(),
 }))
 vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({ useBranchSync: vi.fn() }))
+vi.mock('../../../../src/renderer/sidebar/branch-rows', async (importActual) => {
+  const actual = await importActual<typeof import('../../../../src/renderer/sidebar/branch-rows')>()
+  return { ...actual, buildBranchRows: vi.fn(actual.buildBranchRows) }
+})
 vi.mock('../../../../src/renderer/stores/integrations.store', () => ({
   useIntegrationsStore: vi.fn(),
 }))
@@ -1294,5 +1300,74 @@ describe('a session-level ticket link', () => {
     fireEvent.contextMenu(row)
     fireEvent.click(screen.getByText('Remove session link'))
     expect(mockSetLink).toHaveBeenCalledWith({ sessionId: 's1' }, null)
+  })
+})
+
+describe('a busy terminal and the sidebar', () => {
+  const changeStats = vi.fn()
+
+  beforeEach(() => {
+    useChangeStatsStore.getState().invalidateAll()
+    changeStats.mockReset()
+    changeStats.mockResolvedValue({ filesChanged: 1, insertions: 1, deletions: 0 })
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { git: { changeStats } },
+    })
+    vi.mocked(buildBranchRows).mockClear()
+  })
+
+  const diffsOfMain = (): number => changeStats.mock.calls.filter(([cwd]) => cwd === '/b').length
+
+  /** One activity stamp a second while s1 prints, as the session controller sends them. */
+  async function printFor(
+    seconds: number,
+    rerender: (ui: React.ReactElement) => void
+  ): Promise<void> {
+    for (let second = 1; second <= seconds; second++) {
+      const at = NOW + second * 1000
+      sessions.set('s1', { ...sessions.get('s1')!, busy: true, lastActivityAt: at })
+      mockSessionStore.sessions = new Map(sessions)
+      await act(async () => rerender(<UnifiedSidebar {...defaultProps} now={at} />))
+    }
+  }
+
+  it('asks git for its branch once while it prints, and again once it settles', async () => {
+    const { rerender } = renderSidebar()
+    await act(async () => {})
+    expect(diffsOfMain()).toBe(1)
+
+    await printFor(5, rerender)
+    expect(diffsOfMain()).toBe(1)
+
+    sessions.set('s1', { ...sessions.get('s1')!, busy: false, lastActivityAt: NOW + 6000 })
+    mockSessionStore.sessions = new Map(sessions)
+    await act(async () => rerender(<UnifiedSidebar {...defaultProps} now={NOW + 6000} />))
+    expect(diffsOfMain()).toBe(2)
+  })
+
+  it('does not rebuild the rows when only the clock moves', async () => {
+    const { rerender } = renderSidebar()
+    const builds = vi.mocked(buildBranchRows).mock.calls.length
+    for (let second = 1; second <= 5; second++) {
+      await act(async () =>
+        rerender(<UnifiedSidebar {...defaultProps} now={NOW + second * 1000} />)
+      )
+    }
+    expect(vi.mocked(buildBranchRows).mock.calls.length).toBe(builds)
+  })
+
+  it('still lists a branch as stale once its terminals pass the threshold', async () => {
+    const { container, rerender } = renderSidebar()
+    fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Stale/ }))
+    const names = () =>
+      Array.from(container.querySelectorAll('.branch-row__name')).map((n) => n.textContent)
+    expect(names()).not.toContain('Web')
+
+    await act(async () =>
+      rerender(<UnifiedSidebar {...defaultProps} now={NOW + staleAfterMs + 1000} />)
+    )
+    expect(names()).toContain('Web')
   })
 })

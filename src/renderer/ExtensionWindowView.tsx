@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { createElement, useEffect } from 'react'
 import { useSettingsStore } from './stores/settings.store'
 import { useExtensionRegistry } from './extensions/registry'
@@ -5,7 +6,9 @@ import { ToastContainer } from './components/ToastContainer'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 export function ExtensionWindowView({ view }: { view: string }): JSX.Element {
-  const { loadSettings, resolvedTheme } = useSettingsStore()
+  const { loadSettings, resolvedTheme } = useSettingsStore(
+    useShallow((s) => ({ loadSettings: s.loadSettings, resolvedTheme: s.resolvedTheme }))
+  )
   const params = new URLSearchParams(window.location.search)
   const repoRoot = params.get('repoRoot')
   const accentColor = params.get('accentColor')

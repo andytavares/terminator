@@ -792,10 +792,7 @@ export function registerGithubHandlers(
           }
           return entry
         })
-        const tmpFile = join(
-          tmpdir(),
-          `pr-review-${randomUUID()}.json`
-        )
+        const tmpFile = join(tmpdir(), `pr-review-${randomUUID()}.json`)
         await writeFile(tmpFile, JSON.stringify(requestBody))
         try {
           const raw = await gh(repoRoot, ['api', endpoint, '--method', 'POST', '--input', tmpFile])
