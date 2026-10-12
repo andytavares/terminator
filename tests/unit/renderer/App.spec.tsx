@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../src/renderer/stores/workspace.store'
 import { useSettingsStore } from '../../../src/renderer/stores/settings.store'
@@ -355,6 +355,17 @@ beforeEach(() => {
 
 afterEach(() => {
   delete (globalThis as unknown as Record<string, unknown>).electronAPI
+})
+
+// App opens these with React.lazy. Loading them first makes each lazy() resolve
+// from the module cache, so a surface mounts within its own test instead of
+// after that test's teardown has removed window.electronAPI.
+beforeAll(async () => {
+  await Promise.all([
+    import('../../../src/renderer/components/settings/SettingsPanel'),
+    import('../../../src/renderer/components/QuickActionsHost'),
+    import('../../../src/renderer/components/overview/OverviewScreen'),
+  ])
 })
 
 describe('App', () => {
