@@ -654,16 +654,17 @@ describe('a graph written before a node could carry a lane', () => {
 describe('the records location', () => {
   it('refuses to start when the records location cannot be written to, before any work begins', async () => {
     await store.save(order())
-    const wall = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-wall-'))
-    fs.chmodSync(wall, 0o500)
+    // A file where the records' parent directory should be: no one can create under it.
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-wall-'))
+    const wall = path.join(parent, 'wall')
+    fs.writeFileSync(wall, '')
     const blocked = createRunChannels(
       runDeps({
         dataRoot: () => path.join(wall, 'foundry'),
       })
     )
     const r = (await blocked.start({ id: 'WO-1' })) as { error: string }
-    fs.chmodSync(wall, 0o700)
-    fs.rmSync(wall, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
 
     expect(r.error).toContain('foundry')
     // And the order is untouched — no half-started run.

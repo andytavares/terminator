@@ -7,6 +7,18 @@ import { orderDir } from '../../src/data-root.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
+// The one path whose removal the file system refuses, as a read-only volume
+// does (EROFS). Root removes a file in a 0o500 directory, so chmod cannot.
+const refusal = vi.hoisted(() => ({ path: null as string | null }))
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  const rmSync: typeof actual.rmSync = (target, options) => {
+    if (target === refusal.path) throw new Error(`EROFS: read-only file system, rm '${target}'`)
+    actual.rmSync(target, options)
+  }
+  return { ...actual, rmSync }
+})
+
 // Taking a run away again.
 //
 // `removeCheckout` shipped with the feature that cut worktrees, was exported,
@@ -216,13 +228,14 @@ describe('tearDownRun', () => {
   // not remove rather than throwing out of the IPC handler.
   it('names a record it could not remove rather than throwing', async () => {
     const dir = seedRunArtefacts()
-    fs.chmodSync(dir, 0o500)
+    refusal.path = path.join(dir, 'run-graph.json')
     try {
       const { exec } = recorder()
       const result = await tearDownRun(order(), { exec, root })
       expect(result.failed.join(' ')).toContain('the run graph')
+      expect(result.removed.join(' ')).toContain('the gates it raised')
     } finally {
-      fs.chmodSync(dir, 0o700)
+      refusal.path = null
     }
   })
 

@@ -248,10 +248,10 @@ describe('installProjectHook', () => {
   })
 
   it('fails loudly when the project directory cannot be written (FR-026)', async () => {
-    fs.chmodSync(projectDir, 0o500)
+    // A file where `.claude` should be: no one can write the hook into it.
+    fs.writeFileSync(path.join(projectDir, '.claude'), '')
     const mod = await load()
     await expect(mod.installProjectHook(projectDir, options)).rejects.toThrow()
-    fs.chmodSync(projectDir, 0o700)
   })
 })
 
