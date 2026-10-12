@@ -704,11 +704,17 @@ export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
   const fileCount = rawFiles.length > 0 ? rawFiles.length : Number(obj.changedFiles ?? 0)
   const additions =
     rawFiles.length > 0
-      ? rawFiles.reduce((s, f) => s + Number((f as Record<string, unknown>).additions ?? 0), 0)
+      ? rawFiles.reduce<number>(
+          (s, f) => s + Number((f as Record<string, unknown>).additions ?? 0),
+          0
+        )
       : Number(obj.additions ?? 0)
   const deletions =
     rawFiles.length > 0
-      ? rawFiles.reduce((s, f) => s + Number((f as Record<string, unknown>).deletions ?? 0), 0)
+      ? rawFiles.reduce<number>(
+          (s, f) => s + Number((f as Record<string, unknown>).deletions ?? 0),
+          0
+        )
       : Number(obj.deletions ?? 0)
   const filePaths = rawFiles.map((f) =>
     String((f as Record<string, unknown>).path ?? (f as Record<string, unknown>).filename ?? '')
@@ -782,6 +788,7 @@ export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
     riskLevel: queueRiskLevel(additions + deletions),
     signalDots,
     sessionStatus: 'not-started',
+    viewedFileCount: 0,
     approvalCount: approvedBy.length,
     approvedBy,
     requestedReviewers,
@@ -859,17 +866,20 @@ export function extractIssueRefs(body: string): IssueRef[] {
  */
 export async function enrichIssueRefs(
   refs: IssueRef[],
-  issues: {
-    get(
-      tracker: 'linear' | 'jira',
-      key: string,
-      opts?: { refresh?: boolean }
-    ): Promise<{
-      title: string
-      state: { name: string }
-    } | null>
-  }
+  issues:
+    | {
+        get(
+          tracker: 'linear' | 'jira',
+          key: string,
+          opts?: { refresh?: boolean }
+        ): Promise<{
+          title: string
+          state: { name: string }
+        } | null>
+      }
+    | undefined
 ): Promise<IssueRef[]> {
+  if (!issues) return refs
   return Promise.all(
     refs.map(async (ref) => {
       if (ref.type === 'github') return ref
@@ -1127,10 +1137,10 @@ export function mapComment(raw: unknown): InlineComment {
 
 export function parseDiff(raw: string, filePath: string): FileDiff {
   if (!raw.trim()) {
-    return { path: filePath, hunks: [], isBinary: false }
+    return { path: filePath, hunks: [], isBinary: false, truncated: false }
   }
   if (raw.includes('Binary files')) {
-    return { path: filePath, hunks: [], isBinary: true }
+    return { path: filePath, hunks: [], isBinary: true, truncated: false }
   }
 
   const hunks: FileDiff['hunks'] = []
@@ -1189,5 +1199,5 @@ export function parseDiff(raw: string, filePath: string): FileDiff {
   }
 
   const result = FileDiffSchema.safeParse({ path: filePath, hunks, isBinary: false })
-  return result.success ? result.data : { path: filePath, hunks, isBinary: false }
+  return result.success ? result.data : { path: filePath, hunks, isBinary: false, truncated: false }
 }

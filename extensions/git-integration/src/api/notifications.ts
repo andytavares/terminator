@@ -1,4 +1,4 @@
-const bridge = () => window.electronAPI.extensionBridge
+import { invokeBridge } from './bridge'
 
 export type NotifyType = 'info' | 'success' | 'warning' | 'error'
 
@@ -9,5 +9,5 @@ export const notificationsAPI = {
     key: string,
     message?: string
   ): Promise<{ ok: true } | { error: string }> =>
-    bridge().invoke('git:notify', { type, title, key, message }),
+    invokeBridge('git:notify', { type, title, key, message }),
 }

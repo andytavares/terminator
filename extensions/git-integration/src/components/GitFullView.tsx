@@ -8,7 +8,7 @@ import { StagingArea } from './StagingArea'
 import { FileDiffView } from './FileDiffView'
 import { PrDialog } from './PrDialog'
 import type { FileDiff, PullRequest } from '../schemas/git.schema'
-import { gitAPI } from '../api/git'
+import { gitAPI, type CommitResult } from '../api/git'
 import { MergeFlowView } from './merge-flow/MergeFlowView'
 
 interface Props {
@@ -124,11 +124,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
   }, [])
 
   const applyCommitResult = useCallback(
-    (
-      result:
-        | { commitHash: string }
-        | { error: string; hookOutput?: string; isHookFailure?: boolean }
-    ) => {
+    (result: CommitResult) => {
       if ('error' in result) {
         const msgs: Record<string, string> = {
           NOTHING_TO_COMMIT: 'Nothing staged to commit. Stage at least one file first.',

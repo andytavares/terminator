@@ -1,6 +1,12 @@
 // Bridge module — extension components call extension-owned git IPC channels
 // through extensionBridge, never via window.electronAPI.git directly.
 
+import { invokeBridge } from './bridge'
+
+export type CommitResult =
+  | { commitHash: string }
+  | { error: string; hookOutput?: string; isHookFailure?: boolean }
+
 const bridge = () => window.electronAPI.extensionBridge
 
 export const gitAPI = {
@@ -15,7 +21,7 @@ export const gitAPI = {
     bridge().invoke('git:unstage', { repoRoot, paths }),
 
   commit: (repoRoot: string, message: string, signOff?: boolean, noVerify?: boolean) =>
-    bridge().invoke('git:commit', { repoRoot, message, signOff, noVerify }),
+    invokeBridge<CommitResult>('git:commit', { repoRoot, message, signOff, noVerify }),
 
   commitOutputPoll: (repoRoot: string) => bridge().invoke('git:commit-output-poll', { repoRoot }),
 
