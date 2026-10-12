@@ -1,4 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { dispatchChannel } from '@terminator/extension-sdk'
 
 vi.mock('electron-store', () => ({
@@ -28,5 +31,59 @@ describe('every git-integration channel', () => {
       await dispatchChannel({ ...spec, run }, 42)
       expect(run, `${spec.channel} ran a malformed payload`).not.toHaveBeenCalled()
     }
+  })
+})
+
+// The table above proves each channel has a schema, not what it refuses. These
+// are the rules the schemas carry: each payload is valid apart from one field,
+// and the valid one must reach run, so the refusal is the rule's and not the
+// repoRoot confinement's.
+describe('the rules the channel schemas carry', () => {
+  let repo: string
+  beforeAll(() => {
+    repo = realpathSync(mkdtempSync(join(tmpdir(), 'gi-rules-')))
+  })
+  afterAll(() => rmSync(repo, { recursive: true, force: true }))
+
+  const cases: Array<[string, string, Record<string, unknown>, Record<string, unknown>]> = [
+    ['stages at least one path', 'git:stage', { paths: ['a.ts'] }, { paths: [] }],
+    [
+      'resolves a conflict with a known strategy',
+      'git:resolve-conflict',
+      { blockId: 'src/foo.ts#0', resolvedText: 'x', strategy: 'ours' },
+      { blockId: 'src/foo.ts#0', resolvedText: 'x', strategy: 'bad-strategy' },
+    ],
+    [
+      'adds a comment with a body',
+      'github:pr-issue-comment-add',
+      { prNumber: 6, body: 'looks good' },
+      { prNumber: 6, body: '' },
+    ],
+    [
+      'submits a review with an event GitHub knows',
+      'github:pr-review-submit',
+      { prNumber: 42, event: 'COMMENT', body: '' },
+      { prNumber: 42, event: 'MERGE', body: '' },
+    ],
+    [
+      'names a pull request by a positive number',
+      'github:remove-active-review',
+      { prNumber: 3 },
+      { prNumber: -1 },
+    ],
+  ]
+
+  it.each(cases)('%s (%s)', async (_rule, channel, valid, broken) => {
+    const specs = activateCapturingChannels({ folderPath: repo, worktreePaths: [repo] }).channels
+    const spec = specs.find((c) => c.spec.channel === channel)?.spec
+    if (spec === undefined) throw new Error(`no channel ${channel}`)
+
+    const accepted = vi.fn()
+    await dispatchChannel({ ...spec, run: accepted }, { repoRoot: repo, ...valid })
+    expect(accepted, 'the valid payload was refused').toHaveBeenCalledOnce()
+
+    const refused = vi.fn()
+    await dispatchChannel({ ...spec, run: refused }, { repoRoot: repo, ...broken })
+    expect(refused, 'the broken payload ran').not.toHaveBeenCalled()
   })
 })
