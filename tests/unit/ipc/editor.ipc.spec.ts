@@ -1,18 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { corruptStoreFile } from '../../support/stores'
 
-const mockHandle = vi.fn()
-const detectEditor = vi.fn()
-const openInEditor = vi.fn()
-const getGlobalSettings = vi.fn()
+const { mockHandle, detectEditor, openInEditor } = vi.hoisted(() => ({
+  mockHandle: vi.fn(),
+  detectEditor: vi.fn(),
+  openInEditor: vi.fn(),
+}))
 
 vi.mock('electron', () => ({ ipcMain: { handle: mockHandle } }))
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
+// Detecting and launching an editor runs programs on the machine; that is the boundary.
 vi.mock('../../../src/main/editor/open-in-editor.js', () => ({
   detectEditor: (...a: unknown[]) => detectEditor(...a),
   openInEditor: (...a: unknown[]) => openInEditor(...a),
 }))
-vi.mock('../../../src/main/storage/settings-store.js', () => ({
-  getGlobalSettings: () => getGlobalSettings(),
-}))
+
+import { updateGlobalSettings } from '../../../src/main/storage/settings-store.js'
+import { registerEditorHandlers } from '../../../src/main/ipc/editor.ipc.js'
+
+registerEditorHandlers()
 
 function handlerFor(channel: string): (event: unknown, payload?: unknown) => unknown {
   const match = mockHandle.mock.calls.find(([ch]) => ch === channel)
@@ -20,14 +28,15 @@ function handlerFor(channel: string): (event: unknown, payload?: unknown) => unk
   return match[1] as (event: unknown, payload?: unknown) => unknown
 }
 
-beforeEach(async () => {
-  vi.clearAllMocks()
-  vi.resetModules()
-  getGlobalSettings.mockReturnValue({ ui: { hasSeenWelcome: true, editor: '' } })
-  detectEditor.mockResolvedValue({ id: 'cursor', name: 'Cursor' })
-  openInEditor.mockResolvedValue({ ok: true, editor: 'Cursor' })
-  const { registerEditorHandlers } = await import('../../../src/main/ipc/editor.ipc.js')
-  registerEditorHandlers()
+function chooseEditor(editor: string): void {
+  updateGlobalSettings({ ui: { editor } })
+}
+
+beforeEach(() => {
+  detectEditor.mockReset().mockResolvedValue({ id: 'cursor', name: 'Cursor' })
+  openInEditor.mockReset().mockResolvedValue({ ok: true, editor: 'Cursor' })
+  corruptStoreFile(null)
+  chooseEditor('')
 })
 
 describe('editor:detect', () => {
@@ -43,7 +52,7 @@ describe('editor:detect', () => {
   })
 
   it('passes the configured editor through', async () => {
-    getGlobalSettings.mockReturnValue({ ui: { hasSeenWelcome: true, editor: 'sublime' } })
+    chooseEditor('sublime')
     await handlerFor('editor:detect')({})
     expect(detectEditor).toHaveBeenCalledWith('sublime')
   })
@@ -53,13 +62,13 @@ describe('editor:detect', () => {
     expect(detectEditor).toHaveBeenCalledWith(undefined)
   })
 
-  it('still answers when settings cannot be read', async () => {
-    getGlobalSettings.mockImplementation(() => {
-      throw new Error('store unavailable')
-    })
+  it('still answers when the settings file cannot be read', async () => {
+    chooseEditor('sublime')
+    corruptStoreFile('settings')
     expect(await handlerFor('editor:detect')({})).toEqual({
       editor: { id: 'cursor', name: 'Cursor' },
     })
+    expect(detectEditor).toHaveBeenCalledWith(undefined)
   })
 })
 
@@ -71,7 +80,7 @@ describe('editor:open', () => {
   })
 
   it('uses the configured editor when one is set', async () => {
-    getGlobalSettings.mockReturnValue({ ui: { hasSeenWelcome: true, editor: 'zed' } })
+    chooseEditor('zed')
     await handlerFor('editor:open')({}, { folderPath: '/repos/app' })
     expect(openInEditor).toHaveBeenCalledWith('/repos/app', 'zed')
   })

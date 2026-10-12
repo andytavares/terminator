@@ -16,10 +16,10 @@ const { mockNotificationShow, mockNotificationOn, MockNotification, mockDockBoun
 const mockWin = { isDestroyed: vi.fn(() => false), webContents: { send: mockSend } }
 const mockDestroyedWin = { isDestroyed: vi.fn(() => true), webContents: { send: mockSend } }
 
-const mockGetGlobalSettings = vi.hoisted(() => vi.fn())
+const getAllWindows = vi.hoisted(() => vi.fn())
 
 vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn(() => [mockWin]) },
+  BrowserWindow: { getAllWindows },
   Notification: MockNotification,
   app: { dock: { bounce: mockDockBounce } },
 }))
@@ -28,20 +28,18 @@ vi.mock('crypto', () => ({
   randomUUID: vi.fn(() => 'test-uuid'),
 }))
 
-vi.mock('../../../src/main/storage/settings-store', () => ({
-  getGlobalSettings: mockGetGlobalSettings,
-}))
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
 
-import {
-  notificationManager,
-  setExtensionNotificationSettingReader,
-} from '../../../src/main/notifications/notification-manager'
-import { BrowserWindow } from 'electron'
+type Manager = typeof import('../../../src/main/notifications/notification-manager')
+
+let notificationManager: Manager['notificationManager']
+let setExtensionNotificationSettingReader: Manager['setExtensionNotificationSettingReader']
+let updateGlobalSettings: typeof import('../../../src/main/storage/settings-store').updateGlobalSettings
 
 function withDefaultTargets(...defaultTargets: Array<'system' | 'center' | 'toast'>): void {
-  mockGetGlobalSettings.mockReturnValue({
-    notifications: { defaultTargets, overrides: {} },
-  })
+  updateGlobalSettings({ notifications: { defaultTargets } })
 }
 
 function withCoreOverride(
@@ -49,16 +47,18 @@ function withCoreOverride(
   overrideTargets: Array<'system' | 'center' | 'toast'>,
   defaultTargets: Array<'system' | 'center' | 'toast'> = ['toast']
 ): void {
-  mockGetGlobalSettings.mockReturnValue({
-    notifications: { defaultTargets, overrides: { [key]: overrideTargets } },
-  })
+  updateGlobalSettings({ notifications: { defaultTargets, overrides: { [key]: overrideTargets } } })
 }
 
-beforeEach(() => {
+// Fresh modules each test, so the settings store starts from its defaults.
+beforeEach(async () => {
   vi.clearAllMocks()
-  vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([mockWin] as unknown as ReturnType<
-    typeof BrowserWindow.getAllWindows
-  >)
+  vi.resetModules()
+  ;({ updateGlobalSettings } = await import('../../../src/main/storage/settings-store'))
+  ;({ notificationManager, setExtensionNotificationSettingReader } = await import(
+    '../../../src/main/notifications/notification-manager'
+  ))
+  getAllWindows.mockReturnValue([mockWin])
   MockNotification.isSupported.mockReturnValue(true)
   withDefaultTargets('system', 'center', 'toast')
   // Reset the injected extension reader to its no-registration default between tests.
@@ -269,9 +269,7 @@ describe('NotificationManager.create — broadcast', () => {
 
   it('skips destroyed windows during broadcast', () => {
     withDefaultTargets('center')
-    vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([
-      mockDestroyedWin,
-    ] as unknown as ReturnType<typeof BrowserWindow.getAllWindows>)
+    getAllWindows.mockReturnValue([mockDestroyedWin])
     notificationManager.create({ type: 'info', title: 'Skip me', key: 'skipKey' })
     expect(mockSend).not.toHaveBeenCalled()
   })
