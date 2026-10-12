@@ -219,15 +219,14 @@ export function NoteWindowView(): React.JSX.Element {
           ? headingMatch[1].trim()
           : (firstLine?.trim().slice(0, 120) ?? 'Untitled note')
         try {
-          await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.autosave', {
-            id: note.id,
-            title,
-            body: newBody,
-            tags: note.tags,
-            originId: ORIGIN_ID,
-          })
-          setNote((n) => (n ? { ...n, title } : n))
-          document.title = title || 'Note'
+          const saved = await window.electronAPI.extensionBridge.invoke(
+            'terminator.notepad:notes.autosave',
+            { id: note.id, title, body: newBody, tags: note.tags, originId: ORIGIN_ID }
+          )
+          // A title set by hand is kept by the save, so the stored one is shown.
+          const storedTitle = (saved as { data?: { title?: string } }).data?.title ?? title
+          setNote((n) => (n ? { ...n, title: storedTitle } : n))
+          document.title = storedTitle || 'Note'
           markSaved()
 
           // Re-check anchors after save against the live editor body, not the

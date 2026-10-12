@@ -135,109 +135,113 @@ function writeSidecar(markdownPath: string, comments: ExportedComment[], format:
   fs.writeFileSync(sidecarPath, JSON.stringify(comments, null, 2), 'utf-8')
 }
 
-export async function exportNotes(
-  db: ExtensionDB,
-  args: z.infer<typeof exportSchema>
-): Promise<{ data: { exported: number; diagrams: number } } | { error: string }> {
-  const {
-    folder,
-    scope = 'all',
-    noteId,
-    tagId,
-    includeFrontmatter = true,
-    overwriteById = true,
-    includeDiagrams = false,
-    commentFormat = 'none',
-  } = args
-  const resolvedFolder = folder.replace(/^~(?=$|\/)/, os.homedir())
+type ExportArgs = z.infer<typeof exportSchema>
 
-  let querySql = `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at,
+/** Where and how each note is written. */
+interface NoteExport {
+  folder: string
+  existing: Map<string, string>
+  overwriteById: boolean
+  includeFrontmatter: boolean
+  commentFormat: CommentFormat
+}
+
+/** The notes in the export's scope, newest first, each with its tags joined by commas. */
+function scopedNotesQuery({ scope = 'all', noteId, tagId }: ExportArgs): {
+  sql: string
+  params: unknown[]
+} {
+  const select = `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at,
                          GROUP_CONCAT(t.name, ',') AS tags
                   FROM notes n
                   LEFT JOIN note_tags nt ON nt.note_id = n.id
                   LEFT JOIN tags t ON t.id = nt.tag_id`
-
-  const params: unknown[] = []
-
-  if (scope === 'note' && noteId) {
-    querySql += ' WHERE n.id = ?'
-    params.push(noteId)
-  } else if (scope === 'tag' && tagId) {
-    querySql += ' WHERE n.id IN (SELECT note_id FROM note_tags WHERE tag_id = ?)'
-    params.push(tagId)
-  }
-
-  querySql +=
+  const group =
     ' GROUP BY n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at ORDER BY n.updated_at DESC'
-
-  const notes = await db.query<NoteRow>(querySql, params)
-
-  const existingMap = buildExistingIdMap(resolvedFolder)
-  fs.mkdirSync(resolvedFolder, { recursive: true })
-
-  for (const note of notes) {
-    const tags = note.tags ? note.tags.split(',').filter(Boolean) : []
-    const slug = toSlug(note.title, note.id)
-    const existingFilename = overwriteById ? existingMap.get(note.id) : undefined
-    const filename = existingFilename ?? `${slug}.md`
-
-    let fileContent: string
-    if (includeFrontmatter) {
-      const frontmatter = {
-        id: note.id,
-        title: note.title,
-        tags,
-        created: note.created_at,
-        updated: note.updated_at,
-      }
-      fileContent = stringifyFrontMatter(note.body, frontmatter)
-    } else {
-      fileContent = note.body
-    }
-
-    const comments = commentFormat === 'none' ? [] : await noteComments(db, note.id)
-    const markdownPath = path.join(resolvedFolder, filename)
-    fs.writeFileSync(
-      markdownPath,
-      withInlineComments(fileContent, comments, commentFormat),
-      'utf-8'
-    )
-    writeSidecar(markdownPath, comments, commentFormat)
+  if (scope === 'note' && noteId)
+    return { sql: `${select} WHERE n.id = ?${group}`, params: [noteId] }
+  if (scope === 'tag' && tagId) {
+    const where = ' WHERE n.id IN (SELECT note_id FROM note_tags WHERE tag_id = ?)'
+    return { sql: `${select}${where}${group}`, params: [tagId] }
   }
+  return { sql: `${select}${group}`, params: [] }
+}
 
-  let diagramsExported = 0
-  if (includeDiagrams && scope === 'all') {
-    const diagrams = await db.query<DiagramRow>(
-      `SELECT id, title, scene_json, created_at, updated_at FROM diagrams WHERE archived_at IS NULL ORDER BY updated_at DESC`
-    )
-    const diagramsFolder = path.join(resolvedFolder, 'diagrams')
-    fs.mkdirSync(diagramsFolder, { recursive: true })
-    for (const d of diagrams) {
-      const slug = toSlug(d.title, d.id)
-      let sceneData: Record<string, unknown> = {}
-      try {
-        sceneData = JSON.parse(d.scene_json || '{}') as Record<string, unknown>
-      } catch {
-        // use empty scene
-      }
-      const excalidrawFile = {
-        type: 'excalidraw',
-        version: 2,
-        source: 'terminator-notepad',
-        elements: (sceneData.elements as unknown[]) ?? [],
-        appState: (sceneData.appState as Record<string, unknown>) ?? {},
-        files: {},
-      }
-      fs.writeFileSync(
-        path.join(diagramsFolder, `${slug}.excalidraw`),
-        JSON.stringify(excalidrawFile, null, 2),
-        'utf-8'
-      )
-      diagramsExported++
-    }
+function noteMarkdown(note: NoteRow, includeFrontmatter: boolean): string {
+  if (!includeFrontmatter) return note.body
+  const tags = note.tags ? note.tags.split(',').filter(Boolean) : []
+  return stringifyFrontMatter(note.body, {
+    id: note.id,
+    title: note.title,
+    tags,
+    created: note.created_at,
+    updated: note.updated_at,
+  })
+}
+
+/** Writes one note, and its comments in the format asked for. */
+async function exportNote(db: ExtensionDB, note: NoteRow, to: NoteExport): Promise<void> {
+  const existingFilename = to.overwriteById ? to.existing.get(note.id) : undefined
+  const filename = existingFilename ?? `${toSlug(note.title, note.id)}.md`
+  const comments = to.commentFormat === 'none' ? [] : await noteComments(db, note.id)
+  const markdownPath = path.join(to.folder, filename)
+  const markdown = noteMarkdown(note, to.includeFrontmatter)
+  fs.writeFileSync(markdownPath, withInlineComments(markdown, comments, to.commentFormat), 'utf-8')
+  writeSidecar(markdownPath, comments, to.commentFormat)
+}
+
+/** A diagram as an .excalidraw file (https://docs.excalidraw.com/docs/codebase/json-schema). */
+function excalidrawFile(sceneJson: string): Record<string, unknown> {
+  let scene: Record<string, unknown> = {}
+  try {
+    scene = JSON.parse(sceneJson || '{}') as Record<string, unknown>
+  } catch {
+    // An unreadable scene exports as an empty one.
   }
+  return {
+    type: 'excalidraw',
+    version: 2,
+    source: 'terminator-notepad',
+    elements: (scene.elements as unknown[]) ?? [],
+    appState: (scene.appState as Record<string, unknown>) ?? {},
+    files: {},
+  }
+}
 
-  return { data: { exported: notes.length, diagrams: diagramsExported } }
+/** Writes every active diagram into `diagrams/` under the folder; answers how many. */
+async function exportDiagrams(db: ExtensionDB, folder: string): Promise<number> {
+  const diagrams = await db.query<DiagramRow>(
+    `SELECT id, title, scene_json, created_at, updated_at FROM diagrams WHERE archived_at IS NULL ORDER BY updated_at DESC`
+  )
+  const diagramsFolder = path.join(folder, 'diagrams')
+  fs.mkdirSync(diagramsFolder, { recursive: true })
+  for (const d of diagrams) {
+    const file = path.join(diagramsFolder, `${toSlug(d.title, d.id)}.excalidraw`)
+    fs.writeFileSync(file, JSON.stringify(excalidrawFile(d.scene_json), null, 2), 'utf-8')
+  }
+  return diagrams.length
+}
+
+export async function exportNotes(
+  db: ExtensionDB,
+  args: ExportArgs
+): Promise<{ data: { exported: number; diagrams: number } } | { error: string }> {
+  const folder = args.folder.replace(/^~(?=$|\/)/, os.homedir())
+  const { sql, params } = scopedNotesQuery(args)
+  const notes = await db.query<NoteRow>(sql, params)
+  const to: NoteExport = {
+    folder,
+    existing: buildExistingIdMap(folder),
+    overwriteById: args.overwriteById ?? true,
+    includeFrontmatter: args.includeFrontmatter ?? true,
+    commentFormat: args.commentFormat ?? 'none',
+  }
+  fs.mkdirSync(folder, { recursive: true })
+  for (const note of notes) await exportNote(db, note, to)
+
+  const withDiagrams = args.includeDiagrams === true && (args.scope ?? 'all') === 'all'
+  const diagrams = withDiagrams ? await exportDiagrams(db, folder) : 0
+  return { data: { exported: notes.length, diagrams } }
 }
 
 // ──────────────────────────────────────────────────────────────

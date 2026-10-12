@@ -79,6 +79,26 @@ test("a note's title and tags are edited from its menu", async () => {
   expect(await storedNote(notepad, 'Weekly groceries')).toMatchObject({ tags: ['home'] })
 })
 
+test('a title set by hand stays when the note is edited again', async () => {
+  // The body still opens with "# Groceries", which is what the title followed.
+  await noteRow(notepad, 'Weekly groceries').click()
+  await typeInEditor('\nAnd bread')
+  await waitForSave()
+
+  await expect(noteRow(notepad, 'Weekly groceries')).toBeVisible()
+  expect((await storedNote(notepad, 'Weekly groceries'))?.body).toContain('And bread')
+})
+
+test('a note never renamed by hand keeps following its first heading', async () => {
+  await createItem(notepad, 'Note', 'Scratch')
+  await noteRow(notepad, 'Scratch').click()
+  await typeInEditor('# Packing list\nSocks')
+  await waitForSave()
+
+  await expect(noteRow(notepad, 'Packing list')).toBeVisible()
+  expect(await storedNote(notepad, 'Packing list')).toBeTruthy()
+})
+
 test('a note is archived, restored, archived again and deleted for good', async () => {
   await createItem(notepad, 'Note', 'Old draft')
   await contextMenu('Old draft', 'Archive')

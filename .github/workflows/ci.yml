@@ -322,6 +322,39 @@ jobs:
           xvfb-run -a node scripts/smoke-start.mjs exec "$PWD/dist/linux-unpacked/@andytavaresterminator"
         timeout-minutes: 15
 
+  # The specs that press keys at the X server (tests/e2e/x11-keys.ts), such as
+  # Task Vault's global capture shortcut. The E2E job runs on macOS, where they
+  # skip: synthesising a system-wide key there needs Accessibility consent for
+  # the runner. Chromium's sandbox needs a setuid helper or user namespaces this
+  # runner does not grant, so the app starts with --no-sandbox, as Start does.
+  e2e-x11:
+    name: E2E (Linux, X11)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The e2e harness runs terminals under zsh; XTEST presses the keys.
+      - name: Install zsh and the X test extension
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh libxtst6
+
+      - name: Build
+        run: npm run build
+
+      - name: Run X11 specs
+        env:
+          E2E_ELECTRON_ARGS: --no-sandbox
+        run: xvfb-run -a npx playwright test tests/e2e/task-vault-capture.spec.ts --reporter=dot
+        timeout-minutes: 10
+
   e2e-select:
     name: E2E select
     runs-on: ubuntu-latest

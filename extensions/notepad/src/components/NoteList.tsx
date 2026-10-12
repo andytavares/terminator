@@ -143,6 +143,8 @@ function ItemEditModal({
           title: title.trim() || 'Untitled note',
           body,
           tags,
+          // Editing only the tags leaves a derived title deriving.
+          titleSetByHand: title.trim() !== state.title,
         })
       }
       onSaved()
@@ -332,6 +334,45 @@ function DiagramRow({
 }
 
 // ── NoteList ──────────────────────────────────────────────────────
+
+type ItemRef = { id: string; type: 'note' | 'diagram' }
+
+/** Whether the pointer is over the top half of the row, which drops above it. */
+function inTopHalf(e: React.DragEvent): boolean {
+  const rect = e.currentTarget.getBoundingClientRect()
+  return e.clientY < rect.top + rect.height / 2
+}
+
+/**
+ * The group's order with the dragged item put before or after the target,
+ * or null when the target is not in the group.
+ */
+function orderAfterDrop(
+  group: ItemRef[],
+  dragged: ItemRef,
+  target: { id: string; before: boolean }
+): ItemRef[] | null {
+  if (!group.some((item) => item.id === target.id)) return null
+  const order = group.filter((item) => item.id !== dragged.id)
+  const at = order.findIndex((item) => item.id === target.id)
+  order.splice(target.before ? at : at + 1, 0, dragged)
+  return order
+}
+
+/** Saves a dropped order and, when the item changed folder, its new folder. */
+function saveDrop(
+  order: ItemRef[],
+  moved: ItemRef,
+  toFolder: string | null | undefined
+): Promise<unknown> {
+  const invoke = (channel: string, payload: unknown) =>
+    window.electronAPI.extensionBridge.invoke(channel, payload)
+  const saves = [invoke('terminator.notepad:notes.reorder', { items: order })]
+  if (toFolder !== undefined) {
+    saves.push(invoke('terminator.notepad:folders.move', { items: [moved], folderId: toFolder }))
+  }
+  return Promise.all(saves)
+}
 
 export function NoteList(): React.JSX.Element {
   const {
@@ -640,6 +681,36 @@ export function NoteList(): React.JSX.Element {
     )
   }
 
+  function clearDrag() {
+    setDragId(null)
+    setDragType(null)
+    setDropTarget(null)
+  }
+
+  function folderOf(itemId: string): string | null {
+    const entry = activeItems.find((en) => en.item.id === itemId)
+    return entry && 'folderId' in entry.item ? (entry.item.folderId ?? null) : null
+  }
+
+  /** Puts the dragged item where the drop target says, in the target's folder. */
+  function dropOnItem(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    const target = dropTarget
+    if (!dragId || !dragType || !target) return clearDrag()
+    const dragged: ItemRef = { id: dragId, type: dragType }
+    const dropFolderId = folderOf(target.id)
+    const group = dropFolderId === null ? rootActiveItems : getItemsInFolder(dropFolderId)
+    const refs = group.map((en) => ({ id: en.item.id, type: en.kind }))
+    const order = orderAfterDrop(refs, dragged, target)
+    clearDrag()
+    if (!order) return
+    const movedFolder = folderOf(dragged.id) === dropFolderId ? undefined : dropFolderId
+    saveDrop(order, dragged, movedFolder)
+      .then(() => reloadAll())
+      .catch(console.error)
+  }
+
   function makeDragProps(id: string, type: 'note' | 'diagram'): DragProps {
     return {
       draggable: searchResults === null,
@@ -654,80 +725,15 @@ export function NoteList(): React.JSX.Element {
         // The list under the row clears the drop target on its own dragover.
         e.stopPropagation()
         e.dataTransfer.dropEffect = 'move'
-        const rect = e.currentTarget.getBoundingClientRect()
-        const before = e.clientY < rect.top + rect.height / 2
+        const before = inTopHalf(e)
         setDropTarget((prev) => (prev?.id === id && prev.before === before ? prev : { id, before }))
       },
       onDragLeave() {
         setDropTarget((prev) => (prev?.id === id ? null : prev))
       },
-      onDrop(e) {
-        e.preventDefault()
-        e.stopPropagation()
-        if (!dragId || !dragType || !dropTarget) {
-          setDragId(null)
-          setDragType(null)
-          setDropTarget(null)
-          return
-        }
-
-        const draggedEntry = activeItems.find((en) => en.item.id === dragId)
-        const dropEntry = activeItems.find((en) => en.item.id === dropTarget.id)
-
-        const draggedFolderId =
-          draggedEntry && 'folderId' in draggedEntry.item ? draggedEntry.item.folderId : null
-        const dropFolderId =
-          dropEntry && 'folderId' in dropEntry.item ? dropEntry.item.folderId : null
-
-        // Determine the item set to reorder within
-        const sameGroup = draggedFolderId === dropFolderId
-        const baseItems = dropFolderId === null ? rootActiveItems : getItemsInFolder(dropFolderId)
-        const ordered = baseItems.map((en) => ({ id: en.item.id, type: en.kind }))
-
-        // If dragged item is in a different group, inject it into the destination list
-        const fromIdx = ordered.findIndex((i) => i.id === dragId)
-        const dropIdx = ordered.findIndex((i) => i.id === dropTarget.id)
-
-        if (dropIdx === -1) {
-          setDragId(null)
-          setDragType(null)
-          setDropTarget(null)
-          return
-        }
-
-        const newOrder = [...ordered]
-        if (fromIdx !== -1) newOrder.splice(fromIdx, 1)
-        const newDropIdx = newOrder.findIndex((i) => i.id === dropTarget.id)
-        newOrder.splice(dropTarget.before ? newDropIdx : newDropIdx + 1, 0, {
-          id: dragId,
-          type: dragType,
-        })
-
-        setDragId(null)
-        setDragType(null)
-        setDropTarget(null)
-
-        const ops: Promise<unknown>[] = [
-          window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.reorder', {
-            items: newOrder,
-          }),
-        ]
-        if (!sameGroup) {
-          ops.push(
-            window.electronAPI.extensionBridge.invoke('terminator.notepad:folders.move', {
-              items: [{ id: dragId, type: dragType }],
-              folderId: dropFolderId,
-            })
-          )
-        }
-        Promise.all(ops)
-          .then(() => reloadAll())
-          .catch(console.error)
-      },
+      onDrop: dropOnItem,
       onDragEnd() {
-        setDragId(null)
-        setDragType(null)
-        setDropTarget(null)
+        clearDrag()
         setFolderDropTarget(null)
       },
     }
