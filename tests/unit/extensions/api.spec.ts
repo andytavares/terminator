@@ -567,18 +567,23 @@ describe('api.pty.listSessions', () => {
 })
 
 describe('registry query functions', () => {
-  it('listExtensionSettingsSections decodes the extension id from the section key', () => {
+  it('lists a settings section under its extension, with its label, description and properties', () => {
     const api = createExtensionAPI('com.query.settings', '0.1.0')
+    const flag = { type: 'boolean' as const, label: 'Flag', default: false }
     const d = api.settings.register({
       label: 'Query Test',
-      properties: { 'com.query.settings.flag': { type: 'boolean', label: 'Flag', default: false } },
+      description: 'What the query extension can be told',
+      properties: { 'com.query.settings.flag': flag },
     })
     const section = listExtensionSettingsSections().find(
       (s) => s.extensionId === 'com.query.settings'
     )
-    expect(section).toBeDefined()
-    expect(section!.label).toBe('Query Test')
-    expect(section!.properties['com.query.settings.flag']).toBeDefined()
+    expect(section).toEqual({
+      extensionId: 'com.query.settings',
+      label: 'Query Test',
+      description: 'What the query extension can be told',
+      properties: { 'com.query.settings.flag': flag },
+    })
     d.dispose()
   })
 
