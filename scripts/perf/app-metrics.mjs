@@ -6,7 +6,7 @@
 // (https://www.electronjs.org/docs/latest/api/app#appgetappmetrics), which
 // reports the same numbers on every platform.
 import { _electron as electron } from 'playwright'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -54,17 +54,65 @@ async function memoryByProcessType(app) {
   return totals
 }
 
-async function terminalThroughput(page) {
-  await page.locator('.xterm-helper-textarea').first().focus()
-  const command = `head -c ${THROUGHPUT_BYTES} /dev/zero | tr '\\0' x; echo; echo __PERF_DONE__\r`
+// CPU seconds used so far, per process type. Unlike wall time it does not grow
+// when other work shares the machine, so before/after comparisons can use it.
+async function cpuSecondsByProcessType(app) {
+  const metrics = await app.evaluate(({ app: electronApp }) => electronApp.getAppMetrics())
+  const totals = {}
+  for (const metric of metrics) {
+    totals[metric.type] = (totals[metric.type] ?? 0) + metric.cpu.cumulativeCPUUsage
+  }
+  return totals
+}
+
+// A fresh profile has no terminal: add a workspace and a branch, which opens one.
+async function openTerminal(page, folder) {
+  await page.click('.sidebar-header__add')
+  await page.getByPlaceholder('My Workspace').fill('Perf')
+  await page.getByPlaceholder('/path/to/folder').fill(folder)
+  await page.click('.dialog__btn-primary')
+  const header = page.locator('.repo-header').filter({ hasText: 'Perf' })
+  await header.hover()
+  await header.locator('.repo-header__action[aria-label="New branch in Perf"]').click()
+  await page.getByPlaceholder('My branch').fill('perf')
+  await page.click('.dialog__btn-primary')
+  await page.locator('.branch-row').filter({ hasText: 'perf' }).last().click()
+  await page.getByRole('textbox', { name: 'Terminal input' }).first().waitFor({ timeout: 30_000 })
+}
+
+const IDLE_POLL_MS = 1000
+
+// Waits until the app's processes have stopped using CPU: the renderer is still
+// parsing and drawing after the shell is done writing.
+async function waitUntilIdle(app) {
+  const total = async () =>
+    Object.values(await cpuSecondsByProcessType(app)).reduce((sum, seconds) => sum + seconds, 0)
+  let last = await total()
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, IDLE_POLL_MS))
+    const now = await total()
+    if (now - last < 0.1) return
+    last = now
+  }
+}
+
+// The shell creates a marker file when it has written the output, so the wait
+// does not depend on how the terminal draws (DOM rows or WebGL). producedMs is
+// when the shell finished; renderedMs is when the app went idle after it.
+async function terminalThroughput(page, app, profile) {
+  await openTerminal(page, profile)
+  await page.getByRole('textbox', { name: 'Terminal input' }).first().focus()
+  const marker = join(profile, 'perf-done')
+  const command = `head -c ${THROUGHPUT_BYTES} /dev/zero | tr '\\0' x; echo; touch ${marker}\r`
   const startedAt = performance.now()
   await page.keyboard.type(command)
-  await page.waitForFunction(
-    () => document.querySelector('.xterm-rows')?.textContent?.includes('__PERF_DONE__'),
-    undefined,
-    { timeout: 300_000, polling: 100 }
-  )
-  return performance.now() - startedAt
+  while (!existsSync(marker)) {
+    if (performance.now() - startedAt > 300_000) throw new Error('throughput run timed out')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  const producedMs = performance.now() - startedAt
+  await waitUntilIdle(app)
+  return { producedMs, renderedMs: performance.now() - startedAt - IDLE_POLL_MS }
 }
 
 async function measureOnce(settleMs, withThroughput) {
@@ -73,8 +121,23 @@ async function measureOnce(settleMs, withThroughput) {
   try {
     await page.waitForTimeout(settleMs)
     const memory = await memoryByProcessType(app)
-    const throughputMs = withThroughput ? await terminalThroughput(page) : null
-    return { startup, memory, throughputMs }
+    const cpuBefore = await cpuSecondsByProcessType(app)
+    const throughput = withThroughput ? await terminalThroughput(page, app, profile) : null
+    const throughputMs = throughput?.producedMs ?? null
+    const renderedMs = throughput?.renderedMs ?? null
+    const cpuAfter = await cpuSecondsByProcessType(app)
+    const memoryAfterThroughput = withThroughput ? await memoryByProcessType(app) : null
+    const throughputCpuSeconds = Object.fromEntries(
+      Object.keys(cpuAfter).map((type) => [type, cpuAfter[type] - (cpuBefore[type] ?? 0)])
+    )
+    return {
+      startup,
+      memory,
+      throughputMs,
+      renderedMs,
+      throughputCpuSeconds,
+      memoryAfterThroughput,
+    }
   } finally {
     await app.close()
     rmSync(profile, { recursive: true, force: true })
@@ -91,6 +154,24 @@ function summarise(results) {
     ),
     memoryMB: Object.fromEntries(types.map((type) => [type, pick((r) => r.memory[type] ?? 0)])),
     throughputMs: results[0].throughputMs === null ? null : pick((r) => r.throughputMs),
+    renderedMs: results[0].renderedMs === null ? null : pick((r) => r.renderedMs),
+    throughputRunsMs:
+      results[0].throughputMs === null ? null : results.map((r) => Math.round(r.throughputMs)),
+    memoryAfterThroughputMB:
+      results[0].throughputMs === null
+        ? null
+        : Object.fromEntries(
+            types.map((type) => [type, pick((r) => r.memoryAfterThroughput[type] ?? 0)])
+          ),
+    throughputCpuSeconds:
+      results[0].throughputMs === null
+        ? null
+        : Object.fromEntries(
+            Object.keys(results[0].throughputCpuSeconds).map((type) => [
+              type,
+              Number(median(results.map((r) => r.throughputCpuSeconds[type] ?? 0)).toFixed(2)),
+            ])
+          ),
   }
 }
 

@@ -61,15 +61,15 @@ interface Spawned {
 
 let spawned: Spawned[]
 let broadcasts: Array<{ channel: string; payload: Record<string, unknown> }>
-let dataListener: ((data: string) => void) | null
-let exitListener: ((code: number) => void) | null
+let subscribedToPty: string[]
+let relayed: string[]
 let killed: string[]
 
 function build(withWindow = true) {
   spawned = []
   broadcasts = []
-  dataListener = null
-  exitListener = null
+  subscribedToPty = []
+  relayed = []
   killed = []
   const ptyManager = {
     kill: (id: string) => killed.push(id),
@@ -77,17 +77,18 @@ function build(withWindow = true) {
       spawned.push(options)
       return options
     },
-    onData: (_id: string, l: (d: string) => void) => {
-      dataListener = l
+    onData: (id: string) => {
+      subscribedToPty.push(id)
       return () => {}
     },
-    onExit: (_id: string, l: (c: number) => void) => {
-      exitListener = l
+    onExit: (id: string) => {
+      subscribedToPty.push(id)
       return () => {}
     },
   }
   return createExtensionAPI('test.pilot', '0.1.0', {
     ptyManager: ptyManager as never,
+    terminalRelay: { start: (id: string) => relayed.push(id) } as never,
     broadcastToWindows: withWindow
       ? (channel: string, payload: unknown) =>
           broadcasts.push({ channel, payload: payload as Record<string, unknown> })
@@ -229,24 +230,17 @@ describe('pty.openTerminalTab', () => {
     expect(build().pty.openTerminalTab(input)).toEqual(expect.any(String))
   })
 
-  it('relays output to the renderer', () => {
-    const api = build()
-    const sessionId = api.pty.openTerminalTab(input)
-    dataListener?.('hello')
-    expect(broadcasts).toContainEqual({
-      channel: 'terminal:output',
-      payload: { sessionId, data: 'hello' },
-    })
+  it('sends its output and exit through the shared batched, flow-controlled relay', () => {
+    const sessionId = build().pty.openTerminalTab(input)
+    expect(relayed).toEqual([sessionId])
   })
 
-  it('relays exit to the renderer', () => {
-    const api = build()
-    const sessionId = api.pty.openTerminalTab(input)
-    exitListener?.(1)
-    expect(broadcasts).toContainEqual({
-      channel: 'terminal:process-exit',
-      payload: { sessionId, exitCode: 1 },
-    })
+  it('does not broadcast its output or exit to every window and view', () => {
+    // Each chunk used to go to every window and extension view, unbatched and
+    // unacknowledged, so a chatty agent cost every one of them a message per chunk.
+    build().pty.openTerminalTab(input)
+    expect(subscribedToPty).toEqual([])
+    expect(broadcasts.map((b) => b.channel)).toEqual(['terminal:adopt'])
   })
 
   it('uses the shell and scrollback it is given over the defaults', () => {

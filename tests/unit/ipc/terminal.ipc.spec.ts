@@ -39,9 +39,12 @@ vi.mock('../../../src/main/safe-send.js', () => ({
   sendToView: () => {},
 }))
 
-import { registerTerminalHandlers } from '../../../src/main/ipc/terminal.ipc.js'
+import { registerTerminalHandlers, sendToRenderer } from '../../../src/main/ipc/terminal.ipc.js'
+import { OutputRelay } from '../../../src/main/terminal/output-relay.js'
 import { MissingCwdError } from '../../../src/main/terminal/pty-manager.js'
 import type { SessionInfo } from '../../../src/main/terminal/pty-manager.js'
+import { OUTPUT_FLUSH_INTERVAL_MS } from '../../../src/main/terminal/output-batcher.js'
+import { HIGH_WATERMARK_CHARS } from '../../../src/main/terminal/flow-control.js'
 
 function invokeHandler(channel: string) {
   return mockHandle.mock.calls.find(([ch]) => ch === channel)![1] as (
@@ -89,6 +92,8 @@ function makeFakePtyManager() {
     kill: vi.fn((id: string) => sessions.delete(id)),
     releaseOutput: vi.fn((id: string) => id === 'held'),
     write: vi.fn(),
+    pause: vi.fn(),
+    resume: vi.fn(),
     resize: vi.fn(),
     killAll: vi.fn(async () => sessions.clear()),
     getSessionIds: vi.fn(() => [...sessions.keys()]),
@@ -113,7 +118,12 @@ describe('registerTerminalHandlers', () => {
     ptyManager = makeFakePtyManager()
     webContentsSend = vi.fn()
     win = { isDestroyed: () => false, webContents: { send: webContentsSend } }
-    registerTerminalHandlers(ptyManager as never, () => win as never)
+    const getWindow = () => win as never
+    registerTerminalHandlers(
+      ptyManager as never,
+      getWindow,
+      new OutputRelay(ptyManager as never, sendToRenderer(getWindow))
+    )
   })
 
   describe('terminal:create', () => {
@@ -136,16 +146,19 @@ describe('registerTerminalHandlers', () => {
     })
 
     it('relays output and exit pushes to the renderer window', async () => {
+      vi.useFakeTimers()
       const { sessionId } = (await invokeHandler('terminal:create')({}, VALID_CREATE)) as {
         sessionId: string
       }
       ptyManager.emitData(sessionId, 'out')
+      vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
       expect(webContentsSend).toHaveBeenCalledWith('terminal:output', { sessionId, data: 'out' })
       ptyManager.emitExit(sessionId, 7)
       expect(webContentsSend).toHaveBeenCalledWith('terminal:process-exit', {
         sessionId,
         exitCode: 7,
       })
+      vi.useRealTimers()
     })
 
     it('does not relay when the window is gone', async () => {
@@ -286,6 +299,47 @@ describe('registerTerminalHandlers', () => {
       expect(ptyManager.write).toHaveBeenCalledTimes(1)
     })
 
+    it('pauses the process when the renderer falls behind, and resumes it on acknowledgement', async () => {
+      vi.useFakeTimers()
+      const { sessionId } = (await invokeHandler('terminal:create')({}, VALID_CREATE)) as {
+        sessionId: string
+      }
+      ptyManager.emitData(sessionId, 'x'.repeat(HIGH_WATERMARK_CHARS + 1))
+      vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
+      expect(ptyManager.pause).toHaveBeenCalledWith(sessionId)
+
+      sendHandler('terminal:acknowledge')({}, { sessionId, count: HIGH_WATERMARK_CHARS + 1 })
+      expect(ptyManager.resume).toHaveBeenCalledWith(sessionId)
+      vi.useRealTimers()
+    })
+
+    it('ignores an acknowledgement that is not a count', async () => {
+      vi.useFakeTimers()
+      const { sessionId } = (await invokeHandler('terminal:create')({}, VALID_CREATE)) as {
+        sessionId: string
+      }
+      ptyManager.emitData(sessionId, 'x'.repeat(HIGH_WATERMARK_CHARS + 1))
+      vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
+
+      sendHandler('terminal:acknowledge')({}, { sessionId, count: -5 })
+      sendHandler('terminal:acknowledge')({}, { sessionId, count: 'all' })
+      expect(ptyManager.resume).not.toHaveBeenCalled()
+      vi.useRealTimers()
+    })
+
+    it('forgets what an earlier renderer owed when a terminal attaches', async () => {
+      vi.useFakeTimers()
+      const { sessionId } = (await invokeHandler('terminal:create')({}, VALID_CREATE)) as {
+        sessionId: string
+      }
+      ptyManager.emitData(sessionId, 'x'.repeat(HIGH_WATERMARK_CHARS + 1))
+      vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
+
+      await invokeHandler('terminal:attach')({}, { sessionId })
+      expect(ptyManager.resume).toHaveBeenCalledWith(sessionId)
+      vi.useRealTimers()
+    })
+
     it('resizes with valid dimensions and ignores invalid ones', async () => {
       sendHandler('terminal:resize')({}, { sessionId: 's1', cols: 120, rows: 40 })
       expect(ptyManager.resize).toHaveBeenCalledWith('s1', 120, 40)
@@ -351,7 +405,12 @@ describe('terminal:create — linked issue', () => {
   })
 
   async function createTerminal(ptyManager: ReturnType<typeof makeFakePtyManager>) {
-    registerTerminalHandlers(ptyManager as never, () => ({}) as never)
+    const getWindow = () => ({}) as never
+    registerTerminalHandlers(
+      ptyManager as never,
+      getWindow,
+      new OutputRelay(ptyManager as never, sendToRenderer(getWindow))
+    )
     // The outer suite has already registered handlers against a different fake;
     // mockHandle accumulates, so take the most recent registration, not the
     // first one find() would return.

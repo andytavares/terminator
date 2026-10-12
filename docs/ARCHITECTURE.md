@@ -84,7 +84,7 @@ On the main-process side, every core invoke channel registers through the schema
 
 | Namespace        | Direction        | Description                                                                                                                          |
 | ---------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `terminal:*`     | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup                                                                         |
+| `terminal:*`     | renderer ↔ main | PTY lifecycle: create, close, input, output, acknowledge, resize, cleanup                                                            |
 | `workspace:*`    | renderer → main  | Workspace and project CRUD                                                                                                           |
 | `project:*`      | renderer → main  | Project CRUD (scoped under workspace)                                                                                                |
 | `settings:*`     | renderer → main  | Global and per-workspace settings                                                                                                    |
@@ -163,13 +163,13 @@ terminal:create IPC ──► PtyManager.spawn()
       │                      ├─ spawns node-pty process
       │                      │  (env carries TERMINATOR_SESSION_ID, which is how
       │                      │   an agent's conversation is paired to this terminal)
-      │                      ├─ registers onData → webContents.send('terminal:output')
+      │                      ├─ registers onData → OutputRelay (batched, flow-controlled) → 'terminal:output'
       │                      └─ registers onExit → webContents.send('terminal:process-exit')
       ▼
 TerminalInstance created (renderer)
       │
       ├─ new Terminal({ scrollback }) from @xterm/xterm 6 (theme carries the scrollbar colours)
-      ├─ subscribes to terminal:output IPC
+      ├─ subscribes to its session through the output router (one shared terminal:output listener)
       └─ sends keystrokes via terminal:input IPC
 
 Tab switch (navigate away)
@@ -197,6 +197,30 @@ scrollbar colours are set in the xterm theme objects (`XTERM_THEMES` in `Termina
 CSS. Its width is fixed (14px) and `FitAddon` reserves it, whatever the OS scrollbar setting. Code and
 tests that need the scroll position read the xterm buffer or the scrollbar slider, never the
 `.xterm-viewport` element's `scrollTop`.
+
+**Renderer choice.** A visible desktop terminal draws with `@xterm/addon-webgl`; the DOM renderer is the
+fallback. `TerminalInstance.mount()` loads the add-on, and `unmount()` or `mountPreview()` (an Overview
+tile) disposes it, so a hidden terminal or a thumbnail never holds a GPU context. Chromium keeps at most
+16 live WebGL contexts, so `WebglContextBudget` (`src/renderer/terminal/webgl-contexts.ts`) hands out 12
+and a terminal past that stays on the DOM renderer. A lost context (`onContextLoss`) or a machine without
+WebGL2 also falls back to the DOM renderer. The DOM renderer clips the last column's glyph on macOS (about
+2px), which WebGL does not do because it has no row boxes to clip. The phone client keeps the DOM renderer.
+
+**Batching and flow control.** A PTY produces thousands of small chunks a second. `OutputRelay`
+(`src/main/terminal/output-relay.ts`) joins them in an `OutputBatcher` and sends one `terminal:output`
+message per 16 ms frame, or at once when the batch reaches 128 KiB. Order is kept, and pending output is
+flushed before `terminal:process-exit` is sent. Flow control follows the
+[xterm.js guide](https://xtermjs.org/docs/guides/flowcontrol/): the renderer passes
+`terminal.write(data, callback)` and the callback sends `terminal:acknowledge` with the number of characters
+written. `FlowControl` (`src/main/terminal/flow-control.ts`) counts the characters sent and not yet
+acknowledged, calls `PtyManager.pause()` (node-pty `pause()`) above 1 MiB and `resume()` below 256 KiB (characters), so a
+process that prints faster than xterm can parse blocks on its own output instead of filling the renderer's
+memory. Only output actually delivered to a window is counted, output for a session with no subscriber is
+acknowledged on arrival, and `terminal:attach` forgets what an earlier renderer owed, so a reload cannot
+leave a process paused. A browser client (remote) does not acknowledge: its output arrives by its own path. A terminal an extension
+opens (`api.pty.openTerminalTab`) uses the same relay, not a broadcast to every window and view.
+In the renderer the output router (`src/renderer/terminal/output-router.ts`) holds the one
+`terminal:output` listener and dispatches by session id.
 
 ---
 

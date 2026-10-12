@@ -100,6 +100,7 @@ import type {
   SessionInfo,
 } from '../terminal/pty-manager.js'
 export type { SessionOrigin, SpawnSessionOptions, SessionInfo }
+import type { OutputRelay } from '../terminal/output-relay.js'
 
 // Issue-tracker types are re-exported here rather than re-declared by every
 // extension that needs them (Constitution II: shared types come through the
@@ -612,6 +613,8 @@ const auxiliaryWindows = new Map<string, BrowserWindow>()
 
 export interface ExtensionAPIDeps {
   ptyManager?: PtyManager
+  /** Carries a terminal's output to the main window, batched and flow-controlled. */
+  terminalRelay?: OutputRelay
   broadcastToWindows?: (channel: string, data: unknown) => void
   focusExtensionView?: (extensionId: string, viewParam: string) => void
   bridge?: BridgeDeps
@@ -916,7 +919,7 @@ export function createExtensionAPI(
       },
       openTerminalTab(input): string | null {
         if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
-        if (!deps.broadcastToWindows) return null
+        if (!deps.broadcastToWindows || !deps.terminalRelay) return null
 
         const sessionId = randomUUID()
         deps.ptyManager.spawnSession({
@@ -932,12 +935,7 @@ export function createExtensionAPI(
           holdOutput: true,
         })
 
-        deps.ptyManager.onData(sessionId, (data) =>
-          deps.broadcastToWindows?.('terminal:output', { sessionId, data })
-        )
-        deps.ptyManager.onExit(sessionId, (exitCode) =>
-          deps.broadcastToWindows?.('terminal:process-exit', { sessionId, exitCode })
-        )
+        deps.terminalRelay.start(sessionId)
 
         deps.broadcastToWindows('terminal:adopt', {
           sessionId,

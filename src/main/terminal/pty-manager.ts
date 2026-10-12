@@ -284,6 +284,15 @@ export class PtyManager {
     this.sessions.get(sessionId)?.pty.resize(cols, rows)
   }
 
+  /** Stops reading the PTY, so the child blocks once the kernel buffer fills. */
+  pause(sessionId: string): void {
+    this.sessions.get(sessionId)?.pty.pause()
+  }
+
+  resume(sessionId: string): void {
+    this.sessions.get(sessionId)?.pty.resume()
+  }
+
   write(sessionId: string, data: string): void {
     this.sessions.get(sessionId)?.pty.write(data)
   }

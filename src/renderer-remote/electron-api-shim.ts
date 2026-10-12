@@ -151,6 +151,8 @@ forgetLegacyToken()
         window.open(url, '_blank')
         return Promise.resolve()
       },
+      // Flow control is between the desktop renderer and its own main process.
+      'terminal.acknowledge': () => {},
       // No-op in remote mode: WebContentsView positioning is an Electron-only concept.
       'extension.updatePanelBounds': () => {},
       // Dynamic passthrough for extension-owned channels.

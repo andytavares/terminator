@@ -66,6 +66,16 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     toPayload: (sessionId: string, cols: number, rows: number) => ({ sessionId, cols, rows }),
   },
   {
+    // Says the renderer has written this many characters of a session's output,
+    // so main can pause the process while the renderer is behind. A browser
+    // client is fed by its own path and does not take part in flow control.
+    path: 'terminal.acknowledge',
+    kind: 'send',
+    channel: 'terminal:acknowledge',
+    toPayload: (sessionId: string, count: number) => ({ sessionId, count }),
+    remote: 'stub',
+  },
+  {
     path: 'terminal.onOutput',
     kind: 'event',
     channel: 'terminal:output',

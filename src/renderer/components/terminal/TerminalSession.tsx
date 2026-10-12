@@ -1,7 +1,10 @@
 import { Terminal, ILinkProvider, ILink } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { previewWindow } from '../../terminal/preview-window'
+import { subscribeToSessionOutput } from '../../terminal/output-router'
+import { webglContexts } from '../../terminal/webgl-contexts'
 
 const IDLE_DEBOUNCE_MS = 1500
 
@@ -48,6 +51,7 @@ export class TerminalInstance {
   terminal: Terminal
   private hooks?: TerminalInstanceHooks
   private fitAddon: FitAddon
+  private webglAddon: WebglAddon | null = null
   private outputUnsubscribe: (() => void) | null = null
   private resizeObserver: ResizeObserver | null = null
   private cmdClickCleanup: (() => void) | null = null
@@ -120,9 +124,8 @@ export class TerminalInstance {
 
     this.registerLinkProviders()
 
-    this.outputUnsubscribe = window.electronAPI.terminal.onOutput((sid, data) => {
-      if (sid !== sessionId) return
-      this.terminal.write(data)
+    this.outputUnsubscribe = subscribeToSessionOutput(sessionId, (data, written) => {
+      this.terminal.write(data, written)
       this.hooks?.onBusy?.()
       if (this.busyTimer !== null) clearTimeout(this.busyTimer)
       this.busyTimer = setTimeout(() => {
@@ -414,6 +417,26 @@ export class TerminalInstance {
     this.terminal.element?.classList.remove('xterm-cursor-pointer')
   }
 
+  // A visible terminal draws on the GPU. Without a context to spare, or when the
+  // GPU refuses one, it keeps xterm's DOM renderer.
+  private enableWebgl(): void {
+    if (this.webglAddon || !webglContexts.acquire(this.sessionId)) return
+    try {
+      const addon = new WebglAddon()
+      addon.onContextLoss(() => this.disableWebgl())
+      this.terminal.loadAddon(addon)
+      this.webglAddon = addon
+    } catch {
+      webglContexts.release(this.sessionId)
+    }
+  }
+
+  private disableWebgl(): void {
+    this.webglAddon?.dispose()
+    this.webglAddon = null
+    webglContexts.release(this.sessionId)
+  }
+
   // Call once after the element is in a visible, sized container.
   mount(container: HTMLElement): void {
     container.appendChild(this.element)
@@ -421,6 +444,7 @@ export class TerminalInstance {
       this.terminal.open(this.element)
       this.opened = true
     }
+    this.enableWebgl()
     this.fitAddon.fit()
     this.terminal.focus()
     // Detaching/reattaching the element on tab switch (ADR-004) resets the
@@ -486,6 +510,8 @@ export class TerminalInstance {
       this.element.style.transform = `translateY(${translateY}px) scale(${scale})`
     }
 
+    // A tile is a scaled thumbnail of a live terminal; it never takes a GPU context.
+    this.disableWebgl()
     this.element.style.width = `${naturalW}px`
     this.element.style.height = `${naturalH}px`
     this.element.style.transformOrigin = 'top left'
@@ -512,6 +538,7 @@ export class TerminalInstance {
 
   // Remove from DOM without destroying the xterm instance.
   unmount(): void {
+    this.disableWebgl()
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
     this.element.parentElement?.removeChild(this.element)

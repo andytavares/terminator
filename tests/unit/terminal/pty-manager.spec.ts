@@ -7,6 +7,8 @@ const mockPty = {
   write: vi.fn(),
   resize: vi.fn(),
   kill: vi.fn(),
+  pause: vi.fn(),
+  resume: vi.fn(),
 }
 
 vi.mock('node-pty', () => ({
@@ -117,6 +119,28 @@ describe('PtyManager', () => {
     mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
     mgr.resize(id, 120, 40)
     expect(mockPty.resize).toHaveBeenCalledWith(120, 40)
+  })
+
+  it('pause and resume stop and restart reading from the PTY', async () => {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    const id = 'flow-session'
+    mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
+    mgr.pause(id)
+    expect(mockPty.pause).toHaveBeenCalledTimes(1)
+    expect(mockPty.resume).not.toHaveBeenCalled()
+    mgr.resume(id)
+    expect(mockPty.resume).toHaveBeenCalledTimes(1)
+  })
+
+  it('pause and resume are no-ops for unknown sessionId', async () => {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    expect(() => {
+      mgr.pause('no-such')
+      mgr.resume('no-such')
+    }).not.toThrow()
+    expect(mockPty.pause).not.toHaveBeenCalled()
   })
 
   it('write sends data to PTY', async () => {

@@ -626,6 +626,12 @@ listening; delivered live, everything in that window goes to nobody — includin
 the command you just typed into it. The hold is released automatically when the
 tab mounts.
 
+The tab's output reaches the main window through the same batched, flow-controlled
+path as every other terminal (one message per frame; the process is paused while the
+window is behind). It is no longer broadcast to every window and extension view, so
+an extension view cannot read a tab's output with `electronAPI.terminal.onOutput`;
+use `api.pty.onData` in the extension backend.
+
 #### `closeTerminalTab` — closing a tab you opened _(v2.6.0)_
 
 `kill` ends the process but leaves the tab on screen marked `[exited]`. An

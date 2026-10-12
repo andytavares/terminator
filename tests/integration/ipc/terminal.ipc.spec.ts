@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ipcMain } from 'electron'
+import { OUTPUT_FLUSH_INTERVAL_MS } from '../../../src/main/terminal/output-batcher'
 
 // Mock electron
 vi.mock('electron', () => ({
@@ -80,8 +81,18 @@ describe('terminal IPC handlers', () => {
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     ptyManager = new PtyManager()
 
-    const { registerTerminalHandlers } = await import('../../../src/main/ipc/terminal.ipc')
-    registerTerminalHandlers(ptyManager, () => null)
+    const { registerTerminalHandlers, sendToRenderer } = await import(
+      '../../../src/main/ipc/terminal.ipc'
+    )
+    const { OutputRelay } = await import('../../../src/main/terminal/output-relay')
+    registerTerminalHandlers(
+      ptyManager,
+      () => null,
+      new OutputRelay(
+        ptyManager,
+        sendToRenderer(() => null)
+      )
+    )
   })
 
   afterEach(() => {
@@ -272,10 +283,15 @@ describe('terminal IPC handlers', () => {
     })
 
     it('skips send when window is destroyed', async () => {
+      vi.useFakeTimers()
       const mockSend = vi.fn()
       const destroyedWin = { isDestroyed: () => true, webContents: { send: mockSend } }
-      const { registerTerminalHandlers: reg } = await import('../../../src/main/ipc/terminal.ipc')
-      reg(ptyManager, () => destroyedWin as never)
+      const { registerTerminalHandlers: reg, sendToRenderer } = await import(
+        '../../../src/main/ipc/terminal.ipc'
+      )
+      const { OutputRelay } = await import('../../../src/main/terminal/output-relay')
+      const getWindow = () => destroyedWin as never
+      reg(ptyManager, getWindow, new OutputRelay(ptyManager, sendToRenderer(getWindow)))
 
       await handlerMap['terminal:create'](
         {},
@@ -288,15 +304,22 @@ describe('terminal IPC handlers', () => {
       )
       const onDataH = mockPty.onData.mock.calls.at(-1)?.[0] as (d: string) => void
       onDataH?.('data')
+      vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
       expect(mockSend).not.toHaveBeenCalled()
+      vi.useRealTimers()
     })
 
     it('removes session from registry when PTY process exits', async () => {
+      vi.useFakeTimers()
       // Re-register with a mock window so the output/exit callbacks execute fully
       const mockSend = vi.fn()
       const mockWin = { isDestroyed: () => false, webContents: { send: mockSend } }
-      const { registerTerminalHandlers: reg } = await import('../../../src/main/ipc/terminal.ipc')
-      reg(ptyManager, () => mockWin as never)
+      const { registerTerminalHandlers: reg, sendToRenderer } = await import(
+        '../../../src/main/ipc/terminal.ipc'
+      )
+      const { OutputRelay } = await import('../../../src/main/terminal/output-relay')
+      const getWindow = () => mockWin as never
+      reg(ptyManager, getWindow, new OutputRelay(ptyManager, sendToRenderer(getWindow)))
 
       await handlerMap['terminal:create'](
         {},
@@ -311,6 +334,7 @@ describe('terminal IPC handlers', () => {
       // Trigger the onData callback (covers the data→send path)
       const onDataHandler = mockPty.onData.mock.calls.at(-1)?.[0] as (d: string) => void
       onDataHandler?.('hello')
+      vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
       expect(mockSend).toHaveBeenCalledWith(
         'terminal:output',
         expect.objectContaining({ data: 'hello' })
@@ -326,6 +350,7 @@ describe('terminal IPC handlers', () => {
         expect.objectContaining({ exitCode: 0 })
       )
 
+      vi.useRealTimers()
       const result = await handlerMap['terminal:list-sessions']({}, undefined)
       expect(
         (result as unknown[]).every(

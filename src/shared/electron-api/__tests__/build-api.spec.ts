@@ -33,6 +33,7 @@ const REMOTE_LOCALS = {
   'dialog.openDirectory': () => Promise.resolve({ cancelled: true }),
   'shell.openExternal': vi.fn(),
   'extension.updatePanelBounds': () => {},
+  'terminal.acknowledge': () => {},
   'extensionBridge.invoke': vi.fn(),
   'extensionBridge.on': vi.fn(),
 }
@@ -214,6 +215,19 @@ describe('buildElectronApi — native mode', () => {
 })
 
 describe('buildElectronApi — remote mode', () => {
+  it('keeps flow-control acknowledgements off the wire, but sends them natively', () => {
+    const remote = makeTransport()
+    const native = makeTransport()
+    const remoteApi = buildElectronApi(remote, { mode: 'remote', locals: REMOTE_LOCALS }) as any
+    const nativeApi = buildElectronApi(native, { mode: 'native', locals: NATIVE_LOCALS }) as any
+
+    remoteApi.terminal.acknowledge('s1', 5)
+    nativeApi.terminal.acknowledge('s1', 5)
+
+    expect(remote.send).not.toHaveBeenCalled()
+    expect(native.send).toHaveBeenCalledWith('terminal:acknowledge', { sessionId: 's1', count: 5 })
+  })
+
   it('omits native-only methods and their empty namespaces', () => {
     const t = makeTransport()
     const api = buildElectronApi(t, { mode: 'remote', locals: REMOTE_LOCALS }) as any
