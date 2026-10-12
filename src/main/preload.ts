@@ -29,11 +29,8 @@ contextBridge.exposeInMainWorld(
       // Dynamic passthrough for extension-owned channels.
       'extensionBridge.invoke': (channel: string, payload?: unknown) =>
         ipcRenderer.invoke(channel, payload),
-      'extensionBridge.on': (channel: string, handler: (data: unknown) => void) => {
-        const listener = (_: Electron.IpcRendererEvent, data: unknown) => handler(data)
-        ipcRenderer.on(channel, listener)
-        return () => ipcRenderer.removeListener(channel, listener)
-      },
+      'extensionBridge.on': (channel: string, handler: (data: unknown) => void) =>
+        transport.subscribe(channel, ([data]) => handler(data)),
     },
   })
 )

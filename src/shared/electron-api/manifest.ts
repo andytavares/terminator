@@ -117,6 +117,19 @@ function method<
 }
 
 type Unsubscribe = () => void
+
+/** An event pushed as `{ id }` about one extension, which the handler receives as the id. */
+function extensionIdEvent<const Path extends string>(path: Path, channel: string) {
+  return method({
+    path,
+    kind: 'event',
+    channel,
+    signature: signature<(handler: (id: string) => void) => Unsubscribe>(),
+    toHandlerArgs: (args) => [(args[0] as { id: string }).id],
+    remote: 'omit',
+    extensionView: 'shared',
+  })
+}
 type Failure = { error: string }
 type DetailedFailure = { error: string; message?: string }
 type SessionRecordResult<Data> = Promise<{ data: Data } | { error: string; message: string }>
@@ -859,24 +872,8 @@ export const ELECTRON_API_MANIFEST = [
     remote: 'omit',
     extensionView: 'shared',
   }),
-  method({
-    path: 'extensionEvents.onExtensionPanelLoaded',
-    kind: 'event',
-    channel: 'extension:panel-loaded',
-    signature: signature<(handler: (id: string) => void) => Unsubscribe>(),
-    toHandlerArgs: (args) => [(args[0] as { id: string }).id],
-    remote: 'omit',
-    extensionView: 'shared',
-  }),
-  method({
-    path: 'extensionEvents.onExtensionRendererReload',
-    kind: 'event',
-    channel: 'extension:renderer-reload',
-    signature: signature<(handler: (id: string) => void) => Unsubscribe>(),
-    toHandlerArgs: (args) => [(args[0] as { id: string }).id],
-    remote: 'omit',
-    extensionView: 'shared',
-  }),
+  extensionIdEvent('extensionEvents.onExtensionPanelLoaded', 'extension:panel-loaded'),
+  extensionIdEvent('extensionEvents.onExtensionRendererReload', 'extension:renderer-reload'),
   // Emitted when the double-Escape exit gesture fires inside an extension
   // WebContentsView. Native only: remote extension panels are iframes in the
   // host page, so their Escape never leaves the renderer.

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { defaultGlobalSettings } from '../settings-defaults'
 
 export const ThemeSchema = z.enum(['dark', 'light'])
 const NotificationTargetSchema = z.enum(['system', 'center', 'toast'])
@@ -109,28 +110,7 @@ export const WorkspaceSettingsSchema = z.object({
   extensions: z.record(z.string(), z.record(z.string(), z.unknown())).default({}),
 })
 
-export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
-  appearance: { theme: 'dark' },
-  terminal: {
-    scrollbackLimit: 10000,
-    defaultShell: process.env.SHELL || '/bin/zsh',
-    promptForName: false,
-  },
-  git: { worktreeBaseDir: '', branchExcludePatterns: [] },
-  extensions: {},
-  ui: { hasSeenWelcome: false, editor: '' },
-  sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
-  notifications: {
-    defaultTargets: ['system', 'center', 'toast'],
-    overrides: {},
-  },
-  quickActions: {
-    pins: [],
-    usage: [],
-    directUse: [],
-    custom: [],
-  },
-}
+export const DEFAULT_GLOBAL_SETTINGS = defaultGlobalSettings(process.env.SHELL || '/bin/zsh')
 
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
 export type WorkspaceSettings = z.infer<typeof WorkspaceSettingsSchema>

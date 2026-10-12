@@ -62,6 +62,36 @@ function loadCollapsedProjectIds(): Set<string> {
   return new Set()
 }
 
+/** The state with `project` listed under its workspace, unless it already is. */
+function withProjectAdded(
+  s: WorkspaceState,
+  project: Project
+): WorkspaceState | Pick<WorkspaceState, 'projectsByWorkspaceId'> {
+  const map = new Map(s.projectsByWorkspaceId)
+  const existing = map.get(project.workspaceId) ?? []
+  if (existing.some((p) => p.id === project.id)) return s
+  map.set(project.workspaceId, [...existing, project])
+  return { projectsByWorkspaceId: map }
+}
+
+/** The state with the project of the same id swapped for `project`. */
+function withProjectReplaced(
+  s: WorkspaceState,
+  project: Project
+): Pick<WorkspaceState, 'projectsByWorkspaceId'> {
+  const map = new Map(s.projectsByWorkspaceId)
+  for (const [workspaceId, projects] of map) {
+    if (projects.some((p) => p.id === project.id)) {
+      map.set(
+        workspaceId,
+        projects.map((p) => (p.id === project.id ? project : p))
+      )
+      break
+    }
+  }
+  return { projectsByWorkspaceId: map }
+}
+
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeWorkspaceId: null,
@@ -132,13 +162,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const result = await window.electronAPI.project.create(input)
     if ('project' in result) {
       const project = result.project
-      set((s) => {
-        const map = new Map(s.projectsByWorkspaceId)
-        const existing = map.get(project.workspaceId) ?? []
-        if (existing.some((p) => p.id === project.id)) return s
-        map.set(project.workspaceId, [...existing, project])
-        return { projectsByWorkspaceId: map }
-      })
+      set((s) => withProjectAdded(s, project))
     }
     return result
   },
@@ -147,19 +171,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const result = await window.electronAPI.project.updateBranch(id, gitBranch)
     if ('project' in result) {
       const project = result.project
-      set((s) => {
-        const map = new Map(s.projectsByWorkspaceId)
-        for (const [wsId, projects] of map) {
-          if (projects.some((p) => p.id === id)) {
-            map.set(
-              wsId,
-              projects.map((p) => (p.id === id ? project : p))
-            )
-            break
-          }
-        }
-        return { projectsByWorkspaceId: map }
-      })
+      set((s) => withProjectReplaced(s, project))
     }
     return result
   },
@@ -168,19 +180,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const result = await window.electronAPI.project.rename(id, name)
     if ('project' in result) {
       const project = result.project
-      set((s) => {
-        const map = new Map(s.projectsByWorkspaceId)
-        for (const [wsId, projects] of map) {
-          if (projects.some((p) => p.id === id)) {
-            map.set(
-              wsId,
-              projects.map((p) => (p.id === id ? project : p))
-            )
-            break
-          }
-        }
-        return { projectsByWorkspaceId: map }
-      })
+      set((s) => withProjectReplaced(s, project))
     }
     return result
   },
@@ -288,13 +288,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 // updates immediately when any caller (including extensions) creates a project.
 if (typeof window !== 'undefined' && window.electronAPI?.project?.onAdded) {
   window.electronAPI.project.onAdded((project) => {
-    useWorkspaceStore.setState((s) => {
-      const map = new Map(s.projectsByWorkspaceId)
-      const existing = map.get(project.workspaceId) ?? []
-      if (existing.some((p) => p.id === project.id)) return s
-      map.set(project.workspaceId, [...existing, project])
-      return { projectsByWorkspaceId: map }
-    })
+    useWorkspaceStore.setState((s) => withProjectAdded(s, project))
   })
 }
 
