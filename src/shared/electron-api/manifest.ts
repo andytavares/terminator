@@ -329,6 +329,21 @@ export const ELECTRON_API_MANIFEST = [
     remote: 'omit',
     extensionView: 'shared',
   }),
+  method({
+    // The app renderer says what is on screen; workspace.getActive answers from it.
+    path: 'workspace.setActive',
+    kind: 'send',
+    channel: 'workspace:active-changed',
+    signature:
+      signature<
+        (context: {
+          workspaceId: string | null
+          projectId: string | null
+          repoRoot: string | null
+        }) => void
+      >(),
+    remote: 'omit',
+  }),
 
   // ── project ───────────────────────────────────────────────────────────────
   method({

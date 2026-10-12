@@ -1,5 +1,17 @@
 # Changelog — @terminator/extension-sdk
 
+## Unreleased
+
+### Fixed
+
+- `workspace.getActive()` in a view answered `{ workspaceId: null, projectId: null, repoRoot:
+null }` whatever was on screen: nothing told the core what the main window showed. The app
+  renderer now reports it (`workspace.setActive`, internal to the app), and views also receive it
+  as `workspace:changed`.
+- A view's `extensionEvents.onSelectProjectTab` subscription is driven by a broadcast of
+  `extension:select-project-tab` with `{ tabId }`, the payload the core always read; the
+  e2e probe extension (`tests/e2e/fixtures/extensions/probe`) is its first sender.
+
 ## 4.0.0
 
 Every member of the Extension API now crosses a process boundary: extension backends run in
