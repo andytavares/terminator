@@ -82,13 +82,6 @@ export function PrReviewView({
   const [showResume, setShowResume] = useState(
     () => !!lastAccessedAt && Date.now() - new Date(lastAccessedAt).getTime() > RESUME_CARD_STALE_MS
   )
-  useEffect(() => {
-    setShowResume(
-      !!lastAccessedAt && Date.now() - new Date(lastAccessedAt).getTime() > RESUME_CARD_STALE_MS
-    )
-    // Only re-evaluate when a different PR opens, not on every persist.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pr.number])
 
   const loadInlineComments = useLoadInlineComments(repoRoot)
   const [showSubmit, setShowSubmit] = useState(false)
@@ -111,9 +104,11 @@ export function PrReviewView({
   const [largePrDismissed, setLargePrDismissed] = useState(false)
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('agent')
 
-  useEffect(() => {
+  const [shownAgentScope, setShownAgentScope] = useState(agentPanelScope)
+  if (shownAgentScope !== agentPanelScope) {
+    setShownAgentScope(agentPanelScope)
     if (agentPanelScope) setInspectorTab('agent')
-  }, [agentPanelScope])
+  }
 
   // When focus mode is active, filter each chapter to only medium/high risk files.
   // Chapters where every file is low-risk are dropped entirely; if all chapters

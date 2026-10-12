@@ -72,11 +72,12 @@ function CodePreview({
 }
 
 function AuthorHeader({ author, branch }: { author?: GitAuthor; branch?: string }) {
+  const [openedAt] = useState(() => Date.now())
   const hash = author?.commitHash?.slice(0, 7) ?? ''
   const ts = author?.timestamp
     ? (() => {
         try {
-          const ms = Date.now() - new Date(author.timestamp).getTime()
+          const ms = openedAt - new Date(author.timestamp).getTime()
           const min = Math.round(ms / 60000)
           if (min < 60) return `${min}m ago`
           const hr = Math.round(min / 60)

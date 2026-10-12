@@ -63,6 +63,14 @@ function GroupCheckbox({
   )
 }
 
+async function fetchAccessibleRepos(refresh: boolean): Promise<Loaded> {
+  try {
+    return (await githubAPI.accessibleRepos(refresh)) as Loaded
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export function RepoPicker({ initial, onClose, onSaved }: Props): JSX.Element {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [query, setQuery] = useState('')
@@ -73,16 +81,18 @@ export function RepoPicker({ initial, onClose, onSaved }: Props): JSX.Element {
 
   const load = useCallback(async (refresh: boolean) => {
     setLoaded(null)
-    try {
-      setLoaded((await githubAPI.accessibleRepos(refresh)) as Loaded)
-    } catch (err) {
-      setLoaded({ error: err instanceof Error ? err.message : String(err) })
-    }
+    setLoaded(await fetchAccessibleRepos(refresh))
   }, [])
 
   useEffect(() => {
-    void load(false)
-  }, [load])
+    let cancelled = false
+    void fetchAccessibleRepos(false).then((result) => {
+      if (!cancelled) setLoaded(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     searchRef.current?.focus()

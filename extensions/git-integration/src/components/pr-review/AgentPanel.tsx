@@ -79,6 +79,21 @@ interface Props {
   pr: PrReviewDetail
 }
 
+/** Activity lines plus the seconds since the run started, ticking once a second. */
+function RunningNote({ activity, startedAt }: { activity: string[]; startedAt: string }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  const elapsedSeconds = Math.max(0, Math.floor((now - Date.parse(startedAt)) / 1000))
+  return (
+    <p className="ap-note" style={{ margin: 0 }} key={now}>
+      {[...activity, `${elapsedSeconds} s`].join(' · ')}
+    </p>
+  )
+}
+
 export function AgentPanel({ repoRoot, pr }: Props) {
   const agentPanelScope = useReviewUiStore((s) => s.agentPanelScope)
   const agentPanelRequest = useReviewUiStore((s) => s.agentPanelRequest)
@@ -95,16 +110,18 @@ export function AgentPanel({ repoRoot, pr }: Props) {
   const [model, setModel] = useState<'sonnet' | 'opus'>('sonnet')
   const [forceAsk, setForceAsk] = useState(false)
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
-  const [elapsedTick, setElapsedTick] = useState(0)
 
   const autoStartedFor = useRef<string | null>(null)
 
-  useEffect(() => {
+  const panelTarget = `${scopeKey}\u0000${agentPanelRequest}`
+  const [shownPanelTarget, setShownPanelTarget] = useState(panelTarget)
+  if (shownPanelTarget !== panelTarget) {
+    setShownPanelTarget(panelTarget)
     setRequest(agentPanelRequest)
     setForceAsk(false)
     setQuestion('')
     setDismissedIds(new Set())
-  }, [scopeKey, agentPanelRequest])
+  }
 
   useEffect(() => {
     reviewAgentAPI
@@ -125,12 +142,6 @@ export function AgentPanel({ repoRoot, pr }: Props) {
         r.repoRoot === repoRoot && r.prNumber === pr.number && scopesEqual(r.scope, agentPanelScope)
     )
   }, [agentRuns, agentPanelScope, repoRoot, pr.number])
-
-  useEffect(() => {
-    if (currentRun?.status !== 'running') return
-    const id = setInterval(() => setElapsedTick((t) => t + 1), 1000)
-    return () => clearInterval(id)
-  }, [currentRun?.status, currentRun?.id])
 
   const handleStart = useCallback(
     async (req: AgentRequestKind) => {
@@ -310,15 +321,11 @@ export function AgentPanel({ repoRoot, pr }: Props) {
             {currentRun.request === 'explain' ? 'Explaining ' : 'Reviewing '}
             {label}
           </h5>
-          <p className="ap-note" style={{ margin: 0 }} key={elapsedTick}>
-            {[
-              ...currentRun.activity,
-              `${Math.max(
-                0,
-                Math.floor((Date.now() - Date.parse(currentRun.startedAt)) / 1000)
-              )} s`,
-            ].join(' · ')}
-          </p>
+          <RunningNote
+            key={currentRun.id}
+            activity={currentRun.activity}
+            startedAt={currentRun.startedAt}
+          />
           <div className="ap-actions-row">
             <button
               type="button"
