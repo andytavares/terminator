@@ -85,6 +85,9 @@ vi.mock('../../../src/main/logger', () => ({
 import { createExtensionAPI } from '../../../src/main/extensions/api'
 import { setExtensionSetting } from '../../../src/main/storage/extension-settings-store'
 import { EventEmitter } from 'events'
+import type { SessionInfo } from '@terminator/extension-sdk'
+import type { PtyManager } from '../../../src/main/terminal/pty-manager'
+import { partialFake } from '../../support/fakes'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -280,15 +283,16 @@ describe('api.ipc bridge channels', () => {
 // ── pty ──────────────────────────────────────────────────────────────────────
 
 describe('api.pty', () => {
-  const sessionInfo = {
+  const sessionInfo: SessionInfo = {
     sessionId: 's1',
     cwd: '/cwd',
-    type: 'human' as const,
-    origin: 'app' as const,
+    type: 'human',
+    origin: 'app',
     createdAt: 't',
     pid: 1,
   }
-  const mockPtyManager = {
+  const otherSession: SessionInfo = { ...sessionInfo, sessionId: 's2' }
+  const mockPtyManager = partialFake<PtyManager>({
     spawnSession: vi.fn(() => sessionInfo),
     onData: vi.fn(() => () => {}),
     onExit: vi.fn(() => () => {}),
@@ -297,8 +301,8 @@ describe('api.pty', () => {
     write: vi.fn(),
     resize: vi.fn(),
     kill: vi.fn(),
-    listSessions: vi.fn(() => ['s1', 's2']),
-  }
+    listSessions: vi.fn(() => [sessionInfo, otherSession]),
+  })
 
   describe('session authority surface (v1.4.0)', () => {
     it('spawnSession delegates and returns the session info', async () => {
@@ -368,7 +372,7 @@ describe('api.pty', () => {
 
     it('listSessions returns the manager session list', async () => {
       const api = createExtensionAPI('test.pty5', '0.1.0', { ptyManager: mockPtyManager })
-      expect(await api.pty.listSessions()).toEqual(['s1', 's2'])
+      expect(await api.pty.listSessions()).toEqual([sessionInfo, otherSession])
     })
   })
 

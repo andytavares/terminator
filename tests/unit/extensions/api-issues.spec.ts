@@ -43,7 +43,7 @@ const LINK = {
 
 async function makeApi() {
   const { createExtensionAPI } = await import('../../../src/main/extensions/api')
-  return createExtensionAPI('test-extension')
+  return createExtensionAPI('test-extension', '1.0.0')
 }
 
 beforeEach(() => {

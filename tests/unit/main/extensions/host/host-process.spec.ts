@@ -14,6 +14,7 @@ import { HostRuntime } from '../../../../../src/main/extensions/host/host-runtim
 import { RpcEndpoint, type MessageLink } from '../../../../../src/main/extensions/host/rpc-endpoint'
 import { hostSnapshot } from '../../../../support/host-snapshot'
 import type { HostSnapshot } from '../../../../../src/main/extensions/host/snapshot'
+import type { BackendModule } from '../../../../../src/main/extensions/host/backend-loader'
 
 const ports: MessagePort[] = []
 afterEach(() => {
@@ -62,8 +63,6 @@ const backend = {
     return { version: 1 }
   },
 }
-
-type BackendModule = { activate(api: ExtensionAPI): unknown }
 
 /** A host process whose "process" is a HostRuntime on the other end of a MessageChannel. */
 function harness(modules: Record<string, BackendModule> = {}) {

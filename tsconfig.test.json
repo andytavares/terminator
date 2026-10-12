@@ -19,13 +19,5 @@
     "tests/support/**/*",
     "tests/setup.ts",
     "src/renderer/electron-api.d.ts"
-  ],
-  "exclude": [
-    "tests/unit/extensions/**",
-    "tests/unit/main/extensions/**",
-    "tests/unit/packages/**",
-    // Imports vite.config.remote.ts, whose @vitejs/plugin-react declarations
-    // use string export names that TypeScript 5.5 cannot parse.
-    "tests/unit/config/vite-config-remote.spec.ts"
   ]
 }

@@ -1,5 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { routeExtensionExitRequest } from '../../../../src/main/extensions/extension-exit.js'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
+import {
+  routeExtensionExitRequest,
+  type ExtensionExitDeps,
+} from '../../../../src/main/extensions/extension-exit.js'
 import type { Extension } from '../../../../src/shared/types/index.js'
 
 const SENDER = { id: 'sender' } as never
@@ -17,10 +20,10 @@ function makeExt(overrides: Partial<Extension> = {}): Extension {
 }
 
 describe('routeExtensionExitRequest', () => {
-  let send: ReturnType<typeof vi.fn>
-  let focusMainRenderer: ReturnType<typeof vi.fn>
-  let findViewByWebContents: ReturnType<typeof vi.fn>
-  let listExtensions: ReturnType<typeof vi.fn>
+  let send: Mock<ExtensionExitDeps['send']>
+  let focusMainRenderer: Mock<ExtensionExitDeps['focusMainRenderer']>
+  let findViewByWebContents: Mock<ExtensionExitDeps['findViewByWebContents']>
+  let listExtensions: Mock<ExtensionExitDeps['listExtensions']>
 
   function route(): boolean {
     return routeExtensionExitRequest(SENDER, {
@@ -34,10 +37,8 @@ describe('routeExtensionExitRequest', () => {
   beforeEach(() => {
     send = vi.fn()
     focusMainRenderer = vi.fn()
-    findViewByWebContents = vi
-      .fn()
-      .mockReturnValue({ extensionId: 'com.test.ext', viewParam: 'main' })
-    listExtensions = vi.fn().mockReturnValue([makeExt()])
+    findViewByWebContents = vi.fn(() => ({ extensionId: 'com.test.ext', viewParam: 'main' }))
+    listExtensions = vi.fn(() => [makeExt()])
   })
 
   it('tells the renderer to exit to the terminal', () => {

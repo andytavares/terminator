@@ -9,6 +9,8 @@ const createdViews = vi.hoisted(
         send: ReturnType<typeof vi.fn>
         reload: ReturnType<typeof vi.fn>
         on: ReturnType<typeof vi.fn>
+        openDevTools: ReturnType<typeof vi.fn>
+        insertCSS: ReturnType<typeof vi.fn>
       }
       setBounds: ReturnType<typeof vi.fn>
       setVisible: ReturnType<typeof vi.fn>

@@ -88,7 +88,10 @@ async function hostedApi(contributes: Record<string, unknown> = {}): Promise<Ext
 }
 
 function registerFolderSetting(api: ExtensionAPI, type: 'folder' | 'string' = 'folder'): void {
-  api.settings.register({ label: 'Tool', properties: { [FOLDER_KEY]: { type, label: 'Clone' } } })
+  api.settings.register({
+    label: 'Tool',
+    properties: { [FOLDER_KEY]: { type, label: 'Clone', default: '' } },
+  })
 }
 
 const gitIn = (api: ExtensionAPI, cwd: string) =>

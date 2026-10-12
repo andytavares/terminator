@@ -164,6 +164,7 @@ describe('api.shell.exec', () => {
       stdout: 'output',
       stderr: '',
       timedOut: false,
+      exceededMaxBuffer: false,
     })
   })
 
@@ -339,7 +340,7 @@ describe('api.settings workspace precedence', () => {
   })
 
   it('returns undefined when key not set globally or in workspace', () => {
-    const api = createExtensionAPI('com.test', '0.1.0', () => 'ws-789')
+    const api = createExtensionAPI('com.test', '0.1.0')
 
     const val = api.settings.get<boolean>('com.test.missing')
     expect(val).toBeUndefined()
@@ -581,16 +582,18 @@ describe('registry query functions', () => {
     d.dispose()
   })
 
-  it('commands are listed with their key and executed through it', () => {
+  it('commands are listed with their key and executed through it', async () => {
     const api = createExtensionAPI('com.query.cmd', '0.1.0')
     const handler = vi.fn()
     const d = api.commands.register({ id: 'q-cmd', label: 'Run' }, handler)
     const cmd = listExtensionCommands().find((c) => c.id === 'q-cmd')
-    expect(cmd).toBeDefined()
-    executeExtensionCommand(cmd!.key)
-    expect(handler).toHaveBeenCalled()
-    executeExtensionCommand('unknown-key')
-    expect(handler).toHaveBeenCalledTimes(1)
+    const ctx = { projectId: 'p1', sessionId: null, repoRoot: null }
+    expect(await executeExtensionCommand(cmd!.key, ctx)).toEqual({ ok: true })
+    expect(handler).toHaveBeenCalledWith(ctx)
+    expect(await executeExtensionCommand('unknown-key', ctx)).toEqual({
+      ok: false,
+      reason: 'not-registered',
+    })
     d.dispose()
   })
 

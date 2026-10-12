@@ -1,9 +1,10 @@
 import { existsSync, realpathSync } from 'node:fs'
 import { isAbsolute, relative, sep } from 'node:path'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 /** A backend's module, as the extension host requires it. */
 export interface BackendModule {
-  activate?: (api: unknown) => unknown
+  activate?: (api: ExtensionAPI) => unknown
   deactivate?: () => void | Promise<void>
 }
 
