@@ -254,3 +254,23 @@ describe('tracker-store — migration from the extension (FR-004)', () => {
     await expect(store.migrateLegacyCredentials()).resolves.toBeUndefined()
   })
 })
+
+describe('tracker-store — concurrent writes', () => {
+  // The issue service records a tracker's error while other writes are in
+  // flight. Each write read the file and wrote it back whole, so the later one
+  // dropped the earlier one's change.
+  it('keeps every change when two writes overlap', async () => {
+    const store = await load()
+    await store.setCredential({ tracker: 'linear', apiKey: 'lin_key' })
+    await Promise.all([
+      store.setLastError('linear', 'auth-failed'),
+      store.setMine('linear', { kind: 'assignee', email: 'a@b.c' }),
+    ])
+    const [linear] = await store.listConnections()
+    expect(linear).toMatchObject({
+      connected: true,
+      lastError: 'auth-failed',
+      mine: { kind: 'assignee', email: 'a@b.c' },
+    })
+  })
+})
