@@ -224,6 +224,23 @@ function openBlockingFindings(order: WorkOrder): WorkOrder['redTeam'] {
   return order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
 }
 
+/**
+ * What is open on the order: its blocking red-team findings, its unanswered
+ * questions, and whether the findings now wait on the operator (rule 5)
+ * because the machine is not acting on them or has run out of rounds.
+ */
+function openWork(input: Pick<ReadinessInput, 'order' | 'intake' | 'loop'>) {
+  const { order, intake, loop } = input
+  const openBlocking = openBlockingFindings(order)
+  const machineActing = intake.kind === 'running' && loop.heldAt === null
+  return {
+    openBlocking,
+    machineActing,
+    rule5Applies: openBlocking.length > 0 && (loop.exhausted || !machineActing),
+    openQuestions: order.openQuestions.filter((q) => q.answer === null),
+  }
+}
+
 function lastFinishedRound(loop: LoopFacts): LoopFacts['rounds'][number] | null {
   const finished = loop.rounds.filter((r) => r.finishedAt !== null)
   return finished.length === 0 ? null : finished[finished.length - 1]
@@ -239,10 +256,7 @@ interface HolderStrip {
 function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
   const { order, compile, intake, loop, agreed, shape, clock } = input
   const Shape = capitalise(shape.name ?? 'the proposed')
-  const openBlocking = openBlockingFindings(order)
-  const machineActing = intake.kind === 'running' && loop.heldAt === null
-  const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
-  const openQuestions = order.openQuestions.filter((q) => q.answer === null)
+  const { openBlocking, rule5Applies, openQuestions } = openWork(input)
 
   // 1. Not draft.
   if (order.status !== 'draft') {
@@ -567,10 +581,7 @@ function checkRow(id: CheckId, input: ReadinessInput): Row {
   if (id === 'questions')
     return { id, label: ROW_LABELS[id], state: 'needs-you', detail: failure.detail }
   if (id === 'redTeam') {
-    const openBlocking = openBlockingFindings(order)
-    const machineActing = intake.kind === 'running' && loop.heldAt === null
-    const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
-    if (rule5Applies)
+    if (openWork({ order, intake, loop }).rule5Applies)
       return { id, label: ROW_LABELS[id], state: 'needs-you', detail: failure.detail }
   }
   return { id, label: ROW_LABELS[id], state: 'failing', detail: failure.detail }
@@ -665,9 +676,7 @@ function computeBaseStep(
   Shape: string
 ): BaseStep {
   const { order, compile, intake, loop } = input
-  const openBlocking = openBlockingFindings(order)
-  const machineActing = intake.kind === 'running' && loop.heldAt === null
-  const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
+  const { openBlocking, machineActing, rule5Applies } = openWork(input)
 
   if (id === 'intent') {
     const stated = order.intent.problem.trim() !== '' && order.intent.outcome.trim() !== ''
@@ -881,10 +890,7 @@ function buildFindings(input: ReadinessInput): readonly FindingView[] {
 
 function buildHandOffLock(input: ReadinessInput): string | null {
   const { order, compile, intake, loop, agreed, clock } = input
-  const openBlocking = openBlockingFindings(order)
-  const machineActing = intake.kind === 'running' && loop.heldAt === null
-  const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
-  const openQuestions = order.openQuestions.filter((q) => q.answer === null)
+  const { openBlocking, rule5Applies, openQuestions } = openWork(input)
 
   if (order.status !== 'draft') {
     const t = clock(agreed?.at ?? order.agreedAt ?? '')

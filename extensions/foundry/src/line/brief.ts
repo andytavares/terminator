@@ -5,6 +5,7 @@ import type { PlanUnit, WorkOrder } from '../order/schema.js'
 import type { Role } from '../recipe/parse.js'
 import type { Rule } from '../recipe/parse.js'
 import type { Feedback } from './run-graph.js'
+import { findingHeadline } from '../order/finding-headline.js'
 
 // What an agent is actually told.
 //
@@ -179,21 +180,6 @@ function rulesSection(rules: readonly Rule[]): string[] {
     '',
     ...rules.map((rule) => `- **${rule.id}** (${rule.rung}) — ${rule.asserts.trim()}`),
   ]
-}
-
-/**
- * The claim in a finding's text, without its evidence.
- *
- * Mirrors `findingParts` in `Forge.tsx` and `findingHeadline` in
- * `order/render.ts` — the same rule in three places because none of them may
- * import from either of the other two.
- */
-function findingHeadline(text: string): string {
-  const trimmed = text.trim()
-  const newline = trimmed.indexOf('\n')
-  if (newline !== -1) return trimmed.slice(0, newline).trim()
-  const sentence = /^(.+?[.!?])\s+(?=[A-Z`'"(])/s.exec(trimmed)
-  return sentence === null ? trimmed : sentence[1]
 }
 
 /**

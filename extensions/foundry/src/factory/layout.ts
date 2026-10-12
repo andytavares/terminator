@@ -136,6 +136,19 @@ const FIXTURE_KINDS: readonly FixtureKind[] = ['shelves', 'racks', 'statuswall',
 const CREWED_KINDS: readonly StepKind[] = ['agent', 'fanout', 'run']
 
 /** The nearest column in `row` that isn't solid, scanning outward from `preferred`. */
+/** The two tiles either side of a belt tile, across the way the belt runs. */
+function sidesOf(t: Tile, horizontal: boolean): readonly [Tile, Tile] {
+  return horizontal
+    ? [
+        { x: t.x, y: t.y - 1 },
+        { x: t.x, y: t.y + 1 },
+      ]
+    : [
+        { x: t.x - 1, y: t.y },
+        { x: t.x + 1, y: t.y },
+      ]
+}
+
 function nearestClearColumn(
   solid: boolean[][],
   row: number,
@@ -685,15 +698,7 @@ export function layoutHall(
     return outs.includes('E') || outs.includes('W')
   }
   const sidesOpen = (t: Tile): readonly [Tile, Tile] | null => {
-    const [p, q] = isHorizontal(t)
-      ? [
-          { x: t.x, y: t.y - 1 },
-          { x: t.x, y: t.y + 1 },
-        ]
-      : [
-          { x: t.x - 1, y: t.y },
-          { x: t.x + 1, y: t.y },
-        ]
+    const [p, q] = sidesOf(t, isHorizontal(t))
     const isOpen = (u: Tile): boolean => walk[u.y]?.[u.x] !== true
     return isOpen(p) && isOpen(q) ? [p, q] : null
   }
@@ -732,15 +737,7 @@ export function layoutHall(
         if (!isOpenableStraight(t)) return false
         const tile = beltTileAt.get(key(t)) as BeltTile
         const horizontal = tile.outs.includes('E') || tile.outs.includes('W')
-        const [p, q] = horizontal
-          ? [
-              { x: t.x, y: t.y - 1 },
-              { x: t.x, y: t.y + 1 },
-            ]
-          : [
-              { x: t.x - 1, y: t.y },
-              { x: t.x + 1, y: t.y },
-            ]
+        const [p, q] = sidesOf(t, horizontal)
         const isOpen = (u: Tile): boolean => walk[u.y]?.[u.x] !== true
         return isOpen(p) && isOpen(q) && seen.has(key(p)) !== seen.has(key(q))
       })

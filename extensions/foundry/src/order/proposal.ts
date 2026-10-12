@@ -24,7 +24,7 @@ const orderShape = WorkOrderSchema.shape
  * code keeps, and the prior art it found. Those are findings, and nothing else
  * fills them: Scout runs after agreement, which is too late to inform one.
  */
-const FindingsSchema = z
+export const FindingsSchema = z
   .object({
     entryPoints: z.array(z.string()).optional(),
     conventions: z.array(z.string()).optional(),

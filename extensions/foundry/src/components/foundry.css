@@ -809,17 +809,22 @@
   color: var(--tm-text-secondary);
 }
 
-.fdry-ask-detail {
-  margin: 0;
-  max-height: 140px;
+/* An agent's own words, verbatim: what it asked, its transcript. */
+.fdry-ask-detail,
+.fdry-transcript {
   overflow: auto;
-  padding: 6px 8px;
   font-size: 11px;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-sm);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.fdry-ask-detail {
+  margin: 0;
+  max-height: 140px;
+  padding: 6px 8px;
 }
 
 .fdry-ask-actions {
@@ -832,15 +837,8 @@
 .fdry-transcript {
   margin: 0 0 8px;
   max-height: 220px;
-  overflow: auto;
   padding: 8px 10px;
-  font-size: 11px;
   line-height: 1.5;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .fdry-redirect {
@@ -849,16 +847,27 @@
   align-items: center;
 }
 
-.fdry-redirect input {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 8px;
+/* A small field on a Foundry surface: one fill, edge and type. */
+.fdry-redirect input,
+.fdry-accept input,
+.fdry-accept textarea,
+.fdry-ledger-bar select,
+.fdry-map select,
+.fdry-budget input[type='number'] {
   font: inherit;
-  font-size: 12px;
   color: var(--tm-text-primary);
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-sm);
+}
+
+.fdry-redirect input,
+.fdry-accept input,
+.fdry-accept textarea {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: 12px;
 }
 
 .fdry-accept {
@@ -878,19 +887,6 @@
 
 .fdry-accept button {
   align-self: flex-start;
-}
-
-.fdry-accept input,
-.fdry-accept textarea {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 8px;
-  font: inherit;
-  font-size: 12px;
-  color: var(--tm-text-primary);
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
 }
 
 /* Just redrawn. Striking an assumption redraws only what depended on it
@@ -954,12 +950,7 @@
 
 .fdry-ledger-bar select {
   padding: 4px 6px;
-  font: inherit;
   font-size: 12px;
-  color: var(--tm-text-primary);
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
 }
 
 .fdry-propose {
@@ -1087,18 +1078,13 @@
 }
 
 .fdry-map select {
-  /* Room to read the option, and an ellipsis rather than a cut when there is
-     not. At 55% the longest option — "let the tracker decide" — was sliced
-     mid-word in a panel with space to spare beside it. */
+  /* Room to read the option, and an ellipsis rather than a cut when there is;
+  not. At 55% the longest option — "let the tracker decide" — was sliced;
+  mid-word in a panel with space to spare beside it. */
   flex: 1 1 auto;
   min-width: 0;
   text-overflow: ellipsis;
   padding: 4px 6px;
-  font: inherit;
-  color: var(--tm-text-primary);
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
 }
 
 .fdry-src,
@@ -1287,13 +1273,18 @@
   margin-top: 24px;
 }
 
-.fdry-input input {
+/* A line to type an idea or an answer into. */
+.fdry-input input,
+.fdry-seed input {
   flex: 1;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-sm);
   padding: 8px 12px;
   color: var(--tm-text-primary);
+}
+
+.fdry-input input {
   font-size: 12.5px;
 }
 
@@ -1379,12 +1370,6 @@
 }
 
 .fdry-seed input {
-  flex: 1;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm);
-  padding: 8px 12px;
-  color: var(--tm-text-primary);
   font-size: 13px;
 }
 
@@ -2613,12 +2598,7 @@
 .fdry-budget input[type='number'] {
   width: 90px;
   padding: 5px 8px;
-  font: inherit;
   font-size: 12.5px;
-  color: var(--tm-text-primary);
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
 }
 
 .fdry-budget input[aria-invalid='true'] {
