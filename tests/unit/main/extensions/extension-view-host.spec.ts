@@ -42,10 +42,6 @@ vi.mock('electron', () => ({
   session: { defaultSession: mockDefaultSession, fromPartition: () => mockDefaultSession },
 }))
 
-vi.mock('../../../src/main/logger.js', () => ({
-  makeLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
-}))
-
 import {
   ExtensionViewHost,
   EXTENSION_BASE_CSS,
@@ -118,7 +114,7 @@ describe('ExtensionViewHost', () => {
 
   it('createView passes viewParam as ?view= query param', async () => {
     await host.createView(makeExt(), 'sidebar')
-    expect(mockLoadURL).toHaveBeenCalledWith(expect.stringContaining('view=sidebar'))
+    expect(new URL(mockLoadURL.mock.calls[0][0]).searchParams.get('view')).toBe('sidebar')
   })
 
   it('createView does nothing when ext has no rendererUrl', async () => {
@@ -239,7 +235,11 @@ describe('ExtensionViewHost', () => {
       if (event === 'did-finish-load') finishLoadCb = cb
     })
     await host.createView(makeExt(), 'main', null)
-    finishLoadCb?.()
+    finishLoadCb!()
+    expect(mockSend).toHaveBeenCalledWith('extension:panel-loaded', {
+      id: 'com.test.ext',
+      viewParam: 'main',
+    })
     const workspaceCalls = mockSend.mock.calls.filter(([ch]) => ch === 'workspace:changed')
     expect(workspaceCalls).toHaveLength(0)
   })
@@ -259,7 +259,7 @@ describe('ExtensionViewHost', () => {
 
   it('createView includes repoRoot in URL when provided', async () => {
     await host.createView(makeExt(), 'main', '/my/repo')
-    expect(mockLoadURL).toHaveBeenCalledWith(expect.stringContaining('repoRoot='))
+    expect(new URL(mockLoadURL.mock.calls[0][0]).searchParams.get('repoRoot')).toBe('/my/repo')
   })
 
   it('createView URL omits repoRoot when not provided', async () => {

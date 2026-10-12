@@ -15,6 +15,7 @@ import { RpcEndpoint, type MessageLink } from '../../../../../src/main/extension
 import { hostSnapshot } from '../../../../support/host-snapshot'
 import type { HostSnapshot } from '../../../../../src/main/extensions/host/snapshot'
 import type { BackendModule } from '../../../../../src/main/extensions/host/backend-loader'
+import { partialFake } from '../../../../support/fakes'
 
 const ports: MessagePort[] = []
 afterEach(() => {
@@ -30,22 +31,23 @@ function link(port: MessagePort): MessageLink {
 function mainApi() {
   const channels = new Map<string, ChannelSpec>()
   const dataListeners: Array<(data: string) => void> = []
-  const api = {
-    ipc: {
-      registerHandler: vi.fn((spec: ChannelSpec) => {
+  const broadcast = vi.fn<ExtensionAPI['window']['broadcast']>()
+  const api = partialFake<ExtensionAPI>({
+    ipc: partialFake<ExtensionAPI['ipc']>({
+      registerHandler: (spec: ChannelSpec) => {
         channels.set(spec.channel, spec)
-        return { dispose: () => channels.delete(spec.channel) }
-      }),
-    },
-    pty: {
-      onData: vi.fn((_session: string, listener: (data: string) => void) => {
+        return { dispose: () => void channels.delete(spec.channel) }
+      },
+    }),
+    pty: partialFake<ExtensionAPI['pty']>({
+      onData: (_session: string, listener: (data: string) => void) => {
         dataListeners.push(listener)
-        return () => dataListeners.splice(dataListeners.indexOf(listener), 1)
-      }),
-    },
-    window: { broadcast: vi.fn() },
-  }
-  return { api: api as unknown as ExtensionAPI, raw: api, channels, dataListeners }
+        return () => void dataListeners.splice(dataListeners.indexOf(listener), 1)
+      },
+    }),
+    window: partialFake<ExtensionAPI['window']>({ broadcast }),
+  })
+  return { api, broadcast, channels, dataListeners }
 }
 
 /** A backend that registers a validated channel and relays a session's output. */
@@ -115,9 +117,7 @@ describe('extension backends in the extension host', () => {
     await vi.waitFor(() => expect(main.dataListeners).toHaveLength(1))
 
     main.dataListeners[0]('ls\r\n')
-    await vi.waitFor(() =>
-      expect(main.raw.window.broadcast).toHaveBeenCalledWith('demo:output', 'ls\r\n')
-    )
+    await vi.waitFor(() => expect(main.broadcast).toHaveBeenCalledWith('demo:output', 'ls\r\n'))
   })
 
   it('ends what a backend registered in main when it is deactivated', async () => {

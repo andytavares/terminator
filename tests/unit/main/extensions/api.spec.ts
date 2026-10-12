@@ -199,7 +199,7 @@ describe('executeExtensionCommand with args', () => {
 
     const result = await executeExtensionCommand(key, noCtx)
 
-    expect(result).toMatchObject({ ok: false })
+    expect(result).toMatchObject({ ok: false, reason: expect.stringMatching(/^invalid-args: /) })
     expect(handler).not.toHaveBeenCalled()
   })
 

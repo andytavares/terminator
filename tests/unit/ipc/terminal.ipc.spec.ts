@@ -19,7 +19,7 @@ vi.mock('electron-store', async () =>
 import { registerTerminalHandlers, sendToRenderer } from '../../../src/main/ipc/terminal.ipc.js'
 import { OutputRelay } from '../../../src/main/terminal/output-relay.js'
 import { MissingCwdError } from '../../../src/main/terminal/pty-manager.js'
-import type { SessionInfo } from '@terminator/extension-sdk'
+import type { SessionInfo, SpawnSessionOptions } from '@terminator/extension-sdk'
 import { OUTPUT_FLUSH_INTERVAL_MS } from '../../../src/main/terminal/output-batcher.js'
 import { HIGH_WATERMARK_CHARS } from '../../../src/main/terminal/flow-control.js'
 import { updateGlobalSettings } from '../../../src/main/storage/settings-store.js'
@@ -71,9 +71,10 @@ function makeFakePtyManager() {
       sessions.delete(id)
       exitListeners.get(id)?.forEach((l) => l(code))
     },
-    spawnSession: vi.fn((opts: Record<string, unknown>) => {
-      const info = { ...opts, createdAt: 't', pid: 1 } as unknown as SessionInfo
-      sessions.set(opts.sessionId as string, info)
+    spawnSession: vi.fn((opts: SpawnSessionOptions): SessionInfo => {
+      const { sessionId, cwd, type, origin, projectId, tabTitle } = opts
+      const info = { sessionId, cwd, type, origin, projectId, tabTitle, createdAt: 't', pid: 1 }
+      sessions.set(sessionId, info)
       return { ...info }
     }),
     onData: vi.fn((id: string, l: (data: string) => void) => {
@@ -160,34 +161,34 @@ describe('registerTerminalHandlers', () => {
     })
 
     it('does not relay when the window is gone', async () => {
+      vi.useFakeTimers()
       const { sessionId } = (await invokeHandler('terminal:create')({}, VALID_CREATE)) as {
         sessionId: string
       }
       win = null
       ptyManager.emitData(sessionId, 'out')
+      // The batch is flushed after the interval; asserting before it would pass either way.
+      vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
       expect(webContentsSend).not.toHaveBeenCalled()
+      vi.useRealTimers()
     })
 
     it('resolves ~ to the home directory', async () => {
       await invokeHandler('terminal:create')({}, { ...VALID_CREATE, cwd: '~' })
-      const spawned = ptyManager.spawnSession.mock.calls[0][0] as { cwd: string }
-      expect(spawned.cwd).not.toBe('~')
-      expect(spawned.cwd.startsWith('/')).toBe(true)
+      expect(ptyManager.spawnSession.mock.calls[0][0].cwd).toBe(os.homedir())
     })
 
     it('names the terminal in its environment, so an agent in it can be placed', async () => {
       const { sessionId } = (await invokeHandler('terminal:create')({}, VALID_CREATE)) as {
         sessionId: string
       }
-      const spawned = ptyManager.spawnSession.mock.calls[0][0] as { env: Record<string, string> }
-      expect(spawned.env.TERMINATOR_SESSION_ID).toBe(sessionId)
+      expect(ptyManager.spawnSession.mock.calls[0][0].env?.TERMINATOR_SESSION_ID).toBe(sessionId)
     })
 
     it('names it beside the linked issue, not instead of it', async () => {
       await links.setLink({ projectId: VALID_CREATE.projectId, tracker: 'linear', key: 'TAV-42' })
       await invokeHandler('terminal:create')({}, VALID_CREATE)
-      const spawned = ptyManager.spawnSession.mock.calls[0][0] as { env: Record<string, string> }
-      expect(spawned.env).toMatchObject({
+      expect(ptyManager.spawnSession.mock.calls[0][0].env).toMatchObject({
         TERMINATOR_ISSUE_KEY: 'TAV-42',
         TERMINATOR_SESSION_ID: expect.any(String),
       })

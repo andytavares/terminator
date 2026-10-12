@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { BrowserWindow, WebContentsView } from 'electron'
+import type { BrowserWindow, WebContents, WebContentsView } from 'electron'
 import { sendToWindow, sendToView } from '../../../src/main/safe-send.js'
+import { partialFake } from '../../support/fakes'
 
 // A supervised run's PTY kept emitting after its window closed. The broadcast
 // read `mainWindow.webContents` on a destroyed window, which throws, and the
@@ -15,18 +16,18 @@ function makeWindow(opts: { destroyed: boolean; contentsDestroyed?: boolean }): 
   send: ReturnType<typeof vi.fn>
 } {
   const send = vi.fn()
-  const webContents = {
+  const webContents = partialFake<WebContents>({
     send,
     isDestroyed: () => opts.contentsDestroyed === true,
-  }
-  const win = {
+  })
+  const win = partialFake<BrowserWindow>({
     isDestroyed: () => opts.destroyed,
     // Reading this off a destroyed window is one of the accesses that throws.
     get webContents() {
       if (opts.destroyed) throw new TypeError('Object has been destroyed')
       return webContents
     },
-  } as unknown as BrowserWindow
+  })
   return { win, send }
 }
 
@@ -60,9 +61,9 @@ describe('sending to a window', () => {
 describe('sending to an extension view', () => {
   function makeView(destroyed: boolean): { view: WebContentsView; send: ReturnType<typeof vi.fn> } {
     const send = vi.fn()
-    const view = {
-      webContents: { send, isDestroyed: () => destroyed },
-    } as unknown as WebContentsView
+    const view = partialFake<WebContentsView>({
+      webContents: partialFake<WebContents>({ send, isDestroyed: () => destroyed }),
+    })
     return { view, send }
   }
 
