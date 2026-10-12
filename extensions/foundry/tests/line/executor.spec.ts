@@ -1715,7 +1715,7 @@ id: direct
 steps:
   - id: check
     kind: run
-    command: echo hi
+    command: /review the change
 `
     const o = order([unit('U-1')])
     await execute(o, recipe(roleless), buildRunGraph(o, recipe(roleless)), deps(run as never))
