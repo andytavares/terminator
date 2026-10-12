@@ -18,6 +18,7 @@ import {
 import type { IndexedProject, IndexedTask } from '../vault/types'
 import { useVaultStore } from '../stores/vault.store'
 import { SmartTaskInput } from './SmartTaskInput'
+import { SessionOptions, useTerminalSessions } from './terminal-sessions'
 
 interface AreaOption {
   name: string
@@ -122,46 +123,7 @@ function AreaCombobox({
 function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element {
   const [linking, setLinking] = useState(false)
   const [linked, setLinked] = useState(false)
-  const [activeSessions, setActiveSessions] = useState<
-    Array<{ sessionId: string; projectId: string; tabTitle: string }>
-  >([])
-  // Read over the bridge, not from the core store.
-  //
-  // This used to import the host's workspace store directly. That is a
-  // Principle II violation, but it was also simply broken: this view bundles
-  // its own copy of that module, so the store it read was a second, empty
-  // instance nobody populates — every session fell through to the truncated-id
-  // label below.
-  const [workspaces, setWorkspaces] = useState<Array<{ id: string; name: string }>>([])
-  const [projects, setProjects] = useState<
-    Array<{ id: string; name: string; workspaceId: string }>
-  >([])
-
-  useEffect(() => {
-    if (!linking) return
-    void window.electronAPI.terminal.listSessions().then(setActiveSessions)
-    void (async () => {
-      const { workspaces: list } = await window.electronAPI.workspace.list()
-      setWorkspaces(list)
-      const perWorkspace = await Promise.all(
-        list.map(async (workspace) => {
-          const { projects: own } = await window.electronAPI.project.list(workspace.id)
-          return own.map((project) => ({ ...project, workspaceId: workspace.id }))
-        })
-      )
-      setProjects(perWorkspace.flat())
-    })()
-  }, [linking])
-
-  function sessionLabel(s: { sessionId: string; tabTitle: string; projectId: string }): string {
-    const project = projects.find((p) => p.id === s.projectId)
-    const workspace = project ? workspaces.find((w) => w.id === project.workspaceId) : undefined
-    const parts: string[] = []
-    if (workspace) parts.push(workspace.name)
-    if (project) parts.push(project.name)
-    if (s.tabTitle) parts.push(s.tabTitle)
-    return parts.length ? parts.join(' › ') : s.sessionId.slice(0, 8)
-  }
+  const { sessions: activeSessions, labelOf } = useTerminalSessions(linking)
 
   async function handleSelect(sessionId: string) {
     if (!sessionId) return
@@ -197,14 +159,11 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
   return (
     <span className="projects-browser__link-picker">
       <select defaultValue="" onChange={(e) => void handleSelect(e.target.value)} autoFocus>
-        <option value="" disabled>
-          Select terminal…
-        </option>
-        {activeSessions.map((s) => (
-          <option key={s.sessionId} value={s.sessionId}>
-            {sessionLabel(s)}
-          </option>
-        ))}
+        <SessionOptions
+          sessions={activeSessions}
+          labelOf={labelOf}
+          placeholder="Select terminal…"
+        />
       </select>
       <IconButton icon={X} label="Close" size="sm" onClick={() => setLinking(false)} />
     </span>

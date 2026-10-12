@@ -41,6 +41,8 @@ import {
 } from '../schemas/vault.schema'
 import { triggerSchedulerTick, broadcast } from '../notifications/task-scheduler.js'
 import { archiveAreaContents, restoreAreaContents } from '../vault/area-archive'
+import { setProjectStatus } from '../vault/project-status'
+import { dailyTasks, reopenTask, taskMetadata } from '../vault/task-reads'
 import {
   rowToTask,
   rowToProject,
@@ -246,19 +248,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
         })
       }
 
-      const taskRows = await db.query<Record<string, unknown>>(
-        `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
-         WHERE t.source='daily' AND t.source_ref=? AND t.parent_id IS NULL ORDER BY t.sort_order, t.created_at`,
-        [date]
-      )
-      const tasks = taskRows.map(rowToTask)
-      for (const task of tasks) {
-        const subtaskRows = await db.query<Record<string, unknown>>(
-          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE t.parent_id=? ORDER BY t.sort_order, t.created_at`,
-          [task.id]
-        )
-        task.subtasks = subtaskRows.map(rowToTask)
-      }
+      const tasks = await dailyTasks(db, date)
       const thresholdRow = await db.get<{ value: string }>(
         `SELECT value FROM settings WHERE extension_id='task-vault' AND key='stale_days_threshold'`
       )
@@ -281,19 +271,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
   handleRemote('task-vault:vault:get-daily', GetDailyRequestSchema, async (args) => {
     try {
       const { date } = args
-      const taskRows = await db.query<Record<string, unknown>>(
-        `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
-         WHERE t.source='daily' AND t.source_ref=? AND t.parent_id IS NULL ORDER BY t.sort_order, t.created_at`,
-        [date]
-      )
-      const tasks = taskRows.map(rowToTask)
-      for (const task of tasks) {
-        const subtaskRows = await db.query<Record<string, unknown>>(
-          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE t.parent_id=? ORDER BY t.sort_order, t.created_at`,
-          [task.id]
-        )
-        task.subtasks = subtaskRows.map(rowToTask)
-      }
+      const tasks = await dailyTasks(db, date)
       return {
         date,
         filePath: `daily/${date}.md`,
@@ -642,28 +620,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
   })
 
   handleRemote('task-vault:vault:restore-task', RestoreTaskRequestSchema, async (args) => {
-    const { taskId } = args
-    const now = new Date().toISOString()
-    const existing = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
-      taskId,
-    ])
-    if (!existing) return { error: 'STALE_ID' }
-    const meta = JSON.parse(existing.metadata || '{}') as Record<string, unknown>
-    const twinId = meta.migration_twin_id as string | undefined
-    if (twinId) {
-      await db.run(`DELETE FROM tasks WHERE parent_id=?`, [twinId])
-      await db.run(`DELETE FROM tasks WHERE id=?`, [twinId])
-      delete meta.migration_twin_id
-    }
-    await db.run(
-      `UPDATE tasks SET status='open', migrated_to=NULL, metadata=json_remove(metadata, '$.migration_twin_id'), updated_at=? WHERE parent_id=? AND status='migrated'`,
-      [now, taskId]
-    )
-    const todayDate = today()
-    await db.run(
-      `UPDATE tasks SET status='open', source='daily', source_ref=?, completed_date=NULL, migrated_to=NULL, metadata=?, updated_at=? WHERE id=?`,
-      [todayDate, JSON.stringify(meta), now, taskId]
-    )
+    if (!(await reopenTask(db, args.taskId, today()))) return { error: 'STALE_ID' }
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
@@ -1063,29 +1020,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     UpdateProjectStatusRequestSchema,
     async (args) => {
       const { projectFilePath: projectName, status } = args
-      const now = new Date().toISOString()
-
-      let proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [projectName])
-      if (!proj) {
-        proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE id=?`, [projectName])
-      }
-      if (!proj) return { error: 'NOT_FOUND' }
-
-      if (status === 'archived') {
-        await db.run(
-          `WITH RECURSIVE subtree(id) AS (
-           SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
-           UNION ALL
-           SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
-         )
-         UPDATE tasks SET status='cancelled', updated_at=?
-         WHERE id IN (SELECT id FROM subtree)
-           AND status IN ('open','in-progress','in-review','blocked')`,
-          [proj.id, now]
-        )
-      }
-
-      await db.run(`UPDATE projects SET status=?, updated_at=? WHERE id=?`, [status, now, proj.id])
+      if (!(await setProjectStatus(db, projectName, status))) return { error: 'NOT_FOUND' }
       if (status === 'archived') {
         api.notifications.createNotification({
           type: 'info',
@@ -1140,27 +1075,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
   })
 
   handleRemote('task-vault:vault:reopen-task', RestoreTaskRequestSchema, async (args) => {
-    const { taskId } = args
-    const now = new Date().toISOString()
-    const existing = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
-      taskId,
-    ])
-    if (!existing) return { error: 'STALE_ID' }
-    const meta = JSON.parse(existing.metadata || '{}') as Record<string, unknown>
-    const twinId = meta.migration_twin_id as string | undefined
-    if (twinId) {
-      await db.run(`DELETE FROM tasks WHERE parent_id=?`, [twinId])
-      await db.run(`DELETE FROM tasks WHERE id=?`, [twinId])
-      delete meta.migration_twin_id
-    }
-    await db.run(
-      `UPDATE tasks SET status='open', migrated_to=NULL, metadata=json_remove(metadata, '$.migration_twin_id'), updated_at=? WHERE parent_id=? AND status='migrated'`,
-      [now, taskId]
-    )
-    await db.run(
-      `UPDATE tasks SET status='open', completed_date=NULL, migrated_to=NULL, metadata=?, updated_at=? WHERE id=?`,
-      [JSON.stringify(meta), now, taskId]
-    )
+    if (!(await reopenTask(db, args.taskId, null))) return { error: 'STALE_ID' }
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
@@ -1168,11 +1083,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
   handleRemote('task-vault:vault:block-task', BlockTaskRequestSchema, async (args) => {
     const { taskId, reason, checkInterval } = args
     const now = new Date().toISOString()
-    const row = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
-      taskId,
-    ])
-    if (!row) return { error: 'STALE_ID' }
-    const meta = JSON.parse(row.metadata || '{}') as Record<string, string>
+    const meta = await taskMetadata(db, taskId)
+    if (!meta) return { error: 'STALE_ID' }
     meta.blocked_reason = reason
     meta.blocked_check_interval = checkInterval
     await db.run(
@@ -1187,11 +1099,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
   handleRemote('task-vault:vault:unblock-task', UnblockTaskRequestSchema, async (args) => {
     const { taskId } = args
     const now = new Date().toISOString()
-    const row = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
-      taskId,
-    ])
-    if (!row) return { error: 'STALE_ID' }
-    const meta = JSON.parse(row.metadata || '{}') as Record<string, string>
+    const meta = await taskMetadata(db, taskId)
+    if (!meta) return { error: 'STALE_ID' }
     delete meta.blocked_reason
     delete meta.blocked_check_interval
     await db.run(

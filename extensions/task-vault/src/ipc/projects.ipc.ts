@@ -15,6 +15,7 @@ import {
   RenameProjectRequestSchema,
 } from '../schemas/vault.schema'
 import type { ProjectStatus } from '../vault/types'
+import { setProjectStatus } from '../vault/project-status'
 import {
   rowToTask,
   rowToProject,
@@ -190,29 +191,7 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     UpdateProjectStatusRequestSchema,
     async (args) => {
       const { projectFilePath: projectName, status } = args
-      const now = new Date().toISOString()
-
-      let proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [projectName])
-      if (!proj) {
-        proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE id=?`, [projectName])
-      }
-      if (!proj) return { error: 'NOT_FOUND' }
-
-      if (status === 'archived') {
-        await db.run(
-          `WITH RECURSIVE subtree(id) AS (
-           SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
-           UNION ALL
-           SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
-         )
-         UPDATE tasks SET status='cancelled', updated_at=?
-         WHERE id IN (SELECT id FROM subtree)
-           AND status IN ('open','in-progress','in-review','blocked')`,
-          [proj.id, now]
-        )
-      }
-
-      await db.run(`UPDATE projects SET status=?, updated_at=? WHERE id=?`, [status, now, proj.id])
+      if (!(await setProjectStatus(db, projectName, status))) return { error: 'NOT_FOUND' }
       broadcast('task-vault:push:index-updated', {})
       return { success: true }
     }

@@ -10,80 +10,16 @@ import { rowToTask, rowToProject, PROJECT_COLS, PROJECT_JOINS } from '../vault/m
 export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handleRemote, cleanup } = createIpcRegistrar(api, errorResult)
 
-  handleRemote('task-vault:links:create', LinksCreateRequestSchema, async (args) => {
-    const { taskId, projectFilePath, targetId } = args
-    const now = new Date().toISOString()
-    try {
-      if (taskId) {
-        const task = await db.get<{ terminator_links: string }>(
-          `SELECT terminator_links FROM tasks WHERE id=?`,
-          [taskId]
-        )
-        if (!task) return { error: 'NOT_FOUND' }
-        // Replace all existing links — a task links to exactly one terminal at a time.
-        await db.run(`UPDATE tasks SET terminator_links=?, updated_at=? WHERE id=?`, [
-          JSON.stringify([targetId]),
-          now,
-          taskId,
-        ])
-      } else if (projectFilePath) {
-        const project = await db.get<{ terminator_links: string }>(
-          `SELECT terminator_links FROM projects WHERE name=?`,
-          [projectFilePath]
-        )
-        if (!project) return { error: 'NOT_FOUND' }
-        const links: string[] = JSON.parse(project.terminator_links || '[]')
-        if (!links.includes(targetId)) links.push(targetId)
-        await db.run(`UPDATE projects SET terminator_links=?, updated_at=? WHERE name=?`, [
-          JSON.stringify(links),
-          now,
-          projectFilePath,
-        ])
-      }
-      return { success: true }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
+  handleRemote('task-vault:links:create', LinksCreateRequestSchema, (args) =>
+    // A task links to exactly one terminal at a time; a project to any number.
+    changeLinks(db, args, (links, isTask) =>
+      isTask ? [args.targetId] : links.includes(args.targetId) ? links : [...links, args.targetId]
+    )
+  )
 
-  handleRemote('task-vault:links:remove', LinksRemoveRequestSchema, async (args) => {
-    const { taskId, projectFilePath, targetId } = args
-    const now = new Date().toISOString()
-    try {
-      if (taskId) {
-        const task = await db.get<{ terminator_links: string }>(
-          `SELECT terminator_links FROM tasks WHERE id=?`,
-          [taskId]
-        )
-        if (!task) return { error: 'NOT_FOUND' }
-        const links: string[] = JSON.parse(task.terminator_links || '[]').filter(
-          (l: string) => l !== targetId
-        )
-        await db.run(`UPDATE tasks SET terminator_links=?, updated_at=? WHERE id=?`, [
-          JSON.stringify(links),
-          now,
-          taskId,
-        ])
-      } else if (projectFilePath) {
-        const project = await db.get<{ terminator_links: string }>(
-          `SELECT terminator_links FROM projects WHERE name=?`,
-          [projectFilePath]
-        )
-        if (!project) return { error: 'NOT_FOUND' }
-        const links: string[] = JSON.parse(project.terminator_links || '[]').filter(
-          (l: string) => l !== targetId
-        )
-        await db.run(`UPDATE projects SET terminator_links=?, updated_at=? WHERE name=?`, [
-          JSON.stringify(links),
-          now,
-          projectFilePath,
-        ])
-      }
-      return { success: true }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
+  handleRemote('task-vault:links:remove', LinksRemoveRequestSchema, (args) =>
+    changeLinks(db, args, (links) => links.filter((l) => l !== args.targetId))
+  )
 
   handleRemote(
     'task-vault:links:get-for-terminator-target',
@@ -110,4 +46,38 @@ export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
   )
 
   return cleanup
+}
+
+/**
+ * Rewrites the terminal links of the task `taskId`, or else the project named
+ * `projectFilePath`, to `change(current links, isTask)`.
+ */
+async function changeLinks(
+  db: ExtensionDB,
+  owner: { taskId?: string; projectFilePath?: string },
+  change: (links: string[], isTask: boolean) => string[]
+): Promise<{ success: true } | { error: string }> {
+  const { taskId, projectFilePath } = owner
+  const at = taskId
+    ? { table: 'tasks', key: 'id', value: taskId }
+    : projectFilePath
+      ? { table: 'projects', key: 'name', value: projectFilePath }
+      : null
+  if (!at) return { success: true }
+  try {
+    const row = await db.get<{ terminator_links: string }>(
+      `SELECT terminator_links FROM ${at.table} WHERE ${at.key}=?`,
+      [at.value]
+    )
+    if (!row) return { error: 'NOT_FOUND' }
+    const links = change(JSON.parse(row.terminator_links || '[]') as string[], at.table === 'tasks')
+    await db.run(`UPDATE ${at.table} SET terminator_links=?, updated_at=? WHERE ${at.key}=?`, [
+      JSON.stringify(links),
+      new Date().toISOString(),
+      at.value,
+    ])
+    return { success: true }
+  } catch (err) {
+    return { error: String(err) }
+  }
 }
