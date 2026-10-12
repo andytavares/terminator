@@ -1,3 +1,5 @@
+import { access, constants } from 'fs/promises'
+import { resolve } from 'path'
 import { stripVTControlCharacters } from 'util'
 import type { GitStatus, FileDiff } from '../schemas/git.schema.js'
 import { parseStatus, parseDiff } from './git-parser.js'
@@ -145,12 +147,39 @@ function isHookFailure(stderr: string): boolean {
   )
 }
 
-function commitFailure(error: GitCommandError): CommitError {
+/** The hooks `git commit` runs and `--no-verify` skips (https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---no-verify). */
+const VERIFY_HOOKS = ['pre-commit', 'commit-msg']
+
+/** True when one of the commit's verify hooks is installed, where core.hooksPath puts it. */
+async function hasVerifyHook(repoRoot: string): Promise<boolean> {
+  const installed = await Promise.all(
+    VERIFY_HOOKS.map(async (name) => {
+      const path = await git(['rev-parse', '--git-path', `hooks/${name}`], repoRoot)
+      return access(resolve(repoRoot, path), constants.X_OK).then(
+        () => true,
+        () => false
+      )
+    })
+  )
+  return installed.includes(true)
+}
+
+/**
+ * A hook that exits non-zero aborts the commit, and git prints nothing of its
+ * own beside the hook's output (https://git-scm.com/docs/githooks#_pre_commit);
+ * git's own failures say `fatal:` or `error:`.
+ */
+async function plainHookFailed(repoRoot: string, output: string): Promise<boolean> {
+  if (/^(fatal|error):/m.test(output)) return false
+  return hasVerifyHook(repoRoot).catch(() => false)
+}
+
+async function commitFailure(error: GitCommandError, repoRoot: string): Promise<CommitError> {
   const combined = stripVTControlCharacters(
     [error.stdout, error.stderr].filter(Boolean).join('\n').trim()
   )
   if (combined.includes('nothing to commit')) return { error: 'NOTHING_TO_COMMIT' }
-  const hookFailed = isHookFailure(error.stderr)
+  const hookFailed = isHookFailure(error.stderr) || (await plainHookFailed(repoRoot, combined))
   return {
     error: hookFailed ? 'HOOK_FAILED' : combined || 'Commit failed',
     hookOutput: combined || undefined,
@@ -179,6 +208,6 @@ export async function commitChanges(
   } catch (e) {
     if (!(e instanceof GitCommandError)) return { error: String(e) }
     if (e.timedOut) return { error: 'TIMEOUT' }
-    return commitFailure(e)
+    return commitFailure(e, repoRoot)
   }
 }

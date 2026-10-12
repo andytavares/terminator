@@ -61,12 +61,22 @@ export async function startIpcTrace(app: ElectronApplication): Promise<void> {
 }
 
 /** Appends what the app recorded to this spec's trace file. */
+const TRACE_READ_MS = 3000
+
 export async function saveIpcTrace(app: ElectronApplication): Promise<void> {
   const directory = traceDirectory()
   if (!directory) return
-  const lines = await app
+  // A main process that stopped answering (the test failed mid-call) must not
+  // hold up closeApp, so the read gives up after a deadline.
+  const read = app
     .evaluate(() => [...((globalThis as { __ipcTrace?: Set<string> }).__ipcTrace ?? [])])
     .catch(() => [] as string[])
+  const lines = await Promise.race([
+    read,
+    // A deadline, not a sleep: the race ends as soon as the trace is read.
+    // eslint-disable-next-line no-restricted-syntax
+    new Promise<string[]>((resolve) => setTimeout(() => resolve([]), TRACE_READ_MS)),
+  ])
   mkdirSync(directory, { recursive: true })
   const spec = basename(test.info().file)
   appendFileSync(join(directory, `${spec}.jsonl`), lines.map((line) => `${line}\n`).join(''))

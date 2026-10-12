@@ -33,7 +33,10 @@ vi.mock('../../src/git/conflict-reader', () => ({
 // --- mock fs/promises ---
 vi.mock('fs/promises', () => ({
   readFile: (...a: unknown[]) => mockReadFile(...a),
-  writeFile: (...a: unknown[]) => mockWriteFile(...a),
+}))
+// How the file is replaced is merge-flow-atomic-write.spec.ts's subject; here, what is written.
+vi.mock('../../src/utils/write-atomic', () => ({
+  writeFileAtomic: (...a: unknown[]) => mockWriteFile(...a),
 }))
 
 // --- mock electron-store ---

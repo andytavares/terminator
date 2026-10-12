@@ -19,11 +19,10 @@ let repo: string
 let bare: string
 const BRANCH = 'feat/greeting'
 
-/** A pre-commit hook in the form husky writes: progress lines, then its verdict. */
+/** Plain git pre-commit hooks, no hook manager: progress lines, then an exit status. */
 const PASSING_HOOK =
   '#!/bin/sh\necho "lint: checking staged files"\nsleep 1\necho "lint: clean"\nsleep 1\n'
-const FAILING_HOOK =
-  '#!/bin/sh\necho "lint: src/greeting.ts has a problem"\necho "husky - pre-commit script failed (code 1)" >&2\nexit 1\n'
+const FAILING_HOOK = '#!/bin/sh\necho "lint: src/greeting.ts has a problem"\nexit 1\n'
 
 function installHook(script: string): void {
   writeFile(repo, '.git/hooks/pre-commit', script)
@@ -128,6 +127,10 @@ test('Open PR pushes the branch and opens a pull request on GitHub', async () =>
   await dialog.getByLabel('Draft').check()
   await dialog.getByRole('button', { name: 'Create Draft PR' }).click()
   await expect(dialog).toBeHidden({ timeout: 15000 })
+  await expect(view.getByRole('status').getByRole('link')).toHaveText('#1 Greet in either order')
+  await expect(
+    handle.page.locator('.tmui-toast__message', { hasText: 'Opened #1 Greet in either order' })
+  ).toBeVisible()
 
   expect(stub.pullRequests).toHaveLength(1)
   const [created] = stub.pullRequests

@@ -30,64 +30,41 @@ export interface TrackerStub {
   env: Record<string, string>
   linear: LinearState
   jira: JiraState
+  /** Each tunnel the app opened and each TLS handshake it refused, for a failure message. */
+  diagnostics: string[]
   close(): Promise<void>
 }
 
-/** A CA and a server certificate for both hosts, with openssl(1). */
+// Every extension and the digest are written out, so the certificates do not
+// depend on which openssl runs: macOS ships LibreSSL, Linux OpenSSL 3, and their
+// defaults differ (OpenSSL 3 adds key identifiers unasked).
+const CA_EXTENSIONS = [
+  'basicConstraints=critical,CA:TRUE',
+  'keyUsage=critical,keyCertSign,cRLSign',
+  'subjectKeyIdentifier=hash',
+]
+const LEAF_EXTENSIONS = [
+  `subjectAltName=DNS:${LINEAR_HOST},DNS:${JIRA_SITE}`,
+  'basicConstraints=CA:FALSE',
+  'keyUsage=critical,digitalSignature,keyEncipherment',
+  'extendedKeyUsage=serverAuth',
+  'subjectKeyIdentifier=hash',
+  'authorityKeyIdentifier=keyid,issuer',
+]
+
+/** A CA and a server certificate for both hosts, with openssl(1) commands LibreSSL also takes. */
 function makeCertificates(dir: string): { ca: string; key: Buffer; cert: Buffer } {
-  const openssl = (...args: string[]) => execFileSync('openssl', args, { cwd: dir, stdio: 'pipe' })
-  openssl(
-    'req',
-    '-x509',
-    '-newkey',
-    'rsa:2048',
-    '-nodes',
-    '-keyout',
-    'ca.key',
-    '-out',
-    'ca.pem',
-    '-days',
-    '2',
-    '-subj',
-    '/CN=terminator-e2e-ca',
-    '-addext',
-    'basicConstraints=critical,CA:TRUE',
-    '-addext',
-    'keyUsage=critical,keyCertSign'
-  )
-  openssl(
-    'req',
-    '-newkey',
-    'rsa:2048',
-    '-nodes',
-    '-keyout',
-    'leaf.key',
-    '-out',
-    'leaf.csr',
-    '-subj',
-    '/CN=stub'
-  )
-  writeFileSync(
-    join(dir, 'leaf.ext'),
-    `subjectAltName=DNS:${LINEAR_HOST},DNS:${JIRA_SITE}\nextendedKeyUsage=serverAuth\n`
-  )
-  openssl(
-    'x509',
-    '-req',
-    '-in',
-    'leaf.csr',
-    '-CA',
-    'ca.pem',
-    '-CAkey',
-    'ca.key',
-    '-CAcreateserial',
-    '-out',
-    'leaf.pem',
-    '-days',
-    '2',
-    '-extfile',
-    'leaf.ext'
-  )
+  const openssl = (args: string) =>
+    execFileSync('openssl', args.split(' '), { cwd: dir, stdio: 'pipe' })
+  writeFileSync(join(dir, 'ca.ext'), CA_EXTENSIONS.join('\n'))
+  writeFileSync(join(dir, 'leaf.ext'), LEAF_EXTENSIONS.join('\n'))
+  const sign = '-req -sha256 -days 2 -set_serial'
+  for (const name of ['ca', 'leaf']) {
+    openssl(`genrsa -out ${name}.key 2048`)
+    openssl(`req -new -sha256 -key ${name}.key -subj /CN=terminator-e2e-${name} -out ${name}.csr`)
+  }
+  openssl(`x509 ${sign} 1 -in ca.csr -signkey ca.key -extfile ca.ext -out ca.pem`)
+  openssl(`x509 ${sign} 2 -in leaf.csr -CA ca.pem -CAkey ca.key -extfile leaf.ext -out leaf.pem`)
   return {
     ca: join(dir, 'ca.pem'),
     key: readFileSync(join(dir, 'leaf.key')),
@@ -108,11 +85,9 @@ function reply(response: ServerResponse, status: number, body: unknown): void {
   response.end(JSON.stringify(body))
 }
 
-/** Starts the stub; pass its `env` to `launchApp`. */
-export async function startTrackerStub(linear: LinearState, jira: JiraState): Promise<TrackerStub> {
-  const dir = mkdtempSync(join(tmpdir(), 'terminator-e2e-trackers-'))
-  const { ca, key, cert } = makeCertificates(dir)
-  const tls = createHttpsServer({ key, cert }, (request, response) => {
+/** Answers TLS for both hosts itself, each request by the host it names. */
+function trackerServer(linear: LinearState, jira: JiraState, key: Buffer, cert: Buffer) {
+  return createHttpsServer({ key, cert }, (request, response) => {
     void readJson(request).then((body) => {
       const host = request.headers.host ?? ''
       const answer =
@@ -120,9 +95,18 @@ export async function startTrackerStub(linear: LinearState, jira: JiraState): Pr
       reply(response, answer.status, answer.body)
     })
   })
+}
+
+/** A CONNECT proxy that tunnels the two tracker hosts to `tls` and refuses every other. */
+function trackerProxy(tls: ReturnType<typeof trackerServer>, diagnostics: string[]) {
+  tls.on('tlsClientError', (error) => diagnostics.push(`TLS: ${error.message}`))
   const proxy = createHttpServer((_request, response) => reply(response, 403, {}))
+  const tunnels = new Set<Socket>()
   proxy.on('connect', (request: IncomingMessage, socket: Socket) => {
+    tunnels.add(socket)
+    socket.on('close', () => tunnels.delete(socket))
     const host = (request.url ?? '').split(':')[0]
+    diagnostics.push(`CONNECT ${request.url}`)
     if (host !== LINEAR_HOST && host !== JIRA_SITE) {
       socket.end('HTTP/1.1 403 Forbidden\r\n\r\n')
       return
@@ -130,21 +114,44 @@ export async function startTrackerStub(linear: LinearState, jira: JiraState): Pr
     socket.write('HTTP/1.1 200 Connection Established\r\n\r\n')
     tls.emit('connection', socket)
   })
+  return { proxy, tunnels }
+}
+
+/**
+ * Closes the proxy without waiting on its clients. A tunnel the app left open
+ * (keep-alive, or a test that failed mid-request) would keep `server.close()`
+ * pending forever, so every tunnel and idle connection is destroyed first.
+ */
+function closeProxy(proxy: ReturnType<typeof createHttpServer>, tunnels: Set<Socket>) {
+  for (const socket of tunnels) socket.destroy()
+  proxy.closeAllConnections()
+  return new Promise<void>((resolve) => proxy.close(() => resolve()))
+}
+
+function proxyEnvironment(url: string, ca: string): Record<string, string> {
+  const noProxy = '127.0.0.1,localhost'
+  return {
+    NODE_USE_ENV_PROXY: '1',
+    ...{ HTTPS_PROXY: url, https_proxy: url, HTTP_PROXY: url, http_proxy: url },
+    ...{ NO_PROXY: noProxy, no_proxy: noProxy },
+    NODE_EXTRA_CA_CERTS: ca,
+  }
+}
+
+/** Starts the stub; pass its `env` to `launchApp`. */
+export async function startTrackerStub(linear: LinearState, jira: JiraState): Promise<TrackerStub> {
+  const { ca, key, cert } = makeCertificates(
+    mkdtempSync(join(tmpdir(), 'terminator-e2e-trackers-'))
+  )
+  const diagnostics: string[] = []
+  const { proxy, tunnels } = trackerProxy(trackerServer(linear, jira, key, cert), diagnostics)
   await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve))
   const url = `http://127.0.0.1:${(proxy.address() as AddressInfo).port}`
   return {
-    env: {
-      NODE_USE_ENV_PROXY: '1',
-      HTTPS_PROXY: url,
-      https_proxy: url,
-      HTTP_PROXY: url,
-      http_proxy: url,
-      NO_PROXY: '127.0.0.1,localhost',
-      no_proxy: '127.0.0.1,localhost',
-      NODE_EXTRA_CA_CERTS: ca,
-    },
+    env: proxyEnvironment(url, ca),
     linear,
     jira,
-    close: () => new Promise((resolve) => proxy.close(() => resolve())),
+    diagnostics,
+    close: () => closeProxy(proxy, tunnels),
   }
 }

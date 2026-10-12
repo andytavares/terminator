@@ -8,6 +8,7 @@ import type {
 } from '@terminator/extension-sdk'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
 import { bindWorkspaceRoots } from './ipc/repo-root.js'
+import { projectForCheckout } from './review/terminal-project.js'
 import { VALIDATION_ERROR } from './ipc/register.js'
 import { registerGithubHandlers } from './ipc/github.ipc.js'
 import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'
@@ -51,6 +52,7 @@ const NOTIFICATION_KEYS: { key: string; label: string }[] = [
   { key: 'pushFailed', label: 'Push failed' },
   { key: 'pullSucceeded', label: 'Pull succeeded' },
   { key: 'pullFailed', label: 'Pull failed' },
+  { key: 'prCreated', label: 'Pull request opened' },
 ]
 
 function buildNotificationSettingProperties(): Record<string, SettingDefinition> {
@@ -196,14 +198,7 @@ export function activate(api: ExtensionAPI): void {
     getSetting: (key) => api.settings.get(key),
     broadcast: (channel, data) => api.window.broadcast(channel, data),
     openTerminal: async ({ repoRoot, cwd, title, command }) => {
-      let projectId: string | undefined
-      for (const ws of api.workspace.list()) {
-        const match = api.workspace.listProjects(ws.id).find((p) => p.worktreePath === repoRoot)
-        if (match) {
-          projectId = match.id
-          break
-        }
-      }
+      const projectId = projectForCheckout(api.workspace, repoRoot)
       if (!projectId) return
       const sessionId = await api.pty.openTerminal({
         projectId,

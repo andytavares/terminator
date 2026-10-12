@@ -82,10 +82,15 @@ test.beforeEach(() => {
   test.skip(!credentialStore, 'safeStorage has no OS encryption under Playwright here')
 })
 
+// Each step is bounded (closeApp kills the app after a deadline; the stub drops
+// its tunnels), and each runs even when the one before it threw.
 test.afterAll(async () => {
-  await closeApp(handle)
-  await stub?.close()
-  if (repo) rmSync(repo, { recursive: true, force: true })
+  try {
+    await closeApp(handle)
+  } finally {
+    await stub?.close()
+    if (repo) rmSync(repo, { recursive: true, force: true })
+  }
 })
 
 async function openIntegrations(): Promise<Page> {
@@ -104,17 +109,27 @@ async function closeSettings(): Promise<void> {
 const tracker = (page: Page, name: string) =>
   page.locator('.integrations__tracker').filter({ hasText: name })
 
+/** The tracker reads as connected; if not, the failure says what reached the stub. */
+async function connected(page: Page, name: string): Promise<void> {
+  try {
+    await expect(tracker(page, name)).toContainText('Connected as ada@acme.dev')
+  } catch (error) {
+    const seen = stub.diagnostics.join('\n  ') || 'nothing reached the proxy'
+    throw new Error(`${(error as Error).message}\nstub saw:\n  ${seen}`, { cause: error })
+  }
+}
+
 test('Linear and Jira connect with credentials their servers accept', async () => {
   const page = await openIntegrations()
   await page.locator('#linear-api-key').fill('lin_api_e2e')
   await page.getByRole('button', { name: 'Connect Linear' }).click()
-  await expect(tracker(page, 'Linear')).toContainText('Connected as ada@acme.dev')
+  await connected(page, 'Linear')
 
   await page.locator('#jira-site').fill(JIRA_SITE)
   await page.locator('#jira-email').fill('ada@acme.dev')
   await page.locator('#jira-token').fill('jira-token')
   await page.getByRole('button', { name: 'Connect Jira' }).click()
-  await expect(tracker(page, 'Jira')).toContainText('Connected as ada@acme.dev')
+  await connected(page, 'Jira')
   await closeSettings()
 })
 
