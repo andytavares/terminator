@@ -117,7 +117,7 @@ const CRATE_PX_PER_S = 34
 export const VERDICT_MS = 1600
 
 /** A node counts as crewed when someone works it: a role, or a working kind. */
-const CREWED_KINDS: readonly StepKind[] = ['agent', 'fanout', 'run', 'judge']
+const CREWED_KINDS: readonly StepKind[] = ['agent', 'fanout', 'run']
 
 const NEIGHBOUR_STEPS: readonly Tile[] = [
   { x: 1, y: 0 },
@@ -131,7 +131,7 @@ function key(tile: Tile): string {
 }
 
 export function workAnim(kind: StepKind): CrewAnim {
-  return kind === 'run' || kind === 'judge' ? 'scan' : 'type'
+  return kind === 'run' ? 'scan' : 'type'
 }
 
 /** What a crew member does at their station while their step runs: scan at a rig or bench, else type. */
@@ -227,10 +227,7 @@ function placementFor(map: HallMap, node: RunNode, taken: Set<number>): Placemen
   if (seat === null) return null
   switch (node.state) {
     case 'running':
-    case 'verifying':
       return { tile: seat, anim: workAnim(node.kind), ...WORKING }
-    case 'ready':
-      return { tile: seat, anim: 'idle', ...WORKING }
     case 'failed':
       return { tile: seat, anim: 'slump', ...WORKING }
     case 'passed':

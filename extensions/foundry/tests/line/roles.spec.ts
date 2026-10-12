@@ -124,21 +124,19 @@ describe('tool and write permissions', () => {
 })
 
 // `writes:` says what a role produces, not where. The red team produces
-// findings, the foreman a schedule, the architect a plan — none of them
-// touches the repository, and all three came back as "may write" because the
-// check was `writes.length > 0`. The executor installs its read-only policy on
+// findings, the architect a plan — neither touches the repository, and both
+// came back as "may write" because the check was `writes.length > 0`. The executor installs its read-only policy on
 // that answer, so the adversarial pass could edit the code it was reviewing.
 describe('who may write to the checkout', () => {
-  it('is the three roles whose writes land in a working copy', () => {
+  it('is the roles whose writes land in a working copy', () => {
     const registry = createRoleRegistry(sources())
     expect(registry.mayWrite('builder')).toBe(true)
-    expect(registry.mayWrite('integrator')).toBe(true)
     expect(registry.mayWrite('scribe')).toBe(true)
   })
 
   it('is not a role that produces an artefact but touches no file', () => {
     const registry = createRoleRegistry(sources())
-    for (const role of ['red-team', 'foreman', 'architect', 'scout']) {
+    for (const role of ['red-team', 'architect', 'scout']) {
       expect(registry.mayWrite(role), role).toBe(false)
     }
   })
@@ -156,15 +154,13 @@ describe('who may write to the checkout', () => {
     const writers = [
       'architect',
       'builder',
-      'foreman',
       'inspector',
-      'integrator',
       'red-team',
       'scout',
       'scribe',
       'verifier',
     ].filter((role) => registry.mayWrite(role))
-    expect(writers.sort()).toEqual(['builder', 'integrator', 'scribe'])
+    expect(writers.sort()).toEqual(['builder', 'scribe'])
   })
 })
 

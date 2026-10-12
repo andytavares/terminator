@@ -189,19 +189,6 @@ describe('diffObservation', () => {
     ])
   })
 
-  it('emits a handoff when the source becomes passed while the target is ready or running', () => {
-    const g = graph()
-    const before = withNode(g, 'b', { state: 'ready' })
-    const after = withNode(before, 'a', { state: 'passed' })
-    const events = diffObservation(obs(before), obs(after))
-    expect(events).toContainEqual({
-      kind: 'handoff',
-      fromNodeId: 'a',
-      toNodeId: 'b',
-      targetStarted: false,
-    })
-  })
-
   it('hands work off to a step that has not started, so it can queue there', () => {
     const g = graph()
     const after = withNode(g, 'a', { state: 'passed' })
@@ -230,7 +217,7 @@ describe('diffObservation', () => {
   it('does not re-emit a handoff for a source that was already passed', () => {
     const g = withNode(graph(), 'a', { state: 'passed' })
     const before = withNode(g, 'b', { state: 'waiting' })
-    const after = withNode(g, 'b', { state: 'ready' })
+    const after = withNode(g, 'b', { state: 'running' })
     const events = diffObservation(obs(before), obs(after))
     expect(events.some((e) => e.kind === 'handoff')).toBe(false)
   })

@@ -69,19 +69,17 @@ export interface RunDeps {
    *
    * A seam, so this file keeps knowing nothing about terminals, worktrees or
    * agents — and so a test can assert the graph was handed over without
-   * launching one. Optional: a host with no supervision runtime persists the
-   * graph and says so, rather than reporting a run that never began.
+   * launching one.
    */
-  readonly execute?: (order: WorkOrder, recipe: Recipe, graph: RunGraph) => Promise<void>
+  readonly execute: (order: WorkOrder, recipe: Recipe, graph: RunGraph) => Promise<void>
   /**
    * Whether this process is still running that agent's session.
    *
-   * Absent means there is nothing to ask, which is not "everything is fine" —
-   * it is "nothing is running anything". A run whose agents died with the last
-   * application is exactly that case, and answering it optimistically is what
-   * left a reopened run drawing "building" chips for ever.
+   * A run whose agents died with the last application must read as "nothing is
+   * running anything"; answering optimistically is what left a reopened run
+   * drawing "building" chips for ever.
    */
-  readonly isLive?: SessionLiveness
+  readonly isLive: SessionLiveness
   /**
    * Whether an executor in this process is still driving that order.
    *
@@ -90,48 +88,43 @@ export interface RunDeps {
    * like a node whose agent is gone. Reclaiming it there would launch a second
    * agent into the same worktree.
    */
-  readonly executing?: (orderId: string) => boolean
+  readonly executing: (orderId: string) => boolean
   /**
    * Every gate raised against this order, decided or not.
    *
    * Here rather than left to the surface because a gate is what stops the
    * line, and a surface that has to fetch it separately is a surface that can
-   * draw a run as busy while it has been halted for two hours. Absent means
-   * no gate store to ask, which is not "no gates" — it is a host that never
-   * raises any.
+   * draw a run as busy while it has been halted for two hours.
    */
-  readonly gatesFor?: (orderId: string) => Promise<readonly Gate[]>
-  /** Tool calls this order's agents are holding. No runtime means none. */
-  readonly asksFor?: (orderId: string) => number
+  readonly gatesFor: (orderId: string) => Promise<readonly Gate[]>
+  /** Tool calls this order's agents are holding. */
+  readonly asksFor: (orderId: string) => number
   /**
    * Runs of this order the stall detector has fired on and acted on.
    *
    * Shadow firings are recorded and deliberately never notified, so they are
    * not counted here: a standing is a notification.
    */
-  readonly stallsFor?: (orderId: string) => number
+  readonly stallsFor: (orderId: string) => number
   /** Agents of this order parked at their terminal's own prompt. */
-  readonly strandedFor?: (orderId: string) => number
+  readonly strandedFor: (orderId: string) => number
   /**
    * Which sessions those are.
    *
    * The count says what is wrong; these are what the one move needs — a
    * handed-back call can only be answered in the terminal it was handed to.
    */
-  readonly strandedSessions?: (orderId: string) => readonly string[]
+  readonly strandedSessions: (orderId: string) => readonly string[]
   /**
    * What an agent's session has been doing, for the Factory view's activity
-   * markers. Absent means no runtime to ask, which reads as "no activity"
-   * rather than an error — a factory hall with nothing lit is still a valid
-   * picture of a run that just started.
+   * markers.
    */
-  readonly activityFor?: (sessionId: string) => readonly ToolActivity[]
+  readonly activityFor: (sessionId: string) => readonly ToolActivity[]
   /**
    * Every in-flight order's queue entries, for the refinery's file-overlap
-   * queue. Absent means no queue to ask, which reads as "not queued" — a host
-   * that has never wired the refinery has nothing to say either way.
+   * queue.
    */
-  readonly queueEntries?: () => Promise<readonly QueueEntry[]>
+  readonly queueEntries: () => Promise<readonly QueueEntry[]>
 }
 
 export interface RunChannels {
@@ -152,14 +145,12 @@ export interface RunChannels {
 /**
  * Where one order stands in the refinery's file-overlap queue.
  *
- * Null when there is no queue to ask, or the order is not in one — both read
- * the same to a surface that only wants to know whether to draw a queue band.
+ * Null when the order is not in one.
  */
 async function queuePositionFor(
   deps: Pick<RunDeps, 'queueEntries'>,
   orderId: string
 ): Promise<QueuePosition | null> {
-  if (deps.queueEntries === undefined) return null
   const entries = await deps.queueEntries()
   return queue(entries).find((position) => position.orderId === orderId) ?? null
 }
@@ -328,9 +319,7 @@ function fitRecipe(
 }
 
 export function createRunChannels(deps: RunDeps): RunChannels {
-  // Nothing to ask means nothing is running it. The optimistic reading is what
-  // made a reopened run look like a working one.
-  const isLive: SessionLiveness = (sessionId) => deps.isLive?.(sessionId) ?? false
+  const isLive: SessionLiveness = deps.isLive
 
   /**
    * The nodes nothing is running, for one order.
@@ -341,7 +330,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
    * safe to restart.
    */
   function orphansOf(orderId: string, graph: RunGraph): string[] {
-    if (deps.executing?.(orderId) === true) return []
+    if (deps.executing(orderId)) return []
     return orphanedNodes(graph, isLive).map((node) => node.id)
   }
 
@@ -426,17 +415,6 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       evidence: [],
     })
 
-    if (deps.execute === undefined) {
-      // Said out loud. A graph persisted with nothing to run it is what the
-      // Forge's hand-off used to produce, and it read as a started run.
-      return {
-        graph,
-        order: running,
-        started: false,
-        reason: 'The supervision runtime is not available, so nothing was started.',
-      }
-    }
-
     // Not awaited: a run outlives the call that started it, and a channel that
     // blocked until the last agent finished would hold the bridge for the
     // length of the work. Failures reach the ledger and the graph, which is
@@ -476,7 +454,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const name = (id: string): string => labels[id] ?? id
 
     const orphaned = orphansOf(parsed.data.id, graph)
-    const gates = await (deps.gatesFor?.(parsed.data.id) ?? Promise.resolve([]))
+    const gates = await deps.gatesFor(parsed.data.id)
     const waiting = gates.filter((gate) => gate.decision === null)
 
     // Every node's skills, resolved the way `start` resolves them. An order
@@ -540,7 +518,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       ),
       // The agents waiting at a terminal prompt, so the band can offer the one
       // move that answers a handed-back call: going to that terminal.
-      stranded: deps.strandedSessions?.(parsed.data.id) ?? [],
+      stranded: deps.strandedSessions(parsed.data.id),
       // The gates holding it, in full. A band that says "halted at a gate" and
       // cannot offer the gate's own options is the wall this replaces.
       waiting,
@@ -599,7 +577,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     // scheduler it is already inside offers the same nodes this call would.
     // Starting another produced `run.halted: waiting on a gate` three times
     // in 23 seconds on WO-0927-4fd.
-    if (deps.executing?.(order.id) === true) {
+    if (deps.executing(order.id)) {
       return { error: 'This run is already going; nothing to resume.' }
     }
 
@@ -633,14 +611,6 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const retried = (parsed.data.retry ?? []).reduce((g, id) => retryNode(g, id), taken.graph)
     await saveGraph(retried)
 
-    if (deps.execute === undefined) {
-      return {
-        graph: retried,
-        reclaimed: taken.reclaimed,
-        started: false,
-        reason: 'The supervision runtime is not available.',
-      }
-    }
     // Clears any failure the previous attempt left in the ledger: without
     // this, a resumed run that goes on to succeed still reads `stopped` from
     // the attempt before it, because `runFailure` has nothing newer to stop
@@ -751,7 +721,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     }
     // A session id outlives the process that ran it, so handing one back
     // unchecked sent the operator to a terminal that no longer exists.
-    if (!isLive(node.sessionId) && deps.executing?.(parsed.data.orderId) !== true) {
+    if (!isLive(node.sessionId) && !deps.executing(parsed.data.orderId)) {
       return {
         error: `${node.id} has no live agent — its session ended when the application last closed. Resume the run to start it again.`,
       }
@@ -776,7 +746,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const activity: Record<string, ToolActivity[]> = {}
     for (const node of graph.nodes) {
       if (node.sessionId === null) continue
-      const events = deps.activityFor?.(node.sessionId) ?? []
+      const events = deps.activityFor(node.sessionId)
       activity[node.id] = events.slice(-20)
     }
     return { activity }
@@ -797,7 +767,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     return {
       graph,
       timeline: await readTimeline(orderDir(deps.dataRoot(), parsed.data.id)),
-      gates: (await deps.gatesFor?.(parsed.data.id)) ?? [],
+      gates: await deps.gatesFor(parsed.data.id),
     }
   }
 

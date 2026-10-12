@@ -49,7 +49,7 @@ function order(id: string, questions: OpenQuestion[], status?: WorkOrder['status
 describe('countAttention', () => {
   it('counts undecided gates as the inbox badge', () => {
     const counts = countAttention({
-      gates: [gate({ id: 'G-1' }), gate({ id: 'G-2', rule: 'destructive' })],
+      gates: [gate({ id: 'G-1' }), gate({ id: 'G-2', rule: 'unit.boundary' })],
       autonomy: 'escorted',
       orders: [],
       pendingAsks: 0,

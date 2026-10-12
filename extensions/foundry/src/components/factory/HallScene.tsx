@@ -229,7 +229,7 @@ function draw(
       glow(paint, cx, prop.y * TILE_PX - 2, 30, `rgba(${tint},.16)`, `rgba(${tint},0)`)
     } else if (prop.kind === 'press') {
       const step = states[prop.nodeId]
-      if (step !== 'running' && step !== 'verifying') continue
+      if (step !== 'running') continue
       glow(
         paint,
         cx,

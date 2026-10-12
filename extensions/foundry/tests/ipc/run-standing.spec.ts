@@ -4,6 +4,8 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRunChannels } from '../../src/ipc/run-channels.js'
+import type { RunDeps } from '../../src/ipc/run-channels.js'
+import { idleRunSeams } from './run-deps.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { raiseGate } from '../../src/gates/rules.js'
@@ -27,16 +29,25 @@ interface Observed {
   waiting: Gate[]
 }
 
-function channels(over: { gates?: Gate[]; asks?: number; stalls?: number } = {}) {
-  return createRunChannels({
+function runDeps(over: Partial<RunDeps> = {}): RunDeps {
+  return {
     store,
     dataRoot: () => dataRoot,
     sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
     now: () => '2026-09-06T10:00:00.000Z',
-    gatesFor: async () => over.gates ?? [],
-    asksFor: () => over.asks ?? 0,
-    stallsFor: () => over.stalls ?? 0,
-  })
+    ...idleRunSeams(),
+    ...over,
+  }
+}
+
+function channels(over: { gates?: Gate[]; asks?: number; stalls?: number } = {}) {
+  return createRunChannels(
+    runDeps({
+      gatesFor: async () => over.gates ?? [],
+      asksFor: () => over.asks ?? 0,
+      stallsFor: () => over.stalls ?? 0,
+    })
+  )
 }
 
 async function markAllPassed(orderId: string): Promise<void> {
@@ -157,22 +168,6 @@ describe('what run.observe says about where an order stands', () => {
     expect(view.standing.kind).toBe('stalled')
   })
 
-  // A host with no supervision runtime supplies none of these. It still has to
-  // get a standing back rather than a crash or a blank band.
-  it('still stands somewhere with no runtime to ask', async () => {
-    await store.save(order())
-    const bare = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-    })
-    await bare.start({ id: 'WO-1' })
-    const view = (await bare.observe({ id: 'WO-1' })) as Observed
-    expect(view.standing.label.trim()).not.toBe('')
-    expect(view.waiting).toEqual([])
-  })
-
   // The WO-0913-0bd shape: every node in the graph finished, but the ledger's
   // tail says the run went on to fail — here, opening the pull request.
   // Before `runFailureFor` was wired in, this read `working`/"Between steps.
@@ -225,13 +220,12 @@ describe('what run.observe says about where an order stands', () => {
     let view = (await channels().observe({ id: 'WO-1' })) as Observed
     expect(view.standing.kind).toBe('stopped')
 
-    const withExecute = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-13T10:10:00.000Z',
-      execute: async () => undefined,
-    })
+    const withExecute = createRunChannels(
+      runDeps({
+        now: () => '2026-09-13T10:10:00.000Z',
+        execute: async () => undefined,
+      })
+    )
     await withExecute.resume({ id: 'WO-1' })
     view = (await channels().observe({ id: 'WO-1' })) as Observed
     expect(view.standing.kind).not.toBe('stopped')

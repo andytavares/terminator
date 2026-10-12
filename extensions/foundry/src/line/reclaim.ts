@@ -18,7 +18,7 @@ import type { RunGraph, RunNode } from './run-graph.js'
 // however alive its terminal looks.
 
 /** Occupying an agent, as far as the graph is concerned. */
-export const IN_FLIGHT: readonly RunNode['state'][] = ['running', 'verifying']
+export const IN_FLIGHT: readonly RunNode['state'][] = ['running']
 
 /**
  * Whether this process is still running that session.

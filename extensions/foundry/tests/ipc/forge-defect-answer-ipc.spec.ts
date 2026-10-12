@@ -223,8 +223,8 @@ describe('answering a forge-defect gate', () => {
     await store.save(order({ status: 'draft' }))
     saveGate({
       ...forgeDefectGate(),
-      id: 'WO-1-critical-path',
-      rule: 'critical-path',
+      id: 'WO-1-unit-boundary',
+      rule: 'unit.boundary',
       options: [
         { id: 'approve', label: 'Approve', consequence: 'c' },
         { id: 'hold', label: 'Hold', consequence: 'c' },
@@ -232,7 +232,7 @@ describe('answering a forge-defect gate', () => {
     })
 
     const r = (await call('foundry:inbox.decide', {
-      gateId: 'WO-1-critical-path',
+      gateId: 'WO-1-unit-boundary',
       option: 'approve',
     })) as { ok: boolean; actionError?: string }
 

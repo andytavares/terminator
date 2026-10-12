@@ -44,18 +44,17 @@ export interface InboxDeps {
    * the decision was the operator's and is already in the ledger; `gh` being
    * unreachable is a separate problem with a separate fix.
    */
-  readonly act?: (gate: Gate, option: string) => Promise<void>
+  readonly act: (gate: Gate, option: string) => Promise<void>
   /**
-   * The pull requests an order opened, so a gate can link them. Absent means
-   * none are known, which is what a host that has never shipped one is.
+   * The pull requests an order opened, so a gate can link them.
    */
-  readonly readPulls?: (orderId: string) => Promise<readonly { readonly url: string }[]>
+  readonly readPulls: (orderId: string) => Promise<readonly { readonly url: string }[]>
   /**
    * Orders waiting on the operator that no gate stands for — a draft ready to
    * hand off, shaping that stopped, a run that did not start. Without them
    * this list said "Nothing needs you" over an order nothing would move.
    */
-  readonly waiting?: () => Promise<readonly WaitingRow[]>
+  readonly waiting: () => Promise<readonly WaitingRow[]>
 }
 
 export interface WaitingRow {
@@ -99,7 +98,7 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
         // same treatment for a failure: written down, never thrown at a caller
         // that was only asking what is waiting.
         try {
-          await deps.act?.(gate, gate.decision.option)
+          await deps.act(gate, gate.decision.option)
         } catch (error) {
           await deps.record(gate.orderId, 'gate.action_failed', gate.id, (error as Error).message)
         }
@@ -121,7 +120,7 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
     for (const orderId of new Set(settled.map((gate) => gate.orderId))) {
       pullsFor.set(
         orderId,
-        ((await deps.readPulls?.(orderId)) ?? []).map((pull) => ({
+        (await deps.readPulls(orderId)).map((pull) => ({
           number: pullNumber(pull.url),
           url: pull.url,
         }))
@@ -138,7 +137,7 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
       // something different at each rung of the dial, and an operator who
       // cannot see which rules are silenced cannot tell a quiet factory from
       // a deaf one.
-      waiting: (await deps.waiting?.()) ?? [],
+      waiting: await deps.waiting(),
       autonomy,
       silenced: silencedRules(autonomy),
       summary: {
@@ -200,7 +199,7 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
     }
 
     try {
-      await deps.act?.(decided, parsed.data.option)
+      await deps.act(decided, parsed.data.option)
     } catch (error) {
       const reason = (error as Error).message
       await deps.record(gate.orderId, 'gate.action_failed', gate.id, reason)

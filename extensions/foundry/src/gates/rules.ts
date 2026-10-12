@@ -11,12 +11,9 @@ import type { BudgetBreach } from '../line/scheduler.js'
 export const GATE_RULES = [
   'risk.p0',
   'budget.exceeded',
-  'destructive',
   'ready-for-review',
   'verify.repeat-fail',
   'verify.base-fail',
-  'critical-path',
-  'new-dependency',
   'forge-defect',
   'unit.boundary',
   'run.interrupted',
@@ -37,12 +34,9 @@ export type GateRuleId = (typeof GATE_RULES)[number]
 const RULE_IN_WORDS: Record<GateRuleId, string> = {
   'risk.p0': 'changes that turn out to be riskier than planned',
   'budget.exceeded': 'a run going past its time, files or agent budget',
-  destructive: 'anything that destroys work rather than changing it',
   'ready-for-review': 'whether a draft is ready for review',
   'verify.repeat-fail': 'work that keeps failing its checks',
   'verify.base-fail': 'a check that already fails on the base branch',
-  'critical-path': 'edits to a path you marked critical',
-  'new-dependency': 'a new third-party dependency',
   'forge-defect': 'an order that contradicts itself',
   'unit.boundary': 'each unit of work as it finishes',
   'run.interrupted': 'a run whose agents are gone, so nothing is moving it',
@@ -123,14 +117,6 @@ const RULE_SHAPE: Record<GateRuleId, { options: GateOption[]; defaultIfIgnored: 
     ],
     defaultIfIgnored: 'hold',
   },
-  destructive: {
-    options: [
-      { id: 'approve', label: 'Approve', consequence: 'The destructive step runs.' },
-      { id: 'skip', label: 'Skip it', consequence: 'The step is skipped and recorded as skipped.' },
-      HOLD,
-    ],
-    defaultIfIgnored: 'hold',
-  },
   'ready-for-review': {
     options: [
       { id: 'mark_ready', label: 'Mark ready', consequence: 'The draft becomes a review request.' },
@@ -170,26 +156,6 @@ const RULE_SHAPE: Record<GateRuleId, { options: GateOption[]; defaultIfIgnored: 
         label: 'Accept the debt',
         consequence: 'The criterion is accepted unmet, in writing.',
       },
-      HOLD,
-    ],
-    defaultIfIgnored: 'hold',
-  },
-  'critical-path': {
-    options: [
-      {
-        id: 'approve',
-        label: 'Approve',
-        consequence: 'The change proceeds into the critical path.',
-      },
-      { id: 'send_back', label: 'Send back', consequence: 'The unit is reopened.' },
-      HOLD,
-    ],
-    defaultIfIgnored: 'hold',
-  },
-  'new-dependency': {
-    options: [
-      { id: 'approve', label: 'Approve', consequence: 'The dependency stays.' },
-      { id: 'send_back', label: 'Send back', consequence: 'The unit is reopened without it.' },
       HOLD,
     ],
     defaultIfIgnored: 'hold',

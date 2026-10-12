@@ -567,7 +567,7 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
           ? 'gone'
           : selectedNode.state === 'failed' || selectedNode.state === 'blocked'
             ? 'failed'
-            : selectedNode.state === 'running' || selectedNode.state === 'verifying'
+            : selectedNode.state === 'running'
               ? 'running'
               : 'idle'
   const monitorAlert =

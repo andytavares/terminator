@@ -2518,8 +2518,7 @@
   background: var(--tm-success);
 }
 
-.fdry-unit.is-running::before,
-.fdry-unit.is-verifying::before {
+.fdry-unit.is-running::before {
   background: var(--tm-accent);
 }
 

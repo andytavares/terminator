@@ -14,7 +14,7 @@ export type Autonomy = (typeof AUTONOMY_LEVELS)[number]
 /**
  * Live at every setting, including the most permissive.
  *
- * Risk, budget, destruction and the merge decision. Everything else is a
+ * Risk, budget and the merge decision. Everything else is a
  * matter of taste; these are the difference between a factory and a machine
  * that ships whatever it happens to produce.
  *
@@ -33,7 +33,6 @@ export type Autonomy = (typeof AUTONOMY_LEVELS)[number]
 export const UNCONDITIONAL: readonly GateRuleId[] = [
   'risk.p0',
   'budget.exceeded',
-  'destructive',
   'ready-for-review',
   'run.interrupted',
   'ci.red',
@@ -43,8 +42,6 @@ export const UNCONDITIONAL: readonly GateRuleId[] = [
 const STANDARD_EXTRA: readonly GateRuleId[] = [
   'verify.repeat-fail',
   'verify.base-fail',
-  'critical-path',
-  'new-dependency',
   'forge-defect',
 ]
 

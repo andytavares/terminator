@@ -92,13 +92,6 @@ describe('readyNodes', () => {
     expect(readyNodes(g, BUDGETS).filter((n) => n.kind !== 'gate')).toHaveLength(1)
   })
 
-  it('counts verifying against the budget too, since it occupies an agent', () => {
-    const g = withNode(withNode(graph(), 'build:U-1', { state: 'verifying' }), 'build:U-2', {
-      state: 'running',
-    })
-    expect(readyNodes(g, BUDGETS).filter((n) => n.kind !== 'gate')).toEqual([])
-  })
-
   it('does not offer a node whose dependency has not passed', () => {
     expect(readyNodes(graph(), BUDGETS).map((n) => n.id)).not.toContain('integrate')
   })

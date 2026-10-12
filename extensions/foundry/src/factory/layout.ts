@@ -133,7 +133,7 @@ type FixtureKind = 'shelves' | 'racks' | 'statuswall' | 'lockers'
 const FIXTURE_KINDS: readonly FixtureKind[] = ['shelves', 'racks', 'statuswall', 'lockers']
 
 /** A node crewed by someone, and so one that needs a place to sit when idle. */
-const CREWED_KINDS: readonly StepKind[] = ['agent', 'fanout', 'run', 'judge']
+const CREWED_KINDS: readonly StepKind[] = ['agent', 'fanout', 'run']
 
 /** The nearest column in `row` that isn't solid, scanning outward from `preferred`. */
 function nearestClearColumn(
@@ -161,8 +161,6 @@ export function stationKind(kind: StepKind): StationKind {
       return 'desk'
     case 'run':
       return 'rig'
-    case 'judge':
-      return 'bench'
     case 'join':
       return 'press'
     case 'gate':

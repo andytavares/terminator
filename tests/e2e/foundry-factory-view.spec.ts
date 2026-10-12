@@ -186,7 +186,7 @@ test.describe('a real hall', () => {
   interface HallNodeSpec {
     readonly id: string
     readonly stepId: string
-    readonly kind: 'agent' | 'run' | 'judge' | 'gate' | 'fanout' | 'join'
+    readonly kind: 'agent' | 'run' | 'gate' | 'fanout' | 'join'
     readonly state: string
     readonly lane: number | null
     readonly role: string | null
@@ -218,7 +218,7 @@ test.describe('a real hall', () => {
    * The graph, frozen mid-run: an architect done, two build lanes (one still
    * `running`, with a session nothing in this process is running — the
    * Factory view must draw it orphaned, "no agent", not faked as live), a
-   * verifier per lane, a judge, a join and a gate.
+   * verifier per lane, an inspector, a join and a gate.
    */
   function hallGraph(): unknown {
     return {
@@ -270,16 +270,16 @@ test.describe('a real hall', () => {
           id: 'verify:lane2',
           stepId: 'verify',
           kind: 'run',
-          state: 'ready',
+          state: 'waiting',
           lane: 2,
           role: 'verifier',
           dependsOn: ['build:lane2'],
           attempts: 0,
         }),
         graphNode({
-          id: 'judge',
-          stepId: 'judge',
-          kind: 'judge',
+          id: 'inspect',
+          stepId: 'inspect',
+          kind: 'agent',
           state: 'waiting',
           lane: null,
           role: 'inspector',
@@ -292,8 +292,8 @@ test.describe('a real hall', () => {
           kind: 'join',
           state: 'waiting',
           lane: null,
-          role: 'integrator',
-          dependsOn: ['judge'],
+          role: 'scribe',
+          dependsOn: ['inspect'],
           attempts: 0,
         }),
         graphNode({
@@ -390,9 +390,9 @@ test.describe('a real hall', () => {
       'builder, builder, no agent, attempt 1',
       'builder, builder, Done, attempt 1',
       'verifier, verifier, Queued, attempt 0',
-      'verifier, verifier, Ready, attempt 0',
+      'verifier, verifier, Queued, attempt 0',
       'inspector, inspector, Queued, attempt 0',
-      'integrator, integrator, Queued, attempt 0',
+      'scribe, scribe, Queued, attempt 0',
       'gate, unassigned, Queued, attempt 0',
     ]
     for (const label of expectedStations) {

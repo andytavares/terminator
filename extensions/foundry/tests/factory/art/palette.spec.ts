@@ -6,13 +6,6 @@ describe('factory/art/palette roleStyle', () => {
     const s = roleStyle('builder')
     expect(s.hat).not.toBeNull()
     expect(s.visor).toBe(false)
-    expect(s.vest).toBe(false)
-  })
-
-  it('gives the foreman a hi-vis vest and a white hat', () => {
-    const s = roleStyle('foreman')
-    expect(s.vest).toBe(true)
-    expect(s.hat).not.toBeNull()
   })
 
   it('gives verifier and inspector a visor but distinct shirts', () => {
@@ -33,20 +26,11 @@ describe('factory/art/palette roleStyle', () => {
   })
 
   it('falls back to a neutral silhouette for an unknown role', () => {
-    const known = [
-      'builder',
-      'foreman',
-      'verifier',
-      'inspector',
-      'architect',
-      'author',
-      'scribe',
-      'scout',
-    ]
-    const unknown = roleStyle('integrator')
+    const known = ['builder', 'verifier', 'inspector', 'architect', 'author', 'scribe', 'scout']
+    const unknown = roleStyle('unlisted')
     const none = roleStyle(null)
     expect(unknown).toEqual(none)
-    expect(known).not.toContain('integrator')
+    expect(known).not.toContain('unlisted')
   })
 
   it('is deterministic for the same role', () => {

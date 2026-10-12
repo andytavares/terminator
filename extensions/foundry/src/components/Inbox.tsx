@@ -49,12 +49,9 @@ function latestEvidence(signal: Signal): Signal['evidence'][number] | undefined 
 const RULE_ICON: Record<GateRuleId, React.ComponentType> = {
   'risk.p0': ShieldAlert,
   'budget.exceeded': Gauge,
-  destructive: AlertTriangle,
   'ready-for-review': GitPullRequest,
   'verify.repeat-fail': AlertTriangle,
   'verify.base-fail': AlertTriangle,
-  'critical-path': ShieldAlert,
-  'new-dependency': AlertTriangle,
   'forge-defect': HelpCircle,
   'unit.boundary': CheckCircle2,
   'run.interrupted': Unplug,
@@ -65,12 +62,9 @@ const RULE_ICON: Record<GateRuleId, React.ComponentType> = {
 /** Severity is carried by a stripe, so what needs attention reads at a glance. */
 const RULE_TONE: Record<GateRuleId, string> = {
   'risk.p0': 'is-p0',
-  destructive: 'is-p0',
-  'critical-path': 'is-p0',
   'budget.exceeded': 'is-warn',
   'verify.repeat-fail': 'is-warn',
   'verify.base-fail': 'is-warn',
-  'new-dependency': 'is-warn',
   'forge-defect': 'is-info',
   'unit.boundary': 'is-info',
   'ready-for-review': 'is-ok',

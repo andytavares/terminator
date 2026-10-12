@@ -223,7 +223,6 @@ function mountFloor(pending: unknown[]) {
       }
     }
     if (channel === 'foundry:permissions-list') return { pending }
-    if (channel === 'foundry:supervision-snapshot') return { review: [] }
     if (channel === 'foundry:stalls-list') return { firings: [], shadowMode: true }
     if (channel === 'foundry:feed-list') return { entries: [], mutes: [] }
     return { ok: true }

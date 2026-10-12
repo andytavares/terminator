@@ -182,11 +182,9 @@ export interface ExecutorDeps {
    * Nothing else ever runs `git commit`, so without it a branch has no commits
    * to push and a pull request has nothing to open on. A clean tree is how an
    * agent that passed having changed nothing is told from one that did the
-   * work, and a refusal from both. Absent means the
-   * caller commits nothing here and no node is judged on whether it changed
-   * anything.
+   * work, and a refusal from both.
    */
-  readonly commitNode?: (input: { node: RunNode; message: string }) => Promise<CommitOutcome>
+  readonly commitNode: (input: { node: RunNode; message: string }) => Promise<CommitOutcome>
 
   /**
    * End a lane's live session before it is resumed.
@@ -195,70 +193,66 @@ export interface ExecutorDeps {
    * prompt; two processes must not share one conversation — the same reason
    * `endAndWait` exists in `src/runtime/end-session.ts`.
    */
-  readonly endSession?: (sessionId: string) => Promise<void>
+  readonly endSession: (sessionId: string) => Promise<void>
 
   readonly now: () => string
   readonly sources: ResolveSources
-  readonly onEvent?: (event: ExecutorEvent) => void
+  readonly onEvent: (event: ExecutorEvent) => void
 
   /**
    * Put a raised gate where the operator will see it.
    *
-   * A seam rather than a store, so the executor knows nothing about disk. A
-   * run with no way to raise a gate does not silently continue past one: it
-   * halts, and says which rule it could not put in front of anybody.
+   * A seam rather than a store, so the executor knows nothing about disk.
    */
-  readonly raise?: (gate: Gate) => Promise<void>
+  readonly raise: (gate: Gate) => Promise<void>
 
   /**
    * This order's gates from earlier attempts. A resume re-runs everything
    * after the last passed node, so a rule that fires on the finished work
    * fires again; without these, Approve resumed straight into the same gate.
    */
-  readonly priorGates?: readonly Gate[]
+  readonly priorGates: readonly Gate[]
 
-  /** Which rules are live. Without one, everything is asked — the safe end. */
-  readonly autonomy?: Autonomy
+  /** Which rules are live. */
+  readonly autonomy: Autonomy
 
   /** The house rules in force here, for the brief. Loaded by the caller. */
-  readonly rules?: readonly Rule[]
+  readonly rules: readonly Rule[]
 
   /**
    * Run one rung of the verification ladder, returning its exit status.
    *
    * Null means it did not run, which the ladder reports as "not measured" and
-   * never as a pass. Absent entirely means the whole climb is not measured —
-   * honest, and visible, rather than a silent green.
+   * never as a pass.
    */
-  readonly runStep?: (step: LadderStep, logPath: string) => Promise<number | null>
+  readonly runStep: (step: LadderStep, logPath: string) => Promise<number | null>
 
   /**
    * Run one rung in a checkout of the order's base branch, without this change.
    *
    * It is how a failure the change caused is told from one that was already
    * there. Null means it could not run there, which is "not known", never
-   * "passes on the base". Absent means the base is never consulted.
+   * "passes on the base".
    */
-  readonly runStepOnBase?: (step: LadderStep, logPath: string) => Promise<number | null>
+  readonly runStepOnBase: (step: LadderStep, logPath: string) => Promise<number | null>
 
   /**
    * Let go of the base checkout `runStepOnBase` used. Called once, in a
    * `finally`, after any base run, so a throwing rung cannot leave it behind.
    */
-  readonly releaseBase?: () => Promise<void>
+  readonly releaseBase: () => Promise<void>
 
   /**
    * Install the dependencies afresh in the order's own checkout or the base
    * checkout, returning the install's exit status. Null means it could not run.
-   * Absent means a broken install is reported, never mended.
    */
-  readonly reinstall?: (where: 'change' | 'base', logPath: string) => Promise<number | null>
+  readonly reinstall: (where: 'change' | 'base', logPath: string) => Promise<number | null>
 
   /** Minutes elapsed, for the wall-clock budget. */
-  readonly observe?: () => { elapsedMinutes: number } | Promise<{ elapsedMinutes: number }>
+  readonly observe: () => { elapsedMinutes: number } | Promise<{ elapsedMinutes: number }>
 
   /** Write a line to the order's record. */
-  readonly record?: (action: string, subject: string, reason: string) => Promise<void>
+  readonly record: (action: string, subject: string, reason: string) => Promise<void>
 
   /**
    * Take what a read-only rung wrote and put it on the order.
@@ -285,7 +279,7 @@ export interface ExecutorDeps {
    * the Floor showed every node `waiting` while agents were working in their
    * worktrees, and a crash left a record saying nothing had started.
    */
-  readonly persist?: (graph: RunGraph) => Promise<void>
+  readonly persist: (graph: RunGraph) => Promise<void>
 
   /**
    * Wait, interruptibly. Injected so a test can drive the clock.
@@ -293,7 +287,7 @@ export interface ExecutorDeps {
    * Used only to re-read the budget while agents are in flight — see
    * `waveOrBreach`.
    */
-  readonly wait?: (ms: number) => Promise<void>
+  readonly wait: (ms: number) => Promise<void>
 
   /**
    * Called once the graph's work is done and before the final check climbs,
@@ -326,7 +320,7 @@ export interface ExecutorDeps {
    * command, a ladder rung — has its own, so a rung told "run this and do not
    * fix what it reports" never arrives carrying the builder's identity.
    */
-  readonly sessionFor?: (lane: number, role: string | null) => string | undefined
+  readonly sessionFor: (lane: number, role: string | null) => string | undefined
 
   /**
    * What the working copies actually changed.
@@ -339,11 +333,10 @@ export interface ExecutorDeps {
    * graded worse than it was planned as. The comment above the regrade already
    * said it must not read the plan; the code read the plan.
    *
-   * Absent, the executor falls back to the declaration and nothing is worse
-   * than it was. Present, the two are combined rather than swapped: an empty
-   * answer from git means "unknown", not "nothing touched authentication".
+   * The two are combined rather than swapped: an empty answer from git means
+   * "unknown", not "nothing touched authentication".
    */
-  readonly observedChange?: () => Promise<{
+  readonly observedChange: () => Promise<{
     readonly changedFiles: readonly string[]
     readonly linesChanged: number
   }>
@@ -495,8 +488,8 @@ export async function execute(
 ): Promise<RunOutcome> {
   const roles = createRoleRegistry(deps.sources)
   const budgets: Budgets = order.budgets
-  const rules = deps.rules ?? []
-  const autonomy: Autonomy = deps.autonomy ?? 'escorted'
+  const rules = deps.rules
+  const autonomy: Autonomy = deps.autonomy
   const verdicts: Verdict[] = []
   /** unit id → the session that did the work, so a checker is never it. */
   const producedUnit = new Map<string, string>()
@@ -504,7 +497,7 @@ export async function execute(
   const gates: Gate[] = []
 
   let current = graph
-  const priorGates = (deps.priorGates ?? []).filter((g) => g.orderId === order.id)
+  const priorGates = deps.priorGates.filter((g) => g.orderId === order.id)
   // Past what is already on file, so a new gate never overwrites a decided one.
   let gateSeq = priorGates.length
 
@@ -524,7 +517,7 @@ export async function execute(
     current = next
     // Never fatal: a run that cannot write its graph down is still a run, and
     // failing it here would turn a reporting problem into a lost agent.
-    await deps.persist?.(current).catch(() => undefined)
+    await deps.persist(current).catch(() => undefined)
   }
 
   /** Nodes whose session is already on the graph, so a late write is not a second start. */
@@ -546,7 +539,7 @@ export async function execute(
     if (announced.has(nodeId)) return
     announced.add(nodeId)
     await advance(withNode(current, nodeId, { sessionId }))
-    deps.onEvent?.({ type: 'started', nodeId, sessionId })
+    deps.onEvent({ type: 'started', nodeId, sessionId })
   }
 
   /**
@@ -635,8 +628,8 @@ export async function execute(
       omitOptions: input.omitOptions,
     })
     gates.push(gate)
-    deps.onEvent?.({ type: 'gate', gate })
-    await deps.raise?.(gate)
+    deps.onEvent({ type: 'gate', gate })
+    await deps.raise(gate)
     return true
   }
 
@@ -645,7 +638,7 @@ export async function execute(
 
   /** The budget, read against what is happening right now. */
   async function currentBreach(): Promise<ReturnType<typeof budgetBreach>> {
-    const observed = (await deps.observe?.()) ?? { elapsedMinutes: 0 }
+    const observed = await deps.observe()
     return budgetBreach(budgets, {
       ...observed,
       agents: current.nodes.filter((n) => n.state === 'running' && n.kind !== 'gate').length,
@@ -669,7 +662,6 @@ export async function execute(
   ): Promise<{ results: T[] } | { breach: NonNullable<ReturnType<typeof budgetBreach>> }> {
     const pollMs = deps.budgetPollMs ?? 15_000
     const wait = deps.wait
-    if (wait === undefined) return { results: await wave }
 
     let settled = false
     const done = wave.then((results) => {
@@ -807,7 +799,7 @@ export async function execute(
             if (resolved === null) {
               // Half a template, or a check this repository has no command
               // for. Not measured here — never a silent pass.
-              await deps.record?.(
+              await deps.record(
                 'step.not_measured',
                 node.id,
                 `${node.stepId} names "${step.command}", which nothing in this repository's toolchain resolves.`
@@ -876,7 +868,7 @@ export async function execute(
           // saving was: a builder taking a second unit in the same lane keeps
           // everything it learned taking the first. `sessionFor` keys on the
           // role, so across a boundary there is simply nothing to offer.
-          const offered = wantsFresh ? undefined : deps.sessionFor?.(node.lane ?? 1, roleId)
+          const offered = wantsFresh ? undefined : deps.sessionFor(node.lane ?? 1, roleId)
           const resumeSessionId =
             roleId !== null && offered !== undefined && roles.mayResume(roleId)
               ? offered
@@ -903,7 +895,7 @@ export async function execute(
           if (skillsMount !== null) {
             const { skills } = resolveSkills(skillIds, deps.sources)
             mountSkills(skillsMount, skills)
-            await deps.record?.(
+            await deps.record(
               'skills.mounted',
               node.id,
               skills.map((skill) => `${skill.id} (${skill.rung})`).join(', ')
@@ -913,7 +905,7 @@ export async function execute(
           // The previous process of this conversation may still be sitting at
           // its prompt. Two processes must not share one conversation — the
           // same reason `endAndWait` exists for a resumed terminal session.
-          if (resumeSessionId !== undefined) await deps.endSession?.(resumeSessionId)
+          if (resumeSessionId !== undefined) await deps.endSession(resumeSessionId)
 
           const result = await deps.run({
             node,
@@ -994,7 +986,7 @@ export async function execute(
           .catch(() => null)
 
         if (collected === null || collected === undefined) {
-          await deps.record?.(
+          await deps.record(
             'rung.wrote_nothing',
             node.id,
             `The ${roleId} left nothing at ${outputPath}. Its turn ended, so whatever it worked out is only in its terminal.`
@@ -1005,9 +997,9 @@ export async function execute(
           briefed = collected.order
           handedBack = collected.document ?? null
           if (handedBack !== null) {
-            await deps.record?.('document.handed_back', node.id, describeDocument(handedBack))
+            await deps.record('document.handed_back', node.id, describeDocument(handedBack))
           }
-          await deps.record?.(
+          await deps.record(
             'rung.collected',
             node.id,
             collected.note === '' ? `the ${roleId} filed its result` : collected.note
@@ -1064,7 +1056,7 @@ export async function execute(
               at: deps.now(),
             })
             verdicts.push(verdict)
-            deps.onEvent?.({ type: 'verdict', verdict })
+            deps.onEvent({ type: 'verdict', verdict })
           }
         }
       }
@@ -1097,7 +1089,7 @@ export async function execute(
         (failure) => `${failure.key} expected ${failure.expected}, got ${String(failure.actual)}`
       )
       if (unmeasurable.length > 0) {
-        await deps.record?.(
+        await deps.record(
           'step.expectation_not_measured',
           node.id,
           `${node.stepId} promised ${unmeasurable.join(', ')}, which nothing here measures. Judged on its exit status instead.`
@@ -1118,7 +1110,7 @@ export async function execute(
       // document is outside the checkout changes nothing in it.
       let madeNoChange = false
       let refusal: Extract<CommitOutcome, { kind: 'refused' }> | null = null
-      if (passed && roleId !== null && roles.mayWrite(roleId) && deps.commitNode !== undefined) {
+      if (passed && roleId !== null && roles.mayWrite(roleId)) {
         const commit = await deps.commitNode({ node, message: commitMessage(node, order) })
         const mayChangeNothing =
           (handedBack !== null && handedBack.location !== 'checkout') ||
@@ -1128,7 +1120,7 @@ export async function execute(
           passed = false
           if (commit.kind === 'refused') {
             refusal = commit
-            await deps.record?.('step.commit_refused', node.id, refusedReason(commit))
+            await deps.record('step.commit_refused', node.id, refusedReason(commit))
             // The builder's next attempt is told what refused its work.
             await advance(
               withNode(current, node.id, {
@@ -1148,17 +1140,17 @@ export async function execute(
             )
           } else {
             madeNoChange = true
-            await deps.record?.('step.no_change', node.id, 'made no change to the checkout')
+            await deps.record('step.no_change', node.id, 'made no change to the checkout')
           }
         }
       }
 
       if (passed) {
         await advance(markPassed(current, node.id, deps.now()))
-        deps.onEvent?.({ type: 'passed', nodeId: node.id })
+        deps.onEvent({ type: 'passed', nodeId: node.id })
       } else {
         if (unmet.length > 0) {
-          await deps.record?.(
+          await deps.record(
             'step.expectation_unmet',
             node.id,
             `${node.stepId} did not meet what it promised: ${unmet.join('; ')}`
@@ -1199,7 +1191,7 @@ export async function execute(
             logPath,
           }
           await advance(rework(current, node.id, onFail.rework, feedback))
-          await deps.record?.(
+          await deps.record(
             'rework.started',
             node.id,
             `${node.stepId} exited ${result.exitCode ?? 'without a status'}; sending ${onFail.rework} back (round ${node.reworks + 1} of ${onFail.max})`
@@ -1216,7 +1208,7 @@ export async function execute(
                   }${logPath ? `. The output is in \`${logPath}\`` : ''}`
           const failure = markFailed(current, node.id, deps.now(), reason)
           await advance(failure.graph)
-          deps.onEvent?.({ type: 'failed', nodeId: node.id, needsDecision: failure.needsDecision })
+          deps.onEvent({ type: 'failed', nodeId: node.id, needsDecision: failure.needsDecision })
 
           if (failure.needsDecision) {
             awaitingDecision.push(node.id)
@@ -1251,8 +1243,8 @@ export async function execute(
   // What the plan said, plus what the work did. Combined rather than swapped,
   // because git reporting nothing means it could not be read — and reading
   // that as "nothing touched authentication" is how a P0 quietly grades P3.
-  const seen = deps.observedChange === undefined ? null : await deps.observedChange()
-  const touched = [...new Set([...declared, ...(seen?.changedFiles ?? [])])]
+  const seen = await deps.observedChange()
+  const touched = [...new Set([...declared, ...seen.changedFiles])]
   const summary = summarise(verdicts)
   // The graph's work is done when everything but the held ship node has passed.
   // That node is the tail's to settle, so it is not waited for here.
@@ -1274,7 +1266,7 @@ export async function execute(
   // authentication must take the operator's decision before it reaches the
   // remote, and reading the stale grade is how it would not have.
   const risk = regrade(order, observed)
-  deps.onEvent?.({
+  deps.onEvent({
     type: 'inspection',
     required: inspection.required,
     triggers: inspection.triggers,
@@ -1296,12 +1288,11 @@ export async function execute(
   /** One climb, with each step's log kept so a gate can show what it saw. */
   async function climbWith(
     steps: readonly LadderStep[],
-    runner: NonNullable<typeof deps.runStep> | undefined,
+    runner: NonNullable<typeof deps.runStep>,
     suffix: string
   ): Promise<{ outcome: LadderOutcome; logs: Map<string, string> }> {
     const logs = new Map<string, string>()
     const outcome = await climb(steps, async (step) => {
-      if (runner === undefined) return null
       const logPath = finalLogPath(step.name, suffix)
       logs.set(step.name, logPath)
       return runner(step, logPath)
@@ -1349,7 +1340,7 @@ export async function execute(
     const first = await climbWith(ladderSteps, deps.runStep, '')
     ladder = first.outcome
     ladderLogs = first.logs
-    deps.onEvent?.({ type: 'ladder', outcome: ladder })
+    deps.onEvent({ type: 'ladder', outcome: ladder })
 
     // A check that fails once and passes on the same commit is not the change's
     // doing. Passes on this commit are cached by the caller, so only the failed
@@ -1359,9 +1350,9 @@ export async function execute(
       const retry = await climbWith(ladderSteps, deps.runStep, '.retry')
       ladder = retry.outcome
       ladderLogs = retry.logs
-      deps.onEvent?.({ type: 'ladder', outcome: ladder })
+      deps.onEvent({ type: 'ladder', outcome: ladder })
       if (ladder.ok) {
-        await deps.record?.(
+        await deps.record(
           'verify.flaky',
           firstFailed.name,
           `${firstFailed.name} failed once and passed on a re-run: ${first.logs.get(firstFailed.name) ?? 'no log'} then ${retry.logs.get(firstFailed.name) ?? 'no log'}`
@@ -1372,10 +1363,10 @@ export async function execute(
     // A missing package or a half-downloaded binary is mended here rather than
     // asked about: reinstalling is the whole answer, and the code is not at fault.
     installFault = ladder.ok ? null : installFaultIn(ladder, ladderLogs)
-    if (installFault !== null && deps.reinstall !== undefined) {
+    if (installFault !== null) {
       const failedName = ladder.steps.find((s) => s.result === 'fail')?.name ?? order.id
       const installed = await deps.reinstall('change', finalLogPath('reinstall', ''))
-      await deps.record?.(
+      await deps.record(
         'verify.reinstalled',
         failedName,
         `${failedName} failed because ${installFault}; reinstalled the dependencies (exit ${installed ?? 'not run'}).`
@@ -1384,7 +1375,7 @@ export async function execute(
         const healed = await climbWith(ladderSteps, deps.runStep, '.reinstalled')
         ladder = healed.outcome
         ladderLogs = healed.logs
-        deps.onEvent?.({ type: 'ladder', outcome: ladder })
+        deps.onEvent({ type: 'ladder', outcome: ladder })
         installFault = ladder.ok ? null : installFaultIn(ladder, ladderLogs)
       }
     }
@@ -1434,13 +1425,13 @@ export async function execute(
       let baseLogs = new Map<string, string>()
       let baseFault: string | null = null
       const baseBranch = order.context.repos[0]?.baseBranch ?? 'the base branch'
-      if (failedStep !== null && installFault === null && deps.runStepOnBase !== undefined) {
+      if (failedStep !== null && installFault === null) {
         const upTo = ladderSteps.findIndex((s) => s.name === failedStep.name)
         const baseSteps = ladderSteps.slice(0, upTo + 1)
         try {
           let base = await climbWith(baseSteps, deps.runStepOnBase, '.base')
           baseFault = installFaultIn(base.outcome, base.logs)
-          if (baseFault !== null && deps.reinstall !== undefined) {
+          if (baseFault !== null) {
             const installed = await deps.reinstall('base', finalLogPath('reinstall', '.base'))
             if (installed === 0) {
               base = await climbWith(baseSteps, deps.runStepOnBase, '.base.reinstalled')
@@ -1459,7 +1450,7 @@ export async function execute(
                   ? 'passes'
                   : 'unknown'
         } finally {
-          await deps.releaseBase?.()
+          await deps.releaseBase()
         }
       }
 
@@ -1492,7 +1483,7 @@ export async function execute(
           failedStep === null
             ? ''
             : installFault !== null
-              ? ` The installed dependencies are broken: ${installFault}${deps.reinstall === undefined ? '' : ', and reinstalling did not fix it'}.`
+              ? ` The installed dependencies are broken: ${installFault}, and reinstalling did not fix it.`
               : onBase === 'passes'
                 ? ` It passes on ${baseBranch} without this change.`
                 : baseFault !== null
@@ -1510,7 +1501,7 @@ export async function execute(
 
   if (draftsOpen && ladder !== null && !ladder.ok) {
     const failedStep = ladder.steps.find((s) => s.result === 'fail')
-    await deps.record?.(
+    await deps.record(
       'ship.final_check_failed',
       failedStep?.name ?? order.id,
       failedStep === undefined

@@ -348,14 +348,12 @@ describe('the author role', () => {
 })
 
 describe('built-in roles', () => {
-  it('ships the nine roles the design names, and the author', () => {
+  it('ships the eight roles the shipped recipes use, and the author', () => {
     expect(roleFiles.map((f) => f.replace('.yaml', '')).sort()).toEqual([
       'architect',
       'author',
       'builder',
-      'foreman',
       'inspector',
-      'integrator',
       'red-team',
       'scout',
       'scribe',
@@ -381,11 +379,10 @@ describe('built-in roles', () => {
   })
 
   // The property that matters is narrower than "writes nothing": the red team
-  // and the foreman do produce output — findings, a schedule — they just may
-  // not touch a checkout. Only three roles may.
-  it('lets only the builder, the integrator, the scribe and the author write to a checkout', () => {
+  // does produce output — findings — it just may not touch a checkout.
+  it('lets only the builder, the scribe and the author write to a checkout', () => {
     const CHECKOUT = ['worktree', 'integration_branch', 'docs']
-    const allowed = new Set(['builder', 'integrator', 'scribe', 'author'])
+    const allowed = new Set(['builder', 'scribe', 'author'])
     for (const file of roleFiles) {
       const parsed = parseRole(read(rolesDir, file), file)
       if (!parsed.ok) throw new Error(parsed.reason)
@@ -433,14 +430,8 @@ describe('built-in roles', () => {
   })
 })
 
-// Two roles ship that no built-in recipe names: the foreman and the
-// integrator. Scheduling and integration are code here, not agents. They are
-// not dead weight — an operator's own recipe may name any role (FR-021), and
-// the executor resolves a role by id with no list of which ones are "real".
-//
-// That is a claim, so it is proved rather than asserted: every shipped role
-// resolves through the same registry the executor uses, and briefs into a
-// message an agent could actually be launched with.
+// Every shipped role resolves through the same registry the executor uses, and
+// briefs into a message an agent could actually be launched with.
 describe('every shipped role is one an operator recipe could name', () => {
   const registry = createRoleRegistry({
     dataRoot: path.join(root, 'nowhere-data'),

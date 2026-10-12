@@ -66,8 +66,6 @@ export function calloutFor(
       switch (event.to) {
         case 'running':
           return callout(event.nodeId, 'start', 'Started', at)
-        case 'verifying':
-          return callout(event.nodeId, 'start', 'Checking', at)
         case 'passed':
           return callout(event.nodeId, 'done', 'Done', at)
         case 'failed':
@@ -77,7 +75,6 @@ export function calloutFor(
         case 'skipped':
           return callout(event.nodeId, 'done', 'Skipped', at)
         case 'waiting':
-        case 'ready':
           return null
         /* v8 ignore next 3 -- exhaustive union, unreachable */
         default: {
@@ -333,12 +330,8 @@ export function stateWord(state: NodeState): string {
   switch (state) {
     case 'waiting':
       return 'Queued'
-    case 'ready':
-      return 'Ready'
     case 'running':
       return 'Working'
-    case 'verifying':
-      return 'Checking'
     case 'passed':
       return 'Done'
     case 'failed':

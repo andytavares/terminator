@@ -4,6 +4,8 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRunChannels, proposeRecipe, readRunGraph } from '../../src/ipc/run-channels.js'
+import type { RunDeps } from '../../src/ipc/run-channels.js'
+import { idleRunSeams } from './run-deps.js'
 import { createOrderStore } from '../../src/order/store.js'
 import type { OrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -25,15 +27,21 @@ let dataRoot: string
 let repo: string
 let store: OrderStore
 
-function channels() {
-  return createRunChannels({
+function runDeps(over: Partial<RunDeps> = {}): RunDeps {
+  return {
     store,
     // Resolved on every call in the host, because the records location follows
     // the open workspace — a fixed value here is what that resolver returns.
     dataRoot: () => dataRoot,
     sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
     now: () => '2026-09-06T10:00:00.000Z',
-  })
+    ...idleRunSeams(),
+    ...over,
+  }
+}
+
+function channels() {
+  return createRunChannels(runDeps())
 }
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
@@ -316,32 +324,30 @@ describe('foundry:run.observe', () => {
   it('carries the queue position when the refinery is wired and this order overlaps another', async () => {
     await store.save(order())
     await channels().start({ id: 'WO-1' })
-    const withQueue = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      queueEntries: async () => [
-        {
-          orderId: 'WO-1',
-          title: 'x',
-          repo: 'repo',
-          base: 'main',
-          agreedAt: '2026-09-02T00:00:00.000Z',
-          files: ['src/a'],
-          merged: false,
-        },
-        {
-          orderId: 'WO-earlier',
-          title: 'Earlier work',
-          repo: 'repo',
-          base: 'main',
-          agreedAt: '2026-09-01T00:00:00.000Z',
-          files: ['src/a'],
-          merged: false,
-        },
-      ],
-    })
+    const withQueue = createRunChannels(
+      runDeps({
+        queueEntries: async () => [
+          {
+            orderId: 'WO-1',
+            title: 'x',
+            repo: 'repo',
+            base: 'main',
+            agreedAt: '2026-09-02T00:00:00.000Z',
+            files: ['src/a'],
+            merged: false,
+          },
+          {
+            orderId: 'WO-earlier',
+            title: 'Earlier work',
+            repo: 'repo',
+            base: 'main',
+            agreedAt: '2026-09-01T00:00:00.000Z',
+            files: ['src/a'],
+            merged: false,
+          },
+        ],
+      })
+    )
     const r = (await withQueue.observe({ id: 'WO-1' })) as {
       queue: { position: number; behind: { orderId: string }[] } | null
     }
@@ -654,12 +660,11 @@ describe('the records location', () => {
     await store.save(order())
     const wall = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-wall-'))
     fs.chmodSync(wall, 0o500)
-    const blocked = createRunChannels({
-      store,
-      dataRoot: () => path.join(wall, 'foundry'),
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-    })
+    const blocked = createRunChannels(
+      runDeps({
+        dataRoot: () => path.join(wall, 'foundry'),
+      })
+    )
     const r = (await blocked.start({ id: 'WO-1' })) as { error: string }
     fs.chmodSync(wall, 0o700)
     fs.rmSync(wall, { recursive: true, force: true })
@@ -685,13 +690,11 @@ describe('attaching to a running agent', () => {
     // Live, said out loud. A session id outlives the process that ran it, so
     // "there is an id on the node" is not the same question as "is anything
     // running it" — and only the second one can be attached to.
-    const withRunner = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      isLive: (sessionId) => sessionId === 'sess-42',
-    })
+    const withRunner = createRunChannels(
+      runDeps({
+        isLive: (sessionId) => sessionId === 'sess-42',
+      })
+    )
     const r = (await withRunner.attach({ orderId: 'WO-1', nodeId: graph.nodes[0].id })) as {
       terminalSessionId: string
     }
@@ -771,13 +774,11 @@ describe('attaching to a running agent', () => {
 
 describe('foundry:run.activity', () => {
   function channelsWithActivity(activityFor: (sessionId: string) => ToolActivity[]) {
-    return createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      activityFor,
-    })
+    return createRunChannels(
+      runDeps({
+        activityFor,
+      })
+    )
   }
 
   async function startedGraph(): Promise<{ id: string; sessionId: string | null }[]> {
@@ -940,13 +941,11 @@ describe('the graph is actually run (FR-020)', () => {
   it('hands the graph to whatever executes it', async () => {
     await store.save(order())
     const execute = vi.fn(async () => undefined)
-    const r = (await createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      execute,
-    }).start({ id: 'WO-1' })) as { started: boolean }
+    const r = (await createRunChannels(
+      runDeps({
+        execute,
+      })
+    ).start({ id: 'WO-1' })) as { started: boolean }
 
     expect(r.started).toBe(true)
     expect(execute).toHaveBeenCalledWith(
@@ -956,24 +955,15 @@ describe('the graph is actually run (FR-020)', () => {
     )
   })
 
-  it('says so when there is nothing to run it, rather than reporting a started run', async () => {
-    await store.save(order())
-    const r = (await channels().start({ id: 'WO-1' })) as { started: boolean; reason: string }
-    expect(r.started).toBe(false)
-    expect(r.reason).toMatch(/not available/)
-  })
-
   it('does not wait for the run to finish before answering', async () => {
     await store.save(order())
     let released = (): void => {}
     const execute = vi.fn(() => new Promise<void>((r) => (released = r)))
-    const r = await createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      execute: execute as never,
-    }).start({ id: 'WO-1' })
+    const r = await createRunChannels(
+      runDeps({
+        execute: execute as never,
+      })
+    ).start({ id: 'WO-1' })
 
     // Answered while the run is still going: a channel that blocked until the
     // last agent finished would hold the bridge for the length of the work.
@@ -983,13 +973,11 @@ describe('the graph is actually run (FR-020)', () => {
 
   it('records a run that failed to start rather than losing it', async () => {
     await store.save(order())
-    await createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      execute: async () => Promise.reject(new Error('no worktree could be prepared')),
-    }).start({ id: 'WO-1' })
+    await createRunChannels(
+      runDeps({
+        execute: async () => Promise.reject(new Error('no worktree could be prepared')),
+      })
+    ).start({ id: 'WO-1' })
 
     // The rejection is handled off the call — that is the point of not
     // awaiting it — so poll for the entry rather than assuming one turn of the
@@ -1007,26 +995,22 @@ describe('the graph is actually run (FR-020)', () => {
 
   it('runs nothing for an order that was refused', async () => {
     const execute = vi.fn(async () => undefined)
-    await createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      execute,
-    }).start({ id: 'WO-nope' })
+    await createRunChannels(
+      runDeps({
+        execute,
+      })
+    ).start({ id: 'WO-nope' })
     expect(execute).not.toHaveBeenCalled()
   })
 })
 
 describe('foundry:run.resume', () => {
   function live(execute?: ReturnType<typeof vi.fn>) {
-    return createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      execute: (execute ?? vi.fn(async () => undefined)) as never,
-    })
+    return createRunChannels(
+      runDeps({
+        execute: (execute ?? vi.fn(async () => undefined)) as never,
+      })
+    )
   }
 
   async function started(execute?: ReturnType<typeof vi.fn>) {
@@ -1099,24 +1083,6 @@ describe('foundry:run.resume', () => {
     expect(ledger).toContain('run.resumed')
   })
 
-  // Never recorded when there is nothing to resume it with — a ledger line
-  // saying a run picked back up would be false when nothing did.
-  it('does not record a resume when there is no runtime to run it', async () => {
-    await store.save(order())
-    const noRuntime = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-    })
-    await noRuntime.start({ id: 'WO-1' })
-    await noRuntime.resume({ id: 'WO-1' })
-
-    const ledgerFile = path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl')
-    const ledger = fs.readFileSync(ledgerFile, 'utf8')
-    expect(ledger).not.toContain('run.resumed')
-  })
-
   it('refuses an order that is not running', async () => {
     await store.save(order({ status: 'agreed' }))
     expect(await live().resume({ id: 'WO-1' })).toEqual({
@@ -1135,19 +1101,6 @@ describe('foundry:run.resume', () => {
 
   it('rejects a malformed request', async () => {
     expect(await live().resume({ retry: 'U-1' })).toEqual({ error: 'Malformed request.' })
-  })
-
-  it('says so when there is nothing to run it', async () => {
-    await store.save(order())
-    const channels = live()
-    await channels.start({ id: 'WO-1' })
-    const bare = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-    })
-    expect(await bare.resume({ id: 'WO-1' })).toMatchObject({ started: false })
   })
 })
 
@@ -1191,13 +1144,11 @@ describe('a start is never refused for finished turns waiting on review', () => 
 
   it('starts even when a legacy gate says there is no room', async () => {
     await store.save(order())
-    const legacy = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      backpressure: full,
-    } as unknown as Parameters<typeof createRunChannels>[0])
+    const legacy = createRunChannels(
+      runDeps({
+        backpressure: full,
+      })
+    )
     const r = (await legacy.start({ id: 'WO-1' })) as { error?: string }
     expect(r.error).toBeUndefined()
     expect((await store.load('WO-1'))?.status).toBe('running')
@@ -1237,14 +1188,12 @@ describe('a run whose agents are gone', () => {
     over: Partial<Parameters<typeof createRunChannels>[0]> = {}
   ): Promise<ReturnType<typeof createRunChannels>> {
     await store.save(order())
-    const channels = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      execute: vi.fn(async () => undefined) as never,
-      ...over,
-    })
+    const channels = createRunChannels(
+      runDeps({
+        execute: vi.fn(async () => undefined) as never,
+        ...over,
+      })
+    )
     await channels.start({ id: 'WO-1' })
     return channels
   }
@@ -1347,13 +1296,11 @@ describe('the run timeline', () => {
     await store.save(order())
     await channels().start({ id: 'WO-1' })
     const gate = { id: 'g-1', orderId: 'WO-1' }
-    const withGates = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      gatesFor: async () => [gate as never],
-    })
+    const withGates = createRunChannels(
+      runDeps({
+        gatesFor: async () => [gate as never],
+      })
+    )
     const r = (await withGates.timeline({ id: 'WO-1' })) as {
       graph: RunGraph
       timeline: { frames: unknown[]; tools: unknown[] }

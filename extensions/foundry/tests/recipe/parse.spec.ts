@@ -125,7 +125,6 @@ describe('parseRecipe', () => {
   it.each([
     ['agent', 'a role', 'kind: agent\n    role: builder', 'kind: agent'],
     ['run', 'a command', 'kind: agent\n    role: builder', 'kind: run'],
-    ['judge', 'a rubric', 'kind: agent\n    role: builder', 'kind: judge'],
   ])('rejects a %s step with no %s', (_kind, _need, from, to) => {
     const r = parseRecipe(RECIPE.replace(from, to), 'bugfix.yaml')
     expect(r.ok).toBe(false)

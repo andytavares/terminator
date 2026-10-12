@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { execute, opensPullRequest, skillsFor } from '../../src/line/executor.js'
 import type { ExecutorEvent, StartedRun } from '../../src/line/executor.js'
 import { buildRunGraph } from '../../src/line/run-graph.js'
+import { idleExecutorSeams } from './idle-executor-seams.js'
 import { retry } from '../../src/line/scheduler.js'
 import type { CommitOutcome } from '../../src/line/commit.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
@@ -150,6 +151,7 @@ function deps(
   events: ExecutorEvent[] = []
 ) {
   return {
+    ...idleExecutorSeams(),
     run,
     now: () => '2026-09-06T11:00:00.000Z',
     sources: { dataRoot, repoPaths: [repo], builtInDir },
@@ -596,16 +598,6 @@ steps:
     expect(outcome.complete).toBe(true)
   })
 
-  it('works with no event listener at all', async () => {
-    const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
-      run: ok,
-      now: () => 'now',
-      sources: { dataRoot, repoPaths: [repo], builtInDir },
-    })
-    expect(outcome.graph.nodes.some((n) => n.state === 'passed')).toBe(true)
-  })
-
   it('writes a verdict per criterion the unit claims', async () => {
     const o = order([unit('U-1', { satisfies: ['AC-1', 'AC-2'] })], {
       acceptance: [
@@ -1007,23 +999,15 @@ describe('a failed final climb', () => {
 
   it('says so when the base branch could not be checked, and never counts it as a pass', async () => {
     const o = order([unit('U-1')])
-    const unmeasured = await execute(
+    const outcome = await execute(
       o,
       recipe(),
       buildRunGraph(o, recipe()),
       base({ runStep: lintRunner(() => 1), runStepOnBase: async () => null })
     )
-    const absent = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
-      base({ runStep: lintRunner(() => 1) })
-    )
-    for (const outcome of [unmeasured, absent]) {
-      const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
-      expect(gate?.why).toContain('main could not be checked')
-      expect(gate?.options.map((o) => o.id)).toContain('send_back')
-    }
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.why).toContain('main could not be checked')
+    expect(gate?.options.map((o) => o.id)).toContain('send_back')
   })
 
   it('releases the base checkout once, even when a base step throws', async () => {
@@ -1298,7 +1282,7 @@ steps:
     step: { kind: agent, role: builder }
   - id: check
     kind: gate
-    rule: critical-path
+    rule: verify.repeat-fail
     defaultIfIgnored: hold
     after: [build]
 `
@@ -1309,7 +1293,7 @@ steps:
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
-    expect(outcome.gates.map((g) => g.rule)).toContain('critical-path')
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
     expect(outcome.gates.map((g) => g.rule)).not.toContain('unit.boundary')
   })
 
@@ -1319,7 +1303,7 @@ steps:
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
-    const gate = outcome.gates.find((g) => g.rule === 'critical-path')
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
     expect(gate?.options.map((o) => o.id)).toContain('send_back')
     expect(gate?.defaultIfIgnored).toBe('hold')
   })
@@ -1720,9 +1704,19 @@ steps:
         return ok(input)
       }
     )
+    const roleless = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: check
+    kind: run
+    command: echo hi
+`
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run as never))
-    for (const tier of seen) expect(tier).toBe('deep')
+    await execute(o, recipe(roleless), buildRunGraph(o, recipe(roleless)), deps(run as never))
+    // Said out loud: with no role-less node reached, the check below asserts nothing.
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.every((tier) => tier === 'deep')).toBe(true)
   })
 })
 

@@ -59,18 +59,9 @@ describe('factory/art/crew drawCrew', () => {
     expect(distinct.size).toBeGreaterThan(1)
   })
 
-  it('gives a builder a hat mark and a foreman a vest mark', () => {
-    const builder = createRecordingPaint()
-    drawCrew(builder, crew({ role: 'builder' }), 0)
-    const foreman = createRecordingPaint()
-    drawCrew(foreman, crew({ role: 'foreman' }), 0)
-    expect(foreman.calls.some((c) => c.op === 'fillRect' && c.style === '#f28c28')).toBe(true)
-    expect(builder.calls.some((c) => c.op === 'fillRect' && c.style === '#f28c28')).toBe(false)
-  })
-
   it('does not throw for an unknown role (neutral silhouette)', () => {
     const paint = createRecordingPaint()
-    expect(() => drawCrew(paint, crew({ role: 'integrator' }), 0)).not.toThrow()
+    expect(() => drawCrew(paint, crew({ role: 'unlisted' }), 0)).not.toThrow()
   })
 
   it('draws a visor for a visored role facing every direction', () => {

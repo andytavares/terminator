@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { orphanedNodes, reclaim, IN_FLIGHT } from '../../src/line/reclaim.js'
+import { orphanedNodes, reclaim } from '../../src/line/reclaim.js'
 import { buildRunGraph, withNode, nodeById } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -59,12 +59,6 @@ describe('orphanedNodes', () => {
   it('names an in-flight node whose agent is gone', () => {
     const g = withNode(graph(), 'build:U-1', { state: 'running', sessionId: 's1' })
     expect(orphanedNodes(g, nothingLive).map((n) => n.id)).toEqual(['build:U-1'])
-  })
-
-  it('covers verifying as well as running, because both occupy an agent', () => {
-    const g = withNode(graph(), 'build:U-1', { state: 'verifying', sessionId: 's1' })
-    expect(orphanedNodes(g, nothingLive).map((n) => n.id)).toEqual(['build:U-1'])
-    expect(IN_FLIGHT).toContain('verifying')
   })
 
   it('leaves an in-flight node whose agent is still in its terminal alone', () => {
@@ -138,7 +132,7 @@ describe('reclaim', () => {
 
   it('reclaims every orphan at once, not one per pass', () => {
     let g = withNode(graph(), 'build:U-1', { state: 'running', sessionId: 's1' })
-    g = withNode(g, 'build:U-2', { state: 'verifying', sessionId: 's2' })
+    g = withNode(g, 'build:U-2', { state: 'running', sessionId: 's2' })
     expect(reclaim(g, nothingLive).reclaimed).toEqual(['build:U-1', 'build:U-2'])
   })
 })

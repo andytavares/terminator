@@ -195,9 +195,7 @@ function applyNodeState(world: World, event: Extract<FactoryEvent, { kind: 'node
   const cleared = withVerdict(clearOpenCalls(world, event.nodeId), event)
   const fed = hasStarted(event.to) ? consumeQueued(cleared, event.nodeId) : cleared
   switch (event.to) {
-    case 'ready':
     case 'running':
-    case 'verifying':
       return withCrew(fed, event.nodeId, (crew) => {
         const seat = seatOf(world.map, event.nodeId)
         return seat === null ? crew : sendTo(crew, seat, workAnimFor(world.map, event.nodeId))
@@ -337,19 +335,7 @@ function applyGate(world: World, event: Extract<FactoryEvent, { kind: 'gate' }>)
       ? world.gatesWaiting
       : [...world.gatesWaiting, event.nodeId]
     : world.gatesWaiting.filter((id) => id !== event.nodeId)
-
-  const foreman = world.crew.find((c) => c.role === 'foreman')
-  let world2 = { ...world, gatesWaiting }
-  if (foreman !== undefined) {
-    if (event.waiting) {
-      const seat = seatOf(world.map, event.nodeId)
-      if (seat !== null) world2 = withCrew(world2, foreman.nodeId, (c) => sendTo(c, seat, 'wave'))
-    } else {
-      const seat = seatOf(world.map, foreman.nodeId)
-      if (seat !== null) world2 = withCrew(world2, foreman.nodeId, (c) => sendTo(c, seat, 'idle'))
-    }
-  }
-  return world2
+  return { ...world, gatesWaiting }
 }
 
 /** A run's round advancing: the dispatch tower's own count moves on. */
