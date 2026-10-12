@@ -19,6 +19,17 @@ async function buildApp(extraRoutes?: (app: FastifyInstance) => void): Promise<F
   return app
 }
 
+/** Answer one request on an app of its own, closed again before the caller asserts. */
+async function injectIntoFreshApp(
+  request: Parameters<FastifyInstance['inject']>[0],
+  extraRoutes?: (app: FastifyInstance) => void
+) {
+  const app = await buildApp(extraRoutes)
+  const res = await app.inject(request)
+  await app.close()
+  return res
+}
+
 describe('isAllowedHost', () => {
   it('returns false for empty string (missing Host header should be blocked)', () =>
     expect(isAllowedHost('')).toBe(false))
@@ -41,153 +52,163 @@ describe('isAllowedHost', () => {
   it('blocks public IP', () => expect(isAllowedHost('8.8.8.8')).toBe(false))
 })
 
-describe('auth.middleware', () => {
-  describe('session cookie', () => {
-    it('returns 401 when there is no session cookie on an API route', async () => {
-      const app = await buildApp()
-      const res = await app.inject({ method: 'GET', url: '/api/protected' })
-      await app.close()
-      expect(res.statusCode).toBe(401)
-      expect(JSON.parse(res.body)).toMatchObject({ error: 'UNAUTHORIZED' })
-    })
+describe('auth.middleware', authMiddlewareTests)
 
-    it('returns 401 for a session cookie the server did not issue', async () => {
-      const app = await buildApp()
-      const res = await app.inject({
-        method: 'GET',
-        url: '/api/protected',
-        headers: { cookie: 'remote-session=other' },
-      })
-      await app.close()
-      expect(res.statusCode).toBe(401)
-    })
+function authMiddlewareTests() {
+  describe('session cookie', sessionCookieTests)
+  describe('Non-API paths bypass auth', nonApiPathTests)
+  describe(
+    'Self-authenticating routes skip the session check but still get the Host check',
+    selfAuthenticatingRouteTests
+  )
+  describe('/ws/ routes get DNS rebinding protection', socketRouteHostTests)
+}
 
-    it('does not accept an Authorization header in place of a session', async () => {
-      const app = await buildApp()
-      const res = await app.inject({
-        method: 'GET',
-        url: '/api/protected',
-        headers: { Authorization: 'Bearer correct-password' },
-      })
-      await app.close()
-      expect(res.statusCode).toBe(401)
-    })
+function sessionCookieTests() {
+  describe('without a valid session', sessionCookieMissingTests)
+  describe('with a valid session', sessionCookieValidTests)
+}
 
-    it.each([
-      ['IP host', '127.0.0.1'],
-      ['ngrok domain', 'abc.ngrok-free.app'],
-      ['RFC-1918 LAN host with port', '192.168.1.42:7681'],
-    ])('passes through with a valid session (%s)', async (_label, host) => {
-      const app = await buildApp()
-      const res = await app.inject({
-        method: 'GET',
-        url: '/api/protected',
-        headers: { cookie: VALID_COOKIE, Host: host },
-      })
-      await app.close()
-      expect(res.statusCode).toBe(200)
-    })
-
-    it('returns 403 when Host header is an unexpected external domain', async () => {
-      const app = await buildApp()
-      const res = await app.inject({
-        method: 'GET',
-        url: '/api/protected',
-        headers: { cookie: VALID_COOKIE, Host: 'evil.attacker.com' },
-      })
-      await app.close()
-      expect(res.statusCode).toBe(403)
-      expect(JSON.parse(res.body)).toMatchObject({ error: 'FORBIDDEN' })
-    })
+function sessionCookieMissingTests() {
+  it('returns 401 when there is no session cookie on an API route', async () => {
+    const res = await injectIntoFreshApp({ method: 'GET', url: '/api/protected' })
+    expect(res.statusCode).toBe(401)
+    expect(JSON.parse(res.body)).toMatchObject({ error: 'UNAUTHORIZED' })
   })
 
-  describe('Non-API paths bypass auth', () => {
-    it('serves / without credentials', async () => {
-      const app = await buildApp()
-      const res = await app.inject({ method: 'GET', url: '/' })
-      await app.close()
-      expect(res.statusCode).toBe(200)
+  it('returns 401 for a session cookie the server did not issue', async () => {
+    const res = await injectIntoFreshApp({
+      method: 'GET',
+      url: '/api/protected',
+      headers: { cookie: 'remote-session=other' },
     })
-
-    it('serves /health without credentials', async () => {
-      const app = await buildApp()
-      const res = await app.inject({ method: 'GET', url: '/health' })
-      await app.close()
-      expect(res.statusCode).toBe(200)
-    })
+    expect(res.statusCode).toBe(401)
   })
 
-  describe('Self-authenticating routes skip the session check but still get the Host check', () => {
-    it.each(['/api/bridge', '/api/login'])('allows %s without a session', async (url) => {
-      const app = await buildApp((a) => {
-        a.all(url, async () => ({ ok: true }))
-      })
-      const res = await app.inject({ method: 'POST', url })
-      await app.close()
-      expect(res.statusCode).toBe(200)
+  it('does not accept an Authorization header in place of a session', async () => {
+    const res = await injectIntoFreshApp({
+      method: 'GET',
+      url: '/api/protected',
+      headers: { Authorization: 'Bearer correct-password' },
     })
+    expect(res.statusCode).toBe(401)
+  })
+}
 
-    it('blocks /api/bridge with unexpected Host (DNS rebinding still applies)', async () => {
-      const app = await buildApp((a) => {
-        a.get('/api/bridge', async () => ({ ok: true }))
-      })
-      const res = await app.inject({
+function sessionCookieValidTests() {
+  it.each([
+    ['IP host', '127.0.0.1'],
+    ['ngrok domain', 'abc.ngrok-free.app'],
+    ['RFC-1918 LAN host with port', '192.168.1.42:7681'],
+  ])('passes through with a valid session (%s)', async (_label, host) => {
+    const res = await injectIntoFreshApp({
+      method: 'GET',
+      url: '/api/protected',
+      headers: { cookie: VALID_COOKIE, Host: host },
+    })
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('returns 403 when Host header is an unexpected external domain', async () => {
+    const res = await injectIntoFreshApp({
+      method: 'GET',
+      url: '/api/protected',
+      headers: { cookie: VALID_COOKIE, Host: 'evil.attacker.com' },
+    })
+    expect(res.statusCode).toBe(403)
+    expect(JSON.parse(res.body)).toMatchObject({ error: 'FORBIDDEN' })
+  })
+}
+
+function nonApiPathTests() {
+  it('serves / without credentials', async () => {
+    const res = await injectIntoFreshApp({ method: 'GET', url: '/' })
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('serves /health without credentials', async () => {
+    const res = await injectIntoFreshApp({ method: 'GET', url: '/health' })
+    expect(res.statusCode).toBe(200)
+  })
+}
+
+function selfAuthenticatingRouteTests() {
+  describe('login and bridge', selfAuthenticatingBridgeTests)
+  describe('the bridge ticket', selfAuthenticatingTicketTests)
+}
+
+function selfAuthenticatingBridgeTests() {
+  it.each(['/api/bridge', '/api/login'])('allows %s without a session', async (url) => {
+    const res = await injectIntoFreshApp({ method: 'POST', url }, (a) => {
+      a.all(url, async () => ({ ok: true }))
+    })
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('blocks /api/bridge with unexpected Host (DNS rebinding still applies)', async () => {
+    const res = await injectIntoFreshApp(
+      {
         method: 'GET',
         url: '/api/bridge',
         headers: { Host: 'evil.attacker.com' },
-      })
-      await app.close()
-      expect(res.statusCode).toBe(403)
-    })
+      },
+      (a) => {
+        a.get('/api/bridge', async () => ({ ok: true }))
+      }
+    )
+    expect(res.statusCode).toBe(403)
+  })
+}
 
-    it('/api/bridge-ticket requires a session', async () => {
-      const app = await buildApp((a) => {
-        a.post('/api/bridge-ticket', async () => ({ ticket: 'tok' }))
-      })
-      const res = await app.inject({ method: 'POST', url: '/api/bridge-ticket' })
-      await app.close()
-      expect(res.statusCode).toBe(401)
+function selfAuthenticatingTicketTests() {
+  it('/api/bridge-ticket requires a session', async () => {
+    const res = await injectIntoFreshApp({ method: 'POST', url: '/api/bridge-ticket' }, (a) => {
+      a.post('/api/bridge-ticket', async () => ({ ticket: 'tok' }))
     })
+    expect(res.statusCode).toBe(401)
+  })
 
-    it('/api/bridge-ticket is issued to a client with a valid session', async () => {
-      const app = await buildApp((a) => {
-        a.post('/api/bridge-ticket', async () => ({ ticket: 'tok' }))
-      })
-      const res = await app.inject({
+  it('/api/bridge-ticket is issued to a client with a valid session', async () => {
+    const res = await injectIntoFreshApp(
+      {
         method: 'POST',
         url: '/api/bridge-ticket',
         headers: { cookie: VALID_COOKIE },
-      })
-      await app.close()
-      expect(res.statusCode).toBe(200)
-    })
+      },
+      (a) => {
+        a.post('/api/bridge-ticket', async () => ({ ticket: 'tok' }))
+      }
+    )
+    expect(res.statusCode).toBe(200)
   })
+}
 
-  describe('/ws/ routes get DNS rebinding protection', () => {
-    it('blocks /ws/terminals with unexpected Host', async () => {
-      const app = await buildApp((a) => {
-        a.get('/ws/terminals/s1', async () => ({ ok: true }))
-      })
-      const res = await app.inject({
+function socketRouteHostTests() {
+  it('blocks /ws/terminals with unexpected Host', async () => {
+    const res = await injectIntoFreshApp(
+      {
         method: 'GET',
         url: '/ws/terminals/s1',
         headers: { Host: 'evil.attacker.com' },
-      })
-      await app.close()
-      expect(res.statusCode).toBe(403)
-    })
-
-    it('allows /ws/terminals from localhost', async () => {
-      const app = await buildApp((a) => {
+      },
+      (a) => {
         a.get('/ws/terminals/s1', async () => ({ ok: true }))
-      })
-      const res = await app.inject({
+      }
+    )
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('allows /ws/terminals from localhost', async () => {
+    const res = await injectIntoFreshApp(
+      {
         method: 'GET',
         url: '/ws/terminals/s1',
         headers: { Host: 'localhost:7681' },
-      })
-      await app.close()
-      expect(res.statusCode).toBe(200)
-    })
+      },
+      (a) => {
+        a.get('/ws/terminals/s1', async () => ({ ok: true }))
+      }
+    )
+    expect(res.statusCode).toBe(200)
   })
-})
+}
