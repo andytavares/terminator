@@ -47,18 +47,14 @@ export interface PtyManagerAPI {
 }
 
 export interface WorkspaceSnapshot {
-  id: string
-  name: string
-  folderPath: string
-  color: string
-  tags: string[]
+  readonly id: string
+  readonly name: string
+  readonly folderPath: string
 }
 
 export interface ProjectSnapshot {
-  id: string
-  workspaceId: string
-  name: string
-  gitBranch?: string
-  worktreePath?: string
-  isWorktree: boolean
+  readonly id: string
+  readonly workspaceId: string
+  readonly name: string
+  readonly worktreePath?: string
 }

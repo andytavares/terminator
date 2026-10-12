@@ -74,6 +74,24 @@ describe('reduceStatus', () => {
     expect(next.failure.resolution).toBe('upstream refused the connection')
   })
 
+  describe('no password set', () => {
+    it('fails with a way forward instead of going quietly off', () => {
+      const status = reduceStatus(OFF, { enabled: false, error: 'PASSWORD_REQUIRED' })
+      expect(status).toMatchObject({ kind: 'failed', failure: { reason: 'password-required' } })
+    })
+
+    it('shows the explanation the main process sent', () => {
+      const status = reduceStatus(OFF, {
+        enabled: false,
+        error: 'PASSWORD_REQUIRED',
+        message: 'The saved password used an old format.',
+      })
+      expect(status).toMatchObject({
+        failure: { message: 'The saved password used an old format.' },
+      })
+    })
+  })
+
   describe('port already in use', () => {
     it('fails, naming the port', () => {
       const next = reduceStatus(OFF, { error: 'PORT_IN_USE', port: 7681 })

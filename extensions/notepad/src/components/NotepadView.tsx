@@ -186,8 +186,8 @@ export function NotepadView(): React.JSX.Element {
       const view = editorViewRef.current
       const panel = commentPanelRef.current
       if (!view || !panel) return
-      function onEditorScroll() {
-        if (panel) panel.scrollTop = view.scrollDOM.scrollTop
+      const onEditorScroll = () => {
+        panel.scrollTop = view.scrollDOM.scrollTop
       }
       view.scrollDOM.addEventListener('scroll', onEditorScroll, { passive: true })
       removeScroll = () => view.scrollDOM.removeEventListener('scroll', onEditorScroll)
@@ -201,7 +201,8 @@ export function NotepadView(): React.JSX.Element {
   // Load selected note body and comments
   useEffect(() => {
     if (!selectedNoteId) return
-    activeIdRef.current = selectedNoteId
+    const noteId = selectedNoteId
+    activeIdRef.current = noteId
     // Clear stale comments immediately so the previous note's anchors don't
     // get applied to the newly mounted editor before the new note loads.
     setComments([])
@@ -210,28 +211,28 @@ export function NotepadView(): React.JSX.Element {
       try {
         // Use the in-session body cache when available so content is never lost
         // due to a race between a cleanup flush and this DB read.
-        const cachedBody = useNotesStore.getState().bodyCache[selectedNoteId!]
+        const cachedBody = useNotesStore.getState().bodyCache[noteId]
 
         const [bodyResult, commentsResult] = await Promise.all([
           cachedBody !== undefined
             ? Promise.resolve({ data: { body: cachedBody } })
             : window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.get', {
-                id: selectedNoteId,
+                id: noteId,
               }),
           window.electronAPI.extensionBridge.invoke('terminator.notepad:comments.list', {
-            noteId: selectedNoteId,
+            noteId: noteId,
             includeResolved: true,
           }),
         ])
 
         const note = (bodyResult as { data?: { body: string } }).data
-        if (!note || activeIdRef.current !== selectedNoteId) return
+        if (!note || activeIdRef.current !== noteId) return
         // Populate the cache on first DB fetch so future navigate-backs skip the round-trip
         if (cachedBody === undefined) {
-          useNotesStore.getState().setBodyCache(selectedNoteId!, note.body)
+          useNotesStore.getState().setBodyCache(noteId, note.body)
         }
-        setActiveNote(selectedNoteId, note.body)
-        setLoadedNoteId(selectedNoteId)
+        setActiveNote(noteId, note.body)
+        setLoadedNoteId(noteId)
 
         const allComments = (commentsResult as { data?: Comment[] }).data ?? []
         const anchorUpdates: { id: string; newFrom: number; newTo: number }[] = []

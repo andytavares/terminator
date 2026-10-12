@@ -1,19 +1,24 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import './Login.css'
-import { setToken } from './api/remote-client'
+import { forgetLegacyToken } from './api/remote-client'
 
 export function App(): JSX.Element {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  useEffect(forgetLegacyToken, [])
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/workspaces', {
-        headers: { Authorization: `Bearer ${password}` },
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ password }),
       })
       if (res.status === 401) {
         setError('Wrong password')
@@ -22,6 +27,11 @@ export function App(): JSX.Element {
       }
       if (res.status === 403) {
         setError('Access denied')
+        setLoading(false)
+        return
+      }
+      if (res.status === 429) {
+        setError('Too many attempts. Try again later')
         setLoading(false)
         return
       }
@@ -34,10 +44,9 @@ export function App(): JSX.Element {
       const ticketEndpoint = isMobile ? '/api/mobile-ticket' : '/api/app-ticket'
       const ticketRes = await fetch(ticketEndpoint, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${password}` },
+        credentials: 'same-origin',
       })
       const { ticket } = (await ticketRes.json()) as { ticket: string }
-      setToken(password)
       const dest = isMobile ? '/mobile/' : '/app/'
       location.replace(`${dest}?t=${encodeURIComponent(ticket)}`)
     } catch {

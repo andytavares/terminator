@@ -50,7 +50,6 @@ async function buildExtension(name) {
       'fastify',
       '@fastify/static',
       '@fastify/websocket',
-      'bcryptjs',
       // Git Integration's parser. Loads its .wasm files relative to its own
       // module path, which a bundle would move.
       'web-tree-sitter',

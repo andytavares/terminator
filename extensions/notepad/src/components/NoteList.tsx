@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   ChevronDown,
@@ -392,8 +392,11 @@ export function NoteList(): React.JSX.Element {
   const { searchQuery, activeTagIds, setQuery, toggleTag, clearTags } = useFilterStore()
 
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
-  const [tags, setTags] = useState<Tag[]>([])
-  const tagsRef = useRef<Tag[]>([])
+  const [resultsQuery, setResultsQuery] = useState(searchQuery)
+  if (resultsQuery !== searchQuery) {
+    setResultsQuery(searchQuery)
+    if (!searchQuery) setSearchResults(null)
+  }
   const searchGenRef = useRef(0)
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false)
   const tagDropdownRef = useRef<HTMLDivElement>(null)
@@ -413,26 +416,11 @@ export function NoteList(): React.JSX.Element {
   const [dropTarget, setDropTarget] = useState<{ id: string; before: boolean } | null>(null)
   const [folderDropTarget, setFolderDropTarget] = useState<string | null>(null)
 
-  useEffect(() => {
-    const previousTags = tagsRef.current
-    const tagMap = new Map<string, { id: string; name: string; count: number }>()
+  const tags = useMemo<Tag[]>(() => {
+    const noteCounts = new Map<string, number>()
     const allTagSources = [...notes.flatMap((n) => n.tags), ...diagrams.flatMap((d) => d.tags)]
-    for (const name of allTagSources) {
-      const existing = tagMap.get(name)
-      if (existing) {
-        existing.count++
-      } else {
-        const known = previousTags.find((t) => t.name === name)
-        tagMap.set(name, { id: known?.id ?? `local:${name}`, name, count: 1 })
-      }
-    }
-    const derived = Array.from(tagMap.values()).map((t) => ({
-      id: t.id,
-      name: t.name,
-      noteCount: t.count,
-    }))
-    tagsRef.current = derived
-    setTags(derived)
+    for (const name of allTagSources) noteCounts.set(name, (noteCounts.get(name) ?? 0) + 1)
+    return Array.from(noteCounts, ([name, noteCount]) => ({ id: `local:${name}`, name, noteCount }))
   }, [notes, diagrams])
 
   // Close tag dropdown when clicking outside
@@ -452,7 +440,6 @@ export function NoteList(): React.JSX.Element {
     /* v8 ignore next */
     if (!searchQuery) {
       ++searchGenRef.current
-      setSearchResults(null)
       return
     }
     /* v8 ignore next */
@@ -701,110 +688,96 @@ export function NoteList(): React.JSX.Element {
     )
   }
 
-  const makeDragProps = useCallback(
-    function makeDragProps(id: string, type: 'note' | 'diagram'): DragProps {
-      return {
-        draggable: searchResults === null,
-        dragOverPosition: dropTarget?.id === id ? (dropTarget.before ? 'before' : 'after') : null,
-        onDragStart(e) {
-          setDragId(id)
-          setDragType(type)
-          e.dataTransfer.effectAllowed = 'move'
-        },
-        onDragOver(e) {
-          e.preventDefault()
-          e.dataTransfer.dropEffect = 'move'
-          const rect = e.currentTarget.getBoundingClientRect()
-          const before = e.clientY < rect.top + rect.height / 2
-          setDropTarget((prev) =>
-            prev?.id === id && prev.before === before ? prev : { id, before }
+  function makeDragProps(id: string, type: 'note' | 'diagram'): DragProps {
+    return {
+      draggable: searchResults === null,
+      dragOverPosition: dropTarget?.id === id ? (dropTarget.before ? 'before' : 'after') : null,
+      onDragStart(e) {
+        setDragId(id)
+        setDragType(type)
+        e.dataTransfer.effectAllowed = 'move'
+      },
+      onDragOver(e) {
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        const rect = e.currentTarget.getBoundingClientRect()
+        const before = e.clientY < rect.top + rect.height / 2
+        setDropTarget((prev) => (prev?.id === id && prev.before === before ? prev : { id, before }))
+      },
+      onDragLeave() {
+        setDropTarget((prev) => (prev?.id === id ? null : prev))
+      },
+      onDrop(e) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (!dragId || !dragType || !dropTarget) {
+          setDragId(null)
+          setDragType(null)
+          setDropTarget(null)
+          return
+        }
+
+        const draggedEntry = activeItems.find((en) => en.item.id === dragId)
+        const dropEntry = activeItems.find((en) => en.item.id === dropTarget.id)
+
+        const draggedFolderId =
+          draggedEntry && 'folderId' in draggedEntry.item ? draggedEntry.item.folderId : null
+        const dropFolderId =
+          dropEntry && 'folderId' in dropEntry.item ? dropEntry.item.folderId : null
+
+        // Determine the item set to reorder within
+        const sameGroup = draggedFolderId === dropFolderId
+        const baseItems = dropFolderId === null ? rootActiveItems : getItemsInFolder(dropFolderId)
+        const ordered = baseItems.map((en) => ({ id: en.item.id, type: en.kind }))
+
+        // If dragged item is in a different group, inject it into the destination list
+        const fromIdx = ordered.findIndex((i) => i.id === dragId)
+        const dropIdx = ordered.findIndex((i) => i.id === dropTarget.id)
+
+        if (dropIdx === -1) {
+          setDragId(null)
+          setDragType(null)
+          setDropTarget(null)
+          return
+        }
+
+        const newOrder = [...ordered]
+        if (fromIdx !== -1) newOrder.splice(fromIdx, 1)
+        const newDropIdx = newOrder.findIndex((i) => i.id === dropTarget.id)
+        newOrder.splice(dropTarget.before ? newDropIdx : newDropIdx + 1, 0, {
+          id: dragId,
+          type: dragType,
+        })
+
+        setDragId(null)
+        setDragType(null)
+        setDropTarget(null)
+
+        const ops: Promise<unknown>[] = [
+          window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.reorder', {
+            items: newOrder,
+          }),
+        ]
+        if (!sameGroup) {
+          ops.push(
+            window.electronAPI.extensionBridge.invoke('terminator.notepad:folders.move', {
+              items: [{ id: dragId, type: dragType }],
+              folderId: dropFolderId,
+            })
           )
-        },
-        onDragLeave() {
-          setDropTarget((prev) => (prev?.id === id ? null : prev))
-        },
-        onDrop(e) {
-          e.preventDefault()
-          e.stopPropagation()
-          if (!dragId || !dragType || !dropTarget) {
-            setDragId(null)
-            setDragType(null)
-            setDropTarget(null)
-            return
-          }
-
-          const draggedEntry = activeItems.find((en) => en.item.id === dragId)
-          const dropEntry = activeItems.find((en) => en.item.id === dropTarget.id)
-
-          const draggedFolderId =
-            draggedEntry && 'folderId' in draggedEntry.item ? draggedEntry.item.folderId : null
-          const dropFolderId =
-            dropEntry && 'folderId' in dropEntry.item ? dropEntry.item.folderId : null
-
-          // Determine the item set to reorder within
-          const sameGroup = draggedFolderId === dropFolderId
-          const baseItems = dropFolderId === null ? rootActiveItems : getItemsInFolder(dropFolderId)
-          const ordered = baseItems.map((en) => ({ id: en.item.id, type: en.kind }))
-
-          // If dragged item is in a different group, inject it into the destination list
-          const fromIdx = ordered.findIndex((i) => i.id === dragId)
-          const dropIdx = ordered.findIndex((i) => i.id === dropTarget.id)
-
-          if (dropIdx === -1) {
-            setDragId(null)
-            setDragType(null)
-            setDropTarget(null)
-            return
-          }
-
-          const newOrder = [...ordered]
-          if (fromIdx !== -1) newOrder.splice(fromIdx, 1)
-          const newDropIdx = newOrder.findIndex((i) => i.id === dropTarget.id)
-          newOrder.splice(dropTarget.before ? newDropIdx : newDropIdx + 1, 0, {
-            id: dragId,
-            type: dragType,
-          })
-
-          setDragId(null)
-          setDragType(null)
-          setDropTarget(null)
-
-          const ops: Promise<unknown>[] = [
-            window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.reorder', {
-              items: newOrder,
-            }),
-          ]
-          if (!sameGroup) {
-            ops.push(
-              window.electronAPI.extensionBridge.invoke('terminator.notepad:folders.move', {
-                items: [{ id: dragId, type: dragType }],
-                folderId: dropFolderId,
-              })
-            )
-          }
-          Promise.all(ops)
-            .then(() => reloadAll())
-            .catch(console.error)
-        },
-        onDragEnd() {
-          setDragId(null)
-          setDragType(null)
-          setDropTarget(null)
-          setFolderDropTarget(null)
-        },
-      }
-    },
-    [
-      searchResults,
-      dropTarget,
-      dragId,
-      dragType,
-      activeItems,
-      rootActiveItems,
-      getItemsInFolder,
-      reloadAll,
-    ]
-  )
+        }
+        Promise.all(ops)
+          .then(() => reloadAll())
+          .catch(console.error)
+      },
+      onDragEnd() {
+        setDragId(null)
+        setDragType(null)
+        setDropTarget(null)
+        setFolderDropTarget(null)
+      },
+    }
+  }
 
   function makeFolderDropProps(folderId: string) {
     return {

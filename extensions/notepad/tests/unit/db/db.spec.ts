@@ -75,6 +75,30 @@ describe('applyNotepadMigrations', () => {
     await expect(applyNotepadMigrations(db)).resolves.not.toThrow()
   })
 
+  it('changes no table definition when the schema is already current', async () => {
+    await applyNotepadSchema(db)
+    const statements: string[] = []
+    const recordingDb: ExtensionDB = {
+      ...db,
+      exec: (sql: string) => {
+        statements.push(sql)
+        return db.exec(sql)
+      },
+      transaction: (work) =>
+        db.transaction((tx) =>
+          work({
+            ...tx,
+            exec: (sql: string) => {
+              statements.push(sql)
+              return tx.exec(sql)
+            },
+          })
+        ),
+    }
+    await applyNotepadMigrations(recordingDb)
+    expect(statements.filter((sql) => /ALTER TABLE|DROP /i.test(sql))).toEqual([])
+  })
+
   it('creates diagram_tags and does not add tags column when old schema had no tags column', async () => {
     await db.exec(`
       CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled note', body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0, folder_id TEXT);

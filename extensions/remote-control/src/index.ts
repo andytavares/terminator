@@ -1,6 +1,5 @@
 import { networkInterfaces } from 'os'
 import { randomBytes } from 'crypto'
-import bcryptjs from 'bcryptjs'
 import type { ExtensionAPI } from '../../../src/main/extensions/api.js'
 import {
   createRemoteServer,
@@ -8,16 +7,21 @@ import {
   type RemoteServerHandle,
 } from './server/remote-server.js'
 import { NgrokManager, generateCaddyfile } from './server/ngrok-manager.js'
+import { CredentialStore } from './server/credential-store.js'
 
 const EXT = 'terminator.remote-control'
 const KEY = {
   enabled: `${EXT}.enabled`,
   port: `${EXT}.port`,
-  password: `${EXT}.password`,
+  // Held the password in plain text before ADR-100; only ever read to migrate it, then emptied.
+  legacyPassword: `${EXT}.password`,
   passwordHash: `${EXT}.passwordHash`,
   maxSubscribers: `${EXT}.maxSubscribers`,
   ngrokAuthToken: `${EXT}.ngrokAuthToken`,
 }
+
+const PASSWORD_RESET_MESSAGE =
+  'The saved password used an old format that cannot be kept. Set a new password in Settings.'
 
 function getLanUrl(port: number): string {
   const ifaces = networkInterfaces()
@@ -62,33 +66,26 @@ export function activate(api: ExtensionAPI): void {
   function getPort(): number {
     return api.settings.get<number>(KEY.port) ?? 7681
   }
-  function getPasswordHash(): string {
-    return api.settings.get<string>(KEY.passwordHash) ?? ''
-  }
+  const credentials = new CredentialStore(api.settings, KEY)
   function getMaxSubscribers(): number {
     return api.settings.get<number>(KEY.maxSubscribers) ?? 5
   }
 
-  async function ensurePassword(): Promise<void> {
-    const existing = api.settings.get<string>(KEY.password) ?? ''
-    const existingHash = getPasswordHash()
-    if (existingHash) return
-    const pw = existing || randomBytes(16).toString('base64url')
-    const hash = await bcryptjs.hash(pw, 10)
-    api.settings.set(KEY.password, pw)
-    api.settings.set(KEY.passwordHash, hash)
+  function refuseWithoutPassword(message?: string): void {
+    api.settings.set(KEY.enabled, false)
+    api.window.broadcast('remote:status', { enabled: false, error: 'PASSWORD_REQUIRED', message })
   }
 
   async function startServer(): Promise<void> {
     if (remoteServer) await stopServer()
-    await ensurePassword()
+    if (!credentials.hasPassword()) return refuseWithoutPassword()
     const port = getPort()
     try {
       remoteServer = await createRemoteServer({
         port,
         ptyManager: api.pty,
         deps: {
-          getPasswordHash,
+          getPasswordHash: () => credentials.getPasswordHash(),
           getMaxSubscribers,
           listWorkspaces: () => api.workspace.list(),
           listProjects: (id) => api.workspace.listProjects(id),
@@ -197,6 +194,10 @@ export function activate(api: ExtensionAPI): void {
     'remote:toggle',
     async (payload) => {
       const { enabled } = payload as { enabled: boolean }
+      if (enabled && !credentials.hasPassword()) {
+        refuseWithoutPassword()
+        return { error: 'PASSWORD_REQUIRED' }
+      }
       api.settings.set(KEY.enabled, enabled)
       enqueue(enabled ? startServer : stopServer)
       return { ok: true }
@@ -220,10 +221,9 @@ export function activate(api: ExtensionAPI): void {
     'remote:update-password',
     async (payload) => {
       const { password } = payload as { password: string }
+      const generated = !password
       const actual = password || randomBytes(16).toString('base64url')
-      const hash = await bcryptjs.hash(actual, 10)
-      api.settings.set(KEY.password, actual)
-      api.settings.set(KEY.passwordHash, hash)
+      await credentials.setPassword(actual)
       remoteServer?.disconnectAllClients()
       const listening = !!remoteServer?.isListening()
       const port = api.settings.get<number>(KEY.port) ?? 7681
@@ -231,7 +231,8 @@ export function activate(api: ExtensionAPI): void {
         enabled: listening,
         ...(listening && { port, lanUrl: getLanUrl(port), publicUrl: currentPublicUrl }),
       })
-      return { password: actual }
+      // A generated password is the one value the owner has no other way to learn.
+      return generated ? { password: actual } : { ok: true }
     },
     LOCAL_ONLY
   )
@@ -286,7 +287,7 @@ export function activate(api: ExtensionAPI): void {
         enabled: api.settings.get<boolean>(KEY.enabled) ?? false,
         port,
         maxSubscribers: getMaxSubscribers(),
-        password: api.settings.get<string>(KEY.password) ?? '',
+        hasPassword: credentials.hasPassword(),
         ngrokAuthToken: api.settings.get<string>(KEY.ngrokAuthToken) ?? '',
         ...(listening && { lanUrl: getLanUrl(port), publicUrl: currentPublicUrl }),
       }
@@ -337,10 +338,12 @@ export function activate(api: ExtensionAPI): void {
     LOCAL_ONLY
   )
 
-  // Auto-start if previously enabled
-  if (api.settings.get<boolean>(KEY.enabled)) {
-    enqueue(startServer)
-  }
+  // Convert what earlier versions stored, then auto-start if previously enabled.
+  enqueue(async () => {
+    const outcome = await credentials.migrateLegacy()
+    if (outcome === 'invalidated') refuseWithoutPassword(PASSWORD_RESET_MESSAGE)
+    else if (api.settings.get<boolean>(KEY.enabled)) await startServer()
+  })
 }
 
 export async function deactivate(): Promise<void> {

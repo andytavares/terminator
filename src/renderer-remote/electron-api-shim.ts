@@ -5,6 +5,9 @@
 // this file only supplies the WebSocket transport and the browser-local stubs for
 // methods that cannot work remotely (native dialogs, WebContentsView bounds, …).
 import { buildElectronApi, type ApiTransport } from '../shared/electron-api/build-api.js'
+import { forgetLegacyToken } from './api/remote-client.js'
+
+forgetLegacyToken()
 ;(function () {
   let ws: WebSocket
   let wsReady = false
@@ -46,12 +49,9 @@ import { buildElectronApi, type ApiTransport } from '../shared/electron-api/buil
   }
 
   async function connectBridge(): Promise<void> {
-    const token = localStorage.getItem('remote_token') ?? ''
     let ticket: string
     try {
-      const headers: Record<string, string> = {}
-      if (token) headers['Authorization'] = `Bearer ${token}`
-      const res = await fetch('/api/bridge-ticket', { method: 'POST', headers })
+      const res = await fetch('/api/bridge-ticket', { method: 'POST', credentials: 'same-origin' })
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
           // Session expired or missing — send back to login

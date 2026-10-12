@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { MessageSquarePlus, X, Check, Trash2, Pencil } from 'lucide-react'
+import type { ExcalidrawInitialDataState } from '@excalidraw/excalidraw/types/types'
 import type { DiagramComment } from '../db/types'
 import { useNotesStore } from '../stores/notes.store'
 
@@ -8,6 +9,8 @@ const ExcalidrawComponent = lazy(async () => {
   const mod = await import('@excalidraw/excalidraw')
   return { default: mod.Excalidraw }
 })
+
+type SceneData = Pick<ExcalidrawInitialDataState, 'elements' | 'appState'>
 
 const AUTOSAVE_DELAY_MS = 1200
 
@@ -232,7 +235,7 @@ interface DiagramViewProps {
 }
 
 export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element {
-  const initialSceneRef = useRef<{ elements?: unknown[]; appState?: unknown }>({})
+  const [initialScene, setInitialScene] = useState<SceneData>({})
   const [loaded, setLoaded] = useState(false)
   const [title, setTitle] = useState('Untitled diagram')
   const [tags, setTags] = useState<string[]>([])
@@ -271,11 +274,6 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
 
   useEffect(() => {
     activeIdRef.current = diagramId
-    setLoaded(false)
-    setLoadError(null)
-    setComments([])
-    setPendingPin(null)
-    setActiveCommentId(null)
 
     async function load() {
       try {
@@ -321,12 +319,9 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
         setTitle(diagram.title)
         setTags(diagram.tags ?? [])
         try {
-          initialSceneRef.current = JSON.parse(diagram.sceneJson || '{}') as {
-            elements?: unknown[]
-            appState?: unknown
-          }
+          setInitialScene(JSON.parse(diagram.sceneJson || '{}') as SceneData)
         } catch {
-          initialSceneRef.current = {}
+          setInitialScene({})
         }
         const commentData = (commentsResult as { data?: DiagramComment[] }).data ?? []
         setComments(commentData)
@@ -596,8 +591,8 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
               key={diagramId}
               theme="dark"
               initialData={{
-                elements: (initialSceneRef.current.elements ?? []) as any,
-                appState: (initialSceneRef.current.appState ?? {}) as any,
+                elements: initialScene.elements ?? [],
+                appState: initialScene.appState ?? {},
                 scrollToContent: true,
               }}
               onChange={handleExcalidrawChange}

@@ -566,13 +566,14 @@ operator asked for, Linear only (ADR-061).
 
 ## Remote Control Server
 
-When enabled via Settings → Remote Control, Terminator starts an embedded [Fastify](https://fastify.dev/) 5.x HTTP/WebSocket server. The server binds to `0.0.0.0` so it is reachable directly over the LAN (the `remote:status` payload reports both a `lanUrl` and an optional ngrok `publicUrl`). Access is gated by per-request password/Bearer auth, a `Host`-header check, and single-use tickets — not by the bind address.
+When enabled via Settings → Remote Control, Terminator starts an embedded [Fastify](https://fastify.dev/) 5.x HTTP/WebSocket server. The server binds to `0.0.0.0` so it is reachable directly over the LAN (the `remote:status` payload reports both a `lanUrl` and an optional ngrok `publicUrl`). Access is gated by a password checked once at login (exchanged for a session cookie), a `Host`-header check, and single-use tickets — not by the bind address.
 
 ```
 Remote Control Extension (extensions/remote-control/)
 │
 ├── RemoteServer (Fastify 5.x, binds 0.0.0.0 — LAN + ngrok)
 │   ├── GET    /health                         → { ok: true }
+│   ├── POST   /api/login                      → checks the password once; sets the remote-session cookie
 │   ├── GET    /api/workspaces                 → workspace list
 │   ├── GET    /api/projects?workspaceId=      → project list
 │   ├── POST   /api/terminals                  → spawn PTY, returns sessionId
@@ -601,15 +602,15 @@ Remote Control Extension (extensions/remote-control/)
 **Security constraints**:
 
 - Server binds to `0.0.0.0` so phones/tablets on the same LAN can connect directly; remote (off-LAN) access is via ngrok. Security relies on auth, the `Host`-header check, per-IP rate limiting, and tickets rather than the bind address. See [ADR-017](adr/017-embedded-http-remote-server.md) § Threat Model & Accepted Risk.
-- All routes (except `/health`) require `Authorization: Bearer <password>` validated with `bcryptjs.compare()` (async, work factor 10).
-- Failed password attempts are rate-limited per client IP (`auth-rate-limiter.ts`): after 10 failures within 15 minutes the client is locked out (`429`) until the window drains. This is what makes a single shared password tolerable on a `0.0.0.0`-bound listener.
+- The password is checked once, by `POST /api/login`, against a scrypt hash with a random salt (`password-hash.ts`, `crypto.timingSafeEqual`). A correct password is exchanged for an HttpOnly, SameSite=Strict `remote-session` cookie (8h TTL, `Path=/`); every other `/api` route (except `/health` and the ticket-authenticated socket routes) requires that cookie. The password is never sent again, never stored by the browser and never put in the QR code. Only the hash is stored (the password is shown once when generated); settings written by earlier versions are migrated at start (plaintext is hashed and erased, a bcrypt hash is cleared and the password must be set again). See [ADR-100](adr/100-remote-control-credentials.md).
+- Failed logins are rate-limited per client IP (`auth-rate-limiter.ts`): after 10 failures within 15 minutes the client is locked out (`429`) until the window drains. This is what makes a single shared password tolerable on a `0.0.0.0`-bound listener.
 - `Host` header is checked against `localhost`, `127.0.0.1`, RFC-1918 private ranges, and the ngrok domain.
 - WebSocket upgrade requires a single-use ticket issued by `POST /api/terminals/:id/ws-ticket`; ticket is consumed on first use and expires after 30 s.
 - Input is accepted from the primary subscriber only (first WS client to connect to a session).
 - `/app/*` and `/mobile/*` static assets are each gated behind a dedicated HttpOnly SameSite=Strict cookie (`app-session` / `mobile-session`, 8h TTL) issued when a valid one-time ticket (`POST /api/app-ticket` / `POST /api/mobile-ticket`) is consumed at `GET /app/` / `GET /mobile/`. Requests to those paths without a valid cookie receive `403 FORBIDDEN`. Session tokens carry an expiry and are purged hourly.
 - The IPC bridge (`GET /api/bridge`) requires a single-use bridge ticket and lets the browser invoke/send/subscribe to IPC channels on behalf of the browser-side SPA. The bridge is **default-deny across all three message types** (`invoke`, `send`, `subscribe`): a message is rejected unless its channel is in the central allowlist `src/main/remote/remote-accessible-channels.ts` (surfaced to the extension via `api.ipc.isRemoteAccessible`). That file is the single auditable definition of the remote attack surface, and `remote-accessible-channels.spec.ts` asserts it stays in sync with the channels the `/app/` shim actually uses — so the enforcement and the allowlist can never half-ship independently (the prior `/app/` outage).
 
-**Browser login SPA + mobile client** (`src/renderer-remote/`): A separate Vite build (`npm run build:remote`) produces `out/renderer-remote/` which Fastify serves at `/`. After password authentication the login page either calls `POST /api/app-ticket` and redirects to `/app/?t=<ticket>` to load the full Electron renderer bundle, or calls `POST /api/mobile-ticket` and redirects to `/mobile/?t=<ticket>` to load the touch-optimised mobile client (`mobile.html` from the same renderer-remote output directory).
+**Browser login SPA + mobile client** (`src/renderer-remote/`): A separate Vite build (`npm run build:remote`) produces `out/renderer-remote/` which Fastify serves at `/`. After the login page has posted the password to `POST /api/login` and received the session cookie, it either calls `POST /api/app-ticket` and redirects to `/app/?t=<ticket>` to load the full Electron renderer bundle, or calls `POST /api/mobile-ticket` and redirects to `/mobile/?t=<ticket>` to load the touch-optimised mobile client (`mobile.html` from the same renderer-remote output directory).
 
 **Full Electron renderer in browser** (`out/renderer/`): Fastify also serves the regular Electron renderer bundle under `/app/`. A `remote-shim.js` script is injected into `index.html` to polyfill `window.electronAPI` — all IPC calls are forwarded over the bridge WebSocket instead of the Electron `contextBridge`.
 
@@ -893,6 +894,8 @@ Renderer process (jsdom + React + CM6)
 ### Database Layer
 
 Notes and diagrams are stored in the **shared PGlite (PostgreSQL-compatible) database** at `<userData>/app.pglite`. The notepad extension never manages its own database file; it receives an `ExtensionDB` instance (defined in `src/main/db/index.ts`) injected into every IPC handler at registration time. `ExtensionDB` wraps PGlite with a SQLite-compatible `?`-placeholder API via a positional converter, and exposes `exec`, `query`, `get`, `run`, and `transaction`. Nested `transaction()` calls automatically demote to PostgreSQL savepoints.
+
+**Schema migrations**: `applyNotepadMigrations` is idempotent. Each step is guarded by a check of the current schema, so a launch against an up-to-date database executes no `ALTER TABLE` or `DROP` (asserted in `db.spec.ts`).
 
 **Legacy migration**: removed. The import of the old better-sqlite3 `notepad.db` / `vault.db` files through `sql.js` is closed (ADR 099).
 

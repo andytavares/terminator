@@ -62,7 +62,6 @@ function hasMsg(ws: MockWebSocket, substring: string) {
 
 describe('electron-api-shim bootstrap', () => {
   it('creates WebSocket to /api/bridge with ticket from bridge-ticket endpoint', async () => {
-    localStorage.setItem('remote_token', 'my-token')
     await loadShim()
     expect(MockWebSocket.instances[0].url).toContain('/api/bridge')
     expect(MockWebSocket.instances[0].url).toContain('ticket=test-ticket')
@@ -97,22 +96,18 @@ describe('electron-api-shim bootstrap', () => {
 })
 
 describe('electron-api-shim connection edge cases', () => {
-  it('sends Authorization header when remote_token is in localStorage', async () => {
-    localStorage.setItem('remote_token', 'secret')
+  it('asks for the ticket with the session cookie and no Authorization header', async () => {
+    localStorage.setItem('remote_token', 'old-password')
     await loadShim()
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/bridge-ticket',
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer secret' }),
-      })
-    )
+    const init = mockFetch.mock.calls[0][1] as RequestInit
+    expect(init.credentials).toBe('same-origin')
+    expect(new Headers(init.headers).has('Authorization')).toBe(false)
   })
 
-  it('omits Authorization header when remote_token is not in localStorage', async () => {
-    // localStorage is cleared in beforeEach, so remote_token is absent
+  it('removes a password an older version left in localStorage', async () => {
+    localStorage.setItem('remote_token', 'old-password')
     await loadShim()
-    const callHeaders = (mockFetch.mock.calls[0][1] as { headers: Record<string, string> }).headers
-    expect(callHeaders).not.toHaveProperty('Authorization')
+    expect(localStorage.getItem('remote_token')).toBeNull()
   })
 
   it('does not open WebSocket when bridge-ticket returns 401', async () => {
