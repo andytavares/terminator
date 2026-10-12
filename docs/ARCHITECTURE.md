@@ -1569,6 +1569,21 @@ App
 - All `foundry:*` IPC channels are extension-owned. The core app has no
   knowledge of them: delete `extensions/foundry/` and core still builds.
 
+### Where the code lives
+
+`src/index.ts` is a composition of about 80 lines: `activate` connects the
+index, starts the supervision runtime, the sensor tick and the refinery tick,
+and registers each surface's channels from its own module; `deactivate` stops
+each. Process-wide state lives with its owner: the runtime's parts in
+`runtime/runtime-state.ts`, the index in `state/live-index.ts`, the Forge's open
+conversations in `forge/intake-sessions.ts`, executing and adopted orders in
+`line/run-control.ts`. Channel registration is per surface in
+`src/ipc/*-registration.ts`; the work they call is in `forge/` (`intake-turn.ts`,
+`forge-loop.ts`), `line/` (`executor-deps.ts`, `execute-run.ts`, `ship-deps.ts`,
+`run-control.ts`, `refinery-run.ts`) and `runtime/` (`supervision-runtime.ts`,
+`held-calls.ts`, `palette-commands.ts`, `agent-policy.ts`).
+`extensions/foundry/CLAUDE.md` has the full table.
+
 ### ADRs
 
 - [ADR-007: agent-runner-subprocess](adr/007-agent-runner-subprocess.md) — spawn Claude Code as a child process rather than using the Anthropic API directly.
