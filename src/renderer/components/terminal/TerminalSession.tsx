@@ -124,8 +124,8 @@ export class TerminalInstance {
 
     this.registerLinkProviders()
 
-    this.outputUnsubscribe = subscribeToSessionOutput(sessionId, (data) => {
-      this.terminal.write(data)
+    this.outputUnsubscribe = subscribeToSessionOutput(sessionId, (data, written) => {
+      this.terminal.write(data, written)
       this.hooks?.onBusy?.()
       if (this.busyTimer !== null) clearTimeout(this.busyTimer)
       this.busyTimer = setTimeout(() => {

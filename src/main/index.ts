@@ -4,7 +4,8 @@ import { registerAppInfoHandlers, registerDialogHandlers } from './ipc/app.ipc.j
 import { app, BrowserWindow, dialog, Menu, shell, net, session, protocol } from 'electron'
 import { join } from 'path'
 import { registerWorkspaceHandlers } from './ipc/workspace.ipc.js'
-import { registerTerminalHandlers } from './ipc/terminal.ipc.js'
+import { registerTerminalHandlers, sendToRenderer } from './ipc/terminal.ipc.js'
+import { OutputRelay } from './terminal/output-relay.js'
 import { registerSettingsHandlers } from './ipc/settings.ipc.js'
 import { registerExtensionHandlers } from './ipc/extension.ipc.js'
 import { registerGitHandlers } from './ipc/git.ipc.js'
@@ -299,7 +300,11 @@ app.whenReady().then(async () => {
   session.fromPartition('ext-views').protocol.handle('ext', handleExtProtocol)
 
   registerWorkspaceHandlers()
-  registerTerminalHandlers(ptyManager, () => mainWindow)
+  const terminalRelay = new OutputRelay(
+    ptyManager,
+    sendToRenderer(() => mainWindow)
+  )
+  registerTerminalHandlers(ptyManager, () => mainWindow, terminalRelay)
   registerSettingsHandlers()
   registerExtensionHandlers(
     extensionHost,

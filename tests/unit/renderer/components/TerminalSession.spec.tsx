@@ -98,8 +98,10 @@ vi.mock('../../../../src/renderer/terminal/webgl-contexts', async (importOrigina
 })
 
 vi.mock('../../../../src/renderer/terminal/output-router', () => ({
-  subscribeToSessionOutput: (sessionId: string, handler: (data: string) => void) =>
-    mockSubscribe(sessionId, handler),
+  subscribeToSessionOutput: (
+    sessionId: string,
+    handler: (data: string, written: () => void) => void
+  ) => mockSubscribe(sessionId, handler),
 }))
 
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}))
@@ -261,8 +263,20 @@ describe('TerminalInstance', () => {
   it('writes the output it receives to the terminal', () => {
     const instance = new TerminalInstance('ses-write', 1000)
     const receive = mockSubscribe.mock.calls[0][1]
-    receive('hello')
-    expect(instance.terminal.write).toHaveBeenCalledWith('hello')
+    receive('hello', vi.fn())
+    expect(instance.terminal.write).toHaveBeenCalledWith('hello', expect.any(Function))
+  })
+
+  it('says the output is written once xterm has taken it', () => {
+    const instance = new TerminalInstance('ses-written', 1000)
+    const written = vi.fn()
+    const receive = mockSubscribe.mock.calls[0][1]
+    receive('hello', written)
+
+    expect(written).not.toHaveBeenCalled()
+    const xtermDone = vi.mocked(instance.terminal.write).mock.calls[0][1] as () => void
+    xtermDone()
+    expect(written).toHaveBeenCalledTimes(1)
   })
 
   it('reads the visible screen as one string per row, trailing spaces trimmed', () => {
@@ -441,7 +455,7 @@ describe('TerminalInstance', () => {
       vi.useFakeTimers()
       new TerminalInstance('ses-busy', 1000, ACTIVITY_HOOKS)
       const receive = mockSubscribe.mock.calls[0][1]
-      receive('data')
+      receive('data', vi.fn())
 
       expect(mockSetSessionBusy).toHaveBeenCalled()
       vi.runAllTimers()
@@ -456,7 +470,7 @@ describe('TerminalInstance', () => {
       const instance = new TerminalInstance('ses-dispose', 1000, ACTIVITY_HOOKS)
       // Trigger a busy timer
       const receive = mockSubscribe.mock.calls[0][1]
-      receive('data')
+      receive('data', vi.fn())
 
       mockSetSessionIdle.mockClear()
       instance.dispose()

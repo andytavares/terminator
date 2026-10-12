@@ -80,9 +80,26 @@ async function openTerminal(page, folder) {
   await page.getByRole('textbox', { name: 'Terminal input' }).first().waitFor({ timeout: 30_000 })
 }
 
-// The shell creates a marker file when the output has been written, so the wait
-// does not depend on how the terminal draws (DOM rows or WebGL).
-async function terminalThroughput(page, profile) {
+const IDLE_POLL_MS = 1000
+
+// Waits until the app's processes have stopped using CPU: the renderer is still
+// parsing and drawing after the shell is done writing.
+async function waitUntilIdle(app) {
+  const total = async () =>
+    Object.values(await cpuSecondsByProcessType(app)).reduce((sum, seconds) => sum + seconds, 0)
+  let last = await total()
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, IDLE_POLL_MS))
+    const now = await total()
+    if (now - last < 0.1) return
+    last = now
+  }
+}
+
+// The shell creates a marker file when it has written the output, so the wait
+// does not depend on how the terminal draws (DOM rows or WebGL). producedMs is
+// when the shell finished; renderedMs is when the app went idle after it.
+async function terminalThroughput(page, app, profile) {
   await openTerminal(page, profile)
   await page.getByRole('textbox', { name: 'Terminal input' }).first().focus()
   const marker = join(profile, 'perf-done')
@@ -93,7 +110,9 @@ async function terminalThroughput(page, profile) {
     if (performance.now() - startedAt > 300_000) throw new Error('throughput run timed out')
     await new Promise((resolve) => setTimeout(resolve, 50))
   }
-  return performance.now() - startedAt
+  const producedMs = performance.now() - startedAt
+  await waitUntilIdle(app)
+  return { producedMs, renderedMs: performance.now() - startedAt - IDLE_POLL_MS }
 }
 
 async function measureOnce(settleMs, withThroughput) {
@@ -103,12 +122,22 @@ async function measureOnce(settleMs, withThroughput) {
     await page.waitForTimeout(settleMs)
     const memory = await memoryByProcessType(app)
     const cpuBefore = await cpuSecondsByProcessType(app)
-    const throughputMs = withThroughput ? await terminalThroughput(page, profile) : null
+    const throughput = withThroughput ? await terminalThroughput(page, app, profile) : null
+    const throughputMs = throughput?.producedMs ?? null
+    const renderedMs = throughput?.renderedMs ?? null
     const cpuAfter = await cpuSecondsByProcessType(app)
+    const memoryAfterThroughput = withThroughput ? await memoryByProcessType(app) : null
     const throughputCpuSeconds = Object.fromEntries(
       Object.keys(cpuAfter).map((type) => [type, cpuAfter[type] - (cpuBefore[type] ?? 0)])
     )
-    return { startup, memory, throughputMs, throughputCpuSeconds }
+    return {
+      startup,
+      memory,
+      throughputMs,
+      renderedMs,
+      throughputCpuSeconds,
+      memoryAfterThroughput,
+    }
   } finally {
     await app.close()
     rmSync(profile, { recursive: true, force: true })
@@ -125,8 +154,15 @@ function summarise(results) {
     ),
     memoryMB: Object.fromEntries(types.map((type) => [type, pick((r) => r.memory[type] ?? 0)])),
     throughputMs: results[0].throughputMs === null ? null : pick((r) => r.throughputMs),
+    renderedMs: results[0].renderedMs === null ? null : pick((r) => r.renderedMs),
     throughputRunsMs:
       results[0].throughputMs === null ? null : results.map((r) => Math.round(r.throughputMs)),
+    memoryAfterThroughputMB:
+      results[0].throughputMs === null
+        ? null
+        : Object.fromEntries(
+            types.map((type) => [type, pick((r) => r.memoryAfterThroughput[type] ?? 0)])
+          ),
     throughputCpuSeconds:
       results[0].throughputMs === null
         ? null

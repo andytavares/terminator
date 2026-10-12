@@ -78,8 +78,18 @@ describe('terminal IPC handlers', () => {
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     ptyManager = new PtyManager()
 
-    const { registerTerminalHandlers } = await import('../../../src/main/ipc/terminal.ipc')
-    registerTerminalHandlers(ptyManager, () => null)
+    const { registerTerminalHandlers, sendToRenderer } = await import(
+      '../../../src/main/ipc/terminal.ipc'
+    )
+    const { OutputRelay } = await import('../../../src/main/terminal/output-relay')
+    registerTerminalHandlers(
+      ptyManager,
+      () => null,
+      new OutputRelay(
+        ptyManager,
+        sendToRenderer(() => null)
+      )
+    )
   })
 
   afterEach(() => {
@@ -273,8 +283,12 @@ describe('terminal IPC handlers', () => {
       vi.useFakeTimers()
       const mockSend = vi.fn()
       const destroyedWin = { isDestroyed: () => true, webContents: { send: mockSend } }
-      const { registerTerminalHandlers: reg } = await import('../../../src/main/ipc/terminal.ipc')
-      reg(ptyManager, () => destroyedWin as never)
+      const { registerTerminalHandlers: reg, sendToRenderer } = await import(
+        '../../../src/main/ipc/terminal.ipc'
+      )
+      const { OutputRelay } = await import('../../../src/main/terminal/output-relay')
+      const getWindow = () => destroyedWin as never
+      reg(ptyManager, getWindow, new OutputRelay(ptyManager, sendToRenderer(getWindow)))
 
       await handlerMap['terminal:create'](
         {},
@@ -297,8 +311,12 @@ describe('terminal IPC handlers', () => {
       // Re-register with a mock window so the output/exit callbacks execute fully
       const mockSend = vi.fn()
       const mockWin = { isDestroyed: () => false, webContents: { send: mockSend } }
-      const { registerTerminalHandlers: reg } = await import('../../../src/main/ipc/terminal.ipc')
-      reg(ptyManager, () => mockWin as never)
+      const { registerTerminalHandlers: reg, sendToRenderer } = await import(
+        '../../../src/main/ipc/terminal.ipc'
+      )
+      const { OutputRelay } = await import('../../../src/main/terminal/output-relay')
+      const getWindow = () => mockWin as never
+      reg(ptyManager, getWindow, new OutputRelay(ptyManager, sendToRenderer(getWindow)))
 
       await handlerMap['terminal:create'](
         {},

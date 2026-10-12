@@ -8,7 +8,7 @@ import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { homedir } from 'os'
 import { MissingCwdError } from '../terminal/pty-manager.js'
-import { OutputBatcher } from '../terminal/output-batcher.js'
+import type { OutputRelay, RendererSend } from '../terminal/output-relay.js'
 import type { PtyManager } from '../terminal/pty-manager.js'
 import type { BrowserWindow } from 'electron'
 import { getGlobalSettings } from '../storage/settings-store.js'
@@ -42,6 +42,11 @@ const TerminalResizeSchema = z.object({
   sessionId: z.string(),
   cols: z.number().int().positive(),
   rows: z.number().int().positive(),
+})
+
+const TerminalAcknowledgeSchema = z.object({
+  sessionId: z.string(),
+  count: z.number().int().nonnegative(),
 })
 
 /**
@@ -96,11 +101,18 @@ async function announceIssueContext(
   })
 }
 
+interface TerminalContext {
+  ptyManager: PtyManager
+  getWindow: () => BrowserWindow | null
+  relay: OutputRelay
+}
+
 // PtyManager owns session state (see ADR-024); this layer only translates IPC
 // payloads and relays output/exit pushes to the renderer window.
 export function registerTerminalHandlers(
   ptyManager: PtyManager,
-  getWindow: () => BrowserWindow | null
+  getWindow: () => BrowserWindow | null,
+  relay: OutputRelay
 ): void {
   const sessionIdPayload = z.object({ sessionId: z.string() })
 
@@ -109,7 +121,7 @@ export function registerTerminalHandlers(
       channel: 'terminal:create',
       schema: CreateTerminalSchema,
       invalid: (error: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: error.message }),
-      run: (input) => createTerminal(ptyManager, getWindow, input),
+      run: (input) => createTerminal({ ptyManager, getWindow, relay }, input),
       // Reported rather than thrown, so the renderer can say which folder is
       // gone. A branch whose worktree was deleted outside the app otherwise
       // produced a tab that died instantly with nothing written in it.
@@ -142,7 +154,11 @@ export function registerTerminalHandlers(
       invalid: { released: false },
       // A terminal is on screen and ready to be written to. Anything the process
       // printed before now was held back rather than dropped.
-      run: ({ sessionId }) => ({ released: ptyManager.releaseOutput(sessionId) }),
+      run: ({ sessionId }) => {
+        // A renderer attaching owes nothing for output an earlier one was sent.
+        relay.reset(sessionId)
+        return { released: ptyManager.releaseOutput(sessionId) }
+      },
     }),
     invokeSpec({
       channel: 'terminal:close',
@@ -179,6 +195,11 @@ export function registerTerminalHandlers(
     }
   })
 
+  onChannel('terminal:acknowledge', (_event, payload) => {
+    const parsed = TerminalAcknowledgeSchema.safeParse(payload)
+    if (parsed.success) relay.acknowledge(parsed.data.sessionId, parsed.data.count)
+  })
+
   onChannel('terminal:resize', (_event, payload) => {
     const parsed = TerminalResizeSchema.safeParse(payload)
     if (parsed.success) {
@@ -188,8 +209,7 @@ export function registerTerminalHandlers(
 }
 
 function createTerminal(
-  ptyManager: PtyManager,
-  getWindow: () => BrowserWindow | null,
+  { ptyManager, getWindow, relay }: TerminalContext,
   input: z.infer<typeof CreateTerminalSchema>
 ): { sessionId: string; shell: string } {
   const { projectId, tabTitle, type, cwd, shell, initialCommand } = input
@@ -208,7 +228,7 @@ function createTerminal(
     // application or by hand — can be placed against this session (ADR 055).
     env: { ...issueEnvFor(projectId), TERMINATOR_SESSION_ID: sessionId },
   })
-  relayTerminalEvents(ptyManager, sessionId, sendToRenderer(getWindow))
+  relay.start(sessionId)
   void announceIssueContext(projectId, sessionId, getWindow)
 
   // Written straight in: the line discipline holds it until the shell reads
@@ -219,27 +239,12 @@ function createTerminal(
   return { sessionId, shell: defaultShell }
 }
 
-/**
- * Forwards a session's output and exit to the renderer. Output goes out one
- * message per frame, not one per PTY chunk; what is pending leaves before the
- * exit does, so the renderer never sees an exit with output still to come.
- */
-export function relayTerminalEvents(
-  ptyManager: PtyManager,
-  sessionId: string,
-  send: (channel: string, payload: object) => void
-): void {
-  const batcher = new OutputBatcher((data) => send('terminal:output', { sessionId, data }))
-  ptyManager.onData(sessionId, (data) => batcher.push(data))
-  ptyManager.onExit(sessionId, (exitCode) => {
-    batcher.flush()
-    send('terminal:process-exit', { sessionId, exitCode })
-  })
-}
-
-function sendToRenderer(getWindow: () => BrowserWindow | null) {
-  return (channel: string, payload: object): void => {
+/** Sends to the window if there is a live one, and says whether it did. */
+export function sendToRenderer(getWindow: () => BrowserWindow | null): RendererSend {
+  return (channel, payload) => {
     const win = getWindow()
-    if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
+    if (!win || win.isDestroyed()) return false
+    win.webContents.send(channel, payload)
+    return true
   }
 }

@@ -47,6 +47,8 @@ interface ElectronAPI {
     attach(sessionId: string): Promise<{ released: boolean }>
     input(sessionId: string, data: string): void
     resize(sessionId: string, cols: number, rows: number): void
+    /** Tells main how many characters of a session's output xterm has now written. */
+    acknowledge(sessionId: string, count: number): void
     onOutput(handler: (sessionId: string, data: string) => void): () => void
     closeAll(): Promise<{ terminatedCount: number }>
     cleanupOrphans(): Promise<{ cleanedCount: number }>
