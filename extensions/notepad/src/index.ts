@@ -1,5 +1,5 @@
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
-import { applyNotepadSchema, applyNotepadMigrations } from './db/db'
+import { applyNotepadSchema } from './db/db'
 import { registerNotesIpcHandlers, registerTagsIpcHandlers } from './ipc/notes.ipc'
 import { registerCommentsIpcHandlers } from './ipc/comments.ipc'
 import { registerSearchIpcHandlers } from './ipc/search.ipc'
@@ -45,7 +45,6 @@ let _pendingQuickCreateTimer: ReturnType<typeof setTimeout> | null = null
 export async function activate(api: ExtensionAPI): Promise<void> {
   try {
     await applyNotepadSchema(api.db)
-    await applyNotepadMigrations(api.db)
   } catch (err) {
     console.error('[notepad] Failed to initialize schema:', err)
     api.notifications.showToast(
@@ -106,7 +105,6 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   const disposeDbReinit = api.ipc.registerHandler('terminator.notepad:db.reinit', async () => {
     try {
       await applyNotepadSchema(api.db)
-      await applyNotepadMigrations(api.db)
       return { data: { ok: true } }
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }

@@ -90,9 +90,8 @@ export async function exportNotes(
   } = parsed.data
   const resolvedFolder = folder.replace(/^~(?=$|\/)/, os.homedir())
 
-  // STRING_AGG is Postgres-specific (replaces SQLite GROUP_CONCAT); correct for PGlite.
   let querySql = `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at,
-                         STRING_AGG(t.name, ',') AS tags
+                         GROUP_CONCAT(t.name, ',') AS tags
                   FROM notes n
                   LEFT JOIN note_tags nt ON nt.note_id = n.id
                   LEFT JOIN tags t ON t.id = nt.tag_id`

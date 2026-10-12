@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ipcMain } from 'electron'
 
 // Adapter: registerHandler forwards to the electron ipcMain mocks so existing
@@ -16,7 +16,7 @@ const mockApi = {
     },
   },
 } as unknown as import('../../../../../src/main/extensions/api').ExtensionAPI
-import { PGlite } from '@electric-sql/pglite'
+import { DatabaseSync } from 'node:sqlite'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
@@ -28,7 +28,6 @@ import { applyNotepadSchema } from '../../../src/db/db'
 import { searchNotes, registerSearchIpcHandlers } from '../../../src/ipc/search.ipc'
 import type { ExtensionDB } from '../../../../../src/main/db/index'
 
-let pg: PGlite
 let db: ExtensionDB
 
 async function insertNote(
@@ -59,25 +58,9 @@ async function insertNote(
   }
 }
 
-let tables: string
-
-beforeAll(async () => {
-  pg = new PGlite()
-  await pg.waitReady
-  db = wrapDb(pg)
+beforeEach(async () => {
+  db = wrapDb(new DatabaseSync(':memory:'))
   await applyNotepadSchema(db)
-  const { rows } = await pg.query<{ names: string }>(
-    "SELECT string_agg(quote_ident(tablename), ', ') AS names FROM pg_tables WHERE schemaname = 'public'"
-  )
-  tables = rows[0].names
-})
-
-afterAll(async () => {
-  await pg.close()
-})
-
-afterEach(async () => {
-  await pg.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`)
 })
 
 describe('registerSearchIpcHandlers', () => {
@@ -88,7 +71,7 @@ describe('registerSearchIpcHandlers', () => {
   })
 })
 
-describe('searchNotes — basic text query (ILIKE)', () => {
+describe('searchNotes — basic text query (LIKE)', () => {
   it('returns matching notes with a snippet', async () => {
     await insertNote('n1', 'Project Alpha', 'authentication with OAuth2 tokens')
     await insertNote('n2', 'Meeting Notes', 'discussed quarterly targets')
