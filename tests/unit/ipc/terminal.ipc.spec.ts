@@ -42,6 +42,7 @@ vi.mock('../../../src/main/safe-send.js', () => ({
 import { registerTerminalHandlers } from '../../../src/main/ipc/terminal.ipc.js'
 import { MissingCwdError } from '../../../src/main/terminal/pty-manager.js'
 import type { SessionInfo } from '../../../src/main/terminal/pty-manager.js'
+import { OUTPUT_FLUSH_INTERVAL_MS } from '../../../src/main/terminal/output-batcher.js'
 
 function invokeHandler(channel: string) {
   return mockHandle.mock.calls.find(([ch]) => ch === channel)![1] as (
@@ -136,16 +137,49 @@ describe('registerTerminalHandlers', () => {
     })
 
     it('relays output and exit pushes to the renderer window', async () => {
+      vi.useFakeTimers()
       const { sessionId } = (await invokeHandler('terminal:create')({}, VALID_CREATE)) as {
         sessionId: string
       }
       ptyManager.emitData(sessionId, 'out')
+      vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
       expect(webContentsSend).toHaveBeenCalledWith('terminal:output', { sessionId, data: 'out' })
       ptyManager.emitExit(sessionId, 7)
       expect(webContentsSend).toHaveBeenCalledWith('terminal:process-exit', {
         sessionId,
         exitCode: 7,
       })
+      vi.useRealTimers()
+    })
+
+    it('sends the chunks of one frame as one message', async () => {
+      vi.useFakeTimers()
+      const { sessionId } = (await invokeHandler('terminal:create')({}, VALID_CREATE)) as {
+        sessionId: string
+      }
+      ptyManager.emitData(sessionId, 'a')
+      ptyManager.emitData(sessionId, 'b')
+      ptyManager.emitData(sessionId, 'c')
+      vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
+      const outputs = webContentsSend.mock.calls.filter(
+        ([channel]) => channel === 'terminal:output'
+      )
+      expect(outputs).toEqual([['terminal:output', { sessionId, data: 'abc' }]])
+      vi.useRealTimers()
+    })
+
+    it('sends pending output before the exit, without waiting for the frame', async () => {
+      vi.useFakeTimers()
+      const { sessionId } = (await invokeHandler('terminal:create')({}, VALID_CREATE)) as {
+        sessionId: string
+      }
+      ptyManager.emitData(sessionId, 'last words')
+      ptyManager.emitExit(sessionId, 0)
+      expect(webContentsSend.mock.calls.map(([channel]) => channel)).toEqual([
+        'terminal:output',
+        'terminal:process-exit',
+      ])
+      vi.useRealTimers()
     })
 
     it('does not relay when the window is gone', async () => {

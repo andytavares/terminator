@@ -134,7 +134,7 @@ terminal:create IPC ──► PtyManager.spawn()
       │                      ├─ spawns node-pty process
       │                      │  (env carries TERMINATOR_SESSION_ID, which is how
       │                      │   an agent's conversation is paired to this terminal)
-      │                      ├─ registers onData → webContents.send('terminal:output')
+      │                      ├─ registers onData → OutputBatcher → webContents.send('terminal:output')
       │                      └─ registers onExit → webContents.send('terminal:process-exit')
       ▼
 TerminalInstance created (renderer)
@@ -176,6 +176,13 @@ tile) disposes it, so a hidden terminal or a thumbnail never holds a GPU context
 and a terminal past that stays on the DOM renderer. A lost context (`onContextLoss`) or a machine without
 WebGL2 also falls back to the DOM renderer. The DOM renderer clips the last column's glyph on macOS (about
 2px), which WebGL does not do because it has no row boxes to clip. The phone client keeps the DOM renderer.
+
+**Batching.** A PTY produces thousands of small chunks a second, so `relayTerminalEvents`
+(`src/main/ipc/terminal.ipc.ts`) joins them in an `OutputBatcher` (`src/main/terminal/output-batcher.ts`)
+and sends one `terminal:output` message per 16 ms frame, or at once when the batch reaches 128 KiB.
+Order is kept, and pending output is flushed before `terminal:process-exit` is sent. In the renderer the
+output router (`src/renderer/terminal/output-router.ts`) holds the one `terminal:output` listener and
+dispatches by session id.
 
 ---
 

@@ -54,6 +54,17 @@ async function memoryByProcessType(app) {
   return totals
 }
 
+// CPU seconds used so far, per process type. Unlike wall time it does not grow
+// when other work shares the machine, so before/after comparisons can use it.
+async function cpuSecondsByProcessType(app) {
+  const metrics = await app.evaluate(({ app: electronApp }) => electronApp.getAppMetrics())
+  const totals = {}
+  for (const metric of metrics) {
+    totals[metric.type] = (totals[metric.type] ?? 0) + metric.cpu.cumulativeCPUUsage
+  }
+  return totals
+}
+
 // A fresh profile has no terminal: add a workspace and a branch, which opens one.
 async function openTerminal(page, folder) {
   await page.click('.sidebar-header__add')
@@ -91,8 +102,13 @@ async function measureOnce(settleMs, withThroughput) {
   try {
     await page.waitForTimeout(settleMs)
     const memory = await memoryByProcessType(app)
+    const cpuBefore = await cpuSecondsByProcessType(app)
     const throughputMs = withThroughput ? await terminalThroughput(page, profile) : null
-    return { startup, memory, throughputMs }
+    const cpuAfter = await cpuSecondsByProcessType(app)
+    const throughputCpuSeconds = Object.fromEntries(
+      Object.keys(cpuAfter).map((type) => [type, cpuAfter[type] - (cpuBefore[type] ?? 0)])
+    )
+    return { startup, memory, throughputMs, throughputCpuSeconds }
   } finally {
     await app.close()
     rmSync(profile, { recursive: true, force: true })
@@ -109,6 +125,17 @@ function summarise(results) {
     ),
     memoryMB: Object.fromEntries(types.map((type) => [type, pick((r) => r.memory[type] ?? 0)])),
     throughputMs: results[0].throughputMs === null ? null : pick((r) => r.throughputMs),
+    throughputRunsMs:
+      results[0].throughputMs === null ? null : results.map((r) => Math.round(r.throughputMs)),
+    throughputCpuSeconds:
+      results[0].throughputMs === null
+        ? null
+        : Object.fromEntries(
+            Object.keys(results[0].throughputCpuSeconds).map((type) => [
+              type,
+              Number(median(results.map((r) => r.throughputCpuSeconds[type] ?? 0)).toFixed(2)),
+            ])
+          ),
   }
 }
 

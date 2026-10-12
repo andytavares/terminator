@@ -8,6 +8,7 @@ import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { homedir } from 'os'
 import { MissingCwdError } from '../terminal/pty-manager.js'
+import { OutputBatcher } from '../terminal/output-batcher.js'
 import type { PtyManager } from '../terminal/pty-manager.js'
 import type { BrowserWindow } from 'electron'
 import { getGlobalSettings } from '../storage/settings-store.js'
@@ -207,7 +208,7 @@ function createTerminal(
     // application or by hand — can be placed against this session (ADR 055).
     env: { ...issueEnvFor(projectId), TERMINATOR_SESSION_ID: sessionId },
   })
-  relayTerminalEvents(ptyManager, getWindow, sessionId)
+  relayTerminalEvents(ptyManager, sessionId, sendToRenderer(getWindow))
   void announceIssueContext(projectId, sessionId, getWindow)
 
   // Written straight in: the line discipline holds it until the shell reads
@@ -218,18 +219,27 @@ function createTerminal(
   return { sessionId, shell: defaultShell }
 }
 
-function relayTerminalEvents(
+/**
+ * Forwards a session's output and exit to the renderer. Output goes out one
+ * message per frame, not one per PTY chunk; what is pending leaves before the
+ * exit does, so the renderer never sees an exit with output still to come.
+ */
+export function relayTerminalEvents(
   ptyManager: PtyManager,
-  getWindow: () => BrowserWindow | null,
-  sessionId: string
+  sessionId: string,
+  send: (channel: string, payload: object) => void
 ): void {
-  ptyManager.onData(sessionId, (data) => {
-    const win = getWindow()
-    if (win && !win.isDestroyed()) win.webContents.send('terminal:output', { sessionId, data })
-  })
+  const batcher = new OutputBatcher((data) => send('terminal:output', { sessionId, data }))
+  ptyManager.onData(sessionId, (data) => batcher.push(data))
   ptyManager.onExit(sessionId, (exitCode) => {
-    const win = getWindow()
-    if (win && !win.isDestroyed())
-      win.webContents.send('terminal:process-exit', { sessionId, exitCode })
+    batcher.flush()
+    send('terminal:process-exit', { sessionId, exitCode })
   })
+}
+
+function sendToRenderer(getWindow: () => BrowserWindow | null) {
+  return (channel: string, payload: object): void => {
+    const win = getWindow()
+    if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
+  }
 }
