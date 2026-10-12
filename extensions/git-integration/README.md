@@ -9,7 +9,7 @@ A first-party Terminator extension that adds a Git tab with a staging area, comm
 - **Commit** — write a commit message and commit directly. Optionally add `--signoff` via settings.
 - **Pull Request** — click **Open Pull Request** to create or view a PR via the `gh` CLI. Supports draft PRs.
 - **Rich PR text** — PR descriptions, PR comments, inline review comments, the composer preview and the Open Pull Request template preview render markdown and any HTML embedded in it (`<details>`, `<br>`, `<sub>`, `<img>`, `<a>`…) through a sanitizing allowlist: scripts, frames, styles, `on*` handlers and `javascript:` links are dropped. Remote images load from their host, whether written as markdown or HTML; nothing proxies or blocks them.
-- **Auto-refresh** — the Git tab refreshes automatically when files change (via `fs.watch`).
+- **Auto-refresh** — the Git tab refreshes automatically when files change (the core's file-change events) and on an interval.
 - **Settings** — all behaviour is configurable globally and per-workspace (see below).
 
 ## Usage
@@ -26,13 +26,19 @@ The extension is bundled with Terminator and activates automatically on startup.
 
 ## Settings
 
-Configure under **Settings → Git Integration** or per-workspace:
+Configure under **Settings → Git Integration**. `activate` (`src/index.ts`) registers them:
 
-| Key                     | Type    | Default | Scope     | Description                          |
-| ----------------------- | ------- | ------- | --------- | ------------------------------------ |
-| `git.enabled`           | boolean | `true`  | workspace | Enable/disable the entire extension  |
-| `git.commit.signOff`    | boolean | `false` | workspace | Append `--signoff` to commits        |
-| `git.maxDisplayedFiles` | number  | `500`   | global    | Cap on changed files shown (10–5000) |
+| Key                                                               | Type    | Default   | Scope     | Description                                                    |
+| ----------------------------------------------------------------- | ------- | --------- | --------- | -------------------------------------------------------------- |
+| `terminator.git-integration.git.enabled`                          | boolean | `true`    | workspace | Enable/disable the entire extension                            |
+| `terminator.git-integration.git.githubToken`                      | string  | `''`      | global    | Token passed to gh as `GH_TOKEN`; stored as a secret           |
+| `terminator.git-integration.git.commit.signOff`                   | boolean | `false`   | workspace | Append `--signoff` to commits                                  |
+| `terminator.git-integration.git.maxDisplayedFiles`                | number  | `500`     | global    | Cap on changed files shown (10–5000)                           |
+| `terminator.git-integration.review.agentModel`                    | enum    | `sonnet`  | global    | Review agent model: `opus` or `sonnet`                         |
+| `terminator.git-integration.review.agentEffort`                   | enum    | `default` | global    | Review agent effort: `default`, `low`, `medium`, `high`        |
+| `terminator.git-integration.review.cloneFolder`                   | folder  | `''`      | global    | Where "Clone and review" clones; empty keeps reviews diff-only |
+| `terminator.git-integration.review.agentTimeoutMinutes`           | number  | `5`       | global    | Review agent timeout (1–30)                                    |
+| `terminator.git-integration.notify.<event>.{system,center,toast}` | boolean | `true`    | global    | Where each notification is delivered                           |
 
 ## Requirements
 
@@ -43,58 +49,60 @@ Every git and gh command goes through the core: git through `api.shell.exec` (`s
 
 ## How It Works
 
-The extension runs in two parts:
+The extension has the two halves every extension has ([Extension Development Guide](../../docs/EXTENSION-DEVELOPMENT.md)):
 
-- **Main process** (`src/index.js`) — registers settings, native menu items, and file-system watchers. Sends `git:toggle-sidebar` IPC events to the renderer when the menu item or keyboard shortcut fires.
-- **Renderer** (`src/components/`) — React components imported directly by `src/renderer/components/git/GitRightSidebar.tsx`. All git IPC calls (`window.electronAPI.git.*`) happen in the renderer.
+- **Backend** (`src/index.ts`, bundled by `npm run build:extensions` into `src/index.js`, the manifest's `main`) — runs in the extension host. `activate` registers the settings, the `git:*`, `github:*`, merge-flow and review-agent channels (`src/ipc/`), the Quick Actions commands (`src/commands.ts`), the review command (`src/review-command.ts`) and the View menu's "Code Reviews in New Window".
+- **View** (`src/renderer/main.tsx`, built by `npm run build:renderer` into `dist/index.html`, the manifest's `renderer`) — `src/renderer/App.tsx` routes on `?view=`: `project` shows `GitFullView` (the Git tab), `code-reviews` and `pr-review` show `PrReviewTab`, and `reviews` shows `ReviewDashboard`. It calls its own channels through the bridge modules in `src/api/`. The Git tab refreshes on the core's file-change events and on an interval (`src/hooks/useGitStatus.ts`).
 
 ## Development
 
-This extension is a first-party bundled extension. Its source lives inside the repository at `extensions/git-integration/`.
+This extension is a first-party bundled extension. Its source lives inside the repository at `extensions/git-integration/`; `CLAUDE.md` holds its development rules.
 
 ### Directory structure
 
 ```
 extensions/git-integration/
-├── manifest.json              # Extension manifest (main → src/index.js)
-├── README.md                  # This file
+├── manifest.json        # id, main (src/index.js), renderer (dist/index.html), contributes
+├── package.json         # its own dependencies and the build:renderer script
+├── index.html           # view document
+├── vite.renderer.config.ts
 ├── src/
-│   ├── index.js               # Main-process entry point (CommonJS)
-│   ├── index.ts               # TypeScript source for type checking
-│   ├── components/
-│   │   ├── GitView.tsx          # Full staging / commit / PR view
-│   │   ├── StagingArea.tsx      # Stage/unstage file list
-│   │   ├── FileDiffView.tsx     # Unified diff renderer
-│   │   └── PrDialog.tsx         # Pull request creation dialog (preview via pr-review/RichContent)
-│   ├── api/
-│   │   └── bridge.ts            # invokeBridge<T>: the one typed call into extensionBridge
-│   ├── git/
-│   │   └── git-parser.ts        # Pure parsers: parseStatus, parseDiff
-│   └── stores/
-│       └── git.store.ts         # Zustand store: status, selectedFile, diffCache
-└── tests/
-    └── unit/
-        └── git-parser.spec.ts
+│   ├── index.ts         # backend: activate(api) / deactivate()
+│   ├── commands.ts      # Quick Actions commands
+│   ├── review-command.ts
+│   ├── remote-access.ts # REMOTE_READ_CHANNELS
+│   ├── ipc/             # channel specs: git, github, merge-flow, review-agent
+│   ├── schemas/         # zod payload schemas
+│   ├── git/             # git-service, git-parser, conflict-reader
+│   ├── github/          # gh access and PR review services
+│   ├── review/          # diff analysis, reading order, review agent
+│   ├── shell/run-git.ts # git over api.shell.exec
+│   ├── api/             # the view's typed bridge to its channels
+│   ├── stores/          # Zustand stores for the view
+│   ├── hooks/
+│   ├── components/      # GitFullView, StagingArea, FileDiffView, PrDialog, pr-review/, merge-flow/
+│   └── renderer/        # main.tsx, App.tsx
+└── tests/unit/
 ```
 
-### Main process vs renderer split
+### Backend vs view split
 
-| Code                   | Location                                          | Runs in                             |
-| ---------------------- | ------------------------------------------------- | ----------------------------------- |
-| Settings registration  | `src/index.js`                                    | Main process                        |
-| Native menu / keyboard | `src/index.js`                                    | Main process                        |
-| File-system watcher    | `src/index.js`                                    | Main process                        |
-| Git IPC handlers       | `src/main/ipc/git.ipc.ts`                         | Main process                        |
-| React UI components    | `src/components/*.tsx`                            | Renderer (bundled by electron-vite) |
-| Git status polling     | `src/renderer/components/git/GitRightSidebar.tsx` | Renderer                            |
+| Code                  | Location                    | Runs in        |
+| --------------------- | --------------------------- | -------------- |
+| Settings registration | `src/index.ts`              | Extension host |
+| View menu item        | `src/index.ts`              | Extension host |
+| Git IPC handlers      | `src/ipc/git.ipc.ts`        | Extension host |
+| GitHub IPC handlers   | `src/ipc/github.ipc.ts`     | Extension host |
+| React UI components   | `src/components/`           | View (`dist/`) |
+| Git status refresh    | `src/hooks/useGitStatus.ts` | View (`dist/`) |
 
 ### Modifying the extension
 
-1. Edit `src/index.js` for main-process behaviour (settings, menus, fs.watch).
+1. Edit `src/index.ts` for backend registrations (settings, menus, commands).
 2. Edit `src/components/` for UI changes.
-3. Edit `src/main/ipc/git.ipc.ts` for new IPC channels.
-4. Run `npm test` to verify nothing is broken.
-5. Run `npm run dev` to test interactively.
+3. Add a channel as a `ChannelSpec` in `src/ipc/` and its bridge call in `src/api/`.
+4. Run `npx vitest run extensions/git-integration` to verify nothing is broken.
+5. Run `npm run dev` to test interactively; it runs `npm run build:extensions` first.
 
 ### Writing a new extension
 
@@ -104,4 +112,4 @@ See [`docs/EXTENSION-DEVELOPMENT.md`](../../docs/EXTENSION-DEVELOPMENT.md) and u
 npm run create-extension -- my-extension-name
 ```
 
-This generates a working hello-world extension at `extensions/my-extension-name/` with stubs for all API surfaces.
+This generates a plain-JavaScript extension at `extensions/my-extension-name/` that registers a setting, a command and a session listener, with commented-out examples of the rest of the API.

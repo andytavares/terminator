@@ -208,5 +208,7 @@ submits; do not draw your own overlay, title or action row.
 
 Every story is screenshot by `npm run test:visual` (Playwright, over the built
 Storybook, both themes). A change that moves a component's pixels updates its
-baseline in `packages/extension-ui/visual/__screenshots__/linux/` in the same
-commit, generated on Linux with the Playwright version the repository pins.
+baseline in the same commit, generated on Linux with the Playwright version the
+repository pins. Baselines live under `__screenshots__/linux/` in
+`packages/extension-ui/visual/` (the `snapshotPathTemplate` in
+`packages/extension-ui/playwright.visual.config.ts`); none is committed yet.

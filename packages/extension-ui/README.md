@@ -41,7 +41,7 @@ trap, the modal-depth registry and the layer scale (`LAYERS`, `layerValue`,
 
 **Fonts** — `@terminator/extension-ui/fonts` imports the IBM Plex Sans and Mono
 faces the tokens name. Every document imports it once from its entry: the core
-renderer, the Storybook preview and each extension view (`src/renderer/main.tsx`),
+renderer, the Storybook preview and each extension view (`extensions/<name>/src/renderer/main.tsx`),
 because an extension view inherits nothing from the core and injected CSS cannot
 carry font files. The bundler copies the woff2 files next to the view's script.
 
@@ -129,7 +129,8 @@ The Stories job runs with `--update-snapshots=missing`: every committed baseline
 compared, and a story without one fails and gets one written, which the job uploads
 as the `story-baselines-linux` artifact. To commit them, add the
 `update-story-baselines` label to the pull request: the Story baselines workflow
-(`.github/workflows/story-baselines.yml`) writes the missing baselines on Linux,
+(`.github/workflows/story-baselines.yml`) writes the missing baselines on Linux into `__screenshots__/linux/` under `visual/`
+(`snapshotPathTemplate` in `playwright.visual.config.ts`),
 commits them to the branch and removes the label. It never overwrites an existing
 baseline; review the committed images in the pull request's diff.
 

@@ -160,7 +160,7 @@ In the Quick Actions row the probe measured Home still shown and focus on `BODY`
 
 - **Notifications don't lead anywhere.**
   - The bell notification (`session-controller.ts:21-27`) carries no target. `dispatchNotification` has no field for one (`src/renderer/lib/notifications.ts`).
-  - In main, a macOS banner's click is wired only when the notification has `actions` (`notification-manager.ts:123`). A notification that has only `onClick` does nothing when its banner is clicked. That includes every extension notification using `onClick` (`extensions/api.ts:1014`).
+  - In main, a macOS banner's click is wired only when the notification has `actions` (`notification-manager.ts:123`). A notification that has only `onClick` does nothing when its banner is clicked. That includes every extension notification using `onClick` (`src/main/extensions/api.ts:1014`).
   - Clicking the app into focus runs `refocusActive` (`TerminalPane.tsx`), which focuses whichever session was _already_ active, not the one that rang.
 
 ### Options
