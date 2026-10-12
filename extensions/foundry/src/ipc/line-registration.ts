@@ -54,7 +54,7 @@ function createRuns(
       executingOrders.add(order.id)
       announceLive(order.id)
       try {
-        await executeRun(api, dataRoot(), order, recipe, graph)
+        await executeRun(api, { root: dataRoot(), order, recipe, graph })
       } finally {
         executingOrders.delete(order.id)
         announceLive(order.id)
