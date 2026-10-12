@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useDismissible } from '@terminator/extension-ui'
 import { DateTimePicker } from './DateTimePicker'
 import {
   Zap,
@@ -51,15 +52,12 @@ function AreaCombobox({
     setHighlighted(0)
   }
 
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [])
+  useDismissible({
+    ref: containerRef,
+    onDismiss: () => setOpen(false),
+    manageFocus: false,
+    enabled: open,
+  })
 
   function select(opt: { value: string }) {
     onChange(opt.value)

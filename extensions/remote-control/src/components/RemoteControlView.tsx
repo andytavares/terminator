@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { RelativeTime } from '@terminator/extension-ui'
+import { Button, RelativeTime } from '@terminator/extension-ui'
 import { ChevronDown, ChevronRight, Loader, TriangleAlert, Wifi, WifiOff } from 'lucide-react'
 import { OFF, reduceStatus, tunnelDropped, type RemoteStatus } from '../state/status'
 import type { ConnectedDevice } from '../server/connected-devices'
@@ -103,14 +103,9 @@ function StatusBand({
             <h2 className="rc-band__title">Off</h2>
             <p className="rc-band__sub">Your terminals are not reachable from any browser.</p>
           </div>
-          <button
-            type="button"
-            className="rc-btn rc-btn--primary"
-            disabled={busy}
-            onClick={() => onToggle(true)}
-          >
+          <Button variant="primary" disabled={busy} onClick={() => onToggle(true)}>
             Turn on
-          </button>
+          </Button>
         </div>
       </section>
     )
@@ -125,9 +120,9 @@ function StatusBand({
             <h2 className="rc-band__title">Starting…</h2>
             <p className="rc-band__sub">Opening port {status.port} and creating an address.</p>
           </div>
-          <button type="button" className="rc-btn" disabled={busy} onClick={() => onToggle(false)}>
+          <Button disabled={busy} onClick={() => onToggle(false)}>
             Cancel
-          </button>
+          </Button>
         </div>
       </section>
     )
@@ -144,14 +139,9 @@ function StatusBand({
               <p className="rc-band__sub">{status.failure.resolution}</p>
             )}
           </div>
-          <button
-            type="button"
-            className="rc-btn rc-btn--primary"
-            disabled={busy}
-            onClick={() => onToggle(true)}
-          >
+          <Button variant="primary" disabled={busy} onClick={() => onToggle(true)}>
             Try again
-          </button>
+          </Button>
         </div>
       </section>
     )
@@ -174,14 +164,9 @@ function StatusBand({
             </p>
           )}
         </div>
-        <button
-          type="button"
-          className="rc-btn rc-btn--danger"
-          disabled={busy}
-          onClick={() => onToggle(false)}
-        >
+        <Button variant="danger" disabled={busy} onClick={() => onToggle(false)}>
           Turn off
-        </button>
+        </Button>
       </div>
 
       <div className="rc-reach">
@@ -255,13 +240,9 @@ function ConnectedDevices({
               <span className="rc-device__since">
                 <RelativeTime value={device.connectedAt} />
               </span>
-              <button
-                type="button"
-                className="rc-btn rc-btn--ghost"
-                onClick={() => onDisconnect(device.id)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => onDisconnect(device.id)}>
                 Disconnect
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -313,9 +294,9 @@ function SettingsSection({
 function CopyButton({ value, label }: { value: string; label: string }): React.JSX.Element {
   const [copied, setCopied] = useState(false)
   return (
-    <button
-      type="button"
-      className="rc-btn rc-btn--ghost"
+    <Button
+      variant="ghost"
+      size="sm"
       aria-label={label}
       onClick={() => {
         void navigator.clipboard?.writeText(value)
@@ -324,6 +305,6 @@ function CopyButton({ value, label }: { value: string; label: string }): React.J
       }}
     >
       {copied ? 'Copied' : 'Copy'}
-    </button>
+    </Button>
   )
 }

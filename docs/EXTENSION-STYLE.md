@@ -194,6 +194,7 @@ missing one is added there first (ADR 098). Storybook shows each in both themes:
 | Markdown from a person/agent   | `Markdown`, never `dangerouslySetInnerHTML`; `inline` in a label, `fetchesNothing` for tracker text |
 | "5 minutes ago"                | `RelativeTime` / `formatRelativeTime`, never hand-made                                              |
 | Re-reading something on a tick | `usePolling`                                                                                        |
+| A dropdown or menu that closes | `useDismissible` (Escape, a click outside, the open-surface count), never a document listener       |
 
 A button's icon is the `icon` prop, sized by the stylesheet, not by `size`.
 

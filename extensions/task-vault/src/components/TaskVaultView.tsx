@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { CalendarDays, ChevronDown, Download, Kanban, List, Settings, Upload } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import { Dialog, IconButton } from '@terminator/extension-ui'
+import { Dialog, IconButton, useDismissible } from '@terminator/extension-ui'
 import './task-vault.css'
 import { notify } from '../utils/notify'
 import { useVaultStore } from '../stores/vault.store'
@@ -302,15 +302,13 @@ export function TaskVaultView(): React.JSX.Element {
     }
   }, [setKanbanLanes])
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
-        setContextMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  // The ref wraps the trigger too, so clicking it to close does not reopen.
+  useDismissible({
+    ref: contextMenuRef,
+    onDismiss: () => setContextMenuOpen(false),
+    manageFocus: false,
+    enabled: contextMenuOpen,
+  })
 
   // Navigation intent arrives on the `task-vault:navigate` bridge channel, which
   // the effect further down listens to. A second path used to read the core

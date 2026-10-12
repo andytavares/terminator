@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Button } from '@terminator/extension-ui'
 
 interface PasswordFieldProps {
   hasPassword: boolean
@@ -48,39 +49,31 @@ export function PasswordField({ hasPassword, onChanged }: PasswordFieldProps): R
           placeholder="New password"
           style={{ flex: 1 }}
         />
-        <button
-          className="settings-section__btn"
-          style={{ marginBottom: 0, flexShrink: 0 }}
+        <Button
+          size="sm"
+          style={{ flexShrink: 0 }}
           disabled={draft.trim() === ''}
           onClick={() => void setChosen()}
         >
           Set password
-        </button>
-        <button
-          className="settings-section__btn"
-          style={{ marginBottom: 0, flexShrink: 0 }}
-          onClick={() => void generate()}
-        >
+        </Button>
+        <Button size="sm" style={{ flexShrink: 0 }} onClick={() => void generate()}>
           Generate new
-        </button>
+        </Button>
       </div>
       {generated !== null && (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
           <code style={{ userSelect: 'all', wordBreak: 'break-all' }}>{generated}</code>
-          <button
-            className="settings-section__btn"
-            style={{ marginBottom: 0, flexShrink: 0 }}
+          <Button
+            size="sm"
+            style={{ flexShrink: 0 }}
             onClick={() => void navigator.clipboard.writeText(generated)}
           >
             Copy
-          </button>
-          <button
-            className="settings-section__btn"
-            style={{ marginBottom: 0, flexShrink: 0 }}
-            onClick={() => setGenerated(null)}
-          >
+          </Button>
+          <Button size="sm" style={{ flexShrink: 0 }} onClick={() => setGenerated(null)}>
             Done
-          </button>
+          </Button>
           <span className="settings-section__hint">Copy it now: it will not be shown again.</span>
         </div>
       )}
