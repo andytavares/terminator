@@ -411,11 +411,12 @@ export function createExtensionAPI(
       },
     },
     extensions: {
-      get<T = unknown>(dependencyId: string): T {
+      // The provider's type is the declaration the caller chose; nothing here can check it.
+      get(dependencyId: string): never {
         if (!deps?.extensionExports) {
           throw new Error(`Extension "${extensionId}" declares no extensionDependencies`)
         }
-        return deps.extensionExports(dependencyId) as T
+        return deps.extensionExports(dependencyId) as never
       },
     },
     shell: {

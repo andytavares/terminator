@@ -1,4 +1,6 @@
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import type { ExtensionAPI, VaultDestination } from '@terminator/extension-sdk'
+
+export type { VaultDestination }
 
 // Taking someone to a task, from wherever they asked.
 //
@@ -21,20 +23,6 @@ const GLOBAL_TAB_ID = 'terminator.task-vault'
  * later and never hears it. It reads this on mount instead.
  */
 let pending: VaultDestination | null = null
-
-export interface VaultDestination {
-  date?: string
-  taskId?: string
-  /**
-   * Which of the vault's views to land on.
-   *
-   * Absent means "wherever it already was", which is right for a task — the
-   * task itself decides the view. It is not right for the weekly-review nudge,
-   * whose whole content is "go to the review": without this it opened the
-   * vault on today's log and left you to find it.
-   */
-  view?: 'daily' | 'review'
-}
 
 /**
  * Brings the window forward, opens the vault, and says where to go.

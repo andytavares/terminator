@@ -14,6 +14,7 @@ import type {
   TrackerTeam,
   TransitionIntent,
 } from './issues'
+import type { BuiltInExtensionExports } from './extensions'
 
 export interface Disposable {
   dispose(): void
@@ -253,6 +254,7 @@ export interface ExtensionAPI {
    */
   extensions: {
     /** The provider's `activate` return value. Throws for an id the manifest does not declare. */
+    get<K extends keyof BuiltInExtensionExports>(extensionId: K): BuiltInExtensionExports[K]
     get<T = unknown>(extensionId: string): T
   }
   shell: {
