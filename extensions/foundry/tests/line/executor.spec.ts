@@ -153,6 +153,9 @@ function deps(
   return {
     ...idleExecutorSeams(),
     run,
+    // Commands pass and no rung files anything unless a test says otherwise.
+    runCommand: async () => 0,
+    collect: async () => null,
     now: () => '2026-09-06T11:00:00.000Z',
     sources: { dataRoot, repoPaths: [repo], builtInDir },
     onEvent: (e: ExecutorEvent) => events.push(e),
@@ -533,7 +536,7 @@ describe('what the change turned out to be', () => {
 })
 
 describe('executor edge cases', () => {
-  it('runs a plain shell step with its command as the prompt', async () => {
+  it('hands a slash-command step to an agent with the command as the prompt', async () => {
     const run = vi.fn(ok)
     const shell = `
 schemaVersion: 1
@@ -541,13 +544,13 @@ id: direct
 steps:
   - id: check
     kind: run
-    command: npm test
+    command: /speckit-plan
 `
     const o = order([])
     await execute(o, recipe(shell), buildRunGraph(o, recipe(shell)), deps(run))
-    // The command, and an instruction not to reinterpret it. A bare command
-    // handed to an agent is an invitation to fix what it reports.
-    expect(run.mock.calls[0][0].prompt).toContain('npm test')
+    // The command, and an instruction not to reinterpret it. A command handed
+    // to an agent is an invitation to fix what it reports.
+    expect(run.mock.calls[0][0].prompt).toContain('/speckit-plan')
     expect(run.mock.calls[0][0].prompt).toContain('Do not fix what it reports')
   })
 
@@ -1374,7 +1377,8 @@ steps:
   it('passes when it was kept', async () => {
     const o = order([])
     const outcome = await execute(o, recipe(bugfix), buildRunGraph(o, recipe(bugfix)), {
-      ...deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 })),
+      ...deps(vi.fn(ok)),
+      runCommand: async () => 1,
       autonomy: 'lights-out',
       runStep: async () => 0,
     })
@@ -1639,7 +1643,8 @@ steps:
 `
     const o = order([])
     const outcome = await execute(o, recipe(repro), buildRunGraph(o, recipe(repro)), {
-      ...deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 })),
+      ...deps(vi.fn(ok)),
+      runCommand: async () => 1,
       autonomy: 'lights-out',
       runStep: async () => 0,
     })
@@ -2152,21 +2157,6 @@ steps:
     expect(build?.outputPath).toBeNull()
   })
 
-  it('names no destination when the caller collects nothing', async () => {
-    // A file nobody reads back is worse than silence: the agent spends a turn
-    // on it and the rung still hands back nothing.
-    const o = order([unit('U-1')])
-    const run = vi.fn(ok)
-    await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
-      ...deps(run),
-      autonomy: 'lights-out',
-      runStep: async () => 0,
-    })
-    const challenge = run.mock.calls.find((c) => c[0].node.id === 'challenge')?.[0]
-    expect(challenge?.outputPath).toBeNull()
-    expect(challenge?.prompt).not.toContain('What to write, and where')
-  })
-
   it('collects what the rung wrote and records it', async () => {
     const o = order([unit('U-1')])
     const recorded: string[][] = []
@@ -2500,14 +2490,6 @@ steps:
     })
     expect(runCommand).not.toHaveBeenCalled()
     expect(run.mock.calls.some((c) => c[0].node.id === 'lint')).toBe(true)
-  })
-
-  it('behaves exactly as before when nothing offers a runCommand', async () => {
-    const o = order([])
-    const run = vi.fn(ok)
-    const outcome = await execute(o, recipe(REWORK), buildRunGraph(o, recipe(REWORK)), deps(run))
-    expect(run.mock.calls.some((c) => c[0].node.id === 'lint')).toBe(true)
-    expect(outcome.graph.nodes.find((n) => n.id === 'lint')?.state).toBe('passed')
   })
 })
 

@@ -166,10 +166,9 @@ export interface ExecutorDeps {
    *
    * Without this every `run` step went to `deps.run`, which starts an agent
    * session; the agent was told "run this exactly" and the turn's end reported
-   * exit 0 regardless, so a `run` step could never actually fail. Absent, a
-   * `run` step keeps going to `deps.run` exactly as before.
+   * exit 0 regardless, so a `run` step could never actually fail.
    */
-  readonly runCommand?: (input: {
+  readonly runCommand: (input: {
     node: RunNode
     command: string
     title: string
@@ -260,12 +259,8 @@ export interface ExecutorDeps {
    * A seam rather than a store, for the reason `raise` is one: the executor
    * knows nothing about disk, and the order is the caller's to save. Null
    * means the rung left nothing, which is a result and is recorded as one.
-   *
-   * Absent entirely means rung output is not collected here — the ladder's own
-   * runs and every test stub — and the brief then names no destination rather
-   * than pointing an agent at a file nobody will read.
    */
-  readonly collect?: (input: {
+  readonly collect: (input: {
     readonly nodeId: string
     readonly role: string
     readonly outputPath: string
@@ -545,12 +540,10 @@ export async function execute(
   /**
    * Where this node writes what it found, or null when it has nothing to file.
    *
-   * Null for a role whose product is the checkout, for a bare command, and for
-   * a caller that collects nothing — an agent told to write a file nobody will
-   * read is worse off than one told nothing.
+   * Null for a role whose product is the checkout and for a bare command.
    */
   function outputFor(node: RunNode, roleId: string | null): string | null {
-    if (roleId === null || deps.collect === undefined) return null
+    if (roleId === null) return null
     const role = roles.get(roleId)
     if (role === null || collectableWrites(role).length === 0) return null
     try {
@@ -565,11 +558,9 @@ export async function execute(
   /**
    * The order's `outputs/` directory, for a role that hands back a document.
    *
-   * Under the same condition as `outputFor`: a caller that collects nothing
-   * has no use for a document a role could not hand back.
    */
   function outputsDirFor(roleId: string | null): string | null {
-    if (roleId === null || deps.collect === undefined) return null
+    if (roleId === null) return null
     const role = roles.get(roleId)
     if (!collectableWrites(role).includes('document')) return null
     return path.join(orderDir(deps.sources.dataRoot, order.id), 'outputs')
@@ -792,8 +783,7 @@ export async function execute(
           if (
             step?.kind === 'run' &&
             step.command !== undefined &&
-            !step.command.trimStart().startsWith('/') &&
-            deps.runCommand !== undefined
+            !step.command.trimStart().startsWith('/')
           ) {
             const resolved = resolveCommand(step.command, order)
             if (resolved === null) {
@@ -980,12 +970,12 @@ export async function execute(
       let handedBack: DocumentHandBack | null = null
       if (outputPath !== null && roleId !== null) {
         const collected = await deps
-          .collect?.({ nodeId: node.id, role: roleId, outputPath })
+          .collect({ nodeId: node.id, role: roleId, outputPath })
           // Never fatal, for the reason `persist` is not: a run that cannot
           // file what a rung wrote is still a run.
           .catch(() => null)
 
-        if (collected === null || collected === undefined) {
+        if (collected === null) {
           await deps.record(
             'rung.wrote_nothing',
             node.id,

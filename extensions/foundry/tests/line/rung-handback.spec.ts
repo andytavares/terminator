@@ -205,6 +205,7 @@ describe('a rung handing back what it found, end to end', () => {
       sources,
       autonomy: 'lights-out',
       runStep: async () => 0,
+      runCommand: async () => 0,
       collect: collector.collect,
     })
 
@@ -261,6 +262,7 @@ describe('a rung handing back what it found, end to end', () => {
       sources,
       autonomy: 'standard',
       runStep: async () => 0,
+      runCommand: async () => 0,
       collect: collector.collect,
       raise: async () => {},
     })
