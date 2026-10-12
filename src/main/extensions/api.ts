@@ -583,9 +583,13 @@ export function createExtensionAPI(
           key,
           handler as (ctx: CommandContext, args?: unknown) => void | Promise<void>
         )
+        // Quick Actions re-reads the list: a backend that activates after the
+        // panel opened would otherwise stay missing from it.
+        deps?.broadcastToWindows?.('extension:commands-changed', null)
         return disposable(() => {
           globalRegistry.commandContributions.delete(key)
           globalRegistry.commandHandlers.delete(key)
+          deps?.broadcastToWindows?.('extension:commands-changed', null)
         })
       },
     },

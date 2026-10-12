@@ -422,6 +422,18 @@ describe('api.commands.register', () => {
     expect(disposable).toHaveProperty('dispose')
     disposable.dispose()
   })
+
+  // Quick Actions lists the registered commands; an extension that activates
+  // after the panel opened must still reach it.
+  it('tells the windows when a command arrives and when it goes', () => {
+    const broadcastToWindows = vi.fn()
+    const api = createExtensionAPI('test.ext', '0.1.0', { broadcastToWindows })
+    const disposable = api.commands.register({ id: 'push', label: 'Push' }, vi.fn())
+    expect(broadcastToWindows).toHaveBeenCalledWith('extension:commands-changed', null)
+    broadcastToWindows.mockClear()
+    disposable.dispose()
+    expect(broadcastToWindows).toHaveBeenCalledWith('extension:commands-changed', null)
+  })
 })
 
 /** A channel that takes any payload, for tests about registration itself. */

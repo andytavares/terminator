@@ -597,6 +597,15 @@ export const ELECTRON_API_MANIFEST = [
     extensionView: 'shared',
   }),
   method({
+    path: 'extension.onCommandsChanged',
+    kind: 'event',
+    channel: 'extension:commands-changed',
+    signature: signature<(handler: () => void) => Unsubscribe>(),
+    toHandlerArgs: () => [],
+    // The remote client re-reads the commands each time its panel opens.
+    remote: 'omit',
+  }),
+  method({
     path: 'extension.getCommands',
     kind: 'invoke',
     channel: 'extension:get-commands',

@@ -330,6 +330,7 @@ beforeEach(() => {
     extension: {
       setBottomInset: vi.fn(),
       getCommands: vi.fn().mockResolvedValue({ commands: [] }),
+      onCommandsChanged: vi.fn().mockReturnValue(mockUnsubscribe),
       list: vi.fn().mockResolvedValue({ extensions: [] }),
       executeCommand: vi.fn(),
     },
@@ -355,6 +356,22 @@ beforeAll(async () => {
 })
 
 describe('App', () => {
+  // An extension backend can activate after the app (and an open Quick Actions
+  // panel) is up; its commands must still show without reopening the panel.
+  it('reads the extension commands again when they change', async () => {
+    render(<App />)
+    const extension = (
+      globalThis as unknown as {
+        electronAPI: { extension: Record<string, ReturnType<typeof vi.fn>> }
+      }
+    ).electronAPI.extension
+    await waitFor(() => expect(extension.getCommands).toHaveBeenCalled())
+    const reads = extension.getCommands.mock.calls.length
+    const announce = extension.onCommandsChanged.mock.calls[0][0] as () => void
+    act(() => announce())
+    await waitFor(() => expect(extension.getCommands.mock.calls.length).toBe(reads + 1))
+  })
+
   it('renders UnifiedSidebar', () => {
     render(<App />)
     expect(screen.getByTestId('unified-sidebar')).toBeTruthy()

@@ -358,12 +358,17 @@ export function App(): JSX.Element {
     return records.subscribe()
   }, [])
 
-  // Read before the first ⌘P, so the keys typed straight after it find them.
+  // Read before the first ⌘P, so the keys typed straight after it find them,
+  // and again whenever a backend registers or drops a command.
   useEffect(() => {
-    useExtensionCommandsStore
-      .getState()
-      .refresh()
-      .catch((error: unknown) => console.warn('Could not read extension commands', error))
+    const refresh = (): void => {
+      useExtensionCommandsStore
+        .getState()
+        .refresh()
+        .catch((error: unknown) => console.warn('Could not read extension commands', error))
+    }
+    refresh()
+    return window.electronAPI.extension?.onCommandsChanged?.(refresh)
   }, [])
 
   useEffect(() => {
