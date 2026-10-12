@@ -112,12 +112,42 @@ export class ExtensionHostProcess {
     }
     this.restarts++
     this.options.log('Restarting the extension host')
-    for (const record of records) {
-      this.activate(record).catch((error) =>
-        this.options.onBackendsFailed([record.id], `${message}; restart failed: ${String(error)}`)
+    this.reactivate(records, message)
+  }
+
+  /** Activates `records` again, each after the dependencies it had, as main first did. */
+  private reactivate(records: BackendRecord[], message: string): void {
+    const byId = new Map(records.map((record) => [record.id, record]))
+    const reactivations = new Map<string, Promise<void>>()
+    const reactivation = (id: string): Promise<void> => {
+      const started = reactivations.get(id)
+      if (started) return started
+      const record = byId.get(id)!
+      const dependencies = record.dependencies.filter((dependency) => byId.has(dependency))
+      const activated = Promise.all(dependencies.map(dependencyReady(reactivation))).then(() =>
+        this.activate(record)
+      )
+      reactivations.set(id, activated)
+      return activated
+    }
+    for (const { id } of records) {
+      reactivation(id).catch((error) =>
+        this.options.onBackendsFailed([id], `${message}; restart failed: ${errorText(error)}`)
       )
     }
   }
+}
+
+/** A dependency's reactivation, failing with a message naming it rather than its own error. */
+function dependencyReady(reactivation: (id: string) => Promise<void>) {
+  return (id: string) =>
+    reactivation(id).catch(() => {
+      throw new Error(`Extension dependency "${id}" failed to activate`)
+    })
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 function portLink(port: Electron.MessagePortMain): MessageLink {

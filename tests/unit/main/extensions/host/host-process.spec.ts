@@ -75,14 +75,16 @@ const backend = {
   },
 }
 
+type BackendModule = { activate(api: ExtensionAPI): unknown }
+
 /** A host process whose "process" is a HostRuntime on the other end of a MessageChannel. */
-function harness() {
+function harness(modules: Record<string, BackendModule> = {}) {
   const main = mainApi()
   const exits: Array<(code: number) => void> = []
   const spawned = vi.fn((initial: HostSnapshot): SpawnedHost => {
     const { port1, port2 } = new MessageChannel()
     const endpoint = new RpcEndpoint(link(port2))
-    new HostRuntime(endpoint, initial, {} as ExtensionDB, () => backend)
+    new HostRuntime(endpoint, initial, {} as ExtensionDB, (entry) => modules[entry] ?? backend)
     return { link: link(port1), onExit: (listener) => exits.push(listener), kill: vi.fn() }
   })
   const onBackendsFailed = vi.fn()
@@ -160,5 +162,64 @@ describe('extension backends in the extension host', () => {
 
     expect(onBackendsFailed).toHaveBeenCalledWith(['demo'], 'Extension host exited with code 134')
     expect(spawned).toHaveBeenCalledTimes(2)
+  })
+
+  it('hands a backend the exports of a dependency it declared, and refuses one it did not', async () => {
+    const seen: unknown[] = []
+    const provider: BackendModule = { activate: () => ({ secret: 1 }) }
+    const reader: BackendModule = { activate: (api) => seen.push(api.extensions.get('provider')) }
+    const { process } = harness({ '/p.cjs': provider, '/r.cjs': reader })
+    await process.activate({ id: 'provider', entryPoint: '/p.cjs', dependencies: [] })
+
+    await process.activate({ id: 'declared', entryPoint: '/r.cjs', dependencies: ['provider'] })
+    await expect(
+      process.activate({ id: 'snoop', entryPoint: '/r.cjs', dependencies: [] })
+    ).rejects.toThrow('Extension "snoop" did not declare "provider" in extensionDependencies')
+    expect(seen).toEqual([{ secret: 1 }])
+  })
+
+  it('activates backends again in dependency order: a consumer sees its provider after a restart', async () => {
+    const seen: unknown[] = []
+    const provider: BackendModule = {
+      async activate() {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        return { greet: () => 'hello' }
+      },
+    }
+    const consumer: BackendModule = {
+      activate: (api) => seen.push(api.extensions.get<{ greet(): string }>('provider')?.greet()),
+    }
+    const { process, crash, onBackendsFailed } = harness({ '/p.cjs': provider, '/c.cjs': consumer })
+    await process.activate({ id: 'provider', entryPoint: '/p.cjs', dependencies: [] })
+    await process.activate({ id: 'consumer', entryPoint: '/c.cjs', dependencies: ['provider'] })
+
+    crash(1)
+
+    await vi.waitFor(() => expect(seen).toHaveLength(2))
+    expect(seen).toEqual(['hello', 'hello'])
+    expect(onBackendsFailed).not.toHaveBeenCalled()
+  })
+
+  it('fails a consumer whose provider does not come back after a restart', async () => {
+    let providerStarts = 0
+    const provider: BackendModule = {
+      activate() {
+        if (++providerStarts > 1) throw new Error('provider broke')
+        return {}
+      },
+    }
+    const consumer: BackendModule = { activate: vi.fn() }
+    const { process, crash, onBackendsFailed } = harness({ '/p.cjs': provider, '/c.cjs': consumer })
+    await process.activate({ id: 'provider', entryPoint: '/p.cjs', dependencies: [] })
+    await process.activate({ id: 'consumer', entryPoint: '/c.cjs', dependencies: ['provider'] })
+
+    crash(1)
+
+    await vi.waitFor(() => expect(onBackendsFailed).toHaveBeenCalledTimes(2))
+    expect(onBackendsFailed).toHaveBeenCalledWith(
+      ['consumer'],
+      'Extension host exited with code 1; restart failed: Extension dependency "provider" failed to activate'
+    )
+    expect(consumer.activate).toHaveBeenCalledTimes(1)
   })
 })
