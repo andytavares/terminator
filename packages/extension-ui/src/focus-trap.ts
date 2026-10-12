@@ -69,8 +69,10 @@ export function trapTab(container: HTMLElement, shiftKey: boolean): boolean {
  * the document in the meantime — a branch row that was deleted by the very
  * dialog confirming its deletion is the obvious case.
  */
-export function captureFocus(container: HTMLElement): () => void {
-  const opener = document.activeElement as HTMLElement | null
+export function captureFocus(
+  container: HTMLElement,
+  opener = document.activeElement as HTMLElement | null
+): () => void {
   const focusables = focusableWithin(container)
   // The close control sits first in DOM order but is the worst initial target:
   // a dialog should open on the safe action, which is what the core's own
@@ -79,7 +81,8 @@ export function captureFocus(container: HTMLElement): () => void {
     focusables.find((el) => el.hasAttribute('data-tmui-initial-focus')) ??
     focusables.find((el) => !el.hasAttribute('data-tmui-close')) ??
     focusables[0]
-  ;(preferred ?? container).focus()
+  // A field that focused itself on mount (autoFocus) keeps it.
+  if (!container.contains(document.activeElement)) (preferred ?? container).focus()
 
   let restored = false
   return () => {

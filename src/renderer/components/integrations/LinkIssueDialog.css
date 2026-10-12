@@ -1,10 +1,5 @@
 /* ── Link issue dialog ───────────────────────────────────────── */
 
-.link-issue {
-  width: 460px;
-  max-width: 92vw;
-}
-
 .link-issue__search {
   display: flex;
   align-items: center;

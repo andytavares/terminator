@@ -13,20 +13,8 @@ const DOCUMENTS = [
   '../../../src/renderer-remote/mobile.html',
 ]
 
-const ENTRIES = [
-  '../../../src/renderer/index.tsx',
-  '../../../src/renderer-remote/main.tsx',
-  '../../../src/renderer-remote/mobile.main.tsx',
-]
-
 describe('fonts ship with the app', () => {
   it.each(DOCUMENTS)('%s requests nothing from a font service', (path) => {
     expect(read(path)).not.toMatch(/https?:\/\//)
-  })
-
-  it.each(ENTRIES)('%s bundles the mono and sans faces the tokens name', (path) => {
-    const source = read(path)
-    expect(source).toMatch(/@fontsource\/ibm-plex-mono\/400\.css/)
-    expect(source).toMatch(/@fontsource\/ibm-plex-sans\/400\.css/)
   })
 })

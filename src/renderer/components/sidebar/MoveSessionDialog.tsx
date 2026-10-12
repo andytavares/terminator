@@ -1,11 +1,12 @@
 import { useShallow } from 'zustand/react/shallow'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Dialog, type DialogAction } from '@terminator/extension-ui'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { SCRATCH_PROJECT_ID } from '../../../shared/types/index'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { useModalEffect } from '../../stores/modal.store'
-import './Dialog.css'
+import './dialog-fields.css'
 import './MoveSessionDialog.css'
 import { branchLabel } from '../../sidebar/branch-display'
 
@@ -106,11 +107,22 @@ export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.E
     return <CreateWorkspaceDialog onClose={onClose} />
   }
 
-  return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog move-session-dialog" onClick={(e) => e.stopPropagation()}>
-        <h2 className="dialog__title">Move to branch</h2>
+  const actions: DialogAction[] =
+    subView?.type === 'new-project'
+      ? [
+          { label: 'Back', onSelect: () => setSubView(null) },
+          {
+            label: 'Create & move',
+            tone: 'primary',
+            disabled: loading,
+            onSelect: () => handleCreateProject(subView.workspaceId),
+          },
+        ]
+      : []
 
+  return (
+    <Dialog title="Move to branch" onDismiss={onClose} actions={actions}>
+      <div className="move-session-dialog">
         {subView?.type === 'new-project' ? (
           <div className="move-session-dialog__new-project">
             <div className="dialog__field">
@@ -124,24 +136,16 @@ export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.E
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void handleCreateProject(subView.workspaceId)
-                  if (e.key === 'Escape') setSubView(null)
+                  if (e.key === 'Escape') {
+                    // Escape leaves the sub-view; it must not also close the dialog.
+                    e.stopPropagation()
+                    setSubView(null)
+                  }
                 }}
                 placeholder="My branch"
                 autoFocus
               />
               {newProjectError && <span className="dialog__error">{newProjectError}</span>}
-            </div>
-            <div className="dialog__actions">
-              <button className="dialog__btn-secondary" onClick={() => setSubView(null)}>
-                Back
-              </button>
-              <button
-                className="dialog__btn-primary"
-                onClick={() => void handleCreateProject(subView.workspaceId)}
-                disabled={loading}
-              >
-                Create & move
-              </button>
             </div>
           </div>
         ) : (
@@ -199,6 +203,6 @@ export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.E
           </>
         )}
       </div>
-    </div>
+    </Dialog>
   )
 }

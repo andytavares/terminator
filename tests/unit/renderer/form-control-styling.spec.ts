@@ -66,7 +66,7 @@ describe('core checkbox styling', () => {
 
   it('leaves no accent-color rule behind — it does nothing once appearance is none', () => {
     for (const file of [
-      '../../../src/renderer/components/sidebar/Dialog.css',
+      '../../../src/renderer/components/sidebar/dialog-fields.css',
       '../../../src/renderer/components/settings/SettingsPanel.css',
     ]) {
       expect(read(file)).not.toMatch(/accent-color/)

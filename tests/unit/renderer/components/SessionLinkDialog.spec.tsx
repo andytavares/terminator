@@ -105,7 +105,7 @@ describe('SessionLinkDialog', () => {
     const { container } = render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
     fireEvent.click(screen.getByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
-    fireEvent.click(container.querySelector('.dialog-overlay')!)
+    fireEvent.click(container.querySelector('.tmui-dialog__scrim')!)
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onClose).toHaveBeenCalledTimes(2)
   })

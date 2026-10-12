@@ -30,7 +30,7 @@ async function addBranch(workspaceName: string, branchName: string): Promise<voi
     .locator(`.repo-header__action[aria-label="New branch in ${workspaceName}"]`)
     .click()
   await page.getByPlaceholder('My branch').fill(branchName)
-  await page.click('.dialog__btn-primary')
+  await page.click('.tmui-dialog__actions .tmui-button--primary')
   await expect(page.locator('.branch-row__name', { hasText: branchName })).toBeVisible()
 }
 

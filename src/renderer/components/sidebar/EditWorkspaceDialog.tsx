@@ -1,10 +1,11 @@
 import { useShallow } from 'zustand/react/shallow'
-import React, { useState } from 'react'
+import { useState } from 'react'
+import { Button, Dialog } from '@terminator/extension-ui'
 import type { Workspace } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { WORKSPACE_PRESET_COLORS as PRESET_COLORS } from './workspace-colors'
 import { useModalEffect } from '../../stores/modal.store'
-import './Dialog.css'
+import './dialog-fields.css'
 
 interface Props {
   workspace: Workspace
@@ -40,8 +41,7 @@ export function EditWorkspaceDialog({ workspace, onClose }: Props): JSX.Element 
     if ('filePath' in result) setFolderPath(result.filePath)
   }
 
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
-    e.preventDefault()
+  async function handleSubmit(): Promise<void> {
     const nameErr = validateName(name)
     if (nameErr) {
       setNameError(nameErr)
@@ -69,75 +69,68 @@ export function EditWorkspaceDialog({ workspace, onClose }: Props): JSX.Element 
   }
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <h2 className="dialog__title">Edit Workspace</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="dialog__field">
-            <label className="dialog__label">Name *</label>
-            <input
-              className={`dialog__input${nameError ? ' dialog__input--error' : ''}`}
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value)
-                setNameError('')
-              }}
-              onBlur={() => setNameError(validateName(name))}
-              autoFocus
-            />
-            {nameError && <span className="dialog__error">{nameError}</span>}
-          </div>
-
-          <div className="dialog__field">
-            <label className="dialog__label">Folder</label>
-            <div className="dialog__row">
-              <input
-                className="dialog__input"
-                value={folderPath}
-                onChange={(e) => setFolderPath(e.target.value)}
-              />
-              <button type="button" className="dialog__btn-secondary" onClick={handleBrowse}>
-                Browse
-              </button>
-            </div>
-          </div>
-
-          <div className="dialog__field">
-            <label className="dialog__label">Color</label>
-            <div className="dialog__colors">
-              {PRESET_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`dialog__color-swatch${color === c ? ' dialog__color-swatch--selected' : ''}`}
-                  style={{ backgroundColor: c }}
-                  onClick={() => setColor(c)}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="dialog__field">
-            <label className="dialog__label">Tags (comma-separated)</label>
-            <input
-              className="dialog__input"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-            />
-          </div>
-
-          {error && <p className="dialog__error">{error}</p>}
-
-          <div className="dialog__actions">
-            <button type="button" className="dialog__btn-secondary" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="dialog__btn-primary" disabled={!!nameError}>
-              Save
-            </button>
-          </div>
-        </form>
+    <Dialog
+      title="Edit Workspace"
+      onDismiss={onClose}
+      actions={[
+        { label: 'Cancel', onSelect: onClose },
+        {
+          label: 'Save',
+          tone: 'primary',
+          submit: true,
+          disabled: !!nameError,
+          onSelect: handleSubmit,
+        },
+      ]}
+    >
+      <div className="dialog__field">
+        <label className="dialog__label">Name *</label>
+        <input
+          className={`dialog__input${nameError ? ' dialog__input--error' : ''}`}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value)
+            setNameError('')
+          }}
+          onBlur={() => setNameError(validateName(name))}
+          autoFocus
+        />
+        {nameError && <span className="dialog__error">{nameError}</span>}
       </div>
-    </div>
+
+      <div className="dialog__field">
+        <label className="dialog__label">Folder</label>
+        <div className="dialog__row">
+          <input
+            className="dialog__input"
+            value={folderPath}
+            onChange={(e) => setFolderPath(e.target.value)}
+          />
+          <Button onClick={handleBrowse}>Browse</Button>
+        </div>
+      </div>
+
+      <div className="dialog__field">
+        <label className="dialog__label">Color</label>
+        <div className="dialog__colors">
+          {PRESET_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`dialog__color-swatch${color === c ? ' dialog__color-swatch--selected' : ''}`}
+              style={{ backgroundColor: c }}
+              onClick={() => setColor(c)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="dialog__field">
+        <label className="dialog__label">Tags (comma-separated)</label>
+        <input className="dialog__input" value={tags} onChange={(e) => setTags(e.target.value)} />
+      </div>
+
+      {error && <p className="dialog__error">{error}</p>}
+    </Dialog>
   )
 }

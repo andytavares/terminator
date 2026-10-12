@@ -1,6 +1,6 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useDismissible } from '@terminator/extension-ui'
+import { RelativeTime, useDismissible } from '@terminator/extension-ui'
 import { Search, X } from 'lucide-react'
 import type { SearchResult } from '../db/types'
 import { useNotesStore } from '../stores/notes.store'
@@ -24,18 +24,6 @@ function highlightTitle(title: string, query: string): React.JSX.Element {
       )}
     </>
   )
-}
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  if (days < 7) return `${days}d ago`
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 interface SearchOverlayProps {
@@ -220,7 +208,7 @@ export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Elemen
                   {r.tags.map((t) => `#${t}`).join(' ')}
                 </span>
                 <span className="notepad-search-overlay__result-time">
-                  {relativeTime(r.updatedAt)}
+                  <RelativeTime value={r.updatedAt} />
                 </span>
               </div>
             </div>

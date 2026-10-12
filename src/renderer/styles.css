@@ -206,22 +206,9 @@ button {
   flex-shrink: 1 !important;
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 12px;
-  color: var(--text-muted);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  user-select: none;
-}
-
-.empty-state__icon {
-  font-size: 32px;
-  opacity: 0.3;
+/* The main area's empty state sits in the middle of the space it explains. */
+.main-content > .tmui-empty {
+  margin: auto;
 }
 
 /* ── Skeleton Loading ────────────────────────────────────────── */

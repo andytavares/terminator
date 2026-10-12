@@ -159,10 +159,10 @@ export async function closeApp(handle: AppHandle | undefined): Promise<void> {
  */
 export async function createWorkspace(page: Page, name: string, folderPath: string): Promise<void> {
   await page.click('.sidebar-header__add')
-  await page.waitForSelector('.dialog__title')
+  await page.waitForSelector('.tmui-dialog__title')
   await page.getByPlaceholder('My Workspace').fill(name)
   await page.getByPlaceholder('/path/to/folder').fill(folderPath)
-  await page.click('.dialog__btn-primary')
+  await page.click('.tmui-dialog__actions .tmui-button--primary')
   await expect(workspaceRow(page, name)).toBeVisible()
 }
 
@@ -202,9 +202,9 @@ export async function addAndSelectProject(
   await workspaceRow(page, workspaceName)
     .locator(`.repo-header__action[aria-label="New branch in ${workspaceName}"]`)
     .click()
-  await expect(page.locator('.dialog__title')).toContainText('Create Branch')
+  await expect(page.locator('.tmui-dialog__title')).toContainText('Create Branch')
   await page.getByPlaceholder('My branch').fill(projectName)
-  await page.click('.dialog__btn-primary')
+  await page.click('.tmui-dialog__actions .tmui-button--primary')
   const row = projectGroup(page, projectName)
   await expect(row).toBeVisible()
   // Clicking the row selects the branch; the app's auto-open effect gives it

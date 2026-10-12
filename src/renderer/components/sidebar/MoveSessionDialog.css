@@ -1,6 +1,4 @@
 .move-session-dialog {
-  min-width: 320px;
-  max-width: 420px;
   max-height: 70vh;
   display: flex;
   flex-direction: column;

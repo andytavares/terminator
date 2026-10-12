@@ -9,7 +9,8 @@ import React, {
   useState,
   createElement,
 } from 'react'
-import { House, LayoutGrid } from 'lucide-react'
+import { Hexagon, House, LayoutGrid, Option } from 'lucide-react'
+import { EmptyState } from '@terminator/extension-ui'
 import { UnifiedSidebar } from './components/sidebar/UnifiedSidebar'
 import { AppBand } from './components/sidebar/AppBand'
 import { TerminalPane } from './components/terminal/TerminalPane'
@@ -37,7 +38,6 @@ import { dispatchNotification } from './lib/notifications'
 import { useNotificationStore } from './stores/notification.store'
 import { NotificationPanel } from './components/NotificationPanel'
 import { useExtensionRegistry } from './extensions/registry'
-import { EmptyState } from './components/EmptyState'
 import { HomeScreen } from './components/home/HomeScreen'
 import { useMetricsStore } from './stores/metrics.store'
 import { AboutDialog } from './components/AboutDialog'
@@ -734,29 +734,30 @@ export function App(): JSX.Element {
                   </>
                 ) : globalSettings && !globalSettings.ui?.hasSeenWelcome ? (
                   <EmptyState
-                    icon="⬡"
-                    title="Welcome to Terminator"
-                    subtitle="A keyboard-first terminal for developers. Open a project to get started."
+                    icon={Hexagon}
+                    heading="Welcome to Terminator"
+                    description="A keyboard-first terminal for developers. Open a project to get started."
                     actions={[
-                      { label: 'Quick actions', shortcut: '⌘P', onClick: handleOpenQuickActions },
-                      { label: 'New Tab', shortcut: '⌘T', onClick: () => {} },
+                      { label: 'Quick actions', shortcut: '⌘P', onSelect: handleOpenQuickActions },
+                      { label: 'New Tab', shortcut: '⌘T', onSelect: () => {} },
                       {
                         label: 'Open Settings',
                         shortcut: '⌘,',
-                        onClick: () => setSettingsOpen(true),
+                        onSelect: () => setSettingsOpen(true),
                       },
                     ]}
                   />
                 ) : (
                   <EmptyState
-                    icon="⌥"
-                    title={
+                    icon={Option}
+                    heading={
                       activeWorkspaceId
                         ? 'Select or create a project'
                         : 'Select a workspace to get started'
                     }
+                    description="Pick one in the sidebar, or make one from quick actions."
                     actions={[
-                      { label: 'Quick actions', shortcut: '⌘P', onClick: handleOpenQuickActions },
+                      { label: 'Quick actions', shortcut: '⌘P', onSelect: handleOpenQuickActions },
                     ]}
                   />
                 )}

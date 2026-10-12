@@ -51,7 +51,7 @@ describe('AboutDialog', () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
-    fireEvent.click(document.querySelector('.dialog-overlay')!)
+    fireEvent.click(document.querySelector('.tmui-dialog__scrim')!)
     expect(onClose).toHaveBeenCalled()
   })
 

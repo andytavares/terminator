@@ -153,7 +153,7 @@ test.describe('opening and running the panel', () => {
     await page.keyboard.press('d')
     await expect(dialog(page)).toBeHidden()
     await expect(page.locator('.xterm')).toHaveCount(2, { timeout: 15000 })
-    await expect(page.locator('.toast__message')).toContainText('Next time: ⌘D', { timeout: 5000 })
+    await expect(page.locator('.tmui-toast__message')).toContainText('Next time: ⌘D', { timeout: 5000 })
   })
 
   // AC3: `/` then "push" surfaces Git's Push action through its category.
@@ -286,7 +286,7 @@ test.describe('no repository focused', () => {
     // Disabled: the row shows its reason in the footer and the panel stays open.
     await expect(page.locator('.qa-footer__message')).toHaveText('No repository focused')
     await expect(dialog(page)).toBeVisible()
-    await expect(page.locator('.toast__message')).toHaveCount(0)
+    await expect(page.locator('.tmui-toast__message')).toHaveCount(0)
     await page.keyboard.press('Escape')
     await expect(dialog(page)).toBeHidden()
   })
@@ -399,7 +399,7 @@ test.describe('git push and a custom shell action', () => {
     await expect(page.getByRole('option', { name: /^p Push/ })).toBeVisible()
     await page.keyboard.press('p')
     await expect(dialog(page)).toBeHidden({ timeout: 10000 })
-    await expect(page.locator('.toast__message')).toContainText('Pushed main to origin', {
+    await expect(page.locator('.tmui-toast__message')).toContainText('Pushed main to origin', {
       timeout: 15000,
     })
 

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import { RelativeTime } from '@terminator/extension-ui'
 import { ChevronDown, ChevronRight, Loader, TriangleAlert, Wifi, WifiOff } from 'lucide-react'
 import { OFF, reduceStatus, tunnelDropped, type RemoteStatus } from '../state/status'
 import type { ConnectedDevice } from '../server/connected-devices'
@@ -251,7 +252,9 @@ function ConnectedDevices({
             <li key={device.id} className="rc-device">
               <span className="rc-device__label">{device.label}</span>
               <span className="rc-device__viewing">{device.viewing}</span>
-              <span className="rc-device__since">{elapsed(device.connectedAt)}</span>
+              <span className="rc-device__since">
+                <RelativeTime value={device.connectedAt} />
+              </span>
               <button
                 type="button"
                 className="rc-btn rc-btn--ghost"
@@ -323,13 +326,4 @@ function CopyButton({ value, label }: { value: string; label: string }): React.J
       {copied ? 'Copied' : 'Copy'}
     </button>
   )
-}
-
-/** Elapsed time, never a raw timestamp. */
-function elapsed(since: number, now: number = Date.now()): string {
-  const seconds = Math.max(0, Math.round((now - since) / 1000))
-  if (seconds < 60) return 'just now'
-  const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes}m`
-  return `${Math.round(minutes / 60)}h`
 }
