@@ -1,9 +1,8 @@
 import { expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { launchApp, closeApp, workspaceRow } from './helpers'
+import { launchApp, closeApp, workspaceRow, e2eTempDir } from './helpers'
 import type { AppHandle } from './helpers'
 
 // Shared helpers for every `tests/e2e/foundry-*.spec.ts` file. Each spec keeps
@@ -27,7 +26,7 @@ export function git(repo: string, ...args: string[]): string {
 /** A minimal git repository with a real toolchain, exactly what every foundry
  *  spec seeds before launching the app. */
 export function makeFixtureRepo(prefix: string): string {
-  const repo = mkdtempSync(join(tmpdir(), prefix))
+  const repo = e2eTempDir(prefix)
   git(repo, 'init', '-b', 'main')
   git(repo, 'config', 'user.email', 'e2e@example.com')
   git(repo, 'config', 'user.name', 'E2E')

@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { launchApp, closeApp, createWorkspace, type AppHandle } from '../helpers'
+import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
 
 // A red CI goes back to the builder, for real (ADR-064).
 //
@@ -57,7 +56,7 @@ test.skip(REMOTE === '', 'set LIVE_REMOTE to run this')
 
 test.beforeAll(async () => {
   test.setTimeout(300_000)
-  repo = mkdtempSync(join(tmpdir(), 'foundry-live-ci-'))
+  repo = e2eTempDir('foundry-live-ci-')
   execFileSync('git', ['clone', REMOTE, repo])
   git('config', 'user.email', 'live@example.com')
   git('config', 'user.name', 'Live')

@@ -1,7 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { rmSync } from 'node:fs'
 import {
   AppHandle,
   launchApp,
@@ -9,6 +7,7 @@ import {
   createWorkspace,
   addAndSelectProject,
   selectProject,
+  e2eTempDir,
 } from './helpers'
 
 // Home against the running app: it is the launch view, it lists every terminal
@@ -23,7 +22,7 @@ let handle: AppHandle | undefined
 let folder: string
 
 test.beforeEach(() => {
-  folder = mkdtempSync(join(tmpdir(), 'home-'))
+  folder = e2eTempDir('home-')
 })
 
 test.afterEach(async () => {

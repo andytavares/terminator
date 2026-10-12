@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { execSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -9,6 +9,7 @@ import {
   closeApp,
   createWorkspace,
   addAndSelectProject,
+  e2eTempDir,
   terminalRows,
 } from '../helpers'
 
@@ -53,7 +54,7 @@ async function waitForChoice(page: Page): Promise<string[]> {
 
 test('a live Claude Code prompt is pinned on the wall and answered from its buttons', async () => {
   test.setTimeout(240_000)
-  repo = mkdtempSync(join(tmpdir(), 'choice-live-'))
+  repo = e2eTempDir('choice-live-')
   handle = await launchApp()
   const { page } = handle
   await createWorkspace(page, 'Live', repo)

@@ -1,8 +1,13 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
+import { rmSync } from 'node:fs'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  e2eTempDir,
+} from './helpers'
 
 // Ending a session, and clearing away what is left of one, from the surfaces
 // that draw it — without going to the sidebar or the tab bar.
@@ -15,7 +20,7 @@ let handle: AppHandle | undefined
 let folder: string
 
 test.beforeEach(() => {
-  folder = mkdtempSync(join(tmpdir(), 'close-session-'))
+  folder = e2eTempDir('close-session-')
 })
 
 test.afterEach(async () => {

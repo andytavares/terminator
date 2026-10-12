@@ -22,7 +22,7 @@ export interface AppHandle {
  * everything in one place after every worker has exited, and `closeApp`
  * never has to delete anything itself.
  */
-function e2eRunRoot(): string {
+export function e2eRunRoot(): string {
   const root = process.env.TERMINATOR_E2E_RUN_ROOT
   if (!root) {
     throw new Error(
@@ -32,8 +32,17 @@ function e2eRunRoot(): string {
   return root
 }
 
+/**
+ * A new directory under this run's root, for a spec's repository or folder.
+ * `tests/e2e/global-teardown.ts` removes it with the root, whether the spec
+ * passed or failed; one made in the OS temp directory stayed there.
+ */
+export function e2eTempDir(prefix: string): string {
+  return mkdtempSync(join(e2eRunRoot(), prefix))
+}
+
 function e2eProfileDir(): string {
-  return mkdtempSync(join(e2eRunRoot(), 'profile-'))
+  return e2eTempDir('profile-')
 }
 
 /**

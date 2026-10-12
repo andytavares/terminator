@@ -1,9 +1,15 @@
 import { test, expect, type Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  e2eTempDir,
+} from './helpers'
 
 /**
  * Feature 057 — Quick Actions.
@@ -101,7 +107,7 @@ test.describe('opening and running the panel', () => {
   let folder: string
 
   test.beforeAll(async () => {
-    folder = mkdtempSync(join(tmpdir(), 'terminator-e2e-qa-'))
+    folder = e2eTempDir('terminator-e2e-qa-')
     handle = await launchApp()
     await createWorkspace(handle.page, 'QA Workspace', folder)
     await addAndSelectProject(handle.page, 'QA Workspace', 'scratch')
@@ -368,8 +374,8 @@ test.describe('git push and a custom shell action', () => {
   }
 
   test.beforeAll(async () => {
-    bareDir = mkdtempSync(join(tmpdir(), 'terminator-e2e-qa-bare-'))
-    workDir = mkdtempSync(join(tmpdir(), 'terminator-e2e-qa-work-'))
+    bareDir = e2eTempDir('terminator-e2e-qa-bare-')
+    workDir = e2eTempDir('terminator-e2e-qa-work-')
     git(bareDir, 'init', '--bare', '-b', 'main')
     git(workDir, 'init', '-b', 'main')
     git(workDir, 'config', 'user.email', 'e2e@example.com')
@@ -469,7 +475,7 @@ test.describe('panel screenshots', () => {
   let folder: string
 
   test.beforeAll(async () => {
-    folder = mkdtempSync(join(tmpdir(), 'terminator-e2e-qa-shots-'))
+    folder = e2eTempDir('terminator-e2e-qa-shots-')
     handle = await launchApp()
     await createWorkspace(handle.page, 'QA Shots', folder)
     await addAndSelectProject(handle.page, 'QA Shots', 'scratch')

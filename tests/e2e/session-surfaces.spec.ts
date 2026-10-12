@@ -1,8 +1,13 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
+import { rmSync } from 'node:fs'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  e2eTempDir,
+} from './helpers'
 
 // A regression suite for feature 058: output arriving in a background terminal
 // must never reorder Home or the wall, and every way of opening a session must
@@ -19,7 +24,7 @@ let handle: AppHandle | undefined
 let folder: string
 
 test.beforeEach(() => {
-  folder = mkdtempSync(join(tmpdir(), 'surfaces-'))
+  folder = e2eTempDir('surfaces-')
 })
 
 test.afterEach(async () => {

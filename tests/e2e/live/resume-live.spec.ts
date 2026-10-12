@@ -1,14 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { execSync } from 'node:child_process'
-import {
-  copyFileSync,
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
+import { copyFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -17,6 +9,7 @@ import {
   closeApp,
   createWorkspace,
   addAndSelectProject,
+  e2eTempDir,
   terminalRows,
 } from '../helpers'
 
@@ -68,7 +61,7 @@ async function openHome(page: Page): Promise<void> {
 
 test('a real conversation is captured, ended, and brought back', async () => {
   test.setTimeout(300_000)
-  folder = mkdtempSync(join(tmpdir(), 'resume-live-'))
+  folder = e2eTempDir('resume-live-')
   const report: Record<string, unknown> = {
     claude: execSync('claude --version').toString().trim(),
   }
