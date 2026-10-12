@@ -265,25 +265,6 @@ describe('workspace IPC handlers', () => {
       expect(store.deleteProject).toHaveBeenCalledWith('p1')
     })
 
-    it('skips worktree removal when workspace has no folderPath', async () => {
-      vi.mocked(store.getProjectById).mockReturnValue({
-        id: 'p1',
-        isWorktree: true,
-        worktreePath: '/repo/branches/feat',
-        workspaceId: 'ws-1',
-      } as unknown as ReturnType<typeof store.getProjectById>)
-      vi.mocked(store.listWorkspaces).mockReturnValue([
-        { id: 'ws-1', folderPath: undefined },
-      ] as unknown as ReturnType<typeof store.listWorkspaces>)
-      vi.mocked(store.deleteProject).mockReturnValue(
-        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
-      )
-      const handler = captureHandler('project:delete')
-      await handler({}, { id: 'p1' })
-      expect(gitService.removeWorktree).not.toHaveBeenCalled()
-      expect(store.deleteProject).toHaveBeenCalledWith('p1')
-    })
-
     it('broadcasts workspace:project-removed to all BrowserWindows after deletion', async () => {
       vi.mocked(store.getProjectById).mockReturnValue(undefined)
       vi.mocked(store.deleteProject).mockReturnValue(

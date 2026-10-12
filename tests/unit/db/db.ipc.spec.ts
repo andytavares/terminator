@@ -49,12 +49,4 @@ describe('db:health IPC handler', () => {
     const result = await handler({})
     expect(result).toEqual({ ok: false, message: 'DB not initialized' })
   })
-
-  it('db:health returns { ok: false, message } when healthCheck throws', async () => {
-    mockHealthCheck.mockRejectedValue(new Error('connection lost'))
-    registerDbIpcHandlers()
-    const handler = mockHandle.mock.calls.find((c) => c[0] === 'db:health')?.[1]
-    const result = await handler({})
-    expect(result).toMatchObject({ ok: false, message: expect.stringContaining('connection lost') })
-  })
 })

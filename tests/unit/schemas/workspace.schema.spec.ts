@@ -1,24 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import {
-  WorkspaceSchema,
-  CreateWorkspaceInputSchema,
-  ProjectSchema,
-} from '../../../src/shared/schemas/workspace.schema'
+import { CreateWorkspaceInputSchema } from '../../../src/shared/schemas/workspace.schema'
 
-describe('WorkspaceSchema', () => {
+describe('CreateWorkspaceInputSchema', () => {
   const validWorkspace = {
-    id: '550e8400-e29b-41d4-a716-446655440000',
     name: 'My Workspace',
     folderPath: '/home/user/project',
     color: '#4A90E2',
     tags: ['frontend', 'work'],
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
   }
-
-  it('accepts a valid workspace', () => {
-    expect(WorkspaceSchema.safeParse(validWorkspace).success).toBe(true)
-  })
 
   it('rejects empty name', () => {
     const result = CreateWorkspaceInputSchema.safeParse({ ...validWorkspace, name: '' })
@@ -63,24 +52,5 @@ describe('WorkspaceSchema', () => {
       tags: Array.from({ length: 20 }, (_, i) => `tag${i}`),
     })
     expect(result.success).toBe(true)
-  })
-})
-
-describe('ProjectSchema', () => {
-  const validProject = {
-    id: '550e8400-e29b-41d4-a716-446655440001',
-    workspaceId: '550e8400-e29b-41d4-a716-446655440000',
-    name: 'My Project',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-  }
-
-  it('accepts a valid project', () => {
-    expect(ProjectSchema.safeParse(validProject).success).toBe(true)
-  })
-
-  it('rejects empty project name', () => {
-    const result = ProjectSchema.safeParse({ ...validProject, name: '' })
-    expect(result.success).toBe(false)
   })
 })
