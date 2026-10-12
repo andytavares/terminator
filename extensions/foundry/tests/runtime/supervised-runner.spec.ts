@@ -24,6 +24,18 @@ let projectId: string | null
 let exitListener: ((exitCode: number | null) => void) | null
 let exitDetached: boolean
 let closed: string[]
+let ran: Array<{ file: string; args: string[] } & Record<string, unknown>>
+/** How the next `runInTerminal` ends; never, unless a test says. */
+let nextExit: { exitCode: number | null } | null
+
+function exitWith(exit: { exitCode: number | null }): void {
+  nextExit = exit
+}
+
+/** The script a command's terminal was asked to run. */
+function scriptOf(input: { args: string[] }): string {
+  return input.args[input.args.length - 1]
+}
 
 function api() {
   return {
@@ -40,6 +52,12 @@ function api() {
       },
       write: (terminal: string, data: string) => written.push({ terminal, data }),
       closeTerminalTab: (terminal: string) => closed.push(terminal),
+      runInTerminal: (input: { file: string; args: string[] } & Record<string, unknown>) => {
+        ran.push(input)
+        if (terminalId === null) return Promise.resolve(null)
+        if (nextExit === null) return new Promise(() => {})
+        return Promise.resolve({ sessionId: terminalId, ...nextExit })
+      },
       onExit: (_sessionId: string, listener: (exitCode: number | null) => void) => {
         exitListener = listener
         return () => {
@@ -121,6 +139,8 @@ beforeEach(async () => {
   exitListener = null
   exitDetached = false
   closed = []
+  ran = []
+  nextExit = null
 })
 
 afterEach(async () => {
@@ -835,7 +855,7 @@ describe('running one command in a terminal, with no agent', () => {
     void runner().runCommand(command)
     await settled()
     expect(created[0]).toMatchObject({ worktreePath: '/wt/feat-thing', gitBranch: 'feat/thing' })
-    expect(opened[0]).toMatchObject({
+    expect(ran[0]).toMatchObject({
       projectId: 'project-1',
       cwd: '/wt/feat-thing',
       tabTitle: 'Lint',
@@ -843,52 +863,36 @@ describe('running one command in a terminal, with no agent', () => {
     })
   })
 
-  it('runs the command from a script and exits the shell with its status', async () => {
+  // The terminal's own process is the command's script, so the exit node-pty
+  // reports is the command's. Typing it into an interactive shell made the
+  // verdict that shell's exit, and closing the tab killed the shell with a
+  // signal that read as exit 0.
+  it("runs the command's script as the terminal's process, typing nothing", async () => {
     void runner().runCommand(command)
     await settled()
-    expect(launchScriptBody()).toContain('npm run lint')
-    expect(written.map((w) => w.data).join('')).toMatch(/; exit \$\?\r$/)
-    expect(launchScriptBody()).not.toContain('claude')
+    expect(written).toEqual([])
+    expect(ran[0].file).toBe(process.env.SHELL ?? '/bin/sh')
+    expect(readFileSync(scriptOf(ran[0]), 'utf8')).toContain('npm run lint')
   })
 
-  it('closes the tab of a command that passed', async () => {
-    const pending = runner().runCommand(command)
-    await settled()
-    exitListener!(0)
-    await pending
+  it('resolves 0 for a command that exited 0, and closes its tab', async () => {
+    exitWith({ exitCode: 0 })
+    await expect(runner().runCommand(command)).resolves.toBe(0)
     expect(closed).toEqual(['terminal-1'])
   })
 
-  // The extension loads from the checkout; the host is whatever app is
-  // installed. A host built before `closeTerminalTab` existed threw from the
-  // exit listener, the pass never resolved, and the run sat at lint for ever.
-  it('still resolves a pass on a host that cannot close the tab', async () => {
-    const host = api() as { pty: { closeTerminalTab?: unknown } }
-    delete host.pty.closeTerminalTab
-    const pending = createSupervisedRunner({
-      api: host as never,
-      control,
-      stateDir: join(dir, 'state'),
-      now: () => 1_000,
-    }).runCommand(command)
-    await settled()
-    expect(() => exitListener!(0)).not.toThrow()
-    await expect(pending).resolves.toBe(0)
-  })
-
-  it('keeps the tab of a command that failed, with its output on screen', async () => {
-    const pending = runner().runCommand(command)
-    await settled()
-    exitListener!(1)
-    await pending
+  it('resolves the status of a command that failed, and keeps its tab on screen', async () => {
+    exitWith({ exitCode: 2 })
+    await expect(runner().runCommand(command)).resolves.toBe(2)
     expect(closed).toEqual([])
   })
 
-  it("resolves with the terminal's exit status, a failure as much as a pass", async () => {
-    const pending = runner().runCommand(command)
-    await settled()
-    exitListener!(2)
-    await expect(pending).resolves.toBe(2)
+  // Killed by a signal, or its tab closed before it finished: the core has no
+  // exit status to give, and "not measured" is the only honest verdict.
+  it('resolves null, never 0, for a command that ended without an exit status', async () => {
+    exitWith({ exitCode: null })
+    await expect(runner().runCommand(command)).resolves.toBeNull()
+    expect(closed).toEqual([])
   })
 
   it('resolves null when no project or terminal could be opened', async () => {
@@ -901,8 +905,8 @@ describe('running one command in a terminal, with no agent', () => {
 })
 
 // A command step's output used to vanish the moment the tab scrolled past it.
-// logPath tees stdout+stderr to a file while keeping the tab's own exit code
-// as the verdict — the command's status, never tee's.
+// logPath tees stdout+stderr to a file while keeping the script's own exit
+// status as the verdict — the command's status, never tee's.
 describe('running a command with a log file', () => {
   const shells = ['/bin/sh', ...(existsSync('/bin/zsh') ? ['/bin/zsh'] : [])]
 
@@ -916,57 +920,36 @@ describe('running a command with a log file', () => {
     rmSync(logDir, { recursive: true, force: true, maxRetries: 5 })
   })
 
-  function scriptPath(): string {
-    const typed = written.map((w) => w.data).join('')
-    const match = /([^'\s]*\/launch\/[\w-]+\.sh)/.exec(typed)
-    if (match === null) throw new Error(`no command script was typed: ${typed}`)
-    return match[1]
+  async function scriptFor(commandLine: string, logPath?: string): Promise<string> {
+    void runner().runCommand({
+      worktreePath: '/wt/feat-thing',
+      workspaceId: 'ws-1',
+      branch: 'feat/thing',
+      title: 'Check',
+      command: commandLine,
+      logPath,
+    })
+    await settled()
+    return scriptOf(ran[ran.length - 1])
   }
 
   for (const shell of shells) {
     it(`(${shell}) exits with the command's status, not tee's, and writes the log`, async () => {
       const logPath = join(logDir, 'false.log')
-      void runner().runCommand({
-        worktreePath: '/wt/feat-thing',
-        workspaceId: 'ws-1',
-        branch: 'feat/thing',
-        title: 'Check',
-        command: 'false',
-        logPath,
-      })
-      await settled()
-      const result = spawnSync(shell, [scriptPath()])
+      const result = spawnSync(shell, [await scriptFor('false', logPath)])
       expect(result.status).toBe(1)
       expect(existsSync(logPath)).toBe(true)
     })
 
     it(`(${shell}) captures the command's exit code and its combined output in the log`, async () => {
-      written = []
       const logPath = join(logDir, 'echo.log')
-      void runner().runCommand({
-        worktreePath: '/wt/feat-thing',
-        workspaceId: 'ws-1',
-        branch: 'feat/thing',
-        title: 'Check',
-        command: 'echo hello; exit 3',
-        logPath,
-      })
-      await settled()
-      const result = spawnSync(shell, [scriptPath()])
+      const result = spawnSync(shell, [await scriptFor('echo hello; exit 3', logPath)])
       expect(result.status).toBe(3)
       expect(readFileSync(logPath, 'utf8')).toContain('hello')
     })
   }
 
   it('has no tee when logPath is absent', async () => {
-    void runner().runCommand({
-      worktreePath: '/wt/feat-thing',
-      workspaceId: 'ws-1',
-      branch: 'feat/thing',
-      title: 'Check',
-      command: 'npm run lint',
-    })
-    await settled()
-    expect(readFileSync(scriptPath(), 'utf8')).not.toContain('tee')
+    expect(readFileSync(await scriptFor('npm run lint'), 'utf8')).not.toContain('tee')
   })
 })

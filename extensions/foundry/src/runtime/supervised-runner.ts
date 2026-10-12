@@ -161,7 +161,9 @@ export interface SupervisedRunner {
    * verdict is the exit status, so a model in between adds cost and a
    * transcript to read back, and nothing else.
    *
-   * Null when no project or tab could be opened — "not measured", never a pass.
+   * Null when no project or tab could be opened, or when the command ended
+   * without an exit status (a signal, or its tab closed first) — "not
+   * measured", never a pass.
    */
   runCommand(options: RunCommandOptions): Promise<number | null>
   /** The card's open conversation, if it still has one. */ /**
@@ -320,9 +322,9 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
   /**
    * A script that shows the command, then runs it and exits with its status.
    *
-   * A file for the same reason the agent launch is one: a typed line past
-   * `MAX_CANON` is mangled. Run by the shell rather than `exec`ed, so a
-   * command with `&&` in it still works.
+   * The terminal runs it as its own process, so its exit status is the tab's.
+   * The command is run by the shell rather than `exec`ed, so a command with
+   * `&&` in it still works.
    */
   function writeCommandScript(id: string, command: string, logPath?: string): string {
     const dir = path.join(stateDir, 'launch')
@@ -562,30 +564,22 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       })
       if (project === null) return null
 
-      const terminalSessionId = await api.pty.openTerminal({
+      // The script is the tab's own process, so the exit the core reports is
+      // the command's, and null when a signal or a closed tab ended it first.
+      const script = writeCommandScript(randomUUID(), options.command, options.logPath)
+      const exit = await api.pty.runInTerminal({
         projectId: project.id,
         cwd: options.worktreePath,
         tabTitle: options.title,
         type: 'human',
+        file: process.env.SHELL ?? '/bin/sh',
+        args: [script],
       })
-      if (terminalSessionId === null) return null
-
-      return new Promise((resolve) => {
-        // The shell exits with the command's status, so the tab's own exit is
-        // the verdict. A failure stays open, exited, as the record of what
-        // ran; a pass closes, and its output is in the log. The verdict goes
-        // first and the close is optional: an installed host older than
-        // `closeTerminalTab` threw here, and the pass never reached the run.
-        api.pty.onExit?.(terminalSessionId, (exitCode: number | null) => {
-          resolve(exitCode)
-          if (exitCode === 0) api.pty.closeTerminalTab?.(terminalSessionId)
-        })
-        const script = writeCommandScript(randomUUID(), options.command, options.logPath)
-        api.pty.write(
-          terminalSessionId,
-          `${shellQuote(process.env.SHELL ?? '/bin/sh')} ${shellQuote(script)}; exit $?\r`
-        )
-      })
+      if (exit === null) return null
+      // A failure stays open, exited, as the record of what ran; a pass
+      // closes, and its output is in the log.
+      if (exit.exitCode === 0) api.pty.closeTerminalTab(exit.sessionId)
+      return exit.exitCode
     },
 
     continueRun(sessionId, next): SupervisedRun | null {
