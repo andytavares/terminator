@@ -45,9 +45,11 @@ function AreaCombobox({
       : []),
   ]
 
-  useEffect(() => {
+  const [highlightedFor, setHighlightedFor] = useState(value)
+  if (highlightedFor !== value) {
+    setHighlightedFor(value)
     setHighlighted(0)
-  }, [value])
+  }
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -138,21 +140,14 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
 
   useEffect(() => {
     if (!linking) return
-    void window.electronAPI.terminal.listSessions?.().then((result) => {
-      if (Array.isArray(result)) setActiveSessions(result)
-    })
+    void window.electronAPI.terminal.listSessions().then(setActiveSessions)
     void (async () => {
-      const list = (await window.electronAPI.workspace.list()) as
-        | Array<{ id: string; name: string }>
-        | undefined
-      if (!Array.isArray(list)) return
+      const { workspaces: list } = await window.electronAPI.workspace.list()
       setWorkspaces(list)
       const perWorkspace = await Promise.all(
-        list.map(async (w) => {
-          const own = (await window.electronAPI.project.list(w.id)) as
-            | Array<{ id: string; name: string; workspaceId: string }>
-            | undefined
-          return Array.isArray(own) ? own : []
+        list.map(async (workspace) => {
+          const { projects: own } = await window.electronAPI.project.list(workspace.id)
+          return own.map((project) => ({ ...project, workspaceId: workspace.id }))
         })
       )
       setProjects(perWorkspace.flat())
@@ -335,7 +330,7 @@ function CreateProjectForm({ onCreated, onCancel }: CreateProjectFormProps): Rea
 }
 
 function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.Element {
-  const tickCalendar = useVaultStore((s) => s.tickCalendar)
+  const { tickCalendar } = useVaultStore()
   const [tasks, setTasks] = useState<IndexedTask[]>([])
   const [expanded, setExpanded] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -645,6 +640,19 @@ function ProjectAreaBadge({
   )
 }
 
+async function fetchProjects(
+  statusFilter: 'active' | 'archived' | 'all'
+): Promise<IndexedProject[] | null> {
+  const status = statusFilter === 'all' ? ['active', 'someday', 'archived'] : [statusFilter]
+  const result = await window.electronAPI.extensionBridge.invoke('task-vault:projects:list', {
+    status,
+  })
+  if (result && typeof result === 'object' && 'projects' in result) {
+    return (result as { projects: IndexedProject[] }).projects
+  }
+  return null
+}
+
 export function ProjectsBrowser(): React.JSX.Element {
   const [projects, setProjects] = useState<IndexedProject[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -658,21 +666,25 @@ export function ProjectsBrowser(): React.JSX.Element {
   const [deadlineValue, setDeadlineValue] = useState('')
   const { selectedProjectName } = useVaultStore()
 
-  async function load() {
-    setIsLoading(true)
-    const status = statusFilter === 'all' ? ['active', 'someday', 'archived'] : [statusFilter]
-    const result = await window.electronAPI.extensionBridge.invoke('task-vault:projects:list', {
-      status,
-    })
-    if (result && typeof result === 'object' && 'projects' in result) {
-      setProjects((result as { projects: IndexedProject[] }).projects)
-    }
+  function applyProjects(loaded: IndexedProject[] | null) {
+    if (loaded) setProjects(loaded)
     setIsLoading(false)
     setInitialized(true)
   }
 
+  async function load(): Promise<void> {
+    setIsLoading(true)
+    applyProjects(await fetchProjects(statusFilter))
+  }
+
+  function changeStatusFilter(filter: 'active' | 'archived' | 'all') {
+    if (filter === statusFilter) return
+    setStatusFilter(filter)
+    setIsLoading(true)
+  }
+
   useEffect(() => {
-    load()
+    void fetchProjects(statusFilter).then(applyProjects)
   }, [statusFilter])
 
   useEffect(() => {
@@ -739,7 +751,7 @@ export function ProjectsBrowser(): React.JSX.Element {
             <button
               key={f}
               className={`projects-browser__filter-btn${statusFilter === f ? ' projects-browser__filter-btn--active' : ''}`}
-              onClick={() => setStatusFilter(f)}
+              onClick={() => changeStatusFilter(f)}
             >
               {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>

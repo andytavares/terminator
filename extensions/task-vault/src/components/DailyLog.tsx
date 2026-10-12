@@ -109,12 +109,12 @@ function SessionPicker({
   useEffect(() => {
     async function load() {
       const [sessions, wsResult] = await Promise.all([
-        window.electronAPI.terminal.listSessions?.() ?? Promise.resolve([]),
+        window.electronAPI.terminal.listSessions(),
         window.electronAPI.workspace.list(),
       ])
-      if (Array.isArray(sessions)) setActiveSessions(sessions)
+      setActiveSessions(sessions)
 
-      const workspaces = wsResult.workspaces ?? []
+      const workspaces = wsResult.workspaces
       const labels = new Map<string, { wsName: string; projName: string }>()
       await Promise.all(
         workspaces.map(async (ws) => {
@@ -768,10 +768,12 @@ function TaskRow({
   const [savingSubtask, setSavingSubtask] = useState(false)
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => {
+  const [linksSeen, setLinksSeen] = useState(task.terminatorLinks)
+  if (linksSeen !== task.terminatorLinks) {
+    setLinksSeen(task.terminatorLinks)
     setLinked(task.terminatorLinks.length > 0)
     if (task.terminatorLinks[0]) setLinkedSessionId(task.terminatorLinks[0])
-  }, [task.terminatorLinks])
+  }
 
   useEffect(() => {
     return () => {
@@ -1056,15 +1058,9 @@ function TaskRow({
                             return
                           }
                           void window.electronAPI.terminal
-                            .listSessions?.()
+                            .listSessions()
                             .then((sessions) => {
-                              if (!Array.isArray(sessions)) {
-                                setLinking(true)
-                                return
-                              }
-                              const meta = (
-                                sessions as Array<{ sessionId: string; projectId: string }>
-                              ).find((s) => s.sessionId === sessionId)
+                              const meta = sessions.find((s) => s.sessionId === sessionId)
                               if (!meta) {
                                 setLinking(true)
                                 return

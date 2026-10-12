@@ -6,6 +6,23 @@ import { SmartTaskInput } from './SmartTaskInput'
 import { useVaultStore } from '../stores/vault.store'
 import { useVaultDataStore } from '../stores/vault-data.store'
 
+type InboxOutcome = { tasks?: IndexedTask[] } | { error: string }
+
+async function fetchInbox(): Promise<InboxOutcome> {
+  try {
+    const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-inbox')
+    if (result && typeof result === 'object' && 'error' in result) {
+      return { error: (result as { error: string }).error }
+    }
+    if (result && typeof result === 'object' && 'tasks' in result) {
+      return { tasks: (result as { tasks: IndexedTask[] }).tasks }
+    }
+    return {}
+  } catch (err) {
+    return { error: String(err) }
+  }
+}
+
 export function InboxView(): React.JSX.Element {
   const [items, setItems] = useState<IndexedTask[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -16,29 +33,26 @@ export function InboxView(): React.JSX.Element {
   const [processing, setProcessing] = useState(false)
   const { refreshInboxCount, loadToday, setView, loadSomeday } = useVaultStore()
 
+  function applyOutcome(outcome: InboxOutcome) {
+    if ('error' in outcome) {
+      setError(outcome.error)
+    } else if (outcome.tasks) {
+      setItems(outcome.tasks)
+      // Keep the store's inboxCount in sync so the sidebar badge is always accurate
+      useVaultDataStore.setState({ inboxCount: outcome.tasks.length })
+    }
+    setIsLoading(false)
+    setInitialized(true)
+  }
+
   async function load() {
     setIsLoading(true)
     setError(null)
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-inbox')
-      if (result && typeof result === 'object' && 'error' in result) {
-        setError((result as { error: string }).error)
-      } else if (result && typeof result === 'object' && 'tasks' in result) {
-        const tasks = (result as { tasks: IndexedTask[] }).tasks
-        setItems(tasks)
-        // Keep the store's inboxCount in sync so the sidebar badge is always accurate
-        useVaultDataStore.setState({ inboxCount: tasks.length })
-      }
-    } catch (err) {
-      setError(String(err))
-    } finally {
-      setIsLoading(false)
-      setInitialized(true)
-    }
+    applyOutcome(await fetchInbox())
   }
 
   useEffect(() => {
-    load()
+    void fetchInbox().then(applyOutcome)
   }, [])
 
   useEffect(() => {

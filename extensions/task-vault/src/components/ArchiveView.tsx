@@ -47,6 +47,29 @@ function ArchiveStatusIcon({ status }: { status: string }): React.JSX.Element {
   }
 }
 
+type ArchiveOutcome = { data?: ArchiveData } | { error: string }
+
+async function fetchArchive(windowDays: number): Promise<ArchiveOutcome> {
+  try {
+    const result = await window.electronAPI.extensionBridge.invoke(
+      'task-vault:vault:list-archive',
+      {
+        days: windowDays,
+      }
+    )
+    if (result && typeof result === 'object' && 'error' in result) {
+      return { error: (result as { error: string }).error }
+    }
+    if (result && typeof result === 'object') {
+      const r = result as Partial<ArchiveData>
+      return { data: { tasks: r.tasks ?? [], projects: r.projects ?? [], areas: r.areas ?? [] } }
+    }
+    return {}
+  } catch (err) {
+    return { error: String(err) }
+  }
+}
+
 export function ArchiveView(): React.JSX.Element {
   const [data, setData] = useState<ArchiveData>({ tasks: [], projects: [], areas: [] })
   const [isLoading, setIsLoading] = useState(true)
@@ -54,41 +77,36 @@ export function ArchiveView(): React.JSX.Element {
   const [days, setDays] = useState(30)
   const [tab, setTab] = useState<'tasks' | 'projects' | 'areas'>('tasks')
 
+  function applyOutcome(outcome: ArchiveOutcome) {
+    if ('error' in outcome) setError(outcome.error)
+    else if (outcome.data) setData(outcome.data)
+    setIsLoading(false)
+  }
+
   async function load(windowDays: number) {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'task-vault:vault:list-archive',
-        { days: windowDays }
-      )
-      if (result && typeof result === 'object' && 'error' in result) {
-        setError((result as { error: string }).error)
-      } else if (result && typeof result === 'object') {
-        const r = result as Partial<ArchiveData>
-        setData({ tasks: r.tasks ?? [], projects: r.projects ?? [], areas: r.areas ?? [] })
-      }
-    } catch (err) {
-      setError(String(err))
-    } finally {
-      setIsLoading(false)
-    }
+    applyOutcome(await fetchArchive(windowDays))
   }
 
   useEffect(() => {
-    load(days)
+    void fetchArchive(days).then(applyOutcome)
   }, [])
 
   useEffect(() => {
     const unsub = window.electronAPI.extensionBridge.on('task-vault:push:index-updated', () => {
-      void load(days)
+      void reload(days)
     })
     return unsub
   }, [days])
 
+  function reload(windowDays: number): Promise<void> {
+    setIsLoading(true)
+    setError(null)
+    return load(windowDays)
+  }
+
   function changeWindow(newDays: number) {
     setDays(newDays)
-    load(newDays)
+    void reload(newDays)
   }
 
   async function restoreProject(filePath: string) {
@@ -96,7 +114,7 @@ export function ArchiveView(): React.JSX.Element {
       projectFilePath: filePath,
       status: 'active',
     })
-    await load(days)
+    await reload(days)
   }
 
   async function deleteProject(filePath: string, name: string) {
@@ -104,23 +122,23 @@ export function ArchiveView(): React.JSX.Element {
     await window.electronAPI.extensionBridge.invoke('task-vault:projects:delete', {
       projectFilePath: filePath,
     })
-    await load(days)
+    await reload(days)
   }
 
   async function handleRestoreTask(taskId: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:restore-task', { taskId })
-    await load(days)
+    await reload(days)
   }
 
   async function handleDeleteTask(taskId: string, text: string) {
     if (!confirm(`Delete task: "${text}"?`)) return
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-task', { taskId })
-    await load(days)
+    await reload(days)
   }
 
   async function handleRestoreArea(areaName: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:restore-area', { areaName })
-    await load(days)
+    await reload(days)
   }
 
   async function handleDeleteArea(areaName: string) {
@@ -128,7 +146,7 @@ export function ArchiveView(): React.JSX.Element {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-area', {
       areaFilePath: areaName,
     })
-    await load(days)
+    await reload(days)
   }
 
   if (isLoading) return <div className="archive-view__loading">Loading archive…</div>

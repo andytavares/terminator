@@ -8,6 +8,7 @@ import {
   MinusCircle,
   Pencil,
   Timer,
+  Trash2,
   X,
 } from 'lucide-react'
 import type { IndexedTask } from '../vault/types'
@@ -34,6 +35,25 @@ interface AreaData {
   projects?: AreaProject[]
 }
 
+type AreasOutcome = { areas: AreaData[] } | { error: string } | Record<string, never>
+
+async function fetchAreas(status: 'active' | 'archived'): Promise<AreasOutcome> {
+  try {
+    const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:list-areas', {
+      status,
+    })
+    if (result && typeof result === 'object' && 'areas' in result) {
+      return { areas: (result as { areas: AreaData[] }).areas }
+    }
+    if (result && typeof result === 'object' && 'error' in result) {
+      return { error: (result as { error: string }).error }
+    }
+    return {}
+  } catch (err) {
+    return { error: String(err) }
+  }
+}
+
 export function AreasView(): React.JSX.Element {
   const [areas, setAreas] = useState<AreaData[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -46,28 +66,27 @@ export function AreasView(): React.JSX.Element {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
-  async function load(silent = false) {
+  function applyOutcome(outcome: AreasOutcome, silent: boolean) {
+    if ('areas' in outcome) setAreas(outcome.areas)
+    else if ('error' in outcome) setError(outcome.error)
+    if (!silent) setIsLoading(false)
+  }
+
+  async function load(silent = false): Promise<void> {
     if (!silent) setIsLoading(true)
     setError(null)
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'task-vault:vault:list-areas',
-        { status: statusFilter }
-      )
-      if (result && typeof result === 'object' && 'areas' in result) {
-        setAreas((result as { areas: AreaData[] }).areas)
-      } else if (result && typeof result === 'object' && 'error' in result) {
-        setError((result as { error: string }).error)
-      }
-    } catch (err) {
-      setError(String(err))
-    } finally {
-      if (!silent) setIsLoading(false)
-    }
+    applyOutcome(await fetchAreas(statusFilter), silent)
+  }
+
+  function changeStatusFilter(filter: 'active' | 'archived') {
+    if (filter === statusFilter) return
+    setStatusFilter(filter)
+    setIsLoading(true)
+    setError(null)
   }
 
   useEffect(() => {
-    load()
+    void fetchAreas(statusFilter).then((outcome) => applyOutcome(outcome, false))
   }, [statusFilter])
 
   useEffect(() => {
@@ -77,9 +96,11 @@ export function AreasView(): React.JSX.Element {
     return unsub
   }, [statusFilter])
 
-  useEffect(() => {
+  // Re-derive the open detail view whenever the list or the requested area changes.
+  const [syncedSource, setSyncedSource] = useState({ areas, selectedAreaName })
+  if (syncedSource.areas !== areas || syncedSource.selectedAreaName !== selectedAreaName) {
+    setSyncedSource({ areas, selectedAreaName })
     if (selectedArea) {
-      // Refresh the open detail view from the newly loaded list.
       // If the area is no longer in the list (deleted/renamed), close the detail.
       const refreshed = areas.find((a) => a.name === selectedArea.name)
       if (refreshed) {
@@ -91,7 +112,7 @@ export function AreasView(): React.JSX.Element {
       const found = areas.find((a) => a.name === selectedAreaName)
       if (found) setSelectedArea(found)
     }
-  }, [selectedAreaName, areas])
+  }
 
   async function handleCreateArea() {
     if (!newAreaName.trim()) return
@@ -172,7 +193,7 @@ export function AreasView(): React.JSX.Element {
             <button
               key={f}
               className={`projects-browser__filter-btn${statusFilter === f ? ' projects-browser__filter-btn--active' : ''}`}
-              onClick={() => setStatusFilter(f)}
+              onClick={() => changeStatusFilter(f)}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
@@ -317,7 +338,7 @@ function AreaDetail({
   onRefresh: () => Promise<void>
   onNavToProject: (name: string) => void
 }): React.JSX.Element {
-  const tickCalendar = useVaultStore((s) => s.tickCalendar)
+  const { tickCalendar } = useVaultStore()
   const [tasks, setTasks] = useState<IndexedTask[]>(area.tasks)
   const [newTaskText, setNewTaskText] = useState('')
   const [adding, setAdding] = useState(false)

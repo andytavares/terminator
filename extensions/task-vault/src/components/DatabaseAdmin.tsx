@@ -70,6 +70,11 @@ async function invoke<T = unknown>(channel: string, payload?: unknown): Promise<
   return window.electronAPI.extensionBridge.invoke(channel, payload) as Promise<T>
 }
 
+async function fetchStats(): Promise<TableStats | null> {
+  const res = await invoke<{ stats?: TableStats; error?: string }>('task-vault:admin:table-stats')
+  return res.stats ?? null
+}
+
 export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Element {
   const [stats, setStats] = useState<TableStats | null>(null)
   const [sql, setSql] = useState('')
@@ -79,13 +84,15 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const loadStats = useCallback(async () => {
-    const res = await invoke<{ stats?: TableStats; error?: string }>('task-vault:admin:table-stats')
-    if (res.stats) setStats(res.stats)
+    const loaded = await fetchStats()
+    if (loaded) setStats(loaded)
   }, [])
 
   useEffect(() => {
-    void loadStats()
-  }, [loadStats])
+    void fetchStats().then((loaded) => {
+      if (loaded) setStats(loaded)
+    })
+  }, [])
 
   const runQuery = useCallback(
     async (querySql: string) => {

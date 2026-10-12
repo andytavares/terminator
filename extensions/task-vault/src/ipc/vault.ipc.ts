@@ -36,6 +36,27 @@ import { rowToTask, rowToProject, TASK_COLS, TASK_JOINS } from '../vault/mappers
 
 const localDate = _localDate
 
+/** One task as written by the JSON export. */
+interface ImportedTask {
+  id: string
+  text: string
+  created_at: string
+  updated_at: string
+  status?: string
+  project?: string | null
+  area?: string | null
+  context?: string | null
+  due_date?: string | null
+  completed_date?: string | null
+  migrated_to?: string | null
+  source?: string
+  source_ref?: string | null
+  parent_id?: string | null
+  sort_order?: number
+  metadata?: string
+  terminator_links?: string
+}
+
 function today(): string {
   return localDate()
 }
@@ -1007,7 +1028,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     try {
       const data = payload as {
         version?: number
-        tasks?: Record<string, unknown>[]
+        tasks?: ImportedTask[]
         projects?: Record<string, unknown>[]
         areas?: Record<string, unknown>[]
       }
@@ -1253,7 +1274,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }>(`SELECT metadata, due_date, source_ref FROM tasks WHERE id=?`, [taskId])
     if (!task) return { error: 'STALE_ID' }
 
-    let recurrenceRule = interval
+    let recurrenceRule: string = interval
     if (interval === 'weekly' && days != null && days.length > 0) {
       recurrenceRule = `weekly:${[...days].sort((a, b) => a - b).join(',')}`
     }

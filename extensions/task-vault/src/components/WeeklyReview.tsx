@@ -35,8 +35,15 @@ const STEP_NAMES = ['Get clear', 'Inbox', 'Projects', 'Stale', 'Someday', 'Refle
 
 const DRAFT_KEY = 'task-vault:weekly-review-draft'
 
+function readDraftStep(): number {
+  const draft = sessionStorage.getItem(DRAFT_KEY)
+  if (!draft) return 1
+  const parsed = JSON.parse(draft) as { step?: number }
+  return parsed.step && parsed.step > 1 ? parsed.step : 1
+}
+
 export function WeeklyReview(): React.JSX.Element {
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(readDraftStep)
   const [payload, setPayload] = useState<WeeklyReviewPayload | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [done, setDone] = useState(false)
@@ -45,12 +52,6 @@ export function WeeklyReview(): React.JSX.Element {
   const [reviewId, setReviewId] = useState<string | null>(null)
 
   useEffect(() => {
-    // Restore draft step if present
-    const draft = sessionStorage.getItem(DRAFT_KEY)
-    if (draft) {
-      const parsed = JSON.parse(draft) as { step?: number }
-      if (parsed.step && parsed.step > 1) setStep(parsed.step)
-    }
     // Resumes the open review rather than forking a second record, which
     // matters because the step above is restored from sessionStorage.
     void window.electronAPI.extensionBridge

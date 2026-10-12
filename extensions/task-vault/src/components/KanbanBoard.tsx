@@ -155,7 +155,6 @@ interface SwimlaneProps {
   grouping: SwimlaneGrouping
   dragOverLane: string | null
   selectedTaskId: string | null
-  draggingTaskId: string | null
   onDragOver: (e: React.DragEvent, laneId: string) => void
   onDragLeave: () => void
   onDrop: (e: React.DragEvent, laneId: string) => void
@@ -204,6 +203,33 @@ function Swimlane({
   )
 }
 
+type KanbanTasksOutcome = { tasks: KanbanTask[] } | { error: string } | Record<string, never>
+
+async function fetchKanbanConfig(): Promise<KanbanConfig | null> {
+  try {
+    const result = await window.electronAPI.extensionBridge.invoke('task-vault:kanban:get-config')
+    if (result && typeof result === 'object' && !('error' in result)) return result as KanbanConfig
+  } catch {
+    // fall back to the default config
+  }
+  return null
+}
+
+async function fetchKanbanTasks(): Promise<KanbanTasksOutcome> {
+  try {
+    const result = await window.electronAPI.extensionBridge.invoke('task-vault:kanban:list-tasks')
+    if (result && typeof result === 'object' && 'tasks' in result) {
+      return { tasks: (result as { tasks: KanbanTask[] }).tasks }
+    }
+    if (result && typeof result === 'object' && 'error' in result) {
+      return { error: (result as { error: string }).error }
+    }
+    return {}
+  } catch (err) {
+    return { error: String(err) }
+  }
+}
+
 export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
   const [config, setConfig] = useState<KanbanConfig>(DEFAULT_KANBAN_CONFIG)
   const [tasks, setTasks] = useState<KanbanTask[]>([])
@@ -222,40 +248,28 @@ export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
     return tasks.filter((t) => selectedContexts.includes(t.context ?? ''))
   }, [tasks, selectedContexts])
 
-  const loadConfig = useCallback(async () => {
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke('task-vault:kanban:get-config')
-      if (result && typeof result === 'object' && !('error' in result)) {
-        const cfg = result as KanbanConfig
-        setConfig(cfg)
-        setKanbanLanes(cfg.lanes)
-      }
-    } catch {
-      // fallback to default
-    }
+  function applyConfig(loaded: KanbanConfig | null) {
+    if (!loaded) return
+    setConfig(loaded)
+    setKanbanLanes(loaded.lanes)
+  }
+
+  const applyTasks = useCallback((outcome: KanbanTasksOutcome) => {
+    if ('tasks' in outcome) setTasks(outcome.tasks)
+    else if ('error' in outcome) setError(outcome.error)
+    setLoading(false)
   }, [])
 
   const loadTasks = useCallback(async () => {
     setLoading(true)
     setError(null)
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke('task-vault:kanban:list-tasks')
-      if (result && typeof result === 'object' && 'tasks' in result) {
-        setTasks((result as { tasks: KanbanTask[] }).tasks)
-      } else if (result && typeof result === 'object' && 'error' in result) {
-        setError((result as { error: string }).error)
-      }
-    } catch (err) {
-      setError(String(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+    applyTasks(await fetchKanbanTasks())
+  }, [applyTasks])
 
   useEffect(() => {
-    void loadConfig()
-    void loadTasks()
-  }, [loadConfig, loadTasks])
+    void fetchKanbanConfig().then(applyConfig)
+    void fetchKanbanTasks().then(applyTasks)
+  }, [applyTasks])
 
   useEffect(() => {
     const unsub = window.electronAPI.extensionBridge.on('task-vault:push:index-updated', () => {
@@ -368,7 +382,6 @@ export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
               grouping={config.swimlaneGrouping}
               dragOverLane={dragOverLane}
               selectedTaskId={selectedTaskId}
-              draggingTaskId={draggingTaskId.current}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}

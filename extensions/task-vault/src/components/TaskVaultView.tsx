@@ -238,6 +238,20 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
   )
 }
 
+async function fetchContexts(): Promise<string[] | null> {
+  try {
+    const result = await window.electronAPI.extensionBridge.invoke(
+      'task-vault:kanban:list-contexts'
+    )
+    if (result && typeof result === 'object' && 'contexts' in result) {
+      return (result as { contexts: string[] }).contexts
+    }
+  } catch {
+    // non-critical
+  }
+  return null
+}
+
 export function TaskVaultView(): React.JSX.Element {
   const {
     todayLog,
@@ -272,6 +286,10 @@ export function TaskVaultView(): React.JSX.Element {
 
   const loadSomedayTasks = loadSomeday
 
+  function applyContexts(contexts: string[] | null) {
+    if (contexts) setAvailableContexts(contexts)
+  }
+
   const loadKanbanConfig = useCallback(async () => {
     try {
       const result = await window.electronAPI.extensionBridge.invoke('task-vault:kanban:get-config')
@@ -283,19 +301,6 @@ export function TaskVaultView(): React.JSX.Element {
       // non-critical
     }
   }, [setKanbanLanes])
-
-  const loadContexts = useCallback(async () => {
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'task-vault:kanban:list-contexts'
-      )
-      if (result && typeof result === 'object' && 'contexts' in result) {
-        setAvailableContexts((result as { contexts: string[] }).contexts)
-      }
-    } catch {
-      // non-critical
-    }
-  }, [])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -312,18 +317,19 @@ export function TaskVaultView(): React.JSX.Element {
   // registry's pendingNavigations map — but this view bundles its own copy of
   // that store, so nothing was ever put in the map it was reading.
 
+  const pendingTask =
+    pendingTaskId && todayLog ? todayLog.tasks.find((t) => t.id === pendingTaskId) : undefined
+  if (pendingTask && (selectedTaskId !== pendingTask.id || selectedTaskText !== pendingTask.text)) {
+    setSelectedTaskId(pendingTask.id)
+    setSelectedTaskText(pendingTask.text)
+  }
+
   useEffect(() => {
     if (!pendingTaskId || !todayLog) return
-    const task = todayLog.tasks.find((t) => t.id === pendingTaskId)
-    if (task) {
-      setSelectedTaskId(pendingTaskId)
-      setSelectedTaskText(task.text)
-      clearPendingTask()
-    } else if (!isLoading) {
-      // Data has finished loading but task wasn't found — stale/deleted task, clear to avoid looping
-      clearPendingTask()
-    }
-    // If still loading: wait for todayLog to update with the correct date's data
+    const found = todayLog.tasks.some((t) => t.id === pendingTaskId)
+    // If still loading: wait for todayLog to update with the correct date's data.
+    // Loaded but not found: stale/deleted task, clear to avoid looping.
+    if (found || !isLoading) clearPendingTask()
   }, [pendingTaskId, todayLog, isLoading, clearPendingTask])
 
   // Reset to today whenever the vault panel becomes visible from hidden.
@@ -395,7 +401,7 @@ export function TaskVaultView(): React.JSX.Element {
     if (vd) void loadDate(vd)
     else loadToday()
     refreshInboxCount()
-    void loadContexts()
+    void fetchContexts().then(applyContexts)
     void loadSomedayTasks()
     void loadKanbanConfig()
 
@@ -406,7 +412,7 @@ export function TaskVaultView(): React.JSX.Element {
         if (vd) void loadDate(vd)
         else loadToday()
         refreshInboxCount()
-        void loadContexts()
+        void fetchContexts().then(applyContexts)
         void loadSomedayTasks()
         tickCalendar()
       }
