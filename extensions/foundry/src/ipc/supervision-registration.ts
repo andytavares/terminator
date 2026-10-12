@@ -1,5 +1,6 @@
 import { defineChannel, noPayload } from '@terminator/extension-sdk'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
+import type { z } from 'zod'
 
 import { foundryChannel, sessionChannel } from './channel.js'
 import {
@@ -75,28 +76,7 @@ function registerPermissionAnswers(api: ExtensionAPI): void {
       channel: 'foundry:permission-resolve',
       schema: PermissionResolvePayload,
       invalid: { ok: false, reason: 'Malformed request.' },
-      run: ({ requestId, decision, answer }) => {
-        const sessionId = pendingPermissions.sessionFor(requestId)
-        if (sessionId === null || runtime.supervisedRunner === null) {
-          // Already answered, already handed back, or the run has ended. Reported
-          // rather than swallowed: a click that does nothing is worse than a
-          // refusal that says why.
-          return { ok: false, reason: 'that request is no longer waiting' }
-        }
-        const answered = runtime.supervisedRunner.resolve(sessionId, requestId, {
-          allow: decision === 'allow',
-          answer: answer === undefined || answer.trim() === '' ? undefined : answer,
-        })
-        if (!answered) {
-          // The id was still on the board but the bridge had let it go — answered
-          // in the terminal, handed back, or the run ended. Saying "ok" left a card
-          // showing a request nobody could clear.
-          pendingPermissions.remove(requestId)
-          announceLive('')
-          return { ok: false, reason: 'that request is no longer waiting' }
-        }
-        return { ok: true }
-      },
+      run: resolvePermission,
     }),
     // Hands one back deliberately: the operator would rather answer it in the
     // terminal, where they can see what the agent was doing around it.
@@ -109,6 +89,33 @@ function registerPermissionAnswers(api: ExtensionAPI): void {
   )
 }
 
+function resolvePermission({
+  requestId,
+  decision,
+  answer,
+}: z.infer<typeof PermissionResolvePayload>): { ok: true } | { ok: false; reason: string } {
+  const sessionId = pendingPermissions.sessionFor(requestId)
+  if (sessionId === null || runtime.supervisedRunner === null) {
+    // Already answered, already handed back, or the run has ended. Reported
+    // rather than swallowed: a click that does nothing is worse than a
+    // refusal that says why.
+    return { ok: false, reason: 'that request is no longer waiting' }
+  }
+  const answered = runtime.supervisedRunner.resolve(sessionId, requestId, {
+    allow: decision === 'allow',
+    answer: answer === undefined || answer.trim() === '' ? undefined : answer,
+  })
+  if (!answered) {
+    // The id was still on the board but the bridge had let it go — answered
+    // in the terminal, handed back, or the run ended. Saying "ok" left a card
+    // showing a request nobody could clear.
+    pendingPermissions.remove(requestId)
+    announceLive('')
+    return { ok: false, reason: 'that request is no longer waiting' }
+  }
+  return { ok: true }
+}
+
 function registerRunActions(api: ExtensionAPI): void {
   // The four things you do about a run that has stopped making progress, and
   // the one you do about any run. Without these the supervision panel could
@@ -116,22 +123,9 @@ function registerRunActions(api: ExtensionAPI): void {
   // useless" surface this line of work exists to stop shipping.
   reg(
     api,
-    // Takes you to the terminal the run is in.
-    //
-    // Done here rather than in the panel: the extension's UI is a separate
-    // renderer process, so a store it imports from core is a second copy that
-    // nothing renders. `terminal:navigate-to-session` is the core's own channel
-    // for this — it selects the workspace, the project and the tab.
-    sessionChannel('foundry:run-terminal', SessionPayload, ({ sessionId }) => {
-      const terminal = runtime.supervisedRunner?.terminalFor(sessionId) ?? null
-      if (terminal === null) return { ok: false }
-      api.window.focusSelf()
-      api.window.broadcast('terminal:navigate-to-session', {
-        sessionId: terminal.terminalSessionId,
-        projectId: terminal.projectId,
-      })
-      return { ok: true }
-    }),
+    sessionChannel('foundry:run-terminal', SessionPayload, ({ sessionId }) =>
+      goToRunTerminal(api, sessionId)
+    ),
     // What it was doing, in its own words. The action that decides the others.
     defineChannel({
       channel: 'foundry:run-transcript',
@@ -150,35 +144,56 @@ function registerRunActions(api: ExtensionAPI): void {
       runtime.supervisedRunner.interrupt(sessionId)
       return { ok: true }
     }),
-    // Asking it what is wrong, or telling it what to do instead — the same
-    // action, and the reason interrupt does not also end the run. The schema
-    // trims the message and refuses an empty one.
-    sessionChannel('foundry:run-redirect', RedirectPayload, ({ sessionId, message }) => {
-      if (runtime.supervisedRunner === null) return { ok: false }
-      runtime.supervisedRunner.interrupt(sessionId)
-      const ok = runtime.supervisedRunner.send(sessionId, message)
-      if (ok) {
-        runtime.supervision?.runs.setState(sessionId, 'working', Date.now())
-        runtime.supervision?.feed.post({
-          at: Date.now(),
-          sessionId,
-          author: 'console',
-          summary: `redirected: ${message}`,
-        })
-      }
-      return { ok }
-    }),
-    // Ends the run, saying why first so the agent's own record carries it.
-    sessionChannel('foundry:run-stop', SessionStopPayload, ({ sessionId, reason }) => {
-      if (runtime.supervisedRunner === null) return { ok: false }
-      const ok = runtime.supervisedRunner.stop(sessionId, reason)
-      if (ok) {
-        runtime.supervision?.finish(sessionId, Date.now())
-        // Recorded before it leaves the live list, so a run somebody stopped is
-        // still answerable later — "what was it doing when I killed it".
-        runtime.supervision?.runs.archive(sessionId, 'stopped', Date.now())
-      }
-      return { ok }
-    })
+    sessionChannel('foundry:run-redirect', RedirectPayload, redirectRun),
+    sessionChannel('foundry:run-stop', SessionStopPayload, stopRun)
   )
+}
+
+// Takes you to the terminal the run is in.
+//
+// Done here rather than in the panel: the extension's UI is a separate
+// renderer process, so a store it imports from core is a second copy that
+// nothing renders. `terminal:navigate-to-session` is the core's own channel
+// for this — it selects the workspace, the project and the tab.
+function goToRunTerminal(api: ExtensionAPI, sessionId: string): { ok: boolean } {
+  const terminal = runtime.supervisedRunner?.terminalFor(sessionId) ?? null
+  if (terminal === null) return { ok: false }
+  api.window.focusSelf()
+  api.window.broadcast('terminal:navigate-to-session', {
+    sessionId: terminal.terminalSessionId,
+    projectId: terminal.projectId,
+  })
+  return { ok: true }
+}
+
+// Asking it what is wrong, or telling it what to do instead — the same
+// action, and the reason interrupt does not also end the run. The schema
+// trims the message and refuses an empty one.
+function redirectRun({ sessionId, message }: z.infer<typeof RedirectPayload>): { ok: boolean } {
+  if (runtime.supervisedRunner === null) return { ok: false }
+  runtime.supervisedRunner.interrupt(sessionId)
+  const ok = runtime.supervisedRunner.send(sessionId, message)
+  if (ok) {
+    runtime.supervision?.runs.setState(sessionId, 'working', Date.now())
+    runtime.supervision?.feed.post({
+      at: Date.now(),
+      sessionId,
+      author: 'console',
+      summary: `redirected: ${message}`,
+    })
+  }
+  return { ok }
+}
+
+// Ends the run, saying why first so the agent's own record carries it.
+function stopRun({ sessionId, reason }: z.infer<typeof SessionStopPayload>): { ok: boolean } {
+  if (runtime.supervisedRunner === null) return { ok: false }
+  const ok = runtime.supervisedRunner.stop(sessionId, reason)
+  if (ok) {
+    runtime.supervision?.finish(sessionId, Date.now())
+    // Recorded before it leaves the live list, so a run somebody stopped is
+    // still answerable later — "what was it doing when I killed it".
+    runtime.supervision?.runs.archive(sessionId, 'stopped', Date.now())
+  }
+  return { ok }
 }

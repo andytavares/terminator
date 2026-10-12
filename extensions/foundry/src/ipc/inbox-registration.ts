@@ -65,15 +65,7 @@ function createInbox(context: ActivationContext, deps: InboxRegistrationDeps): I
   return createInboxChannels({
     gates: createLiveGateStore(dataRoot, indexFor),
     orders: createLiveOrderStore(dataRoot, indexFor),
-    waiting: async () => {
-      const { orders, waiting } = await readLiveStandings(dataRoot, deps.standingSources)
-      return ordersWaiting(waiting, questionsByOrder(orders)).map(({ orderId, standing }) => ({
-        orderId,
-        title: orders.find((order) => order.id === orderId)?.title ?? orderId,
-        headline: standing.headline,
-        detail: standing.detail,
-      }))
-    },
+    waiting: () => ordersWaitingOnSomething(dataRoot, deps.standingSources),
     autonomy: () => autonomyFor(api),
     readPulls: (orderId) => readPulls(dataRoot(), orderId),
     now: () => new Date().toISOString(),
@@ -92,6 +84,19 @@ function createInbox(context: ActivationContext, deps: InboxRegistrationDeps): I
   })
 }
 
+async function ordersWaitingOnSomething(
+  dataRoot: () => string,
+  standingSources: LiveStandingSources
+): Promise<Awaited<ReturnType<Parameters<typeof createInboxChannels>[0]['waiting']>>> {
+  const { orders, waiting } = await readLiveStandings(dataRoot, standingSources)
+  return ordersWaiting(waiting, questionsByOrder(orders)).map(({ orderId, standing }) => ({
+    orderId,
+    title: orders.find((order) => order.id === orderId)?.title ?? orderId,
+    headline: standing.headline,
+    detail: standing.detail,
+  }))
+}
+
 interface Decision {
   readonly gate: Gate
   readonly option: string
@@ -106,9 +111,9 @@ interface Decision {
 async function actOnDecision(
   context: ActivationContext,
   deps: InboxRegistrationDeps,
-  { gate, option }: Decision
+  decision: Decision
 ): Promise<void> {
-  const { dataRoot } = context
+  const { gate, option } = decision
   if (gate.rule === 'ready-for-review') {
     if (option === 'mark_ready') await markPullsReady(context, gate)
     return
@@ -122,7 +127,15 @@ async function actOnDecision(
     if (option === 'send_back') await anotherCiRound(context, gate.orderId)
     return
   }
+  await stopOrCarryOn(context, deps, decision)
+}
 
+async function stopOrCarryOn(
+  context: ActivationContext,
+  deps: InboxRegistrationDeps,
+  { gate, option }: Decision
+): Promise<void> {
+  const { dataRoot } = context
   // `stop` now stops. Every gate offering it promised the order would be
   // cancelled and nothing did it — the run stayed `running` for ever, and
   // `order.cancel` refuses a running order and points back at this gate.
@@ -144,8 +157,11 @@ async function actOnDecision(
   }
 
   if (sendsBackFinalCheck(gate, option)) await sendBackFinalCheck(context, gate)
+  await resumeRun(deps.runs, { gate, option })
+}
 
-  const resumed = (await deps.runs.resume({
+async function resumeRun(runs: RunChannels, { gate, option }: Decision): Promise<void> {
+  const resumed = (await runs.resume({
     id: gate.orderId,
     // "Send back" is a retry of the node that failed; the others resume
     // whatever the wave was doing.

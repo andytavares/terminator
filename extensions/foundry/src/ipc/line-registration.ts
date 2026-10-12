@@ -15,6 +15,7 @@ import { announceLive, indexFor, orderStoreAt } from '../state/live-index.js'
 import { runtime, strandedAgents, isLiveSession } from '../runtime/runtime-state.js'
 import { executingOrders, stopOrder } from '../line/run-control.js'
 import { executeRun } from '../line/execute-run.js'
+import type { OrderRun } from '../line/run-context.js'
 import type { LiveStandingSources } from './standing.js'
 
 /**
@@ -38,49 +39,58 @@ export function registerLineChannels(
 // can refuse does so before any agent starts: the order has to be agreed,
 // the shape has to be one this repository can actually support, and the
 // records location has to be writable.
-function createRuns(
-  { api, dataRoot }: ActivationContext,
-  standingSources: LiveStandingSources
-): RunChannels {
+function createRuns(context: ActivationContext, standingSources: LiveStandingSources): RunChannels {
+  const { api, dataRoot } = context
   return createRunChannels({
     store: createLiveOrderStore(dataRoot, indexFor),
     dataRoot,
     index: indexFor,
     sources: () => resolveSources(api, dataRoot()),
     now: () => new Date().toISOString(),
-    // Marked while it runs, so nothing reclaims a node out from under an
-    // executor that is part way through starting it.
-    execute: async (order, recipe, graph) => {
-      executingOrders.add(order.id)
-      announceLive(order.id)
-      try {
-        await executeRun(api, { root: dataRoot(), order, recipe, graph })
-      } finally {
-        executingOrders.delete(order.id)
-        announceLive(order.id)
-      }
-    },
+    execute: (order, recipe, graph) => executeMarked(context, { order, recipe, graph }),
     isLive: isLiveSession,
     executing: (orderId) => executingOrders.has(orderId),
     gatesFor: standingSources.gatesFor,
     asksFor: standingSources.asksFor,
     stallsFor: standingSources.stallsFor,
     strandedFor: standingSources.strandedFor,
-    // The sessions themselves, so the band can offer the one thing that
-    // answers a handed-back call: going to the terminal it was handed to.
-    strandedSessions: (orderId) =>
-      [...strandedAgents.values()]
-        .filter((a) => a.orderId === orderId && isLiveSession(a.sessionId))
-        .map((a) => a.sessionId),
-    // What each agent has been doing, for the Factory view's activity
-    // markers. Read from the same transcript file the stall detector tails —
-    // no session means nothing to report, not an error.
-    activityFor: (sessionId) => {
-      const run = runtime.supervision?.runs.get(sessionId)
-      return run ? readTranscript(run.transcriptPath) : []
-    },
+    strandedSessions: liveStrandedSessions,
+    activityFor: transcriptActivity,
     queueEntries: () => computeQueueEntries(dataRoot(), orderStoreAt(dataRoot())),
   })
+}
+
+// Marked while it runs, so nothing reclaims a node out from under an
+// executor that is part way through starting it.
+async function executeMarked(
+  { api, dataRoot }: ActivationContext,
+  run: Omit<OrderRun, 'root'>
+): Promise<void> {
+  const { order } = run
+  executingOrders.add(order.id)
+  announceLive(order.id)
+  try {
+    await executeRun(api, { root: dataRoot(), ...run })
+  } finally {
+    executingOrders.delete(order.id)
+    announceLive(order.id)
+  }
+}
+
+// The sessions themselves, so the band can offer the one thing that
+// answers a handed-back call: going to the terminal it was handed to.
+function liveStrandedSessions(orderId: string): string[] {
+  return [...strandedAgents.values()]
+    .filter((a) => a.orderId === orderId && isLiveSession(a.sessionId))
+    .map((a) => a.sessionId)
+}
+
+// What each agent has been doing, for the Factory view's activity
+// markers. Read from the same transcript file the stall detector tails —
+// no session means nothing to report, not an error.
+function transcriptActivity(sessionId: string): ReturnType<typeof readTranscript> {
+  const run = runtime.supervision?.runs.get(sessionId)
+  return run ? readTranscript(run.transcriptPath) : []
 }
 
 // Stop the whole order, as opposed to one agent.
