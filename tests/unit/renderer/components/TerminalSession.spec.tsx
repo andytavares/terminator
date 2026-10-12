@@ -97,6 +97,11 @@ vi.mock('../../../../src/renderer/terminal/webgl-contexts', async (importOrigina
   }
 })
 
+vi.mock('../../../../src/renderer/terminal/output-router', () => ({
+  subscribeToSessionOutput: (sessionId: string, handler: (data: string) => void) =>
+    mockSubscribe(sessionId, handler),
+}))
+
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}))
 
 // TerminalInstance is a pure view object: busy/idle/bell reach the outside
@@ -117,7 +122,7 @@ vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
   () => mockFakeCtx as unknown as CanvasRenderingContext2D
 )
 
-const mockOnOutput = vi.fn()
+const mockSubscribe = vi.fn()
 const mockAttach = vi.fn()
 const mockInput = vi.fn()
 const mockResize = vi.fn()
@@ -137,13 +142,12 @@ beforeEach(async () => {
   mockPlatform = 'MacIntel'
   vi.clearAllMocks()
   mockMeasureText.mockReturnValue({ width: 8 })
-  mockOnOutput.mockReturnValue(mockUnsubscribe)
+  mockSubscribe.mockReturnValue(mockUnsubscribe)
   mockAttach.mockResolvedValue({ released: false })
   mockOpenExternal.mockResolvedValue({ ok: true })
   mockOpenPath.mockResolvedValue({ ok: true })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     terminal: {
-      onOutput: mockOnOutput,
       input: mockInput,
       resize: mockResize,
       attach: mockAttach,
@@ -248,9 +252,17 @@ describe('TerminalInstance', () => {
     expect(instance.paste).not.toHaveBeenCalled()
   })
 
-  it('subscribes to terminal output on construction', () => {
+  it('subscribes to its own session output on construction', () => {
     new TerminalInstance('ses-1', 1000)
-    expect(mockOnOutput).toHaveBeenCalledTimes(1)
+    expect(mockSubscribe).toHaveBeenCalledTimes(1)
+    expect(mockSubscribe).toHaveBeenCalledWith('ses-1', expect.any(Function))
+  })
+
+  it('writes the output it receives to the terminal', () => {
+    const instance = new TerminalInstance('ses-write', 1000)
+    const receive = mockSubscribe.mock.calls[0][1]
+    receive('hello')
+    expect(instance.terminal.write).toHaveBeenCalledWith('hello')
   })
 
   it('reads the visible screen as one string per row, trailing spaces trimmed', () => {
@@ -428,20 +440,13 @@ describe('TerminalInstance', () => {
     it('fires onBusy and schedules onIdle on output', () => {
       vi.useFakeTimers()
       new TerminalInstance('ses-busy', 1000, ACTIVITY_HOOKS)
-      const outputCallback = mockOnOutput.mock.calls[0][0]
-      outputCallback('ses-busy', 'data')
+      const receive = mockSubscribe.mock.calls[0][1]
+      receive('data')
 
       expect(mockSetSessionBusy).toHaveBeenCalled()
       vi.runAllTimers()
       expect(mockSetSessionIdle).toHaveBeenCalled()
       vi.useRealTimers()
-    })
-
-    it('ignores output from other sessions', () => {
-      new TerminalInstance('ses-a', 1000, ACTIVITY_HOOKS)
-      const outputCallback = mockOnOutput.mock.calls[0][0]
-      outputCallback('ses-other', 'data')
-      expect(mockSetSessionBusy).not.toHaveBeenCalled()
     })
   })
 
@@ -450,8 +455,8 @@ describe('TerminalInstance', () => {
       vi.useFakeTimers()
       const instance = new TerminalInstance('ses-dispose', 1000, ACTIVITY_HOOKS)
       // Trigger a busy timer
-      const outputCallback = mockOnOutput.mock.calls[0][0]
-      outputCallback('ses-dispose', 'data')
+      const receive = mockSubscribe.mock.calls[0][1]
+      receive('data')
 
       mockSetSessionIdle.mockClear()
       instance.dispose()
@@ -1112,7 +1117,7 @@ describe('taking over a terminal that was already running', () => {
 
   it('subscribes before attaching, so nothing arrives with nowhere to go', () => {
     new TerminalInstance('agent-session', 1000)
-    expect(mockOnOutput.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mockSubscribe.mock.invocationCallOrder[0]).toBeLessThan(
       mockAttach.mock.invocationCallOrder[0]
     )
   })

@@ -3,6 +3,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { previewWindow } from '../../terminal/preview-window'
+import { subscribeToSessionOutput } from '../../terminal/output-router'
 import { webglContexts } from '../../terminal/webgl-contexts'
 
 const IDLE_DEBOUNCE_MS = 1500
@@ -123,8 +124,7 @@ export class TerminalInstance {
 
     this.registerLinkProviders()
 
-    this.outputUnsubscribe = window.electronAPI.terminal.onOutput((sid, data) => {
-      if (sid !== sessionId) return
+    this.outputUnsubscribe = subscribeToSessionOutput(sessionId, (data) => {
       this.terminal.write(data)
       this.hooks?.onBusy?.()
       if (this.busyTimer !== null) clearTimeout(this.busyTimer)

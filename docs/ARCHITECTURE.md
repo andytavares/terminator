@@ -140,7 +140,7 @@ terminal:create IPC ──► PtyManager.spawn()
 TerminalInstance created (renderer)
       │
       ├─ new Terminal({ scrollback }) from @xterm/xterm 6 (theme carries the scrollbar colours)
-      ├─ subscribes to terminal:output IPC
+      ├─ subscribes to its session through the output router (one shared terminal:output listener)
       └─ sends keystrokes via terminal:input IPC
 
 Tab switch (navigate away)
