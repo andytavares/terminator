@@ -4,10 +4,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PrDialog } from '../../../extensions/git-integration/src/components/PrDialog'
 import type { PullRequest } from '../../../extensions/git-integration/src/schemas/git.schema'
 
-vi.mock('marked', () => ({
-  marked: { parse: (s: string) => `<p>${s}</p>` },
-}))
-
 const mockShellExec = vi.fn()
 const mockListBranches = vi.fn()
 const mockReadFile = vi.fn()
