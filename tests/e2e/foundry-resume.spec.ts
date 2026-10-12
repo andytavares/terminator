@@ -508,16 +508,22 @@ test('a run that finished every step and still failed to ship says so, with a mo
   expect(text).toContain('Opening the pull request for fixture failed: exit code 1')
   expect(text).not.toContain('Between steps')
 
-  await expect(
-    inFoundry<boolean>(`(function () {
+  // The standing text also shows in the order's list row, so it can be on
+  // screen before the Floor renders its move: wait for the button itself.
+  await expect
+    .poll(
+      () =>
+        inFoundry<boolean>(`(function () {
       var all = document.querySelectorAll('button')
       for (var i = 0; i < all.length; i++) {
         var label = (all[i].getAttribute('aria-label') || all[i].textContent || '').trim()
         if (label === 'Try again') return true
       }
       return false
-    })()`)
-  ).resolves.toBe(true)
+    })()`),
+      { timeout: 15_000 }
+    )
+    .toBe(true)
 })
 
 test('answering it puts the abandoned step back in the queue', async () => {
