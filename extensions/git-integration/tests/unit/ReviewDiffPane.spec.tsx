@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 // The pane reads both stores through selectors; these resolve them against the state each test sets.
@@ -216,8 +216,40 @@ const defaultProps = {
   onShowRisk: vi.fn(),
 }
 
+// jsdom has no layout. The diff list is virtualised, so give the scroll container a
+// height and every other element a row height; the default shows every test diff whole.
+const ROW_PX = 20
+const jsdomOffsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')!
+const jsdomOffsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')!
+function layOut(scrollerPx: number) {
+  const isScroller = (el: HTMLElement) => el.classList.contains('review-diff-scroll')
+  const getters: Record<string, (this: HTMLElement) => number> = {
+    offsetHeight() {
+      return isScroller(this) ? scrollerPx : ROW_PX
+    },
+    clientHeight() {
+      return isScroller(this) ? scrollerPx : ROW_PX
+    },
+    // Taller than any test diff, so the scroller can reach every entry.
+    scrollHeight() {
+      return isScroller(this) ? 1_000_000 : ROW_PX
+    },
+    offsetWidth: () => 1000,
+  }
+  for (const [name, get] of Object.entries(getters)) {
+    Object.defineProperty(HTMLElement.prototype, name, { configurable: true, get })
+  }
+}
+afterAll(() => {
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', jsdomOffsetHeight)
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', jsdomOffsetWidth)
+  delete (HTMLElement.prototype as Partial<HTMLElement>).clientHeight
+  delete (HTMLElement.prototype as Partial<HTMLElement>).scrollHeight
+})
+
 beforeEach(() => {
   vi.clearAllMocks()
+  layOut(4000)
   mockPrFileDiff.mockResolvedValue({ diff: { hunks: [] } })
   mockPrCompare.mockResolvedValue({ rewritten: false, commits: [], files: [] })
   mockInvoke.mockImplementation((channel: string, payload: unknown) => {
@@ -1147,8 +1179,10 @@ describe('ReviewDiffPane', () => {
       ],
     }
 
+    // A one-row viewport, so the list can scroll to any entry.
     beforeEach(() => {
-      Element.prototype.scrollIntoView = vi.fn()
+      layOut(ROW_PX)
+      HTMLElement.prototype.scrollTo = vi.fn()
     })
 
     it('searches the tests with the hunk as it reads after the change', async () => {
@@ -1192,8 +1226,15 @@ describe('ReviewDiffPane', () => {
       )
       fireEvent.click(await screen.findByRole('button', { name: /src\/foo\.ts:2/ }))
       expect(mockSetCurrentFile).toHaveBeenCalledWith('src/foo.ts')
-      const row = document.querySelector('[data-new-line="2"]') as HTMLElement
-      await waitFor(() => expect(row.scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
+      const entry = document
+        .querySelector('[data-new-line="2"]')!
+        .closest<HTMLElement>('[data-index]')!
+      const scroller = document.querySelector<HTMLElement>('.review-diff-scroll')!
+      await waitFor(() =>
+        expect(scroller.scrollTo).toHaveBeenCalledWith(
+          expect.objectContaining({ top: Number(entry.dataset.index) * ROW_PX })
+        )
+      )
     })
   })
 
@@ -1213,18 +1254,23 @@ describe('ReviewDiffPane', () => {
       ],
     }
 
+    // A one-row viewport, so the list can scroll to any entry.
     beforeEach(() => {
-      Element.prototype.scrollIntoView = vi.fn()
+      layOut(ROW_PX)
+      HTMLElement.prototype.scrollTo = vi.fn()
     })
 
     it('nextHunk scrolls the next hunk header into view', async () => {
       mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
       await renderPane()
       await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
-      const headers = screen.getAllByText(/@@/)
-      const spy = vi.spyOn(headers[1], 'scrollIntoView')
+      const second = screen.getByText('@@ -10,1 +10,1 @@').closest<HTMLElement>('[data-index]')!
+      const scroller = document.querySelector<HTMLElement>('.review-diff-scroll')!
       window.dispatchEvent(new CustomEvent('review:next-hunk'))
-      expect(spy).toHaveBeenCalledWith({ block: 'start' })
+      expect(Number(second.dataset.index)).toBeGreaterThan(0)
+      expect(scroller.scrollTo).toHaveBeenLastCalledWith(
+        expect.objectContaining({ top: Number(second.dataset.index) * ROW_PX })
+      )
     })
 
     it('nextHunk at the last hunk calls onNextFile', async () => {
@@ -1250,11 +1296,17 @@ describe('ReviewDiffPane', () => {
       mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
       await renderPane()
       await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
-      const headers = screen.getAllByText(/@@/)
+      const first = screen.getByText('@@ -1,1 +1,1 @@').closest<HTMLElement>('[data-index]')!
+      const second = screen.getByText('@@ -10,1 +10,1 @@').closest<HTMLElement>('[data-index]')!
+      const scroller = document.querySelector<HTMLElement>('.review-diff-scroll')!
       window.dispatchEvent(new CustomEvent('review:next-hunk')) // move to hunk 1 first
-      const spy = vi.spyOn(headers[0], 'scrollIntoView')
+      expect(scroller.scrollTo).toHaveBeenLastCalledWith(
+        expect.objectContaining({ top: Number(second.dataset.index) * ROW_PX })
+      )
       window.dispatchEvent(new CustomEvent('review:prev-hunk'))
-      expect(spy).toHaveBeenCalledWith({ block: 'start' })
+      expect(scroller.scrollTo).toHaveBeenLastCalledWith(
+        expect.objectContaining({ top: Number(first.dataset.index) * ROW_PX })
+      )
     })
 
     it('askAgent with no selection opens the agent panel scoped to the nearest hunk', async () => {
@@ -1894,5 +1946,35 @@ describe('ReviewDiffPane — fetch and render cost', () => {
 
     expect(container.querySelector<HTMLElement>('.diff-table--left')!.style.width).toBe('60%')
     expect(rowRenderSpy).not.toHaveBeenCalled()
+  })
+
+  it('mounts only the rows near the viewport of a 2,000-line file', async () => {
+    layOut(800)
+    mockPrFileDiff.mockResolvedValue({ diff: longDiff(2000) })
+    const { container } = await renderPane()
+    await screen.findByText('@@ -1,2000 +1,2000 @@')
+
+    const mounted = container.querySelectorAll('tr.diff-line').length
+    expect(mounted).toBeGreaterThan(800 / ROW_PX - 1)
+    expect(mounted).toBeLessThan(100)
+    expect(container.querySelector('[data-new-line="1500"]')).toBeNull()
+  })
+
+  it('mounts the rows it scrolls to', async () => {
+    layOut(800)
+    mockPrFileDiff.mockResolvedValue({ diff: longDiff(2000) })
+    const { container } = await renderPane()
+    await screen.findByText('@@ -1,2000 +1,2000 @@')
+    const scroller = container.querySelector<HTMLElement>('.review-diff-scroll')!
+
+    Object.defineProperty(scroller, 'scrollTop', { configurable: true, value: 1500 * ROW_PX })
+    fireEvent.scroll(scroller)
+
+    const mountedLines = () =>
+      Array.from(container.querySelectorAll<HTMLElement>('tr.diff-line')).map((row) =>
+        Number(row.dataset.newLine)
+      )
+    await waitFor(() => expect(Math.min(...mountedLines())).toBeGreaterThan(1000))
+    expect(mountedLines().length).toBeLessThan(100)
   })
 })
