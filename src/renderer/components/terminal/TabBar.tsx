@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useState, useRef } from 'react'
 import { Play, Circle, Pause, CircleX } from 'lucide-react'
 import { useSessionStore } from '../../stores/session.store'
@@ -60,7 +61,20 @@ export function TabBar({
     renameSession,
     reorderSessions,
     requestFocus,
-  } = useSessionStore()
+  } = useSessionStore(
+    useShallow((s) => ({
+      getSessionsForProject: s.getSessionsForProject,
+      closeSession: s.closeSession,
+      setActiveSessionForProject: s.setActiveSessionForProject,
+      getActiveSessionForProject: s.getActiveSessionForProject,
+      getBellCountForSession: s.getBellCountForSession,
+      renameSession: s.renameSession,
+      reorderSessions: s.reorderSessions,
+      requestFocus: s.requestFocus,
+      sessions: s.sessions,
+      projectViews: s.projectViews,
+    }))
+  )
   const factsById = new Map(useSessionFacts().map((f) => [f.sessionId, f]))
   const setDescription = useSessionRecordsStore((s) => s.setDescription)
   const [notingId, setNotingId] = useState<string | null>(null)
@@ -72,7 +86,13 @@ export function TabBar({
   const [linkSessionId, setLinkSessionId] = useState<string | null>(null)
   const dragIndexRef = useRef<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-  const { workspaces, activeWorkspaceId, projectsByWorkspaceId } = useWorkspaceStore()
+  const { workspaces, activeWorkspaceId, projectsByWorkspaceId } = useWorkspaceStore(
+    useShallow((s) => ({
+      workspaces: s.workspaces,
+      activeWorkspaceId: s.activeWorkspaceId,
+      projectsByWorkspaceId: s.projectsByWorkspaceId,
+    }))
+  )
   const branch = [...projectsByWorkspaceId.values()].flat().find((p) => p.id === projectId)
   const scopeLabel = branch
     ? qualifiedBranchLabel(branch, workspaces.find((w) => w.id === branch.workspaceId)?.name)

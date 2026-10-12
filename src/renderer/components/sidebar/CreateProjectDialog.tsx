@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useState, useEffect } from 'react'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSettingsStore } from '../../stores/settings.store'
@@ -38,9 +39,27 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
   // link made once the project exists.
   const [issue, setIssue] = useState<IssueSummary | null>(null)
 
-  const { createProject, projectsByWorkspaceId, workspaces } = useWorkspaceStore()
-  const { linkIssue, isAnyConnected } = useIntegrationsStore()
-  const { resolveSettings } = useSettingsStore()
+  const { createProject, projectsByWorkspaceId, workspaces } = useWorkspaceStore(
+    useShallow((s) => ({
+      createProject: s.createProject,
+      projectsByWorkspaceId: s.projectsByWorkspaceId,
+      workspaces: s.workspaces,
+    }))
+  )
+  const { linkIssue, isAnyConnected } = useIntegrationsStore(
+    useShallow((s) => ({
+      linkIssue: s.linkIssue,
+      isAnyConnected: s.isAnyConnected,
+      connections: s.connections,
+    }))
+  )
+  const { resolveSettings } = useSettingsStore(
+    useShallow((s) => ({
+      resolveSettings: s.resolveSettings,
+      globalSettings: s.globalSettings,
+      workspaceSettings: s.workspaceSettings,
+    }))
+  )
   const workspace = workspaces.find((w) => w.id === workspaceId)
   const worktreeBaseDir = resolveSettings(workspaceId).git.worktreeBaseDir || undefined
   const hasNonWorktreeProject = (projectsByWorkspaceId.get(workspaceId) ?? []).some(

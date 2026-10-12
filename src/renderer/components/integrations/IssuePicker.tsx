@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { useIntegrationsStore } from '../../stores/integrations.store'
@@ -28,7 +29,9 @@ export interface IssuePickerProps {
 }
 
 export function IssuePicker({ selected, onSelect, onClear }: IssuePickerProps): JSX.Element {
-  const { listMine, searchIssues } = useIntegrationsStore()
+  const { listMine, searchIssues } = useIntegrationsStore(
+    useShallow((s) => ({ listMine: s.listMine, searchIssues: s.searchIssues }))
+  )
   const [term, setTerm] = useState('')
   const [open, setOpen] = useState(false)
   const [result, setResult] = useState<IssueListResult>({ issues: [], failures: [] })

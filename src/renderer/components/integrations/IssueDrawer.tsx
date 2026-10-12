@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useState } from 'react'
 import { ExternalLink, RefreshCw, X } from 'lucide-react'
 import { useIntegrationsStore } from '../../stores/integrations.store'
@@ -35,7 +36,16 @@ export interface IssueDrawerProps {
 }
 
 export function IssueDrawer({ projectId, projectName, onClose }: IssueDrawerProps): JSX.Element {
-  const { linkFor, issueFor, loadLink, unlinkIssue } = useIntegrationsStore()
+  const { linkFor, issueFor, loadLink, unlinkIssue } = useIntegrationsStore(
+    useShallow((s) => ({
+      linkFor: s.linkFor,
+      issueFor: s.issueFor,
+      loadLink: s.loadLink,
+      unlinkIssue: s.unlinkIssue,
+      links: s.links,
+      issues: s.issues,
+    }))
+  )
   const link = linkFor(projectId)
   const issue: Issue | null = issueFor(projectId)
 

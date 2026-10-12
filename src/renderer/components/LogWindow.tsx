@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useRef } from 'react'
 import { useLogStore } from '../stores/log.store'
 import type { LogLevel } from '../stores/log.store'
@@ -15,7 +16,9 @@ const LEVEL_LABEL: Record<LogLevel, string> = {
 }
 
 export function LogWindow({ onClose }: Props): JSX.Element {
-  const { entries, clear } = useLogStore()
+  const { entries, clear } = useLogStore(
+    useShallow((s) => ({ entries: s.entries, clear: s.clear }))
+  )
   const bottomRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 

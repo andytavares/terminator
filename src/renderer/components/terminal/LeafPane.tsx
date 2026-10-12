@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useRef, useLayoutEffect, useCallback } from 'react'
 import { X } from 'lucide-react'
 import { useSessionStore } from '../../stores/session.store'
@@ -18,7 +19,19 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
     sessions,
     closeSplitLeaf,
     closeSession,
-  } = useSessionStore()
+  } = useSessionStore(
+    useShallow((s) => ({
+      getTerminalInstance: s.getTerminalInstance,
+      getFocusedSession: s.getFocusedSession,
+      setFocusedSession: s.setFocusedSession,
+      clearBellCount: s.clearBellCount,
+      sessions: s.sessions,
+      closeSplitLeaf: s.closeSplitLeaf,
+      closeSession: s.closeSession,
+      terminalInstances: s.terminalInstances,
+      projectViews: s.projectViews,
+    }))
+  )
   const isFocused = getFocusedSession(projectId) === sessionId
   const session = sessions.get(sessionId)
   const tabTitle = session?.tabTitle ?? sessionId

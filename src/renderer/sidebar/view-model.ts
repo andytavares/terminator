@@ -59,3 +59,20 @@ export function isStale(session: TerminalSession, now: number, staleAfterMs: num
   if (session.agentState === 'awaiting-input') return false
   return now - session.lastActivityAt > staleAfterMs
 }
+
+/** Which sessions are stale at `now`, as one comparable value: it changes only when that set does. */
+export function staleSessionsKey(
+  sessions: TerminalSession[],
+  now: number,
+  staleAfterMs: number
+): string {
+  return sessions
+    .filter((session) => isStale(session, now, staleAfterMs))
+    .map((session) => session.id)
+    .join('\n')
+}
+
+/** The branches with at least one terminal printing right now. */
+export function busyBranchIds(sessions: TerminalSession[]): Set<string> {
+  return new Set(sessions.filter((session) => session.busy).map((session) => session.projectId))
+}

@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useState } from 'react'
 import { Check, Link2, RefreshCw, X } from 'lucide-react'
 import { useIntegrationsStore } from '../../stores/integrations.store'
@@ -31,7 +32,13 @@ function StatusDot({ connection }: { connection: TrackerConnection | undefined }
 }
 
 function LinearForm(): JSX.Element {
-  const { connect, connectError, clearConnectError } = useIntegrationsStore()
+  const { connect, connectError, clearConnectError } = useIntegrationsStore(
+    useShallow((s) => ({
+      connect: s.connect,
+      connectError: s.connectError,
+      clearConnectError: s.clearConnectError,
+    }))
+  )
   const [apiKey, setApiKey] = useState('')
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
@@ -90,7 +97,13 @@ function LinearForm(): JSX.Element {
 }
 
 function JiraForm(): JSX.Element {
-  const { connect, connectError, clearConnectError } = useIntegrationsStore()
+  const { connect, connectError, clearConnectError } = useIntegrationsStore(
+    useShallow((s) => ({
+      connect: s.connect,
+      connectError: s.connectError,
+      clearConnectError: s.clearConnectError,
+    }))
+  )
   const [site, setSite] = useState('')
   const [email, setEmail] = useState('')
   const [apiToken, setApiToken] = useState('')
@@ -176,7 +189,15 @@ function JiraForm(): JSX.Element {
 }
 
 function ConnectedPanel({ tracker }: { tracker: TrackerId }): JSX.Element {
-  const { connectionFor, disconnect, setMine, loadConnections } = useIntegrationsStore()
+  const { connectionFor, disconnect, setMine, loadConnections } = useIntegrationsStore(
+    useShallow((s) => ({
+      connectionFor: s.connectionFor,
+      disconnect: s.disconnect,
+      setMine: s.setMine,
+      loadConnections: s.loadConnections,
+      connections: s.connections,
+    }))
+  )
   const connection = connectionFor(tracker)
   const [mineValue, setMineValue] = useState(() => {
     if (connection?.mine.kind === 'assignee') return connection.mine.email ?? ''
@@ -246,7 +267,9 @@ function TrackerRow({ tracker }: { tracker: TrackerId }): JSX.Element {
 }
 
 export function IntegrationsSettings(): JSX.Element {
-  const { loadConnections, subscribe } = useIntegrationsStore()
+  const { loadConnections, subscribe } = useIntegrationsStore(
+    useShallow((s) => ({ loadConnections: s.loadConnections, subscribe: s.subscribe }))
+  )
 
   useEffect(() => {
     void loadConnections()

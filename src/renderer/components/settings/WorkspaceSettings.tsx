@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect } from 'react'
 import { useSettingsStore } from '../../stores/settings.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
@@ -17,8 +18,18 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
     updateWorkspaceWorktreeBaseDir,
     updateWorkspaceBranchExcludePatterns,
     loadSettings,
-  } = useSettingsStore()
-  const { workspaces } = useWorkspaceStore()
+  } = useSettingsStore(
+    useShallow((s) => ({
+      workspaceSettings: s.workspaceSettings,
+      globalSettings: s.globalSettings,
+      updateWorkspaceTheme: s.updateWorkspaceTheme,
+      updateWorkspaceScrollback: s.updateWorkspaceScrollback,
+      updateWorkspaceWorktreeBaseDir: s.updateWorkspaceWorktreeBaseDir,
+      updateWorkspaceBranchExcludePatterns: s.updateWorkspaceBranchExcludePatterns,
+      loadSettings: s.loadSettings,
+    }))
+  )
+  const { workspaces } = useWorkspaceStore(useShallow((s) => ({ workspaces: s.workspaces })))
 
   const workspace = workspaces.find((w) => w.id === workspaceId)
   const ws = workspaceSettings.get(workspaceId)
