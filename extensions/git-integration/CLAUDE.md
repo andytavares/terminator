@@ -2,12 +2,8 @@
 
 ## Extension Isolation (MANDATORY)
 
-This is a **fully isolated extension**. The core application knows nothing about this extension until it is installed. Violations break the architecture.
+The rules every extension follows are in `extensions/CLAUDE.md`. In this extension:
 
-### What extensions MAY do
-
-- Import `@terminator/extension-sdk`, `@terminator/extension-ui` and this extension's own dependencies — nothing from the core's `src/` and nothing from another extension (ADR 094; `npm run lint` rejects any other import)
-- Call core IPC via `window.electronAPI.{terminal,workspace,project,git,shell,fs,settings,...}` for **core-owned channels only**
 - Call own IPC via `window.electronAPI.extensionBridge.invoke('git:...')`, `invoke('github:...')` and the extension's other own channels, through the `src/api/*.ts` bridge modules
 - Register IPC handlers in `src/index.ts` via `api.ipc.registerHandler()`, as a `ChannelSpec` (ADR 096): a zod `schema` for the payload, the `invalid` response (`VALIDATION_ERROR` from `src/ipc/register.ts`), `run` on the parsed payload, and `onError` where a thrown error becomes a response. Never parse the payload by hand; `tests/unit/channel-schemas.spec.ts` checks every channel has a schema
 
