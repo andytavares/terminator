@@ -536,7 +536,7 @@ test('answering it puts the abandoned step back in the queue', async () => {
   await expect
     .poll(() => graphOnDisk().nodes[0].attempts, { timeout: 20_000 })
     .toBeLessThanOrEqual(1)
-  expect(['waiting', 'ready', 'running']).toContain(graphOnDisk().nodes[0].state)
+  expect(['waiting', 'running']).toContain(graphOnDisk().nodes[0].state)
 })
 
 test('stopping a run stops it, which nothing used to do', async () => {

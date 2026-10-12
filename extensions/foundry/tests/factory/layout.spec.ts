@@ -14,13 +14,10 @@ import type { WorkOrder } from '../../src/order/schema.js'
 // Two real recipes drive most of these tests, the same way
 // tests/line/run-graph.spec.ts exercises buildRunGraph — this is a layout of
 // an actual run graph, not of a hand-built fixture that only happens to look
-// like one. The golden fixtures pin the prototype's exact output; the
-// property tests sweep every recipe the repo ships, at every lane count.
+// like one. The property tests sweep every recipe the repo ships, at every
+// lane count.
 
 const SHIPPED_RECIPES = path.join(__dirname, '..', '..', 'recipes')
-// The recipes the prototype's golden output was recorded against. The shipped
-// ones change as shapes gain steps; the recording cannot be re-run.
-const RECORDED_RECIPES = path.join(__dirname, 'fixtures', 'recipes')
 
 function recipeFrom(file: string, dir = SHIPPED_RECIPES): Recipe {
   const text = fs.readFileSync(path.join(dir, file), 'utf-8')
@@ -96,7 +93,7 @@ function graph(nodes: RunNode[]): RunGraph {
   return { orderId: 'WO-hand', recipe: 'hand', nodes }
 }
 
-const CREWED_KINDS = ['agent', 'fanout', 'run', 'judge']
+const CREWED_KINDS = ['agent', 'fanout', 'run']
 function isCrewed(node: RunNode): boolean {
   return node.role !== null || CREWED_KINDS.includes(node.kind)
 }
@@ -116,68 +113,6 @@ function blockedForBeltKeys(map: HallMap): Set<string> {
   }
   return blocked
 }
-
-describe('layoutHall — golden output', () => {
-  const GOLDEN: Record<string, { file: string; lanes: number[] }> = {
-    'standard-3': { file: 'standard.yaml', lanes: [1, 2, 3] },
-    'bugfix-1': { file: 'bugfix.yaml', lanes: [1] },
-    'standard-2': { file: 'standard.yaml', lanes: [1, 2] },
-  }
-
-  const goldenPath = path.join(__dirname, 'fixtures', 'hall-golden.json')
-  const golden: Record<string, unknown> = JSON.parse(fs.readFileSync(goldenPath, 'utf-8'))
-
-  for (const [key, { file, lanes }] of Object.entries(GOLDEN)) {
-    it(`matches the prototype's output for ${key}`, () => {
-      const map = layoutHall(graphFor(file, lanes, RECORDED_RECIPES))
-      const expected = golden[key] as {
-        width: number
-        height: number
-        props: unknown
-        belts: unknown
-        beltTiles: unknown
-        crossovers: unknown
-        restSeats: unknown
-        breakroom: unknown
-        lights: unknown
-        anchors: unknown
-        walk: string[]
-      }
-      expect(map.width).toBe(expected.width)
-      expect(map.height).toBe(expected.height)
-      expect(
-        map.props.map((p) => ({
-          id: p.id,
-          kind: p.kind,
-          x: p.x,
-          y: p.y,
-          w: p.w,
-          h: p.h,
-          nodeId: p.nodeId,
-          seat: p.seat,
-        }))
-      ).toEqual(expected.props)
-      expect(
-        map.belts.map((b) => ({
-          id: b.id,
-          fromNodeId: b.fromNodeId,
-          toNodeId: b.toNodeId,
-          path: b.path,
-        }))
-      ).toEqual(expected.belts)
-      expect(map.beltTiles).toEqual(expected.beltTiles)
-      expect(map.crossovers).toEqual(expected.crossovers)
-      expect(map.restSeats.map((s) => ({ id: s.id, tile: s.tile, facing: s.facing }))).toEqual(
-        expected.restSeats
-      )
-      expect(map.breakroom).toEqual(expected.breakroom)
-      expect(map.lights).toEqual(expected.lights)
-      expect(map.anchors).toEqual(expected.anchors)
-      const walkRows = map.walk.map((row) => row.map((v) => (v ? '#' : '.')).join(''))
-      expect(walkRows).toEqual(expected.walk)
-    })
-  }
-})
 
 describe('layoutHall — properties, across every recipe and lane count', () => {
   const recipeFiles = fs
@@ -460,14 +395,6 @@ describe('layoutHall', () => {
   })
 
   describe('hand-built graphs, for the shapes no real recipe happens to produce', () => {
-    it('gives a judge node a bench station', () => {
-      const g = graph([rn({ id: 'inspect', kind: 'judge' })])
-      const map = layoutHall(g)
-      const station = map.props.find((p) => p.nodeId === 'inspect')!
-      expect(station.kind).toBe('bench')
-      expect(stationKind('judge')).toBe('bench')
-    })
-
     it('lays out a graph with no edges at all: one belt-free node per station, all in the yard', () => {
       const g = graph([
         rn({ id: 'a', kind: 'agent' }),

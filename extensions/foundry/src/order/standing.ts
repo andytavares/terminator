@@ -143,7 +143,7 @@ export function standingOf(input: StandingInput): Standing {
   const nodes = input.graph?.nodes ?? []
   const total = nodes.length
   const done = nodes.filter((n) => n.state === 'passed' || n.state === 'skipped').length
-  const running = nodes.filter((n) => n.state === 'running' || n.state === 'verifying').length
+  const running = nodes.filter((n) => n.state === 'running').length
   const failed = nodes.filter((n) => n.state === 'failed').length
   const counts = { done, total, gateId: null }
   const holding = input.gates.find((gate) => gate.decision === null)

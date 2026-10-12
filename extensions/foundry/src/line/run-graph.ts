@@ -9,15 +9,7 @@ import type { PlanUnit, WorkOrder } from '../order/schema.js'
 // order stay immutable while work runs. An order that changed while its own
 // work was running would mean the agreement moved under the work.
 
-export type NodeState =
-  | 'waiting'
-  | 'ready'
-  | 'running'
-  | 'verifying'
-  | 'passed'
-  | 'failed'
-  | 'blocked'
-  | 'skipped'
+export type NodeState = 'waiting' | 'running' | 'passed' | 'failed' | 'blocked' | 'skipped'
 
 /** A failed check's own words, handed to the node sent back to answer it. */
 export interface Feedback {

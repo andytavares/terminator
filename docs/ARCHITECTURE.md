@@ -1069,8 +1069,8 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
 ### The Line (`src/line/`, `src/recipe/`, `src/verify/`, `src/gates/`)
 
 - **Recipes** (`recipe/parse.ts`, `recipe/resolve.ts`) are YAML: a list of steps
-  over six kinds — `agent`, `run`, `judge`, `gate`, `fanout`, `join`. There is
-  no seventh. The ten SpecKit phases are one recipe, `recipes/speckit.yaml`.
+  over five kinds — `agent`, `run`, `gate`, `fanout`, `join`. There is
+  no sixth. The ten SpecKit phases are one recipe, `recipes/speckit.yaml`.
 - **A failed check sends the work back** (ADR-063). A `run` step whose command
   is not a slash command runs as a command in a terminal tab
   (`SupervisedRunner.runCommand`), with `${toolchain.<check>}` resolved by
@@ -1256,11 +1256,12 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   Line had never asked anything.
 - **The ladder** (`verify/ladder.ts`) stops at the first failure, so a run does
   not spend an inspection budget on a change that does not compile.
-- **Gates** (`gates/rules.ts`) are raised by nine named rules, never by phase
+- **Gates** (`gates/rules.ts`) are raised by ten named rules, never by phase
   boundaries. Each carries the rule, the reason, the evidence, its options with
   their consequences, and what happens if nobody answers. The **autonomy dial**
-  selects which are live; four — `risk.p0`, `budget.exceeded`, `destructive`,
-  `ready-for-review` — stay live at every setting.
+  selects which are live; six — `risk.p0`, `budget.exceeded`,
+  `ready-for-review`, `run.interrupted`, `ci.red`, `refinery.conflict` — stay
+  live at every setting.
 - **The executor** (`line/executor.ts`) joins the scheduler, the roles and the
   supervised runner: a wave at a time, so the agent budget means something.
 - **An accidental question costs five minutes, not a click** (ADR-049).

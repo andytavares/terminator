@@ -78,7 +78,7 @@ export function toolProp(toolName: string, isShell: boolean): ToolProp {
 
 /** A step that has taken in its input — work bound for it no longer queues. */
 export function hasStarted(state: NodeState): boolean {
-  return state !== 'waiting' && state !== 'ready' && state !== 'blocked'
+  return state !== 'waiting' && state !== 'blocked'
 }
 
 function activityKey(activity: ToolActivity): string {

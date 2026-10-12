@@ -1298,7 +1298,7 @@ steps:
     step: { kind: agent, role: builder }
   - id: check
     kind: gate
-    rule: critical-path
+    rule: verify.repeat-fail
     defaultIfIgnored: hold
     after: [build]
 `
@@ -1309,7 +1309,7 @@ steps:
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
-    expect(outcome.gates.map((g) => g.rule)).toContain('critical-path')
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
     expect(outcome.gates.map((g) => g.rule)).not.toContain('unit.boundary')
   })
 
@@ -1319,7 +1319,7 @@ steps:
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
-    const gate = outcome.gates.find((g) => g.rule === 'critical-path')
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
     expect(gate?.options.map((o) => o.id)).toContain('send_back')
     expect(gate?.defaultIfIgnored).toBe('hold')
   })

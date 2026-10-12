@@ -393,8 +393,7 @@ describe('FactoryHall', () => {
             node({
               id: 'G',
               kind: 'gate',
-              role: 'foreman',
-              state: 'ready',
+              state: 'waiting',
               sessionId: null,
               dependsOn: ['N-1'],
             }),

@@ -117,7 +117,7 @@ export function createRoleRegistry(sources: ResolveSources): RoleRegistry {
     /**
      * Whether this role may write to the checkout.
      *
-     * Not "does it write anything": the red team writes findings, the foreman
+     * Not "does it write anything": the red team writes findings, a scheduler
      * writes a schedule and the architect writes a plan, and none of them
      * touches the repository. This asked `writes.length > 0`, so all three
      * came back true, and the executor installs its read-only policy on the

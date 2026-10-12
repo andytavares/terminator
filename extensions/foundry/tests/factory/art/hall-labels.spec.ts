@@ -290,7 +290,6 @@ describe('the ship gate while its step runs through the final check and CI', () 
 
   it('burns a steady cyan beacon, neither idle grey nor the open green', () => {
     expect(beacon('running')).toBe(HALL.cyan)
-    expect(beacon('verifying')).toBe(HALL.cyan)
     expect(beacon('waiting')).toBe('#3a414b')
     expect(beacon('passed')).toBe(HALL.green)
   })

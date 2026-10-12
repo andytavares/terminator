@@ -16,16 +16,7 @@ import type { FrameNode, Timeline, ToolEntry, GraphFrame, CiFrame } from './repl
 
 export const TIMELINE_FILE = 'run-timeline.jsonl'
 
-const NodeStateSchema = z.enum([
-  'waiting',
-  'ready',
-  'running',
-  'verifying',
-  'passed',
-  'failed',
-  'blocked',
-  'skipped',
-])
+const NodeStateSchema = z.enum(['waiting', 'running', 'passed', 'failed', 'blocked', 'skipped'])
 
 const GraphLine = z.object({
   kind: z.literal('graph'),

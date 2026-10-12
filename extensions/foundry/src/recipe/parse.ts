@@ -62,14 +62,14 @@ function badSkillIds(ids: readonly string[]): string[] {
 // ── recipes ──────────────────────────────────────────────────────────────
 
 /**
- * Six step kinds, and there is no seventh.
+ * Five step kinds, and there is no sixth.
  *
- * They exist because six concrete recipes need them, not in anticipation: fan
- * out over units, a barrier for lane merge order, a human decision, an agent
- * role, a shell command and a rubric judgement. A recipe that wants arbitrary
- * logic wants a role — a prompt and an output schema — not code in a data file.
+ * They exist because concrete recipes need them, not in anticipation: fan out
+ * over units, a barrier for lane merge order, a human decision, an agent role
+ * and a shell command. A recipe that wants arbitrary logic wants a role — a
+ * prompt and an output schema — not code in a data file.
  */
-export const STEP_KINDS = ['agent', 'run', 'judge', 'gate', 'fanout', 'join'] as const
+export const STEP_KINDS = ['agent', 'run', 'gate', 'fanout', 'join'] as const
 export type StepKind = (typeof STEP_KINDS)[number]
 
 /**
@@ -91,7 +91,6 @@ const StepSchema = z
     when: z.string().optional(),
     role: z.string().optional(),
     command: z.string().optional(),
-    rubric: z.string().optional(),
     rule: z.string().optional(),
     options: z.array(z.string()).optional(),
     defaultIfIgnored: z.string().optional(),
@@ -101,7 +100,6 @@ const StepSchema = z
     order: z.string().optional(),
     expect: z.record(z.string(), z.unknown()).optional(),
     context: z.enum(['fresh', 'resume']).optional(),
-    evidence: z.array(z.string()).optional(),
     effort: z.enum(EFFORT_LEVELS).optional(),
     // Mounted for this step's agent the way Claude Code loads a skill: a
     // directory per id, passed with `--add-dir`. Optional, because most steps
@@ -120,7 +118,6 @@ const StepSchema = z
     }
     if (step.kind === 'agent' && step.role === undefined) need('a role')
     if (step.kind === 'run' && step.command === undefined) need('a command')
-    if (step.kind === 'judge' && step.rubric === undefined) need('a rubric')
     if (step.kind === 'fanout' && (step.over === undefined || step.step === undefined)) {
       need('both `over` and `step`')
     }

@@ -61,7 +61,6 @@ export interface RoleStyle {
   readonly pants: string
   readonly hat: string | null
   readonly visor: boolean
-  readonly vest: boolean
 }
 
 const NEUTRAL: RoleStyle = {
@@ -72,7 +71,6 @@ const NEUTRAL: RoleStyle = {
   pants: '#2a2e38',
   hat: null,
   visor: false,
-  vest: false,
 }
 
 /**
@@ -93,18 +91,6 @@ export function roleStyle(role: string | null): RoleStyle {
         pants: '#2a2e38',
         hat: '#e3b341',
         visor: false,
-        vest: false,
-      }
-    case 'foreman':
-      return {
-        shirt: '#f28c28',
-        shirtDark: '#c86e1c',
-        hair: '#2a2420',
-        skin: '#d9a57c',
-        pants: '#262a33',
-        hat: '#e9ecef',
-        visor: false,
-        vest: true,
       }
     case 'verifier':
       return {
@@ -115,7 +101,6 @@ export function roleStyle(role: string | null): RoleStyle {
         pants: '#343a46',
         hat: null,
         visor: true,
-        vest: false,
       }
     case 'inspector':
       return {
@@ -126,7 +111,6 @@ export function roleStyle(role: string | null): RoleStyle {
         pants: '#2b2f3a',
         hat: null,
         visor: true,
-        vest: false,
       }
     case 'architect':
       return {
@@ -137,7 +121,6 @@ export function roleStyle(role: string | null): RoleStyle {
         pants: '#2b2f3a',
         hat: null,
         visor: false,
-        vest: false,
       }
     case 'author':
       return {
@@ -148,7 +131,6 @@ export function roleStyle(role: string | null): RoleStyle {
         pants: '#2f2733',
         hat: null,
         visor: false,
-        vest: false,
       }
     case 'scribe':
       return {
@@ -159,7 +141,6 @@ export function roleStyle(role: string | null): RoleStyle {
         pants: '#2a2e2a',
         hat: null,
         visor: false,
-        vest: false,
       }
     case 'scout':
       return {
@@ -170,7 +151,6 @@ export function roleStyle(role: string | null): RoleStyle {
         pants: '#2e2a20',
         hat: null,
         visor: false,
-        vest: false,
       }
     default:
       return NEUTRAL

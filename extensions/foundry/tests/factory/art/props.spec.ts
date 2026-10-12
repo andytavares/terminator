@@ -225,7 +225,6 @@ describe('factory/art/props drawProp', () => {
       const off = lamp({ states: { n1: 'running' } }, 500)
       expect(containsColor(on, HALL.cyan)).toBe(true)
       expect(containsColor(off, HALL.cyan)).toBe(false)
-      expect(containsColor(lamp({ states: { n1: 'verifying' } }, 0), HALL.cyan)).toBe(true)
     })
 
     it('burns orange while its step needs you, over the working flash', () => {
@@ -244,7 +243,7 @@ describe('factory/art/props drawProp', () => {
 
     it('burns green once its step is done, and stays dark before it starts', () => {
       expect(containsColor(lamp({ states: { n1: 'passed' } }), HALL.green)).toBe(true)
-      for (const state of ['waiting', 'ready', 'skipped'] as const) {
+      for (const state of ['waiting', 'skipped'] as const) {
         const calls = lamp({ states: { n1: state } })
         for (const lit of [HALL.cyan, HALL.orange, HALL.red, HALL.green]) {
           expect(containsColor(calls, lit)).toBe(false)
@@ -821,18 +820,15 @@ describe('factory/art/props station work', () => {
         .filter((c) => c.op === 'fillRect' && c.style === HEAD)
         .map((c) => (c as { y: number }).y)
 
-    it.each(['running', 'verifying'] as const)(
-      'works while its step is %s, with no crew at all',
-      (state) => {
-        const ctx = context({ states: { n1: state } })
-        for (const t of STAGES) expect(containsColor(draw('press', ctx, t), BEACON)).toBe(true)
-        expect(containsColor(draw('press', ctx, 714), SPARK)).toBe(true)
-        expect(containsColor(draw('press', ctx, 0), SPARK)).toBe(false)
-        expect(headY(draw('press', ctx, 0))).not.toEqual(headY(draw('press', ctx, 714)))
-      }
-    )
+    it('works while its step is running, with no crew at all', () => {
+      const ctx = context({ states: { n1: 'running' } })
+      for (const t of STAGES) expect(containsColor(draw('press', ctx, t), BEACON)).toBe(true)
+      expect(containsColor(draw('press', ctx, 714), SPARK)).toBe(true)
+      expect(containsColor(draw('press', ctx, 0), SPARK)).toBe(false)
+      expect(headY(draw('press', ctx, 0))).not.toEqual(headY(draw('press', ctx, 714)))
+    })
 
-    it.each(['waiting', 'ready', 'passed', 'failed', 'blocked'] as const)(
+    it.each(['waiting', 'passed', 'failed', 'blocked'] as const)(
       'stands still while its step is %s, even with a crew member typing',
       (state) => {
         const ctx = context({ states: { n1: state }, crew: [crew({ anim: 'type' })] })

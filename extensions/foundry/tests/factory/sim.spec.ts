@@ -86,13 +86,8 @@ function obs(g: RunGraph, over: Partial<Observation> = {}): Observation {
 }
 
 // Duplicated from tests/factory/layout.spec.ts: builds a real run graph from
-// a shipped recipe file and a lane count, the same way that spec does, so
-// the golden crew fixture below is exercised against the exact graph the
-// prototype was run against.
+// a shipped recipe file and a lane count, the same way that spec does.
 const SHIPPED_RECIPES = path.join(__dirname, '..', '..', 'recipes')
-// The recipes the prototype's golden output was recorded against. The shipped
-// ones change as shapes gain steps; the recording cannot be re-run.
-const RECORDED_RECIPES = path.join(__dirname, 'fixtures', 'recipes')
 
 function recipeFrom(file: string, dir = SHIPPED_RECIPES): Recipe {
   const text = fs.readFileSync(path.join(dir, file), 'utf-8')
@@ -300,13 +295,6 @@ describe('createWorld', () => {
       at: '2026-09-06T10:00:00.000Z',
     })
     expect(createWorld(map, obs(g, { waiting: [raised] })).gatesWaiting).toEqual(['g'])
-  })
-
-  it('a ready node with no station in the map gets no crew of its own', () => {
-    const g = withNode(graph(), 'b', { state: 'ready' })
-    const mapMissingB = layoutHall({ ...g, nodes: g.nodes.filter((n) => n.id !== 'b') })
-    const world = createWorld(mapMissingB, obs(g))
-    expect(world.crew.some((c) => c.nodeId === 'b')).toBe(false)
   })
 
   it('a waiting node with no station in the map gets no crew of its own', () => {
@@ -621,56 +609,6 @@ describe('tick', () => {
   })
 })
 
-describe('createWorld — golden crew', () => {
-  const goldenPath = path.join(__dirname, 'fixtures', 'hall-golden.json')
-  const golden = JSON.parse(fs.readFileSync(goldenPath, 'utf-8')) as {
-    crew: { initial: unknown; afterIdle: unknown; allPassed: unknown }
-  }
-
-  function project(world: World): unknown {
-    return world.crew.map((c) => ({
-      nodeId: c.nodeId,
-      x: c.x,
-      y: c.y,
-      facing: c.facing,
-      anim: c.anim,
-    }))
-  }
-
-  it("matches the prototype's initial placement, idle-settle sequence and all-passed layout", () => {
-    let g0 = graphFor('standard.yaml', [1, 2, 3], RECORDED_RECIPES)
-    for (const id of ['scout', 'challenge', 'build:lane-1', 'build:lane-2', 'build:lane-3']) {
-      g0 = withNode(g0, id, { state: 'running' })
-    }
-    const map = layoutHall(g0)
-
-    const initialWorld = createWorld(map, obs(g0))
-    expect(project(initialWorld)).toEqual(golden.crew.initial)
-
-    let world = initialWorld
-    for (const nodeId of ['scout', 'challenge', 'build:lane-2']) {
-      world = direct(
-        world,
-        [{ kind: 'node-state', nodeId, from: 'running', to: 'passed' }],
-        world.clockMs
-      )
-      let guard = 0
-      while (world.crew.find((c) => c.nodeId === nodeId)!.goal !== null && guard < 10_000) {
-        world = tick(world, 16)
-        guard++
-      }
-      expect(guard).toBeLessThan(10_000)
-    }
-    expect(project(world)).toEqual(golden.crew.afterIdle)
-
-    let allPassed = graphFor('standard.yaml', [1, 2, 3], RECORDED_RECIPES)
-    for (const node of allPassed.nodes)
-      allPassed = withNode(allPassed, node.id, { state: 'passed' })
-    const allPassedWorld = createWorld(layoutHall(allPassed), obs(allPassed))
-    expect(project(allPassedWorld)).toEqual(golden.crew.allPassed)
-  })
-})
-
 describe('cratePosition', () => {
   const belt = {
     id: 'a->b',
@@ -703,7 +641,7 @@ describe('cratePosition', () => {
 
 describe('idle crew wander', () => {
   function restingWorld(): World {
-    let g = graphFor('standard.yaml', [1, 2], RECORDED_RECIPES)
+    let g = graphFor('standard.yaml', [1, 2])
     for (const node of g.nodes) g = withNode(g, node.id, { state: 'passed' })
     return createWorld(layoutHall(g), obs(g))
   }

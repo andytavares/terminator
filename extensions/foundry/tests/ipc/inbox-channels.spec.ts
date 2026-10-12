@@ -164,9 +164,14 @@ describe('foundry:inbox.list', () => {
     expect(((await channels('escorted').list()) as { gates: Gate[] }).gates).toHaveLength(1)
   })
 
-  it('never hides the four that are live at every setting', async () => {
+  it('never hides the unconditional rules at any setting', async () => {
     const store = createGateStore(root)
-    for (const rule of ['risk.p0', 'budget.exceeded', 'destructive', 'ready-for-review'] as const) {
+    for (const rule of [
+      'risk.p0',
+      'budget.exceeded',
+      'run.interrupted',
+      'ready-for-review',
+    ] as const) {
       await store.save(gate({ id: `G-${rule}`, rule }))
     }
     const r = (await channels('lights-out').list()) as { gates: Gate[] }
@@ -580,9 +585,9 @@ describe('what this setting is not asking about', () => {
     expect(r.silenced).toEqual([])
   })
 
-  it('never silences the four that stay live at every setting', async () => {
+  it('never silences the unconditional rules at any setting', async () => {
     const r = (await channels('lights-out').list()) as { silenced: string[] }
-    for (const rule of ['risk.p0', 'budget.exceeded', 'destructive', 'ready-for-review']) {
+    for (const rule of ['risk.p0', 'budget.exceeded', 'run.interrupted', 'ready-for-review']) {
       expect(r.silenced).not.toContain(rule)
     }
   })

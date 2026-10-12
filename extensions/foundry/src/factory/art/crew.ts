@@ -6,7 +6,7 @@ import { HALL } from './palette.js'
 import { drawCrate } from './props.js'
 
 // A crew member is drawn as a small layered silhouette: legs, torso, arms,
-// head, then a role's hat or vest — one exhaustive switch per axis (facing,
+// head, then a role's hat — one exhaustive switch per axis (facing,
 // then anim) so a new `CrewAnim` the sim adds is a compile error here, not a
 // silently unposed sprite.
 
@@ -166,10 +166,6 @@ export function drawCrew(paint: Paint, crew: Crew, tMs: number): void {
   rect(paint, x - 4, torsoY, 8, 8, style.shirt)
   bevel(paint, x - 4, torsoY, 8, 8, 'rgba(255,255,255,.18)', '#1c1f26')
   rect(paint, x + 2, torsoY, 2, 8, style.shirtDark)
-  if (style.vest) {
-    rect(paint, x - 4, torsoY, 8, 8, '#f28c28')
-    rect(paint, x - 4, torsoY + 4, 8, 1, '#f4f4f0')
-  }
 
   if (crew.carrying === true) {
     if (crew.facing !== 'N') {

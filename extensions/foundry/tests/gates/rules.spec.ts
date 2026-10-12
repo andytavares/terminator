@@ -143,7 +143,7 @@ describe('isOverdue', () => {
 })
 
 describe('autonomy', () => {
-  it('keeps four rules live at every setting', () => {
+  it('keeps the unconditional rules live at every setting', () => {
     for (const level of AUTONOMY_LEVELS) {
       for (const rule of UNCONDITIONAL) expect(isLive(rule, level)).toBe(true)
     }
@@ -159,14 +159,8 @@ describe('autonomy', () => {
     expect(isLive('unit.boundary', 'lights-out')).toBe(false)
   })
 
-  it('asks about a repeat failure and a new dependency at standard, and not at lights-out', () => {
-    for (const rule of [
-      'verify.repeat-fail',
-      'verify.base-fail',
-      'new-dependency',
-      'critical-path',
-      'forge-defect',
-    ] as GateRuleId[]) {
+  it('asks about a repeat failure at standard, and not at lights-out', () => {
+    for (const rule of ['verify.repeat-fail', 'verify.base-fail', 'forge-defect'] as GateRuleId[]) {
       expect(isLive(rule, 'standard')).toBe(true)
       expect(isLive(rule, 'lights-out')).toBe(false)
     }

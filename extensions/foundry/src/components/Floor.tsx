@@ -117,9 +117,7 @@ function ago(at: number, now: number): string {
 
 const STATE_LABEL: Record<RunNode['state'], string> = {
   waiting: 'waiting',
-  ready: 'ready',
   running: 'building',
-  verifying: 'verifying',
   passed: 'done',
   failed: 'failed',
   blocked: 'blocked',

@@ -100,7 +100,7 @@ function toolAt(context: SceneContext, nodeId: string | null): ToolProp | null {
 
 function isWorking(context: SceneContext, nodeId: string | null): boolean {
   const state = nodeId === null ? undefined : context.states[nodeId]
-  return state === 'running' || state === 'verifying'
+  return state === 'running'
 }
 
 /** The newest verdict on a step that is still inside its window, with its age. */
@@ -139,7 +139,6 @@ function stationLamp(context: SceneContext, nodeId: string, tMs: number): string
     case 'passed':
       return HALL.green
     case 'running':
-    case 'verifying':
       return Math.floor(tMs / LAMP_FLASH_MS) % 2 === 0 ? HALL.cyan : LAMP_OFF
     default:
       return LAMP_OFF
@@ -835,7 +834,7 @@ function drawBench(paint: Paint, prop: HallProp, context: SceneContext, tMs: num
 /**
  * The press is the biggest machine on the floor — the lanes converge here.
  * A join step never has a crew member, so its cause is its own state: it
- * strokes while the step is running or verifying, and stands still otherwise.
+ * strokes while the step is running, and stands still otherwise.
  */
 function drawPress(paint: Paint, prop: HallProp, context: SceneContext, tMs: number): void {
   const x = prop.x * TILE_PX
@@ -921,7 +920,7 @@ function drawGate(paint: Paint, prop: HallProp, context: SceneContext, tMs: numb
   // A gate whose step is running (the ship step, through the final check and
   // CI) is busy, not idle: its beacon burns steady cyan.
   const state = prop.nodeId === null ? undefined : context.states[prop.nodeId]
-  const working = !waiting && !open && (state === 'running' || state === 'verifying')
+  const working = !waiting && !open && state === 'running'
   const beacon = waiting
     ? flashOn
       ? HALL.amber

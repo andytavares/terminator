@@ -24,9 +24,6 @@ const RECIPE = `
 schemaVersion: 1
 id: standard
 steps:
-  - id: foreman
-    kind: agent
-    role: foreman
   - id: a
     kind: agent
     role: builder
@@ -104,7 +101,7 @@ function ghostCrew(nodeId: string, role: string | null = null): Crew {
 }
 
 describe('direct: node-state', () => {
-  it('sends a node to its seat, to type, on ready/running', () => {
+  it('sends a node to its seat, to type, on running', () => {
     const g = graph()
     const world = worldFor(g)
     const events: FactoryEvent[] = [
@@ -149,7 +146,7 @@ describe('direct: node-state', () => {
     const world = worldFor(g)
     const next = direct(
       world,
-      [{ kind: 'node-state', nodeId: 'a', from: 'ready', to: 'blocked' }],
+      [{ kind: 'node-state', nodeId: 'a', from: 'running', to: 'blocked' }],
       0
     )
     const crew = next.crew.find((c) => c.nodeId === 'a')!
@@ -162,7 +159,7 @@ describe('direct: node-state', () => {
     const world = worldFor(g)
     const next = direct(
       world,
-      [{ kind: 'node-state', nodeId: 'g', from: 'waiting', to: 'ready' }],
+      [{ kind: 'node-state', nodeId: 'g', from: 'waiting', to: 'running' }],
       0
     )
     expect(next).toEqual(world)
@@ -180,13 +177,15 @@ describe('direct: node-state', () => {
     expect(crew.then).toBe('scan')
   })
 
-  it('sends a node to its seat on ready, and on verifying, same as running', () => {
+  it('sends an agent node to its seat typing when it starts running', () => {
     const g = graph()
     const world = worldFor(g)
-    for (const to of ['ready', 'verifying'] as const) {
-      const next = direct(world, [{ kind: 'node-state', nodeId: 'a', from: 'waiting', to }], 0)
-      expect(next.crew.find((c) => c.nodeId === 'a')!.then).toBe('type')
-    }
+    const next = direct(
+      world,
+      [{ kind: 'node-state', nodeId: 'a', from: 'waiting', to: 'running' }],
+      0
+    )
+    expect(next.crew.find((c) => c.nodeId === 'a')!.then).toBe('type')
   })
 
   it('sends a skipped node to a rest seat too', () => {
@@ -213,7 +212,7 @@ describe('direct: node-state', () => {
     expect(next).toEqual(world)
   })
 
-  it('leaves a crew member with no station untouched on ready/running/verifying', () => {
+  it('leaves a crew member with no station untouched on running', () => {
     const g = graph()
     const world: World = { ...worldFor(g), crew: [...worldFor(g).crew, ghostCrew('ghost')] }
     const next = direct(
@@ -575,7 +574,7 @@ describe('direct: handoff', () => {
     }
     const next = direct(
       world,
-      [{ kind: 'node-state', nodeId: 'b', from: 'ready', to: 'running' }],
+      [{ kind: 'node-state', nodeId: 'b', from: 'waiting', to: 'running' }],
       0
     )
     expect(next.crates).toEqual([{ id: 'q', beltId: 'a->b', progress: 1, parks: false }])
@@ -644,14 +643,10 @@ describe('direct: rework', () => {
 })
 
 describe('direct: gate', () => {
-  it('adds the node to gatesWaiting and sends the foreman to wave at its seat', () => {
-    const g = graph()
-    const world = worldFor(g)
+  it('adds the node to gatesWaiting', () => {
+    const world = worldFor(graph())
     const next = direct(world, [{ kind: 'gate', nodeId: 'g', waiting: true }], 0)
     expect(next.gatesWaiting).toEqual(['g'])
-    const foreman = next.crew.find((c) => c.role === 'foreman')!
-    expect(foreman.then).toBe('wave')
-    expect(foreman.goal).toEqual(seatOf(world.map, 'g'))
   })
 
   it('does not duplicate an already-waiting gate', () => {
@@ -661,44 +656,11 @@ describe('direct: gate', () => {
     expect(next.gatesWaiting).toEqual(['g'])
   })
 
-  it('removes the node from gatesWaiting and sends the foreman back on clear', () => {
+  it('removes the node from gatesWaiting on clear', () => {
     const g = graph()
     const world: World = { ...worldFor(g), gatesWaiting: ['g'] }
     const next = direct(world, [{ kind: 'gate', nodeId: 'g', waiting: false }], 0)
     expect(next.gatesWaiting).toEqual([])
-    const foreman = next.crew.find((c) => c.role === 'foreman')!
-    expect(foreman.then).toBe('idle')
-  })
-
-  it('adds gatesWaiting without moving the foreman when the gate node has no station', () => {
-    const g = graph()
-    const world = worldFor(g)
-    const next = direct(world, [{ kind: 'gate', nodeId: 'ghost', waiting: true }], 0)
-    expect(next.gatesWaiting).toEqual(['ghost'])
-    const foreman = next.crew.find((c) => c.role === 'foreman')!
-    expect(foreman.goal).toBe(null)
-  })
-
-  it('clears gatesWaiting without moving a foreman that has no station', () => {
-    const g = graph()
-    const base = worldFor(g)
-    const world: World = {
-      ...base,
-      gatesWaiting: ['g'],
-      crew: [...base.crew.filter((c) => c.role !== 'foreman'), ghostCrew('foreman-x', 'foreman')],
-    }
-    const next = direct(world, [{ kind: 'gate', nodeId: 'g', waiting: false }], 0)
-    expect(next.gatesWaiting).toEqual([])
-    expect(next.crew.find((c) => c.role === 'foreman')).toEqual(ghostCrew('foreman-x', 'foreman'))
-  })
-
-  it('does nothing at all when there is no foreman crew', () => {
-    const g = graph()
-    const base = worldFor(g)
-    const world: World = { ...base, crew: base.crew.filter((c) => c.role !== 'foreman') }
-    const next = direct(world, [{ kind: 'gate', nodeId: 'g', waiting: true }], 0)
-    expect(next.gatesWaiting).toEqual(['g'])
-    expect(next.crew).toEqual(world.crew)
   })
 })
 

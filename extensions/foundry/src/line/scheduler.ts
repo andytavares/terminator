@@ -10,7 +10,7 @@ import type { Budgets } from '../order/schema.js'
 // "why is nothing running" is always answerable without watching it happen.
 
 /** Occupying an agent right now. */
-const IN_FLIGHT: readonly RunNode['state'][] = ['running', 'verifying']
+const IN_FLIGHT: readonly RunNode['state'][] = ['running']
 
 export const MAX_ATTEMPTS = 2
 
@@ -48,9 +48,7 @@ function anyDependencyFailed(graph: RunGraph, node: RunNode): boolean {
 export function readyNodes(graph: RunGraph, budgets: Budgets): RunNode[] {
   const capacity =
     budgets.agents === null ? Infinity : Math.max(0, budgets.agents - inFlight(graph).length)
-  const eligible = graph.nodes.filter(
-    (n) => (n.state === 'waiting' || n.state === 'ready') && dependenciesSettled(graph, n)
-  )
+  const eligible = graph.nodes.filter((n) => n.state === 'waiting' && dependenciesSettled(graph, n))
   const gates = eligible.filter((n) => n.kind === 'gate')
   const work = eligible.filter((n) => n.kind !== 'gate').slice(0, capacity)
   return [...gates, ...work]
@@ -78,7 +76,7 @@ export function blockedReason(
 ): string | null {
   const node = nodeById(graph, id)
   if (node === undefined) return null
-  if (node.state !== 'waiting' && node.state !== 'ready' && node.state !== 'blocked') return null
+  if (node.state !== 'waiting' && node.state !== 'blocked') return null
 
   const failed = node.dependsOn.filter((dep) => {
     const dependency = nodeById(graph, dep)

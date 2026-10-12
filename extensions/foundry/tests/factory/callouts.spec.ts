@@ -36,7 +36,7 @@ const graph: RunGraph = {
   recipe: 'standard',
   nodes: [
     node('build', { state: 'running', sessionId: 's-build' }),
-    node('ship', { kind: 'gate', role: 'foreman' }),
+    node('ship', { kind: 'gate', role: null }),
   ],
 }
 const labels = { build: 'Build the API', ship: 'Ship it' }
@@ -85,7 +85,7 @@ describe('calloutFor', () => {
   })
 
   it('stays quiet for bookkeeping moves nobody needs to see', () => {
-    expect(at({ kind: 'node-state', nodeId: 'build', from: 'waiting', to: 'ready' })).toBeNull()
+    expect(at({ kind: 'node-state', nodeId: 'build', from: 'running', to: 'waiting' })).toBeNull()
     expect(
       at({ kind: 'tool', nodeId: 'build', prop: 'desk', callId: 'c', open: true, at: 0 })
     ).toBeNull()
@@ -126,16 +126,13 @@ describe('calloutFor', () => {
   })
 
   it('covers every other event kind', () => {
-    expect(at({ kind: 'node-state', nodeId: 'build', from: 'ready', to: 'running' })?.text).toBe(
+    expect(at({ kind: 'node-state', nodeId: 'build', from: 'waiting', to: 'running' })?.text).toBe(
       'Started'
     )
-    expect(
-      at({ kind: 'node-state', nodeId: 'build', from: 'running', to: 'verifying' })?.text
-    ).toBe('Checking')
-    expect(at({ kind: 'node-state', nodeId: 'build', from: 'ready', to: 'blocked' })?.tone).toBe(
+    expect(at({ kind: 'node-state', nodeId: 'build', from: 'waiting', to: 'blocked' })?.tone).toBe(
       'fail'
     )
-    expect(at({ kind: 'node-state', nodeId: 'build', from: 'ready', to: 'skipped' })?.text).toBe(
+    expect(at({ kind: 'node-state', nodeId: 'build', from: 'waiting', to: 'skipped' })?.text).toBe(
       'Skipped'
     )
     expect(at({ kind: 'node-state', nodeId: 'build', from: null, to: 'waiting' })).toBeNull()
@@ -279,16 +276,7 @@ describe('interruptionsFor', () => {
 
 describe('stateWord', () => {
   it('has a word for every node state', () => {
-    const states: NodeState[] = [
-      'waiting',
-      'ready',
-      'running',
-      'verifying',
-      'passed',
-      'failed',
-      'blocked',
-      'skipped',
-    ]
+    const states: NodeState[] = ['waiting', 'running', 'passed', 'failed', 'blocked', 'skipped']
     const words = states.map(stateWord)
     expect(new Set(words).size).toBe(states.length)
     expect(stateWord('running')).toBe('Working')
@@ -345,9 +333,9 @@ describe('calloutsFor', () => {
   it('raises one callout per station, however many things happened to it in one poll', () => {
     const raised = calloutsFor(
       [
-        { kind: 'node-state', nodeId: 'build', from: 'ready', to: 'running' },
+        { kind: 'node-state', nodeId: 'build', from: 'waiting', to: 'running' },
         { kind: 'handoff', fromNodeId: 'plan', toNodeId: 'build', targetStarted: true },
-        { kind: 'node-state', nodeId: 'ship', from: 'ready', to: 'running' },
+        { kind: 'node-state', nodeId: 'ship', from: 'waiting', to: 'running' },
       ] as FactoryEvent[],
       labels,
       1000
@@ -362,7 +350,7 @@ describe('calloutsFor', () => {
   it('lets a failure speak over anything else that happened at the station', () => {
     const raised = calloutsFor(
       [
-        { kind: 'node-state', nodeId: 'build', from: 'ready', to: 'running' },
+        { kind: 'node-state', nodeId: 'build', from: 'waiting', to: 'running' },
         { kind: 'orphaned', nodeId: 'build' },
         { kind: 'handoff', fromNodeId: 'plan', toNodeId: 'build', targetStarted: true },
       ] as FactoryEvent[],
