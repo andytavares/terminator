@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { registerInvokeTable, invokeSpec, noPayload } from './invoke-table.js'
-import { execSync } from 'child_process'
+import { execFile, execSync } from 'child_process'
 import * as os from 'os'
-import { readFileSync } from 'fs'
+import { readFile } from 'fs/promises'
+import { promisify } from 'util'
 import type { PtyManager } from '../terminal/pty-manager.js'
 import type { SystemMetrics, ProcessMetrics } from '../../shared/types/index.js'
 
@@ -28,44 +29,54 @@ function takeCpuSnapshot(): CpuSnapshot {
 
 // ─── Network sampler ─────────────────────────────────────────────────────────
 
-interface NetSnapshot {
-  ts: number
+const execFileAsync = promisify(execFile)
+
+interface NetBytes {
   bytesIn: number
   bytesOut: number
 }
 
+interface NetSnapshot extends NetBytes {
+  ts: number
+}
+
+function sumProcNetDev(raw: string): NetBytes {
+  let bytesIn = 0
+  let bytesOut = 0
+  for (const line of raw.split('\n').slice(2)) {
+    const parts = line.trim().split(/\s+/)
+    const iface = parts[0]?.replace(':', '')
+    if (!iface || iface === 'lo') continue
+    bytesIn += parseInt(parts[1] ?? '0', 10) || 0
+    bytesOut += parseInt(parts[9] ?? '0', 10) || 0
+  }
+  return { bytesIn, bytesOut }
+}
+
+// Columns: Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Drop
+function sumNetstat(raw: string): NetBytes {
+  let bytesIn = 0
+  let bytesOut = 0
+  for (const line of raw.split('\n').slice(1)) {
+    const parts = line.trim().split(/\s+/)
+    const iface = parts[0] ?? ''
+    if (!iface || iface.startsWith('lo')) continue
+    const ib = parseInt(parts[6] ?? '0', 10)
+    const ob = parseInt(parts[9] ?? '0', 10)
+    if (!isNaN(ib)) bytesIn += ib
+    if (!isNaN(ob)) bytesOut += ob
+  }
+  return { bytesIn, bytesOut }
+}
+
 /** @internal */
-export function readNetBytes(): { bytesIn: number; bytesOut: number } {
+export async function readNetBytes(): Promise<NetBytes> {
   try {
     if (process.platform === 'linux') {
-      const raw = readFileSync('/proc/net/dev', 'utf-8')
-      let bytesIn = 0
-      let bytesOut = 0
-      for (const line of raw.split('\n').slice(2)) {
-        const parts = line.trim().split(/\s+/)
-        const iface = parts[0]?.replace(':', '')
-        if (!iface || iface === 'lo') continue
-        bytesIn += parseInt(parts[1] ?? '0', 10) || 0
-        bytesOut += parseInt(parts[9] ?? '0', 10) || 0
-      }
-      return { bytesIn, bytesOut }
+      return sumProcNetDev(await readFile('/proc/net/dev', 'utf-8'))
     }
-    // macOS — parse netstat -ib
-    const raw = execSync('netstat -ib', { timeout: 2000 }).toString()
-    const lines = raw.split('\n').slice(1) // skip header
-    let bytesIn = 0
-    let bytesOut = 0
-    for (const line of lines) {
-      const parts = line.trim().split(/\s+/)
-      const iface = parts[0] ?? ''
-      if (!iface || iface.startsWith('lo')) continue
-      // Columns: Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Drop
-      const ib = parseInt(parts[6] ?? '0', 10)
-      const ob = parseInt(parts[9] ?? '0', 10)
-      if (!isNaN(ib)) bytesIn += ib
-      if (!isNaN(ob)) bytesOut += ob
-    }
-    return { bytesIn, bytesOut }
+    const { stdout } = await execFileAsync('netstat', ['-ib'], { timeout: 2000 })
+    return sumNetstat(stdout.toString())
   } catch {
     return { bytesIn: 0, bytesOut: 0 }
   }
@@ -73,36 +84,72 @@ export function readNetBytes(): { bytesIn: number; bytesOut: number } {
 
 // ─── Background sampler state ────────────────────────────────────────────────
 
-let prevCpu: CpuSnapshot = takeCpuSnapshot()
+// The sampler runs only while the renderer polls metrics:system, which it does
+// only while a metrics view is showing. It stops once polls have been absent
+// this long; the renderer polls every 2 s.
+const SAMPLER_IDLE_MS = 5000
+
+let prevCpu: CpuSnapshot = { idle: 0, total: 0 }
 let latestCpuPercent = 0
 
 let prevNet: NetSnapshot | null = null
 let latestNetIn = 0
 let latestNetOut = 0
 
-function tick(): void {
-  // CPU
+let samplerTimer: ReturnType<typeof setInterval> | null = null
+let lastRequestedAt = 0
+let networkSampleInFlight = false
+
+function sampleCpu(): void {
   const curr = takeCpuSnapshot()
   const idleDelta = curr.idle - prevCpu.idle
   const totalDelta = curr.total - prevCpu.total
   latestCpuPercent = totalDelta > 0 ? 100 * (1 - idleDelta / totalDelta) : 0
   prevCpu = curr
-
-  // Network
-  const net = readNetBytes()
-  const now = Date.now()
-  if (prevNet !== null) {
-    const elapsed = (now - prevNet.ts) / 1000
-    if (elapsed > 0) {
-      latestNetIn = Math.max(0, (net.bytesIn - prevNet.bytesIn) / elapsed)
-      latestNetOut = Math.max(0, (net.bytesOut - prevNet.bytesOut) / elapsed)
-    }
-  }
-  prevNet = { ts: now, ...net }
 }
 
-function startSampler(): void {
-  setInterval(tick, 1000).unref()
+async function sampleNetwork(): Promise<void> {
+  if (networkSampleInFlight) return
+  networkSampleInFlight = true
+  try {
+    const net = await readNetBytes()
+    const now = Date.now()
+    if (prevNet !== null) {
+      const elapsed = (now - prevNet.ts) / 1000
+      if (elapsed > 0) {
+        latestNetIn = Math.max(0, (net.bytesIn - prevNet.bytesIn) / elapsed)
+        latestNetOut = Math.max(0, (net.bytesOut - prevNet.bytesOut) / elapsed)
+      }
+    }
+    prevNet = { ts: now, ...net }
+  } finally {
+    networkSampleInFlight = false
+  }
+}
+
+function tick(): void {
+  if (samplerTimer !== null && Date.now() - lastRequestedAt > SAMPLER_IDLE_MS) {
+    clearInterval(samplerTimer)
+    samplerTimer = null
+    return
+  }
+  sampleCpu()
+  void sampleNetwork()
+}
+
+/** Called on every metrics:system poll: keeps the sampler running, starting it if it is stopped. */
+function keepSamplerRunning(): void {
+  lastRequestedAt = Date.now()
+  if (samplerTimer !== null) return
+  // Rates are measured between samples, so a restart must not span the idle gap.
+  prevCpu = takeCpuSnapshot()
+  prevNet = null
+  latestCpuPercent = 0
+  latestNetIn = 0
+  latestNetOut = 0
+  void sampleNetwork()
+  samplerTimer = setInterval(tick, 1000)
+  samplerTimer.unref()
 }
 
 // ─── ps-based process metrics ────────────────────────────────────────────────
@@ -137,22 +184,23 @@ export function queryProcessMetrics(pids: number[]): ProcessMetrics[] {
 // ─── IPC registration ────────────────────────────────────────────────────────
 
 export function registerMetricsHandlers(ptyManager: PtyManager): void {
-  startSampler()
-
   registerInvokeTable([
     invokeSpec({
       channel: 'metrics:system',
       schema: noPayload,
       invalid: { error: 'VALIDATION_ERROR' },
-      run: (): { data: SystemMetrics } => ({
-        data: {
-          cpuPercent: Math.min(100, Math.max(0, latestCpuPercent)),
-          memUsedBytes: os.totalmem() - os.freemem(),
-          memTotalBytes: os.totalmem(),
-          netInBytesPerSec: latestNetIn,
-          netOutBytesPerSec: latestNetOut,
-        },
-      }),
+      run: (): { data: SystemMetrics } => {
+        keepSamplerRunning()
+        return {
+          data: {
+            cpuPercent: Math.min(100, Math.max(0, latestCpuPercent)),
+            memUsedBytes: os.totalmem() - os.freemem(),
+            memTotalBytes: os.totalmem(),
+            netInBytesPerSec: latestNetIn,
+            netOutBytesPerSec: latestNetOut,
+          },
+        }
+      },
     }),
     invokeSpec({
       channel: 'metrics:processes',

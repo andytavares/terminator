@@ -43,6 +43,8 @@ export function registerExtensionHandlers(
       schema: PanelBoundsSchema,
       invalid,
       run: async ({ extensionId, viewParam, bounds, visible, repoRoot }) => {
+        // A view talks to its extension's backend as soon as it loads.
+        await extensionHost.whenActivated(extensionId)
         await getViewHost()?.updatePanelBounds(
           () => extensionHost.listExtensions().find((e) => e.id === extensionId),
           extensionId,

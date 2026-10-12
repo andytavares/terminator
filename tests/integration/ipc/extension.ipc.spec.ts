@@ -63,6 +63,7 @@ const mockExtensionHost = {
   toggle: vi.fn(),
   uninstall: vi.fn(),
   reload: vi.fn(),
+  whenActivated: vi.fn().mockResolvedValue(undefined),
 }
 
 function captureHandle(channel: string): (event: unknown, payload?: unknown) => unknown {
@@ -201,6 +202,33 @@ describe('extension IPC handlers', () => {
       const [findExtension, ...rest] = updatePanelBounds.mock.calls[0]
       expect(rest).toEqual(['com.test', 'main', bounds, true, '/repo'])
       expect(findExtension()).toBe(ext)
+    })
+
+    it("does not create the extension's view until that extension has been activated", async () => {
+      const updatePanelBounds = vi.fn().mockResolvedValue(undefined)
+      vi.clearAllMocks()
+      let finishActivation = () => {}
+      mockExtensionHost.whenActivated.mockReturnValueOnce(
+        new Promise<void>((resolve) => (finishActivation = resolve))
+      )
+      registerExtensionHandlers(
+        mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
+        undefined,
+        () => ({ updatePanelBounds }) as never
+      )
+      const bounds = { x: 0, y: 0, width: 1, height: 1 }
+      const pending = captureHandle('extension:update-panel-bounds')(
+        {},
+        { extensionId: 'com.slow', viewParam: 'main', bounds, visible: true }
+      )
+
+      await Promise.resolve()
+      expect(mockExtensionHost.whenActivated).toHaveBeenCalledWith('com.slow')
+      expect(updatePanelBounds).not.toHaveBeenCalled()
+
+      finishActivation()
+      await pending
+      expect(updatePanelBounds).toHaveBeenCalledTimes(1)
     })
 
     it('does nothing before the view host exists', async () => {

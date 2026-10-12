@@ -13,6 +13,9 @@ vi.mock('electron', () => ({
 const storeData: Record<string, unknown> = { extensions: [] }
 vi.mock('electron-store', () => ({
   default: class MockStore {
+    onDidAnyChange() {
+      return () => {}
+    }
     get(key: string) {
       return storeData[key]
     }
@@ -88,18 +91,6 @@ describe('ExtensionHost', () => {
     const host = new ExtensionHost()
     const result = await host.toggle('nonexistent.ext', true)
     expect(result).toBeNull()
-  })
-
-  it('loadAll does not throw when no extensions are stored', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    await expect(host.loadAll()).resolves.toBeUndefined()
-  })
-
-  it('loadBundledExtensions does not throw for non-existent directory', async () => {
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    await expect(host.loadBundledExtensions('/nonexistent/bundled')).resolves.toBeUndefined()
   })
 
   it('DUPLICATE_ID error when loading same extension twice', async () => {
@@ -376,7 +367,7 @@ describe('ExtensionHost – unload deactivate error path', () => {
   })
 })
 
-describe('ExtensionHost – loadBundledExtensions paths', () => {
+describe('ExtensionHost – start with bundled directories', () => {
   beforeEach(() => {
     vi.resetModules()
     storeData.extensions = []
@@ -387,7 +378,9 @@ describe('ExtensionHost – loadBundledExtensions paths', () => {
     const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
     const host = new ExtensionHost()
     // /tmp has no manifest.json at top level sub-dirs in CI → should complete without error
-    await expect(host.loadBundledExtensions('/tmp')).resolves.toBeUndefined()
+    await expect(
+      host.start({ bundledDirectory: '/tmp', beforeActivation: Promise.resolve() })
+    ).resolves.toBeUndefined()
   })
 })
 
@@ -544,85 +537,7 @@ describe('ExtensionHost – successful load paths (real temp extensions)', () =>
     expect(enabledExt?.status).toBe('enabled')
   })
 
-  it('loadAll() activates all enabled extensions from store', async () => {
-    const dir = makeExtDir('com.loadall.test', '0.0.1')
-    tmpDirs.push(dir)
-
-    // Pre-populate store with an enabled extension
-    storeData.extensions = [
-      {
-        id: 'com.loadall.test',
-        name: 'LoadAll Test',
-        version: '1.0.0',
-        description: 'Test',
-        entryPoint: join(dir, 'main.js'),
-        status: 'enabled',
-        installedAt: new Date().toISOString(),
-        directoryPath: dir,
-      },
-    ]
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    await expect(host.loadAll()).resolves.toBeUndefined()
-  })
-
-  it('loadBundledExtensions() loads extensions from a real directory', async () => {
-    const bundledDir = join(os.tmpdir(), `bundled-${Date.now()}`)
-    const extDir = join(bundledDir, 'com.bundled.test')
-    mkdirSync(extDir, { recursive: true })
-    writeFileSync(
-      join(extDir, 'manifest.json'),
-      JSON.stringify({
-        id: 'com.bundled.test',
-        name: 'Bundled',
-        version: '1.0.0',
-        description: 'Bundled extension',
-        main: 'main.js',
-        minAppVersion: '0.0.1',
-      })
-    )
-    writeFileSync(join(extDir, 'main.js'), 'module.exports = { activate: () => {} }')
-    tmpDirs.push(bundledDir)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-    await expect(host.loadBundledExtensions(bundledDir)).resolves.toBeUndefined()
-  })
-
-  it('loadBundledExtensions() skips already-loaded extensions', async () => {
-    const bundledDir = join(os.tmpdir(), `bundled-skip-${Date.now()}`)
-    const extDir = join(bundledDir, 'com.skip.test')
-    mkdirSync(extDir, { recursive: true })
-    writeFileSync(
-      join(extDir, 'manifest.json'),
-      JSON.stringify({
-        id: 'com.skip.test',
-        name: 'Skip',
-        version: '1.0.0',
-        description: 'Skip extension',
-        main: 'main.js',
-        minAppVersion: '0.0.1',
-      })
-    )
-    writeFileSync(join(extDir, 'main.js'), 'module.exports = { activate: () => {} }')
-    tmpDirs.push(bundledDir)
-
-    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-    const host = new ExtensionHost()
-
-    // Pre-populate the internal loaded map to simulate already loaded
-    const loadedMap: Map<string, unknown> = (host as unknown as { loaded: Map<string, unknown> })
-      .loaded
-    loadedMap.set('com.skip.test', {})
-
-    // Should not try to load again
-    await host.loadBundledExtensions(bundledDir)
-    // Extension was not loaded via load() so listExtensions returns empty
-    expect(host.listExtensions()).toHaveLength(0)
-  })
-
-  it('loadBundledExtensions() skips extensions already in the store (avoids DUPLICATE_ID when activation failed)', async () => {
+  it('start() does not register a bundled extension that is already in the store', async () => {
     const bundledDir = join(os.tmpdir(), `bundled-store-skip-${Date.now()}`)
     const extDir = join(bundledDir, 'com.store.skip.test')
     mkdirSync(extDir, { recursive: true })
@@ -655,9 +570,7 @@ describe('ExtensionHost – successful load paths (real temp extensions)', () =>
 
     const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
     const host = new ExtensionHost()
-    // Extension is NOT in this.loaded (simulates activation failure during loadAll)
-    // but IS in the store — loadBundledExtensions must skip it to avoid DUPLICATE_ID
-    await host.loadBundledExtensions(bundledDir)
+    await host.start({ bundledDirectory: bundledDir, beforeActivation: Promise.resolve() })
     // Still just the pre-existing store entry, not a duplicate
     expect(host.listExtensions()).toHaveLength(1)
     expect(host.listExtensions()[0].id).toBe('com.store.skip.test')
@@ -733,7 +646,7 @@ describe('ExtensionHost – successful load paths (real temp extensions)', () =>
     expect(host.listExtensions()[0].status).toBe('error')
   })
 
-  it('loadBundledExtensions() handles readdirSync errors gracefully', async () => {
+  it('start() copes with a bundled path that is not a directory', async () => {
     // Create a directory then immediately chmod it to cause readdirSync to fail
     // Alternative: pass a file path that exists but is not a directory (readdirSync throws ENOTDIR)
     const filePath = join(os.tmpdir(), `not-a-dir-${Date.now()}.txt`)
@@ -744,7 +657,9 @@ describe('ExtensionHost – successful load paths (real temp extensions)', () =>
     const host = new ExtensionHost()
 
     // existsSync will return true (file exists) but readdirSync will throw ENOTDIR
-    await expect(host.loadBundledExtensions(filePath)).resolves.toBeUndefined()
+    await expect(
+      host.start({ bundledDirectory: filePath, beforeActivation: Promise.resolve() })
+    ).resolves.toBeUndefined()
   })
 })
 

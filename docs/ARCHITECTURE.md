@@ -49,6 +49,31 @@ Terminator is an Electron application with two OS processes and one shared code 
 
 ---
 
+## Startup sequence
+
+The window comes first; everything slow happens beside it. `app.whenReady()` in `src/main/index.ts`:
+
+1. Starts the login-shell PATH probe (macOS only; a login shell takes hundreds of milliseconds) without waiting for it.
+2. Opens the database (synchronous `node:sqlite`) and registers the IPC handlers.
+3. Builds the menu and creates the window.
+4. Calls `ExtensionHost.start({ bundledDirectory, beforeActivation, afterActivation })`.
+
+`start` registers every extension synchronously (the stored enabled ones, and any bundled one not yet in the store), so `extension:list` is complete as soon as the renderer can ask. It then activates them **all at once** after `beforeActivation` (the PATH probe, which extension code that spawns tools needs). Activation is isolated per extension: a throwing `activate` marks that extension `error` and nothing else. No extension depends on another's activation: each creates its own tables and registrations, and the one table two of them share (`settings`) is created with `CREATE TABLE IF NOT EXISTS`, which does not care who goes first.
+
+`afterActivation` runs once every extension has activated. It is where the legacy PGlite import (`legacy-pglite-import.ts`) runs, because it copies into tables the extensions create in `activate`.
+
+An extension view is created by `extension:update-panel-bounds`, which first awaits `ExtensionHost.whenActivated(extensionId)`: the extension's own activation, and the import when one is pending. A view therefore never loads before the backend it talks to, and one slow extension delays only its own view.
+
+Because the PATH probe now runs beside the window, a child process started from a core IPC handler in the first moments after launch can still see the app's own PATH on macOS. Extension code is not affected (it waits on `beforeActivation`).
+
+### Loops in the main process
+
+- **System metrics** (`ipc/metrics.ipc.ts`). The sampler (CPU delta, and network bytes through `netstat -ib` on macOS or `/proc/net/dev` on Linux) runs only while the renderer is polling `metrics:system`, which it does only while a metrics view is showing; it stops 5 s after the last poll and restarts, with fresh baselines, on the next. `netstat` runs through `execFile`, asynchronously, never overlapping itself.
+- **Stores** (`storage/cached-store.ts`). The four core electron-store files (workspaces, settings, extension settings, extensions) are read through `CachedStore`, which parses a file once per key. The cache is dropped on the store's own writes and on electron-store's `onDidAnyChange` (the stores are opened with `watch: true`, so another writer is noticed too). Values are returned as copies.
+- **Agent session reports** (`agents/agent-session-watcher.ts`): see [Resuming an agent session](#resuming-an-agent-session).
+
+---
+
 ## IPC Contract
 
 All renderer-to-main communication goes through `window.electronAPI`. The surface is declared once as a channel manifest (`src/shared/electron-api/manifest.ts`) — each method's channel, kind (invoke/send/event), payload mapping, and remote behavior — and both adapters are generated from it: `src/main/preload.ts` (native, `contextBridge` over `ipcRenderer`) and `src/renderer-remote/electron-api-shim.ts` (browser, WebSocket bridge). The manifest also derives the core remote allowlist (see [ADR-023](adr/023-channel-manifest-and-declared-remote-access.md)). Every IPC payload is validated with Zod at both ends.
@@ -117,7 +142,7 @@ Extension ──── contributes to ──── GlobalSettings.extensions[ext
 
 Sessions do not survive app restart. This is an explicit Phase 1 scope decision. What the operator wrote about a session does: its description and its own work item link are a `SessionRecord`, kept until 30 days after the session closes (see [Home and the Monitor wall](#home-and-the-monitor-wall), ADR 054). So does the agent conversation that ran in it, which can be picked up again afterwards (see [Resuming an agent session](#resuming-an-agent-session), ADR 055).
 
-See [ADR-003](adr/003-electron-store-for-persistence.md) for the storage decision.
+See [ADR-003](adr/003-electron-store-for-persistence.md) for the storage decision. The core stores are read through a per-key cache (see [Loops in the main process](#loops-in-the-main-process)).
 
 **Application database.** `userData/app.sqlite` is the one SQL database of the app, opened through Node's built-in `node:sqlite` (`DatabaseSync`, WAL journal, foreign keys on) in `src/main/db/index.ts`. The core owns no tables; each extension creates its own when it activates and reaches the database only through the injected `ExtensionDB` (`exec`, `query`, `get`, `run`, `transaction`). Statements and transactions run on the one connection in call order; a statement issued while a transaction is open waits for it. `node:sqlite` is a release candidate (stability 1.2) in Node 24, the risk ADR 099 accepts. It replaced PGlite, which added about 250 MB to the main process and about 0.6 s to every start.
 
@@ -195,7 +220,7 @@ Extensions are Node.js CommonJS modules loaded in the main process by `Extension
 
 ### Bundled extensions
 
-First-party extensions (like `extensions/git-integration/`) are auto-loaded at startup via `ExtensionHost.loadBundledExtensions(bundledDir)`. This scans the `extensions/` directory for subdirectories containing a `manifest.json` and loads each one. See [ADR-007](adr/007-bundled-first-extension-distribution.md).
+First-party extensions (like `extensions/git-integration/`) are auto-loaded at startup by `ExtensionHost.start` (see [Startup sequence](#startup-sequence)). It scans the `extensions/` directory for subdirectories containing a `manifest.json`, registers each one, and activates them concurrently. See [ADR-007](adr/007-bundled-first-extension-distribution.md).
 
 ### Loading sequence
 
@@ -739,7 +764,7 @@ A terminal dies with the app; the conversation that ran in it does not. Claude C
 
 - **Capture is a hook in the operator's own Claude settings.** At startup `installCaptureScript` writes `agent-session-hook.cjs` beside the profile (ADR 026's pattern: a loose script survives development and vanishes from a packaged bundle) and `installUserHook` merges one `SessionStart` entry into `~/.claude/settings.json`. The entry is matched by script _name_, so re-installing from a packaged app, a development run or a test profile replaces it rather than stacking copies, and its command is guarded with `test -f <script> … || true` so an entry whose script has gone does nothing instead of failing before every agent session on the machine. Removing the feature is removing that block; the user guide says so.
 - **The terminal is named by the environment.** `terminal:create` exports `TERMINATOR_SESSION_ID` into the PTY. The hook runs beneath the agent, reads `session_id`, `transcript_path` and `cwd` from its stdin payload, and writes `userData/agent-sessions/<terminal id>.json`. This is exact where matching on folder or time is a guess, and it captures a `claude` the operator typed themselves. A conversation in a terminal outside Terminator names no terminal and is ignored.
-- **The watcher folds reports into records.** `agent-session-watcher.ts` sweeps that directory once a second (a sweep, not `fs.watch`, which proved unreliable under load), parses each file with the pure `parseHookReport`, and calls `setAgent` with the snapshot `makeSnapshotFor` builds from the PTY registry and the workspace store. `lastSeen` keeps it from rewriting an unchanged report.
+- **The watcher folds reports into records.** `agent-session-watcher.ts` watches that directory with `fs.watch` ([ADR-005](adr/005-native-fswatcher-over-chokidar.md)) and reads it once at startup, for reports written while the application was closed. Each report is claimed by renaming it, parsed with the pure `parseHookReport`, passed to `setAgent` with the snapshot `makeSnapshotFor` builds from the PTY registry and the workspace store, and deleted, so it is handled once however many events announce it. A report for a terminal the registry cannot place is deleted too. There is no timer: a report whose event the platform drops stays on disk until the next start.
 - **Resumability is read at answer time, never cached.** `session-records:list` stats the transcript for every record, because the file belongs to the agent and can be deleted at any moment; `useSessionFacts` asks again whenever a surface that draws Resume appears.
 - **Resuming replaces the terminal.** `planResume` (pure) turns the facts into a plan, refusing anything that is not a conversation id rather than escaping it. `resumeSession` opens a terminal on the same branch in the recorded folder with `claude --resume <id>` as its `initialCommand`, calls `session-records:transfer` to move the description, link and conversation onto it, then closes the exited one. One terminal per conversation.
 - **Proved live** on Claude Code 2.1.273 by `tests/e2e/live/resume-live.spec.ts`, which runs a real conversation, ends it, presses Resume, and asks it what it was told.
