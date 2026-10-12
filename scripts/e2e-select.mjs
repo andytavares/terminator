@@ -39,6 +39,10 @@ export const IMPACT_MAP = [
       'git-integration-contrast.spec.ts',
       'git-integration-stacking.spec.ts',
       'merge-flow.spec.ts',
+      'merge-flow-resolve.spec.ts',
+      'git-commit-flow.spec.ts',
+      'pr-review-*.spec.ts',
+      'review-*.spec.ts',
       'extension-commands.spec.ts',
       ...EXTENSION_TRIO,
     ],
@@ -46,7 +50,7 @@ export const IMPACT_MAP = [
   {
     globs: ['extensions/notepad/**'],
     specs: [
-      'notepad-outline.spec.ts',
+      'notepad-*.spec.ts',
       'dismiss-surface-on-click.spec.ts',
       'extension-escape-exit.spec.ts',
       'quick-actions.spec.ts',
@@ -59,7 +63,7 @@ export const IMPACT_MAP = [
   },
   {
     globs: ['extensions/task-vault/**'],
-    specs: [...EXTENSION_TRIO],
+    specs: ['task-vault-*.spec.ts', ...EXTENSION_TRIO],
   },
 ]
 
@@ -108,6 +112,7 @@ export const CORE_SPECS = [
   'extension-lifecycle.spec.ts',
   'extension.spec.ts',
   'integrations.spec.ts',
+  'issue-trackers.spec.ts',
   'monitor-wall.spec.ts',
   'open-in-editor.spec.ts',
   'project.spec.ts',
