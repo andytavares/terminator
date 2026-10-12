@@ -28,3 +28,10 @@ export class BellAndBusySource implements AgentStateSource {
     return 'idle'
   }
 }
+
+const signals = new BellAndBusySource()
+
+/** A session's state, from its signals: the `agentState` a session is stored with never changes. */
+export function agentStateOf(session: TerminalSession): AgentState {
+  return signals.derive(session)
+}

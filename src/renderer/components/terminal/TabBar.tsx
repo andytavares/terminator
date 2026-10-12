@@ -7,7 +7,8 @@ import { AlertBadge } from '../AlertBadge'
 import { MoveSessionDialog } from '../sidebar/MoveSessionDialog'
 import type { ProjectTabRegistration } from '../../extensions/registry'
 import { qualifiedBranchLabel } from '../../sidebar/branch-display'
-import { statusPresentationFor, type StatusIcon } from '../../sidebar/session-status'
+import { statusPresentationForState, type StatusIcon } from '../../sidebar/session-status'
+import { agentStateOf } from '../../sidebar/agent-state'
 import './TabBar.css'
 import { useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
@@ -248,11 +249,12 @@ export function TabBar({
             >
               {renamingId !== session.id &&
                 (() => {
-                  const status = statusPresentationFor(session)
+                  const state = agentStateOf(session)
+                  const status = statusPresentationForState(state)
                   const Icon = STATUS_ICON[status.icon]
                   return (
                     <span className="tab-bar__state" aria-label={status.label}>
-                      <Icon aria-hidden="true" data-state={session.agentState} />
+                      <Icon aria-hidden="true" data-state={state} />
                     </span>
                   )
                 })()}
