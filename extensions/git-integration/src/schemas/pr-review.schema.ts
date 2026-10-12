@@ -371,6 +371,13 @@ export const ReviewSessionSchema = z.object({
 
 // ─── Type exports ─────────────────────────────────────────────────────────────
 
+/** One pull request at one head commit, in one repository: what a review is kept against. */
+export interface PrHead {
+  repoRoot: string
+  prNumber: number
+  headSHA: string
+}
+
 export type SignalValue = z.infer<typeof SignalValueSchema>
 export type SignalDots = z.infer<typeof SignalDotsSchema>
 export type RiskScore = z.infer<typeof RiskScoreSchema>

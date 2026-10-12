@@ -1220,7 +1220,7 @@ export function registerGithubHandlers(
       invalid: VALIDATION_ERROR,
       run: async ({ repoRoot, headSHA, path, code, hunkHeader }) => {
         const symbols = await symbolsForBlock(path, code, hunkHeader)
-        const locations = await findTestLocations(repoRoot, headSHA, symbols, runGit)
+        const locations = await findTestLocations({ repoRoot, headSHA }, symbols, runGit)
         return { symbols, locations }
       },
     })

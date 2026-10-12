@@ -245,7 +245,7 @@ const baseInput: RunAgentReviewInput = {
 }
 
 /** Starts a run against a fake claude process and waits for the diff and prompt to settle. */
-async function startRun(input: RunAgentReviewInput = baseInput) {
+async function startFakeRun(input: RunAgentReviewInput = baseInput) {
   const exec = vi.fn(async () => ({ stdout: 'diff' }))
   const fake = makeFakeProcess()
   const spawn = vi.fn(() => fake)
@@ -272,7 +272,7 @@ const NIT_WITHOUT_SIDE = {
 
 describe('runAgentReview — a run that completes', () => {
   it('spawns claude with read-only tools only, on the worktree cwd, and parses structured_output', async () => {
-    const { fake, spawn, done } = await startRun()
+    const { fake, spawn, done } = await startFakeRun()
     printAndExit(fake, { structured_output: { summary: 'looks fine', findings: [] } })
 
     const run = await done
@@ -289,7 +289,7 @@ describe('runAgentReview — a run that completes', () => {
   })
 
   it('assigns an id to each finding and defaults side to RIGHT', async () => {
-    const { fake, done } = await startRun()
+    const { fake, done } = await startFakeRun()
     printAndExit(fake, { structured_output: { summary: 's', findings: [NIT_WITHOUT_SIDE] } })
 
     const run = await done
@@ -302,7 +302,7 @@ describe('runAgentReview — a run that completes', () => {
 
 describe('runAgentReview — reading the result', () => {
   it('falls back to parsing .result as JSON when structured_output is absent', async () => {
-    const { fake, done } = await startRun()
+    const { fake, done } = await startFakeRun()
     printAndExit(fake, { result: JSON.stringify({ summary: 'via result', findings: [] }) })
 
     const run = await done
@@ -311,7 +311,7 @@ describe('runAgentReview — reading the result', () => {
   })
 
   it('takes .result as it is when it is already an object', async () => {
-    const { fake, done } = await startRun()
+    const { fake, done } = await startFakeRun()
     printAndExit(fake, { result: { summary: 'object result', findings: [] } })
 
     const run = await done
@@ -320,7 +320,7 @@ describe('runAgentReview — reading the result', () => {
   })
 
   it('fails with a readable error and no partial findings when output does not validate', async () => {
-    const { fake, done } = await startRun()
+    const { fake, done } = await startFakeRun()
     printAndExit(fake, { structured_output: { summary: 'x' } })
 
     const run = await done
@@ -332,7 +332,7 @@ describe('runAgentReview — reading the result', () => {
 
 describe('runAgentReview — a run that fails', () => {
   it('fails on non-zero exit', async () => {
-    const { fake, done } = await startRun()
+    const { fake, done } = await startFakeRun()
     fake.emitExit(1)
 
     const run = await done
@@ -340,7 +340,7 @@ describe('runAgentReview — a run that fails', () => {
   })
 
   it("reports claude's stderr as the error when it exits non-zero", async () => {
-    const { fake, done } = await startRun()
+    const { fake, done } = await startFakeRun()
     fake.stderrEmitter.emit('data', '  model not available\n')
     fake.emitExit(2)
 
@@ -350,7 +350,7 @@ describe('runAgentReview — a run that fails', () => {
 
 describe('runAgentReview — a run that never gets an answer', () => {
   it('fails when claude cannot start', async () => {
-    const { fake, done } = await startRun()
+    const { fake, done } = await startFakeRun()
     fake.emitError(new Error('ENOENT'))
 
     const run = await done
@@ -371,7 +371,7 @@ describe('runAgentReview — a run that never gets an answer', () => {
   })
 
   it('times out after the given timeoutMs and kills the process', async () => {
-    const { fake, done } = await startRun({ ...baseInput, timeoutMs: 5 })
+    const { fake, done } = await startFakeRun({ ...baseInput, timeoutMs: 5 })
     const run = await done
     expect(run.status).toBe('failed')
     expect(run.error).toMatch(/Timed out/)
@@ -381,7 +381,7 @@ describe('runAgentReview — a run that never gets an answer', () => {
 
 describe('runAgentReview — cancelling', () => {
   it('cancel() marks the run cancelled and kills the process', async () => {
-    const { fake, done, cancel } = await startRun()
+    const { fake, done, cancel } = await startFakeRun()
     cancel()
     fake.emitExit(137)
 
@@ -427,7 +427,7 @@ describe('runAgentReview — child environment', () => {
     await withEnv(
       { CLAUDE_CODE_BRIDGE_SESSION_ID: 'parent-session', CLAUDECODE: '1' },
       async () => {
-        const { fake, spawn, done } = await startRun()
+        const { fake, spawn, done } = await startFakeRun()
         printAndExit(fake, { structured_output: { summary: 's', findings: [] } })
         await done
 

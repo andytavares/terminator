@@ -6,32 +6,49 @@ import { join } from 'path'
 import { ensureReviewWorktree } from '../../src/review/worktree.js'
 import { bindRealShell } from './support/shell'
 
-describe('ensureReviewWorktree', () => {
-  let repoRoot: string
+interface GitCall {
+  cmd: string
+  args: string[]
+  cwd?: string
+}
 
-  beforeEach(() => {
-    repoRoot = mkdtempSync(join(tmpdir(), 'review-worktree-'))
+/**
+ * A git stand-in that records every call, creates the directory `worktree add`
+ * names, records `worktree remove`, and answers `rev-parse` with `headAt`.
+ */
+function recordingGit(headAt = '') {
+  const calls: GitCall[] = []
+  const removed: string[] = []
+  const exec = vi.fn(async (cmd: string, args: string[], opts: { cwd?: string }) => {
+    calls.push({ cmd, args, cwd: opts.cwd })
+    if (args[0] === 'worktree' && args[1] === 'add') mkdirSync(args[3], { recursive: true })
+    if (args[0] === 'worktree' && args[1] === 'remove') removed.push(args[3])
+    if (args[0] === 'rev-parse') return { stdout: headAt }
+    return { stdout: '' }
   })
+  return { exec, calls, removed }
+}
 
-  afterEach(() => {
-    rmSync(repoRoot, { recursive: true, force: true })
-  })
+let repoRoot: string
 
+beforeEach(() => {
+  repoRoot = mkdtempSync(join(tmpdir(), 'review-worktree-'))
+})
+
+afterEach(() => {
+  rmSync(repoRoot, { recursive: true, force: true })
+})
+
+const pr42 = () => ({ repoRoot, prNumber: 42, headSHA: 'abc1234def' })
+const pr42Dir = () => join(repoRoot, '.git', 'terminator-review', 'pr-42-abc1234')
+
+describe('ensureReviewWorktree — a new worktree', () => {
   it('fetches the PR ref then adds a detached worktree at the head SHA, in order', async () => {
-    const calls: { cmd: string; args: string[]; cwd?: string }[] = []
-    const exec = vi.fn(async (cmd: string, args: string[], opts: { cwd?: string }) => {
-      calls.push({ cmd, args, cwd: opts.cwd })
-      if (args[0] === 'worktree' && args[1] === 'add') {
-        mkdirSync(args[3], { recursive: true })
-      }
-      return { stdout: '' }
-    })
+    const { exec, calls } = recordingGit()
 
-    const dir = await ensureReviewWorktree(repoRoot, 42, 'abc1234def', { exec })
+    const dir = await ensureReviewWorktree(pr42(), { exec })
 
-    expect(dir).toBe(join(repoRoot, '.git', 'terminator-review', 'pr-42-abc1234'))
-
-    const relevant = calls.filter((c) => c.cmd === 'git' && c.args[0] !== 'worktree')
+    expect(dir).toBe(pr42Dir())
     expect(calls[0].args).toEqual(['worktree', 'prune'])
     const fetchCall = calls.find((c) => c.args[0] === 'fetch')
     expect(fetchCall?.args).toEqual([
@@ -45,21 +62,27 @@ describe('ensureReviewWorktree', () => {
     const fetchIdx = calls.indexOf(fetchCall!)
     const addIdx = calls.indexOf(addCall!)
     expect(fetchIdx).toBeLessThan(addIdx)
-    void relevant
   })
 
+  it('removes nothing when git left no review folder behind', async () => {
+    const exec = vi.fn(async () => ({ stdout: '' }))
+    expect(await ensureReviewWorktree(pr42(), { exec })).toBe(pr42Dir())
+    expect(exec).not.toHaveBeenCalledWith(
+      'git',
+      expect.arrayContaining(['remove']),
+      expect.anything()
+    )
+  })
+})
+
+describe('ensureReviewWorktree — an existing worktree', () => {
   it('reuses an existing worktree already at the head SHA without fetching or re-adding', async () => {
-    const dir = join(repoRoot, '.git', 'terminator-review', 'pr-42-abc1234')
-    mkdirSync(dir, { recursive: true })
+    mkdirSync(pr42Dir(), { recursive: true })
+    const { exec } = recordingGit('abc1234def\n')
 
-    const exec = vi.fn(async (_cmd: string, args: string[]) => {
-      if (args[0] === 'rev-parse') return { stdout: 'abc1234def\n' }
-      return { stdout: '' }
-    })
+    const result = await ensureReviewWorktree(pr42(), { exec })
 
-    const result = await ensureReviewWorktree(repoRoot, 42, 'abc1234def', { exec })
-
-    expect(result).toBe(dir)
+    expect(result).toBe(pr42Dir())
     expect(exec).not.toHaveBeenCalledWith(
       'git',
       expect.arrayContaining(['fetch']),
@@ -69,21 +92,17 @@ describe('ensureReviewWorktree', () => {
   })
 
   it('re-creates the worktree when the existing directory is at a different SHA', async () => {
-    const dir = join(repoRoot, '.git', 'terminator-review', 'pr-42-abc1234')
-    mkdirSync(dir, { recursive: true })
+    mkdirSync(pr42Dir(), { recursive: true })
+    const { exec } = recordingGit('differentsha\n')
 
-    const exec = vi.fn(async (_cmd: string, args: string[]) => {
-      if (args[0] === 'rev-parse') return { stdout: 'differentsha\n' }
-      if (args[0] === 'worktree' && args[1] === 'add') return { stdout: '' }
-      return { stdout: '' }
-    })
-
-    await ensureReviewWorktree(repoRoot, 42, 'abc1234def', { exec })
+    await ensureReviewWorktree(pr42(), { exec })
 
     const addCall = exec.mock.calls.find((c) => c[1][0] === 'worktree' && c[1][1] === 'add')
     expect(addCall).toBeDefined()
   })
+})
 
+describe('ensureReviewWorktree — pruning', () => {
   it('keeps only the 5 most recently used review worktrees, pruning first then removing older ones', async () => {
     const base = join(repoRoot, '.git', 'terminator-review')
     const now = Date.now()
@@ -93,37 +112,48 @@ describe('ensureReviewWorktree', () => {
       const t = new Date(now - (5 - i) * 60_000)
       utimesSync(d, t, t)
     }
+    const { exec, removed } = recordingGit()
 
-    const removed: string[] = []
-    const exec = vi.fn(async (_cmd: string, args: string[]) => {
-      if (args[0] === 'worktree' && args[1] === 'add') {
-        mkdirSync(args[3], { recursive: true })
-      }
-      if (args[0] === 'worktree' && args[1] === 'remove') {
-        removed.push(args[3])
-      }
-      return { stdout: '' }
-    })
-
-    await ensureReviewWorktree(repoRoot, 99, 'newsha1234', { exec })
+    await ensureReviewWorktree({ repoRoot, prNumber: 99, headSHA: 'newsha1234' }, { exec })
 
     // 6 dirs now exist (5 pre-seeded + the new one); the oldest must be removed.
     expect(removed).toEqual([join(base, 'pr-0-0000000')])
   })
 })
 
+// Scrub GIT_* so a hook's environment can never point these commands at the real repo.
+const scrubbedGitEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_') || k === 'GIT_TRACE2_EVENT')
+) as NodeJS.ProcessEnv
+
+const git = (cwd: string, ...args: string[]) =>
+  execFileSync('git', args, { cwd, env: scrubbedGitEnv, encoding: 'utf-8' }).trim()
+
+const COMMITTER = ['-c', 'user.name=t', '-c', 'user.email=t@t']
+
+/** An origin whose feature branch is published as pull/212/head, and a clone of its main branch. */
+function cloneOfOriginWithPullRequest(dir: string): { clone: string; head: string } {
+  const origin = join(dir, 'origin')
+  mkdirSync(origin)
+  git(origin, 'init', '-q', '-b', 'main')
+  git(origin, ...COMMITTER, 'commit', '-q', '--allow-empty', '-m', 'base')
+  git(origin, 'checkout', '-q', '-b', 'feature')
+  writeFileSync(join(origin, 'shard.ts'), 'export const shards = 2\n')
+  git(origin, 'add', 'shard.ts')
+  git(origin, ...COMMITTER, 'commit', '-q', '-m', 'feature')
+  const head = git(origin, 'rev-parse', 'HEAD')
+  git(origin, 'update-ref', 'refs/pull/212/head', head)
+  const clone = join(dir, 'clone')
+  execFileSync('git', ['clone', '-q', '-b', 'main', origin, clone], { env: scrubbedGitEnv })
+  return { clone, head }
+}
+
 describe('ensureReviewWorktree against real git', () => {
   let dir: string
-  // Scrub GIT_* so a hook's environment can never point these commands at the real repo.
-  const env = Object.fromEntries(
-    Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_') || k === 'GIT_TRACE2_EVENT')
-  ) as NodeJS.ProcessEnv
-  const git = (cwd: string, ...args: string[]) =>
-    execFileSync('git', args, { cwd, env, encoding: 'utf-8' }).trim()
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'review-worktree-real-'))
-    bindRealShell(env)
+    bindRealShell(scrubbedGitEnv)
   })
 
   afterEach(() => {
@@ -131,36 +161,15 @@ describe('ensureReviewWorktree against real git', () => {
   })
 
   it('checks out the PR head GitHub publishes under pull/N/head, and reuses it', async () => {
-    const origin = join(dir, 'origin')
-    mkdirSync(origin)
-    git(origin, 'init', '-q', '-b', 'main')
-    git(
-      origin,
-      '-c',
-      'user.name=t',
-      '-c',
-      'user.email=t@t',
-      'commit',
-      '-q',
-      '--allow-empty',
-      '-m',
-      'base'
-    )
-    git(origin, 'checkout', '-q', '-b', 'feature')
-    writeFileSync(join(origin, 'shard.ts'), 'export const shards = 2\n')
-    git(origin, 'add', 'shard.ts')
-    git(origin, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'feature')
-    const head = git(origin, 'rev-parse', 'HEAD')
-    git(origin, 'update-ref', 'refs/pull/212/head', head)
-    const clone = join(dir, 'clone')
-    execFileSync('git', ['clone', '-q', '-b', 'main', origin, clone], { env })
+    const { clone, head } = cloneOfOriginWithPullRequest(dir)
+    const pr = { repoRoot: clone, prNumber: 212, headSHA: head }
 
-    const wt = await ensureReviewWorktree(clone, 212, head)
+    const wt = await ensureReviewWorktree(pr)
     expect(git(wt, 'rev-parse', 'HEAD')).toBe(head)
     expect(readFileSync(join(wt, 'shard.ts'), 'utf-8')).toContain('shards = 2')
     // The reviewer's own checkout is untouched.
     expect(git(clone, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('main')
 
-    expect(await ensureReviewWorktree(clone, 212, head)).toBe(wt)
+    expect(await ensureReviewWorktree(pr)).toBe(wt)
   })
 })

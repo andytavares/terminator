@@ -290,7 +290,7 @@ function diffArgsFor(target: DiffTarget): string[] {
   return args
 }
 
-function capped(diffText: string): { diffText: string; truncated: boolean } {
+function cappedDiff(diffText: string): { diffText: string; truncated: boolean } {
   if (Buffer.byteLength(diffText, 'utf8') <= DIFF_CAP_BYTES) return { diffText, truncated: false }
   return { diffText: diffText.slice(0, DIFF_CAP_BYTES), truncated: true }
 }
@@ -304,9 +304,9 @@ export async function buildDiffText(
   const { stdout } = await exec('git', diffArgsFor(target), { cwd })
   const { scope } = target
   if (usesContext(scope) && scope.startLine != null && scope.endLine != null) {
-    return capped(filterHunksByRange(stdout, scope.startLine, scope.endLine))
+    return cappedDiff(filterHunksByRange(stdout, scope.startLine, scope.endLine))
   }
-  return capped(stdout)
+  return cappedDiff(stdout)
 }
 
 // ─── Run ───────────────────────────────────────────────────────────────────
@@ -500,7 +500,10 @@ function runClaude(run: RunContext, launch: ClaudeLaunch, control: RunControl): 
   })
 }
 
-function promptFor(input: RunAgentReviewInput, diff: { diffText: string; truncated: boolean }) {
+function reviewPromptFor(
+  input: RunAgentReviewInput,
+  diff: { diffText: string; truncated: boolean }
+) {
   return buildAgentPrompt({
     scope: input.scope,
     request: input.request,
@@ -510,7 +513,7 @@ function promptFor(input: RunAgentReviewInput, diff: { diffText: string; truncat
   })
 }
 
-async function executeRun(
+async function executeAgentRun(
   run: RunContext,
   deps: RunAgentReviewDeps,
   control: RunControl
@@ -523,7 +526,7 @@ async function executeRun(
     return failedRun(run, `Could not compute diff: ${String(e)}`)
   }
   if (control.cancelled) return cancelledRun(run)
-  const prompt = promptFor(input, diff)
+  const prompt = reviewPromptFor(input, diff)
   const schemaJson = JSON.stringify(buildAgentJsonSchema())
   const { sessionId, model, effort } = input
   const args = buildClaudeArgs({ sessionId, model, effort, schemaJson })
@@ -543,7 +546,7 @@ export function runAgentReview(
   const control: RunControl = { cancelled: false }
   return {
     runId,
-    done: executeRun(run, deps, control),
+    done: executeAgentRun(run, deps, control),
     cancel: () => {
       control.cancelled = true
       control.proc?.kill('SIGKILL')

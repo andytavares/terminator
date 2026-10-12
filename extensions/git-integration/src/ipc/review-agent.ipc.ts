@@ -149,7 +149,7 @@ export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAg
 
         void (async () => {
           try {
-            const worktreePath = await ensureWorktree(input.repoRoot, input.prNumber, input.headSHA)
+            const worktreePath = await ensureWorktree(input)
             const { cancel, done } = runReview({
               repoRoot: input.repoRoot,
               worktreePath,
@@ -257,7 +257,7 @@ export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAg
       run: async ({ runId }) => {
         const found = findStoredRun(runId)
         if (!found) return { error: 'NOT_FOUND' }
-        const cwd = await ensureWorktree(found.repoRoot, found.prNumber, found.headSHA)
+        const cwd = await ensureWorktree(found)
         deps.openTerminal({
           repoRoot: found.repoRoot,
           cwd,

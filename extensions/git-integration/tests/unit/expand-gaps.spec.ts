@@ -28,7 +28,9 @@ describe('gapsFor', () => {
     const gaps = gapsFor([hunk('@@ -1,2 +1,2 @@'), hunk('@@ -3,2 +3,2 @@')])
     expect(gaps.map((g) => g.key)).toEqual(['bottom'])
   })
+})
 
+describe('gapsFor — counts and the bottom gap', () => {
   it('treats omitted header counts as 1', () => {
     const gaps = gapsFor([hunk('@@ -5 +5 @@'), hunk('@@ -9 +9 @@')])
     expect(gaps).toEqual([
@@ -50,7 +52,9 @@ describe('gapsFor', () => {
       { key: 'bottom', newStart: 5, newEnd: null, oldOffset: -2 },
     ])
   })
+})
 
+describe('gapsFor — whole added or deleted files', () => {
   it('returns no gaps for an added file', () => {
     expect(gapsFor([hunk('@@ -0,0 +1,4 @@')])).toEqual([])
   })
@@ -78,9 +82,10 @@ describe('splitLines', () => {
   })
 })
 
-describe('reveal', () => {
-  const file = Array.from({ length: 40 }, (_, i) => `line ${i + 1}`)
+/** A 40-line file whose line n reads `line n`. */
+const file = Array.from({ length: 40 }, (_, i) => `line ${i + 1}`)
 
+describe('reveal', () => {
   it('uses a step of 20', () => {
     expect(EXPAND_STEP).toBe(20)
   })
@@ -100,7 +105,9 @@ describe('reveal', () => {
     ])
     expect(r.hidden).toBe(17)
   })
+})
 
+describe('reveal — sizes at the edges', () => {
   it('shows 30 distinct lines when 20 + 20 exceed a 30-line gap', () => {
     const gap = { key: 'g', newStart: 1, newEnd: 30, oldOffset: 0 }
     const r = reveal(gap, file, { fromTop: 20, fromBottom: 20 })
