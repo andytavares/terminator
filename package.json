@@ -32,7 +32,7 @@
     "create-extension": "node scripts/create-extension.cjs",
     "package": "npm run build:extensions && npm run build:remote && electron-vite build && electron-builder --mac --arm64 --publish never",
     "prepare": "husky",
-    "typecheck:extensions": "tsc --noEmit -p extensions/foundry/tsconfig.json"
+    "typecheck:extensions": "tsc -p extensions/foundry/tsconfig.json && tsc -p extensions/git-integration/tsconfig.json && tsc -p extensions/notepad/tsconfig.json && tsc -p extensions/task-vault/tsconfig.json && tsc -p extensions/remote-control/tsconfig.json"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
