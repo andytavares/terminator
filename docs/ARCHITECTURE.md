@@ -958,7 +958,8 @@ nothing to them. The architect still finds the row, because the rendered order
 it amends carries each statement beside its id.
 
 Budgets are the operator's (ADR 052), and there are two: agents at once and
-minutes. A count of files is not one (ADR 056). The architect's proposal never changes
+minutes. A count of files is not one (ADR 056). The order schema also carries a
+`tokens` field, which every draft sets to `null` and nothing enforces. The architect's proposal never changes
 them. A draft's budgets are set on the Forge's Plan step
 (`foundry:order.budgets`). On a running order, the one budget it went past is
 raised at its `budget.exceeded` gate: the gate carries the `breach`, and
@@ -1017,15 +1018,19 @@ closes only when the proposal lists it in `resolveFindings` with how (ADR 068).
 **The red team argues before agreement (ADR 069).** A finding carries a
 `category`, and only `wrong-outcome`, `regression` and `unprovable` block. The
 others (`scope`, `process`, `pre-existing`, `infra`) are notes the builder sees.
-Once a redraft passes every other check, `src/forge/review-loop.ts` runs a
-red-team round in the Forge. The architect gets every blocking finding in one
+Once a redraft passes every other check, the Forge loop (`createForgeLoop`,
+`src/forge/forge-loop.ts`) runs a red-team round in the Forge; `src/forge/review-loop.ts`
+holds its prompt and decides what follows each round. The architect gets every blocking finding in one
 turn. The fix is ready for hand-off unless the red team set `anotherPass` or a blocking
 finding is still open (ADR 075); then the next round attacks only what changed. The red team reads what
 earlier rounds settled and may reopen a finding only with new evidence. After
 three rounds the order goes to the operator. A clean round says the order is
-ready and stops: hand-off is always the operator's, and nothing agrees an order
-or starts the Line on its own (ADR 078). Before the first draft, the scout reads
-the repository.
+ready and stops: hand-off is the operator's, and nothing agrees an order the
+operator has not released or starts its Line on its own (ADR 078). The one
+exception is an order the operator already released that a defect sent back:
+once the amended plan passes every check, `src/forge/release-again.ts` agrees
+it again and restarts the run. Beside the first draft, the scout reads the
+repository; the architect does not wait for it (ADR 084).
 
 **The Forge reads one readiness (ADR 074).** `src/forge/readiness.ts` is a pure
 function over the order, its compile result, the last intake turn and the loop
@@ -1035,7 +1040,8 @@ strip, the six hand-off rows, each step's state word, the red-team findings
 grouped by who acts, and the reason each lockable control is locked. The Forge
 draws it and decides nothing. Every turn writes a start line: the loop's fix
 turn records `converge.started` with reason `red team round N fix`. An
-`order.agreed` by `rule:forge` exists only in ledgers from before ADR 078. `foundry:order.hold` records
+`order.agreed` by `rule:forge` is that re-agreement of a released order (`agreedFacts` reads it
+as `automatic`); any other one is from a ledger written before ADR 078. `foundry:order.hold` records
 `review.held` / `review.released`; every automatic continuation checks it, and
 a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
 `foundry:order.recipe` saves the operator's shape to `order.recipe`, which
@@ -1141,9 +1147,10 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   hand it a session — a verdict from the working session is the builder marking
   its own homework with extra steps.
 - **A rung hands back what it found through a file** (`line/rung-output.ts`).
-  Four of the standard shape's nine steps are read-only roles whose whole
+  When the standard shape had nine steps, four were read-only roles whose whole
   product is a document — the scout's reconnaissance, the architect's plan, the
-  red team's attack, the inspector's findings — and the Line kept none of them:
+  red team's attack, the inspector's findings. (The scout, the plan and the red
+  team have since moved into the Forge, and `standard` has seven steps.) The Line kept none of them:
   the brief named no destination, nothing read a rung's result past its exit
   status, and the read-only policy refused every channel the agents invented
   (`cat >`, `sed`, `awk`, then `Write`). Intake had always had the answer, so
@@ -1151,7 +1158,7 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   in the brief, that one path allowed through `decideTool`, and a validated
   read-back that is merged and then cleared. **A role may only write the
   artefacts its own `writes:` declares** — `context`, `findings`, `plan`,
-  `acceptance` — so the channel is a permission, not an open door, and a scout
+  `acceptance`, `document` (`COLLECTABLE`) — so the channel is a permission, not an open door, and a scout
   that decided to rewrite the plan is refused at the boundary.
 - **What a rung disagrees with is a question, not an edit.** `context` informs
   the briefs that follow and leaves the order agreed. `findings` land where the
@@ -1185,8 +1192,9 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
 - **One sidebar project per order, per repository** (`line/order-project.ts`,
   ADR-061). The lane checkout is cut before the architect's first turn, and
   the architect, every lane agent and every check command run in it — so the
-  order is one project, named with lane 1's branch: the ticket's recommended
-  `branchName`, else `foundry/wo-…`. The order's ticket is linked to it, it
+  order is one project, named with lane 1's branch (`branchFor`): the ticket's
+  recommended branch, else the lane's declared branch, else the repository's
+  head branch, else `foundry/wo-…`. The order's ticket is linked to it, it
   sits under the workspace whose folder is the repository (not the first
   workspace in the sidebar), and reset and delete remove it with the
   checkout. A typed idea is offered a Linear ticket first when Linear is
@@ -1199,8 +1207,10 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   closed, and its tabs dropped. Deleting an order also stops its architect.
 - **The Forge decides what it is sure of** (`forge/autonomy.ts`, ADR-062).
   Questions at ≥ 0.9 confidence are answered with the recommended option and
-  recorded as assumptions; low/medium findings may be dismissed with a reason;
-  closable failing checks go back to the architect up to twice.
+  recorded as assumptions; a finding of any severity the architect is ≥ 0.9
+  sure does not apply is accepted with its reason (`dismissConfidentFindings`:
+  whether a finding blocks is now its `category`); closable failing checks go
+  back to the architect up to twice (`MAX_AUTO_TURNS`).
 - **Agent text is markdown** — rendered by the design system's `Markdown`
   (with `inline` for buttons and labels), which sanitises it so nothing an
   agent writes runs as HTML. Tool input stays literal.
@@ -1291,7 +1301,8 @@ operator decides before anything reaches the remote; for everything lower the
 draft opens first, so review happens on a real change.
 
 **The draft opens before the final check** (ADR-085, `src/line/early-ship.ts`).
-`shipOrder` is `openDrafts` then `watchAndFinish`. For a run whose work is done,
+`shipOrder` (`src/line/integrate.ts`) is `openDrafts` then `watchAndFinish`;
+`createEarlyShip` splits the two around the ladder. For a run whose work is done,
 with no open gate and no inspection owed, and a grade below P1, the executor
 calls `beforeFinalCheck` just before the ladder climbs: the drafts open and the
 CI watch starts, and the ladder runs beside it. The ready gate is raised only
@@ -1314,7 +1325,7 @@ feedback, runs the Line again and pushes the lanes (`pushLanes`). With the
 rounds spent, `ci.red` replaces the ready gate, and its "Another round" runs
 one more. The state is in the order's `ci.json`, rewritten whenever the set of
 check buckets changes while a round is watched (and `ci.watching` is recorded as
-each round starts); `ciLabel` (`src/line/ci-state.ts`) is the words a surface
+each round starts); `ciLabel` (`src/line/ci-label.ts`) is the words a surface
 shows for it. The ready gate's `why` is Markdown, one fact per line: units and CI,
 Acceptance (or "No verdicts were recorded"), Inspection ("Not run: <reason>"
 when it was skipped), Not measured here, Judged against. A skipped `RunNode`
@@ -1372,15 +1383,17 @@ nothing they see starts a run. A sensor is YAML resolved on the three rungs
 (`sensors/<id>.yaml`): a source (`github-runs` on a branch, `github-issues`
 with a label, or a `tracker` query), an interval and a severity. The two
 built-ins, `ci-main-red` and `tracker-query`, are off until enabled in
-Settings, which also names the repository each watches. One 60-second tick in
-`activate()` runs whatever is due, and only while the application is open.
+Settings, which also names the repository each watches. One 60-second tick
+(`src/sensors/sensor-tick.ts`, started by `activate()`) runs whatever is due,
+and only while the application is open.
 
 Collectors use `gh` and the core's issues API only. Items cluster by key
 (workflow name; label and a normalised title) into signals in
 `<dataRoot>/signals/signals.jsonl` (append-only; the latest line per signal
 wins) with each sensor's state in `state.json`. Impact is occurrences × severity
-(1, 3, 9). The queue above the Forge lists open signals below the gates, and the tab badge
-counts gates only. Dismissing hides a signal until it grows by half again.
+(1, 3, 9). The queue above the Forge lists open signals below the gates, and the
+Forge tab's badge counts no signals: it counts live undecided gates, orders waiting
+on the operator, open questions and held tool calls (`countAttention`). Dismissing hides a signal until it grows by half again.
 Promoting seeds a draft order whose `source.kind` is `signal`; it still has to
 converge in the Forge and be agreed by a person.
 
@@ -1436,7 +1449,8 @@ App
   │                `review-pull-request` command, and a way into the terminal
   ├─ Ledger  — every decision, filtered by order / actor / action; the one
   │            button that asks the curator
-  └─ Settings — the model picker; everything else is registered through the
+  └─ Settings — the model picker, the model that answers asks, and the
+                sensors; everything else is registered through the
                 application's own settings API
 ```
 
