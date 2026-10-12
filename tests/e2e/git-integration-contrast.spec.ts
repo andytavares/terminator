@@ -112,8 +112,8 @@ const SURFACES: Surface[] = [
     ready: '[data-testid="conflict-file-row"]',
   },
   { name: 'reviews', ready: '.rd-row' },
-  { name: 'review-footer', ready: '.rf-btn.rf-pri' },
-  { name: 'review-queue', ready: '.rd-btn.rd-pri' },
+  { name: 'review-footer', ready: '.tmui-button--primary' },
+  { name: 'review-queue', ready: '.tmui-button--primary' },
   { name: 'repo-picker', ready: '.rp-row' },
   {
     name: 'reviews-mine',
