@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { execute } from '../../src/line/executor.js'
 import type { StartedRun } from '../../src/line/executor.js'
 import { buildRunGraph } from '../../src/line/run-graph.js'
+import { idleExecutorSeams } from './idle-executor-seams.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import { createRoleRegistry } from '../../src/line/roles.js'
 import { collectableWrites, readRungOutput } from '../../src/line/rung-output.js'
@@ -197,6 +198,8 @@ describe('a rung handing back what it found, end to end', () => {
 
     const o = order()
     await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...idleExecutorSeams(),
+      onEvent: () => undefined,
       run: agent as never,
       now: () => '2026-09-08T02:00:00.000Z',
       sources,
@@ -251,6 +254,8 @@ describe('a rung handing back what it found, end to end', () => {
 
     const o = order()
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...idleExecutorSeams(),
+      onEvent: () => undefined,
       run: agent as never,
       now: () => '2026-09-08T02:00:00.000Z',
       sources,
