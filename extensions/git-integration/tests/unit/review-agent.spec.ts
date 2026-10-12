@@ -41,7 +41,9 @@ describe('buildAgentPrompt — rules every prompt states', () => {
     expect(prompt).toMatch(/must not post/i)
     expect(prompt).toMatch(/new side/i)
   })
+})
 
+describe('buildAgentPrompt — rules every prompt states (continued)', () => {
   it.each([
     [scopeOf('lines', { path: 'a.ts', startLine: 1, endLine: 2 }), 'lines 1-2 of a.ts'],
     [scopeOf('lines'), 'lines ?-? of the file'],

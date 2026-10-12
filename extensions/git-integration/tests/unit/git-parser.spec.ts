@@ -23,7 +23,9 @@ describe('parseStatus()', () => {
       staged: true,
     })
   })
+})
 
+describe('parseStatus() — parses an untracked file (??)', () => {
   it('parses an untracked file (??)', () => {
     const stdout = '?? notes.txt\0'
     const result = parseStatus(stdout, 500)
@@ -57,7 +59,9 @@ describe('parseStatus() — deletions, renames and conflicts', () => {
       staged: true,
     })
   })
+})
 
+describe('parseStatus() — deletions, renames and conflicts — parses a conflicted file (UU)', () => {
   it('parses a conflicted file (UU)', () => {
     const stdout = 'UU conflict.ts\0'
     const result = parseStatus(stdout, 500)

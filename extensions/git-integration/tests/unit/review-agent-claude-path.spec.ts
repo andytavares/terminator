@@ -85,7 +85,9 @@ describe('runAgentReview without an injected claude resolver', () => {
     expect(await spawnedCommands(2)).toEqual(['claude', 'claude'])
     expect(execFile).toHaveBeenCalledTimes(2)
   })
+})
 
+describe('runAgentReview without an injected claude resolver — falls back to a bare claude when the shell itself fails', () => {
   it('falls back to a bare claude when the shell itself fails', async () => {
     shellPrints(new Error('zsh: timeout'))
 

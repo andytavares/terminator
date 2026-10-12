@@ -91,7 +91,9 @@ describe('MergeFlowView', () => {
     render(<MergeFlowView repoRoot="/repo" onExit={vi.fn()} />)
     expect(screen.getByText(/loading/i)).toBeTruthy()
   })
+})
 
+describe('MergeFlowView — renders ConflictHub when session has files and no file selected', () => {
   it('renders ConflictHub when session has files and no file selected', async () => {
     const session = {
       repoRoot: '/repo',
@@ -115,7 +117,9 @@ describe('MergeFlowView', () => {
     render(<MergeFlowView repoRoot="/repo" onExit={vi.fn()} />)
     expect(screen.getByTestId('conflict-hub')).toBeTruthy()
   })
+})
 
+describe('MergeFlowView — renders CompletionScreen when restored session has all conflicts resolved', () => {
   it('renders CompletionScreen when restored session has all conflicts resolved', async () => {
     const session = {
       repoRoot: '/repo',
@@ -130,7 +134,9 @@ describe('MergeFlowView', () => {
     render(<MergeFlowView repoRoot="/repo" onExit={vi.fn()} />)
     await waitFor(() => expect(screen.getByTestId('completion-screen')).toBeTruthy())
   })
+})
 
+describe('MergeFlowView — calls onExit when listConflicts returns no files', () => {
   it('calls onExit when listConflicts returns no files', async () => {
     mockListConflicts.mockResolvedValueOnce({
       repoRoot: '/repo',

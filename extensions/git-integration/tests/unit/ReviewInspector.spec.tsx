@@ -46,7 +46,9 @@ describe('ReviewInspector', () => {
     expect(screen.getByRole('tab', { name: /Agent/ })).toBeTruthy()
     expect(screen.queryByRole('tab', { name: /File/ })).toBeNull()
   })
+})
 
+describe('ReviewInspector — shows only the File tab when agent is unavailable', () => {
   it('shows only the File tab when agent is unavailable', () => {
     render(
       <ReviewInspector
@@ -62,7 +64,9 @@ describe('ReviewInspector', () => {
     expect(screen.queryByRole('tab', { name: /Agent/ })).toBeNull()
     expect(screen.getByRole('tab', { name: /File/ })).toBeTruthy()
   })
+})
 
+describe('ReviewInspector — marks the active tab aria-selected and renders its panel', () => {
   it('marks the active tab aria-selected and renders its panel', () => {
     render(
       <ReviewInspector
@@ -82,7 +86,9 @@ describe('ReviewInspector', () => {
     expect(screen.getByTestId('agent-body')).toBeTruthy()
     expect(screen.queryByTestId('risk-panel')).toBeNull()
   })
+})
 
+describe('ReviewInspector — calls onTabChange when a tab is clicked', () => {
   it('calls onTabChange when a tab is clicked', () => {
     const onTabChange = vi.fn()
     render(
@@ -99,7 +105,9 @@ describe('ReviewInspector', () => {
     fireEvent.click(screen.getByRole('tab', { name: /File/ }))
     expect(onTabChange).toHaveBeenCalledWith('file')
   })
+})
 
+describe('ReviewInspector — calls onTabChange with agent when the Agent tab is clicked', () => {
   it('calls onTabChange with "agent" when the Agent tab is clicked', () => {
     const onTabChange = vi.fn()
     render(
@@ -116,7 +124,9 @@ describe('ReviewInspector', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Agent/ }))
     expect(onTabChange).toHaveBeenCalledWith('agent')
   })
+})
 
+describe('ReviewInspector — shows a count badge on the Agent tab when agentFindingCount > 0', () => {
   it('shows a count badge on the Agent tab when agentFindingCount > 0', () => {
     render(
       <ReviewInspector
@@ -131,7 +141,9 @@ describe('ReviewInspector', () => {
     )
     expect(screen.getByText('3')).toBeTruthy()
   })
+})
 
+describe('ReviewInspector — does not show a count badge when agentFindingCount is 0', () => {
   it('does not show a count badge when agentFindingCount is 0', () => {
     render(
       <ReviewInspector
@@ -146,7 +158,9 @@ describe('ReviewInspector', () => {
     )
     expect(screen.queryByText('0')).toBeNull()
   })
+})
 
+describe('ReviewInspector — falls back to the available tab when the requested tab is unavailable', () => {
   it('falls back to the available tab when the requested tab is unavailable', () => {
     render(
       <ReviewInspector
@@ -163,7 +177,9 @@ describe('ReviewInspector', () => {
     const fileTab = screen.getByRole('tab', { name: /File/ })
     expect(fileTab.getAttribute('aria-selected')).toBe('true')
   })
+})
 
+describe('ReviewInspector — calls onClose when the close button is clicked', () => {
   it('calls onClose when the close button is clicked', () => {
     const onClose = vi.fn()
     render(
@@ -180,7 +196,9 @@ describe('ReviewInspector', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('ReviewInspector — renders the File tab with the risk panel and the Health list rows', () => {
   it('renders the File tab with the risk panel and the Health list rows', () => {
     render(
       <ReviewInspector
@@ -197,7 +215,9 @@ describe('ReviewInspector', () => {
     expect(screen.getByText('Health')).toBeTruthy()
     expect(screen.getByRole('tabpanel')).toBeTruthy()
   })
+})
 
+describe('ReviewInspector — has an accessible tablist labelled Inspector', () => {
   it('has an accessible tablist labelled Inspector', () => {
     render(
       <ReviewInspector
@@ -212,7 +232,9 @@ describe('ReviewInspector', () => {
     )
     expect(screen.getByRole('tablist', { name: 'Inspector' })).toBeTruthy()
   })
+})
 
+describe('ReviewInspector — moves to the File tab with the arrow keys', () => {
   it('moves to the File tab with the arrow keys', () => {
     const onTabChange = vi.fn()
     render(
@@ -230,7 +252,9 @@ describe('ReviewInspector', () => {
     expect(onTabChange).toHaveBeenCalledWith('file')
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'File' }))
   })
+})
 
+describe('ReviewInspector — names the Agent tab with its finding count and ties the panel to it', () => {
   it('names the Agent tab with its finding count and ties the panel to it', () => {
     render(
       <ReviewInspector

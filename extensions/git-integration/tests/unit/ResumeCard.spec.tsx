@@ -86,7 +86,9 @@ describe('ResumeCard', () => {
     expect(screen.getByText('Where you left off · #209')).toBeTruthy()
     expect(screen.getByText(/9 of 16 files viewed/)).toBeTruthy()
   })
+})
 
+describe('ResumeCard — shows the last-position row with chapter and file', () => {
   it('shows the last-position row with chapter and file', () => {
     render(
       <ResumeCard
@@ -109,7 +111,9 @@ describe('ResumeCard', () => {
     expect(screen.getByText('forge/amend.ts')).toBeTruthy()
     expect(screen.getByText('last position')).toBeTruthy()
   })
+})
 
+describe('ResumeCard — omits the last-position row when there is no current file', () => {
   it('omits the last-position row when there is no current file', () => {
     render(
       <ResumeCard
@@ -130,7 +134,9 @@ describe('ResumeCard', () => {
     )
     expect(screen.queryByText('last position')).toBeNull()
   })
+})
 
+describe('ResumeCard — shows notes with the question quoted and an Ask agent button', () => {
   it('shows notes with the question quoted and an Ask agent button', () => {
     render(
       <ResumeCard
@@ -152,7 +158,9 @@ describe('ResumeCard', () => {
     expect(screen.getByText(/2 notes, 1 is a question/)).toBeTruthy()
     expect(screen.getByText('Ask agent')).toBeTruthy()
   })
+})
 
+describe('ResumeCard — opens the agent panel for the question note line when Ask agent is clicked', () => {
   it('opens the agent panel for the question note line when Ask agent is clicked', () => {
     const note = makeNote()
     render(
@@ -182,7 +190,9 @@ describe('ResumeCard', () => {
       chapter: null,
     })
   })
+})
 
+describe('ResumeCard — shows unopened agent findings with the highest severity', () => {
   it('shows unopened agent findings with the highest severity', () => {
     render(
       <ResumeCard
@@ -233,7 +243,9 @@ describe('ResumeCard', () => {
     expect(screen.getByText(/2 agent findings you haven't opened/)).toBeTruthy()
     expect(screen.getByText('must-fix')).toBeTruthy()
   })
+})
 
+describe('ResumeCard — shows draft comments with a Review drafts button', () => {
   it('shows draft comments with a Review drafts button', () => {
     render(
       <ResumeCard
@@ -255,7 +267,9 @@ describe('ResumeCard', () => {
     expect(screen.getByText('2 draft comments not yet submitted')).toBeTruthy()
     expect(screen.getByText('Review drafts')).toBeTruthy()
   })
+})
 
+describe('ResumeCard — opens the drafts for review from Review drafts', () => {
   it('opens the drafts for review from Review drafts', () => {
     const onReviewDrafts = vi.fn()
     render(
@@ -278,7 +292,9 @@ describe('ResumeCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review drafts' }))
     expect(onReviewDrafts).toHaveBeenCalledOnce()
   })
+})
 
+describe('ResumeCard — shows the push-since row only when files changed since viewing', () => {
   it('shows the push-since row only when files changed since viewing', () => {
     render(
       <ResumeCard
@@ -299,7 +315,9 @@ describe('ResumeCard', () => {
     )
     expect(screen.getByText(/1 push since · 2 viewed files changed/)).toBeTruthy()
   })
+})
 
+describe('ResumeCard — omits empty rows entirely', () => {
   it('omits empty rows entirely', () => {
     render(
       <ResumeCard
@@ -322,7 +340,9 @@ describe('ResumeCard', () => {
     expect(screen.queryByText('Ask agent')).toBeNull()
     expect(screen.queryByText(/push since/)).toBeNull()
   })
+})
 
+describe('ResumeCard — calls onContinue when Continue is clicked', () => {
   it('calls onContinue when Continue is clicked', () => {
     const onContinue = vi.fn()
     render(

@@ -170,7 +170,9 @@ describe('PrReviewView', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
     expect(screen.getByTestId('chapter-nav')).toBeTruthy()
   })
+})
 
+describe('PrReviewView — does not show chapter nav for single-chapter PRs', () => {
   it('does not show chapter nav for single-chapter PRs', async () => {
     await renderView()
     expect(screen.queryByTestId('chapter-nav')).toBeNull()
@@ -196,7 +198,9 @@ describe('PrReviewView', () => {
     fireEvent.click(screen.getByText('CloseSubmit'))
     expect(screen.queryByTestId('submit-panel')).toBeNull()
   })
+})
 
+describe('PrReviewView — calls setPaused and onClose when Pause is clicked', () => {
   it('calls setPaused and onClose when Pause is clicked', async () => {
     const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
     setupStore({ currentFilePath: 'src/foo.ts' })
@@ -218,7 +222,9 @@ describe('PrReviewView', () => {
     await renderView({}, { currentFilePath: 'src/foo.ts' })
     expect(screen.getAllByRole('button', { name: /^Submit review/ })).toHaveLength(1)
   })
+})
 
+describe('PrReviewView — opens the Agent tab of the inspector from Ask agent, and closes it', () => {
   it('opens the Agent tab of the inspector from Ask agent, and closes it', async () => {
     await renderView({}, { currentFilePath: 'src/foo.ts' })
     fireEvent.click(screen.getByRole('button', { name: 'Ask agent about this PR' }))
@@ -239,7 +245,9 @@ describe('PrReviewView', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /^Hide file list/ }))
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
+})
 
+describe('PrReviewView — shows risk panel when ShowRisk is clicked', () => {
   it('shows risk panel when ShowRisk is clicked', async () => {
     const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
     setupStore({ currentFilePath: 'src/foo.ts' })
@@ -261,7 +269,9 @@ describe('PrReviewView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Submit review…' }))
     expect(screen.getByTestId('submit-panel')).toBeTruthy()
   })
+})
 
+describe('PrReviewView — advances to next chapter (not submit) when FinishChapter is clicked on a non-final chapter', () => {
   it('advances to next chapter (not submit) when FinishChapter is clicked on a non-final chapter', async () => {
     const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2', files: [mockFile] }
     const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
@@ -278,7 +288,9 @@ describe('PrReviewView', () => {
     expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
     expect(screen.queryByTestId('submit-panel')).toBeNull()
   })
+})
 
+describe('PrReviewView — finishing a chapter marks its unviewed files in one batch', () => {
   it('finishing a chapter marks its unviewed files in one batch', async () => {
     const file2 = { ...mockFile, path: 'src/bar.ts' }
     const file3 = { ...mockFile, path: 'src/baz.ts' }
@@ -301,7 +313,9 @@ describe('PrReviewView', () => {
     ])
     expect(mockMarkFileViewed).not.toHaveBeenCalled()
   })
+})
 
+describe('PrReviewView — calls markFileViewed and advances file on MarkViewed', () => {
   it('calls markFileViewed and advances file on MarkViewed', async () => {
     const file2 = { ...mockFile, path: 'src/bar.ts' }
     const chapter = { ...mockChapter, files: [mockFile, file2] }
@@ -319,7 +333,9 @@ describe('PrReviewView', () => {
     expect(mockMarkFileViewed).toHaveBeenCalledWith('/repo', 1, 'abc', 'src/foo.ts')
     expect(mockSetCurrentFile).toHaveBeenCalledWith('src/bar.ts')
   })
+})
 
+describe('PrReviewView — shows full-file-list by default, restores it after switching to guided and back', () => {
   it('shows full-file-list by default, restores it after switching to guided and back', async () => {
     const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
     const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
@@ -339,7 +355,9 @@ describe('PrReviewView', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Files' }))
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
+})
 
+describe('PrReviewView — switches to guided mode from full mode', () => {
   it('switches to guided mode from full mode', async () => {
     const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
     const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
@@ -366,7 +384,9 @@ describe('PrReviewView', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /^Refresh PR/ }))
     expect(mockRefresh).toHaveBeenCalled()
   })
+})
 
+describe('PrReviewView — shows empty state message when no active file', () => {
   it('shows empty state message when no active file', async () => {
     const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
     setupStore({ currentFilePath: null })
@@ -380,234 +400,250 @@ describe('PrReviewView', () => {
     )
     expect(screen.getByText('Select a file to review.')).toBeTruthy()
   })
+})
 
-  describe('large-PR warning', () => {
-    function makeLargeFile(path: string, additions: number) {
-      return { ...mockFile, path, additions, deletions: 0 }
-    }
+function makeLargeFile(path: string, additions: number) {
+  return { ...mockFile, path, additions, deletions: 0 }
+}
 
-    it('shows large-PR banner when PR exceeds 400 LOC', async () => {
-      const bigFile = makeLargeFile('src/big.ts', 500)
-      const chapter = { ...mockChapter, files: [bigFile] }
-      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-      setupStore({ currentFilePath: 'src/big.ts' })
-      render(
-        <PrReviewView
-          repoRoot="/repo"
-          pr={{ ...mockPr, chapters: [chapter] }}
-          onClose={mockClose}
-          onRefresh={mockRefresh}
-        />
-      )
-      fireEvent.click(screen.getByRole('button', { name: /500 LOC/ }))
-      expect(screen.getByText(/Large PR — 500 LOC, estimated 125 min to review/)).toBeTruthy()
-    })
-
-    it('does not show large-PR banner when PR is under 400 LOC', async () => {
-      await renderView()
-      expect(screen.queryByRole('button', { name: /LOC ·/ })).toBeNull()
-    })
-
-    it('dismisses large-PR banner when × clicked', async () => {
-      const bigFile = makeLargeFile('src/big.ts', 500)
-      const chapter = { ...mockChapter, files: [bigFile] }
-      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-      setupStore({ currentFilePath: 'src/big.ts' })
-      render(
-        <PrReviewView
-          repoRoot="/repo"
-          pr={{ ...mockPr, chapters: [chapter] }}
-          onClose={mockClose}
-          onRefresh={mockRefresh}
-        />
-      )
-      fireEvent.click(screen.getByRole('button', { name: /500 LOC/ }))
-      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
-      expect(screen.queryByRole('button', { name: /500 LOC/ })).toBeNull()
-    })
-
-    it('toggles focus mode on/off', async () => {
-      const bigFile = makeLargeFile('src/big.ts', 500)
-      const chapter = { ...mockChapter, files: [bigFile] }
-      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-      setupStore({ currentFilePath: 'src/big.ts' })
-      render(
-        <PrReviewView
-          repoRoot="/repo"
-          pr={{ ...mockPr, chapters: [chapter] }}
-          onClose={mockClose}
-          onRefresh={mockRefresh}
-        />
-      )
-      expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
-      fireEvent.click(screen.getByRole('menuitem', { name: /^Focus mode/ }))
-      const pill = screen.getByRole('button', { name: 'Focus mode', pressed: true })
-      fireEvent.click(pill)
-      expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
-    })
-
-    it('drops all-low-risk chapters in focus mode instead of showing their full file list', async () => {
-      const lowFile = makeLargeFile('src/low.ts', 300)
-      const highFile = {
-        ...makeLargeFile('src/high.ts', 300),
-        riskScore: { ...mockFile.riskScore, level: 'high' as const },
-      }
-      const lowChapter = {
-        id: 'ch-low',
-        name: 'Low only',
-        estimatedMinutes: 5,
-        status: 'not-started' as const,
-        files: [lowFile],
-      }
-      const highChapter = {
-        id: 'ch-high',
-        name: 'High risk',
-        estimatedMinutes: 5,
-        status: 'not-started' as const,
-        files: [highFile],
-      }
-      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-      setupStore({ currentFilePath: 'src/high.ts', currentChapterId: 'ch-high' })
-      const { unmount } = render(
-        <PrReviewView
-          repoRoot="/repo"
-          pr={{ ...mockPr, chapters: [lowChapter, highChapter] }}
-          onClose={mockClose}
-          onRefresh={mockRefresh}
-        />
-      )
-      fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
-      fireEvent.click(screen.getByRole('menuitem', { name: /^Focus mode/ }))
-      // Progress total should reflect only the high-risk chapter (1 file), not both (2 files)
-      expect(screen.getByRole('progressbar', { name: '0 of 1 files viewed' })).toBeTruthy()
-      unmount()
-    })
-
-    it('progress bar does not exceed 100% when viewedFiles exceeds displayPr files in focus mode', async () => {
-      const bigFile = {
-        ...makeLargeFile('src/low.ts', 500),
-        riskScore: { ...mockFile.riskScore, level: 'low' as const },
-      }
-      const chapter = { ...mockChapter, files: [bigFile] }
-      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-      // 3 viewed files but only 1 file in PR
-      setupStore({
-        currentFilePath: 'src/low.ts',
-        viewedFiles: new Set(['src/low.ts', 'src/other.ts', 'src/another.ts']),
-      })
-      render(
-        <PrReviewView
-          repoRoot="/repo"
-          pr={{ ...mockPr, chapters: [chapter] }}
-          onClose={mockClose}
-          onRefresh={mockRefresh}
-        />
-      )
-      const bar = screen.getByRole('progressbar')
-      expect(Number(bar.getAttribute('aria-valuenow'))).toBeLessThanOrEqual(
-        Number(bar.getAttribute('aria-valuemax'))
-      )
-    })
+describe('PrReviewView (continued) — large-PR warning', () => {
+  it('shows large-PR banner when PR exceeds 400 LOC', async () => {
+    const bigFile = makeLargeFile('src/big.ts', 500)
+    const chapter = { ...mockChapter, files: [bigFile] }
+    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+    setupStore({ currentFilePath: 'src/big.ts' })
+    render(
+      <PrReviewView
+        repoRoot="/repo"
+        pr={{ ...mockPr, chapters: [chapter] }}
+        onClose={mockClose}
+        onRefresh={mockRefresh}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /500 LOC/ }))
+    expect(screen.getByText(/Large PR — 500 LOC, estimated 125 min to review/)).toBeTruthy()
   })
 
-  describe('chapter keyboard navigation', () => {
-    const f = (path: string) => ({ ...mockFile, path })
-    const chapters = [
-      { ...mockChapter, id: 'ch-1', name: 'One', files: [f('a.ts'), f('b.ts')] },
-      { ...mockChapter, id: 'ch-2', name: 'Two', files: [f('c.ts'), f('d.ts')] },
-      { ...mockChapter, id: 'ch-3', name: 'Three', files: [f('e.ts')] },
-    ]
-    const press = (key: string) => fireEvent.keyDown(window, { key })
+  it('does not show large-PR banner when PR is under 400 LOC', async () => {
+    await renderView()
+    expect(screen.queryByRole('button', { name: /LOC ·/ })).toBeNull()
+  })
+})
 
-    it('} selects the next chapter and its first file', async () => {
-      await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
-      press('}')
-      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
-      expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
-    })
+describe('PrReviewView (continued) — large-PR warning — dismisses large-PR banner when × clicked', () => {
+  it('dismisses large-PR banner when × clicked', async () => {
+    const bigFile = makeLargeFile('src/big.ts', 500)
+    const chapter = { ...mockChapter, files: [bigFile] }
+    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+    setupStore({ currentFilePath: 'src/big.ts' })
+    render(
+      <PrReviewView
+        repoRoot="/repo"
+        pr={{ ...mockPr, chapters: [chapter] }}
+        onClose={mockClose}
+        onRefresh={mockRefresh}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /500 LOC/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(screen.queryByRole('button', { name: /500 LOC/ })).toBeNull()
+  })
+})
 
-    it('{ selects the previous chapter and its first file', async () => {
-      await renderView({ chapters }, { currentChapterId: 'ch-3', currentFilePath: 'e.ts' })
-      press('{')
-      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
-      expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
-    })
+describe('PrReviewView (continued) — large-PR warning — toggles focus mode on/off', () => {
+  it('toggles focus mode on/off', async () => {
+    const bigFile = makeLargeFile('src/big.ts', 500)
+    const chapter = { ...mockChapter, files: [bigFile] }
+    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+    setupStore({ currentFilePath: 'src/big.ts' })
+    render(
+      <PrReviewView
+        repoRoot="/repo"
+        pr={{ ...mockPr, chapters: [chapter] }}
+        onClose={mockClose}
+        onRefresh={mockRefresh}
+      />
+    )
+    expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Focus mode/ }))
+    const pill = screen.getByRole('button', { name: 'Focus mode', pressed: true })
+    fireEvent.click(pill)
+    expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
+  })
+})
 
-    it('chapter keys do not wrap at the ends', async () => {
-      await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'a.ts' })
-      press('{')
-      expect(mockSetCurrentChapter).not.toHaveBeenCalled()
-      expect(mockSetCurrentFile).not.toHaveBeenCalled()
-    })
+describe('PrReviewView (continued) — large-PR warning — drops all-low-risk chapters in focus mode instead of showing their full file list', () => {
+  it('drops all-low-risk chapters in focus mode instead of showing their full file list', async () => {
+    const lowFile = makeLargeFile('src/low.ts', 300)
+    const highFile = {
+      ...makeLargeFile('src/high.ts', 300),
+      riskScore: { ...mockFile.riskScore, level: 'high' as const },
+    }
+    const lowChapter = {
+      id: 'ch-low',
+      name: 'Low only',
+      estimatedMinutes: 5,
+      status: 'not-started' as const,
+      files: [lowFile],
+    }
+    const highChapter = {
+      id: 'ch-high',
+      name: 'High risk',
+      estimatedMinutes: 5,
+      status: 'not-started' as const,
+      files: [highFile],
+    }
+    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+    setupStore({ currentFilePath: 'src/high.ts', currentChapterId: 'ch-high' })
+    const { unmount } = render(
+      <PrReviewView
+        repoRoot="/repo"
+        pr={{ ...mockPr, chapters: [lowChapter, highChapter] }}
+        onClose={mockClose}
+        onRefresh={mockRefresh}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Focus mode/ }))
+    // Progress total should reflect only the high-risk chapter (1 file), not both (2 files)
+    expect(screen.getByRole('progressbar', { name: '0 of 1 files viewed' })).toBeTruthy()
+    unmount()
+  })
+})
 
-    it('chapter keys do not wrap past the last chapter', async () => {
-      await renderView({ chapters }, { currentChapterId: 'ch-3', currentFilePath: 'e.ts' })
-      press('}')
-      expect(mockSetCurrentChapter).not.toHaveBeenCalled()
+describe('PrReviewView (continued) — large-PR warning — progress bar does not exceed 100% when viewedFiles exceeds displayPr files in focus mode', () => {
+  it('progress bar does not exceed 100% when viewedFiles exceeds displayPr files in focus mode', async () => {
+    const bigFile = {
+      ...makeLargeFile('src/low.ts', 500),
+      riskScore: { ...mockFile.riskScore, level: 'low' as const },
+    }
+    const chapter = { ...mockChapter, files: [bigFile] }
+    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+    // 3 viewed files but only 1 file in PR
+    setupStore({
+      currentFilePath: 'src/low.ts',
+      viewedFiles: new Set(['src/low.ts', 'src/other.ts', 'src/another.ts']),
     })
+    render(
+      <PrReviewView
+        repoRoot="/repo"
+        pr={{ ...mockPr, chapters: [chapter] }}
+        onClose={mockClose}
+        onRefresh={mockRefresh}
+      />
+    )
+    const bar = screen.getByRole('progressbar')
+    expect(Number(bar.getAttribute('aria-valuenow'))).toBeLessThanOrEqual(
+      Number(bar.getAttribute('aria-valuemax'))
+    )
+  })
+})
 
-    it('} respects the file order override of the target chapter', async () => {
-      await renderView(
-        { chapters },
-        {
-          currentChapterId: 'ch-1',
-          currentFilePath: 'a.ts',
-          fileOrderOverrides: { 'ch-2': ['d.ts', 'c.ts'] },
-        }
-      )
-      press('}')
-      expect(mockSetCurrentFile).toHaveBeenCalledWith('d.ts')
-    })
+const f = (path: string) => ({ ...mockFile, path })
 
-    it('] crosses into the next chapter from the last file of a chapter (Files view)', async () => {
-      await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
-      press(']')
-      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
-      expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
-    })
+const chapters = [
+  { ...mockChapter, id: 'ch-1', name: 'One', files: [f('a.ts'), f('b.ts')] },
+  { ...mockChapter, id: 'ch-2', name: 'Two', files: [f('c.ts'), f('d.ts')] },
+  { ...mockChapter, id: 'ch-3', name: 'Three', files: [f('e.ts')] },
+]
 
-    it('] stays in the chapter and does not switch it mid-chapter', async () => {
-      await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'a.ts' })
-      press(']')
-      expect(mockSetCurrentFile).toHaveBeenCalledWith('b.ts')
-      expect(mockSetCurrentChapter).not.toHaveBeenCalled()
-    })
+const press = (key: string) => fireEvent.keyDown(window, { key })
 
-    it('] crosses chapters in the Chapters view too', async () => {
-      await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
-      fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
-      press(']')
-      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
-      expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
-    })
+describe('PrReviewView (continued) — chapter keyboard navigation', () => {
+  it('} selects the next chapter and its first file', async () => {
+    await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
+    press('}')
+    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+    expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+  })
 
-    it('[ crosses back to the last file of the previous chapter', async () => {
-      await renderView({ chapters }, { currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
-      press('[')
-      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-1')
-      expect(mockSetCurrentFile).toHaveBeenCalledWith('b.ts')
-    })
+  it('{ selects the previous chapter and its first file', async () => {
+    await renderView({ chapters }, { currentChapterId: 'ch-3', currentFilePath: 'e.ts' })
+    press('{')
+    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+    expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+  })
 
-    it('] and [ stop at the first and last files of the whole PR', async () => {
-      await renderView({ chapters }, { currentChapterId: 'ch-3', currentFilePath: 'e.ts' })
-      press(']')
-      expect(mockSetCurrentFile).not.toHaveBeenCalled()
-    })
+  it('chapter keys do not wrap at the ends', async () => {
+    await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'a.ts' })
+    press('{')
+    expect(mockSetCurrentChapter).not.toHaveBeenCalled()
+    expect(mockSetCurrentFile).not.toHaveBeenCalled()
+  })
 
-    it('marking the last file of a chapter viewed advances into the next chapter', async () => {
-      await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
-      fireEvent.click(screen.getByText('MarkViewed'))
-      expect(mockMarkFileViewed).toHaveBeenCalledWith('/repo', 1, 'abc', 'b.ts')
-      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
-      expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
-    })
+  it('chapter keys do not wrap past the last chapter', async () => {
+    await renderView({ chapters }, { currentChapterId: 'ch-3', currentFilePath: 'e.ts' })
+    press('}')
+    expect(mockSetCurrentChapter).not.toHaveBeenCalled()
+  })
+})
 
-    it('shows "Chapter 2 of 3" in the Chapters view only', async () => {
-      await renderView({ chapters }, { currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
-      expect(screen.queryByText('Chapter 2 of 3')).toBeNull()
-      fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
-      expect(screen.getByText('Chapter 2 of 3')).toBeTruthy()
-    })
+describe('PrReviewView (continued) — chapter keyboard navigation — } respects the file order override of the target chapter', () => {
+  it('} respects the file order override of the target chapter', async () => {
+    await renderView(
+      { chapters },
+      {
+        currentChapterId: 'ch-1',
+        currentFilePath: 'a.ts',
+        fileOrderOverrides: { 'ch-2': ['d.ts', 'c.ts'] },
+      }
+    )
+    press('}')
+    expect(mockSetCurrentFile).toHaveBeenCalledWith('d.ts')
+  })
+
+  it('] crosses into the next chapter from the last file of a chapter (Files view)', async () => {
+    await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
+    press(']')
+    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+    expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+  })
+
+  it('] stays in the chapter and does not switch it mid-chapter', async () => {
+    await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'a.ts' })
+    press(']')
+    expect(mockSetCurrentFile).toHaveBeenCalledWith('b.ts')
+    expect(mockSetCurrentChapter).not.toHaveBeenCalled()
+  })
+})
+
+describe('PrReviewView (continued) — chapter keyboard navigation — ] crosses chapters in the Chapters view too', () => {
+  it('] crosses chapters in the Chapters view too', async () => {
+    await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
+    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
+    press(']')
+    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+    expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+  })
+
+  it('[ crosses back to the last file of the previous chapter', async () => {
+    await renderView({ chapters }, { currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
+    press('[')
+    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-1')
+    expect(mockSetCurrentFile).toHaveBeenCalledWith('b.ts')
+  })
+
+  it('] and [ stop at the first and last files of the whole PR', async () => {
+    await renderView({ chapters }, { currentChapterId: 'ch-3', currentFilePath: 'e.ts' })
+    press(']')
+    expect(mockSetCurrentFile).not.toHaveBeenCalled()
+  })
+})
+
+describe('PrReviewView (continued) — chapter keyboard navigation — marking the last file of a chapter viewed advances into the next chapter', () => {
+  it('marking the last file of a chapter viewed advances into the next chapter', async () => {
+    await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
+    fireEvent.click(screen.getByText('MarkViewed'))
+    expect(mockMarkFileViewed).toHaveBeenCalledWith('/repo', 1, 'abc', 'b.ts')
+    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+    expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+  })
+
+  it('shows "Chapter 2 of 3" in the Chapters view only', async () => {
+    await renderView({ chapters }, { currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
+    expect(screen.queryByText('Chapter 2 of 3')).toBeNull()
+    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
+    expect(screen.getByText('Chapter 2 of 3')).toBeTruthy()
   })
 })

@@ -54,7 +54,9 @@ describe('useGitStatus', () => {
     })
     expect(mockGitStatus).toHaveBeenCalledWith({ path: '/repo', maxFiles: undefined })
   })
+})
 
+describe('useGitStatus — sets status from successful response', () => {
   it('sets status from successful response', async () => {
     const status = { branch: 'main', staged: [], unstaged: [], untracked: [] }
     mockGitStatus.mockResolvedValue(status)
@@ -73,7 +75,9 @@ describe('useGitStatus', () => {
     })
     expect(mockSetStatus).toHaveBeenCalledWith(null)
   })
+})
 
+describe('useGitStatus — sets status to null on exception', () => {
   it('sets status to null on exception', async () => {
     mockGitStatus.mockRejectedValue(new Error('network error'))
     renderHook(() => useGitStatus('/repo'))
@@ -96,64 +100,66 @@ describe('useGitStatus', () => {
     unmount()
     expect(mockUnsubFs).toHaveBeenCalled()
   })
+})
 
-  describe('polling', () => {
-    const setVisibility = (state: 'hidden' | 'visible') => {
-      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state })
-    }
-    afterEach(() => setVisibility('visible'))
+describe('useGitStatus (continued) — polling', () => {
+  const setVisibility = (state: 'hidden' | 'visible') => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state })
+  }
+  afterEach(() => setVisibility('visible'))
 
-    it('polls on the interval while visible', async () => {
-      renderHook(() => useGitStatus('/repo', 3000))
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(3000)
-      })
-      expect(mockGitStatus).toHaveBeenCalledTimes(2)
+  it('polls on the interval while visible', async () => {
+    renderHook(() => useGitStatus('/repo', 3000))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000)
     })
-
-    it('skips poll ticks while the document is hidden', async () => {
-      renderHook(() => useGitStatus('/repo', 3000))
-      await act(async () => {
-        await Promise.resolve()
-      })
-      mockGitStatus.mockClear()
-      setVisibility('hidden')
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(9000)
-      })
-      expect(mockGitStatus).not.toHaveBeenCalled()
-    })
-
-    it('refreshes once when the document becomes visible again', async () => {
-      renderHook(() => useGitStatus('/repo', 3000))
-      await act(async () => {
-        await Promise.resolve()
-      })
-      mockGitStatus.mockClear()
-      setVisibility('visible')
-      await act(async () => {
-        document.dispatchEvent(new Event('visibilitychange'))
-        await Promise.resolve()
-      })
-      expect(mockGitStatus).toHaveBeenCalledTimes(1)
-    })
-
-    it('does not start a second refresh while one is in flight', async () => {
-      let resolve!: (v: unknown) => void
-      mockGitStatus.mockReturnValue(new Promise((r) => (resolve = r)))
-      renderHook(() => useGitStatus('/repo', 3000))
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(9000)
-      })
-      expect(mockGitStatus).toHaveBeenCalledTimes(1)
-      resolve({ branch: 'main', files: [] })
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(3000)
-      })
-      expect(mockGitStatus).toHaveBeenCalledTimes(2)
-    })
+    expect(mockGitStatus).toHaveBeenCalledTimes(2)
   })
 
+  it('skips poll ticks while the document is hidden', async () => {
+    renderHook(() => useGitStatus('/repo', 3000))
+    await act(async () => {
+      await Promise.resolve()
+    })
+    mockGitStatus.mockClear()
+    setVisibility('hidden')
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(9000)
+    })
+    expect(mockGitStatus).not.toHaveBeenCalled()
+  })
+
+  it('refreshes once when the document becomes visible again', async () => {
+    renderHook(() => useGitStatus('/repo', 3000))
+    await act(async () => {
+      await Promise.resolve()
+    })
+    mockGitStatus.mockClear()
+    setVisibility('visible')
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      await Promise.resolve()
+    })
+    expect(mockGitStatus).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not start a second refresh while one is in flight', async () => {
+    let resolve!: (v: unknown) => void
+    mockGitStatus.mockReturnValue(new Promise((r) => (resolve = r)))
+    renderHook(() => useGitStatus('/repo', 3000))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(9000)
+    })
+    expect(mockGitStatus).toHaveBeenCalledTimes(1)
+    resolve({ branch: 'main', files: [] })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000)
+    })
+    expect(mockGitStatus).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('useGitStatus — drops a status that lands after the view unmounted', () => {
   it('drops a status that lands after the view unmounted', async () => {
     let resolve!: (v: unknown) => void
     mockGitStatus.mockReturnValue(new Promise((r) => (resolve = r)))
@@ -178,7 +184,9 @@ describe('useGitStatus', () => {
     })
     expect(mockSetStatus).not.toHaveBeenCalled()
   })
+})
 
+describe('useGitStatus — does not refresh when the view becomes hidden', () => {
   it('does not refresh when the view becomes hidden', async () => {
     renderHook(() => useGitStatus('/repo'))
     await act(async () => {

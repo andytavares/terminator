@@ -83,7 +83,9 @@ describe('CompletionScreen', () => {
     expect(textarea).toBeTruthy()
     expect(textarea.value).toContain('Merge')
   })
+})
 
+describe('CompletionScreen — calls mergeCommit on commit button click', () => {
   it('calls mergeCommit on commit button click', async () => {
     mockMergeCommit.mockResolvedValueOnce({ commitHash: 'abc123' })
     const onExit = vi.fn()
@@ -107,7 +109,9 @@ describe('CompletionScreen', () => {
       expect(onExit).toHaveBeenCalledOnce()
     })
   })
+})
 
+describe('CompletionScreen — shows error toast and stays on screen if commit fails', () => {
   it('shows error toast and stays on screen if commit fails', async () => {
     mockMergeCommit.mockResolvedValueOnce({ error: 'hook failed' })
     const onExit = vi.fn()

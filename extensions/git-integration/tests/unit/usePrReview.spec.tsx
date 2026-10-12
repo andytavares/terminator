@@ -176,7 +176,9 @@ describe('useLoadPrQueue', () => {
     expect(mockListOpenPrs).toHaveBeenCalledWith('/repo', expect.any(Object))
     expect(mockSetQueue).toHaveBeenCalled()
   })
+})
 
+describe('useLoadPrQueue — sets queue error when listOpenPrs returns error', () => {
   it('sets queue error when listOpenPrs returns error', async () => {
     mockListOpenPrs.mockResolvedValue({ error: 'NETWORK_ERROR' })
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
@@ -203,7 +205,9 @@ describe('useLoadPrQueue', () => {
     })
     expect(mockSetQueueError).toHaveBeenCalledWith(expect.stringContaining('crash'))
   })
+})
 
+describe('useLoadPrQueue — appends to queue when append option is true', () => {
   it('appends to queue when append option is true', async () => {
     mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false, nextCursor: undefined })
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
@@ -213,7 +217,9 @@ describe('useLoadPrQueue', () => {
     expect(mockAppendQueue).toHaveBeenCalled()
     expect(mockSetQueue).not.toHaveBeenCalled()
   })
+})
 
+describe('useLoadPrQueue — excludes orphan PRs when pruneActiveReviews reports them closed/merged', () => {
   it('excludes orphan PRs when pruneActiveReviews reports them closed/merged', async () => {
     const orphanPr = {
       number: 99,
@@ -253,7 +259,9 @@ describe('useLoadPrQueue', () => {
     const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
     expect(queue.find((p: { number: number }) => p.number === 99)).toBeUndefined()
   })
+})
 
+describe('useLoadPrQueue — includes orphan PRs when pruneActiveReviews confirms they are still open', () => {
   it('includes orphan PRs when pruneActiveReviews confirms they are still open', async () => {
     const orphanPr = {
       number: 99,
@@ -293,7 +301,9 @@ describe('useLoadPrQueue', () => {
     const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
     expect(queue.find((p: { number: number }) => p.number === 99)).toBeDefined()
   })
+})
 
+describe('useLoadPrQueue — keeps all orphans when pruneActiveReviews returns an error object', () => {
   it('keeps all orphans when pruneActiveReviews returns an error object', async () => {
     const orphanPr = {
       number: 55,
@@ -333,7 +343,9 @@ describe('useLoadPrQueue', () => {
     const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
     expect(queue.find((p: { number: number }) => p.number === 55)).toBeDefined()
   })
+})
 
+describe('useLoadPrQueue — keeps all orphans when pruneActiveReviews throws', () => {
   it('keeps all orphans when pruneActiveReviews throws', async () => {
     const orphanPr = {
       number: 66,
@@ -373,7 +385,9 @@ describe('useLoadPrQueue', () => {
     const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
     expect(queue.find((p: { number: number }) => p.number === 66)).toBeDefined()
   })
+})
 
+describe('useLoadPrQueue — sets hasMorePrs and nextCursor from response', () => {
   it('sets hasMorePrs and nextCursor from response', async () => {
     mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: true, nextCursor: 'cursor-abc' })
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
@@ -393,7 +407,9 @@ describe('useLoadPrQueue', () => {
     expect(mockSetLoadingMorePrs).toHaveBeenCalledWith(true)
     expect(mockSetLoadingMorePrs).toHaveBeenCalledWith(false)
   })
+})
 
+describe('useLoadPrQueue — TAV-7: discards a stale response that resolves after a newer request', () => {
   it('TAV-7: discards a stale response that resolves after a newer request', async () => {
     // Simulates pasting "049": an earlier query's slower response (e.g. a
     // broader text search) resolves *after* a later query's faster response
@@ -466,7 +482,9 @@ describe('useLoadPrQueue', () => {
       expect.arrayContaining([expect.objectContaining({ number: 49 })])
     )
   })
+})
 
+describe('useLoadPrQueue — TAV-7: discards a stale currentUser response for a superseded request', () => {
   it('TAV-7: discards a stale currentUser response for a superseded request', async () => {
     let resolveStaleUser!: (v: unknown) => void
     mockCurrentUserAPI
@@ -522,7 +540,9 @@ describe('useLoadPrDetail', () => {
     expect(mockPrReviewDetail).toHaveBeenCalledWith('/repo', 42)
     expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ number: 42 }))
   })
+})
 
+describe('useLoadPrDetail — does not call onSuccess when result has error', () => {
   it('does not call onSuccess when result has error', async () => {
     mockPrReviewDetail.mockResolvedValue({ error: 'NETWORK_ERROR' })
     const onSuccess = vi.fn()
@@ -541,7 +561,9 @@ describe('useLoadPrDetail', () => {
     })
     expect(mockSetRateLimitState).toHaveBeenCalledWith({ resetAt: 12345 })
   })
+})
 
+describe('useLoadPrDetail — does not crash on exception', () => {
   it('does not crash on exception', async () => {
     mockPrReviewDetail.mockRejectedValue(new Error('network fail'))
     const { result } = renderHook(() => useLoadPrDetail('/repo'))
@@ -577,7 +599,9 @@ describe('useLoadInlineComments', () => {
     })
     expect(mockPrInlineComments).not.toHaveBeenCalled()
   })
+})
 
+describe('useLoadInlineComments — calls prInlineComments and sets threads when activePr is set', () => {
   it('calls prInlineComments and sets threads when activePr is set', async () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
@@ -592,7 +616,9 @@ describe('useLoadInlineComments', () => {
     expect(mockPrInlineComments).toHaveBeenCalledWith('/repo', 42)
     expect(mockSetThreads).toHaveBeenCalled()
   })
+})
 
+describe('useLoadInlineComments — does nothing when result has error', () => {
   it('does nothing when result has error', async () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
@@ -606,7 +632,9 @@ describe('useLoadInlineComments', () => {
     })
     expect(mockSetThreads).not.toHaveBeenCalled()
   })
+})
 
+describe('useLoadInlineComments — marks a thread resolved when its first comment id is in resolvedCommentIds', () => {
   it('marks a thread resolved when its first comment id is in resolvedCommentIds', async () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
@@ -697,7 +725,9 @@ describe('useFetchFileMetrics', () => {
     })
     expect(mockFileMetrics).not.toHaveBeenCalled()
   })
+})
 
+describe('useFetchFileMetrics — fetches file metrics and updates risk scores for chapters with files', () => {
   it('fetches file metrics and updates risk scores for chapters with files', async () => {
     const prWithFiles = {
       ...validActivePr,
@@ -759,7 +789,9 @@ describe('useFetchFileMetrics', () => {
     expect(mockUpdateFileRiskScores).toHaveBeenCalled()
     expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
   })
+})
 
+describe('useFetchFileMetrics — keeps a large but mechanically-simple PR at high risk via the size floor', () => {
   it('keeps a large but mechanically-simple PR at high risk via the size floor', async () => {
     const prBigSimple = {
       ...validActivePr,
@@ -821,7 +853,9 @@ describe('useFetchFileMetrics', () => {
     })
     expect(mockUpdateQueuePrRisk).toHaveBeenCalledWith(42, 'high', expect.anything())
   })
+})
 
+describe('useFetchFileMetrics — does nothing when all files are tier-3 (lock files excluded from risk scoring)', () => {
   it('does nothing when all files are tier-3 (lock files excluded from risk scoring)', async () => {
     const prWithLockFiles = {
       ...validActivePr,
@@ -876,7 +910,9 @@ describe('useFetchFileMetrics', () => {
     // Tier 3 files are excluded, so no metrics calls
     expect(mockFileMetrics).not.toHaveBeenCalled()
   })
+})
 
+describe('useFetchFileMetrics — handles fileMetrics returning an error object (null value)', () => {
   it('handles fileMetrics returning an error object (null value)', async () => {
     const prWithFiles = {
       ...validActivePr,
@@ -958,7 +994,9 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch', () => {
       resetAt: expect.any(Number),
     })
   })
+})
 
+describe('useLoadPrQueue — NOT_AUTHENTICATED branch — passes cursor and search options to listOpenPrs', () => {
   it('passes cursor and search options to listOpenPrs', async () => {
     mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false, nextCursor: undefined })
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
@@ -970,7 +1008,9 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch', () => {
       search: 'fix bug',
     })
   })
+})
 
+describe('useLoadPrQueue — NOT_AUTHENTICATED branch — mergeSessionStatuses: session with pausedAt=null is in-progress', () => {
   it('mergeSessionStatuses: session with pausedAt=null is in-progress', async () => {
     mockSessionsForRepoAPI.mockResolvedValue({
       sessions: [
@@ -1015,7 +1055,9 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch', () => {
     // Queue should be set (with merged session status)
     expect(mockSetQueue).toHaveBeenCalled()
   })
+})
 
+describe('useLoadPrQueue — NOT_AUTHENTICATED branch — mergeSessionStatuses: session with pausedAt set marks PR as paused', () => {
   it('mergeSessionStatuses: session with pausedAt set marks PR as paused', async () => {
     mockSessionsForRepoAPI.mockResolvedValue({
       sessions: [
@@ -1071,7 +1113,9 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch', () => {
     const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
     expect(queue.find((p: { number: number }) => p.number === 42)?.sessionStatus).toBe('paused')
   })
+})
 
+describe('useLoadPrQueue — NOT_AUTHENTICATED branch — mergeSessionStatuses: falls back to original prs on error', () => {
   it('mergeSessionStatuses: falls back to original prs on error', async () => {
     mockSessionsForRepoAPI.mockRejectedValue(new Error('IPC error'))
 
@@ -1125,54 +1169,54 @@ describe('useLoadPrDetail — additional branches', () => {
   })
 })
 
-describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
-  function makePrWithFile(
-    patchCoverage: number | null,
-    ciStatus: 'passing' | 'failing' | 'pending' | 'none' = 'passing'
-  ) {
-    return {
-      ...validActivePr,
-      ciStatus,
-      coverageStatus: 'unknown' as const,
-      chapters: [
-        {
-          id: 'ch-1',
-          name: 'Chapter 1',
-          estimatedMinutes: 5,
-          status: 'not-started' as const,
-          files: [
-            {
-              path: 'src/foo.ts',
-              oldPath: undefined,
-              changeType: 'modified' as const,
-              additions: 10,
-              deletions: 2,
-              isBinary: false,
-              tier: 1 as const,
-              whyHere: 'changed',
-              estimatedMinutes: 3,
-              riskScore: {
-                level: 'low' as const,
-                composite: null,
-                dominantDriver: '',
-                topImporters: [],
-                importerCount: 0,
-                metrics: {
-                  changeSize: null,
-                  churn90d: null,
-                  blastRadius: null,
-                  testFilePresent: null,
-                  complexityDelta: null,
-                  patchCoverage: null,
-                },
+function makePrWithFile(
+  patchCoverage: number | null,
+  ciStatus: 'passing' | 'failing' | 'pending' | 'none' = 'passing'
+) {
+  return {
+    ...validActivePr,
+    ciStatus,
+    coverageStatus: 'unknown' as const,
+    chapters: [
+      {
+        id: 'ch-1',
+        name: 'Chapter 1',
+        estimatedMinutes: 5,
+        status: 'not-started' as const,
+        files: [
+          {
+            path: 'src/foo.ts',
+            oldPath: undefined,
+            changeType: 'modified' as const,
+            additions: 10,
+            deletions: 2,
+            isBinary: false,
+            tier: 1 as const,
+            whyHere: 'changed',
+            estimatedMinutes: 3,
+            riskScore: {
+              level: 'low' as const,
+              composite: null,
+              dominantDriver: '',
+              topImporters: [],
+              importerCount: 0,
+              metrics: {
+                changeSize: null,
+                churn90d: null,
+                blastRadius: null,
+                testFilePresent: null,
+                complexityDelta: null,
+                patchCoverage: null,
               },
             },
-          ],
-        },
-      ],
-    }
+          },
+        ],
+      },
+    ],
   }
+}
 
+describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
   it('coverageDot=pass when avgCoverage >= 80', async () => {
     const pr = makePrWithFile(null)
     vi.mocked(usePrReviewStore).mockReturnValue({
@@ -1201,7 +1245,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
     expect(signalDots.coverage).toBe('pass')
   })
+})
 
+describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — coverageDot=warn when avgCoverage is 50-79', () => {
   it('coverageDot=warn when avgCoverage is 50-79', async () => {
     const pr = makePrWithFile(null)
     vi.mocked(usePrReviewStore).mockReturnValue({
@@ -1229,7 +1275,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
     expect(signalDots.coverage).toBe('warn')
   })
+})
 
+describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — coverageDot=fail when avgCoverage < 50', () => {
   it('coverageDot=fail when avgCoverage < 50', async () => {
     const pr = makePrWithFile(null)
     vi.mocked(usePrReviewStore).mockReturnValue({
@@ -1257,7 +1305,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
     expect(signalDots.coverage).toBe('fail')
   })
+})
 
+describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — ciDot=fail when pr.ciStatus=failing', () => {
   it('ciDot=fail when pr.ciStatus=failing', async () => {
     const pr = makePrWithFile(null, 'failing')
     vi.mocked(usePrReviewStore).mockReturnValue({
@@ -1284,7 +1334,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
     expect(signalDots.ci).toBe('fail')
   })
+})
 
+describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — ciDot=warn when pr.ciStatus=pending', () => {
   it('ciDot=warn when pr.ciStatus=pending', async () => {
     const pr = makePrWithFile(null, 'pending')
     vi.mocked(usePrReviewStore).mockReturnValue({
@@ -1311,7 +1363,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
     expect(signalDots.ci).toBe('warn')
   })
+})
 
+describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — ciDot=unknown when pr.ciStatus=none', () => {
   it('ciDot=unknown when pr.ciStatus=none', async () => {
     const pr = makePrWithFile(null, 'none')
     vi.mocked(usePrReviewStore).mockReturnValue({
@@ -1338,7 +1392,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
     expect(signalDots.ci).toBe('unknown')
   })
+})
 
+describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — accepts prDetail argument instead of activePr', () => {
   it('accepts prDetail argument instead of activePr', async () => {
     // useFetchFileMetrics with explicit prDetail arg (prDetail ?? activePr branch)
     vi.mocked(usePrReviewStore).mockReturnValue({
@@ -1472,33 +1528,33 @@ describe('useLoadIssueComments', () => {
   })
 })
 
-describe('useFetchFileMetrics — one batched request', () => {
-  const file = (path: string, tier: 1 | 2 | 3 = 1) => ({
-    path,
-    changeType: 'modified' as const,
-    additions: 4,
-    deletions: 1,
-    isBinary: false,
-    tier,
-    whyHere: 'changed',
-    estimatedMinutes: 1,
-    riskScore: {
-      level: 'low' as const,
-      composite: null,
-      dominantDriver: '',
-      topImporters: [],
-      importerCount: 0,
-      metrics: {
-        changeSize: null,
-        churn90d: null,
-        blastRadius: null,
-        testFilePresent: null,
-        complexityDelta: null,
-        patchCoverage: null,
-      },
+const file = (path: string, tier: 1 | 2 | 3 = 1) => ({
+  path,
+  changeType: 'modified' as const,
+  additions: 4,
+  deletions: 1,
+  isBinary: false,
+  tier,
+  whyHere: 'changed',
+  estimatedMinutes: 1,
+  riskScore: {
+    level: 'low' as const,
+    composite: null,
+    dominantDriver: '',
+    topImporters: [],
+    importerCount: 0,
+    metrics: {
+      changeSize: null,
+      churn90d: null,
+      blastRadius: null,
+      testFilePresent: null,
+      complexityDelta: null,
+      patchCoverage: null,
     },
-  })
+  },
+})
 
+describe('useFetchFileMetrics — one batched request', () => {
   it('asks for every non-generated file in one call and applies the scores in one update', async () => {
     const pr = {
       ...validActivePr,
@@ -1549,15 +1605,15 @@ describe('useFetchFileMetrics — one batched request', () => {
   })
 })
 
-describe('comment loaders — stable across activePr patches', () => {
-  const setActive = (pr: typeof validActivePr | null) =>
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: pr,
-      setThreads: mockSetThreads,
-      setIssueComments: mockSetIssueComments,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+const setActive = (pr: typeof validActivePr | null) =>
+  vi.mocked(usePrReviewStore).mockReturnValue({
+    ...vi.mocked(usePrReviewStore)(),
+    activePr: pr,
+    setThreads: mockSetThreads,
+    setIssueComments: mockSetIssueComments,
+  } as unknown as ReturnType<typeof usePrReviewStore>)
 
+describe('comment loaders — stable across activePr patches', () => {
   it('keeps the inline loader identity when activePr is patched for the same PR', () => {
     setActive(validActivePr)
     const { result, rerender } = renderHook(() => useLoadInlineComments('/repo'))
@@ -1575,7 +1631,9 @@ describe('comment loaders — stable across activePr patches', () => {
     rerender()
     expect(result.current).not.toBe(first)
   })
+})
 
+describe('comment loaders — stable across activePr patches — does not fetch inline comments again when activePr is patched', () => {
   it('does not fetch inline comments again when activePr is patched', async () => {
     mockPrInlineComments.mockResolvedValue({ comments: [] })
     setActive(validActivePr)
@@ -1595,7 +1653,9 @@ describe('comment loaders — stable across activePr patches', () => {
     })
     expect(mockPrInlineComments).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('comment loaders — stable across activePr patches — does not fetch issue comments again when activePr is patched', () => {
   it('does not fetch issue comments again when activePr is patched', async () => {
     mockPrIssueCommentsAPI.mockResolvedValue({ comments: [] })
     setActive(validActivePr)

@@ -103,7 +103,9 @@ describe('highlightBlock', () => {
     expect(mockHighlightAuto).toHaveBeenCalled()
     expect(result).toBe('<auto>')
   })
+})
 
+describe('highlightBlock — returns escaped html when hljs throws', () => {
   it('returns escaped html when hljs throws', () => {
     mockHighlight.mockImplementation(() => {
       throw new Error('hljs error')

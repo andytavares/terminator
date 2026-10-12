@@ -60,7 +60,9 @@ describe('ensureReviewWorktree — a new worktree', () => {
     const addIdx = calls.indexOf(addCall!)
     expect(fetchIdx).toBeLessThan(addIdx)
   })
+})
 
+describe('ensureReviewWorktree — a new worktree — removes nothing when git left no review folder behind', () => {
   it('removes nothing when git left no review folder behind', async () => {
     const exec = vi.fn(async () => ({ stdout: '' }))
     expect(await ensureReviewWorktree(pr42(), { exec })).toBe(pr42Dir())

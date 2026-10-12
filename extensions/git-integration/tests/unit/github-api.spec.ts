@@ -32,7 +32,9 @@ describe('githubAPI bridge', () => {
       prNumber: 42,
     })
   })
+})
 
+describe('githubAPI bridge — prFileDiff calls correct channel', () => {
   it('prFileDiff calls correct channel', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.prFileDiff('/repo', 42, 'src/foo.ts')
@@ -53,7 +55,9 @@ describe('githubAPI bridge', () => {
       ref: 'abc123',
     })
   })
+})
 
+describe('githubAPI bridge — prInlineComments calls correct channel', () => {
   it('prInlineComments calls correct channel', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.prInlineComments('/repo', 7)
@@ -76,7 +80,9 @@ describe('githubAPI bridge', () => {
     await githubAPI.prReviewSubmit(payload)
     expect(mockInvoke).toHaveBeenCalledWith('github:pr-review-submit', payload)
   })
+})
 
+describe('githubAPI bridge — sessionGet calls correct channel', () => {
   it('sessionGet calls correct channel', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.sessionGet('my-key')
@@ -97,7 +103,9 @@ describe('githubAPI bridge', () => {
     await githubAPI.sessionsForRepo('/repo')
     expect(mockInvoke).toHaveBeenCalledWith('github:sessions-for-repo', { repoRoot: '/repo' })
   })
+})
 
+describe('githubAPI bridge — saveActiveReview calls correct channel', () => {
   it('saveActiveReview calls correct channel', async () => {
     const { githubAPI } = await import('../../src/api/github')
     const pr = { number: 1 }
@@ -119,7 +127,9 @@ describe('githubAPI bridge', () => {
       prNumber: 42,
     })
   })
+})
 
+describe('githubAPI bridge — pruneActiveReviews calls correct channel with repoRoot and prNumbers', () => {
   it('pruneActiveReviews calls correct channel with repoRoot and prNumbers', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.pruneActiveReviews('/repo', [1, 2, 3])
@@ -146,7 +156,9 @@ describe('githubAPI bridge', () => {
       prNumber: 42,
     })
   })
+})
 
+describe('githubAPI bridge — prIssueCommentAdd calls correct channel', () => {
   it('prIssueCommentAdd calls correct channel', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.prIssueCommentAdd({ repoRoot: '/repo', prNumber: 42, body: 'hello' })
@@ -165,7 +177,9 @@ describe('githubAPI bridge', () => {
       prNumber: 42,
     })
   })
+})
 
+describe('githubAPI bridge — review revamp channels send the payloads their handlers validate', () => {
   it('review revamp channels send the payloads their handlers validate', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.dashboardSearch()
@@ -192,7 +206,9 @@ describe('githubAPI bridge', () => {
       ['github:tests-for-block', { repoRoot: '/repo', headSHA: 'h', path: 'a.ts', code: 'x' }],
     ])
   })
+})
 
+describe('githubAPI bridge — batch channels send the payloads their handlers validate', () => {
   it('batch channels send the payloads their handlers validate', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.filesMetrics('/repo', ['a.ts', 'b.ts'])
@@ -215,7 +231,9 @@ describe('githubAPI bridge', () => {
       ],
     ])
   })
+})
 
+describe('githubAPI bridge — leaves nodeId out of a batch viewed mark when the PR has none', () => {
   it('leaves nodeId out of a batch viewed mark when the PR has none', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.filesViewedSet('/repo', 211, undefined, ['a.ts'], false)

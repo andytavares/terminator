@@ -81,7 +81,9 @@ describe('ConflictHeader', () => {
     expect(container.textContent).toContain('foo.ts')
     expect(screen.getByText(/Conflict 1 of 2/)).toBeTruthy()
   })
+})
 
+describe('ConflictHeader — renders progress dots matching block count', () => {
   it('renders progress dots matching block count', () => {
     const { container } = render(
       <ConflictHeader
@@ -97,7 +99,9 @@ describe('ConflictHeader', () => {
     const dots = container.querySelectorAll('.conflict-header__dot')
     expect(dots.length).toBe(2)
   })
+})
 
+describe('ConflictHeader — marks resolved dot with resolved class', () => {
   it('marks resolved dot with resolved class', () => {
     const { container } = render(
       <ConflictHeader
@@ -113,7 +117,9 @@ describe('ConflictHeader', () => {
     const dots = container.querySelectorAll('.conflict-header__dot')
     expect(dots[1].classList.contains('conflict-header__dot--resolved')).toBe(true)
   })
+})
 
+describe('ConflictHeader — calls onBack when Files button clicked', () => {
   it('calls onBack when Files button clicked', () => {
     const onBack = vi.fn()
     render(
@@ -130,7 +136,9 @@ describe('ConflictHeader', () => {
     fireEvent.click(screen.getByText(/Files/i))
     expect(onBack).toHaveBeenCalledOnce()
   })
+})
 
+describe('ConflictHeader — calls onUndo when Undo button clicked', () => {
   it('calls onUndo when Undo button clicked', () => {
     const onUndo = vi.fn()
     render(
@@ -147,7 +155,9 @@ describe('ConflictHeader', () => {
     fireEvent.click(screen.getByText(/Undo/i))
     expect(onUndo).toHaveBeenCalledOnce()
   })
+})
 
+describe('ConflictHeader — Undo button is disabled when canUndo is false', () => {
   it('Undo button is disabled when canUndo is false', () => {
     render(
       <ConflictHeader
@@ -163,7 +173,9 @@ describe('ConflictHeader', () => {
     const undoBtn = screen.getByText(/Undo/i).closest('button') as HTMLButtonElement
     expect(undoBtn.disabled).toBe(true)
   })
+})
 
+describe('ConflictHeader — Undo button is enabled when canUndo is true', () => {
   it('Undo button is enabled when canUndo is true', () => {
     render(
       <ConflictHeader
@@ -179,7 +191,9 @@ describe('ConflictHeader', () => {
     const undoBtn = screen.getByText(/Undo/i).closest('button') as HTMLButtonElement
     expect(undoBtn.disabled).toBe(false)
   })
+})
 
+describe('ConflictHeader — renders null when session is null', () => {
   it('renders null when session is null', () => {
     mockStoreState = { ...mockStoreState, session: null }
     const { container } = render(
@@ -195,7 +209,9 @@ describe('ConflictHeader', () => {
     )
     expect(container.firstChild).toBeNull()
   })
+})
 
+describe('ConflictHeader — shows exit button when onExit prop is provided', () => {
   it('shows exit button when onExit prop is provided', () => {
     render(
       <ConflictHeader
@@ -211,7 +227,9 @@ describe('ConflictHeader', () => {
     )
     expect(screen.getByLabelText(/exit merge flow/i)).toBeTruthy()
   })
+})
 
+describe('ConflictHeader — calls onExit when exit button is clicked', () => {
   it('calls onExit when exit button is clicked', () => {
     const onExit = vi.fn()
     render(
@@ -229,7 +247,9 @@ describe('ConflictHeader', () => {
     fireEvent.click(screen.getByLabelText(/exit merge flow/i))
     expect(onExit).toHaveBeenCalledOnce()
   })
+})
 
+describe('ConflictHeader — does not show exit button when onExit is not provided', () => {
   it('does not show exit button when onExit is not provided', () => {
     render(
       <ConflictHeader

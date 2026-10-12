@@ -100,7 +100,9 @@ describe('git:diff-file', () => {
     })
     expect(result).toEqual({ diff: { path: 'a.ts', hunks: [], isBinary: false, truncated: false } })
   })
+})
 
+describe('git:diff-file — returns an error when getDiff throws', () => {
   it('returns an error when getDiff throws', async () => {
     vi.mocked(gitService.getDiff).mockRejectedValue(new Error('no such path'))
     const result = (await getHandler('git:diff-file')({

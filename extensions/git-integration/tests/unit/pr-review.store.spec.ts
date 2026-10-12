@@ -40,14 +40,14 @@ function session(overrides: Partial<ReviewSession> = {}): ReviewSession {
   }
 }
 
-describe('pr-review store — session v2', () => {
-  beforeEach(() => {
-    usePrReviewStore.getState().reset()
-    sessionSet.mockClear()
-    fileViewedSet.mockClear()
-    filesViewedSet.mockClear()
-  })
+beforeEach(() => {
+  usePrReviewStore.getState().reset()
+  sessionSet.mockClear()
+  fileViewedSet.mockClear()
+  filesViewedSet.mockClear()
+})
 
+describe('pr-review store — session v2', () => {
   it('keys a session by PR, not by head', () => {
     expect(sessionKey(REPO, 211)).toBe(`${REPO}:::211`)
     expect(legacySessionKey(REPO, 211, 'aaa111')).toBe(`${REPO}:::211:::aaa111`)
@@ -70,7 +70,9 @@ describe('pr-review store — session v2', () => {
     expect(s.historyRewritten).toBe(false)
     expect(s.lastSeenHeadSHA).toBe('aaa111')
   })
+})
 
+describe('pr-review store — session v2 — treats every viewed file as changed when the old head is gone', () => {
   it('treats every viewed file as changed when the old head is gone', () => {
     const store = usePrReviewStore.getState()
     store.initSession(session())
@@ -95,7 +97,9 @@ describe('pr-review store — session v2', () => {
     expect(key).toBe(`${REPO}:::211`)
     expect((persisted as ReviewSession).viewedAt['scripts/e2e-shard.ts']).toBe('bbb222')
   })
+})
 
+describe('pr-review store — session v2 — unmarking forgets the viewed SHA and unsyncs GitHub', () => {
   it('unmarking forgets the viewed SHA and unsyncs GitHub', () => {
     const store = usePrReviewStore.getState()
     store.initSession(session())
@@ -105,7 +109,9 @@ describe('pr-review store — session v2', () => {
     expect(s.viewedAt['playwright.config.ts']).toBeUndefined()
     expect(fileViewedSet).toHaveBeenCalledWith(REPO, 211, 'playwright.config.ts', false, undefined)
   })
+})
 
+describe('pr-review store — session v2 — drafts and notes persist with the session', () => {
   it('drafts and notes persist with the session', () => {
     const store = usePrReviewStore.getState()
     store.initSession(session())
@@ -143,66 +149,70 @@ describe('pr-review store — session v2', () => {
     store.clearDrafts(REPO, 211, 'aaa111')
     expect(usePrReviewStore.getState().drafts).toHaveLength(0)
   })
+})
 
-  describe('viewed marks and risk scores against an active PR', () => {
-    const riskScore = (composite: number) =>
-      ({
-        level: 'low',
-        composite,
-        dominantDriver: 'changeSize',
-        topImporters: [],
-        importerCount: 0,
-        metrics: {},
-      }) as never
-    const file = (path: string) => ({ path, riskScore: riskScore(0) })
-    const activePr = () =>
-      ({
-        number: 211,
-        headSHA: 'aaa111',
-        nodeId: 'PR_node_211',
-        chapters: [
-          { id: 'ch-1', files: [file('a.ts'), file('b.ts')] },
-          { id: 'ch-2', files: [file('c.ts')] },
-        ],
-      }) as never
+const riskScore = (composite: number) =>
+  ({
+    level: 'low',
+    composite,
+    dominantDriver: 'changeSize',
+    topImporters: [],
+    importerCount: 0,
+    metrics: {},
+  }) as never
 
-    it('passes the PR node id so a single mark costs one GitHub call', () => {
-      usePrReviewStore.getState().setActivePr(activePr())
-      usePrReviewStore.getState().markFileViewed(REPO, 211, 'aaa111', 'a.ts')
-      expect(fileViewedSet).toHaveBeenCalledWith(REPO, 211, 'a.ts', true, 'PR_node_211')
+const file = (path: string) => ({ path, riskScore: riskScore(0) })
+
+const activePr = () =>
+  ({
+    number: 211,
+    headSHA: 'aaa111',
+    nodeId: 'PR_node_211',
+    chapters: [
+      { id: 'ch-1', files: [file('a.ts'), file('b.ts')] },
+      { id: 'ch-2', files: [file('c.ts')] },
+    ],
+  }) as never
+
+describe('pr-review store — session v2 (continued) — viewed marks and risk scores against an active PR', () => {
+  it('passes the PR node id so a single mark costs one GitHub call', () => {
+    usePrReviewStore.getState().setActivePr(activePr())
+    usePrReviewStore.getState().markFileViewed(REPO, 211, 'aaa111', 'a.ts')
+    expect(fileViewedSet).toHaveBeenCalledWith(REPO, 211, 'a.ts', true, 'PR_node_211')
+  })
+
+  it('marks several files with one session write and one GitHub request', () => {
+    usePrReviewStore.getState().setActivePr(activePr())
+    usePrReviewStore.getState().markFilesViewed(REPO, 211, 'aaa111', ['a.ts', 'b.ts'])
+    const s = usePrReviewStore.getState()
+    expect([...s.viewedFiles].sort()).toEqual(['a.ts', 'b.ts'])
+    expect(s.viewedAt).toEqual({ 'a.ts': 'aaa111', 'b.ts': 'aaa111' })
+    expect(sessionSet).toHaveBeenCalledTimes(1)
+    expect(fileViewedSet).not.toHaveBeenCalled()
+    expect(filesViewedSet).toHaveBeenCalledTimes(1)
+    expect(filesViewedSet).toHaveBeenCalledWith(REPO, 211, 'PR_node_211', ['a.ts', 'b.ts'], true)
+  })
+
+  it('does nothing for an empty batch', () => {
+    usePrReviewStore.getState().markFilesViewed(REPO, 211, 'aaa111', [])
+    expect(sessionSet).not.toHaveBeenCalled()
+    expect(filesViewedSet).not.toHaveBeenCalled()
+  })
+})
+
+describe('pr-review store — session v2 (continued) — viewed marks and risk scores against an active PR — applies many risk scores across chapters in one store update', () => {
+  it('applies many risk scores across chapters in one store update', () => {
+    usePrReviewStore.getState().setActivePr(activePr())
+    let updates = 0
+    const unsub = usePrReviewStore.subscribe(() => updates++)
+    usePrReviewStore.getState().updateFileRiskScores({
+      'a.ts': riskScore(40),
+      'c.ts': riskScore(80),
     })
-
-    it('marks several files with one session write and one GitHub request', () => {
-      usePrReviewStore.getState().setActivePr(activePr())
-      usePrReviewStore.getState().markFilesViewed(REPO, 211, 'aaa111', ['a.ts', 'b.ts'])
-      const s = usePrReviewStore.getState()
-      expect([...s.viewedFiles].sort()).toEqual(['a.ts', 'b.ts'])
-      expect(s.viewedAt).toEqual({ 'a.ts': 'aaa111', 'b.ts': 'aaa111' })
-      expect(sessionSet).toHaveBeenCalledTimes(1)
-      expect(fileViewedSet).not.toHaveBeenCalled()
-      expect(filesViewedSet).toHaveBeenCalledTimes(1)
-      expect(filesViewedSet).toHaveBeenCalledWith(REPO, 211, 'PR_node_211', ['a.ts', 'b.ts'], true)
-    })
-
-    it('does nothing for an empty batch', () => {
-      usePrReviewStore.getState().markFilesViewed(REPO, 211, 'aaa111', [])
-      expect(sessionSet).not.toHaveBeenCalled()
-      expect(filesViewedSet).not.toHaveBeenCalled()
-    })
-
-    it('applies many risk scores across chapters in one store update', () => {
-      usePrReviewStore.getState().setActivePr(activePr())
-      let updates = 0
-      const unsub = usePrReviewStore.subscribe(() => updates++)
-      usePrReviewStore.getState().updateFileRiskScores({
-        'a.ts': riskScore(40),
-        'c.ts': riskScore(80),
-      })
-      unsub()
-      const chapters = usePrReviewStore.getState().activePr!.chapters
-      expect(updates).toBe(1)
-      expect(chapters[0].files.map((f) => f.riskScore.composite)).toEqual([40, 0])
-      expect(chapters[1].files[0].riskScore.composite).toBe(80)
-    })
+    unsub()
+    const chapters = usePrReviewStore.getState().activePr!.chapters
+    expect(updates).toBe(1)
+    expect(chapters[0].files.map((f) => f.riskScore.composite)).toEqual([40, 0])
+    expect(chapters[1].files[0].riskScore.composite).toBe(80)
   })
 })

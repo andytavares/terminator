@@ -39,6 +39,24 @@ export function stubPrints(stdout: string): ExecFileStub {
   return (...args) => (args.at(-1) as ExecFileCallback)(null, { stdout, stderr: '' })
 }
 
+/** One call an execFile stub received. */
+export interface StubCall {
+  command: string
+  args: string[]
+  cwd?: string
+}
+
+/** An execFile stub that answers each call with what `answer` returns: stdout text, or an Error to fail. */
+export function stubAnswering(answer: (call: StubCall) => string | StubError): ExecFileStub {
+  return (...callArgs) => {
+    const [command, args, opts] = callArgs as [string, string[], { cwd?: string } | undefined]
+    const out = answer({ command, args, cwd: opts?.cwd })
+    const cb = callArgs.at(-1) as ExecFileCallback
+    if (out instanceof Error) return cb(out)
+    return cb(null, { stdout: out, stderr: '' })
+  }
+}
+
 /** An execFile stub answer that fails with `error`. */
 export function stubFails(error: StubError): ExecFileStub {
   return (...args) => (args.at(-1) as ExecFileCallback)(error)

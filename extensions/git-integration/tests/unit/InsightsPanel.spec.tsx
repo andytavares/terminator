@@ -141,7 +141,9 @@ describe('InsightsPanel', () => {
     expect(screen.getByTitle('CI check codecov/patch')).toBeTruthy()
     expect(screen.getByTitle('computeRiskScore · git log, git grep')).toBeTruthy()
   })
+})
 
+describe('InsightsPanel — renders the complexity sentence with signed value and top-3 functions', () => {
   it('renders the complexity sentence with signed value and top-3 functions', () => {
     render(<InsightsPanel pr={buildPr()} />)
     const text = screen.getByText(/\+23 branches\./)
@@ -162,7 +164,9 @@ describe('InsightsPanel', () => {
     render(<InsightsPanel pr={pr} />)
     expect(screen.getByText('No change. No function gained branches.')).toBeTruthy()
   })
+})
 
+describe('InsightsPanel — describes test files, not functions, when no function changed', () => {
   it('describes test files, not functions, when no function changed', () => {
     const pr = buildPr({
       insights: {
@@ -185,7 +189,9 @@ describe('InsightsPanel', () => {
       )
     ).toBeTruthy()
   })
+})
 
+describe('InsightsPanel — says no source files changed for a config-only PR', () => {
   it('says no source files changed for a config-only PR', () => {
     const pr = buildPr({
       insights: {
@@ -204,7 +210,9 @@ describe('InsightsPanel', () => {
     render(<InsightsPanel pr={pr} />)
     expect(screen.getByText('No functions changed. No source files changed.')).toBeTruthy()
   })
+})
 
+describe('InsightsPanel — uses a singular verb for one untested function', () => {
   it('uses a singular verb for one untested function', () => {
     const pr = buildPr({
       insights: {
@@ -223,7 +231,9 @@ describe('InsightsPanel', () => {
     expect(row.textContent).toContain('playwright.config.ts (Wide blast radius — 41 importers)')
     expect(row.textContent).toContain('scripts/e2e-shard.ts (High churn — 14 commits/90d)')
   })
+})
 
+describe('InsightsPanel — leaves low risk files out of the hotspots', () => {
   it('leaves low risk files out of the hotspots', () => {
     const pr = buildPr({
       chapters: [
@@ -241,7 +251,9 @@ describe('InsightsPanel', () => {
     expect(row.textContent).toContain('No file stands out.')
     expect(row.textContent).not.toContain('quiet.ts')
   })
+})
 
+describe('InsightsPanel — shows Not measured for risk when no file has a composite score', () => {
   it('shows "Not measured" for risk when no file has a composite score', () => {
     const pr = buildPr({
       chapters: [
@@ -266,7 +278,9 @@ describe('InsightsPanel', () => {
     )
     expect(text.textContent).toContain('CI reports 84% of new lines covered.')
   })
+})
 
+describe('InsightsPanel — renders Every changed function has a test. when nothing is untested', () => {
   it('renders "Every changed function has a test." when nothing is untested', () => {
     const pr = buildPr({
       insights: {
@@ -288,7 +302,9 @@ describe('InsightsPanel', () => {
       )
     ).toBeTruthy()
   })
+})
 
+describe('InsightsPanel — renders No flags raised. when there are none', () => {
   it('renders "No flags raised." when there are none', () => {
     const pr = buildPr({
       insights: {
@@ -308,7 +324,9 @@ describe('InsightsPanel', () => {
       )
     ).toBeTruthy()
   })
+})
 
+describe('InsightsPanel — renders a muted Analysing this PR… row when insights is null, keeping risk', () => {
   it('renders a muted "Analysing this PR…" row when insights is null, keeping risk', () => {
     render(<InsightsPanel pr={buildPr({ insights: null })} />)
     expect(screen.getByText('Analysing this PR…')).toBeTruthy()

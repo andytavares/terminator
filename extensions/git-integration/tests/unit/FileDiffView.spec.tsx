@@ -59,7 +59,9 @@ describe('FileDiffView', () => {
     await renderDiff()
     expect(screen.getByText('@@ -1,3 +1,3 @@')).toBeTruthy()
   })
+})
 
+describe('FileDiffView — shows Unified and Split toggle buttons', () => {
   it('shows Unified and Split toggle buttons', async () => {
     await renderDiff()
     expect(screen.getByText('Unified')).toBeTruthy()
@@ -83,7 +85,9 @@ describe('FileDiffView', () => {
     await renderDiff({ isStale: true })
     expect(screen.getByText(/File changed while viewing/)).toBeTruthy()
   })
+})
 
+describe('FileDiffView — calls onRefresh when Refresh is clicked in stale banner', () => {
   it('calls onRefresh when Refresh is clicked in stale banner', async () => {
     const onRefresh = vi.fn()
     await renderDiff({ isStale: true, onRefresh })
@@ -107,7 +111,9 @@ describe('FileDiffView', () => {
     fireEvent.click(screen.getByText('Split'))
     expect(screen.getByText('@@ -1,3 +1,3 @@')).toBeTruthy()
   })
+})
 
+describe('FileDiffView — renders a diff with only removes correctly in split view', () => {
   it('renders a diff with only removes correctly in split view', async () => {
     const diff = makeDiff({
       hunks: [
@@ -123,7 +129,9 @@ describe('FileDiffView', () => {
     fireEvent.click(screen.getByText('Split'))
     expect(screen.getByText('@@ -1 +0,0 @@')).toBeTruthy()
   })
+})
 
+describe('FileDiffView — renders a diff with only adds correctly in split view', () => {
   it('renders a diff with only adds correctly in split view', async () => {
     const diff = makeDiff({
       hunks: [
@@ -148,7 +156,9 @@ describe('FileDiffView', () => {
     // drag state activated — fire mouseup to deactivate
     fireEvent.mouseUp(window)
   })
+})
 
+describe('FileDiffView — moves split position on mousemove while dragging', () => {
   it('moves split position on mousemove while dragging', async () => {
     const { container } = await renderDiff()
     fireEvent.click(screen.getByText('Split'))

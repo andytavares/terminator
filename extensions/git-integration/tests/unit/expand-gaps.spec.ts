@@ -131,7 +131,9 @@ describe('reveal — sizes at the edges', () => {
       below: [],
     })
   })
+})
 
+describe('reveal — sizes at the edges — reveals nothing when the expansion is zero', () => {
   it('reveals nothing when the expansion is zero', () => {
     const gap = { key: 'g', newStart: 1, newEnd: 5, oldOffset: 0 }
     const r = reveal(gap, file, { fromTop: 0, fromBottom: 0 })

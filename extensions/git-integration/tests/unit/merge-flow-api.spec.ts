@@ -34,7 +34,9 @@ describe('mergeFlowAPI bridge', () => {
       originalConflictText: 'orig',
     })
   })
+})
 
+describe('mergeFlowAPI bridge — resolveConflict calls correct channel without optional args', () => {
   it('resolveConflict calls correct channel without optional args', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
     await mergeFlowAPI.resolveConflict('/repo', 'src/foo.ts#0', 'resolved', 'theirs')
@@ -58,7 +60,9 @@ describe('mergeFlowAPI bridge', () => {
       originalConflictText: 'original',
     })
   })
+})
 
+describe('mergeFlowAPI bridge — mergeCommit calls correct channel', () => {
   it('mergeCommit calls correct channel', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
     await mergeFlowAPI.mergeCommit('/repo', ['src/foo.ts', 'src/bar.ts'], 'Merge conflict resolved')
@@ -74,7 +78,9 @@ describe('mergeFlowAPI bridge', () => {
     await mergeFlowAPI.restoreSession('/repo')
     expect(mockInvoke).toHaveBeenCalledWith('git:session-restore', { repoRoot: '/repo' })
   })
+})
 
+describe('mergeFlowAPI bridge — persistSession calls correct channel', () => {
   it('persistSession calls correct channel', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
     const session = {
@@ -97,7 +103,9 @@ describe('mergeFlowAPI bridge', () => {
     await mergeFlowAPI.clearSession('/repo')
     expect(mockInvoke).toHaveBeenCalledWith('git:session-clear', { repoRoot: '/repo' })
   })
+})
 
+describe('mergeFlowAPI bridge — resetSession calls correct channel', () => {
   it('resetSession calls correct channel', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
     const files = [{ filePath: 'src/foo.ts' }, { filePath: 'src/bar.ts' }]

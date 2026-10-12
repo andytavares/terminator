@@ -105,7 +105,9 @@ describe('navigation', () => {
     })
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1)
   })
+})
 
+describe('navigation — goToNextBlock clamps at last block of last file', () => {
   it('goToNextBlock clamps at last block of last file', () => {
     act(() => {
       useMergeFlowStore.getState().startSession(makeSession())
@@ -164,7 +166,9 @@ describe('undoLastDecision', () => {
     const decision = useMergeFlowStore.getState().undoLastDecision()
     expect(decision).toBeNull()
   })
+})
 
+describe('undoLastDecision — pops the last decision from undo stack and navigates back to that block', () => {
   it('pops the last decision from undo stack and navigates back to that block', () => {
     const session = makeSession()
     act(() => {
@@ -219,61 +223,61 @@ describe('isComplete selector', () => {
   })
 })
 
-describe('cross-file undo', () => {
-  function makeTwoFileSession(): ConflictSession {
-    return {
-      repoRoot: '/repo',
-      isRebase: false,
-      totalConflicts: 2,
-      totalResolved: 0,
-      startedAt: new Date().toISOString(),
-      files: [
-        {
-          filePath: 'src/alpha.ts',
-          conflictCount: 1,
-          resolvedCount: 0,
-          conflictDescription: '',
-          oursAuthor: { name: 'A', commitHash: 'a', timestamp: '2026-01-01T00:00:00Z' },
-          theirsAuthor: { name: 'B', commitHash: 'b', timestamp: '2026-01-01T00:00:00Z' },
-          blocks: [
-            {
-              blockId: 'src/alpha.ts#0',
-              index: 0,
-              oursText: 'alpha-ours',
-              theirsText: 'alpha-theirs',
-              baseText: '',
-              contextBefore: [],
-              contextAfter: [],
-              originalConflictText: '<<<alpha>>>',
-              isResolved: false,
-            },
-          ],
-        },
-        {
-          filePath: 'src/beta.ts',
-          conflictCount: 1,
-          resolvedCount: 0,
-          conflictDescription: '',
-          oursAuthor: { name: 'A', commitHash: 'a', timestamp: '2026-01-01T00:00:00Z' },
-          theirsAuthor: { name: 'B', commitHash: 'b', timestamp: '2026-01-01T00:00:00Z' },
-          blocks: [
-            {
-              blockId: 'src/beta.ts#0',
-              index: 0,
-              oursText: 'beta-ours',
-              theirsText: 'beta-theirs',
-              baseText: '',
-              contextBefore: [],
-              contextAfter: [],
-              originalConflictText: '<<<beta>>>',
-              isResolved: false,
-            },
-          ],
-        },
-      ],
-    }
+function makeTwoFileSession(): ConflictSession {
+  return {
+    repoRoot: '/repo',
+    isRebase: false,
+    totalConflicts: 2,
+    totalResolved: 0,
+    startedAt: new Date().toISOString(),
+    files: [
+      {
+        filePath: 'src/alpha.ts',
+        conflictCount: 1,
+        resolvedCount: 0,
+        conflictDescription: '',
+        oursAuthor: { name: 'A', commitHash: 'a', timestamp: '2026-01-01T00:00:00Z' },
+        theirsAuthor: { name: 'B', commitHash: 'b', timestamp: '2026-01-01T00:00:00Z' },
+        blocks: [
+          {
+            blockId: 'src/alpha.ts#0',
+            index: 0,
+            oursText: 'alpha-ours',
+            theirsText: 'alpha-theirs',
+            baseText: '',
+            contextBefore: [],
+            contextAfter: [],
+            originalConflictText: '<<<alpha>>>',
+            isResolved: false,
+          },
+        ],
+      },
+      {
+        filePath: 'src/beta.ts',
+        conflictCount: 1,
+        resolvedCount: 0,
+        conflictDescription: '',
+        oursAuthor: { name: 'A', commitHash: 'a', timestamp: '2026-01-01T00:00:00Z' },
+        theirsAuthor: { name: 'B', commitHash: 'b', timestamp: '2026-01-01T00:00:00Z' },
+        blocks: [
+          {
+            blockId: 'src/beta.ts#0',
+            index: 0,
+            oursText: 'beta-ours',
+            theirsText: 'beta-theirs',
+            baseText: '',
+            contextBefore: [],
+            contextAfter: [],
+            originalConflictText: '<<<beta>>>',
+            isResolved: false,
+          },
+        ],
+      },
+    ],
   }
+}
 
+describe('cross-file undo', () => {
   it('undo on empty stack returns null', () => {
     act(() => {
       useMergeFlowStore.getState().startSession(makeTwoFileSession())
@@ -284,7 +288,9 @@ describe('cross-file undo', () => {
     })
     expect(result!).toBeNull()
   })
+})
 
+describe('cross-file undo — undo reverses decision in file A after navigating to file B', () => {
   it('undo reverses decision in file A after navigating to file B', () => {
     act(() => {
       useMergeFlowStore.getState().startSession(makeTwoFileSession())
@@ -316,7 +322,9 @@ describe('cross-file undo', () => {
     // File B should be unaffected
     expect(useMergeFlowStore.getState().session!.files[1].resolvedCount).toBe(0)
   })
+})
 
+describe('cross-file undo — undo reverses only the most recent decision regardless of current activeFile', () => {
   it('undo reverses only the most recent decision regardless of current activeFile', () => {
     act(() => {
       useMergeFlowStore.getState().startSession(makeTwoFileSession())

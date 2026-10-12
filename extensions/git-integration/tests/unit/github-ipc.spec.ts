@@ -33,7 +33,13 @@ import { registerGithubHandlers } from '../../src/ipc/github.ipc'
 import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
 import { reviewQueuePr } from './support/review-queue-pr'
 import { stateForSearch } from '../../src/github/gh-cli'
-import { bindShellToStub, githubOverStub } from './support/shell'
+import {
+  bindShellToStub,
+  githubOverStub,
+  stubAnswering,
+  stubFails,
+  stubPrints,
+} from './support/shell'
 
 bindShellToStub(mockExecFile)
 bindWorkspaceRoots(() => ['/repo', '/other', '/Users/me/repos/widgets'])
@@ -48,8 +54,6 @@ type Handler = (payload: unknown) => Promise<unknown>
 const answerInto = (handlers: Record<string, Handler>) => (spec: ChannelSpec) => {
   handlers[spec.channel] = (payload) => dispatchChannel(spec, payload)
 }
-
-type ExecCallback = (err: Error | null, result?: { stdout: string; stderr: string }) => void
 
 function captureHandlers(
   getReviewRepos?: () => string[],
@@ -78,16 +82,22 @@ function captureHandlersWithToken(token: string): Record<string, Handler> {
 }
 
 function mockGitSuccess(stdout: string) {
-  mockExecFile.mockImplementationOnce(
-    (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
-      cb(null, { stdout, stderr: '' })
-  )
+  mockExecFile.mockImplementationOnce(stubPrints(stdout))
 }
 
 function mockGitFailure(message: string) {
-  mockExecFile.mockImplementationOnce(
-    (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) => cb(new Error(message))
-  )
+  mockExecFile.mockImplementationOnce(stubFails(new Error(message)))
+}
+
+/** The graphql reply for the section a dashboard query names by its alias, or its failure. */
+function dashboardSectionReply(
+  args: string[],
+  sections: Record<string, unknown[]>,
+  failing: Record<string, Error>
+): string | Error {
+  const alias = /(\w+): search\(/.exec(args[3])![1]
+  if (failing[alias]) return failing[alias]
+  return JSON.stringify({ data: { [alias]: { nodes: sections[alias] ?? [] } } })
 }
 
 // The dashboard sends one graphql request per section in parallel, so replies are
@@ -98,26 +108,18 @@ function mockDashboardExec(
   failing: Record<string, Error> = {}
 ) {
   mockExecFile.mockImplementation(
-    (_cmd: string, args: string[], opts: { cwd?: string }, cb: ExecCallback) => {
-      if (args[0] === 'api' && args[1] === 'user') return cb(null, { stdout: 'alice', stderr: '' })
-      if (args[0] === 'api' && args[1] === 'graphql') {
-        const alias = /(\w+): search\(/.exec(args[3])![1]
-        if (failing[alias]) return cb(failing[alias])
-        const data = { [alias]: { nodes: sections[alias] ?? [] } }
-        return cb(null, { stdout: JSON.stringify({ data }), stderr: '' })
-      }
-      const remote = remotes[opts.cwd ?? '']
-      if (remote instanceof Error || remote === undefined)
-        return cb(remote ?? new Error('no remote'))
-      return cb(null, { stdout: remote, stderr: '' })
-    }
+    stubAnswering(({ args, cwd }) => {
+      if (args[0] === 'api' && args[1] === 'user') return 'alice'
+      if (args[0] === 'api' && args[1] === 'graphql')
+        return dashboardSectionReply(args, sections, failing)
+      return remotes[cwd ?? ''] ?? new Error('no remote')
+    })
   )
 }
 
 function mockGitFailureWithStdout(message: string, stdout: string) {
   mockExecFile.mockImplementationOnce(
-    (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
-      cb(Object.assign(new Error(message), { stdout, stderr: '' }))
+    stubFails(Object.assign(new Error(message), { stdout, stderr: '' }))
   )
 }
 
@@ -208,6 +210,15 @@ describe('github:pr-review-detail', () => {
     expect(flat[1].whyHere).toBe('Calls computeRiskScore (step 1)')
     expect(result.pr.insights?.complexity.branchDelta).toBeGreaterThan(0)
   })
+})
+
+describe('github:pr-review-detail — returns a pr object on success with no status checks', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('returns a pr object on success with no status checks', async () => {
     mockPrDetail(PR_META)
@@ -223,6 +234,15 @@ describe('github:pr-review-detail', () => {
     expect(result.pr.statusChecks).toEqual([])
     expect(result.pr.ciStatus).toBe('none')
   })
+})
+
+describe('github:pr-review-detail — falls back to check-suites when statusCheckRollup is empty and suites are returned', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('falls back to check-suites when statusCheckRollup is empty and suites are returned', async () => {
     mockPrDetail(PR_META)
@@ -237,6 +257,15 @@ describe('github:pr-review-detail', () => {
     expect(result.pr.statusChecks[0].name).toBe('Buildkite')
     expect(result.pr.statusChecks[0].state).toBe('pending')
   })
+})
+
+describe('github:pr-review-detail — leaves statusChecks empty when check-suites also returns empty array', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('leaves statusChecks empty when check-suites also returns empty array', async () => {
     mockPrDetail(PR_META)
@@ -248,6 +277,15 @@ describe('github:pr-review-detail', () => {
     })) as { pr: { statusChecks: unknown[] } }
 
     expect(result.pr.statusChecks).toEqual([])
+  })
+})
+
+describe('github:pr-review-detail — skips check-suites fallback when headSHA is empty', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('skips check-suites fallback when headSHA is empty', async () => {
@@ -263,6 +301,15 @@ describe('github:pr-review-detail', () => {
     // Only 5 execFile calls (repo view + pr view + files + reviews + requested_reviewers), check-suites skipped
     expect(mockExecFile).toHaveBeenCalledTimes(5)
   })
+})
+
+describe('github:pr-review-detail — maps isDraft=true onto pr object', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('maps isDraft=true onto pr object', async () => {
     mockPrDetail({ ...PR_META, isDraft: true })
@@ -274,6 +321,15 @@ describe('github:pr-review-detail', () => {
     })) as { pr: { isDraft: boolean } }
 
     expect(result.pr.isDraft).toBe(true)
+  })
+})
+
+describe('github:pr-review-detail — maps SUCCESS conclusion to pass state', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('maps SUCCESS conclusion to pass state', async () => {
@@ -291,6 +347,15 @@ describe('github:pr-review-detail', () => {
     expect(result.pr.statusChecks[0].state).toBe('pass')
     expect(result.pr.statusChecks[0].url).toBe('https://ci/1')
   })
+})
+
+describe('github:pr-review-detail — maps FAILURE conclusion to fail state', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('maps FAILURE conclusion to fail state', async () => {
     mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'lint', conclusion: 'FAILURE' }] })
@@ -301,6 +366,15 @@ describe('github:pr-review-detail', () => {
     })) as { pr: { statusChecks: Array<{ state: string }> } }
 
     expect(result.pr.statusChecks[0].state).toBe('fail')
+  })
+})
+
+describe('github:pr-review-detail — maps TIMED_OUT and ACTION_REQUIRED conclusions to fail', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('maps TIMED_OUT and ACTION_REQUIRED conclusions to fail', async () => {
@@ -316,6 +390,15 @@ describe('github:pr-review-detail', () => {
       expect(result.pr.statusChecks[0].state).toBe('fail')
     }
   })
+})
+
+describe('github:pr-review-detail — maps IN_PROGRESS and QUEUED to pending state', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('maps IN_PROGRESS and QUEUED to pending state', async () => {
     for (const conclusion of ['IN_PROGRESS', 'QUEUED', 'PENDING', 'WAITING']) {
@@ -329,6 +412,15 @@ describe('github:pr-review-detail', () => {
 
       expect(result.pr.statusChecks[0].state).toBe('pending')
     }
+  })
+})
+
+describe('github:pr-review-detail — maps SKIPPED, NEUTRAL, CANCELLED to skipped state', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('maps SKIPPED, NEUTRAL, CANCELLED to skipped state', async () => {
@@ -344,6 +436,15 @@ describe('github:pr-review-detail', () => {
       expect(result.pr.statusChecks[0].state).toBe('skipped')
     }
   })
+})
+
+describe('github:pr-review-detail — maps unknown conclusion string to unknown state', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('maps unknown conclusion string to unknown state', async () => {
     mockPrDetail({
@@ -357,6 +458,15 @@ describe('github:pr-review-detail', () => {
     })) as { pr: { statusChecks: Array<{ state: string }> } }
 
     expect(result.pr.statusChecks[0].state).toBe('unknown')
+  })
+})
+
+describe('github:pr-review-detail — uses state field when conclusion is absent (StatusContext)', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('uses state field when conclusion is absent (StatusContext)', async () => {
@@ -372,6 +482,15 @@ describe('github:pr-review-detail', () => {
 
     expect(result.pr.statusChecks[0].name).toBe('legacy/check')
     expect(result.pr.statusChecks[0].state).toBe('pass')
+  })
+})
+
+describe('github:pr-review-detail — preserves multiple checks with mixed states', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('preserves multiple checks with mixed states', async () => {
@@ -394,6 +513,15 @@ describe('github:pr-review-detail', () => {
     expect(result.pr.statusChecks.find((c) => c.name === 'lint')?.state).toBe('fail')
     expect(result.pr.statusChecks.find((c) => c.name === 'deploy')?.state).toBe('pending')
   })
+})
+
+describe('github:pr-review-detail — maps mergeStateStatus BEHIND to behind', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('maps mergeStateStatus BEHIND to behind', async () => {
     mockPrDetail({ ...PR_META, mergeStateStatus: 'BEHIND' })
@@ -414,6 +542,15 @@ describe('github:pr-review-detail', () => {
     })) as { pr: { mergeStateStatus: string } }
     expect(result.pr.mergeStateStatus).toBe('dirty')
   })
+})
+
+describe('github:pr-review-detail — maps mergeStateStatus CLEAN to clean', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('maps mergeStateStatus CLEAN to clean', async () => {
     mockPrDetail({ ...PR_META, mergeStateStatus: 'CLEAN' })
@@ -423,6 +560,15 @@ describe('github:pr-review-detail', () => {
       prNumber: 6,
     })) as { pr: { mergeStateStatus: string } }
     expect(result.pr.mergeStateStatus).toBe('clean')
+  })
+})
+
+describe('github:pr-review-detail — maps lintStatus to fail when eslint check has FAILURE conclusion', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('maps lintStatus to fail when eslint check has FAILURE conclusion', async () => {
@@ -436,6 +582,15 @@ describe('github:pr-review-detail', () => {
     })) as { pr: { lintStatus: string } }
     expect(result.pr.lintStatus).toBe('fail')
   })
+})
+
+describe('github:pr-review-detail — maps lintStatus to warn when lint check is PENDING', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('maps lintStatus to warn when lint check is PENDING', async () => {
     mockPrDetail({
@@ -447,6 +602,15 @@ describe('github:pr-review-detail', () => {
       prNumber: 6,
     })) as { pr: { lintStatus: string } }
     expect(result.pr.lintStatus).toBe('warn')
+  })
+})
+
+describe('github:pr-review-detail — maps lintStatus to pass when lint check has SUCCESS conclusion', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('maps lintStatus to pass when lint check has SUCCESS conclusion', async () => {
@@ -460,6 +624,15 @@ describe('github:pr-review-detail', () => {
     })) as { pr: { lintStatus: string } }
     expect(result.pr.lintStatus).toBe('pass')
   })
+})
+
+describe('github:pr-review-detail — maps lintStatus to unknown when lint check is SKIPPED (non-blocking)', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('maps lintStatus to unknown when lint check is SKIPPED (non-blocking)', async () => {
     mockPrDetail({
@@ -471,6 +644,15 @@ describe('github:pr-review-detail', () => {
       prNumber: 6,
     })) as { pr: { lintStatus: string } }
     expect(result.pr.lintStatus).toBe('unknown')
+  })
+})
+
+describe('github:pr-review-detail — extracts approvals from REST reviews field', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('extracts approvals from REST reviews field', async () => {
@@ -495,6 +677,15 @@ describe('github:pr-review-detail', () => {
     expect(result.pr.approvals).toHaveLength(1)
     expect(result.pr.approvals[0].author).toBe('bob')
   })
+})
+
+describe('github:pr-review-detail — skips reviews with no login in mapApprovals', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('skips reviews with no login in mapApprovals', async () => {
     const reviews = [{ user: {}, state: 'APPROVED', submitted_at: '2026-05-01T10:00:00Z' }]
@@ -505,6 +696,15 @@ describe('github:pr-review-detail', () => {
       prNumber: 6,
     })) as { pr: { approvals: Array<{ author: string }> } }
     expect(result.pr.approvals).toHaveLength(0)
+  })
+})
+
+describe('github:pr-review-detail — deduplicates approvals keeping the later non-COMMENTED review', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('deduplicates approvals keeping the later non-COMMENTED review', async () => {
@@ -530,6 +730,15 @@ describe('github:pr-review-detail', () => {
     expect(result.pr.approvals).toHaveLength(1)
     expect(result.pr.approvals[0].author).toBe('bob')
   })
+})
+
+describe('github:pr-review-detail — lintStatus is unknown for a lint check with a non-blocking-but-unrecognized conclusion', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('lintStatus is unknown for a lint check with a non-blocking-but-unrecognized conclusion', async () => {
     // STARTUP_FAILURE is not in FAILURE/ERROR/TIMED_OUT/ACTION_REQUIRED, not in PENDING set,
@@ -547,6 +756,15 @@ describe('github:pr-review-detail', () => {
 
     expect(result.pr.lintStatus).toBe('unknown')
   })
+})
+
+describe('github:pr-review-detail — maps mergeStateStatus CONFLICTING to dirty', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('maps mergeStateStatus CONFLICTING to dirty', async () => {
     mockPrDetail({
@@ -560,6 +778,15 @@ describe('github:pr-review-detail', () => {
     })) as { pr: { mergeStateStatus: string } }
     expect(result.pr.mergeStateStatus).toBe('dirty')
   })
+})
+
+describe('github:pr-review-detail — maps unknown mergeStateStatus to unknown', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('maps unknown mergeStateStatus to unknown', async () => {
     mockPrDetail({
@@ -572,6 +799,15 @@ describe('github:pr-review-detail', () => {
       prNumber: 6,
     })) as { pr: { mergeStateStatus: string } }
     expect(result.pr.mergeStateStatus).toBe('unknown')
+  })
+})
+
+describe('github:pr-review-detail — exercises computeCoChangeAffinityFromGit when PR has 2+ files', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('exercises computeCoChangeAffinityFromGit when PR has 2+ files', async () => {
@@ -698,6 +934,16 @@ describe('github:pr-file-content', () => {
     expect(mockExecFile.mock.calls[0][0]).toBe('git')
     expect(mockExecFile.mock.calls[0][1]).toEqual(['show', 'abc123:src/foo.ts'])
   })
+})
+
+describe('github:pr-file-content — fetches the PR head and retries once when the commit is not local', () => {
+  let handlers: Record<string, Handler>
+  const payload = { repoRoot: '/repo', prNumber: 6, path: 'src/foo.ts', ref: 'abc123' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('fetches the PR head and retries once when the commit is not local', async () => {
     mockGitFailure('fatal: bad object abc123')
@@ -713,6 +959,16 @@ describe('github:pr-file-content', () => {
     ])
     expect(mockExecFile.mock.calls[2][1]).toEqual(['show', 'abc123:src/foo.ts'])
   })
+})
+
+describe('github:pr-file-content — returns an error when the retry also fails', () => {
+  let handlers: Record<string, Handler>
+  const payload = { repoRoot: '/repo', prNumber: 6, path: 'src/foo.ts', ref: 'abc123' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('returns an error when the retry also fails', async () => {
     mockGitFailure('fatal: bad object abc123')
@@ -721,6 +977,16 @@ describe('github:pr-file-content', () => {
     const result = await handlers['github:pr-file-content'](payload)
     expect(result).toMatchObject({ error: expect.stringContaining('path not in abc123') })
     expect(mockExecFile).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('github:pr-file-content — asks GitHub for the raw file with an encoded path for a gh: root, never git', () => {
+  let handlers: Record<string, Handler>
+  const payload = { repoRoot: '/repo', prNumber: 6, path: 'src/foo.ts', ref: 'abc123' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('asks GitHub for the raw file with an encoded path for a gh: root, never git', async () => {
@@ -737,6 +1003,16 @@ describe('github:pr-file-content', () => {
     expect(args).toContain('Accept: application/vnd.github.raw+json')
     expect(args).toContain('repos/{owner}/{repo}/contents/src/my%20dir/a%23b.ts?ref=abc123')
   })
+})
+
+describe('github:pr-file-content — returns tooLarge instead of content past two megabytes', () => {
+  let handlers: Record<string, Handler>
+  const payload = { repoRoot: '/repo', prNumber: 6, path: 'src/foo.ts', ref: 'abc123' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('returns tooLarge instead of content past two megabytes', async () => {
     mockGitSuccess('x'.repeat(2 * 1024 * 1024 + 1))
@@ -752,6 +1028,16 @@ describe('github:pr-file-content', () => {
   it('measures the limit in bytes, not characters', async () => {
     mockGitSuccess('é'.repeat(1024 * 1024 + 1))
     expect(await handlers['github:pr-file-content'](payload)).toEqual({ tooLarge: true })
+  })
+})
+
+describe('github:pr-file-content — keeps leading and trailing blank lines, which line numbers depend on', () => {
+  let handlers: Record<string, Handler>
+  const payload = { repoRoot: '/repo', prNumber: 6, path: 'src/foo.ts', ref: 'abc123' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('keeps leading and trailing blank lines, which line numbers depend on', async () => {
@@ -771,15 +1057,24 @@ describe('github:pr-file-content', () => {
     }
     expect(mockExecFile).toHaveBeenCalledTimes(2)
   })
+})
+
+describe('github:pr-file-content — returns tooLarge when the read overflows, without fetching and retrying', () => {
+  let handlers: Record<string, Handler>
+  const payload = { repoRoot: '/repo', prNumber: 6, path: 'src/foo.ts', ref: 'abc123' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('returns tooLarge when the read overflows, without fetching and retrying', async () => {
     mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
-        cb(
-          Object.assign(new Error('stdout maxBuffer length exceeded'), {
-            code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER',
-          })
-        )
+      stubFails(
+        Object.assign(new Error('stdout maxBuffer length exceeded'), {
+          code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER',
+        })
+      )
     )
     expect(await handlers['github:pr-file-content'](payload)).toEqual({ tooLarge: true })
     expect(mockExecFile).toHaveBeenCalledTimes(1)
@@ -788,7 +1083,6 @@ describe('github:pr-file-content', () => {
 
 describe('github:list-open-prs', () => {
   let handlers: Record<string, Handler>
-  const REPO_VIEW = { owner: { login: 'test-owner' }, name: 'test-repo' }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -811,6 +1105,15 @@ describe('github:list-open-prs', () => {
     expect(result.error).toBe('RATE_LIMITED')
     expect(result.resetAt).toBeTypeOf('number')
   })
+})
+
+describe('github:list-open-prs — returns generic error message for other failures', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('returns generic error message for other failures', async () => {
     mockGitFailure('network timeout')
@@ -818,6 +1121,15 @@ describe('github:list-open-prs', () => {
       repoRoot: '/repo',
     })) as { error: string }
     expect(result.error).toContain('network timeout')
+  })
+})
+
+describe('github:list-open-prs — handles numeric PR number search', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('handles numeric PR number search', async () => {
@@ -842,6 +1154,15 @@ describe('github:list-open-prs', () => {
     })) as { prs: unknown[]; hasMore: boolean }
     expect(result.prs).toHaveLength(1)
     expect(result.hasMore).toBe(false)
+  })
+})
+
+describe('github:list-open-prs — handles text search', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('handles text search', async () => {
@@ -872,6 +1193,16 @@ describe('github:list-open-prs', () => {
 
   // Settings → Git → Branch Exclude Patterns: the queue leaves out pull
   // requests opened from an excluded branch, and does not count them.
+})
+
+describe('github:list-open-prs — leaves out pull requests opened from an excluded branch', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
   it('leaves out pull requests opened from an excluded branch', async () => {
     handlers = captureHandlers(undefined, async (branch, repoPath) =>
       repoPath === '/repo' ? branch.startsWith('renovate/') : false
@@ -900,6 +1231,15 @@ describe('github:list-open-prs', () => {
     expect(result.prs.map((pr) => pr.number)).toEqual([2])
     expect(result.totalCount).toBe(1)
   })
+})
+
+describe('github:list-open-prs — leaves excluded branches out of a text search too', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('leaves excluded branches out of a text search too', async () => {
     handlers = captureHandlers(undefined, async (branch) => branch.startsWith('renovate/'))
@@ -914,6 +1254,15 @@ describe('github:list-open-prs', () => {
       search: 'bump',
     })) as { prs: { number: number }[] }
     expect(result.prs.map((pr) => pr.number)).toEqual([2])
+  })
+})
+
+describe('github:list-open-prs — handles paginated GraphQL load with cursor', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('handles paginated GraphQL load with cursor', async () => {
@@ -936,6 +1285,15 @@ describe('github:list-open-prs', () => {
     })) as { prs: unknown[]; hasMore: boolean; nextCursor?: string }
     expect(result.hasMore).toBe(true)
     expect(result.nextCursor).toBe('cursor-xyz')
+  })
+})
+
+describe('github:list-open-prs — always asks GraphQL for open PRs, newest first, and ignores includeClosedPrs', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('always asks GraphQL for open PRs, newest first, and ignores includeClosedPrs', async () => {
@@ -964,6 +1322,15 @@ describe('github:list-open-prs', () => {
     expect(query).not.toContain('direction:ASC')
     expect(query).toMatch(/nodes\{number title state isDraft/)
   })
+})
+
+describe('github:list-open-prs — maps the PR state of a GraphQL node', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('maps the PR state of a GraphQL node', async () => {
     mockGitSuccess(JSON.stringify(REPO_VIEW))
@@ -984,6 +1351,15 @@ describe('github:list-open-prs', () => {
     }
     expect(result.prs[0].state).toBe('open')
   })
+})
+
+describe('github:list-open-prs — searches open PRs only for plain text', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('searches open PRs only for plain text', async () => {
     mockGitSuccess('[]')
@@ -996,6 +1372,15 @@ describe('github:list-open-prs', () => {
       'fix bug',
     ])
     expect(args[args.indexOf('--json') + 1]).toContain('state')
+  })
+})
+
+describe('github:list-open-prs — searches merged PRs for is:merged and strips the qualifier', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('searches merged PRs for is:merged and strips the qualifier', async () => {
@@ -1012,6 +1397,15 @@ describe('github:list-open-prs', () => {
     const args = mockExecFile.mock.calls[0][1] as string[]
     expect(args[args.indexOf('--state') + 1]).toBe('closed')
     expect(args).not.toContain('--search')
+  })
+})
+
+describe('github:list-open-prs — normalizes GQL nodes with optional fields when response contains PRs', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('normalizes GQL nodes with optional fields when response contains PRs', async () => {
@@ -1075,6 +1469,15 @@ describe('github:list-open-prs', () => {
     expect(result.prs).toHaveLength(1)
     expect(result.prs[0].number).toBe(7)
     expect(result.prs[0].requestedReviewers).toContain('carol')
+  })
+})
+
+describe('github:list-open-prs — normalizes GQL nodes when optional fields are absent', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('normalizes GQL nodes when optional fields are absent', async () => {
@@ -1165,6 +1568,15 @@ describe('github:pr-inline-comments', () => {
     expect(result.comments).toHaveLength(1)
     expect(result.resolvedCommentIds).toEqual([1])
   })
+})
+
+describe('github:pr-inline-comments — returns resolvedCommentIds: [] when the GraphQL resolved-threads call fails', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('returns resolvedCommentIds: [] when the GraphQL resolved-threads call fails', async () => {
     const comments = [
@@ -1192,6 +1604,15 @@ describe('github:pr-inline-comments', () => {
     })) as { comments: unknown[]; resolvedCommentIds: number[] }
     expect(result.comments).toHaveLength(1)
     expect(result.resolvedCommentIds).toEqual([])
+  })
+})
+
+describe('github:pr-inline-comments — returns NOT_AUTHENTICATED on auth error', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('returns NOT_AUTHENTICATED on auth error', async () => {
@@ -1260,6 +1681,15 @@ describe('github:pr-review-submit', () => {
     })) as { reviewId: number }
     expect(result.reviewId).toBe(999)
   })
+})
+
+describe('github:pr-review-submit — returns error string on failure', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('returns error string on failure', async () => {
     mockGitFailure('permission denied')
@@ -1271,6 +1701,15 @@ describe('github:pr-review-submit', () => {
       body: '',
     })) as { error: string }
     expect(result.error).toContain('permission denied')
+  })
+})
+
+describe('github:pr-review-submit — extracts string error from JSON stdout errors array (covers 731T, 740T branches)', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('extracts string error from JSON stdout errors array (covers 731T, 740T branches)', async () => {
@@ -1287,6 +1726,15 @@ describe('github:pr-review-submit', () => {
       body: 'LGTM',
     })) as { error: string }
     expect(result.error).toBe('Cannot approve your own pull request')
+  })
+})
+
+describe('github:pr-review-submit — sends draft comments in the same POST via --input (S5)', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('sends draft comments in the same POST via --input (S5)', async () => {
@@ -1349,6 +1797,15 @@ describe('github:sessions-for-repo and github:session-get/set', () => {
       session: null
     }
     expect(result.session).toBeNull()
+  })
+})
+
+describe('github:sessions-for-repo and github:session-get/set — github:session-set stores a valid session', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('github:session-set stores a valid session', async () => {
@@ -1415,6 +1872,15 @@ describe('github:prune-active-reviews', () => {
     })) as { openNumbers: number[] }
     expect(result.openNumbers).toEqual([7])
   })
+})
+
+describe('github:prune-active-reviews — excludes CLOSED PRs from openNumbers and removes them from the store', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('excludes CLOSED PRs from openNumbers and removes them from the store', async () => {
     mockGitSuccess(JSON.stringify({ number: 8, state: 'CLOSED' }))
@@ -1432,6 +1898,15 @@ describe('github:prune-active-reviews', () => {
       prNumbers: [9],
     })) as { openNumbers: number[] }
     expect(result.openNumbers).toEqual([])
+  })
+})
+
+describe('github:prune-active-reviews — silently skips PRs whose gh call fails and excludes them from openNumbers', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('silently skips PRs whose gh call fails and excludes them from openNumbers', async () => {
@@ -1472,6 +1947,15 @@ describe('github:pr-review-detail — catchError branches', () => {
     })) as { error: string }
     expect(result.error).toBe('NOT_AUTHENTICATED')
   })
+})
+
+describe('github:pr-review-detail — catchError branches — returns RATE_LIMITED when rate limit error thrown', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('returns RATE_LIMITED when rate limit error thrown', async () => {
     mockGitFailure('rate limit exceeded')
@@ -1482,6 +1966,15 @@ describe('github:pr-review-detail — catchError branches', () => {
     })) as { error: string; resetAt?: number }
     expect(result.error).toBe('RATE_LIMITED')
     expect(result.resetAt).toBeTypeOf('number')
+  })
+})
+
+describe('github:pr-review-detail — catchError branches — returns generic error string for other failures', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('returns generic error string for other failures', async () => {
@@ -1552,6 +2045,15 @@ describe('github:pr-mark-ready', () => {
     expect(args).toContain('ready')
     expect(args).toContain('6')
   })
+})
+
+describe('github:pr-mark-ready — returns error string when gh fails', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('returns error string when gh fails', async () => {
     mockGitFailure('not in draft state')
@@ -1596,6 +2098,15 @@ describe('github:pr-issue-comments', () => {
     expect(result.comments[0].author).toBe('alice')
     expect(result.comments[0].body).toBe('Looks good')
   })
+})
+
+describe('github:pr-issue-comments — includes PR review body comments merged with issue comments', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('includes PR review body comments merged with issue comments', async () => {
     const issueComments = [
@@ -1627,6 +2138,15 @@ describe('github:pr-issue-comments', () => {
     // sorted by createdAt — review body (Jan 1) before issue comment (Jan 2)
     expect(result.comments[0].body).toBe('Review body comment')
     expect(result.comments[1].body).toBe('Issue comment')
+  })
+})
+
+describe('github:pr-issue-comments — returns error string when gh fails', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
   })
 
   it('returns error string when gh fails', async () => {
@@ -1671,6 +2191,15 @@ describe('github:pr-issue-comment-add', () => {
     expect(args).toContain('POST')
     expect(args).toContain('body=LGTM!')
   })
+})
+
+describe('github:pr-issue-comment-add — returns error string when gh fails', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('returns error string when gh fails', async () => {
     mockGitFailure('forbidden')
@@ -1703,6 +2232,14 @@ describe('github:pr-update-branch', () => {
     expect(args).toContain('update-branch')
     expect(args).toContain('6')
     expect(args).toContain('--rebase=false')
+  })
+})
+
+describe('github:pr-update-branch — returns error string when gh fails', () => {
+  let handlers: Record<string, Handler>
+  beforeEach(() => {
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
   })
 
   it('returns error string when gh fails', async () => {
@@ -1739,6 +2276,13 @@ describe('github:current-user', () => {
     }
     expect(result.error).toContain('not authenticated')
   })
+})
+
+describe('github:current-user — passes GH_TOKEN env var to gh when a token is configured', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    captureHandlers()
+  })
 
   it('passes GH_TOKEN env var to gh when a token is configured', async () => {
     const handlersWithToken = captureHandlersWithToken('my-secret-token')
@@ -1746,6 +2290,13 @@ describe('github:current-user', () => {
     await handlersWithToken['github:current-user']({ repoRoot: '/repo' })
     const callOpts = mockExecFile.mock.calls[0][2] as { env?: Record<string, string> }
     expect(callOpts.env?.GH_TOKEN).toBe('my-secret-token')
+  })
+})
+
+describe('github:current-user — retries without token when token is set but gh returns auth error', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    captureHandlers()
   })
 
   it('retries without token when token is set but gh returns auth error', async () => {
@@ -1837,6 +2388,19 @@ describe('github:remove-active-review — store side-effects', () => {
     expect(result.ok).toBe(true)
     // Verify sessionStore.delete was called for the matching session key (line 842)
     expect(deleteSpy).toHaveBeenCalledWith('/repo:::42:::abc123')
+  })
+})
+
+describe('github:remove-active-review — store side-effects — returns { error } when activeReviewStore.delete throws (line 846)', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('returns { error } when activeReviewStore.delete throws (line 846)', async () => {
@@ -1952,6 +2516,16 @@ describe('github:file-viewed-set', () => {
     expect(mutationArgs.join(' ')).toContain('markFileAsViewed')
     expect(mutationArgs.some((a) => a.includes('id=PR_id123'))).toBe(true)
   })
+})
+
+describe('github:file-viewed-set — unmarks a file via unmarkFileAsViewed', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
+  })
 
   it('unmarks a file via unmarkFileAsViewed', async () => {
     mockGitSuccess(JSON.stringify({ owner: { login: 'owner' }, name: 'repo' }))
@@ -1967,6 +2541,16 @@ describe('github:file-viewed-set', () => {
     expect(result.ok).toBe(true)
     const mutationArgs: string[] = mockExecFile.mock.calls[2][1]
     expect(mutationArgs.join(' ')).toContain('unmarkFileAsViewed')
+  })
+})
+
+describe('github:file-viewed-set — returns an error when the PR id lookup fails', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
   })
 
   it('returns an error when the PR id lookup fails', async () => {
@@ -2008,6 +2592,16 @@ describe('github:pr-compare', () => {
     expect(result.files).toEqual([{ path: 'src/foo.ts', status: 'modified', patch: '@@ -1 +1 @@' }])
     const compareArgs: string[] = mockExecFile.mock.calls[1][1]
     expect(compareArgs.join(' ')).toContain('compare/aaa...bbb')
+  })
+})
+
+describe('github:pr-compare — returns rewritten:true when gh reports no common ancestor', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
   })
 
   it('returns rewritten:true when gh reports no common ancestor', async () => {
@@ -2121,6 +2715,16 @@ describe('review revamp — edge branches', () => {
     }
     expect(result.pr.insights?.coverage.patchPercent).toBe(84)
   })
+})
+
+describe('review revamp — edge branches — compare tolerates a response with no files or counts', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
+  })
 
   it('compare tolerates a response with no files or counts', async () => {
     mockGitSuccess(JSON.stringify({ owner: { login: 'owner' }, name: 'repo' }))
@@ -2131,6 +2735,16 @@ describe('review revamp — edge branches', () => {
       toSha: 'bbb',
     })
     expect(result).toEqual({ rewritten: false, commits: 0, files: [] })
+  })
+})
+
+describe('review revamp — edge branches — compare keeps a file whose patch GitHub omitted (a binary or huge file)', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
   })
 
   it('compare keeps a file whose patch GitHub omitted (a binary or huge file)', async () => {
@@ -2145,6 +2759,16 @@ describe('review revamp — edge branches', () => {
     })) as { files: unknown[] }
     expect(result.files).toEqual([{ path: 'logo.png', status: 'added', patch: '' }])
   })
+})
+
+describe('review revamp — edge branches — compare reports other failures as errors, not as rewritten history', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
+  })
 
   it('compare reports other failures as errors, not as rewritten history', async () => {
     mockGitSuccess(JSON.stringify({ owner: { login: 'owner' }, name: 'repo' }))
@@ -2157,6 +2781,16 @@ describe('review revamp — edge branches', () => {
     expect(result.rewritten).toBeUndefined()
     expect(result.error).toContain('500')
   })
+})
+
+describe('review revamp — edge branches — clone reports a gh failure', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
+  })
 
   it('clone reports a gh failure', async () => {
     mockGitFailure('repository not found')
@@ -2165,6 +2799,14 @@ describe('review revamp — edge branches', () => {
       folder: '/tmp',
     })) as { error: string }
     expect(result.error).toContain('repository not found')
+  })
+})
+
+describe('review revamp — edge branches — maps ssh remotes, and ignores non-GitHub and unreadable ones', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    captureHandlers()
   })
 
   it('maps ssh remotes, and ignores non-GitHub and unreadable ones', async () => {
@@ -2270,6 +2912,13 @@ describe('github:dashboard-search', () => {
     const userCallOpts = mockExecFile.mock.calls[0][2] as { cwd?: string }
     expect(userCallOpts.cwd).toBe(USER_DATA)
   })
+})
+
+describe('github:dashboard-search — sends each section as its own graphql request', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+  })
 
   it('sends each section as its own graphql request', async () => {
     const handlers = captureHandlers()
@@ -2281,6 +2930,13 @@ describe('github:dashboard-search', () => {
       .map((args) => args[3])
     expect(queries).toHaveLength(5)
     for (const q of queries) expect(q.match(/: search\(/g)).toHaveLength(1)
+  })
+})
+
+describe('github:dashboard-search — scopes every section to the selected repositories', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
   })
 
   it('scopes every section to the selected repositories', async () => {
@@ -2295,6 +2951,13 @@ describe('github:dashboard-search', () => {
     for (const q of queries) expect(q).toContain(' repo:acme/widgets repo:acme/gadgets"')
     expect(result.scopedTo).toBe(2)
   })
+})
+
+describe('github:dashboard-search — reports no scope when no repositories are selected', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+  })
 
   it('reports no scope when no repositories are selected', async () => {
     const handlers = captureHandlers(() => [])
@@ -2305,6 +2968,13 @@ describe('github:dashboard-search', () => {
     }
     expect(result.scopedTo).toBe(0)
     expect(result.failed).toEqual([])
+  })
+})
+
+describe('github:dashboard-search — keeps the other sections when one fails, naming the failure briefly', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
   })
 
   it('keeps the other sections when one fails, naming the failure briefly', async () => {
@@ -2342,6 +3012,13 @@ describe('github:dashboard-search', () => {
     expect(result.prs.map((p) => p.number)).toEqual([7])
     expect(result.failed).toEqual([{ section: 'team', error: 'gh: HTTP 502' }])
   })
+})
+
+describe('github:dashboard-search — returns the error when every section fails', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+  })
 
   it('returns the error when every section fails', async () => {
     const handlers = captureHandlers()
@@ -2353,6 +3030,13 @@ describe('github:dashboard-search', () => {
     )
     const result = (await handlers['github:dashboard-search']({})) as { error: string }
     expect(result.error).toContain('HTTP 502')
+  })
+})
+
+describe('github:dashboard-search — returns catchError shape when the login lookup fails', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
   })
 
   it('returns catchError shape when the login lookup fails', async () => {
@@ -2368,40 +3052,37 @@ describe('github:dashboard-search', () => {
   })
 })
 
-describe('github:accessible-repos', () => {
-  const JSONL = [
-    {
-      fullName: 'acme/zeta',
-      owner: 'acme',
-      private: true,
-      archived: false,
-      pushedAt: '2026-01-02T00:00:00Z',
-    },
-    {
-      fullName: 'acme/old',
-      owner: 'acme',
-      private: false,
-      archived: true,
-      pushedAt: '2020-01-01T00:00:00Z',
-    },
-    {
-      fullName: 'Acme/alpha',
-      owner: 'Acme',
-      private: false,
-      archived: false,
-      pushedAt: '2026-02-02T00:00:00Z',
-    },
-  ]
-    .map((r) => JSON.stringify(r))
-    .join('\n')
+const JSONL = [
+  {
+    fullName: 'acme/zeta',
+    owner: 'acme',
+    private: true,
+    archived: false,
+    pushedAt: '2026-01-02T00:00:00Z',
+  },
+  {
+    fullName: 'acme/old',
+    owner: 'acme',
+    private: false,
+    archived: true,
+    pushedAt: '2020-01-01T00:00:00Z',
+  },
+  {
+    fullName: 'Acme/alpha',
+    owner: 'Acme',
+    private: false,
+    archived: false,
+    pushedAt: '2026-02-02T00:00:00Z',
+  },
+]
+  .map((r) => JSON.stringify(r))
+  .join('\n')
 
+describe('github:accessible-repos', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockExecFile.mockReset()
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
-        cb(null, { stdout: JSONL + '\n', stderr: '' })
-    )
+    mockExecFile.mockImplementation(stubPrints(JSONL + '\n'))
   })
 
   it('drops archived repositories and sorts by name ignoring case', async () => {
@@ -2421,6 +3102,14 @@ describe('github:accessible-repos', () => {
     ])
     expect(options).toMatchObject({ cwd: USER_DATA, maxBuffer: 50 * 1024 * 1024, timeout: 60_000 })
   })
+})
+
+describe('github:accessible-repos — serves a second call from the cache and re-runs on refresh', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    mockExecFile.mockImplementation(stubPrints(JSONL + '\n'))
+  })
 
   it('serves a second call from the cache and re-runs on refresh', async () => {
     const handlers = captureHandlers()
@@ -2433,9 +3122,7 @@ describe('github:accessible-repos', () => {
 
   it('does not cache a failure', async () => {
     const handlers = captureHandlers()
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) => cb(new Error('boom'))
-    )
+    mockExecFile.mockImplementationOnce(stubFails(new Error('boom')))
     expect(await handlers['github:accessible-repos']({})).toHaveProperty('error')
     expect(await handlers['github:accessible-repos']({})).toHaveProperty('repos')
   })
@@ -2451,11 +3138,7 @@ describe('gh: pseudo-root (uncloned repo)', () => {
   })
 
   it('routes github:pr-mark-ready through GH_REPO with cwd in api.paths.userData, no git spawned', async () => {
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) => {
-        cb(null, { stdout: '', stderr: '' })
-      }
-    )
+    mockExecFile.mockImplementationOnce(stubPrints(''))
     const result = (await handlers['github:pr-mark-ready']({
       repoRoot: 'gh:acme/widgets',
       prNumber: 6,
@@ -2474,6 +3157,16 @@ describe('gh: pseudo-root (uncloned repo)', () => {
     expect(callOpts.env?.GH_REPO).toBe('acme/widgets')
     expect(process.env.GH_REPO).toBeUndefined()
   })
+})
+
+describe('gh: pseudo-root (uncloned repo) — builds owner/repo API paths for a gh: root', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
+  })
 
   it('builds owner/repo API paths for a gh: root', async () => {
     mockGitSuccess(JSON.stringify({ ahead_by: 1, files: [] }))
@@ -2483,6 +3176,16 @@ describe('gh: pseudo-root (uncloned repo)', () => {
       toSha: 'bbb222',
     })
     expect(mockExecFile.mock.calls[0][1]).toContain('repos/acme/widgets/compare/aaa111...bbb222')
+  })
+})
+
+describe('gh: pseudo-root (uncloned repo) — github:pr-file-diff reads the patch from GitHub for a gh: root, never git', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
   })
 
   it('github:pr-file-diff reads the patch from GitHub for a gh: root, never git', async () => {
@@ -2518,12 +3221,10 @@ function routeExec(route: (args: string[]) => string | Error): Spawn[] {
   const spawns: Spawn[] = []
   mockExecFile.mockReset()
   mockExecFile.mockImplementation(
-    (cmd: string, args: string[], _opts: unknown, cb: ExecCallback) => {
-      spawns.push({ cmd, args })
-      const out = route(args)
-      if (out instanceof Error) return cb(out)
-      return cb(null, { stdout: out, stderr: '' })
-    }
+    stubAnswering(({ command, args }) => {
+      spawns.push({ cmd: command, args })
+      return route(args)
+    })
   )
   return spawns
 }
@@ -2547,6 +3248,12 @@ describe('handler timing', () => {
   })
 })
 
+const gitRoute = (a: string[]) => {
+  if (isGhPrView(a)) return '{"baseRefName":"main"}'
+  if (a[0] === 'merge-base') return 'mb111\n'
+  return ''
+}
+
 describe('github:pr-file-diff caching', () => {
   const payload = { repoRoot: '/repo', prNumber: 6, path: 'src/foo.ts' }
   let handlers: Record<string, Handler>
@@ -2554,12 +3261,6 @@ describe('github:pr-file-diff caching', () => {
   beforeEach(() => {
     handlers = captureHandlers()
   })
-
-  const gitRoute = (a: string[]) => {
-    if (isGhPrView(a)) return '{"baseRefName":"main"}'
-    if (a[0] === 'merge-base') return 'mb111\n'
-    return ''
-  }
 
   it('skips fetch and gh pr view when the head commit is unchanged', async () => {
     const spawns = routeExec(gitRoute)
@@ -2572,6 +3273,15 @@ describe('github:pr-file-diff caching', () => {
     expect(spawns.map((s) => s.args.slice(0, 2))).toEqual([
       ['diff', 'mb111...refs/remotes/pull/6/head'],
     ])
+  })
+})
+
+describe('github:pr-file-diff caching — fetches again when the head commit changed', () => {
+  const payload = { repoRoot: '/repo', prNumber: 6, path: 'src/foo.ts' }
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    handlers = captureHandlers()
   })
 
   it('fetches again when the head commit changed', async () => {
@@ -2591,6 +3301,15 @@ describe('github:pr-file-diff caching', () => {
 
     expect(spawns.some((s) => isGhPrView(s.args))).toBe(false)
     expect(spawns.find((s) => s.args[0] === 'merge-base')?.args).toContain('origin/develop')
+  })
+})
+
+describe('github:pr-file-diff caching — does not reuse a cached merge base without a head commit', () => {
+  const payload = { repoRoot: '/repo', prNumber: 6, path: 'src/foo.ts' }
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    handlers = captureHandlers()
   })
 
   it('does not reuse a cached merge base without a head commit', async () => {
@@ -2622,7 +3341,9 @@ describe('repository lookups run once', () => {
 
     expect(spawns.filter((s) => isGhRepoView(s.args))).toHaveLength(1)
   })
+})
 
+describe('repository lookups run once — asks again after a failed lookup', () => {
   it('asks again after a failed lookup', async () => {
     const handlers = captureHandlers()
     let fail = true
@@ -2638,7 +3359,9 @@ describe('repository lookups run once', () => {
 
     expect(spawns.filter((s) => isGhRepoView(s.args))).toHaveLength(2)
   })
+})
 
+describe('repository lookups run once — looks up the signed-in user once across handlers', () => {
   it('looks up the signed-in user once across handlers', async () => {
     const handlers = captureHandlers()
     const spawns = routeExec((a) => (a[0] === 'api' && a[1] === 'user' ? 'alice\n' : '{"data":{}}'))
@@ -2782,6 +3505,13 @@ describe('viewed files', () => {
     expect(result.pr.nodeId).toBe('PR_node1')
     expect(spawns.find((s) => isGhPrView(s.args))?.args.join(' ')).toContain('id,')
   })
+})
+
+describe('viewed files — github:file-viewed-set with a node id makes one gh call', () => {
+  let handlers: Record<string, Handler>
+  beforeEach(() => {
+    handlers = captureHandlers()
+  })
 
   it('github:file-viewed-set with a node id makes one gh call', async () => {
     const spawns = routeExec(() => '{}')
@@ -2798,6 +3528,13 @@ describe('viewed files', () => {
     expect(spawns).toHaveLength(1)
     expect(spawns[0].args.join(' ')).toContain('markFileAsViewed')
     expect(spawns[0].args).toContain('id=PR_node1')
+  })
+})
+
+describe('viewed files — github:files-viewed-set sends one request with one mutation per path', () => {
+  let handlers: Record<string, Handler>
+  beforeEach(() => {
+    handlers = captureHandlers()
   })
 
   it('github:files-viewed-set sends one request with one mutation per path', async () => {
@@ -2816,6 +3553,13 @@ describe('viewed files', () => {
     const query = spawns[0].args.find((x) => x.startsWith('query='))!
     expect(query.match(/unmarkFileAsViewed/g)).toHaveLength(3)
     expect(spawns[0].args).toEqual(expect.arrayContaining(['p0=a.ts', 'p1=b.ts', 'p2=c.ts']))
+  })
+})
+
+describe('viewed files — github:files-viewed-set looks up the node id when none is given', () => {
+  let handlers: Record<string, Handler>
+  beforeEach(() => {
+    handlers = captureHandlers()
   })
 
   it('github:files-viewed-set looks up the node id when none is given', async () => {
@@ -2928,15 +3672,12 @@ describe('github:dashboard-search sessions and cap', () => {
   it('reports sections whose search matched more than it returned', async () => {
     const handlers = captureHandlers()
     mockExecFile.mockImplementation(
-      (_cmd: string, args: string[], _o: unknown, cb: ExecCallback) => {
-        if (args[1] === 'user') return cb(null, { stdout: 'alice', stderr: '' })
+      stubAnswering(({ args }) => {
+        if (args[1] === 'user') return 'alice'
         const alias = /(\w+): search\(/.exec(args[3])![1]
         const issueCount = alias === 'mine' ? 120 : 0
-        return cb(null, {
-          stdout: JSON.stringify({ data: { [alias]: { issueCount, nodes: [] } } }),
-          stderr: '',
-        })
-      }
+        return JSON.stringify({ data: { [alias]: { issueCount, nodes: [] } } })
+      })
     )
     const result = (await handlers['github:dashboard-search']({})) as { capped: string[] }
     expect(result.capped).toEqual(['mine'])

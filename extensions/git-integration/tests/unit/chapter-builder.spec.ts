@@ -31,7 +31,9 @@ describe('buildChapters()', () => {
     expect(ids).toContain('auth')
     expect(ids).toContain('docs')
   })
+})
 
+describe('buildChapters() — assigns semantic group names for canonical directories', () => {
   it('assigns semantic group names for canonical directories', () => {
     const chapters = buildChapters([f('services/auth.ts'), f('components/Button.tsx')])
     const names = chapters.map((c) => c.name)
@@ -52,7 +54,9 @@ describe('buildChapters()', () => {
     const chapters = buildChapters(manyFiles)
     expect(chapters).toHaveLength(1)
   })
+})
 
+describe('buildChapters() — places type/interface files in tier 0', () => {
   it('places type/interface files in tier 0', () => {
     const chapters = buildChapters([f('src/auth.types.ts'), f('src/auth.ts')])
     const files = chapters.flatMap((c) => c.files)
@@ -72,7 +76,9 @@ describe('buildChapters()', () => {
     const files = chapters.flatMap((c) => c.files)
     expect(files.find((f) => f.path === 'package-lock.json')?.tier).toBe(3)
   })
+})
 
+describe('buildChapters() — implementation files (tier 1) appear before type files (tier 0) within the same chapter', () => {
   it('implementation files (tier 1) appear before type files (tier 0) within the same chapter', () => {
     const chapters = buildChapters([f('src/types.ts'), f('src/service.ts')])
     const files = chapters[0].files
@@ -96,7 +102,9 @@ describe('buildChapters()', () => {
     const utilIdx = files.findIndex((f) => f.path === 'src/util.ts')
     expect(compIdx).toBeLessThan(utilIdx)
   })
+})
 
+describe('buildChapters() — all-mechanical files form their own chapter with tier 3', () => {
   it('all-mechanical files form their own chapter with tier 3', () => {
     const chapters = buildChapters([f('package-lock.json'), f('src/auth.ts')])
     const mechChapter = chapters.find((c) => c.files.every((f) => f.tier === 3))
@@ -118,7 +126,9 @@ describe('buildChapters()', () => {
     const files = chapters.flatMap((c) => c.files)
     expect(files.every((f) => typeof f.whyHere === 'string' && f.whyHere.length > 0)).toBe(true)
   })
+})
 
+describe('buildChapters() — sets estimatedMinutes on each chapter as sum of file estimates', () => {
   it('sets estimatedMinutes on each chapter as sum of file estimates', () => {
     const chapters = buildChapters([
       f('src/big.ts', 120, 0), // ceil(120/60) = 2
@@ -141,7 +151,9 @@ describe('buildChapters()', () => {
     expect(names).toContain('API Layer')
     expect(names).toContain('Types & Contracts')
   })
+})
 
+describe('buildChapters() — falls back to immediate parent directory name for unknown directories', () => {
   it('falls back to immediate parent directory name for unknown directories', () => {
     const chapters = buildChapters([f('src/auth/login.ts'), f('src/auth/logout.ts')])
     expect(chapters).toHaveLength(1)
@@ -164,7 +176,9 @@ describe('buildChapters()', () => {
     expect(chapters).toHaveLength(1)
     expect(chapters[0].files).toHaveLength(2)
   })
+})
 
+describe('buildChapters() — does not merge files with different stems into the same chapter', () => {
   it('does not merge files with different stems into the same chapter', () => {
     const chapters = buildChapters([
       f('types/auth.ts'),
@@ -190,7 +204,9 @@ describe('buildChapters()', () => {
     expect(chapters).toHaveLength(1)
     expect(chapters[0].files).toHaveLength(3)
   })
+})
 
+describe('buildChapters() — merges groups connected by an import in patch text', () => {
   // ─── Signal 3: Import-graph merge ───────────────────────────────────────────
 
   it('merges groups connected by an import in patch text', () => {

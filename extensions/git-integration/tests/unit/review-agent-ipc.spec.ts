@@ -115,7 +115,9 @@ describe('review-agent IPC', () => {
       expect.objectContaining({ run: expect.objectContaining({ status: 'done' }) })
     )
   })
+})
 
+describe('review-agent IPC — a second start with the same scope while running returns the same running run', () => {
   it('a second start with the same scope while running returns the same running run', async () => {
     let resolveDone: (r: AgentRun) => void = () => {}
     const donePromise = new Promise<AgentRun>((r) => {
@@ -147,7 +149,9 @@ describe('review-agent IPC', () => {
     expect(runReview).toHaveBeenCalledTimes(1)
     resolveDone(makeDoneRun({ id: first.run.id }))
   })
+})
 
+describe('review-agent IPC — uses the model override when given, else the setting, else sonnet', () => {
   it('uses the model override when given, else the setting, else sonnet', async () => {
     const runReview = vi.fn(() => ({
       runId: 'x',
@@ -192,7 +196,9 @@ describe('review-agent IPC', () => {
     await new Promise((r) => setTimeout(r, 5))
     expect(runReview.mock.calls[2][0].model).toBe('sonnet')
   })
+})
 
+describe('review-agent IPC — passes no effort for the Default choice or an unset one, else the chosen level', () => {
   it('passes no effort for the Default choice or an unset one, else the chosen level', async () => {
     const runReview = vi.fn(() => ({
       runId: 'x',
@@ -219,14 +225,18 @@ describe('review-agent IPC', () => {
 
     expect(runReview.mock.calls.map((c) => c[0].effort)).toEqual([undefined, undefined, 'high'])
   })
+})
 
+describe('review-agent IPC — review-agent:settings returns the configured default model', () => {
   it('review-agent:settings returns the configured default model', async () => {
     const { handlers, settings } = captureHandlers({})
     expect(await handlers['review-agent:settings']({})).toEqual({ model: 'sonnet' })
     settings['terminator.git-integration.review.agentModel'] = 'opus'
     expect(await handlers['review-agent:settings']({})).toEqual({ model: 'opus' })
   })
+})
 
+describe('review-agent IPC — review-agent:cancel cancels a live run', () => {
   it('review-agent:cancel cancels a live run', async () => {
     const cancel = vi.fn()
     const donePromise = new Promise<AgentRun>(() => {})
@@ -253,7 +263,9 @@ describe('review-agent IPC', () => {
     const { handlers } = captureHandlers({})
     expect(await handlers['review-agent:cancel']({ runId: 'nope' })).toEqual({ ok: false })
   })
+})
 
+describe('review-agent IPC — review-agent:list returns persisted runs newest first', () => {
   it('review-agent:list returns persisted runs newest first', async () => {
     const { handlers } = captureHandlers({})
     storeState.data['/repo:::1:::sha1'] = [
@@ -267,7 +279,9 @@ describe('review-agent IPC', () => {
     })) as { runs: AgentRun[] }
     expect(result.runs.map((r) => r.id)).toEqual(['older', 'newer'])
   })
+})
 
+describe('review-agent IPC — review-agent:dismiss marks a finding dismissed and persists it', () => {
   it('review-agent:dismiss marks a finding dismissed and persists it', async () => {
     const { handlers } = captureHandlers({})
     const run = makeDoneRun({
@@ -301,7 +315,9 @@ describe('review-agent IPC', () => {
     const persisted = storeState.data['/repo:::1:::sha1'] as AgentRun[]
     expect(persisted[0].findings[0].dismissed).toBe(true)
   })
+})
 
+describe('review-agent IPC — review-agent:dismiss returns NOT_FOUND for an unknown finding', () => {
   it('review-agent:dismiss returns NOT_FOUND for an unknown finding', async () => {
     const { handlers } = captureHandlers({})
     storeState.data['/repo:::1:::sha1'] = [makeDoneRun({ id: 'run-1' })]
@@ -314,7 +330,9 @@ describe('review-agent IPC', () => {
     })
     expect(result).toEqual({ error: 'NOT_FOUND' })
   })
+})
 
+describe('review-agent IPC — review-agent:open-terminal opens claude --resume <sessionId> in the run worktree', () => {
   it('review-agent:open-terminal opens `claude --resume <sessionId>` in the run worktree', async () => {
     const ensureWorktree = vi.fn(async () => '/wt/pr-1-sha1')
     const { handlers, openTerminal } = captureHandlers({ ensureWorktree })

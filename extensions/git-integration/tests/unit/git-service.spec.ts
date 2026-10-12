@@ -53,7 +53,9 @@ describe('getStatus', () => {
     ])
     expect(result.hasConflicts).toBe(false)
   })
+})
 
+describe('getStatus — falls back to HEAD when the branch cannot be read (e.g. detached HEAD)', () => {
   it('falls back to HEAD when the branch cannot be read (e.g. detached HEAD)', async () => {
     mockExecSuccess('') // no changes
     mockExecError('fatal: ref HEAD is not a symbolic ref') // git branch --show-current fails
@@ -97,7 +99,9 @@ describe('getDiff', () => {
       { type: 'add', content: 'line2', oldLineNumber: null, newLineNumber: 2 },
     ])
   })
+})
 
+describe('getDiff — requests an unstaged diff without --cached when staged is false', () => {
   it('requests an unstaged diff without --cached when staged is false', async () => {
     mockExecSuccess('@@ -1,1 +1,1 @@\n-old\n+new\n')
 
@@ -296,7 +300,9 @@ describe('commitChanges — failures', () => {
     expect(result.isHookFailure).toBe(true)
     expect(result.hookOutput).toContain('husky - pre-commit hook exited with code 1')
   })
+})
 
+describe('commitChanges — failures — reports a generic failure with the combined output when no hook pattern matches', () => {
   it('reports a generic failure with the combined output when no hook pattern matches', async () => {
     commitRuns([], { exitCode: 128, stderr: 'fatal: unable to auto-detect email address\n' })
 

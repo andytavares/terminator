@@ -166,37 +166,39 @@ describe('PrReviewTab', () => {
     // With activePr set and showOverview=false, PrReviewView should render
     expect(screen.getByTestId('pr-review-view')).toBeTruthy()
   })
+})
 
-  describe('window title', () => {
-    afterEach(() => {
-      window.history.replaceState(null, '', '/')
-      document.title = ''
-    })
-
-    it('names the pop-out window after the PR it shows, so the Window menu can list it', () => {
-      window.history.replaceState(null, '', '/?view=pr-review')
-      const { rerender } = render(<PrReviewTab repoRoot="/repo" />)
-      expect(document.title).toBe('Code Reviews')
-
-      vi.mocked(usePrReviewStore).mockReturnValue({
-        ...defaultStoreState,
-        activePr: { number: 214, title: 'Code review revamp' } as unknown as PrReviewDetail,
-      } as unknown as ReturnType<typeof usePrReviewStore>)
-      rerender(<PrReviewTab repoRoot="/repo" />)
-      expect(document.title).toBe('#214 Code review revamp — Review')
-    })
-
-    it('leaves the title alone when embedded in the main window', () => {
-      document.title = 'Git Integration'
-      vi.mocked(usePrReviewStore).mockReturnValue({
-        ...defaultStoreState,
-        activePr: { number: 214, title: 'Code review revamp' } as unknown as PrReviewDetail,
-      } as unknown as ReturnType<typeof usePrReviewStore>)
-      render(<PrReviewTab repoRoot="/repo" />)
-      expect(document.title).toBe('Git Integration')
-    })
+describe('PrReviewTab (continued) — window title', () => {
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+    document.title = ''
   })
 
+  it('names the pop-out window after the PR it shows, so the Window menu can list it', () => {
+    window.history.replaceState(null, '', '/?view=pr-review')
+    const { rerender } = render(<PrReviewTab repoRoot="/repo" />)
+    expect(document.title).toBe('Code Reviews')
+
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      activePr: { number: 214, title: 'Code review revamp' } as unknown as PrReviewDetail,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    rerender(<PrReviewTab repoRoot="/repo" />)
+    expect(document.title).toBe('#214 Code review revamp — Review')
+  })
+
+  it('leaves the title alone when embedded in the main window', () => {
+    document.title = 'Git Integration'
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      activePr: { number: 214, title: 'Code review revamp' } as unknown as PrReviewDetail,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<PrReviewTab repoRoot="/repo" />)
+    expect(document.title).toBe('Git Integration')
+  })
+})
+
+describe('PrReviewTab — shows pop out button', () => {
   it('shows pop out button', () => {
     render(<PrReviewTab repoRoot="/repo" />)
     expect(screen.getByTitle('Open in new window')).toBeTruthy()
@@ -210,7 +212,9 @@ describe('PrReviewTab', () => {
       expect.objectContaining({ repoRoot: '/repo' })
     )
   })
+})
 
+describe('PrReviewTab — includes prNumber and showOverview in popout payload when a PR is active', () => {
   it('includes prNumber and showOverview in popout payload when a PR is active', async () => {
     const activePr = {
       number: 42,
@@ -229,7 +233,9 @@ describe('PrReviewTab', () => {
       expect.objectContaining({ repoRoot: '/repo', prNumber: '42', showOverview: 'false' })
     )
   })
+})
 
+describe('PrReviewTab — closes PR view and persists paused session when onClose is called', () => {
   it('closes PR view and persists paused session when onClose is called', async () => {
     const activePr = { number: 1, title: 'My PR', headSHA: 'abc123' } as unknown as PrReviewDetail
     vi.mocked(usePrReviewStore).mockReturnValue({
@@ -244,43 +250,45 @@ describe('PrReviewTab', () => {
     expect(mockReset).toHaveBeenCalled()
     expect(mockSetPaused).toHaveBeenCalledWith('/repo', 1, 'abc123', expect.any(String))
   })
+})
 
-  describe('after an approval', () => {
-    const activePr = { number: 7, title: 'My PR', headSHA: 'abc123' } as unknown as PrReviewDetail
+describe('PrReviewTab (continued) — after an approval', () => {
+  const activePr = { number: 7, title: 'My PR', headSHA: 'abc123' } as unknown as PrReviewDetail
 
-    afterEach(() => {
-      window.history.replaceState(null, '', '/')
-    })
-
-    it('closes the pop-out so the review list behind it shows, and tells the list to reload', async () => {
-      window.history.replaceState(null, '', '/?view=pr-review')
-      const close = vi.spyOn(window, 'close').mockImplementation(() => {})
-      vi.mocked(usePrReviewStore).mockReturnValue({
-        ...defaultStoreState,
-        activePr,
-      } as unknown as ReturnType<typeof usePrReviewStore>)
-      render(<PrReviewTab repoRoot="/repo" />)
-      fireEvent.click(screen.getByText('Approved'))
-      await waitFor(() => expect(close).toHaveBeenCalled())
-      expect(mockInvoke).toHaveBeenCalledWith('window:review-submitted', {})
-      close.mockRestore()
-    })
-
-    it('returns the docked panel to its queue', async () => {
-      const close = vi.spyOn(window, 'close').mockImplementation(() => {})
-      vi.mocked(usePrReviewStore).mockReturnValue({
-        ...defaultStoreState,
-        activePr,
-      } as unknown as ReturnType<typeof usePrReviewStore>)
-      render(<PrReviewTab repoRoot="/repo" />)
-      fireEvent.click(screen.getByText('Approved'))
-      await waitFor(() => expect(mockSetActivePr).toHaveBeenCalledWith(null))
-      expect(mockInvoke).toHaveBeenCalledWith('window:review-submitted', {})
-      expect(close).not.toHaveBeenCalled()
-      close.mockRestore()
-    })
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
   })
 
+  it('closes the pop-out so the review list behind it shows, and tells the list to reload', async () => {
+    window.history.replaceState(null, '', '/?view=pr-review')
+    const close = vi.spyOn(window, 'close').mockImplementation(() => {})
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      activePr,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<PrReviewTab repoRoot="/repo" />)
+    fireEvent.click(screen.getByText('Approved'))
+    await waitFor(() => expect(close).toHaveBeenCalled())
+    expect(mockInvoke).toHaveBeenCalledWith('window:review-submitted', {})
+    close.mockRestore()
+  })
+
+  it('returns the docked panel to its queue', async () => {
+    const close = vi.spyOn(window, 'close').mockImplementation(() => {})
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      activePr,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<PrReviewTab repoRoot="/repo" />)
+    fireEvent.click(screen.getByText('Approved'))
+    await waitFor(() => expect(mockSetActivePr).toHaveBeenCalledWith(null))
+    expect(mockInvoke).toHaveBeenCalledWith('window:review-submitted', {})
+    expect(close).not.toHaveBeenCalled()
+    close.mockRestore()
+  })
+})
+
+describe('PrReviewTab — reads the v2 session key before falling back to the legacy key', () => {
   it('reads the v2 session key before falling back to the legacy key', async () => {
     ;(githubModule.githubAPI.sessionGet as ReturnType<typeof vi.fn>).mockImplementation(
       async (key: string) => (key === '/repo:::1' ? { session: null } : { session: null })
@@ -295,7 +303,9 @@ describe('PrReviewTab', () => {
     expect(githubModule.githubAPI.sessionGet).toHaveBeenCalledWith('/repo:::1')
     expect(githubModule.githubAPI.sessionGet).toHaveBeenCalledWith('/repo:::1:::headA')
   })
+})
 
+describe('PrReviewTab — reconciles the stored session against the new head via prCompare', () => {
   it('reconciles the stored session against the new head via prCompare', async () => {
     ;(githubModule.githubAPI.sessionGet as ReturnType<typeof vi.fn>).mockImplementation(
       async (key: string) =>
@@ -340,7 +350,9 @@ describe('PrReviewTab', () => {
       ['scripts/e2e-burn-in.ts']
     )
   })
+})
 
+describe('PrReviewTab — reconciles with all when the compare says history was rewritten', () => {
   it('reconciles with "all" when the compare says history was rewritten', async () => {
     ;(githubModule.githubAPI.sessionGet as ReturnType<typeof vi.fn>).mockImplementation(
       async (key: string) =>

@@ -56,7 +56,9 @@ describe('InlineCommentThread', () => {
     render(<InlineCommentThread thread={makeThread()} onReply={onReply} />)
     expect(screen.getByText('Reply')).toBeTruthy()
   })
+})
 
+describe('InlineCommentThread — calls onReply with thread id when reply button clicked', () => {
   it('calls onReply with thread id when reply button clicked', () => {
     const onReply = vi.fn()
     render(<InlineCommentThread thread={makeThread()} onReply={onReply} />)
@@ -68,7 +70,9 @@ describe('InlineCommentThread', () => {
     render(<InlineCommentThread thread={makeThread()} />)
     expect(screen.queryByText('Reply')).toBeNull()
   })
+})
 
+describe('InlineCommentThread — shows show more replies button when thread is collapsed with multiple comments', () => {
   it('shows "show more replies" button when thread is collapsed with multiple comments', () => {
     const thread = makeThread({
       collapsed: true,
@@ -102,7 +106,9 @@ describe('InlineCommentThread', () => {
     render(<InlineCommentThread thread={thread} />)
     expect(screen.getByText(/Show 2 more replies/)).toBeTruthy()
   })
+})
 
+describe('InlineCommentThread — expands collapsed thread when show more is clicked', () => {
   it('expands collapsed thread when show more is clicked', () => {
     const thread = makeThread({
       collapsed: true,
@@ -129,7 +135,9 @@ describe('InlineCommentThread', () => {
     fireEvent.click(screen.getByText(/Show 1 more reply/))
     expect(screen.getByText('Second')).toBeTruthy()
   })
+})
 
+describe('InlineCommentThread — shows singular reply label for single hidden comment', () => {
   it('shows singular "reply" label for single hidden comment', () => {
     const thread = makeThread({
       collapsed: true,
@@ -155,7 +163,9 @@ describe('InlineCommentThread', () => {
     render(<InlineCommentThread thread={thread} />)
     expect(screen.getByText('Show 1 more reply')).toBeTruthy()
   })
+})
 
+describe('InlineCommentThread — renders avatar image', () => {
   it('renders avatar image', () => {
     render(<InlineCommentThread thread={makeThread()} />)
     const img = screen.getByRole('img')

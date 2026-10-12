@@ -71,7 +71,9 @@ describe('CommentComposer (new comment)', () => {
     fireEvent.click(screen.getByText('Preview'))
     expect(screen.getByTestId('rich-content')).toBeTruthy()
   })
+})
 
+describe('CommentComposer (new comment) — calls onCancel when Cancel is clicked', () => {
   it('calls onCancel when Cancel is clicked', () => {
     const onCancel = vi.fn()
     render(<CommentComposer {...newCommentProps} onCancel={onCancel} />)
@@ -96,7 +98,9 @@ describe('CommentComposer (new comment)', () => {
     render(<CommentComposer {...newCommentProps} />)
     expect(screen.getByText('Sent when you submit your review')).toBeTruthy()
   })
+})
 
+describe('CommentComposer (new comment) — adds the comment to the pending review on submit', () => {
   it('adds the comment to the pending review on submit', async () => {
     const onSubmitted = vi.fn()
     render(<CommentComposer {...newCommentProps} onSubmitted={onSubmitted} />)
@@ -118,7 +122,9 @@ describe('CommentComposer (new comment)', () => {
     )
     expect(onSubmitted).toHaveBeenCalled()
   })
+})
 
+describe('CommentComposer (new comment) — shows New comment · line N header, and edited from agent finding when fromFindingId is set', () => {
   it('shows "New comment · line N" header, and "edited from agent finding" when fromFindingId is set', () => {
     render(<CommentComposer {...newCommentProps} fromFindingId="finding-1" />)
     expect(screen.getByText(/New comment · line 10/)).toBeTruthy()
@@ -158,7 +164,9 @@ describe('CommentComposer (reply)', () => {
     expect(mockAddDraft).not.toHaveBeenCalled()
     expect(onSubmitted).toHaveBeenCalled()
   })
+})
 
+describe('CommentComposer (reply) — shows error when reply submission returns error field', () => {
   it('shows error when reply submission returns error field', async () => {
     mockPrCommentReply.mockResolvedValue({ error: 'FORBIDDEN' })
     render(<CommentComposer {...replyProps} />)

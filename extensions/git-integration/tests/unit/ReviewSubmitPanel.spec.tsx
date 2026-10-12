@@ -15,14 +15,14 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('ReviewSubmitPanel', () => {
-  const defaultProps = {
-    repoRoot: '/repo',
-    prNumber: 42,
-    headSHA: 'abc123',
-    onClose: vi.fn(),
-  }
+const defaultProps = {
+  repoRoot: '/repo',
+  prNumber: 42,
+  headSHA: 'abc123',
+  onClose: vi.fn(),
+}
 
+describe('ReviewSubmitPanel', () => {
   it('renders submit review heading', () => {
     render(<ReviewSubmitPanel {...defaultProps} />)
     expect(screen.getAllByText('Submit review').length).toBeGreaterThanOrEqual(1)
@@ -41,7 +41,9 @@ describe('ReviewSubmitPanel', () => {
     const commentRadio = radios.find((r) => r.getAttribute('value') === 'COMMENT')
     expect((commentRadio as HTMLInputElement).checked).toBe(true)
   })
+})
 
+describe('ReviewSubmitPanel — changes radio selection when clicking Approve', () => {
   it('changes radio selection when clicking Approve', () => {
     render(<ReviewSubmitPanel {...defaultProps} />)
     const approveLabel = screen.getByText('Approve')
@@ -62,7 +64,9 @@ describe('ReviewSubmitPanel', () => {
     const submitBtns = screen.getAllByText('Submit review')
     expect(submitBtns.length).toBeGreaterThanOrEqual(2) // heading + button
   })
+})
 
+describe('ReviewSubmitPanel — calls onClose when Cancel is clicked', () => {
   it('calls onClose when Cancel is clicked', () => {
     const onClose = vi.fn()
     render(<ReviewSubmitPanel {...defaultProps} onClose={onClose} />)
@@ -89,7 +93,9 @@ describe('ReviewSubmitPanel', () => {
     await waitFor(() => expect(onApproved).toHaveBeenCalledTimes(1))
     expect(screen.queryByText('Review submitted successfully.')).toBeNull()
   })
+})
 
+describe('ReviewSubmitPanel — stays on the success screen after a comment review', () => {
   it('stays on the success screen after a comment review', async () => {
     mockPrReviewSubmit.mockResolvedValue({ success: true })
     const onApproved = vi.fn()
@@ -113,7 +119,9 @@ describe('ReviewSubmitPanel', () => {
     fireEvent.click(screen.getByText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
+})
 
+describe('ReviewSubmitPanel — shows error when submission fails', () => {
   it('shows error when submission fails', async () => {
     mockPrReviewSubmit.mockRejectedValue(new Error('API error'))
     render(<ReviewSubmitPanel {...defaultProps} />)
@@ -133,7 +141,9 @@ describe('ReviewSubmitPanel', () => {
     await waitFor(() => screen.getByText(/UNAUTHORIZED/))
     expect(screen.getByText(/UNAUTHORIZED/)).toBeTruthy()
   })
+})
 
+describe('ReviewSubmitPanel — shows validation error when submitting COMMENT with empty body', () => {
   it('shows validation error when submitting COMMENT with empty body', async () => {
     render(<ReviewSubmitPanel {...defaultProps} />)
     // COMMENT is the default event

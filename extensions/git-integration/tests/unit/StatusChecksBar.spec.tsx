@@ -37,7 +37,9 @@ describe('StatusChecksBar', () => {
     render(<StatusChecksBar checks={pending} />)
     expect(screen.getByText(/1 pending/i)).toBeTruthy()
   })
+})
 
+describe('StatusChecksBar — prioritises fail over pending in summary', () => {
   it('prioritises fail over pending in summary', () => {
     const mixed: StatusCheck[] = [
       { name: 'ci', state: 'fail' },
@@ -59,7 +61,9 @@ describe('StatusChecksBar', () => {
     expect(screen.getByText('build / test')).toBeTruthy()
     expect(screen.getByText('lint')).toBeTruthy()
   })
+})
 
+describe('StatusChecksBar — collapses again on second click', () => {
   it('collapses again on second click', () => {
     render(<StatusChecksBar checks={passing} />)
     const btn = screen.getByRole('button')
@@ -81,7 +85,9 @@ describe('StatusChecksBar', () => {
     const items = screen.getAllByRole('listitem')
     expect(items).toHaveLength(5)
   })
+})
 
+describe('StatusChecksBar — renders link-out anchor when url is provided', () => {
   it('renders link-out anchor when url is provided', () => {
     const withUrl: StatusCheck[] = [{ name: 'ci', state: 'pass', url: 'https://example.com/run/1' }]
     render(<StatusChecksBar checks={withUrl} />)
@@ -104,41 +110,43 @@ describe('StatusChecksBar', () => {
     fireEvent.click(btn)
     expect(btn.getAttribute('aria-expanded')).toBe('true')
   })
+})
 
+describe('StatusChecksBar — shows singular check label for a single check', () => {
   it('shows singular "check" label for a single check', () => {
     render(<StatusChecksBar checks={[{ name: 'only', state: 'pass' }]} />)
     const btn = screen.getByRole('button')
     expect(btn.textContent).toMatch(/1 check[^s]*/)
     expect(btn.textContent).not.toMatch(/1 checks/)
   })
+})
 
-  describe('detailed summary', () => {
-    it('names failing checks against the total', () => {
-      const checks: StatusCheck[] = [
-        { name: 'Format', state: 'fail' },
-        { name: 'codecov/patch', state: 'fail' },
-        { name: 'build', state: 'pass' },
-      ]
-      render(<StatusChecksBar checks={checks} detailed />)
-      expect(screen.getByText('2 of 3 checks failing · Format, codecov/patch')).toBeTruthy()
-    })
+describe('StatusChecksBar (continued) — detailed summary', () => {
+  it('names failing checks against the total', () => {
+    const checks: StatusCheck[] = [
+      { name: 'Format', state: 'fail' },
+      { name: 'codecov/patch', state: 'fail' },
+      { name: 'build', state: 'pass' },
+    ]
+    render(<StatusChecksBar checks={checks} detailed />)
+    expect(screen.getByText('2 of 3 checks failing · Format, codecov/patch')).toBeTruthy()
+  })
 
-    it('counts pending checks against the total', () => {
-      render(
-        <StatusChecksBar
-          checks={[
-            { name: 'a', state: 'pending' },
-            { name: 'b', state: 'pass' },
-          ]}
-          detailed
-        />
-      )
-      expect(screen.getByText('1 of 2 checks pending')).toBeTruthy()
-    })
+  it('counts pending checks against the total', () => {
+    render(
+      <StatusChecksBar
+        checks={[
+          { name: 'a', state: 'pending' },
+          { name: 'b', state: 'pass' },
+        ]}
+        detailed
+      />
+    )
+    expect(screen.getByText('1 of 2 checks pending')).toBeTruthy()
+  })
 
-    it('says all checks are passing', () => {
-      render(<StatusChecksBar checks={passing} detailed />)
-      expect(screen.getByText('2 checks passing')).toBeTruthy()
-    })
+  it('says all checks are passing', () => {
+    render(<StatusChecksBar checks={passing} detailed />)
+    expect(screen.getByText('2 checks passing')).toBeTruthy()
   })
 })
