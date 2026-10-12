@@ -23,7 +23,8 @@
   "scripts": {
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test:stories": "vitest run --config vitest.stories.config.ts"
+    "test:stories": "vitest run --config vitest.stories.config.ts",
+    "test:visual": "playwright test --config playwright.visual.config.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "5.2.7",

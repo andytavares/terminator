@@ -104,6 +104,14 @@ jobs:
       - name: Build Storybook
         run: npm run build-storybook
 
+      # Screenshots of every story against the Linux baselines in
+      # packages/extension-ui/visual/__screenshots__/linux (ADR 098). Baselines
+      # are per platform, so this job compares on Linux only; a macOS run would
+      # look for .../darwin and is not made.
+      - name: Compare story screenshots
+        run: npm run test:visual
+        timeout-minutes: 5
+
   # On Linux: GitHub allows five macOS jobs at once, and those go to the build
   # and E2E, which drive the real app. Tests of macOS behaviour pin
   # process.platform rather than inheriting the host's. Each shard writes a
