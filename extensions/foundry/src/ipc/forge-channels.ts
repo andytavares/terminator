@@ -26,6 +26,8 @@ import { TransitionIntentSchema, WorkOrderSchema, WriteBackSchema } from '../ord
 import type { Budgets, TransitionIntent, WorkOrder, WriteBack } from '../order/schema.js'
 import { budgetsInWords } from '../order/render.js'
 import type { CapabilityReport } from '../trackers/write-back.js'
+import { noPayload, type ChannelSpec } from '@terminator/extension-sdk'
+import { foundryChannel } from './channel.js'
 
 /** What one turn of intake produced, or why it produced nothing. */
 export type ConvergeOutcome =
@@ -228,25 +230,25 @@ export interface ForgeDeps {
 
 export interface ForgeChannels {
   /** Run one turn of intake: the architect drafts, or redrafts, the plan. */
-  converge(payload: unknown): Promise<unknown>
-  create(payload: unknown): Promise<unknown>
-  turn(payload: unknown): Promise<unknown>
-  compile(payload: unknown): Promise<unknown>
+  converge(payload: z.infer<typeof TurnPayload>): Promise<unknown>
+  create(payload: z.infer<typeof CreatePayload>): Promise<unknown>
+  turn(payload: z.infer<typeof TurnPayload>): Promise<unknown>
+  compile(payload: z.infer<typeof CompilePayload>): Promise<unknown>
   list(): Promise<unknown>
   /** The candidate states, for the operator to map intents against. */
-  states(payload: unknown): Promise<unknown>
+  states(payload: z.infer<typeof StatesPayload>): Promise<unknown>
   /** Record which state one intent means for this order. */
-  mapState(payload: unknown): Promise<unknown>
+  mapState(payload: z.infer<typeof MapStatePayload>): Promise<unknown>
   /** Turn each write-back on or off for this order (FR-062). */
-  setWriteBack(payload: unknown): Promise<unknown>
+  setWriteBack(payload: z.infer<typeof WriteBackPayload>): Promise<unknown>
   /** Set a draft order's budgets. Null is no limit. */
-  setBudgets(payload: unknown): Promise<unknown>
+  setBudgets(payload: z.infer<typeof BudgetsPayload>): Promise<unknown>
   /** Discard an order that should not have been made. */
-  cancel(payload: unknown): Promise<unknown>
+  cancel(payload: z.infer<typeof CancelPayload>): Promise<unknown>
   /** Choose which shape hand-off will run (FR-014's override). */
-  recipe(payload: unknown): Promise<unknown>
+  recipe(payload: z.infer<typeof RecipePayload>): Promise<unknown>
   /** Hold the loop for the operator, or release it. */
-  hold(payload: unknown): Promise<unknown>
+  hold(payload: z.infer<typeof HoldPayload>): Promise<unknown>
 }
 
 /** The order plus its checks — what every Forge channel hands back. */
@@ -301,10 +303,8 @@ function advisoryForOrder(order: WorkOrder, entries: readonly QueueEntry[]): str
 }
 
 export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
-  async function create(raw: unknown): Promise<unknown> {
-    const parsed = CreatePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const { source, repoPaths } = parsed.data
+  async function create(payload: z.infer<typeof CreatePayload>): Promise<unknown> {
+    const { source, repoPaths } = payload
 
     const input =
       source.kind === 'tracker'
@@ -368,10 +368,8 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     return { ...view(attacked), unavailableChecks: seeded.unavailableChecks }
   }
 
-  async function turn(raw: unknown): Promise<unknown> {
-    const parsed = TurnPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const { id, strike, answer } = parsed.data
+  async function turn(payload: z.infer<typeof TurnPayload>): Promise<unknown> {
+    const { id, strike, answer } = payload
 
     const order = await deps.store.load(id)
     if (order === null) return { error: `No order ${id}.` }
@@ -391,8 +389,8 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       return view(result.order, [...result.redraw])
     }
 
-    if (parsed.data.finding !== undefined) {
-      const { id: findingId, decision, reason } = parsed.data.finding
+    if (payload.finding !== undefined) {
+      const { id: findingId, decision, reason } = payload.finding
       if (reason.trim() === '') {
         // An accepted finding with no reason is a shrug, and the compile check
         // would refuse it anyway — said here rather than silently ignored.
@@ -413,8 +411,8 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       return view(next, ['redTeam'])
     }
 
-    if (parsed.data.unverifiable !== undefined) {
-      const { criterionId, reason } = parsed.data.unverifiable
+    if (payload.unverifiable !== undefined) {
+      const { criterionId, reason } = payload.unverifiable
       if (reason.trim() === '') {
         // The schema refuses an empty reason too, but it would refuse it as a
         // malformed order rather than as the thing it is: an accepted
@@ -466,8 +464,8 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     // Free text goes to the architect, which is the whole conversational half
     // of the Forge. It used to return the order unchanged with a comment
     // saying the text had gone to an agent session; there was no agent.
-    if (parsed.data.message !== undefined && parsed.data.message.trim() !== '') {
-      return converge({ id, message: parsed.data.message })
+    if (payload.message !== undefined && payload.message.trim() !== '') {
+      return converge({ id, message: payload.message })
     }
 
     return view(order)
@@ -620,28 +618,23 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
    * which is validated before any of it reaches the order — an agent that
    * could write the order directly could set its status and agree its own work.
    */
-  async function converge(raw: unknown): Promise<unknown> {
-    const parsed = TurnPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const id = parsed.data.id
+  async function converge(payload: z.infer<typeof TurnPayload>): Promise<unknown> {
+    const id = payload.id
     const order = await deps.store.load(id)
     if (order === null) return { error: `No order ${id}.` }
     if (order.status !== 'draft') {
       return { error: `Only a draft can be converged; this order is ${order.status}.` }
     }
 
-    if (parsed.data.settle !== undefined) {
-      return settleTurn(order, parsed.data.settle, parsed.data.message)
+    if (payload.settle !== undefined) {
+      return settleTurn(order, payload.settle, payload.message)
     }
 
-    return runArchitectTurn(order, parsed.data.message)
+    return runArchitectTurn(order, payload.message)
   }
 
-  async function compile(raw: unknown): Promise<unknown> {
-    const parsed = CompilePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const { id, commit, automatic } = parsed.data
+  async function compile(payload: z.infer<typeof CompilePayload>): Promise<unknown> {
+    const { id, commit, automatic } = payload
 
     const order = await deps.store.load(id)
     if (order === null) return { error: `No order ${id}.` }
@@ -709,11 +702,9 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
    * and this is a network read: asking the tracker every time the document
    * redraws would spend the operator's rate limit on nothing.
    */
-  async function states(raw: unknown): Promise<unknown> {
-    const parsed = StatesPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const order = await deps.store.load(parsed.data.id)
-    if (order === null) return { error: `No order ${parsed.data.id}.` }
+  async function states(payload: z.infer<typeof StatesPayload>): Promise<unknown> {
+    const order = await deps.store.load(payload.id)
+    if (order === null) return { error: `No order ${payload.id}.` }
     if (deps.capability === undefined) {
       return { capability: { transitions: 'no_issue', states: [], unreachable: [] } }
     }
@@ -724,10 +715,8 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     }
   }
 
-  async function mapState(raw: unknown): Promise<unknown> {
-    const parsed = MapStatePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const { id, intent, optionId } = parsed.data
+  async function mapState(payload: z.infer<typeof MapStatePayload>): Promise<unknown> {
+    const { id, intent, optionId } = payload
 
     const order = await deps.store.load(id)
     if (order === null) return { error: `No order ${id}.` }
@@ -762,12 +751,9 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
    * their worktrees, and throwing that away silently is the opposite of what
    * every budget and gate here is for; stop it at its gate first.
    */
-  async function cancel(raw: unknown): Promise<unknown> {
-    const parsed = CancelPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const order = await deps.store.load(parsed.data.id)
-    if (order === null) return { error: `No order ${parsed.data.id}.` }
+  async function cancel(payload: z.infer<typeof CancelPayload>): Promise<unknown> {
+    const order = await deps.store.load(payload.id)
+    if (order === null) return { error: `No order ${payload.id}.` }
     if (order.status === 'running') {
       return {
         error: `${order.id} is running. Stop it at its gate before discarding it — its agents still have work in their worktrees.`,
@@ -783,7 +769,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       actor: 'operator',
       action: 'order.cancelled',
       subject: order.id,
-      reason: parsed.data.reason ?? 'Discarded by the operator.',
+      reason: payload.reason ?? 'Discarded by the operator.',
       evidence: [],
     })
     return view(next)
@@ -878,43 +864,37 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
    * reason to turn one off without changing the setting for every order after
    * it.
    */
-  async function setWriteBack(raw: unknown): Promise<unknown> {
-    const parsed = WriteBackPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
+  async function setWriteBack(payload: z.infer<typeof WriteBackPayload>): Promise<unknown> {
+    const order = await deps.store.load(payload.id)
+    if (order === null) return { error: `No order ${payload.id}.` }
 
-    const order = await deps.store.load(parsed.data.id)
-    if (order === null) return { error: `No order ${parsed.data.id}.` }
-
-    const next: WorkOrder = { ...order, writeBack: parsed.data.writeBack }
+    const next: WorkOrder = { ...order, writeBack: payload.writeBack }
     await deps.store.save(next)
     await deps.store.record({
       at: deps.now(),
-      orderId: parsed.data.id,
+      orderId: payload.id,
       actor: 'operator',
       action: 'writeback.configured',
-      subject: parsed.data.id,
+      subject: payload.id,
       reason:
-        parsed.data.writeBack.length === 0
+        payload.writeBack.length === 0
           ? 'nothing is written back to the tracker'
-          : parsed.data.writeBack.join(', '),
+          : payload.writeBack.join(', '),
       evidence: [],
     })
     return view(next, ['writeBack'])
   }
 
-  async function setBudgets(raw: unknown): Promise<unknown> {
-    const parsed = BudgetsPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const order = await deps.store.load(parsed.data.id)
-    if (order === null) return { error: `No order ${parsed.data.id}.` }
+  async function setBudgets(payload: z.infer<typeof BudgetsPayload>): Promise<unknown> {
+    const order = await deps.store.load(payload.id)
+    if (order === null) return { error: `No order ${payload.id}.` }
     if (order.status !== 'draft') {
       return {
         error: `${order.id} is ${order.status}. A running order's budget is raised at its budget gate.`,
       }
     }
 
-    const next: WorkOrder = { ...order, budgets: { ...order.budgets, ...parsed.data.budgets } }
+    const next: WorkOrder = { ...order, budgets: { ...order.budgets, ...payload.budgets } }
     await deps.store.save(next)
     await deps.store.record({
       at: deps.now(),
@@ -935,17 +915,14 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
    * changing it here would say one thing while the graph already cut ran
    * another.
    */
-  async function recipe(raw: unknown): Promise<unknown> {
-    const parsed = RecipePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const order = await deps.store.load(parsed.data.id)
-    if (order === null) return { error: `No order ${parsed.data.id}.` }
+  async function recipe(payload: z.infer<typeof RecipePayload>): Promise<unknown> {
+    const order = await deps.store.load(payload.id)
+    if (order === null) return { error: `No order ${payload.id}.` }
     if (order.status !== 'draft') {
       return { error: `Only a draft can have its shape chosen; this order is ${order.status}.` }
     }
 
-    const next: WorkOrder = { ...order, recipe: parsed.data.recipe }
+    const next: WorkOrder = { ...order, recipe: payload.recipe }
     await deps.store.save(next)
     await deps.store.record({
       at: deps.now(),
@@ -953,7 +930,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       actor: 'operator',
       action: 'recipe.chosen',
       subject: order.id,
-      reason: parsed.data.recipe ?? 'the proposal',
+      reason: payload.recipe ?? 'the proposal',
       evidence: [],
     })
     return view(next)
@@ -966,24 +943,21 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
    * resumes — the next review round, a follow-up, hand-off — is
    * `deps.onReleased`'s job, over in the loop that knows what those are.
    */
-  async function hold(raw: unknown): Promise<unknown> {
-    const parsed = HoldPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const order = await deps.store.load(parsed.data.id)
-    if (order === null) return { error: `No order ${parsed.data.id}.` }
+  async function hold(payload: z.infer<typeof HoldPayload>): Promise<unknown> {
+    const order = await deps.store.load(payload.id)
+    if (order === null) return { error: `No order ${payload.id}.` }
 
     await deps.store.record({
       at: deps.now(),
       orderId: order.id,
       actor: 'operator',
-      action: parsed.data.held ? 'review.held' : 'review.released',
+      action: payload.held ? 'review.held' : 'review.released',
       subject: order.id,
-      reason: parsed.data.held ? 'held by the operator' : 'released by the operator',
+      reason: payload.held ? 'held by the operator' : 'released by the operator',
       evidence: [],
     })
 
-    if (!parsed.data.held) deps.onReleased(order)
+    if (!payload.held) deps.onReleased(order)
 
     return view(order)
   }
@@ -1002,4 +976,22 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     recipe,
     hold,
   }
+}
+
+/** The Forge's channels, each with the schema its payload is parsed with (ADR 096). */
+export function forgeChannelSpecs(forge: ForgeChannels): ChannelSpec[] {
+  return [
+    foundryChannel('foundry:order.create', CreatePayload, forge.create),
+    foundryChannel('foundry:order.turn', TurnPayload, forge.turn),
+    foundryChannel('foundry:order.compile', CompilePayload, forge.compile),
+    foundryChannel('foundry:order.list', noPayload, forge.list),
+    foundryChannel('foundry:order.states', StatesPayload, forge.states),
+    foundryChannel('foundry:order.mapState', MapStatePayload, forge.mapState),
+    foundryChannel('foundry:order.converge', TurnPayload, forge.converge),
+    foundryChannel('foundry:order.writeBack', WriteBackPayload, forge.setWriteBack),
+    foundryChannel('foundry:order.budgets', BudgetsPayload, forge.setBudgets),
+    foundryChannel('foundry:order.cancel', CancelPayload, forge.cancel),
+    foundryChannel('foundry:order.recipe', RecipePayload, forge.recipe),
+    foundryChannel('foundry:order.hold', HoldPayload, forge.hold),
+  ]
 }

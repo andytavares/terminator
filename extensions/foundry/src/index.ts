@@ -1,20 +1,42 @@
 import { createPassCache } from './verify/pass-cache.js'
-import { z } from 'zod'
-import type { ExtensionAPI, Disposable } from '@terminator/extension-sdk'
+import { defineChannel, noPayload } from '@terminator/extension-sdk'
+import type { ExtensionAPI, Disposable, ChannelSpec } from '@terminator/extension-sdk'
 import { app } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { modelCatalog } from './state/model-catalog.js'
 
-import { createForgeChannels } from './ipc/forge-channels.js'
-import { createRunChannels, writeRunGraph, readRunGraph } from './ipc/run-channels.js'
+import { createForgeChannels, forgeChannelSpecs } from './ipc/forge-channels.js'
+import {
+  createRunChannels,
+  runChannelSpecs,
+  writeRunGraph,
+  readRunGraph,
+} from './ipc/run-channels.js'
 import { createFoundryIndexes } from './state/foundry-index.js'
 import type { FoundryIndex, FoundryIndexes } from './state/foundry-index.js'
 import { diskSourceFor } from './state/disk-source.js'
-import { createInboxChannels } from './ipc/inbox-channels.js'
-import { createLedgerChannels } from './ipc/ledger-channels.js'
-import { createSensorChannels } from './ipc/sensor-channels.js'
+import { createInboxChannels, DecidePayload } from './ipc/inbox-channels.js'
+import { createLedgerChannels, ledgerChannelSpecs } from './ipc/ledger-channels.js'
+import { createSensorChannels, sensorChannelSpecs } from './ipc/sensor-channels.js'
+import { foundryChannel, MALFORMED_REQUEST, sessionChannel } from './ipc/channel.js'
+import {
+  AskModelSetPayload,
+  FeedDismissPayload,
+  FeedMutePayload,
+  IssuesMinePayload,
+  ModelSetPayload,
+  OrderIdPayload,
+  PermissionHandBackPayload,
+  PermissionResolvePayload,
+  RedirectPayload,
+  SessionPayload,
+  SessionStopPayload,
+  TicketCreatePayload,
+  TranscriptPayload,
+  ViewPayload,
+} from './ipc/payloads.js'
 import { newOrderId } from './forge/intake-source.js'
 import { createSignalStore } from './sensors/store.js'
 import type { SignalStore } from './sensors/store.js'
@@ -160,13 +182,11 @@ const disposables: Disposable[] = []
 // Active session registry: sessionId → session metadata
 const activeSessions: Map<string, { id: string; name: string }> = new Map()
 
-function reg(
-  api: ExtensionAPI,
-  channel: string,
-  handler: (payload: unknown) => Promise<unknown> | unknown
-) {
-  const remoteAccessible = REMOTE_READ_CHANNELS.has(channel)
-  disposables.push(api.ipc.registerHandler(channel, handler, { remoteAccessible }))
+function reg(api: ExtensionAPI, ...specs: ChannelSpec[]) {
+  for (const spec of specs) {
+    const remoteAccessible = REMOTE_READ_CHANNELS.has(spec.channel)
+    disposables.push(api.ipc.registerHandler(spec, { remoteAccessible }))
+  }
 }
 
 /** Where the chosen model lives, on the side of the bridge that launches runs. */
@@ -3282,62 +3302,50 @@ export function activate(api: ExtensionAPI): void {
   // and `search` have been there the whole time — and nothing here asked.
   // Importing work is the front door of a tool that does work, and it did not
   // have one.
-  reg(api, 'foundry:issues.mine', async (payload) => {
+  const myIssues = foundryChannel('foundry:issues.mine', IssuesMinePayload, async (payload) => {
     const issues = api.issues
     if (issues === undefined) return { connected: [], issues: [] }
-    const term =
-      typeof (payload as { term?: unknown })?.term === 'string'
-        ? ((payload as { term: string }).term ?? '').trim()
-        : ''
-    try {
-      const connected = await issues.connections()
-      // Nothing connected is a real answer and not an error: the surface says
-      // so rather than showing an empty list that looks like "no tickets".
-      if (connected.length === 0) return { connected: [], issues: [] }
-      const found =
-        term === ''
-          ? await issues.listMine({ limit: 50 })
-          : await issues.search(term, { limit: 50 })
-      return {
-        connected: connected.map((c) => ({
-          tracker: String(c.tracker),
-          account: String(c.account ?? ''),
-        })),
-        issues: (found.issues ?? []).map((issue) => ({
-          tracker: String(issue.tracker),
-          key: String(issue.key),
-          title: String(issue.title ?? ''),
-          status: String((issue as { status?: unknown }).status ?? ''),
-        })),
-        failures: (found.failures ?? []).map((f) =>
-          String((f as { message?: unknown }).message ?? f)
-        ),
-      }
-    } catch (error) {
-      return { error: error instanceof Error ? error.message : 'Could not read your tickets.' }
+    const term = (payload?.term ?? '').trim()
+    const connected = await issues.connections()
+    // Nothing connected is a real answer and not an error: the surface says
+    // so rather than showing an empty list that looks like "no tickets".
+    if (connected.length === 0) return { connected: [], issues: [] }
+    const found =
+      term === '' ? await issues.listMine({ limit: 50 }) : await issues.search(term, { limit: 50 })
+    return {
+      connected: connected.map((c) => ({
+        tracker: String(c.tracker),
+        account: String(c.account ?? ''),
+      })),
+      issues: (found.issues ?? []).map((issue) => ({
+        tracker: String(issue.tracker),
+        key: String(issue.key),
+        title: String(issue.title ?? ''),
+        status: String((issue as { status?: unknown }).status ?? ''),
+      })),
+      failures: (found.failures ?? []).map((f) =>
+        String((f as { message?: unknown }).message ?? f)
+      ),
     }
+  })
+  reg(api, {
+    ...myIssues,
+    onError: (error) => ({
+      error: error instanceof Error ? error.message : 'Could not read your tickets.',
+    }),
   })
   // A ticket for a typed idea, offered before it becomes an order (spec 061).
-  reg(api, 'foundry:ticket.offer', async () => ({ offer: await ticketOffer(api.issues) }))
-  reg(api, 'foundry:ticket.create', async (payload) => {
-    const { idea, teamId } = (payload ?? {}) as { idea?: unknown; teamId?: unknown }
-    if (typeof idea !== 'string' || typeof teamId !== 'string' || api.issues === undefined) {
-      return { error: 'Malformed request.' }
-    }
-    return fileTicket(api.issues, { idea, teamId })
-  })
-  reg(api, 'foundry:order.create', (payload) => forge.create(payload))
-  reg(api, 'foundry:order.turn', (payload) => forge.turn(payload))
-  reg(api, 'foundry:order.compile', (payload) => forge.compile(payload))
-  reg(api, 'foundry:order.list', () => forge.list())
-  reg(api, 'foundry:order.states', (payload) => forge.states(payload))
-  reg(api, 'foundry:order.mapState', (payload) => forge.mapState(payload))
-  reg(api, 'foundry:order.converge', (payload) => forge.converge(payload))
-  reg(api, 'foundry:order.writeBack', (payload) => forge.setWriteBack(payload))
-  reg(api, 'foundry:order.budgets', (payload) => forge.setBudgets(payload))
-  reg(api, 'foundry:order.cancel', (payload) => forge.cancel(payload))
-  reg(api, 'foundry:order.recipe', (payload) => forge.recipe(payload))
-  reg(api, 'foundry:order.hold', (payload) => forge.hold(payload))
+  reg(
+    api,
+    foundryChannel('foundry:ticket.offer', noPayload, async () => ({
+      offer: await ticketOffer(api.issues),
+    })),
+    foundryChannel('foundry:ticket.create', TicketCreatePayload, async (payload) => {
+      if (api.issues === undefined) return MALFORMED_REQUEST
+      return fileTicket(api.issues, payload)
+    })
+  )
+  reg(api, ...forgeChannelSpecs(forge))
 
   // Gone, rather than hidden.
   //
@@ -3345,34 +3353,34 @@ export function activate(api: ExtensionAPI): void {
   // leaves its directory, its ledger, its worktree and its branch exactly
   // where they were — so the records location and the target repository fill
   // up with work nobody can reach or restart. This is the other answer.
-  reg(api, 'foundry:order.delete', async (payload) => {
-    const { id } = payload as { id?: unknown }
-    if (typeof id !== 'string' || id === '') return { error: 'Malformed request.' }
+  reg(
+    api,
+    foundryChannel('foundry:order.delete', OrderIdPayload, async ({ id }) => {
+      const root = dataRoot()
+      const order = await orderStoreAt(root).load(id)
+      if (order === null) return { error: `No order ${id}.` }
 
-    const root = dataRoot()
-    const order = await orderStoreAt(root).load(id)
-    if (order === null) return { error: `No order ${id}.` }
-
-    deletedOrders.add(id)
-    // Its agents first. Deleting the records out from under a live session
-    // leaves an agent writing into a worktree whose order no longer exists.
-    await stopOrder(root, id, 'the order was deleted')
-    // The architect too: it runs in the checkout about to be removed, and the
-    // run graph that `stopOrder` reads does not know about it.
-    const intake = intakeSessions.get(id)
-    if (intake !== undefined) {
-      supervisedRunner?.stop(intake, 'the order was deleted')
-      intakeSessions.delete(id)
-      announceLive(id)
-    }
-    const result = await deleteOrder(order, {
-      exec: (o) => api.shell.exec(o),
-      root,
-      removeProjectAt: projectRemover(api.workspace),
+      deletedOrders.add(id)
+      // Its agents first. Deleting the records out from under a live session
+      // leaves an agent writing into a worktree whose order no longer exists.
+      await stopOrder(root, id, 'the order was deleted')
+      // The architect too: it runs in the checkout about to be removed, and the
+      // run graph that `stopOrder` reads does not know about it.
+      const intake = intakeSessions.get(id)
+      if (intake !== undefined) {
+        supervisedRunner?.stop(intake, 'the order was deleted')
+        intakeSessions.delete(id)
+        announceLive(id)
+      }
+      const result = await deleteOrder(order, {
+        exec: (o) => api.shell.exec(o),
+        root,
+        removeProjectAt: projectRemover(api.workspace),
+      })
+      indexFor(root).orderRemoved(id)
+      return { ok: result.failed.length === 0, removed: result.removed, failed: result.failed }
     })
-    indexFor(root).orderRemoved(id)
-    return { ok: result.failed.length === 0, removed: result.removed, failed: result.failed }
-  })
+  )
 
   // ── The Line ───────────────────────────────────────────────────────────
   //
@@ -3419,20 +3427,20 @@ export function activate(api: ExtensionAPI): void {
     },
     queueEntries: () => computeQueueEntries(dataRoot(), orderStoreAt(dataRoot())),
   })
-  reg(api, 'foundry:run.start', (payload) => runs.start(payload))
-  reg(api, 'foundry:run.resume', (payload) => runs.resume(payload))
+  reg(api, ...runChannelSpecs(runs))
   // Stop the whole order, as opposed to one agent.
   //
   // `foundry:run-stop` ends one session; this ends the run. The distinction is
   // the reason a dead run could never be got rid of: the only order-level stop
   // was a gate option that did nothing, and `order.cancel` refuses a running
   // order and points back at that gate.
-  reg(api, 'foundry:run.stop', async (payload) => {
-    const { id } = payload as { id?: unknown }
-    if (typeof id !== 'string' || id === '') return { error: 'Malformed request.' }
-    await stopOrder(dataRoot(), id, 'stopped by the operator')
-    return { ok: true }
-  })
+  reg(
+    api,
+    foundryChannel('foundry:run.stop', OrderIdPayload, async ({ id }) => {
+      await stopOrder(dataRoot(), id, 'stopped by the operator')
+      return { ok: true }
+    })
+  )
   // Start the same order over.
   //
   // Stop whatever is still running, destroy everything the run made — every
@@ -3440,51 +3448,44 @@ export function activate(api: ExtensionAPI): void {
   // put the order back to `agreed` so it can be run again from node zero. The
   // ask, the criteria and the plan survive, which is the whole difference
   // between this and making a fourth order for the same sentence.
-  reg(api, 'foundry:run.reset', async (payload) => {
-    const { id } = payload as { id?: unknown }
-    if (typeof id !== 'string' || id === '') return { error: 'Malformed request.' }
+  reg(
+    api,
+    foundryChannel('foundry:run.reset', OrderIdPayload, async ({ id }) => {
+      const root = dataRoot()
+      const store = orderStoreAt(root)
+      const order = await store.load(id)
+      if (order === null) return { error: `No order ${id}.` }
 
-    const root = dataRoot()
-    const store = orderStoreAt(root)
-    const order = await store.load(id)
-    if (order === null) return { error: `No order ${id}.` }
+      await stopOrder(root, id, 'starting over')
+      const result = await tearDownRun(order, {
+        exec: (o) => api.shell.exec(o),
+        root,
+        removeProjectAt: projectRemover(api.workspace),
+      })
+      indexFor(root).runReset(id)
 
-    await stopOrder(root, id, 'starting over')
-    const result = await tearDownRun(order, {
-      exec: (o) => api.shell.exec(o),
-      root,
-      removeProjectAt: projectRemover(api.workspace),
+      // Read back rather than reused: `stopOrder` saves, and writing the order
+      // we loaded before it would put `running` back.
+      const stopped = (await store.load(id)) ?? order
+      // Only an agreed order can be started, and only a draft can be agreed —
+      // so a reset that left it `cancelled` would be the dead end it exists to
+      // undo. It was agreed once and nothing about the agreement changed.
+      await store.save({ ...stopped, status: 'agreed', recipe: null, recipeOverriddenBy: null })
+      await store.record({
+        at: new Date().toISOString(),
+        orderId: id,
+        actor: 'operator',
+        action: 'run.reset',
+        subject: id,
+        reason:
+          result.removed.length === 0
+            ? 'started over; there was nothing left to remove'
+            : `started over; removed ${result.removed.join(', ')}`,
+        evidence: [],
+      })
+      return { ok: true, removed: result.removed, failed: result.failed }
     })
-    indexFor(root).runReset(id)
-
-    // Read back rather than reused: `stopOrder` saves, and writing the order
-    // we loaded before it would put `running` back.
-    const stopped = (await store.load(id)) ?? order
-    // Only an agreed order can be started, and only a draft can be agreed —
-    // so a reset that left it `cancelled` would be the dead end it exists to
-    // undo. It was agreed once and nothing about the agreement changed.
-    await store.save({ ...stopped, status: 'agreed', recipe: null, recipeOverriddenBy: null })
-    await store.record({
-      at: new Date().toISOString(),
-      orderId: id,
-      actor: 'operator',
-      action: 'run.reset',
-      subject: id,
-      reason:
-        result.removed.length === 0
-          ? 'started over; there was nothing left to remove'
-          : `started over; removed ${result.removed.join(', ')}`,
-      evidence: [],
-    })
-    return { ok: true, removed: result.removed, failed: result.failed }
-  })
-
-  reg(api, 'foundry:run.observe', (payload) => runs.observe(payload))
-  reg(api, 'foundry:run.recipes', (payload) => runs.recipes(payload))
-  reg(api, 'foundry:session.attach', (payload) => runs.attach(payload))
-  // What each running node's agent has been doing, for the Factory view.
-  reg(api, 'foundry:run.activity', (payload) => runs.activity(payload))
-  reg(api, 'foundry:run.timeline', (payload) => runs.timeline(payload))
+  )
 
   // ── The inbox ──────────────────────────────────────────────────────────
   //
@@ -3681,13 +3682,16 @@ export function activate(api: ExtensionAPI): void {
       if (resumed.error !== undefined) throw new Error(resumed.error)
     },
   })
-  reg(api, 'foundry:inbox.list', async () => {
-    // Before the list is composed, not after: a run the last application left
-    // in flight has to be on it the first time it is read, not the second.
-    await adoptInterruptedRuns(dataRoot())
-    return inbox.list()
-  })
-  reg(api, 'foundry:inbox.decide', (payload) => inbox.decide(payload))
+  reg(
+    api,
+    foundryChannel('foundry:inbox.list', noPayload, async () => {
+      // Before the list is composed, not after: a run the last application left
+      // in flight has to be on it the first time it is read, not the second.
+      await adoptInterruptedRuns(dataRoot())
+      return inbox.list()
+    }),
+    foundryChannel('foundry:inbox.decide', DecidePayload, inbox.decide)
+  )
 
   // How much is waiting for the operator, and where.
   //
@@ -3697,21 +3701,24 @@ export function activate(api: ExtensionAPI): void {
   // rail and a held tool call sat under a whole run graph, so the only way to
   // find either was to already be looking at it.
   const attentionGates = createLiveGateStore(dataRoot, indexFor)
-  reg(api, 'foundry:attention', async () => {
-    // The chrome polls this from the moment the application opens, which makes
-    // it the earliest place a run the last one left behind can be noticed. A
-    // dead run that announces itself in four seconds is the whole difference
-    // between this and finding out hours later that nothing had moved.
-    await adoptInterruptedRuns(dataRoot())
-    const { orders, waiting } = await liveStandings()
-    return countAttention({
-      gates: await attentionGates.list(),
-      autonomy: autonomyFor(api),
-      orders,
-      pendingAsks: pendingPermissions.list().length,
-      waiting,
+  reg(
+    api,
+    foundryChannel('foundry:attention', noPayload, async () => {
+      // The chrome polls this from the moment the application opens, which makes
+      // it the earliest place a run the last one left behind can be noticed. A
+      // dead run that announces itself in four seconds is the whole difference
+      // between this and finding out hours later that nothing had moved.
+      await adoptInterruptedRuns(dataRoot())
+      const { orders, waiting } = await liveStandings()
+      return countAttention({
+        gates: await attentionGates.list(),
+        autonomy: autonomyFor(api),
+        orders,
+        pendingAsks: pendingPermissions.list().length,
+        waiting,
+      })
     })
-  })
+  )
 
   // ── The record ─────────────────────────────────────────────────────────
   //
@@ -3750,12 +3757,7 @@ export function activate(api: ExtensionAPI): void {
     sources: () => resolveSources(api, dataRoot()),
     now: () => new Date().toISOString(),
   })
-  reg(api, 'foundry:ledger.query', (payload) => ledger.query(payload))
-  reg(api, 'foundry:factory.metrics', (payload) => ledger.factoryMetrics(payload))
-  reg(api, 'foundry:rules.propose', (payload) => ledger.proposeRules(payload))
-  reg(api, 'foundry:rules.decide', (payload) => ledger.decideProposal(payload))
-  reg(api, 'foundry:rules.inForce', (payload) => ledger.rulesInForce(payload))
-  reg(api, 'foundry:rules.remove', (payload) => ledger.removeAcceptedRule(payload))
+  reg(api, ...ledgerChannelSpecs(ledger))
 
   // ── Signals (ADR-066) ────────────────────────────────────────────────────
   const sensors = createSensorChannels({
@@ -3766,214 +3768,188 @@ export function activate(api: ExtensionAPI): void {
     now: () => new Date().toISOString(),
     newId: () => newOrderId(new Date()),
   })
-  reg(api, 'foundry:signals.list', (payload) => sensors.list(payload))
-  reg(api, 'foundry:signals.dismiss', (payload) => sensors.dismiss(payload))
-  reg(api, 'foundry:signals.promote', (payload) => sensors.promote(payload))
-  reg(api, 'foundry:sensors.list', (payload) => sensors.sensorsList(payload))
-  reg(api, 'foundry:sensors.set', (payload) => sensors.sensorsSet(payload))
-  reg(api, 'foundry:sensors.run-now', (payload) => sensors.sensorsRunNow(payload))
+  reg(api, ...sensorChannelSpecs(sensors))
 
   // What a supervised run is waiting on, and how the operator answers it.
   // Without these a phase blocks at its PreToolUse hook until the bridge hands
   // the decision back to the terminal — which works, but makes the console a
   // spectator of its own agents.
-  reg(api, 'foundry:permissions-list', () => ({ pending: pendingPermissions.list() }))
-
-  // What can go in the model box, and which one is chosen. Asked for rather
-  // than hardcoded in the view, where the last list sat naming a superseded
-  // generation until somebody noticed.
-  //
-  // `selected` comes back with the list because the two must not drift: the
-  // settings view keeps its own copy for rendering, and a copy that disagrees
-  // with what the runs are actually launched with is worse than no setting.
-  reg(api, 'foundry:models-list', async () => ({
-    models: await modelCatalog(),
-    selected: defaultModel(api),
-  }))
-
-  // Persisted where the main process can read it, which is the only place that
-  // matters: the launch command is built here, not in the renderer.
-  reg(api, 'foundry:model-set', (payload: unknown) => {
-    const { model } = payload as { model?: unknown }
-    if (typeof model !== 'string') return { error: 'model must be a string' }
-    api.settings.set(MODEL_SETTING_KEY, model)
-    return { ok: true, selected: model }
-  })
-
-  // What answers an ask: a narrow amendment, so Sonnet unless overridden.
-  reg(api, 'foundry:ask-model', () => ({ selected: askModel(api) }))
-
-  reg(api, 'foundry:ask-model-set', (payload: unknown) => {
-    const { model } = payload as { model?: unknown }
-    const chosen = ASK_MODELS.find((m) => m === model)
-    if (chosen === undefined) return { error: `model must be one of ${ASK_MODELS.join(', ')}` }
-    api.settings.set(ASK_MODEL_SETTING_KEY, chosen)
-    return { ok: true, selected: chosen }
-  })
-
-  // The firings, and whether they were recorded or surfaced. Precision is
-  // measured against these by hand before shadow mode is turned off.
-  reg(api, 'foundry:stalls-list', () => ({
-    firings: stallFirings,
-    shadowMode: stallShadowMode(api),
-  }))
-
-  reg(api, 'foundry:feed-list', () => ({
-    entries: supervision?.feed.list() ?? [],
-    mutes: mutes?.list() ?? [],
-  }))
-
-  // Anything shown as a list should be prunable, and a feed you cannot clear a
-  // line from is one you stop reading.
-  // Validated, because each writes a line that every later read replays: a
-  // dismiss with no id appended `{}`, which then read back as a feed entry with
-  // no summary and took the Floor down.
-  const FeedDismiss = z.object({ id: z.string().min(1) })
-  const FeedMute = z
-    .object({
-      sessionId: z.string().min(1).optional(),
-      author: z.enum(['agent', 'console']).optional(),
-    })
-    .refine((rule) => rule.sessionId !== undefined || rule.author !== undefined)
-
-  reg(api, 'foundry:feed-dismiss', (payload: unknown) => {
-    const parsed = FeedDismiss.safeParse(payload)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    supervision?.feed.removeEntry(parsed.data.id)
-    return { ok: true }
-  })
-
-  reg(api, 'foundry:feed-mute', (payload: unknown) => {
-    const parsed = FeedMute.safeParse(payload)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    mutes?.add(parsed.data)
-    announceLive('')
-    return { mutes: mutes?.list() ?? [] }
-  })
-
-  reg(api, 'foundry:feed-unmute', (payload: unknown) => {
-    const parsed = FeedMute.safeParse(payload)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    mutes?.remove(parsed.data)
-    announceLive('')
-    return { mutes: mutes?.list() ?? [] }
-  })
-
-  reg(api, 'foundry:permission-resolve', (payload: unknown) => {
-    const { requestId, decision, answer } = payload as {
-      requestId: string
-      decision: 'allow' | 'deny'
-      answer?: string
-    }
-    const sessionId = pendingPermissions.sessionFor(requestId)
-    if (sessionId === null || supervisedRunner === null) {
-      // Already answered, already handed back, or the run has ended. Reported
-      // rather than swallowed: a click that does nothing is worse than a
-      // refusal that says why.
-      return { ok: false, reason: 'that request is no longer waiting' }
-    }
-    const answered = supervisedRunner.resolve(sessionId, requestId, {
-      allow: decision === 'allow',
-      answer: answer === undefined || answer.trim() === '' ? undefined : answer,
-    })
-    if (!answered) {
-      // The id was still on the board but the bridge had let it go — answered
-      // in the terminal, handed back, or the run ended. Saying "ok" left a card
-      // showing a request nobody could clear.
-      pendingPermissions.remove(requestId)
+  reg(
+    api,
+    foundryChannel('foundry:permissions-list', noPayload, () => ({
+      pending: pendingPermissions.list(),
+    })),
+    // What can go in the model box, and which one is chosen. Asked for rather
+    // than hardcoded in the view, where the last list sat naming a superseded
+    // generation until somebody noticed.
+    //
+    // `selected` comes back with the list because the two must not drift: the
+    // settings view keeps its own copy for rendering, and a copy that disagrees
+    // with what the runs are actually launched with is worse than no setting.
+    foundryChannel('foundry:models-list', noPayload, async () => ({
+      models: await modelCatalog(),
+      selected: defaultModel(api),
+    })),
+    // Persisted where the main process can read it, which is the only place that
+    // matters: the launch command is built here, not in the renderer.
+    defineChannel({
+      channel: 'foundry:model-set',
+      schema: ModelSetPayload,
+      invalid: { error: 'model must be a string' },
+      run: ({ model }) => {
+        api.settings.set(MODEL_SETTING_KEY, model)
+        return { ok: true, selected: model }
+      },
+    }),
+    // What answers an ask: a narrow amendment, so Sonnet unless overridden.
+    foundryChannel('foundry:ask-model', noPayload, () => ({ selected: askModel(api) })),
+    defineChannel({
+      channel: 'foundry:ask-model-set',
+      schema: AskModelSetPayload,
+      invalid: { error: `model must be one of ${ASK_MODELS.join(', ')}` },
+      run: ({ model }) => {
+        api.settings.set(ASK_MODEL_SETTING_KEY, model)
+        return { ok: true, selected: model }
+      },
+    }),
+    // The firings, and whether they were recorded or surfaced. Precision is
+    // measured against these by hand before shadow mode is turned off.
+    foundryChannel('foundry:stalls-list', noPayload, () => ({
+      firings: stallFirings,
+      shadowMode: stallShadowMode(api),
+    })),
+    foundryChannel('foundry:feed-list', noPayload, () => ({
+      entries: supervision?.feed.list() ?? [],
+      mutes: mutes?.list() ?? [],
+    })),
+    // Anything shown as a list should be prunable, and a feed you cannot clear a
+    // line from is one you stop reading.
+    foundryChannel('foundry:feed-dismiss', FeedDismissPayload, ({ id }) => {
+      supervision?.feed.removeEntry(id)
+      return { ok: true }
+    }),
+    foundryChannel('foundry:feed-mute', FeedMutePayload, (rule) => {
+      mutes?.add(rule)
       announceLive('')
-      return { ok: false, reason: 'that request is no longer waiting' }
-    }
-    return { ok: true }
-  })
+      return { mutes: mutes?.list() ?? [] }
+    }),
+    foundryChannel('foundry:feed-unmute', FeedMutePayload, (rule) => {
+      mutes?.remove(rule)
+      announceLive('')
+      return { mutes: mutes?.list() ?? [] }
+    })
+  )
 
-  // Hands one back deliberately: the operator would rather answer it in the
-  // terminal, where they can see what the agent was doing around it.
-  reg(api, 'foundry:permission-hand-back', (payload: unknown) => {
-    const { requestId } = payload as { requestId: string }
-    const sessionId = pendingPermissions.sessionFor(requestId)
-    if (sessionId === null || supervisedRunner === null) return { ok: false }
-    supervisedRunner.handBackToTerminal(sessionId, requestId)
-    return { ok: true }
-  })
+  reg(
+    api,
+    defineChannel({
+      channel: 'foundry:permission-resolve',
+      schema: PermissionResolvePayload,
+      invalid: { ok: false, reason: 'Malformed request.' },
+      run: ({ requestId, decision, answer }) => {
+        const sessionId = pendingPermissions.sessionFor(requestId)
+        if (sessionId === null || supervisedRunner === null) {
+          // Already answered, already handed back, or the run has ended. Reported
+          // rather than swallowed: a click that does nothing is worse than a
+          // refusal that says why.
+          return { ok: false, reason: 'that request is no longer waiting' }
+        }
+        const answered = supervisedRunner.resolve(sessionId, requestId, {
+          allow: decision === 'allow',
+          answer: answer === undefined || answer.trim() === '' ? undefined : answer,
+        })
+        if (!answered) {
+          // The id was still on the board but the bridge had let it go — answered
+          // in the terminal, handed back, or the run ended. Saying "ok" left a card
+          // showing a request nobody could clear.
+          pendingPermissions.remove(requestId)
+          announceLive('')
+          return { ok: false, reason: 'that request is no longer waiting' }
+        }
+        return { ok: true }
+      },
+    }),
+    // Hands one back deliberately: the operator would rather answer it in the
+    // terminal, where they can see what the agent was doing around it.
+    sessionChannel('foundry:permission-hand-back', PermissionHandBackPayload, ({ requestId }) => {
+      const sessionId = pendingPermissions.sessionFor(requestId)
+      if (sessionId === null || supervisedRunner === null) return { ok: false }
+      supervisedRunner.handBackToTerminal(sessionId, requestId)
+      return { ok: true }
+    })
+  )
 
   // The four things you do about a run that has stopped making progress, and
   // the one you do about any run. Without these the supervision panel could
   // name a stall and offer nothing — which is the shape of every "correct and
   // useless" surface this line of work exists to stop shipping.
-
-  // Takes you to the terminal the run is in.
-  //
-  // Done here rather than in the panel: the extension's UI is a separate
-  // renderer process, so a store it imports from core is a second copy that
-  // nothing renders. `terminal:navigate-to-session` is the core's own channel
-  // for this — it selects the workspace, the project and the tab.
-  reg(api, 'foundry:run-terminal', (payload: unknown) => {
-    const { sessionId } = payload as { sessionId: string }
-    const terminal = supervisedRunner?.terminalFor(sessionId) ?? null
-    if (terminal === null) return { ok: false }
-    api.window.focusSelf()
-    api.window.broadcast('terminal:navigate-to-session', {
-      sessionId: terminal.terminalSessionId,
-      projectId: terminal.projectId,
-    })
-    return { ok: true }
-  })
-
-  // What it was doing, in its own words. The action that decides the others.
-  reg(api, 'foundry:run-transcript', (payload: unknown) => {
-    const { sessionId, limit } = payload as { sessionId: string; limit?: number }
-    const run = supervision?.runs.get(sessionId) ?? null
-    if (run === null) return { lines: [] }
-    return { lines: readTranscriptTail(run.transcriptPath, limit ?? 40) }
-  })
-
-  // Ends the turn and keeps the session, which is what makes the next message
-  // land instead of queueing behind whatever it is part-way through.
-  reg(api, 'foundry:run-interrupt', (payload: unknown) => {
-    const { sessionId } = payload as { sessionId: string }
-    if (supervisedRunner === null) return { ok: false }
-    supervisedRunner.interrupt(sessionId)
-    return { ok: true }
-  })
-
-  // Asking it what is wrong, or telling it what to do instead — the same
-  // action, and the reason interrupt does not also end the run.
-  reg(api, 'foundry:run-redirect', (payload: unknown) => {
-    const { sessionId, message } = payload as { sessionId: string; message?: string }
-    // Guarded rather than assumed: an IPC payload is whatever the caller sent,
-    // and a handler that throws on a missing field takes the channel down for
-    // everyone rather than refusing one call.
-    if (supervisedRunner === null || typeof message !== 'string' || message.trim() === '') {
-      return { ok: false }
-    }
-    supervisedRunner.interrupt(sessionId)
-    const ok = supervisedRunner.send(sessionId, message.trim())
-    if (ok) {
-      supervision?.runs.setState(sessionId, 'working', Date.now())
-      supervision?.feed.post({
-        at: Date.now(),
-        sessionId,
-        author: 'console',
-        summary: `redirected: ${message.trim()}`,
+  reg(
+    api,
+    // Takes you to the terminal the run is in.
+    //
+    // Done here rather than in the panel: the extension's UI is a separate
+    // renderer process, so a store it imports from core is a second copy that
+    // nothing renders. `terminal:navigate-to-session` is the core's own channel
+    // for this — it selects the workspace, the project and the tab.
+    sessionChannel('foundry:run-terminal', SessionPayload, ({ sessionId }) => {
+      const terminal = supervisedRunner?.terminalFor(sessionId) ?? null
+      if (terminal === null) return { ok: false }
+      api.window.focusSelf()
+      api.window.broadcast('terminal:navigate-to-session', {
+        sessionId: terminal.terminalSessionId,
+        projectId: terminal.projectId,
       })
-    }
-    return { ok }
-  })
-
-  // Ends the run, saying why first so the agent's own record carries it.
-  reg(api, 'foundry:run-stop', (payload: unknown) => {
-    const { sessionId, reason } = payload as { sessionId: string; reason?: string }
-    if (supervisedRunner === null) return { ok: false }
-    const ok = supervisedRunner.stop(sessionId, reason)
-    if (ok) {
-      supervision?.finish(sessionId, Date.now())
-      // Recorded before it leaves the live list, so a run somebody stopped is
-      // still answerable later — "what was it doing when I killed it".
-      supervision?.runs.archive(sessionId, 'stopped', Date.now())
-    }
-    return { ok }
-  })
+      return { ok: true }
+    }),
+    // What it was doing, in its own words. The action that decides the others.
+    defineChannel({
+      channel: 'foundry:run-transcript',
+      schema: TranscriptPayload,
+      invalid: { lines: [] },
+      run: ({ sessionId, limit }) => {
+        const run = supervision?.runs.get(sessionId) ?? null
+        if (run === null) return { lines: [] }
+        return { lines: readTranscriptTail(run.transcriptPath, limit ?? 40) }
+      },
+    }),
+    // Ends the turn and keeps the session, which is what makes the next message
+    // land instead of queueing behind whatever it is part-way through.
+    sessionChannel('foundry:run-interrupt', SessionPayload, ({ sessionId }) => {
+      if (supervisedRunner === null) return { ok: false }
+      supervisedRunner.interrupt(sessionId)
+      return { ok: true }
+    }),
+    // Asking it what is wrong, or telling it what to do instead — the same
+    // action, and the reason interrupt does not also end the run. The schema
+    // trims the message and refuses an empty one.
+    sessionChannel('foundry:run-redirect', RedirectPayload, ({ sessionId, message }) => {
+      if (supervisedRunner === null) return { ok: false }
+      supervisedRunner.interrupt(sessionId)
+      const ok = supervisedRunner.send(sessionId, message)
+      if (ok) {
+        supervision?.runs.setState(sessionId, 'working', Date.now())
+        supervision?.feed.post({
+          at: Date.now(),
+          sessionId,
+          author: 'console',
+          summary: `redirected: ${message}`,
+        })
+      }
+      return { ok }
+    }),
+    // Ends the run, saying why first so the agent's own record carries it.
+    sessionChannel('foundry:run-stop', SessionStopPayload, ({ sessionId, reason }) => {
+      if (supervisedRunner === null) return { ok: false }
+      const ok = supervisedRunner.stop(sessionId, reason)
+      if (ok) {
+        supervision?.finish(sessionId, Date.now())
+        // Recorded before it leaves the live list, so a run somebody stopped is
+        // still answerable later — "what was it doing when I killed it".
+        supervision?.runs.archive(sessionId, 'stopped', Date.now())
+      }
+      return { ok }
+    })
+  )
 
   // Track terminal sessions for the session-list IPC
   if (api.terminal?.onSessionCreate) {
@@ -4130,27 +4106,26 @@ export function activate(api: ExtensionAPI): void {
   const viewSetting = (): 'list' | 'factory' =>
     api.settings.get<string>('terminator.foundry.view') === 'factory' ? 'factory' : 'list'
 
-  reg(api, 'foundry:ui.view', () => ({ view: viewSetting() }))
-
-  reg(api, 'foundry:ui.set-view', (payload: unknown) => {
-    const { view } = (payload ?? {}) as { view?: unknown }
-    if (view !== 'list' && view !== 'factory') return { error: 'Malformed request.' }
-    api.settings.set('terminator.foundry.view', view)
-    api.window.broadcast('foundry:ui.view-changed', { view })
-    return { view }
-  })
-
-  // Renderer calls this on mount to pick up an intake request triggered
-  // before the main view existed.
-  reg(api, 'foundry:ui.consume-pending-new-order', () => {
-    const pending = pendingNewOrder
-    pendingNewOrder = false
-    if (pendingNewOrderTimer !== null) {
-      clearTimeout(pendingNewOrderTimer)
-      pendingNewOrderTimer = null
-    }
-    return { pending }
-  })
+  reg(
+    api,
+    foundryChannel('foundry:ui.view', noPayload, () => ({ view: viewSetting() })),
+    foundryChannel('foundry:ui.set-view', ViewPayload, ({ view }) => {
+      api.settings.set('terminator.foundry.view', view)
+      api.window.broadcast('foundry:ui.view-changed', { view })
+      return { view }
+    }),
+    // Renderer calls this on mount to pick up an intake request triggered
+    // before the main view existed.
+    foundryChannel('foundry:ui.consume-pending-new-order', noPayload, () => {
+      const pending = pendingNewOrder
+      pendingNewOrder = false
+      if (pendingNewOrderTimer !== null) {
+        clearTimeout(pendingNewOrderTimer)
+        pendingNewOrderTimer = null
+      }
+      return { pending }
+    })
+  )
 
   disposables.push(
     api.commands.register(

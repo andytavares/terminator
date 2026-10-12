@@ -88,11 +88,6 @@ describe('foundry:signals.list', () => {
     expect(result.signals.map((s) => s.id)).toEqual(['sig-open'])
     expect(result.counts.open).toBe(1)
   })
-
-  it('rejects a malformed payload', async () => {
-    const { c } = channels()
-    expect(await c.list({ bogus: true })).toEqual({ error: 'Malformed request.' })
-  })
 })
 
 describe('foundry:signals.dismiss', () => {
@@ -108,11 +103,6 @@ describe('foundry:signals.dismiss', () => {
   it('errors on an unknown signal', async () => {
     const { c } = channels()
     expect(await c.dismiss({ id: 'nope' })).toEqual({ error: 'No signal nope.' })
-  })
-
-  it('rejects a malformed payload', async () => {
-    const { c } = channels()
-    expect(await c.dismiss({})).toEqual({ error: 'Malformed request.' })
   })
 })
 
@@ -139,11 +129,6 @@ describe('foundry:signals.promote', () => {
     const { c } = channels()
     expect(await c.promote({ id: 'nope', repoPaths: [repo] })).toEqual({ error: 'No signal nope.' })
   })
-
-  it('rejects a malformed payload', async () => {
-    const { c } = channels()
-    expect(await c.promote({ id: 'sig-1' })).toEqual({ error: 'Malformed request.' })
-  })
 })
 
 describe('foundry:sensors.list', () => {
@@ -161,11 +146,6 @@ describe('foundry:sensors.list', () => {
       lastProblem: null,
     })
     expect(result.sensors[0].nextDueAt).toBeNull()
-  })
-
-  it('rejects a malformed payload', async () => {
-    const { c } = channels()
-    expect(await c.sensorsList({ bogus: true })).toEqual({ error: 'Malformed request.' })
   })
 
   it('is due now for an enabled sensor that has never run', async () => {
@@ -230,11 +210,6 @@ describe('foundry:sensors.set', () => {
       lastProblem: null,
     })
   })
-
-  it('rejects a malformed payload', async () => {
-    const { c } = channels()
-    expect(await c.sensorsSet({ enabled: true })).toEqual({ error: 'Malformed request.' })
-  })
 })
 
 describe('foundry:sensors.run-now', () => {
@@ -256,10 +231,5 @@ describe('foundry:sensors.run-now', () => {
   it('errors on an unknown sensor', async () => {
     const { c } = channels()
     expect(await c.sensorsRunNow({ id: 'nope' })).toEqual({ error: 'No sensor nope.' })
-  })
-
-  it('rejects a malformed payload', async () => {
-    const { c } = channels()
-    expect(await c.sensorsRunNow({})).toEqual({ error: 'Malformed request.' })
   })
 })

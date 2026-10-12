@@ -15,7 +15,7 @@ import * as path from 'node:path'
 const USER_DATA = tmpdir()
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -161,8 +161,8 @@ beforeAll(async () => {
   const handlers = new Map<string, (payload: unknown) => Promise<unknown>>()
   api = {
     ipc: {
-      registerHandler: vi.fn((channel: string, handler: (payload: unknown) => Promise<unknown>) => {
-        handlers.set(channel, handler)
+      registerHandler: vi.fn((spec: ChannelSpec) => {
+        handlers.set(spec.channel, (payload) => dispatchChannel(spec, payload))
         return { dispose: vi.fn() }
       }),
       invokeChannel: vi.fn(),
@@ -394,11 +394,5 @@ describe('stopping the whole order rather than one agent', () => {
     expect(await call('foundry:run.stop', { id: 'WO-1' })).toEqual({ ok: true })
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('cancelled')
     expect(ledger()).toContain('run.stopped')
-  })
-
-  it('rejects a malformed request rather than cancelling something else', async () => {
-    await seedInterruptedRun()
-    expect(await call('foundry:run.stop', {})).toEqual({ error: 'Malformed request.' })
-    expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
   })
 })

@@ -192,10 +192,6 @@ describe('foundry:run.start', () => {
   it('reports an order it cannot find', async () => {
     expect(await channels().start({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().start({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
 })
 
 describe('foundry:run.observe', () => {
@@ -766,10 +762,6 @@ describe('attaching to a running agent', () => {
     const r = (await channels().attach({ orderId: 'WO-nope', nodeId: 'x' })) as { error: string }
     expect(r.error).toBe('No run for WO-nope.')
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().attach({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
 })
 
 describe('foundry:run.activity', () => {
@@ -822,17 +814,9 @@ describe('foundry:run.activity', () => {
     const r = (await channels().activity({ id: 'WO-nope' })) as { error: string }
     expect(r.error).toBe('No run for WO-nope.')
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().activity({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
 })
 
 describe('offering shapes of work', () => {
-  it('rejects a malformed request', async () => {
-    expect(await channels().recipes({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
-
   it('reports an order it cannot find', async () => {
     expect(await channels().recipes({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
   })
@@ -1098,10 +1082,6 @@ describe('foundry:run.resume', () => {
   it('reports an order it cannot find', async () => {
     expect(await live().resume({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await live().resume({ retry: 'U-1' })).toEqual({ error: 'Malformed request.' })
-  })
 })
 
 describe('what the Floor is told to call each node', () => {
@@ -1312,9 +1292,8 @@ describe('the run timeline', () => {
     expect(r.gates).toEqual([gate])
   })
 
-  it('says so for an order with no run, and for a request it cannot read', async () => {
+  it('says so for an order with no run', async () => {
     expect(await channels().timeline({ id: 'WO-1' })).toEqual({ error: 'No run for WO-1.' })
-    expect(await channels().timeline({})).toEqual({ error: 'Malformed request.' })
   })
 
   it('hands back no gates when the host has no gate store to ask', async () => {

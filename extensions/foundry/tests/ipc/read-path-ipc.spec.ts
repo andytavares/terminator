@@ -13,7 +13,7 @@ import * as path from 'node:path'
 const USER_DATA = tmpdir()
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { checkoutPath } from '../../src/line/worktree.js'
@@ -109,17 +109,11 @@ beforeAll(async () => {
   const handlers = new Map<string, (payload: unknown) => Promise<unknown>>()
   const api = {
     ipc: {
-      registerHandler: vi.fn(
-        (
-          channel: string,
-          handler: (payload: unknown) => Promise<unknown>,
-          opts?: { remoteAccessible?: boolean }
-        ) => {
-          handlers.set(channel, handler)
-          if (opts?.remoteAccessible === true) remoteChannels.push(channel)
-          return { dispose: vi.fn() }
-        }
-      ),
+      registerHandler: vi.fn((spec: ChannelSpec, opts?: { remoteAccessible?: boolean }) => {
+        handlers.set(spec.channel, (payload) => dispatchChannel(spec, payload))
+        if (opts?.remoteAccessible === true) remoteChannels.push(spec.channel)
+        return { dispose: vi.fn() }
+      }),
       invokeChannel: vi.fn(),
       sendChannel: vi.fn(),
       onWindowEvent: vi.fn().mockReturnValue(() => {}),

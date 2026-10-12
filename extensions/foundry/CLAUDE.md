@@ -84,7 +84,7 @@ This is a fully isolated extension. The core application knows nothing about it.
 
 - Call core IPC via `window.electronAPI.{terminal,workspace,project,git,shell,fs,settings,…}` for **core-owned channels only**
 - Call its own IPC via `window.electronAPI.extensionBridge.invoke('foundry:…')`
-- Register IPC handlers in `src/index.ts` via `api.ipc.registerHandler()`
+- Register IPC channels through `reg` in `src/index.ts`, each a `ChannelSpec` with the zod schema of its payload (`foundryChannel` in `src/ipc/channel.ts`; ADR 096). The schema sits beside the module that answers the channel, the host parses the payload before `run` sees it, and `run` takes the parsed type — never parse or cast a payload by hand. `tests/channel-schemas.spec.ts` checks every registered channel has one; a test of one schema's rules is zod's concern, not this repository's
 - Use `api.shell.exec` for `git` and `gh` — those are the only two commands the core allowlist admits (`src/main/shell/shell-executor.ts`). Core's default timeout is 10 seconds, so a call that can take longer passes `timeoutMs` (`git commit` 300 s, rebase and push 120 s), and a result with `timedOut` set is a failure that says it timed out
 
 Verification commands (`npm test`, `pytest`, …) do **not** run through `api.shell.exec` and do **not** run as hidden child processes. Each runs in a terminal tab of its own in the lane's checkout (`SupervisedRunner.runCommand`), so its output is visible, and its verdict is that tab's exit status — no agent runs it and no transcript is read back.

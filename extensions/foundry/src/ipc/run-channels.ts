@@ -28,6 +28,8 @@ import type { ToolActivity } from '../runtime/transcript-tailer.js'
 import { recordGraph, readTimeline } from '../factory/timeline-store.js'
 import { pullNumber } from '../line/pull-number.js'
 import type { FoundryIndex } from '../state/foundry-index.js'
+import type { ChannelSpec } from '@terminator/extension-sdk'
+import { foundryChannel } from './channel.js'
 
 // Starting a run.
 //
@@ -132,17 +134,17 @@ export interface RunDeps {
 
 export interface RunChannels {
   /** Continue a run that halted at a gate the operator has now answered. */
-  resume(payload: unknown): Promise<unknown>
-  start(payload: unknown): Promise<unknown>
-  observe(payload: unknown): Promise<unknown>
+  resume(payload: z.infer<typeof ObservePayload>): Promise<unknown>
+  start(payload: z.infer<typeof StartPayload>): Promise<unknown>
+  observe(payload: z.infer<typeof ObservePayload>): Promise<unknown>
   /** Which shapes of work this order could actually take, and why not. */
-  recipes(payload: unknown): Promise<unknown>
+  recipes(payload: z.infer<typeof ObservePayload>): Promise<unknown>
   /** The live session behind a running agent, so a surface can go to it. */
-  attach(payload: unknown): Promise<unknown>
+  attach(payload: z.infer<typeof AttachPayload>): Promise<unknown>
   /** What each running node's agent has been doing, for the Factory view. */
-  activity(payload: unknown): Promise<unknown>
+  activity(payload: z.infer<typeof ActivityPayload>): Promise<unknown>
   /** Everything recorded about a run, for the Factory view to play back. */
-  timeline(payload: unknown): Promise<unknown>
+  timeline(payload: z.infer<typeof ActivityPayload>): Promise<unknown>
 }
 
 /**
@@ -356,12 +358,9 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     return readRunGraph(deps.dataRoot(), orderId, deps.index?.(deps.dataRoot()))
   }
 
-  async function start(raw: unknown): Promise<unknown> {
-    const parsed = StartPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const order = await deps.store.load(parsed.data.id)
-    if (order === null) return { error: `No order ${parsed.data.id}.` }
+  async function start(payload: z.infer<typeof StartPayload>): Promise<unknown> {
+    const order = await deps.store.load(payload.id)
+    if (order === null) return { error: `No order ${payload.id}.` }
     if (order.status !== 'agreed') {
       return {
         error: `Only an agreed order can be started; this one is ${order.status}.`,
@@ -371,12 +370,12 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const writable = await ensureWritable(deps.dataRoot())
     if (!writable.ok) return { error: writable.reason }
 
-    const chosenByOperator = parsed.data.recipe !== undefined
+    const chosenByOperator = payload.recipe !== undefined
     // An operator's choice is honoured or refused, never quietly swapped. A
     // *proposal* walks its own ladder instead: proposing a shape this
     // repository cannot run would refuse the run over a decision nobody made.
     const ladder = chosenByOperator
-      ? [{ name: parsed.data.recipe as string, why: 'chosen by the operator' }]
+      ? [{ name: payload.recipe as string, why: 'chosen by the operator' }]
       : recipeLadder(order)
 
     const fitted = fitRecipe(ladder, order, deps.sources())
@@ -448,14 +447,11 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     return { graph, order: running, started: true }
   }
 
-  async function observe(raw: unknown): Promise<unknown> {
-    const parsed = ObservePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
+  async function observe(payload: z.infer<typeof ObservePayload>): Promise<unknown> {
+    const graph = await loadGraph(payload.id)
+    if (graph === null) return { error: `No run for ${payload.id}.` }
 
-    const graph = await loadGraph(parsed.data.id)
-    if (graph === null) return { error: `No run for ${parsed.data.id}.` }
-
-    const order = await deps.store.load(parsed.data.id)
+    const order = await deps.store.load(payload.id)
     const budgets = order?.budgets ?? {
       agents: 3,
       wallClockMinutes: 45,
@@ -467,8 +463,8 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const labels = nodeLabels(order, graph)
     const name = (id: string): string => labels[id] ?? id
 
-    const orphaned = orphansOf(parsed.data.id, graph)
-    const gates = await deps.gatesFor(parsed.data.id)
+    const orphaned = orphansOf(payload.id, graph)
+    const gates = await deps.gatesFor(payload.id)
     const waiting = gates.filter((gate) => gate.decision === null)
 
     // Every node's skills, resolved the way `start` resolves them. An order
@@ -493,10 +489,10 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       // The draft's CI, read from the ship tail's own file rather than
       // re-derived here — a surface that only wants "where does CI stand"
       // reads one small file instead of walking nodes and feedback.
-      ci: await readCiState(deps.dataRoot(), parsed.data.id),
+      ci: await readCiState(deps.dataRoot(), payload.id),
       // Where the pull requests are, and the ticket the order came from, so the
       // Floor can link both. `cwd` is the checkout a review opens against.
-      pulls: (await readPulls(deps.dataRoot(), parsed.data.id)).map((pull) => ({
+      pulls: (await readPulls(deps.dataRoot(), payload.id)).map((pull) => ({
         repo: pull.repo,
         url: pull.url,
         number: pullNumber(pull.url),
@@ -517,22 +513,19 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       // second assembly of the same inputs: two callers assembling them
       // separately is how the order list and this surface came to describe
       // one halted run as "ready to hand off" and "building" at once.
-      standing: await readStanding(
-        order ?? ({ id: parsed.data.id, status: 'running' } as WorkOrder),
-        {
-          graphFor: async () => graph,
-          gatesFor: async () => gates,
-          asksFor: deps.asksFor,
-          stallsFor: deps.stallsFor,
-          strandedFor: deps.strandedFor,
-          orphansFor: () => orphaned,
-          runFailureFor: async (id) => runFailure(await deps.store.entries(id)),
-          documentReadyFor: async (id) => runDocumentReady(await deps.store.entries(id)),
-        }
-      ),
+      standing: await readStanding(order ?? ({ id: payload.id, status: 'running' } as WorkOrder), {
+        graphFor: async () => graph,
+        gatesFor: async () => gates,
+        asksFor: deps.asksFor,
+        stallsFor: deps.stallsFor,
+        strandedFor: deps.strandedFor,
+        orphansFor: () => orphaned,
+        runFailureFor: async (id) => runFailure(await deps.store.entries(id)),
+        documentReadyFor: async (id) => runDocumentReady(await deps.store.entries(id)),
+      }),
       // The agents waiting at a terminal prompt, so the band can offer the one
       // move that answers a handed-back call: going to that terminal.
-      stranded: deps.strandedSessions(parsed.data.id),
+      stranded: deps.strandedSessions(payload.id),
       // The gates holding it, in full. A band that says "halted at a gate" and
       // cannot offer the gate's own options is the wall this replaces.
       waiting,
@@ -563,7 +556,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       // Where this order stands in the refinery's file-overlap queue. Null
       // when it is not in one — nothing else agreed against the same repo and
       // base touches the same files.
-      queue: await queuePositionFor(deps, parsed.data.id),
+      queue: await queuePositionFor(deps, payload.id),
     }
   }
 
@@ -578,12 +571,9 @@ export function createRunChannels(deps: RunDeps): RunChannels {
    * Idempotent against a run that is already going: `execute` starts only what
    * the scheduler offers, and a running node is not offered.
    */
-  async function resume(raw: unknown): Promise<unknown> {
-    const parsed = ObservePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const order = await deps.store.load(parsed.data.id)
-    if (order === null) return { error: `No order ${parsed.data.id}.` }
+  async function resume(payload: z.infer<typeof ObservePayload>): Promise<unknown> {
+    const order = await deps.store.load(payload.id)
+    if (order === null) return { error: `No order ${payload.id}.` }
     if (order.status !== 'running') {
       return { error: `Only a running order can be resumed; this one is ${order.status}.` }
     }
@@ -595,8 +585,8 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       return { error: 'This run is already going; nothing to resume.' }
     }
 
-    const graph = await loadGraph(parsed.data.id)
-    if (graph === null) return { error: `No run for ${parsed.data.id}.` }
+    const graph = await loadGraph(payload.id)
+    if (graph === null) return { error: `No run for ${payload.id}.` }
     if (order.recipe === null) return { error: `${order.id} has no recipe to resume.` }
 
     const resolved = resolveRecipe(order.recipe, deps.sources())
@@ -622,7 +612,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     // Anything the operator sent back is offered again. Without this a failed
     // node stays failed and the resumed run has nothing to do — which reads
     // as "it finished" rather than "it never restarted".
-    const retried = (parsed.data.retry ?? []).reduce((g, id) => retryNode(g, id), taken.graph)
+    const retried = (payload.retry ?? []).reduce((g, id) => retryNode(g, id), taken.graph)
     await saveGraph(retried)
 
     // Clears any failure the previous attempt left in the ledger: without
@@ -652,12 +642,9 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     return { graph: retried, reclaimed: taken.reclaimed, started: true }
   }
 
-  async function recipes(raw: unknown): Promise<unknown> {
-    const parsed = ObservePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const order = await deps.store.load(parsed.data.id)
-    if (order === null) return { error: `No order ${parsed.data.id}.` }
+  async function recipes(payload: z.infer<typeof ObservePayload>): Promise<unknown> {
+    const order = await deps.store.load(payload.id)
+    if (order === null) return { error: `No order ${payload.id}.` }
 
     const offered = availableNames('recipes', deps.sources()).map((name) => {
       const resolved = resolveRecipe(name, deps.sources())
@@ -705,16 +692,13 @@ export function createRunChannels(deps: RunDeps): RunChannels {
    * when the only useful thing is to be in the session typing at it. One
    * action, from any surface.
    */
-  async function attach(raw: unknown): Promise<unknown> {
-    const parsed = AttachPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
+  async function attach(payload: z.infer<typeof AttachPayload>): Promise<unknown> {
+    const graph = await loadGraph(payload.orderId)
+    if (graph === null) return { error: `No run for ${payload.orderId}.` }
 
-    const graph = await loadGraph(parsed.data.orderId)
-    if (graph === null) return { error: `No run for ${parsed.data.orderId}.` }
-
-    const node = graph.nodes.find((n) => n.id === parsed.data.nodeId)
-    if (node === undefined) return { error: `No step ${parsed.data.nodeId}.` }
-    const step = nodeLabel(await deps.store.load(parsed.data.orderId), node)
+    const node = graph.nodes.find((n) => n.id === payload.nodeId)
+    if (node === undefined) return { error: `No step ${payload.nodeId}.` }
+    const step = nodeLabel(await deps.store.load(payload.orderId), node)
     // A step that never has an agent, said as such rather than as "no session
     // yet", which promises one is coming.
     if (AUTOMATIC_KINDS.includes(node.kind)) {
@@ -735,7 +719,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     }
     // A session id outlives the process that ran it, so handing one back
     // unchecked sent the operator to a terminal that no longer exists.
-    if (!isLive(node.sessionId) && !deps.executing(parsed.data.orderId)) {
+    if (!isLive(node.sessionId) && !deps.executing(payload.orderId)) {
       return {
         error: `${node.id} has no live agent — its session ended when the application last closed. Resume the run to start it again.`,
       }
@@ -750,12 +734,9 @@ export function createRunChannels(deps: RunDeps): RunChannels {
    * the last 20 entries are plenty to say "reading" or "running a shell
    * command" and drop off as soon as the agent moves on.
    */
-  async function activity(raw: unknown): Promise<unknown> {
-    const parsed = ActivityPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const graph = await loadGraph(parsed.data.id)
-    if (graph === null) return { error: `No run for ${parsed.data.id}.` }
+  async function activity(payload: z.infer<typeof ActivityPayload>): Promise<unknown> {
+    const graph = await loadGraph(payload.id)
+    if (graph === null) return { error: `No run for ${payload.id}.` }
 
     const activity: Record<string, ToolActivity[]> = {}
     for (const node of graph.nodes) {
@@ -771,19 +752,29 @@ export function createRunChannels(deps: RunDeps): RunChannels {
    * each frame of node states and each tool call, and every gate the order
    * raised — decided ones included, since a replay shows the waits too.
    */
-  async function timeline(raw: unknown): Promise<unknown> {
-    const parsed = ActivityPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const graph = await loadGraph(parsed.data.id)
-    if (graph === null) return { error: `No run for ${parsed.data.id}.` }
+  async function timeline(payload: z.infer<typeof ActivityPayload>): Promise<unknown> {
+    const graph = await loadGraph(payload.id)
+    if (graph === null) return { error: `No run for ${payload.id}.` }
 
     return {
       graph,
-      timeline: await readTimeline(orderDir(deps.dataRoot(), parsed.data.id)),
-      gates: await deps.gatesFor(parsed.data.id),
+      timeline: await readTimeline(orderDir(deps.dataRoot(), payload.id)),
+      gates: await deps.gatesFor(payload.id),
     }
   }
 
   return { start, resume, observe, recipes, attach, activity, timeline }
+}
+
+/** The Line's channels, each with the schema its payload is parsed with (ADR 096). */
+export function runChannelSpecs(runs: RunChannels): ChannelSpec[] {
+  return [
+    foundryChannel('foundry:run.start', StartPayload, runs.start),
+    foundryChannel('foundry:run.resume', ObservePayload, runs.resume),
+    foundryChannel('foundry:run.observe', ObservePayload, runs.observe),
+    foundryChannel('foundry:run.recipes', ObservePayload, runs.recipes),
+    foundryChannel('foundry:session.attach', AttachPayload, runs.attach),
+    foundryChannel('foundry:run.activity', ActivityPayload, runs.activity),
+    foundryChannel('foundry:run.timeline', ActivityPayload, runs.timeline),
+  ]
 }

@@ -181,10 +181,6 @@ describe('foundry:ledger.query', () => {
     expect(r.actors).toEqual(['operator', 'rule:risk.p0'])
     expect(r.actions).toEqual(['gate.decided', 'gate.default'])
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().query({ limit: 'lots' })).toEqual({ error: 'Malformed request.' })
-  })
 })
 
 describe('foundry:rules.propose', () => {
@@ -212,10 +208,6 @@ describe('foundry:rules.propose', () => {
       proposals: unknown[]
     }
     expect(again.proposals).toEqual([])
-  })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().proposeRules({ orderId: 7 })).toEqual({ error: 'Malformed request.' })
   })
 })
 
@@ -263,12 +255,6 @@ describe('deciding a proposal', () => {
       accept: true,
     })) as { error: string }
     expect(r.error).toMatch(/no longer supports/)
-  })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().decideProposal({ accept: true })).toEqual({
-      error: 'Malformed request.',
-    })
   })
 })
 
@@ -363,10 +349,6 @@ describe('removing an accepted check (FR-081)', () => {
       error: string
     }
     expect(result.error).toMatch(/not yours to remove/)
-  })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().removeAcceptedRule({})).toEqual({ error: 'Malformed request.' })
   })
 })
 
@@ -466,11 +448,5 @@ describe('foundry:factory.metrics', () => {
     await seedOrder('WO-1')
     const r = (await channels().factoryMetrics({ window: 'all' })) as { window: string }
     expect(r.window).toBe('all')
-  })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().factoryMetrics({ window: 'bogus' })).toEqual({
-      error: 'Malformed request.',
-    })
   })
 })

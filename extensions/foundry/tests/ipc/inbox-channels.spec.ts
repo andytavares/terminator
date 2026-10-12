@@ -301,10 +301,6 @@ describe('foundry:inbox.decide', () => {
     })
   })
 
-  it('rejects a malformed request', async () => {
-    expect(await channels().decide({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
-
   it('takes a decision with no note', async () => {
     await createGateStore(root).save(gate())
     const r = (await channels().decide({ gateId: 'G-1', option: 'hold' })) as { ok: true }
