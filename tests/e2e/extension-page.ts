@@ -51,6 +51,17 @@ export function invokeChannel<T = unknown>(
   ) as Promise<T>
 }
 
+/** Answers the next native save dialog in main with `filePath`, as if the user chose it. */
+export async function answerNextSaveDialog(handle: AppHandle, filePath: string): Promise<void> {
+  await handle.app.evaluate(({ dialog }, chosen) => {
+    const original = dialog.showSaveDialog
+    dialog.showSaveDialog = (async () => {
+      dialog.showSaveDialog = original
+      return { canceled: false, filePath: chosen }
+    }) as typeof dialog.showSaveDialog
+  }, filePath)
+}
+
 /** Answers the next native open dialog in main with `folder`, as if the user picked it. */
 export async function answerNextOpenDialog(handle: AppHandle, folder: string): Promise<void> {
   await handle.app.evaluate(({ dialog }, picked) => {
