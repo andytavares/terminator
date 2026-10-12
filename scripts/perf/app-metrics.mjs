@@ -6,7 +6,7 @@
 // (https://www.electronjs.org/docs/latest/api/app#appgetappmetrics), which
 // reports the same numbers on every platform.
 import { _electron as electron } from 'playwright'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -54,16 +54,34 @@ async function memoryByProcessType(app) {
   return totals
 }
 
-async function terminalThroughput(page) {
-  await page.locator('.xterm-helper-textarea').first().focus()
-  const command = `head -c ${THROUGHPUT_BYTES} /dev/zero | tr '\\0' x; echo; echo __PERF_DONE__\r`
+// A fresh profile has no terminal: add a workspace and a branch, which opens one.
+async function openTerminal(page, folder) {
+  await page.click('.sidebar-header__add')
+  await page.getByPlaceholder('My Workspace').fill('Perf')
+  await page.getByPlaceholder('/path/to/folder').fill(folder)
+  await page.click('.dialog__btn-primary')
+  const header = page.locator('.repo-header').filter({ hasText: 'Perf' })
+  await header.hover()
+  await header.locator('.repo-header__action[aria-label="New branch in Perf"]').click()
+  await page.getByPlaceholder('My branch').fill('perf')
+  await page.click('.dialog__btn-primary')
+  await page.locator('.branch-row').filter({ hasText: 'perf' }).last().click()
+  await page.getByRole('textbox', { name: 'Terminal input' }).first().waitFor({ timeout: 30_000 })
+}
+
+// The shell creates a marker file when the output has been written, so the wait
+// does not depend on how the terminal draws (DOM rows or WebGL).
+async function terminalThroughput(page, profile) {
+  await openTerminal(page, profile)
+  await page.getByRole('textbox', { name: 'Terminal input' }).first().focus()
+  const marker = join(profile, 'perf-done')
+  const command = `head -c ${THROUGHPUT_BYTES} /dev/zero | tr '\\0' x; echo; touch ${marker}\r`
   const startedAt = performance.now()
   await page.keyboard.type(command)
-  await page.waitForFunction(
-    () => document.querySelector('.xterm-rows')?.textContent?.includes('__PERF_DONE__'),
-    undefined,
-    { timeout: 300_000, polling: 100 }
-  )
+  while (!existsSync(marker)) {
+    if (performance.now() - startedAt > 300_000) throw new Error('throughput run timed out')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
   return performance.now() - startedAt
 }
 
@@ -73,7 +91,7 @@ async function measureOnce(settleMs, withThroughput) {
   try {
     await page.waitForTimeout(settleMs)
     const memory = await memoryByProcessType(app)
-    const throughputMs = withThroughput ? await terminalThroughput(page) : null
+    const throughputMs = withThroughput ? await terminalThroughput(page, profile) : null
     return { startup, memory, throughputMs }
   } finally {
     await app.close()
