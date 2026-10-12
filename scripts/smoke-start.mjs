@@ -140,8 +140,13 @@ export function electronMainPid(processTable, rootPid, binary) {
     .map((line) => line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/))
     .filter(Boolean)
     .map(([, pid, parent, args]) => ({ pid: Number(pid), parent: Number(parent), args }))
+  // Repeated until nothing joins: once pids wrap, a child can sort before its parent.
   const tree = new Set([rootPid])
-  for (const row of rows) if (tree.has(row.parent)) tree.add(row.pid)
+  let size = 0
+  while (size !== tree.size) {
+    size = tree.size
+    for (const row of rows) if (tree.has(row.parent)) tree.add(row.pid)
+  }
   const main = rows.find(
     (row) => tree.has(row.pid) && row.args.startsWith(binary) && !row.args.includes('--type=')
   )
@@ -166,7 +171,7 @@ async function quit(run, executable) {
   while (run.exitCode === undefined && Date.now() < deadline) await pause(200)
   if (run.exitCode !== undefined) return run.exitCode
   process.kill(-run.child.pid, 'SIGKILL')
-  return 'still running 15s after SIGTERM'
+  return pid ? `still running 15s after SIGTERM to ${pid}` : 'no Electron main process found'
 }
 
 function appName() {

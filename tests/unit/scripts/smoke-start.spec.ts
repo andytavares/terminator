@@ -128,6 +128,16 @@ describe('electronMainPid', () => {
     expect(electronMainPid(table, 100, electron)).toBe(103)
   })
 
+  it('follows the tree when pids wrapped and a child has a lower pid than its parent', () => {
+    const wrapped = [
+      `   40 32700 ${electron} . --no-sandbox`,
+      '32690     1 npm run dev',
+      '32695 32690 sh -c electron-vite dev',
+      '32700 32695 node /repo/node_modules/.bin/electron-vite dev',
+    ].join('\n')
+    expect(electronMainPid(wrapped, 32690, electron)).toBe(40)
+  })
+
   it('is the command itself when it is the packaged app', () => {
     expect(electronMainPid(table, 103, electron)).toBe(103)
   })
