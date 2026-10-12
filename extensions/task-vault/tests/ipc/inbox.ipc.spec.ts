@@ -1,179 +1,142 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import * as fs from 'node:fs/promises'
-import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
-
-vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>()
-  return {
-    ...actual,
-    readFile: vi.fn(),
-    writeFile: vi.fn(),
-    rename: vi.fn(),
-    mkdir: vi.fn(),
-    stat: vi.fn(),
-    readdir: vi.fn(),
-  }
-})
-
-const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
-  mockHandle: vi.fn(),
-  mockRemoveHandler: vi.fn(),
-}))
-vi.mock('electron', () => ({
-  ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
-}))
-
-// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
-// capture/assert code (mockHandle.mock.calls, removeHandler assertions) still works.
-const mockApiIpc = {
-  registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
-    mockHandle(ch, (_e: unknown, payload: unknown) => fn(payload))
-    return { dispose: () => mockRemoveHandler(ch) }
-  },
-}
+import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import { localDate } from '../../src/vault/recurrence'
+import {
+  createIpcHarness,
+  createVaultDb,
+  seedArea,
+  seedProject,
+  seedTask,
+  taskRow,
+} from '../support/vault-db'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
   triggerSchedulerTick: vi.fn(),
   broadcast: vi.fn(),
 }))
 
-vi.mock('../../src/vault/indexer', () => ({
-  buildIndex: vi.fn().mockResolvedValue({ tasks: [], projects: [], inboxCount: 0 }),
-}))
-
-vi.mock('../../src/vault/db', () => ({
-  randomUUID: vi.fn(() => 'test-uuid'),
-}))
-
 import { registerVaultIpcHandlers } from '../../src/ipc/vault.ipc'
 
-function createMockDb() {
-  const mockQuery = vi.fn().mockResolvedValue([])
-  const mockGet = vi.fn().mockResolvedValue(undefined)
-  const mockRun = vi.fn().mockResolvedValue(undefined)
-  const db: ExtensionDB = {
-    query: mockQuery,
-    get: mockGet,
-    run: mockRun,
-    exec: vi.fn().mockResolvedValue(undefined),
-    transaction: vi
-      .fn()
-      .mockImplementation(async (fn: (tx: ExtensionDB) => Promise<unknown>) => fn(db)),
-  }
-  return Object.assign(db, { mockQuery, mockGet, mockRun })
-}
-
 const TASK_ID = 'task-uuid-1'
-const TASK_ROW = {
-  id: TASK_ID,
-  status: 'open',
-  text: 'Item one',
-  source: 'inbox',
-  terminator_links: '[]',
-}
+const SUBTASK_ID = 'subtask-uuid-1'
 
-let db: ReturnType<typeof createMockDb>
-const mockApi = {
-  ipc: mockApiIpc,
-  notifications: { createNotification: vi.fn() },
-} as unknown as ExtensionAPI
+let db: ExtensionDB
+let harness: ReturnType<typeof createIpcHarness>
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  db = createMockDb()
-  db.mockGet.mockResolvedValue(TASK_ROW)
-  vi.mocked(fs.mkdir).mockResolvedValue(undefined)
-  vi.mocked(fs.readdir).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof fs.readdir>>)
-  vi.mocked(fs.stat).mockResolvedValue({ mtime: new Date() } as unknown as Awaited<
-    ReturnType<typeof fs.stat>
-  >)
+beforeEach(async () => {
+  db = await createVaultDb()
+  harness = createIpcHarness()
+  registerVaultIpcHandlers(harness.api, db)
+  await seedTask(db, { id: TASK_ID, text: 'Item one' })
+  await seedTask(db, { id: SUBTASK_ID, text: 'Sub item', parentId: TASK_ID })
 })
 
-function getHandler(channel: string): (event: unknown, payload: unknown) => Promise<unknown> {
-  let handler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
-  vi.mocked(mockHandle).mockImplementation((ch, fn) => {
-    if (ch === channel) handler = fn as typeof handler
-  })
-  registerVaultIpcHandlers(mockApi, db)
-  if (!handler) throw new Error(`Handler for ${channel} not registered`)
-  return handler
-}
+const processItem = (payload: unknown) =>
+  harness.invoke('task-vault:vault:process-inbox-item', payload)
 
 describe('task-vault:vault:process-inbox-item', () => {
-  it('action:trash removes item from inbox', async () => {
-    const handler = getHandler('task-vault:vault:process-inbox-item')
-    const result = await handler({}, { taskId: TASK_ID, action: 'trash' })
-    expect(result).toMatchObject({ success: true })
+  it('trash cancels the item and its subtasks', async () => {
+    expect(await processItem({ taskId: TASK_ID, action: 'trash' })).toMatchObject({
+      success: true,
+    })
+    expect(await taskRow(db, TASK_ID)).toMatchObject({ status: 'cancelled' })
+    expect(await taskRow(db, SUBTASK_ID)).toMatchObject({ status: 'cancelled' })
   })
 
-  it('action:do-now moves task to today daily log', async () => {
-    const handler = getHandler('task-vault:vault:process-inbox-item')
-    const result = await handler({}, { taskId: TASK_ID, action: 'do-now' })
-    expect(result).toMatchObject({ success: true })
-    // Two UPDATE statements: one for task, one for subtasks
-    expect(db.mockRun).toHaveBeenCalledTimes(2)
+  it('do-now moves the task and its subtasks to today and starts the task', async () => {
+    expect(await processItem({ taskId: TASK_ID, action: 'do-now' })).toMatchObject({
+      success: true,
+    })
+    expect(await taskRow(db, TASK_ID)).toMatchObject({
+      status: 'in-progress',
+      source: 'daily',
+      source_ref: localDate(),
+    })
+    expect(await taskRow(db, SUBTASK_ID)).toMatchObject({
+      source: 'daily',
+      source_ref: localDate(),
+    })
   })
 
-  it('action:someday files to someday', async () => {
-    const handler = getHandler('task-vault:vault:process-inbox-item')
-    const result = await handler({}, { taskId: TASK_ID, action: 'someday' })
-    expect(result).toMatchObject({ success: true })
-  })
-
-  it('action:someday clears today_since so task is not immediately stale on return', async () => {
-    const handler = getHandler('task-vault:vault:process-inbox-item')
-    await handler({}, { taskId: TASK_ID, action: 'someday' })
-    const runSqls = db.mockRun.mock.calls.map((c) => c[0] as string)
-    expect(runSqls.some((sql) => sql.includes('today_since=NULL'))).toBe(true)
-  })
-
-  it('action:file with destination files to destination', async () => {
-    const handler = getHandler('task-vault:vault:process-inbox-item')
-    const result = await handler(
-      {},
-      { taskId: TASK_ID, action: 'file', destination: 'projects/alpha.md' }
+  it('someday files the task and its subtasks, clearing source_ref and today_since so it is not immediately stale on return', async () => {
+    await db.run(
+      `UPDATE tasks SET source='daily', source_ref='2026-01-01', today_since='2026-01-01'`
     )
-    expect(result).toMatchObject({ success: true, newTaskId: TASK_ID })
+
+    expect(await processItem({ taskId: TASK_ID, action: 'someday' })).toMatchObject({
+      success: true,
+    })
+
+    for (const id of [TASK_ID, SUBTASK_ID]) {
+      expect(await taskRow(db, id)).toMatchObject({
+        source: 'someday',
+        source_ref: null,
+        today_since: null,
+      })
+    }
   })
 
-  it('action:file with newProjectName creates project if missing and files task', async () => {
-    // First get() returns the task, second get() returns undefined (project not found)
-    db.mockGet.mockResolvedValueOnce(TASK_ROW).mockResolvedValueOnce(undefined)
-    const handler = getHandler('task-vault:vault:process-inbox-item')
-    const result = await handler(
-      {},
-      { taskId: TASK_ID, action: 'file', newProjectName: 'Brand New Project' }
+  it('file with an existing project destination links the task to that project', async () => {
+    await seedProject(db, 'p-alpha', 'alpha')
+
+    const result = await processItem({
+      taskId: TASK_ID,
+      action: 'file',
+      destination: 'projects/alpha.md',
+    })
+
+    expect(result).toMatchObject({ success: true, newTaskId: TASK_ID })
+    expect(await taskRow(db, TASK_ID)).toMatchObject({
+      project_id: 'p-alpha',
+      source: 'daily',
+      source_ref: localDate(),
+    })
+    expect(await taskRow(db, SUBTASK_ID)).toMatchObject({ project_id: 'p-alpha' })
+  })
+
+  it('file with an area destination links the task to that area', async () => {
+    await seedArea(db, 'a-home', 'home')
+
+    await processItem({ taskId: TASK_ID, action: 'file', destination: 'areas/home.md' })
+
+    expect(await taskRow(db, TASK_ID)).toMatchObject({ area_id: 'a-home', project_id: null })
+  })
+
+  it('file with newProjectName creates the project when missing and links the task', async () => {
+    await processItem({ taskId: TASK_ID, action: 'file', newProjectName: 'Brand New Project' })
+
+    const project = await db.get<{ id: string; status: string }>(
+      `SELECT id, status FROM projects WHERE name = 'Brand New Project'`
     )
-    expect(result).toMatchObject({ success: true, newTaskId: TASK_ID })
+    expect(project?.status).toBe('active')
+    expect(await taskRow(db, TASK_ID)).toMatchObject({ project_id: project?.id })
   })
 
-  it('action:file with newProjectName skips insert when project exists', async () => {
-    // First get() returns the task, second get() returns existing project
-    db.mockGet.mockResolvedValueOnce(TASK_ROW).mockResolvedValueOnce({ id: 'existing-proj' })
-    const handler = getHandler('task-vault:vault:process-inbox-item')
-    const result = await handler(
-      {},
-      { taskId: TASK_ID, action: 'file', newProjectName: 'Existing Project' }
-    )
-    expect(result).toMatchObject({ success: true, newTaskId: TASK_ID })
+  it('file with newProjectName reuses the project when it exists', async () => {
+    await seedProject(db, 'p-existing', 'Existing Project')
+
+    await processItem({ taskId: TASK_ID, action: 'file', newProjectName: 'Existing Project' })
+
+    expect(await db.query('SELECT id FROM projects')).toHaveLength(1)
+    expect(await taskRow(db, TASK_ID)).toMatchObject({ project_id: 'p-existing' })
   })
 
-  it('action:file without destination or newProjectName returns error', async () => {
-    const handler = getHandler('task-vault:vault:process-inbox-item')
-    const result = await handler({}, { taskId: TASK_ID, action: 'file' })
+  it('file without destination or newProjectName returns an error and leaves the task', async () => {
+    const result = await processItem({ taskId: TASK_ID, action: 'file' })
+
     expect(result).toMatchObject({ error: 'destination required for action: file' })
+    expect(await taskRow(db, TASK_ID)).toMatchObject({ source: 'inbox' })
   })
 
-  it('returns STALE_ID when task not found', async () => {
-    db.mockGet.mockResolvedValueOnce(undefined)
-    const handler = getHandler('task-vault:vault:process-inbox-item')
-    const result = await handler({}, { taskId: TASK_ID, action: 'trash' })
-    expect(result).toMatchObject({ error: 'STALE_ID' })
+  it('returns STALE_ID when the task does not exist', async () => {
+    expect(await processItem({ taskId: 'gone', action: 'trash' })).toMatchObject({
+      error: 'STALE_ID',
+    })
   })
 
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const handler = getHandler('task-vault:vault:process-inbox-item')
-    const result = await handler({}, { taskId: TASK_ID, action: 'invalid-action' })
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  it('returns VALIDATION_ERROR for an unknown action', async () => {
+    expect(await processItem({ taskId: TASK_ID, action: 'invalid-action' })).toMatchObject({
+      error: 'VALIDATION_ERROR',
+    })
   })
 })

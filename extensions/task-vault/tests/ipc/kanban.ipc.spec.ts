@@ -1,293 +1,194 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
+import { wrapDb } from '../../../../src/main/db/index'
 import type { ExtensionDB } from '../../../../src/main/extensions/api'
-
-const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
-  mockHandle: vi.fn(),
-  mockRemoveHandler: vi.fn(),
-}))
-vi.mock('electron', () => ({
-  ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
-}))
-
-// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
-// capture/assert code (mockHandle.mock.calls, removeHandler assertions) still works.
-const mockApiIpc = {
-  registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
-    mockHandle(ch, (_e: unknown, payload: unknown) => fn(payload))
-    return { dispose: () => mockRemoveHandler(ch) }
-  },
-}
-const mockApi = {
-  ipc: mockApiIpc,
-} as unknown as import('../../../../src/main/extensions/api').ExtensionAPI
-
 import { registerKanbanIpcHandlers } from '../../src/ipc/kanban.ipc.js'
 import { DEFAULT_KANBAN_CONFIG } from '../../src/vault/types.js'
+import {
+  createIpcHarness,
+  createVaultDb,
+  seedArea,
+  seedProject,
+  seedTask,
+  taskRow,
+} from '../support/vault-db'
 
-function createMockDb() {
-  const mockQuery = vi.fn().mockResolvedValue([])
-  const mockGet = vi.fn().mockResolvedValue(undefined)
-  const mockRun = vi.fn().mockResolvedValue(undefined)
-  const db: ExtensionDB = {
-    query: mockQuery,
-    get: mockGet,
-    run: mockRun,
-    exec: vi.fn().mockResolvedValue(undefined),
-    transaction: vi
-      .fn()
-      .mockImplementation(async (fn: (tx: ExtensionDB) => Promise<unknown>) => fn(db)),
-  }
-  return Object.assign(db, { mockQuery, mockGet, mockRun })
-}
+let db: ExtensionDB
+let harness: ReturnType<typeof createIpcHarness>
 
-function getHandler(db: ExtensionDB, channel: string): (...args: unknown[]) => Promise<unknown> {
-  return mockHandle.mock.calls.find(([ch]) => ch === channel)![1] as (
-    ...args: unknown[]
-  ) => Promise<unknown>
-}
+beforeEach(async () => {
+  db = await createVaultDb()
+  harness = createIpcHarness()
+  registerKanbanIpcHandlers(harness.api, db)
+})
+
+const invoke = (channel: string, payload?: unknown) => harness.invoke(channel, payload)
 
 describe('registerKanbanIpcHandlers', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockHandle.mockImplementation((_ch: string, fn: (...args: unknown[]) => unknown) => fn)
-  })
-
-  it('registers five IPC handlers', () => {
-    const db = createMockDb()
-    registerKanbanIpcHandlers(mockApi, db)
-    expect(mockHandle).toHaveBeenCalledWith('task-vault:kanban:get-config', expect.any(Function))
-    expect(mockHandle).toHaveBeenCalledWith('task-vault:kanban:save-config', expect.any(Function))
-    expect(mockHandle).toHaveBeenCalledWith('task-vault:kanban:list-tasks', expect.any(Function))
-    expect(mockHandle).toHaveBeenCalledWith('task-vault:kanban:list-contexts', expect.any(Function))
-    expect(mockHandle).toHaveBeenCalledWith('task-vault:kanban:move-task', expect.any(Function))
-  })
-
-  it('returns dispose function that removes all handlers', () => {
-    const db = createMockDb()
-    const dispose = registerKanbanIpcHandlers(mockApi, db)
+  it('registers the five kanban channels and dispose removes them', () => {
+    const dispose = registerKanbanIpcHandlers(harness.api, db)
+    expect(harness.channels().sort()).toEqual([
+      'task-vault:kanban:get-config',
+      'task-vault:kanban:list-contexts',
+      'task-vault:kanban:list-tasks',
+      'task-vault:kanban:move-task',
+      'task-vault:kanban:save-config',
+    ])
     dispose()
-    expect(mockRemoveHandler).toHaveBeenCalledWith('task-vault:kanban:get-config')
-    expect(mockRemoveHandler).toHaveBeenCalledWith('task-vault:kanban:save-config')
-    expect(mockRemoveHandler).toHaveBeenCalledWith('task-vault:kanban:list-tasks')
-    expect(mockRemoveHandler).toHaveBeenCalledWith('task-vault:kanban:list-contexts')
-    expect(mockRemoveHandler).toHaveBeenCalledWith('task-vault:kanban:move-task')
+    expect(harness.channels()).toEqual([])
   })
 
-  describe('get-config handler', () => {
-    it('returns default config when no config is stored in DB', async () => {
-      const db = createMockDb()
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = await getHandler(db, 'task-vault:kanban:get-config')()
-      expect(result).toMatchObject({
-        viewMode: 'list',
-        lanes: expect.arrayContaining([expect.objectContaining({ id: 'todo', label: 'Todo' })]),
-        swimlaneGrouping: 'none',
+  describe('config', () => {
+    const config = {
+      viewMode: 'kanban',
+      lanes: [{ id: 'todo', label: 'Todo', taskStatuses: ['open'] }],
+      swimlaneGrouping: 'project',
+    }
+
+    it('returns the default config when nothing is stored', async () => {
+      expect(await invoke('task-vault:kanban:get-config')).toEqual(DEFAULT_KANBAN_CONFIG)
+    })
+
+    it('returns what save-config stored', async () => {
+      expect(await invoke('task-vault:kanban:save-config', config)).toEqual({ ok: true })
+      expect(await invoke('task-vault:kanban:get-config')).toEqual(config)
+    })
+
+    it('replaces the stored config on a second save instead of adding a row', async () => {
+      await invoke('task-vault:kanban:save-config', config)
+      await invoke('task-vault:kanban:save-config', { ...config, swimlaneGrouping: 'area' })
+
+      expect(await invoke('task-vault:kanban:get-config')).toMatchObject({
+        swimlaneGrouping: 'area',
       })
+      expect(await db.query(`SELECT key FROM settings WHERE key = 'kanban_config'`)).toHaveLength(1)
     })
 
-    it('returns parsed config from DB', async () => {
-      const stored = {
-        viewMode: 'kanban',
-        lanes: [{ id: 'todo', label: 'Todo', taskStatuses: ['open'] }],
-        swimlaneGrouping: 'project',
-      }
-      const db = createMockDb()
-      db.mockGet.mockResolvedValue({ value: JSON.stringify(stored) })
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = await getHandler(db, 'task-vault:kanban:get-config')()
-      expect(result).toMatchObject(stored)
-    })
-  })
-
-  describe('save-config handler', () => {
-    it('writes valid config to DB', async () => {
-      const db = createMockDb()
-      registerKanbanIpcHandlers(mockApi, db)
-      const config = {
-        viewMode: 'kanban',
-        lanes: [{ id: 'todo', label: 'Todo', taskStatuses: ['open'] }],
-        swimlaneGrouping: 'none',
-      }
-      const result = await getHandler(db, 'task-vault:kanban:save-config')(null, config)
-      expect(result).toEqual({ ok: true })
-      expect(db.mockRun).toHaveBeenCalled()
-    })
-
-    it('returns error for invalid payload', async () => {
-      const db = createMockDb()
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = await getHandler(db, 'task-vault:kanban:save-config')(null, { invalid: true })
-      expect(result).toHaveProperty('error')
-    })
-  })
-
-  describe('list-contexts handler', () => {
-    it('returns distinct contexts from DB', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockResolvedValue([{ context: 'work' }, { context: 'home' }])
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:kanban:list-contexts')()) as {
-        contexts: string[]
-      }
-      expect(result.contexts).toEqual(['work', 'home'])
-    })
-  })
-
-  describe('list-tasks handler', () => {
-    it('returns tasks from DB excluding migrated and cancelled', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockResolvedValue([
-        {
-          id: 'task-1',
-          text: 'Do something',
-          status: 'open',
-          project: 'alpha',
-          context: null,
-          area: null,
-          due_date: null,
-          terminator_links: '[]',
-          metadata: '{}',
-        },
-      ])
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:kanban:list-tasks')()) as {
-        tasks: unknown[]
-      }
-      expect(result.tasks).toHaveLength(1)
-      expect((result.tasks[0] as Record<string, unknown>).id).toBe('task-1')
-    })
-
-    it('extracts description from metadata', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockResolvedValue([
-        {
-          id: 'task-2',
-          text: 'Task with desc',
-          status: 'open',
-          project: null,
-          context: null,
-          area: null,
-          due_date: null,
-          terminator_links: '[]',
-          metadata: JSON.stringify({ description: 'Detailed explanation' }),
-        },
-      ])
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:kanban:list-tasks')()) as {
-        tasks: Record<string, unknown>[]
-      }
-      expect(result.tasks[0].description).toBe('Detailed explanation')
-    })
-
-    it('returns no description when metadata is empty', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockResolvedValue([
-        {
-          id: 'task-3',
-          text: 'No desc',
-          status: 'open',
-          project: null,
-          context: null,
-          area: null,
-          due_date: null,
-          terminator_links: '[]',
-          metadata: '{}',
-        },
-      ])
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:kanban:list-tasks')()) as {
-        tasks: Record<string, unknown>[]
-      }
-      expect(result.tasks[0].description).toBeUndefined()
-    })
-  })
-
-  describe('get-config with DB fallback', () => {
-    it('get-config returns default config when DB returns no row', async () => {
-      const db = createMockDb()
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = await getHandler(db, 'task-vault:kanban:get-config')()
-      expect(result).toMatchObject(DEFAULT_KANBAN_CONFIG)
-    })
-  })
-
-  describe('error paths', () => {
-    it('list-tasks returns error when db.query throws', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockRejectedValueOnce(new Error('db unavailable'))
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:kanban:list-tasks')()) as { error: string }
-      expect(result.error).toMatch(/db unavailable/)
-    })
-
-    it('list-contexts returns error when db.query throws', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockRejectedValueOnce(new Error('db unavailable'))
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:kanban:list-contexts')()) as {
-        error: string
-      }
-      expect(result.error).toMatch(/db unavailable/)
-    })
-
-    it('list-tasks handles malformed metadata gracefully', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockResolvedValue([
-        {
-          id: 'task-bad',
-          text: 'Bad meta',
-          status: 'open',
-          project: null,
-          context: null,
-          area: null,
-          due_date: null,
-          terminator_links: '[]',
-          metadata: 'not-json{{{',
-        },
-      ])
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:kanban:list-tasks')()) as {
-        tasks: Record<string, unknown>[]
-      }
-      expect(result.tasks[0].description).toBeUndefined()
-    })
-  })
-
-  describe('move-task handler', () => {
-    it('updates task status in DB', async () => {
-      const db = createMockDb()
-      db.mockGet.mockResolvedValue({ id: 'task-1' })
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = await getHandler(db, 'task-vault:kanban:move-task')(null, {
-        taskId: 'task-1',
-        toStatus: 'in-progress',
-      })
-      expect(result).toEqual({ ok: true })
-      expect(db.mockRun).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE tasks'),
-        expect.arrayContaining(['in-progress', 'task-1'])
+    it('rejects an invalid payload and keeps the stored config', async () => {
+      await invoke('task-vault:kanban:save-config', config)
+      expect(await invoke('task-vault:kanban:save-config', { invalid: true })).toHaveProperty(
+        'error'
       )
+      expect(await invoke('task-vault:kanban:get-config')).toEqual(config)
     })
 
-    it('returns error when task not found', async () => {
-      const db = createMockDb()
-      db.mockGet.mockResolvedValue(undefined)
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = await getHandler(db, 'task-vault:kanban:move-task')(null, {
-        taskId: 'nonexistent',
-        toStatus: 'done',
+    it('falls back to the default config when the stored value is not JSON', async () => {
+      await db.run(
+        `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'kanban_config', 'oops{')`
+      )
+      expect(await invoke('task-vault:kanban:get-config')).toEqual(DEFAULT_KANBAN_CONFIG)
+    })
+  })
+
+  describe('list-contexts', () => {
+    it('returns the distinct non-empty contexts in order', async () => {
+      await seedTask(db, { id: 't1', context: 'work' })
+      await seedTask(db, { id: 't2', context: 'home' })
+      await seedTask(db, { id: 't3', context: 'work' })
+      await seedTask(db, { id: 't4', context: '' })
+      await seedTask(db, { id: 't5' })
+
+      expect(await invoke('task-vault:kanban:list-contexts')).toEqual({
+        contexts: ['home', 'work'],
       })
-      expect(result).toEqual({ error: 'Task not found' })
+    })
+  })
+
+  describe('list-tasks', () => {
+    it('returns top-level tasks with project and area names, excluding migrated and cancelled', async () => {
+      await seedProject(db, 'p1', 'alpha')
+      await seedArea(db, 'a1', 'Work')
+      await seedTask(db, { id: 'shown', projectId: 'p1', areaId: 'a1', dueDate: '2026-02-01' })
+      await seedTask(db, { id: 'done', status: 'done' })
+      await seedTask(db, { id: 'migrated', status: 'migrated' })
+      await seedTask(db, { id: 'cancelled', status: 'cancelled' })
+      await seedTask(db, { id: 'child', parentId: 'shown' })
+
+      const result = (await invoke('task-vault:kanban:list-tasks')) as {
+        tasks: Record<string, unknown>[]
+      }
+
+      expect(result.tasks.map((task) => task.id).sort()).toEqual(['done', 'shown'])
+      expect(result.tasks.find((task) => task.id === 'shown')).toMatchObject({
+        project: 'alpha',
+        area: 'Work',
+        dueDate: '2026-02-01',
+        status: 'open',
+      })
     })
 
-    it('returns error for invalid toStatus', async () => {
-      const db = createMockDb()
-      registerKanbanIpcHandlers(mockApi, db)
-      const result = await getHandler(db, 'task-vault:kanban:move-task')(null, {
-        taskId: 'task-1',
-        toStatus: 'invalid-status',
+    it('extracts the description from metadata', async () => {
+      await seedTask(db, {
+        id: 'described',
+        metadata: JSON.stringify({ description: 'Detailed explanation' }),
       })
-      expect(result).toHaveProperty('error')
+      await seedTask(db, { id: 'plain' })
+
+      const result = (await invoke('task-vault:kanban:list-tasks')) as {
+        tasks: Record<string, unknown>[]
+      }
+
+      expect(result.tasks.find((task) => task.id === 'described')?.description).toBe(
+        'Detailed explanation'
+      )
+      expect(result.tasks.find((task) => task.id === 'plain')?.description).toBeUndefined()
     })
+
+    it('tolerates malformed metadata', async () => {
+      await seedTask(db, { id: 'bad', metadata: 'not-json{{{' })
+
+      const result = (await invoke('task-vault:kanban:list-tasks')) as {
+        tasks: Record<string, unknown>[]
+      }
+
+      expect(result.tasks).toHaveLength(1)
+      expect(result.tasks[0].description).toBeUndefined()
+    })
+  })
+
+  describe('move-task', () => {
+    it('updates the task status', async () => {
+      await seedTask(db, { id: 'task-1' })
+
+      expect(
+        await invoke('task-vault:kanban:move-task', { taskId: 'task-1', toStatus: 'in-progress' })
+      ).toEqual({ ok: true })
+      expect(await taskRow(db, 'task-1')).toMatchObject({ status: 'in-progress' })
+    })
+
+    it('reports a missing task', async () => {
+      expect(
+        await invoke('task-vault:kanban:move-task', { taskId: 'nonexistent', toStatus: 'done' })
+      ).toEqual({ error: 'Task not found' })
+    })
+
+    it('rejects an unknown status and leaves the task', async () => {
+      await seedTask(db, { id: 'task-1' })
+
+      expect(
+        await invoke('task-vault:kanban:move-task', {
+          taskId: 'task-1',
+          toStatus: 'invalid-status',
+        })
+      ).toHaveProperty('error')
+      expect(await taskRow(db, 'task-1')).toMatchObject({ status: 'open' })
+    })
+  })
+
+  describe('when the database is closed', () => {
+    it.each(['task-vault:kanban:list-tasks', 'task-vault:kanban:list-contexts'])(
+      '%s returns the error',
+      async (channel) => {
+        const database = new DatabaseSync(':memory:')
+        const closed = wrapDb(database)
+        database.close()
+        const other = createIpcHarness()
+        registerKanbanIpcHandlers(other.api, closed)
+
+        expect(await other.invoke(channel)).toMatchObject({
+          error: expect.stringMatching(/not open/),
+        })
+      }
+    )
   })
 })

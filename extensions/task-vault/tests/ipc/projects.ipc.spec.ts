@@ -1,29 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ExtensionDB } from '../../../../src/main/extensions/api'
-
-const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
-  mockHandle: vi.fn(),
-  mockRemoveHandler: vi.fn(),
-}))
-vi.mock('electron', () => ({
-  ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
-  Notification: Object.assign(
-    vi.fn(() => ({ show: vi.fn() })),
-    { isSupported: vi.fn(() => false) }
-  ),
-}))
-
-// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
-// capture/assert code (mockHandle.mock.calls, removeHandler assertions) still works.
-const mockApiIpc = {
-  registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
-    mockHandle(ch, (_e: unknown, payload: unknown) => fn(payload))
-    return { dispose: () => mockRemoveHandler(ch) }
-  },
-}
-const mockApi = {
-  ipc: mockApiIpc,
-} as unknown as import('../../../../src/main/extensions/api').ExtensionAPI
+import { localDate } from '../../src/vault/recurrence'
+import {
+  createIpcHarness,
+  createVaultDb,
+  seedArea,
+  seedProject,
+  seedTask,
+  taskRow,
+} from '../support/vault-db'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
   broadcast: vi.fn(),
@@ -31,416 +16,395 @@ vi.mock('../../src/notifications/task-scheduler.js', () => ({
 
 import { registerProjectsIpcHandlers } from '../../src/ipc/projects.ipc'
 
-function createMockDb() {
-  const mockQuery = vi.fn().mockResolvedValue([])
-  const mockGet = vi.fn().mockResolvedValue(undefined)
-  const mockRun = vi.fn().mockResolvedValue(undefined)
-  const db: ExtensionDB = {
-    query: mockQuery,
-    get: mockGet,
-    run: mockRun,
-    exec: vi.fn().mockResolvedValue(undefined),
-    transaction: vi
-      .fn()
-      .mockImplementation(async (fn: (tx: ExtensionDB) => Promise<unknown>) => fn(db)),
-  }
-  return Object.assign(db, { mockQuery, mockGet, mockRun })
-}
+let db: ExtensionDB
+let harness: ReturnType<typeof createIpcHarness>
 
-type MockDb = ReturnType<typeof createMockDb>
-let db: MockDb
+beforeEach(async () => {
+  db = await createVaultDb()
+  harness = createIpcHarness()
+  registerProjectsIpcHandlers(harness.api, db)
+})
 
-function getHandler(channel: string): (event: unknown, payload: unknown) => Promise<unknown> {
-  let handler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
-  vi.mocked(mockHandle).mockImplementation((ch, fn) => {
-    if (ch === channel) handler = fn as typeof handler
+const invoke = (channel: string, payload?: unknown) => harness.invoke(channel, payload)
+
+const projectRow = (name: string) =>
+  db.get<Record<string, unknown>>(`SELECT * FROM projects WHERE name = ?`, [name])
+
+describe('registerProjectsIpcHandlers', () => {
+  it('dispose removes every registered channel', () => {
+    const own = createIpcHarness()
+    const dispose = registerProjectsIpcHandlers(own.api, db)
+    expect(own.channels()).toContain('task-vault:projects:list')
+    dispose()
+    expect(own.channels()).toEqual([])
   })
-  registerProjectsIpcHandlers(mockApi, db)
-  if (!handler) throw new Error(`Handler for ${channel} not registered`)
-  return handler
-}
-
-const makeProjectRow = (overrides: Record<string, unknown> = {}) => ({
-  id: 'proj-1',
-  name: 'Alpha',
-  status: 'active',
-  area: null,
-  deadline: null,
-  outcome: null,
-  terminator_links: '[]',
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  ...overrides,
 })
 
-const makeTaskRow = (overrides: Record<string, unknown> = {}) => ({
-  id: 'task-1',
-  source: 'inbox',
-  source_ref: null,
-  text: 'Task',
-  status: 'open',
-  project: null,
-  context: null,
-  area: null,
-  due_date: null,
-  terminator_links: '[]',
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  parent_id: null,
-  sort_order: 0,
-  completed_date: null,
-  migrated_to: null,
-  ...overrides,
-})
-
-beforeEach(() => {
-  vi.clearAllMocks()
-  db = createMockDb()
-})
-
-describe('task-vault:projects:list IPC handler', () => {
-  it('registers the projects list handler', () => {
-    registerProjectsIpcHandlers(mockApi, db)
-    const channels = vi.mocked(mockHandle).mock.calls.map((c) => c[0])
-    expect(channels).toContain('task-vault:projects:list')
+describe('task-vault:projects:list', () => {
+  beforeEach(async () => {
+    await seedProject(db, 'p-active', 'Alpha')
+    await seedProject(db, 'p-someday', 'Beta', { status: 'someday' })
+    await seedProject(db, 'p-archived', 'Gamma', { status: 'archived' })
   })
+
+  const names = (result: unknown) =>
+    (result as { projects: { name: string }[] }).projects.map((project) => project.name)
 
   it('returns only active projects by default', async () => {
-    db.mockQuery.mockResolvedValueOnce([makeProjectRow()])
-    db.mockGet.mockResolvedValue({ c: '2' })
-    const handler = getHandler('task-vault:projects:list')
-    const result = (await handler({}, {})) as { projects: { status: string }[] }
-    expect(result.projects.every((p) => p.status === 'active')).toBe(true)
+    expect(names(await invoke('task-vault:projects:list', {}))).toEqual(['Alpha'])
   })
 
-  it('returns empty list when no active projects exist', async () => {
-    const handler = getHandler('task-vault:projects:list')
-    const result = (await handler({}, {})) as { projects: unknown[] }
-    expect(result.projects).toHaveLength(0)
+  it('returns nothing when no project has the status', async () => {
+    await db.run(`DELETE FROM projects`)
+    expect(names(await invoke('task-vault:projects:list', {}))).toEqual([])
   })
 
-  it('filters by status someday', async () => {
-    db.mockQuery.mockResolvedValueOnce([
-      makeProjectRow({ id: 'proj-2', name: 'Beta', status: 'someday' }),
-    ])
-    db.mockGet.mockResolvedValue({ c: '0' })
-    const handler = getHandler('task-vault:projects:list')
-    const result = (await handler({}, { status: 'someday' })) as { projects: { status: string }[] }
-    expect(result.projects).toHaveLength(1)
-    expect(result.projects[0].status).toBe('someday')
+  it('filters by one status', async () => {
+    const result = await invoke('task-vault:projects:list', { status: 'someday' })
+    expect(names(result)).toEqual(['Beta'])
   })
 
-  it('marks project as stale when nextActionCount is 0', async () => {
-    db.mockQuery.mockResolvedValueOnce([makeProjectRow()])
-    db.mockGet.mockResolvedValue({ c: '0' })
-    const handler = getHandler('task-vault:projects:list')
-    const result = (await handler({}, {})) as { projects: { isStale: boolean }[] }
-    expect(result.projects[0].isStale).toBe(true)
+  it('accepts an array of statuses and orders by name', async () => {
+    const result = await invoke('task-vault:projects:list', { status: ['someday', 'active'] })
+    expect(names(result)).toEqual(['Alpha', 'Beta'])
   })
 
-  it('marks project as not stale when nextActionCount > 0', async () => {
-    db.mockQuery.mockResolvedValueOnce([makeProjectRow()])
-    db.mockGet.mockResolvedValue({ c: '3' })
-    const handler = getHandler('task-vault:projects:list')
-    const result = (await handler({}, {})) as { projects: { isStale: boolean }[] }
-    expect(result.projects[0].isStale).toBe(false)
-  })
+  it('counts open tasks as next actions and marks a project with none as stale', async () => {
+    await seedTask(db, { id: 't1', projectId: 'p-active' })
+    await seedTask(db, { id: 't2', projectId: 'p-active' })
+    await seedTask(db, { id: 't3', projectId: 'p-active', status: 'done' })
 
-  it('accepts status as an array', async () => {
-    db.mockQuery.mockResolvedValueOnce([makeProjectRow({ status: 'active' })])
-    db.mockGet.mockResolvedValue({ c: '1' })
-    const handler = getHandler('task-vault:projects:list')
-    const result = (await handler({}, { status: ['active', 'someday'] })) as { projects: unknown[] }
-    expect(Array.isArray(result.projects)).toBe(true)
-  })
-})
-
-describe('task-vault:projects:weekly-review IPC handler', () => {
-  it('returns inbox items', async () => {
-    db.mockQuery
-      .mockResolvedValueOnce([
-        makeTaskRow({ text: 'Inbox item 1' }),
-        makeTaskRow({ text: 'Inbox item 2' }),
-      ])
-      .mockResolvedValueOnce([]) // activeRows
-      .mockResolvedValueOnce([]) // somedayRows
-      .mockResolvedValueOnce([]) // somedayTaskRows
-      .mockResolvedValueOnce([]) // completedRows
-      .mockResolvedValueOnce([]) // staleTaskRows
-    const handler = getHandler('task-vault:projects:weekly-review')
-    const result = (await handler({}, {})) as { inboxItems: unknown[] }
-    expect(result.inboxItems.length).toBeGreaterThan(0)
-  })
-
-  it('returns active and stale projects', async () => {
-    const activeRow = makeProjectRow()
-    db.mockQuery
-      .mockResolvedValueOnce([]) // inboxRows
-      .mockResolvedValueOnce([activeRow]) // activeRows
-      .mockResolvedValueOnce([]) // somedayRows
-      .mockResolvedValueOnce([]) // somedayTaskRows
-      .mockResolvedValueOnce([]) // completedRows
-      .mockResolvedValueOnce([]) // staleTaskRows
-    db.mockGet
-      .mockResolvedValueOnce({ c: '0' }) // COUNT for active project → stale
-      .mockResolvedValueOnce(undefined) // stale_days_threshold
-    const handler = getHandler('task-vault:projects:weekly-review')
-    const result = (await handler({}, {})) as {
-      activeProjects: unknown[]
-      staleProjects: unknown[]
+    const result = (await invoke('task-vault:projects:list', {
+      status: ['active', 'someday'],
+    })) as {
+      projects: { name: string; nextActionCount: number; isStale: boolean }[]
     }
-    expect(Array.isArray(result.activeProjects)).toBe(true)
-    expect(Array.isArray(result.staleProjects)).toBe(true)
-    expect(result.activeProjects).toHaveLength(1)
-    expect(result.staleProjects).toHaveLength(1)
+
+    expect(result.projects).toMatchObject([
+      { name: 'Alpha', nextActionCount: 2, isStale: false },
+      { name: 'Beta', nextActionCount: 0, isStale: true },
+    ])
   })
 
-  it('stale projects excluded from staleProjects when nextActionCount > 0', async () => {
-    const activeRow = makeProjectRow()
-    db.mockQuery
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([activeRow])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-    db.mockGet
-      .mockResolvedValueOnce({ c: '2' }) // not stale
-      .mockResolvedValueOnce(undefined)
-    const handler = getHandler('task-vault:projects:weekly-review')
-    const result = (await handler({}, {})) as { staleProjects: unknown[] }
-    expect(result.staleProjects).toHaveLength(0)
+  it('names the area of each project', async () => {
+    await seedArea(db, 'a1', 'Work')
+    await db.run(`UPDATE projects SET area_id = 'a1' WHERE id = 'p-active'`)
+
+    const result = (await invoke('task-vault:projects:list', {})) as {
+      projects: { area?: string }[]
+    }
+
+    expect(result.projects[0].area).toBe('Work')
+  })
+})
+
+describe('task-vault:projects:weekly-review', () => {
+  type Review = {
+    inboxItems: { id: string }[]
+    activeProjects: { name: string }[]
+    staleProjects: { name: string }[]
+    somedayProjects: { name: string }[]
+    somedayTasks: { id: string }[]
+    completedLastWeek: { id: string }[]
+    staleTasks: { id: string }[]
+    staleDaysThreshold: number
+    lastReviewDate: string | null
+  }
+  const review = () => invoke('task-vault:projects:weekly-review') as Promise<Review>
+  const ids = (rows: { id: string }[]) => rows.map((row) => row.id).sort()
+
+  it('returns the open inbox items only', async () => {
+    await seedTask(db, { id: 'inbox-1', source: 'inbox' })
+    await seedTask(db, { id: 'inbox-done', source: 'inbox', status: 'done' })
+    await seedTask(db, { id: 'daily-1', source: 'daily', sourceRef: localDate() })
+
+    expect(ids((await review()).inboxItems)).toEqual(['inbox-1'])
   })
 
-  it('returns someday projects', async () => {
-    const somedayRow = makeProjectRow({ id: 'proj-2', name: 'Beta', status: 'someday' })
-    db.mockQuery
-      .mockResolvedValueOnce([]) // inboxRows
-      .mockResolvedValueOnce([]) // activeRows
-      .mockResolvedValueOnce([somedayRow]) // somedayRows
-      .mockResolvedValueOnce([]) // somedayTaskRows
-      .mockResolvedValueOnce([]) // completedRows
-      .mockResolvedValueOnce([]) // staleTaskRows
-    const handler = getHandler('task-vault:projects:weekly-review')
-    const result = (await handler({}, {})) as { somedayProjects: unknown[] }
-    expect(Array.isArray(result.somedayProjects)).toBe(true)
-    expect(result.somedayProjects).toHaveLength(1)
+  it('returns active projects and flags those with no open task as stale', async () => {
+    await seedProject(db, 'p1', 'Busy')
+    await seedProject(db, 'p2', 'Idle')
+    await seedTask(db, { id: 't1', projectId: 'p1' })
+
+    const result = await review()
+
+    expect(result.activeProjects.map((project) => project.name).sort()).toEqual(['Busy', 'Idle'])
+    expect(result.staleProjects.map((project) => project.name)).toEqual(['Idle'])
   })
 
-  it('somedayTasks query excludes subtasks (parent_id IS NULL filter)', async () => {
-    db.mockQuery.mockResolvedValue([])
-    const handler = getHandler('task-vault:projects:weekly-review')
-    await handler({}, {})
-    const sqls = db.mockQuery.mock.calls.map((c) => c[0] as string)
-    const somedaySql = sqls.find(
-      (s) => s.includes("source='someday'") && s.includes("status='open'")
+  it('returns someday projects and top-level someday tasks without their subtasks', async () => {
+    await seedProject(db, 'p1', 'Beta', { status: 'someday' })
+    await seedTask(db, { id: 'someday-1', source: 'someday' })
+    await seedTask(db, { id: 'someday-child', source: 'someday', parentId: 'someday-1' })
+
+    const result = await review()
+
+    expect(result.somedayProjects.map((project) => project.name)).toEqual(['Beta'])
+    expect(ids(result.somedayTasks)).toEqual(['someday-1'])
+  })
+
+  it('returns tasks completed within the last seven days', async () => {
+    const recent = new Date(Date.now() - 2 * 86400000).toISOString()
+    const old = new Date(Date.now() - 20 * 86400000).toISOString()
+    await seedTask(db, { id: 'recent', status: 'done', updatedAt: recent })
+    await seedTask(db, { id: 'old', status: 'done', updatedAt: old })
+    await seedTask(db, { id: 'open', updatedAt: recent })
+
+    expect(ids((await review()).completedLastWeek)).toEqual(['recent'])
+  })
+
+  it('returns daily tasks that have been on today for longer than the stale threshold', async () => {
+    await db.run(
+      `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'stale_days_threshold', '3')`
     )
-    expect(somedaySql).toContain('parent_id IS NULL')
+    const daysAgo = (days: number) => localDate(new Date(Date.now() - days * 86400000))
+    await seedTask(db, {
+      id: 'stale',
+      source: 'daily',
+      sourceRef: daysAgo(0),
+      todaySince: daysAgo(5),
+    })
+    await seedTask(db, {
+      id: 'fresh',
+      source: 'daily',
+      sourceRef: daysAgo(0),
+      todaySince: daysAgo(1),
+    })
+
+    const result = await review()
+
+    expect(result.staleDaysThreshold).toBe(3)
+    expect(ids(result.staleTasks)).toEqual(['stale'])
   })
 
-  it('returns prior week completed tasks', async () => {
-    const completedRow = makeTaskRow({ status: 'done', text: 'Completed task' })
-    db.mockQuery
-      .mockResolvedValueOnce([]) // inboxRows
-      .mockResolvedValueOnce([]) // activeRows
-      .mockResolvedValueOnce([]) // somedayRows
-      .mockResolvedValueOnce([]) // somedayTaskRows
-      .mockResolvedValueOnce([completedRow]) // completedRows
-      .mockResolvedValueOnce([]) // staleTaskRows
-    const handler = getHandler('task-vault:projects:weekly-review')
-    const result = (await handler({}, {})) as { completedLastWeek: unknown[] }
-    expect(Array.isArray(result.completedLastWeek)).toBe(true)
-    expect(result.completedLastWeek).toHaveLength(1)
+  it('uses a threshold of seven days when none is stored', async () => {
+    expect((await review()).staleDaysThreshold).toBe(7)
   })
 
-  it('returns null lastReviewDate when no review recorded', async () => {
-    db.mockQuery.mockResolvedValue([])
-    const handler = getHandler('task-vault:projects:weekly-review')
-    const result = (await handler({}, {})) as { lastReviewDate: string | null }
-    expect(result.lastReviewDate).toBeNull()
-  })
-})
+  it('has no lastReviewDate until a review is completed, then the latest completion', async () => {
+    expect((await review()).lastReviewDate).toBeNull()
 
-describe('task-vault:projects:update-status IPC handler', () => {
-  it('registers the update-status handler', () => {
-    registerProjectsIpcHandlers(mockApi, db)
-    const channels = vi.mocked(mockHandle).mock.calls.map((c) => c[0])
-    expect(channels).toContain('task-vault:projects:update-status')
-  })
+    await db.run(
+      `INSERT INTO weekly_reviews (id, started_at, completed_at, status) VALUES
+         ('r1', '2026-01-01T09:00:00.000Z', '2026-01-01T10:00:00.000Z', 'completed'),
+         ('r2', '2026-01-08T09:00:00.000Z', '2026-01-08T10:00:00.000Z', 'completed'),
+         ('r3', '2026-01-15T09:00:00.000Z', NULL, 'in_progress')`
+    )
 
-  it('returns success when project is updated', async () => {
-    db.mockGet.mockResolvedValue({ id: 'proj-1' })
-    const handler = getHandler('task-vault:projects:update-status')
-    const result = await handler({}, { projectFilePath: 'Alpha', status: 'done' })
-    expect(result).toMatchObject({ success: true })
-  })
-
-  it('returns NOT_FOUND when project does not exist', async () => {
-    const handler = getHandler('task-vault:projects:update-status')
-    const result = await handler({}, { projectFilePath: 'nonexistent', status: 'done' })
-    expect(result).toMatchObject({ error: 'NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const handler = getHandler('task-vault:projects:update-status')
-    const result = await handler({}, {})
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+    expect((await review()).lastReviewDate).toBe('2026-01-08T10:00:00.000Z')
   })
 })
 
-describe('task-vault:projects:create IPC handler', () => {
-  it('creates a new project and returns success', async () => {
-    const handler = getHandler('task-vault:projects:create')
-    const result = await handler({}, { name: 'New Project' })
-    expect(result).toMatchObject({ success: true, filePath: 'New Project' })
-    expect(db.mockRun).toHaveBeenCalled()
+describe('task-vault:projects:update-status', () => {
+  it('updates a project found by name', async () => {
+    await seedProject(db, 'p1', 'Alpha')
+
+    expect(
+      await invoke('task-vault:projects:update-status', {
+        projectFilePath: 'Alpha',
+        status: 'someday',
+      })
+    ).toEqual({ success: true })
+    expect(await projectRow('Alpha')).toMatchObject({ status: 'someday' })
   })
 
-  it('returns PROJECT_EXISTS when project already exists', async () => {
-    db.mockGet.mockResolvedValue({ id: 'existing-id' })
-    const handler = getHandler('task-vault:projects:create')
-    const result = await handler({}, { name: 'Existing Project' })
-    expect(result).toMatchObject({ error: 'PROJECT_EXISTS' })
+  it('finds the project by id when no project has that name', async () => {
+    await seedProject(db, 'p1', 'Alpha')
+
+    await invoke('task-vault:projects:update-status', { projectFilePath: 'p1', status: 'done' })
+
+    expect(await projectRow('Alpha')).toMatchObject({ status: 'done' })
   })
 
-  it('creates area record when area is provided', async () => {
-    const handler = getHandler('task-vault:projects:create')
-    const result = await handler({}, { name: 'Work Project', area: 'Work' })
-    expect(result).toMatchObject({ success: true })
-    // run called for both insert area + insert project
-    expect(db.mockRun).toHaveBeenCalledTimes(2)
+  it('cancels open tasks, subtasks included, when archiving and leaves finished ones', async () => {
+    await seedProject(db, 'p1', 'Alpha')
+    await seedProject(db, 'p2', 'Other')
+    await seedTask(db, { id: 'open', projectId: 'p1' })
+    await seedTask(db, { id: 'blocked-child', parentId: 'open', status: 'blocked' })
+    await seedTask(db, { id: 'done', projectId: 'p1', status: 'done' })
+    await seedTask(db, { id: 'elsewhere', projectId: 'p2' })
+
+    await invoke('task-vault:projects:update-status', {
+      projectFilePath: 'Alpha',
+      status: 'archived',
+    })
+
+    expect(await taskRow(db, 'open')).toMatchObject({ status: 'cancelled' })
+    expect(await taskRow(db, 'blocked-child')).toMatchObject({ status: 'cancelled' })
+    expect(await taskRow(db, 'done')).toMatchObject({ status: 'done' })
+    expect(await taskRow(db, 'elsewhere')).toMatchObject({ status: 'open' })
   })
 
-  it('returns VALIDATION_ERROR for missing name', async () => {
-    const handler = getHandler('task-vault:projects:create')
-    const result = await handler({}, {})
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-  })
-})
-
-describe('task-vault:projects:delete IPC handler', () => {
-  it('deletes archived project and its tasks', async () => {
-    db.mockGet.mockResolvedValue({ id: 'proj-1', status: 'archived' })
-    const handler = getHandler('task-vault:projects:delete')
-    const result = await handler({}, { projectFilePath: 'Alpha' })
-    expect(result).toMatchObject({ success: true })
+  it('returns NOT_FOUND for an unknown project', async () => {
+    expect(
+      await invoke('task-vault:projects:update-status', { projectFilePath: 'nope', status: 'done' })
+    ).toEqual({ error: 'NOT_FOUND' })
   })
 
-  it('returns MUST_ARCHIVE_FIRST for non-archived project', async () => {
-    db.mockGet.mockResolvedValue({ id: 'proj-1', status: 'active' })
-    const handler = getHandler('task-vault:projects:delete')
-    const result = await handler({}, { projectFilePath: 'Alpha' })
-    expect(result).toMatchObject({ error: 'MUST_ARCHIVE_FIRST' })
-  })
-
-  it('returns NOT_FOUND when project does not exist', async () => {
-    const handler = getHandler('task-vault:projects:delete')
-    const result = await handler({}, { projectFilePath: 'Ghost' })
-    expect(result).toMatchObject({ error: 'NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR for missing projectFilePath', async () => {
-    const handler = getHandler('task-vault:projects:delete')
-    const result = await handler({}, {})
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  it('returns VALIDATION_ERROR for an invalid payload', async () => {
+    expect(await invoke('task-vault:projects:update-status', { bad: 'payload' })).toEqual({
+      error: 'VALIDATION_ERROR',
+    })
   })
 })
 
-describe('task-vault:projects:update-area IPC handler', () => {
-  it('updates area for project', async () => {
-    const handler = getHandler('task-vault:projects:update-area')
-    const result = await handler({}, { projectFilePath: 'Alpha', area: 'Work' })
-    expect(result).toMatchObject({ success: true })
-    // run called for insert area + update project
-    expect(db.mockRun).toHaveBeenCalledTimes(2)
+describe('task-vault:projects:create', () => {
+  it('creates an active project named in display form', async () => {
+    const result = await invoke('task-vault:projects:create', {
+      name: 'new-project',
+      deadline: '2026-06-01',
+      outcome: 'Shipped',
+    })
+
+    expect(result).toEqual({ success: true, filePath: 'New Project' })
+    expect(await projectRow('New Project')).toMatchObject({
+      status: 'active',
+      deadline: '2026-06-01',
+      outcome: 'Shipped',
+    })
   })
 
-  it('updates area to null when area is not provided', async () => {
-    const handler = getHandler('task-vault:projects:update-area')
-    const result = await handler({}, { projectFilePath: 'Alpha', area: null })
-    expect(result).toMatchObject({ success: true })
-    // run called once for UPDATE only
-    expect(db.mockRun).toHaveBeenCalledTimes(1)
+  it('returns PROJECT_EXISTS for a name already in use', async () => {
+    await seedProject(db, 'p1', 'Existing')
+
+    expect(await invoke('task-vault:projects:create', { name: 'Existing' })).toEqual({
+      error: 'PROJECT_EXISTS',
+    })
+    expect(await db.query('SELECT id FROM projects')).toHaveLength(1)
   })
 
-  it('returns VALIDATION_ERROR when projectFilePath missing', async () => {
-    const handler = getHandler('task-vault:projects:update-area')
-    const result = await handler({}, { area: 'Work' })
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  it('creates the area when it is new and reuses it when it exists', async () => {
+    await invoke('task-vault:projects:create', { name: 'First', area: 'work' })
+    await invoke('task-vault:projects:create', { name: 'Second', area: 'work' })
+
+    const areas = await db.query<{ id: string; name: string }>(`SELECT id, name FROM areas`)
+    expect(areas.map((area) => area.name)).toEqual(['Work'])
+    expect(await db.query('SELECT id FROM projects WHERE area_id = ?', [areas[0].id])).toHaveLength(
+      2
+    )
+  })
+
+  it('returns VALIDATION_ERROR for a missing name', async () => {
+    expect(await invoke('task-vault:projects:create', {})).toEqual({ error: 'VALIDATION_ERROR' })
   })
 })
 
-describe('task-vault:projects:update-deadline IPC handler', () => {
-  it('updates the project deadline and returns success', async () => {
-    const handler = getHandler('task-vault:projects:update-deadline')
-    const result = await handler({}, { projectFilePath: 'Alpha', deadline: '2026-12-31' })
-    expect(result).toMatchObject({ success: true })
-    expect(db.mockRun).toHaveBeenCalled()
+describe('task-vault:projects:delete', () => {
+  it('deletes an archived project with its tasks and subtasks', async () => {
+    await seedProject(db, 'p1', 'Old', { status: 'archived' })
+    await seedTask(db, { id: 'parent', projectId: 'p1' })
+    await seedTask(db, { id: 'child', parentId: 'parent' })
+    await seedTask(db, { id: 'unrelated' })
+
+    expect(await invoke('task-vault:projects:delete', { projectFilePath: 'Old' })).toEqual({
+      success: true,
+    })
+
+    expect(await projectRow('Old')).toBeUndefined()
+    expect((await db.query<{ id: string }>('SELECT id FROM tasks')).map((t) => t.id)).toEqual([
+      'unrelated',
+    ])
   })
 
-  it('clears the deadline when passed null', async () => {
-    const handler = getHandler('task-vault:projects:update-deadline')
-    const result = await handler({}, { projectFilePath: 'Alpha', deadline: null })
-    expect(result).toMatchObject({ success: true })
+  it('returns MUST_ARCHIVE_FIRST for a project that is not archived and keeps it', async () => {
+    await seedProject(db, 'p1', 'Live')
+
+    expect(await invoke('task-vault:projects:delete', { projectFilePath: 'Live' })).toEqual({
+      error: 'MUST_ARCHIVE_FIRST',
+    })
+    expect(await projectRow('Live')).toBeDefined()
+  })
+
+  it('returns NOT_FOUND for an unknown project', async () => {
+    expect(await invoke('task-vault:projects:delete', { projectFilePath: 'nope' })).toEqual({
+      error: 'NOT_FOUND',
+    })
+  })
+
+  it('returns VALIDATION_ERROR for a missing projectFilePath', async () => {
+    expect(await invoke('task-vault:projects:delete', {})).toEqual({ error: 'VALIDATION_ERROR' })
+  })
+})
+
+describe('task-vault:projects:update-area', () => {
+  it('moves the project to the area, creating the area when new', async () => {
+    await seedProject(db, 'p1', 'Alpha')
+
+    expect(
+      await invoke('task-vault:projects:update-area', { projectFilePath: 'Alpha', area: 'Home' })
+    ).toEqual({ success: true })
+
+    const area = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name = 'Home'`)
+    expect(await projectRow('Alpha')).toMatchObject({ area_id: area?.id })
+  })
+
+  it('removes the project from its area when no area is given', async () => {
+    await seedArea(db, 'a1', 'Home')
+    await seedProject(db, 'p1', 'Alpha', { areaId: 'a1' })
+
+    await invoke('task-vault:projects:update-area', { projectFilePath: 'Alpha', area: null })
+
+    expect(await projectRow('Alpha')).toMatchObject({ area_id: null })
   })
 
   it('returns VALIDATION_ERROR when projectFilePath is missing', async () => {
-    const handler = getHandler('task-vault:projects:update-deadline')
-    const result = await handler({}, { deadline: '2026-12-31' })
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+    expect(await invoke('task-vault:projects:update-area', { area: 'Home' })).toEqual({
+      error: 'VALIDATION_ERROR',
+    })
   })
 })
 
-describe('task-vault:projects:rename IPC handler', () => {
-  it('renames the project and returns success', async () => {
-    db.mockGet
-      .mockResolvedValueOnce({ id: 'proj-1' }) // SELECT id FROM projects WHERE name=?
-      .mockResolvedValueOnce(undefined) // SELECT id WHERE name=newName AND id!=
-    const handler = getHandler('task-vault:projects:rename')
-    const result = await handler({}, { projectFilePath: 'Alpha', newName: 'Beta' })
-    expect(result).toMatchObject({ success: true })
-    expect(db.mockRun).toHaveBeenCalled()
+describe('task-vault:projects:update-deadline', () => {
+  it('sets the deadline and clears it again with null', async () => {
+    await seedProject(db, 'p1', 'Alpha')
+
+    await invoke('task-vault:projects:update-deadline', {
+      projectFilePath: 'Alpha',
+      deadline: '2026-05-01',
+    })
+    expect(await projectRow('Alpha')).toMatchObject({ deadline: '2026-05-01' })
+
+    await invoke('task-vault:projects:update-deadline', {
+      projectFilePath: 'Alpha',
+      deadline: null,
+    })
+    expect(await projectRow('Alpha')).toMatchObject({ deadline: null })
   })
 
   it('returns VALIDATION_ERROR when projectFilePath is missing', async () => {
-    const handler = getHandler('task-vault:projects:rename')
-    const result = await handler({}, { newName: 'Beta' })
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('returns VALIDATION_ERROR when newName is missing', async () => {
-    const handler = getHandler('task-vault:projects:rename')
-    const result = await handler({}, { projectFilePath: 'Alpha' })
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('returns NOT_FOUND when project does not exist', async () => {
-    const handler = getHandler('task-vault:projects:rename')
-    const result = await handler({}, { projectFilePath: 'Ghost', newName: 'Specter' })
-    expect(result).toMatchObject({ error: 'NOT_FOUND' })
-  })
-
-  it('returns PROJECT_EXISTS when new name is already taken', async () => {
-    db.mockGet
-      .mockResolvedValueOnce({ id: 'proj-1' }) // project found
-      .mockResolvedValueOnce({ id: 'proj-2' }) // collision found
-    const handler = getHandler('task-vault:projects:rename')
-    const result = await handler({}, { projectFilePath: 'Alpha', newName: 'Existing' })
-    expect(result).toMatchObject({ error: 'PROJECT_EXISTS' })
+    expect(await invoke('task-vault:projects:update-deadline', { deadline: null })).toEqual({
+      error: 'VALIDATION_ERROR',
+    })
   })
 })
 
-describe('registerProjectsIpcHandlers dispose', () => {
-  it('calls ipcMain.removeHandler for all registered channels', () => {
-    const dispose = registerProjectsIpcHandlers(mockApi, db)
-    dispose()
-    const removedChannels = vi.mocked(mockRemoveHandler).mock.calls.map((c) => c[0])
-    expect(removedChannels).toContain('task-vault:projects:list')
-    expect(removedChannels).toContain('task-vault:projects:create')
-    expect(removedChannels).toContain('task-vault:projects:delete')
-    expect(removedChannels).toContain('task-vault:projects:update-status')
-    expect(removedChannels).toContain('task-vault:projects:update-area')
-    expect(removedChannels).toContain('task-vault:projects:update-deadline')
-    expect(removedChannels).toContain('task-vault:projects:rename')
+describe('task-vault:projects:rename', () => {
+  it('renames the project', async () => {
+    await seedProject(db, 'p1', 'Old Name')
+
+    expect(
+      await invoke('task-vault:projects:rename', {
+        projectFilePath: 'Old Name',
+        newName: '  New Name ',
+      })
+    ).toEqual({ success: true })
+
+    expect(await projectRow('Old Name')).toBeUndefined()
+    expect(await projectRow('New Name')).toMatchObject({ id: 'p1' })
+  })
+
+  it.each([
+    [{ newName: 'X' }, 'VALIDATION_ERROR'],
+    [{ projectFilePath: 'Old Name' }, 'VALIDATION_ERROR'],
+    [{ projectFilePath: 'Missing', newName: 'X' }, 'NOT_FOUND'],
+    [{ projectFilePath: 'Old Name', newName: 'Taken' }, 'PROJECT_EXISTS'],
+  ])('rejects %j with %s and leaves the names alone', async (payload, error) => {
+    await seedProject(db, 'p1', 'Old Name')
+    await seedProject(db, 'p2', 'Taken')
+
+    expect(await invoke('task-vault:projects:rename', payload)).toEqual({ error })
+
+    const names = await db.query<{ name: string }>(`SELECT name FROM projects ORDER BY name`)
+    expect(names.map((row) => row.name)).toEqual(['Old Name', 'Taken'])
   })
 })

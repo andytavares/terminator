@@ -1,196 +1,130 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
+import { wrapDb } from '../../../../src/main/db/index'
 import type { ExtensionDB } from '../../../../src/main/extensions/api'
-
-const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
-  mockHandle: vi.fn(),
-  mockRemoveHandler: vi.fn(),
-}))
-vi.mock('electron', () => ({
-  ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
-}))
-
-// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
-// capture/assert code (mockHandle.mock.calls, removeHandler assertions) still works.
-const mockApiIpc = {
-  registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
-    mockHandle(ch, (_e: unknown, payload: unknown) => fn(payload))
-    return { dispose: () => mockRemoveHandler(ch) }
-  },
-}
-const mockApi = {
-  ipc: mockApiIpc,
-} as unknown as import('../../../../src/main/extensions/api').ExtensionAPI
-
 import { registerAdminIpcHandlers } from '../../src/ipc/admin.ipc.js'
+import { createIpcHarness, createVaultDb, seedArea, seedTask } from '../support/vault-db'
 
-function createMockDb(): ExtensionDB & {
-  mockQuery: ReturnType<typeof vi.fn>
-  mockGet: ReturnType<typeof vi.fn>
-  mockRun: ReturnType<typeof vi.fn>
-} {
-  const mockQuery = vi.fn().mockResolvedValue([])
-  const mockGet = vi.fn().mockResolvedValue(undefined)
-  const mockRun = vi.fn().mockResolvedValue(undefined)
-  const db: ExtensionDB = {
-    query: mockQuery,
-    get: mockGet,
-    run: mockRun,
-    exec: vi.fn().mockResolvedValue(undefined),
-    transaction: vi
-      .fn()
-      .mockImplementation(async (fn: (tx: ExtensionDB) => Promise<unknown>) => fn(db)),
-  }
-  return Object.assign(db, { mockQuery, mockGet, mockRun })
-}
+let db: ExtensionDB
+let harness: ReturnType<typeof createIpcHarness>
 
-function getHandler(db: ExtensionDB, channel: string): (...args: unknown[]) => Promise<unknown> {
-  return mockHandle.mock.calls.find(([ch]) => ch === channel)![1] as (
-    ...args: unknown[]
-  ) => Promise<unknown>
-}
+beforeEach(async () => {
+  db = await createVaultDb()
+  harness = createIpcHarness()
+})
 
 describe('registerAdminIpcHandlers', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockHandle.mockImplementation((_ch: string, fn: (...args: unknown[]) => unknown) => fn)
-  })
-
-  it('registers three IPC handlers', () => {
-    const db = createMockDb()
-    registerAdminIpcHandlers(mockApi, db)
-    expect(mockHandle).toHaveBeenCalledWith('task-vault:admin:list-tables', expect.any(Function))
-    expect(mockHandle).toHaveBeenCalledWith('task-vault:admin:table-stats', expect.any(Function))
-    expect(mockHandle).toHaveBeenCalledWith('task-vault:admin:run-query', expect.any(Function))
-  })
-
-  it('dispose removes all three handlers', () => {
-    const db = createMockDb()
-    const dispose = registerAdminIpcHandlers(mockApi, db)
+  it('registers the three admin channels and dispose removes them', () => {
+    const dispose = registerAdminIpcHandlers(harness.api, db)
+    expect(harness.channels().sort()).toEqual([
+      'task-vault:admin:list-tables',
+      'task-vault:admin:run-query',
+      'task-vault:admin:table-stats',
+    ])
     dispose()
-    expect(mockRemoveHandler).toHaveBeenCalledWith('task-vault:admin:list-tables')
-    expect(mockRemoveHandler).toHaveBeenCalledWith('task-vault:admin:table-stats')
-    expect(mockRemoveHandler).toHaveBeenCalledWith('task-vault:admin:run-query')
+    expect(harness.channels()).toEqual([])
   })
 
   describe('list-tables', () => {
-    it('returns table names', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockResolvedValueOnce([{ table_name: 'tasks' }, { table_name: 'projects' }])
-      registerAdminIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:admin:list-tables')()) as {
-        tables: string[]
-      }
-      expect(result.tables).toEqual(['tasks', 'projects'])
+    it('lists the tables of the database, sorted', async () => {
+      registerAdminIpcHandlers(harness.api, db)
+      const result = (await harness.invoke('task-vault:admin:list-tables')) as { tables: string[] }
+      expect(result.tables).toEqual([
+        'areas',
+        'projects',
+        'settings',
+        'tasks',
+        'weekly_review_actions',
+        'weekly_reviews',
+      ])
     })
 
-    it('returns error when query throws', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockRejectedValueOnce(new Error('connection lost'))
-      registerAdminIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:admin:list-tables')()) as { error: string }
-      expect(result.error).toMatch(/connection lost/)
+    it('returns the error when the database is closed', async () => {
+      const database = new DatabaseSync(':memory:')
+      const closed = wrapDb(database)
+      database.close()
+      registerAdminIpcHandlers(harness.api, closed)
+      const result = (await harness.invoke('task-vault:admin:list-tables')) as { error: string }
+      expect(result.error).toMatch(/not open/)
     })
   })
 
   describe('table-stats', () => {
-    it('returns row counts per table', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockResolvedValueOnce([{ table_name: 'tasks' }, { table_name: 'areas' }])
-      db.mockGet.mockResolvedValueOnce({ n: '42' }).mockResolvedValueOnce({ n: '5' })
-      registerAdminIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:admin:table-stats')()) as {
+    it('counts the rows of every table', async () => {
+      await seedArea(db, 'a1', 'Work')
+      await seedArea(db, 'a2', 'Home')
+      await seedTask(db, { id: 't1' })
+      registerAdminIpcHandlers(harness.api, db)
+      const result = (await harness.invoke('task-vault:admin:table-stats')) as {
         stats: Record<string, number>
       }
-      expect(result.stats.tasks).toBe(42)
-      expect(result.stats.areas).toBe(5)
-    })
-
-    it('returns error when query throws', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockRejectedValueOnce(new Error('pg error'))
-      registerAdminIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:admin:table-stats')()) as { error: string }
-      expect(result.error).toMatch(/pg error/)
+      expect(result.stats).toMatchObject({ tasks: 1, areas: 2, projects: 0 })
     })
   })
 
   describe('run-query', () => {
-    it('returns rows for SELECT queries', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockResolvedValueOnce([{ id: '1', text: 'hello' }])
-      registerAdminIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
-        sql: 'SELECT * FROM tasks',
-      })) as { rows: unknown[] }
-      expect(result.rows).toHaveLength(1)
+    beforeEach(async () => {
+      await seedTask(db, { id: 't1', text: 'hello', status: 'cancelled' })
+      await seedTask(db, { id: 't2', text: 'world' })
+      registerAdminIpcHandlers(harness.api, db)
     })
 
-    it('returns changes count for write queries', async () => {
-      const db = createMockDb()
-      db.mockRun.mockResolvedValueOnce(3)
-      registerAdminIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
-        sql: "DELETE FROM tasks WHERE status='cancelled'",
-      })) as { rows: unknown[]; changes: number }
-      expect(result.rows).toHaveLength(0)
-      expect(result.changes).toBe(3)
-    })
+    const runQuery = (sql: string) => harness.invoke('task-vault:admin:run-query', { sql })
 
-    it('returns changes: 0 when no rows affected by write', async () => {
-      const db = createMockDb()
-      db.mockRun.mockResolvedValueOnce(0)
-      registerAdminIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
-        sql: "UPDATE tasks SET status='open' WHERE 1=0",
-      })) as { changes: number }
+    it('returns rows for a SELECT', async () => {
+      const result = (await runQuery('SELECT id, text FROM tasks ORDER BY id')) as {
+        rows: Record<string, unknown>[]
+        changes: number
+      }
+      expect(result.rows.map((row) => ({ ...row }))).toEqual([
+        { id: 't1', text: 'hello' },
+        { id: 't2', text: 'world' },
+      ])
       expect(result.changes).toBe(0)
     })
 
-    it('blocks DROP statements', async () => {
-      const db = createMockDb()
-      registerAdminIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
-        sql: 'DROP TABLE tasks',
-      })) as { error: string }
-      expect(result.error).toMatch(/not permitted/i)
-      expect(db.mockQuery).not.toHaveBeenCalled()
-    })
-
-    it('blocks CREATE statements', async () => {
-      const db = createMockDb()
-      registerAdminIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
-        sql: 'CREATE TABLE foo (id TEXT)',
-      })) as { error: string }
-      expect(result.error).toMatch(/not permitted/i)
-    })
-
-    it('blocks ALTER statements', async () => {
-      const db = createMockDb()
-      registerAdminIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
-        sql: 'ALTER TABLE tasks ADD COLUMN x TEXT',
-      })) as { error: string }
-      expect(result.error).toMatch(/not permitted/i)
-    })
-
-    it('returns error for empty query', async () => {
-      const db = createMockDb()
-      registerAdminIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:admin:run-query')(null, { sql: '   ' })) as {
-        error: string
+    it('runs a WITH query as a read', async () => {
+      const result = (await runQuery(
+        'WITH c AS (SELECT id FROM tasks) SELECT COUNT(*) AS n FROM c'
+      )) as {
+        rows: { n: number }[]
       }
-      expect(result.error).toBeTruthy()
+      expect(result.rows[0].n).toBe(2)
     })
 
-    it('returns error when query throws', async () => {
-      const db = createMockDb()
-      db.mockQuery.mockRejectedValueOnce(new Error('syntax error'))
-      registerAdminIpcHandlers(mockApi, db)
-      const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
-        sql: 'SELECT 1',
-      })) as { error: string }
-      expect(result.error).toMatch(/syntax error/)
+    it('executes a write and reports how many rows it changed', async () => {
+      const result = (await runQuery("DELETE FROM tasks WHERE status='cancelled'")) as {
+        rows: unknown[]
+        changes: number
+      }
+      expect(result).toEqual({ rows: [], changes: 1 })
+      expect(await db.query('SELECT id FROM tasks')).toHaveLength(1)
+    })
+
+    it('reports zero changes when a write matches nothing', async () => {
+      expect(await runQuery("UPDATE tasks SET status='open' WHERE 1=0")).toMatchObject({
+        changes: 0,
+      })
+    })
+
+    it.each([
+      'DROP TABLE tasks',
+      'CREATE TABLE foo (id TEXT)',
+      'ALTER TABLE tasks ADD COLUMN x TEXT',
+    ])('refuses %s and leaves the schema alone', async (sql) => {
+      const result = (await runQuery(sql)) as { error: string }
+      expect(result.error).toMatch(/not permitted/i)
+      expect(await db.query('SELECT id FROM tasks')).toHaveLength(2)
+      expect(await db.get(`SELECT name FROM sqlite_master WHERE name = 'foo'`)).toBeUndefined()
+    })
+
+    it('returns an error for an empty query', async () => {
+      expect(await runQuery('   ')).toEqual({ error: 'Empty query' })
+    })
+
+    it('returns the database error for invalid SQL', async () => {
+      const result = (await runQuery('SELECT FROM nowhere')) as { error: string }
+      expect(result.error).toMatch(/syntax error/i)
     })
   })
 })
