@@ -54,9 +54,7 @@ async function loadAndReconcileSession(
     files: Array<{ path: string; status?: string }>
   }
   reconcileHead(
-    repoRoot,
-    detail.number,
-    detail.headSHA,
+    { repoRoot, prNumber: detail.number, headSHA: detail.headSHA },
     compare.rewritten ? 'all' : compare.files.map((f) => f.path),
     compare.files.filter((f) => f.status === 'added').map((f) => f.path)
   )
@@ -193,7 +191,10 @@ export function PrReviewTab({ repoRoot }: Props) {
     // The store writes the whole session (notes, drafts, viewed marks included) before
     // reset(), so mergeSessionStatuses on the next queue load finds it as paused.
     if (repoRoot && activePr) {
-      setPaused(repoRoot, activePr.number, activePr.headSHA, new Date().toISOString())
+      setPaused(
+        { repoRoot, prNumber: activePr.number, headSHA: activePr.headSHA },
+        new Date().toISOString()
+      )
     }
     setShowOverview(false)
     setActiveQueuePr(null)

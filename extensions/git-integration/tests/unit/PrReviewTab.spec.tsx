@@ -248,7 +248,10 @@ describe('PrReviewTab — closes PR view and persists paused session when onClos
     await new Promise((r) => setTimeout(r, 0))
     expect(mockSetActivePr).toHaveBeenCalledWith(null)
     expect(mockReset).toHaveBeenCalled()
-    expect(mockSetPaused).toHaveBeenCalledWith('/repo', 1, 'abc123', expect.any(String))
+    expect(mockSetPaused).toHaveBeenCalledWith(
+      { repoRoot: '/repo', prNumber: 1, headSHA: 'abc123' },
+      expect.any(String)
+    )
   })
 })
 
@@ -343,9 +346,7 @@ describe('PrReviewTab — reconciles the stored session against the new head via
     await new Promise((r) => setTimeout(r, 0))
     expect(githubModule.githubAPI.prCompare).toHaveBeenCalledWith('/repo', 'oldSha', 'newSha')
     expect(mockReconcileHead).toHaveBeenCalledWith(
-      '/repo',
-      1,
-      'newSha',
+      { repoRoot: '/repo', prNumber: 1, headSHA: 'newSha' },
       ['a.ts', 'scripts/e2e-burn-in.ts'],
       ['scripts/e2e-burn-in.ts']
     )
@@ -385,6 +386,10 @@ describe('PrReviewTab — reconciles with all when the compare says history was 
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByText('Open PR'))
     await new Promise((r) => setTimeout(r, 0))
-    expect(mockReconcileHead).toHaveBeenCalledWith('/repo', 1, 'newSha', 'all', [])
+    expect(mockReconcileHead).toHaveBeenCalledWith(
+      { repoRoot: '/repo', prNumber: 1, headSHA: 'newSha' },
+      'all',
+      []
+    )
   })
 })

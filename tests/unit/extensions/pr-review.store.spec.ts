@@ -178,26 +178,39 @@ describe('usePrReviewStore', () => {
 
   describe('viewed files tracking', () => {
     it('markFileViewed adds file to viewedFiles set', () => {
-      usePrReviewStore.getState().markFileViewed('/repo', 42, 'abc1234', 'src/app.ts')
+      usePrReviewStore
+        .getState()
+        .markFileViewed({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc1234' }, 'src/app.ts')
       expect(usePrReviewStore.getState().viewedFiles.has('src/app.ts')).toBe(true)
     })
 
     it('markFileViewed is idempotent', () => {
-      usePrReviewStore.getState().markFileViewed('/repo', 42, 'abc1234', 'src/app.ts')
-      usePrReviewStore.getState().markFileViewed('/repo', 42, 'abc1234', 'src/app.ts')
+      usePrReviewStore
+        .getState()
+        .markFileViewed({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc1234' }, 'src/app.ts')
+      usePrReviewStore
+        .getState()
+        .markFileViewed({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc1234' }, 'src/app.ts')
       expect(usePrReviewStore.getState().viewedFiles.size).toBe(1)
     })
 
     it('unmarkFileViewed removes file from viewedFiles', () => {
       usePrReviewStore.setState({ viewedFiles: new Set(['src/app.ts']) })
-      usePrReviewStore.getState().unmarkFileViewed('/repo', 42, 'abc1234', 'src/app.ts')
+      usePrReviewStore
+        .getState()
+        .unmarkFileViewed({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc1234' }, 'src/app.ts')
       expect(usePrReviewStore.getState().viewedFiles.has('src/app.ts')).toBe(false)
     })
   })
 
   describe('file reordering', () => {
     it('reorderFiles updates fileOrderOverrides', () => {
-      usePrReviewStore.getState().reorderFiles('ch-1', ['src/b.ts', 'src/a.ts'], '/repo', 42, 'abc')
+      usePrReviewStore
+        .getState()
+        .reorderFiles({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc' }, 'ch-1', [
+          'src/b.ts',
+          'src/a.ts',
+        ])
       expect(usePrReviewStore.getState().fileOrderOverrides['ch-1']).toEqual([
         'src/b.ts',
         'src/a.ts',
@@ -206,7 +219,9 @@ describe('usePrReviewStore', () => {
 
     it('reorderFiles preserves overrides for other chapters', () => {
       usePrReviewStore.setState({ fileOrderOverrides: { 'ch-2': ['x.ts'] } })
-      usePrReviewStore.getState().reorderFiles('ch-1', ['src/b.ts'], '/repo', 42, 'abc')
+      usePrReviewStore
+        .getState()
+        .reorderFiles({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc' }, 'ch-1', ['src/b.ts'])
       expect(usePrReviewStore.getState().fileOrderOverrides['ch-2']).toEqual(['x.ts'])
     })
   })
@@ -224,13 +239,17 @@ describe('usePrReviewStore', () => {
     })
 
     it('setPaused stores timestamp', () => {
-      usePrReviewStore.getState().setPaused('/repo', 42, 'abc', '2024-01-01T12:00:00Z')
+      usePrReviewStore
+        .getState()
+        .setPaused({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc' }, '2024-01-01T12:00:00Z')
       expect(usePrReviewStore.getState().pausedAt).toBe('2024-01-01T12:00:00Z')
     })
 
     it('setPaused clears with null', () => {
       usePrReviewStore.setState({ pausedAt: '2024-01-01T12:00:00Z' })
-      usePrReviewStore.getState().setPaused('/repo', 42, 'abc', null)
+      usePrReviewStore
+        .getState()
+        .setPaused({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc' }, null)
       expect(usePrReviewStore.getState().pausedAt).toBeNull()
     })
   })

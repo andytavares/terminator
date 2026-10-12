@@ -108,9 +108,7 @@ describe('CommentComposer (new comment) — adds the comment to the pending revi
     fireEvent.click(screen.getByText('Add to pending review'))
     await waitFor(() => expect(mockAddDraft).toHaveBeenCalled())
     expect(mockAddDraft).toHaveBeenCalledWith(
-      '/repo',
-      42,
-      'abc123',
+      { repoRoot: '/repo', prNumber: 42, headSHA: 'abc123' },
       expect.objectContaining({
         path: 'src/foo.ts',
         line: 10,

@@ -307,10 +307,10 @@ describe('PrReviewView — finishing a chapter marks its unviewed files in one b
     )
     fireEvent.click(screen.getByRole('button', { name: 'Submit review…' }))
     expect(mockMarkFilesViewed).toHaveBeenCalledTimes(1)
-    expect(mockMarkFilesViewed).toHaveBeenCalledWith('/repo', 1, 'abc', [
-      'src/foo.ts',
-      'src/baz.ts',
-    ])
+    expect(mockMarkFilesViewed).toHaveBeenCalledWith(
+      { repoRoot: '/repo', prNumber: 1, headSHA: 'abc' },
+      ['src/foo.ts', 'src/baz.ts']
+    )
     expect(mockMarkFileViewed).not.toHaveBeenCalled()
   })
 })
@@ -330,7 +330,10 @@ describe('PrReviewView — calls markFileViewed and advances file on MarkViewed'
       />
     )
     fireEvent.click(screen.getByText('MarkViewed'))
-    expect(mockMarkFileViewed).toHaveBeenCalledWith('/repo', 1, 'abc', 'src/foo.ts')
+    expect(mockMarkFileViewed).toHaveBeenCalledWith(
+      { repoRoot: '/repo', prNumber: 1, headSHA: 'abc' },
+      'src/foo.ts'
+    )
     expect(mockSetCurrentFile).toHaveBeenCalledWith('src/bar.ts')
   })
 })
@@ -635,7 +638,10 @@ describe('PrReviewView (continued) — chapter keyboard navigation — marking t
   it('marking the last file of a chapter viewed advances into the next chapter', async () => {
     await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
     fireEvent.click(screen.getByText('MarkViewed'))
-    expect(mockMarkFileViewed).toHaveBeenCalledWith('/repo', 1, 'abc', 'b.ts')
+    expect(mockMarkFileViewed).toHaveBeenCalledWith(
+      { repoRoot: '/repo', prNumber: 1, headSHA: 'abc' },
+      'b.ts'
+    )
     expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
     expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
   })

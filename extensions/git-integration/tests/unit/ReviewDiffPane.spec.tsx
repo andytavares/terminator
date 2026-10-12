@@ -328,9 +328,7 @@ describe('ReviewDiffPane — shows viewed badge when file is already viewed', ()
     expect(box.checked).toBe(true)
     fireEvent.click(box)
     expect(mockUnmarkFileViewed).toHaveBeenCalledWith(
-      '/repo',
-      mockPr.number,
-      mockPr.headSHA,
+      { repoRoot: '/repo', prNumber: mockPr.number, headSHA: mockPr.headSHA },
       'src/foo.ts'
     )
   })
@@ -344,9 +342,7 @@ describe('ReviewDiffPane — marks the file viewed from the header checkbox with
     expect(box.checked).toBe(false)
     fireEvent.click(box)
     expect(mockMarkFileViewed).toHaveBeenCalledWith(
-      '/repo',
-      mockPr.number,
-      mockPr.headSHA,
+      { repoRoot: '/repo', prNumber: mockPr.number, headSHA: mockPr.headSHA },
       'src/foo.ts'
     )
     expect(onMarkViewed).not.toHaveBeenCalled()

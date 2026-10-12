@@ -217,7 +217,7 @@ export function PrReviewView({
 
   const handleMarkViewed = () => {
     if (!activeFile) return
-    markFileViewed(repoRoot, pr.number, pr.headSHA, activeFile.path)
+    markFileViewed({ repoRoot, prNumber: pr.number, headSHA: pr.headSHA }, activeFile.path)
     stepFile(1)
   }
 
@@ -241,9 +241,7 @@ export function PrReviewView({
   const handleFinishChapter = () => {
     if (!activeChapter) return
     markFilesViewed(
-      repoRoot,
-      pr.number,
-      pr.headSHA,
+      { repoRoot, prNumber: pr.number, headSHA: pr.headSHA },
       orderedFiles.map((f) => f.path).filter((path) => !viewedFiles.has(path))
     )
     const chapterIndex = displayPr.chapters.findIndex((c) => c.id === activeChapterId)
@@ -256,7 +254,7 @@ export function PrReviewView({
   }
 
   const handlePause = () => {
-    setPaused(repoRoot, pr.number, pr.headSHA, new Date().toISOString())
+    setPaused({ repoRoot, prNumber: pr.number, headSHA: pr.headSHA }, new Date().toISOString())
     onClose()
   }
 

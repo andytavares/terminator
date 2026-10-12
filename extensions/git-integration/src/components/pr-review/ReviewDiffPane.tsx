@@ -923,14 +923,17 @@ export function ReviewDiffPane({
 
   const saveNote = () => {
     if (!noteAnchor || !noteDraft.trim()) return
-    addNote(repoRoot, pr.number, pr.headSHA, {
-      id: crypto.randomUUID(),
-      path: file.path,
-      line: noteAnchor.line,
-      side: noteAnchor.side,
-      body: noteDraft,
-      createdAt: new Date().toISOString(),
-    })
+    addNote(
+      { repoRoot, prNumber: pr.number, headSHA: pr.headSHA },
+      {
+        id: crypto.randomUUID(),
+        path: file.path,
+        line: noteAnchor.line,
+        side: noteAnchor.side,
+        body: noteDraft,
+        createdAt: new Date().toISOString(),
+      }
+    )
     setNoteAnchor(null)
     setNoteDraft('')
   }
@@ -1104,7 +1107,9 @@ export function ReviewDiffPane({
               <button
                 type="button"
                 className="rs-btn"
-                onClick={() => removeNote(repoRoot, pr.number, pr.headSHA, n.id)}
+                onClick={() =>
+                  removeNote({ repoRoot, prNumber: pr.number, headSHA: pr.headSHA }, n.id)
+                }
               >
                 Delete
               </button>
@@ -1123,7 +1128,8 @@ export function ReviewDiffPane({
                 className="rs-btn"
                 onClick={() => {
                   const next = prompt('Edit draft', d.body)
-                  if (next != null) updateDraft(repoRoot, pr.number, pr.headSHA, d.id, next)
+                  if (next != null)
+                    updateDraft({ repoRoot, prNumber: pr.number, headSHA: pr.headSHA }, d.id, next)
                 }}
               >
                 Edit
@@ -1131,7 +1137,9 @@ export function ReviewDiffPane({
               <button
                 type="button"
                 className="rs-btn"
-                onClick={() => removeDraft(repoRoot, pr.number, pr.headSHA, d.id)}
+                onClick={() =>
+                  removeDraft({ repoRoot, prNumber: pr.number, headSHA: pr.headSHA }, d.id)
+                }
               >
                 Delete
               </button>
@@ -1494,8 +1502,11 @@ export function ReviewDiffPane({
             checked={isViewed}
             onChange={() =>
               isViewed
-                ? unmarkFileViewed(repoRoot, pr.number, pr.headSHA, file.path)
-                : markFileViewed(repoRoot, pr.number, pr.headSHA, file.path)
+                ? unmarkFileViewed(
+                    { repoRoot, prNumber: pr.number, headSHA: pr.headSHA },
+                    file.path
+                  )
+                : markFileViewed({ repoRoot, prNumber: pr.number, headSHA: pr.headSHA }, file.path)
             }
           />
           Viewed

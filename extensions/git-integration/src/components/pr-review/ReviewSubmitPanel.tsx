@@ -52,7 +52,7 @@ export function ReviewSubmitPanel({
         })),
       })
       if ('error' in result) throw new Error((result as { error: string }).error)
-      if (drafts.length > 0) clearDrafts(repoRoot, prNumber, headSHA)
+      if (drafts.length > 0) clearDrafts({ repoRoot, prNumber, headSHA })
       if (event === 'APPROVE' && onApproved) {
         onApproved()
         return

@@ -153,11 +153,9 @@ describe('ChapterFileList — calls reorderFiles on drag and drop between rows',
     fireEvent.dragOver(rows[1])
     fireEvent.drop(rows[1])
     expect(mockReorderFiles).toHaveBeenCalledWith(
+      { repoRoot: '/repo', prNumber: 42, headSHA: 'abc' },
       'ch-1',
-      ['src/bar.ts', 'src/foo.ts'],
-      '/repo',
-      42,
-      'abc'
+      ['src/bar.ts', 'src/foo.ts']
     )
   })
 

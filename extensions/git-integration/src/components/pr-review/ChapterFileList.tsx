@@ -71,7 +71,7 @@ export function ChapterFileList({
     const newOrder = [...files.map((f) => f.path)]
     const [moved] = newOrder.splice(fromIndex, 1)
     newOrder.splice(dropIndex, 0, moved)
-    reorderFiles(chapter.id, newOrder, repoRoot, prNumber, headSHA)
+    reorderFiles({ repoRoot, prNumber, headSHA }, chapter.id, newOrder)
     dragIndexRef.current = null
     setDragOverIndex(null)
   }

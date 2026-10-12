@@ -60,15 +60,18 @@ export function CommentComposer(props: Props) {
       }
       return
     }
-    addDraft(props.repoRoot, props.prNumber, props.commitId, {
-      id: crypto.randomUUID(),
-      path: props.path,
-      line: props.line,
-      startLine: props.startLine ?? null,
-      side: props.side,
-      body,
-      fromFindingId: props.fromFindingId ?? null,
-    })
+    addDraft(
+      { repoRoot: props.repoRoot, prNumber: props.prNumber, headSHA: props.commitId },
+      {
+        id: crypto.randomUUID(),
+        path: props.path,
+        line: props.line,
+        startLine: props.startLine ?? null,
+        side: props.side,
+        body,
+        fromFindingId: props.fromFindingId ?? null,
+      }
+    )
     props.onSubmitted()
   }
 
