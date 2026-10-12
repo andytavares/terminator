@@ -32,7 +32,14 @@ import {
   ArchiveAreaRequestSchema,
 } from '../schemas/vault.schema'
 import { triggerSchedulerTick, broadcast } from '../notifications/task-scheduler.js'
-import { rowToTask, rowToProject, TASK_COLS, TASK_JOINS } from '../vault/mappers'
+import {
+  rowToTask,
+  rowToProject,
+  TASK_COLS,
+  TASK_JOINS,
+  PROJECT_COLS,
+  PROJECT_JOINS,
+} from '../vault/mappers'
 
 const localDate = _localDate
 
@@ -935,7 +942,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
         [cutoff]
       )
       const projectRows = await db.query<Record<string, unknown>>(
-        `SELECT * FROM projects WHERE status='archived' ORDER BY updated_at DESC`
+        `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='archived' ORDER BY p.updated_at DESC`
       )
       const areaRows = await db.query<Record<string, unknown>>(
         `SELECT * FROM areas WHERE status='archived' ORDER BY updated_at DESC`
@@ -960,7 +967,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
          ORDER BY t.created_at ASC`
       )
       const projectRows = await db.query<Record<string, unknown>>(
-        `SELECT * FROM projects WHERE status='someday' ORDER BY name ASC`
+        `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='someday' ORDER BY p.name ASC`
       )
       return { tasks: taskRows.map(rowToTask), projects: projectRows.map(rowToProject) }
     } catch (err) {

@@ -5,7 +5,7 @@ import {
   LinksRemoveRequestSchema,
   LinksGetForTargetRequestSchema,
 } from '../schemas/vault.schema'
-import { rowToTask, rowToProject } from '../vault/mappers'
+import { rowToTask, rowToProject, PROJECT_COLS, PROJECT_JOINS } from '../vault/mappers'
 
 export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const registrar = createIpcRegistrar(api)
@@ -111,7 +111,7 @@ export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     const tasks = taskRows.map(rowToTask).filter((t) => t.terminatorLinks.includes(targetId))
 
     const projectRows = await db.query<Record<string, unknown>>(
-      `SELECT * FROM projects WHERE terminator_links LIKE ? ESCAPE '\\'`,
+      `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.terminator_links LIKE ? ESCAPE '\\'`,
       [`%${escapedId}%`]
     )
     const projects = projectRows

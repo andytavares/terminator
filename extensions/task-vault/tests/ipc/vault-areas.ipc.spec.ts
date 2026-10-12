@@ -346,6 +346,17 @@ describe('task-vault:vault:list-someday and someday-to-today', () => {
     expect(result.projects.map((project) => project.name)).toEqual(['Maybe'])
   })
 
+  it('names the area of a someday project', async () => {
+    await seedArea(db, 'a1', 'Home')
+    await seedProject(db, 'p1', 'Maybe', { status: 'someday', areaId: 'a1' })
+
+    const result = (await invoke('task-vault:vault:list-someday')) as {
+      projects: { name: string; area?: string }[]
+    }
+
+    expect(result.projects).toMatchObject([{ name: 'Maybe', area: 'Home' }])
+  })
+
   it('moves a someday task and its subtasks to today and opens it', async () => {
     await seedTask(db, { id: 'parked', source: 'someday', status: 'cancelled' })
     await seedTask(db, { id: 'parked-sub', source: 'someday', parentId: 'parked' })
