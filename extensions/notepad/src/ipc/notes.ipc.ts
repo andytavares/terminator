@@ -2,17 +2,15 @@ import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import { noPayload, type ExtensionDB, type ExtensionAPI } from '@terminator/extension-sdk'
 import { createIpcRegistrar, IdPayload } from './register'
+import { rowToNote, type NoteRow } from '../db/mappers'
+import { noteTitle } from '../db/note-title'
 
-function deriveTitle(body: string): string {
-  const headingMatch = /^#{1,6}\s+(.+)/m.exec(body)
-  if (headingMatch) return headingMatch[1].trim()
-  const firstLine = body.split('\n').find((l) => l.trim().length > 0)
-  if (firstLine) return firstLine.trim().slice(0, 120)
-  return 'Untitled note'
-}
-
-// Upsert tags and reconcile note_tags; safe to call within an open transaction.
-async function reconcileTags(db: ExtensionDB, noteId: string, tagNames: string[]): Promise<void> {
+/** Upserts the tags and makes them the note's whole tag set; safe within an open transaction. */
+export async function reconcileTags(
+  db: ExtensionDB,
+  noteId: string,
+  tagNames: string[]
+): Promise<void> {
   const normalized = tagNames.map((t) => t.toLowerCase().trim()).filter(Boolean)
 
   const tagIds: string[] = []
@@ -51,7 +49,7 @@ export async function createNote(
   args: z.infer<typeof CreateNotePayload>
 ): Promise<Record<string, unknown>> {
   const body = args.body ?? ''
-  const title = args.title?.trim() || deriveTitle(body)
+  const title = args.title?.trim() || noteTitle(body)
   const id = randomUUID()
   const now = new Date().toISOString()
 
@@ -134,15 +132,7 @@ export async function getNote(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const row = await db.get<{
-    id: string
-    title: string
-    body: string
-    created_at: string
-    updated_at: string
-    archived_at: string | null
-    tags: string
-  }>(
+  const row = await db.get<NoteRow>(
     `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at,
             COALESCE((
               SELECT GROUP_CONCAT(t.name, ',')
@@ -155,17 +145,7 @@ export async function getNote(
 
   if (!row) return { error: 'NOTE_NOT_FOUND' }
 
-  return {
-    data: {
-      id: row.id,
-      title: row.title,
-      body: row.body,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      archivedAt: row.archived_at,
-      tags: row.tags ? row.tags.split(',').filter(Boolean) : [],
-    },
-  }
+  return { data: rowToNote(row) }
 }
 
 const AutosaveNotePayload = z.object({
