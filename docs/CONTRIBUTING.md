@@ -10,16 +10,12 @@ cd terminator
 nvm use            # Node 24.21.0, from .nvmrc: the Node that Electron 44 ships
 
 # Install all dependencies from the root: npm resolves every workspace (versions are pinned — do not use --legacy-peer-deps without cause)
-# node-pty is NAPI-based (ABI-stable), so its `npm install` build works across
-# Electron versions with no separate rebuild step.
+# node-pty loads the N-API prebuilds it ships (macOS, Linux, Windows; x64 and arm64);
+# its install script is denied in `allowScripts`, so nothing is compiled.
 npm install
 ```
 
-**macOS with Python 3.12+**: node-pty's native build requires `setuptools`:
-
-```bash
-pip3 install setuptools --break-system-packages
-```
+Electron 44 no longer downloads its binary when it is installed: it does so on first run or through its `install-electron` bin ([breaking changes](https://github.com/electron/electron/blob/v44.7.0/docs/breaking-changes.md)). electron-vite does not run that bin, so `predev` and `prepreview` call `install-electron` before starting the app; it returns at once when the binary is already there.
 
 ---
 
@@ -205,7 +201,7 @@ Per the constitution (Principle IV):
 | `postcss`            | 8.5.24          | [GHSA-fxqj-rqcc-2cmp](https://github.com/advisories/GHSA-fxqj-rqcc-2cmp), [GHSA-r28c-9q8g-f849](https://github.com/advisories/GHSA-r28c-9q8g-f849) |
 | `tar`                | 7.5.22          | [GHSA-r292-9mhp-454m](https://github.com/advisories/GHSA-r292-9mhp-454m), [GHSA-23hp-3jrh-7fpw](https://github.com/advisories/GHSA-23hp-3jrh-7fpw) |
 
-Dependency install scripts are blocked by npm unless listed in `allowScripts` in `package.json` ([npm docs](https://docs.npmjs.com/cli/v11/commands/npm-install-scripts)). Review a new one with `npm install-scripts ls` before approving it.
+`allowScripts` in `package.json` records which dependencies may run install scripts ([npm docs](https://docs.npmjs.com/cli/v11/commands/npm-install-scripts)). npm 11 runs an unreviewed script and lists it after the install; a later npm release will block it. List unreviewed ones with `npm install-scripts ls` and approve or deny each before it lands.
 
 ---
 
