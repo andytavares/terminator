@@ -46,7 +46,7 @@ describe('notify', () => {
 
   it('passes onClick through to the toast store', () => {
     const onClick = vi.fn()
-    notify('info', 'Hello', 'testKey', { onClick })
+    notify('info', 'Hello', { key: 'testKey', onClick })
     expect(mockAddToast).toHaveBeenCalledWith('info', 'Hello', { onClick })
   })
 

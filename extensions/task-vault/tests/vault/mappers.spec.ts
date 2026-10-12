@@ -129,6 +129,26 @@ describe('rowToTask', () => {
     expect(task.recurrenceEndType).toBeUndefined()
   })
 
+  it('keeps an explicit none end type, with the counts its columns hold', () => {
+    const task = rowToTask(
+      baseTaskRow({
+        recurrence_end_type: 'none',
+        recurrence_end_count: 4,
+        recurrence_completed_count: 2,
+      })
+    )
+    expect(task.recurrenceEndType).toBe('none')
+    expect(task.recurrenceEndCount).toBe(4)
+    expect(task.recurrenceCompletedCount).toBe(2)
+    expect(task.recurrenceEndDate).toBeUndefined()
+  })
+
+  it('leaves the end fields unset when no end type is recorded anywhere', () => {
+    const task = rowToTask(baseTaskRow())
+    expect(task.recurrenceEndType).toBeUndefined()
+    expect(task.recurrenceEndCount).toBeUndefined()
+  })
+
   it('reads recurrence rule columns', () => {
     const task = rowToTask(
       baseTaskRow({

@@ -202,7 +202,8 @@ function SubtaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', {
       taskId: subtask.id,
     })
-    notify('success', `Completed: ${subtask.text}`, 'taskCompleted', {
+    notify('success', `Completed: ${subtask.text}`, {
+      key: 'taskCompleted',
       onClick: makeTaskNavHandler(subtask.id),
     })
     await onRefresh()
@@ -779,7 +780,8 @@ function TaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', {
       taskId: task.id,
     })
-    notify('info', `Archived: ${task.text}`, 'taskArchived', {
+    notify('info', `Archived: ${task.text}`, {
+      key: 'taskArchived',
       onClick: makeTaskNavHandler(task.id),
     })
     await onRefresh()
@@ -816,7 +818,8 @@ function TaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:reopen-task', {
       taskId: task.id,
     })
-    notify('info', `Reopened: ${task.text}`, 'taskReopened', {
+    notify('info', `Reopened: ${task.text}`, {
+      key: 'taskReopened',
       onClick: makeTaskNavHandler(task.id),
     })
     await onRefresh()
@@ -829,7 +832,8 @@ function TaskRow({
       reason,
       checkInterval,
     })
-    notify('warning', `Blocked: ${task.text}`, 'taskBlocked', {
+    notify('warning', `Blocked: ${task.text}`, {
+      key: 'taskBlocked',
       onClick: makeTaskNavHandler(task.id),
     })
     await onRefresh()
@@ -839,7 +843,8 @@ function TaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:unblock-task', {
       taskId: task.id,
     })
-    notify('success', `Unblocked: ${task.text}`, 'taskUnblocked', {
+    notify('success', `Unblocked: ${task.text}`, {
+      key: 'taskUnblocked',
       onClick: makeTaskNavHandler(task.id),
     })
     await onRefresh()
@@ -866,8 +871,7 @@ function TaskRow({
     notify(
       'success',
       `Recurrence set: ${formatRecurrenceRule(days && days.length > 0 ? `weekly:${days.sort((a, b) => a - b).join(',')}` : interval)}`,
-      'recurrenceSet',
-      { onClick: makeTaskNavHandler(task.id) }
+      { key: 'recurrenceSet', onClick: makeTaskNavHandler(task.id) }
     )
     await onRefresh()
   }

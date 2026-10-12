@@ -39,40 +39,24 @@ export function parseRecurrenceRule(raw: string): RecurrenceRule {
 export function computeNextDueDate(fromDate: string, rule: RecurrenceRule): string {
   // Use noon to avoid DST edge cases
   const d = new Date(`${fromDate}T12:00:00`)
-  switch (rule.kind) {
-    case 'daily':
-      d.setDate(d.getDate() + 1)
-      break
-    case 'biweekly':
-      d.setDate(d.getDate() + 14)
-      break
-    case 'monthly':
-      // Intentional overflow: Jan 31 + 1 month = Mar 2 (documented accepted behaviour)
-      d.setMonth(d.getMonth() + 1)
-      break
-    case 'weekly': {
-      const days = rule.days
-      if (days.length === 0) {
-        d.setDate(d.getDate() + 7)
-      } else {
-        const todayDow = d.getDay()
-        const sortedDays = [...days].sort((a, b) => a - b)
-        let found = false
-        for (const day of sortedDays) {
-          if (day > todayDow) {
-            d.setDate(d.getDate() + (day - todayDow))
-            found = true
-            break
-          }
-        }
-        if (!found) {
-          d.setDate(d.getDate() + (7 - todayDow + sortedDays[0]))
-        }
-      }
-      break
-    }
+  if (rule.kind === 'monthly') {
+    // Intentional overflow: Jan 31 + 1 month = Mar 2 (documented accepted behaviour)
+    d.setMonth(d.getMonth() + 1)
+  } else {
+    d.setDate(d.getDate() + daysToNext(rule, d.getDay()))
   }
   return localDate(d)
+}
+
+/** Days from a date on weekday `dow` to the rule's next occurrence (monthly aside). */
+function daysToNext(rule: RecurrenceRule, dow: number): number {
+  if (rule.kind === 'daily') return 1
+  if (rule.kind === 'biweekly') return 14
+  if (rule.kind !== 'weekly' || rule.days.length === 0) return 7
+  const sortedDays = [...rule.days].sort((a, b) => a - b)
+  const later = sortedDays.find((day) => day > dow)
+  if (later !== undefined) return later - dow
+  return 7 - dow + sortedDays[0]
 }
 
 // ─── Recurrence end-condition decoding ───────────────────────────────────────
@@ -112,23 +96,30 @@ export function parseRecurrenceEndMeta(
   }
 }
 
-/**
- * End-conditions for a task row: columns first, metadata fallback when the
- * columns say 'none' (matching the historical read semantics).
- */
-export function readRecurrenceEndState(row: {
+/** The task columns that hold a series' end-conditions. */
+export interface RecurrenceEndColumns {
   recurrence_end_type?: string | null
   recurrence_end_date?: string | null
   recurrence_end_count?: number | null
   recurrence_completed_count?: number | null
   metadata?: string | null
-}): RecurrenceEndMeta {
-  const fromColumns: RecurrenceEndMeta = {
+}
+
+/**
+ * End-conditions for a task row: columns first, metadata fallback when the
+ * columns say 'none' (matching the historical read semantics).
+ */
+export function readRecurrenceEndState(row: RecurrenceEndColumns): RecurrenceEndMeta {
+  const fromColumns = endStateFromColumns(row)
+  if (fromColumns.endType !== 'none') return fromColumns
+  return parseRecurrenceEndMeta(row.metadata) ?? fromColumns
+}
+
+function endStateFromColumns(row: RecurrenceEndColumns): RecurrenceEndMeta {
+  return {
     endType: (row.recurrence_end_type as RecurrenceEndType) ?? 'none',
     endDate: row.recurrence_end_date ?? null,
     endCount: row.recurrence_end_count ?? null,
     completedCount: row.recurrence_completed_count ?? 0,
   }
-  if (fromColumns.endType !== 'none') return fromColumns
-  return parseRecurrenceEndMeta(row.metadata) ?? fromColumns
 }

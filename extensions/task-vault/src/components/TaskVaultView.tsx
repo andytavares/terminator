@@ -449,7 +449,8 @@ export function TaskVaultView(): React.JSX.Element {
   async function handleComplete(taskId: string) {
     const taskText = (todayLog?.tasks ?? []).find((t) => t.id === taskId)?.text ?? ''
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', { taskId })
-    notify('success', taskText ? `Completed: ${taskText}` : 'Task completed', 'taskCompleted', {
+    notify('success', taskText ? `Completed: ${taskText}` : 'Task completed', {
+      key: 'taskCompleted',
       onClick: makeTaskNavHandler(taskId),
     })
     if (viewingDate) await loadDate(viewingDate)
@@ -477,7 +478,8 @@ export function TaskVaultView(): React.JSX.Element {
       }
     )) as { noop?: boolean } | undefined
     if (result?.noop) return
-    notify('info', taskText ? `Migrated: ${taskText}` : 'Task migrated', 'taskMigrated', {
+    notify('info', taskText ? `Migrated: ${taskText}` : 'Task migrated', {
+      key: 'taskMigrated',
       onClick: makeTaskNavHandler(taskId),
     })
     if (viewingDate) await loadDate(viewingDate)
