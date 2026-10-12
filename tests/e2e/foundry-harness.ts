@@ -243,7 +243,8 @@ export async function openForge(handle: AppHandle): Promise<void> {
  * scraping a screen an agent's own output may since have scrolled past.
  */
 export function launchScript(handle: AppHandle): string {
-  const dir = join(handle.userDataDir, 'foundry-runtime', 'launch')
+  // Foundry's own folder (ADR 103): <userData>/extensions/<id>/runtime.
+  const dir = join(handle.userDataDir, 'extensions', 'terminator.foundry', 'runtime', 'launch')
   const scripts = readdirSync(dir)
     .filter((name) => name.endsWith('.sh'))
     .map((name) => join(dir, name))
