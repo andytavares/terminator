@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
+import { noPayload, type ExtensionAPI, type ExtensionDB } from '@terminator/extension-sdk'
 import { createIpcRegistrar } from './register'
 import type { KanbanConfig, TaskStatus } from '../vault/types'
 import { DEFAULT_KANBAN_CONFIG } from '../vault/types'
@@ -52,7 +52,7 @@ const SaveConfigSchema = z.object({
 
 export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handleRemote, cleanup } = createIpcRegistrar(api)
-  handleRemote('task-vault:kanban:get-config', async () => {
+  handleRemote('task-vault:kanban:get-config', noPayload, async () => {
     try {
       return await readConfig(db)
     } catch (err) {
@@ -60,9 +60,8 @@ export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): (
     }
   })
 
-  handleRemote('task-vault:kanban:save-config', async (payload: unknown) => {
+  handleRemote('task-vault:kanban:save-config', SaveConfigSchema, async (config) => {
     try {
-      const config = SaveConfigSchema.parse(payload)
       await writeConfig(db, config)
       return { ok: true }
     } catch (err) {
@@ -70,7 +69,7 @@ export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): (
     }
   })
 
-  handleRemote('task-vault:kanban:list-tasks', async () => {
+  handleRemote('task-vault:kanban:list-tasks', noPayload, async () => {
     try {
       const rows = await db.query<Record<string, unknown>>(
         `SELECT t.id, t.text, t.status, p.name AS project, t.context, a.name AS area,
@@ -108,7 +107,7 @@ export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): (
     }
   })
 
-  handleRemote('task-vault:kanban:list-contexts', async () => {
+  handleRemote('task-vault:kanban:list-contexts', noPayload, async () => {
     try {
       const rows = await db.query<{ context: string }>(
         `SELECT DISTINCT context FROM tasks
@@ -121,9 +120,8 @@ export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): (
     }
   })
 
-  handleRemote('task-vault:kanban:move-task', async (payload: unknown) => {
+  handleRemote('task-vault:kanban:move-task', MoveTaskSchema, async ({ taskId, toStatus }) => {
     try {
-      const { taskId, toStatus } = MoveTaskSchema.parse(payload)
       const now = new Date().toISOString()
       const existing = await db.get<{ id: string }>(`SELECT id FROM tasks WHERE id=?`, [taskId])
       if (!existing) return { error: 'Task not found' }

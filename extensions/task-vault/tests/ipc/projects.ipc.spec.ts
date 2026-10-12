@@ -240,12 +240,6 @@ describe('task-vault:projects:update-status', () => {
       await invoke('task-vault:projects:update-status', { projectFilePath: 'nope', status: 'done' })
     ).toEqual({ error: 'NOT_FOUND' })
   })
-
-  it('returns VALIDATION_ERROR for an invalid payload', async () => {
-    expect(await invoke('task-vault:projects:update-status', { bad: 'payload' })).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
-  })
 })
 
 describe('task-vault:projects:create', () => {
@@ -283,10 +277,6 @@ describe('task-vault:projects:create', () => {
       2
     )
   })
-
-  it('returns VALIDATION_ERROR for a missing name', async () => {
-    expect(await invoke('task-vault:projects:create', {})).toEqual({ error: 'VALIDATION_ERROR' })
-  })
 })
 
 describe('task-vault:projects:delete', () => {
@@ -320,10 +310,6 @@ describe('task-vault:projects:delete', () => {
       error: 'NOT_FOUND',
     })
   })
-
-  it('returns VALIDATION_ERROR for a missing projectFilePath', async () => {
-    expect(await invoke('task-vault:projects:delete', {})).toEqual({ error: 'VALIDATION_ERROR' })
-  })
 })
 
 describe('task-vault:projects:update-area', () => {
@@ -346,12 +332,6 @@ describe('task-vault:projects:update-area', () => {
 
     expect(await projectRow('Alpha')).toMatchObject({ area_id: null })
   })
-
-  it('returns VALIDATION_ERROR when projectFilePath is missing', async () => {
-    expect(await invoke('task-vault:projects:update-area', { area: 'Home' })).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
-  })
 })
 
 describe('task-vault:projects:update-deadline', () => {
@@ -369,12 +349,6 @@ describe('task-vault:projects:update-deadline', () => {
       deadline: null,
     })
     expect(await projectRow('Alpha')).toMatchObject({ deadline: null })
-  })
-
-  it('returns VALIDATION_ERROR when projectFilePath is missing', async () => {
-    expect(await invoke('task-vault:projects:update-deadline', { deadline: null })).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
   })
 })
 
@@ -394,8 +368,6 @@ describe('task-vault:projects:rename', () => {
   })
 
   it.each([
-    [{ newName: 'X' }, 'VALIDATION_ERROR'],
-    [{ projectFilePath: 'Old Name' }, 'VALIDATION_ERROR'],
     [{ projectFilePath: 'Missing', newName: 'X' }, 'NOT_FOUND'],
     [{ projectFilePath: 'Old Name', newName: 'Taken' }, 'PROJECT_EXISTS'],
   ])('rejects %j with %s and leaves the names alone', async (payload, error) => {

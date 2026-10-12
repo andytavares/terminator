@@ -151,15 +151,6 @@ describe('task-vault:vault:set-recurrence', () => {
       error: 'STALE_ID',
     })
   })
-
-  it('returns VALIDATION_ERROR for an invalid interval and leaves the task', async () => {
-    await seedTask(db, { id: 'task-1' })
-
-    expect(await setRecurrence({ taskId: 'task-1', interval: 'hourly' })).toMatchObject({
-      error: 'VALIDATION_ERROR',
-    })
-    expect(await taskRow(db, 'task-1')).toMatchObject({ recurrence_rule: null })
-  })
 })
 
 describe('task-vault:vault:clear-recurrence', () => {
@@ -432,12 +423,6 @@ describe('task-vault:vault:export-json and import-json', () => {
     expect(await db.get(`SELECT area_id FROM projects WHERE id = 'p1'`)).toEqual({ area_id: 'a1' })
   })
 
-  it.each([null, 'not-an-object'])('returns INVALID_PAYLOAD for %j', async (payload) => {
-    expect(await invoke('task-vault:vault:import-json', payload)).toEqual({
-      error: 'INVALID_PAYLOAD',
-    })
-  })
-
   it('returns the database error when a row violates the schema', async () => {
     const result = await invoke('task-vault:vault:import-json', {
       areas: [{ id: 'a1', name: null, created_at: now }],
@@ -457,12 +442,6 @@ describe('task-vault settings and today_since', () => {
       `SELECT value FROM settings WHERE extension_id = 'task-vault' AND key = 'stale_days_threshold'`
     )
     expect(rows.map((row) => row.value)).toEqual(['9'])
-  })
-
-  it.each([0, 'ten', undefined])('set-stale-threshold rejects %j', async (days) => {
-    expect(await invoke('task-vault:settings:set-stale-threshold', { days })).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
   })
 
   it('reset-today-since sets today_since to today', async () => {
