@@ -976,7 +976,16 @@ describe('a check sees what the user’s shell startup files export', () => {
         '.bashrc': 'export FOUNDRY_RC_ONLY=from-rc\n',
       },
     },
-    { shell: '/bin/zsh', files: { '.zshrc': 'export FOUNDRY_RC_ONLY=from-rc\n' } },
+    {
+      shell: '/bin/zsh',
+      files: {
+        // Debian and Ubuntu's /etc/zsh/zshrc runs compinit, which stops to ask
+        // about group-writable system directories on CI's runner; that file's
+        // own documented opt-out is this line in ~/.zshenv.
+        '.zshenv': 'skip_global_compinit=1\n',
+        '.zshrc': 'export FOUNDRY_RC_ONLY=from-rc\n',
+      },
+    },
   ].filter(({ shell }) => existsSync(shell))
 
   let home: string
