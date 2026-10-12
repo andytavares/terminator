@@ -100,11 +100,12 @@ export interface StartSupervisedRunOptions {
    * The conversation is over, with the terminal's exit code when there is one.
    *
    * Zero when the runtime reported a clean `SessionEnd`; whatever the shell
-   * exited with when the tab was closed or the process died. A phase that
+   * exited with when the process died, and null when closing the tab or a
+   * signal ended it. A phase that
    * crashed must not land in `awaiting_review`, which is an approval gate over
    * nothing.
    */
-  onEnd?: (exitCode: number) => void
+  onEnd?: (exitCode: number | null) => void
 }
 
 /**
@@ -120,7 +121,7 @@ export interface PhaseCallbacks {
   /** The ladder refused something without asking. Only refusals are reported. */
   onAutoDenied?: (toolName: string, reason: string) => void
   onTurnEnd?: (turns: number) => void
-  onEnd?: (exitCode: number) => void
+  onEnd?: (exitCode: number | null) => void
 }
 
 export interface RunCommandOptions {
@@ -477,7 +478,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       // `session_end` only arrives when the runtime exits cleanly enough to
       // fire its hook.
       const detachExit =
-        api.pty.onExit?.(terminalSessionId, (exitCode: number) => {
+        api.pty.onExit?.(terminalSessionId, (exitCode: number | null) => {
           phase.current.onEnd?.(exitCode)
           end(sessionId, exitCode === 0)
         }) ?? null
@@ -575,7 +576,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         // ran; a pass closes, and its output is in the log. The verdict goes
         // first and the close is optional: an installed host older than
         // `closeTerminalTab` threw here, and the pass never reached the run.
-        api.pty.onExit?.(terminalSessionId, (exitCode: number) => {
+        api.pty.onExit?.(terminalSessionId, (exitCode: number | null) => {
           resolve(exitCode)
           if (exitCode === 0) api.pty.closeTerminalTab?.(terminalSessionId)
         })

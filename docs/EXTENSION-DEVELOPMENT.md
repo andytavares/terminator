@@ -142,7 +142,7 @@ export function deactivate(): void {
 
 Every backend runs in the **extension host**, one Electron [`utilityProcess`](https://www.electronjs.org/docs/latest/api/utility-process) shared by all extensions and started by `src/main/extensions/host/host-process.ts`. It is never the main process. The API reaches the core over a `MessagePort`, which shapes it:
 
-- A value the core holds is a promise: `settings.isBranchExcluded`, `globalShortcut.register`, `pty.spawnSession` / `openTerminal` / `getSession` / `setWorkspace` / `listSessions`, `workspace.addProject`, `ipc.isRemoteAccessible`, `dialog.*`, and every `issues` and `github` call.
+- A value the core holds is a promise: `settings.isBranchExcluded`, `globalShortcut.register`, `pty.spawnSession` / `openTerminal` / `runInTerminal` / `getSession` / `setWorkspace` / `listSessions`, `workspace.addProject`, `ipc.isRemoteAccessible`, `dialog.*`, and every `issues` and `github` call.
 - `settings.get`, `workspace.list` / `listProjects` and `issues.supportsTransitions` / `supportsCreate` are synchronous: they read a snapshot the core pushes on every change.
 - A callback you pass (a command handler, a notification's `onClick`, `pty.onData`) stays in the extension host, and the core calls it by id. Registrations still return a `Disposable` at once.
 - Values you pass and return must survive structured clone: plain data, no functions or class instances. An `Error` arrives with its `name` and `message`.
@@ -791,7 +791,7 @@ await api.pty.setWorkspace(sessionId, 'ws-1') // null clears
 await api.pty.listSessions()
 ```
 
-`spawnSession` rejects with an error named `MissingCwdError` when `cwd` is not an existing directory. `onData` and `onExit` take any number of listeners and always return a disposer; a session that does not exist never calls them.
+`spawnSession` rejects with an error named `MissingCwdError` when `cwd` is not an existing directory. `onData` and `onExit` take any number of listeners and always return a disposer; a session that does not exist never calls them. `onExit` passes the process's exit code, or `null` when a signal ended it (closing its tab, `kill`, a crash): node-pty reports such a process as exit code 0 with the signal beside it, and the core does not pass that 0 on. Treat `null` as "no exit status", never as success.
 
 **A terminal the operator can see.** `spawnSession` gives a process and a stream but nothing on screen. `openTerminal` spawns a terminal and shows it as an ordinary tab in a project, typically one from `workspace.addProject`:
 
@@ -812,6 +812,20 @@ It resolves to `null` when the core cannot reach a window. Output produced befor
 api.pty.onExit(sessionId, (exitCode) => {
   if (exitCode === 0) api.pty.closeTerminalTab(sessionId) // keep a failure on screen
 })
+```
+
+**A program whose exit status you need.** `runInTerminal` runs a program as the process of a new tab, with nothing typed into a shell, and resolves once it ends with `{ sessionId, exitCode }`. The core subscribes to the exit in the tick it spawns the process, so a program that exits at once is not missed, as a listener added after `openTerminal` resolves can be. `exitCode` is `null` when a signal ended the process, which is also what closing its tab before it finished does. It resolves to `null`, running nothing, when there is no window:
+
+```typescript
+const exit = await api.pty.runInTerminal({
+  projectId,
+  cwd: worktreePath,
+  tabTitle: 'Tests',
+  type: 'human',
+  file: '/bin/sh',
+  args: [scriptPath],
+})
+if (exit?.exitCode === 0) api.pty.closeTerminalTab(exit.sessionId)
 ```
 
 ### `api.window`

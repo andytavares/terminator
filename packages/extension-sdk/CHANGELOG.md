@@ -19,6 +19,9 @@ stays in the extension host and the core calls it by id.
 - `pty.onData` delivers output in batches of at most one per frame, every batch before the
   session's exit. `pty.onData` and `pty.onExit` always return a disposer: a session that does
   not exist never calls the listener (they returned `null`).
+- `pty.onExit` passes `number | null`: `null` when a signal ended the process, closing its tab
+  included. node-pty reports such a process as exit code 0, and the core passed that 0 on, so a
+  terminal killed before its process finished read as a success.
 - `ipc.isRemoteAccessible(channel)` returns `Promise<boolean>`.
 - `shell.exec` and every `github` call reject with an error named `CwdOutOfScopeError`, and run
   nothing, when `cwd` is outside the extension's shell roots: the workspace folders, the project
@@ -32,6 +35,12 @@ stays in the extension host and the core calls it by id.
 ### Added
 
 - `pty.openTerminal(input)`: replaces `openTerminalTab`, as a promise.
+- `pty.runInTerminal(input)`, with `RunInTerminalInput` and `TerminalExit`: runs a program as
+  the process of a new tab, nothing typed into a shell, and resolves when it ends with
+  `{ sessionId, exitCode }`; `exitCode` is `null` when a signal or a closed tab ended it. Resolves
+  `null`, running nothing, when there is no window. The exit is subscribed in the tick the process
+  is spawned, so one that exits at once is not missed.
+- `SpawnSessionOptions.args`: arguments for `shell`, in place of the login flag `-l`.
 - `workspace.addProject(input)`: replaces `createProject`, as a promise.
 - `paths.app` and `paths.userData`: the application's directory and the per-user data
   directory, for what used to come from `electron.app`.

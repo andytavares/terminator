@@ -141,7 +141,7 @@ interface SessionState {
   stampActivity: (sessionId: string, now: number) => void
   setActiveSessionForProject: (projectId: string, sessionId: string, now?: number) => void
   getActiveSessionForProject: (projectId: string) => string | null
-  handleProcessExit: (sessionId: string, exitCode: number) => void
+  handleProcessExit: (sessionId: string, exitCode: number | null) => void
   incrementBellCount: (sessionId: string) => void
   clearBellCount: (sessionId: string) => void
   getBellCountForSession: (sessionId: string) => number

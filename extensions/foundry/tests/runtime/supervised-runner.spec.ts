@@ -21,7 +21,7 @@ let opened: Array<Record<string, unknown>>
 let written: Array<{ terminal: string; data: string }>
 let terminalId: string | null
 let projectId: string | null
-let exitListener: ((exitCode: number) => void) | null
+let exitListener: ((exitCode: number | null) => void) | null
 let exitDetached: boolean
 let closed: string[]
 
@@ -40,7 +40,7 @@ function api() {
       },
       write: (terminal: string, data: string) => written.push({ terminal, data }),
       closeTerminalTab: (terminal: string) => closed.push(terminal),
-      onExit: (_sessionId: string, listener: (exitCode: number) => void) => {
+      onExit: (_sessionId: string, listener: (exitCode: number | null) => void) => {
         exitListener = listener
         return () => {
           exitDetached = true
@@ -406,7 +406,7 @@ describe('when the terminal itself goes', () => {
   // delivered.
 
   it('ends the run, carrying the terminal’s exit code', async () => {
-    const ends: number[] = []
+    const ends: Array<number | null> = []
     const r = runner()
     await r.start({ ...start, onEnd: (code) => ends.push(code) })
     exitListener?.(137)
@@ -446,6 +446,16 @@ describe('when the terminal itself goes', () => {
     await call.arrived
     expect(() => exitListener?.(0)).not.toThrow()
     expect(await pending).toMatchObject({ permissionDecision: 'deny' })
+  })
+
+  // Closing the tab kills the shell with SIGHUP. The core reports that as no
+  // exit status; it used to arrive as 0, and the phase was recorded as ended.
+  it('ends a run whose terminal was killed with no exit status, never a clean 0', async () => {
+    const ends: Array<number | null> = []
+    await runner().start({ ...start, onEnd: (code) => ends.push(code) })
+    exitListener?.(null)
+    expect(ends).toEqual([null])
+    expect(closed).toEqual([])
   })
 
   it('keeps the tab of a run that failed, so the operator can read why', async () => {

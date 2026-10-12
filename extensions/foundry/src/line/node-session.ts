@@ -231,7 +231,7 @@ function onRegistered(input: NodeInput, turn: NodeTurn, run: SupervisedRun): voi
   input.onStarted?.(run.sessionId)
 }
 
-function onEnd(turn: NodeTurn, exitCode: number): void {
+function onEnd(turn: NodeTurn, exitCode: number | null): void {
   // Off the live list and into the record, so a finished unit stops
   // holding a review slot and the next wave can start.
   runtime.supervision?.finish(turn.sessionId, Date.now())

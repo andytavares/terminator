@@ -268,9 +268,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'terminal.onProcessExit',
     kind: 'event',
     channel: 'terminal:process-exit',
-    signature: signature<(handler: (sessionId: string, exitCode: number) => void) => Unsubscribe>(),
+    signature:
+      signature<(handler: (sessionId: string, exitCode: number | null) => void) => Unsubscribe>(),
     toHandlerArgs: (args) => {
-      const p = args[0] as { sessionId: string; exitCode: number }
+      const p = args[0] as { sessionId: string; exitCode: number | null }
       return [p.sessionId, p.exitCode]
     },
     extensionView: 'shared',

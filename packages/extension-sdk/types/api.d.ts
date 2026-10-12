@@ -156,6 +156,8 @@ export interface SpawnSessionOptions {
   sessionId: string
   cwd: string
   shell: string
+  /** Arguments for `shell`. Without them it starts as a login shell, `-l`. Since 4.0.0. */
+  args?: string[]
   type: 'human' | 'agent'
   origin: SessionOrigin
   projectId?: string
@@ -189,6 +191,24 @@ export interface OpenTerminalTabInput {
   scrollbackLimit?: number
 }
 
+/** A program to run as a terminal tab's own process, in place of a shell. Since 4.0.0. */
+export interface RunInTerminalInput extends Omit<OpenTerminalTabInput, 'shell'> {
+  /** The program, as node-pty's `spawn` takes it. */
+  file: string
+  args: string[]
+}
+
+/** How a `runInTerminal` process ended. */
+export interface TerminalExit {
+  sessionId: string
+  /**
+   * The process's exit code. Null when it has none: a signal ended it, which
+   * is also what closing its tab before it finished does. Null is never a
+   * success.
+   */
+  exitCode: number | null
+}
+
 export interface PtyManagerAPI {
   /**
    * Spawns a process and a data stream. Throws an error whose `name` is
@@ -202,6 +222,13 @@ export interface PtyManagerAPI {
    */
   openTerminal(input: OpenTerminalTabInput): Promise<string | null>
   /**
+   * Runs a program as the process of a new terminal tab, nothing typed into a
+   * shell, and resolves once it ends, with how it ended. The tab stays open,
+   * showing "[exited]", until `closeTerminalTab`. Null when there is no window
+   * to show it in; nothing is run then. Since 4.0.0.
+   */
+  runInTerminal(input: RunInTerminalInput): Promise<TerminalExit | null>
+  /**
    * Closes a tab `openTerminal` opened, ending its process if it still runs
    * (v2.6.0). `kill` alone leaves the tab on screen marked "[exited]".
    */
@@ -213,9 +240,10 @@ export interface PtyManagerAPI {
   onData(sessionId: string, listener: (data: string) => void): () => void
   /**
    * Multi-subscriber exit fan-out. Listeners fire after the session is removed, and after the
-   * last batch of its output. Returns a disposer.
+   * last batch of its output, with the exit code, or null when a signal ended the process
+   * (4.0.0). Returns a disposer.
    */
-  onExit(sessionId: string, listener: (exitCode: number) => void): () => void
+  onExit(sessionId: string, listener: (exitCode: number | null) => void): () => void
   getSession(sessionId: string): Promise<SessionInfo | undefined>
   /** Stamps workspace metadata on the session (null clears it). False for an unknown session. */
   setWorkspace(sessionId: string, workspaceId: string | null): Promise<boolean>

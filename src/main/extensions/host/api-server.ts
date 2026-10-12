@@ -50,6 +50,7 @@ export const CROSSING_MEMBERS: ReadonlySet<string> = new Set([
   'terminal.onSessionClose',
   'pty.spawnSession',
   'pty.openTerminal',
+  'pty.runInTerminal',
   'pty.closeTerminalTab',
   'pty.onData',
   'pty.onExit',

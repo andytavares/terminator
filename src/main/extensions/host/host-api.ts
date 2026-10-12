@@ -120,6 +120,7 @@ function ptyFor(main: MainCalls): ExtensionAPI['pty'] {
   return {
     spawnSession: (options) => main.call('pty.spawnSession', options),
     openTerminal: (input) => main.call('pty.openTerminal', input),
+    runInTerminal: (input) => main.call('pty.runInTerminal', input),
     closeTerminalTab: (sessionId) => main.fire('pty.closeTerminalTab', sessionId),
     onData: (sessionId, callback) => listener('pty.onData', sessionId, callback),
     onExit: (sessionId, callback) => listener('pty.onExit', sessionId, callback),

@@ -21,7 +21,7 @@ interface ActiveSession {
   pty: pty.IPty
   info: SessionInfo
   dataListeners: Set<(data: string) => void>
-  exitListeners: Set<(exitCode: number) => void>
+  exitListeners: Set<(exitCode: number | null) => void>
   /** Output produced before anything attached; null once released. */
   held: string[] | null
   /**
@@ -69,6 +69,15 @@ export class MissingCwdError extends Error {
   }
 }
 
+/**
+ * The process's exit code, or null when a signal ended it. node-pty reports a
+ * signalled process as `exitCode` 0 with the signal beside it (WIFSIGNALED in
+ * its src/unix/pty.cc), and 0 alone reads as success.
+ */
+function exitStatusOf(exit: { exitCode: number; signal?: number }): number | null {
+  return exit.signal ? null : exit.exitCode
+}
+
 function assertUsableCwd(cwd: string): void {
   let isDirectory: boolean
   try {
@@ -100,7 +109,7 @@ export class PtyManager {
     // the operator exited.
     assertUsableCwd(opts.cwd)
 
-    const ptyProcess = pty.spawn(opts.shell, ['-l'], {
+    const ptyProcess = pty.spawn(opts.shell, opts.args ?? ['-l'], {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
@@ -139,7 +148,7 @@ export class PtyManager {
       }
       for (const listener of session.dataListeners) listener(data)
     })
-    ptyProcess.onExit(({ exitCode }) => {
+    ptyProcess.onExit((exit) => {
       // Everything held goes out first. A process that dies before any tab
       // mounted — a bad flag, a missing binary, the wrong cwd — otherwise took
       // its output to the grave and left exactly the blank terminal this hold
@@ -161,7 +170,8 @@ export class PtyManager {
       }
       this.sessions.delete(opts.sessionId)
       this.persistRegistry()
-      for (const listener of session.exitListeners) listener(exitCode ?? 0)
+      const exitCode = exitStatusOf(exit)
+      for (const listener of session.exitListeners) listener(exitCode)
       session.dataListeners.clear()
       session.exitListeners.clear()
     })
@@ -213,8 +223,11 @@ export class PtyManager {
     return () => session.dataListeners.delete(listener)
   }
 
-  /** Subscribes to a session's exit. Listeners fire after the session is removed. */
-  onExit(sessionId: string, listener: (exitCode: number) => void): (() => void) | null {
+  /**
+   * Subscribes to a session's exit: its exit code, or null when a signal ended
+   * it. Listeners fire after the session is removed.
+   */
+  onExit(sessionId: string, listener: (exitCode: number | null) => void): (() => void) | null {
     const session = this.sessions.get(sessionId)
     if (!session) return null
     session.exitListeners.add(listener)

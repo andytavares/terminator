@@ -199,6 +199,7 @@ terminal:create IPC ──► PtyManager.spawn()
       │                      │   an agent's conversation is paired to this terminal)
       │                      ├─ registers onData → OutputRelay (batched, flow-controlled) → 'terminal:output'
       │                      └─ registers onExit → webContents.send('terminal:process-exit')
+      │                         (exit code, or null when a signal ended the process)
       ▼
 TerminalInstance created (renderer)
       │
@@ -252,9 +253,17 @@ process that prints faster than xterm can parse blocks on its own output instead
 memory. Only output actually delivered to a window is counted, output for a session with no subscriber is
 acknowledged on arrival, and `terminal:attach` forgets what an earlier renderer owed, so a reload cannot
 leave a process paused. A browser client (remote) does not acknowledge: its output arrives by its own path. A terminal an extension
-opens (`api.pty.openTerminal`) uses the same relay, not a broadcast to every window and view.
+opens (`api.pty.openTerminal`, `api.pty.runInTerminal`) uses the same relay, not a broadcast to every
+window and view.
 In the renderer the output router (`src/renderer/terminal/output-router.ts`) holds the one
 `terminal:output` listener and dispatches by session id.
+
+**Exit status.** node-pty reports a process ended by a signal as `exitCode` 0 with `signal` set
+(`WIFSIGNALED` in its [`src/unix/pty.cc`](https://github.com/microsoft/node-pty/blob/main/src/unix/pty.cc)).
+`PtyManager` passes `null` for such a process, never that 0, so a terminal closed or killed before its
+process finished does not read as a success. `api.pty.runInTerminal` runs a program as a tab's own
+process and resolves with `{ sessionId, exitCode }` when it ends; it subscribes to the exit in the tick
+it spawns, so a program that exits at once is not missed across the extension host's port.
 
 ---
 
@@ -1467,7 +1476,10 @@ App
   `api.shell.exec` admits only `git` and `gh`. Each verification command runs
   in a terminal tab of its own in the lane's checkout
   (`SupervisedRunner.runCommand`): its output is visible, and its verdict is
-  the tab's exit status, with no agent in between (ADR 059).
+  the tab's exit status, with no agent in between (ADR 059). The command's
+  script is the tab's own process (`api.pty.runInTerminal`), nothing is typed
+  into a shell, and an exit with no status (a signal, or the tab closed
+  first) is "not measured", never a pass.
 - **It closes the tabs it opens (ADR 076).** A tab is titled for its agent
   ("Architect", "Red team", "Builder") or its check ("Lint"). An agent is
   stopped once its turn's output is collected, and `SupervisedRunner` closes a
