@@ -10,7 +10,7 @@ import type { WorkOrder } from '../order/schema.js'
 import type { Verdict } from '../verify/verdict.js'
 import type { LadderOutcome } from '../verify/ladder.js'
 import type { CiOutcome } from './ship-tail.js'
-import { gradeInWords } from '../runtime/review/risk-grader.js'
+import { gradeInWords } from '../runtime/review/risk-grade.js'
 
 // The end of the line: a draft pull request, opened without being asked for.
 //

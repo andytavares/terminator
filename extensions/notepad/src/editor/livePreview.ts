@@ -168,7 +168,7 @@ class MermaidWidget extends WidgetType {
   toDOM(): HTMLElement {
     const container = document.createElement('div')
     container.className = 'notepad-mermaid'
-    const id = `mermaid-${Math.random().toString(36).slice(2)}`
+    const id = `mermaid-${crypto.randomUUID()}`
     void import('mermaid').then(({ default: mermaid }) => {
       mermaid.initialize({ startOnLoad: false, theme: 'dark' })
       void mermaid.render(id, this.code).then(({ svg }) => {

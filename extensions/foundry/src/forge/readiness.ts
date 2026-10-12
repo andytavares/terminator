@@ -1,7 +1,7 @@
 import { isBlocking } from '../order/schema.js'
 import type { AcceptanceCriterion, WorkOrder } from '../order/schema.js'
 import { statusInWords } from '../order/render.js'
-import { gradeInWords } from '../runtime/review/risk-grader.js'
+import { gradeInWords } from '../runtime/review/risk-grade.js'
 import type { CheckId, CompileResult } from '../order/compile.js'
 import { refusedParts } from '../order/proposal.js'
 import { REWRITING_UNREADABLE } from './autonomy.js'

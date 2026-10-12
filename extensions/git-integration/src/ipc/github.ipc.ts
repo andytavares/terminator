@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import Store from 'electron-store'
 import { basename, join } from 'path'
@@ -793,7 +794,7 @@ export function registerGithubHandlers(
         })
         const tmpFile = join(
           tmpdir(),
-          `pr-review-${Date.now()}-${Math.random().toString(36).slice(2)}.json`
+          `pr-review-${randomUUID()}.json`
         )
         await writeFile(tmpFile, JSON.stringify(requestBody))
         try {

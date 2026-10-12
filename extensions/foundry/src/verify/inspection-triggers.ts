@@ -1,4 +1,5 @@
-import { gradeRisk, matchesGlob } from '../runtime/review/risk-grader.js'
+import { matchesGlob } from 'node:path'
+import { gradeRisk } from '../runtime/review/risk-grader.js'
 import type { CheckState } from '../runtime/review/risk-grader.js'
 import type { RiskAssessment, WorkOrder } from '../order/schema.js'
 import { isDocumentationRelative } from './documentation-path.js'

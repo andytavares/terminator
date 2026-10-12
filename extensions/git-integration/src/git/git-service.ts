@@ -1,5 +1,5 @@
 import { execFile as execFileCb, spawn } from 'child_process'
-import { promisify } from 'util'
+import { promisify, stripVTControlCharacters } from 'util'
 import type { GitStatus, FileDiff } from '../schemas/git.schema.js'
 import { parseStatus, parseDiff } from './git-parser.js'
 
@@ -20,11 +20,6 @@ export interface CommitError {
 }
 
 export type CommitResult = CommitSuccess | CommitError
-
-function stripAnsi(str: string): string {
-  // eslint-disable-next-line no-control-regex
-  return str.replace(/\x1b\[[0-9;]*m/g, '').replace(/\x1b\[\??\d+[hl]/g, '')
-}
 
 async function git(args: string[], cwd: string): Promise<string> {
   const { stdout } = await execFile('git', args, {
@@ -180,7 +175,7 @@ export function commitChanges(
     }, HOOK_TIMEOUT)
 
     const emit = (chunk: Buffer) => {
-      const text = stripAnsi(chunk.toString())
+      const text = stripVTControlCharacters(chunk.toString())
       if (onOutput) {
         for (const line of text.split('\n')) {
           if (line.trim()) onOutput(line.trimEnd())
@@ -208,7 +203,7 @@ export function commitChanges(
         resolve({ commitHash: match?.[1] ?? '' })
         return
       }
-      const combined = stripAnsi([stdout, stderr].filter(Boolean).join('\n').trim())
+      const combined = stripVTControlCharacters([stdout, stderr].filter(Boolean).join('\n').trim())
       if (combined.includes('nothing to commit')) {
         resolve({ error: 'NOTHING_TO_COMMIT' })
         return

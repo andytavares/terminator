@@ -216,7 +216,7 @@ export async function registerTerminalRoutes(
 
       // The socket is the device's identity for as long as it is open, which is
       // exactly as long as the view should list it.
-      const deviceId = `${sessionId}:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+      const deviceId = `${sessionId}:${randomUUID()}`
       deviceRegistry?.add(deviceId, request.headers['user-agent'], sessionId, () =>
         ws.close(4004, 'disconnected from the app')
       )

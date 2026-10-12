@@ -11,8 +11,8 @@ import { ConfirmButton } from './ConfirmButton.js'
 import type { Standing } from '../order/standing.js'
 import { statusInWords } from '../order/render.js'
 import type { OrderStatus } from '../order/schema.js'
-import { gradeInWords } from '../runtime/review/risk-grader.js'
-import type { RiskGrade } from '../runtime/review/risk-grader.js'
+import { gradeInWords } from '../runtime/review/risk-grade.js'
+import type { RiskGrade } from '../runtime/review/risk-grade.js'
 
 // The way into the Forge: what orders exist, and a way to seed another.
 //

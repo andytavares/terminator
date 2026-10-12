@@ -16,7 +16,7 @@ export const NOTES_CHANGED_CHANNEL = 'terminator.notepad:notes.changed'
  * apart from another surface's and skip re-applying it (which would clobber
  * keystrokes typed during the IPC round-trip).
  */
-export const ORIGIN_ID = `notepad-${Math.random().toString(36).slice(2)}-${Date.now()}`
+export const ORIGIN_ID = `notepad-${crypto.randomUUID()}`
 
 export interface NoteChangedEvent {
   id: string

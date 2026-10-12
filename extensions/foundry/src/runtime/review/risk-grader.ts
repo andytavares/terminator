@@ -2,8 +2,8 @@
 // carries the safety property: P3 is checked LAST, so a lockfile change that
 // also touches authentication grades P0 rather than slipping into the only
 // lane that needs the least of your attention.
-
-export type RiskGrade = 'P0' | 'P1' | 'P2' | 'P3'
+import { matchesGlob } from 'node:path'
+import type { RiskGrade } from './risk-grade.js'
 
 export type CheckState = 'passing' | 'failing' | 'pending' | 'unavailable'
 
@@ -23,18 +23,6 @@ export interface GradedChange {
   readonly trigger: string
 }
 
-const GRADE_IN_WORDS: Record<RiskGrade, string> = {
-  P0: 'highest risk',
-  P1: 'elevated risk',
-  P2: 'ordinary risk',
-  P3: 'low risk',
-}
-
-/** A risk grade in words a person can read, never the bare code on its own. */
-export function gradeInWords(grade: RiskGrade): string {
-  return GRADE_IN_WORDS[grade]
-}
-
 const P0_PATTERNS: ReadonlyArray<{ label: string; pattern: RegExp }> = [
   { label: 'authentication', pattern: /(^|\/)(auth|authn|authz|login|session-auth)(\/|\.)/i },
   { label: 'payments', pattern: /(^|\/)(payment|payments|billing|charge)(\/|\.)/i },
@@ -51,27 +39,6 @@ const LARGE_CHANGE_LINES = 300
 /** A generated lockfile: hundreds of lines nobody reviews line by line. */
 export function isLockfile(file: string): boolean {
   return /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/i.test(file)
-}
-
-/**
- * Minimal glob matching for the two forms an operator writes in a
- * critical-path list: `**` (any depth) and `*` (one segment). Deliberately not
- * a dependency — `minimatch` is only present in this tree by workspace
- * hoisting from an extension, and Constitution IV requires the standard
- * library be used where it fully satisfies the requirement.
- */
-export function matchesGlob(file: string, glob: string): boolean {
-  const pattern = glob
-    .split(/(\*\*\/|\*\*|\*|\?)/)
-    .map((part) => {
-      if (part === '**/') return '(?:.*/)?'
-      if (part === '**') return '.*'
-      if (part === '*') return '[^/]*'
-      if (part === '?') return '[^/]'
-      return part.replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    })
-    .join('')
-  return new RegExp(`^${pattern}$`).test(file)
 }
 
 function matchesAnyGlob(file: string, globs: readonly string[]): boolean {

@@ -39,7 +39,7 @@ import type { Gate, GateRuleId } from '../gates/rules.js'
 import { isLive } from '../gates/autonomy.js'
 import { GATE_RULES } from '../gates/rules.js'
 import type { Autonomy } from '../gates/autonomy.js'
-import { gradeInWords } from '../runtime/review/risk-grader.js'
+import { gradeInWords } from '../runtime/review/risk-grade.js'
 
 // The thing that joins the pieces.
 //
