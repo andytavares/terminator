@@ -32,7 +32,7 @@ test('a branch whose folder is gone says so instead of opening a dead terminal',
 
   await page.keyboard.press('Meta+t')
 
-  const toast = page.locator('.toast__message')
+  const toast = page.locator('.tmui-toast__message')
   await expect(toast).toContainText('no longer exists')
   await expect(toast).toContainText(folder)
   // No second tab, and nothing marked [exited]: the terminal never opened.

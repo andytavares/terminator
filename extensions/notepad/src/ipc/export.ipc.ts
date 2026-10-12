@@ -5,7 +5,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { parseFrontMatter, stringifyFrontMatter } from './front-matter'
 import { randomUUID } from '../db/db'
-import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
+import { noPayload, type ExtensionDB, type ExtensionAPI } from '@terminator/extension-sdk'
 import { createIpcRegistrar } from './register'
 
 // ──────────────────────────────────────────────────────────────
@@ -73,11 +73,8 @@ function buildExistingIdMap(folder: string): Map<string, string> {
 
 export async function exportNotes(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof exportSchema>
 ): Promise<{ data: { exported: number; diagrams: number } } | { error: string }> {
-  const parsed = exportSchema.safeParse(payload)
-  if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-
   const {
     folder,
     scope = 'all',
@@ -86,7 +83,7 @@ export async function exportNotes(
     includeFrontmatter = true,
     overwriteById = true,
     includeDiagrams = false,
-  } = parsed.data
+  } = args
   const resolvedFolder = folder.replace(/^~(?=$|\/)/, os.homedir())
 
   let querySql = `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at,
@@ -179,12 +176,9 @@ const importSchema = z.object({ folder: z.string() })
 
 export async function importNotes(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof importSchema>
 ): Promise<{ data: { imported: number; updated: number; skipped: number } } | { error: string }> {
-  const parsed = importSchema.safeParse(payload)
-  if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-
-  const { folder } = parsed.data
+  const { folder } = args
   let imported = 0
   let updated = 0
   let skipped = 0
@@ -276,7 +270,7 @@ export async function importNotes(
 
 export function registerExportIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handle, cleanup } = createIpcRegistrar(api)
-  handle('terminator.notepad:export.pickFolder', async () => {
+  handle('terminator.notepad:export.pickFolder', noPayload, async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],
     })
@@ -284,9 +278,9 @@ export function registerExportIpcHandlers(api: ExtensionAPI, db: ExtensionDB): (
     return { data: result.filePaths[0] }
   })
 
-  handle('terminator.notepad:export.run', (payload: unknown) => exportNotes(db, payload))
+  handle('terminator.notepad:export.run', exportSchema, (args) => exportNotes(db, args))
 
-  handle('terminator.notepad:import.run', (payload: unknown) => importNotes(db, payload))
+  handle('terminator.notepad:import.run', importSchema, (args) => importNotes(db, args))
 
   return cleanup
 }

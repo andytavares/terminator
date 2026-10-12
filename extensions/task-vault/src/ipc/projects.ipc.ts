@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
-import { createIpcRegistrar } from './register'
+import { noPayload } from '@terminator/extension-sdk'
+import { createIpcRegistrar, errorResult } from './register'
 import { lastCompletedReviewDate } from '../vault/weekly-review-repository'
 import { randomUUID } from '../vault/db'
 import { toDisplayName } from '../vault/tags'
@@ -9,6 +10,9 @@ import {
   UpdateProjectStatusRequestSchema,
   CreateProjectRequestSchema,
   DeleteProjectRequestSchema,
+  UpdateProjectAreaRequestSchema,
+  UpdateProjectDeadlineRequestSchema,
+  RenameProjectRequestSchema,
 } from '../schemas/vault.schema'
 import type { ProjectStatus } from '../vault/types'
 import {
@@ -21,26 +25,13 @@ import {
 } from '../vault/mappers'
 
 export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const registrar = createIpcRegistrar(api)
+  const { handleRemote, cleanup } = createIpcRegistrar(api, errorResult)
 
-  function handleRemote(channel: string, fn: (payload: unknown) => Promise<unknown>) {
-    registrar.handleRemote(channel, async (payload) => {
-      try {
-        return await fn(payload)
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : String(err) }
-      }
-    })
-  }
-
-  handleRemote('task-vault:projects:list', async (payload) => {
-    const parsed = ListProjectsRequestSchema.safeParse(payload ?? {})
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-
-    const statusFilter: ProjectStatus[] = parsed.data.status
-      ? Array.isArray(parsed.data.status)
-        ? (parsed.data.status as ProjectStatus[])
-        : [parsed.data.status as ProjectStatus]
+  handleRemote('task-vault:projects:list', ListProjectsRequestSchema.default({}), async (args) => {
+    const statusFilter: ProjectStatus[] = args.status
+      ? Array.isArray(args.status)
+        ? (args.status as ProjectStatus[])
+        : [args.status as ProjectStatus]
       : ['active']
 
     const placeholders = statusFilter.map(() => '?').join(',')
@@ -64,7 +55,7 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     return { projects }
   })
 
-  handleRemote('task-vault:projects:weekly-review', async () => {
+  handleRemote('task-vault:projects:weekly-review', noPayload, async () => {
     const inboxRows = await db.query<Record<string, unknown>>(
       `SELECT * FROM tasks WHERE source='inbox' AND status='open'`
     )
@@ -136,10 +127,8 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     }
   })
 
-  handleRemote('task-vault:projects:create', async (payload) => {
-    const parsed = CreateProjectRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { name, area, deadline, outcome } = parsed.data
+  handleRemote('task-vault:projects:create', CreateProjectRequestSchema, async (args) => {
+    const { name, area, deadline, outcome } = args
     const displayName = toDisplayName(name.trim())
     const displayArea = area ? toDisplayName(area.trim()) : undefined
     const existing = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [
@@ -171,10 +160,8 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     return { success: true, filePath: displayName }
   })
 
-  handleRemote('task-vault:projects:delete', async (payload) => {
-    const parsed = DeleteProjectRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { projectFilePath: projectName } = parsed.data
+  handleRemote('task-vault:projects:delete', DeleteProjectRequestSchema, async (args) => {
+    const { projectFilePath: projectName } = args
 
     const proj = await db.get<{ id: string; status: string }>(
       `SELECT id, status FROM projects WHERE name=?`,
@@ -198,21 +185,22 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     return { success: true }
   })
 
-  handleRemote('task-vault:projects:update-status', async (payload) => {
-    const parsed = UpdateProjectStatusRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { projectFilePath: projectName, status } = parsed.data
-    const now = new Date().toISOString()
+  handleRemote(
+    'task-vault:projects:update-status',
+    UpdateProjectStatusRequestSchema,
+    async (args) => {
+      const { projectFilePath: projectName, status } = args
+      const now = new Date().toISOString()
 
-    let proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [projectName])
-    if (!proj) {
-      proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE id=?`, [projectName])
-    }
-    if (!proj) return { error: 'NOT_FOUND' }
+      let proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [projectName])
+      if (!proj) {
+        proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE id=?`, [projectName])
+      }
+      if (!proj) return { error: 'NOT_FOUND' }
 
-    if (status === 'archived') {
-      await db.run(
-        `WITH RECURSIVE subtree(id) AS (
+      if (status === 'archived') {
+        await db.run(
+          `WITH RECURSIVE subtree(id) AS (
            SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
            UNION ALL
            SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
@@ -220,21 +208,18 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
          UPDATE tasks SET status='cancelled', updated_at=?
          WHERE id IN (SELECT id FROM subtree)
            AND status IN ('open','in-progress','in-review','blocked')`,
-        [proj.id, now]
-      )
-    }
+          [proj.id, now]
+        )
+      }
 
-    await db.run(`UPDATE projects SET status=?, updated_at=? WHERE id=?`, [status, now, proj.id])
-    broadcast('task-vault:push:index-updated', {})
-    return { success: true }
-  })
-
-  handleRemote('task-vault:projects:update-area', async (payload) => {
-    const { projectFilePath: projectName, area } = payload as {
-      projectFilePath: string
-      area: string | null
+      await db.run(`UPDATE projects SET status=?, updated_at=? WHERE id=?`, [status, now, proj.id])
+      broadcast('task-vault:push:index-updated', {})
+      return { success: true }
     }
-    if (!projectName) return { error: 'VALIDATION_ERROR' }
+  )
+
+  handleRemote('task-vault:projects:update-area', UpdateProjectAreaRequestSchema, async (args) => {
+    const { projectFilePath: projectName, area } = args
     const now = new Date().toISOString()
     let areaId: string | null = null
     if (area) {
@@ -258,28 +243,24 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     return { success: true }
   })
 
-  handleRemote('task-vault:projects:update-deadline', async (payload) => {
-    const { projectFilePath: projectName, deadline } = payload as {
-      projectFilePath: string
-      deadline: string | null
+  handleRemote(
+    'task-vault:projects:update-deadline',
+    UpdateProjectDeadlineRequestSchema,
+    async (args) => {
+      const { projectFilePath: projectName, deadline } = args
+      const now = new Date().toISOString()
+      await db.run(`UPDATE projects SET deadline=?, updated_at=? WHERE name=?`, [
+        deadline || null,
+        now,
+        projectName,
+      ])
+      broadcast('task-vault:push:index-updated', {})
+      return { success: true }
     }
-    if (!projectName) return { error: 'VALIDATION_ERROR' }
-    const now = new Date().toISOString()
-    await db.run(`UPDATE projects SET deadline=?, updated_at=? WHERE name=?`, [
-      deadline || null,
-      now,
-      projectName,
-    ])
-    broadcast('task-vault:push:index-updated', {})
-    return { success: true }
-  })
+  )
 
-  handleRemote('task-vault:projects:rename', async (payload) => {
-    const { projectFilePath: projectName, newName } = payload as {
-      projectFilePath: string
-      newName: string
-    }
-    if (!projectName || !newName?.trim()) return { error: 'VALIDATION_ERROR' }
+  handleRemote('task-vault:projects:rename', RenameProjectRequestSchema, async (args) => {
+    const { projectFilePath: projectName, newName } = args
     const now = new Date().toISOString()
     const proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [projectName])
     if (!proj) return { error: 'NOT_FOUND' }
@@ -297,5 +278,5 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     return { success: true }
   })
 
-  return registrar.cleanup
+  return cleanup
 }

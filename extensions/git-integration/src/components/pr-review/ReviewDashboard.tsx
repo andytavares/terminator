@@ -1,5 +1,6 @@
 import { AlertTriangle, ListFilter } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { formatRelativeTime } from '@terminator/extension-ui'
 import { z } from 'zod'
 import { githubAPI } from '../../api/github'
 import { DashboardPRSchema, type DashboardPR } from '../../schemas/pr-review.schema'
@@ -422,11 +423,7 @@ export function ReviewDashboard(): JSX.Element {
     </button>
   )
 
-  const updatedText = (() => {
-    if (!fetchedAt) return ''
-    const minutes = Math.floor((Date.now() - fetchedAt.getTime()) / 60000)
-    return minutes < 1 ? 'Updated just now' : `Updated ${minutes} min ago`
-  })()
+  const updatedText = fetchedAt ? `Updated ${formatRelativeTime(fetchedAt)}` : ''
 
   return (
     <div className="rd-app">

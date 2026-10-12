@@ -2,6 +2,7 @@ import { useShallow } from 'zustand/react/shallow'
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useSessionStore } from '../../stores/session.store'
 import { useModalStore } from '../../stores/modal.store'
+import { Button } from '@terminator/extension-ui'
 import { useTerminalOpenErrorStore } from '../../stores/terminal-open-error.store'
 import type { PaneNode } from '@shared/types/index'
 import { SplitContainer } from './SplitContainer'
@@ -143,13 +144,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
         {openError ? (
           <div className="terminal-pane__open-error" role="alert">
             <span>Couldn&apos;t open a terminal: {openError}</span>
-            <button
-              type="button"
-              className="dialog__btn-secondary"
-              onClick={() => retryOpen(projectId)}
-            >
-              Try again
-            </button>
+            <Button onClick={() => retryOpen(projectId)}>Try again</Button>
           </div>
         ) : (
           <span>Open a terminal tab to get started</span>

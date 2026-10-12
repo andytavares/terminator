@@ -32,6 +32,7 @@ export function formatRelativeTime(
   locale?: string
 ): string {
   const difference = toMilliseconds(from) - toMilliseconds(now)
+  if (Number.isNaN(difference)) return ''
   const magnitude = Math.abs(difference)
   const { unit, size } = UNITS.find((candidate) => magnitude < candidate.until) ?? UNITS[6]
   const count = Math.trunc(difference / size)

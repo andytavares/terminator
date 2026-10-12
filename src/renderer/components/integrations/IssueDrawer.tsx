@@ -1,6 +1,7 @@
 import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useState } from 'react'
 import { ExternalLink, RefreshCw, X } from 'lucide-react'
+import { RelativeTime } from '@terminator/extension-ui'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { IssueMarkdown } from './IssueMarkdown'
 import type { AgentContext, Issue, TrackerId } from '../../../shared/types/index'
@@ -17,17 +18,6 @@ const TRACKER_LABELS: Record<TrackerId, string> = { linear: 'Linear', jira: 'Jir
 const CONTEXT_LIMIT = 10_000
 /** Where the counter starts warning: close enough that trimming is imminent. */
 const CONTEXT_WARN_AT = 0.85
-
-function relative(iso: string): string {
-  const then = Date.parse(iso)
-  if (Number.isNaN(then)) return ''
-  const minutes = Math.round((Date.now() - then) / 60_000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.round(hours / 24)}d ago`
-}
 
 export interface IssueDrawerProps {
   projectId: string
@@ -165,7 +155,9 @@ export function IssueDrawer({ projectId, projectName, onClose }: IssueDrawerProp
                 </span>
               ))}
               {issue.updatedAt !== '' && (
-                <span className="issue-drawer__tag">updated {relative(issue.updatedAt)}</span>
+                <span className="issue-drawer__tag">
+                  updated <RelativeTime value={issue.updatedAt} />
+                </span>
               )}
             </div>
           </>
@@ -190,7 +182,7 @@ export function IssueDrawer({ projectId, projectName, onClose }: IssueDrawerProp
           {issue.comments.map((c, i) => (
             <div key={`${c.author}-${c.createdAt}-${i}`} className="issue-drawer__comment">
               <span className="issue-drawer__who">
-                {c.author} · {relative(c.createdAt)}
+                {c.author} · <RelativeTime value={c.createdAt} />
               </span>
               <IssueMarkdown>{c.body}</IssueMarkdown>
             </div>

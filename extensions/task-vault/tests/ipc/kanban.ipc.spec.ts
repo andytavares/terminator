@@ -64,14 +64,6 @@ describe('registerKanbanIpcHandlers', () => {
       expect(await db.query(`SELECT key FROM settings WHERE key = 'kanban_config'`)).toHaveLength(1)
     })
 
-    it('rejects an invalid payload and keeps the stored config', async () => {
-      await invoke('task-vault:kanban:save-config', config)
-      expect(await invoke('task-vault:kanban:save-config', { invalid: true })).toHaveProperty(
-        'error'
-      )
-      expect(await invoke('task-vault:kanban:get-config')).toEqual(config)
-    })
-
     it('falls back to the default config when the stored value is not JSON', async () => {
       await db.run(
         `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'kanban_config', 'oops{')`
@@ -160,18 +152,6 @@ describe('registerKanbanIpcHandlers', () => {
       expect(
         await invoke('task-vault:kanban:move-task', { taskId: 'nonexistent', toStatus: 'done' })
       ).toEqual({ error: 'Task not found' })
-    })
-
-    it('rejects an unknown status and leaves the task', async () => {
-      await seedTask(db, { id: 'task-1' })
-
-      expect(
-        await invoke('task-vault:kanban:move-task', {
-          taskId: 'task-1',
-          toStatus: 'invalid-status',
-        })
-      ).toHaveProperty('error')
-      expect(await taskRow(db, 'task-1')).toMatchObject({ status: 'open' })
     })
   })
 

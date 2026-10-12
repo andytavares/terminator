@@ -153,7 +153,7 @@ describe('CreateWorkspaceDialog', () => {
   it('calls onClose when overlay is clicked', () => {
     const onClose = vi.fn()
     render(<CreateWorkspaceDialog onClose={onClose} />)
-    fireEvent.click(screen.getByText('Create Workspace').closest('.dialog-overlay')!)
+    fireEvent.click(screen.getByText('Create Workspace').closest('.tmui-dialog__scrim')!)
     expect(onClose).toHaveBeenCalled()
   })
 

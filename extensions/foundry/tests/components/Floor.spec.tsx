@@ -1151,7 +1151,7 @@ describe('the standing band', () => {
     await waitFor(() => expect(within(band).getByText('Bash: npm test')).toBeTruthy())
     expect(within(band).getByText('Read: src/forge/intake.ts')).toBeTruthy()
     expect(within(band).getByText('builder')).toBeTruthy()
-    expect(within(band).getByText(/\d+s ago/)).toBeTruthy()
+    expect(within(band).getByText(/\d+ seconds? ago|now/)).toBeTruthy()
     expect(invoke).toHaveBeenCalledWith(
       'foundry:run-transcript',
       expect.objectContaining({ sessionId: 's-1' })

@@ -118,6 +118,34 @@ describe('Dialog', () => {
       opener.remove()
     })
 
+    // A form dialog focuses its first field itself; moving focus off it would
+    // blur the field and run its validation before anyone typed.
+    it('leaves focus on a field that took it as the dialog opened', () => {
+      renderDialog({
+        actions: [{ label: 'Create', onSelect: noop }],
+        children: (
+          <>
+            <input aria-label="Search" />
+            <input aria-label="Name" autoFocus />
+          </>
+        ),
+      })
+      expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Name' }))
+    })
+
+    it('returns focus to the opener when a field inside took focus first', () => {
+      const opener = document.createElement('button')
+      document.body.appendChild(opener)
+      opener.focus()
+
+      const { unmount } = renderDialog({
+        children: <input aria-label="Name" autoFocus />,
+      })
+      unmount()
+      expect(document.activeElement).toBe(opener)
+      opener.remove()
+    })
+
     it('keeps Tab inside the dialog', () => {
       renderDialog({
         actions: [
@@ -328,5 +356,51 @@ describe('a disabled action', () => {
     expect((screen.getByRole('button', { name: /Create PR/ }) as HTMLButtonElement).disabled).toBe(
       false
     )
+  })
+})
+
+// A dialog holding fields submits on Enter, as a form does. Without it the
+// core's create and rename dialogs would lose the keyboard path they had.
+describe('a submitting action', () => {
+  function renderForm(onSelect: () => void, disabled = false) {
+    render(
+      <Dialog
+        title="Name this terminal"
+        actions={[
+          { label: 'Cancel', onSelect: () => {} },
+          { label: 'Open', tone: 'primary', submit: true, disabled, onSelect },
+        ]}
+        onDismiss={() => {}}
+      >
+        <input aria-label="Name" />
+        <input aria-label="Colour" />
+      </Dialog>
+    )
+  }
+
+  it('runs once when Enter is pressed in a field', () => {
+    const onSelect = vi.fn()
+    renderForm(onSelect)
+    fireEvent.submit(screen.getByRole('textbox', { name: 'Name' }))
+    expect(onSelect).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs once when clicked', () => {
+    const onSelect = vi.fn()
+    renderForm(onSelect)
+    fireEvent.click(screen.getByRole('button', { name: /Open/ }))
+    expect(onSelect).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not run on Enter while disabled', () => {
+    const onSelect = vi.fn()
+    renderForm(onSelect, true)
+    fireEvent.submit(screen.getByRole('textbox', { name: 'Name' }))
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('makes the dialog panel a form', () => {
+    renderForm(() => {})
+    expect(screen.getByRole('dialog').tagName).toBe('FORM')
   })
 })

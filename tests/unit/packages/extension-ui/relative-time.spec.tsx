@@ -71,3 +71,16 @@ describe('RelativeTime', () => {
     expect(time.textContent).toBe(formatRelativeTime(moment, NOW))
   })
 })
+
+// A tracker or a file can hand over a time that does not parse. That is no
+// time to show, not a crash in the view that shows it.
+describe('a time that does not parse', () => {
+  it('formats as nothing', () => {
+    expect(formatRelativeTime('not a date', NOW, 'en')).toBe('')
+  })
+
+  it('renders nothing', () => {
+    const { container } = render(<RelativeTime value="not a date" now={NOW} />)
+    expect(container.firstChild).toBeNull()
+  })
+})

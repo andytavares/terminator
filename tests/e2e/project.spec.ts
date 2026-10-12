@@ -28,9 +28,9 @@ test.describe.serial('project view', () => {
     await workspaceRow(page, WS)
       .locator('.repo-header__action[aria-label^="New branch in"]')
       .click()
-    await expect(page.locator('.dialog__title')).toContainText('Create Branch')
+    await expect(page.locator('.tmui-dialog__title')).toContainText('Create Branch')
     await page.getByRole('button', { name: 'Cancel' }).click()
-    await expect(page.locator('.dialog__title')).toHaveCount(0)
+    await expect(page.locator('.tmui-dialog__title')).toHaveCount(0)
   })
 
   test('US2-2: a created project appears under its workspace', async () => {
@@ -38,9 +38,9 @@ test.describe.serial('project view', () => {
     await workspaceRow(page, WS)
       .locator('.repo-header__action[aria-label^="New branch in"]')
       .click()
-    await page.waitForSelector('.dialog__title')
+    await page.waitForSelector('.tmui-dialog__title')
     await page.getByPlaceholder('My branch').fill('alpha-project')
-    await page.click('.dialog__btn-primary')
+    await page.click('.tmui-dialog__actions .tmui-button--primary')
     await expect(projectGroup(page, 'alpha-project')).toBeVisible()
   })
 

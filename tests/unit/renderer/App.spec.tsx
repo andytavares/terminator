@@ -184,19 +184,6 @@ vi.mock('../../../src/renderer/components/LogWindow', () => ({
 vi.mock('../../../src/renderer/components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
-type EmptyStateAction = { label: string; onClick: () => void }
-vi.mock('../../../src/renderer/components/EmptyState', () => ({
-  EmptyState: ({ title, actions }: { title: string; actions?: EmptyStateAction[] }) => (
-    <div data-testid="empty-state">
-      {title}
-      {actions?.map((a) => (
-        <button key={a.label} onClick={a.onClick}>
-          {a.label}
-        </button>
-      ))}
-    </div>
-  ),
-}))
 
 const mockLoadWorkspaces = vi.fn()
 const mockLoadSettings = vi.fn()
@@ -363,7 +350,6 @@ afterEach(() => {
 beforeAll(async () => {
   await Promise.all([
     import('../../../src/renderer/components/settings/SettingsPanel'),
-    import('../../../src/renderer/components/QuickActionsHost'),
     import('../../../src/renderer/components/overview/OverviewScreen'),
   ])
 })
@@ -413,8 +399,7 @@ describe('App', () => {
       globalSettings: { ui: { hasSeenWelcome: true } },
     })
     render(<App />)
-    expect(screen.getByTestId('empty-state')).toBeTruthy()
-    expect(screen.getByText('Select or create a project')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Select or create a project' })).toBeTruthy()
   })
 
   it('shows Welcome to Terminator EmptyState when no welcome seen', () => {
@@ -424,8 +409,7 @@ describe('App', () => {
       globalSettings: { ui: { hasSeenWelcome: false } },
     })
     render(<App />)
-    expect(screen.getByTestId('empty-state')).toBeTruthy()
-    expect(screen.getByText('Welcome to Terminator')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Welcome to Terminator' })).toBeTruthy()
   })
 
   it('shows select workspace prompt when globalSettings is null', () => {
@@ -435,8 +419,7 @@ describe('App', () => {
       globalSettings: null,
     })
     render(<App />)
-    expect(screen.getByTestId('empty-state')).toBeTruthy()
-    expect(screen.getByText('Select a workspace to get started')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Select a workspace to get started' })).toBeTruthy()
   })
 
   it('does not show SettingsPanel by default', () => {
@@ -873,7 +856,7 @@ describe('App', () => {
       globalSettings: { ui: { hasSeenWelcome: false } },
     })
     render(<App />)
-    fireEvent.click(screen.getByText('Open Settings'))
+    fireEvent.click(screen.getByRole('button', { name: /Open Settings/ }))
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
 

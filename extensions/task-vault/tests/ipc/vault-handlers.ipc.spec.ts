@@ -36,8 +36,6 @@ const taskIds = async (where = '1=1') =>
 const metadataOf = async (id: string) =>
   JSON.parse((await taskRow(db, id))?.metadata as string) as Record<string, unknown>
 
-const daysAgo = (days: number) => localDate(new Date(Date.now() - days * 86400000))
-
 describe('registerVaultIpcHandlers', () => {
   it('dispose removes every registered channel', () => {
     const own = createIpcHarness()
@@ -95,12 +93,6 @@ describe('task-vault:vault:complete-task', () => {
     })
   })
 
-  it('returns VALIDATION_ERROR for a missing taskId', async () => {
-    expect(await invoke('task-vault:vault:complete-task', {})).toMatchObject({
-      error: expect.stringContaining('VALIDATION_ERROR'),
-    })
-  })
-
   it('spawns no new task for a task without recurrence', async () => {
     await seedTask(db, { id: 'task-1', dueDate: '2026-01-10' })
 
@@ -152,12 +144,6 @@ describe('task-vault:vault:delete-task', () => {
       error: 'STALE_ID',
     })
   })
-
-  it('returns VALIDATION_ERROR for a null payload', async () => {
-    expect(await invoke('task-vault:vault:delete-task', null)).toMatchObject({
-      error: expect.stringContaining('VALIDATION_ERROR'),
-    })
-  })
 })
 
 describe('task-vault:vault:cancel-task', () => {
@@ -173,12 +159,6 @@ describe('task-vault:vault:cancel-task', () => {
   it('returns STALE_ID for an unknown task', async () => {
     expect(await invoke('task-vault:vault:cancel-task', { taskId: 'missing' })).toEqual({
       error: 'STALE_ID',
-    })
-  })
-
-  it('returns VALIDATION_ERROR for a non-string taskId', async () => {
-    expect(await invoke('task-vault:vault:cancel-task', { taskId: 123 })).toMatchObject({
-      error: expect.stringContaining('VALIDATION_ERROR'),
     })
   })
 })
@@ -227,10 +207,6 @@ describe.each(['restore-task', 'reopen-task'])('task-vault:vault:%s', (action) =
   it('returns STALE_ID for an unknown task', async () => {
     expect(await invoke(channel, { taskId: 'gone' })).toEqual({ error: 'STALE_ID' })
   })
-
-  it('returns VALIDATION_ERROR for a missing taskId', async () => {
-    expect(await invoke(channel, {})).toMatchObject({ error: 'VALIDATION_ERROR' })
-  })
 })
 
 describe('task-vault:vault:restore-task', () => {
@@ -277,15 +253,6 @@ describe('task-vault:vault:edit-task', () => {
       error: 'STALE_ID',
     })
   })
-
-  it.each([{ text: 'No id here' }, { taskId: 'task-1' }])(
-    'returns VALIDATION_ERROR for %j',
-    async (payload) => {
-      expect(await invoke('task-vault:vault:edit-task', payload)).toMatchObject({
-        error: expect.stringContaining('VALIDATION_ERROR'),
-      })
-    }
-  )
 })
 
 describe('task-vault:vault:add-task', () => {
@@ -337,16 +304,6 @@ describe('task-vault:vault:add-task', () => {
       area: 'Work',
     })
   })
-
-  it.each([{ text: 'No path' }, { filePath: 'inbox' }])(
-    'returns VALIDATION_ERROR for %j',
-    async (payload) => {
-      expect(await addTask(payload)).toMatchObject({
-        error: expect.stringContaining('VALIDATION_ERROR'),
-      })
-      expect(await taskIds()).toEqual([])
-    }
-  )
 })
 
 describe('task-vault:vault:add-subtask', () => {
@@ -368,15 +325,6 @@ describe('task-vault:vault:add-subtask', () => {
       await invoke('task-vault:vault:add-subtask', { taskId: 'gone', text: 'Sub item' })
     ).toEqual({ error: 'STALE_ID' })
   })
-
-  it.each([{ text: 'No parent' }, { taskId: 'task-1' }])(
-    'returns VALIDATION_ERROR for %j',
-    async (payload) => {
-      expect(await invoke('task-vault:vault:add-subtask', payload)).toMatchObject({
-        error: 'VALIDATION_ERROR',
-      })
-    }
-  )
 })
 
 describe('task-vault:vault:get-today', () => {
@@ -499,12 +447,6 @@ describe('task-vault:vault:get-daily', () => {
     expect(result.tasks.map((task) => task.id)).toEqual(['on-date'])
     expect(result.exists).toBe(true)
   })
-
-  it('returns VALIDATION_ERROR for a missing date', async () => {
-    expect(await invoke('task-vault:vault:get-daily', {})).toMatchObject({
-      error: expect.stringContaining('VALIDATION_ERROR'),
-    })
-  })
 })
 
 describe('task-vault:vault:migrate-task', () => {
@@ -583,12 +525,6 @@ describe('task-vault:vault:migrate-task', () => {
       error: 'STALE_ID',
     })
   })
-
-  it('returns VALIDATION_ERROR for a missing taskId', async () => {
-    expect(await migrate({ targetDate: '2026-05-21' })).toMatchObject({
-      error: expect.stringContaining('VALIDATION_ERROR'),
-    })
-  })
 })
 
 describe('task-vault:vault:query', () => {
@@ -645,12 +581,6 @@ describe('task-vault:vault:query', () => {
   it('returns nothing when no task matches every filter', async () => {
     expect(await ids({ context: 'elsewhere' })).toEqual([])
   })
-
-  it('returns VALIDATION_ERROR for an invalid payload', async () => {
-    expect(await invoke('task-vault:vault:query', { status: 123 })).toMatchObject({
-      error: expect.stringContaining('VALIDATION_ERROR'),
-    })
-  })
 })
 
 describe('task-vault:projects:get-tasks', () => {
@@ -664,11 +594,6 @@ describe('task-vault:projects:get-tasks', () => {
     })) as { tasks: { id: string }[] }
 
     expect(result.tasks.map((task) => task.id)).toEqual(['in-project'])
-  })
-
-  it('returns no tasks when projectName is missing', async () => {
-    await seedTask(db, { id: 'any' })
-    expect(await invoke('task-vault:projects:get-tasks', {})).toEqual({ tasks: [] })
   })
 })
 
@@ -726,15 +651,6 @@ describe('task-vault:vault:block-task and unblock-task', () => {
       ).toEqual({ error: 'STALE_ID' })
     }
   )
-
-  it('returns VALIDATION_ERROR for invalid payloads', async () => {
-    expect(await invoke('task-vault:vault:block-task', { taskId: 'task-1' })).toMatchObject({
-      error: expect.stringMatching(/VALIDATION_ERROR/),
-    })
-    expect(await invoke('task-vault:vault:unblock-task', {})).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
-  })
 })
 
 describe('task-vault:vault:reorder-tasks', () => {
@@ -747,12 +663,6 @@ describe('task-vault:vault:reorder-tasks', () => {
 
     const order = await db.query<{ id: string }>(`SELECT id FROM tasks ORDER BY sort_order`)
     expect(order.map((row) => row.id)).toEqual(['id-3', 'id-1', 'id-2'])
-  })
-
-  it.each([{ orderedIds: [] }, {}])('returns VALIDATION_ERROR for %j', async (payload) => {
-    expect(await invoke('task-vault:vault:reorder-tasks', payload)).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
   })
 })
 
@@ -800,7 +710,7 @@ describe('task-vault:vault task detail', () => {
     })
   })
 
-  it('reports a missing task and invalid payloads', async () => {
+  it('reports a missing task', async () => {
     expect(await invoke('task-vault:vault:get-task-detail', { taskId: 'nope' })).toEqual({
       error: 'Task not found',
     })
@@ -812,12 +722,6 @@ describe('task-vault:vault task detail', () => {
         devHints: '',
       })
     ).toEqual({ error: 'Task not found' })
-    expect(await invoke('task-vault:vault:get-task-detail', {})).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
-    expect(await invoke('task-vault:vault:save-task-detail', { taskId: 'task-1' })).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
   })
 })
 
@@ -853,17 +757,6 @@ describe('task-vault:vault:list-archive', () => {
     }
 
     expect(result.projects).toMatchObject([{ name: 'Old Project', area: 'Work' }])
-  })
-
-  it('looks back 30 days when the payload is invalid', async () => {
-    await seedTask(db, { id: 'recent', status: 'done', updatedAt: daysAgo(1) })
-    await seedTask(db, { id: 'old', status: 'done', updatedAt: daysAgo(60) })
-
-    const result = (await invoke('task-vault:vault:list-archive', null)) as {
-      tasks: { id: string }[]
-    }
-
-    expect(result.tasks.map((task) => task.id)).toEqual(['recent'])
   })
 
   it('returns the error when the database fails', async () => {

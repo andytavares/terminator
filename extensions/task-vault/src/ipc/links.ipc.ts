@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
-import { createIpcRegistrar } from './register'
+import { createIpcRegistrar, errorResult } from './register'
 import {
   LinksCreateRequestSchema,
   LinksRemoveRequestSchema,
@@ -8,22 +8,10 @@ import {
 import { rowToTask, rowToProject, PROJECT_COLS, PROJECT_JOINS } from '../vault/mappers'
 
 export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const registrar = createIpcRegistrar(api)
+  const { handleRemote, cleanup } = createIpcRegistrar(api, errorResult)
 
-  function handleRemote(channel: string, fn: (payload: unknown) => Promise<unknown>) {
-    registrar.handleRemote(channel, async (payload) => {
-      try {
-        return await fn(payload)
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : String(err) }
-      }
-    })
-  }
-
-  handleRemote('task-vault:links:create', async (payload) => {
-    const parsed = LinksCreateRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId, projectFilePath, targetId } = parsed.data
+  handleRemote('task-vault:links:create', LinksCreateRequestSchema, async (args) => {
+    const { taskId, projectFilePath, targetId } = args
     const now = new Date().toISOString()
     try {
       if (taskId) {
@@ -58,10 +46,8 @@ export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:links:remove', async (payload) => {
-    const parsed = LinksRemoveRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { taskId, projectFilePath, targetId } = parsed.data
+  handleRemote('task-vault:links:remove', LinksRemoveRequestSchema, async (args) => {
+    const { taskId, projectFilePath, targetId } = args
     const now = new Date().toISOString()
     try {
       if (taskId) {
@@ -99,27 +85,29 @@ export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handleRemote('task-vault:links:get-for-terminator-target', async (payload) => {
-    const parsed = LinksGetForTargetRequestSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { targetId } = parsed.data
-    const escapedId = targetId.replace(/[%_]/g, '\\$&')
-    const taskRows = await db.query<Record<string, unknown>>(
-      `SELECT * FROM tasks WHERE terminator_links LIKE ? ESCAPE '\\'`,
-      [`%${escapedId}%`]
-    )
-    const tasks = taskRows.map(rowToTask).filter((t) => t.terminatorLinks.includes(targetId))
+  handleRemote(
+    'task-vault:links:get-for-terminator-target',
+    LinksGetForTargetRequestSchema,
+    async (args) => {
+      const { targetId } = args
+      const escapedId = targetId.replace(/[%_]/g, '\\$&')
+      const taskRows = await db.query<Record<string, unknown>>(
+        `SELECT * FROM tasks WHERE terminator_links LIKE ? ESCAPE '\\'`,
+        [`%${escapedId}%`]
+      )
+      const tasks = taskRows.map(rowToTask).filter((t) => t.terminatorLinks.includes(targetId))
 
-    const projectRows = await db.query<Record<string, unknown>>(
-      `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.terminator_links LIKE ? ESCAPE '\\'`,
-      [`%${escapedId}%`]
-    )
-    const projects = projectRows
-      .map(rowToProject)
-      .filter((p) => p.terminatorLinks.includes(targetId))
+      const projectRows = await db.query<Record<string, unknown>>(
+        `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.terminator_links LIKE ? ESCAPE '\\'`,
+        [`%${escapedId}%`]
+      )
+      const projects = projectRows
+        .map(rowToProject)
+        .filter((p) => p.terminatorLinks.includes(targetId))
 
-    return { tasks, projects }
-  })
+      return { tasks, projects }
+    }
+  )
 
-  return registrar.cleanup
+  return cleanup
 }

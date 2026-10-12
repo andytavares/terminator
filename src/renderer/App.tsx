@@ -9,7 +9,8 @@ import React, {
   useState,
   createElement,
 } from 'react'
-import { House, LayoutGrid } from 'lucide-react'
+import { Hexagon, House, LayoutGrid, Option } from 'lucide-react'
+import { EmptyState } from '@terminator/extension-ui'
 import { UnifiedSidebar } from './components/sidebar/UnifiedSidebar'
 import { AppBand } from './components/sidebar/AppBand'
 import { TerminalPane } from './components/terminal/TerminalPane'
@@ -18,6 +19,9 @@ import { ToastContainer } from './components/ToastContainer'
 import { LogWindow } from './components/LogWindow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { HomeBadge, GlobalMetricsBar, SessionLinkHost } from './components/AppShellParts'
+// Not lazy: the keys typed straight after ⌘P ("n n", "/") would reach the
+// app before a lazily loaded panel mounted, and be lost.
+import { QuickActionsHost } from './components/QuickActionsHost'
 import { findSurface, type SurfaceRegistration } from './quick-actions/surface-actions'
 import { recordDirectUse } from './quick-actions/usage'
 import { useActiveScope } from './quick-actions/use-active-scope'
@@ -37,7 +41,6 @@ import { dispatchNotification } from './lib/notifications'
 import { useNotificationStore } from './stores/notification.store'
 import { NotificationPanel } from './components/NotificationPanel'
 import { useExtensionRegistry } from './extensions/registry'
-import { EmptyState } from './components/EmptyState'
 import { HomeScreen } from './components/home/HomeScreen'
 import { useMetricsStore } from './stores/metrics.store'
 import { AboutDialog } from './components/AboutDialog'
@@ -52,9 +55,6 @@ installLogInterceptor()
 // script (https://react.dev/reference/react/lazy).
 const SettingsPanel = lazy(() =>
   import('./components/settings/SettingsPanel').then((m) => ({ default: m.SettingsPanel }))
-)
-const QuickActionsHost = lazy(() =>
-  import('./components/QuickActionsHost').then((m) => ({ default: m.QuickActionsHost }))
 )
 const OverviewScreen = lazy(() =>
   import('./components/overview/OverviewScreen').then((m) => ({ default: m.OverviewScreen }))
@@ -734,29 +734,30 @@ export function App(): JSX.Element {
                   </>
                 ) : globalSettings && !globalSettings.ui?.hasSeenWelcome ? (
                   <EmptyState
-                    icon="⬡"
-                    title="Welcome to Terminator"
-                    subtitle="A keyboard-first terminal for developers. Open a project to get started."
+                    icon={Hexagon}
+                    heading="Welcome to Terminator"
+                    description="A keyboard-first terminal for developers. Open a project to get started."
                     actions={[
-                      { label: 'Quick actions', shortcut: '⌘P', onClick: handleOpenQuickActions },
-                      { label: 'New Tab', shortcut: '⌘T', onClick: () => {} },
+                      { label: 'Quick actions', shortcut: '⌘P', onSelect: handleOpenQuickActions },
+                      { label: 'New Tab', shortcut: '⌘T', onSelect: () => {} },
                       {
                         label: 'Open Settings',
                         shortcut: '⌘,',
-                        onClick: () => setSettingsOpen(true),
+                        onSelect: () => setSettingsOpen(true),
                       },
                     ]}
                   />
                 ) : (
                   <EmptyState
-                    icon="⌥"
-                    title={
+                    icon={Option}
+                    heading={
                       activeWorkspaceId
                         ? 'Select or create a project'
                         : 'Select a workspace to get started'
                     }
+                    description="Pick one in the sidebar, or make one from quick actions."
                     actions={[
-                      { label: 'Quick actions', shortcut: '⌘P', onClick: handleOpenQuickActions },
+                      { label: 'Quick actions', shortcut: '⌘P', onSelect: handleOpenQuickActions },
                     ]}
                   />
                 )}
@@ -810,16 +811,14 @@ export function App(): JSX.Element {
             <SessionLinkHost sessionId={linkSessionId} onClose={() => setLinkSessionId(null)} />
           )}
           {quickActionsOpen && (
-            <Suspense fallback={null}>
-              <QuickActionsHost
-                openedAt={quickActionsOpenedAt}
-                searchSignal={searchSignal}
-                surfaces={surfaces}
-                activateSurface={activateSurface}
-                shell={shellCommands}
-                onClose={closeQuickActions}
-              />
-            </Suspense>
+            <QuickActionsHost
+              openedAt={quickActionsOpenedAt}
+              searchSignal={searchSignal}
+              surfaces={surfaces}
+              activateSurface={activateSurface}
+              shell={shellCommands}
+              onClose={closeQuickActions}
+            />
           )}
           <HomeBadge />
           <ToastContainer />

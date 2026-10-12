@@ -1,10 +1,10 @@
 import { useShallow } from 'zustand/react/shallow'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
+import { Dialog } from '@terminator/extension-ui'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useModalEffect } from '../../stores/modal.store'
 import type { IssueListResult, IssueSummary, TrackerId } from '../../../shared/types/index'
-import '../sidebar/Dialog.css'
 import './LinkIssueDialog.css'
 
 // Picking the issue a project is for.
@@ -107,10 +107,21 @@ export function LinkIssueDialog({
   }
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog link-issue" onClick={(e) => e.stopPropagation()}>
-        <h3 className="dialog__title">Link an issue</h3>
-        <p className="dialog__description">
+    <Dialog
+      title="Link an issue"
+      onDismiss={onClose}
+      actions={[
+        { label: 'Cancel', onSelect: onClose },
+        {
+          label: busy ? 'Linking…' : selected === null ? 'Link issue' : `Link ${selected.key}`,
+          tone: 'primary',
+          disabled: selected === null || busy,
+          onSelect: commit,
+        },
+      ]}
+    >
+      <div className="link-issue">
+        <p className="tmui-dialog__description">
           Attaching to <strong>{projectName}</strong>
         </p>
 
@@ -183,20 +194,7 @@ export function LinkIssueDialog({
             )}
           </>
         )}
-
-        <div className="dialog__actions">
-          <button className="dialog__btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="dialog__btn-primary"
-            disabled={selected === null || busy}
-            onClick={() => void commit()}
-          >
-            {busy ? 'Linking…' : selected === null ? 'Link issue' : `Link ${selected.key}`}
-          </button>
-        </div>
       </div>
-    </div>
+    </Dialog>
   )
 }

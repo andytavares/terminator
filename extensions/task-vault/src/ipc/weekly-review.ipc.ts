@@ -3,7 +3,8 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { z } from 'zod'
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
-import { createIpcRegistrar } from './register'
+import { noPayload } from '@terminator/extension-sdk'
+import { createIpcRegistrar, errorResult } from './register'
 import {
   completeReview,
   formatReviewMarkdown,
@@ -45,62 +46,36 @@ const completeSchema = z.object({
 
 const idSchema = z.object({ reviewId: z.string().min(1) })
 
-const listSchema = z.object({ limit: z.number().int().positive().max(500).optional() })
+const listSchema = z.object({ limit: z.number().int().positive().max(500).optional() }).default({})
 
 export function registerWeeklyReviewIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const registrar = createIpcRegistrar(api)
+  const { handle, handleRemote, cleanup } = createIpcRegistrar(api, errorResult)
 
-  type Register = (channel: string, fn: (payload: unknown) => Promise<unknown>) => void
-
-  function withErrorResult(register: Register): Register {
-    return (channel, fn) =>
-      register(channel, async (payload) => {
-        try {
-          return await fn(payload)
-        } catch (err) {
-          return { error: err instanceof Error ? err.message : String(err) }
-        }
-      })
-  }
-
-  const handle = withErrorResult(registrar.handle)
-  const handleRemote = withErrorResult(registrar.handleRemote)
-
-  handleRemote('task-vault:review:start', async () => {
+  handleRemote('task-vault:review:start', noPayload, async () => {
     return await startOrResumeReview(db)
   })
 
-  handleRemote('task-vault:review:log', async (payload) => {
-    const parsed = logSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    return { action: await logReviewAction(db, parsed.data) }
+  handleRemote('task-vault:review:log', logSchema, async (args) => {
+    return { action: await logReviewAction(db, args) }
   })
 
-  handleRemote('task-vault:review:complete', async (payload) => {
-    const parsed = completeSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    await completeReview(db, parsed.data)
+  handleRemote('task-vault:review:complete', completeSchema, async (args) => {
+    await completeReview(db, args)
     return { ok: true }
   })
 
-  handleRemote('task-vault:review:list', async (payload) => {
-    const parsed = listSchema.safeParse(payload ?? {})
-    const limit = parsed.success ? parsed.data.limit : undefined
+  handleRemote('task-vault:review:list', listSchema, async ({ limit }) => {
     return { reviews: await listReviews(db, limit) }
   })
 
-  handleRemote('task-vault:review:get', async (payload) => {
-    const parsed = idSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const review = await getReview(db, parsed.data.reviewId)
+  handleRemote('task-vault:review:get', idSchema, async (args) => {
+    const review = await getReview(db, args.reviewId)
     if (!review) return { error: 'REVIEW_NOT_FOUND' }
     return { review }
   })
 
-  handle('task-vault:review:export', async (payload) => {
-    const parsed = idSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const review = await getReview(db, parsed.data.reviewId)
+  handle('task-vault:review:export', idSchema, async (args) => {
+    const review = await getReview(db, args.reviewId)
     if (!review) return { error: 'REVIEW_NOT_FOUND' }
 
     const result = await dialog.showSaveDialog({
@@ -115,7 +90,7 @@ export function registerWeeklyReviewIpcHandlers(api: ExtensionAPI, db: Extension
     return { filePath: result.filePath }
   })
 
-  return registrar.cleanup
+  return cleanup
 }
 
 export type { ReviewActionKind, ReviewEntityType }

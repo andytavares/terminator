@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { wrapDb, type ExtensionDB } from '../../../src/main/db/index'
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { dispatchChannel } from '@terminator/extension-sdk'
+import type { ChannelSpec, ExtensionAPI } from '@terminator/extension-sdk'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
@@ -36,8 +37,8 @@ async function activateAndGetResetHandler(): Promise<Handler> {
   const api = {
     db,
     ipc: {
-      registerHandler: vi.fn((channel: string, handler: Handler) => {
-        handlers.set(channel, handler)
+      registerHandler: vi.fn((spec: ChannelSpec) => {
+        handlers.set(spec.channel, () => dispatchChannel(spec, undefined))
         return { dispose: vi.fn() }
       }),
     },

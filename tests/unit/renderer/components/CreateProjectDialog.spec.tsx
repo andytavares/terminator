@@ -130,7 +130,7 @@ describe('CreateProjectDialog', () => {
   it('calls onClose when overlay is clicked', () => {
     const onClose = vi.fn()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={onClose} />)
-    fireEvent.click(screen.getByText('Create Branch').closest('.dialog-overlay')!)
+    fireEvent.click(screen.getByText('Create Branch').closest('.tmui-dialog__scrim')!)
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -671,7 +671,7 @@ describe('CreateProjectDialog — from an issue', () => {
       await screen.findByRole('button', { name: 'Creating…' })
 
       fireEvent.click(screen.getByText('Cancel'))
-      fireEvent.click(document.querySelector('.dialog-overlay')!)
+      fireEvent.click(document.querySelector('.tmui-dialog__scrim')!)
       expect(onClose).not.toHaveBeenCalled()
       gate.finish()
     })

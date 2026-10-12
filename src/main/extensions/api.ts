@@ -1,4 +1,6 @@
+import { dispatchChannel } from '@terminator/extension-sdk'
 import type {
+  ChannelSpec,
   CommandContext,
   CommandContribution,
   Disposable,
@@ -10,6 +12,7 @@ import type {
   NativeMenuItemContribution,
   NewIssueInput,
   ProjectSnapshot,
+  RegisterHandlerOptions,
   SessionSnapshot,
   ShellExecOptions,
   ToastType,
@@ -66,6 +69,30 @@ import { getIssueService } from '../integrations/index.js'
 import { listConnections as listTrackerConnections } from '../integrations/tracker-store.js'
 import { setLink as setIssueLink } from '../integrations/issue-link-store.js'
 import { REMOTE_ACCESSIBLE_CHANNELS } from '../remote/remote-accessible-channels.js'
+
+interface ChannelRegistration {
+  channel: string
+  answer: (payload: unknown) => unknown
+  options?: RegisterHandlerOptions
+}
+
+// registerHandler takes a ChannelSpec (ADR 096) or, until every extension
+// declares a schema, the unvalidated (channel, handler, options) form.
+function toChannelRegistration(
+  channelOrSpec: string | ChannelSpec,
+  handlerOrOptions?: ((payload: unknown) => unknown) | RegisterHandlerOptions,
+  unvalidatedOptions?: RegisterHandlerOptions
+): ChannelRegistration {
+  if (typeof channelOrSpec === 'string') {
+    const handler = handlerOrOptions as (payload: unknown) => unknown
+    return { channel: channelOrSpec, answer: handler, options: unvalidatedOptions }
+  }
+  return {
+    channel: channelOrSpec.channel,
+    answer: (payload) => dispatchChannel(channelOrSpec, payload),
+    options: handlerOrOptions as RegisterHandlerOptions | undefined,
+  }
+}
 
 /**
  * Attach the issue a caller said the project is for (v2.2.0).
@@ -531,14 +558,19 @@ export function createExtensionAPI(
     },
     ipc: {
       registerHandler(
-        channel: string,
-        handler: (payload: unknown) => Promise<unknown> | unknown,
-        opts?: { remoteAccessible?: boolean }
+        channelOrSpec: string | ChannelSpec,
+        handlerOrOptions?: ((payload: unknown) => unknown) | RegisterHandlerOptions,
+        unvalidatedOptions?: RegisterHandlerOptions
       ): Disposable {
-        handleChannel(channel, (_event, payload) => handler(payload), {
-          remoteAccessible: opts?.remoteAccessible ?? false,
+        const registration = toChannelRegistration(
+          channelOrSpec,
+          handlerOrOptions,
+          unvalidatedOptions
+        )
+        handleChannel(registration.channel, (_event, payload) => registration.answer(payload), {
+          remoteAccessible: registration.options?.remoteAccessible ?? false,
         })
-        return disposable(() => removeChannel(channel))
+        return disposable(() => removeChannel(registration.channel))
       },
       async invokeChannel(channel: string, payload: unknown): Promise<unknown> {
         const entry = deps?.bridge?.invokeRegistry.get(channel)

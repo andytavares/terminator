@@ -387,7 +387,7 @@ describe('PrOverviewPanel', () => {
     expect(screen.getByRole('button', { name: 'Start Review' })).toBeTruthy()
   })
 
-  it('renders age as "2d ago"', () => {
+  it('says how long ago the pull request was opened', () => {
     render(
       <PrOverviewPanel
         repoRoot="/repo"
@@ -397,20 +397,7 @@ describe('PrOverviewPanel', () => {
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('2d ago')).toBeTruthy()
-  })
-
-  it('renders age as "today" for same-day PRs', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, openedAt: new Date().toISOString() }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText('today')).toBeTruthy()
+    expect(screen.getByText('2 days ago').getAttribute('datetime')).toBe(basePr.openedAt)
   })
 
   it('renders optional pop out button when onPopOut is provided', () => {

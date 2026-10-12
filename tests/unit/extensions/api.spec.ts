@@ -83,7 +83,8 @@ import {
 } from '../../../src/main/extensions/api'
 import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry'
 import { registerAdminIpcHandlers } from '../../../extensions/task-vault/src/ipc/admin.ipc'
-import type { ExtensionDB } from '@terminator/extension-sdk'
+import { defineChannel, type ExtensionDB } from '@terminator/extension-sdk'
+import { z } from 'zod'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
 
 beforeEach(() => {
@@ -461,6 +462,49 @@ describe('api.ipc.registerHandler', () => {
       expect(api.ipc.isRemoteAccessible(channel)).toBe(false)
     }
     dispose()
+  })
+
+  it('parses the payload of a channel registered with a schema before run sees it', async () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const run = vi.fn(({ id }: { id: string }) => ({ data: id }))
+    const disposable = api.ipc.registerHandler(
+      defineChannel({
+        channel: 'test.ext:get',
+        schema: z.object({ id: z.string() }),
+        invalid: { error: 'VALIDATION_ERROR' },
+        run,
+      })
+    )
+    const handler = ipcInvokeRegistry.get('test.ext:get')!.handler
+
+    await expect(handler(null as never, { id: 'n1', extra: true })).resolves.toEqual({
+      data: 'n1',
+    })
+    expect(run).toHaveBeenCalledWith({ id: 'n1' })
+    disposable.dispose()
+  })
+
+  it('answers a payload the schema rejects with the declared invalid response', async () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const run = vi.fn()
+    const disposable = api.ipc.registerHandler(
+      defineChannel({
+        channel: 'test.ext:strict',
+        schema: z.object({ id: z.string() }),
+        invalid: { error: 'VALIDATION_ERROR' },
+        run,
+      }),
+      { remoteAccessible: true }
+    )
+    const entry = ipcInvokeRegistry.get('test.ext:strict')!
+
+    await expect(entry.handler(null as never, { id: 7 })).resolves.toEqual({
+      error: 'VALIDATION_ERROR',
+    })
+    expect(run).not.toHaveBeenCalled()
+    expect(entry.remoteAccessible).toBe(true)
+    disposable.dispose()
+    expect(ipcInvokeRegistry.has('test.ext:strict')).toBe(false)
   })
 
   it('honors remoteAccessible: false for local-only channels', () => {

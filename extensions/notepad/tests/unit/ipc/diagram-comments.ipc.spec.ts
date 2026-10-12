@@ -6,18 +6,19 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp') },
 }))
 import { ipcMain } from 'electron'
+import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 
 // Adapter: registerHandler forwards to the electron ipcMain mocks so existing
 // capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
 const mockApi = {
   ipc: {
-    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+    registerHandler: (spec: ChannelSpec) => {
       ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
-        ch,
-        (_e: unknown, payload: unknown) => fn(payload)
+        spec.channel,
+        (_e: unknown, payload: unknown) => dispatchChannel(spec, payload)
       )
       return {
-        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
+        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(spec.channel),
       }
     },
   },
@@ -81,11 +82,6 @@ describe('createDiagramComment', () => {
     })
     expect(result).toEqual({ error: 'DIAGRAM_NOT_FOUND' })
   })
-
-  it('returns VALIDATION_ERROR for missing body', async () => {
-    const result = await createDiagramComment(db, { diagramId, sceneX: 0, sceneY: 0 })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
 })
 
 describe('listDiagramComments', () => {
@@ -134,11 +130,6 @@ describe('listDiagramComments', () => {
     await resolveDiagramComment(db, { id })
     const result = await listDiagramComments(db, { diagramId, includeResolved: true })
     expect((result as { data: unknown[] }).data).toHaveLength(1)
-  })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await listDiagramComments(db, {})
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
   })
 })
 

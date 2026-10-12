@@ -437,6 +437,9 @@ import {
 </Dialog>
 ```
 
+An action with `submit: true` makes the dialog a form: Enter in a field runs that
+action once, and a field with `autoFocus` keeps the focus the dialog opens with.
+
 | Export                                       | Use it for                                                      |
 | -------------------------------------------- | --------------------------------------------------------------- |
 | `Dialog`                                     | A modal question or form. Scrim, focus trap, Escape.            |
@@ -448,7 +451,7 @@ import {
 | `Button`                                     | Primary, secondary, ghost or danger; an optional lucide icon.   |
 | `Tabs`                                       | An accessible tab list: arrow keys, Home, End, `aria-selected`. |
 | `Markdown`                                   | Sanitised Markdown. Links open through your `onOpenLink`.       |
-| `RelativeTime` / `formatRelativeTime`        | "5 minutes ago", through `Intl.RelativeTimeFormat`.             |
+| `RelativeTime` / `formatRelativeTime`        | "5 minutes ago"; nothing for a time that does not parse.        |
 | `usePolling`                                 | Read now and on an interval; ignores answers after unmount.     |
 | `everyWhileVisible`                          | Run a tick on an interval only while the view is visible.       |
 | `useDismissible`                             | Outside-click + Escape + focus restore, for your own surface.   |
@@ -476,6 +479,16 @@ declaration.
 `packages/extension-ui/src/tokens.css` defines every `--tm-*` token, and Storybook
 (`npm run storybook`) shows each component in both themes. Do not define a colour
 of your own.
+
+The tokens name IBM Plex Sans and IBM Plex Mono, but injected CSS cannot carry
+font files, so your view's entry imports them once, next to `createRoot`:
+
+```tsx
+import '@terminator/extension-ui/fonts'
+```
+
+Your bundler copies the font files beside your script; nothing is fetched. Without
+the import your view draws in whatever fonts the machine has.
 
 `docs/EXTENSION-STYLE.md` is the rule set — vocabulary, sentence case, button
 voice, empty states, icons, colour and layering. The vocabulary rules are enforced
@@ -561,20 +574,37 @@ Test against a real database, not a mock: `wrapDb(new DatabaseSync(':memory:'))`
 
 ---
 
-### `api.ipc` — Custom IPC Handlers _(v1.1.0)_
+### `api.ipc` — Custom IPC Handlers _(v1.1.0; schema since SDK 2.1.0)_
 
 Register named IPC handlers in the main process. The renderer side calls these with `invoke(channel, payload)` from `@terminator/extension-sdk/renderer`.
 
+Register each channel as a `ChannelSpec` (ADR 096), the shape the core registers its own channels in: the channel name, a zod `schema` for its payload, the `invalid` response for a payload the schema rejects, and `run`, which receives the parsed payload. The core parses the payload before `run` sees it, so `run` never handles the raw value a caller sent, and its argument type comes from the schema.
+
 ```typescript
-const handler = api.ipc.registerHandler('my-ext:do-thing', async (payload) => {
-  // payload is the argument passed from the renderer
-  const result = await someMainProcessWork(payload)
-  return result // returned value is resolved to the renderer's invoke() call
-})
+import { z } from 'zod'
+import { defineChannel, noPayload } from '@terminator/extension-sdk'
+
+const handler = api.ipc.registerHandler(
+  defineChannel({
+    channel: 'my-ext:do-thing',
+    schema: z.object({ id: z.string().min(1) }),
+    invalid: { error: 'VALIDATION_ERROR' },
+    run: async ({ id }) => someMainProcessWork(id), // resolved to the renderer's invoke()
+  })
+)
+
+// A channel that takes nothing: the desktop renderer sends nothing, the remote bridge `{}`.
+api.ipc.registerHandler(
+  defineChannel({ channel: 'my-ext:status', schema: noPayload, invalid: null, run: () => status() })
+)
 
 // In deactivate():
 handler.dispose()
 ```
+
+`invalid` may also be a function of the `ZodError`, e.g. `(error) => ({ error: 'VALIDATION_ERROR', message: error.message })`. An optional `onError(e)` turns an error `run` throws into a response instead of a rejected invoke. Do not re-check the payload inside `run`; the schema is the check. Whether zod rejects bad input is zod's concern, so test that each channel declares a schema (activate the extension, and for every registered spec send a malformed payload through `dispatchChannel` and assert `run` is not called) rather than one rejection case per channel.
+
+The unvalidated form `registerHandler(channel, (payload) => ..., opts)` still works and is deprecated: its handler receives the payload exactly as the caller sent it. It is removed once every first-party extension declares its schemas.
 
 **Channel naming**: prefix every channel with your extension ID followed by `:` to avoid collisions with core channels and other extensions. For example `com.acme.my-ext:fetch-data`.
 
@@ -584,13 +614,13 @@ handler.dispose()
 
 ```typescript
 // Read and edit the extension's own data: the remote browser view may call it.
-api.ipc.registerHandler('my-ext:list-items', handler, { remoteAccessible: true })
+api.ipc.registerHandler(listItems, { remoteAccessible: true })
 
 // Anything else stays local-only without further ceremony.
-api.ipc.registerHandler('my-ext:run-sql', handler)
+api.ipc.registerHandler(runSql)
 ```
 
-Opt in only the channels the extension's own view calls for ordinary use. Keep a channel local if it reads or writes a filesystem path the caller chooses, runs a command or arbitrary SQL, opens a native dialog or window, or administers the database. A remote client holds a password, not the desktop session, so each opted-in channel is attack surface and its payload must be validated as untrusted. The first-party extensions follow this: Notepad and Task Vault opt in their data channels and keep file import and export, the Task Vault SQL console and database administration local; the repository extension and Foundry opt in nothing yet, because their channels take a repository or data-root path.
+Opt in only the channels the extension's own view calls for ordinary use. Keep a channel local if it reads or writes a filesystem path the caller chooses, runs a command or arbitrary SQL, opens a native dialog or window, or administers the database. A remote client holds a password, not the desktop session, so each opted-in channel is attack surface and its schema is the check on what a remote client can send. The first-party extensions follow this: Notepad and Task Vault opt in their data channels and keep file import and export, the Task Vault SQL console and database administration local; the repository extension and Foundry opt in nothing yet, because their channels take a repository or data-root path.
 
 The declaration made at registration is the single authority — a channel that is neither in the core manifest-derived allowlist nor declared `remoteAccessible` at registration is rejected by the bridge. Extensions must never call Electron's `ipcMain` directly: handlers registered that way are invisible to the bridge registry and unreachable remotely.
 

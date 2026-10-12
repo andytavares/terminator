@@ -7,12 +7,12 @@ An extension imports only this package, `@terminator/extension-ui` and the npm p
 own `package.json`. `npm run lint` rejects anything else, including core source and other
 extensions.
 
-| Entry                                      | What it holds                                                                   |
-| ------------------------------------------ | ------------------------------------------------------------------------------- |
-| `@terminator/extension-sdk`                | `ExtensionAPI`, `ExtensionDB`, the issue-tracker types, `defineChannel`         |
-| `@terminator/extension-sdk/renderer`       | `invoke<T>(channel, payload = {})`, `mountExtension(<App />)`                   |
-| `@terminator/extension-sdk/node`           | `writeJsonAtomic(path, value)`                                                  |
-| `@terminator/extension-sdk/types/renderer` | The `window.electronAPI` an extension view receives (loaded through `tsconfig`) |
+| Entry                                      | What it holds                                                                                           |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `@terminator/extension-sdk`                | `ExtensionAPI`, `ExtensionDB`, the issue-tracker types, `defineChannel`, `dispatchChannel`, `noPayload` |
+| `@terminator/extension-sdk/renderer`       | `invoke<T>(channel, payload = {})`, `mountExtension(<App />)`                                           |
+| `@terminator/extension-sdk/node`           | `writeJsonAtomic(path, value)`                                                                          |
+| `@terminator/extension-sdk/types/renderer` | The `window.electronAPI` an extension view receives (loaded through `tsconfig`)                         |
 
 Source-only TypeScript, with `react`, `react-dom` and `zod` as peer dependencies. See
 `CHANGELOG.md`.
@@ -64,14 +64,21 @@ my-extension/
 ### Main process (`src/index.ts`)
 
 ```typescript
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { z } from 'zod'
+import { defineChannel, type ExtensionAPI } from '@terminator/extension-sdk'
 
 export function activate(api: ExtensionAPI): void {
   api.log.info('My extension activated')
 
-  api.ipc.registerHandler('my-ext:hello', async (payload) => {
-    return { greeting: `Hello, ${payload}!` }
-  })
+  // The payload is parsed with `schema` before `run` sees it (ADR 096).
+  api.ipc.registerHandler(
+    defineChannel({
+      channel: 'my-ext:hello',
+      schema: z.string(),
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: (name) => ({ greeting: `Hello, ${name}!` }),
+    })
+  )
 }
 
 export function deactivate(): void {}

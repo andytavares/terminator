@@ -35,11 +35,11 @@ test('/app/ browser remote renderer loads and the IPC bridge serves workspace:li
 }) => {
   // 1. Create a workspace in the desktop app so we have something to observe remotely.
   await page.click('.sidebar-header__add')
-  await page.waitForSelector('.dialog__title')
+  await page.waitForSelector('.tmui-dialog__title')
   await page.getByPlaceholder('My Workspace').fill(WS_NAME)
   // folderPath is required by the schema; point it at the (non-repo) temp profile dir.
   await page.getByPlaceholder('/path/to/folder').fill(userDataDir)
-  await page.click('.dialog__btn-primary')
+  await page.click('.tmui-dialog__actions .tmui-button--primary')
   await expect(page.locator('.repo-header__name').filter({ hasText: WS_NAME })).toBeVisible()
 
   // 2. Set a password, then enable the remote-control server on an isolated port.

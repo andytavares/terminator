@@ -1,47 +1,42 @@
 import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
-import { createIpcRegistrar } from './register'
+import { createIpcRegistrar, IdPayload } from './register'
 
-const VALIDATION_ERROR = { error: 'VALIDATION_ERROR' }
+const CreateDiagramPayload = z
+  .object({
+    title: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+  })
+  .strict()
+  .default({})
 
 export async function createDiagram(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof CreateDiagramPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z
-    .object({
-      title: z.string().optional(),
-      tags: z.array(z.string()).optional(),
-    })
-    .strict()
-  const parsed = schema.safeParse(payload ?? {})
-  if (!parsed.success) return VALIDATION_ERROR
-
   const id = randomUUID()
   const now = new Date().toISOString()
-  const title = parsed.data.title?.trim() || 'Untitled diagram'
+  const title = args.title?.trim() || 'Untitled diagram'
 
   await db.run(
     `INSERT INTO diagrams (id, title, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
     [id, title, '{}', now, now]
   )
-  for (const tag of parsed.data.tags ?? []) {
+  for (const tag of args.tags ?? []) {
     await db.run(`INSERT INTO diagram_tags (diagram_id, tag) VALUES (?, ?)`, [id, tag])
   }
 
   return { data: { id, title, createdAt: now } }
 }
 
+const ListDiagramsPayload = z.object({ includeArchived: z.boolean().optional() }).default({})
+
 export async function listDiagrams(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof ListDiagramsPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ includeArchived: z.boolean().optional() })
-  const parsed = schema.safeParse(payload ?? {})
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const { includeArchived = false } = parsed.data
+  const { includeArchived = false } = args
 
   const archivedFilter = includeArchived ? '' : 'AND archived_at IS NULL'
   const rows = await db.query<{
@@ -86,12 +81,8 @@ export async function listDiagrams(
 
 export async function getDiagram(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
   const row = await db.get<{
     id: string
     title: string
@@ -100,14 +91,14 @@ export async function getDiagram(
     updated_at: string
     archived_at: string | null
   }>(`SELECT id, title, scene_json, created_at, updated_at, archived_at FROM diagrams WHERE id=?`, [
-    parsed.data.id,
+    args.id,
   ])
 
   if (!row) return { error: 'DIAGRAM_NOT_FOUND' }
 
   const tagRows = await db.query<{ tag: string }>(
     `SELECT tag FROM diagram_tags WHERE diagram_id=? ORDER BY tag`,
-    [parsed.data.id]
+    [args.id]
   )
 
   return {
@@ -123,20 +114,18 @@ export async function getDiagram(
   }
 }
 
+const AutosaveDiagramPayload = z.object({
+  id: z.string(),
+  title: z.string(),
+  sceneJson: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+})
+
 export async function autosaveDiagram(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof AutosaveDiagramPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({
-    id: z.string(),
-    title: z.string(),
-    sceneJson: z.string().optional(),
-    tags: z.array(z.string()).optional(),
-  })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const { id, title, sceneJson } = parsed.data
+  const { id, title, sceneJson } = args
   const now = new Date().toISOString()
 
   const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [id])
@@ -157,9 +146,9 @@ export async function autosaveDiagram(
     ])
   }
 
-  if (parsed.data.tags !== undefined) {
+  if (args.tags !== undefined) {
     await db.run(`DELETE FROM diagram_tags WHERE diagram_id=?`, [id])
-    for (const tag of parsed.data.tags) {
+    for (const tag of args.tags) {
       await db.run(`INSERT INTO diagram_tags (diagram_id, tag) VALUES (?, ?)`, [id, tag])
     }
   }
@@ -169,70 +158,55 @@ export async function autosaveDiagram(
 
 export async function archiveDiagram(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
   const archivedAt = new Date().toISOString()
-  const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [
-    parsed.data.id,
-  ])
+  const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [args.id])
   if (!existing) return { error: 'DIAGRAM_NOT_FOUND' }
 
-  await db.run('UPDATE diagrams SET archived_at=? WHERE id=?', [archivedAt, parsed.data.id])
+  await db.run('UPDATE diagrams SET archived_at=? WHERE id=?', [archivedAt, args.id])
   return { data: { archivedAt } }
 }
 
 export async function restoreDiagram(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
   const now = new Date().toISOString()
-  const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [
-    parsed.data.id,
-  ])
+  const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [args.id])
   if (!existing) return { error: 'DIAGRAM_NOT_FOUND' }
 
-  await db.run('UPDATE diagrams SET archived_at=NULL, updated_at=? WHERE id=?', [
-    now,
-    parsed.data.id,
-  ])
+  await db.run('UPDATE diagrams SET archived_at=NULL, updated_at=? WHERE id=?', [now, args.id])
   return { data: { ok: true } }
 }
 
 export async function hardDeleteDiagram(
   db: ExtensionDB,
-  payload: unknown
+  args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [
-    parsed.data.id,
-  ])
+  const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [args.id])
   if (!existing) return { error: 'DIAGRAM_NOT_FOUND' }
 
-  await db.run('DELETE FROM diagrams WHERE id=?', [parsed.data.id])
+  await db.run('DELETE FROM diagrams WHERE id=?', [args.id])
   return { data: { ok: true } }
 }
 
 export function registerDiagramsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handleRemote, cleanup } = createIpcRegistrar(api)
-  handleRemote('terminator.notepad:diagrams.create', (payload) => createDiagram(db, payload))
-  handleRemote('terminator.notepad:diagrams.list', (payload) => listDiagrams(db, payload))
-  handleRemote('terminator.notepad:diagrams.get', (payload) => getDiagram(db, payload))
-  handleRemote('terminator.notepad:diagrams.autosave', (payload) => autosaveDiagram(db, payload))
-  handleRemote('terminator.notepad:diagrams.archive', (payload) => archiveDiagram(db, payload))
-  handleRemote('terminator.notepad:diagrams.restore', (payload) => restoreDiagram(db, payload))
-  handleRemote('terminator.notepad:diagrams.hardDelete', (payload) =>
-    hardDeleteDiagram(db, payload)
+  handleRemote('terminator.notepad:diagrams.create', CreateDiagramPayload, (args) =>
+    createDiagram(db, args)
+  )
+  handleRemote('terminator.notepad:diagrams.list', ListDiagramsPayload, (args) =>
+    listDiagrams(db, args)
+  )
+  handleRemote('terminator.notepad:diagrams.get', IdPayload, (args) => getDiagram(db, args))
+  handleRemote('terminator.notepad:diagrams.autosave', AutosaveDiagramPayload, (args) =>
+    autosaveDiagram(db, args)
+  )
+  handleRemote('terminator.notepad:diagrams.archive', IdPayload, (args) => archiveDiagram(db, args))
+  handleRemote('terminator.notepad:diagrams.restore', IdPayload, (args) => restoreDiagram(db, args))
+  handleRemote('terminator.notepad:diagrams.hardDelete', IdPayload, (args) =>
+    hardDeleteDiagram(db, args)
   )
   return cleanup
 }

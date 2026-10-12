@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { ArrowDown, TriangleAlert } from 'lucide-react'
-import { Dialog } from '@terminator/extension-ui'
+import { Dialog, RelativeTime } from '@terminator/extension-ui'
 import type { ConflictBlock, GitAuthor } from '../../schemas/merge-flow.schema'
 import { highlightBlock, langFromBlockId } from '../../utils/syntax'
 
@@ -74,20 +74,6 @@ function CodePreview({
 function AuthorHeader({ author, branch }: { author?: GitAuthor; branch?: string }) {
   const [openedAt] = useState(() => Date.now())
   const hash = author?.commitHash?.slice(0, 7) ?? ''
-  const ts = author?.timestamp
-    ? (() => {
-        try {
-          const ms = openedAt - new Date(author.timestamp).getTime()
-          const min = Math.round(ms / 60000)
-          if (min < 60) return `${min}m ago`
-          const hr = Math.round(min / 60)
-          if (hr < 24) return `${hr}h ago`
-          return `${Math.round(hr / 24)}d ago`
-        } catch {
-          return ''
-        }
-      })()
-    : ''
 
   return (
     <div className="keep-both-modal__author-row">
@@ -95,7 +81,11 @@ function AuthorHeader({ author, branch }: { author?: GitAuthor; branch?: string 
       {branch && <span className="keep-both-modal__branch-tag">{branch}</span>}
       {author?.name && <span className="keep-both-modal__author-name">{author.name}</span>}
       {hash && <span className="keep-both-modal__commit-hash">{hash}</span>}
-      {ts && <span className="keep-both-modal__timestamp">{ts}</span>}
+      {author?.timestamp && (
+        <span className="keep-both-modal__timestamp">
+          <RelativeTime value={author.timestamp} now={openedAt} />
+        </span>
+      )}
     </div>
   )
 }

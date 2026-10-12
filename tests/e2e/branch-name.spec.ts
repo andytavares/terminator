@@ -52,15 +52,15 @@ test.describe.serial('branch naming', () => {
     await workspaceRow(page, WS)
       .locator('.repo-header__action[aria-label^="New branch in"]')
       .click()
-    await expect(page.locator('.dialog__title')).toContainText('Create Branch')
+    await expect(page.locator('.tmui-dialog__title')).toContainText('Create Branch')
     // The Name field only exists where there is no branch to take a name from.
     await expect(page.getByPlaceholder('My branch')).toHaveCount(0)
     // The branch is the only thing it asks for, so submitting without one is
     // refused for the branch rather than for a missing name.
-    await page.click('.dialog__btn-primary')
+    await page.click('.tmui-dialog__actions .tmui-button--primary')
     await expect(page.locator('.dialog__error')).toContainText('Select or enter a branch name')
     await page.getByRole('button', { name: 'Cancel' }).click()
-    await expect(page.locator('.dialog__title')).toHaveCount(0)
+    await expect(page.locator('.tmui-dialog__title')).toHaveCount(0)
   })
 
   test('the card follows a checkout made outside the app', async () => {
@@ -92,13 +92,13 @@ test.describe.serial('branch naming', () => {
     await workspaceRow(page, WS)
       .locator('.repo-header__action[aria-label^="New branch in"]')
       .click()
-    await expect(page.locator('.dialog__title')).toContainText('Create Branch')
+    await expect(page.locator('.tmui-dialog__title')).toContainText('Create Branch')
     await page.getByRole('button', { name: 'Worktree' }).click()
     await page.getByPlaceholder('feature/my-feature').fill('feature/busy-state')
 
-    await page.click('.dialog__btn-primary')
+    await page.click('.tmui-dialog__actions .tmui-button--primary')
     // Either caught mid-flight or already done — both prove it is not inert.
-    await expect(page.locator('.dialog__title')).toHaveCount(0, { timeout: 30_000 })
+    await expect(page.locator('.tmui-dialog__title')).toHaveCount(0, { timeout: 30_000 })
     await expect(
       page.locator('.branch-row__name', { hasText: /^feature\/busy-state$/ }).first()
     ).toBeVisible()

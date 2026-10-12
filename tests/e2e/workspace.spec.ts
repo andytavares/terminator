@@ -14,13 +14,13 @@ test.afterAll(async () => {
 test('US1-1: clicking New workspace opens a dialog with name, folder, and color fields', async () => {
   const { page } = handle
   await page.click('.sidebar-header__add')
-  await expect(page.locator('.dialog__title')).toContainText('Create Workspace')
+  await expect(page.locator('.tmui-dialog__title')).toContainText('Create Workspace')
   await expect(page.getByPlaceholder('My Workspace')).toBeVisible()
   await expect(page.getByPlaceholder('/path/to/folder')).toBeVisible()
   await expect(page.locator('.dialog__colors')).toBeVisible()
   // CreateWorkspaceDialog closes via Cancel/overlay (no Escape handler).
   await page.getByRole('button', { name: 'Cancel' }).click()
-  await expect(page.locator('.dialog__title')).toHaveCount(0)
+  await expect(page.locator('.tmui-dialog__title')).toHaveCount(0)
 })
 
 // One story from here: each test acts on the workspace the previous one
@@ -54,10 +54,10 @@ test.describe.serial('workspace lifecycle', () => {
     const { page } = handle
     await workspaceRow(page, 'My Test Workspace').click({ button: 'right' })
     await page.locator('.ctx-menu__item').filter({ hasText: 'Edit workspace' }).click()
-    await expect(page.locator('.dialog__title')).toContainText('Edit Workspace')
+    await expect(page.locator('.tmui-dialog__title')).toContainText('Edit Workspace')
     const nameInput = page.locator('.dialog__input').first()
     await nameInput.fill('Renamed Workspace')
-    await page.click('.dialog__btn-primary')
+    await page.click('.tmui-dialog__actions .tmui-button--primary')
     await expect(
       page.locator('.repo-header__name').filter({ hasText: 'Renamed Workspace' })
     ).toBeVisible()
@@ -87,13 +87,13 @@ test.describe.serial('workspace lifecycle', () => {
   test('US1-bonus: duplicate workspace name shows an inline error on submit', async () => {
     const { page } = handle
     await page.click('.sidebar-header__add')
-    await page.waitForSelector('.dialog__title')
+    await page.waitForSelector('.tmui-dialog__title')
     await page.getByPlaceholder('My Workspace').fill('Renamed Workspace')
     // Moving focus to the folder field blurs the name field, which validates and
     // surfaces the duplicate-name error (the submit button stays disabled).
     await page.getByPlaceholder('/path/to/folder').fill(handle.userDataDir)
     await expect(page.locator('.dialog__error')).toContainText('already exists')
-    await expect(page.locator('.dialog__btn-primary')).toBeDisabled()
+    await expect(page.locator('.tmui-dialog__actions .tmui-button--primary')).toBeDisabled()
     await page.getByRole('button', { name: 'Cancel' }).click()
   })
 })

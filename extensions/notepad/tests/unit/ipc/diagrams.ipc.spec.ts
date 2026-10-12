@@ -6,18 +6,19 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp') },
 }))
 import { ipcMain } from 'electron'
+import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 
 // Adapter: registerHandler forwards to the electron ipcMain mocks so existing
 // capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
 const mockApi = {
   ipc: {
-    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+    registerHandler: (spec: ChannelSpec) => {
       ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
-        ch,
-        (_e: unknown, payload: unknown) => fn(payload)
+        spec.channel,
+        (_e: unknown, payload: unknown) => dispatchChannel(spec, payload)
       )
       return {
-        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
+        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(spec.channel),
       }
     },
   },
@@ -57,16 +58,6 @@ describe('createDiagram', () => {
   it('creates with provided title', async () => {
     const result = await createDiagram(db, { title: 'My flowchart' })
     expect((result as { data: { title: string } }).data.title).toBe('My flowchart')
-  })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await createDiagram(db, { unexpectedKey: true })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('handles null payload', async () => {
-    const result = await createDiagram(db, null)
-    expect(result).toHaveProperty('data')
   })
 })
 
@@ -110,16 +101,6 @@ describe('listDiagrams', () => {
     expect(data[0].type).toBe('diagram')
   })
 
-  it('handles null payload', async () => {
-    const result = await listDiagrams(db, null)
-    expect((result as { data: unknown[] }).data).toEqual([])
-  })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await listDiagrams(db, { includeArchived: 'yes' })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
   it('returns empty tags array when no diagram_tags rows exist for diagram', async () => {
     const now = new Date().toISOString()
     await db.run(
@@ -146,11 +127,6 @@ describe('getDiagram', () => {
   it('returns DIAGRAM_NOT_FOUND for missing id', async () => {
     const result = await getDiagram(db, { id: 'nonexistent' })
     expect(result).toEqual({ error: 'DIAGRAM_NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await getDiagram(db, {})
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
   })
 
   it('returns empty tags array when no diagram_tags rows exist for diagram', async () => {
@@ -182,11 +158,6 @@ describe('autosaveDiagram', () => {
   it('returns DIAGRAM_NOT_FOUND for unknown id', async () => {
     const result = await autosaveDiagram(db, { id: 'x', title: 'T', sceneJson: '{}' })
     expect(result).toEqual({ error: 'DIAGRAM_NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR on bad payload', async () => {
-    const result = await autosaveDiagram(db, { id: 1 })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
   })
 
   it('updates title only (no sceneJson) without overwriting scene', async () => {
@@ -225,14 +196,6 @@ describe('archiveDiagram / restoreDiagram', () => {
   it('restoreDiagram returns DIAGRAM_NOT_FOUND for unknown id', async () => {
     expect(await restoreDiagram(db, { id: 'nope' })).toEqual({ error: 'DIAGRAM_NOT_FOUND' })
   })
-
-  it('archiveDiagram returns VALIDATION_ERROR for bad payload', async () => {
-    expect(await archiveDiagram(db, { id: 123 })).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('restoreDiagram returns VALIDATION_ERROR for bad payload', async () => {
-    expect(await restoreDiagram(db, null)).toEqual({ error: 'VALIDATION_ERROR' })
-  })
 })
 
 describe('hardDeleteDiagram', () => {
@@ -246,10 +209,6 @@ describe('hardDeleteDiagram', () => {
 
   it('returns DIAGRAM_NOT_FOUND for unknown id', async () => {
     expect(await hardDeleteDiagram(db, { id: 'nope' })).toEqual({ error: 'DIAGRAM_NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR for bad payload', async () => {
-    expect(await hardDeleteDiagram(db, null)).toEqual({ error: 'VALIDATION_ERROR' })
   })
 })
 
@@ -300,6 +259,20 @@ describe('registerDiagramsIpcHandlers', () => {
     await getHandler('terminator.notepad:diagrams.archive')?.(null, { id: 'noop' })
     await getHandler('terminator.notepad:diagrams.restore')?.(null, { id: 'noop' })
     await getHandler('terminator.notepad:diagrams.hardDelete')?.(null, { id: 'noop' })
+  })
+
+  it('creates and lists with defaults when the renderer sends no payload', async () => {
+    const { ipcMain } = await import('electron')
+    vi.mocked(ipcMain.handle).mockClear()
+    registerDiagramsIpcHandlers(mockApi, db)
+    const calls = vi.mocked(ipcMain.handle).mock.calls as [string, (...a: unknown[]) => unknown][]
+    const getHandler = (ch: string) => calls.find(([c]) => c === ch)![1]
+
+    const created = await getHandler('terminator.notepad:diagrams.create')(null, undefined)
+    const listed = await getHandler('terminator.notepad:diagrams.list')(null, undefined)
+
+    expect(created).toHaveProperty('data.title', 'Untitled diagram')
+    expect((listed as { data: unknown[] }).data).toHaveLength(1)
   })
 })
 

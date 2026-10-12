@@ -114,7 +114,7 @@ describe('MoveSessionDialog', () => {
 
   it('calls onClose when clicking overlay', () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
-    fireEvent.click(document.querySelector('.dialog-overlay')!)
+    fireEvent.click(document.querySelector('.tmui-dialog__scrim')!)
     expect(mockOnClose).toHaveBeenCalled()
   })
 

@@ -1,5 +1,23 @@
 # Changelog — @terminator/extension-sdk
 
+## 2.1.0
+
+### Added
+
+- `api.ipc.registerHandler(spec, opts?)` takes a `ChannelSpec` (ADR 096): the core parses the
+  payload with `spec.schema` before `spec.run` sees it, and answers a payload the schema rejects
+  with `spec.invalid` without calling `run`. `onError` turns a thrown error into a response.
+- `dispatchChannel(spec, payload)` (main entry): that parse step, shared by the core's invoke
+  table and extension channels; extension tests use it to answer a registered spec.
+- `noPayload` (main entry): the schema of a channel that takes no payload.
+- `RegisterHandlerOptions`, `RegisterChannel` and `RegisterUnvalidatedChannel` in
+  `types/api.d.ts`.
+
+### Deprecated
+
+- `api.ipc.registerHandler(channel, handler, opts?)`, whose handler receives the payload
+  unvalidated. It is removed once every first-party extension declares its schemas.
+
 ## 2.0.0
 
 ### Changed

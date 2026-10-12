@@ -1,17 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ipcMain } from 'electron'
+import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 
 // Adapter: registerHandler forwards to the electron ipcMain mocks so existing
 // capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
 const mockApi = {
   ipc: {
-    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+    registerHandler: (spec: ChannelSpec) => {
       ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
-        ch,
-        (_e: unknown, payload: unknown) => fn(payload)
+        spec.channel,
+        (_e: unknown, payload: unknown) => dispatchChannel(spec, payload)
       )
       return {
-        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
+        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(spec.channel),
       }
     },
   },
@@ -140,11 +141,6 @@ describe('createComment', () => {
     const data = (result as { data: { id: string; createdAt: string } }).data
     expect(data.id).toBeTruthy()
     expect(data.createdAt).toBeTruthy()
-  })
-
-  it('returns error on validation failure', async () => {
-    const result = await createComment(db, { noteId: 123 as unknown as string, body: 'x' })
-    expect(result).toHaveProperty('error')
   })
 })
 
@@ -307,38 +303,6 @@ describe('markOrphaned', () => {
 
     const row = await db.get<{ status: string }>('SELECT status FROM comments WHERE id = ?', [id])
     expect(row?.status).toBe('orphaned')
-  })
-})
-
-describe('validation errors', () => {
-  it('listComments returns error on invalid payload', async () => {
-    const result = await listComments(db, { noteId: 123 })
-    expect(result).toHaveProperty('error')
-  })
-
-  it('updateComment returns error on invalid payload', async () => {
-    const result = await updateComment(db, { id: 123, body: 'x' })
-    expect(result).toHaveProperty('error')
-  })
-
-  it('deleteComment returns error on invalid payload', async () => {
-    const result = await deleteComment(db, { id: 123 })
-    expect(result).toHaveProperty('error')
-  })
-
-  it('resolveComment returns error on invalid payload', async () => {
-    const result = await resolveComment(db, { id: 123, resolved: 'yes' })
-    expect(result).toHaveProperty('error')
-  })
-
-  it('updateAnchor returns error on invalid payload', async () => {
-    const result = await updateAnchor(db, { id: 123 })
-    expect(result).toHaveProperty('error')
-  })
-
-  it('markOrphaned returns error on invalid payload', async () => {
-    const result = await markOrphaned(db, { id: 123 })
-    expect(result).toHaveProperty('error')
   })
 })
 

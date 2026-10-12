@@ -25,17 +25,6 @@ describe('task-vault:vault:capture IPC handler', () => {
     expect(harness.channels()).toContain('task-vault:vault:capture')
   })
 
-  it.each([{ text: '' }, { text: '   ' }])('rejects %j and stores nothing', async (payload) => {
-    expect(await capture(payload)).toMatchObject({
-      error: expect.stringContaining('VALIDATION_ERROR'),
-    })
-    expect(await db.query('SELECT id FROM tasks')).toEqual([])
-  })
-
-  it('rejects a null payload', async () => {
-    expect(await capture(null)).toMatchObject({ error: expect.any(String) })
-  })
-
   it('stores an open inbox task and returns its id', async () => {
     const { taskId } = (await capture({ text: 'New task' })) as { taskId: string }
 

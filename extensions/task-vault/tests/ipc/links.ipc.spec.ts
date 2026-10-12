@@ -63,18 +63,6 @@ describe('task-vault:links:create', () => {
       await invoke('task-vault:links:create', { projectFilePath: 'nope', targetId: TARGET })
     ).toEqual({ error: 'NOT_FOUND' })
   })
-
-  it('returns VALIDATION_ERROR when targetId is not a UUID', async () => {
-    await seedTask(db, { id: 't1' })
-
-    expect(await invoke('task-vault:links:create', { taskId: 't1' })).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
-    expect(await invoke('task-vault:links:create', { taskId: 't1', targetId: 'nope' })).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
-    expect(await linksOf('tasks', 't1')).toEqual([])
-  })
 })
 
 describe('task-vault:links:remove', () => {
@@ -105,12 +93,6 @@ describe('task-vault:links:remove', () => {
     expect(
       await invoke('task-vault:links:remove', { projectFilePath: 'nope', targetId: TARGET })
     ).toEqual({ error: 'NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR when targetId is missing', async () => {
-    expect(await invoke('task-vault:links:remove', { taskId: 't1' })).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
   })
 })
 
@@ -153,12 +135,6 @@ describe('task-vault:links:get-for-terminator-target', () => {
     expect(
       await invoke('task-vault:links:get-for-terminator-target', { targetId: TARGET })
     ).toEqual({ tasks: [], projects: [] })
-  })
-
-  it('returns VALIDATION_ERROR for a missing targetId', async () => {
-    expect(await invoke('task-vault:links:get-for-terminator-target', {})).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
   })
 })
 

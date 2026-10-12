@@ -35,7 +35,8 @@
     "typecheck:extensions": "tsc -p extensions/foundry/tsconfig.json && tsc -p extensions/git-integration/tsconfig.json && tsc -p extensions/notepad/tsconfig.json && tsc -p extensions/task-vault/tsconfig.json && tsc -p extensions/remote-control/tsconfig.json",
     "storybook": "npm run storybook -w @terminator/extension-ui",
     "build-storybook": "npm run build-storybook -w @terminator/extension-ui",
-    "test:stories": "npm run test:stories -w @terminator/extension-ui"
+    "test:stories": "npm run test:stories -w @terminator/extension-ui",
+    "test:visual": "npm run test:visual -w @terminator/extension-ui"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

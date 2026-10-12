@@ -96,6 +96,42 @@ export const CreateAreaRequestSchema = z.object({ name: z.string().min(1) })
 export const DeleteAreaRequestSchema = z.object({ areaFilePath: z.string().min(1) })
 export const ArchiveAreaRequestSchema = z.object({ areaName: z.string().min(1) })
 
+// ── projects:update-area / projects:update-deadline / projects:rename ───────
+
+export const UpdateProjectAreaRequestSchema = z.object({
+  projectFilePath: z.string().min(1),
+  area: z.string().nullish(),
+})
+export const UpdateProjectDeadlineRequestSchema = z.object({
+  projectFilePath: z.string().min(1),
+  deadline: z.string().nullish(),
+})
+export const RenameProjectRequestSchema = z.object({
+  projectFilePath: z.string().min(1),
+  newName: z.string().trim().min(1),
+})
+
+// ── vault:rename-area / vault:list-areas ─────────────────────────────────────
+
+export const RenameAreaRequestSchema = z.object({
+  areaFilePath: z.string().min(1),
+  newName: z.string().trim().min(1),
+})
+export const ListAreasRequestSchema = z.object({ status: z.string().optional() }).default({})
+
+// ── projects:get-tasks / vault:add-subtask ───────────────────────────────────
+
+export const GetProjectTasksRequestSchema = z.object({ projectName: z.string() })
+export const AddSubtaskRequestSchema = z.object({ taskId: TaskIdSchema, text: z.string().min(1) })
+
+// ── vault:get-calendar-month / settings:set-stale-threshold ──────────────────
+
+export const CalendarMonthRequestSchema = z.object({
+  year: z.number().int(),
+  month: z.number().int().min(1).max(12),
+})
+export const StaleThresholdRequestSchema = z.object({ days: z.number().min(1) })
+
 // ── vault:list-archive ───────────────────────────────────────────────────────
 
 export const ListArchiveRequestSchema = z.object({
