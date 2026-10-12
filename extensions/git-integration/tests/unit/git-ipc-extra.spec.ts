@@ -285,19 +285,3 @@ describe('git:push handler (lines 96-110)', () => {
     expect(result.error).toBe('NO_UPSTREAM')
   })
 })
-
-describe('git:pr-status stub', () => {
-  let getHandler: (channel: string) => Handler
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    const registry = buildRegistry()
-    registerGitExtensionHandlers(registry.register)
-    getHandler = registry.getHandler
-  })
-
-  it('git:pr-status returns { pr: null }', async () => {
-    const result = await getHandler('git:pr-status')({ repoRoot: '/repo' })
-    expect(result).toEqual({ pr: null })
-  })
-})

@@ -1533,6 +1533,58 @@ describe('github:pr-create', () => {
   })
 })
 
+describe('git:pr-status', () => {
+  let handlers: Record<string, Handler>
+  const openPr = {
+    number: 4,
+    title: 'Greet in either order',
+    body: 'Adds a greeting.',
+    url: 'https://github.com/o/r/pull/4',
+    state: 'OPEN',
+    isDraft: true,
+    baseRefName: 'main',
+    headRefName: 'feat/greeting',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it("answers the checkout's branch's open pull request", async () => {
+    mockGitSuccess('feat/greeting\n')
+    mockGitSuccess(JSON.stringify(openPr))
+
+    const result = await handlers['git:pr-status']({ repoRoot: '/repo' })
+
+    expect(result).toEqual({ pr: { ...openPr, state: 'open' } })
+    expect(mockExecFile.mock.calls[0].slice(0, 2)).toEqual(['git', ['branch', '--show-current']])
+    const [command, args] = mockExecFile.mock.calls[1]
+    expect([command, args.slice(0, 3)]).toEqual(['gh', ['pr', 'view', 'feat/greeting']])
+  })
+
+  it('answers null when the branch has no pull request', async () => {
+    mockGitSuccess('feat/greeting\n')
+    mockGitFailure('no pull requests found for branch "feat/greeting"')
+
+    expect(await handlers['git:pr-status']({ repoRoot: '/repo' })).toEqual({ pr: null })
+  })
+
+  it("answers null when the branch's pull request is merged, so a new one can be opened", async () => {
+    mockGitSuccess('feat/greeting\n')
+    mockGitSuccess(JSON.stringify({ ...openPr, state: 'MERGED' }))
+
+    expect(await handlers['git:pr-status']({ repoRoot: '/repo' })).toEqual({ pr: null })
+  })
+
+  it('answers null on a detached HEAD without asking GitHub', async () => {
+    mockGitSuccess('\n')
+
+    expect(await handlers['git:pr-status']({ repoRoot: '/repo' })).toEqual({ pr: null })
+    expect(mockExecFile).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('github:pr-mark-ready', () => {
   let handlers: Record<string, Handler>
 

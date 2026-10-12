@@ -7,7 +7,7 @@ A first-party Terminator extension that adds a Git tab with a staging area, comm
 - **Staging area** — stage/unstage individual files or all at once; conflict detection blocks staging.
 - **File diff viewer** — click any file to see a syntax-highlighted unified diff with line numbers.
 - **Commit** — write a commit message and commit directly. Optionally add `--signoff` via settings.
-- **Pull Request** — click **Open Pull Request** to create or view a PR via the `gh` CLI. Supports draft PRs.
+- **Pull Request** — click **Open PR** to create a PR via the `gh` CLI, draft or not. When the branch already has an open pull request, the dialog links to it instead of opening a second (`git:pr-status`).
 - **Rich PR text** — PR descriptions, PR comments, inline review comments, the composer preview and the Open Pull Request template preview render markdown and any HTML embedded in it (`<details>`, `<br>`, `<sub>`, `<img>`, `<a>`…) through a sanitizing allowlist: scripts, frames, styles, `on*` handlers and `javascript:` links are dropped. Remote images load from their host, whether written as markdown or HTML; nothing proxies or blocks them.
 - **Auto-refresh** — the Git tab refreshes automatically when files change (the core's file-change events) and on an interval.
 - **Settings** — all behaviour is configurable globally and per-workspace (see below).
@@ -16,13 +16,13 @@ A first-party Terminator extension that adds a Git tab with a staging area, comm
 
 The extension is bundled with Terminator and activates automatically on startup.
 
-| Action             | How                                             |
-| ------------------ | ----------------------------------------------- |
-| View changed files | Open the **Git** tab above the terminal         |
-| Stage a file       | Check the file checkbox in the staging area     |
-| Stage all          | Click **Stage All**                             |
-| Commit             | Enter a message and click **Commit**            |
-| Open / create a PR | Click **Open Pull Request** (requires `gh` CLI) |
+| Action             | How                                         |
+| ------------------ | ------------------------------------------- |
+| View changed files | Open the **Git** tab above the terminal     |
+| Stage a file       | Check the file checkbox in the staging area |
+| Stage all          | Click **Stage All**                         |
+| Commit             | Enter a message and click **Commit**        |
+| Open / create a PR | Click **Open PR** (requires `gh` CLI)       |
 
 ## Settings
 

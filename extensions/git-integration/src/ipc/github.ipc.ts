@@ -152,6 +152,36 @@ function reviewSubmitError(e: unknown): { error: string } {
   return { error: ghOutput || String(e) }
 }
 
+const PR_STATUS_FIELDS = [
+  'number',
+  'title',
+  'body',
+  'url',
+  'state',
+  'isDraft',
+  'baseRefName',
+  'headRefName',
+]
+
+/** The open pull request from the checkout's branch, which Open PR shows instead of opening a second. */
+async function openPullRequestForBranch(repoRoot: string, access: GithubAccess) {
+  const branch = (await runGit(repoRoot, ['branch', '--show-current'])).trim()
+  if (!branch) return { pr: null }
+  const target = githubTarget(repoRoot, access)
+  const pr = await access.github.pullRequests.view(target, branch, PR_STATUS_FIELDS)
+  return { pr: pr.state === 'OPEN' ? { ...pr, state: 'open' } : null }
+}
+
+// gh fails when the branch has no pull request; the dialog then opens one.
+const pullRequestStatusChannel = (access: GithubAccess) =>
+  defineChannel({
+    channel: 'git:pr-status',
+    schema: RepoRootPayload,
+    invalid: VALIDATION_ERROR,
+    run: ({ repoRoot }) => openPullRequestForBranch(repoRoot, access),
+    onError: () => ({ pr: null }),
+  })
+
 /** The last line of a gh failure, e.g. "gh: HTTP 502"; the first lines echo the whole command. */
 function lastLine(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error)
@@ -168,6 +198,7 @@ export function registerGithubHandlers(
   isBranchExcluded: BranchExclusionQuery = async () => false
 ): void {
   const register = withTiming(registerRaw)
+  register(pullRequestStatusChannel(access))
   const excludedIn = (prs: ReadonlyArray<{ headRefName: string }>, repoPath: string) =>
     resolveBranchExclusions(
       isBranchExcluded,
