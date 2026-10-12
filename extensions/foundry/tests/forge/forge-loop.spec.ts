@@ -292,6 +292,11 @@ describe('the very first draft', () => {
     await untilLedgerHas('scout.collected')
     const entries = await createOrderStore(dataDir).entries('WO-1')
     expect(entries.find((e) => e.action === 'scout.collected')?.reason).toBe('found 1 entry point')
+    // The loop goes on to the red team's round. Left running, it would write
+    // into the next case's records once beforeEach moves dataDir.
+    await vi.waitFor(() => expect(said()).toContain('Make it red is ready to hand off.'), {
+      timeout: 10_000,
+    })
   })
 })
 
