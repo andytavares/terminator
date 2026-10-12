@@ -6,7 +6,7 @@ export type * from '../types/issues'
 /**
  * One invoke channel: its payload schema, the response to a payload the
  * schema rejects, and how to answer a valid one. The core registers its own
- * channels in this shape (ADR 096).
+ * channels in this shape, and so does `api.ipc.registerHandler` (ADR 096).
  */
 export interface ChannelSpec<S extends z.ZodType = z.ZodType> {
   channel: string
@@ -22,4 +22,23 @@ export interface ChannelSpec<S extends z.ZodType = z.ZodType> {
 /** Identity helper so each channel infers its own schema's payload type. */
 export function defineChannel<S extends z.ZodType>(spec: ChannelSpec<S>): ChannelSpec {
   return spec as unknown as ChannelSpec
+}
+
+/**
+ * Answers one invoke of `spec`: parses the payload, returns the declared
+ * invalid response when the schema rejects it, and otherwise runs the channel.
+ */
+export async function dispatchChannel(spec: ChannelSpec, payload: unknown): Promise<unknown> {
+  const parsed = spec.schema.safeParse(payload)
+  if (!parsed.success) {
+    return typeof spec.invalid === 'function'
+      ? (spec.invalid as (error: z.ZodError) => unknown)(parsed.error)
+      : spec.invalid
+  }
+  try {
+    return await spec.run(parsed.data)
+  } catch (e) {
+    if (spec.onError) return spec.onError(e)
+    throw e
+  }
 }
