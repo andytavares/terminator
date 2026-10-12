@@ -1,6 +1,5 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { MessageSquarePlus } from 'lucide-react'
 import { Button } from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
 import { useEditorStore } from '../stores/editor.store'
@@ -9,29 +8,35 @@ import { NoteList } from './NoteList'
 import { NoteOutline } from './NoteOutline'
 import { EmptyState } from './EmptyState'
 import { DiagramView } from './DiagramView'
-import { CommentMargin } from './CommentMargin'
-import { CommentComposer } from './CommentComposer'
 import { ExportDialog } from './ExportDialog'
 import { SearchOverlay } from './SearchOverlay'
-import {
-  NoteEditor,
-  applyAnchors,
-  applyExternalDoc,
-  scrollToAnchor,
-  scrollToPosition,
-  setEditorHoverAnchor,
-  type SelectionAnchor,
-} from '../editor/NoteEditor'
+import { NoteEditor, applyExternalDoc, scrollToPosition } from '../editor/NoteEditor'
 import { ORIGIN_ID, onForeignNoteChange } from '../editor/noteSync'
-import { reanchorComment } from '../editor/reanchor'
-import { commentAnchorField } from '../editor/commentField'
+import {
+  AUTOSAVE_DELAY_MS,
+  deriveNoteTitle,
+  reanchorAfterSave,
+  reanchorComments,
+  schedulePersist,
+} from './noteComments'
+import {
+  CommentColumn,
+  EditorCommentOverlays,
+  applyStoredAnchors,
+  hoveredAnchor,
+  useCommentCards,
+  useCommentDraft,
+  useCommentHover,
+  useMarginScrollSync,
+  type ViewRef,
+} from './noteSurface'
 import type { EditorView } from '@codemirror/view'
-import type { Comment } from '../db/types'
+import type { Comment, NoteListItem } from '../db/types'
 
-const AUTOSAVE_DELAY_MS = 800
-const ANCHOR_DEBOUNCE_MS = 2000
-const CARD_HEIGHT_EST = 110
-const CARD_GAP = 8
+type TimerRef = React.MutableRefObject<ReturnType<typeof setTimeout> | null>
+
+/** Which of the panel's optional surfaces are showing. */
+type PanelToggles = ReturnType<typeof usePanelToggles>
 
 async function importNotes(onDone: () => void): Promise<void> {
   const result = await window.electronAPI.extensionBridge.invoke(
@@ -46,709 +51,546 @@ async function importNotes(onDone: () => void): Promise<void> {
   onDone()
 }
 
+async function reloadNoteList(): Promise<void> {
+  const result = await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.list', {
+    includeArchived: true,
+  })
+  const data = (result as { data?: NoteListItem[] }).data
+  if (Array.isArray(data)) useNotesStore.getState().setNotes(data)
+}
+
+/** Loads the note, diagram and folder lists. */
+async function loadLists(): Promise<void> {
+  const bridge = window.electronAPI.extensionBridge
+  const [notesResult, diagramsResult, foldersResult] = await Promise.all([
+    bridge.invoke('terminator.notepad:notes.list', { includeArchived: true }),
+    bridge.invoke('terminator.notepad:diagrams.list', { includeArchived: true }),
+    bridge.invoke('terminator.notepad:folders.list', {}),
+  ])
+  const store = useNotesStore.getState()
+  const listOf = (result: unknown) => (result as { data?: unknown[] }).data
+  const notesData = listOf(notesResult)
+  if (Array.isArray(notesData)) store.setNotes(notesData as NoteListItem[])
+  const diagramsData = listOf(diagramsResult)
+  if (Array.isArray(diagramsData)) store.setDiagrams(diagramsData as typeof store.diagrams)
+  const foldersData = listOf(foldersResult)
+  if (Array.isArray(foldersData)) store.setFolders(foldersData as typeof store.folders)
+}
+
 export function NotepadView(): React.JSX.Element {
+  const toggles = usePanelToggles()
+  const { selectedNoteId, selectedDiagramId, notes, diagrams } = useNotesStore()
+  // The session outlives the editor pane: it flushes an edit when a diagram is
+  // opened and keeps cached bodies current while none is showing.
+  const session = useNoteSession(selectedNoteId)
+  useNotepadShortcuts(toggles)
+  useListsAndSelectionPush()
+
+  const search = toggles.showSearch && (
+    <SearchOverlay onClose={() => toggles.setShowSearch(false)} />
+  )
+  if (notes.length === 0 && diagrams.length === 0) {
+    return <EmptyNotepad search={search} />
+  }
+
+  if (selectedDiagramId) return <DiagramWorkspace search={search} diagramId={selectedDiagramId} />
+  return <NoteWorkspace toggles={toggles} search={search} session={session} />
+}
+
+/** A selected diagram's canvas, in place of the editor pane. */
+function DiagramWorkspace(props: { search: React.ReactNode; diagramId: string }) {
+  const { search, diagramId } = props
+  return (
+    <div className="notepad-view">
+      {search}
+      <div className="notepad-view__sidebar">
+        <NoteList />
+      </div>
+      <div className="notepad-view__editor notepad-view__editor--diagram">
+        <DiagramView key={diagramId} diagramId={diagramId} />
+      </div>
+    </div>
+  )
+}
+
+function usePanelToggles() {
   const [showExport, setShowExport] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [showComments, setShowComments] = useState(true)
   const [showOutline, setShowOutline] = useState(true)
   const [readingMode, setReadingMode] = useState(false)
-  const [loadedNoteId, setLoadedNoteId] = useState<string | null>(null)
-  const [pendingAnchor, setPendingAnchor] = useState<SelectionAnchor | null>(null)
-  const [composingAnchor, setComposingAnchor] = useState<SelectionAnchor | null>(null)
-  const [anchorTops, setAnchorTops] = useState<Record<string, number>>({})
-  const [panelContentHeight, setPanelContentHeight] = useState(0)
-  const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
-  const [commentHover, setCommentHover] = useState<{ id: string; top: number } | null>(null)
-  const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const {
-    selectedNoteId,
-    selectedDiagramId,
-    notes,
-    setNotes,
-    setDiagrams,
-    setFolders,
-    setShowQuickCreate,
-  } = useNotesStore()
-  const {
-    bodyDraft,
-    isDirty,
-    saveStatus,
-    previewMode,
-    setActiveNote,
-    markDirty,
-    markSaving,
-    markSaved,
-    markError,
-    togglePreviewMode,
-  } = useEditorStore()
-  const { comments, setComments } = useCommentsStore()
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const anchorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const activeIdRef = useRef<string | null>(null)
-  const editorViewRef = useRef<EditorView | null>(null)
-  const commentPanelRef = useRef<HTMLDivElement>(null)
-  const editorWrapRef = useRef<HTMLDivElement>(null)
+  return {
+    ...{ showExport, setShowExport, showSearch, setShowSearch },
+    ...{ showComments, setShowComments, showOutline, setShowOutline, readingMode, setReadingMode },
+  }
+}
 
-  // Load note + diagram + folder lists on mount
+function EmptyNotepad({ search }: { search: React.ReactNode }): React.JSX.Element {
+  const setShowQuickCreate = useNotesStore((s) => s.setShowQuickCreate)
+  return (
+    <div className="notepad-view notepad-view--empty-screen">
+      {search}
+      <EmptyState
+        onNewNote={() => setShowQuickCreate(true)}
+        onImport={() => void importNotes(() => void reloadNoteList())}
+      />
+    </div>
+  )
+}
+
+/**
+ * Cmd+Alt+M toggles the comment margin. Handled here rather than via globalShortcut so it
+ * fires only while Terminator is focused and this view is mounted. The chord matches the
+ * CommandOrControl+Alt+M accelerator this replaced — keep them in sync so the binding
+ * users already know does not silently move.
+ *
+ * Matched on e.code, not e.key: on macOS Option+M emits the dead-key character 'µ', so an
+ * e.key === 'm' comparison never fires while Alt is held. Cmd+Shift+F opens search.
+ */
+function useNotepadShortcuts(toggles: PanelToggles): void {
+  const { setShowComments, setReadingMode, setShowExport, setShowSearch } = toggles
   useEffect(() => {
-    async function loadList() {
-      try {
-        const [notesResult, diagramsResult, foldersResult] = await Promise.all([
-          window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.list', {
-            includeArchived: true,
-          }),
-          window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.list', {
-            includeArchived: true,
-          }),
-          window.electronAPI.extensionBridge.invoke('terminator.notepad:folders.list', {}),
-        ])
-        const notesData = (notesResult as { data?: unknown[] }).data
-        if (Array.isArray(notesData)) setNotes(notesData as Parameters<typeof setNotes>[0])
-        const diagramsData = (diagramsResult as { data?: unknown[] }).data
-        if (Array.isArray(diagramsData))
-          setDiagrams(diagramsData as Parameters<typeof setDiagrams>[0])
-        const foldersData = (foldersResult as { data?: unknown[] }).data
-        if (Array.isArray(foldersData)) setFolders(foldersData as Parameters<typeof setFolders>[0])
-      } catch (err) {
-        console.error('[notepad] Failed to load list', err)
-      }
+    const handlers: Record<string, () => void> = {
+      'notepad:toggleComments': () => setShowComments((v) => !v),
+      'notepad:toggleEditorMode': () => setReadingMode((v) => !v),
+      'notepad:openExport': () => setShowExport(true),
     }
-    void loadList()
-  }, [setNotes, setDiagrams, setFolders])
-
-  // Push-down layout for comment cards
-  const computeAnchorTops = useCallback((view: EditorView, commentList: Comment[]) => {
-    requestAnimationFrame(() => {
-      const scrollTop = view.scrollDOM.scrollTop
-      const rect = view.scrollDOM.getBoundingClientRect()
-
-      // Use live-mapped positions from the editor state field (updated on every keystroke)
-      const livePositions = new Map(view.state.field(commentAnchorField).map((a) => [a.id, a.from]))
-
-      type Target = { id: string; targetTop: number; createdAt: string }
-      const targets: Target[] = []
-
-      for (const c of commentList) {
-        if (c.parentId === null && c.status !== 'orphaned') {
-          const livePos = livePositions.get(c.id)
-          const rawPos = livePos !== undefined ? livePos : c.startOffset
-          if (rawPos === null) continue
-          const pos = Math.min(rawPos, Math.max(0, view.state.doc.length - 1))
-          try {
-            const coords = view.coordsAtPos(pos)
-            if (coords) {
-              targets.push({
-                id: c.id,
-                targetTop: coords.top - rect.top + scrollTop,
-                createdAt: c.createdAt,
-              })
-            }
-          } catch {
-            /* out of viewport */
-          }
-        }
-      }
-
-      targets.sort((a, b) => a.targetTop - b.targetTop || a.createdAt.localeCompare(b.createdAt))
-
-      const tops: Record<string, number> = {}
-      let prevBottom = 0
-      for (const t of targets) {
-        const top = Math.max(t.targetTop, prevBottom + CARD_GAP)
-        tops[t.id] = top
-        prevBottom = top + CARD_HEIGHT_EST
-      }
-
-      setAnchorTops(tops)
-      const lastTop = Object.values(tops).reduce((max, v) => Math.max(max, v), 0)
-      setPanelContentHeight(Math.max(view.scrollDOM.scrollHeight, lastTop + CARD_HEIGHT_EST + 20))
-    })
-  }, [])
-
-  // Re-apply anchors + recompute whenever comments change
-  useEffect(() => {
-    const view = editorViewRef.current
-    if (!view || !selectedNoteId) return
-
-    const validAnchors = comments
-      .filter((c) => c.parentId === null && c.status !== 'orphaned')
-      .map((c) => ({ id: c.id, from: c.startOffset ?? 0, to: c.endOffset ?? 0 }))
-      .filter((a) => a.from < a.to)
-
-    applyAnchors(view, validAnchors)
-    computeAnchorTops(view, comments)
-  }, [comments, selectedNoteId, computeAnchorTops])
-
-  // Sync comment panel scroll with editor scroll
-  useEffect(() => {
-    if (!selectedNoteId) return
-    let removeScroll: (() => void) | undefined
-    const t = setTimeout(() => {
-      const view = editorViewRef.current
-      const panel = commentPanelRef.current
-      if (!view || !panel) return
-      const onEditorScroll = () => {
-        panel.scrollTop = view.scrollDOM.scrollTop
-      }
-      view.scrollDOM.addEventListener('scroll', onEditorScroll, { passive: true })
-      removeScroll = () => view.scrollDOM.removeEventListener('scroll', onEditorScroll)
-    }, 100)
+    const onKeyDown = (e: KeyboardEvent) => {
+      const action = shortcutAction(e)
+      if (!action) return
+      e.preventDefault()
+      if (action === 'comments') handlers['notepad:toggleComments']()
+      else setShowSearch(true)
+    }
+    for (const name of Object.keys(handlers)) window.addEventListener(name, handlers[name])
+    document.addEventListener('keydown', onKeyDown)
     return () => {
-      clearTimeout(t)
-      removeScroll?.()
+      for (const name of Object.keys(handlers)) window.removeEventListener(name, handlers[name])
+      document.removeEventListener('keydown', onKeyDown)
     }
-  }, [selectedNoteId])
+  }, [setShowComments, setReadingMode, setShowExport, setShowSearch])
+}
 
-  // Load selected note body and comments
+function shortcutAction(e: KeyboardEvent): 'comments' | 'search' | null {
+  const mod = e.metaKey || e.ctrlKey
+  if (mod && e.altKey && e.code === 'KeyM') return 'comments'
+  if (mod && e.shiftKey && e.key === 'f') return 'search'
+  return null
+}
+
+/**
+ * Loads the lists on mount. The open-in-window push selects its note. The tab activation is the main
+ * process's job and it already does it (index.ts broadcasts
+ * extension:activate-global-tab). Calling the core registry from here reached a
+ * *copy* of that store bundled into this view, so it moved nothing.
+ */
+function useListsAndSelectionPush(): void {
   useEffect(() => {
-    if (!selectedNoteId) return
-    const noteId = selectedNoteId
+    loadLists().catch((err) => console.error('[notepad] Failed to load list', err))
+  }, [])
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on(
+      'terminator.notepad:selectNote',
+      (data: unknown) => {
+        const id = (data as { id?: string })?.id
+        if (id) useNotesStore.getState().setSelected(id)
+      }
+    )
+  }, [])
+}
+
+interface NoteWorkspaceProps {
+  toggles: PanelToggles
+  search: React.ReactNode
+  session: NoteSession
+}
+
+/** The sidebar, the open note's editor, and its outline and comment rail. */
+function NoteWorkspace({ toggles, search, session }: NoteWorkspaceProps) {
+  const { selectedNoteId } = session
+  return (
+    <div className="notepad-view">
+      {search}
+      <div className="notepad-view__sidebar">
+        <NoteList />
+      </div>
+      <div className="notepad-view__editor">
+        <NotepadToolbar toggles={toggles} />
+        {toggles.showExport && (
+          <ExportDialog
+            onClose={() => toggles.setShowExport(false)}
+            noteId={selectedNoteId ?? undefined}
+          />
+        )}
+        {selectedNoteId ? (
+          <NoteEditorPane session={session} readingMode={toggles.readingMode} />
+        ) : (
+          <div className="notepad-view__no-selection">Select a note to start editing</div>
+        )}
+      </div>
+      <NotepadRail session={session} toggles={toggles} />
+    </div>
+  )
+}
+
+/** The open note's editor state: its body, autosave, comments and their layout. */
+function useNoteSession(selectedNoteId: string | null) {
+  const comments = useCommentsStore((s) => s.comments)
+  const editorViewRef: ViewRef = useRef<EditorView | null>(null)
+  const commentPanelRef = useRef<HTMLDivElement>(null)
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const activeIdRef = useRef<string | null>(null)
+  const draft = useCommentDraft()
+  const hover = useCommentHover()
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
+
+  const cards = useCommentCards(editorViewRef, comments, { noteId: selectedNoteId })
+  useMarginScrollSync(editorViewRef, commentPanelRef, selectedNoteId)
+  const loadedNoteId = useOpenNote(selectedNoteId, autosaveTimerRef, activeIdRef)
+  useForeignNoteAdoption(activeIdRef, editorViewRef)
+  const scheduleAutosave = useAutosave(selectedNoteId, autosaveTimerRef)
+
+  return {
+    ...{ selectedNoteId, loadedNoteId, editorViewRef, commentPanelRef, scheduleAutosave },
+    ...{ draft, hover, activeCommentId, setActiveCommentId, ...cards },
+  }
+}
+
+type NoteSession = ReturnType<typeof useNoteSession>
+
+/**
+ * Loads the selected note's body and comments, and on leaving a note flushes an
+ * unsaved edit. Resolves to the id of the note whose body is in the editor.
+ */
+function useOpenNote(noteId: string | null, autosaveTimerRef: TimerRef, activeIdRef: IdRef) {
+  const [loadedNoteId, setLoadedNoteId] = useState<string | null>(null)
+  const anchorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (!noteId) return
     activeIdRef.current = noteId
     // Clear stale comments immediately so the previous note's anchors don't
     // get applied to the newly mounted editor before the new note loads.
-    setComments([])
+    useCommentsStore.getState().setComments([])
+    loadNoteAndComments(noteId, { activeIdRef, anchorTimerRef, onLoaded: setLoadedNoteId }).catch(
+      (err) => console.error('[notepad] Failed to load note', err)
+    )
+    return () => flushUnsavedNote(noteId, autosaveTimerRef)
+  }, [noteId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    async function loadNoteAndComments() {
-      try {
-        // Use the in-session body cache when available so content is never lost
-        // due to a race between a cleanup flush and this DB read.
-        const cachedBody = useNotesStore.getState().bodyCache[noteId]
-
-        const [bodyResult, commentsResult] = await Promise.all([
-          cachedBody !== undefined
-            ? Promise.resolve({ data: { body: cachedBody } })
-            : window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.get', {
-                id: noteId,
-              }),
-          window.electronAPI.extensionBridge.invoke('terminator.notepad:comments.list', {
-            noteId: noteId,
-            includeResolved: true,
-          }),
-        ])
-
-        const note = (bodyResult as { data?: { body: string } }).data
-        if (!note || activeIdRef.current !== noteId) return
-        // Populate the cache on first DB fetch so future navigate-backs skip the round-trip
-        if (cachedBody === undefined) {
-          useNotesStore.getState().setBodyCache(noteId, note.body)
-        }
-        setActiveNote(noteId, note.body)
-        setLoadedNoteId(noteId)
-
-        const allComments = (commentsResult as { data?: Comment[] }).data ?? []
-        const anchorUpdates: { id: string; newFrom: number; newTo: number }[] = []
-        const orphanIds: string[] = []
-
-        for (const comment of allComments) {
-          if (comment.parentId !== null || comment.status === 'orphaned') continue
-          const result = reanchorComment(comment, note.body)
-          if (result.status === 'orphaned') {
-            orphanIds.push(comment.id)
-          } else if (result.newFrom !== undefined && result.newTo !== undefined) {
-            anchorUpdates.push({ id: comment.id, newFrom: result.newFrom, newTo: result.newTo })
-          }
-        }
-
-        // Apply reanchored offsets and orphan status immediately
-        const updatedMap = new Map(anchorUpdates.map((u) => [u.id, u]))
-        const orphanSet = new Set(orphanIds)
-        setComments(
-          allComments.map((c) => {
-            if (orphanSet.has(c.id)) return { ...c, status: 'orphaned' as const }
-            const upd = updatedMap.get(c.id)
-            return upd ? { ...c, startOffset: upd.newFrom, endOffset: upd.newTo } : c
-          })
-        )
-
-        if (anchorUpdates.length > 0 || orphanIds.length > 0) {
-          if (anchorTimer.current) clearTimeout(anchorTimer.current)
-          anchorTimer.current = setTimeout(async () => {
-            await Promise.all([
-              ...anchorUpdates.map((u) =>
-                window.electronAPI.extensionBridge
-                  .invoke('terminator.notepad:comments.updateAnchor', {
-                    id: u.id,
-                    startOffset: u.newFrom,
-                    endOffset: u.newTo,
-                  })
-                  .catch((err) => console.error('[notepad] updateAnchor failed', err))
-              ),
-              ...orphanIds.map((id) =>
-                window.electronAPI.extensionBridge
-                  .invoke('terminator.notepad:comments.markOrphaned', { id })
-                  .catch((err) => console.error('[notepad] markOrphaned failed', err))
-              ),
-            ])
-          }, ANCHOR_DEBOUNCE_MS)
-        }
-      } catch (err) {
-        console.error('[notepad] Failed to load note', err)
-      }
-    }
-
-    void loadNoteAndComments()
-
+  useEffect(() => {
     return () => {
-      // Flush pending autosave for this note before switching to another.
-      // Check isDirty first — if the timer already fired but the save is still
-      // in-flight (or failed), autosaveTimer.current may be null while isDirty
-      // is still true, so we must not gate the flush on the timer alone.
-      const { bodyDraft, isDirty } = useEditorStore.getState()
-      if (isDirty) {
-        if (autosaveTimer.current) {
-          clearTimeout(autosaveTimer.current)
-          autosaveTimer.current = null
-        }
-        // Cache the body optimistically so navigate-back never reads stale DB data
-        // even if this fire-and-forget flush races with the next notes.get call.
-        useNotesStore.getState().setBodyCache(selectedNoteId, bodyDraft)
-        const n = useNotesStore.getState().notes.find((x) => x.id === selectedNoteId)
-        const headingMatch = /^#{1,6}\s+(.+)/m.exec(bodyDraft)
-        const firstLine = bodyDraft.split('\n').find((l) => l.trim().length > 0)
-        const title = headingMatch
-          ? headingMatch[1].trim()
-          : (firstLine?.trim().slice(0, 120) ?? 'Untitled note')
-        window.electronAPI.extensionBridge
-          .invoke('terminator.notepad:notes.autosave', {
-            id: selectedNoteId,
-            title,
-            body: bodyDraft,
-            tags: n?.tags ?? [],
-            originId: ORIGIN_ID,
-          })
-          .catch((err) => console.error('[notepad] flush autosave failed', err))
-      } else if (autosaveTimer.current) {
-        clearTimeout(autosaveTimer.current)
-        autosaveTimer.current = null
-      }
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
+      if (anchorTimerRef.current) clearTimeout(anchorTimerRef.current)
     }
-  }, [selectedNoteId, setActiveNote, setComments])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Adopt bodies saved by another surface (a popped-out note window) so the
-  // panel never serves — or re-saves — a stale copy of the same note.
+  return loadedNoteId
+}
+
+type IdRef = React.MutableRefObject<string | null>
+
+/** Where a note load records what it opened. */
+interface NoteLoad {
+  activeIdRef: IdRef
+  anchorTimerRef: TimerRef
+  onLoaded: (noteId: string) => void
+}
+
+/**
+ * Reads the body (from the in-session cache when there is one, so content is
+ * never lost to a race between a cleanup flush and this read) and the comments,
+ * re-anchoring the comments to the body. Does nothing when the note is gone or
+ * another note was opened meanwhile.
+ */
+async function loadNoteAndComments(noteId: string, load: NoteLoad): Promise<void> {
+  const { activeIdRef, anchorTimerRef } = load
+  const cachedBody = useNotesStore.getState().bodyCache[noteId]
+  const [note, commentsResult] = await Promise.all([
+    readNoteBody(noteId, cachedBody),
+    window.electronAPI.extensionBridge.invoke('terminator.notepad:comments.list', {
+      noteId,
+      includeResolved: true,
+    }),
+  ])
+
+  if (!note || activeIdRef.current !== noteId) return
+  // Populate the cache on first DB fetch so future navigate-backs skip the round-trip
+  if (cachedBody === undefined) useNotesStore.getState().setBodyCache(noteId, note.body)
+  useEditorStore.getState().setActiveNote(noteId, note.body)
+  load.onLoaded(noteId)
+
+  const reanchored = reanchorComments(
+    (commentsResult as { data?: Comment[] }).data ?? [],
+    note.body
+  )
+  useCommentsStore.getState().setComments(reanchored.comments)
+  schedulePersist(anchorTimerRef, reanchored)
+}
+
+async function readNoteBody(noteId: string, cachedBody: string | undefined) {
+  if (cachedBody !== undefined) return { body: cachedBody }
+  const result = await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.get', {
+    id: noteId,
+  })
+  return (result as { data?: { body: string } }).data
+}
+
+/**
+ * Flushes a pending autosave for the note being left. Checks isDirty rather
+ * than the timer: if the timer already fired but its save is in flight (or
+ * failed), the timer is null while the edit is still unsaved. The body is
+ * cached optimistically so navigating back never reads stale DB data, even if
+ * this fire-and-forget flush races the next notes.get.
+ */
+function flushUnsavedNote(noteId: string, autosaveTimerRef: TimerRef): void {
+  const { bodyDraft, isDirty } = useEditorStore.getState()
+  if (autosaveTimerRef.current) {
+    clearTimeout(autosaveTimerRef.current)
+    autosaveTimerRef.current = null
+  }
+  if (!isDirty) return
+  useNotesStore.getState().setBodyCache(noteId, bodyDraft)
+  const n = useNotesStore.getState().notes.find((x) => x.id === noteId)
+  window.electronAPI.extensionBridge
+    .invoke('terminator.notepad:notes.autosave', {
+      id: noteId,
+      title: deriveNoteTitle(bodyDraft),
+      body: bodyDraft,
+      tags: n?.tags ?? [],
+      originId: ORIGIN_ID,
+    })
+    .catch((err) => console.error('[notepad] flush autosave failed', err))
+}
+
+/**
+ * Adopts bodies saved by another surface (a popped-out note window) so the
+ * panel never serves — or re-saves — a stale copy of the same note. A local
+ * edit still in flight is newer than the push, so it is left alone: its own
+ * save will win and re-broadcast.
+ */
+function useForeignNoteAdoption(activeIdRef: IdRef, editorViewRef: ViewRef): void {
   useEffect(() => {
     return onForeignNoteChange((event) => {
-      useNotesStore.getState().setBodyCache(event.id, event.body)
-      useNotesStore.getState().patchNote(event.id, {
+      const notesStore = useNotesStore.getState()
+      notesStore.setBodyCache(event.id, event.body)
+      notesStore.patchNote(event.id, {
         title: event.title,
         updatedAt: event.updatedAt,
         bodyPreview: event.body.slice(0, 120),
         tags: event.tags,
       })
       if (event.id !== activeIdRef.current) return
-      // A local edit still in flight is newer than this push — leave it alone;
-      // its own save will win and re-broadcast.
       if (useEditorStore.getState().isDirty) return
       applyExternalDoc(editorViewRef.current, event.body)
-      setActiveNote(event.id, event.body)
+      useEditorStore.getState().setActiveNote(event.id, event.body)
     })
-  }, [setActiveNote])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+}
 
-  const scheduleAutosave = useCallback(
+/** Saves an edit once typing pauses. */
+function useAutosave(noteId: string | null, autosaveTimerRef: TimerRef) {
+  return useCallback(
     (newBody: string) => {
-      if (!selectedNoteId) return
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
-      autosaveTimer.current = setTimeout(async () => {
-        markSaving()
-        const note = notes.find((n) => n.id === selectedNoteId)
-        const headingMatch = /^#{1,6}\s+(.+)/m.exec(newBody)
-        const firstLine = newBody.split('\n').find((l) => l.trim().length > 0)
-        const derivedTitle = headingMatch
-          ? headingMatch[1].trim()
-          : (firstLine?.trim().slice(0, 120) ?? 'Untitled note')
-        try {
-          await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.autosave', {
-            id: selectedNoteId,
-            title: derivedTitle,
-            body: newBody,
-            tags: note?.tags ?? [],
-            originId: ORIGIN_ID,
-          })
-          markSaved()
-          // Keep the sidebar and body cache in sync so navigate-back never loses content
-          const savedAt = new Date().toISOString()
-          useNotesStore.getState().patchNote(selectedNoteId, {
-            title: derivedTitle,
-            updatedAt: savedAt,
-            bodyPreview: newBody.slice(0, 120),
-          })
-          useNotesStore.getState().setBodyCache(selectedNoteId, newBody)
-
-          // Re-check anchors after save against the live editor body, not the
-          // stale newBody captured at debounce time — the user may have typed
-          // more during the IPC round-trip.
-          const liveBody = useEditorStore.getState().bodyDraft
-          const currentComments = useCommentsStore.getState().comments
-          const orphanIds: string[] = []
-          const anchorUpdates: { id: string; newFrom: number; newTo: number }[] = []
-
-          for (const comment of currentComments) {
-            if (comment.parentId !== null || comment.status === 'orphaned') continue
-            const result = reanchorComment(comment, liveBody)
-            if (result.status === 'orphaned') {
-              orphanIds.push(comment.id)
-            } else if (result.newFrom !== undefined && result.newTo !== undefined) {
-              anchorUpdates.push({ id: comment.id, newFrom: result.newFrom, newTo: result.newTo })
-            }
-          }
-
-          if (orphanIds.length > 0 || anchorUpdates.length > 0) {
-            const updatedMap = new Map(anchorUpdates.map((u) => [u.id, u]))
-            useCommentsStore.getState().setComments(
-              currentComments.map((c) => {
-                if (orphanIds.includes(c.id)) return { ...c, status: 'orphaned' as const }
-                const upd = updatedMap.get(c.id)
-                return upd ? { ...c, startOffset: upd.newFrom, endOffset: upd.newTo } : c
-              })
-            )
-            await Promise.all([
-              ...orphanIds.map((id) =>
-                window.electronAPI.extensionBridge
-                  .invoke('terminator.notepad:comments.markOrphaned', { id })
-                  .catch((err) => console.error('[notepad] markOrphaned failed', err))
-              ),
-              ...anchorUpdates.map((u) =>
-                window.electronAPI.extensionBridge
-                  .invoke('terminator.notepad:comments.updateAnchor', {
-                    id: u.id,
-                    startOffset: u.newFrom,
-                    endOffset: u.newTo,
-                  })
-                  .catch((err) => console.error('[notepad] updateAnchor failed', err))
-              ),
-            ])
-          }
-        } catch (err) {
-          console.error('[notepad] Autosave failed', err)
-          markError()
-        }
-      }, AUTOSAVE_DELAY_MS)
+      if (!noteId) return
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
+      autosaveTimerRef.current = setTimeout(
+        () => void autosaveNote(noteId, newBody),
+        AUTOSAVE_DELAY_MS
+      )
     },
-    [selectedNoteId, notes, markSaving, markSaved, markError]
+    [noteId] // eslint-disable-line react-hooks/exhaustive-deps
   )
+}
 
-  function handleEditorChange(newBody: string) {
-    markDirty(newBody)
-    scheduleAutosave(newBody)
+/** Saves the body, then keeps the sidebar and body cache in step and re-anchors comments. */
+async function autosaveNote(noteId: string, body: string): Promise<void> {
+  const editor = useEditorStore.getState()
+  editor.markSaving()
+  const note = useNotesStore.getState().notes.find((n) => n.id === noteId)
+  const title = deriveNoteTitle(body)
+  try {
+    await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.autosave', {
+      id: noteId,
+      title,
+      body,
+      tags: note?.tags ?? [],
+      originId: ORIGIN_ID,
+    })
+    editor.markSaved()
+    const notesStore = useNotesStore.getState()
+    notesStore.patchNote(noteId, {
+      title,
+      updatedAt: new Date().toISOString(),
+      bodyPreview: body.slice(0, 120),
+    })
+    notesStore.setBodyCache(noteId, body)
+    await reanchorAfterSave(useEditorStore.getState().bodyDraft)
+  } catch (err) {
+    console.error('[notepad] Autosave failed', err)
+    editor.markError()
   }
+}
 
-  useEffect(() => {
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
-      if (anchorTimer.current) clearTimeout(anchorTimer.current)
-      if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current)
-    }
-  }, [])
+function saveStatusLabel(isDirty: boolean, saveStatus: string): string {
+  if (isDirty) return 'Unsaved'
+  if (saveStatus === 'saving') return 'Saving…'
+  if (saveStatus === 'saved') return 'Saved'
+  if (saveStatus === 'error') return 'Save failed'
+  return ''
+}
 
-  // Cmd+Alt+M toggles the comment margin. Handled here rather than via globalShortcut so it
-  // fires only while Terminator is focused and this view is mounted. The chord matches the
-  // CommandOrControl+Alt+M accelerator this replaced — keep them in sync so the binding
-  // users already know does not silently move.
-  //
-  // Matched on e.code, not e.key: on macOS Option+M emits the dead-key character 'µ', so an
-  // e.key === 'm' comparison never fires while Alt is held.
-  useEffect(() => {
-    function onToggleComments() {
-      setShowComments((v) => !v)
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === 'KeyM') {
-        e.preventDefault()
-        onToggleComments()
-      }
-    }
-    window.addEventListener('notepad:toggleComments', onToggleComments)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      window.removeEventListener('notepad:toggleComments', onToggleComments)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [])
+interface ToggleButtonProps {
+  on: boolean
+  onClick: () => void
+  labels: [on: string, off: string]
+  titles: [on: string, off: string]
+}
 
-  useEffect(() => {
-    function onToggleEditorMode() {
-      setReadingMode((v) => !v)
-    }
-    window.addEventListener('notepad:toggleEditorMode', onToggleEditorMode)
-    return () => window.removeEventListener('notepad:toggleEditorMode', onToggleEditorMode)
-  }, [])
+function ToggleButton(props: ToggleButtonProps): React.JSX.Element {
+  const { on, onClick, labels, titles } = props
+  return (
+    <Button variant="ghost" size="sm" onClick={onClick} title={on ? titles[0] : titles[1]}>
+      {on ? labels[0] : labels[1]}
+    </Button>
+  )
+}
 
-  useEffect(() => {
-    function onOpenExport() {
-      setShowExport(true)
-    }
-    window.addEventListener('notepad:openExport', onOpenExport)
-    return () => window.removeEventListener('notepad:openExport', onOpenExport)
-  }, [])
+function NotepadToolbar({ toggles }: { toggles: PanelToggles }): React.JSX.Element {
+  const { isDirty, saveStatus, previewMode, togglePreviewMode } = useEditorStore()
+  return (
+    <div className="notepad-view__toolbar">
+      <span className="notepad-view__save-status">{saveStatusLabel(isDirty, saveStatus)}</span>
+      <ToggleButton
+        on={previewMode}
+        onClick={togglePreviewMode}
+        labels={['Markdown', 'Live']}
+        titles={['Show raw markdown source', 'Show the rendered live preview']}
+      />
+      <PanelToggleButtons toggles={toggles} />
+      <Button variant="ghost" size="sm" onClick={() => toggles.setShowExport(true)}>
+        Export
+      </Button>
+    </div>
+  )
+}
 
-  // Cmd+Shift+F opens search overlay
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
-        e.preventDefault()
-        setShowSearch(true)
-      }
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [])
+function PanelToggleButtons({ toggles }: { toggles: PanelToggles }): React.JSX.Element {
+  const { readingMode, showOutline, showComments } = toggles
+  return (
+    <>
+      <ToggleButton
+        on={readingMode}
+        onClick={() => toggles.setReadingMode((v) => !v)}
+        labels={['Edit', 'Read']}
+        titles={['Switch to edit mode', 'Switch to reading mode']}
+      />
+      <ToggleButton
+        on={showOutline}
+        onClick={() => toggles.setShowOutline((v) => !v)}
+        labels={['Hide outline', 'Outline']}
+        titles={['Hide the heading outline', 'Show the heading outline']}
+      />
+      <ToggleButton
+        on={showComments}
+        onClick={() => toggles.setShowComments((v) => !v)}
+        labels={['Hide comments', 'Show comments']}
+        titles={['Hide comments', 'Show comments']}
+      />
+    </>
+  )
+}
 
-  // Listen for open-in-window push: activate notepad tab and select the note
-  useEffect(() => {
-    const off = window.electronAPI.extensionBridge.on(
-      'terminator.notepad:selectNote',
-      (data: unknown) => {
-        const id = (data as { id?: string })?.id
-        // The tab activation is the main process's job and it already does it
-        // (index.ts broadcasts extension:activate-global-tab). Calling the core
-        // registry from here reached a *copy* of that store bundled into this
-        // view, so it moved nothing.
-        if (id) useNotesStore.getState().setSelected(id)
-      }
-    )
-    return off
-  }, [])
-
-  function scheduleHoverHide() {
-    if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current)
-    hoverHideTimer.current = setTimeout(() => setCommentHover(null), 200)
-  }
-
-  function cancelHoverHide() {
-    if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current)
-  }
+/** Shows "View comment" over the hovered anchor; going to a comment flashes its card. */
+function useAnchorHover(session: NoteSession, editorWrapRef: React.RefObject<HTMLDivElement>) {
+  const { hover, setActiveCommentId } = session
 
   function handleEditorMouseOver(e: React.MouseEvent<HTMLDivElement>) {
-    const target = e.target as HTMLElement
-    const anchor = target.closest('[data-comment-id]') as HTMLElement | null
-    if (anchor) {
-      const id = anchor.dataset.commentId
-      if (id) {
-        cancelHoverHide()
-        const anchorRect = anchor.getBoundingClientRect()
-        const wrapRect = editorWrapRef.current?.getBoundingClientRect()
-        if (wrapRect) {
-          setCommentHover({ id, top: anchorRect.top - wrapRect.top })
-        }
-        return
-      }
-    }
+    const hovered = hoveredAnchor(e)
+    if (!hovered) return
+    hover.cancelHoverHide()
+    const wrapRect = editorWrapRef.current?.getBoundingClientRect()
+    const anchorRect = hovered.anchor.getBoundingClientRect()
+    if (wrapRect) hover.setCommentHover({ id: hovered.id, top: anchorRect.top - wrapRect.top })
   }
 
-  function handleGoToComment(id: string) {
-    cancelHoverHide()
-    setCommentHover(null)
+  function goToComment(id: string) {
+    hover.cancelHoverHide()
+    hover.setCommentHover(null)
     setActiveCommentId(id)
     setTimeout(() => setActiveCommentId(null), 1600)
   }
 
-  function saveStatusLabel(): string {
-    if (isDirty) return 'Unsaved'
-    if (saveStatus === 'saving') return 'Saving…'
-    if (saveStatus === 'saved') return 'Saved'
-    if (saveStatus === 'error') return 'Save failed'
-    return ''
-  }
+  return { handleEditorMouseOver, goToComment }
+}
 
-  const { diagrams } = useNotesStore.getState()
-  if (notes.length === 0 && diagrams.length === 0) {
-    return (
-      <div className="notepad-view notepad-view--empty-screen">
-        {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
-        <EmptyState
-          onNewNote={() => setShowQuickCreate(true)}
-          onImport={() =>
-            void importNotes(async () => {
-              const result = await window.electronAPI.extensionBridge.invoke(
-                'terminator.notepad:notes.list',
-                { includeArchived: true }
-              )
-              const data = (result as { data?: unknown[] }).data
-              if (Array.isArray(data)) setNotes(data as Parameters<typeof setNotes>[0])
-            })
-          }
-        />
-      </div>
-    )
+/** A local edit marks the note unsaved and schedules its save; a new view gets the highlights. */
+function editorCallbacks(session: NoteSession) {
+  return {
+    onChange: (newBody: string) => {
+      useEditorStore.getState().markDirty(newBody)
+      session.scheduleAutosave(newBody)
+    },
+    onAnchorsReady: (getView: () => EditorView | null) => {
+      const v = getView()
+      session.editorViewRef.current = v
+      if (v && session.selectedNoteId) applyStoredAnchors(v)
+    },
   }
+}
 
-  // When a diagram is selected, render the canvas view in place of the editor pane
-  if (selectedDiagramId) {
-    return (
-      <div className="notepad-view">
-        {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
-        <div className="notepad-view__sidebar">
-          <NoteList />
-        </div>
-        <div className="notepad-view__editor notepad-view__editor--diagram">
-          <DiagramView key={selectedDiagramId} diagramId={selectedDiagramId} />
-        </div>
-      </div>
-    )
-  }
+function NoteEditorPane(props: { session: NoteSession; readingMode: boolean }) {
+  const { session, readingMode } = props
+  const { draft, hover } = session
+  const { bodyDraft, previewMode } = useEditorStore()
+  const editorWrapRef = useRef<HTMLDivElement>(null)
+  const { handleEditorMouseOver, goToComment } = useAnchorHover(session, editorWrapRef)
+  const { onChange, onAnchorsReady } = editorCallbacks(session)
 
   return (
-    <div className="notepad-view">
-      {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
-      <div className="notepad-view__sidebar">
-        <NoteList />
-      </div>
-      <div className="notepad-view__editor">
-        <div className="notepad-view__toolbar">
-          <span className="notepad-view__save-status">{saveStatusLabel()}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={togglePreviewMode}
-            title={previewMode ? 'Show raw markdown source' : 'Show the rendered live preview'}
-          >
-            {previewMode ? 'Markdown' : 'Live'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setReadingMode((v) => !v)}
-            title={readingMode ? 'Switch to edit mode' : 'Switch to reading mode'}
-          >
-            {readingMode ? 'Edit' : 'Read'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowOutline((v) => !v)}
-            title={showOutline ? 'Hide the heading outline' : 'Show the heading outline'}
-          >
-            {showOutline ? 'Hide outline' : 'Outline'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowComments((v) => !v)}
-            title={showComments ? 'Hide comments' : 'Show comments'}
-          >
-            {showComments ? 'Hide comments' : 'Show comments'}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setShowExport(true)}>
-            Export
-          </Button>
-        </div>
-        {showExport && (
-          <ExportDialog onClose={() => setShowExport(false)} noteId={selectedNoteId ?? undefined} />
-        )}
-        {selectedNoteId ? (
-          <div
-            ref={editorWrapRef}
-            className="notepad-view__editor-wrap"
-            onMouseOver={handleEditorMouseOver}
-            onMouseLeave={scheduleHoverHide}
-          >
-            <NoteEditor
-              key={loadedNoteId}
-              initialDoc={bodyDraft}
-              onChange={handleEditorChange}
-              onAnchorsReady={(getView) => {
-                const v = getView()
-                editorViewRef.current = v
-                // Apply anchors immediately so React Strict Mode's double-mount doesn't
-                // leave the second view without highlights. The parent anchors effect
-                // won't re-run if its deps haven't changed, but editorViewRef now holds
-                // a fresh view that needs anchors dispatched to it.
-                if (v && selectedNoteId) {
-                  const live = useCommentsStore.getState().comments
-                  const validAnchors = live
-                    .filter((c) => c.parentId === null && c.status !== 'orphaned')
-                    .map((c) => ({ id: c.id, from: c.startOffset ?? 0, to: c.endOffset ?? 0 }))
-                    .filter((a) => a.from < a.to)
-                  applyAnchors(v, validAnchors)
-                }
-              }}
-              onSelectionChange={(sel) => {
-                setPendingAnchor(sel)
-                if (!sel) setComposingAnchor(null)
-              }}
-              readOnly={readingMode}
-              sourceMode={!previewMode}
-            />
-            {pendingAnchor && !composingAnchor && (
-              <button
-                className="notepad-add-comment-btn"
-                style={{ top: pendingAnchor.lineTop }}
-                title="Add comment"
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  setComposingAnchor(pendingAnchor)
-                  setPendingAnchor(null)
-                }}
-              >
-                <MessageSquarePlus className="tm-icon" />
-              </button>
-            )}
-            {commentHover && (
-              <div
-                className="notepad-comment-hover-btn"
-                style={{ top: commentHover.top }}
-                onMouseEnter={cancelHoverHide}
-                onMouseLeave={scheduleHoverHide}
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  handleGoToComment(commentHover.id)
-                }}
-              >
-                View comment
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="notepad-view__no-selection">Select a note to start editing</div>
-        )}
-      </div>
-      <div
-        className="notepad-view__rail"
-        hidden={!selectedNoteId || (!showOutline && !showComments)}
-      >
-        {selectedNoteId && showOutline && (
-          <NoteOutline
-            onSelect={(pos) => scrollToPosition(editorViewRef.current, pos)}
-            onClose={() => setShowOutline(false)}
+    <div
+      ref={editorWrapRef}
+      className="notepad-view__editor-wrap"
+      onMouseOver={handleEditorMouseOver}
+      onMouseLeave={hover.scheduleHoverHide}
+    >
+      <NoteEditor
+        key={session.loadedNoteId}
+        initialDoc={bodyDraft}
+        onChange={onChange}
+        onAnchorsReady={onAnchorsReady}
+        onSelectionChange={draft.onSelectionChange}
+        readOnly={readingMode}
+        sourceMode={!previewMode}
+      />
+      <EditorCommentOverlays draft={draft} hover={hover} onGoToComment={goToComment} />
+    </div>
+  )
+}
+
+function NotepadRail(props: { session: NoteSession; toggles: PanelToggles }) {
+  const { session, toggles } = props
+  const { selectedNoteId, editorViewRef, commentPanelRef } = session
+  const { showOutline, showComments } = toggles
+  return (
+    <div className="notepad-view__rail" hidden={!selectedNoteId || (!showOutline && !showComments)}>
+      {selectedNoteId && showOutline && (
+        <NoteOutline
+          onSelect={(pos) => scrollToPosition(editorViewRef.current, pos)}
+          onClose={() => toggles.setShowOutline(false)}
+        />
+      )}
+      <div className="notepad-view__comments" ref={commentPanelRef} hidden={!showComments}>
+        {selectedNoteId && (
+          <CommentColumn
+            noteId={selectedNoteId}
+            draft={session.draft}
+            viewRef={editorViewRef}
+            anchorTops={session.anchorTops}
+            containerHeight={session.panelContentHeight}
+            activeCommentId={session.activeCommentId}
           />
         )}
-        <div className="notepad-view__comments" ref={commentPanelRef} hidden={!showComments}>
-          {selectedNoteId && (
-            <>
-              {composingAnchor && (
-                <CommentComposer
-                  anchor={{
-                    noteId: selectedNoteId,
-                    from: composingAnchor.from,
-                    to: composingAnchor.to,
-                    quote: composingAnchor.quote,
-                    prefix: composingAnchor.prefix,
-                    suffix: composingAnchor.suffix,
-                  }}
-                  onClose={() => setComposingAnchor(null)}
-                  onCreated={() => {
-                    setComposingAnchor(null)
-                    window.electronAPI.extensionBridge
-                      .invoke('terminator.notepad:comments.list', { noteId: selectedNoteId })
-                      .then((r) => {
-                        const data = (r as { data?: Comment[] }).data
-                        if (data) setComments(data)
-                      })
-                      .catch(console.error)
-                  }}
-                />
-              )}
-              <CommentMargin
-                noteId={selectedNoteId}
-                anchorTops={anchorTops}
-                containerHeight={panelContentHeight}
-                activeCommentId={activeCommentId}
-                onCommentClick={(from, to) => scrollToAnchor(editorViewRef.current, from, to)}
-                onHoverComment={(id) => setEditorHoverAnchor(editorViewRef.current, id)}
-              />
-            </>
-          )}
-        </div>
       </div>
     </div>
   )
