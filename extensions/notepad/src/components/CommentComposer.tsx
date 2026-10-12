@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
+import { Button } from '@terminator/extension-ui'
 
 interface CommentAnchorData {
   noteId: string
@@ -70,17 +71,17 @@ export function CommentComposer({
         rows={3}
       />
       <div className="notepad-composer__actions">
-        <button className="notepad-composer__cancel" onClick={onClose} type="button">
+        <Button variant="ghost" size="sm" onClick={onClose}>
           Cancel
-        </button>
-        <button
-          className="notepad-composer__submit"
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
           onClick={handleSubmit}
           disabled={!body.trim() || submitting}
-          type="button"
         >
           Add comment
-        </button>
+        </Button>
       </div>
     </div>
   )

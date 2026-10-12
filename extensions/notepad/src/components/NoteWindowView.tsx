@@ -1,6 +1,7 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { MessageSquarePlus } from 'lucide-react'
+import { Button } from '@terminator/extension-ui'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
 import { CommentMargin } from './CommentMargin'
@@ -343,20 +344,22 @@ export function NoteWindowView(): React.JSX.Element {
       <div className="notepad-window__titlebar">
         <span className="notepad-window__title">{note.title || 'Untitled'}</span>
         <div className="notepad-window__titlebar-right">
-          <button
-            className="notepad-btn-ghost"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={togglePreviewMode}
             title={previewMode ? 'Show raw markdown source' : 'Show the rendered live preview'}
           >
             {previewMode ? 'Markdown' : 'Live'}
-          </button>
-          <button
-            className="notepad-btn-ghost"
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setShowOutline((v) => !v)}
             title={showOutline ? 'Hide the heading outline' : 'Show the heading outline'}
           >
             {showOutline ? 'Hide outline' : 'Outline'}
-          </button>
+          </Button>
           {note.tags.length > 0 && (
             <div className="notepad-window__tags">
               {note.tags.map((t) => (

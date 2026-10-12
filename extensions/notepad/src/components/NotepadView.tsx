@@ -1,6 +1,7 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { MessageSquarePlus } from 'lucide-react'
+import { Button } from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
@@ -595,40 +596,41 @@ export function NotepadView(): React.JSX.Element {
       <div className="notepad-view__editor">
         <div className="notepad-view__toolbar">
           <span className="notepad-view__save-status">{saveStatusLabel()}</span>
-          <button
-            className="notepad-btn-ghost"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={togglePreviewMode}
             title={previewMode ? 'Show raw markdown source' : 'Show the rendered live preview'}
           >
             {previewMode ? 'Markdown' : 'Live'}
-          </button>
-          <button
-            className="notepad-btn-ghost"
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setReadingMode((v) => !v)}
             title={readingMode ? 'Switch to edit mode' : 'Switch to reading mode'}
           >
             {readingMode ? 'Edit' : 'Read'}
-          </button>
-          <button
-            className={`notepad-btn-ghost${showOutline ? ' notepad-view__comments-toggle--on' : ''}`}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setShowOutline((v) => !v)}
             title={showOutline ? 'Hide the heading outline' : 'Show the heading outline'}
           >
             {showOutline ? 'Hide outline' : 'Outline'}
-          </button>
-          <button
-            className={`notepad-btn-ghost${showComments ? ' notepad-view__comments-toggle--on' : ''}`}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setShowComments((v) => !v)}
             title={showComments ? 'Hide comments' : 'Show comments'}
           >
             {showComments ? 'Hide comments' : 'Show comments'}
-          </button>
-          <button
-            className="notepad-btn-ghost notepad-view__export-btn"
-            onClick={() => setShowExport(true)}
-          >
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowExport(true)}>
             Export
-          </button>
+          </Button>
         </div>
         {showExport && (
           <ExportDialog onClose={() => setShowExport(false)} noteId={selectedNoteId ?? undefined} />

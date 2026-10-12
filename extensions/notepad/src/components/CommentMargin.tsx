@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { AlertTriangle, Trash2 } from 'lucide-react'
+import { Button, IconButton } from '@terminator/extension-ui'
 import { useCommentsStore } from '../stores/comments.store'
 import type { Comment } from '../db/types'
 
@@ -141,14 +142,13 @@ function CommentCard({
         <div className="notepad-comment__avatar">{initial}</div>
         <span className="notepad-comment__author-name">{comment.author}</span>
         <span className="notepad-comment__timestamp">{relativeTime(comment.createdAt)}</span>
-        <button
+        <IconButton
+          icon={Trash2}
+          label="Delete comment"
+          size="sm"
           className="notepad-comment__delete-btn"
           onClick={() => void handleDelete()}
-          aria-label="Delete comment"
-          title="Delete comment"
-        >
-          <Trash2 className="tm-icon-sm" />
-        </button>
+        />
       </div>
 
       {/* Quote anchor */}
@@ -177,12 +177,12 @@ function CommentCard({
             aria-label="Edit comment"
           />
           <div className="notepad-comment__edit-actions">
-            <button onClick={() => void handleSaveEdit()} className="notepad-comment__btn">
+            <Button variant="primary" size="sm" onClick={() => void handleSaveEdit()}>
               Save
-            </button>
-            <button onClick={() => setEditMode(false)} className="notepad-comment__btn">
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setEditMode(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -220,9 +220,9 @@ function CommentCard({
             placeholder="Write a reply…"
             className="notepad-comment__reply-input"
           />
-          <button onClick={() => void handleReply()} className="notepad-comment__btn">
+          <Button variant="primary" size="sm" onClick={() => void handleReply()}>
             Send
-          </button>
+          </Button>
         </div>
       )}
 
@@ -230,20 +230,13 @@ function CommentCard({
       {!isOrphaned && (
         <div className="notepad-comment__actions-row">
           {!isResolved && (
-            <button
-              className="notepad-comment__action-link"
-              onClick={() => setReplyOpen((v) => !v)}
-            >
+            <Button variant="ghost" size="sm" onClick={() => setReplyOpen((v) => !v)}>
               Reply
-            </button>
+            </Button>
           )}
-          <button
-            className={`notepad-comment__action-link${isResolved ? ' notepad-comment__action-link--active' : ''}`}
-            onClick={() => void handleResolve()}
-            title={isResolved ? 'Unresolve' : 'Resolve'}
-          >
+          <Button variant="ghost" size="sm" onClick={() => void handleResolve()}>
             {isResolved ? 'Unresolve' : 'Resolve'}
-          </button>
+          </Button>
         </div>
       )}
     </div>

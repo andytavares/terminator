@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react'
-import { Dialog } from '@terminator/extension-ui'
+import { Button, Dialog } from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
 
 type ExportScope = 'all' | 'note'
@@ -124,13 +124,9 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
               spellCheck={false}
               aria-label="Destination folder"
             />
-            <button
-              className="notepad-export-dialog__choose-btn"
-              onClick={() => void pickFolder()}
-              aria-label="Choose folder"
-            >
+            <Button onClick={() => void pickFolder()} aria-label="Choose folder">
               Choose…
-            </button>
+            </Button>
           </div>
         </div>
 
