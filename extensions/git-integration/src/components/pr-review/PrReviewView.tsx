@@ -87,14 +87,12 @@ export function PrReviewView({
   const [showSubmit, setShowSubmit] = useState(false)
   const { size: leftWidth, handleMouseDown: handleLeftDividerMouseDown } = useResizePanel(
     240,
-    120,
-    500,
+    { min: 120, max: 500 },
     1
   )
   const { size: rightWidth, handleMouseDown: handleRightDividerMouseDown } = useResizePanel(
     280,
-    160,
-    600,
+    { min: 160, max: 600 },
     -1
   )
   const [showRiskFor, setShowRiskFor] = useState<string | null>(null)

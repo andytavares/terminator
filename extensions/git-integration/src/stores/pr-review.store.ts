@@ -18,7 +18,7 @@ interface RateLimitState {
   resetAt: number
 }
 
-interface PrReviewStore {
+export interface PrReviewStore {
   // Queue state
   prQueue: ReviewQueuePR[]
   queueLoading: boolean

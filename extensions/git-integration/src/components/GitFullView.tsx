@@ -21,8 +21,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
 
   const { size: changesWidth, handleMouseDown: handleDividerMouseDown } = useResizePanel(
     300,
-    160,
-    600,
+    { min: 160, max: 600 },
     -1
   )
 
