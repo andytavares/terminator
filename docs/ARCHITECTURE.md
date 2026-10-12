@@ -397,20 +397,27 @@ leaving its band. A raw `z-index` number in an extension is a lint error.
 ### Design tokens and themes in extension views
 
 Tokens cannot travel as an import, because CSS in a separate document has to be
-injected into that document. `EXTENSION_BASE_CSS` in
-`src/main/extensions/extension-view-host.ts` is that injection, and it is the
-authority for which `--tm-*` names exist — colour, spacing, radius, fonts and the
-`--tm-layer-*` scale. A name referenced but not defined there makes its
-declaration invalid and the browser drops it.
+injected into that document. `packages/extension-ui/src/tokens.css` is the one
+definition of every `--tm-*` name — colour, spacing, radius, fonts and the
+`--tm-layer-*` scale — and `EXTENSION_BASE_CSS` (that file plus
+`extension-base.css`, the icon scale and control resets) is what the host injects.
+A name referenced but not defined there makes its declaration invalid and the
+browser drops it. The core renderer imports the same file; its `--bg-*`,
+`--text-*` and `--space-*` names are aliases of `--tm-*` and hold no value.
 
-It carries **both** palettes: a dark `:root` and a light `:root[data-theme='light']`
-mirroring the core's AA-verified light values. An extension document never sees
+The text is read with Vite's `?raw` import, so it is part of the bundle in dev and
+in the packaged app alike (electron-vite bundles the package into main, and
+`scripts/build-extensions.cjs` gives esbuild the same `?raw` rule for Remote
+Control); nothing is looked up on disk at run time.
+
+The file carries **both** palettes: a dark `:root` and a light
+`[data-theme='light']` with AA-verified values. An extension document never sees
 the renderer's `data-theme`, so the host stamps it — `ExtensionViewHost.setTheme`
 restamps every open view and remembers the theme for views created later, driven
 from the renderer over `extension:set-theme`.
 
-`extensions/remote-control/src/server/remote-server.ts` keeps a verbatim copy of
-the constant for the remote client, enforced by a parity spec.
+`extensions/remote-control/src/server/remote-server.ts` serves the same constant
+to the remote client.
 
 Contrast is verified by rendering, not by reading: `tests/e2e/extension-themes.spec.ts`
 walks every visible text node in each extension view, in both themes, resolves the

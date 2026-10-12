@@ -10,6 +10,7 @@ import { EXTENSION_BASE_CSS } from '../../../src/main/extensions/extension-view-
 
 const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8')
 const STYLES = read('../../../src/renderer/styles.css')
+const TOKENS = read('../../../packages/extension-ui/src/tokens.css')
 
 function ruleBody(css: string, selector: string): string {
   const start = css.indexOf(`${selector} {`)
@@ -56,10 +57,11 @@ describe('core checkbox styling', () => {
   })
 
   it('defines --on-accent in both themes, since the accent fill is the same colour in each', () => {
-    const dark = STYLES.slice(STYLES.indexOf(':root'), STYLES.indexOf("[data-theme='light']"))
-    const light = STYLES.slice(STYLES.indexOf("[data-theme='light']"))
-    expect(dark).toMatch(/--on-accent:\s*#ffffff/)
-    expect(light).toMatch(/--on-accent:\s*#ffffff/)
+    const dark = TOKENS.slice(TOKENS.indexOf(':root {'), TOKENS.indexOf("[data-theme='light'] {"))
+    const light = TOKENS.slice(TOKENS.indexOf("[data-theme='light'] {"))
+    expect(dark).toMatch(/--tm-on-accent:\s*#ffffff/)
+    expect(light).toMatch(/--tm-on-accent:\s*#ffffff/)
+    expect(STYLES).toMatch(/--on-accent:\s*var\(--tm-on-accent\)/)
   })
 
   it('leaves no accent-color rule behind — it does nothing once appearance is none', () => {
@@ -150,8 +152,8 @@ describe('core radio styling', () => {
     }
   })
 
-  it('publishes --tm-on-accent, or an extension view resolves it to nothing', () => {
-    expect(STYLES).toMatch(/--tm-on-accent:\s*var\(--on-accent\)/)
+  it('draws the dot with the core alias of the published --tm-on-accent', () => {
+    expect(STYLES).toMatch(/--on-accent:\s*var\(--tm-on-accent\)/)
   })
 })
 

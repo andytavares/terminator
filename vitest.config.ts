@@ -28,6 +28,9 @@ export default defineConfig({
   test: {
     globals: true,
     setupFiles: ['tests/setup.ts'],
+    // Vitest turns every stylesheet into an empty string, `?raw` imports included.
+    // The design system's token file is read as text, so those keep their content.
+    css: { include: [/\.css\?raw$/] },
     // Electron 42 downloads its binary on the first require('electron'), which
     // specs reach through externalised dependencies vi.mock cannot intercept.
     // No unit test runs the binary; the override makes the require a path join.

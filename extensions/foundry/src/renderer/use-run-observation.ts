@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { usePolled } from './use-polled.js'
+import { usePolling } from '@terminator/extension-ui'
 import type { RunGraph } from '../line/run-graph.js'
 import type { Standing } from '../order/standing.js'
 import type { Gate } from '../gates/rules.js'
@@ -140,8 +140,8 @@ export function useRunObservation(orderId: string): UseRunObservation {
     [readObservation, showObservation]
   )
 
-  usePolled(readObservation, showObservation, LIVE_POLL_MS)
-  usePolled(readPending, setPending, LIVE_POLL_MS)
+  usePolling(readObservation, showObservation, LIVE_POLL_MS)
+  usePolling(readPending, setPending, LIVE_POLL_MS)
 
   return { view, problem, pending, refresh }
 }

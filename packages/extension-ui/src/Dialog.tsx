@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useId, useRef } from 'react'
 import { X } from 'lucide-react'
+import { Button } from './Button'
 import { captureFocus, trapTab } from './focus-trap'
 import { nestedLayerValue } from './layers'
 import { createModalDepthRegistry } from './modal-depth'
@@ -168,17 +169,18 @@ export function Dialog({
   )
 }
 
+const TONE_VARIANT = { default: 'secondary', primary: 'primary', danger: 'danger' } as const
+
 export function DialogActionButton({ action }: { action: DialogAction }): JSX.Element {
   return (
-    <button
-      type="button"
-      className={`tmui-button tmui-button--${action.tone ?? 'default'}`}
+    <Button
+      variant={TONE_VARIANT[action.tone ?? 'default']}
       disabled={action.disabled === true}
       onClick={() => void action.onSelect()}
     >
       {action.label}
       {action.shortcut !== undefined && <kbd className="tmui-kbd">{action.shortcut}</kbd>}
-    </button>
+    </Button>
   )
 }
 

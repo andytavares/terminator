@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 // tokens) clears WCAG AA (4.5:1) both on the plain code background and on the
 // added/removed diff-line tinted backgrounds, in both themes.
 const CSS = readFileSync(
-  fileURLToPath(new URL('../../../src/renderer/styles.css', import.meta.url)),
+  fileURLToPath(new URL('../../../packages/extension-ui/src/tokens.css', import.meta.url)),
   'utf8'
 )
 
@@ -61,17 +61,23 @@ const lightBlock = CSS.slice(CSS.indexOf("[data-theme='light']"))
 
 const AA_NORMAL = 4.5
 
-const TEXT_TOKENS = ['--text-primary', '--text-secondary', '--text-muted', '--danger', '--success']
+const TEXT_TOKENS = [
+  '--tm-text-primary',
+  '--tm-text-secondary',
+  '--tm-text-muted',
+  '--tm-danger',
+  '--tm-success',
+]
 
 const SYNTAX_TOKENS = [
-  '--syntax-comment',
-  '--syntax-keyword',
-  '--syntax-string',
-  '--syntax-tag',
-  '--syntax-literal',
-  '--syntax-number',
-  '--syntax-title',
-  '--syntax-attribute',
+  '--tm-syntax-comment',
+  '--tm-syntax-keyword',
+  '--tm-syntax-string',
+  '--tm-syntax-tag',
+  '--tm-syntax-literal',
+  '--tm-syntax-number',
+  '--tm-syntax-title',
+  '--tm-syntax-attribute',
 ]
 
 describe('diff / syntax token contrast (WCAG AA)', () => {
@@ -79,9 +85,9 @@ describe('diff / syntax token contrast (WCAG AA)', () => {
     ['dark', rootBlock],
     ['light', lightBlock],
   ] as const) {
-    const bg = hexToRgb(token(block, '--bg-base'))
-    const added = rgbaToken(rootBlock, '--diff-added-bg')
-    const removed = rgbaToken(rootBlock, '--diff-removed-bg')
+    const bg = hexToRgb(token(block, '--tm-bg-base'))
+    const added = rgbaToken(rootBlock, '--tm-diff-added-bg')
+    const removed = rgbaToken(rootBlock, '--tm-diff-removed-bg')
     const addedBg = composite(bg, added.rgb, added.alpha)
     const removedBg = composite(bg, removed.rgb, removed.alpha)
 

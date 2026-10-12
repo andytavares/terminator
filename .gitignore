@@ -28,3 +28,4 @@ playwright-report/
 .forge-backups/
 *.tsbuildinfo
 .vitest-reports/
+storybook-static/

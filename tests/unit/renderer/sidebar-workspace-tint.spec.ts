@@ -20,7 +20,7 @@ const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.m
 const ROW_CSS = read('../../../src/renderer/components/sidebar/BranchRow.css')
 const HEAD_CSS = read('../../../src/renderer/components/sidebar/RepoHeader.css')
 const HEAD_TSX = read('../../../src/renderer/components/sidebar/RepoHeader.tsx')
-const TOKENS = read('../../../src/renderer/styles.css')
+const TOKENS = read('../../../packages/extension-ui/src/tokens.css')
 
 const SIDEBAR_CSS = ROW_CSS + '\n' + HEAD_CSS
 
@@ -126,30 +126,30 @@ describe('the repo name is text, not colour (FR-043)', () => {
   it.each(['dark', 'light'] as const)(
     'every preset repo colour would have failed AA as text in the %s theme',
     (theme) => {
-      const surface = hex(token('--bg-base', theme))
+      const surface = hex(token('--tm-bg-base', theme))
       const failing = WORKSPACE_PRESET_COLORS.filter((c) => contrast(hex(c), surface) < 4.5)
       expect(failing.length).toBeGreaterThan(0)
     }
   )
 
   it.each(['dark', 'light'] as const)('the name token clears AA in the %s theme', (theme) => {
-    const surface = hex(token('--bg-base', theme))
-    expect(contrast(hex(token('--text-primary', theme)), surface)).toBeGreaterThanOrEqual(4.5)
+    const surface = hex(token('--tm-bg-base', theme))
+    expect(contrast(hex(token('--tm-text-primary', theme)), surface)).toBeGreaterThanOrEqual(4.5)
   })
 
   it.each(['dark', 'light'] as const)(
     'the name still clears AA on the selected surface in the %s theme',
     (theme) => {
-      const surface = hex(token('--bg-card-hover', theme))
-      expect(contrast(hex(token('--text-primary', theme)), surface)).toBeGreaterThanOrEqual(4.5)
+      const surface = hex(token('--tm-bg-card-hover', theme))
+      expect(contrast(hex(token('--tm-text-primary', theme)), surface)).toBeGreaterThanOrEqual(4.5)
     }
   )
 
   it.each(['dark', 'light'] as const)(
     'the muted meta text clears AA on the hover surface in the %s theme',
     (theme) => {
-      const surface = hex(token('--bg-elevated', theme))
-      expect(contrast(hex(token('--text-muted', theme)), surface)).toBeGreaterThanOrEqual(4.5)
+      const surface = hex(token('--tm-bg-elevated', theme))
+      expect(contrast(hex(token('--tm-text-muted', theme)), surface)).toBeGreaterThanOrEqual(4.5)
     }
   )
 })

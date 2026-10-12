@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { usePolled } from '../../src/renderer/use-polled.js'
+import { usePolling } from '../../../../packages/extension-ui/src/usePolling'
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
 
-describe('usePolled', () => {
+describe('usePolling', () => {
   it('reads at once, then every interval, and shows each answer', async () => {
     let count = 0
     const read = vi.fn(async () => ++count)
     const show = vi.fn()
-    renderHook(() => usePolled(read, show, 1000))
+    renderHook(() => usePolling(read, show, 1000))
 
     await act(async () => {})
     expect(show.mock.calls).toEqual([[1]])
@@ -26,7 +26,7 @@ describe('usePolled', () => {
 
   it('stops reading once unmounted', async () => {
     const read = vi.fn(async () => 1)
-    const { unmount } = renderHook(() => usePolled(read, vi.fn(), 1000))
+    const { unmount } = renderHook(() => usePolling(read, vi.fn(), 1000))
     await act(async () => {})
     unmount()
     await vi.advanceTimersByTimeAsync(5000)
@@ -37,7 +37,7 @@ describe('usePolled', () => {
     let arrive: (value: number) => void = () => {}
     const read = vi.fn(() => new Promise<number>((resolve) => (arrive = resolve)))
     const show = vi.fn()
-    const { unmount } = renderHook(() => usePolled(read, show, 1000))
+    const { unmount } = renderHook(() => usePolling(read, show, 1000))
     unmount()
     arrive(7)
     await act(async () => {})

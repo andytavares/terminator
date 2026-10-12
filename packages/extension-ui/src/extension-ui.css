@@ -114,6 +114,32 @@
   cursor: default;
 }
 
+.tmui-button--sm {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.tmui-button--ghost {
+  border-color: transparent;
+  color: var(--tm-text-secondary);
+}
+
+.tmui-button--ghost:hover:not(:disabled) {
+  color: var(--tm-text-primary);
+}
+
+/* Principle XII: the icon is sized here, never by a size prop. */
+.tmui-button__icon {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+}
+
+.tmui-button--sm .tmui-button__icon {
+  width: 12px;
+  height: 12px;
+}
+
 .tmui-button--primary {
   background: var(--tm-accent);
   border-color: var(--tm-accent);
@@ -323,4 +349,111 @@
 .tmui-toast__action:focus-visible {
   outline: 2px solid var(--tm-accent);
   outline-offset: 2px;
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
+
+.tmui-tabs__list {
+  display: flex;
+  gap: var(--tm-space-1, 4px);
+  border-bottom: 1px solid var(--tm-border);
+  font-family: var(--tm-font-ui);
+}
+
+.tmui-tabs__tab {
+  margin-bottom: -1px;
+  padding: 6px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--tm-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tmui-tabs__tab:hover:not(:disabled) {
+  color: var(--tm-text-primary);
+}
+
+.tmui-tabs__tab[aria-selected='true'] {
+  border-bottom-color: var(--tm-accent);
+  color: var(--tm-text-primary);
+  font-weight: 500;
+}
+
+.tmui-tabs__tab:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tmui-tabs__tab:focus-visible,
+.tmui-tabs__panel:focus-visible {
+  outline: 2px solid var(--tm-accent);
+  outline-offset: -2px;
+}
+
+.tmui-tabs__panel {
+  padding-top: var(--tm-space-3, 12px);
+}
+
+/* ── Markdown ───────────────────────────────────────────────────────────── */
+
+/* Every selector is wrapped in :where() so the defaults weigh nothing: a caller
+   that styles its own class on the same elements always wins, whatever the
+   order the stylesheets load in. */
+
+:where(.tmui-markdown) {
+  color: var(--tm-text-primary);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+:where(.tmui-markdown a) {
+  color: var(--tm-accent-text);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--tm-accent) 50%, transparent);
+  text-underline-offset: 2px;
+}
+
+:where(.tmui-markdown p) {
+  margin: 0 0 8px;
+}
+
+:where(.tmui-markdown p:last-child) {
+  margin-bottom: 0;
+}
+
+:where(.tmui-markdown code) {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--tm-overlay);
+  font-family: var(--tm-font-mono);
+  font-size: 12px;
+}
+
+:where(.tmui-markdown pre) {
+  margin: 8px 0;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+:where(.tmui-markdown pre code) {
+  padding: 0;
+  background: none;
+}
+
+:where(.tmui-markdown ul, .tmui-markdown ol) {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
+
+:where(.tmui-markdown li) {
+  margin-bottom: 3px;
+}
+
+:where(.tmui-markdown img) {
+  max-width: 100%;
 }

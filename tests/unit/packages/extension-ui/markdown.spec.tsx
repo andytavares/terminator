@@ -1,25 +1,22 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
-import { RichContent } from '../../src/components/pr-review/RichContent'
+import { Markdown } from '../../../../packages/extension-ui/src/Markdown'
 
-const mockOpenExternal = vi.fn().mockResolvedValue({ ok: true })
-
-Object.defineProperty(window, 'electronAPI', {
-  writable: true,
-  value: { shell: { openExternal: mockOpenExternal } },
-})
+const onOpenLink = vi.fn()
 
 function renderBody(body: string) {
-  return render(<RichContent>{body}</RichContent>).container
+  return render(<Markdown onOpenLink={onOpenLink}>{body}</Markdown>).container
 }
 
-describe('RichContent before its HTML renderer has loaded', () => {
+describe('Markdown before its HTML renderer has loaded', () => {
   it('shows no tag text and no unsafe element, then renders the HTML', async () => {
     vi.resetModules()
-    const { RichContent: Fresh } = await import('../../src/components/pr-review/RichContent')
+    const { Markdown: Fresh } = await import('../../../../packages/extension-ui/src/Markdown')
     const el = render(
-      <Fresh>{'<details><summary>Logs</summary>body</details>\n\n<script>alert(1)</script>'}</Fresh>
+      <Fresh onOpenLink={onOpenLink}>
+        {'<details><summary>Logs</summary>body</details>\n\n<script>alert(1)</script>'}
+      </Fresh>
     ).container
     expect(el.textContent).not.toContain('<details>')
     expect(el.textContent).not.toContain('alert(1)')
@@ -29,14 +26,14 @@ describe('RichContent before its HTML renderer has loaded', () => {
   })
 })
 
-describe('RichContent raw HTML', () => {
+describe('Markdown raw HTML', () => {
   beforeAll(async () => {
     const el = renderBody('<sub>x</sub>')
     await waitFor(() => expect(el.querySelector('sub')).not.toBeNull())
   })
 
   beforeEach(() => {
-    mockOpenExternal.mockClear()
+    onOpenLink.mockClear()
   })
 
   it('renders <details>/<summary> as a disclosure, not tag text', () => {
@@ -69,9 +66,33 @@ describe('RichContent raw HTML', () => {
     expect(href).not.toContain('user-content-user-content-')
   })
 
-  it('still highlights fenced code by language', () => {
+  it('leaves a fenced block as plain code when no code renderer is given', () => {
     const el = renderBody('```js\nconst a = 1\n```')
-    expect(el.querySelector('pre > code.hljs.language-js')).not.toBeNull()
+    expect(el.querySelector('pre > code.language-js')?.textContent).toBe('const a = 1\n')
+  })
+
+  it('hands a fenced block and its language to the code renderer', () => {
+    const renderCode = vi.fn((code: string, language: string) => (
+      <b data-language={language}>{code}</b>
+    ))
+    const el = render(
+      <Markdown onOpenLink={onOpenLink} renderCode={renderCode}>
+        {'```js\nconst a = 1\n```'}
+      </Markdown>
+    ).container
+    expect(renderCode).toHaveBeenCalledWith('const a = 1', 'js')
+    expect(el.querySelector('b[data-language="js"]')?.textContent).toBe('const a = 1')
+  })
+
+  it('keeps inline code out of the code renderer', () => {
+    const renderCode = vi.fn(() => <b />)
+    const el = render(
+      <Markdown onOpenLink={onOpenLink} renderCode={renderCode}>
+        {'use `npm ci` here'}
+      </Markdown>
+    ).container
+    expect(renderCode).not.toHaveBeenCalled()
+    expect(el.querySelector('code')?.textContent).toBe('npm ci')
   })
 
   describe('sanitising', () => {
@@ -133,13 +154,73 @@ describe('RichContent raw HTML', () => {
       expect(el.querySelector(`[id="${href.slice(1)}"]`)?.textContent).toBe('Notes')
     })
 
-    it('opens an HTML <a href="https://…"> via shell.openExternal', () => {
+    it('opens an HTML <a href="https://…"> through onOpenLink', () => {
       const el = renderBody('<a href="https://example.com/pr">PR</a>')
       const link = el.querySelector('a')!
       const event = new MouseEvent('click', { bubbles: true, cancelable: true })
       link.dispatchEvent(event)
-      expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com/pr')
+      expect(onOpenLink).toHaveBeenCalledWith('https://example.com/pr')
       expect(event.defaultPrevented).toBe(true)
     })
+  })
+})
+
+describe('Markdown links', () => {
+  const link = (body: string) => {
+    const { container } = render(<Markdown onOpenLink={onOpenLink}>{body}</Markdown>)
+    return container.querySelector('a')!
+  }
+  const click = (anchor: HTMLElement) => {
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+    anchor.dispatchEvent(event)
+    return event
+  }
+
+  beforeEach(() => onOpenLink.mockClear())
+
+  it('opens an https address through onOpenLink and keeps the view where it is', () => {
+    const event = click(link('[PR](https://example.com/pr)'))
+    expect(onOpenLink).toHaveBeenCalledWith('https://example.com/pr')
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it('opens an http address through onOpenLink', () => {
+    click(link('[PR](http://example.com/pr)'))
+    expect(onOpenLink).toHaveBeenCalledWith('http://example.com/pr')
+  })
+
+  it('lets an in-page link scroll the view', () => {
+    const anchor = link('[jump](#section)')
+    expect(click(anchor).defaultPrevented).toBe(false)
+    expect(onOpenLink).not.toHaveBeenCalled()
+  })
+
+  it('points an in-page link at the prefixed id the sanitiser gives the target', () => {
+    expect(link('[jump](#section)').getAttribute('href')).toBe('#user-content-section')
+  })
+
+  it('leaves an already-prefixed in-page link alone', () => {
+    expect(link('[jump](#user-content-section)').getAttribute('href')).toBe('#user-content-section')
+  })
+
+  it('keeps a relative href from navigating the view', () => {
+    const event = click(link('[x](./relative/path)'))
+    expect(event.defaultPrevented).toBe(true)
+    expect(onOpenLink).not.toHaveBeenCalled()
+  })
+
+  it('keeps a protocol-relative href from navigating the view', () => {
+    const event = click(link('[x](//evil.example/x)'))
+    expect(event.defaultPrevented).toBe(true)
+    expect(onOpenLink).not.toHaveBeenCalled()
+  })
+
+  it('adds the caller class beside its own', () => {
+    const { container } = render(
+      <Markdown onOpenLink={onOpenLink} className="extra">
+        text
+      </Markdown>
+    )
+    expect(container.firstElementChild?.className).toBe('tmui-markdown extra')
   })
 })

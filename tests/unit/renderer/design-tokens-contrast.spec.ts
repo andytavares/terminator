@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 // asserts every text token clears AA for normal text on its theme background, and
 // that the primary > secondary > muted prominence order holds.
 const CSS = readFileSync(
-  fileURLToPath(new URL('../../../src/renderer/styles.css', import.meta.url)),
+  fileURLToPath(new URL('../../../packages/extension-ui/src/tokens.css', import.meta.url)),
   'utf8'
 )
 
@@ -43,11 +43,11 @@ describe('design token contrast (WCAG AA)', () => {
     ['dark', rootBlock],
     ['light', lightBlock],
   ] as const) {
-    const bg = token(block, '--bg-base')
-    const primary = token(block, '--text-primary')
+    const bg = token(block, '--tm-bg-base')
+    const primary = token(block, '--tm-text-primary')
 
     it(`${themeName}: all text tokens meet AA on --bg-base`, () => {
-      for (const name of ['--text-primary', '--text-secondary', '--text-muted']) {
+      for (const name of ['--tm-text-primary', '--tm-text-secondary', '--tm-text-muted']) {
         const value = token(block, name)
         expect(
           contrast(value, bg),
@@ -57,8 +57,8 @@ describe('design token contrast (WCAG AA)', () => {
     })
 
     it(`${themeName}: prominence order is primary > secondary > muted`, () => {
-      const secondary = token(block, '--text-secondary')
-      const muted = token(block, '--text-muted')
+      const secondary = token(block, '--tm-text-secondary')
+      const muted = token(block, '--tm-text-muted')
       const cPrimary = contrast(primary, bg)
       const cSecondary = contrast(secondary, bg)
       const cMuted = contrast(muted, bg)

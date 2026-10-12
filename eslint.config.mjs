@@ -12,6 +12,7 @@ export default defineConfig([
     '**/dist/',
     '**/out/',
     '**/build/',
+    '**/storybook-static/',
     'coverage/',
     '.worktrees/',
     '.claude/',
