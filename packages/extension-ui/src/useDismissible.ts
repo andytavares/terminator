@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { captureFocus } from './focus-trap'
 import { createModalDepthRegistry } from './modal-depth'
 
@@ -56,11 +56,11 @@ export function useDismissible({
   captureEscape = false,
   enabled = true,
 }: DismissibleOptions): void {
-  const alsoInsideRef = { current: alsoInside }
-  alsoInsideRef.current = alsoInside
-  // Read through a ref so a caller passing a fresh closure each render does not
+  // Read through refs so a caller passing a fresh closure each render does not
   // rebind the document listeners on every keystroke.
-  const dismissRef = { current: onDismiss }
+  const alsoInsideRef = useRef(alsoInside)
+  alsoInsideRef.current = alsoInside
+  const dismissRef = useRef(onDismiss)
   dismissRef.current = onDismiss
 
   useEffect(() => {

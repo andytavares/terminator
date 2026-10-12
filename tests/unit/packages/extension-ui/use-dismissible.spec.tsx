@@ -115,6 +115,33 @@ describe('useDismissible', () => {
 
 // An anchored popover has to treat its own trigger as inside, or clicking the
 // trigger to close it dismisses and immediately reopens.
+describe('a re-rendered onDismiss', () => {
+  it('is the one called on Escape and on an outside click', async () => {
+    const first = vi.fn()
+    const latest = vi.fn()
+    const view = render(<Panel onDismiss={first} />)
+    await settle()
+    view.rerender(<Panel onDismiss={latest} />)
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.mouseDown(document.body)
+
+    expect(latest).toHaveBeenCalledTimes(2)
+    expect(first).not.toHaveBeenCalled()
+  })
+
+  it('does not rebind the document listeners when only the callback changes', async () => {
+    const add = vi.spyOn(document, 'addEventListener')
+    const view = render(<Panel onDismiss={vi.fn()} />)
+    await settle()
+    const bound = add.mock.calls.length
+    view.rerender(<Panel onDismiss={vi.fn()} />)
+    await settle()
+    expect(add.mock.calls.length).toBe(bound)
+    add.mockRestore()
+  })
+})
+
 describe('alsoInside', () => {
   function Anchored({ onDismiss }: { onDismiss: () => void }): JSX.Element {
     const trigger = useRef<HTMLButtonElement>(null)
