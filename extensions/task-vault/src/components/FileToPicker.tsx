@@ -16,29 +16,47 @@ interface DestOption {
   createName?: string
 }
 
-export function FileToPicker({
-  prefilledQuery,
-  onSelect,
-  onSelectNew,
-  onClose,
-}: {
+interface PickerProps {
   prefilledQuery: string
   onSelect: (filePath: string) => void
   onSelectNew?: (kind: 'project' | 'area', name: string) => void
   onClose: () => void
-}): React.JSX.Element {
-  const [query, setQuery] = useState(prefilledQuery)
+}
+
+function isCreate(opt: DestOption): boolean {
+  return opt.kind === 'create-project' || opt.kind === 'create-area'
+}
+
+/** Which kind of destination an option is, created or not. */
+function baseKind(opt: DestOption): 'project' | 'area' {
+  if (opt.kind === 'project' || opt.kind === 'create-project') return 'project'
+  return 'area'
+}
+
+function projectOptions(result: unknown): DestOption[] {
+  if (!result || typeof result !== 'object' || !('projects' in result)) return []
+  return (result as { projects: IndexedProject[] }).projects.map((p) => ({
+    kind: 'project',
+    label: p.name,
+    sublabel: p.area ? `#${p.area}` : undefined,
+    filePath: `projects/${p.name}.md`,
+  }))
+}
+
+function areaOptions(result: unknown): DestOption[] {
+  if (!result || typeof result !== 'object' || !('areas' in result)) return []
+  return (result as { areas: AreaData[] }).areas.map((a) => ({
+    kind: 'area',
+    label: a.name,
+    filePath: `areas/${a.name}.md`,
+  }))
+}
+
+/** The active and someday projects, then the areas, a task can be filed to. */
+function useDestinations() {
   const [baseOptions, setBaseOptions] = useState<DestOption[]>([])
   const [loading, setLoading] = useState(true)
-  const [highlighted, setHighlighted] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
-  // Escape already worked while focus sat in the field; the hook adds the two
-  // that did not — a click outside, and focus returning to whatever opened it.
-  const surfaceRef = useRef<HTMLDivElement>(null)
-  useDismissible({ ref: surfaceRef, onDismiss: onClose, manageFocus: false })
-
   useEffect(() => {
-    inputRef.current?.focus()
     Promise.all([
       window.electronAPI.extensionBridge.invoke('task-vault:projects:list', {
         status: ['active', 'someday'],
@@ -46,85 +64,177 @@ export function FileToPicker({
       window.electronAPI.extensionBridge.invoke('task-vault:vault:list-areas'),
     ])
       .then(([projResult, areaResult]) => {
-        const opts: DestOption[] = []
-        if (projResult && typeof projResult === 'object' && 'projects' in projResult) {
-          for (const p of (projResult as { projects: IndexedProject[] }).projects) {
-            opts.push({
-              kind: 'project',
-              label: p.name,
-              sublabel: p.area ? `#${p.area}` : undefined,
-              filePath: `projects/${p.name}.md`,
-            })
-          }
-        }
-        if (areaResult && typeof areaResult === 'object' && 'areas' in areaResult) {
-          for (const a of (areaResult as { areas: AreaData[] }).areas) {
-            opts.push({ kind: 'area', label: a.name, filePath: `areas/${a.name}.md` })
-          }
-        }
-        setBaseOptions(opts)
+        setBaseOptions([...projectOptions(projResult), ...areaOptions(areaResult)])
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+  return { baseOptions, loading }
+}
 
+function createOption(kind: 'project' | 'area', name: string): DestOption {
+  return {
+    kind: kind === 'project' ? 'create-project' : 'create-area',
+    label: `Create ${kind} "${name}"`,
+    filePath: '',
+    createName: name,
+  }
+}
+
+interface Matching {
+  baseOptions: DestOption[]
+  query: string
+  canCreate: boolean
+}
+
+/** Options matching the query, plus a create option for each kind it does not name exactly. */
+function matchingOptions({ baseOptions, query, canCreate }: Matching): DestOption[] {
+  const q = query.trim().toLowerCase().replace(/^[@#]/, '')
+  const matches = (o: DestOption) =>
+    !q || o.label.toLowerCase().includes(q) || (o.sublabel ?? '').toLowerCase().includes(q)
+  const filtered = baseOptions.filter(matches)
+  if (!canCreate || q.length === 0) return filtered
+  for (const kind of ['project', 'area'] as const) {
+    const exact = baseOptions.some((o) => o.kind === kind && o.label.toLowerCase() === q)
+    if (!exact) filtered.push(createOption(kind, query.trim()))
+  }
+  return filtered
+}
+
+/** The highlighted option, reset to the first whenever the query changes. */
+function useHighlight(query: string) {
+  const [highlighted, setHighlighted] = useState(0)
   const [highlightedFor, setHighlightedFor] = useState(query)
   if (highlightedFor !== query) {
     setHighlightedFor(query)
     setHighlighted(0)
   }
+  return { highlighted, setHighlighted }
+}
 
-  const q = query.trim().toLowerCase().replace(/^[@#]/, '')
-  const filtered: DestOption[] = baseOptions.filter(
-    (o) => !q || o.label.toLowerCase().includes(q) || (o.sublabel ?? '').toLowerCase().includes(q)
-  )
+interface KeyNav {
+  count: number
+  setHighlighted: React.Dispatch<React.SetStateAction<number>>
+  pick: () => void
+  onClose: () => void
+}
 
-  if (onSelectNew && q.length > 0) {
-    const exactProject = baseOptions.some(
-      (o) => o.kind === 'project' && o.label.toLowerCase() === q
-    )
-    const exactArea = baseOptions.some((o) => o.kind === 'area' && o.label.toLowerCase() === q)
-    if (!exactProject) {
-      filtered.push({
-        kind: 'create-project',
-        label: `Create project "${query.trim()}"`,
-        filePath: '',
-        createName: query.trim(),
-      })
-    }
-    if (!exactArea) {
-      filtered.push({
-        kind: 'create-area',
-        label: `Create area "${query.trim()}"`,
-        filePath: '',
-        createName: query.trim(),
-      })
-    }
-  }
-
-  function select(opt: DestOption) {
-    if (opt.kind === 'create-project' || opt.kind === 'create-area') {
-      onSelectNew?.(opt.kind === 'create-project' ? 'project' : 'area', opt.createName!)
-    } else {
-      onSelect(opt.filePath)
-    }
-  }
-
-  function onKeyDown(e: React.KeyboardEvent) {
+function keyHandler(nav: KeyNav) {
+  return (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setHighlighted((h) => Math.min(h + 1, filtered.length - 1))
+      nav.setHighlighted((h) => Math.min(h + 1, nav.count - 1))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setHighlighted((h) => Math.max(h - 1, 0))
+      nav.setHighlighted((h) => Math.max(h - 1, 0))
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      if (filtered[highlighted]) select(filtered[highlighted])
+      nav.pick()
     } else if (e.key === 'Escape') {
-      onClose()
+      nav.onClose()
     }
   }
+}
 
+interface OptionProps {
+  opt: DestOption
+  highlighted: boolean
+  onPick: () => void
+  onHover: () => void
+}
+
+function optionClass(opt: DestOption, highlighted: boolean): string {
+  return [
+    'file-to-picker__option',
+    highlighted ? 'file-to-picker__option--highlighted' : '',
+    isCreate(opt) ? 'file-to-picker__option--create' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+function OptionRow(props: OptionProps): React.JSX.Element {
+  const { opt, highlighted, onPick, onHover } = props
+  const kind = baseKind(opt)
+  return (
+    <li
+      className={optionClass(opt, highlighted)}
+      onMouseDown={(e) => {
+        e.preventDefault()
+        onPick()
+      }}
+      onMouseEnter={onHover}
+    >
+      <span className={`file-to-picker__kind file-to-picker__kind--${kind}`}>
+        {kind === 'project' ? '@' : '#'}
+      </span>
+      <span className="file-to-picker__label">{opt.label}</span>
+      {opt.sublabel && <span className="file-to-picker__sublabel">{opt.sublabel}</span>}
+    </li>
+  )
+}
+
+function optionKey(opt: DestOption): string {
+  if (isCreate(opt)) return opt.kind + '-' + opt.createName
+  return opt.filePath
+}
+
+interface ListProps {
+  loading: boolean
+  options: DestOption[]
+  highlighted: number
+  onPick: (opt: DestOption) => void
+  onHover: (index: number) => void
+}
+
+function OptionList(props: ListProps): React.JSX.Element {
+  const { loading, options, highlighted, onPick, onHover } = props
+  if (loading) return <div className="file-to-picker__loading">Loading…</div>
+  if (options.length === 0) {
+    return <div className="file-to-picker__empty">Type to search or create…</div>
+  }
+  return (
+    <ul className="file-to-picker__list">
+      {options.map((opt, i) => (
+        <OptionRow
+          key={optionKey(opt)}
+          opt={opt}
+          highlighted={i === highlighted}
+          onPick={() => onPick(opt)}
+          onHover={() => onHover(i)}
+        />
+      ))}
+    </ul>
+  )
+}
+
+/** The picker's query, matching options, highlight and key handling. */
+function usePicker(props: PickerProps) {
+  const { prefilledQuery, onSelect, onSelectNew, onClose } = props
+  const [query, setQuery] = useState(prefilledQuery)
+  const { baseOptions, loading } = useDestinations()
+  const { highlighted, setHighlighted } = useHighlight(query)
+  const options = matchingOptions({ baseOptions, query, canCreate: Boolean(onSelectNew) })
+  function select(opt: DestOption) {
+    if (isCreate(opt)) onSelectNew?.(baseKind(opt), opt.createName!)
+    else onSelect(opt.filePath)
+  }
+  const pick = () => options[highlighted] && select(options[highlighted])
+  const onKeyDown = keyHandler({ count: options.length, setHighlighted, pick, onClose })
+  return { query, setQuery, loading, options, highlighted, setHighlighted, select, onKeyDown }
+}
+
+/**
+ * Picks where to file a task. Escape already worked while focus sat in the field;
+ * useDismissible adds the two that did not — a click outside, and focus returning
+ * to whatever opened it.
+ */
+export function FileToPicker(props: PickerProps): React.JSX.Element {
+  const picker = usePicker(props)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const surfaceRef = useRef<HTMLDivElement>(null)
+  useDismissible({ ref: surfaceRef, onDismiss: props.onClose, manageFocus: false })
+  useEffect(() => inputRef.current?.focus(), [])
   return (
     <div className="file-to-picker" ref={surfaceRef} data-tmui-surface="">
       <div className="file-to-picker__header">
@@ -133,55 +243,19 @@ export function FileToPicker({
           className="file-to-picker__search"
           type="text"
           placeholder="Search or create project / area…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={onKeyDown}
+          value={picker.query}
+          onChange={(e) => picker.setQuery(e.target.value)}
+          onKeyDown={picker.onKeyDown}
         />
-        <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
+        <IconButton icon={X} label="Close" size="sm" onClick={props.onClose} />
       </div>
-      {loading ? (
-        <div className="file-to-picker__loading">Loading…</div>
-      ) : filtered.length === 0 ? (
-        <div className="file-to-picker__empty">Type to search or create…</div>
-      ) : (
-        <ul className="file-to-picker__list">
-          {filtered.map((opt, i) => (
-            <li
-              key={
-                opt.kind === 'create-project' || opt.kind === 'create-area'
-                  ? `${opt.kind}-${opt.createName}`
-                  : opt.filePath
-              }
-              className={[
-                'file-to-picker__option',
-                i === highlighted ? 'file-to-picker__option--highlighted' : '',
-                opt.kind === 'create-project' || opt.kind === 'create-area'
-                  ? 'file-to-picker__option--create'
-                  : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              onMouseDown={(e) => {
-                e.preventDefault()
-                select(opt)
-              }}
-              onMouseEnter={() => setHighlighted(i)}
-            >
-              <span
-                className={`file-to-picker__kind file-to-picker__kind--${opt.kind === 'create-project' ? 'project' : opt.kind === 'create-area' ? 'area' : opt.kind}`}
-              >
-                {opt.kind === 'project' || opt.kind === 'create-project'
-                  ? '@'
-                  : opt.kind === 'area' || opt.kind === 'create-area'
-                    ? '#'
-                    : ''}
-              </span>
-              <span className="file-to-picker__label">{opt.label}</span>
-              {opt.sublabel && <span className="file-to-picker__sublabel">{opt.sublabel}</span>}
-            </li>
-          ))}
-        </ul>
-      )}
+      <OptionList
+        loading={picker.loading}
+        options={picker.options}
+        highlighted={picker.highlighted}
+        onPick={picker.select}
+        onHover={picker.setHighlighted}
+      />
     </div>
   )
 }
