@@ -1,3 +1,4 @@
+import { remoteAccessFor } from './remote-access.js'
 import { z } from 'zod'
 import type { ExtensionAPI, Disposable } from '@terminator/extension-sdk'
 
@@ -53,14 +54,18 @@ const ReviewReposArgs = z.object({
 /** The Reviews view reads the clone folder and the repository selection, and writes the selection. */
 export function registerReviewSettings(api: ExtensionAPI): Disposable[] {
   return [
-    api.ipc.registerHandler('github:review-settings', () => {
-      const repos = api.settings.get<unknown>(REVIEW_REPOS_KEY)
-      return {
-        cloneFolder:
-          api.settings.get<string>('terminator.git-integration.review.cloneFolder') ?? '',
-        repos: Array.isArray(repos) ? repos : [],
-      }
-    }),
+    api.ipc.registerHandler(
+      'github:review-settings',
+      () => {
+        const repos = api.settings.get<unknown>(REVIEW_REPOS_KEY)
+        return {
+          cloneFolder:
+            api.settings.get<string>('terminator.git-integration.review.cloneFolder') ?? '',
+          repos: Array.isArray(repos) ? repos : [],
+        }
+      },
+      remoteAccessFor('github:review-settings')
+    ),
     api.ipc.registerHandler('github:review-repos-set', (payload) => {
       const parsed = ReviewReposArgs.safeParse(payload)
       if (!parsed.success) return { error: 'VALIDATION_ERROR' }

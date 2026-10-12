@@ -3,6 +3,7 @@ import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
 import { registerGithubHandlers } from './ipc/github.ipc.js'
 import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'
 import { registerQuickActionCommands } from './commands.js'
+import { remoteAccessFor } from './remote-access.js'
 import { bindShell } from './shell/run-git.js'
 import {
   openPrReviewWindow,
@@ -67,7 +68,7 @@ export function activate(api: ExtensionAPI): void {
     channel: string,
     handler: (payload: unknown) => Promise<unknown> | unknown
   ) => {
-    disposables.push(api.ipc.registerHandler(channel, handler))
+    disposables.push(api.ipc.registerHandler(channel, handler, remoteAccessFor(channel)))
   }
   registerGitExtensionHandlers(registerFn)
   disposables.push(...registerQuickActionCommands(api))
