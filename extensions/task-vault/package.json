@@ -7,7 +7,7 @@
     "build:renderer": "vite build --config vite.renderer.config.ts"
   },
   "dependencies": {
-    "@terminator/extension-sdk": "2.0.0",
+    "@terminator/extension-sdk": "3.0.0",
     "@terminator/extension-ui": "1.0.0",
     "lucide-react": "1.21.0",
     "react": "18.3.1",

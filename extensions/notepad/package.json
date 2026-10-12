@@ -26,7 +26,7 @@
     "@excalidraw/excalidraw": "0.17.6",
     "@lezer/common": "1.5.2",
     "@lezer/markdown": "1.6.4",
-    "@terminator/extension-sdk": "2.0.0",
+    "@terminator/extension-sdk": "3.0.0",
     "@terminator/extension-ui": "1.0.0",
     "js-yaml": "4.3.2",
     "lucide-react": "1.21.0",

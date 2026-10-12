@@ -70,28 +70,12 @@ import { listConnections as listTrackerConnections } from '../integrations/track
 import { setLink as setIssueLink } from '../integrations/issue-link-store.js'
 import { REMOTE_ACCESSIBLE_CHANNELS } from '../remote/remote-accessible-channels.js'
 
-interface ChannelRegistration {
-  channel: string
-  answer: (payload: unknown) => unknown
-  options?: RegisterHandlerOptions
-}
-
-// registerHandler takes a ChannelSpec (ADR 096) or, until every extension
-// declares a schema, the unvalidated (channel, handler, options) form.
-function toChannelRegistration(
-  channelOrSpec: string | ChannelSpec,
-  handlerOrOptions?: ((payload: unknown) => unknown) | RegisterHandlerOptions,
-  unvalidatedOptions?: RegisterHandlerOptions
-): ChannelRegistration {
-  if (typeof channelOrSpec === 'string') {
-    const handler = handlerOrOptions as (payload: unknown) => unknown
-    return { channel: channelOrSpec, answer: handler, options: unvalidatedOptions }
-  }
-  return {
-    channel: channelOrSpec.channel,
-    answer: (payload) => dispatchChannel(channelOrSpec, payload),
-    options: handlerOrOptions as RegisterHandlerOptions | undefined,
-  }
+// Extension bundles are plain JavaScript at run time; a handler without a
+// schema would otherwise fail only when its first payload arrives (ADR 096).
+function assertChannelSpec(spec: unknown): asserts spec is ChannelSpec {
+  const candidate = spec as Partial<ChannelSpec> | null
+  if (typeof candidate?.channel === 'string' && candidate.schema !== undefined) return
+  throw new TypeError('registerHandler needs a ChannelSpec with a schema (ADR 096)')
 }
 
 /**
@@ -557,20 +541,12 @@ export function createExtensionAPI(
       },
     },
     ipc: {
-      registerHandler(
-        channelOrSpec: string | ChannelSpec,
-        handlerOrOptions?: ((payload: unknown) => unknown) | RegisterHandlerOptions,
-        unvalidatedOptions?: RegisterHandlerOptions
-      ): Disposable {
-        const registration = toChannelRegistration(
-          channelOrSpec,
-          handlerOrOptions,
-          unvalidatedOptions
-        )
-        handleChannel(registration.channel, (_event, payload) => registration.answer(payload), {
-          remoteAccessible: registration.options?.remoteAccessible ?? false,
+      registerHandler(spec: ChannelSpec, options?: RegisterHandlerOptions): Disposable {
+        assertChannelSpec(spec)
+        handleChannel(spec.channel, (_event, payload) => dispatchChannel(spec, payload), {
+          remoteAccessible: options?.remoteAccessible ?? false,
         })
-        return disposable(() => removeChannel(registration.channel))
+        return disposable(() => removeChannel(spec.channel))
       },
       async invokeChannel(channel: string, payload: unknown): Promise<unknown> {
         const entry = deps?.bridge?.invokeRegistry.get(channel)

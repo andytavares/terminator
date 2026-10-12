@@ -4,6 +4,9 @@
 const fs = require('fs')
 const path = require('path')
 
+// The SDK version a new extension depends on is the one in this repository.
+const SDK_VERSION = require('../packages/extension-sdk/package.json').version
+
 const NAME_REGEX = /^[a-z][a-z0-9-]{2,49}$/
 const ID_REGEX = /^[a-z0-9]+(\.[a-z0-9-]+)+$/
 
@@ -32,7 +35,7 @@ function generatePackageJson(name) {
       version: '0.1.0',
       private: true,
       description: `${name} extension for Terminator`,
-      devDependencies: { '@terminator/extension-sdk': '2.0.0' },
+      devDependencies: { '@terminator/extension-sdk': SDK_VERSION },
     },
     null,
     2

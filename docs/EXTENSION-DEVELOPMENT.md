@@ -119,7 +119,7 @@ The SDK has three entries:
 `window.electronAPI` in a view is typed by `@terminator/extension-sdk/types/renderer`, which
 `tsconfig.extension.json` loads.
 
-**Another extension** _(SDK 2.1.0)_. An extension's API is what its `activate` returns. A consumer
+**Another extension** _(SDK 3.0.0)_. An extension's API is what its `activate` returns. A consumer
 lists the provider in its manifest's `extensionDependencies` and reads that returned object with
 `api.extensions.get(id)`, as VS Code's `extensionDependencies` and `exports` work (ADR 094):
 
@@ -389,7 +389,7 @@ if (result.exitCode !== 0) {
 
 A command that outlives `timeoutMs` is killed and resolves with `timedOut: true` and a non-zero `exitCode` (124, as `timeout(1)`), so an `exitCode !== 0` check also catches timeouts. The same holds for a command ended by a signal.
 
-Per-call options _(SDK 2.1.0)_:
+Per-call options _(SDK 3.0.0)_:
 
 | Option               | What it does                                                                                                                     |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -402,7 +402,7 @@ Output is never trimmed: `stdout` is exactly what the command wrote, which file 
 
 **Security**: `command` must be `'git'` or `'gh'`. `cwd` must be within the workspace folder. Arguments are passed directly to the OS — no shell expansion.
 
-### `api.github` — Pull Requests through gh _(SDK 2.1.0)_
+### `api.github` — Pull Requests through gh _(SDK 3.0.0)_
 
 The pull request verbs, run by the core over the `gh` CLI, as `api.issues` holds the tracker verbs. Each takes a `GithubTarget`: the checkout gh runs in (`cwd`), or a repository with no checkout (`repository: 'owner/name'`, gh's `GH_REPO`), and optionally a `token` that is retried without, under gh's own login, when GitHub rejects it.
 
@@ -631,7 +631,7 @@ Test against a real database, not a mock: `wrapDb(new DatabaseSync(':memory:'))`
 
 ---
 
-### `api.ipc` — Custom IPC Handlers _(v1.1.0; schema since SDK 2.1.0)_
+### `api.ipc` — Custom IPC Handlers _(v1.1.0; schema since SDK 3.0.0)_
 
 Register named IPC handlers in the main process. The renderer side calls these with `invoke(channel, payload)` from `@terminator/extension-sdk/renderer`.
 
@@ -661,7 +661,7 @@ handler.dispose()
 
 `invalid` may also be a function of the `ZodError`, e.g. `(error) => ({ error: 'VALIDATION_ERROR', message: error.message })`. An optional `onError(e)` turns an error `run` throws into a response instead of a rejected invoke. Do not re-check the payload inside `run`; the schema is the check. Whether zod rejects bad input is zod's concern, so test that each channel declares a schema (activate the extension, and for every registered spec send a malformed payload through `dispatchChannel` and assert `run` is not called) rather than one rejection case per channel.
 
-The unvalidated form `registerHandler(channel, (payload) => ..., opts)` still works and is deprecated: its handler receives the payload exactly as the caller sent it. It is removed once every first-party extension declares its schemas.
+There is no unvalidated form: since SDK 3.0.0 `registerHandler` throws when it is given anything but a `ChannelSpec` with a schema, so an extension without one fails at activation rather than on its first payload.
 
 **Channel naming**: prefix every channel with your extension ID followed by `:` to avoid collisions with core channels and other extensions. For example `com.acme.my-ext:fetch-data`.
 

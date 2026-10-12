@@ -1,4 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 // We import the pure functions from create-extension.cjs
 // The script uses CommonJS; vitest handles the transform
@@ -67,7 +72,8 @@ describe('generateManifest()', () => {
 describe('generatePackageJson()', () => {
   it('depends on the Extension SDK it is typed against', () => {
     const pkg = JSON.parse(generatePackageJson('my-ext'))
-    expect(pkg.devDependencies).toEqual({ '@terminator/extension-sdk': '2.0.0' })
+    const sdk = JSON.parse(readFileSync(join(ROOT, 'packages/extension-sdk/package.json'), 'utf8'))
+    expect(pkg.devDependencies).toEqual({ '@terminator/extension-sdk': sdk.version })
   })
 })
 

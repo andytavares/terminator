@@ -417,18 +417,31 @@ describe('api.commands.register', () => {
   })
 })
 
+/** A channel that takes any payload, for tests about registration itself. */
+function anyPayload(channel: string) {
+  return defineChannel({ channel, schema: z.unknown(), invalid: null, run: vi.fn() })
+}
+
 describe('api.ipc.registerHandler', () => {
   it('registers an IPC handler and returns disposable', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    const handler = vi.fn().mockResolvedValue({ ok: true })
-    const disposable = api.ipc.registerHandler('test.ext:my-channel', handler)
+    const disposable = api.ipc.registerHandler(anyPayload('test.ext:my-channel'))
     expect(disposable).toHaveProperty('dispose')
     disposable.dispose()
   })
 
+  // ADR 096. Extension bundles are plain JavaScript at run time, so the type
+  // alone does not stop a handler from arriving without one.
+  it('refuses a handler registered without a schema', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const register = api.ipc.registerHandler as unknown as (...args: unknown[]) => unknown
+    expect(() => register('test.ext:bare', vi.fn())).toThrow(/schema/)
+    expect(ipcInvokeRegistry.has('test.ext:bare')).toBe(false)
+  })
+
   it('keeps a channel registered without the option local-only', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.ipc.registerHandler('test.ext:no-option', vi.fn())
+    const disposable = api.ipc.registerHandler(anyPayload('test.ext:no-option'))
     expect(ipcInvokeRegistry.get('test.ext:no-option')?.remoteAccessible).toBe(false)
     disposable.dispose()
     expect(ipcInvokeRegistry.has('test.ext:no-option')).toBe(false)
@@ -436,7 +449,7 @@ describe('api.ipc.registerHandler', () => {
 
   it('makes a channel remote-accessible only when it opts in', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.ipc.registerHandler('test.ext:opted-in', vi.fn(), {
+    const disposable = api.ipc.registerHandler(anyPayload('test.ext:opted-in'), {
       remoteAccessible: true,
     })
     expect(ipcInvokeRegistry.get('test.ext:opted-in')?.remoteAccessible).toBe(true)
@@ -509,7 +522,7 @@ describe('api.ipc.registerHandler', () => {
 
   it('honors remoteAccessible: false for local-only channels', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.ipc.registerHandler('test.ext:local-only', vi.fn(), {
+    const disposable = api.ipc.registerHandler(anyPayload('test.ext:local-only'), {
       remoteAccessible: false,
     })
     expect(ipcInvokeRegistry.get('test.ext:local-only')?.remoteAccessible).toBe(false)

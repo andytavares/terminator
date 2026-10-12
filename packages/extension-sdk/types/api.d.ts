@@ -34,16 +34,6 @@ export interface RegisterHandlerOptions {
  */
 export type RegisterChannel = (spec: ChannelSpec, opts?: RegisterHandlerOptions) => Disposable
 
-/**
- * @deprecated Register a `ChannelSpec` instead (ADR 096). The handler receives
- * the payload exactly as the caller sent it, unvalidated.
- */
-export type RegisterUnvalidatedChannel = (
-  channel: string,
-  handler: (payload: unknown) => Promise<unknown> | unknown,
-  opts?: RegisterHandlerOptions
-) => Disposable
-
 /** The extension's own SQLite tables. Every call is async and runs in call order. */
 export interface ExtensionDB {
   exec(sql: string): Promise<void>
@@ -392,7 +382,7 @@ export interface ExtensionAPI {
     ): Disposable
   }
   ipc: {
-    registerHandler: RegisterChannel & RegisterUnvalidatedChannel
+    registerHandler: RegisterChannel
     invokeChannel(channel: string, payload: unknown): Promise<unknown>
     sendChannel(channel: string, payload: unknown): void
     onWindowEvent(channel: string, handler: (...args: unknown[]) => void): () => void

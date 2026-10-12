@@ -1,6 +1,6 @@
 # Changelog — @terminator/extension-sdk
 
-## 2.1.0
+## 3.0.0
 
 ### Added
 
@@ -10,8 +10,7 @@
 - `dispatchChannel(spec, payload)` (main entry): that parse step, shared by the core's invoke
   table and extension channels; extension tests use it to answer a registered spec.
 - `noPayload` (main entry): the schema of a channel that takes no payload.
-- `RegisterHandlerOptions`, `RegisterChannel` and `RegisterUnvalidatedChannel` in
-  `types/api.d.ts`.
+- `RegisterHandlerOptions` and `RegisterChannel` in `types/api.d.ts`.
 - Extension APIs (ADR 094): the value an extension's `activate` returns is its API. A manifest's
   `extensionDependencies` lists the providers it uses; the host activates them first and fails
   the consumer's activation, naming the dependency, when one is missing, failed, disabled or in a
@@ -29,10 +28,12 @@
   API. A `GithubTarget` names the checkout or `owner/name`, and an optional token that is
   retried without on an authentication failure; a failure rejects with `GithubCommandError`.
 
-### Deprecated
+### Removed
 
-- `api.ipc.registerHandler(channel, handler, opts?)`, whose handler receives the payload
-  unvalidated. It is removed once every first-party extension declares its schemas.
+- `api.ipc.registerHandler(channel, handler, opts?)`, whose handler received the payload
+  unvalidated. Every channel is a `ChannelSpec` with a schema; the core throws when
+  `registerHandler` is given anything else, so a plain-JavaScript bundle fails at activation
+  rather than on its first payload.
 
 ## 2.0.0
 
