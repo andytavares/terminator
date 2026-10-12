@@ -6,31 +6,10 @@ import { ViewPayload } from './payloads.js'
 
 import { disposables, reg } from './register.js'
 
-// Active session registry: sessionId → session metadata
-const activeSessions: Map<string, { id: string; name: string }> = new Map()
-
 // Auto-expires so a late manual visit to the Forge doesn't surprise the
 // operator with an intake that opened itself for no reason they can see.
 let pendingNewOrder = false
 let pendingNewOrderTimer: NodeJS.Timeout | null = null
-
-// Track terminal sessions for the session-list IPC
-export function trackTerminalSessions(api: ExtensionAPI): void {
-  if (api.terminal?.onSessionCreate) {
-    disposables.push(
-      api.terminal.onSessionCreate((session) => {
-        activeSessions.set(session.id, { id: session.id, name: session.tabTitle })
-      })
-    )
-  }
-  if (api.terminal?.onSessionClose) {
-    disposables.push(
-      api.terminal.onSessionClose((sessionId) => {
-        activeSessions.delete(sessionId)
-      })
-    )
-  }
-}
 
 // Anything but 'factory' reads as 'list' — an unset or corrupted setting is
 // the same as never having chosen the newer view.

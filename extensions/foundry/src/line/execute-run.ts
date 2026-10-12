@@ -42,9 +42,7 @@ export async function executeRun(
   const issuesPort = issuesPortFor(api)
 
   // The issue moves the moment work starts, not when somebody remembers.
-  if (issuesPort !== null) {
-    await writeBack(order, 'started', writeBackDepsFor(api, root, order, issuesPort))
-  }
+  await writeBack(order, 'started', writeBackDepsFor(api, root, order, issuesPort))
 
   const gates = createLiveGateStore(() => root, indexFor)
   const graphRef = { current: graph }
@@ -90,7 +88,6 @@ export async function executeRun(
     // The ticket moves to In Review when the draft opens, not when the CI
     // watch that follows it ends.
     onDraftOpened: async (pulls) => {
-      if (issuesPort === null) return
       await writeBack(order, 'draft_opened', writeBackDepsFor(api, root, order, issuesPort), {
         pulls: pulls.map((pull) => ({ repo: pull.repo, url: pull.url })),
       })

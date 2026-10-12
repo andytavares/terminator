@@ -2,7 +2,7 @@ import { noPayload } from '@terminator/extension-sdk'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 import { createForgeChannels, forgeChannelSpecs } from './forge-channels.js'
-import { foundryChannel, MALFORMED_REQUEST } from './channel.js'
+import { foundryChannel } from './channel.js'
 import { IssuesMinePayload, OrderIdPayload, TicketCreatePayload } from './payloads.js'
 import { createLiveOrderStore } from '../order/store.js'
 import { deleteOrder } from '../line/teardown.js'
@@ -82,16 +82,11 @@ function createForge(
     converge: (order, message) => loop.convergeMaybeScouted(order, message),
     // FR-059a: asked when the order is agreed, so an issue that will never
     // move is known before the run rather than after it.
-    capability:
-      issuesPort === null
-        ? undefined
-        : (order) => checkCapability(order, writeBackDepsFor(api, dataRoot(), order, issuesPort)),
-    onAgreed:
-      issuesPort === null
-        ? undefined
-        : async (order) => {
-            await writeBack(order, 'agreed', writeBackDepsFor(api, dataRoot(), order, issuesPort))
-          },
+    capability: (order) =>
+      checkCapability(order, writeBackDepsFor(api, dataRoot(), order, issuesPort)),
+    onAgreed: async (order) => {
+      await writeBack(order, 'agreed', writeBackDepsFor(api, dataRoot(), order, issuesPort))
+    },
     readIssue: (tracker, key) => readIssue(api, tracker, key),
     queueEntries: () => computeQueueEntries(dataRoot(), orderStoreAt(dataRoot())),
     onReleased: loop.onReleased,
@@ -106,8 +101,8 @@ async function readIssue(
   // Through the application's own tracker connection. This extension never
   // holds a credential and never contacts a tracker itself. A host with no
   // tracker connected answers "no issue" rather than throwing.
-  const issue = await api.issues?.get(tracker, key)
-  if (issue === null || issue === undefined) return null
+  const issue = await api.issues.get(tracker, key)
+  if (issue === null) return null
   return {
     key: issue.key,
     title: issue.title,
@@ -140,16 +135,14 @@ function registerIssueChannels(api: ExtensionAPI): void {
     foundryChannel('foundry:ticket.offer', noPayload, async () => ({
       offer: await ticketOffer(api.issues),
     })),
-    foundryChannel('foundry:ticket.create', TicketCreatePayload, async (payload) => {
-      if (api.issues === undefined) return MALFORMED_REQUEST
-      return fileTicket(api.issues, payload)
-    })
+    foundryChannel('foundry:ticket.create', TicketCreatePayload, (payload) =>
+      fileTicket(api.issues, payload)
+    )
   )
 }
 
 async function listMyIssues(api: ExtensionAPI, rawTerm: string) {
   const issues = api.issues
-  if (issues === undefined) return { connected: [], issues: [] }
   const term = rawTerm.trim()
   const connected = await issues.connections()
   // Nothing connected is a real answer and not an error: the surface says

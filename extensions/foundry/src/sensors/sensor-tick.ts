@@ -19,12 +19,10 @@ let sensorTimer: NodeJS.Timeout | null = null
 
 /**
  * The application's tracker connection, narrowed to what a sensor's `tracker`
- * source needs (`collect.ts`). Null when nothing is connected — a sensor of
- * this kind then reports "no tracker is connected" rather than throwing.
+ * source needs (`collect.ts`).
  */
 function sensorIssuesFor(api: ExtensionAPI): CollectDeps['issues'] {
   const issues = api.issues
-  if (issues === undefined) return null
   return {
     search: async (query, opts) =>
       (await issues.search(query, opts)).issues.map((issue) => ({
