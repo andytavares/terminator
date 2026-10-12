@@ -1,98 +1,81 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ipcMain } from 'electron'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
+
+type Handler = (event: unknown, payload?: unknown) => unknown
+const handlers = vi.hoisted(() => new Map<string, Handler>())
 
 vi.mock('electron', () => ({
-  ipcMain: { handle: vi.fn() },
+  ipcMain: { handle: (channel: string, handler: Handler) => handlers.set(channel, handler) },
 }))
 
-vi.mock('../../../src/main/fs/fs-watcher', () => ({
-  fsWatcherService: {
-    addHandler: vi.fn(),
-    watchStart: vi.fn(),
-    watchStop: vi.fn(),
-  },
-}))
-
-vi.mock('node:fs/promises', () => ({
-  default: {
-    readFile: vi.fn(),
-  },
-}))
-
-import fs from 'node:fs/promises'
-import { fsWatcherService } from '../../../src/main/fs/fs-watcher'
 import { registerFsHandlers } from '../../../src/main/ipc/fs.ipc'
 
-function captureHandler(channel: string): (event: unknown, payload?: unknown) => unknown {
-  const calls = vi.mocked(ipcMain.handle).mock.calls
-  const match = calls.find(([ch]) => ch === channel)
-  if (!match) throw new Error(`No handler registered for: ${channel}`)
-  return match[1] as (event: unknown, payload?: unknown) => unknown
+function fakeWindow(destroyed = false) {
+  return { isDestroyed: () => destroyed, webContents: { send: vi.fn() } }
 }
 
-describe('fs IPC handlers', () => {
-  const mockGetMainWindow = vi.fn(() => ({
-    webContents: { send: vi.fn() },
-  }))
+let window: ReturnType<typeof fakeWindow> | null
+// The watcher service is a singleton that keeps every handler added to it, so register once.
+registerFsHandlers(() => window as never)
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-    registerFsHandlers(mockGetMainWindow)
+function invoke<T>(channel: string, payload?: unknown): Promise<T> {
+  return Promise.resolve(handlers.get(channel)!({}, payload)) as Promise<T>
+}
+
+/** Long enough for a watch event to have arrived, for asserting one did not. */
+const quiet = () => new Promise((r) => setTimeout(r, 300))
+
+let projectRoot: string
+
+beforeEach(() => {
+  window = fakeWindow()
+  projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fs-ipc-'))
+})
+
+afterEach(async () => {
+  await invoke('fs:watch-stop')
+})
+
+describe('fs:watch-start / fs:watch-stop', () => {
+  it('tells the window about a file that changes in the project', async () => {
+    expect(await invoke('fs:watch-start', { projectRoot })).toEqual({ ok: true })
+    fs.writeFileSync(path.join(projectRoot, 'a.ts'), 'x')
+    await vi.waitFor(() =>
+      expect(window!.webContents.send).toHaveBeenCalledWith(
+        'fs:changed',
+        expect.objectContaining({ projectRoot, filename: 'a.ts' })
+      )
+    )
   })
 
-  describe('fs:watch-start', () => {
-    it('calls watchStart and returns ok for valid payload', async () => {
-      const handler = captureHandler('fs:watch-start')
-      const result = (await handler({}, { projectRoot: '/my/project' })) as { ok: boolean }
-      expect(fsWatcherService.watchStart).toHaveBeenCalledWith('/my/project')
-      expect(result.ok).toBe(true)
-    })
+  it('says nothing once watching has stopped', async () => {
+    await invoke('fs:watch-start', { projectRoot })
+    expect(await invoke('fs:watch-stop')).toEqual({ ok: true })
+    fs.writeFileSync(path.join(projectRoot, 'a.ts'), 'x')
+    await quiet()
+    expect(window!.webContents.send).not.toHaveBeenCalled()
   })
 
-  describe('fs:watch-stop', () => {
-    it('calls watchStop and returns ok', async () => {
-      const handler = captureHandler('fs:watch-stop')
-      const result = (await handler({})) as { ok: boolean }
-      expect(fsWatcherService.watchStop).toHaveBeenCalled()
-      expect(result.ok).toBe(true)
-    })
+  it('sends nothing to a window that has closed', async () => {
+    window = fakeWindow(true)
+    await invoke('fs:watch-start', { projectRoot })
+    fs.writeFileSync(path.join(projectRoot, 'a.ts'), 'x')
+    await quiet()
+    expect(window.webContents.send).not.toHaveBeenCalled()
+  })
+})
+
+describe('fs:read-file', () => {
+  it('returns the file’s content', async () => {
+    const filePath = path.join(projectRoot, 'file.ts')
+    fs.writeFileSync(filePath, 'file contents')
+    expect(await invoke('fs:read-file', { filePath })).toEqual({ content: 'file contents' })
   })
 
-  describe('fs:read-file', () => {
-    it('reads file and returns content', async () => {
-      vi.mocked(fs.readFile).mockResolvedValue('file contents' as unknown as Buffer)
-      const handler = captureHandler('fs:read-file')
-      const result = (await handler({}, { filePath: '/my/file.ts' })) as { content: string }
-      expect(result.content).toBe('file contents')
-    })
-
-    it('returns FILE_NOT_FOUND when readFile rejects', async () => {
-      vi.mocked(fs.readFile).mockRejectedValue(new Error('ENOENT'))
-      const handler = captureHandler('fs:read-file')
-      const result = (await handler({}, { filePath: '/no/such/file.ts' })) as { error: string }
-      expect(result.error).toBe('FILE_NOT_FOUND')
-    })
-  })
-
-  describe('fs watcher event forwarding', () => {
-    it('registers a watcher handler that sends fs:changed events to the window', () => {
-      const handlerCapture = vi.mocked(fsWatcherService.addHandler).mock.calls[0][0]
-      const mockSend = vi.fn()
-      mockGetMainWindow.mockReturnValueOnce({
-        webContents: { send: mockSend },
-        isDestroyed: vi.fn().mockReturnValue(false),
-      })
-      const event = { type: 'change', path: '/my/file.ts' }
-      handlerCapture(event as Parameters<typeof handlerCapture>[0])
-      expect(mockSend).toHaveBeenCalledWith('fs:changed', event)
-    })
-
-    it('does not crash when main window is null', () => {
-      const handlerCapture = vi.mocked(fsWatcherService.addHandler).mock.calls[0][0]
-      mockGetMainWindow.mockReturnValueOnce(null)
-      expect(() =>
-        handlerCapture({ type: 'change', path: '/file.ts' } as Parameters<typeof handlerCapture>[0])
-      ).not.toThrow()
-    })
+  it('returns FILE_NOT_FOUND for a file that is not there', async () => {
+    const filePath = path.join(projectRoot, 'missing.ts')
+    expect(await invoke('fs:read-file', { filePath })).toEqual({ error: 'FILE_NOT_FOUND' })
   })
 })
