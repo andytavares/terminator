@@ -35,7 +35,6 @@ import { buildWindowMenu } from './window-menu.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
-import { runLegacyMigration } from './db/migrate.js'
 import {
   listNativeViewMenuItems,
   getPanelMenuItemId,
@@ -292,7 +291,6 @@ app.whenReady().then(async () => {
 
   const userData = app.getPath('userData')
   await initAppDb(userData)
-  await runLegacyMigration(userData, getAppDb())
 
   // Serve extension renderer files via ext://<id>/<relPath>.
   // Only files within the extension's registered directory are accessible.
