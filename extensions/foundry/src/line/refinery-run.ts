@@ -2,9 +2,7 @@ import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 import { createLiveGateStore } from '../gates/store.js'
 import { raiseGate } from '../gates/rules.js'
-import { readPulls, finishShipping } from './integrate.js'
-import { ciRounds } from './ship-tail.js'
-import { resolveRecipe } from '../recipe/resolve.js'
+import { readPulls } from './integrate.js'
 import { branchFor, checkoutPath } from './worktree.js'
 import { computeQueueEntries } from './refinery-entries.js'
 import { readRefineryState, writeRefineryState } from './refinery-state.js'
@@ -14,11 +12,9 @@ import { restack } from './restack.js'
 import { writeBack } from '../trackers/write-back.js'
 
 import type { ActivationContext } from '../ipc/register.js'
-import { resolveSources } from '../workspace-root.js'
-import { indexFor, orderStoreAt, readGraph } from '../state/live-index.js'
+import { indexFor, orderStoreAt } from '../state/live-index.js'
 import { issuesPortFor, writeBackDepsFor } from '../trackers/issues-port.js'
-import { integrateDepsFor, ciRoundDepsFor, ciSendBackFor, settleShipNode } from './ship-deps.js'
-import { buildExecutorDeps } from './executor-deps.js'
+import { ciRoundAgain } from './ci-round-again.js'
 
 /**
  * The refinery tick: once a minute, watch merged predecessors and restack
@@ -38,40 +34,15 @@ let refineryTimer: NodeJS.Timeout | null = null
  * attempt at a failure the operator already saw.
  */
 async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string): Promise<void> {
-  const order = await orderStoreAt(root).load(orderId)
-  if (order === null || order.recipe === null) return
-  const resolved = resolveRecipe(order.recipe, resolveSources(api, root))
-  if (!resolved.ok) return
-  const recipe = resolved.resolved.value
-  const graph = await readGraph(root, orderId)
-  if (graph === null) return
-  const pulls = await readPulls(root, orderId)
-  if (pulls.length === 0) return
-
-  const { deps: executorDeps, exec } = await buildExecutorDeps(api, { root, order, recipe, graph })
-  const integrateDeps = integrateDepsFor(api, root, orderId)
-  const graphRef = { current: graph }
-  const outcome = await ciRounds({
-    pulls: pulls.map((pull) => ({ url: pull.url, cwd: pull.cwd })),
-    rounds: recipe.ci?.rounds ?? null,
-    ...ciRoundDepsFor(root, orderId, exec),
-    sendBack: ciSendBackFor(root, order, recipe, executorDeps, integrateDeps, graphRef),
+  // A rebased order with no drafts has nothing to watch.
+  if ((await readPulls(root, orderId)).length === 0) return
+  await ciRoundAgain({
+    api,
+    root,
+    orderId,
+    rounds: 'recipe',
+    gates: createLiveGateStore(() => root, indexFor),
   })
-  const gates = createLiveGateStore(() => root, indexFor)
-  const finished = await finishShipping(
-    order,
-    { verdicts: [], findings: [] },
-    pulls,
-    pulls.map((p) => p.bodyPath),
-    outcome,
-    {
-      ...integrateDeps,
-      raiseGate: async (g) => {
-        await gates.save(g)
-      },
-    }
-  )
-  await settleShipNode(root, recipe, graphRef, finished.gate?.rule === 'ready-for-review')
 }
 
 /**

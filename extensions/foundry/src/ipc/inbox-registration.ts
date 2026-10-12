@@ -7,10 +7,8 @@ import { createLiveGateStore } from '../gates/store.js'
 import { ruleInWords } from '../gates/rules.js'
 import { countAttention, ordersWaiting, questionsByOrder } from '../gates/attention.js'
 import { createLiveOrderStore } from '../order/store.js'
-import { markReady, readPulls, finishShipping } from '../line/integrate.js'
-import { ciRounds } from '../line/ship-tail.js'
+import { markReady, readPulls } from '../line/integrate.js'
 import { sendBack } from '../line/scheduler.js'
-import { resolveRecipe } from '../recipe/resolve.js'
 import { finalCheckSendBacks, sendsBackFinalCheck } from '../line/refinery-state.js'
 import { createRoleRegistry } from '../line/roles.js'
 import { fixMessage } from '../forge/review-loop.js'
@@ -24,14 +22,9 @@ import { resolveSources } from '../workspace-root.js'
 import { indexFor, orderStoreAt, gateStoreAt, readGraph, writeGraph } from '../state/live-index.js'
 import { autonomyFor } from '../state/settings.js'
 import { pendingPermissions } from '../runtime/runtime-state.js'
-import {
-  integrateDepsFor,
-  ciRoundDepsFor,
-  ciSendBackFor,
-  settleShipNode,
-} from '../line/ship-deps.js'
+import { integrateDepsFor } from '../line/ship-deps.js'
 import { stopOrder, adoptInterruptedRuns } from '../line/run-control.js'
-import { buildExecutorDeps } from '../line/executor-deps.js'
+import { ciRoundAgain } from '../line/ci-round-again.js'
 import { readLiveStandings } from './standing.js'
 import type { LiveStandingSources } from './standing.js'
 import type { ForgeLoop } from '../forge/forge-loop.js'
@@ -172,39 +165,13 @@ async function anotherCiRound(
   { api, dataRoot }: ActivationContext,
   orderId: string
 ): Promise<void> {
-  const root = dataRoot()
-  const order = await orderStoreAt(root).load(orderId)
-  if (order === null || order.recipe === null) return
-  const resolved = resolveRecipe(order.recipe, resolveSources(api, root))
-  if (!resolved.ok) return
-  const recipe = resolved.resolved.value
-  const graph = await readGraph(root, orderId)
-  if (graph === null) return
-  const pulls = await readPulls(root, orderId)
-  const { deps: executorDeps, exec } = await buildExecutorDeps(api, { root, order, recipe, graph })
-  const integrateDeps = integrateDepsFor(api, root, order.id)
-  const graphRef = { current: graph }
-  const outcome = await ciRounds({
-    pulls: pulls.map((pull) => ({ url: pull.url, cwd: pull.cwd })),
+  await ciRoundAgain({
+    api,
+    root: dataRoot(),
+    orderId,
     rounds: 1,
-    ...ciRoundDepsFor(root, order.id, exec),
-    sendBack: ciSendBackFor(root, order, recipe, executorDeps, integrateDeps, graphRef),
+    gates: createLiveGateStore(dataRoot, indexFor),
   })
-  const gates = createLiveGateStore(dataRoot, indexFor)
-  const finished = await finishShipping(
-    order,
-    { verdicts: [], findings: [] },
-    pulls,
-    pulls.map((pull) => pull.bodyPath),
-    outcome,
-    {
-      ...integrateDeps,
-      raiseGate: async (g) => {
-        await gates.save(g)
-      },
-    }
-  )
-  await settleShipNode(root, recipe, graphRef, finished.gate?.rule === 'ready-for-review')
 }
 
 /**

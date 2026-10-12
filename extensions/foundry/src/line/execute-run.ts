@@ -102,12 +102,8 @@ export async function executeRun(
         sendBack: afterFinalCheck(
           finalCheck.settled,
           ciSendBackFor(
-            root,
-            shippedOrderRef.current,
-            recipe,
-            executorDeps,
-            integrateDepsFor(api, root, order.id),
-            graphRef
+            { root, order: shippedOrderRef.current, recipe, graphRef },
+            { executorDeps, integrateDeps: integrateDepsFor(api, root, order.id) }
           )
         ),
       }),
@@ -168,7 +164,7 @@ export async function executeRun(
       reason: documentEnd.kind === 'missing' ? documentEnd.reason : documentEnd.where,
       evidence: [],
     })
-    await settleShipNode(root, recipe, graphRef, documentEnd.kind === 'ready')
+    await settleShipNode({ root, recipe, graphRef }, documentEnd.kind === 'ready')
     return
   }
 
@@ -190,7 +186,7 @@ export async function executeRun(
       reason: whyNotShipped(recipe, outcome),
       evidence: [],
     })
-    await settleShipNode(root, recipe, graphRef, false)
+    await settleShipNode({ root, recipe, graphRef }, false)
     return
   }
 
@@ -215,7 +211,7 @@ export async function executeRun(
   // The ship node was left running when the executor reached it. It passes
   // when the ready question is raised, and goes back to waiting when shipping
   // stopped short of it, so a resume owes the tail again.
-  await settleShipNode(root, recipe, graphRef, shipped?.gate?.rule === 'ready-for-review')
+  await settleShipNode({ root, recipe, graphRef }, shipped?.gate?.rule === 'ready-for-review')
 
   if (shipped === null || shipped.held || shipped.pulls.length === 0) return
 

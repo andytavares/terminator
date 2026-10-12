@@ -82,6 +82,18 @@ export function integrateDepsFor(api: ExtensionAPI, root: string, orderId: strin
   }
 }
 
+/** The parts of a CI round that both the run and the inbox share. */
+export interface CiRoundDeps {
+  watch: (
+    pull: { url: string; cwd: string },
+    onPoll: (checks: readonly Check[]) => void,
+    judged: ReadonlySet<string>
+  ) => Promise<CiVerdict>
+  failedLogs: (checks: readonly Check[], cwd: string) => Promise<string>
+  record: (action: string, subject: string, reason: string) => Promise<void>
+  state: (state: Omit<CiState, 'at'>) => Promise<void>
+}
+
 /**
  * The parts of a CI round that never change between the run that opened the
  * draft and a later "another round" answered from the inbox: how a pull's
@@ -92,20 +104,7 @@ export function integrateDepsFor(api: ExtensionAPI, root: string, orderId: strin
  * different one, because the run already has a graph and executor deps in
  * hand and the inbox has to rebuild them.
  */
-export function ciRoundDepsFor(
-  root: string,
-  orderId: string,
-  exec: ShellExec
-): {
-  watch: (
-    pull: { url: string; cwd: string },
-    onPoll: (checks: readonly Check[]) => void,
-    judged: ReadonlySet<string>
-  ) => Promise<CiVerdict>
-  failedLogs: (checks: readonly Check[], cwd: string) => Promise<string>
-  record: (action: string, subject: string, reason: string) => Promise<void>
-  state: (state: Omit<CiState, 'at'>) => Promise<void>
-} {
+export function ciRoundDepsFor(root: string, orderId: string, exec: ShellExec): CiRoundDeps {
   return {
     watch: (pull, onPoll, judged) =>
       watchChecks(pull, exec, {
@@ -114,17 +113,7 @@ export function ciRoundDepsFor(
         ignoreRuns: judged,
       }),
     failedLogs: (checks, cwd) => failedLogs(checks, cwd, exec),
-    record: async (action, subject, reason) => {
-      await orderStoreAt(root).record({
-        at: new Date().toISOString(),
-        orderId,
-        actor: 'rule:ci',
-        action,
-        subject,
-        reason,
-        evidence: [],
-      })
-    },
+    record: (action, subject, reason) => recordCiEntry(root, orderId, { action, subject, reason }),
     state: async (state) => {
       await writeCiState(root, orderId, { ...state, at: new Date().toISOString() })
       indexFor(root).announce({ kind: 'graph', orderId })
@@ -132,24 +121,48 @@ export function ciRoundDepsFor(
   }
 }
 
+async function recordCiEntry(
+  root: string,
+  orderId: string,
+  entry: { action: string; subject: string; reason: string }
+): Promise<void> {
+  await orderStoreAt(root).record({
+    at: new Date().toISOString(),
+    orderId,
+    actor: 'rule:ci',
+    action: entry.action,
+    subject: entry.subject,
+    reason: entry.reason,
+    evidence: [],
+  })
+}
+
+/**
+ * Where a run's tail works: its records, its shape, its order, and its graph
+ * as each round leaves it.
+ *
+ * `graphRef` is a box rather than a plain graph because a CI round shared
+ * between a run in flight and a `ci.red` gate answered later from the inbox
+ * has to see the graph the previous round left, and the inbox path has no
+ * closure over a running executor to hold it for it.
+ */
+export interface ShipRun {
+  readonly root: string
+  readonly order: WorkOrder
+  readonly recipe: Recipe
+  readonly graphRef: { current: RunGraph }
+}
+
 /**
  * The fix round a red CI check gets: rework the graph back to the builder,
  * re-run the executor from there, and — if that leaves the order shippable —
  * push the fixed branches onto the drafts that are already open.
- *
- * Shared between a run in flight and a `ci.red` gate answered later from the
- * inbox, which is the whole reason `graphRef` is a box rather than a plain
- * graph: each round has to see the graph the previous round left, and the
- * inbox path has no closure over a running executor to hold it for it.
  */
 export function ciSendBackFor(
-  root: string,
-  order: WorkOrder,
-  recipe: Recipe,
-  executorDeps: ExecutorDeps,
-  integrateDeps: IntegrateDeps,
-  graphRef: { current: RunGraph }
+  run: ShipRun,
+  deps: { executorDeps: ExecutorDeps; integrateDeps: IntegrateDeps }
 ): (feedback: Feedback) => Promise<boolean> {
+  const { root, order, recipe, graphRef } = run
   return async (feedback) => {
     const target = ciReworkTarget(recipe)
     const shipId = shipNodeId(recipe)
@@ -158,12 +171,12 @@ export function ciSendBackFor(
     graphRef.current = rework(graphRef.current, shipId, target, feedback)
     await writeGraph(root, graphRef.current)
 
-    const outcome = await execute(order, recipe, graphRef.current, executorDeps)
+    const outcome = await execute(order, recipe, graphRef.current, deps.executorDeps)
     graphRef.current = outcome.graph
     await writeGraph(root, graphRef.current)
 
     if (!outcome.shippable) return false
-    await pushLanes(order, integrateDeps)
+    await pushLanes(order, deps.integrateDeps)
     return true
   }
 }
@@ -174,11 +187,10 @@ export function ciSendBackFor(
  * neither running nor (when asked) waiting is left as it is.
  */
 export async function settleShipNode(
-  root: string,
-  recipe: Recipe,
-  graphRef: { current: RunGraph },
+  run: Pick<ShipRun, 'root' | 'recipe' | 'graphRef'>,
   asked: boolean
 ): Promise<void> {
+  const { root, recipe, graphRef } = run
   const shipId = shipNodeId(recipe)
   if (shipId === null) return
   const settled = settleShip(graphRef.current, shipId, asked, new Date().toISOString())
