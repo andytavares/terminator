@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Play, RefreshCw, Trash2 } from 'lucide-react'
 import { invoke } from '@terminator/extension-sdk/renderer'
 import { Button, IconButton } from '@terminator/extension-ui'
@@ -20,7 +20,43 @@ interface ConfirmPending {
   sql: string
 }
 
-const QUICK_ACTIONS = [
+interface QueryAnswer {
+  rows?: Record<string, unknown>[]
+  changes?: number
+  error?: string
+}
+
+type Admin = ReturnType<typeof useAdmin>
+
+interface AdminProps {
+  admin: Admin
+}
+
+interface RowsProps {
+  admin: Admin
+  result: QueryResult
+  /** The table rows can be deleted from, when the query read one table with an id column. */
+  table: string | null
+}
+
+interface RowProps extends RowsProps {
+  row: Record<string, unknown>
+  columns: string[]
+}
+
+interface QuickActionDef {
+  label: string
+  sql: string
+  destructive?: boolean
+}
+
+interface StatChipProps {
+  admin: Admin
+  table: string
+  count: number
+}
+
+const QUICK_ACTIONS: QuickActionDef[] = [
   {
     label: 'Count tasks by status',
     sql: 'SELECT status, COUNT(*) AS count FROM tasks GROUP BY status ORDER BY count DESC',
@@ -73,279 +109,343 @@ async function fetchStats(): Promise<TableStats | null> {
   return res.stats ?? null
 }
 
-export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Element {
-  const [stats, setStats] = useState<TableStats | null>(null)
-  const [sql, setSql] = useState('')
-  const [result, setResult] = useState<QueryResult | null>(null)
-  const [running, setRunning] = useState(false)
-  const [confirmPending, setConfirmPending] = useState<ConfirmPending | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+/** Runs one query and times it; `wrote` says whether it changed rows rather than reading them. */
+async function executeQuery(querySql: string): Promise<{ result: QueryResult; wrote: boolean }> {
+  const start = Date.now()
+  try {
+    const res = await invoke<QueryAnswer>('task-vault:admin:run-query', { sql: querySql })
+    const elapsed = Date.now() - start
+    if (res.error) {
+      return {
+        result: { rows: [], changes: 0, error: res.error, elapsed, sourceSql: querySql },
+        wrote: false,
+      }
+    }
+    const result = { rows: res.rows ?? [], changes: res.changes ?? 0, elapsed, sourceSql: querySql }
+    return { result, wrote: !res.rows }
+  } catch (err) {
+    const result = {
+      rows: [],
+      changes: 0,
+      error: String(err),
+      elapsed: Date.now() - start,
+      sourceSql: querySql,
+    }
+    return { result, wrote: false }
+  }
+}
 
+function useTableStats() {
+  const [stats, setStats] = useState<TableStats | null>(null)
   const loadStats = useCallback(async () => {
     const loaded = await fetchStats()
     if (loaded) setStats(loaded)
   }, [])
-
   useEffect(() => {
     void fetchStats().then((loaded) => {
       if (loaded) setStats(loaded)
     })
   }, [])
+  return { stats, loadStats }
+}
 
-  const runQuery = useCallback(
-    async (querySql: string) => {
-      if (!querySql.trim()) return
-      setRunning(true)
-      setResult(null)
-      const start = Date.now()
-      try {
-        const res = await invoke<{
-          rows?: Record<string, unknown>[]
-          changes?: number
-          error?: string
-        }>('task-vault:admin:run-query', { sql: querySql })
-        const elapsed = Date.now() - start
-        if (res.error) {
-          setResult({ rows: [], changes: 0, error: res.error, elapsed, sourceSql: querySql })
-        } else {
-          const isWrite = !res.rows
-          setResult({
-            rows: res.rows ?? [],
-            changes: res.changes ?? 0,
-            elapsed,
-            sourceSql: querySql,
-          })
-          void loadStats()
-          if (isWrite) onWrite?.()
-        }
-      } catch (err) {
-        setResult({
-          rows: [],
-          changes: 0,
-          error: String(err),
-          elapsed: Date.now() - start,
-          sourceSql: querySql,
-        })
-      } finally {
-        setRunning(false)
-      }
-    },
-    [loadStats, onWrite]
-  )
+/** Table counts, the editor's SQL, the last result, and the confirmation waiting to run. */
+function useAdmin(onWrite?: () => void) {
+  const { stats, loadStats } = useTableStats()
+  const [sql, setSql] = useState('')
+  const [result, setResult] = useState<QueryResult | null>(null)
+  const [running, setRunning] = useState(false)
+  const [confirmPending, setConfirmPending] = useState<ConfirmPending | null>(null)
 
-  const handleRun = () => void runQuery(sql)
-
-  const handleQuickAction = (action: (typeof QUICK_ACTIONS)[number]) => {
-    if (action.destructive) {
-      setConfirmPending({ title: 'Run destructive query?', sql: action.sql })
-    } else {
-      setSql(action.sql)
-      void runQuery(action.sql)
-    }
+  async function runQuery(querySql: string) {
+    if (!querySql.trim()) return
+    setRunning(true)
+    setResult(null)
+    const { result: next, wrote } = await executeQuery(querySql)
+    setResult(next)
+    if (!next.error) void loadStats()
+    if (wrote) onWrite?.()
+    setRunning(false)
   }
 
-  const handleConfirm = () => {
-    if (!confirmPending) return
-    const { sql: pendingSql } = confirmPending
-    setSql(pendingSql)
-    setConfirmPending(null)
-    void runQuery(pendingSql)
+  const show = (querySql: string) => {
+    setSql(querySql)
+    void runQuery(querySql)
   }
-
-  const handleClearTable = (table: string) => {
-    setConfirmPending({
-      title: `Clear all rows from "${table}"?`,
-      sql: `DELETE FROM ${table}`,
-    })
+  return {
+    ...{ stats, loadStats, sql, setSql, result, running },
+    ...{ runQuery, show, confirmPending, setConfirmPending },
   }
+}
 
-  const handleDeleteRow = (row: Record<string, unknown>, table: string) => {
-    const id = row['id']
-    if (id == null) return
-    const idStr = typeof id === 'string' ? `'${id}'` : String(id)
-    setConfirmPending({
-      title: `Delete row from "${table}"?`,
-      sql: `DELETE FROM ${table} WHERE id = ${idStr}`,
-    })
-  }
+function confirmClearTable(admin: Admin, table: string) {
+  admin.setConfirmPending({ title: `Clear all rows from "${table}"?`, sql: `DELETE FROM ${table}` })
+}
 
-  const columns = result?.rows.length ? Object.keys(result.rows[0]) : []
-  const sourceTable = result?.sourceSql ? extractTableName(result.sourceSql) : null
-  const hasIdColumn = columns.includes('id')
-  const canDeleteRows = !!(sourceTable && hasIdColumn)
+/** An id as SQL: strings quoted, anything else as written. */
+function sqlLiteral(id: unknown): string {
+  if (typeof id === 'string') return "'" + id + "'"
+  return String(id)
+}
 
+function confirmDeleteRow(admin: Admin, row: Record<string, unknown>, table: string) {
+  const id = row['id']
+  if (id == null) return
+  const idStr = sqlLiteral(id)
+  admin.setConfirmPending({
+    title: 'Delete row from "' + table + '"?',
+    sql: 'DELETE FROM ' + table + ' WHERE id = ' + idStr,
+  })
+}
+
+function StatChip(props: StatChipProps): React.JSX.Element {
+  const { admin, table, count } = props
   return (
-    <div className="db-admin">
-      {/* Table stats */}
-      <div className="db-admin__stats">
-        <div className="db-admin__stats-header">
-          <span className="db-admin__section-title">Tables</span>
-          <IconButton
-            icon={RefreshCw}
-            label="Refresh tables"
-            size="sm"
-            onClick={() => void loadStats()}
-          />
-        </div>
-        {stats ? (
-          <div className="db-admin__stats-grid">
-            {Object.entries(stats).map(([table, count]) => (
-              <div key={table} className="db-admin__stat-chip-wrap">
-                <div
-                  className="db-admin__stat-chip"
-                  onClick={() => {
-                    const q = `SELECT * FROM ${table} LIMIT 100`
-                    setSql(q)
-                    void runQuery(q)
-                  }}
-                  title={`Browse ${table}`}
-                >
-                  <span className="db-admin__stat-table">{table}</span>
-                  <span className="db-admin__stat-count">{count}</span>
-                </div>
-                <IconButton
-                  icon={Trash2}
-                  label={`Clear all rows from ${table}`}
-                  className="db-admin__stat-clear"
-                  size="sm"
-                  onClick={() => handleClearTable(table)}
-                />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <span className="db-admin__muted">Loading…</span>
-        )}
+    <div className="db-admin__stat-chip-wrap">
+      <div
+        className="db-admin__stat-chip"
+        onClick={() => admin.show('SELECT * FROM ' + table + ' LIMIT 100')}
+        title={'Browse ' + table}
+      >
+        <span className="db-admin__stat-table">{table}</span>
+        <span className="db-admin__stat-count">{count}</span>
       </div>
+      <IconButton
+        icon={Trash2}
+        label={'Clear all rows from ' + table}
+        className="db-admin__stat-clear"
+        size="sm"
+        onClick={() => confirmClearTable(admin, table)}
+      />
+    </div>
+  )
+}
 
-      {/* Quick actions */}
-      <div className="db-admin__section">
-        <span className="db-admin__section-title">Quick actions</span>
-        <div className="db-admin__actions">
-          {QUICK_ACTIONS.map((a) => (
-            <Button
-              key={a.label}
-              variant={a.destructive ? 'danger' : 'ghost'}
-              size="sm"
-              onClick={() => handleQuickAction(a)}
-            >
-              {a.label}
-            </Button>
+function TableStatsPanel({ admin }: AdminProps): React.JSX.Element {
+  const { stats } = admin
+  return (
+    <div className="db-admin__stats">
+      <div className="db-admin__stats-header">
+        <span className="db-admin__section-title">Tables</span>
+        <IconButton
+          icon={RefreshCw}
+          label="Refresh tables"
+          size="sm"
+          onClick={() => void admin.loadStats()}
+        />
+      </div>
+      {!stats && <span className="db-admin__muted">Loading…</span>}
+      {stats && (
+        <div className="db-admin__stats-grid">
+          {Object.entries(stats).map(([table, count]) => (
+            <StatChip key={table} admin={admin} table={table} count={count} />
           ))}
         </div>
-      </div>
+      )}
+    </div>
+  )
+}
 
-      {/* SQL editor */}
-      <div className="db-admin__section db-admin__editor-section">
-        <span className="db-admin__section-title">SQL</span>
-        <div className="db-admin__editor-row">
-          <textarea
-            ref={textareaRef}
-            className="db-admin__editor"
-            value={sql}
-            onChange={(e) => setSql(e.target.value)}
-            onKeyDown={(e) => {
-              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                e.preventDefault()
-                handleRun()
-              }
-            }}
-            placeholder="SELECT * FROM tasks LIMIT 50"
-            rows={4}
-            spellCheck={false}
-          />
+function QuickActions({ admin }: AdminProps): React.JSX.Element {
+  const choose = (action: QuickActionDef) => {
+    if (action.destructive)
+      admin.setConfirmPending({ title: 'Run destructive query?', sql: action.sql })
+    else admin.show(action.sql)
+  }
+  return (
+    <div className="db-admin__section">
+      <span className="db-admin__section-title">Quick actions</span>
+      <div className="db-admin__actions">
+        {QUICK_ACTIONS.map((a) => (
           <Button
-            variant="primary"
-            icon={Play}
-            onClick={handleRun}
-            disabled={running || !sql.trim()}
-            title="Run (⌘↵)"
+            key={a.label}
+            variant={a.destructive ? 'danger' : 'ghost'}
+            size="sm"
+            onClick={() => choose(a)}
           >
-            {running ? 'Running…' : 'Run'}
+            {a.label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Cmd/Ctrl+Enter runs the editor's SQL. */
+function runOnModEnter(run: () => void) {
+  return (e: React.KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault()
+      run()
+    }
+  }
+}
+
+function SqlEditor({ admin }: AdminProps): React.JSX.Element {
+  const run = () => void admin.runQuery(admin.sql)
+  return (
+    <div className="db-admin__section db-admin__editor-section">
+      <span className="db-admin__section-title">SQL</span>
+      <div className="db-admin__editor-row">
+        <textarea
+          className="db-admin__editor"
+          value={admin.sql}
+          onChange={(e) => admin.setSql(e.target.value)}
+          onKeyDown={runOnModEnter(run)}
+          placeholder="SELECT * FROM tasks LIMIT 50"
+          rows={4}
+          spellCheck={false}
+        />
+        <Button
+          variant="primary"
+          icon={Play}
+          onClick={run}
+          disabled={admin.running || !admin.sql.trim()}
+          title="Run (⌘↵)"
+        >
+          {admin.running ? 'Running…' : 'Run'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** How long the query took, after `lead`; nothing when it was not timed. */
+function elapsedText(result: QueryResult, lead: string): string | false {
+  if (result.elapsed == null) return false
+  return lead + result.elapsed + 'ms'
+}
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count !== 1 ? 's' : ''}`
+}
+
+function ResultMeta({ result, table }: Omit<RowsProps, 'admin'>): React.JSX.Element {
+  return (
+    <div className="db-admin__result-meta">
+      {plural(result.rows.length, 'row')} {elapsedText(result, '· ')}
+      {table && (
+        <span className="db-admin__result-hint">
+          {' · click '}
+          <Trash2 className="tm-icon-sm" style={{ display: 'inline', verticalAlign: 'middle' }} />
+          {' to delete a row'}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function ResultRow(props: Omit<RowProps, 'result'>): React.JSX.Element {
+  const { admin, table, row, columns } = props
+  return (
+    <tr className="db-admin__data-row">
+      {table && (
+        <td className="db-admin__action-col">
+          <IconButton
+            icon={Trash2}
+            label="Delete this row"
+            className="db-admin__row-delete"
+            size="sm"
+            onClick={() => confirmDeleteRow(admin, row, table)}
+          />
+        </td>
+      )}
+      {columns.map((c) => (
+        <td key={c}>{String(row[c] ?? '')}</td>
+      ))}
+    </tr>
+  )
+}
+
+function ResultTable({ admin, result, table }: RowsProps): React.JSX.Element {
+  const columns = Object.keys(result.rows[0])
+  return (
+    <div className="db-admin__table-wrap">
+      <table className="db-admin__table">
+        <thead>
+          <tr>
+            {table && <th className="db-admin__action-col" />}
+            {columns.map((c) => (
+              <th key={c}>{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {result.rows.map((row, i) => (
+            <ResultRow key={i} admin={admin} table={table} row={row} columns={columns} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/** The table rows can be deleted from: the query's FROM table, when its rows carry an id. */
+function deletableTable(result: QueryResult): string | null {
+  if (result.rows.length === 0) return null
+  if (!Object.keys(result.rows[0]).includes('id')) return null
+  if (!result.sourceSql) return null
+  return extractTableName(result.sourceSql)
+}
+
+function Results({ admin, result }: { admin: Admin; result: QueryResult }): React.JSX.Element {
+  if (result.error) return <div className="db-admin__error">{result.error}</div>
+  if (result.rows.length === 0) {
+    return (
+      <div className="db-admin__result-meta">
+        {plural(result.changes, 'row')} affected
+        {elapsedText(result, ' · ')}
+      </div>
+    )
+  }
+  const table = deletableTable(result)
+  return (
+    <>
+      <ResultMeta result={result} table={table} />
+      <ResultTable admin={admin} result={result} table={table} />
+    </>
+  )
+}
+
+function ConfirmDialog({ admin }: AdminProps): React.JSX.Element | null {
+  const pending = admin.confirmPending
+  if (!pending) return null
+  const close = () => admin.setConfirmPending(null)
+  const confirm = () => {
+    close()
+    admin.show(pending.sql)
+  }
+  return (
+    <div className="db-admin__confirm-backdrop" onClick={close}>
+      <div className="db-admin__confirm" onClick={(e) => e.stopPropagation()}>
+        <p className="db-admin__confirm-title">{pending.title}</p>
+        <p className="db-admin__confirm-sql">{pending.sql}</p>
+        <div className="db-admin__confirm-actions">
+          <Button variant="danger" onClick={confirm}>
+            Run
+          </Button>
+          <Button variant="ghost" onClick={close}>
+            Cancel
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* Results */}
-      {result && (
+export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Element {
+  const admin = useAdmin(onWrite)
+  return (
+    <div className="db-admin">
+      <TableStatsPanel admin={admin} />
+      <QuickActions admin={admin} />
+      <SqlEditor admin={admin} />
+      {admin.result && (
         <div className="db-admin__results">
-          {result.error ? (
-            <div className="db-admin__error">{result.error}</div>
-          ) : result.rows.length > 0 ? (
-            <>
-              <div className="db-admin__result-meta">
-                {result.rows.length} row{result.rows.length !== 1 ? 's' : ''}{' '}
-                {result.elapsed != null && `· ${result.elapsed}ms`}
-                {canDeleteRows && (
-                  <span className="db-admin__result-hint">
-                    {' · click '}
-                    <Trash2
-                      className="tm-icon-sm"
-                      style={{ display: 'inline', verticalAlign: 'middle' }}
-                    />
-                    {' to delete a row'}
-                  </span>
-                )}
-              </div>
-              <div className="db-admin__table-wrap">
-                <table className="db-admin__table">
-                  <thead>
-                    <tr>
-                      {canDeleteRows && <th className="db-admin__action-col" />}
-                      {columns.map((c) => (
-                        <th key={c}>{c}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.rows.map((row, i) => (
-                      <tr key={i} className="db-admin__data-row">
-                        {canDeleteRows && (
-                          <td className="db-admin__action-col">
-                            <IconButton
-                              icon={Trash2}
-                              label="Delete this row"
-                              className="db-admin__row-delete"
-                              size="sm"
-                              onClick={() => handleDeleteRow(row, sourceTable!)}
-                            />
-                          </td>
-                        )}
-                        {columns.map((c) => (
-                          <td key={c}>{String(row[c] ?? '')}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : (
-            <div className="db-admin__result-meta">
-              {result.changes} row{result.changes !== 1 ? 's' : ''} affected
-              {result.elapsed != null && ` · ${result.elapsed}ms`}
-            </div>
-          )}
+          <Results admin={admin} result={admin.result} />
         </div>
       )}
-
-      {/* Confirm dialog */}
-      {confirmPending && (
-        <div className="db-admin__confirm-backdrop" onClick={() => setConfirmPending(null)}>
-          <div className="db-admin__confirm" onClick={(e) => e.stopPropagation()}>
-            <p className="db-admin__confirm-title">{confirmPending.title}</p>
-            <p className="db-admin__confirm-sql">{confirmPending.sql}</p>
-            <div className="db-admin__confirm-actions">
-              <Button variant="danger" onClick={handleConfirm}>
-                Run
-              </Button>
-              <Button variant="ghost" onClick={() => setConfirmPending(null)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog admin={admin} />
     </div>
   )
 }
