@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'fs'
 import { execFileSync } from 'child_process'
-import { tmpdir } from 'os'
 import { join } from 'path'
 import { ensureReviewWorktree } from '../../src/review/worktree.js'
 import { bindRealShell } from './support/shell'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 describe('ensureReviewWorktree', () => {
   let repoRoot: string
 
   beforeEach(() => {
-    repoRoot = mkdtempSync(join(tmpdir(), 'review-worktree-'))
+    repoRoot = makeTempDir('review-worktree-')
   })
 
   afterEach(() => {
@@ -122,7 +122,7 @@ describe('ensureReviewWorktree against real git', () => {
     execFileSync('git', args, { cwd, env, encoding: 'utf-8' }).trim()
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'review-worktree-real-'))
+    dir = makeTempDir('review-worktree-real-')
     bindRealShell(env)
   })
 

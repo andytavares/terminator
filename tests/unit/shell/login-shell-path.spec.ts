@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'fs'
-import { tmpdir } from 'os'
+import { writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { adoptLoginShellPath } from '../../../src/main/shell/login-shell-path'
+import { makeTempDir } from '../../support/temp-dir'
 
 let dir: string
 
@@ -13,7 +13,7 @@ function fakeShell(body: string): string {
 }
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'login-shell-path-'))
+  dir = makeTempDir('login-shell-path-')
 })
 
 afterEach(() => {

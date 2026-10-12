@@ -366,5 +366,12 @@ describe('a question the architect asks', () => {
     )
     answer('ask-1')
     expect(await host.call('foundry:permissions-list')).toEqual({ pending: [] })
+    // The session goes onto the order in a save nobody awaits. Waiting for it
+    // keeps that save from landing after the spec file's records are removed.
+    await vi.waitFor(async () =>
+      expect((await createOrderStore(dataDir).load('WO-1'))?.provenance.forgeSession).toBe(
+        'architect-1'
+      )
+    )
   })
 })

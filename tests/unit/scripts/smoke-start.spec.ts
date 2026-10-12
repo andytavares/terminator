@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -10,6 +10,7 @@ import {
   startCommand,
   startupProblems,
 } from '../../../scripts/smoke-start.mjs'
+import { makeTempDir } from '../../support/temp-dir'
 
 const REPO_ROOT = resolve(__dirname, '../../..')
 const IDS = ['terminator.notepad', 'terminator.task-vault']
@@ -21,7 +22,7 @@ const activated = (id: string) =>
 
 describe('bundledExtensionIds', () => {
   it('reads the id of every extension directory that has a manifest', () => {
-    const directory = mkdtempSync(join(tmpdir(), 'smoke-extensions-'))
+    const directory = makeTempDir('smoke-extensions-')
     for (const [name, id] of [
       ['b', 'com.b'],
       ['a', 'com.a'],

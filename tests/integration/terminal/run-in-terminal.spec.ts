@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { hostSnapshot } from '../../support/host-snapshot'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { rmSync } from 'node:fs'
+import { makeTempDir } from '../../support/temp-dir'
 
 // A real PTY, end to end: node-pty runs the program, the core's terminal API
 // reports how it ended, and the answer crosses the extension host's port the
@@ -11,7 +10,7 @@ import { join } from 'node:path'
 // a shell, and no status is read back from output or a file.
 
 // Read when the registry is written, by which time this has run.
-const userData = mkdtempSync(join(tmpdir(), 'run-in-terminal-'))
+const userData = makeTempDir('run-in-terminal-')
 
 vi.mock('electron', () => ({
   app: { getPath: () => userData, getVersion: () => '0.1.0' },

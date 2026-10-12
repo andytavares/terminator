@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { availableSensors, resolveSensor } from '../../src/recipe/resolve.js'
 import type { ResolveSources } from '../../src/recipe/resolve.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // A sensor resolves on the same three rungs as a recipe, role or rule: the
 // operator's data root, the target repository's `.foundry/sensors`, then the
@@ -27,9 +27,9 @@ function sensor(id: string): string {
 }
 
 beforeEach(() => {
-  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-sensors-data-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-sensors-repo-'))
-  builtIn = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-sensors-built-'))
+  dataRoot = makeTempDir('fdry-sensors-data-')
+  repo = makeTempDir('fdry-sensors-repo-')
+  builtIn = makeTempDir('fdry-sensors-built-')
 })
 
 afterEach(() => {

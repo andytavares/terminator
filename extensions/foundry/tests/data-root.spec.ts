@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import {
   resolveDataRoot,
@@ -11,6 +10,7 @@ import {
   laneDir,
   ensureWritable,
 } from '../src/data-root.js'
+import { makeTempDir } from '../../../tests/support/temp-dir'
 
 // Where Foundry writes is one setting with two behaviours (FR-074), and it is
 // resolved once so that two writers can never disagree about it — a real hazard
@@ -78,7 +78,7 @@ describe('ensureWritable', () => {
   let tmp: string
 
   beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-root-'))
+    tmp = makeTempDir('foundry-root-')
   })
 
   afterEach(() => {

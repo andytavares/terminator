@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
+import { makeTempDir } from '../../support/temp-dir'
 
 const require = createRequire(import.meta.url)
 const { extensionRuntimeModules } = require('../../../scripts/extension-runtime-modules.cjs')
@@ -11,7 +11,7 @@ const REPO_ROOT = resolve(__dirname, '../../..')
 
 /** A repository with one extension and the lockfile npm would write for it. */
 function fixture(dependencies: Record<string, string>, packages: Record<string, object>): string {
-  const root = mkdtempSync(join(tmpdir(), 'runtime-modules-'))
+  const root = makeTempDir('runtime-modules-')
   mkdirSync(join(root, 'extensions', 'server'), { recursive: true })
   writeFileSync(join(root, 'extensions', 'server', 'manifest.json'), '{"id":"com.server"}')
   writeFileSync(

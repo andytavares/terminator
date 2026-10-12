@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { createInboxChannels } from '../../src/ipc/inbox-channels.js'
 import type { InboxDeps } from '../../src/ipc/inbox-channels.js'
@@ -11,6 +10,7 @@ import type { Gate } from '../../src/gates/rules.js'
 import type { Autonomy } from '../../src/gates/autonomy.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // One queue, always sorted, every row attributable to a rule. "Nothing needs
 // you" only means something if nothing can reach this list without a rule
@@ -66,7 +66,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-inbox-'))
+  root = makeTempDir('fdry-inbox-')
 })
 
 afterEach(() => {
@@ -344,7 +344,7 @@ describe('the gate store on disk', () => {
   })
 
   it('lists nothing before any order directory exists', async () => {
-    const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-empty-'))
+    const empty = makeTempDir('fdry-empty-')
     expect(await createGateStore(empty).list()).toEqual([])
     fs.rmSync(empty, { recursive: true, force: true })
   })
@@ -472,8 +472,8 @@ describe('raising a budget', () => {
 
 describe('a gate store whose root follows the workspace', () => {
   it('reads and writes wherever the resolver points, on each call', async () => {
-    const a = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-gates-a-'))
-    const b = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-gates-b-'))
+    const a = makeTempDir('fdry-live-gates-a-')
+    const b = makeTempDir('fdry-live-gates-b-')
     let here = a
     const store = createLiveGateStore(() => here)
 

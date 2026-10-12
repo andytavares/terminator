@@ -1,22 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { moveFromUserData, writeJsonAtomic } from '@terminator/extension-sdk/node'
+import { makeTempDir } from '../../../tests/support/temp-dir'
 
 describe('writeJsonAtomic', () => {
   let dir: string
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'sdk-write-json-'))
+    dir = makeTempDir('sdk-write-json-')
   })
 
   afterEach(() => {
@@ -51,7 +43,7 @@ describe('moveFromUserData', () => {
 
   beforeEach(() => {
     warn.mockClear()
-    userData = mkdtempSync(join(tmpdir(), 'sdk-move-legacy-'))
+    userData = makeTempDir('sdk-move-legacy-')
     globalStorage = join(userData, 'extensions', 'com.example.tool')
   })
 

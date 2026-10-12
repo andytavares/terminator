@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ladderFor, climb, RUNGS } from '../../src/verify/ladder.js'
@@ -9,6 +8,7 @@ import { rulesFor, rulesAtRung } from '../../src/verify/rules.js'
 import { CHECK_NAMES } from '../../src/verify/check-names.js'
 import type { Toolchain } from '../../src/verify/toolchain-probe.js'
 import type { RiskAssessment } from '../../src/order/schema.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Two properties matter more than the ordering: a failure stops the climb at
 // its own rung, and a rung with no command reports "not measured" and is never
@@ -297,8 +297,8 @@ describe('rulesFor', () => {
   let repo: string
 
   beforeEach(() => {
-    dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-rules-'))
-    repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-rules-repo-'))
+    dataRoot = makeTempDir('fdry-rules-')
+    repo = makeTempDir('fdry-rules-repo-')
   })
 
   afterEach(() => {

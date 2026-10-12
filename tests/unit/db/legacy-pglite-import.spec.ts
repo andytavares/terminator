@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import { DatabaseSync } from 'node:sqlite'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readdirSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { makeTempDir } from '../../support/temp-dir'
 
 const { mockLogger } = vi.hoisted(() => ({
   mockLogger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -84,7 +84,7 @@ async function newDatabaseWithExtensionTables(): Promise<ExtensionDB> {
 }
 
 beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), 'legacy-import-'))
+  userData = makeTempDir('legacy-import-')
   vi.clearAllMocks()
 })
 

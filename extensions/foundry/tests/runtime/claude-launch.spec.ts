@@ -1,9 +1,8 @@
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync } from 'fs'
-import { tmpdir, homedir } from 'os'
+import { rmSync, readFileSync } from 'fs'
+import { homedir } from 'os'
 import { join } from 'path'
 import {
   buildLaunchSpec,
@@ -12,11 +11,12 @@ import {
   transcriptPathFor,
   resumableIn,
 } from '../../src/runtime/claude-launch.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let directory: string
 
 beforeEach(() => {
-  directory = mkdtempSync(join(tmpdir(), 'claude-launch-'))
+  directory = makeTempDir('claude-launch-')
 })
 
 afterEach(() => {
@@ -56,7 +56,7 @@ describe('shellQuote', () => {
 // resumed from the order's checkout, and `--resume` on it would end the turn.
 describe('resumableIn', () => {
   it('resumes a conversation filed under this directory', () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'resumable-'))
+    const home = makeTempDir('resumable-')
     const file = transcriptPathFor('/wt/order', 'sid', home)
     fs.mkdirSync(path.dirname(file), { recursive: true })
     fs.writeFileSync(file, '{}\n')
@@ -65,7 +65,7 @@ describe('resumableIn', () => {
   })
 
   it('starts fresh when the conversation was filed under another directory', () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'resumable-'))
+    const home = makeTempDir('resumable-')
     const file = transcriptPathFor('/repos/a', 'sid', home)
     fs.mkdirSync(path.dirname(file), { recursive: true })
     fs.writeFileSync(file, '{}\n')
@@ -104,7 +104,7 @@ describe('transcriptPathFor', () => {
   // measured", and the stall detector, which reads transcripts and nothing
   // else, saw an agent that had never said a word.
   it('encodes the directory as the process sees it, not as it was handed to us', () => {
-    const real = fs.mkdtempSync(path.join(os.tmpdir(), 'transcript-real-'))
+    const real = makeTempDir('transcript-real-')
     const link = path.join(path.dirname(real), `link-${path.basename(real)}`)
     fs.symlinkSync(real, link)
     try {

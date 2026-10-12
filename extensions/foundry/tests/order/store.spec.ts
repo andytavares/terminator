@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { createOrderStore, createLiveOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { SCHEMA_VERSION } from '../../src/order/schema.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let root: string
 
@@ -23,7 +23,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-store-'))
+  root = makeTempDir('foundry-store-')
 })
 
 afterEach(() => {
@@ -155,8 +155,8 @@ describe('createOrderStore', () => {
 
 describe('a store whose root follows the workspace', () => {
   it('writes wherever the resolver points, on each call', async () => {
-    const a = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-a-'))
-    const b = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-b-'))
+    const a = makeTempDir('fdry-live-a-')
+    const b = makeTempDir('fdry-live-b-')
     let here = a
     const store = createLiveOrderStore(() => here)
 
@@ -173,7 +173,7 @@ describe('a store whose root follows the workspace', () => {
   })
 
   it('reads, lists, finds and records through the same resolver', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-c-'))
+    const dir = makeTempDir('fdry-live-c-')
     const store = createLiveOrderStore(() => dir)
 
     await store.save(
@@ -208,7 +208,7 @@ describe('a store whose root follows the workspace', () => {
   // `order.json` — so a store that could only append was a store no surface
   // could ask what had happened.
   it('reads back the ledger it wrote, oldest first', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-entries-'))
+    const dir = makeTempDir('fdry-entries-')
     const store = createOrderStore(dir)
 
     for (const action of ['converge.started', 'converge.refused']) {
@@ -232,7 +232,7 @@ describe('a store whose root follows the workspace', () => {
 
   // An order nothing has happened to yet is not an error.
   it('reads an empty ledger as no entries', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-noledger-'))
+    const dir = makeTempDir('fdry-noledger-')
     expect(await createOrderStore(dir).entries('WO-nothing')).toEqual([])
     fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
   })

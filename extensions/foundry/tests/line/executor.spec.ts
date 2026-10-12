@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execute, opensPullRequest, skillsFor } from '../../src/line/executor.js'
@@ -16,6 +15,7 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import { ResumeForbiddenError, createRoleRegistry } from '../../src/line/roles.js'
 import { makeVerdict, SelfVerificationError } from '../../src/verify/verdict.js'
 import { decide, raiseGate } from '../../src/gates/rules.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The executor is where the scheduler, the roles and a session finally meet.
 // Each of those was testable alone and none of them did anything on its own,
@@ -168,8 +168,8 @@ const ok = async (input: { node: { id: string } }): Promise<StartedRun> => ({
 })
 
 beforeEach(() => {
-  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-exec-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-exec-repo-'))
+  dataRoot = makeTempDir('fdry-exec-')
+  repo = makeTempDir('fdry-exec-repo-')
 })
 
 afterEach(() => {

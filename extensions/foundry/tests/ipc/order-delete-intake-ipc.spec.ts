@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os'
 import { freshGlobalStorage } from '../helpers/foundry-host.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 const GLOBAL_STORAGE = freshGlobalStorage()
 
@@ -157,7 +158,7 @@ beforeEach(() => {
 
 describe('deleting an order while its scout is still reading', () => {
   it('starts nothing more for it once the scout ends, and leaves nothing on disk', async () => {
-    dataDir = fs.mkdtempSync(path.join(tmpdir(), 'fdry-delete-intake-'))
+    dataDir = makeTempDir('fdry-delete-intake-')
     await createOrderStore(dataDir).save(order())
 
     // The architect starts at seed, beside the scout rather than after it.

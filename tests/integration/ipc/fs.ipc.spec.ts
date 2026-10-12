@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
+import { makeTempDir } from '../../support/temp-dir'
 
 type Handler = (event: unknown, payload?: unknown) => unknown
 const handlers = vi.hoisted(() => new Map<string, Handler>())
@@ -31,7 +31,7 @@ let projectRoot: string
 
 beforeEach(() => {
   window = fakeWindow()
-  projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fs-ipc-'))
+  projectRoot = makeTempDir('fs-ipc-')
 })
 
 afterEach(async () => {

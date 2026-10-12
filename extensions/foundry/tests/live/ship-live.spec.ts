@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, afterAll, beforeAll } from 'vitest'
 import { execFile, execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
@@ -99,6 +99,14 @@ function order(): WorkOrder {
 }
 
 describe.skipIf(LIVE === '')('shipping, for real', () => {
+  // vitest.live.config.ts has no tests/setup.ts, so this spec removes its own
+  // directory. The worktree inside it is registered in the live checkout;
+  // `git worktree prune` drops that record once the directory is gone.
+  afterAll(() => {
+    fs.rmSync(dataRoot, { recursive: true, force: true })
+    git('worktree', 'prune')
+  })
+
   beforeAll(() => {
     dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-'))
     branch = `foundry/live-${Date.now().toString(36)}`

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import {
   shipModeFor,
@@ -24,6 +23,7 @@ import { makeVerdict } from '../../src/verify/verdict.js'
 import type { Verdict } from '../../src/verify/verdict.js'
 import type { CiOutcome } from '../../src/line/ship-tail.js'
 import type { Check } from '../../src/line/ci.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Work ends in a draft pull request without anyone asking for one, and the
 // decision the operator is offered is whether to mark it ready — never whether
@@ -111,7 +111,7 @@ function callsTo(exec: ReturnType<typeof vi.fn>, command: string, verb?: string)
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-ship-'))
+  root = makeTempDir('fdry-ship-')
 })
 
 describe('the command line', () => {

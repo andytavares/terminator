@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { tearDownRun, deleteOrder } from '../../src/line/teardown.js'
 import { orderDir } from '../../src/data-root.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Taking a run away again.
 //
@@ -76,8 +76,8 @@ function seedRunArtefacts(id = 'WO-1'): string {
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-teardown-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-teardown-repo-'))
+  root = makeTempDir('fdry-teardown-')
+  repo = makeTempDir('fdry-teardown-repo-')
 })
 
 afterEach(() => {
@@ -127,7 +127,7 @@ describe('tearDownRun', () => {
   })
 
   it('takes every lane, not just the first', async () => {
-    const second = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-teardown-repo2-'))
+    const second = makeTempDir('fdry-teardown-repo2-')
     const base = order()
     const two: WorkOrder = {
       ...base,

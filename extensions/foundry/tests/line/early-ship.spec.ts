@@ -1,7 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import * as fs from 'node:fs'
-import * as os from 'node:os'
-import * as path from 'node:path'
 import { createEarlyShip } from '../../src/line/early-ship.js'
 import type { IntegrateDeps, Shipment } from '../../src/line/integrate.js'
 import type { RunOutcome } from '../../src/line/executor.js'
@@ -9,6 +6,7 @@ import type { CiOutcome } from '../../src/line/ship-tail.js'
 import type { LadderOutcome } from '../../src/verify/ladder.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { RiskAssessment, WorkOrder } from '../../src/order/schema.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The draft opens before the final check, and the check runs while CI does —
 // except where the operator decides before anything reaches the remote.
@@ -113,7 +111,7 @@ function setup(over: Partial<IntegrateDeps> = {}, dirty = false) {
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-early-'))
+  root = makeTempDir('fdry-early-')
 })
 
 describe('opening before the final check', () => {

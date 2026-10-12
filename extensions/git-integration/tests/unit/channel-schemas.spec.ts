@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { realpathSync, rmSync } from 'node:fs'
 import { dispatchChannel } from '@terminator/extension-sdk'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 vi.mock('electron-store', () => ({
   default: class {
@@ -41,7 +40,7 @@ describe('every git-integration channel', () => {
 describe('the rules the channel schemas carry', () => {
   let repo: string
   beforeAll(() => {
-    repo = realpathSync(mkdtempSync(join(tmpdir(), 'gi-rules-')))
+    repo = realpathSync(makeTempDir('gi-rules-'))
   })
   afterAll(() => rmSync(repo, { recursive: true, force: true }))
 

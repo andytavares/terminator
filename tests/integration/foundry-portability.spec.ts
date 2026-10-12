@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { createOrderStore } from '../../extensions/foundry/src/order/store.js'
 import { createForgeChannels } from '../../extensions/foundry/src/ipc/forge-channels.js'
@@ -10,6 +9,7 @@ import { idleRunSeams } from '../../extensions/foundry/tests/ipc/run-deps.js'
 import { createRunChannels } from '../../extensions/foundry/src/ipc/run-channels.js'
 import { probeToolchain } from '../../extensions/foundry/src/verify/toolchain-probe.js'
 import type { WorkOrder } from '../../extensions/foundry/src/order/schema.js'
+import { makeTempDir } from '../support/temp-dir'
 
 // The portability claim, exercised against a repository that is not this one.
 //
@@ -41,14 +41,14 @@ function forge() {
 }
 
 beforeEach(() => {
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-portability-'))
+  repo = makeTempDir('foundry-portability-')
   git(repo, 'init', '--quiet')
   git(repo, 'config', 'user.email', 'test@example.com')
   git(repo, 'config', 'user.name', 'Test')
   fs.writeFileSync(path.join(repo, 'main.py'), 'def greet():\n    return "hi"\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '--quiet', '-m', 'init')
-  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-portability-data-'))
+  dataRoot = makeTempDir('foundry-portability-data-')
 })
 
 afterEach(() => {

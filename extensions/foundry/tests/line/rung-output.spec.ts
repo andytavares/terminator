@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as nodePath from 'node:path'
 import {
   COLLECTABLE,
@@ -15,6 +14,7 @@ import {
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Role } from '../../src/recipe/parse.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // A read-only rung has a product — context, findings, a plan it disagrees
 // with — and before this it had nowhere to put it. These are the tests for the
@@ -633,7 +633,7 @@ describe('readRungOutput', () => {
   let file: string
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'fdry-rung-'))
+    dir = makeTempDir('fdry-rung-')
     file = nodePath.join(dir, 'challenge.json')
   })
 

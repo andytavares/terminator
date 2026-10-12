@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createMuteStore } from '../../../src/runtime/feed/mutes.js'
+import { makeTempDir } from '../../../../../tests/support/temp-dir'
 
 // Which runs are allowed to interrupt you. A mute you have to set again after
 // every restart is one you stop bothering with, and then notifications get
@@ -12,7 +12,7 @@ let dir: string
 let file: string
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'mutes-'))
+  dir = makeTempDir('mutes-')
   file = join(dir, 'mutes.json')
 })
 

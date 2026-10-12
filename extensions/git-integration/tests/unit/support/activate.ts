@@ -1,9 +1,8 @@
 import { vi } from 'vitest'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ChannelSpec, ExtensionAPI } from '@terminator/extension-sdk'
 import { activate, deactivate } from '../../../src/index.ts'
+import { makeTempDir } from '../../../../../tests/support/temp-dir'
 
 export interface RegisteredChannel {
   spec: ChannelSpec
@@ -18,7 +17,7 @@ export interface FakeWorkspace {
 
 /** A `paths.globalStorage` in a fresh userData, `<userData>/extensions/<id>`, not created yet. */
 export function freshGlobalStorage(): string {
-  const userData = mkdtempSync(join(tmpdir(), 'git-integration-user-data-'))
+  const userData = makeTempDir('git-integration-user-data-')
   return join(userData, 'extensions', 'terminator.git-integration')
 }
 

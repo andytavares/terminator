@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ipcMain } from 'electron'
 import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
+import { makeTempDir } from '../../../../../tests/support/temp-dir'
 
 const showOpenDialog = vi
   .fn()
@@ -23,7 +24,6 @@ const mockApi = {
   },
 } as unknown as import('../../../../../src/main/extensions/api').ExtensionAPI
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
@@ -52,7 +52,7 @@ beforeEach(async () => {
 })
 
 beforeEach(async () => {
-  exportDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-export-dest-'))
+  exportDir = makeTempDir('notepad-export-dest-')
 
   noteId = '00000000-0000-0000-0000-000000000001'
   const now = new Date().toISOString()
@@ -156,7 +156,7 @@ describe('exportNotes', () => {
 
 describe('importNotes', () => {
   it('creates a note for each .md file with frontmatter id', async () => {
-    const importDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-import-src-'))
+    const importDir = makeTempDir('notepad-import-src-')
     const frontmatter = `---\nid: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\ntitle: Imported Note\ntags: []\ncreated: 2026-01-01T00:00:00Z\nupdated: 2026-01-02T00:00:00Z\n---\n\n# Imported\n\nHello from import.`
     fs.writeFileSync(path.join(importDir, 'imported-note-aaaaaaaa.md'), frontmatter)
 
@@ -190,7 +190,7 @@ describe('importNotes', () => {
   })
 
   it('creates note with tags and links note_tags rows', async () => {
-    const importDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-import-tags-'))
+    const importDir = makeTempDir('notepad-import-tags-')
     const fc = `---\nid: cccccccc-dddd-eeee-ffff-000000000001\ntitle: Tagged Note\ntags:\n  - work\n  - project\n---\n\nBody.`
     fs.writeFileSync(path.join(importDir, 'tagged-note.md'), fc)
     try {
@@ -223,7 +223,7 @@ describe('importNotes', () => {
   })
 
   it('skips files with no frontmatter id gracefully', async () => {
-    const importDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-import-bad-'))
+    const importDir = makeTempDir('notepad-import-bad-')
     fs.writeFileSync(
       path.join(importDir, 'no-frontmatter.md'),
       '# Just a heading\n\nNo frontmatter here.'
@@ -246,7 +246,7 @@ describe('importNotes', () => {
   })
 
   it('skips non-.md files in import folder', async () => {
-    const importDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-import-nonmd-'))
+    const importDir = makeTempDir('notepad-import-nonmd-')
     fs.writeFileSync(path.join(importDir, 'readme.txt'), 'not a markdown file')
     try {
       const result = await importNotes(db, { folder: importDir })
@@ -258,7 +258,7 @@ describe('importNotes', () => {
   })
 
   it('imports note with missing title and non-array tags (uses defaults)', async () => {
-    const importDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-import-defaults-'))
+    const importDir = makeTempDir('notepad-import-defaults-')
     const fc = `---\nid: bbbbbbbb-cccc-dddd-eeee-ffffffffffff\n---\n\nBody text.`
     fs.writeFileSync(path.join(importDir, 'no-title.md'), fc)
     try {

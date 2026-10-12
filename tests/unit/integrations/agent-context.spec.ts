@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import type { AgentContext, Issue } from '../../../src/shared/types/index'
+import { makeTempDir } from '../../support/temp-dir'
 
 let userData: string
 vi.mock('electron', () => ({ app: { getPath: () => userData } }))
 
 beforeEach(() => {
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-context-'))
+  userData = makeTempDir('agent-context-')
 })
 
 const { buildAgentContext, MAX_CONTEXT_CHARS } = await import(

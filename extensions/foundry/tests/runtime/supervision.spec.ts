@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { rmSync } from 'node:fs'
 import { createSupervision, type Supervision } from '../../src/runtime/supervision.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // What is running, what it changed, what needs looking at, and what must not
 // start yet. Assembled as one thing here because the closed branch's worst bugs
@@ -45,7 +44,7 @@ function addRun(
 }
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'supervision-'))
+  dir = makeTempDir('supervision-')
   diff = { files: 1, added: 10, removed: 2 }
   changedFiles = ['src/a.ts']
 })

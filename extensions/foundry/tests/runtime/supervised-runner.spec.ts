@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { spawn as ptySpawn } from 'node-pty'
 import { createSupervisedRunner } from '../../src/runtime/supervised-runner.js'
 import { createControlServer, type ControlServer } from '../../src/runtime/control-server.js'
 import type { PendingPermission } from '../../src/runtime/permission-bridge.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // This replaces spawning `claude --print --permission-mode bypassPermissions`
 // as a hidden child process — a run nobody could see, approving every tool call
@@ -132,7 +132,7 @@ const start = {
 }
 
 beforeEach(async () => {
-  dir = mkdtempSync(join(tmpdir(), 'supervised-runner-'))
+  dir = makeTempDir('supervised-runner-')
   control = await createControlServer()
   created = []
   opened = []
@@ -919,7 +919,7 @@ describe('running a command with a log file', () => {
   let logDir: string
 
   beforeEach(() => {
-    logDir = mkdtempSync(join(tmpdir(), 'supervised-runner-log-'))
+    logDir = makeTempDir('supervised-runner-log-')
   })
 
   afterEach(() => {
@@ -1055,7 +1055,7 @@ describe('a check sees what the user’s shell startup files export', () => {
 
   beforeEach(() => {
     printed = ''
-    home = mkdtempSync(join(tmpdir(), 'supervised-runner-home-'))
+    home = makeTempDir('supervised-runner-home-')
     delete process.env.FOUNDRY_RC_ONLY
   })
 

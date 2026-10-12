@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os'
 import { freshGlobalStorage } from '../helpers/foundry-host.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 const GLOBAL_STORAGE = freshGlobalStorage()
 
@@ -165,7 +166,7 @@ beforeAll(async () => {
 
 /** A records location with two in-flight orders, each with a checkout on disk. */
 async function seedTwoRunningOrders(): Promise<void> {
-  dataDir = fs.mkdtempSync(path.join(tmpdir(), 'fdry-read-path-'))
+  dataDir = makeTempDir('fdry-read-path-')
   const store = createOrderStore(dataDir)
   for (const [id, agreedAt] of [
     ['WO-1', '2026-09-06T10:01:00.000Z'],

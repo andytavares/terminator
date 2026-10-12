@@ -1,17 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 import { FakeBackendHost } from './fake-backend-host'
+import { makeTempDir } from '../../support/temp-dir'
 
 // Every legitimate caller ADR-006's workspace-only rule would have refused, run
 // with the cwd its real code computes, through the real check (ADR 102): the
@@ -19,7 +11,8 @@ import { FakeBackendHost } from './fake-backend-host'
 // stand-ins on PATH that record where they ran.
 
 vi.mock('electron', () => ({
-  app: { getPath: () => tmpdir(), getVersion: () => '0.1.0' },
+  // The logger writes terminator.log under logs; a spec scratch keeps it out of the temp root.
+  app: { getPath: () => scratch, getVersion: () => '0.1.0' },
 }))
 
 const storeData: Record<string, unknown> = { extensions: [] }
@@ -92,7 +85,7 @@ beforeEach(() => {
   workspaces.length = 0
   projects.length = 0
   for (const key of Object.keys(settings)) delete settings[key]
-  scratch = realpathSync(mkdtempSync(join(tmpdir(), 'shell-callers-')))
+  scratch = realpathSync(makeTempDir('shell-callers-'))
   userData = directory('user-data')
   ran = join(scratch, 'ran.log')
   const bin = directory('bin')

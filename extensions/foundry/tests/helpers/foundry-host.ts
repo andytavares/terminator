@@ -8,12 +8,12 @@
  */
 import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { vi } from 'vitest'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 /** The runner's surface every Foundry module reaches, as `vi.fn`s a spec can drive. */
 export function fakeRunner() {
@@ -191,7 +191,7 @@ export function fakeHost(dataDir: () => string): FoundryHost {
 
 /** A fresh temporary directory under the OS temp directory. */
 export function temporaryDirectory(prefix: string): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`))
+  return makeTempDir(`${prefix}-`)
 }
 
 /**

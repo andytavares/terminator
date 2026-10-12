@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync } from 'fs'
-import { tmpdir } from 'os'
+import { rmSync } from 'fs'
 import { join } from 'path'
 import { createFeedLog } from '../../../src/runtime/feed/feed-log.js'
+import { makeTempDir } from '../../../../../tests/support/temp-dir'
 
 let dir: string
-beforeEach(() => (dir = mkdtempSync(join(tmpdir(), 'feed-'))))
+beforeEach(() => (dir = makeTempDir('feed-')))
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 const newLog = () => createFeedLog(join(dir, 'feed.jsonl'))

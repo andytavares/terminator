@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createLedgerChannels } from '../../src/ipc/ledger-channels.js'
@@ -15,6 +14,7 @@ import type { LedgerEntry } from '../../src/ledger/append.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { ResolveSources } from '../../src/recipe/resolve.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The real built-in directory, so a test asking for "the skills that ship
 // with the tool" is asking about the ones that actually do.
@@ -93,7 +93,7 @@ async function repeatedRejections(orderId = 'WO-1'): Promise<void> {
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-ledger-ipc-'))
+  root = makeTempDir('fdry-ledger-ipc-')
 })
 
 afterEach(() => {

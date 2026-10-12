@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
-import { tmpdir } from 'os'
+import { rmSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { execFile } from 'child_process'
 import { createServer } from 'node:http'
 import { installHookScript, HOOK_SCRIPT_NAME } from '../../src/runtime/hook-script.js'
 import { createControlServer, type ControlServer } from '../../src/runtime/control-server.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The script is run, not read. It is the one part of this feature that
 // executes outside the application, in a process Claude Code owns, and the
@@ -16,7 +16,7 @@ let directory: string
 let server: ControlServer | null = null
 
 beforeEach(() => {
-  directory = mkdtempSync(join(tmpdir(), 'hook-script-'))
+  directory = makeTempDir('hook-script-')
 })
 
 afterEach(async () => {

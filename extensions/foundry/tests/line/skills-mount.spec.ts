@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { mountSkills } from '../../src/line/skills-mount.js'
 import type { ResolvedSkill } from '../../src/recipe/resolve.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let root: string
 let mountDir: string
@@ -14,9 +14,9 @@ function skill(id: string, rung: ResolvedSkill['rung'], dir: string): ResolvedSk
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-mount-'))
+  root = makeTempDir('fdry-mount-')
   mountDir = path.join(root, 'mount')
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-mount-repo-'))
+  repo = makeTempDir('fdry-mount-repo-')
 })
 
 afterEach(() => {

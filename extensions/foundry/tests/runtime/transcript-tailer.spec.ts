@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'fs'
-import { tmpdir } from 'os'
+import { rmSync, writeFileSync, appendFileSync } from 'fs'
 import { join } from 'path'
 import { readTranscript, countTurns } from '../../src/runtime/transcript-tailer.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The tailer opens the path the runtime handed us (research.md R3) and never
 // computes one. The per-line JSONL schema is NOT a published contract, so it
@@ -12,7 +12,7 @@ let dir: string
 let transcript: string
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'transcript-'))
+  dir = makeTempDir('transcript-')
   transcript = join(dir, 's1.jsonl')
 })
 
