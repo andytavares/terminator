@@ -53,6 +53,7 @@ function CaptureRow({ capture }: { capture: Capture }): React.JSX.Element {
   return (
     <div className="wr-step__capture-row">
       <input
+        autoFocus
         className="wr-step__capture-input"
         placeholder="Add to inbox…"
         value={text}
@@ -61,7 +62,6 @@ function CaptureRow({ capture }: { capture: Capture }): React.JSX.Element {
           if (e.key === 'Enter') void add()
         }}
         disabled={adding}
-        autoFocus
       />
       <Button variant="primary" onClick={() => void add()} disabled={adding || !text.trim()}>
         Add

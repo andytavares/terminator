@@ -172,8 +172,8 @@ function StepTrail({ step }: { step: number }): React.JSX.Element {
     <nav className="weekly-review__steps" aria-label="Weekly review steps">
       {STEP_NAMES.map((name, i) => (
         <span
-          key={name}
           aria-current={i + 1 === step ? 'step' : undefined}
+          key={name}
           className={stepClass(i + 1, step)}
         >
           {name}

@@ -131,9 +131,9 @@ function ReviewToggle({ review, expanded, onToggle }: RowProps): React.JSX.Eleme
   const Chevron = expanded ? ChevronDown : ChevronRight
   return (
     <button
+      aria-expanded={expanded}
       className="wr-history__toggle"
       onClick={() => onToggle(review.id)}
-      aria-expanded={expanded}
     >
       <Chevron className="tm-icon" />
       <span className="wr-history__date">{formatReviewDate(review.startedAt)}</span>

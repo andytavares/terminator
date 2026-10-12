@@ -240,11 +240,11 @@ function SubtaskRow({
       {editing ? (
         <span className="daily-log__subtask-edit">
           <SmartTaskInput
+            autoFocus
             value={editText}
             onChange={setEditText}
             onSubmit={() => void saveEdit()}
             onCancel={() => setEditing(false)}
-            autoFocus
           />
           <Button variant="primary" onClick={() => void saveEdit()}>
             Save
@@ -314,6 +314,7 @@ function GhostAddSubtaskRow({
   return (
     <div className="daily-log__subtask-add-row">
       <SmartTaskInput
+        autoFocus
         value={text}
         onChange={setText}
         onSubmit={() => void handleAdd()}
@@ -323,7 +324,6 @@ function GhostAddSubtaskRow({
         }}
         placeholder="Subtask…"
         disabled={saving}
-        autoFocus
       />
       <Button size="sm" onClick={() => void handleAdd()} disabled={saving || !text.trim()}>
         Add
@@ -473,12 +473,12 @@ function BlockModal({
         <label className="daily-log__block-modal-label">
           Why is this blocked?
           <textarea
+            autoFocus
             className="daily-log__block-modal-textarea"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Waiting on design review, blocked by dependency…"
             rows={3}
-            autoFocus
           />
         </label>
         <div className="daily-log__block-modal-label">
@@ -961,11 +961,11 @@ function TaskRow({
           {editing ? (
             <span className="daily-log__task-edit">
               <SmartTaskInput
+                autoFocus
                 value={editText}
                 onChange={setEditText}
                 onSubmit={saveEdit}
                 onCancel={() => setEditing(false)}
-                autoFocus
               />
               <Button variant="primary" onClick={() => void saveEdit()}>
                 Save
@@ -1221,6 +1221,7 @@ function TaskRow({
       {addingSubtask && (
         <div className="daily-log__subtask-add-row daily-log__subtask-add-row--inline">
           <SmartTaskInput
+            autoFocus
             value={subtaskText}
             onChange={setSubtaskText}
             onSubmit={() => void handleAddFirstSubtask()}
@@ -1230,7 +1231,6 @@ function TaskRow({
             }}
             placeholder="Subtask…"
             disabled={savingSubtask}
-            autoFocus
           />
           <Button
             size="sm"
@@ -1328,12 +1328,12 @@ function AddTaskRow({
   return (
     <div className="daily-log__add-row">
       <SmartTaskInput
+        autoFocus
         value={text}
         onChange={setText}
         onSubmit={submit}
         onCancel={() => setOpen(false)}
         disabled={adding}
-        autoFocus
       />
       <Button
         variant="primary"
@@ -1393,13 +1393,13 @@ function BacklogTaskRow({
       {editing ? (
         <span className="daily-log__task-edit">
           <SmartTaskInput
+            autoFocus
             value={editText}
             onChange={setEditText}
             onSubmit={saveEdit}
             onCancel={() => {
               setEditing(false)
             }}
-            autoFocus
           />
           <Button variant="primary" onClick={() => void saveEdit()}>
             Save

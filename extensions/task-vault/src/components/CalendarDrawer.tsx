@@ -222,10 +222,10 @@ function DayCell(props: CellProps): React.JSX.Element {
   const label = dayLoadLabel(dateStr, rows)
   return (
     <button
+      aria-label={label}
       className={cellClass(props)}
       onClick={() => props.onPick(dateStr)}
       title={label}
-      aria-label={label}
     >
       <span className="cal-drawer__day-num">{parseInt(dateStr.slice(8))}</span>
       {rows.length > 0 && <DayDots rows={rows} lanes={props.lanes} />}

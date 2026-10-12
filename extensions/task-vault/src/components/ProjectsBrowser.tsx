@@ -272,12 +272,12 @@ function CreateProjectForm({ onCreated, onCancel }: CreateProjectFormProps): Rea
       <div className="create-project-form__field">
         <label>Name *</label>
         <input
+          autoFocus
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
           placeholder="Project name"
-          autoFocus
         />
       </div>
       <div className="create-project-form__field">
@@ -482,11 +482,11 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
           {editingId === t.id ? (
             <span className="projects-browser__task-edit">
               <SmartTaskInput
+                autoFocus
                 value={editText}
                 onChange={setEditText}
                 onSubmit={() => void handleSaveEdit(t.id)}
                 onCancel={() => setEditingId(null)}
-                autoFocus
               />
               <Button variant="primary" size="sm" onClick={() => void handleSaveEdit(t.id)}>
                 Save
@@ -762,6 +762,7 @@ export function ProjectsBrowser(): React.JSX.Element {
             {renamingProject === project.name ? (
               <div className="area-detail__rename-row projects-browser__rename-row">
                 <input
+                  autoFocus
                   className="area-detail__rename-input projects-browser__rename-input"
                   value={renameText}
                   onChange={(e) => setRenameText(e.target.value)}
@@ -772,7 +773,6 @@ export function ProjectsBrowser(): React.JSX.Element {
                       setRenameError(null)
                     }
                   }}
-                  autoFocus
                 />
                 <Button variant="primary" size="sm" onClick={() => void handleRenameProject()}>
                   Save

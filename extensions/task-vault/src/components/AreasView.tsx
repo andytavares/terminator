@@ -211,6 +211,7 @@ export function AreasView(): React.JSX.Element {
         <div className="areas-view__create-form">
           {createError && <div className="areas-view__create-error">{createError}</div>}
           <input
+            autoFocus
             type="text"
             className="areas-view__create-input"
             value={newAreaName}
@@ -220,7 +221,6 @@ export function AreasView(): React.JSX.Element {
               if (e.key === 'Escape') setCreatingArea(false)
             }}
             placeholder="Area name (e.g. health, finances, work)"
-            autoFocus
           />
           <Button
             variant="primary"
@@ -456,6 +456,7 @@ function AreaDetail({
         {renamingArea ? (
           <div className="area-detail__rename-row">
             <input
+              autoFocus
               className="area-detail__rename-input"
               value={renameText}
               onChange={(e) => setRenameText(e.target.value)}
@@ -466,7 +467,6 @@ function AreaDetail({
                   setRenameText(area.name)
                 }
               }}
-              autoFocus
             />
             <Button variant="primary" size="sm" onClick={() => void handleRenameArea()}>
               Save
@@ -513,12 +513,12 @@ function AreaDetail({
 
       <div className="area-detail__add-row">
         <SmartTaskInput
+          autoFocus
           value={newTaskText}
           onChange={setNewTaskText}
           onSubmit={handleAddTask}
           placeholder="Add task to this area…"
           disabled={adding}
-          autoFocus
         />
         <Button
           variant="primary"
@@ -552,11 +552,11 @@ function AreaDetail({
               {editingId === task.id ? (
                 <span className="area-detail__task-edit">
                   <SmartTaskInput
+                    autoFocus
                     value={editText}
                     onChange={setEditText}
                     onSubmit={() => void handleEdit(task.id)}
                     onCancel={() => setEditingId(null)}
-                    autoFocus
                   />
                   <Button variant="primary" size="sm" onClick={() => void handleEdit(task.id)}>
                     Save

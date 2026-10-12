@@ -79,12 +79,12 @@ export function CaptureModal(): React.JSX.Element | null {
       ]}
     >
       <SmartTaskInput
+        autoFocus
         value={text}
         onChange={setText}
         onSubmit={handleCapture}
         onCancel={close}
         disabled={capturing}
-        autoFocus
         placeholder="Task text… @project #area +context due:YYYY-MM-DD"
       />
     </Dialog>,
@@ -566,11 +566,11 @@ export function TaskVaultView(): React.JSX.Element {
               />
               <div className="tv-context-filter" ref={contextMenuRef}>
                 <Button
+                  aria-label="Filter by context"
                   variant={selectedContexts.length > 0 ? 'secondary' : 'ghost'}
                   size="sm"
                   onClick={() => setContextMenuOpen((v) => !v)}
                   title="Filter"
-                  aria-label="Filter by context"
                 >
                   {selectedContexts.length === 0
                     ? 'Filter'

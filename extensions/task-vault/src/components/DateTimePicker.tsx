@@ -519,8 +519,8 @@ function Popover(p: PopoverProps): React.JSX.Element {
   const { picker, props, popoverRef, timeListRef } = p
   return (
     <div
-      ref={popoverRef}
       data-tmui-surface=""
+      ref={popoverRef}
       className={popoverClass(props.mode)}
       style={{ top: p.pos.top, left: p.pos.left }}
       onMouseDown={(e) => e.stopPropagation()}
