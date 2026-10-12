@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
+import { describe, it, beforeAll, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 // The pane reads both stores through selectors; these resolve them against the state each test sets.
@@ -273,6 +273,12 @@ async function renderPane(props: Partial<typeof defaultProps> = {}) {
   const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
   return render(<ReviewDiffPane {...defaultProps} {...props} />)
 }
+
+// The first import compiles the component tree, which on a loaded machine takes longer
+// than one test's 5 s; load it once here so every test times only its own work.
+beforeAll(async () => {
+  await import('../../src/components/pr-review/ReviewDiffPane')
+}, 60_000)
 
 describe('ReviewDiffPane', () => {
   it('renders file path in header', async () => {

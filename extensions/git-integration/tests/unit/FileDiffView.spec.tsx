@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, beforeAll, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 
 vi.mock('../../src/utils/hljs', () => ({
@@ -31,6 +31,12 @@ async function renderDiff(props: Record<string, unknown> = {}) {
   const { FileDiffView } = await import('../../src/components/FileDiffView')
   return render(<FileDiffView diff={props.diff ?? makeDiff()} {...props} />)
 }
+
+// The first import compiles the component tree, which on a loaded machine takes longer
+// than one test's 5 s; load it once here so every test times only its own work.
+beforeAll(async () => {
+  await import('../../src/components/FileDiffView')
+}, 60_000)
 
 describe('FileDiffView', () => {
   it('shows empty state when diff is null', async () => {

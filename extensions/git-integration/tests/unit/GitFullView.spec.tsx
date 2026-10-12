@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, beforeAll, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useGitStore } from '../../src/stores/git.store'
 
@@ -105,6 +105,12 @@ async function renderView(
   const { GitFullView } = await import('../../src/components/GitFullView')
   return render(<GitFullView repoRoot={repoRoot} />)
 }
+
+// The first import compiles the component tree, which on a loaded machine takes longer
+// than one test's 5 s; load it once here so every test times only its own work.
+beforeAll(async () => {
+  await import('../../src/components/GitFullView')
+}, 60_000)
 
 describe('GitFullView', () => {
   it('shows "No project selected" when repoRoot is null', async () => {
