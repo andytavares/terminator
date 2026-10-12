@@ -107,9 +107,9 @@ jobs:
       # Screenshots of every story against the Linux baselines in
       # packages/extension-ui/visual/__screenshots__/linux (ADR 098). Baselines
       # are per platform, so this job compares on Linux only; a macOS run would
-      # look for .../darwin and is not made. A story with no baseline yet gets
-      # one written here (--update-snapshots=missing) and uploaded, to be
-      # committed; every committed baseline is compared.
+      # look for .../darwin and is not made. A story with no baseline fails and
+      # gets one written here (--update-snapshots=missing); the step below
+      # uploads them so they can be reviewed and committed.
       - name: Compare story screenshots
         run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=missing
         timeout-minutes: 5

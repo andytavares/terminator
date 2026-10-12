@@ -153,7 +153,9 @@ test.describe('opening and running the panel', () => {
     await page.keyboard.press('d')
     await expect(dialog(page)).toBeHidden()
     await expect(page.locator('.xterm')).toHaveCount(2, { timeout: 15000 })
-    await expect(page.locator('.tmui-toast__message')).toContainText('Next time: ⌘D', { timeout: 5000 })
+    await expect(page.locator('.tmui-toast__message')).toContainText('Next time: ⌘D', {
+      timeout: 5000,
+    })
   })
 
   // AC3: `/` then "push" surfaces Git's Push action through its category.

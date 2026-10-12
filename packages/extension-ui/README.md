@@ -89,9 +89,9 @@ per platform (`visual/__screenshots__/{platform}/`), as the
 compares on Linux only, in the Stories job. Generate them on Linux with the
 Chromium build the pinned Playwright installs (`npx playwright install chromium`).
 The Stories job runs with `--update-snapshots=missing`: every committed baseline is
-compared, a story without one gets one written, and the job uploads them as the
-`story-baselines-linux` artifact to download into `visual/__screenshots__/linux/`
-and commit.
+compared, and a story without one fails and gets one written, which the job uploads
+as the `story-baselines-linux` artifact to review, download into
+`visual/__screenshots__/linux/` and commit.
 
 Add a component here before using it anywhere else, with a behaviour spec in
 `tests/unit/packages/extension-ui` and a story file in `stories/` (use `inLight`

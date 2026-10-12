@@ -26,7 +26,9 @@ export default defineConfig({
     viewport: { width: 1280, height: 800 },
   },
   webServer: {
-    command: `npx vite preview --outDir storybook-static --port ${PORT} --strictPort`,
+    // --host: on a runner where localhost resolves to ::1 the server would not
+    // answer on 127.0.0.1, the address Playwright waits for.
+    command: `npx vite preview --outDir storybook-static --host 127.0.0.1 --port ${PORT} --strictPort`,
     cwd: dirname,
     url: `http://127.0.0.1:${PORT}/index.json`,
     reuseExistingServer: !process.env.CI,
