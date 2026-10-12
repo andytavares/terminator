@@ -90,7 +90,9 @@ const SAMPLE_TASKS = [
 
 import { KanbanBoard } from '../../src/components/KanbanBoard.js'
 
-describe('KanbanBoard', () => {
+describe('KanbanBoard', kanbanBoardTests)
+
+function kanbanBoardTests() {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorageMock.clear()
@@ -107,6 +109,13 @@ describe('KanbanBoard', () => {
     cleanup()
   })
 
+  describe('lanes', kanbanBoardLanesTests)
+  describe('swimlanes', kanbanBoardSwimlanesTests)
+  describe('lane editor', kanbanBoardLaneEditorTests)
+  describe('filtering and errors', kanbanBoardFilteringErrorsTests)
+}
+
+function kanbanBoardLanesTests() {
   it('renders all four default lane headers', async () => {
     render(<KanbanBoard />)
     await waitFor(() => {
@@ -134,7 +143,14 @@ describe('KanbanBoard', () => {
       expect(screen.getByText('#work')).toBeTruthy()
     })
   })
+}
 
+function kanbanBoardSwimlanesTests() {
+  describe('toolbar', kanbanBoardSwimlanesToolbarTests)
+  describe('grouping', kanbanBoardSwimlanesGroupingTests)
+}
+
+function kanbanBoardSwimlanesToolbarTests() {
   it('renders swimlane toolbar', async () => {
     render(<KanbanBoard />)
     await waitFor(() => {
@@ -144,7 +160,9 @@ describe('KanbanBoard', () => {
       expect(screen.getByText('Area')).toBeTruthy()
     })
   })
+}
 
+function kanbanBoardSwimlanesGroupingTests() {
   it('switches to project swimlane grouping', async () => {
     const user = userEvent.setup()
     render(<KanbanBoard />)
@@ -171,7 +189,9 @@ describe('KanbanBoard', () => {
       expect(screen.getByText('alpha')).toBeTruthy()
     })
   })
+}
 
+function kanbanBoardLaneEditorTests() {
   it('shows Lanes button to open lane editor', async () => {
     render(<KanbanBoard />)
     await waitFor(() => {
@@ -191,7 +211,9 @@ describe('KanbanBoard', () => {
       expect(dashes.length).toBeGreaterThan(0)
     })
   })
+}
 
+function kanbanBoardFilteringErrorsTests() {
   it('shows only tasks with matching context when filter is active', async () => {
     mockSelectedContexts = ['computer']
     render(<KanbanBoard />)
@@ -217,4 +239,4 @@ describe('KanbanBoard', () => {
       expect(screen.getByText('DB not initialized')).toBeTruthy()
     })
   })
-})
+}
