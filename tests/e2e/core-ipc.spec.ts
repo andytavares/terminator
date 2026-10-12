@@ -13,6 +13,7 @@ import {
   projectGroup,
   quickActionsPanel,
   runQuickAction,
+  terminalRows,
   workspaceRow,
 } from './helpers'
 import { git, makeFixtureRepo } from './foundry-harness'
@@ -46,16 +47,17 @@ function currentBranch(repo: string): string {
 }
 
 /**
- * Prints `line` alone on a row of the active terminal and ⌘-clicks it
+ * Prints `line` alone on a row of the branch's one terminal and ⌘-clicks it
  * (Ctrl-click off macOS), at the row's first characters.
  */
 async function printAndModClick(page: Page, line: string): Promise<void> {
   await page.locator('.terminal-pane .xterm').first().click()
   await page.keyboard.type(`printf '%s\\n' '${line}'`)
   await page.keyboard.press('Enter')
-  const rows = page.locator('.xterm-rows > div')
-  await expect(rows.filter({ hasText: new RegExp(`^${line}`) })).toHaveCount(1)
-  const texts = await rows.allTextContents()
+  await expect
+    .poll(async () => (await terminalRows(page)).filter((row) => row.startsWith(line)).length)
+    .toBe(1)
+  const texts = await terminalRows(page)
   const index = texts.findIndex((text) => text.startsWith(line))
   const screen = (await page.locator('.terminal-pane .xterm-screen').first().boundingBox())!
   const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'

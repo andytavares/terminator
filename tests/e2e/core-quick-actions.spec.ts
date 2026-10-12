@@ -12,6 +12,7 @@ import {
   openSettings,
   projectGroup,
   runQuickAction,
+  terminalRows,
 } from './helpers'
 import { connectJira, startJiraStub, type JiraStub } from './jira-stub'
 import { allowCredentialsWithoutKeychain, recordShellOpens, shellOpens } from './main-stubs'
@@ -30,9 +31,9 @@ async function typeInTerminal(page: Page, command: string): Promise<void> {
   await page.keyboard.press('Enter')
 }
 
-/** The text on the active terminal's screen. */
-function screenText(page: Page): Promise<string> {
-  return page.locator('.xterm-rows').first().innerText()
+/** The text on the open terminals' screens. */
+async function screenText(page: Page): Promise<string> {
+  return (await terminalRows(page)).join('\n')
 }
 
 async function activeWorkspaceName(page: Page): Promise<string> {
