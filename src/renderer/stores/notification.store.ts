@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { SerializedNotification } from '../electron.d'
+import type { SerializedNotification } from '../../shared/types/index'
 
 export interface Notification extends SerializedNotification {
   read: boolean

@@ -14,7 +14,7 @@
 - [ ] `npm run lint` passes
 - [ ] `npm run test` passes (coverage ≥ 80%)
 - [ ] `npm run build:extensions` succeeds
-- [ ] New IPC channels added to `ipc-channels.md` and `electron.d.ts`
+- [ ] New IPC channels added to `ipc-channels.md` and `src/shared/electron-api/manifest.ts`
 - [ ] README / docs updated if user-facing behavior changed
 - [ ] No `console.log` left in production paths
 

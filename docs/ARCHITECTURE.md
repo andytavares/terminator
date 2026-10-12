@@ -107,7 +107,7 @@ and [`specs/031-linear-project-integration/contracts/ipc-channels.md`](../specs/
 
 - `src/shared/types/index.ts` — TypeScript interfaces used by both processes.
 - `src/shared/schemas/` — Zod schemas. Validate IPC payloads before use; a payload that fails its schema gets the `invalid` response declared in the channel's table row (usually an `{ error: 'VALIDATION_ERROR' }` envelope shaped like the channel's other responses).
-- `src/renderer/electron.d.ts` — Type declaration for `window.electronAPI`, keeping the renderer call sites type-checked.
+- `src/shared/electron-api/manifest.ts` — The one declaration of `window.electronAPI`. Each method is a spec with its path, channel, payload mapping and TypeScript `signature`. `src/main/preload.ts` and the remote shim build the object from it at run time (`build-api.ts`), and `api-type.ts` derives the renderer's `ElectronAPI` type from it with mapped types, so a renderer call site type-checks against the manifest. Specs marked `extensionView` are what an extension view receives; `src/main/preload-webview.ts` is still written by hand, because two preload entries sharing the builder would make Rollup emit a chunk the sandboxed preload cannot load, and `tests/unit/main/preload-webview.spec.ts` fails when it and the manifest disagree on a method, a channel or a payload.
 
 ---
 
@@ -990,7 +990,7 @@ Notes and diagrams are stored in the **shared SQLite database** at `<userData>/a
 
 ### New IPC Channels (22 total)
 
-Documented in `specs/010-markdown-notepad/contracts/ipc-channels.md` and typed in `src/renderer/electron.d.ts`.
+Documented in `specs/010-markdown-notepad/contracts/ipc-channels.md`. They are extension-owned and reached through `extensionBridge.invoke`.
 
 ---
 

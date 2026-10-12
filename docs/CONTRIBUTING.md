@@ -123,16 +123,16 @@ Test location by type:
 
 ### When you add or change something, update:
 
-| Change                              | Documentation to update                                                                                           |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| New feature or user-facing behavior | `README.md` features list and/or `docs/ARCHITECTURE.md`                                                           |
-| New IPC channel                     | `specs/001-extension-first-terminal/contracts/ipc-channels.md` (master contract) and `src/renderer/electron.d.ts` |
-| Change to extension API             | `specs/001-extension-first-terminal/contracts/extension-api.md` and `docs/EXTENSION-DEVELOPMENT.md`               |
-| New npm script                      | `README.md` scripts table and `specs/.../quickstart.md`                                                           |
-| Architectural decision              | New ADR in `docs/adr/`                                                                                            |
-| Data model change                   | `specs/.../data-model.md` and `docs/ARCHITECTURE.md`                                                              |
-| Setup step change                   | `README.md`, `docs/CONTRIBUTING.md`, `specs/.../quickstart.md`                                                    |
-| New keyboard shortcut               | `README.md` features list, `contracts/extension-api.md` reserved list                                             |
+| Change                              | Documentation to update                                                                                                    |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| New feature or user-facing behavior | `README.md` features list and/or `docs/ARCHITECTURE.md`                                                                    |
+| New IPC channel                     | `specs/001-extension-first-terminal/contracts/ipc-channels.md` (master contract) and `src/shared/electron-api/manifest.ts` |
+| Change to extension API             | `specs/001-extension-first-terminal/contracts/extension-api.md` and `docs/EXTENSION-DEVELOPMENT.md`                        |
+| New npm script                      | `README.md` scripts table and `specs/.../quickstart.md`                                                                    |
+| Architectural decision              | New ADR in `docs/adr/`                                                                                                     |
+| Data model change                   | `specs/.../data-model.md` and `docs/ARCHITECTURE.md`                                                                       |
+| Setup step change                   | `README.md`, `docs/CONTRIBUTING.md`, `specs/.../quickstart.md`                                                             |
+| New keyboard shortcut               | `README.md` features list, `contracts/extension-api.md` reserved list                                                      |
 
 ---
 
@@ -142,7 +142,7 @@ All IPC channels are defined in `specs/001-extension-first-terminal/contracts/ip
 
 1. Document it in the contracts file first.
 2. Add the Zod payload schema to `src/shared/schemas/` (or beside the handler for a one-off shape).
-3. Declare it in `src/shared/electron-api/manifest.ts` (both adapters and the remote allowlist are generated from it) and type it in `src/renderer/electron.d.ts`.
+3. Declare it in `src/shared/electron-api/manifest.ts` with its `signature`. The native and remote adapters, the remote allowlist and the renderer's `window.electronAPI` type all come from that one entry. If extension views need it, mark it `extensionView` and add it to `src/main/preload-webview.ts`; its spec fails until the two agree.
 4. Register it in the appropriate `src/main/ipc/*.ipc.ts` file as a row of `registerInvokeTable([...invokeSpec({ channel, schema, invalid, run })])` in `src/main/ipc/invoke-table.ts`.
 
 Core invoke channels are registered **only** through that table ([ADR-096](adr/096-every-ipc-channel-has-a-schema.md)). `schema` is a required field, so a channel without one does not compile; `invalid` is the response returned when the payload fails the schema, and `onError` (optional) maps a throwing `run` to a response. A channel that takes no payload uses `noPayload`. Do not call `handleChannel` from a handler module — ESLint rejects the import outside the table and the extension API. Do not write a "rejects a malformed payload" test for the new channel: `tests/unit/ipc/core-channel-schemas.spec.ts` already asserts that every registered core channel has a schema and rejects a payload of the wrong type.
@@ -212,5 +212,5 @@ Before opening a PR, verify:
 - [ ] `npm run build:extensions` succeeds (no compile errors)
 - [ ] No unused imports, variables, or dead code introduced
 - [ ] Documentation updated for every changed behavior (see table above)
-- [ ] New IPC channels documented in `ipc-channels.md` and typed in `electron.d.ts`
+- [ ] New IPC channels documented in `ipc-channels.md` and declared in `src/shared/electron-api/manifest.ts`
 - [ ] ADR written if a significant architectural decision was made

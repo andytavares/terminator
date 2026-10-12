@@ -14,7 +14,7 @@ Object.defineProperty(globalThis, 'window', {
 })
 
 import { useNotificationStore } from '../../../../src/renderer/stores/notification.store'
-import type { SerializedNotification } from '../../../../src/renderer/electron.d'
+import type { SerializedNotification } from '../../../../src/shared/types/index'
 
 function makeNotif(overrides: Partial<SerializedNotification> = {}): SerializedNotification {
   return {

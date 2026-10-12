@@ -6,6 +6,7 @@ import type {
   NotificationType,
 } from '../../shared/notifications/resolve-targets'
 import { getGlobalSettings } from '../storage/settings-store'
+import type { NotificationAction, SerializedNotification } from '../../shared/types/index'
 
 export type { NotificationTarget, NotificationType }
 
@@ -30,11 +31,6 @@ export function setExtensionNotificationSettingReader(
   readExtensionNotificationTargets = fn
 }
 
-export interface NotificationAction {
-  id: string
-  label: string
-}
-
 /**
  * The reserved action id behind "take me to the thing".
  *
@@ -43,19 +39,6 @@ export interface NotificationAction {
  * without the author having to name it.
  */
 export const OPEN_ACTION_ID = '__open__'
-
-export interface SerializedNotification {
-  id: string
-  type: NotificationType
-  title: string
-  message?: string
-  timestamp: number
-  source?: string
-  actions?: NotificationAction[]
-  /** Whether clicking the row goes anywhere. False for a bare report. */
-  clickable?: boolean
-  targets: NotificationTarget[]
-}
 
 interface NotificationRecord extends SerializedNotification {
   callbacks: Map<string, () => void>
