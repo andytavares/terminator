@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
+import { hostSnapshot } from '../../support/host-snapshot'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -70,7 +71,7 @@ function hostApi(): ExtensionAPI {
   return createHostExtensionAPI({
     extensionId: 'test.runner',
     endpoint: new RpcEndpoint(link(port2)),
-    snapshot: { settings: {}, workspaces: { workspaces: [], projects: {} } },
+    snapshot: hostSnapshot(),
     db: {} as never,
     callbacks: new CallbackRegistry(),
     channels: new Map(),
