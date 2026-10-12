@@ -1,6 +1,6 @@
 import type { z } from 'zod'
 import { defineChannel } from '@terminator/extension-sdk'
-import type { ExtensionAPI, Disposable } from '@terminator/extension-sdk'
+import type { ExtensionAPI, ExtensionDB, Disposable } from '@terminator/extension-sdk'
 
 /** What every task-vault channel answers to a payload its schema rejects. */
 export function validationError(error: z.ZodError): { error: string; message: string } {
@@ -46,4 +46,46 @@ export function createIpcRegistrar(
       disposables.forEach((d) => d.dispose())
     },
   }
+}
+
+/** What a route handler gets besides its payload. */
+export interface IpcContext {
+  api: ExtensionAPI
+  db: ExtensionDB
+}
+
+/** One channel: its payload schema, its handler, and whether it stays desktop-only. */
+export interface Route {
+  channel: string
+  schema: z.ZodType
+  run: (ctx: IpcContext, args: never) => unknown
+  local?: boolean
+}
+
+/** A channel the remote browser client may also call. */
+export function route<S extends z.ZodType>(
+  channel: string,
+  schema: S,
+  run: (ctx: IpcContext, args: z.infer<S>) => unknown
+): Route {
+  return { channel, schema, run }
+}
+
+/** A channel reachable from the desktop only. */
+export function localRoute<S extends z.ZodType>(
+  channel: string,
+  schema: S,
+  run: (ctx: IpcContext, args: z.infer<S>) => unknown
+): Route {
+  return { channel, schema, run, local: true }
+}
+
+/** Registers every route with `errorResult` as its error answer; returns the cleanup. */
+export function registerRoutes(ctx: IpcContext, routes: readonly Route[]): () => void {
+  const { handle, handleRemote, cleanup } = createIpcRegistrar(ctx.api, errorResult)
+  for (const r of routes) {
+    const register = r.local ? handle : handleRemote
+    register(r.channel, r.schema, (args) => r.run(ctx, args as never))
+  }
+  return cleanup
 }
