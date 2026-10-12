@@ -150,6 +150,24 @@ describe('ExtensionsSection', () => {
     expect(screen.getByText('enabled')).toBeTruthy()
   })
 
+  it('shows a failed extension as error, with why on its status', async () => {
+    const ext = {
+      id: 'com.lost',
+      name: 'Lost Ext',
+      version: '1.0.0',
+      status: 'error',
+      errorMessage: 'Extension host exited with code 134',
+    }
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    const status = await screen.findByText('error')
+    expect(status.getAttribute('title')).toBe('Extension host exited with code 134')
+    expect(screen.getByText('Enable')).toBeTruthy()
+  })
+
   it('shows Disable button for enabled extensions', async () => {
     const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
     ;(

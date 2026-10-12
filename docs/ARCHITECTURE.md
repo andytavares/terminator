@@ -51,7 +51,7 @@ Terminator is an Electron application with three kinds of process and one shared
 
 - `node-pty` requires native Node.js bindings — unavailable in the sandboxed renderer.
 - `contextIsolation: true` is the Electron security baseline. Disabling it would expose the full Node.js API surface to any XSS vector in the renderer.
-- Extension backends run in a `utilityProcess` so their work never shares the event loop that relays terminal output. Native modules (`node-pty`) stay in main; the extension host reaches PTYs through the API. See [ADR-001](adr/001-pty-in-main-process.md) and [ADR 094](adr/094-extensions-follow-the-vs-code-model.md), which supersedes ADR-002.
+- Extension backends run in a `utilityProcess` so their work never shares the event loop that relays terminal output. It is the only place a backend runs: main never `require()`s an extension's entry point. Native modules (`node-pty`) stay in main; the extension host reaches PTYs through the API. See [ADR-001](adr/001-pty-in-main-process.md) and [ADR 094](adr/094-extensions-follow-the-vs-code-model.md), which supersedes ADR-002.
 
 ---
 
@@ -248,7 +248,7 @@ The shape is declared once, as zod schemas in `src/shared/schemas/settings.schem
 
 ## Extension System
 
-Extensions are Node.js CommonJS modules. `ExtensionHost` (main) reads and validates their manifests and keeps their status; their backends run in the extension host, one `utilityProcess` that `ExtensionHostProcess` (`src/main/extensions/host/host-process.ts`) starts on the first activation (ADR 094).
+Extensions are Node.js CommonJS modules. `ExtensionHost` (main) reads and validates their manifests and keeps their status; their backends run in the extension host, one `utilityProcess` that `ExtensionHostProcess` (`src/main/extensions/host/host-process.ts`) starts on the first activation (ADR 094). `ExtensionHost` is constructed with that process (`src/main/index.ts`) and has no other way to load a backend; its unit specs give it a test double of the same `BackendHost` interface.
 
 ### The process boundary
 
@@ -263,7 +263,7 @@ Extensions are Node.js CommonJS modules. `ExtensionHost` (main) reads and valida
 
 Values the core holds cross as promises, except `settings.get`, `workspace.list` / `listProjects` and `issues.supports*`, which read a snapshot main pushes on every change (`onExtensionSettingsChanged`, `onWorkspacesChanged`). `pty.onData` arrives batched, one message per frame (`pty-stream.ts`), every batch before the exit. A channel's or command's schema stays in the extension host, which validates the payload before `run`.
 
-When the extension host exits unasked the app stays up: it is started again once and its backends activated again; a second exit marks them failed, and Settings → Extensions shows them as `error` with the reason. The failure is not stored, so the next launch tries again.
+When the extension host exits unasked the app stays up: it is started again once and its backends activated again, each after the extensions it declares in `extensionDependencies`, as at startup, so a consumer's `api.extensions.get` returns its provider's new exports. A backend whose dependency fails to come back fails too. A second exit marks them all failed, and Settings → Extensions shows them as `error` with the reason as the status's tooltip. The failure is not stored, so the next launch tries again.
 
 ### Bundled extensions
 

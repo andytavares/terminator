@@ -123,8 +123,11 @@ extension backend (ADR 094), not in the main process. The API reaches the core o
   work: Remote Control's HTTP server runs here.
 
 If the extension host crashes, the app stays up. It is restarted once and every backend activated
-again; if it crashes again, the extensions show as `error` in Settings → Extensions with the
-reason, until the next launch.
+again in the same order as at startup: an extension after those in its `extensionDependencies`, so
+`api.extensions.get` hands it the provider's new exports (keep nothing from the old ones). If a
+provider does not come back, its dependants fail with it. If the host crashes again, the
+extensions show as `error` in Settings → Extensions, with the reason on hover, until the next
+launch.
 
 ### What an extension may import _(SDK 2.0.0)_
 
