@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { Terminal } from 'xterm'
-import { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
+import { Terminal } from '@xterm/xterm'
+import {
+  TerminalInstance,
+  XTERM_THEMES,
+} from '../../../../src/renderer/components/terminal/TerminalSession'
 
 const mockResizeObserver = vi.fn().mockImplementation(function () {
   return {
@@ -26,7 +29,7 @@ function makeMockBuffer(rows: number, cols: number, lineText = '', viewportY = 0
 
 const mockRenderDispose = vi.fn()
 
-vi.mock('xterm', () => {
+vi.mock('@xterm/xterm', () => {
   const Terminal = vi.fn().mockImplementation(function () {
     return {
       loadAddon: vi.fn(),
@@ -51,7 +54,7 @@ vi.mock('xterm', () => {
   return { Terminal }
 })
 
-vi.mock('xterm-addon-fit', () => {
+vi.mock('@xterm/addon-fit', () => {
   const FitAddon = vi.fn().mockImplementation(function () {
     return {
       fit: vi.fn(),
@@ -60,7 +63,7 @@ vi.mock('xterm-addon-fit', () => {
   return { FitAddon }
 })
 
-vi.mock('xterm/css/xterm.css', () => ({}))
+vi.mock('@xterm/xterm/css/xterm.css', () => ({}))
 
 // TerminalInstance is a pure view object: busy/idle/bell reach the outside
 // world only through the constructor hooks (wired by the session controller).
@@ -930,6 +933,28 @@ describe('TerminalInstance', () => {
         })
       )
       document.documentElement.removeAttribute('data-theme')
+    })
+
+    it.each(['dark', 'light'] as const)(
+      'carries distinct scrollbar slider colours in the %s theme, as xterm draws its own scrollbar',
+      (name) => {
+        const theme = XTERM_THEMES[name]
+        const colours = [
+          theme.scrollbarSliderBackground,
+          theme.scrollbarSliderHoverBackground,
+          theme.scrollbarSliderActiveBackground,
+        ]
+        for (const colour of colours) expect(colour).toMatch(/^rgba\(/)
+        expect(new Set(colours).size).toBe(3)
+      }
+    )
+
+    it('hands the scrollbar colours to the terminal on construction', () => {
+      new TerminalInstance('ses-scrollbar', 1000)
+      const terminal = vi.mocked(Terminal).mock.results.at(-1)!.value
+      expect(terminal.options.theme.scrollbarSliderBackground).toBe(
+        XTERM_THEMES.dark.scrollbarSliderBackground
+      )
     })
 
     it('sets dark theme on construction when data-theme is absent', () => {

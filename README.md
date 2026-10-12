@@ -52,7 +52,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 | Framework              | Electron 44.x                               |
 | Language               | TypeScript 5.x (strict)                     |
 | UI                     | React 18.x + Zustand + Lucide React (icons) |
-| Terminal rendering     | xterm.js 5.x + xterm-addon-fit              |
+| Terminal rendering     | @xterm/xterm 6.x + @xterm/addon-fit         |
 | PTY management         | node-pty 1.x (main process only)            |
 | Persistence            | electron-store 8.x                          |
 | Schema validation      | Zod 3.x                                     |
