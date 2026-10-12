@@ -68,16 +68,18 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     runtime.supervisedRunner = createSupervisedRunner({
       api,
       control: runtime.control,
-      stateDir: runtimeStateDir(api.paths.userData),
+      stateDir: runtimeStateDir(api.paths.globalStorage),
     })
     // A run that stops making progress without asking for anything is the
     // failure nobody instruments: it looks exactly like one that is working.
     runtime.supervision = createSupervision({
       api,
-      stateDir: runtimeStateDir(api.paths.userData),
+      stateDir: runtimeStateDir(api.paths.globalStorage),
       onFeedChange: () => announceLive(''),
     })
-    runtime.mutes = createMuteStore(path.join(runtimeStateDir(api.paths.userData), 'mutes.json'))
+    runtime.mutes = createMuteStore(
+      path.join(runtimeStateDir(api.paths.globalStorage), 'mutes.json')
+    )
 
     runtime.stallWatcher = watchForStalls(api, runtime.supervisedRunner)
     runtime.stallWatcher.start()

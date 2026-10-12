@@ -14,7 +14,7 @@ import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'
 import { registerQuickActionCommands } from './commands.js'
 import { remoteAccessFor } from './remote-access.js'
 import { bindShell } from './shell/run-git.js'
-import { setStoreDirectory } from './storage-directory.js'
+import { openStorageDirectory } from './storage-directory.js'
 import {
   openPrReviewWindow,
   registerReviewPullRequestCommand,
@@ -81,7 +81,7 @@ export function activate(api: ExtensionAPI): void {
   const enabled = api.settings.get<boolean>('terminator.git-integration.git.enabled') ?? true
   if (!enabled) return
   bindShell(api.shell)
-  setStoreDirectory(api.paths.userData)
+  const storage = openStorageDirectory(api)
 
   const projectRoots = () =>
     api.workspace
@@ -105,7 +105,7 @@ export function activate(api: ExtensionAPI): void {
     {
       github: api.github,
       getToken: () => api.settings.get<string>('terminator.git-integration.git.githubToken') ?? '',
-      noCheckoutCwd: api.paths.userData,
+      noCheckoutCwd: storage,
     },
     // Optional: an older host has no issues namespace, and the review view
     // then renders references exactly as it does today.

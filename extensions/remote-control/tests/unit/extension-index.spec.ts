@@ -53,7 +53,7 @@ function makeApi() {
       isRemoteAccessible: vi.fn().mockResolvedValue(false),
     },
     window: { broadcast: mockBroadcast },
-    paths: { app: '/app', userData: '/user-data' },
+    paths: { app: '/app', globalStorage: '/user-data/extensions/terminator.remote-control' },
     pty: {},
     workspace: { list: vi.fn(() => []), listProjects: vi.fn(() => []) },
   }

@@ -38,8 +38,9 @@ import { bindShellToStub, githubOverStub } from './support/shell'
 bindShellToStub(mockExecFile)
 bindWorkspaceRoots(() => ['/repo', '/other', '/Users/me/repos/widgets'])
 
-// api.paths.userData: where gh runs when it needs no checkout, inside a root the core allows.
-const USER_DATA = '/Users/me/Library/Application Support/Terminator'
+// api.paths.globalStorage: where gh runs when it needs no checkout, inside a root the core allows.
+const GLOBAL_STORAGE =
+  '/Users/me/Library/Application Support/Terminator/extensions/terminator.git-integration'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -58,7 +59,7 @@ function captureHandlers(
   const handlers: Record<string, Handler> = {}
   registerGithubHandlers(
     answerInto(handlers),
-    { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: USER_DATA },
+    { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
     undefined,
     undefined,
     getReviewRepos,
@@ -72,7 +73,7 @@ function captureHandlersWithToken(token: string): Record<string, Handler> {
   registerGithubHandlers(answerInto(handlers), {
     github: githubOverStub(mockExecFile),
     getToken: () => token,
-    noCheckoutCwd: USER_DATA,
+    noCheckoutCwd: GLOBAL_STORAGE,
   })
   return handlers
 }
@@ -2171,7 +2172,7 @@ describe('review revamp — edge branches', () => {
     const hs: Record<string, Handler> = {}
     registerGithubHandlers(
       answerInto(hs),
-      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: USER_DATA },
+      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
       undefined,
       () => ['/src/widgets', '/src/gadgets', '/src/broken']
     )
@@ -2214,11 +2215,11 @@ describe('github:dashboard-search', () => {
     mockExecFile.mockReset()
   })
 
-  it('runs gh from api.paths.userData, builds the dashboard, and maps local roots', async () => {
+  it('runs gh from api.paths.globalStorage, builds the dashboard, and maps local roots', async () => {
     const handlers: Record<string, Handler> = {}
     registerGithubHandlers(
       answerInto(handlers),
-      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: USER_DATA },
+      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
       undefined,
       () => ['/Users/me/repos/widgets']
     )
@@ -2268,7 +2269,7 @@ describe('github:dashboard-search', () => {
     expect(result.prs[0].localRepoRoot).toBe('/Users/me/repos/widgets')
 
     const userCallOpts = mockExecFile.mock.calls[0][2] as { cwd?: string }
-    expect(userCallOpts.cwd).toBe(USER_DATA)
+    expect(userCallOpts.cwd).toBe(GLOBAL_STORAGE)
   })
 
   it('sends each section as its own graphql request', async () => {
@@ -2360,7 +2361,7 @@ describe('github:dashboard-search', () => {
     registerGithubHandlers(answerInto(handlers), {
       github: githubOverStub(mockExecFile),
       getToken: () => '',
-      noCheckoutCwd: USER_DATA,
+      noCheckoutCwd: GLOBAL_STORAGE,
     })
     mockGitFailure('boom')
     const result = (await handlers['github:dashboard-search']({})) as { error: string }
@@ -2419,7 +2420,11 @@ describe('github:accessible-repos', () => {
       'user/repos?affiliation=owner,collaborator,organization_member&per_page=100',
       '--paginate',
     ])
-    expect(options).toMatchObject({ cwd: USER_DATA, maxBuffer: 50 * 1024 * 1024, timeout: 60_000 })
+    expect(options).toMatchObject({
+      cwd: GLOBAL_STORAGE,
+      maxBuffer: 50 * 1024 * 1024,
+      timeout: 60_000,
+    })
   })
 
   it('serves a second call from the cache and re-runs on refresh', async () => {
@@ -2450,7 +2455,7 @@ describe('gh: pseudo-root (uncloned repo)', () => {
     handlers = captureHandlers()
   })
 
-  it('routes github:pr-mark-ready through GH_REPO with cwd in api.paths.userData, no git spawned', async () => {
+  it('routes github:pr-mark-ready through GH_REPO with cwd in api.paths.globalStorage, no git spawned', async () => {
     mockExecFile.mockImplementationOnce(
       (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) => {
         cb(null, { stdout: '', stderr: '' })
@@ -2469,7 +2474,7 @@ describe('gh: pseudo-root (uncloned repo)', () => {
     ]
     expect(cmd).not.toBe('git')
     expect(args).toEqual(['pr', 'ready', '6'])
-    expect(callOpts.cwd).toBe(USER_DATA)
+    expect(callOpts.cwd).toBe(GLOBAL_STORAGE)
     // Passed per call, so concurrent calls for different repos cannot see each other's.
     expect(callOpts.env?.GH_REPO).toBe('acme/widgets')
     expect(process.env.GH_REPO).toBeUndefined()
@@ -2887,7 +2892,7 @@ describe('github:dashboard-search sessions and cap', () => {
     const handlers: Record<string, Handler> = {}
     registerGithubHandlers(
       answerInto(handlers),
-      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: USER_DATA },
+      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
       undefined,
       () => ['/Users/me/repos/widgets']
     )

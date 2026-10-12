@@ -125,11 +125,22 @@ describe('api.shell.exec runs only inside a root', () => {
     expect((await gitIn(api, worktree)).stdout).toBe(`${worktree}\n`)
   })
 
-  it('runs in api.paths.userData', async () => {
+  it('runs in its own api.paths.globalStorage, <userData>/extensions/<id>', async () => {
     const api = await hostedApi()
-    const records = directory('user-data', 'tool')
 
+    expect(api.paths.globalStorage).toBe(join(scratch, 'user-data', 'extensions', ID))
+    const records = directory('user-data', 'extensions', ID, 'records')
     expect((await gitIn(api, records)).stdout).toBe(`${records}\n`)
+  })
+
+  it("refuses another extension's folder, and userData outside its own folder", async () => {
+    const api = await hostedApi()
+    const other = directory('user-data', 'extensions', 'com.example.other', 'records')
+
+    for (const cwd of [other, join(scratch, 'user-data'), directory('user-data', 'foundry')]) {
+      await expect(gitIn(api, cwd)).rejects.toMatchObject({ name: 'CwdOutOfScopeError' })
+    }
+    expect(existsSync(ran)).toBe(false)
   })
 
   it('runs in a declared folder setting, read when the call is made', async () => {
@@ -189,11 +200,11 @@ describe('api.shell.exec runs only inside a root', () => {
 })
 
 describe('api.github runs gh only inside a root', () => {
-  it('runs gh in api.paths.userData', async () => {
+  it('runs gh in api.paths.globalStorage', async () => {
     const api = await hostedApi()
-    const userData = join(scratch, 'user-data')
+    const own = directory('user-data', 'extensions', ID)
 
-    expect(await api.github.api({ cwd: userData }, { path: 'user' })).toBe(`${userData}\n`)
+    expect(await api.github.api({ cwd: own }, { path: 'user' })).toBe(`${own}\n`)
   })
 
   it('refuses gh in a directory outside every root, such as the home directory', async () => {

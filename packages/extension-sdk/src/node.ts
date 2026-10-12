@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, renameSync } from 'node:fs'
 import { rename, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import type { ExtensionAPI } from '../types/api'
 
 /**
  * Writes `value` as indented JSON so that a reader sees the old file or the
@@ -10,4 +13,45 @@ export async function writeJsonAtomic(target: string, value: unknown): Promise<v
   const temporary = `${target}.${randomUUID()}.tmp`
   await writeFile(temporary, JSON.stringify(value, null, 2), 'utf8')
   await rename(temporary, target)
+}
+
+/** A path an extension kept in the shared userData folder, and where it belongs now. */
+export interface UserDataMove {
+  /** Relative to userData, the folder `paths.globalStorage` is `extensions/<id>` inside. */
+  from: string
+  /** Relative to `paths.globalStorage`. */
+  to: string
+}
+
+export type UserDataMoveOutcome = 'moved' | 'nothing-to-move' | 'kept-both'
+
+/**
+ * Moves what an extension wrote to the shared userData folder into its own
+ * `paths.globalStorage`, each path only while its new location does not exist.
+ * When both exist neither is touched, and the log says where the old copy is.
+ * Synchronous, for the top of `activate`, before anything opens either path.
+ * A rename: both are inside userData.
+ */
+export function moveFromUserData(
+  api: Pick<ExtensionAPI, 'paths'> & { log: Pick<ExtensionAPI['log'], 'warn'> },
+  moves: readonly UserDataMove[]
+): UserDataMoveOutcome[] {
+  const { globalStorage } = api.paths
+  const userData = dirname(dirname(globalStorage))
+  return moves.map(({ from, to }) => {
+    const legacy = join(userData, from)
+    const outcome = movePath(legacy, join(globalStorage, to))
+    if (outcome === 'kept-both') {
+      api.log.warn(`Left ${legacy} where it was: ${join(globalStorage, to)} already exists.`)
+    }
+    return outcome
+  })
+}
+
+function movePath(legacy: string, target: string): UserDataMoveOutcome {
+  if (!existsSync(legacy)) return 'nothing-to-move'
+  if (existsSync(target)) return 'kept-both'
+  mkdirSync(dirname(target), { recursive: true })
+  renameSync(legacy, target)
+  return 'moved'
 }

@@ -1,13 +1,27 @@
+import { mkdirSync } from 'node:fs'
 import Store from 'electron-store'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { moveFromUserData } from '@terminator/extension-sdk/node'
+
+// Merge flow's `config` (electron-store's default name) and the review stores.
+const STORE_FILES = ['config.json', 'pr-review-sessions.json', 'pr-active-reviews.json']
 
 let directory: string | undefined
 
 /**
- * Where this extension's stores live: `api.paths.userData`, bound by `activate`.
- * The extension host has no `electron.app` for electron-store to find it with.
+ * Opens this extension's own folder, `api.paths.globalStorage`, for the stores,
+ * after moving the ones earlier builds kept in the shared userData folder. The
+ * extension host has no `electron.app` for electron-store to find it with.
  */
-export function setStoreDirectory(path: string): void {
-  directory = path
+export function openStorageDirectory(api: ExtensionAPI): string {
+  const folder = api.paths.globalStorage
+  moveFromUserData(
+    api,
+    STORE_FILES.map((file) => ({ from: file, to: file }))
+  )
+  mkdirSync(folder, { recursive: true })
+  directory = folder
+  return folder
 }
 
 const opened = new Map<string, Store<Record<string, unknown>>>()

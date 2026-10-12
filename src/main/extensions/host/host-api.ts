@@ -10,6 +10,7 @@ import type {
 import type { RpcEndpoint } from './rpc-endpoint.js'
 import { CallbackRegistry } from './callbacks.js'
 import type { HostSnapshot } from './snapshot.js'
+import { extensionPaths } from '../extension-paths.js'
 
 /** A command as the extension host keeps it: main sees neither its handler nor its schema. */
 export interface HostCommand {
@@ -289,7 +290,7 @@ export function createHostExtensionAPI(context: HostContext): ExtensionAPI {
   return {
     ...forwardedMembersFor(main),
     db: context.db,
-    paths: context.snapshot.paths,
+    paths: extensionPaths(context.snapshot.paths, context.extensionId),
     extensions: { get: (dependencyId: string) => context.exportsOf(dependencyId) as never },
     log: logFor(main),
     settings: settingsFor(context, main),

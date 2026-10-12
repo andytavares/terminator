@@ -9,10 +9,11 @@
  * by nothing, and every gate offering "Stop here" did nothing at all.
  */
 import { tmpdir } from 'node:os'
+import { freshGlobalStorage } from '../helpers/foundry-host.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-const USER_DATA = tmpdir()
+const GLOBAL_STORAGE = freshGlobalStorage()
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
@@ -174,7 +175,7 @@ beforeAll(async () => {
     shell: { exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }) },
     notifications: { showToast: vi.fn(), createNotification: vi.fn() },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    paths: { app: '', userData: USER_DATA },
+    paths: { app: '', globalStorage: GLOBAL_STORAGE },
     settings: {
       register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       get: settingsGet,

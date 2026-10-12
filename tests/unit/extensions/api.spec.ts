@@ -632,8 +632,11 @@ describe('what the extension host cannot reach itself', () => {
     expect(result).toEqual({ canceled: false, filePaths: ['/x'] })
   })
 
-  it('paths are the directories main was given', () => {
+  it("paths are the app's directory and the extension's own folder under userData", () => {
     const paths = { app: '/app', userData: '/data' }
-    expect(createExtensionAPI('com.paths', '0.1.0', { paths }).paths).toEqual(paths)
+    expect(createExtensionAPI('com.paths', '0.1.0', { paths }).paths).toEqual({
+      app: '/app',
+      globalStorage: '/data/extensions/com.paths',
+    })
   })
 })
