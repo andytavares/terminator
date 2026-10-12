@@ -13,7 +13,7 @@ const USER_DATA = tmpdirForUserData()
 
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
 import type { ExtensionAPI, CommandContribution } from '@terminator/extension-sdk'
-import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/index.js'
+import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
 
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
@@ -158,7 +158,8 @@ beforeAll(async () => {
     app: { version: '0.0.0-test' },
   } as unknown as ExtensionAPI
 
-  const { activate, startSupervisionRuntime } = await import('../../src/index.ts')
+  const { activate } = await import('../../src/index.ts')
+  const { startSupervisionRuntime } = await import('../../src/runtime/supervision-runtime.ts')
   activate(api)
   const started = await startSupervisionRuntime(api)
   if (started === null) throw new Error('the supervision runtime did not start')
