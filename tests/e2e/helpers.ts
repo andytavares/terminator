@@ -73,13 +73,16 @@ export function e2eEnv(): NodeJS.ProcessEnv {
 /**
  * `userDataDir` relaunches onto an existing profile, for a spec that proves
  * something survives a restart; `closeApp` never deletes it, so relaunching
- * after a close just works.
+ * after a close just works. `env` adds to the environment `e2eEnv` gives.
  */
 // Inside the 30s hook timeout, so a launch that hangs fails with the app's own
 // output instead of a bare "hook timeout exceeded" that says nothing about why.
 const LAUNCH_DEADLINE_MS = 25_000
 
-export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<AppHandle> {
+export async function launchApp(
+  userDataDir: string = e2eProfileDir(),
+  env: NodeJS.ProcessEnv = {}
+): Promise<AppHandle> {
   const deadline = Date.now() + LAUNCH_DEADLINE_MS
   const remaining = () => Math.max(1, deadline - Date.now())
   const app = await electron.launch({
@@ -88,7 +91,7 @@ export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<
     // which blocks startup until firstWindow times out. The argument domain
     // turns that restore off for this process only.
     args: ['.', `--user-data-dir=${userDataDir}`, '-ApplePersistenceIgnoreState', 'YES'],
-    env: e2eEnv(),
+    env: { ...e2eEnv(), ...env },
     timeout: remaining(),
   })
   const output: string[] = []
@@ -245,4 +248,63 @@ export async function selectProject(
   projectName: string
 ): Promise<void> {
   await projectGroup(page, projectName).click()
+}
+
+/** The Quick Actions panel. */
+export function quickActionsPanel(page: Page) {
+  return page.getByRole('dialog', { name: 'Quick actions' })
+}
+
+const exactly = (text: string): RegExp =>
+  new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+
+/**
+ * Runs a Quick Action the way an operator finds one they have no key for: the
+ * band's Quick actions button, `/`, its name, then its row. The panel records
+ * the run in `quickActions.usage`, which is how the coverage map counts it.
+ */
+export async function runQuickAction(page: Page, label: string): Promise<void> {
+  await page.locator('.app-band__entry[aria-label="Quick actions (⌘P)"]').click()
+  const panel = quickActionsPanel(page)
+  await expect(panel).toBeFocused({ timeout: 10000 })
+  await page.keyboard.press('/')
+  await page.keyboard.type(label)
+  await panel
+    .locator('.qa-row')
+    .filter({ has: page.locator('.qa-row__label', { hasText: exactly(label) }) })
+    .first()
+    .click()
+  await expect(panel).toBeHidden({ timeout: 15000 })
+}
+
+/** Opens Settings with ⌘, (Ctrl+, off macOS) on the named section. */
+export async function openSettings(page: Page, section: string): Promise<void> {
+  if (!(await page.locator('.settings-panel').isVisible())) {
+    await page.keyboard.press('ControlOrMeta+,')
+  }
+  await expect(page.locator('.settings-panel')).toBeVisible()
+  await page.locator('.settings-panel__nav-item', { hasText: section }).click()
+}
+
+/** Closes Settings with its close button. */
+export async function closeSettings(page: Page): Promise<void> {
+  await page.locator('.settings-panel__close').click()
+  await expect(page.locator('.settings-panel')).toBeHidden()
+}
+
+/**
+ * Runs `script` inside the first extension view whose URL contains `urlPart`:
+ * a WebContentsView of its own, which the page cannot reach.
+ */
+export function inExtensionView<T>(handle: AppHandle, urlPart: string, script: string): Promise<T> {
+  return handle.app.evaluate(
+    async ({ webContents }, { part, source }) => {
+      const view = webContents
+        .getAllWebContents()
+        .find((contents) => !contents.isDestroyed() && contents.getURL().includes(part))
+      if (!view) throw new Error(`no extension view loaded for ${part}`)
+      return view.executeJavaScript(source) as Promise<unknown>
+    },
+    { part: urlPart, source: script }
+  ) as Promise<T>
 }
