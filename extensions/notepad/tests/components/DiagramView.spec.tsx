@@ -120,7 +120,15 @@ describe('DiagramView loading', () => {
   })
 })
 
-describe('DiagramView saving', () => {
+describe('DiagramView saving', diagramViewSavingTests)
+describe('DiagramView comments', diagramViewCommentsTests)
+
+function diagramViewSavingTests() {
+  describe('autosave', diagramViewSavingAutosaveTests)
+  describe('renaming', diagramViewSavingRenamingTests)
+}
+
+function diagramViewSavingAutosaveTests() {
   it('autosaves a drawing after a pause, and keeps the list and cache in step', async () => {
     await openDiagram()
     act(() => canvas.onChange?.([{ id: 'e2' }], APP_STATE))
@@ -146,7 +154,9 @@ describe('DiagramView saving', () => {
     ])
     expect(useNotesStore.getState().diagramCache.d1).toContain('e3')
   })
+}
 
+function diagramViewSavingRenamingTests() {
   it('renames the diagram', async () => {
     await openDiagram()
     fireEvent.click(screen.getByTitle('Click to rename'))
@@ -162,9 +172,14 @@ describe('DiagramView saving', () => {
     )
     expect(screen.getByText('Plan')).toBeTruthy()
   })
-})
+}
 
-describe('DiagramView comments', () => {
+function diagramViewCommentsTests() {
+  describe('placing', diagramViewCommentsPlacingTests)
+  describe('thread actions', diagramViewCommentsThreadActionsTests)
+}
+
+function diagramViewCommentsPlacingTests() {
   it('places a comment where the canvas is clicked, in scene coordinates', async () => {
     await openDiagram()
     fireEvent.click(screen.getByRole('button', { name: /comment/i }))
@@ -178,7 +193,9 @@ describe('DiagramView comments', () => {
       { diagramId: 'd1', body: 'Look', sceneX: 40, sceneY: 10 },
     ])
   })
+}
 
+function diagramViewCommentsThreadActionsTests() {
   it('opens a pin to reply to it, and resolving it removes the pin', async () => {
     await openDiagram([pin('p1', 'Look')])
     await eventually(() => expect(screen.getByLabelText('Comment: Look')).toBeTruthy())
@@ -207,4 +224,4 @@ describe('DiagramView comments', () => {
     await eventually(() => expect(screen.queryByLabelText('Comment: Look')).toBeNull())
     expect(bridge.calls('terminator.notepad:diagram-comments.delete')).toEqual([{ id: 'p1' }])
   })
-})
+}

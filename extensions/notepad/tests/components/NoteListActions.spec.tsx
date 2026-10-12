@@ -116,7 +116,31 @@ describe('NoteList filtering', () => {
   })
 })
 
-describe('NoteList folders', () => {
+describe('NoteList folders', noteListFoldersTests)
+describe('NoteList item context menu', noteListItemContextMenuTests)
+
+type DragKind = 'dragStart' | 'dragOver' | 'drop'
+
+/**
+ * jsdom has no DragEvent, so drag events would be plain Events without a
+ * pointer position or a DataTransfer. This one carries both.
+ */
+class TestDragEvent extends MouseEvent {
+  dataTransfer = { effectAllowed: '', dropEffect: '' }
+}
+
+function drag(kind: DragKind, target: Element, clientY = 0) {
+  const event = createEvent[kind](target, { clientY, bubbles: true, cancelable: true })
+  fireEvent(target, event)
+}
+
+beforeEach(() => {
+  Object.defineProperty(window, 'DragEvent', { value: TestDragEvent, configurable: true })
+})
+
+describe('NoteList drag and drop', noteListDragDropTests)
+
+function noteListFoldersTests() {
   beforeEach(() => {
     useNotesStore.setState({
       notes: [note('n1', 'Loose'), note('n2', 'Filed', { folderId: 'f1' })],
@@ -124,6 +148,11 @@ describe('NoteList folders', () => {
     })
   })
 
+  describe('sections', noteListFoldersSectionsTests)
+  describe('renaming and deleting', noteListFoldersRenamingDeletingTests)
+}
+
+function noteListFoldersSectionsTests() {
   it('groups items under their folder, and collapses a folder', () => {
     render(<NoteList />)
     const work = screen.getByText('Work').closest('.notepad-folder-section')!
@@ -133,7 +162,9 @@ describe('NoteList folders', () => {
     expect(screen.queryByText('Filed')).toBeNull()
     expect(screen.getByLabelText('Expand Work')).toBeTruthy()
   })
+}
 
+function noteListFoldersRenamingDeletingTests() {
   it('renames a folder from its context menu', async () => {
     render(<NoteList />)
     fireEvent.contextMenu(screen.getByText('Work').closest('.notepad-folder-header')!)
@@ -157,9 +188,15 @@ describe('NoteList folders', () => {
       expect(bridge.calls('terminator.notepad:folders.delete')).toEqual([{ id: 'f2' }])
     )
   })
-})
+}
 
-describe('NoteList item context menu', () => {
+function noteListItemContextMenuTests() {
+  describe('archiving', noteListItemContextMenuArchivingTests)
+  describe('deleting', noteListItemContextMenuDeletingTests)
+  describe('moving', noteListItemContextMenuMovingTests)
+}
+
+function noteListItemContextMenuArchivingTests() {
   it('archives a note and a diagram', async () => {
     useNotesStore.setState({ notes: [note('n1', 'Plan')], diagrams: [diagram('d1', 'Flow')] })
     render(<NoteList />)
@@ -172,7 +209,9 @@ describe('NoteList item context menu', () => {
     )
     expect(bridge.calls('terminator.notepad:notes.archive')).toEqual([{ id: 'n1' }])
   })
+}
 
+function noteListItemContextMenuDeletingTests() {
   it('restores, and permanently deletes once confirmed, an archived note', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     useNotesStore.setState({
@@ -190,7 +229,9 @@ describe('NoteList item context menu', () => {
     expect(bridge.calls('terminator.notepad:notes.restore')).toEqual([{ id: 'n1' }])
     confirm.mockRestore()
   })
+}
 
+function noteListItemContextMenuMovingTests() {
   it('moves an item into a folder and back out', async () => {
     useNotesStore.setState({
       notes: [note('n1', 'Plan'), note('n2', 'Filed', { folderId: 'f1' })],
@@ -207,28 +248,9 @@ describe('NoteList item context menu', () => {
       { items: [{ id: 'n2', type: 'note' }], folderId: null },
     ])
   })
-})
-
-type DragKind = 'dragStart' | 'dragOver' | 'drop'
-
-/**
- * jsdom has no DragEvent, so drag events would be plain Events without a
- * pointer position or a DataTransfer. This one carries both.
- */
-class TestDragEvent extends MouseEvent {
-  dataTransfer = { effectAllowed: '', dropEffect: '' }
 }
 
-function drag(kind: DragKind, target: Element, clientY = 0) {
-  const event = createEvent[kind](target, { clientY, bubbles: true, cancelable: true })
-  fireEvent(target, event)
-}
-
-beforeEach(() => {
-  Object.defineProperty(window, 'DragEvent', { value: TestDragEvent, configurable: true })
-})
-
-describe('NoteList drag and drop', () => {
+function noteListDragDropTests() {
   beforeEach(() => {
     useNotesStore.setState({
       notes: [
@@ -241,6 +263,13 @@ describe('NoteList drag and drop', () => {
     })
   })
 
+  describe('reordering', noteListDragDropReorderingTests)
+  describe('dropping among a folder', noteListDragDropDroppingAmongFolderTests)
+  describe('dropping on a header', noteListDragDropDroppingHeaderTests)
+  describe('out of folders', noteListDragDropOutFoldersTests)
+}
+
+function noteListDragDropReorderingTests() {
   it('reorders by dropping one item before another', async () => {
     render(<NoteList />)
     drag('dragStart', row('Flow'))
@@ -259,7 +288,9 @@ describe('NoteList drag and drop', () => {
     )
     expect(bridge.calls('terminator.notepad:folders.move')).toEqual([])
   })
+}
 
+function noteListDragDropDroppingAmongFolderTests() {
   it('moves an item into the folder it is dropped among', async () => {
     render(<NoteList />)
     drag('dragStart', row('First'))
@@ -279,7 +310,9 @@ describe('NoteList drag and drop', () => {
       },
     ])
   })
+}
 
+function noteListDragDropDroppingHeaderTests() {
   it('moves an item into a folder dropped on its header', async () => {
     render(<NoteList />)
     const header = screen.getByText('Work').closest('.notepad-folder-header')!
@@ -293,7 +326,9 @@ describe('NoteList drag and drop', () => {
       ])
     )
   })
+}
 
+function noteListDragDropOutFoldersTests() {
   it('takes an item out of its folder when dropped on the list itself', async () => {
     render(<NoteList />)
     const list = document.querySelector('.notepad-note-list__notes')!
@@ -306,4 +341,4 @@ describe('NoteList drag and drop', () => {
       ])
     )
   })
-})
+}

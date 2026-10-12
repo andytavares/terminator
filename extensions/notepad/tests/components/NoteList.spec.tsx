@@ -38,7 +38,54 @@ const note2: NoteListItem = {
   folderId: null,
 }
 
-describe('NoteList', () => {
+describe('NoteList', noteListTests)
+describe('NoteList search bar', noteListSearchBarTests)
+
+const note3: NoteListItem = {
+  id: 'n3',
+  title: 'Infra Note',
+  bodyPreview: '',
+  updatedAt: '2026-01-04T00:00:00Z',
+  createdAt: '2026-01-01T00:00:00Z',
+  archivedAt: null,
+  tags: ['infra'],
+  sortOrder: 2,
+  folderId: null,
+}
+
+describe('NoteList tag filter dropdown', noteListTagFilterDropdownTests)
+
+function openEditDialog(): HTMLElement {
+  render(<NoteList />)
+  fireEvent.contextMenu(screen.getByText('First Note'))
+  fireEvent.click(screen.getByText('Edit title & tags'))
+  return screen.getByRole('dialog', { name: 'Edit note' })
+}
+
+describe('NoteList edit dialog', noteListEditDialogTests)
+
+describe('NoteList archived section', () => {
+  beforeEach(() => {
+    cleanup()
+    const archived = { ...note2, archivedAt: '2026-01-04T00:00:00Z' }
+    useNotesStore.setState({
+      notes: [note1, archived],
+      selectedNoteId: null,
+      archivedVisible: false,
+    })
+    useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
+  })
+
+  it('says whether the archived section is open', () => {
+    render(<NoteList />)
+    const toggle = screen.getByRole('button', { name: /Archived \(1\)/ })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  })
+})
+
+function noteListTests() {
   beforeEach(() => {
     cleanup()
     mockInvoke.mockClear()
@@ -46,6 +93,11 @@ describe('NoteList', () => {
     useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 
+  describe('rendering', noteListRenderingTests)
+  describe('selecting', noteListSelectingTests)
+}
+
+function noteListRenderingTests() {
   it('shows EmptyState when there are no notes', () => {
     render(<NoteList />)
     expect(screen.getByText(/no notes/i)).toBeDefined()
@@ -57,7 +109,9 @@ describe('NoteList', () => {
     expect(screen.getByText('First Note')).toBeDefined()
     expect(screen.getByText('Second Note')).toBeDefined()
   })
+}
 
+function noteListSelectingTests() {
   it('calls setSelected when a note is clicked', () => {
     useNotesStore.setState({ notes: [note1], selectedNoteId: null, archivedVisible: false })
     render(<NoteList />)
@@ -70,9 +124,9 @@ describe('NoteList', () => {
     render(<NoteList />)
     expect(screen.getByText(/#work/)).toBeDefined()
   })
-})
+}
 
-describe('NoteList search bar', () => {
+function noteListSearchBarTests() {
   beforeEach(() => {
     cleanup()
     mockInvoke.mockClear()
@@ -80,6 +134,11 @@ describe('NoteList search bar', () => {
     useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 
+  describe('search input', noteListSearchBarSearchInputTests)
+  describe('archived notes', noteListSearchBarArchivedNotesTests)
+}
+
+function noteListSearchBarSearchInputTests() {
   it('renders a search input', () => {
     render(<NoteList />)
     expect(screen.getByPlaceholderText(/search/i)).toBeDefined()
@@ -91,7 +150,9 @@ describe('NoteList search bar', () => {
     fireEvent.change(input, { target: { value: 'hello' } })
     expect(useFilterStore.getState().searchQuery).toBe('hello')
   })
+}
 
+function noteListSearchBarArchivedNotesTests() {
   it('archived notes appear in a collapsible section', () => {
     const archivedNote: NoteListItem = {
       ...note1,
@@ -107,21 +168,9 @@ describe('NoteList search bar', () => {
     render(<NoteList />)
     expect(screen.getByText(/Archived \(1\)/)).toBeDefined()
   })
-})
+}
 
-describe('NoteList tag filter dropdown', () => {
-  const note3: NoteListItem = {
-    id: 'n3',
-    title: 'Infra Note',
-    bodyPreview: '',
-    updatedAt: '2026-01-04T00:00:00Z',
-    createdAt: '2026-01-01T00:00:00Z',
-    archivedAt: null,
-    tags: ['infra'],
-    sortOrder: 2,
-    folderId: null,
-  }
-
+function noteListTagFilterDropdownTests() {
   beforeEach(() => {
     cleanup()
     mockInvoke.mockClear()
@@ -129,6 +178,13 @@ describe('NoteList tag filter dropdown', () => {
     useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 
+  describe('listing tags', noteListTagFilterDropdownListingTagsTests)
+  describe('adding a tag', noteListTagFilterDropdownAddingTagTests)
+  describe('removing a tag', noteListTagFilterDropdownRemovingTagTests)
+  describe('closing', noteListTagFilterDropdownClosingTests)
+}
+
+function noteListTagFilterDropdownListingTagsTests() {
   it('renders a Tags button when notes have tags', () => {
     render(<NoteList />)
     expect(screen.getByText('Tags')).toBeDefined()
@@ -140,7 +196,9 @@ describe('NoteList tag filter dropdown', () => {
     expect(screen.getAllByText('work').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('infra').length).toBeGreaterThanOrEqual(1)
   })
+}
 
+function noteListTagFilterDropdownAddingTagTests() {
   it('clicking a tag in the dropdown adds it to activeTagIds', async () => {
     render(<NoteList />)
     fireEvent.click(screen.getByText('Tags'))
@@ -157,7 +215,9 @@ describe('NoteList tag filter dropdown', () => {
     })
     expect(useFilterStore.getState().activeTagIds.length).toBe(1)
   })
+}
 
+function noteListTagFilterDropdownRemovingTagTests() {
   it('clicking the same tag again removes it from activeTagIds', async () => {
     render(<NoteList />)
     fireEvent.click(screen.getByText('Tags'))
@@ -175,7 +235,9 @@ describe('NoteList tag filter dropdown', () => {
     })
     expect(useFilterStore.getState().activeTagIds).toEqual([])
   })
+}
 
+function noteListTagFilterDropdownClosingTests() {
   it('closes the dropdown on Escape', () => {
     render(<NoteList />)
     fireEvent.click(screen.getByText('Tags'))
@@ -203,9 +265,9 @@ describe('NoteList tag filter dropdown', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(document.querySelector('.notepad-context-menu')).toBeNull()
   })
-})
+}
 
-describe('NoteList edit dialog', () => {
+function noteListEditDialogTests() {
   beforeEach(() => {
     cleanup()
     mockInvoke.mockReset()
@@ -214,13 +276,11 @@ describe('NoteList edit dialog', () => {
     useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 
-  function openEditDialog(): HTMLElement {
-    render(<NoteList />)
-    fireEvent.contextMenu(screen.getByText('First Note'))
-    fireEvent.click(screen.getByText('Edit title & tags'))
-    return screen.getByRole('dialog', { name: 'Edit note' })
-  }
+  describe('opening and saving', noteListEditDialogOpeningSavingTests)
+  describe('keyboard', noteListEditDialogKeyboardTests)
+}
 
+function noteListEditDialogOpeningSavingTests() {
   it('is a modal dialog named for what it edits, with the title field focused', () => {
     const dialog = openEditDialog()
     expect(dialog.getAttribute('aria-modal')).toBe('true')
@@ -240,7 +300,9 @@ describe('NoteList edit dialog', () => {
     )
     expect(screen.queryByRole('dialog')).toBeNull()
   })
+}
 
+function noteListEditDialogKeyboardTests() {
   it('moves Tab from the last control back to the first', () => {
     openEditDialog()
     const save = screen.getByRole('button', { name: /Save/ })
@@ -258,25 +320,4 @@ describe('NoteList edit dialog', () => {
       expect.anything()
     )
   })
-})
-
-describe('NoteList archived section', () => {
-  beforeEach(() => {
-    cleanup()
-    const archived = { ...note2, archivedAt: '2026-01-04T00:00:00Z' }
-    useNotesStore.setState({
-      notes: [note1, archived],
-      selectedNoteId: null,
-      archivedVisible: false,
-    })
-    useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
-  })
-
-  it('says whether the archived section is open', () => {
-    render(<NoteList />)
-    const toggle = screen.getByRole('button', { name: /Archived \(1\)/ })
-    expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(toggle)
-    expect(toggle.getAttribute('aria-expanded')).toBe('true')
-  })
-})
+}

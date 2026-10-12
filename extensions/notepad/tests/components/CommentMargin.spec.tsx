@@ -43,12 +43,32 @@ const resolvedComment: Comment = {
   status: 'resolved',
 }
 
-describe('CommentMargin', () => {
+describe('CommentMargin', commentMarginTests)
+
+describe('CommentMargin resolved section', () => {
+  it('says whether the resolved comments are shown', () => {
+    useCommentsStore.setState({ comments: [resolvedComment], loading: false })
+    render(<CommentMargin noteId="n1" anchorTops={{}} />)
+    const toggle = screen.getByRole('button', { name: /1 resolved/ })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  })
+})
+
+function commentMarginTests() {
   beforeEach(() => {
     vi.clearAllMocks()
     useCommentsStore.setState({ comments: [], loading: false })
   })
 
+  describe('header and empty state', commentMarginHeaderEmptyStateTests)
+  describe('comment cards', commentMarginCommentCardsTests)
+  describe('thread actions', commentMarginThreadActionsTests)
+  describe('replies', commentMarginRepliesTests)
+}
+
+function commentMarginHeaderEmptyStateTests() {
   it('shows hint when no comments', () => {
     const { container } = render(<CommentMargin noteId="n1" anchorTops={{}} />)
     expect(container.querySelector('.notepad-comment-margin--empty')).toBeTruthy()
@@ -70,7 +90,9 @@ describe('CommentMargin', () => {
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
     expect(screen.queryByText(/open/)).toBeNull()
   })
+}
 
+function commentMarginCommentCardsTests() {
   it('renders comment body from store', () => {
     useCommentsStore.setState({ comments: [baseComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
@@ -90,7 +112,9 @@ describe('CommentMargin', () => {
     expect(container.querySelector('.notepad-comment--orphaned')).toBeTruthy()
     expect(container.querySelector('.notepad-comment-orphaned-section')).toBeTruthy()
   })
+}
 
+function commentMarginThreadActionsTests() {
   it('Resolve button calls comments.resolve IPC', async () => {
     useCommentsStore.setState({ comments: [baseComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
@@ -111,7 +135,9 @@ describe('CommentMargin', () => {
     await Promise.resolve()
     expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:comments.delete', { id: 'c1' })
   })
+}
 
+function commentMarginRepliesTests() {
   it('renders inline replies with arrow prefix', () => {
     const commentWithReply: Comment = {
       ...baseComment,
@@ -137,15 +163,4 @@ describe('CommentMargin', () => {
     fireEvent.click(screen.getByText('Reply'))
     expect(screen.getByPlaceholderText('Write a reply…')).toBeDefined()
   })
-})
-
-describe('CommentMargin resolved section', () => {
-  it('says whether the resolved comments are shown', () => {
-    useCommentsStore.setState({ comments: [resolvedComment], loading: false })
-    render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    const toggle = screen.getByRole('button', { name: /1 resolved/ })
-    expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(toggle)
-    expect(toggle.getAttribute('aria-expanded')).toBe('true')
-  })
-})
+}

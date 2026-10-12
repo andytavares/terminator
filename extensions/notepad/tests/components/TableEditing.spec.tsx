@@ -54,85 +54,7 @@ function type(v: EditorView, text: string): void {
 
 const tableRendered = (v: EditorView) => v.dom.querySelector('.notepad-table') !== null
 
-describe('editing a rendered table', () => {
-  it('renders the table while the caret is elsewhere', () => {
-    expect(tableRendered(mount(0))).toBe(true)
-  })
-
-  it('clicking a body cell puts the caret in that cell', () => {
-    const v = mount(0)
-    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
-    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-
-    expect(v.state.selection.main.head).toBe(DOC.indexOf('apples'))
-  })
-
-  it('clicking a cell reveals the raw markdown so it can be typed into', () => {
-    const v = mount(0)
-    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
-    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-
-    expect(tableRendered(v)).toBe(false)
-    expect(v.dom.textContent).toContain('| apples | 3 |')
-  })
-
-  it('clicking a header cell puts the caret in the header source', () => {
-    const v = mount(0)
-    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table thead th')[1]
-    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-
-    expect(v.state.selection.main.head).toBe(DOC.indexOf('Count'))
-  })
-
-  it('typing after a click edits the cell rather than the whole table', () => {
-    const v = mount(0)
-    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
-    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-
-    const at = v.state.selection.main.head
-    v.dispatch({ changes: { from: at, insert: 'green ' } })
-
-    expect(v.state.doc.toString()).toContain('| green apples | 3 |')
-  })
-
-  it('the caret can walk into the table from the line above', () => {
-    // Just before the table's first character.
-    const v = mount(DOC.indexOf('| Name') - 1)
-    expect(tableRendered(v)).toBe(true)
-
-    cursorCharRight(v)
-
-    expect(v.state.selection.main.head).toBeGreaterThanOrEqual(DOC.indexOf('| Name'))
-    expect(tableRendered(v)).toBe(false)
-  })
-
-  it('the caret can walk into the table from the line below', () => {
-    const tableEnd = DOC.indexOf('| apples | 3 |') + '| apples | 3 |'.length
-    const v = mount(tableEnd + 1)
-    cursorCharLeft(v)
-
-    expect(v.state.selection.main.head).toBeLessThanOrEqual(tableEnd)
-    expect(tableRendered(v)).toBe(false)
-  })
-
-  it('re-renders once the caret leaves the table again', () => {
-    const v = mount(DOC.indexOf('apples'))
-    expect(tableRendered(v)).toBe(false)
-
-    v.dispatch({ selection: { anchor: 0 } })
-
-    expect(tableRendered(v)).toBe(true)
-  })
-
-  it('reflects an edit in the re-rendered table', () => {
-    const v = mount(DOC.indexOf('apples'))
-    v.dispatch({ changes: { from: DOC.indexOf('apples'), insert: 'green ' } })
-    v.dispatch({ selection: { anchor: 0 } })
-
-    expect(tableRendered(v)).toBe(true)
-    expect(v.dom.querySelector('.notepad-table tbody td')?.textContent).toBe('green apples')
-  })
-})
+describe('editing a rendered table', editingRenderedTableTests)
 
 describe('writing a fenced code block', () => {
   it('keeps the fence and language visible as they are typed', () => {
@@ -162,3 +84,96 @@ describe('writing a fenced code block', () => {
     expect(v.dom.querySelector('.notepad-fence-hidden')).not.toBeNull()
   })
 })
+
+function editingRenderedTableTests() {
+  describe('clicking', editingRenderedTableClickingTests)
+  describe('typing', editingRenderedTableTypingTests)
+  describe('keyboard', editingRenderedTableKeyboardTests)
+  describe('leaving', editingRenderedTableLeavingTests)
+}
+
+function editingRenderedTableClickingTests() {
+  it('renders the table while the caret is elsewhere', () => {
+    expect(tableRendered(mount(0))).toBe(true)
+  })
+
+  it('clicking a body cell puts the caret in that cell', () => {
+    const v = mount(0)
+    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
+    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+
+    expect(v.state.selection.main.head).toBe(DOC.indexOf('apples'))
+  })
+
+  it('clicking a cell reveals the raw markdown so it can be typed into', () => {
+    const v = mount(0)
+    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
+    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+
+    expect(tableRendered(v)).toBe(false)
+    expect(v.dom.textContent).toContain('| apples | 3 |')
+  })
+
+  it('clicking a header cell puts the caret in the header source', () => {
+    const v = mount(0)
+    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table thead th')[1]
+    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+
+    expect(v.state.selection.main.head).toBe(DOC.indexOf('Count'))
+  })
+}
+
+function editingRenderedTableTypingTests() {
+  it('typing after a click edits the cell rather than the whole table', () => {
+    const v = mount(0)
+    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
+    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+
+    const at = v.state.selection.main.head
+    v.dispatch({ changes: { from: at, insert: 'green ' } })
+
+    expect(v.state.doc.toString()).toContain('| green apples | 3 |')
+  })
+}
+
+function editingRenderedTableKeyboardTests() {
+  it('the caret can walk into the table from the line above', () => {
+    // Just before the table's first character.
+    const v = mount(DOC.indexOf('| Name') - 1)
+    expect(tableRendered(v)).toBe(true)
+
+    cursorCharRight(v)
+
+    expect(v.state.selection.main.head).toBeGreaterThanOrEqual(DOC.indexOf('| Name'))
+    expect(tableRendered(v)).toBe(false)
+  })
+
+  it('the caret can walk into the table from the line below', () => {
+    const tableEnd = DOC.indexOf('| apples | 3 |') + '| apples | 3 |'.length
+    const v = mount(tableEnd + 1)
+    cursorCharLeft(v)
+
+    expect(v.state.selection.main.head).toBeLessThanOrEqual(tableEnd)
+    expect(tableRendered(v)).toBe(false)
+  })
+}
+
+function editingRenderedTableLeavingTests() {
+  it('re-renders once the caret leaves the table again', () => {
+    const v = mount(DOC.indexOf('apples'))
+    expect(tableRendered(v)).toBe(false)
+
+    v.dispatch({ selection: { anchor: 0 } })
+
+    expect(tableRendered(v)).toBe(true)
+  })
+
+  it('reflects an edit in the re-rendered table', () => {
+    const v = mount(DOC.indexOf('apples'))
+    v.dispatch({ changes: { from: DOC.indexOf('apples'), insert: 'green ' } })
+    v.dispatch({ selection: { anchor: 0 } })
+
+    expect(tableRendered(v)).toBe(true)
+    expect(v.dom.querySelector('.notepad-table tbody td')?.textContent).toBe('green apples')
+  })
+}

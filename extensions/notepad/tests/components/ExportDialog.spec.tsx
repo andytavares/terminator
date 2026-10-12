@@ -23,7 +23,9 @@ const dummyNote: NoteListItem = {
   bodyPreview: '',
 }
 
-describe('ExportDialog', () => {
+describe('ExportDialog', exportDialogTests)
+
+function exportDialogTests() {
   beforeEach(() => {
     mockInvoke.mockClear()
     useNotesStore.setState({
@@ -34,6 +36,15 @@ describe('ExportDialog', () => {
     })
   })
 
+  describe('the dialog', exportDialogDialogTests)
+  describe('picking a folder', exportDialogPickingFolderTests)
+  describe('scope', exportDialogScopeTests)
+  describe('options', exportDialogOptionsTests)
+  describe('export button', exportDialogExportButtonTests)
+  describe('running', exportDialogRunningTests)
+}
+
+function exportDialogDialogTests() {
   it('renders title "Export to markdown"', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.getByText('Export to markdown')).toBeDefined()
@@ -49,7 +60,9 @@ describe('ExportDialog', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.getByRole('button', { name: /choose folder|choose…/i })).toBeTruthy()
   })
+}
 
+function exportDialogPickingFolderTests() {
   it('folder Choose… button calls export.pickFolder IPC', async () => {
     mockInvoke.mockResolvedValueOnce({ data: '/Users/test/notes' })
     render(<ExportDialog onClose={vi.fn()} />)
@@ -67,7 +80,9 @@ describe('ExportDialog', () => {
       expect(screen.getByDisplayValue('/Users/test/notes')).toBeDefined()
     })
   })
+}
 
+function exportDialogScopeTests() {
   it('renders scope tab "All notes (0)" when no notes in store', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.getByText('All notes (0)')).toBeDefined()
@@ -93,7 +108,9 @@ describe('ExportDialog', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.queryByText('Selected (1)')).toBeNull()
   })
+}
 
+function exportDialogOptionsTests() {
   it('renders YAML frontmatter toggle', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.getByText(/Include YAML frontmatter/)).toBeDefined()
@@ -110,7 +127,9 @@ describe('ExportDialog', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.getByText(/Overwrite existing by id/)).toBeDefined()
   })
+}
 
+function exportDialogExportButtonTests() {
   it('Export button shows note count from store', () => {
     useNotesStore.setState({
       notes: [dummyNote, dummyNote],
@@ -128,7 +147,9 @@ describe('ExportDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
     expect(onClose).toHaveBeenCalled()
   })
+}
 
+function exportDialogRunningTests() {
   it('Export button calls export.run IPC', async () => {
     mockInvoke.mockResolvedValueOnce({ data: { exported: 1 } })
     render(<ExportDialog onClose={vi.fn()} />)
@@ -140,4 +161,4 @@ describe('ExportDialog', () => {
       )
     })
   })
-})
+}
