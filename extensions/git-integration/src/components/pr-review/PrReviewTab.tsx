@@ -81,15 +81,11 @@ export function PrReviewTab({ repoRoot }: Props) {
     reset,
     markPrInProgress,
     dismissPr,
+    setPaused,
     nextPrCursor,
     hasMorePrs,
     queueLoading,
     loadingMorePrs,
-    viewedFiles,
-    currentChapterId,
-    currentFilePath,
-    fileOrderOverrides,
-    scrollPosition,
   } = usePrReviewStore()
   const isPopoutWindow = new URLSearchParams(window.location.search).get('view') === 'pr-review'
   const [isPoppedOut, setIsPoppedOut] = useState(isPopoutWindow)
@@ -191,22 +187,11 @@ export function PrReviewTab({ repoRoot }: Props) {
     })
   }
 
-  const handleClosePr = async () => {
-    // Persist paused state synchronously before resetting, so mergeSessionStatuses
-    // on the next queue load reliably finds this session and shows it as paused.
+  const handleClosePr = () => {
+    // The store writes the whole session (notes, drafts, viewed marks included) before
+    // reset(), so mergeSessionStatuses on the next queue load finds it as paused.
     if (repoRoot && activePr) {
-      await githubAPI.sessionSet(sessionKey(repoRoot, activePr.number), {
-        repoRoot,
-        prNumber: activePr.number,
-        headSHA: activePr.headSHA,
-        currentChapterId,
-        currentFilePath,
-        viewedFiles: [...viewedFiles],
-        fileOrderOverrides,
-        scrollPosition,
-        pausedAt: new Date().toISOString(),
-        lastAccessedAt: new Date().toISOString(),
-      })
+      setPaused(repoRoot, activePr.number, activePr.headSHA, new Date().toISOString())
     }
     setShowOverview(false)
     setActiveQueuePr(null)
@@ -217,14 +202,14 @@ export function PrReviewTab({ repoRoot }: Props) {
     if (repoRoot) void loadQueue({ search: undefined })
   }
 
-  const handleApproved = async () => {
+  const handleApproved = () => {
     void window.electronAPI.extensionBridge.invoke('window:review-submitted', {})
     // The pop-out sits over the main window's review list, so closing it is the way back.
     if (isPopoutWindow) {
       window.close()
       return
     }
-    await handleClosePr()
+    handleClosePr()
   }
 
   const handleDismissPr = useCallback(
@@ -304,6 +289,7 @@ export function PrReviewTab({ repoRoot }: Props) {
   if (activePr && !showOverview) {
     return (
       <PrReviewView
+        key={activePr.number}
         repoRoot={repoRoot}
         pr={activePr}
         onClose={handleClosePr}
