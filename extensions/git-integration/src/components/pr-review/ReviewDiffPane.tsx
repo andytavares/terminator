@@ -9,6 +9,7 @@ import { CommentComposer } from './CommentComposer'
 import { AgentNote } from './AgentNote'
 import { SelectionBar } from './SelectionBar'
 import { MovedRow } from './MovedRow'
+import { SplitLineRow, UnifiedLineRow, type GutterChip, type Side } from './DiffLineRows'
 import { useShallow } from 'zustand/react/shallow'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useReviewUiStore, REVIEW_KEY_EVENTS } from '../../stores/review-ui.store'
@@ -18,7 +19,7 @@ import {
   classifyHunk,
   parseDiff,
 } from '../../github/pr-review-service'
-import { detectLanguage, highlight, buildSplitRows } from '../FileDiffView'
+import { detectLanguage, buildSplitRows } from '../FileDiffView'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
 import type { PrChangedFile, PrReviewDetail, Chapter, Thread } from '../../schemas/pr-review.schema'
 import type { DiffLine, FileDiff } from '../../schemas/git.schema'
@@ -55,21 +56,6 @@ type ContentResult = { content: string } | { tooLarge: true } | { error: string 
 interface CachedDiff {
   diff: FileDiff
   note: string | null
-}
-
-const HIGHLIGHT_CACHE_CAP = 20_000
-const highlightCache = new Map<string, string>()
-
-/** Highlighting is pure in (language, line); the pane re-renders on every hover and drag. */
-function highlightLine(content: string, lang: ReturnType<typeof detectLanguage>): string {
-  const key = `${lang}\u0000${content}`
-  let html = highlightCache.get(key)
-  if (html === undefined) {
-    html = highlight(content, lang)
-    if (highlightCache.size >= HIGHLIGHT_CACHE_CAP) highlightCache.clear()
-    highlightCache.set(key, html)
-  }
-  return html
 }
 
 const REWRITTEN_NOTE = 'History rewritten — showing the whole file'
@@ -702,15 +688,19 @@ export function ReviewDiffPane({
     [threadsForLine, commentVisibility]
   )
 
-  const findingsForLine = useCallback(
-    (lineNum: number, side: 'LEFT' | 'RIGHT') =>
+  const fileFindings = useMemo(
+    () =>
       agentRuns
         .filter((r) => r.status === 'done')
         .flatMap((r) => r.findings)
-        .filter(
-          (f) => !f.dismissed && f.path === file.path && f.side === side && f.endLine === lineNum
-        ),
+        .filter((f) => !f.dismissed && f.path === file.path),
     [agentRuns, file.path]
+  )
+
+  const findingsForLine = useCallback(
+    (lineNum: number, side: 'LEFT' | 'RIGHT') =>
+      fileFindings.filter((f) => f.side === side && f.endLine === lineNum),
+    [fileFindings]
   )
 
   const notesForLine = useCallback(
@@ -725,19 +715,23 @@ export function ReviewDiffPane({
     [drafts, file.path]
   )
 
-  const insightsChipForLine = useCallback(
-    (lineNum: number) => {
-      const fn = pr.insights?.complexity.functions.find(
-        (f) => f.path === file.path && f.line === lineNum && f.branchDelta > 0
-      )
-      if (!fn) return null
+  // One chip object per line, kept across renders so memoised rows see the same prop.
+  const chipsByLine = useMemo(() => {
+    const chips = new Map<number, GutterChip>()
+    for (const fn of pr.insights?.complexity.functions ?? []) {
+      if (fn.path !== file.path || fn.line == null || fn.branchDelta <= 0 || chips.has(fn.line)) {
+        continue
+      }
       const untested = pr.insights?.coverage.untestedFunctions.includes(fn.name)
-      return untested
-        ? { kind: 'danger' as const, label: 'untested' }
-        : { kind: 'warn' as const, label: `+${fn.branchDelta}` }
-    },
-    [pr.insights, file.path]
-  )
+      chips.set(
+        fn.line,
+        untested
+          ? { kind: 'danger', label: 'untested' }
+          : { kind: 'warn', label: `+${fn.branchDelta}` }
+      )
+    }
+    return chips
+  }, [pr.insights, file.path])
 
   // The gutter column is as wide as the widest chip it holds; a table squeezes
   // an unsized cell below its content, which let the chip overlap the code.
@@ -751,8 +745,12 @@ export function ReviewDiffPane({
     return widest === 0 ? 18 : 22 + widest * 7
   }, [pr.insights, file.path])
 
-  const hotspots = diff ? detectComplexityHotspots(diff) : []
-  const hotspotHunks = new Set(hotspots.map((h) => h.hunkIndex))
+  const hotspots = useMemo(() => (diff ? detectComplexityHotspots(diff) : []), [diff])
+  const hotspotHunks = useMemo(() => new Set(hotspots.map((h) => h.hunkIndex)), [hotspots])
+  const splitRowsByHunk = useMemo(
+    () => (diff?.hunks ?? []).map((hunk) => buildSplitRows(hunk.lines)),
+    [diff]
+  )
 
   const visibleHunks = useMemo(() => {
     if (!diff) return []
@@ -1112,88 +1110,29 @@ export function ReviewDiffPane({
       </tr>
     ) : null
 
-  const gutterPip = (lineNum: number, side: 'LEFT' | 'RIGHT') => {
-    const hiddenThreadCount =
-      commentVisibility === 'hidden' ? threadsForLine(lineNum, side).length : 0
-    const findings = !agentNotesOn ? findingsForLine(lineNum, side) : []
-    return (
-      <>
-        {hiddenThreadCount > 0 && (
-          <button
-            type="button"
-            className="rs-pip"
-            aria-label={`${hiddenThreadCount} hidden comments`}
-            onClick={() => setCommentVisibility('all')}
-          >
-            {hiddenThreadCount}
-          </button>
-        )}
-        {findings.length > 0 && (
-          <span className="rs-pip rs-pip--ag" aria-label={`${findings.length} agent notes`}>
-            {findings.length}
-          </span>
-        )}
-      </>
-    )
-  }
+  const showHiddenComments = useCallback(() => setCommentVisibility('all'), [setCommentVisibility])
+
+  /** What a memoised row shows for its line, as primitives so unchanged rows skip rendering. */
+  const rowProps = (lineNum: number, side: Side, expanded: boolean) => ({
+    expanded,
+    language: lang,
+    selected: isLineSelected(lineNum, side),
+    commented: isCommented(lineNum, side),
+    chip: side === 'RIGHT' ? (chipsByLine.get(lineNum) ?? null) : null,
+    hiddenThreadCount: commentVisibility === 'hidden' ? threadsForLine(lineNum, side).length : 0,
+    findingCount: agentNotesOn ? 0 : findingsForLine(lineNum, side).length,
+    gutterWidth,
+    onGutterMouseDown: handleGutterMouseDown,
+    onRowMouseEnter: handleRowMouseEnter,
+    onShowHiddenComments: showHiddenComments,
+  })
 
   const renderUnifiedLine = (line: DiffLine, expanded: boolean) => {
     const lineNum = line.newLineNumber ?? line.oldLineNumber ?? 0
-    const side: 'LEFT' | 'RIGHT' = line.type === 'remove' ? 'LEFT' : 'RIGHT'
+    const side: Side = line.type === 'remove' ? 'LEFT' : 'RIGHT'
     return (
       <>
-        <tr
-          className={`diff-line diff-line--${line.type}${expanded ? ' diff-line--expanded' : ''}${isLineSelected(lineNum, side) ? ' diff-line--selecting rs-line--selected' : ''}${isCommented(lineNum, side) ? ' diff-line--commented' : ''}`}
-          data-expanded={expanded ? 'true' : undefined}
-          data-new-line={line.newLineNumber ?? undefined}
-          data-old-line={line.oldLineNumber ?? undefined}
-          onMouseEnter={() => handleRowMouseEnter(lineNum, side)}
-        >
-          <td className="diff-line__old-num diff-line__num-gutter">
-            {line.oldLineNumber ?? ''}
-            {side === 'LEFT' && (
-              <button
-                className="diff-gutter-btn"
-                aria-label="Add comment"
-                onMouseDown={(e) => handleGutterMouseDown(e, lineNum, side)}
-              >
-                +
-              </button>
-            )}
-          </td>
-          <td className="diff-line__new-num diff-line__num-gutter">
-            {line.newLineNumber ?? ''}
-            {side === 'RIGHT' && (
-              <button
-                className="diff-gutter-btn"
-                aria-label="Add comment"
-                onMouseDown={(e) => handleGutterMouseDown(e, lineNum, side)}
-              >
-                +
-              </button>
-            )}
-          </td>
-          <td className="rs-gut" style={{ width: gutterWidth, minWidth: gutterWidth }}>
-            {side === 'RIGHT' && insightsChipForLine(lineNum) && (
-              <span
-                className={`rs-gutter-chip rs-gutter-chip--${insightsChipForLine(lineNum)!.kind}`}
-              >
-                {insightsChipForLine(lineNum)!.label}
-              </span>
-            )}
-            {gutterPip(lineNum, side)}
-          </td>
-          <td className="diff-line__prefix">
-            {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
-          </td>
-          <td className="diff-line__content">
-            <pre
-              dangerouslySetInnerHTML={{
-                __html: highlightLine(line.content, lang),
-              }}
-            />
-          </td>
-        </tr>
+        <UnifiedLineRow line={line} {...rowProps(lineNum, side, expanded)} />
         {renderSelectionExtras(lineNum, side)}
         {renderLineAnnotations(lineNum, side)}
       </>
@@ -1232,35 +1171,12 @@ export function ReviewDiffPane({
           >
             <tbody>
               {leftLine ? (
-                <tr
-                  className={`diff-line diff-line--${leftLine.type}${expanded ? ' diff-line--expanded' : ''}${isLineSelected(leftLineNum, 'LEFT') ? ' diff-line--selecting rs-line--selected' : ''}${isCommented(leftLineNum, 'LEFT') ? ' diff-line--commented' : ''}`}
-                  data-expanded={expanded ? 'true' : undefined}
-                  data-old-line={leftLine.oldLineNumber ?? undefined}
-                  onMouseEnter={() => handleRowMouseEnter(leftLineNum, 'LEFT')}
-                >
-                  <td
-                    className="diff-line__old-num diff-line__num-gutter"
-                    style={{ width: numColWidth, minWidth: numColWidth }}
-                  >
-                    {leftLine.oldLineNumber ?? ''}
-                    <button
-                      className="diff-gutter-btn"
-                      aria-label="Add comment"
-                      onMouseDown={(e) => handleGutterMouseDown(e, leftLineNum, 'LEFT')}
-                    >
-                      +
-                    </button>
-                    {gutterPip(leftLineNum, 'LEFT')}
-                  </td>
-                  <td className="diff-line__prefix">{leftLine.type === 'remove' ? '-' : ' '}</td>
-                  <td className="diff-line__content">
-                    <pre
-                      dangerouslySetInnerHTML={{
-                        __html: highlightLine(leftLine.content, lang),
-                      }}
-                    />
-                  </td>
-                </tr>
+                <SplitLineRow
+                  line={leftLine}
+                  side="LEFT"
+                  numColWidth={numColWidth}
+                  {...rowProps(leftLineNum, 'LEFT', expanded)}
+                />
               ) : (
                 <tr className="diff-line">
                   <td colSpan={3} className="diff-line__empty-cell" />
@@ -1275,44 +1191,12 @@ export function ReviewDiffPane({
           >
             <tbody>
               {rightLine ? (
-                <tr
-                  className={`diff-line diff-line--${rightLine.type}${expanded ? ' diff-line--expanded' : ''}${isLineSelected(rightLineNum, 'RIGHT') ? ' diff-line--selecting rs-line--selected' : ''}${isCommented(rightLineNum, 'RIGHT') ? ' diff-line--commented' : ''}`}
-                  data-expanded={expanded ? 'true' : undefined}
-                  data-new-line={rightLine.newLineNumber ?? undefined}
-                  onMouseEnter={() => handleRowMouseEnter(rightLineNum, 'RIGHT')}
-                >
-                  <td
-                    className="diff-line__new-num diff-line__num-gutter"
-                    style={{ width: numColWidth, minWidth: numColWidth }}
-                  >
-                    {rightLine.newLineNumber ?? ''}
-                    <button
-                      className="diff-gutter-btn"
-                      aria-label="Add comment"
-                      onMouseDown={(e) => handleGutterMouseDown(e, rightLineNum, 'RIGHT')}
-                    >
-                      +
-                    </button>
-                  </td>
-                  <td className="rs-gut" style={{ width: gutterWidth, minWidth: gutterWidth }}>
-                    {insightsChipForLine(rightLineNum) && (
-                      <span
-                        className={`rs-gutter-chip rs-gutter-chip--${insightsChipForLine(rightLineNum)!.kind}`}
-                      >
-                        {insightsChipForLine(rightLineNum)!.label}
-                      </span>
-                    )}
-                    {gutterPip(rightLineNum, 'RIGHT')}
-                  </td>
-                  <td className="diff-line__prefix">{rightLine.type === 'add' ? '+' : ' '}</td>
-                  <td className="diff-line__content">
-                    <pre
-                      dangerouslySetInnerHTML={{
-                        __html: highlightLine(rightLine.content, lang),
-                      }}
-                    />
-                  </td>
-                </tr>
+                <SplitLineRow
+                  line={rightLine}
+                  side="RIGHT"
+                  numColWidth={numColWidth}
+                  {...rowProps(rightLineNum, 'RIGHT', expanded)}
+                />
               ) : (
                 <tr className="diff-line">
                   <td colSpan={4} className="diff-line__empty-cell" />
@@ -1577,7 +1461,7 @@ export function ReviewDiffPane({
                         {testsButton(`hunk-${hi}`, hunkCode(hunk.lines), hunk.header)}
                       </div>
                     </div>
-                    {buildSplitRows(hunk.lines).map((row, ri) => {
+                    {splitRowsByHunk[hi].map((row, ri) => {
                       const leftLine = row.kind === 'context' ? row.line : row.oldLine
                       const rightLine = row.kind === 'context' ? row.line : row.newLine
                       const leftLineNum = leftLine?.oldLineNumber ?? 0

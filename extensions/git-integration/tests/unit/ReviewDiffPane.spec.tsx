@@ -3,10 +3,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 // The pane reads both stores through selectors; these resolve them against the state each test sets.
-const { prStoreMock, uiStoreMock, highlightSpy } = vi.hoisted(() => ({
+const { prStoreMock, uiStoreMock, highlightSpy, rowRenderSpy } = vi.hoisted(() => ({
   prStoreMock: vi.fn(),
   uiStoreMock: vi.fn(),
   highlightSpy: vi.fn(),
+  rowRenderSpy: vi.fn(),
 }))
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: (sel?: (s: unknown) => unknown) => {
@@ -28,6 +29,25 @@ vi.mock('../../src/components/FileDiffView', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/components/FileDiffView')>()
   highlightSpy.mockImplementation(actual.highlight)
   return { ...actual, highlight: highlightSpy }
+})
+// Counts renders inside each row's memo boundary, keeping the real component and its comparison.
+vi.mock('../../src/components/pr-review/DiffLineRows', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../src/components/pr-review/DiffLineRows')>()
+  const counted = <
+    P extends { line: { newLineNumber: number | null; oldLineNumber: number | null } },
+  >(
+    row: React.NamedExoticComponent<P> & { type?: (props: P) => React.ReactNode }
+  ) =>
+    React.memo((props: P) => {
+      rowRenderSpy(props.line.newLineNumber ?? props.line.oldLineNumber)
+      return row.type!(props)
+    })
+  return {
+    ...actual,
+    UnifiedLineRow: counted(actual.UnifiedLineRow),
+    SplitLineRow: counted(actual.SplitLineRow),
+  }
 })
 vi.mock('../../src/components/pr-review/ViewMenu', () => ({
   ViewMenu: ({ sinceNote }: { sinceNote?: string | null }) => (
@@ -1825,5 +1845,54 @@ describe('ReviewDiffPane — fetch and render cost', () => {
       String(c[0]).includes('highlightOnce')
     ).length
     expect(after).toBe(seen)
+  })
+
+  const longDiff = (count: number) => ({
+    path: 'src/foo.ts',
+    isBinary: false,
+    hunks: [
+      {
+        header: `@@ -1,${count} +1,${count} @@`,
+        lines: Array.from({ length: count }, (_, i) => ({
+          type: 'context' as const,
+          content: `const line${i + 1} = ${i + 1}`,
+          oldLineNumber: i + 1,
+          newLineNumber: i + 1,
+        })),
+      },
+    ],
+  })
+
+  it('a drag over the diff re-renders only the rows whose selection changed', async () => {
+    mockPrFileDiff.mockResolvedValue({ diff: longDiff(30) })
+    const { container } = await renderPane()
+    await screen.findByText('@@ -1,30 +1,30 @@')
+    const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
+    fireEvent.mouseDown(rows[0].querySelector('.diff-gutter-btn')!)
+    rowRenderSpy.mockClear()
+
+    fireEvent.mouseEnter(rows[1])
+    fireEvent.mouseEnter(rows[2])
+
+    expect(rowRenderSpy.mock.calls.map(([line]) => line)).toEqual([2, 3])
+  })
+
+  it('dragging the split divider re-renders no row', async () => {
+    uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), diffViewMode: 'split' })
+    mockPrFileDiff.mockResolvedValue({ diff: longDiff(30) })
+    const { container } = await renderPane()
+    await screen.findByText('@@ -1,30 +1,30 @@')
+    vi.spyOn(
+      container.querySelector('.review-diff-scroll')!,
+      'getBoundingClientRect'
+    ).mockReturnValue({ width: 400 } as DOMRect)
+    rowRenderSpy.mockClear()
+
+    fireEvent.mouseDown(container.querySelector('.diff-split-resize-handle')!, { clientX: 100 })
+    fireEvent.mouseMove(window, { clientX: 140 })
+    fireEvent.mouseUp(window)
+
+    expect(container.querySelector<HTMLElement>('.diff-table--left')!.style.width).toBe('60%')
+    expect(rowRenderSpy).not.toHaveBeenCalled()
   })
 })
