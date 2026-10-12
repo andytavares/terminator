@@ -113,6 +113,19 @@ export function sessionRecordOf(
   }
 }
 
+/**
+ * Put a real renderer store back in its initial state, with `overrides` on
+ * top. Its own actions and getters stay, so a spec sees what the store does;
+ * `overrides` replaces only what it names (an action that reaches the main
+ * process, say).
+ */
+export function resetStore<State extends object>(
+  store: Pick<StoreApi<State>, 'getInitialState' | 'setState'>,
+  overrides: Partial<State> = {}
+): void {
+  store.setState({ ...store.getInitialState(), ...overrides }, true)
+}
+
 /** A store's state with every function a `vi.fn()` of the same signature. */
 export type Seeded<State> = {
   [Key in keyof State]: State[Key] extends (...args: infer Args) => infer Result

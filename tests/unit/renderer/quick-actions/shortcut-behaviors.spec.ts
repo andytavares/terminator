@@ -1,22 +1,5 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-
-const sessions = new Map<string, TerminalSession>()
-const setActiveProject = vi.fn()
-const dispatchNotification = vi.fn()
-const requestFocus = vi.fn()
-const registry = {
-  setActiveGlobalTab: vi.fn(),
-  setActiveWorkspaceTab: vi.fn(),
-  setActiveProjectTab: vi.fn(),
-}
-
-vi.mock('../../../../src/renderer/extensions/registry', () => ({
-  useExtensionRegistry: { getState: () => registry },
-}))
-vi.mock('../../../../src/renderer/lib/notifications', () => ({
-  dispatchNotification: (...args: unknown[]) => dispatchNotification(...args),
-}))
-
 import {
   cycleMostRecentlyAttended,
   jumpToNextAwaitingInput,
@@ -25,71 +8,93 @@ import {
   clearTerminal,
   splitPane,
   closeFocusedPane,
+  type ClosePaneDeps,
 } from '../../../../src/renderer/quick-actions/shortcut-behaviors'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import type { TerminalSession } from '../../../../src/shared/types/index'
-import { seedStore, terminalSessionOf } from '../../../support/renderer-stores'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
+import { resetStore, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
 
-const input = vi.fn()
+// What reaches the main process: keystrokes for a terminal, and notifications.
+const input = vi.fn<ElectronAPI['terminal']['input']>()
+const createNotification = vi.fn<ElectronAPI['notifications']['create']>(async () => ({
+  id: 'n1',
+}))
+
+const sessions = () => useSessionStore.getState()
+const workspaces = () => useWorkspaceStore.getState()
+const registry = () => useExtensionRegistry.getState()
 
 function addSession(id: string, projectId: string, extra: Partial<TerminalSession> = {}): void {
-  sessions.set(id, terminalSessionOf({ id, projectId, ...extra }))
+  const all = new Map(sessions().sessions)
+  all.set(id, terminalSessionOf({ id, projectId, ...extra }))
+  useSessionStore.setState({ sessions: all })
 }
 
-function navDeps(activeId: string | null = null) {
-  return {
-    getActiveSessionForProject: vi.fn(() => activeId),
-    setActiveSessionForProject: vi.fn(),
-  }
-}
+/** The session the project shows, as the store holds it after a step. */
+const shownIn = (projectId: string) => sessions().getActiveSessionForProject(projectId)
 
 beforeEach(() => {
-  sessions.clear()
   vi.clearAllMocks()
-  seedStore(useSessionStore, { sessions, requestFocus })
-  seedStore(useWorkspaceStore, { setActiveProject })
-  ;(globalThis as unknown as { window: unknown }).window = globalThis
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = { terminal: { input } }
+  resetStore(useSessionStore)
+  resetStore(useWorkspaceStore)
+  resetStore(useExtensionRegistry, {
+    activeGlobalTabId: 'core.home',
+    activeWorkspaceTabId: 'reviews',
+    activeProjectTabId: 'git',
+  })
+  installElectronApi({
+    terminal: { input },
+    notifications: { create: createNotification },
+  })
 })
+
+function expectTabsLeft(): void {
+  expect(registry()).toMatchObject({
+    activeGlobalTabId: null,
+    activeWorkspaceTabId: null,
+    activeProjectTabId: null,
+  })
+}
 
 describe('cycleMostRecentlyAttended', () => {
   it('treats sessions never attended as oldest', () => {
     addSession('a', 'p1', { lastAttendedAt: 300 })
     addSession('b', 'p2')
     addSession('c', 'p1', { lastAttendedAt: 100 })
-    const deps = navDeps('a')
-    cycleMostRecentlyAttended('p1', 1, deps)
-    expect(deps.setActiveSessionForProject).toHaveBeenCalledWith('p1', 'c')
+    sessions().setActiveSessionForProject('p1', 'a')
+    cycleMostRecentlyAttended('p1', 1, sessions())
+    expect(shownIn('p1')).toBe('c')
   })
 
   it('starts from the most recent session when no project is active', () => {
     addSession('a', 'p1', { lastAttendedAt: 300 })
     addSession('b', 'p2', { lastAttendedAt: 200 })
-    const deps = navDeps()
-    cycleMostRecentlyAttended(null, 1, deps)
-    expect(setActiveProject).toHaveBeenCalledWith('p2')
-    expect(deps.setActiveSessionForProject).toHaveBeenCalledWith('p2', 'b')
-    expect(requestFocus).toHaveBeenCalledWith('b')
-    expect(registry.setActiveGlobalTab).toHaveBeenCalledWith(null)
-    expect(registry.setActiveWorkspaceTab).toHaveBeenCalledWith(null)
-    expect(registry.setActiveProjectTab).toHaveBeenCalledWith(null)
+    cycleMostRecentlyAttended(null, 1, sessions())
+    expect(workspaces().activeProjectId).toBe('p2')
+    expect(shownIn('p2')).toBe('b')
+    expect(sessions().focusRequest?.sessionId).toBe('b')
+    expectTabsLeft()
   })
 
   it('starts from the first session when the active one is not listed', () => {
     addSession('a', 'p1', { lastAttendedAt: 300 })
     addSession('b', 'p1', { lastAttendedAt: 200 })
-    const deps = navDeps('gone')
-    cycleMostRecentlyAttended('p1', -1, deps)
-    expect(deps.setActiveSessionForProject).toHaveBeenCalledWith('p1', 'b')
+    sessions().setActiveSessionForProject('p1', 'gone')
+    cycleMostRecentlyAttended('p1', -1, sessions())
+    expect(shownIn('p1')).toBe('b')
   })
 
   it('ignores closed sessions and does nothing with fewer than two', () => {
     addSession('a', 'p1', { lastAttendedAt: 300 })
     addSession('b', 'p1', { lastAttendedAt: 200, status: 'closed' })
-    const deps = navDeps('a')
-    cycleMostRecentlyAttended('p1', 1, deps)
-    expect(deps.setActiveSessionForProject).not.toHaveBeenCalled()
+    sessions().setActiveSessionForProject('p1', 'a')
+    cycleMostRecentlyAttended('p1', 1, sessions())
+    expect(shownIn('p1')).toBe('a')
+    expect(registry().activeGlobalTabId).toBe('core.home')
   })
 })
 
@@ -97,71 +102,65 @@ describe('jumpToNextAwaitingInput', () => {
   it('goes to the first waiting session when no project is active', () => {
     addSession('a', 'p1', { agentState: 'awaiting-input' })
     addSession('b', 'p2', { agentState: 'awaiting-input' })
-    const deps = navDeps()
-    jumpToNextAwaitingInput(null, deps)
-    expect(deps.setActiveSessionForProject).toHaveBeenCalledWith('p1', 'a')
+    jumpToNextAwaitingInput(null, sessions())
+    expect(workspaces().activeProjectId).toBe('p1')
+    expect(shownIn('p1')).toBe('a')
   })
 
   it('moves past the waiting session already shown', () => {
     addSession('a', 'p1', { agentState: 'awaiting-input' })
     addSession('b', 'p2', { agentState: 'awaiting-input' })
-    const deps = navDeps('a')
-    jumpToNextAwaitingInput('p1', deps)
-    expect(deps.setActiveSessionForProject).toHaveBeenCalledWith('p2', 'b')
+    sessions().setActiveSessionForProject('p1', 'a')
+    jumpToNextAwaitingInput('p1', sessions())
+    expect(workspaces().activeProjectId).toBe('p2')
+    expect(shownIn('p2')).toBe('b')
   })
 
   it('does nothing when nothing is waiting', () => {
     addSession('a', 'p1')
-    const deps = navDeps('a')
-    jumpToNextAwaitingInput('p1', deps)
-    expect(deps.setActiveSessionForProject).not.toHaveBeenCalled()
+    jumpToNextAwaitingInput('p1', sessions())
+    expect(workspaces().activeProjectId).toBeNull()
+    expect(sessions().focusRequest).toBeNull()
   })
 })
 
 describe('switchToWorkspace', () => {
+  beforeEach(() => {
+    installElectronApi({ project: { list: async () => ({ projects: [] }) } })
+    resetStore(useWorkspaceStore, {
+      workspaces: [workspaceOf({ id: 'w1' }), workspaceOf({ id: 'w2' })],
+    })
+  })
+
   it('switches to and expands the workspace at that position', () => {
-    const deps = {
-      workspaces: [{ id: 'w1' }, { id: 'w2' }],
-      setActiveWorkspace: vi.fn(),
-      setExpandedWorkspaceIds: vi.fn(),
-    }
-    switchToWorkspace(1, deps)
-    expect(deps.setActiveWorkspace).toHaveBeenCalledWith('w2')
-    expect(deps.setExpandedWorkspaceIds).toHaveBeenCalledWith(new Set(['w2']))
+    switchToWorkspace(1, workspaces())
+    expect(workspaces().activeWorkspaceId).toBe('w2')
+    expect(workspaces().expandedWorkspaceIds).toEqual(new Set(['w2']))
   })
 
   it('does nothing past the last workspace', () => {
-    const deps = {
-      workspaces: [{ id: 'w1' }],
-      setActiveWorkspace: vi.fn(),
-      setExpandedWorkspaceIds: vi.fn(),
-    }
-    switchToWorkspace(4, deps)
-    expect(deps.setActiveWorkspace).not.toHaveBeenCalled()
+    switchToWorkspace(4, workspaces())
+    expect(workspaces().activeWorkspaceId).toBeNull()
   })
 })
 
 describe('cycleTab', () => {
+  beforeEach(() => {
+    for (const id of ['s1', 's2', 's3']) addSession(id, 'p1')
+    sessions().setActiveSessionForProject('p1', 's1')
+  })
+
   it('wraps from the first tab back to the last', () => {
-    const deps = {
-      getSessionsForProject: () => [{ id: 's1' }, { id: 's2' }, { id: 's3' }],
-      getActiveSessionForProject: () => 's1',
-      setActiveSessionForProject: vi.fn(),
-    }
-    cycleTab('p1', -1, deps)
-    expect(deps.setActiveSessionForProject).toHaveBeenCalledWith('p1', 's3')
-    expect(requestFocus).toHaveBeenCalledWith('s3')
-    expect(registry.setActiveGlobalTab).toHaveBeenCalledWith(null)
+    cycleTab('p1', -1, sessions())
+    expect(shownIn('p1')).toBe('s3')
+    expect(sessions().focusRequest?.sessionId).toBe('s3')
+    expectTabsLeft()
   })
 
   it('does nothing on a project with no tabs', () => {
-    const deps = {
-      getSessionsForProject: () => [],
-      getActiveSessionForProject: () => null,
-      setActiveSessionForProject: vi.fn(),
-    }
-    cycleTab('p1', 1, deps)
-    expect(deps.setActiveSessionForProject).not.toHaveBeenCalled()
+    cycleTab('p2', 1, sessions())
+    expect(shownIn('p2')).toBeNull()
+    expect(registry().activeGlobalTabId).toBe('core.home')
   })
 })
 
@@ -188,7 +187,7 @@ describe('splitPane', () => {
   it('reports a failure that is not an Error with a stock message', async () => {
     splitPane('p1', 'vertical', { ...base, splitSession: () => Promise.reject('nope') })
     await vi.waitFor(() =>
-      expect(dispatchNotification).toHaveBeenCalledWith(
+      expect(createNotification).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'Could not create split pane' })
       )
     )
@@ -200,7 +199,7 @@ describe('splitPane', () => {
       splitSession: () => Promise.reject(new Error('no pty')),
     })
     await vi.waitFor(() =>
-      expect(dispatchNotification).toHaveBeenCalledWith(
+      expect(createNotification).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'no pty' })
       )
     )
@@ -208,7 +207,7 @@ describe('splitPane', () => {
 })
 
 describe('closeFocusedPane', () => {
-  function deps(overrides: Record<string, unknown> = {}) {
+  function deps(overrides: Partial<ClosePaneDeps> = {}): ClosePaneDeps {
     return {
       getPaneLayout: () => null,
       getFocusedSession: () => null,
@@ -228,7 +227,7 @@ describe('closeFocusedPane', () => {
     closeFocusedPane('p1', d)
     expect(d.closeSplitLeaf).toHaveBeenCalledWith('p1', 's2')
     await vi.waitFor(() =>
-      expect(dispatchNotification).toHaveBeenCalledWith(
+      expect(createNotification).toHaveBeenCalledWith(
         expect.objectContaining({ key: 'closeTerminalFailed' })
       )
     )
