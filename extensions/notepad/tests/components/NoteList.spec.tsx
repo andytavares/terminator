@@ -297,7 +297,12 @@ describe('NoteList drag to reorder', () => {
   beforeEach(() => {
     cleanup()
     mockInvoke.mockClear()
-    useNotesStore.setState({ notes: [note1, note2], selectedNoteId: null, archivedVisible: false })
+    useNotesStore.setState({
+      notes: [note1, note2],
+      folders: [],
+      selectedNoteId: null,
+      archivedVisible: false,
+    })
     useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 
@@ -319,5 +324,48 @@ describe('NoteList drag to reorder', () => {
         { id: 'n1', type: 'note' },
       ],
     })
+  })
+
+  it('moves a note dropped beside one in a folder into that folder', async () => {
+    useNotesStore.setState({
+      notes: [note1, { ...note2, folderId: 'f1' }],
+      folders: [{ id: 'f1', name: 'Work', sortOrder: 0, createdAt: '' }],
+    })
+    render(<NoteList />)
+    const row = (title: string) => screen.getByText(title).closest('button') as HTMLElement
+    const dataTransfer = { effectAllowed: '', dropEffect: '' }
+
+    fireEvent.dragStart(row('First Note'), { dataTransfer })
+    fireEvent.dragOver(row('Second Note'), { dataTransfer })
+    await act(async () => {
+      fireEvent.drop(row('Second Note'), { dataTransfer })
+    })
+
+    expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:folders.move', {
+      items: [{ id: 'n1', type: 'note' }],
+      folderId: 'f1',
+    })
+    expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:notes.reorder', {
+      items: [
+        { id: 'n2', type: 'note' },
+        { id: 'n1', type: 'note' },
+      ],
+    })
+  })
+
+  it('saves nothing for a drop with no row under the pointer', async () => {
+    render(<NoteList />)
+    const row = (title: string) => screen.getByText(title).closest('button') as HTMLElement
+    const dataTransfer = { effectAllowed: '', dropEffect: '' }
+
+    fireEvent.dragStart(row('First Note'), { dataTransfer })
+    await act(async () => {
+      fireEvent.drop(row('Second Note'), { dataTransfer })
+    })
+
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      'terminator.notepad:notes.reorder',
+      expect.anything()
+    )
   })
 })
