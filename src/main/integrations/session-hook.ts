@@ -2,6 +2,14 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { contextFilePath } from './agent-context.js'
 import { sessionContextDirectory } from './session-context.js'
+import {
+  putSessionStartHook,
+  readClaudeSettings,
+  runsCommandContaining,
+  shellQuote,
+  writeClaudeSettings,
+  type ClaudeSettingsFile,
+} from './claude-settings.js'
 
 // How an agent session comes to already know the issue.
 //
@@ -79,16 +87,6 @@ export async function installHookScript(directory: string): Promise<string> {
 
 // ── The owned block in the project's settings ────────────────────────────────
 
-interface SettingsFile {
-  hooks?: { SessionStart?: unknown[] } & Record<string, unknown>
-  [key: string]: unknown
-}
-
-interface HookEntry {
-  matcher?: string
-  hooks?: Array<{ type?: string; command?: string; timeout?: number }>
-}
-
 export interface HookCommandOptions {
   /** Electron's own binary, run in node mode. */
   execPath: string
@@ -106,41 +104,15 @@ export interface HookCommandOptions {
 export function hookCommand(options: HookCommandOptions): string {
   return [
     'ELECTRON_RUN_AS_NODE=1',
-    quote(options.execPath),
-    quote(options.hookScriptPath),
-    quote(contextFilePath(options.projectId)),
-    quote(sessionContextDirectory()),
+    shellQuote(options.execPath),
+    shellQuote(options.hookScriptPath),
+    shellQuote(contextFilePath(options.projectId)),
+    shellQuote(sessionContextDirectory()),
   ].join(' ')
-}
-
-/** Single-quoted for a POSIX shell, which is what runs this. */
-function quote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
 function settingsPath(projectDir: string): string {
   return path.join(projectDir, '.claude', 'settings.local.json')
-}
-
-/** Ours, and identifiable — so unlinking can remove exactly it and nothing else. */
-function isOurs(entry: unknown, hookScriptPath: string): boolean {
-  const hooks = (entry as HookEntry | null)?.hooks
-  if (!Array.isArray(hooks)) return false
-  return hooks.some((h) => typeof h?.command === 'string' && h.command.includes(hookScriptPath))
-}
-
-async function readSettings(projectDir: string): Promise<SettingsFile | null> {
-  try {
-    const parsed: unknown = JSON.parse(await fs.readFile(settingsPath(projectDir), 'utf8'))
-    return typeof parsed === 'object' && parsed !== null ? (parsed as SettingsFile) : {}
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
-    // Malformed is not missing: overwriting settings we cannot parse would
-    // destroy whatever the operator put there.
-    throw new Error(`Could not read ${settingsPath(projectDir)}: ${String(error)}`, {
-      cause: error,
-    })
-  }
 }
 
 /**
@@ -154,32 +126,7 @@ export async function installProjectHook(
   projectDir: string,
   options: HookCommandOptions
 ): Promise<void> {
-  const existing = await readSettings(projectDir)
-  const settings: SettingsFile = existing ?? {}
-  const hooks = (settings.hooks ?? {}) as NonNullable<SettingsFile['hooks']>
-  const sessionStart = Array.isArray(hooks.SessionStart) ? [...hooks.SessionStart] : []
-
-  const ours = {
-    matcher: '*',
-    hooks: [
-      {
-        type: 'command',
-        command: hookCommand(options),
-        // Seconds. Reading one small file; a hook that hung here would hold up
-        // every session start in the project.
-        timeout: 10,
-      },
-    ],
-  }
-
-  const index = sessionStart.findIndex((entry) => isOurs(entry, options.hookScriptPath))
-  if (index === -1) sessionStart.push(ours)
-  else sessionStart[index] = ours
-
-  settings.hooks = { ...hooks, SessionStart: sessionStart }
-
-  await fs.mkdir(path.join(projectDir, '.claude'), { recursive: true })
-  await fs.writeFile(settingsPath(projectDir), `${JSON.stringify(settings, null, 2)}\n`, 'utf8')
+  await putSessionStartHook(settingsPath(projectDir), options.hookScriptPath, hookCommand(options))
 }
 
 /**
@@ -190,20 +137,20 @@ export async function installProjectHook(
  * unchanged after detachment", and a leftover empty file fails that.
  */
 export async function removeProjectHook(projectDir: string, hookScriptPath: string): Promise<void> {
-  const settings = await readSettings(projectDir).catch(() => null)
+  const settings = await readClaudeSettings(settingsPath(projectDir)).catch(() => null)
   if (settings === null) return
 
   const hooks = settings.hooks
   const sessionStart = Array.isArray(hooks?.SessionStart) ? hooks.SessionStart : []
-  const remaining = sessionStart.filter((entry) => !isOurs(entry, hookScriptPath))
+  const remaining = sessionStart.filter((entry) => !runsCommandContaining(entry, hookScriptPath))
   if (remaining.length === sessionStart.length && sessionStart.length > 0) return
 
   const nextHooks: Record<string, unknown> = { ...hooks }
   if (remaining.length > 0) nextHooks.SessionStart = remaining
   else delete nextHooks.SessionStart
 
-  const next: SettingsFile = { ...settings }
-  if (Object.keys(nextHooks).length > 0) next.hooks = nextHooks as SettingsFile['hooks']
+  const next: ClaudeSettingsFile = { ...settings }
+  if (Object.keys(nextHooks).length > 0) next.hooks = nextHooks as ClaudeSettingsFile['hooks']
   else delete next.hooks
 
   if (Object.keys(next).length === 0) {
@@ -212,5 +159,5 @@ export async function removeProjectHook(projectDir: string, hookScriptPath: stri
     await fs.rmdir(path.join(projectDir, '.claude')).catch(() => {})
     return
   }
-  await fs.writeFile(settingsPath(projectDir), `${JSON.stringify(next, null, 2)}\n`, 'utf8')
+  await writeClaudeSettings(settingsPath(projectDir), next)
 }
