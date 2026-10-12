@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useEditorStore } from '../../../src/stores/editor.store'
 
-describe('editor.store', () => {
+describe('editor.store', editorStoreTests)
+
+function editorStoreTests() {
   beforeEach(() => {
     useEditorStore.setState({
       activeNoteId: null,
@@ -12,6 +14,12 @@ describe('editor.store', () => {
     })
   })
 
+  describe('active note', editorStoreActiveNoteTests)
+  describe('save status', editorStoreSaveStatusTests)
+  describe('preview mode', editorStorePreviewModeTests)
+}
+
+function editorStoreActiveNoteTests() {
   it('starts with no active note', () => {
     expect(useEditorStore.getState().activeNoteId).toBeNull()
     expect(useEditorStore.getState().isDirty).toBe(false)
@@ -26,7 +34,9 @@ describe('editor.store', () => {
     expect(s.isDirty).toBe(false)
     expect(s.saveStatus).toBe('idle')
   })
+}
 
+function editorStoreSaveStatusTests() {
   it('markDirty sets isDirty true and updates bodyDraft', () => {
     useEditorStore.getState().markDirty('new content')
     expect(useEditorStore.getState().isDirty).toBe(true)
@@ -45,7 +55,9 @@ describe('editor.store', () => {
     expect(s.saveStatus).toBe('saved')
     expect(s.isDirty).toBe(false)
   })
+}
 
+function editorStorePreviewModeTests() {
   it('togglePreviewMode flips previewMode', () => {
     expect(useEditorStore.getState().previewMode).toBe(true)
     useEditorStore.getState().togglePreviewMode()
@@ -53,4 +65,4 @@ describe('editor.store', () => {
     useEditorStore.getState().togglePreviewMode()
     expect(useEditorStore.getState().previewMode).toBe(true)
   })
-})
+}
