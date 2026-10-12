@@ -3,8 +3,8 @@ import type { ExtensionDB } from '@terminator/extension-sdk'
 
 export { randomUUID }
 
-export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
-  await db.exec(`
+// Folders, notes and their tags.
+const NOTE_SCHEMA = `
     CREATE TABLE IF NOT EXISTS folders (
       id         TEXT PRIMARY KEY,
       name       TEXT NOT NULL,
@@ -32,9 +32,10 @@ export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
       note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
       tag_id  TEXT NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,
       PRIMARY KEY (note_id, tag_id)
-    );
+    );`
 
-    CREATE TABLE IF NOT EXISTS comments (
+// Note comments, and the extension's settings.
+const COMMENT_SCHEMA = `    CREATE TABLE IF NOT EXISTS comments (
       id           TEXT PRIMARY KEY,
       note_id      TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
       parent_id    TEXT REFERENCES comments(id) ON DELETE CASCADE,
@@ -56,9 +57,10 @@ export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
       key          TEXT NOT NULL,
       value        TEXT NOT NULL,
       PRIMARY KEY (extension_id, key)
-    );
+    );`
 
-    CREATE TABLE IF NOT EXISTS diagrams (
+// Diagrams, their tags and their comments.
+const DIAGRAM_SCHEMA = `    CREATE TABLE IF NOT EXISTS diagrams (
       id          TEXT PRIMARY KEY,
       title       TEXT NOT NULL DEFAULT 'Untitled diagram',
       scene_json  TEXT NOT NULL DEFAULT '{}',
@@ -88,5 +90,8 @@ export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_diagram_comments_diagram ON diagram_comments(diagram_id, status);
-  `)
+`
+
+export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
+  await db.exec(NOTE_SCHEMA + '\n\n' + COMMENT_SCHEMA + '\n\n' + DIAGRAM_SCHEMA)
 }

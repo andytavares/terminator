@@ -17,11 +17,14 @@ type SearchRow = {
   tags: string | null
 }
 
-function parseTagFilters(query: string): {
+/** A query's free text, and the tags it requires and excludes. */
+interface TagFilters {
   textQuery: string
   includeTags: string[]
   excludeTags: string[]
-} {
+}
+
+function parseTagFilters(query: string): TagFilters {
   const includeTags: string[] = []
   const excludeTags: string[] = []
 
@@ -40,35 +43,40 @@ function parseTagFilters(query: string): {
 }
 
 function makeSnippet(body: string, query: string): string {
-  if (!query) return escapeHtml(body.slice(0, 120))
+  const words = snippetWords(query)
+  if (words.length === 0) return escapeHtml(body.slice(0, 120))
 
-  const words = query
+  const start = snippetStart(body, words)
+  const end = Math.min(body.length, start + 160)
+  const prefix = start > 0 ? '…' : ''
+  const suffix = end < body.length ? '…' : ''
+
+  let marked = escapeHtml(body.slice(start, end))
+  for (const word of words) {
+    marked = marked.replace(new RegExp(`(${escapeRegex(word)})`, 'gi'), '<mark>$1</mark>')
+  }
+
+  return `${prefix}${marked}${suffix}`
+}
+
+/** The lower-cased words of a query, without the FTS operators `*` and `"`. */
+function snippetWords(query: string): string[] {
+  return query
     .replace(/[*"]/g, '')
     .split(/\s+/)
     .filter(Boolean)
     .map((w) => w.toLowerCase())
+}
 
-  if (words.length === 0) return escapeHtml(body.slice(0, 120))
-
+/** Where the snippet starts: shortly before the earliest matched word, or at the top. */
+function snippetStart(body: string, words: string[]): number {
   const bodyLower = body.toLowerCase()
   let anchorIdx = -1
   for (const word of words) {
     const idx = bodyLower.indexOf(word)
     if (idx !== -1 && (anchorIdx === -1 || idx < anchorIdx)) anchorIdx = idx
   }
-
-  const start = anchorIdx === -1 ? 0 : Math.max(0, anchorIdx - 40)
-  const end = Math.min(body.length, start + 160)
-  const prefix = start > 0 ? '…' : ''
-  const suffix = end < body.length ? '…' : ''
-  const slice = body.slice(start, end)
-
-  let marked = escapeHtml(slice)
-  for (const word of words) {
-    marked = marked.replace(new RegExp(`(${escapeRegex(word)})`, 'gi'), '<mark>$1</mark>')
-  }
-
-  return `${prefix}${marked}${suffix}`
+  return anchorIdx === -1 ? 0 : Math.max(0, anchorIdx - 40)
 }
 
 function escapeHtml(s: string): string {
@@ -83,51 +91,25 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/** The SQL fragments and parameters a search query filters by. */
+interface SearchSql {
+  joinClauses: string[]
+  joinParams: unknown[]
+  whereConditions: string[]
+  whereParams: unknown[]
+}
+
 export async function searchNotes(
   db: ExtensionDB,
   args: z.infer<typeof searchSchema>
 ): Promise<{ data: SearchResult[] } | { error: string }> {
   const { query, includeArchived = false } = args
-  const { textQuery, includeTags, excludeTags } = parseTagFilters(query)
+  const filters = parseTagFilters(query)
+  const sql = searchSql(filters, includeArchived)
 
-  const joinParams: unknown[] = []
-  const whereParams: unknown[] = []
-  const whereConditions: string[] = []
-
-  const joinClauses: string[] = [
-    `LEFT JOIN note_tags nt_all ON nt_all.note_id = n.id`,
-    `LEFT JOIN tags t_all ON t_all.id = nt_all.tag_id`,
-  ]
-
-  if (!includeArchived) {
-    whereConditions.push('n.archived_at IS NULL')
-  }
-
-  if (textQuery) {
-    // LIKE replaces FTS5 and is case-insensitive for ASCII only (ADR-019, ADR-099); full scan on large sets.
-    whereConditions.push(`(n.title LIKE ? OR n.body LIKE ?)`)
-    whereParams.push(`%${textQuery}%`, `%${textQuery}%`)
-  }
-
-  for (let i = 0; i < includeTags.length; i++) {
-    const na = `nt_inc${i}`
-    const ta = `t_inc${i}`
-    joinClauses.push(
-      `JOIN note_tags ${na} ON ${na}.note_id = n.id`,
-      `JOIN tags ${ta} ON ${ta}.id = ${na}.tag_id AND LOWER(${ta}.name) = ?`
-    )
-    joinParams.push(includeTags[i])
-  }
-
-  for (const tag of excludeTags) {
-    whereConditions.push(
-      `NOT EXISTS (SELECT 1 FROM note_tags nx JOIN tags tx ON nx.tag_id = tx.id WHERE nx.note_id = n.id AND LOWER(tx.name) = ?)`
-    )
-    whereParams.push(tag)
-  }
-
-  const joinSql = joinClauses.join('\n           ')
-  const whereSql = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
+  const joinSql = sql.joinClauses.join('\n           ')
+  const whereSql =
+    sql.whereConditions.length > 0 ? `WHERE ${sql.whereConditions.join(' AND ')}` : ''
 
   const rows = await db.query<SearchRow>(
     `SELECT n.id, n.title, n.body, n.updated_at, n.archived_at,
@@ -137,19 +119,58 @@ export async function searchNotes(
      ${whereSql}
      GROUP BY n.id, n.title, n.body, n.updated_at, n.archived_at
      ORDER BY n.updated_at DESC`,
-    [...joinParams, ...whereParams]
+    [...sql.joinParams, ...sql.whereParams]
   )
 
-  const data: SearchResult[] = rows.map((r) => ({
+  return { data: rows.map((r) => toSearchResult(r, filters.textQuery)) }
+}
+
+function searchSql(filters: TagFilters, includeArchived: boolean): SearchSql {
+  const { textQuery, includeTags, excludeTags } = filters
+  const sql: SearchSql = {
+    joinClauses: [
+      `LEFT JOIN note_tags nt_all ON nt_all.note_id = n.id`,
+      `LEFT JOIN tags t_all ON t_all.id = nt_all.tag_id`,
+    ],
+    joinParams: [],
+    whereConditions: includeArchived ? [] : ['n.archived_at IS NULL'],
+    whereParams: [],
+  }
+  if (textQuery) {
+    // LIKE replaces FTS5 and is case-insensitive for ASCII only (ADR-019, ADR-099); full scan on large sets.
+    sql.whereConditions.push(`(n.title LIKE ? OR n.body LIKE ?)`)
+    sql.whereParams.push(`%${textQuery}%`, `%${textQuery}%`)
+  }
+  includeTags.forEach((tag, i) => joinIncludedTag(sql, tag, i))
+  for (const tag of excludeTags) {
+    sql.whereConditions.push(
+      `NOT EXISTS (SELECT 1 FROM note_tags nx JOIN tags tx ON nx.tag_id = tx.id WHERE nx.note_id = n.id AND LOWER(tx.name) = ?)`
+    )
+    sql.whereParams.push(tag)
+  }
+  return sql
+}
+
+/** Each required tag joins its own aliases, so a note must carry all of them. */
+function joinIncludedTag(sql: SearchSql, tag: string, i: number): void {
+  const na = `nt_inc${i}`
+  const ta = `t_inc${i}`
+  sql.joinClauses.push(
+    `JOIN note_tags ${na} ON ${na}.note_id = n.id`,
+    `JOIN tags ${ta} ON ${ta}.id = ${na}.tag_id AND LOWER(${ta}.name) = ?`
+  )
+  sql.joinParams.push(tag)
+}
+
+function toSearchResult(r: SearchRow, textQuery: string): SearchResult {
+  return {
     id: r.id,
     title: r.title,
     snippet: makeSnippet(r.body, textQuery),
     tags: r.tags ? r.tags.split(',').filter(Boolean) : [],
     updatedAt: r.updated_at,
     archivedAt: r.archived_at,
-  }))
-
-  return { data }
+  }
 }
 
 export function registerSearchIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {

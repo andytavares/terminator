@@ -75,6 +75,28 @@ const ListNotesPayload = z
   })
   .default({})
 
+type NoteListRow = {
+  id: string
+  title: string
+  updated_at: string
+  created_at: string
+  archived_at: string | null
+  body: string
+  tags: string
+  sort_order: number
+  folder_id: string | null
+}
+
+type NoteRow = {
+  id: string
+  title: string
+  body: string
+  created_at: string
+  updated_at: string
+  archived_at: string | null
+  tags: string
+}
+
 export async function listNotes(
   db: ExtensionDB,
   args: z.infer<typeof ListNotesPayload>
@@ -85,21 +107,9 @@ export async function listNotes(
   const tagFilter = tagId
     ? 'AND EXISTS (SELECT 1 FROM note_tags nt WHERE nt.note_id = n.id AND nt.tag_id = ?)'
     : ''
-  const orderCol = ['title', 'created_at', 'updated_at'].includes(sortBy) ? sortBy : 'updated_at'
-  const orderDir = sortDir === 'asc' ? 'ASC' : 'DESC'
   const params: unknown[] = tagId ? [tagId] : []
 
-  const rows = await db.query<{
-    id: string
-    title: string
-    updated_at: string
-    created_at: string
-    archived_at: string | null
-    body: string
-    tags: string
-    sort_order: number
-    folder_id: string | null
-  }>(
+  const rows = await db.query<NoteListRow>(
     `SELECT n.id, n.title, n.updated_at, n.created_at, n.archived_at,
             n.body,
             COALESCE(n.sort_order, 0) AS sort_order,
@@ -111,38 +121,47 @@ export async function listNotes(
             ), '') AS tags
      FROM notes n
      WHERE 1=1 ${tagFilter} ${archivedFilter}
-     ORDER BY COALESCE(n.sort_order, 0) ASC, n.${orderCol} ${orderDir}`,
+     ORDER BY COALESCE(n.sort_order, 0) ASC, ${noteListOrder(sortBy, sortDir)}`,
     params
   )
+  return { data: rows.map(toNoteListItem) }
+}
 
-  const data = rows.map((r) => ({
+const NOTE_SORT_COLUMNS = ['title', 'created_at', 'updated_at']
+
+/** An unknown column sorts by last update; any direction but ascending is descending. */
+function noteListOrder(sortBy: string, sortDir: string): string {
+  let orderCol = 'updated_at'
+  if (NOTE_SORT_COLUMNS.includes(sortBy)) orderCol = sortBy
+  if (sortDir === 'asc') return `n.${orderCol} ASC`
+  return `n.${orderCol} DESC`
+}
+
+function toNoteListItem(r: NoteListRow) {
+  return {
     id: r.id,
     title: r.title,
     updatedAt: r.updated_at,
     createdAt: r.created_at,
     archivedAt: r.archived_at,
-    tags: r.tags ? r.tags.split(',').filter(Boolean) : [],
+    tags: splitTagNames(r.tags),
     bodyPreview: r.body.slice(0, 120),
     sortOrder: r.sort_order ?? 0,
     folderId: r.folder_id ?? null,
-  }))
+  }
+}
 
-  return { data }
+/** The comma-joined tag names a GROUP_CONCAT produced, as a list. */
+function splitTagNames(tags: string): string[] {
+  if (!tags) return []
+  return tags.split(',').filter(Boolean)
 }
 
 export async function getNote(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const row = await db.get<{
-    id: string
-    title: string
-    body: string
-    created_at: string
-    updated_at: string
-    archived_at: string | null
-    tags: string
-  }>(
+  const row = await db.get<NoteRow>(
     `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at,
             COALESCE((
               SELECT GROUP_CONCAT(t.name, ',')
@@ -152,9 +171,7 @@ export async function getNote(
      FROM notes n WHERE n.id=?`,
     [args.id]
   )
-
   if (!row) return { error: 'NOTE_NOT_FOUND' }
-
   return {
     data: {
       id: row.id,
@@ -163,7 +180,7 @@ export async function getNote(
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       archivedAt: row.archived_at,
-      tags: row.tags ? row.tags.split(',').filter(Boolean) : [],
+      tags: splitTagNames(row.tags),
     },
   }
 }
@@ -181,10 +198,12 @@ const AutosaveNotePayload = z.object({
 /** Push channel announcing a saved note body to every open notepad surface. */
 export const NOTES_CHANGED_CHANNEL = 'terminator.notepad:notes.changed'
 
+type NotesBroadcast = (channel: string, data: unknown) => void
+
 export async function autosaveNote(
   db: ExtensionDB,
   args: z.infer<typeof AutosaveNotePayload>,
-  broadcast?: (channel: string, data: unknown) => void
+  broadcast?: NotesBroadcast
 ): Promise<Record<string, unknown>> {
   const { id, title, body, tags, originId } = args
   const now = new Date().toISOString()
@@ -194,31 +213,35 @@ export async function autosaveNote(
 
   // Parse inline #tags from body and merge with explicit tags array
   const inlineTags = Array.from(body.matchAll(/#([a-z0-9_-]+)/gi), (m) => m[1])
-  const mergedTags = Array.from(new Set([...tags, ...inlineTags]))
-
-  await db.transaction(async (tx) => {
-    await tx.run('UPDATE notes SET title=?, body=?, updated_at=? WHERE id=?', [
-      title,
-      body,
-      now,
-      id,
-    ])
-    await reconcileTags(tx, id, mergedTags)
-  })
+  const saved = { id, title, body, tags: Array.from(new Set([...tags, ...inlineTags])) }
+  await writeNote(db, saved, now)
 
   // The docked panel and a popped-out note window are separate renderers with
   // separate in-memory body caches. Without this push each keeps serving (and
   // re-saving) its own stale copy, so the same note shows different content.
-  broadcast?.(NOTES_CHANGED_CHANNEL, {
-    id,
-    title,
-    body,
-    tags: mergedTags,
-    updatedAt: now,
-    originId: originId ?? null,
-  })
+  broadcast?.(NOTES_CHANGED_CHANNEL, { ...saved, updatedAt: now, originId: originId ?? null })
 
   return { data: { updatedAt: now } }
+}
+
+/** A note's saved title, body and complete tag list. */
+interface NoteWrite {
+  id: string
+  title: string
+  body: string
+  tags: string[]
+}
+
+async function writeNote(db: ExtensionDB, note: NoteWrite, now: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.run('UPDATE notes SET title=?, body=?, updated_at=? WHERE id=?', [
+      note.title,
+      note.body,
+      now,
+      note.id,
+    ])
+    await reconcileTags(tx, note.id, note.tags)
+  })
 }
 
 export async function archiveNote(

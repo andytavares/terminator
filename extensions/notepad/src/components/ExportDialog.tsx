@@ -1,9 +1,60 @@
 import React, { useState, useCallback } from 'react'
 import { Button, Dialog } from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
+import type { NoteListItem } from '../db/types'
 
 type ExportScope = 'all' | 'note'
 type CommentFormat = 'sidecar' | 'inline' | 'both'
+
+/** What the dialog exports, and how. */
+interface ExportOptions {
+  folder: string
+  scope: ExportScope
+  includeFrontmatter: boolean
+  commentFormat: CommentFormat
+  overwriteById: boolean
+  includeDiagrams: boolean
+}
+
+interface ExportResult {
+  notes: number
+  diagrams: number
+  time: string
+}
+
+type OptionsUpdate = (patch: Partial<ExportOptions>) => void
+
+interface ExportDialogProps {
+  onClose: () => void
+  noteId?: string
+}
+
+interface OptionFieldProps {
+  options: ExportOptions
+  update: OptionsUpdate
+}
+
+interface ToggleRowProps {
+  label: string
+  description: string
+  checked: boolean
+  onToggle: () => void
+}
+
+const DEFAULT_OPTIONS: ExportOptions = {
+  folder: '~/Documents/Terminator Notes',
+  scope: 'all',
+  includeFrontmatter: true,
+  commentFormat: 'sidecar',
+  overwriteById: true,
+  includeDiagrams: true,
+}
+
+const COMMENT_FORMAT_LABELS: Record<CommentFormat, string> = {
+  sidecar: 'Sidecar JSON',
+  inline: 'Inline HTML',
+  both: 'Both',
+}
 
 function previewSlug(title: string, id: string): string {
   return (
@@ -18,84 +69,32 @@ function previewSlug(title: string, id: string): string {
   )
 }
 
-interface ExportDialogProps {
-  onClose: () => void
-  noteId?: string
+function segmentClass(active: boolean): string {
+  return `notepad-segmented__btn${active ? ' notepad-segmented__btn--active' : ''}`
+}
+
+function noteCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'note' : 'notes'}`
+}
+
+/** How many notes and diagrams the chosen scope exports. */
+function useExportCounts(options: ExportOptions) {
+  const { notes, diagrams } = useNotesStore()
+  const scopeCount = options.scope === 'all' ? notes.filter((n) => !n.archivedAt).length : 1
+  const exportsDiagrams = options.scope === 'all' && options.includeDiagrams
+  const diagramCount = exportsDiagrams ? diagrams.filter((d) => !d.archivedAt).length : 0
+  return { scopeCount, diagramCount }
 }
 
 export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.Element {
-  const { notes, diagrams } = useNotesStore()
+  const { notes } = useNotesStore()
   const previewNote = noteId ? notes.find((n) => n.id === noteId) : notes[0]
-  const [folder, setFolder] = useState('~/Documents/Terminator Notes')
-  const [scope, setScope] = useState<ExportScope>('all')
-  const [includeFrontmatter, setIncludeFrontmatter] = useState(true)
-  const [commentFormat, setCommentFormat] = useState<CommentFormat>('sidecar')
-  const [overwriteById, setOverwriteById] = useState(true)
-  const [includeDiagrams, setIncludeDiagrams] = useState(true)
-  const [running, setRunning] = useState(false)
-  const [exportResult, setExportResult] = useState<{
-    notes: number
-    diagrams: number
-    time: string
-  } | null>(null)
+  const [options, setOptions] = useState<ExportOptions>(DEFAULT_OPTIONS)
+  const update: OptionsUpdate = (patch) => setOptions((previous) => ({ ...previous, ...patch }))
+  const { running, exportResult, handleExport } = useExportRun(options, noteId)
 
-  const activeDiagrams = diagrams.filter((d) => !d.archivedAt)
-  const scopeCount = scope === 'all' ? notes.filter((n) => !n.archivedAt).length : 1
-  const diagramCount = scope === 'all' && includeDiagrams ? activeDiagrams.length : 0
-
-  const pickFolder = useCallback(async () => {
-    const result = await window.electronAPI.extensionBridge.invoke(
-      'terminator.notepad:export.pickFolder',
-      {}
-    )
-    const data = (result as { data: string | null }).data
-    if (data) setFolder(data)
-  }, [])
-
-  const handleExport = useCallback(async () => {
-    if (!folder || running) return
-    if (scope === 'note' && !noteId) return
-    setRunning(true)
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:export.run',
-        {
-          folder,
-          scope,
-          ...(scope === 'note' && noteId ? { noteId } : {}),
-          includeFrontmatter,
-          commentFormat,
-          overwriteById,
-          includeDiagrams: scope === 'all' ? includeDiagrams : false,
-        }
-      )
-      const data = (result as { data?: { exported: number; diagrams: number } }).data
-      const now = new Date()
-      const time = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`
-      setExportResult({ notes: data?.exported ?? 0, diagrams: data?.diagrams ?? 0, time })
-    } finally {
-      setRunning(false)
-    }
-  }, [
-    folder,
-    scope,
-    noteId,
-    running,
-    includeFrontmatter,
-    commentFormat,
-    overwriteById,
-    includeDiagrams,
-  ])
-
-  const commentFormatLabels: Record<CommentFormat, string> = {
-    sidecar: 'Sidecar JSON',
-    inline: 'Inline HTML',
-    both: 'Both',
-  }
-
-  const exportLabel = running
-    ? 'Exporting…'
-    : `Export ${scopeCount} ${scopeCount === 1 ? 'note' : 'notes'}`
+  const { scopeCount, diagramCount } = useExportCounts(options)
+  const exportLabel = running ? 'Exporting…' : `Export ${noteCountLabel(scopeCount)}`
 
   return (
     <Dialog
@@ -103,142 +102,216 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
       onDismiss={onClose}
       actions={[
         { label: 'Cancel', onSelect: onClose },
-        {
-          label: exportLabel,
-          tone: 'primary',
-          onSelect: () => {
-            if (folder && !running) void handleExport()
-          },
-        },
+        { label: exportLabel, tone: 'primary', onSelect: () => void handleExport() },
       ]}
     >
       <div className="notepad-export-dialog__body">
-        {/* Destination folder */}
-        <div className="notepad-export-dialog__field">
-          <div className="notepad-export-dialog__field-label">Destination folder</div>
-          <div className="notepad-export-dialog__folder-row">
-            <input
-              className="notepad-export-dialog__folder-input"
-              value={folder}
-              onChange={(e) => setFolder(e.target.value)}
-              spellCheck={false}
-              aria-label="Destination folder"
-            />
-            <Button onClick={() => void pickFolder()} aria-label="Choose folder">
-              Choose…
-            </Button>
-          </div>
-        </div>
-
-        {/* Scope */}
-        <div className="notepad-export-dialog__field">
-          <div className="notepad-export-dialog__field-label">Scope</div>
-          <div className="notepad-segmented notepad-export-dialog__scope-tabs">
-            <button
-              className={`notepad-segmented__btn${scope === 'all' ? ' notepad-segmented__btn--active' : ''}`}
-              onClick={() => setScope('all')}
-            >
-              All notes ({notes.filter((n) => !n.archivedAt).length})
-            </button>
-            {noteId && (
-              <button
-                className={`notepad-segmented__btn${scope === 'note' ? ' notepad-segmented__btn--active' : ''}`}
-                onClick={() => setScope('note')}
-              >
-                Selected (1)
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Include diagrams */}
-        {scope === 'all' && (
-          <div className="notepad-export-dialog__toggle-row">
-            <span>
-              Include diagrams{' '}
-              <span className="notepad-export-dialog__toggle-desc">
-                (saved as .excalidraw files in diagrams/)
-              </span>
-            </span>
-            <button
-              className={`notepad-toggle${includeDiagrams ? ' notepad-toggle--on' : ''}`}
-              onClick={() => setIncludeDiagrams((v) => !v)}
-              role="switch"
-              aria-checked={includeDiagrams}
-              aria-label="Include diagrams"
-            />
-          </div>
-        )}
-
-        {/* YAML frontmatter toggle */}
-        <div className="notepad-export-dialog__toggle-row">
-          <span>
-            Include YAML frontmatter{' '}
-            <span className="notepad-export-dialog__toggle-desc">(id, title, tags, dates)</span>
-          </span>
-          <button
-            className={`notepad-toggle${includeFrontmatter ? ' notepad-toggle--on' : ''}`}
-            onClick={() => setIncludeFrontmatter((v) => !v)}
-            role="switch"
-            aria-checked={includeFrontmatter}
-            aria-label="Include YAML frontmatter"
-          />
-        </div>
-
-        {/* Export comments format */}
-        <div className="notepad-export-dialog__toggle-row">
-          <span>Export comments</span>
-          <div className="notepad-segmented">
-            {(['sidecar', 'inline', 'both'] as CommentFormat[]).map((f) => (
-              <button
-                key={f}
-                className={`notepad-segmented__btn${commentFormat === f ? ' notepad-segmented__btn--active' : ''}`}
-                onClick={() => setCommentFormat(f)}
-              >
-                {commentFormatLabels[f]}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Overwrite toggle */}
-        <div className="notepad-export-dialog__toggle-row">
-          <span>
-            Overwrite existing by id{' '}
-            <span className="notepad-export-dialog__toggle-desc">(idempotent re-export)</span>
-          </span>
-          <button
-            className={`notepad-toggle${overwriteById ? ' notepad-toggle--on' : ''}`}
-            onClick={() => setOverwriteById((v) => !v)}
-            role="switch"
-            aria-checked={overwriteById}
-            aria-label="Overwrite existing by id"
-          />
-        </div>
-
-        {/* Preview box */}
-        {previewNote && (
-          <div className="notepad-export-dialog__preview">
-            <div className="notepad-export-dialog__preview-line notepad-export-dialog__preview-filename">
-              {previewSlug(previewNote.title, previewNote.id)}
-            </div>
-            <div className="notepad-export-dialog__preview-line">---</div>
-            {includeFrontmatter && (
-              <div className="notepad-export-dialog__preview-line">
-                id: {previewNote.id.slice(0, 8)}… · title: {previewNote.title} · tags: [
-                {previewNote.tags.join(', ')}]
-              </div>
-            )}
-            <div className="notepad-export-dialog__preview-line">---</div>
-          </div>
-        )}
+        <ExportOptionFields options={options} update={update} noteId={noteId} />
+        {previewNote && <ExportPreview note={previewNote} options={options} />}
       </div>
-
       <p className="notepad-export-dialog__footer-meta">
-        {exportResult
-          ? `Last export: ${exportResult.time} → ${exportResult.notes} notes${exportResult.diagrams > 0 ? `, ${exportResult.diagrams} diagrams` : ''}`
-          : `${scopeCount} ${scopeCount === 1 ? 'note' : 'notes'}${diagramCount > 0 ? ` + ${diagramCount} diagrams` : ''} will be exported`}
+        {exportResult ? lastExportText(exportResult) : pendingExportText(scopeCount, diagramCount)}
       </p>
     </Dialog>
+  )
+}
+
+function lastExportText(result: ExportResult): string {
+  const diagramsText = result.diagrams > 0 ? `, ${result.diagrams} diagrams` : ''
+  return `Last export: ${result.time} → ${result.notes} notes${diagramsText}`
+}
+
+function pendingExportText(scopeCount: number, diagramCount: number): string {
+  const diagramsText = diagramCount > 0 ? ` + ${diagramCount} diagrams` : ''
+  return `${noteCountLabel(scopeCount)}${diagramsText} will be exported`
+}
+
+/** Running the export with the chosen options, and what it reported last. */
+function useExportRun(options: ExportOptions, noteId: string | undefined) {
+  const [running, setRunning] = useState(false)
+  const [exportResult, setExportResult] = useState<ExportResult | null>(null)
+
+  const handleExport = useCallback(async () => {
+    if (!options.folder || running) return
+    if (options.scope === 'note' && !noteId) return
+    setRunning(true)
+    try {
+      setExportResult(await runExport(options, noteId))
+    } finally {
+      setRunning(false)
+    }
+  }, [options, noteId, running])
+
+  return { running, exportResult, handleExport }
+}
+
+async function runExport(
+  options: ExportOptions,
+  noteId: string | undefined
+): Promise<ExportResult> {
+  const { scope } = options
+  const result = await window.electronAPI.extensionBridge.invoke('terminator.notepad:export.run', {
+    folder: options.folder,
+    scope,
+    ...(scope === 'note' && noteId ? { noteId } : {}),
+    includeFrontmatter: options.includeFrontmatter,
+    commentFormat: options.commentFormat,
+    overwriteById: options.overwriteById,
+    includeDiagrams: scope === 'all' ? options.includeDiagrams : false,
+  })
+  const data = (result as { data?: { exported: number; diagrams: number } }).data
+  return { notes: data?.exported ?? 0, diagrams: data?.diagrams ?? 0, time: exportTime(new Date()) }
+}
+
+function exportTime(now: Date): string {
+  const day = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${day}, ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
+function ExportOptionFields(props: OptionFieldProps & { noteId?: string }): React.JSX.Element {
+  const { options, update } = props
+  return (
+    <>
+      <FolderField options={options} update={update} />
+      <ScopeField options={options} update={update} noteId={props.noteId} />
+      <ExportToggles options={options} update={update} />
+    </>
+  )
+}
+
+function ExportToggles({ options, update }: OptionFieldProps): React.JSX.Element {
+  return (
+    <>
+      {options.scope === 'all' && (
+        <ToggleRow
+          label="Include diagrams"
+          description="(saved as .excalidraw files in diagrams/)"
+          checked={options.includeDiagrams}
+          onToggle={() => update({ includeDiagrams: !options.includeDiagrams })}
+        />
+      )}
+      <ToggleRow
+        label="Include YAML frontmatter"
+        description="(id, title, tags, dates)"
+        checked={options.includeFrontmatter}
+        onToggle={() => update({ includeFrontmatter: !options.includeFrontmatter })}
+      />
+      <CommentFormatField options={options} update={update} />
+      <ToggleRow
+        label="Overwrite existing by id"
+        description="(idempotent re-export)"
+        checked={options.overwriteById}
+        onToggle={() => update({ overwriteById: !options.overwriteById })}
+      />
+    </>
+  )
+}
+
+function FolderField({ options, update }: OptionFieldProps): React.JSX.Element {
+  const pickFolder = async () => {
+    const result = await window.electronAPI.extensionBridge.invoke(
+      'terminator.notepad:export.pickFolder',
+      {}
+    )
+    const data = (result as { data: string | null }).data
+    if (data) update({ folder: data })
+  }
+  return (
+    <div className="notepad-export-dialog__field">
+      <div className="notepad-export-dialog__field-label">Destination folder</div>
+      <div className="notepad-export-dialog__folder-row">
+        <input
+          className="notepad-export-dialog__folder-input"
+          value={options.folder}
+          onChange={(e) => update({ folder: e.target.value })}
+          spellCheck={false}
+          aria-label="Destination folder"
+        />
+        <Button onClick={() => void pickFolder()} aria-label="Choose folder">
+          Choose…
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function ScopeField(props: OptionFieldProps & { noteId?: string }): React.JSX.Element {
+  const { options, update, noteId } = props
+  const { notes } = useNotesStore()
+  return (
+    <div className="notepad-export-dialog__field">
+      <div className="notepad-export-dialog__field-label">Scope</div>
+      <div className="notepad-segmented notepad-export-dialog__scope-tabs">
+        <button
+          className={segmentClass(options.scope === 'all')}
+          onClick={() => update({ scope: 'all' })}
+        >
+          All notes ({notes.filter((n) => !n.archivedAt).length})
+        </button>
+        {noteId && (
+          <button
+            className={segmentClass(options.scope === 'note')}
+            onClick={() => update({ scope: 'note' })}
+          >
+            Selected (1)
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ToggleRow(props: ToggleRowProps): React.JSX.Element {
+  const { label, description, checked, onToggle } = props
+  return (
+    <div className="notepad-export-dialog__toggle-row">
+      <span>
+        {label} <span className="notepad-export-dialog__toggle-desc">{description}</span>
+      </span>
+      <button
+        className={`notepad-toggle${checked ? ' notepad-toggle--on' : ''}`}
+        onClick={onToggle}
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+      />
+    </div>
+  )
+}
+
+function CommentFormatField({ options, update }: OptionFieldProps): React.JSX.Element {
+  return (
+    <div className="notepad-export-dialog__toggle-row">
+      <span>Export comments</span>
+      <div className="notepad-segmented">
+        {(['sidecar', 'inline', 'both'] as CommentFormat[]).map((f) => (
+          <button
+            key={f}
+            className={segmentClass(options.commentFormat === f)}
+            onClick={() => update({ commentFormat: f })}
+          >
+            {COMMENT_FORMAT_LABELS[f]}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ExportPreview(props: { note: NoteListItem; options: ExportOptions }): React.JSX.Element {
+  const { note, options } = props
+  return (
+    <div className="notepad-export-dialog__preview">
+      <div className="notepad-export-dialog__preview-line notepad-export-dialog__preview-filename">
+        {previewSlug(note.title, note.id)}
+      </div>
+      <div className="notepad-export-dialog__preview-line">---</div>
+      {options.includeFrontmatter && (
+        <div className="notepad-export-dialog__preview-line">
+          id: {note.id.slice(0, 8)}… · title: {note.title} · tags: [{note.tags.join(', ')}]
+        </div>
+      )}
+      <div className="notepad-export-dialog__preview-line">---</div>
+    </div>
   )
 }
