@@ -540,6 +540,8 @@ Components read a store through a selector — `useStore(useShallow((s) => ({ a:
 
 `session.store` changes about once a second per printing terminal (the activity stamp and latest line), and `metrics.store` on every sample. `App.tsx` therefore subscribes to neither: the parts that draw them — Home's badge and the metrics bar (`components/AppShellParts.tsx`), and Quick Actions (`components/QuickActionsHost.tsx`, mounted only while the panel is open) — subscribe on their own. The sidebar hands its branch rows a clock that moves only when the set of stale sessions changes (`useStalenessClock`), and drops a branch's change statistics when its terminals stop printing, once per burst rather than once per activity stamp.
 
+Surfaces opened on demand — Settings, Quick Actions, the Overview wall and the issue drawer — load with `React.lazy` behind a `Suspense` boundary, each as its own chunk, and the renderer build is minified (`electron.vite.config.ts`; electron-vite leaves renderers unminified by default). The first script is 851 kB, down from 1,803 kB.
+
 ### Notification Model
 
 Every notification — core app or extension-originated — goes through one

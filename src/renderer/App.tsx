@@ -1,15 +1,22 @@
 import { useShallow } from 'zustand/react/shallow'
-import React, { useCallback, useEffect, useMemo, useRef, useState, createElement } from 'react'
+import React, {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  createElement,
+} from 'react'
 import { House, LayoutGrid } from 'lucide-react'
 import { UnifiedSidebar } from './components/sidebar/UnifiedSidebar'
 import { AppBand } from './components/sidebar/AppBand'
 import { TerminalPane } from './components/terminal/TerminalPane'
 import { TabBar } from './components/terminal/TabBar'
-import { SettingsPanel } from './components/settings/SettingsPanel'
 import { ToastContainer } from './components/ToastContainer'
 import { LogWindow } from './components/LogWindow'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { QuickActionsHost } from './components/QuickActionsHost'
 import { HomeBadge, GlobalMetricsBar, SessionLinkHost } from './components/AppShellParts'
 import { findSurface, type SurfaceRegistration } from './quick-actions/surface-actions'
 import { recordDirectUse } from './quick-actions/usage'
@@ -31,7 +38,6 @@ import { useNotificationStore } from './stores/notification.store'
 import { NotificationPanel } from './components/NotificationPanel'
 import { useExtensionRegistry } from './extensions/registry'
 import { EmptyState } from './components/EmptyState'
-import { OverviewScreen } from './components/overview/OverviewScreen'
 import { HomeScreen } from './components/home/HomeScreen'
 import { useMetricsStore } from './stores/metrics.store'
 import { AboutDialog } from './components/AboutDialog'
@@ -41,6 +47,18 @@ import { adoptTerminalSession } from './terminal/session-controller'
 import { revealSession } from './terminal/navigate-to-session'
 
 installLogInterceptor()
+
+// Opened on demand, so each is its own chunk rather than part of the first
+// script (https://react.dev/reference/react/lazy).
+const SettingsPanel = lazy(() =>
+  import('./components/settings/SettingsPanel').then((m) => ({ default: m.SettingsPanel }))
+)
+const QuickActionsHost = lazy(() =>
+  import('./components/QuickActionsHost').then((m) => ({ default: m.QuickActionsHost }))
+)
+const OverviewScreen = lazy(() =>
+  import('./components/overview/OverviewScreen').then((m) => ({ default: m.OverviewScreen }))
+)
 
 export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -664,7 +682,9 @@ export function App(): JSX.Element {
                 const TabComponent = tab.component as React.ComponentType<Record<string, never>>
                 return (
                   <div className="main-content">
-                    <TabComponent />
+                    <Suspense fallback={null}>
+                      <TabComponent />
+                    </Suspense>
                   </div>
                 )
               })()
@@ -768,7 +788,11 @@ export function App(): JSX.Element {
           </div>
 
           <NotificationPanel />
-          {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+          {settingsOpen && (
+            <Suspense fallback={null}>
+              <SettingsPanel onClose={() => setSettingsOpen(false)} />
+            </Suspense>
+          )}
           {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
           {pendingCreate && (
             <NameTerminalDialog
@@ -786,14 +810,16 @@ export function App(): JSX.Element {
             <SessionLinkHost sessionId={linkSessionId} onClose={() => setLinkSessionId(null)} />
           )}
           {quickActionsOpen && (
-            <QuickActionsHost
-              openedAt={quickActionsOpenedAt}
-              searchSignal={searchSignal}
-              surfaces={surfaces}
-              activateSurface={activateSurface}
-              shell={shellCommands}
-              onClose={closeQuickActions}
-            />
+            <Suspense fallback={null}>
+              <QuickActionsHost
+                openedAt={quickActionsOpenedAt}
+                searchSignal={searchSignal}
+                surfaces={surfaces}
+                activateSurface={activateSurface}
+                shell={shellCommands}
+                onClose={closeQuickActions}
+              />
+            </Suspense>
           )}
           <HomeBadge />
           <ToastContainer />

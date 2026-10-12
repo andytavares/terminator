@@ -1,5 +1,5 @@
 import { useShallow } from 'zustand/react/shallow'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { busyBranchIds, type SessionView } from '../../sidebar/view-model'
 import { useStalenessClock } from './useStalenessClock'
 import type { Workspace } from '../../../shared/types/index'
@@ -36,7 +36,6 @@ import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { SidebarHeader } from './SidebarHeader'
 import { LinkIssueDialog } from '../integrations/LinkIssueDialog'
-import { IssueDrawer } from '../integrations/IssueDrawer'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useSessionFacts } from '../session/useSessionFacts'
 import { useNow } from '../session/useNow'
@@ -48,6 +47,10 @@ import { DisplayMenu } from './DisplayMenu'
 import { RepoHeader } from './RepoHeader'
 import { BranchRow } from './BranchRow'
 import './UnifiedSidebar.css'
+
+const IssueDrawer = lazy(() =>
+  import('../integrations/IssueDrawer').then((m) => ({ default: m.IssueDrawer }))
+)
 
 interface UnifiedSidebarProps {
   activeWorkspaceTabId: string | null
@@ -936,11 +939,13 @@ export function UnifiedSidebar({
           if (!project) return null
           return (
             <div className="issue-drawer-host">
-              <IssueDrawer
-                projectId={project.id}
-                projectName={branchLabel(project)}
-                onClose={closeDrawer}
-              />
+              <Suspense fallback={null}>
+                <IssueDrawer
+                  projectId={project.id}
+                  projectName={branchLabel(project)}
+                  onClose={closeDrawer}
+                />
+              </Suspense>
             </div>
           )
         })()}

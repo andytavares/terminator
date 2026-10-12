@@ -36,11 +36,13 @@ export default defineConfig({
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
     },
     build: {
+      // electron-vite leaves renderers unminified by default; parsing less on
+      // every window open is the point, so the renderer is minified.
+      minify: 'esbuild',
       // Loaded from disk by Electron, so Vite's 500 kB default (a download-size
       // heuristic) is replaced by a budget on the largest chunk: the app shell
-      // is 1,643 kB, unminified as electron-vite builds renderers. A chunk past
-      // it warns, and CI fails the build on any warning.
-      chunkSizeWarningLimit: 1800,
+      // is 851 kB. A chunk past it warns, and CI fails the build on any warning.
+      chunkSizeWarningLimit: 900,
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/renderer/index.html'),
