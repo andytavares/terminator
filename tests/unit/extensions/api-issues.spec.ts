@@ -63,15 +63,17 @@ describe('api.issues — delegation', () => {
     expect(result[0]).toMatchObject({ tracker: 'linear', connected: true })
   })
 
-  it('delegates listMine, search and get to the one service', async () => {
-    service.listMine.mockResolvedValue({ issues: [], failures: [] })
-    service.search.mockResolvedValue({ issues: [], failures: [] })
+  it('answers listMine, search and get with what the one service answered', async () => {
+    const mine = { issues: [], failures: [{ tracker: 'jira', error: 'not-connected' }] }
+    const found = { issues: [], failures: [] }
+    service.listMine.mockResolvedValue(mine)
+    service.search.mockResolvedValue(found)
     service.get.mockResolvedValue(null)
     const api = await makeApi()
 
-    await api.issues.listMine({ tracker: 'linear' })
-    await api.issues.search('sidebar', { limit: 5 })
-    await api.issues.get('jira', 'TAV-7', { refresh: true })
+    await expect(api.issues.listMine({ tracker: 'linear' })).resolves.toBe(mine)
+    await expect(api.issues.search('sidebar', { limit: 5 })).resolves.toBe(found)
+    await expect(api.issues.get('jira', 'TAV-7', { refresh: true })).resolves.toBeNull()
 
     expect(service.listMine).toHaveBeenCalledWith({ tracker: 'linear' })
     expect(service.search).toHaveBeenCalledWith('sidebar', { limit: 5 })

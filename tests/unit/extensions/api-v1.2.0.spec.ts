@@ -119,7 +119,7 @@ describe('api.globalShortcut.register', () => {
 
   it('rejects if Electron reports the accelerator is already registered', async () => {
     const { globalShortcut: electronGS } = await import('electron')
-    vi.mocked(electronGS.register).mockReturnValueOnce(false as unknown as boolean)
+    vi.mocked(electronGS.register).mockReturnValueOnce(false)
     const api = createExtensionAPI('test.gs3', '0.1.0')
 
     await expect(api.globalShortcut.register('CmdOrCtrl+Shift+Q', vi.fn())).rejects.toThrow(
@@ -331,13 +331,15 @@ describe('api.pty', () => {
       ).rejects.toThrow('PTY access not available')
     })
 
-    it('onData/onExit delegate and return a disposer that does nothing without a ptyManager', () => {
+    it('onData/onExit subscribe to the session, and do nothing without a ptyManager', () => {
       const api = createExtensionAPI('test.pty12', '0.1.0', { ptyManager: mockPtyManager })
-      expect(api.pty.onData('s1', vi.fn())).toBeTypeOf('function')
-      expect(api.pty.onExit('s1', vi.fn())).toBeTypeOf('function')
+      api.pty.onData('s1', vi.fn())
+      api.pty.onExit('s1', vi.fn())
+      expect(mockPtyManager.onData).toHaveBeenCalledWith('s1', expect.any(Function))
+      expect(mockPtyManager.onExit).toHaveBeenCalledWith('s1', expect.any(Function))
       const bare = createExtensionAPI('test.pty13', '0.1.0', {})
-      expect(bare.pty.onData('s1', vi.fn())).toBeTypeOf('function')
-      expect(bare.pty.onExit('s1', vi.fn())).toBeTypeOf('function')
+      expect(bare.pty.onData('s1', vi.fn())()).toBeUndefined()
+      expect(bare.pty.onExit('s1', vi.fn())()).toBeUndefined()
     })
 
     it('getSession and setWorkspace delegate, defaulting without a ptyManager', async () => {

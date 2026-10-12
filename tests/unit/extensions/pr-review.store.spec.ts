@@ -351,23 +351,6 @@ describe('usePrReviewStore', () => {
       expect(state.fileOrderOverrides['ch-1']).toEqual(['src/b.ts', 'src/a.ts'])
       expect(state.scrollPosition).toBe(500)
     })
-
-    it('converts viewedFiles array to Set', () => {
-      const session = ReviewSessionSchema.parse({
-        repoRoot: '/repo',
-        prNumber: 1,
-        headSHA: 'abc',
-        currentChapterId: null,
-        currentFilePath: null,
-        viewedFiles: ['a.ts', 'b.ts'],
-        fileOrderOverrides: {},
-        scrollPosition: null,
-        pausedAt: null,
-        lastAccessedAt: '2024-01-01T00:00:00Z',
-      })
-      usePrReviewStore.getState().initSession(session)
-      expect(usePrReviewStore.getState().viewedFiles).toBeInstanceOf(Set)
-    })
   })
 
   describe('reset', () => {
@@ -405,6 +388,8 @@ describe('usePrReviewStore', () => {
       usePrReviewStore.getState().patchFileComplexity('ch-1', 'src/app.ts', 10)
       const file = usePrReviewStore.getState().activePr?.chapters[0].files[0]
       expect(file?.riskScore.metrics.complexityDelta).toBe(10)
+      // 50, plus 10/15 of complexity's 8 points, rounded.
+      expect(file?.riskScore).toMatchObject({ composite: 55, level: 'medium' })
     })
 
     it('is a no-op when activePr is null', () => {

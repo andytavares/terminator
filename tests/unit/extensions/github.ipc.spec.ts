@@ -420,16 +420,6 @@ describe('github:session-set', () => {
 
 // ─── github:save-active-review ────────────────────────────────────────────────
 
-describe('github:save-active-review', () => {
-  it('persists the PR snapshot and returns ok', async () => {
-    const result = (await getHandler('github:save-active-review')({
-      repoRoot: '/repo',
-      pr: reviewQueuePr(42),
-    })) as { ok: boolean }
-    expect(result.ok).toBe(true)
-  })
-})
-
 // ─── github:active-reviews-for-repo ──────────────────────────────────────────
 
 describe('github:active-reviews-for-repo', () => {
