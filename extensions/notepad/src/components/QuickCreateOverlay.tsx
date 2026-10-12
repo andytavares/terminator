@@ -4,7 +4,7 @@ import { X } from 'lucide-react'
 import { useNotesStore } from '../stores/notes.store'
 import { NoteEditor } from '../editor/NoteEditor'
 import type { DiagramListItem } from '../db/types'
-import { Button, useDismissible } from '@terminator/extension-ui'
+import { Button, SegmentedControl, useDismissible } from '@terminator/extension-ui'
 
 function toFilenameSlug(title: string): string {
   return (
@@ -73,6 +73,12 @@ function TagChipBar({
     </div>
   )
 }
+
+const CREATE_KINDS = [
+  { value: 'note', label: 'Note' },
+  { value: 'diagram', label: 'Diagram' },
+  { value: 'folder', label: 'Folder' },
+] as const
 
 export function QuickCreateOverlay(): React.JSX.Element | null {
   const { showQuickCreate, setShowQuickCreate, setNotes, setDiagrams, setFolders } = useNotesStore()
@@ -265,26 +271,13 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
         aria-label={type === 'folder' ? 'New folder' : `New ${type}`}
       >
         <div className="notepad-quick-create__header">
-          <div className="notepad-quick-create__type-tabs">
-            <button
-              className={`notepad-quick-create__type-tab${type === 'note' ? ' notepad-quick-create__type-tab--active' : ''}`}
-              onClick={() => setType('note')}
-            >
-              Note
-            </button>
-            <button
-              className={`notepad-quick-create__type-tab${type === 'diagram' ? ' notepad-quick-create__type-tab--active' : ''}`}
-              onClick={() => setType('diagram')}
-            >
-              Diagram
-            </button>
-            <button
-              className={`notepad-quick-create__type-tab${type === 'folder' ? ' notepad-quick-create__type-tab--active' : ''}`}
-              onClick={() => setType('folder')}
-            >
-              Folder
-            </button>
-          </div>
+          <SegmentedControl
+            label="Create"
+            size="sm"
+            options={CREATE_KINDS}
+            value={type}
+            onChange={setType}
+          />
           {type === 'note' && (
             <span className="notepad-quick-create__vault-status">
               saved · exports as <code>{exportFilename}</code>

@@ -13,7 +13,7 @@ import {
 import {
   Button,
   ConfirmDialog,
-  IconButton,
+  Dialog,
   RelativeTime,
   useDismissible,
 } from '@terminator/extension-ui'
@@ -121,25 +121,6 @@ function ItemEditModal({
   const [title, setTitle] = useState(state.title)
   const [tags, setTags] = useState(state.tags)
   const [saving, setSaving] = useState(false)
-  const titleRef = useRef<HTMLInputElement>(null)
-  const surfaceRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    titleRef.current?.focus()
-  }, [])
-
-  /**
-   * Escape, focus, and the open-surface count the extension-exit gesture reads
-   * — missing here, so two Escapes with focus on Save or Cancel closed Notepad
-   * and discarded the edit. `manageFocus` is off because the effect above puts
-   * focus on the title field, which is where it belongs.
-   */
-  useDismissible({
-    ref: surfaceRef,
-    onDismiss: onClose,
-    closeOnOutsideClick: false,
-    manageFocus: false,
-  })
 
   async function handleSave() {
     if (saving) return
@@ -173,50 +154,33 @@ function ItemEditModal({
   }
 
   return (
-    <div
-      className="notepad-overlay-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+    <Dialog
+      title={state.itemType === 'diagram' ? 'Edit diagram' : 'Edit note'}
+      onDismiss={onClose}
+      actions={[
+        { label: 'Cancel', onSelect: onClose, disabled: saving },
+        {
+          label: saving ? 'Saving…' : 'Save',
+          tone: 'primary',
+          submit: true,
+          shortcut: '↵',
+          disabled: saving,
+          onSelect: handleSave,
+        },
+      ]}
     >
-      <div
-        ref={surfaceRef}
-        data-tmui-surface=""
-        className="notepad-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Edit ${state.itemType}`}
-      >
-        <div className="notepad-dialog__header">
-          <span className="notepad-dialog__title">
-            Edit {state.itemType === 'diagram' ? 'Diagram' : 'Note'}
-          </span>
-          <IconButton icon={X} label="Close" onClick={onClose} />
-        </div>
-        <div className="notepad-dialog__body">
-          <input
-            ref={titleRef}
-            className="notepad-input"
-            placeholder="Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void handleSave()
-            }}
-          />
-          <TagChipInput tags={tags} onChange={setTags} />
-        </div>
-        <div className="notepad-dialog__footer">
-          <span className="notepad-dialog__hint">⌘↵ Save · Esc Cancel</span>
-          <Button variant="ghost" onClick={onClose} disabled={saving}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={() => void handleSave()} disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
-          </Button>
-        </div>
+      <div className="notepad-edit-fields">
+        <input
+          autoFocus
+          className="notepad-input"
+          placeholder="Title"
+          aria-label="Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <TagChipInput tags={tags} onChange={setTags} />
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -1000,10 +964,17 @@ export function NoteList(): React.JSX.Element {
         {archivedItems.length > 0 && (
           <>
             <button
+              type="button"
               className="notepad-archived-toggle"
+              aria-expanded={archivedExpanded}
               onClick={() => setArchivedExpanded((v) => !v)}
             >
-              {archivedExpanded ? '▼' : '▶'} Archived ({archivedItems.length})
+              {archivedExpanded ? (
+                <ChevronDown aria-hidden="true" className="tm-icon-sm" />
+              ) : (
+                <ChevronRight aria-hidden="true" className="tm-icon-sm" />
+              )}
+              Archived ({archivedItems.length})
             </button>
             {archivedExpanded &&
               archivedItems.map((entry) =>

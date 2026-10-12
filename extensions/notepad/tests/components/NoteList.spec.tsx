@@ -204,3 +204,79 @@ describe('NoteList tag filter dropdown', () => {
     expect(document.querySelector('.notepad-context-menu')).toBeNull()
   })
 })
+
+describe('NoteList edit dialog', () => {
+  beforeEach(() => {
+    cleanup()
+    mockInvoke.mockReset()
+    mockInvoke.mockResolvedValue({ data: { body: 'Body' } })
+    useNotesStore.setState({ notes: [note1], selectedNoteId: null, archivedVisible: false })
+    useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
+  })
+
+  function openEditDialog(): HTMLElement {
+    render(<NoteList />)
+    fireEvent.contextMenu(screen.getByText('First Note'))
+    fireEvent.click(screen.getByText('Edit title & tags'))
+    return screen.getByRole('dialog', { name: 'Edit note' })
+  }
+
+  it('is a modal dialog named for what it edits, with the title field focused', () => {
+    const dialog = openEditDialog()
+    expect(dialog.getAttribute('aria-modal')).toBe('true')
+    expect(document.activeElement).toBe(screen.getByPlaceholderText('Title'))
+  })
+
+  it('saves the new title when Enter is pressed in the title field', async () => {
+    openEditDialog()
+    const title = screen.getByPlaceholderText('Title')
+    fireEvent.change(title, { target: { value: 'Renamed' } })
+    await act(async () => {
+      fireEvent.submit(title.closest('form')!)
+    })
+    expect(mockInvoke).toHaveBeenCalledWith(
+      'terminator.notepad:notes.autosave',
+      expect.objectContaining({ id: 'n1', title: 'Renamed', tags: ['work'] })
+    )
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('moves Tab from the last control back to the first', () => {
+    openEditDialog()
+    const save = screen.getByRole('button', { name: /Save/ })
+    save.focus()
+    fireEvent.keyDown(save, { key: 'Tab' })
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }))
+  })
+
+  it('closes on Escape without saving', () => {
+    openEditDialog()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      'terminator.notepad:notes.autosave',
+      expect.anything()
+    )
+  })
+})
+
+describe('NoteList archived section', () => {
+  beforeEach(() => {
+    cleanup()
+    const archived = { ...note2, archivedAt: '2026-01-04T00:00:00Z' }
+    useNotesStore.setState({
+      notes: [note1, archived],
+      selectedNoteId: null,
+      archivedVisible: false,
+    })
+    useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
+  })
+
+  it('says whether the archived section is open', () => {
+    render(<NoteList />)
+    const toggle = screen.getByRole('button', { name: /Archived \(1\)/ })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  })
+})

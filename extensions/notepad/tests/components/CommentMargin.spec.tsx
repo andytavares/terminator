@@ -138,3 +138,14 @@ describe('CommentMargin', () => {
     expect(screen.getByPlaceholderText('Write a reply…')).toBeDefined()
   })
 })
+
+describe('CommentMargin resolved section', () => {
+  it('says whether the resolved comments are shown', () => {
+    useCommentsStore.setState({ comments: [resolvedComment], loading: false })
+    render(<CommentMargin noteId="n1" anchorTops={{}} />)
+    const toggle = screen.getByRole('button', { name: /1 resolved/ })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  })
+})

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { AlertTriangle, Trash2 } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { Button, IconButton } from '@terminator/extension-ui'
 import { useCommentsStore } from '../stores/comments.store'
 import type { Comment } from '../db/types'
@@ -298,11 +298,17 @@ export function CommentMargin({
               {resolvedComments.length > 0 && (
                 <div className="notepad-comment-resolved-section">
                   <button
+                    type="button"
                     className="notepad-comment-resolved-toggle"
+                    aria-expanded={showResolved}
                     onClick={() => setShowResolved((v) => !v)}
                   >
-                    {showResolved ? '▼' : '▶'} {resolvedComments.length} resolved{' '}
-                    {showResolved ? '(hide)' : '(show)'}
+                    {showResolved ? (
+                      <ChevronDown aria-hidden="true" className="tm-icon-sm" />
+                    ) : (
+                      <ChevronRight aria-hidden="true" className="tm-icon-sm" />
+                    )}
+                    {resolvedComments.length} resolved
                   </button>
                   {showResolved &&
                     resolvedComments.map((comment) => (
