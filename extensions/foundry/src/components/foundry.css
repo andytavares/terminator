@@ -1392,6 +1392,15 @@
   flex: none;
 }
 
+/* A field sets the row's height (--tm-control-height); the controls beside it
+   match it, or a stretched row leaves the field shorter than its neighbours. */
+.fdry-seed > .tmui-button,
+.fdry-seed > .tmui-segmented,
+.fdry-input .tmui-button {
+  box-sizing: border-box;
+  height: var(--tm-control-height);
+}
+
 /* The ticket offered for a typed idea, before it becomes an order. A band
    under the seed row, because nothing happens until it is answered. */
 .fdry-ticket-offer {
