@@ -10,14 +10,15 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = join(__dirname, '..')
 
-// The four specs that exercise cross-cutting extension-host behaviour
-// (any extension can regress these), always pulled in alongside a
-// narrower rule match.
+// The specs that exercise cross-cutting extension-host behaviour (any
+// extension can regress these), always pulled in alongside a narrower rule
+// match. extension-settings writes every extension's settings.
 export const EXTENSION_TRIO = [
   'extension-smoke.spec.ts',
   'extension-keyboard.spec.ts',
   'extension-themes.spec.ts',
   'extension-escape.spec.ts',
+  'extension-settings.spec.ts',
 ]
 
 // Path glob -> spec glob rules. A changed path matching a rule's globs
@@ -28,7 +29,7 @@ export const EXTENSION_TRIO = [
 export const IMPACT_MAP = [
   {
     globs: ['extensions/foundry/**'],
-    specs: ['foundry*.spec.ts', ...EXTENSION_TRIO],
+    specs: ['foundry*.spec.ts', 'extension-commands.spec.ts', ...EXTENSION_TRIO],
   },
   {
     globs: ['extensions/git-integration/**', 'tests/e2e/git-integration-contrast.entry.tsx'],
@@ -38,6 +39,7 @@ export const IMPACT_MAP = [
       'git-integration-contrast.spec.ts',
       'git-integration-stacking.spec.ts',
       'merge-flow.spec.ts',
+      'extension-commands.spec.ts',
       ...EXTENSION_TRIO,
     ],
   },
@@ -97,10 +99,15 @@ export const SMOKE_SPECS = ['extension-smoke.spec.ts', 'terminal.spec.ts', 'work
 // selects everything, so these run only then; the list exists so a new spec
 // has to be placed somewhere deliberately.
 export const CORE_SPECS = [
+  'app-menu.spec.ts',
   'branch-exclude-patterns.spec.ts',
   'branch-name.spec.ts',
   'close-session.spec.ts',
+  'core-ipc.spec.ts',
+  'core-quick-actions.spec.ts',
+  'extension-lifecycle.spec.ts',
   'extension.spec.ts',
+  'integrations.spec.ts',
   'monitor-wall.spec.ts',
   'open-in-editor.spec.ts',
   'project.spec.ts',
