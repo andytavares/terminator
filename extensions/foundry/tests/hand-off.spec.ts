@@ -19,10 +19,17 @@ describe('hand-off', () => {
     const starts = [...src.matchAll(/runs\.start\b/g)]
     expect(starts).toHaveLength(1)
     expect(runChannels).toContain("foundryChannel('foundry:run.start', StartPayload, runs.start)")
+    // The one start is the release deps' `start`, and only `readyToHandOff` is handed those.
     const restart = src.indexOf('runs.start({')
-    expect(src.lastIndexOf('await readyToHandOff(order, {', restart)).toBeGreaterThan(
-      src.lastIndexOf('const handOffWhenReady', restart)
+    expect(src.lastIndexOf('function ', restart)).toBe(
+      src.lastIndexOf('function startOrder(', restart)
     )
+    expect([...src.matchAll(/\bstartOrder\(/g)]).toHaveLength(2)
+    expect(src.indexOf('start: (o) => startOrder(forge, o)')).toBeGreaterThan(
+      src.indexOf('function releaseDepsFor(')
+    )
+    expect([...src.matchAll(/\breleaseDepsFor\(/g)]).toHaveLength(2)
+    expect(src).toContain('await readyToHandOff(order, releaseDepsFor(forge))')
   })
 
   it('has no setting that would hand off on its own', () => {

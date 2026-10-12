@@ -197,7 +197,12 @@ async function answerForgeDefect(
   if (decision.kind !== 'converge' || order === null) return false
   // Recorded, or the ledger shows no turn running while the architect
   // amends the order and every surface reads it as idle.
-  const started = await loop.convergeWithFollowUps(order, decision.message, 0, 1)
+  const started = await loop.convergeWithFollowUps({
+    order,
+    message: decision.message,
+    autoTurns: 0,
+    loopRound: 1,
+  })
   await orderStoreAt(dataRoot()).record({
     at: new Date().toISOString(),
     orderId: order.id,
