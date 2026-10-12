@@ -28,7 +28,8 @@ Follow-up TODOs (code and docs that now contradict this version):
     gate whole files on four metrics (Principle VI).
   - codecov.yml sets `if_ci_failed: success` and `if_not_found: success`, so the Codecov
     statuses can pass without a coverage report (Principle VI).
-  - The version-per-dependency CI check does not exist yet; tool to be chosen (Principle IV).
+  - The version-per-dependency CI check does not exist yet; it will be syncpack, an approved
+    Principle IV exception recorded in ADR-097.
   - 11 dependencies are declared at more than one version and 48 specs are ranges (Principle IV).
   - Extension backends still run in the main process; 32 extension source files import core source
     (Principle II). ADR-002 is superseded by ADR-094.
