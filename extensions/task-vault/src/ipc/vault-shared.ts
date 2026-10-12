@@ -103,7 +103,12 @@ export async function deleteTaskTree(db: ExtensionDB, taskId: string): Promise<v
   )
 }
 
-async function findOrCreateArea(db: ExtensionDB, name: string, now: string): Promise<string> {
+/** The id of the area with this name, created when there is none. */
+export async function findOrCreateArea(
+  db: ExtensionDB,
+  name: string,
+  now: string
+): Promise<string> {
   const existing = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [name])
   if (existing) return existing.id
   const id = randomUUID()
