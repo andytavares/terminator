@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useDismissible } from '@terminator/extension-ui'
+import { IconButton, useDismissible } from '@terminator/extension-ui'
 import { X } from 'lucide-react'
 import type { IndexedProject } from '../vault/types'
 
@@ -137,9 +137,7 @@ export function FileToPicker({
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
         />
-        <button className="file-to-picker__close" onClick={onClose}>
-          <X className="tm-icon" />
-        </button>
+        <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
       </div>
       {loading ? (
         <div className="file-to-picker__loading">Loading…</div>

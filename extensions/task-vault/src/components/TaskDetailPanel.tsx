@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { X, Eye, Pencil } from 'lucide-react'
-import { Markdown } from '@terminator/extension-ui'
+import { Button, IconButton, Markdown } from '@terminator/extension-ui'
 import { openInBrowser } from '../utils/open-in-browser'
 
 interface TaskDetail {
@@ -84,8 +84,10 @@ function SectionEditor({ label, value, placeholder, onSave }: SectionEditorProps
     <div className="tv-detail__section">
       <div className="tv-detail__section-header">
         <span className="tv-detail__section-label">{label}</span>
-        <button
-          className="tv-btn tv-btn--icon"
+        <IconButton
+          icon={editing ? Eye : Pencil}
+          label={editing ? 'Preview' : 'Edit'}
+          size="sm"
           onClick={() => {
             if (editing) {
               void handleSave()
@@ -93,11 +95,8 @@ function SectionEditor({ label, value, placeholder, onSave }: SectionEditorProps
               setEditing(true)
             }
           }}
-          title={editing ? 'Preview' : 'Edit'}
           disabled={saving}
-        >
-          {editing ? <Eye className="tm-icon" /> : <Pencil className="tm-icon" />}
-        </button>
+        />
       </div>
 
       {editing ? (
@@ -112,22 +111,19 @@ function SectionEditor({ label, value, placeholder, onSave }: SectionEditorProps
             rows={6}
           />
           <div className="tv-detail__editor-actions">
-            <button
-              className="tv-btn tv-btn--primary tv-btn--xs"
-              onClick={() => void handleSave()}
-              disabled={saving}
-            >
+            <Button variant="primary" size="sm" onClick={() => void handleSave()} disabled={saving}>
               {saving ? '…' : 'Save'}
-            </button>
-            <button
-              className="tv-btn tv-btn--ghost tv-btn--xs"
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setDraft(value)
                 setEditing(false)
               }}
             >
               Cancel
-            </button>
+            </Button>
             <span className="tv-detail__editor-hint">⌘↵ to save · Esc to cancel</span>
           </div>
         </div>
@@ -226,9 +222,7 @@ export function TaskDetailPanel({ taskId, taskText, onClose }: TaskDetailPanelPr
         <span className="tv-detail-panel__title" title={taskText}>
           {taskText}
         </span>
-        <button className="tv-btn tv-btn--icon" onClick={onClose} title="Close detail panel">
-          <X className="tm-icon" />
-        </button>
+        <IconButton icon={X} label="Close detail panel" size="sm" onClick={onClose} />
       </div>
 
       <div className="tv-detail-panel__body">

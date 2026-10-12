@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { useVaultStore } from '../stores/vault.store'
 import { dayLoadLabel, isOverdue, shortDay, weekOf } from '../state/calendar-load'
 import type { KanbanLane, Task } from '../vault/types'
+import { IconButton } from '@terminator/extension-ui'
 
 type DayData = { date: string; status: string; count: number }
 type DayMap = Map<string, DayData[]>
@@ -185,15 +186,11 @@ export function CalendarDrawer(): React.JSX.Element {
     <div className="cal-drawer cal-drawer--open">
       <div className="cal-drawer__panel">
         <div className="cal-drawer__month-nav">
-          <button className="tv-btn tv-btn--icon" onClick={prevMonth} title="Previous month">
-            <ChevronLeft className="tm-icon" />
-          </button>
+          <IconButton icon={ChevronLeft} label="Previous month" size="sm" onClick={prevMonth} />
           <span className="cal-drawer__month-label">
             {MONTH_NAMES[month - 1]} {year}
           </span>
-          <button className="tv-btn tv-btn--icon" onClick={nextMonth} title="Next month">
-            <ChevronRight className="tm-icon" />
-          </button>
+          <IconButton icon={ChevronRight} label="Next month" size="sm" onClick={nextMonth} />
         </div>
 
         <div className="cal-drawer__grid">
@@ -264,13 +261,12 @@ export function CalendarDrawer(): React.JSX.Element {
             <span className="cal-drawer__day-title">
               {selectedDate === todayStr ? 'Today' : selectedDate}
             </span>
-            <button
-              className="tv-btn tv-btn--icon"
+            <IconButton
+              icon={ExternalLink}
+              label="Open in Task Vault"
+              size="sm"
               onClick={handleGoToDay}
-              title="Open in Task Vault"
-            >
-              <ExternalLink className="tm-icon-sm" />
-            </button>
+            />
           </div>
           {loadingDay && <div className="cal-drawer__day-loading">…</div>}
           {!loadingDay && selectedDayTasks.length === 0 && (

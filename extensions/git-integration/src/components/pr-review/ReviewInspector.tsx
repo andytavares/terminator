@@ -1,5 +1,6 @@
 import React from 'react'
 import { X } from 'lucide-react'
+import { Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import type { RiskScore } from '../../schemas/pr-review.schema'
 import { RiskBreakdownPanel } from './RiskBreakdownPanel'
 import { HealthChips } from './HealthChips'
@@ -39,41 +40,32 @@ export function ReviewInspector({
   const resolvedTab: InspectorTab = activeTab === 'file' && !fileAvailable ? 'agent' : activeTab
 
   return (
-    <div className="ri-root">
-      <div className="ri-header">
-        <div className="ri-tablist" role="tablist" aria-label="Inspector">
-          {agentAvailable && (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={resolvedTab === 'agent'}
-              className={`ri-tab${resolvedTab === 'agent' ? ' ri-tab--active' : ''}`}
-              onClick={() => onTabChange('agent')}
-            >
-              Agent
-              {agentFindingCount > 0 && <span className="ri-tab-badge">{agentFindingCount}</span>}
-            </button>
-          )}
-          {fileAvailable && (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={resolvedTab === 'file'}
-              className={`ri-tab${resolvedTab === 'file' ? ' ri-tab--active' : ''}`}
-              onClick={() => onTabChange('file')}
-            >
-              File
-            </button>
-          )}
+    <TabsRoot selectedId={resolvedTab} onSelect={onTabChange}>
+      <div className="ri-root">
+        <div className="ri-header">
+          <TabList label="Inspector" className="ri-tablist">
+            {agentAvailable && (
+              <Tab
+                id="agent"
+                accessibleName={agentFindingCount > 0 ? `Agent, ${agentFindingCount}` : undefined}
+              >
+                Agent
+                {agentFindingCount > 0 && <span className="ri-tab-badge">{agentFindingCount}</span>}
+              </Tab>
+            )}
+            {fileAvailable && <Tab id="file">File</Tab>}
+          </TabList>
+          <button type="button" className="ri-close" aria-label="Close inspector" onClick={onClose}>
+            <X className="tm-icon-sm" />
+          </button>
         </div>
-        <button type="button" className="ri-close" aria-label="Close inspector" onClick={onClose}>
-          <X className="tm-icon-sm" />
-        </button>
-      </div>
-      <div className="ri-panel" role="tabpanel">
-        {resolvedTab === 'agent' && agentAvailable && agent}
-        {resolvedTab === 'file' && file && (
-          <>
+        {agentAvailable && (
+          <TabPanel id="agent" className="ri-panel">
+            {agent}
+          </TabPanel>
+        )}
+        {file && (
+          <TabPanel id="file" className="ri-panel">
             <RiskBreakdownPanel
               filePath={file.path}
               riskScore={file.riskScore}
@@ -86,9 +78,9 @@ export function ReviewInspector({
               coverageStatus={file.coverageStatus}
               dryViolationCount={file.dryViolationCount}
             />
-          </>
+          </TabPanel>
         )}
       </div>
-    </div>
+    </TabsRoot>
   )
 }

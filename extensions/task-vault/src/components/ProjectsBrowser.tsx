@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useDismissible } from '@terminator/extension-ui'
+import { Button, IconButton, useDismissible } from '@terminator/extension-ui'
 import { DateTimePicker } from './DateTimePicker'
 import {
   Zap,
@@ -13,6 +13,7 @@ import {
   MinusCircle,
   ArrowRightCircle,
   Timer,
+  ChevronUp,
 } from 'lucide-react'
 import type { IndexedProject, IndexedTask } from '../vault/types'
 import { useVaultStore } from '../stores/vault.store'
@@ -180,22 +181,16 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
     )
   if (!linking)
     return (
-      <button
-        className="projects-browser__link-btn"
-        onClick={() => setLinking(true)}
-        title="Link to terminal session"
-      >
+      <Button size="sm" onClick={() => setLinking(true)} title="Link to terminal session">
         Link…
-      </button>
+      </Button>
     )
 
   if (activeSessions.length === 0)
     return (
       <span className="projects-browser__link-picker">
         <span className="tv-text-muted-sm">No active sessions</span>
-        <button className="tv-btn tv-btn--icon" onClick={() => setLinking(false)}>
-          <X className="tm-icon" />
-        </button>
+        <IconButton icon={X} label="Close" size="sm" onClick={() => setLinking(false)} />
       </span>
     )
 
@@ -211,9 +206,7 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
           </option>
         ))}
       </select>
-      <button className="tv-btn tv-btn--icon" onClick={() => setLinking(false)}>
-        <X className="tm-icon" />
-      </button>
+      <IconButton icon={X} label="Close" size="sm" onClick={() => setLinking(false)} />
     </span>
   )
 }
@@ -312,16 +305,17 @@ function CreateProjectForm({ onCreated, onCancel }: CreateProjectFormProps): Rea
         </div>
       </div>
       <div className="create-project-form__actions">
-        <button
-          className="create-project-form__create-btn"
+        <Button
+          variant="primary"
+          size="sm"
           onClick={handleCreate}
           disabled={creating || !name.trim()}
         >
           {creating ? 'Creating…' : 'Create project'}
-        </button>
-        <button className="create-project-form__cancel-btn" onClick={onCancel}>
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -410,14 +404,11 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
 
   if (!expanded) {
     return (
-      <button
-        className="tv-btn tv-btn--ghost tv-btn--xs projects-browser__tasks-toggle"
-        onClick={toggle}
-      >
+      <Button variant="ghost" size="sm" onClick={toggle}>
         {loaded
           ? `${tasks.length} task${tasks.length !== 1 ? 's' : ''} tagged @${projectName}`
           : `Show tasks tagged @${projectName}`}
-      </button>
+      </Button>
     )
   }
 
@@ -455,9 +446,7 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
         <span>
           {tasks.length} task{tasks.length !== 1 ? 's' : ''} tagged @{projectName}
         </span>
-        <button className="tv-btn tv-btn--ghost" onClick={() => setExpanded(false)}>
-          ▲
-        </button>
+        <IconButton icon={ChevronUp} label="Hide tasks" onClick={() => setExpanded(false)} />
       </div>
 
       <div className="projects-browser__add-task-row">
@@ -468,13 +457,14 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
           placeholder={`Add task to @${projectName}…`}
           disabled={adding}
         />
-        <button
-          className="tv-btn tv-btn--primary projects-browser__add-btn"
+        <Button
+          variant="primary"
+          className="projects-browser__add-btn"
           onClick={() => void handleAddTask()}
           disabled={adding || !addingText.trim()}
         >
           Add
-        </button>
+        </Button>
       </div>
 
       {tasks.length === 0 && (
@@ -498,15 +488,15 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
                 onCancel={() => setEditingId(null)}
                 autoFocus
               />
-              <button
-                className="tv-btn tv-btn--primary tv-btn--icon"
-                onClick={() => void handleSaveEdit(t.id)}
-              >
-                <Check className="tm-icon" />
-              </button>
-              <button className="tv-btn tv-btn--icon" onClick={() => setEditingId(null)}>
-                <X className="tm-icon" />
-              </button>
+              <Button variant="primary" size="sm" onClick={() => void handleSaveEdit(t.id)}>
+                Save
+              </Button>
+              <IconButton
+                icon={X}
+                label="Cancel edit"
+                size="sm"
+                onClick={() => setEditingId(null)}
+              />
             </span>
           ) : (
             <>
@@ -535,13 +525,14 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
               </span>
               <span className="projects-browser__task-text">{t.text}</span>
               <span className="projects-browser__task-actions">
-                <button
-                  className="tv-btn tv-btn--ghost tv-btn--xs"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => void handleRestore(t.id)}
                   title="Reopen on today's log"
                 >
                   ↩
-                </button>
+                </Button>
               </span>
             </div>
           ))}
@@ -591,16 +582,8 @@ function ProjectAreaBadge({
     return (
       <span className="projects-browser__area-edit">
         <AreaCombobox value={areaValue} onChange={setAreaValue} existingAreas={existingAreas} />
-        <button
-          className="tv-btn tv-btn--icon tv-btn--accent-active"
-          onClick={() => void save()}
-          title="Save area"
-        >
-          <Check className="tm-icon" />
-        </button>
-        <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)} title="Cancel">
-          <X className="tm-icon" />
-        </button>
+        <IconButton icon={Check} label="Save area" size="sm" onClick={() => void save()} />
+        <IconButton icon={X} label="Cancel" size="sm" onClick={() => setEditing(false)} />
       </span>
     )
   }
@@ -616,13 +599,7 @@ function ProjectAreaBadge({
         >
           #{project.area}
         </span>
-        <button
-          className="projects-browser__area-edit-btn"
-          onClick={() => void openEdit()}
-          title="Change area"
-        >
-          <Pencil className="tm-icon" />
-        </button>
+        <IconButton icon={Pencil} label="Change area" size="sm" onClick={() => void openEdit()} />
       </span>
     )
   }
@@ -755,9 +732,9 @@ export function ProjectsBrowser(): React.JSX.Element {
             </button>
           ))}
         </div>
-        <button className="projects-browser__create-btn" onClick={() => setShowCreateForm(true)}>
+        <Button variant="primary" size="sm" onClick={() => setShowCreateForm(true)}>
           + New project
-        </button>
+        </Button>
       </div>
 
       {showCreateForm && (
@@ -797,37 +774,34 @@ export function ProjectsBrowser(): React.JSX.Element {
                   }}
                   autoFocus
                 />
-                <button
-                  className="tv-btn tv-btn--primary tv-btn--xs"
-                  onClick={() => void handleRenameProject()}
-                >
+                <Button variant="primary" size="sm" onClick={() => void handleRenameProject()}>
                   Save
-                </button>
-                <button
-                  className="tv-btn tv-btn--ghost tv-btn--xs"
+                </Button>
+                <IconButton
+                  icon={X}
+                  label="Cancel rename"
+                  size="sm"
                   onClick={() => {
                     setRenamingProject(null)
                     setRenameError(null)
                   }}
-                >
-                  <X className="tm-icon" />
-                </button>
+                />
                 {renameError && <span className="area-detail__rename-error">{renameError}</span>}
               </div>
             ) : (
               <span className="projects-browser__name-wrap">
                 <span className="projects-browser__name">{project.name}</span>
-                <button
-                  className="tv-btn tv-btn--ghost tv-btn--xs area-detail__rename-btn"
+                <IconButton
+                  icon={Pencil}
+                  label="Rename project"
+                  size="sm"
+                  className="area-detail__rename-btn"
                   onClick={() => {
                     setRenameText(project.name)
                     setRenamingProject(project.name)
                     setRenameError(null)
                   }}
-                  title="Rename project"
-                >
-                  <Pencil className="tm-icon-sm" />
-                </button>
+                />
               </span>
             )}
             {project.status === 'archived' && (
@@ -840,26 +814,28 @@ export function ProjectsBrowser(): React.JSX.Element {
             {editingDeadlineProject === project.name ? (
               <span className="projects-browser__deadline-edit">
                 <DateTimePicker mode="date" value={deadlineValue} onChange={setDeadlineValue} />
-                <button
-                  className="tv-btn tv-btn--primary tv-btn--xs"
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={() => void handleUpdateDeadline(project.name, deadlineValue)}
                 >
                   Save
-                </button>
+                </Button>
                 {project.deadline && (
-                  <button
-                    className="tv-btn tv-btn--ghost tv-btn--xs"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => void handleUpdateDeadline(project.name, null)}
                   >
                     Clear
-                  </button>
+                  </Button>
                 )}
-                <button
-                  className="tv-btn tv-btn--ghost tv-btn--xs"
+                <IconButton
+                  icon={X}
+                  label="Cancel deadline edit"
+                  size="sm"
                   onClick={() => setEditingDeadlineProject(null)}
-                >
-                  <X className="tm-icon-sm" />
-                </button>
+                />
               </span>
             ) : project.deadline ? (
               <button
@@ -901,29 +877,30 @@ export function ProjectsBrowser(): React.JSX.Element {
           )}
           {project.status === 'someday' && (
             <div className="projects-browser__stale-actions">
-              <button
-                className="projects-browser__action-btn"
-                onClick={() => void handleUpdateStatus(project.filePath, 'active')}
-              >
+              <Button size="sm" onClick={() => void handleUpdateStatus(project.filePath, 'active')}>
                 Promote to active
-              </button>
+              </Button>
             </div>
           )}
           <div className="projects-browser__footer">
             {project.status !== 'archived' ? (
-              <button
-                className="projects-browser__action-btn projects-browser__action-btn--danger"
+              <Button
+                variant="danger"
+                size="sm"
+                icon={Archive}
                 onClick={() => void handleUpdateStatus(project.filePath, 'archived')}
               >
-                <Archive className="tm-icon-sm" /> Archive project
-              </button>
+                Archive project
+              </Button>
             ) : (
-              <button
-                className="projects-browser__action-btn projects-browser__action-btn--danger"
+              <Button
+                variant="danger"
+                size="sm"
+                icon={Trash2}
                 onClick={() => void handleDelete(project.filePath, project.name)}
               >
-                <Trash2 className="tm-icon-sm" /> Delete project
-              </button>
+                Delete project
+              </Button>
             )}
           </div>
         </div>

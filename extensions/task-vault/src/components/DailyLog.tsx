@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { EmptyState } from '@terminator/extension-ui'
+import { Button, EmptyState, IconButton } from '@terminator/extension-ui'
 import { DateTimePicker } from './DateTimePicker'
 import {
   Trash2,
@@ -14,7 +14,9 @@ import {
   MinusCircle,
   ArrowRightCircle,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
+  RotateCcw,
   OctagonAlert,
   GripVertical,
   CornerUpLeft,
@@ -142,9 +144,7 @@ function SessionPicker({
     return (
       <span className="daily-log__link-picker">
         <span className="tv-text-muted-sm">No active terminal sessions.</span>
-        <button className="tv-btn tv-btn--icon" onClick={onClose}>
-          <X className="tm-icon" />
-        </button>
+        <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
       </span>
     )
   }
@@ -167,9 +167,7 @@ function SessionPicker({
           </option>
         ))}
       </select>
-      <button className="tv-btn tv-btn--icon" onClick={onClose}>
-        <X className="tm-icon" />
-      </button>
+      <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
     </span>
   )
 }
@@ -247,12 +245,10 @@ function SubtaskRow({
             onCancel={() => setEditing(false)}
             autoFocus
           />
-          <button className="tv-btn tv-btn--primary" onClick={() => void saveEdit()}>
+          <Button variant="primary" onClick={() => void saveEdit()}>
             Save
-          </button>
-          <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}>
-            <X className="tm-icon" />
-          </button>
+          </Button>
+          <IconButton icon={X} label="Cancel edit" size="sm" onClick={() => setEditing(false)} />
         </span>
       ) : (
         <span
@@ -265,28 +261,14 @@ function SubtaskRow({
 
       {isOpen && !editing && (
         <span className="daily-log__subtask-actions">
-          <button className="tv-btn tv-btn--outline" onClick={() => setEditing(true)} title="Edit">
-            <Pencil className="tm-icon" />
-          </button>
-          <button
-            className="tv-btn tv-btn--outline"
-            onClick={() => void handleDelete()}
-            title="Delete"
-          >
-            <Trash2 className="tm-icon" />
-          </button>
+          <IconButton icon={Pencil} label="Edit" size="sm" onClick={() => setEditing(true)} />
+          <IconButton icon={Trash2} label="Delete" size="sm" onClick={() => void handleDelete()} />
         </span>
       )}
 
       {!isOpen && !editing && (
         <span className="daily-log__subtask-actions">
-          <button
-            className="tv-btn tv-btn--outline"
-            onClick={() => void handleDelete()}
-            title="Delete"
-          >
-            <Trash2 className="tm-icon" />
-          </button>
+          <IconButton icon={Trash2} label="Delete" size="sm" onClick={() => void handleDelete()} />
         </span>
       )}
     </div>
@@ -342,22 +324,18 @@ function GhostAddSubtaskRow({
         disabled={saving}
         autoFocus
       />
-      <button
-        className="tv-btn tv-btn--outline tv-btn--xs"
-        onClick={() => void handleAdd()}
-        disabled={saving || !text.trim()}
-      >
+      <Button size="sm" onClick={() => void handleAdd()} disabled={saving || !text.trim()}>
         Add
-      </button>
-      <button
-        className="tv-btn tv-btn--icon"
+      </Button>
+      <IconButton
+        icon={X}
+        label="Cancel"
+        size="sm"
         onClick={() => {
           setText('')
           setActive(false)
         }}
-      >
-        <X className="tm-icon" />
-      </button>
+      />
     </div>
   )
 }
@@ -489,9 +467,7 @@ function BlockModal({
         <div className="daily-log__block-modal-header">
           <OctagonAlert className="task-status task-status--blocked tm-icon-lg" />
           <span>Mark as Blocked</span>
-          <button className="tv-btn tv-btn--icon" onClick={onClose}>
-            <X className="tm-icon" />
-          </button>
+          <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
         </div>
         <label className="daily-log__block-modal-label">
           Why is this blocked?
@@ -509,16 +485,16 @@ function BlockModal({
           <IntervalPicker value={checkInterval} onChange={setCheckInterval} />
         </div>
         <div className="daily-log__block-modal-actions">
-          <button className="tv-btn tv-btn--ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            className="tv-btn tv-btn--warning"
+          </Button>
+          <Button
+            variant="primary"
             onClick={handleSubmit}
             disabled={!reason.trim() || (isCustom && !checkInterval)}
           >
             Mark blocked
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -623,9 +599,7 @@ function RecurrenceModal({
         <div className="daily-log__block-modal-header">
           <Repeat className="tm-icon-lg" />
           <span>{existing ? 'Edit Recurrence' : 'Set Recurrence'}</span>
-          <button className="tv-btn tv-btn--icon" onClick={onClose}>
-            <X className="tm-icon" />
-          </button>
+          <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
         </div>
 
         <div className="daily-log__block-modal-label">
@@ -701,20 +675,16 @@ function RecurrenceModal({
 
         <div className="daily-log__block-modal-actions">
           {existing && (
-            <button
-              className="tv-btn tv-btn--ghost tv-btn--danger-text"
-              onClick={onClear}
-              style={{ marginRight: 'auto' }}
-            >
+            <Button variant="danger" onClick={onClear} style={{ marginRight: 'auto' }}>
               Remove
-            </button>
+            </Button>
           )}
-          <button className="tv-btn tv-btn--ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button className="tv-btn tv-btn--primary" onClick={handleSubmit} disabled={!canSubmit}>
+          </Button>
+          <Button variant="primary" onClick={handleSubmit} disabled={!canSubmit}>
             Save
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -993,12 +963,15 @@ function TaskRow({
                 onCancel={() => setEditing(false)}
                 autoFocus
               />
-              <button className="tv-btn tv-btn--primary" onClick={() => void saveEdit()}>
+              <Button variant="primary" onClick={() => void saveEdit()}>
                 Save
-              </button>
-              <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}>
-                <X className="tm-icon" />
-              </button>
+              </Button>
+              <IconButton
+                icon={X}
+                label="Cancel edit"
+                size="sm"
+                onClick={() => setEditing(false)}
+              />
             </span>
           ) : (
             <>
@@ -1033,24 +1006,20 @@ function TaskRow({
 
                 {isOpen && (
                   <span className="daily-log__task-actions">
-                    <button
-                      className="tv-btn tv-btn--outline tv-btn--action-icon"
+                    <IconButton
+                      icon={ArrowRight}
+                      label="Migrate to another day"
                       onClick={() => setMigratingOpen(true)}
-                      title="Migrate to another day"
-                    >
-                      <ArrowRight className="tm-icon" />
-                    </button>
-                    <button
-                      className="tv-btn tv-btn--outline tv-btn--action-icon"
+                    />
+                    <IconButton
+                      icon={Sunset}
+                      label="Send to backlog"
                       onClick={() => void handleSendToBacklog()}
-                      title="Send to backlog"
-                    >
-                      <Sunset className="tm-icon" />
-                    </button>
+                    />
                     {linked || task.terminatorLinks.length > 0 ? (
-                      <button
-                        className="tv-btn tv-btn--outline tv-btn--action-icon"
-                        title="Jump to linked terminal"
+                      <IconButton
+                        icon={Zap}
+                        label="Jump to linked terminal"
                         onClick={() => {
                           const sessionId = linkedSessionId
                           if (!sessionId) {
@@ -1074,80 +1043,60 @@ function TaskRow({
                               setLinking(true)
                             })
                         }}
-                      >
-                        <Zap className="tm-icon" />
-                      </button>
+                      />
                     ) : (
-                      <button
-                        className="tv-btn tv-btn--outline tv-btn--action-icon"
+                      <IconButton
+                        icon={Zap}
+                        label="Link to terminal session"
                         onClick={() => setLinking(true)}
-                        title="Link to terminal session"
-                      >
-                        <Zap className="tm-icon" />
-                      </button>
+                      />
                     )}
                     {!hasSubtasks && (
-                      <button
-                        className="tv-btn tv-btn--outline tv-btn--action-icon"
+                      <IconButton
+                        icon={ListPlus}
+                        label="Add subtask"
                         onClick={() => setAddingSubtask(true)}
-                        title="Add subtask"
-                      >
-                        <ListPlus className="tm-icon" />
-                      </button>
+                      />
                     )}
-                    <button
-                      className={`tv-btn tv-btn--outline tv-btn--action-icon${task.recurrenceRule ? ' tv-btn--accent-active' : ''}`}
-                      onClick={() => setRecurrenceModalOpen(true)}
-                      title={
+                    <IconButton
+                      icon={Repeat}
+                      label={
                         task.recurrenceRule
                           ? `Recurrence: ${formatRecurrenceRule(task.recurrenceRule)}`
                           : 'Set recurrence'
                       }
-                    >
-                      <Repeat className="tm-icon" />
-                    </button>
-                    <button
-                      className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--warning-hover"
+                      onClick={() => setRecurrenceModalOpen(true)}
+                    />
+                    <IconButton
+                      icon={OctagonAlert}
+                      label="Mark as blocked"
                       onClick={() => setBlockModalOpen(true)}
-                      title="Mark as blocked"
-                    >
-                      <OctagonAlert className="tm-icon" />
-                    </button>
-                    <button
-                      className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--danger-hover"
+                    />
+                    <IconButton
+                      icon={Archive}
+                      label="Archive task"
                       onClick={() => void handleCancel()}
-                      title="Archive task"
-                    >
-                      <Archive className="tm-icon" />
-                    </button>
+                    />
                   </span>
                 )}
 
                 {isBlocked && (
                   <span className="daily-log__task-actions">
                     {!hasSubtasks && (
-                      <button
-                        className="tv-btn tv-btn--outline tv-btn--action-icon"
+                      <IconButton
+                        icon={ListPlus}
+                        label="Add subtask"
                         onClick={() => setAddingSubtask(true)}
-                        title="Add subtask"
-                      >
-                        <ListPlus className="tm-icon" />
-                      </button>
+                      />
                     )}
-                    <button
-                      className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--success-hover"
-                      onClick={() => void handleUnblock()}
-                      title="Unblock task"
-                    >
+                    <Button size="sm" onClick={() => void handleUnblock()} title="Unblock task">
                       Unblock
-                    </button>
-                    <button
-                      className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--danger-hover"
+                    </Button>
+                    <IconButton
+                      icon={Archive}
+                      label="Archive task"
                       onClick={() => void handleCancel()}
-                      title="Archive task"
-                    >
-                      <Archive className="tm-icon" />
-                    </button>
+                    />
                   </span>
                 )}
 
@@ -1156,22 +1105,18 @@ function TaskRow({
                     {(task.status === 'done' ||
                       task.status === 'migrated' ||
                       task.status === 'cancelled') && (
-                      <button
-                        className="tv-btn tv-btn--outline tv-btn--action-icon"
+                      <IconButton
+                        icon={RotateCcw}
+                        label="Restore to open"
                         onClick={() => void handleRestore()}
-                        title="Restore to open"
-                      >
-                        ↩
-                      </button>
+                      />
                     )}
                     {(task.status === 'migrated' || task.status === 'cancelled') && (
-                      <button
-                        className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--danger-hover"
+                      <IconButton
+                        icon={Trash2}
+                        label="Remove"
                         onClick={() => void handleDelete()}
-                        title="Remove"
-                      >
-                        <Trash2 className="tm-icon" />
-                      </button>
+                      />
                     )}
                   </span>
                 )}
@@ -1243,16 +1188,19 @@ function TaskRow({
           {migratingOpen && (
             <span className="daily-log__migrate-picker">
               <DateTimePicker mode="date" value={migrateDate} onChange={setMigrateDate} />
-              <button
-                className="tv-btn tv-btn--primary"
+              <Button
+                variant="primary"
                 onClick={() => void handleMigrate()}
                 disabled={!migrateDate}
               >
                 Move
-              </button>
-              <button className="tv-btn tv-btn--icon" onClick={() => setMigratingOpen(false)}>
-                <X className="tm-icon" />
-              </button>
+              </Button>
+              <IconButton
+                icon={X}
+                label="Cancel move"
+                size="sm"
+                onClick={() => setMigratingOpen(false)}
+              />
             </span>
           )}
 
@@ -1280,22 +1228,22 @@ function TaskRow({
             disabled={savingSubtask}
             autoFocus
           />
-          <button
-            className="tv-btn tv-btn--outline tv-btn--xs"
+          <Button
+            size="sm"
             onClick={() => void handleAddFirstSubtask()}
             disabled={savingSubtask || !subtaskText.trim()}
           >
             Add
-          </button>
-          <button
-            className="tv-btn tv-btn--icon"
+          </Button>
+          <IconButton
+            icon={X}
+            label="Cancel"
+            size="sm"
             onClick={() => {
               setSubtaskText('')
               setAddingSubtask(false)
             }}
-          >
-            <X className="tm-icon" />
-          </button>
+          />
         </div>
       )}
       {blockModalOpen && (
@@ -1383,16 +1331,15 @@ function AddTaskRow({
         disabled={adding}
         autoFocus
       />
-      <button
-        className="daily-log__save-btn"
+      <Button
+        variant="primary"
+        size="sm"
         onClick={() => void submit()}
         disabled={adding || !text.trim()}
       >
         Add
-      </button>
-      <button className="daily-log__cancel-edit-btn" onClick={() => setOpen(false)}>
-        <X className="tm-icon" />
-      </button>
+      </Button>
+      <IconButton icon={X} label="Cancel" size="sm" onClick={() => setOpen(false)} />
     </div>
   )
 }
@@ -1450,17 +1397,17 @@ function BacklogTaskRow({
             }}
             autoFocus
           />
-          <button className="tv-btn tv-btn--primary" onClick={() => void saveEdit()}>
+          <Button variant="primary" onClick={() => void saveEdit()}>
             Save
-          </button>
-          <button
-            className="tv-btn tv-btn--icon"
+          </Button>
+          <IconButton
+            icon={X}
+            label="Cancel edit"
+            size="sm"
             onClick={() => {
               setEditing(false)
             }}
-          >
-            <X className="tm-icon" />
-          </button>
+          />
         </span>
       ) : (
         <span
@@ -1486,22 +1433,20 @@ function BacklogTaskRow({
       {!editing && (
         <span className="daily-log__backlog-actions">
           {onPickUpToday && (
-            <button
-              className="daily-log__backlog-btn"
+            <IconButton
+              icon={CalendarCheck}
+              label="Pick up today"
+              size="sm"
               onClick={() => void onPickUpToday(task.id)}
-              title="Pick up today"
-            >
-              <CalendarCheck className="tm-icon" />
-            </button>
+            />
           )}
           {onDelete && (
-            <button
-              className="daily-log__backlog-btn"
+            <IconButton
+              icon={Trash2}
+              label="Delete"
+              size="sm"
               onClick={() => void onDelete(task.id)}
-              title="Delete"
-            >
-              <Trash2 className="tm-icon" />
-            </button>
+            />
           )}
         </span>
       )}
@@ -1661,14 +1606,14 @@ export function DailyLog({
   return (
     <div className="daily-log">
       <div className="daily-log__date">
-        <button
-          className="tv-btn tv-btn--icon daily-log__date-nav"
-          onClick={onPrevDay}
+        <IconButton
+          icon={ChevronLeft}
+          label="Previous day"
+          size="sm"
+          className="daily-log__date-nav"
+          onClick={() => onPrevDay?.()}
           disabled={!onPrevDay}
-          title="Previous day"
-        >
-          <ChevronRight className="tm-icon-lg" style={{ transform: 'rotate(180deg)' }} />
-        </button>
+        />
         <div className="daily-log__date-text">
           <span className="daily-log__date-weekday">
             {weekday}
@@ -1677,23 +1622,18 @@ export function DailyLog({
           <span className="daily-log__date-detail">{detail}</span>
         </div>
         {!isToday && onGoToToday && (
-          <button
-            className="tv-btn tv-btn--xs tv-btn--secondary daily-log__back-to-today"
-            onClick={onGoToToday}
-            title="Back to today"
-          >
-            <CornerUpLeft className="tm-icon-sm" />
+          <Button size="sm" icon={CornerUpLeft} onClick={onGoToToday} title="Back to today">
             Today
-          </button>
+          </Button>
         )}
-        <button
-          className="tv-btn tv-btn--icon daily-log__date-nav"
-          onClick={onNextDay}
+        <IconButton
+          icon={ChevronRight}
+          label="Next day"
+          size="sm"
+          className="daily-log__date-nav"
+          onClick={() => onNextDay?.()}
           disabled={!onNextDay}
-          title="Next day"
-        >
-          <ChevronRight className="tm-icon-lg" />
-        </button>
+        />
       </div>
 
       <section className="daily-log__tasks">

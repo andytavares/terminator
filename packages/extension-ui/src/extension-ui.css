@@ -147,6 +147,13 @@
   font-weight: 500;
 }
 
+/* Without this the base hover's card background won, leaving the light label
+   on a light grey in the light theme. Notepad's own primary had fixed the same. */
+.tmui-button--primary:hover:not(:disabled) {
+  background: var(--tm-accent-hover);
+  border-color: var(--tm-accent-hover);
+}
+
 .tmui-button--danger {
   border-color: var(--tm-danger);
   color: var(--tm-danger);
@@ -177,9 +184,25 @@
   cursor: pointer;
 }
 
-.tmui-icon-button:hover {
+.tmui-icon-button:hover:not(:disabled) {
   background: var(--tm-bg-card-hover);
   color: var(--tm-text-primary);
+}
+
+.tmui-icon-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tmui-icon-button--sm {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--tm-radius-xs, 4px);
+}
+
+.tmui-icon-button.tmui-icon-button--sm svg {
+  width: 12px;
+  height: 12px;
 }
 
 .tmui-icon-button[aria-pressed='true'] {
@@ -361,6 +384,9 @@
 }
 
 .tmui-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tm-space-1, 4px);
   margin-bottom: -1px;
   padding: 6px 12px;
   border: 0;
@@ -370,6 +396,31 @@
   font: inherit;
   font-size: 13px;
   cursor: pointer;
+}
+
+/* A count or badge inside a tab label. */
+.tmui-tabs__count {
+  color: var(--tm-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tmui-tabs__list[aria-orientation='vertical'] {
+  flex-direction: column;
+  gap: 0;
+  border-bottom: 0;
+}
+
+.tmui-tabs__list[aria-orientation='vertical'] .tmui-tabs__tab {
+  margin-bottom: 0;
+  padding: 7px 10px;
+  border-bottom: 0;
+  border-left: 2px solid transparent;
+  text-align: left;
+}
+
+.tmui-tabs__list[aria-orientation='vertical'] .tmui-tabs__tab[aria-selected='true'] {
+  border-left-color: var(--tm-accent);
+  background: var(--tm-accent-dim);
 }
 
 .tmui-tabs__tab:hover:not(:disabled) {
@@ -393,7 +444,9 @@
   outline-offset: -2px;
 }
 
-.tmui-tabs__panel {
+/* Only the assembled Tabs spaces its panel; a TabPanel placed by its caller is
+   spaced by that caller. */
+.tmui-tabs > .tmui-tabs__panel {
   padding-top: var(--tm-space-3, 12px);
 }
 

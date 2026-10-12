@@ -6,10 +6,17 @@ import {
   Download,
   Folder,
   LayoutTemplate,
+  Plus,
   Tag as TagIcon,
   X,
 } from 'lucide-react'
-import { ConfirmDialog, RelativeTime, useDismissible } from '@terminator/extension-ui'
+import {
+  Button,
+  ConfirmDialog,
+  IconButton,
+  RelativeTime,
+  useDismissible,
+} from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
 import { useFilterStore } from '../stores/filter.store'
 import { EmptyState } from './EmptyState'
@@ -184,9 +191,7 @@ function ItemEditModal({
           <span className="notepad-dialog__title">
             Edit {state.itemType === 'diagram' ? 'Diagram' : 'Note'}
           </span>
-          <button className="notepad-btn-icon" onClick={onClose} aria-label="Close">
-            <X className="tm-icon" />
-          </button>
+          <IconButton icon={X} label="Close" onClick={onClose} />
         </div>
         <div className="notepad-dialog__body">
           <input
@@ -203,16 +208,12 @@ function ItemEditModal({
         </div>
         <div className="notepad-dialog__footer">
           <span className="notepad-dialog__hint">⌘↵ Save · Esc Cancel</span>
-          <button className="notepad-btn-ghost" onClick={onClose} disabled={saving}>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
             Cancel
-          </button>
-          <button
-            className="notepad-btn-primary"
-            onClick={() => void handleSave()}
-            disabled={saving}
-          >
+          </Button>
+          <Button variant="primary" onClick={() => void handleSave()} disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -820,11 +821,7 @@ export function NoteList(): React.JSX.Element {
 
       {tags.length > 0 && (
         <div className="notepad-tag-filter" ref={tagDropdownRef}>
-          <button
-            className={`notepad-tag-filter__btn${activeTagIds.length > 0 ? ' notepad-tag-filter__btn--active' : ''}`}
-            onClick={() => setTagDropdownOpen((v) => !v)}
-          >
-            <TagIcon className="tm-icon-sm" />
+          <Button size="sm" icon={TagIcon} onClick={() => setTagDropdownOpen((v) => !v)}>
             {activeTagIds.length > 0
               ? `${activeTagIds.length} tag${activeTagIds.length > 1 ? 's' : ''}`
               : 'Tags'}
@@ -840,7 +837,7 @@ export function NoteList(): React.JSX.Element {
                 <X className="tm-icon-sm" />
               </span>
             )}
-          </button>
+          </Button>
           {tagDropdownOpen && (
             <div className="notepad-tag-filter__dropdown">
               {[...tags]
@@ -1031,18 +1028,17 @@ export function NoteList(): React.JSX.Element {
       </div>
 
       <div className="notepad-note-list__footer">
-        <button
-          className="notepad-btn-export"
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={Download}
           onClick={() => window.dispatchEvent(new CustomEvent('notepad:openExport'))}
         >
-          <Download aria-hidden="true" /> Export
-        </button>
-        <button
-          className="notepad-btn-primary notepad-btn-new"
-          onClick={() => setShowQuickCreate(true)}
-        >
-          + New <kbd className="notepad-kbd notepad-kbd--inline">⌘⇧N</kbd>
-        </button>
+          Export
+        </Button>
+        <Button variant="primary" size="sm" icon={Plus} onClick={() => setShowQuickCreate(true)}>
+          New <kbd className="tmui-kbd">⌘⇧N</kbd>
+        </Button>
       </div>
 
       {/* Context menu */}

@@ -1,6 +1,6 @@
 import { AlertTriangle, ListFilter } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { formatRelativeTime } from '@terminator/extension-ui'
+import { Tab, TabList, TabPanel, TabsRoot, formatRelativeTime } from '@terminator/extension-ui'
 import { z } from 'zod'
 import { githubAPI } from '../../api/github'
 import { DashboardPRSchema, type DashboardPR } from '../../schemas/pr-review.schema'
@@ -451,90 +451,81 @@ export function ReviewDashboard(): JSX.Element {
           onSaved={handleSaved}
         />
       )}
-      <div className="rd-tabs">
-        <div className="rd-tablist" role="tablist" aria-label="Dashboard sections">
-          <button
-            role="tab"
-            aria-selected={activeTab === 'needs'}
-            onClick={() => setActiveTab('needs')}
-          >
-            Needs you<span className="rd-ct">{needsYouCount}</span>
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'mine'}
-            onClick={() => setActiveTab('mine')}
-          >
-            My PRs<span className="rd-ct">{mineCount}</span>
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'involved'}
-            onClick={() => setActiveTab('involved')}
-          >
-            Involved<span className="rd-ct">{involvedCount}</span>
-          </button>
-        </div>
-        <span className="rd-sp" />
-        <SortSelect value={dashboardSort} onChange={setDashboardSort} />
-      </div>
-
-      {loading && <div className="rd-note rd-loading">Loading reviews…</div>}
-
-      {!loading && error && (
-        <div className="rd-error">
-          {error}
-          <button type="button" className="rd-btn" onClick={load}>
-            Retry
-          </button>
-          {chooseButton}
-        </div>
-      )}
-
-      {!loading && !error && failed.length > 0 && (
-        <div className="rd-failed" role="alert">
-          <AlertTriangle aria-hidden="true" className="tm-icon" />
-          <span>{failedSummary(failed)}</span>
+      <TabsRoot selectedId={activeTab} onSelect={setActiveTab}>
+        <div className="rd-tabs">
+          <TabList label="Dashboard sections" className="rd-tablist">
+            <Tab id="needs" accessibleName={`Needs you, ${needsYouCount}`}>
+              Needs you<span className="tmui-tabs__count">{needsYouCount}</span>
+            </Tab>
+            <Tab id="mine" accessibleName={`My PRs, ${mineCount}`}>
+              My PRs<span className="tmui-tabs__count">{mineCount}</span>
+            </Tab>
+            <Tab id="involved" accessibleName={`Involved, ${involvedCount}`}>
+              Involved<span className="tmui-tabs__count">{involvedCount}</span>
+            </Tab>
+          </TabList>
           <span className="rd-sp" />
-          <button type="button" className="rd-btn" onClick={load}>
-            Retry
-          </button>
-          {chooseButton}
+          <SortSelect value={dashboardSort} onChange={setDashboardSort} />
         </div>
-      )}
 
-      {!loading && !error && activeTab === 'needs' && (
-        <div role="tabpanel">
-          <div className="rd-band">
-            <b>{needsYouCount} need you</b>
-            <span>{highRiskCount} high risk</span>
-            <span>About {formatMinutes(totalMinutes)} of reading</span>
+        {loading && <div className="rd-note rd-loading">Loading reviews…</div>}
+
+        {!loading && error && (
+          <div className="rd-error">
+            {error}
+            <button type="button" className="rd-btn" onClick={load}>
+              Retry
+            </button>
+            {chooseButton}
           </div>
-          {needsYou.length === 0 && <div className="rd-empty">Nothing needs you</div>}
-          {renderSection('REQUESTED OF YOU', requested, toNeedsRow, 'requested')}
-          {renderSection(
-            'RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED',
-            reReview,
-            toNeedsRow,
-            're-review'
-          )}
-          {renderSection('REQUESTED OF YOUR TEAM', team, toNeedsRow, 'team')}
-        </div>
-      )}
+        )}
 
-      {!loading && !error && activeTab === 'mine' && (
-        <div role="tabpanel">
-          {mine.length === 0 && <div className="rd-empty">Nothing needs you</div>}
-          {renderSection('YOUR OPEN PRS', mine, toMineRow, 'mine')}
-        </div>
-      )}
+        {!loading && !error && failed.length > 0 && (
+          <div className="rd-failed" role="alert">
+            <AlertTriangle aria-hidden="true" className="tm-icon" />
+            <span>{failedSummary(failed)}</span>
+            <span className="rd-sp" />
+            <button type="button" className="rd-btn" onClick={load}>
+              Retry
+            </button>
+            {chooseButton}
+          </div>
+        )}
 
-      {!loading && !error && activeTab === 'involved' && (
-        <div role="tabpanel">
-          {involved.length === 0 && <div className="rd-empty">Nothing needs you</div>}
-          {renderSection('MENTIONED, ASSIGNED OR COMMENTED', involved, toInvolvedRow, 'involved')}
-        </div>
-      )}
+        {!loading && !error && (
+          <>
+            <TabPanel id="needs">
+              <div className="rd-band">
+                <b>{needsYouCount} need you</b>
+                <span>{highRiskCount} high risk</span>
+                <span>About {formatMinutes(totalMinutes)} of reading</span>
+              </div>
+              {needsYou.length === 0 && <div className="rd-empty">Nothing needs you</div>}
+              {renderSection('REQUESTED OF YOU', requested, toNeedsRow, 'requested')}
+              {renderSection(
+                'RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED',
+                reReview,
+                toNeedsRow,
+                're-review'
+              )}
+              {renderSection('REQUESTED OF YOUR TEAM', team, toNeedsRow, 'team')}
+            </TabPanel>
+            <TabPanel id="mine">
+              {mine.length === 0 && <div className="rd-empty">Nothing needs you</div>}
+              {renderSection('YOUR OPEN PRS', mine, toMineRow, 'mine')}
+            </TabPanel>
+            <TabPanel id="involved">
+              {involved.length === 0 && <div className="rd-empty">Nothing needs you</div>}
+              {renderSection(
+                'MENTIONED, ASSIGNED OR COMMENTED',
+                involved,
+                toInvolvedRow,
+                'involved'
+              )}
+            </TabPanel>
+          </>
+        )}
+      </TabsRoot>
     </div>
   )
 }

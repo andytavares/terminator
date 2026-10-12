@@ -4,7 +4,7 @@ import { X } from 'lucide-react'
 import { useNotesStore } from '../stores/notes.store'
 import { NoteEditor } from '../editor/NoteEditor'
 import type { DiagramListItem } from '../db/types'
-import { useDismissible } from '@terminator/extension-ui'
+import { Button, useDismissible } from '@terminator/extension-ui'
 
 function toFilenameSlug(title: string): string {
   return (
@@ -328,22 +328,18 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
             />
           )}
           <div className="notepad-quick-create__footer-actions">
-            <button className="notepad-quick-create__cancel-link" onClick={close} disabled={saving}>
-              cancel <kbd className="notepad-kbd notepad-kbd--inline">Esc</kbd>
-            </button>
-            <button
-              className="notepad-btn-primary"
-              onClick={() => void handleSave()}
-              disabled={saving}
-            >
+            <Button variant="ghost" size="sm" onClick={close} disabled={saving}>
+              Cancel <kbd className="tmui-kbd">Esc</kbd>
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => void handleSave()} disabled={saving}>
               {saving ? (
                 'Saving…'
               ) : (
                 <>
-                  Save <kbd className="notepad-kbd notepad-kbd--inline">↵</kbd>
+                  Save <kbd className="tmui-kbd">↵</kbd>
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

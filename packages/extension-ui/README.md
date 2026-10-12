@@ -22,17 +22,17 @@ should define a colour.
 
 **Components**
 
-| Export                               | For                                                                                  |
-| ------------------------------------ | ------------------------------------------------------------------------------------ |
-| `Button`                             | primary, secondary, ghost, danger; sm, md; disabled; icon slot                       |
-| `IconButton`                         | an icon-only control with a required accessible name                                 |
-| `Tabs`                               | WAI-ARIA tabs: arrow keys, Home, End, `aria-selected`                                |
-| `Dialog`, `ConfirmDialog`            | a modal question or form; yes or no                                                  |
-| `Popover`                            | a dismissible, non-modal surface anchored to a control                               |
-| `ToastRegion`, `Toast`               | transient messages                                                                   |
-| `EmptyState`                         | heading, one line of why, and the control that fills it                              |
-| `Markdown`                           | react-markdown with GFM and sanitised raw HTML (ADR 091); `inline`, `fetchesNothing` |
-| `RelativeTime`, `formatRelativeTime` | "5 minutes ago" through `Intl.RelativeTimeFormat`                                    |
+| Export                                           | For                                                                                  |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `Button`                                         | primary, secondary, ghost, danger; sm, md; disabled; icon slot                       |
+| `IconButton`                                     | an icon-only control with a required accessible name; sm (20px), md (26px); disabled |
+| `Tabs`; `TabsRoot`, `TabList`, `Tab`, `TabPanel` | WAI-ARIA tabs: arrow keys, Home, End, roving `tabindex`; assembled or in parts       |
+| `Dialog`, `ConfirmDialog`                        | a modal question or form; yes or no                                                  |
+| `Popover`                                        | a dismissible, non-modal surface anchored to a control                               |
+| `ToastRegion`, `Toast`                           | transient messages                                                                   |
+| `EmptyState`                                     | heading, one line of why, and the control that fills it                              |
+| `Markdown`                                       | react-markdown with GFM and sanitised raw HTML (ADR 091); `inline`, `fetchesNothing` |
+| `RelativeTime`, `formatRelativeTime`             | "5 minutes ago" through `Intl.RelativeTimeFormat`                                    |
 
 **Behaviour** — `usePolling(read, show, intervalMs)`, `everyWhileVisible(tick, intervalMs)`, `useDismissible`, the focus
 trap, the modal-depth registry and the layer scale (`LAYERS`, `layerValue`,
@@ -47,6 +47,26 @@ carry font files. The bundler copies the woff2 files next to the view's script.
 `Dialog` actions take `submit: true`: the panel becomes a `<form>`, so Enter in a
 field runs that action once. A field with `autoFocus` keeps focus when the dialog
 opens, and focus still returns to the control that opened it.
+
+`Tabs` follows the [WAI-ARIA tabs pattern](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/)
+with automatic activation: the arrow keys move focus and select (Up and Down in a
+`vertical` list), Home and End jump to the ends, disabled tabs are skipped, and only
+the selected tab is in the Tab order. It comes two ways:
+
+- `Tabs` takes `label`, `tabs` (`id`, `label`, `panel`, optional `disabled`) and
+  puts the list directly over the selected panel.
+- The parts, shaped like [Radix Tabs](https://www.radix-ui.com/primitives/docs/components/tabs)
+  (Root, List, Trigger, Content), for anything else: `TabsRoot` holds `selectedId`
+  and `onSelect` and draws no element; `TabList` (`label`, `orientation`) can share
+  a toolbar row with other controls; each `Tab` (`id`) takes any content; each
+  `TabPanel` (`id`) renders, only while its tab is selected, wherever the caller
+  puts it, so a loading or error block can sit between the list and the panel.
+
+A tab whose content is more than words, such as a count, takes `accessibleName`
+("Needs you, 3"), which a screen reader would otherwise read as "Needs you3"; put
+the count in a `tmui-tabs__count` span. A tab's `aria-controls` names its panel only
+while that panel is in the document, so a list whose content the caller draws
+elsewhere (a chapter list over a file list) points at nothing that is missing.
 
 `formatRelativeTime` returns `''`, and `RelativeTime` renders nothing, for a time
 that does not parse.

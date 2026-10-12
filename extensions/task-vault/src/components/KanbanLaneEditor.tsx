@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Dialog } from '@terminator/extension-ui'
+import { Button, Dialog, IconButton } from '@terminator/extension-ui'
 import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import type { KanbanLane, TaskStatus } from '../vault/types'
@@ -106,22 +106,20 @@ export function KanbanLaneEditor({ lanes, onSave, onClose }: KanbanLaneEditorPro
             <div key={lane.id} className="tv-lane-editor__row">
               <div className="tv-lane-editor__row-header">
                 <div className="tv-lane-editor__reorder">
-                  <button
-                    className="tv-btn tv-btn--ghost tv-btn--xs"
+                  <IconButton
+                    icon={ChevronUp}
+                    label="Move up"
+                    size="sm"
                     onClick={() => moveLane(i, -1)}
                     disabled={i === 0}
-                    title="Move up"
-                  >
-                    <ChevronUp aria-hidden="true" />
-                  </button>
-                  <button
-                    className="tv-btn tv-btn--ghost tv-btn--xs"
+                  />
+                  <IconButton
+                    icon={ChevronDown}
+                    label="Move down"
+                    size="sm"
                     onClick={() => moveLane(i, 1)}
                     disabled={i === draft.length - 1}
-                    title="Move down"
-                  >
-                    <ChevronDown aria-hidden="true" />
-                  </button>
+                  />
                 </div>
                 <input
                   className="tv-lane-editor__name-input"
@@ -129,13 +127,12 @@ export function KanbanLaneEditor({ lanes, onSave, onClose }: KanbanLaneEditorPro
                   onChange={(e) => updateLabel(i, e.target.value)}
                   placeholder="Lane name"
                 />
-                <button
-                  className="tv-btn tv-btn--ghost tv-btn--xs tv-lane-editor__delete"
+                <IconButton
+                  icon={Trash2}
+                  label="Remove lane"
+                  size="sm"
                   onClick={() => removeLane(i)}
-                  title="Remove lane"
-                >
-                  <Trash2 className="tm-icon" />
-                </button>
+                />
               </div>
               <div className="tv-lane-editor__statuses">
                 <span className="tv-lane-editor__statuses-label">Maps:</span>
@@ -171,13 +168,14 @@ export function KanbanLaneEditor({ lanes, onSave, onClose }: KanbanLaneEditorPro
                   title="Calendar dot color"
                 />
                 {lane.dotColor && (
-                  <button
-                    className="tv-btn tv-btn--ghost tv-btn--xs"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => updateDotColor(i, undefined)}
                     title="Reset to default"
                   >
                     Reset
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -194,14 +192,9 @@ export function KanbanLaneEditor({ lanes, onSave, onClose }: KanbanLaneEditorPro
               if (e.key === 'Enter') addLane()
             }}
           />
-          <button
-            className="tv-btn tv-btn--secondary tv-btn--xs"
-            onClick={addLane}
-            disabled={!newLabel.trim()}
-          >
-            <Plus className="tm-icon" />
+          <Button size="sm" icon={Plus} onClick={addLane} disabled={!newLabel.trim()}>
             Add
-          </button>
+          </Button>
         </div>
       </div>
     </Dialog>,

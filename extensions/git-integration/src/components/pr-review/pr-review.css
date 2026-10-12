@@ -516,69 +516,18 @@
   color: var(--tm-accent-text);
 }
 
-.pr-rail-chapters .chapter-nav {
-  flex-direction: column;
-  overflow-x: visible;
-}
-
-.pr-rail-chapters .chapter-nav-tab {
-  width: 100%;
-  padding: 7px 10px;
-  border-bottom: 0;
-  border-left: 2px solid transparent;
-  white-space: normal;
-  text-align: left;
-}
-
-.pr-rail-chapters .chapter-nav-tab--active {
-  border-left-color: var(--tm-accent);
-  background: var(--tm-accent-dim);
-}
-
 .pr-rail-chapters .chapter-nav-meta {
   margin-left: auto;
 }
 
 /* ─── ChapterNav ──────────────────────────────────────────────────────────── */
 
-.chapter-nav {
-  display: flex;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--tm-border);
-  flex-shrink: 0;
-  scrollbar-width: none;
-}
-.chapter-nav::-webkit-scrollbar {
-  display: none;
-}
-
+/* The design system's vertical tab list draws each tab; this lays out a chapter's row. */
 .chapter-nav-tab {
-  padding: 10px 16px;
-  cursor: pointer;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--tm-text-muted);
-  font-size: 13px;
-  white-space: nowrap;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  transition: color 0.15s;
-}
-.chapter-nav-tab:hover {
-  color: var(--tm-text-primary);
-}
-.chapter-nav-tab--active {
-  color: var(--tm-text-primary);
-  border-bottom-color: var(--tm-accent);
-}
-
-.chapter-nav-tab {
-  flex-direction: row;
-  align-items: center;
+  width: 100%;
   gap: 6px;
+  white-space: normal;
 }
 .chapter-nav-name {
   font-weight: 500;

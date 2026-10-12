@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Play, RefreshCw, Trash2 } from 'lucide-react'
 import { invoke } from '@terminator/extension-sdk/renderer'
+import { Button, IconButton } from '@terminator/extension-ui'
 
 interface TableStats {
   [table: string]: number
@@ -179,9 +180,12 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
       <div className="db-admin__stats">
         <div className="db-admin__stats-header">
           <span className="db-admin__section-title">Tables</span>
-          <button className="tv-btn tv-btn--ghost tv-btn--xs" onClick={() => void loadStats()}>
-            <RefreshCw className="tm-icon-sm" />
-          </button>
+          <IconButton
+            icon={RefreshCw}
+            label="Refresh tables"
+            size="sm"
+            onClick={() => void loadStats()}
+          />
         </div>
         {stats ? (
           <div className="db-admin__stats-grid">
@@ -199,13 +203,13 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
                   <span className="db-admin__stat-table">{table}</span>
                   <span className="db-admin__stat-count">{count}</span>
                 </div>
-                <button
+                <IconButton
+                  icon={Trash2}
+                  label={`Clear all rows from ${table}`}
                   className="db-admin__stat-clear"
+                  size="sm"
                   onClick={() => handleClearTable(table)}
-                  title={`Clear all rows from ${table}`}
-                >
-                  <Trash2 className="tm-icon-sm" />
-                </button>
+                />
               </div>
             ))}
           </div>
@@ -219,13 +223,14 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
         <span className="db-admin__section-title">Quick actions</span>
         <div className="db-admin__actions">
           {QUICK_ACTIONS.map((a) => (
-            <button
+            <Button
               key={a.label}
-              className={`tv-btn tv-btn--xs ${a.destructive ? 'tv-btn--danger-ghost' : 'tv-btn--ghost'}`}
+              variant={a.destructive ? 'danger' : 'ghost'}
+              size="sm"
               onClick={() => handleQuickAction(a)}
             >
               {a.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -249,15 +254,15 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
             rows={4}
             spellCheck={false}
           />
-          <button
-            className="tv-btn tv-btn--primary db-admin__run-btn"
+          <Button
+            variant="primary"
+            icon={Play}
             onClick={handleRun}
             disabled={running || !sql.trim()}
             title="Run (⌘↵)"
           >
-            <Play className="tm-icon-sm" />
             {running ? 'Running…' : 'Run'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -297,13 +302,13 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
                       <tr key={i} className="db-admin__data-row">
                         {canDeleteRows && (
                           <td className="db-admin__action-col">
-                            <button
+                            <IconButton
+                              icon={Trash2}
+                              label="Delete this row"
                               className="db-admin__row-delete"
+                              size="sm"
                               onClick={() => handleDeleteRow(row, sourceTable!)}
-                              title="Delete this row"
-                            >
-                              <Trash2 className="tm-icon-sm" />
-                            </button>
+                            />
                           </td>
                         )}
                         {columns.map((c) => (
@@ -331,12 +336,12 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
             <p className="db-admin__confirm-title">{confirmPending.title}</p>
             <p className="db-admin__confirm-sql">{confirmPending.sql}</p>
             <div className="db-admin__confirm-actions">
-              <button className="tv-btn tv-btn--danger" onClick={handleConfirm}>
+              <Button variant="danger" onClick={handleConfirm}>
                 Run
-              </button>
-              <button className="tv-btn tv-btn--ghost" onClick={() => setConfirmPending(null)}>
+              </Button>
+              <Button variant="ghost" onClick={() => setConfirmPending(null)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>

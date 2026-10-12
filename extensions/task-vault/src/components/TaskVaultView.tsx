@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { CalendarDays, ChevronDown, Download, Kanban, List, Settings, Upload } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import { Dialog, IconButton, useDismissible } from '@terminator/extension-ui'
+import { Button, Dialog, IconButton, useDismissible } from '@terminator/extension-ui'
 import './task-vault.css'
 import { notify } from '../utils/notify'
 import { useVaultStore } from '../stores/vault.store'
@@ -182,24 +182,23 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
               existing data is not overwritten.
             </p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="tv-btn tv-btn--primary"
+              <Button
+                variant="primary"
+                icon={Download}
                 onClick={handleExport}
                 disabled={exporting}
                 style={{ display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                <Download className="tm-icon" />
                 {exporting ? 'Exporting…' : 'Export JSON'}
-              </button>
-              <button
-                className="tv-btn tv-btn--secondary"
+              </Button>
+              <Button
+                icon={Upload}
                 onClick={handleImportClick}
                 disabled={importing}
                 style={{ display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                <Upload className="tm-icon" />
                 {importing ? 'Importing…' : 'Import JSON'}
-              </button>
+              </Button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -565,8 +564,9 @@ export function TaskVaultView(): React.JSX.Element {
                 onClick={() => setViewMode('kanban')}
               />
               <div className="tv-context-filter" ref={contextMenuRef}>
-                <button
-                  className={`tv-btn tv-btn--xs tv-context-filter__btn${selectedContexts.length > 0 ? ' tv-btn--secondary' : ' tv-btn--ghost'}`}
+                <Button
+                  variant={selectedContexts.length > 0 ? 'secondary' : 'ghost'}
+                  size="sm"
                   onClick={() => setContextMenuOpen((v) => !v)}
                   title="Filter"
                   aria-label="Filter by context"
@@ -577,18 +577,15 @@ export function TaskVaultView(): React.JSX.Element {
                       ? `+${selectedContexts[0]}`
                       : `${selectedContexts.length} contexts`}
                   <ChevronDown className="tm-icon-sm" />
-                </button>
+                </Button>
                 {contextMenuOpen && (
                   <div className="tv-context-filter__dropdown">
                     <div className="tv-context-filter__header">
                       <span className="tv-context-filter__heading">Filter by context</span>
                       {selectedContexts.length > 0 && (
-                        <button
-                          className="tv-context-filter__clear"
-                          onClick={() => setSelectedContexts([])}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedContexts([])}>
                           Clear
-                        </button>
+                        </Button>
                       )}
                     </div>
                     {availableContexts.length === 0 && (
@@ -612,21 +609,21 @@ export function TaskVaultView(): React.JSX.Element {
                 )}
               </div>
               {activeView === 'daily' && (
-                <button
-                  className={`tv-btn tv-btn--ghost task-vault-view__tools-btn${showCalendar ? ' tv-btn--active' : ''}`}
+                <IconButton
+                  icon={CalendarDays}
+                  label="Calendar"
+                  pressed={showCalendar}
+                  className="task-vault-view__tools-btn"
                   onClick={() => setShowCalendar((v) => !v)}
-                  title={showCalendar ? 'Hide calendar' : 'Show calendar'}
-                >
-                  <CalendarDays className="tm-icon" />
-                </button>
+                />
               )}
-              <button
-                className="tv-btn tv-btn--ghost task-vault-view__tools-btn"
+              <IconButton
+                icon={Settings}
+                label="Data tools (export / import)"
+                size="sm"
+                className="task-vault-view__tools-btn"
                 onClick={() => setShowDataTools(true)}
-                title="Data tools (export / import)"
-              >
-                <Settings className="tm-icon" />
-              </button>
+              />
             </div>
           </div>
         </div>

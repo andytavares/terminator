@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Button } from '@terminator/extension-ui'
 
 interface Props {
   onComplete: () => void
@@ -64,9 +65,9 @@ export function WeeklyReviewStep6Reflect({ onComplete, reviewId }: Props): React
         />
       </label>
 
-      <button className="wr-step__finish" onClick={finishReview} disabled={saving}>
+      <Button variant="primary" onClick={finishReview} disabled={saving}>
         {saving ? 'Saving…' : 'Finish review'}
-      </button>
+      </Button>
     </div>
   )
 }

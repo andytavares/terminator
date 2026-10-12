@@ -1,9 +1,189 @@
-import React, { useId, useRef } from 'react'
+import React, { createContext, useContext, useId, useLayoutEffect, useState } from 'react'
 import './extension-ui.css'
+
+/*
+ * The WAI-ARIA Authoring Practices tabs pattern, with automatic activation:
+ * arrow keys move focus and select, Home and End jump to the ends, and only the
+ * selected tab is in the Tab order.
+ * https://www.w3.org/WAI/ARIA/apg/patterns/tabs/
+ *
+ * Built from parts, as Radix Tabs (Root, List, Trigger, Content) and React Aria
+ * (Tabs, TabList, Tab, TabPanel) are, so a tab list can share a toolbar row with
+ * other controls and its panels render wherever the caller puts them. `Tabs` is
+ * the same parts assembled for the common case of a list over its panel.
+ */
+
+export type TabOrientation = 'horizontal' | 'vertical'
+
+interface TabsContextValue {
+  baseId: string
+  selectedId: string
+  onSelect: (id: string) => void
+  shownPanelId: string | null
+  setShownPanelId: React.Dispatch<React.SetStateAction<string | null>>
+}
+
+const TabsContext = createContext<TabsContextValue | null>(null)
+
+function useTabsContext(part: string): TabsContextValue {
+  const context = useContext(TabsContext)
+  if (!context) throw new Error(`${part} must be inside a TabsRoot`)
+  return context
+}
+
+const tabElementId = (baseId: string, id: string) => `${baseId}-tab-${id}`
+const panelElementId = (baseId: string, id: string) => `${baseId}-panel-${id}`
+
+export interface TabsRootProps<Id extends string = string> {
+  selectedId: Id
+  onSelect: (id: Id) => void
+  children: React.ReactNode
+}
+
+/** Holds the selection. Draws no element, so it does not change the caller's layout. */
+export function TabsRoot<Id extends string = string>({
+  selectedId,
+  onSelect,
+  children,
+}: TabsRootProps<Id>): JSX.Element {
+  const baseId = useId()
+  const [shownPanelId, setShownPanelId] = useState<string | null>(null)
+  // Every id that comes back is one the caller gave a Tab, so it is an Id.
+  const select = onSelect as (id: string) => void
+  const value = { baseId, selectedId, onSelect: select, shownPanelId, setShownPanelId }
+  return <TabsContext.Provider value={value}>{children}</TabsContext.Provider>
+}
+
+type Move = 'previous' | 'next' | 'first' | 'last'
+
+const MOVES: Record<TabOrientation, Record<string, Move>> = {
+  horizontal: { ArrowLeft: 'previous', ArrowRight: 'next', Home: 'first', End: 'last' },
+  vertical: { ArrowUp: 'previous', ArrowDown: 'next', Home: 'first', End: 'last' },
+}
+
+function targetIndex(move: Move, count: number, current: number): number {
+  if (move === 'first') return 0
+  if (move === 'last') return count - 1
+  const step = move === 'next' ? 1 : -1
+  return (current + step + count) % count
+}
+
+function enabledTabs(list: HTMLElement): HTMLButtonElement[] {
+  return Array.from(list.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)'))
+}
+
+export interface TabListProps {
+  /** Names the tab list for assistive technology: "Pull request sections". */
+  label: string
+  /** Vertical lists move with Up and Down instead of Left and Right. */
+  orientation?: TabOrientation
+  className?: string
+  children: React.ReactNode
+}
+
+export function TabList({
+  label,
+  orientation = 'horizontal',
+  className,
+  children,
+}: TabListProps): JSX.Element {
+  const { onSelect } = useTabsContext('TabList')
+  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
+    const move = MOVES[orientation][event.key]
+    const tabs = enabledTabs(event.currentTarget)
+    const current = tabs.indexOf(event.target as HTMLButtonElement)
+    if (!move || current < 0) return
+    event.preventDefault()
+    const next = tabs[targetIndex(move, tabs.length, current)]
+    next.focus()
+    onSelect(next.dataset.tabId ?? '')
+  }
+  const classes = ['tmui-tabs__list', className].filter(Boolean).join(' ')
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      aria-orientation={orientation}
+      className={classes}
+      onKeyDown={onKeyDown}
+    >
+      {children}
+    </div>
+  )
+}
+
+export interface TabProps {
+  id: string
+  disabled?: boolean
+  /**
+   * The tab's name when its content is more than words, such as a count:
+   * "Needs you, 3" for `Needs you<span>3</span>`, which would otherwise be read
+   * as "Needs you3".
+   */
+  accessibleName?: string
+  className?: string
+  children: React.ReactNode
+}
+
+export function Tab({ id, disabled, accessibleName, className, children }: TabProps): JSX.Element {
+  const { baseId, selectedId, onSelect, shownPanelId } = useTabsContext('Tab')
+  const selected = id === selectedId
+  const classes = ['tmui-tabs__tab', className].filter(Boolean).join(' ')
+  return (
+    <button
+      type="button"
+      role="tab"
+      id={tabElementId(baseId, id)}
+      data-tab-id={id}
+      aria-label={accessibleName}
+      aria-selected={selected}
+      // Only the shown panel is in the document; a reference to another would dangle.
+      aria-controls={selected && shownPanelId === id ? panelElementId(baseId, id) : undefined}
+      tabIndex={selected ? 0 : -1}
+      disabled={disabled}
+      className={classes}
+      onClick={() => onSelect(id)}
+    >
+      {children}
+    </button>
+  )
+}
+
+export interface TabPanelProps {
+  /** The `id` of the tab this panel belongs to. Rendered only while that tab is selected. */
+  id: string
+  className?: string
+  children: React.ReactNode
+}
+
+export function TabPanel({ id, className, children }: TabPanelProps): JSX.Element | null {
+  const { baseId, selectedId, setShownPanelId } = useTabsContext('TabPanel')
+  const shown = id === selectedId
+  useLayoutEffect(() => {
+    if (!shown) return undefined
+    setShownPanelId(id)
+    return () => setShownPanelId((current) => (current === id ? null : current))
+  }, [shown, id, setShownPanelId])
+  if (!shown) return null
+  const classes = ['tmui-tabs__panel', className].filter(Boolean).join(' ')
+  return (
+    <div
+      role="tabpanel"
+      id={panelElementId(baseId, id)}
+      aria-labelledby={tabElementId(baseId, id)}
+      tabIndex={0}
+      className={classes}
+    >
+      {children}
+    </div>
+  )
+}
 
 export interface TabItem {
   id: string
-  label: string
+  /** Words, or markup such as a count; give markup an `accessibleName`. */
+  label: React.ReactNode
+  accessibleName?: string
   disabled?: boolean
   panel: React.ReactNode
 }
@@ -16,83 +196,29 @@ export interface TabsProps {
   onSelect: (id: string) => void
 }
 
-type Move = 'previous' | 'next' | 'first' | 'last'
-
-const MOVES: Record<string, Move> = {
-  ArrowLeft: 'previous',
-  ArrowRight: 'next',
-  Home: 'first',
-  End: 'last',
-}
-
-function targetIndex(move: Move, enabled: readonly number[], current: number): number {
-  if (move === 'first') return enabled[0]
-  if (move === 'last') return enabled[enabled.length - 1]
-  const step = move === 'next' ? 1 : -1
-  return enabled[(enabled.indexOf(current) + step + enabled.length) % enabled.length]
-}
-
-function useTabKeys(tabs: readonly TabItem[], onSelect: (id: string) => void) {
-  const buttons = useRef<(HTMLButtonElement | null)[]>([])
-  const register = (index: number) => (element: HTMLButtonElement | null) => {
-    buttons.current[index] = element
-  }
-  const onKeyDown = (event: React.KeyboardEvent, index: number): void => {
-    const move = MOVES[event.key]
-    const enabled = tabs.flatMap((tab, i) => (tab.disabled ? [] : [i]))
-    if (!move || enabled.length === 0) return
-    event.preventDefault()
-    const next = targetIndex(move, enabled, index)
-    buttons.current[next]?.focus()
-    onSelect(tabs[next].id)
-  }
-  return { register, onKeyDown }
-}
-
-/**
- * Tabs with automatic activation, as in the WAI-ARIA Authoring Practices
- * tabs pattern: arrow keys move focus and select, Home and End jump to the
- * ends, and only the selected tab is in the Tab order.
- * https://www.w3.org/WAI/ARIA/apg/patterns/tabs/
- */
+/** A tab list directly over its panel. For any other layout, use the parts. */
 export function Tabs({ label, tabs, selectedId, onSelect }: TabsProps): JSX.Element {
-  const baseId = useId()
-  const { register, onKeyDown } = useTabKeys(tabs, onSelect)
-  const selected = tabs.find((tab) => tab.id === selectedId)
-
   return (
-    <div className="tmui-tabs">
-      <div role="tablist" aria-label={label} className="tmui-tabs__list">
-        {tabs.map((tab, index) => (
-          <button
-            key={tab.id}
-            ref={register(index)}
-            type="button"
-            role="tab"
-            id={`${baseId}-tab-${tab.id}`}
-            aria-selected={tab === selected}
-            aria-controls={`${baseId}-panel-${tab.id}`}
-            tabIndex={tab === selected ? 0 : -1}
-            disabled={tab.disabled}
-            className="tmui-tabs__tab"
-            onClick={() => onSelect(tab.id)}
-            onKeyDown={(event) => onKeyDown(event, index)}
-          >
-            {tab.label}
-          </button>
+    <TabsRoot selectedId={selectedId} onSelect={onSelect}>
+      <div className="tmui-tabs">
+        <TabList label={label}>
+          {tabs.map((tab) => (
+            <Tab
+              key={tab.id}
+              id={tab.id}
+              disabled={tab.disabled}
+              accessibleName={tab.accessibleName}
+            >
+              {tab.label}
+            </Tab>
+          ))}
+        </TabList>
+        {tabs.map((tab) => (
+          <TabPanel key={tab.id} id={tab.id}>
+            {tab.panel}
+          </TabPanel>
         ))}
       </div>
-      {selected && (
-        <div
-          role="tabpanel"
-          id={`${baseId}-panel-${selected.id}`}
-          aria-labelledby={`${baseId}-tab-${selected.id}`}
-          tabIndex={0}
-          className="tmui-tabs__panel"
-        >
-          {selected.panel}
-        </div>
-      )}
-    </div>
+    </TabsRoot>
   )
 }

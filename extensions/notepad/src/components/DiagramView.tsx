@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { MessageSquarePlus, X, Check, Trash2, Pencil } from 'lucide-react'
+import { Button, IconButton } from '@terminator/extension-ui'
 import type { ExcalidrawInitialDataState } from '@excalidraw/excalidraw/types/types'
 import type { DiagramComment } from '../db/types'
 import { useNotesStore } from '../stores/notes.store'
@@ -80,23 +81,9 @@ function CommentPopover({
       <div className="diagram-comment-popover__header">
         <span className="diagram-comment-popover__title">Comment</span>
         <div className="diagram-comment-popover__actions">
-          <button
-            className="notepad-btn-ghost diagram-comment-popover__resolve"
-            onClick={onResolve}
-            title="Resolve thread"
-          >
-            <Check className="tm-icon-sm" />
-          </button>
-          <button
-            className="notepad-btn-ghost diagram-comment-popover__delete"
-            onClick={onDelete}
-            title="Delete thread"
-          >
-            <Trash2 className="tm-icon-sm" />
-          </button>
-          <button className="notepad-btn-icon" onClick={onClose} aria-label="Close">
-            <X className="tm-icon-sm" />
-          </button>
+          <IconButton icon={Check} label="Resolve thread" size="sm" onClick={onResolve} />
+          <IconButton icon={Trash2} label="Delete thread" size="sm" onClick={onDelete} />
+          <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
         </div>
       </div>
       <div className="diagram-comment-popover__messages">
@@ -122,13 +109,15 @@ function CommentPopover({
             }
           }}
         />
-        <button
-          className="notepad-btn-primary diagram-comment-popover__send"
+        <Button
+          variant="primary"
+          size="sm"
+          className="diagram-comment-popover__send"
           onClick={handleReply}
           disabled={!replyText.trim()}
         >
           Reply
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -159,9 +148,7 @@ function NewCommentComposer({ screenX, screenY, onSubmit, onCancel }: NewComment
     <div className="diagram-comment-popover" style={{ left: screenX + 20, top: screenY }}>
       <div className="diagram-comment-popover__header">
         <span className="diagram-comment-popover__title">New comment</span>
-        <button className="notepad-btn-icon" onClick={onCancel} aria-label="Cancel">
-          <X className="tm-icon-sm" />
-        </button>
+        <IconButton icon={X} label="Cancel" size="sm" onClick={onCancel} />
       </div>
       <div className="diagram-comment-popover__reply">
         <textarea
@@ -180,12 +167,12 @@ function NewCommentComposer({ screenX, screenY, onSubmit, onCancel }: NewComment
           }}
         />
         <div className="diagram-comment-popover__footer-actions">
-          <button className="notepad-btn-ghost" onClick={onCancel}>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
             Cancel
-          </button>
-          <button className="notepad-btn-primary" onClick={handleSubmit} disabled={!body.trim()}>
+          </Button>
+          <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!body.trim()}>
             Save
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -561,8 +548,11 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
         <span className="diagram-view__save-status">
           {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Save failed' : ''}
         </span>
-        <button
-          className={`notepad-btn-ghost${commentMode ? ' diagram-view__comment-btn--active' : ''}`}
+        <Button
+          variant={commentMode ? 'primary' : 'ghost'}
+          size="sm"
+          icon={MessageSquarePlus}
+          aria-pressed={commentMode}
           onClick={() => {
             setCommentMode((v) => !v)
             setPendingPin(null)
@@ -571,9 +561,8 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
             commentMode ? 'Cancel comment placement' : 'Add comment (click anywhere on canvas)'
           }
         >
-          <MessageSquarePlus className="tm-icon" />
-          {commentMode ? ' Placing…' : ' Comment'}
-        </button>
+          {commentMode ? 'Placing…' : 'Comment'}
+        </Button>
       </div>
 
       <div

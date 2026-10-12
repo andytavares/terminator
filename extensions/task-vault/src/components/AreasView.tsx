@@ -14,6 +14,7 @@ import {
 import type { IndexedTask } from '../vault/types'
 import { SmartTaskInput, invalidateSmartInputCache } from './SmartTaskInput'
 import { useVaultStore } from '../stores/vault.store'
+import { Button, IconButton } from '@terminator/extension-ui'
 
 interface AreaProject {
   id: string
@@ -200,9 +201,9 @@ export function AreasView(): React.JSX.Element {
           ))}
         </div>
         {statusFilter === 'active' && (
-          <button className="areas-view__create-btn" onClick={() => setCreatingArea(true)}>
+          <Button variant="primary" size="sm" onClick={() => setCreatingArea(true)}>
             + New area
-          </button>
+          </Button>
         )}
       </div>
 
@@ -221,16 +222,14 @@ export function AreasView(): React.JSX.Element {
             placeholder="Area name (e.g. health, finances, work)"
             autoFocus
           />
-          <button
-            className="tv-btn tv-btn--primary"
+          <Button
+            variant="primary"
             onClick={handleCreateArea}
             disabled={creating || !newAreaName.trim()}
           >
             {creating ? '…' : 'Create'}
-          </button>
-          <button className="tv-btn tv-btn--secondary" onClick={() => setCreatingArea(false)}>
-            Cancel
-          </button>
+          </Button>
+          <Button onClick={() => setCreatingArea(false)}>Cancel</Button>
         </div>
       )}
 
@@ -293,27 +292,27 @@ export function AreasView(): React.JSX.Element {
                 )}
               </div>
               {area.status !== 'archived' ? (
-                <button
+                <IconButton
+                  icon={Archive}
+                  label="Archive area"
+                  size="sm"
                   className="areas-view__card-delete"
                   onClick={(e) => {
                     e.stopPropagation()
                     void handleArchiveArea(area.name)
                   }}
-                  title="Archive area"
-                >
-                  <Archive className="tm-icon" />
-                </button>
+                />
               ) : (
-                <button
-                  className="areas-view__card-delete areas-view__card-delete--danger"
+                <IconButton
+                  icon={Trash2}
+                  label="Delete area permanently"
+                  size="sm"
+                  className="areas-view__card-delete"
                   onClick={(e) => {
                     e.stopPropagation()
                     void handleDeleteArea(area.name)
                   }}
-                  title="Delete area permanently"
-                >
-                  <Trash2 className="tm-icon" />
-                </button>
+                />
               )}
             </div>
           ))}
@@ -451,9 +450,9 @@ function AreaDetail({
   return (
     <div className="area-detail">
       <div className="area-detail__header">
-        <button className="tv-btn tv-btn--ghost tv-btn--xs" onClick={onBack}>
-          <ArrowLeft aria-hidden="true" /> Areas
-        </button>
+        <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={onBack}>
+          Areas
+        </Button>
         {renamingArea ? (
           <div className="area-detail__rename-row">
             <input
@@ -469,21 +468,18 @@ function AreaDetail({
               }}
               autoFocus
             />
-            <button
-              className="tv-btn tv-btn--primary tv-btn--xs"
-              onClick={() => void handleRenameArea()}
-            >
+            <Button variant="primary" size="sm" onClick={() => void handleRenameArea()}>
               Save
-            </button>
-            <button
-              className="tv-btn tv-btn--ghost tv-btn--xs"
+            </Button>
+            <IconButton
+              icon={X}
+              label="Cancel rename"
+              size="sm"
               onClick={() => {
                 setRenamingArea(false)
                 setRenameText(area.name)
               }}
-            >
-              <X className="tm-icon" />
-            </button>
+            />
             {renameError && <span className="area-detail__rename-error">{renameError}</span>}
           </div>
         ) : (
@@ -492,30 +488,26 @@ function AreaDetail({
             {area.status === 'archived' && (
               <span className="projects-browser__archived-badge tv-ml-2">archived</span>
             )}
-            <button
-              className="tv-btn tv-btn--ghost tv-btn--xs area-detail__rename-btn"
+            <IconButton
+              icon={Pencil}
+              label="Rename area"
+              size="sm"
+              className="area-detail__rename-btn"
               onClick={() => {
                 setRenameText(area.name)
                 setRenamingArea(true)
               }}
-              title="Rename area"
-            >
-              <Pencil className="tm-icon-sm" />
-            </button>
+            />
           </h2>
         )}
         {area.status !== 'archived' ? (
-          <button className="area-detail__delete-btn" onClick={onArchive} title="Archive area">
+          <Button size="sm" onClick={onArchive} title="Archive area">
             Archive area
-          </button>
+          </Button>
         ) : (
-          <button
-            className="area-detail__delete-btn area-detail__delete-btn--danger"
-            onClick={onDelete}
-            title="Delete area permanently"
-          >
+          <Button variant="danger" size="sm" onClick={onDelete} title="Delete area permanently">
             Delete area
-          </button>
+          </Button>
         )}
       </div>
 
@@ -528,13 +520,14 @@ function AreaDetail({
           disabled={adding}
           autoFocus
         />
-        <button
-          className="tv-btn tv-btn--primary area-detail__add-btn"
+        <Button
+          variant="primary"
+          className="area-detail__add-btn"
           onClick={handleAddTask}
           disabled={adding || !newTaskText.trim()}
         >
           Add
-        </button>
+        </Button>
       </div>
 
       {tasks.length === 0 ? (
@@ -565,18 +558,15 @@ function AreaDetail({
                     onCancel={() => setEditingId(null)}
                     autoFocus
                   />
-                  <button
-                    className="tv-btn tv-btn--primary tv-btn--xs"
-                    onClick={() => void handleEdit(task.id)}
-                  >
+                  <Button variant="primary" size="sm" onClick={() => void handleEdit(task.id)}>
                     Save
-                  </button>
-                  <button
-                    className="tv-btn tv-btn--ghost tv-btn--xs"
+                  </Button>
+                  <IconButton
+                    icon={X}
+                    label="Cancel edit"
+                    size="sm"
                     onClick={() => setEditingId(null)}
-                  >
-                    <X className="tm-icon" />
-                  </button>
+                  />
                 </span>
               ) : (
                 <span

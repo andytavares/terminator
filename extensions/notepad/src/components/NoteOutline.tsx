@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import { PanelRightClose } from 'lucide-react'
+import { IconButton } from '@terminator/extension-ui'
 import { useEditorStore } from '../stores/editor.store'
 import { parseOutline } from '../editor/outline'
 
@@ -28,9 +29,7 @@ export function NoteOutline({ onSelect, onClose }: NoteOutlineProps): React.JSX.
       <div className="notepad-outline__header">
         <span className="notepad-outline__title">Outline</span>
         <span className="notepad-outline__count">{headings.length}</span>
-        <button className="notepad-outline__close" aria-label="Close outline" onClick={onClose}>
-          <PanelRightClose />
-        </button>
+        <IconButton icon={PanelRightClose} label="Close outline" size="sm" onClick={onClose} />
       </div>
 
       {headings.length === 0 ? (

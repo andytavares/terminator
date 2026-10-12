@@ -120,8 +120,7 @@ describe('DateTimePicker — date mode', () => {
     const { container } = render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
     act(() => clickTrigger(container))
     expect(screen.getByText('June 2026')).toBeTruthy()
-    const navButtons = container.querySelectorAll('.dtp__cal-nav')
-    act(() => fireEvent.click(navButtons[0]))
+    act(() => fireEvent.click(screen.getByRole('button', { name: 'Previous month' })))
     expect(screen.getByText('May 2026')).toBeTruthy()
   })
 

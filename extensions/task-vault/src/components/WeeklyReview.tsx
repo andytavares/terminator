@@ -8,6 +8,7 @@ import { WeeklyReviewStepStaleTasks } from './WeeklyReviewStepStaleTasks'
 import { WeeklyReviewStep5Someday } from './WeeklyReviewStep5Someday'
 import { WeeklyReviewStep6Reflect } from './WeeklyReviewStep6Reflect'
 import { WeeklyReviewHistory } from './WeeklyReviewHistory'
+import { Button, IconButton } from '@terminator/extension-ui'
 
 interface WeeklyReviewPayload {
   inboxItems: IndexedTask[]
@@ -135,9 +136,9 @@ export function WeeklyReview(): React.JSX.Element {
             </div>
           </div>
           <div className="weekly-review__nav">
-            <button className="weekly-review__nav-text-btn" onClick={() => setShowHistory(false)}>
+            <Button variant="ghost" size="sm" onClick={() => setShowHistory(false)}>
               Back
-            </button>
+            </Button>
           </div>
         </div>
         <div className="weekly-review__content">
@@ -155,9 +156,7 @@ export function WeeklyReview(): React.JSX.Element {
           <p className="weekly-review__complete-sub">
             Your mind is clear. You're ready for the week.
           </p>
-          <button className="tv-btn tv-btn--secondary" onClick={openHistory}>
-            View past reviews
-          </button>
+          <Button onClick={openHistory}>View past reviews</Button>
         </div>
       </div>
     )
@@ -182,25 +181,23 @@ export function WeeklyReview(): React.JSX.Element {
           {step} of {TOTAL_STEPS}
         </span>
         <div className="weekly-review__nav">
-          <button className="weekly-review__nav-text-btn" onClick={openHistory}>
+          <Button variant="ghost" size="sm" onClick={openHistory}>
             History
-          </button>
-          <button
-            className="tv-btn tv-btn--secondary"
+          </Button>
+          <IconButton
+            icon={ChevronLeft}
+            label="Previous step"
+            size="sm"
             onClick={prevStep}
             disabled={step === 1}
-            aria-label="Previous step"
-          >
-            <ChevronLeft className="tm-icon" />
-          </button>
-          <button
-            className="tv-btn tv-btn--primary"
+          />
+          <IconButton
+            icon={ChevronRight}
+            label="Next step"
+            size="sm"
             onClick={nextStep}
             disabled={step === TOTAL_STEPS}
-            aria-label="Next step"
-          >
-            <ChevronRight className="tm-icon" />
-          </button>
+          />
         </div>
       </div>
 
