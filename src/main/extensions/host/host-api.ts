@@ -254,7 +254,7 @@ function globalShortcutFor(main: MainCalls): ExtensionAPI['globalShortcut'] {
   }
 }
 
-type ForwardedMember = 'dialog' | 'topBar' | 'shell' | 'notifications' | 'nativeMenu' | 'terminal'
+type ForwardedMember = 'dialog' | 'shell' | 'notifications' | 'nativeMenu' | 'terminal'
 
 /** The members that are each one call or registration in main, with nothing kept here. */
 function forwardedMembersFor(main: MainCalls): Pick<ExtensionAPI, ForwardedMember> {
@@ -263,7 +263,6 @@ function forwardedMembersFor(main: MainCalls): Pick<ExtensionAPI, ForwardedMembe
       showOpenDialog: (options) => main.call('dialog.showOpenDialog', options),
       showSaveDialog: (options) => main.call('dialog.showSaveDialog', options),
     },
-    topBar: { registerMenuItem: (item) => main.held('topBar.registerMenuItem', item) },
     shell: {
       exec: ((options) => main.call('shell.exec', options)) as ExtensionAPI['shell']['exec'],
     },

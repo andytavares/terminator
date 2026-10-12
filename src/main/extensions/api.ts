@@ -16,7 +16,6 @@ import type {
   SessionSnapshot,
   ShellExecOptions,
   ToastType,
-  TopBarMenuContribution,
   TrackerConnection,
   TrackerId,
   TrackerStateOption,
@@ -100,7 +99,6 @@ interface Registry {
   settingsSections: Map<string, ExtensionSettingsSchema>
   settingsValues: Map<string, unknown>
   workspaceSettingsValues: Map<string, unknown>
-  topBarItems: Map<string, TopBarMenuContribution>
   nativeMenuItems: Map<string, NativeMenuItemContribution>
   /** Maps panel ID → Electron menu item id for checkbox menu items registered by extensions. */
   panelMenuItemIds: Map<string, string>
@@ -117,7 +115,6 @@ export const globalRegistry: Registry = {
   settingsSections: new Map(),
   settingsValues: new Map(),
   workspaceSettingsValues: new Map(),
-  topBarItems: new Map(),
   nativeMenuItems: new Map(),
   panelMenuItemIds: new Map(),
   commandContributions: new Map(),
@@ -461,13 +458,6 @@ export function createExtensionAPI(
         deleteProjectFromStore(projectId)
         emitProjectDelete(projectId)
         deps?.broadcastToWindows?.('workspace:project-removed', { id: projectId })
-      },
-    },
-    topBar: {
-      registerMenuItem(item: TopBarMenuContribution): Disposable {
-        const key = `${extensionId}.topbar.${item.id}`
-        globalRegistry.topBarItems.set(key, item)
-        return disposable(() => globalRegistry.topBarItems.delete(key))
       },
     },
     extensions: {

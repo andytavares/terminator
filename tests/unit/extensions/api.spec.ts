@@ -100,7 +100,6 @@ beforeEach(() => {
     notifications: { defaultTargets: ['system', 'center', 'toast'], extensionOverrides: {} },
   })
   // Reset shared registry state between tests
-  globalRegistry.topBarItems.clear()
   globalRegistry.nativeMenuItems.clear()
   globalRegistry.settingsSections.clear()
 })
@@ -546,20 +545,6 @@ describe('api.ipc.registerHandler', () => {
     })
     expect(ipcInvokeRegistry.get('test.ext:local-only')?.remoteAccessible).toBe(false)
     disposable.dispose()
-  })
-})
-
-describe('api.topBar.registerMenuItem', () => {
-  it('registers a top bar item and returns disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.topBar.registerMenuItem({
-      id: 'tb-item',
-      label: 'My Item',
-      onClick: vi.fn(),
-    })
-    expect(globalRegistry.topBarItems.has('test.ext.topbar.tb-item')).toBe(true)
-    disposable.dispose()
-    expect(globalRegistry.topBarItems.has('test.ext.topbar.tb-item')).toBe(false)
   })
 })
 

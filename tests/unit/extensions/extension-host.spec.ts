@@ -160,13 +160,11 @@ describe('ExtensionHost.unload', () => {
     // The api server runs a backend's registrations on its API in main.
     const api = host.hostedApi('com.dispose')!
     api.commands.register({ id: 'disp-cmd', label: 'Disp' }, () => {})
-    api.topBar.registerMenuItem({ id: 'disp-top', label: 'Top', onClick: () => {} })
 
     await host.unload('com.dispose')
 
     expect(backendHost.deactivated).toEqual(['com.dispose'])
     expect(globalRegistry.commandContributions.has('com.dispose.command.disp-cmd')).toBe(false)
-    expect(globalRegistry.topBarItems.has('com.dispose.topbar.disp-top')).toBe(false)
     expect(host.hostedApi('com.dispose')).toBeUndefined()
   })
 

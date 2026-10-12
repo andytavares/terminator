@@ -123,18 +123,6 @@ function activate(api) {
 
   // ── More of the API (uncomment to use) ───────────────────────────────────
 
-  // TODO: Register a top-bar menu item
-  // disposables.push(
-  //   api.topBar.registerMenuItem({
-  //     id: '${id}-view',
-  //     label: '${name
-    .split('-')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')}',
-  //     onClick: () => { /* open your view */ },
-  //   })
-  // )
-
   // TODO: Run git/gh commands
   // api.shell.exec({ command: 'git', args: ['status'], cwd: '/path/to/repo' })
   //   .then((result) => console.log(result.stdout))

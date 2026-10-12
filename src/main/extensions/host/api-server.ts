@@ -21,7 +21,6 @@ export const CROSSING_MEMBERS: ReadonlySet<string> = new Set([
   'globalShortcut.register',
   'workspace.addProject',
   'workspace.deleteProject',
-  'topBar.registerMenuItem',
   'shell.exec',
   'github.api',
   'github.pullRequests.view',

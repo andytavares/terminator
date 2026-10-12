@@ -242,17 +242,6 @@ export function activate(api: ExtensionAPI): void {
       })
     )
   )
-
-  disposables.push(
-    api.topBar.registerMenuItem({
-      id: 'git-view',
-      label: 'Git',
-      tooltip: 'Open Git view',
-      onClick: () => {
-        api.notifications.showToast('info', 'Git view', 'gitViewOpened')
-      },
-    })
-  )
 }
 
 export function deactivate(): void {

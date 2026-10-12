@@ -9,6 +9,8 @@ stays in the extension host and the core calls it by id.
 
 ### Changed (breaking)
 
+- `topBar` is removed, with `TopBarMenuContribution`. The core stored the items and nothing
+  ever drew them.
 - `settings.isBranchExcluded(branch, repoPath?)` returns `Promise<boolean>`.
 - `globalShortcut.register(accelerator, handler)` returns `Promise<Disposable>` and rejects
   with `ACCELERATOR_TAKEN`.

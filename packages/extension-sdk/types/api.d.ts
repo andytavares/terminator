@@ -76,13 +76,6 @@ export interface SettingDefinition {
   danger?: boolean
 }
 
-export interface TopBarMenuContribution {
-  id: string
-  label: string
-  onClick(): void
-  tooltip?: string
-}
-
 export interface NativeMenuItemContribution {
   id: string
   label: string
@@ -338,9 +331,6 @@ export interface ExtensionAPI {
      */
     addProject(input: CreateProjectInput): Promise<ProjectSnapshot | null>
     deleteProject(projectId: string): void
-  }
-  topBar: {
-    registerMenuItem(item: TopBarMenuContribution): Disposable
   }
   /**
    * Other extensions' APIs (since 2.1.0). An extension's API is the value its

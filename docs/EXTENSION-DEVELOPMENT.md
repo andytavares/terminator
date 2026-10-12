@@ -511,10 +511,6 @@ An `issue` is attached best-effort: if the link cannot be written the project is
 
 `deleteProject(projectId)` removes a project and tells the sidebar; every terminal in it is closed (`src/main/terminal/project-sessions.ts`). Remove the project when you remove its worktree.
 
-### `api.topBar`
-
-`registerMenuItem({ id, label, onClick, tooltip? })` stores a menu item for the project view's top bar. The current renderer does not draw these items.
-
 ### `api.extensions`
 
 `get(id)` returns another extension's `activate` exports. See [Another extension's API](#another-extensions-api).

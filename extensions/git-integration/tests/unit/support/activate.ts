@@ -38,7 +38,6 @@ export function activateCapturingChannels(workspace?: FakeWorkspace) {
     commands: { register: () => disposable },
     window: { broadcast: () => {}, openAuxiliary: () => {} },
     nativeMenu: { addViewMenuItem: () => disposable },
-    topBar: { registerMenuItem: () => disposable },
     notifications: { showToast: () => {}, createNotification: () => disposable },
     workspace: {
       list: () => (workspace ? [{ id: 'w1', name: 'w', folderPath: workspace.folderPath }] : []),

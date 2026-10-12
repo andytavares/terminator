@@ -129,9 +129,12 @@ describe('generateIndex()', () => {
     expect(specifiers).toEqual(['@terminator/extension-sdk', 'zod'])
   })
 
-  it('includes commented-out stubs for the shell and the top bar', () => {
+  it('includes a commented-out stub for the shell', () => {
     const index = generateIndex('my-ext', 'com.example.my-ext')
     expect(index).toContain('shell.exec')
-    expect(index).toContain('topBar.registerMenuItem')
+  })
+
+  it('shows no top-bar stub, because the SDK has no top bar', () => {
+    expect(generateIndex('my-ext', 'com.example.my-ext')).not.toContain('topBar')
   })
 })
