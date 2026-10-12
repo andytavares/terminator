@@ -89,4 +89,16 @@ export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_diagram_comments_diagram ON diagram_comments(diagram_id, status);
   `)
+  await addColumnIfMissing(db, 'notes', 'title_set_by_hand', 'INTEGER NOT NULL DEFAULT 0')
+}
+
+/** Adds a column to a table created by an earlier version of this schema. */
+async function addColumnIfMissing(
+  db: ExtensionDB,
+  table: string,
+  column: string,
+  definition: string
+): Promise<void> {
+  const present = await db.get('SELECT 1 FROM pragma_table_info(?) WHERE name = ?', [table, column])
+  if (!present) await db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
 }

@@ -176,17 +176,38 @@ const AutosaveNotePayload = z.object({
   // Identifies the renderer that saved, so it can ignore the echo of its own
   // write instead of stomping on newer keystrokes.
   originId: z.string().optional(),
+  // True when the user typed the title; from then on it is no longer derived from the body.
+  titleSetByHand: z.boolean().optional(),
 })
 
 /** Push channel announcing a saved note body to every open notepad surface. */
 export const NOTES_CHANGED_CHANNEL = 'terminator.notepad:notes.changed'
+
+/**
+ * The title to store: one set by hand now or before wins over the one the
+ * renderer derived from the body.
+ */
+async function titleToStore(
+  tx: ExtensionDB,
+  args: z.infer<typeof AutosaveNotePayload>
+): Promise<string> {
+  if (args.titleSetByHand) {
+    await tx.run('UPDATE notes SET title_set_by_hand=1 WHERE id=?', [args.id])
+    return args.title
+  }
+  const row = await tx.get<{ title: string; title_set_by_hand: number }>(
+    'SELECT title, title_set_by_hand FROM notes WHERE id=?',
+    [args.id]
+  )
+  return row?.title_set_by_hand ? row.title : args.title
+}
 
 export async function autosaveNote(
   db: ExtensionDB,
   args: z.infer<typeof AutosaveNotePayload>,
   broadcast?: (channel: string, data: unknown) => void
 ): Promise<Record<string, unknown>> {
-  const { id, title, body, tags, originId } = args
+  const { id, body, tags, originId } = args
   const now = new Date().toISOString()
 
   const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [id])
@@ -196,7 +217,9 @@ export async function autosaveNote(
   const inlineTags = Array.from(body.matchAll(/#([a-z0-9_-]+)/gi), (m) => m[1])
   const mergedTags = Array.from(new Set([...tags, ...inlineTags]))
 
+  let title = args.title
   await db.transaction(async (tx) => {
+    title = await titleToStore(tx, args)
     await tx.run('UPDATE notes SET title=?, body=?, updated_at=? WHERE id=?', [
       title,
       body,
@@ -209,16 +232,10 @@ export async function autosaveNote(
   // The docked panel and a popped-out note window are separate renderers with
   // separate in-memory body caches. Without this push each keeps serving (and
   // re-saving) its own stale copy, so the same note shows different content.
-  broadcast?.(NOTES_CHANGED_CHANNEL, {
-    id,
-    title,
-    body,
-    tags: mergedTags,
-    updatedAt: now,
-    originId: originId ?? null,
-  })
+  const changed = { id, title, body, tags: mergedTags, updatedAt: now, originId: originId ?? null }
+  broadcast?.(NOTES_CHANGED_CHANNEL, changed)
 
-  return { data: { updatedAt: now } }
+  return { data: { updatedAt: now, title } }
 }
 
 export async function archiveNote(

@@ -143,6 +143,8 @@ function ItemEditModal({
           title: title.trim() || 'Untitled note',
           body,
           tags,
+          // Editing only the tags leaves a derived title deriving.
+          titleSetByHand: title.trim() !== state.title,
         })
       }
       onSaved()

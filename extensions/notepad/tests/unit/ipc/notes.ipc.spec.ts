@@ -215,6 +215,44 @@ describe('autosaveNote', () => {
     expect(broadcast).not.toHaveBeenCalled()
   })
 
+  it('keeps a title set by hand when later saves derive another', async () => {
+    const created = await createNote(db, { title: 'Groceries', body: 'milk' })
+    const id = (created as { data: { id: string } }).data.id
+    await autosaveNote(db, {
+      id,
+      title: 'Weekly shop',
+      body: 'milk',
+      tags: [],
+      titleSetByHand: true,
+    })
+    const broadcast = vi.fn()
+
+    const result = await autosaveNote(
+      db,
+      { id, title: 'milk and eggs', body: 'milk and eggs', tags: [] },
+      broadcast
+    )
+
+    expect(result).toMatchObject({ data: { title: 'Weekly shop' } })
+    const note = ((await getNote(db, { id })) as { data: { title: string; body: string } }).data
+    expect(note).toMatchObject({ title: 'Weekly shop', body: 'milk and eggs' })
+    expect(broadcast.mock.calls[0][1]).toMatchObject({ title: 'Weekly shop' })
+  })
+
+  it('keeps deriving the title of a note whose title was never set by hand', async () => {
+    const created = await createNote(db, { title: 'Groceries', body: 'milk' })
+    const id = (created as { data: { id: string } }).data.id
+
+    const result = await autosaveNote(db, {
+      id,
+      title: 'milk and eggs',
+      body: 'milk and eggs',
+      tags: [],
+    })
+
+    expect(result).toMatchObject({ data: { title: 'milk and eggs' } })
+  })
+
   it('saves without a broadcast callback', async () => {
     const created = await createNote(db, { title: 'T', body: 'x' })
     const id = (created as { data: { id: string } }).data.id

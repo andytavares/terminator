@@ -236,9 +236,21 @@ describe('NoteList edit dialog', () => {
     })
     expect(mockInvoke).toHaveBeenCalledWith(
       'terminator.notepad:notes.autosave',
-      expect.objectContaining({ id: 'n1', title: 'Renamed', tags: ['work'] })
+      expect.objectContaining({ id: 'n1', title: 'Renamed', tags: ['work'], titleSetByHand: true })
     )
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('leaves the title deriving from the body when only the tags change', async () => {
+    openEditDialog()
+    const title = screen.getByPlaceholderText('Title')
+    await act(async () => {
+      fireEvent.submit(title.closest('form')!)
+    })
+    expect(mockInvoke).toHaveBeenCalledWith(
+      'terminator.notepad:notes.autosave',
+      expect.objectContaining({ id: 'n1', title: 'First Note', titleSetByHand: false })
+    )
   })
 
   it('moves Tab from the last control back to the first', () => {

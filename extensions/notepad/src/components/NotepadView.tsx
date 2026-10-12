@@ -357,18 +357,22 @@ export function NotepadView(): React.JSX.Element {
           ? headingMatch[1].trim()
           : (firstLine?.trim().slice(0, 120) ?? 'Untitled note')
         try {
-          await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.autosave', {
-            id: selectedNoteId,
-            title: derivedTitle,
-            body: newBody,
-            tags: note?.tags ?? [],
-            originId: ORIGIN_ID,
-          })
+          const saved = await window.electronAPI.extensionBridge.invoke(
+            'terminator.notepad:notes.autosave',
+            {
+              id: selectedNoteId,
+              title: derivedTitle,
+              body: newBody,
+              tags: note?.tags ?? [],
+              originId: ORIGIN_ID,
+            }
+          )
           markSaved()
           // Keep the sidebar and body cache in sync so navigate-back never loses content
           const savedAt = new Date().toISOString()
           useNotesStore.getState().patchNote(selectedNoteId, {
-            title: derivedTitle,
+            // A title set by hand is kept by the save, so the stored one is shown.
+            title: (saved as { data?: { title?: string } }).data?.title ?? derivedTitle,
             updatedAt: savedAt,
             bodyPreview: newBody.slice(0, 120),
           })
