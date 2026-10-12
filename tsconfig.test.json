@@ -18,6 +18,7 @@
     "tests/integration/**/*",
     "tests/support/**/*",
     "tests/setup.ts",
+    "tests/global-setup.ts",
     "src/renderer/electron-api.d.ts"
   ],
   "exclude": [

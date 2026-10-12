@@ -27,6 +27,7 @@ const NODE_INCLUDE = [
 export default defineConfig({
   test: {
     globals: true,
+    globalSetup: ['tests/global-setup.ts'],
     setupFiles: ['tests/setup.ts'],
     // Vitest turns every stylesheet into an empty string, `?raw` imports included.
     // The design system's token file is read as text, so those keep their content.
