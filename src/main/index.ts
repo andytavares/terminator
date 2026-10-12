@@ -36,6 +36,7 @@ import { buildWindowMenu } from './window-menu.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
+import { legacyImportPending, importLegacyDatabase } from './db/legacy-pglite-import.js'
 import {
   listNativeViewMenuItems,
   getPanelMenuItemId,
@@ -264,7 +265,8 @@ app.whenReady().then(async () => {
   if (process.platform === 'darwin') await adoptLoginShellPath()
 
   const userData = app.getPath('userData')
-  await initAppDb(userData)
+  const importLegacy = legacyImportPending(userData)
+  initAppDb(userData)
 
   // Serve extension renderer files via ext://<id>/<relPath>.
   // Only files within the extension's registered directory are accessible.
@@ -412,6 +414,8 @@ app.whenReady().then(async () => {
 
   await extensionHost.loadAll()
   await extensionHost.loadBundledExtensions(join(__dirname, '../../extensions'))
+  // The extensions' migrations have created their tables by now.
+  if (importLegacy) await importLegacyDatabase(userData, getAppDb())
   // Build menu after extensions load so extension-contributed items are included from the start
   setupMenu()
 
@@ -445,7 +449,7 @@ app.on('before-quit', async (event) => {
   isQuitting = true
   await extensionHost.unloadAll()
   await ptyManager.killAll()
-  await closeAppDb()
+  closeAppDb()
   app.exit(0)
 })
 
