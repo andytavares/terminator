@@ -21,7 +21,8 @@ const OVERSCAN_ITEMS = 20
  * Mounts only the diff entries near the viewport of `scrollRef` (TanStack Virtual),
  * measuring each one so comments and notes of any height keep their place.
  */
-export function VirtualDiffList({ items, scrollRef, renderItem, handleRef }: Props) {
+function useDiffVirtualizer(props: Omit<Props, 'renderItem'>) {
+  const { items, scrollRef } = props
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
@@ -30,10 +31,16 @@ export function VirtualDiffList({ items, scrollRef, renderItem, handleRef }: Pro
     overscan: OVERSCAN_ITEMS,
   })
   useImperativeHandle(
-    handleRef,
+    props.handleRef,
     () => ({ scrollToIndex: (index, align) => virtualizer.scrollToIndex(index, { align }) }),
     [virtualizer]
   )
+  return virtualizer
+}
+
+export function VirtualDiffList(props: Props) {
+  const { items, renderItem } = props
+  const virtualizer = useDiffVirtualizer(props)
   const virtualItems = virtualizer.getVirtualItems()
   return (
     <div className="review-diff-virtual" style={{ height: virtualizer.getTotalSize() }}>
