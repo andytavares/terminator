@@ -19,11 +19,10 @@ let repo: string
 let bare: string
 const BRANCH = 'feat/greeting'
 
-/** A pre-commit hook in the form husky writes: progress lines, then its verdict. */
+/** Plain git pre-commit hooks, no hook manager: progress lines, then an exit status. */
 const PASSING_HOOK =
   '#!/bin/sh\necho "lint: checking staged files"\nsleep 1\necho "lint: clean"\nsleep 1\n'
-const FAILING_HOOK =
-  '#!/bin/sh\necho "lint: src/greeting.ts has a problem"\necho "husky - pre-commit script failed (code 1)" >&2\nexit 1\n'
+const FAILING_HOOK = '#!/bin/sh\necho "lint: src/greeting.ts has a problem"\nexit 1\n'
 
 function installHook(script: string): void {
   writeFile(repo, '.git/hooks/pre-commit', script)
