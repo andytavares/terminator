@@ -41,9 +41,11 @@ function exitingProcess() {
 
 type ExecCb = (err: Error | null, out?: { stdout: string }) => void
 function shellPrints(stdout: string | Error) {
-  execFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: ExecCb) =>
-    stdout instanceof Error ? cb(stdout) : cb(null, { stdout })
-  )
+  // promisify(execFile) calls (cmd, args, opts, callback); only the callback matters here.
+  execFile.mockImplementation((...execArgs: unknown[]) => {
+    const cb = execArgs.at(-1) as ExecCb
+    return stdout instanceof Error ? cb(stdout) : cb(null, { stdout })
+  })
 }
 
 async function spawnedCommands(runs: number) {
