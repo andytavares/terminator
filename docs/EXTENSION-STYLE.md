@@ -155,8 +155,10 @@ sits **between two named things in a sentence** (typography).
 
 ## 8. Colour
 
-Every colour comes from the published `--tm-*` tokens. An extension view does
-not load the core stylesheet, so a raw hex is a value that cannot follow the
+Every colour comes from the published `--tm-*` tokens, and
+`packages/extension-ui/src/tokens.css` is the only place one is defined — for
+the core, for every extension view and for the remote client. An extension view
+does not load the core stylesheet, so a raw hex is a value that cannot follow the
 theme, and `rgba(255,255,255,0.08)` is a light-theme bug waiting for someone to
 switch themes. State is never carried by hue alone — pair it with a word, a
 shape or a position.
@@ -177,3 +179,23 @@ whatever padding or font size each class picks. Do not size a control with
 padding. A field drawn borderless inside a container that is the visible box (the
 sidebar search, the Quick Actions search), or an inline rename in a dense row (a
 tab, a branch row), opts out with `height: auto` on its own selector.
+
+## 11. Use the components
+
+If `@terminator/extension-ui` has the control, use it; do not write another. A
+missing one is added there first (ADR 098). Storybook shows each in both themes:
+`npm run storybook`.
+
+| Need                           | Use                                                    |
+| ------------------------------ | ------------------------------------------------------ |
+| A button                       | `Button` (primary, secondary, ghost, danger; sm, md)   |
+| An icon-only button            | `IconButton`, which requires its accessible name       |
+| Switching between views        | `Tabs`, the WAI-ARIA tabs pattern                      |
+| Markdown from a person/agent   | `Markdown`, never `dangerouslySetInnerHTML`            |
+| "5 minutes ago"                | `RelativeTime` / `formatRelativeTime`, never hand-made |
+| Re-reading something on a tick | `usePolling`                                           |
+
+A button's icon is the `icon` prop, sized by the stylesheet, not by `size`.
+
+Fonts ship with the app. Do not add a `<link>` to a font service or an
+`@import url(https://…)`; the UI must draw offline.

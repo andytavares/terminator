@@ -395,6 +395,11 @@ import {
   ToastRegion,
   EmptyState,
   IconButton,
+  Button,
+  Tabs,
+  Markdown,
+  RelativeTime,
+  usePolling,
 } from '@terminator/extension-ui'
 ;<Dialog
   title="Rename branch"
@@ -408,16 +413,21 @@ import {
 </Dialog>
 ```
 
-| Export                                       | Use it for                                                    |
-| -------------------------------------------- | ------------------------------------------------------------- |
-| `Dialog`                                     | A modal question or form. Scrim, focus trap, Escape.          |
-| `ConfirmDialog`                              | Yes/no, with the consequence stated.                          |
-| `Popover`                                    | A dropdown or picker — dismissible, **not** modal.            |
-| `ToastRegion` / `Toast`                      | Transient messages. `role="status"`, mount the region once.   |
-| `EmptyState`                                 | Heading, one line of why, and the control that fills it.      |
-| `IconButton`                                 | An icon-only control that still has an accessible name.       |
-| `useDismissible`                             | Outside-click + Escape + focus restore, for your own surface. |
-| `LAYERS` / `layerValue` / `nestedLayerValue` | Stacking, by name.                                            |
+| Export                                       | Use it for                                                      |
+| -------------------------------------------- | --------------------------------------------------------------- |
+| `Dialog`                                     | A modal question or form. Scrim, focus trap, Escape.            |
+| `ConfirmDialog`                              | Yes/no, with the consequence stated.                            |
+| `Popover`                                    | A dropdown or picker — dismissible, **not** modal.              |
+| `ToastRegion` / `Toast`                      | Transient messages. `role="status"`, mount the region once.     |
+| `EmptyState`                                 | Heading, one line of why, and the control that fills it.        |
+| `IconButton`                                 | An icon-only control that still has an accessible name.         |
+| `Button`                                     | Primary, secondary, ghost or danger; an optional lucide icon.   |
+| `Tabs`                                       | An accessible tab list: arrow keys, Home, End, `aria-selected`. |
+| `Markdown`                                   | Sanitised Markdown. Links open through your `onOpenLink`.       |
+| `RelativeTime` / `formatRelativeTime`        | "5 minutes ago", through `Intl.RelativeTimeFormat`.             |
+| `usePolling`                                 | Read now and on an interval; ignores answers after unmount.     |
+| `useDismissible`                             | Outside-click + Escape + focus restore, for your own surface.   |
+| `LAYERS` / `layerValue` / `nestedLayerValue` | Stacking, by name.                                              |
 
 Three things the package handles that are easy to get wrong on your own:
 
@@ -438,6 +448,10 @@ restamps it when the user switches. A hardcoded hex cannot follow the theme, and
 `--tm-*` name that is not published resolves to nothing and drops the whole
 declaration.
 
+`packages/extension-ui/src/tokens.css` defines every `--tm-*` token, and Storybook
+(`npm run storybook`) shows each component in both themes. Do not define a colour
+of your own.
+
 `docs/EXTENSION-STYLE.md` is the rule set — vocabulary, sentence case, button
 voice, empty states, icons, colour and layering. The vocabulary rules are enforced
 by ESLint on `extensions/*/src/**/*.tsx`.
@@ -453,7 +467,9 @@ you next touch a surface —
 2. Replace raw `z-index` numbers with `layerValue()` or `var(--tm-layer-*)`.
 3. Replace hardcoded colours with `--tm-*` tokens, and check your surface in both
    themes.
-4. Replace `size={n}` on lucide icons with the injected scale —
+4. Replace your own buttons, tabs, Markdown renderer, "time ago" strings and polling
+   timers with `Button`, `Tabs`, `Markdown`, `RelativeTime` and `usePolling`.
+5. Replace `size={n}` on lucide icons with the injected scale —
    `className="tm-icon-sm"` (12px), `"tm-icon"` (14px), `"tm-icon-lg"` (16px).
    The `size` prop is a lint error in `extensions/*/src/**/*.tsx`.
 
@@ -966,7 +982,7 @@ The Code Reviews tab is registered as a workspace tab (`registerWorkspaceTab`), 
 
 ## CSS Token Contract (`--tm-*`)
 
-Extensions MUST use only `--tm-*` CSS custom properties for colors, typography, and spacing. The host application guarantees these tokens are set on `:root` before any extension CSS is evaluated.
+Extensions MUST use only `--tm-*` CSS custom properties for colors, typography, and spacing. The host application guarantees these tokens are set on `:root` before any extension CSS is evaluated. They are defined in one file, `packages/extension-ui/src/tokens.css`, which the host injects into your document; the defaults below are its dark theme.
 
 **Using internal core tokens (`--bg-*`, `--text-*`, `--border-*`, `--accent`) or hardcoded hex values is a contract violation** and will break when the host design system evolves.
 
@@ -986,8 +1002,8 @@ Extensions MUST use only `--tm-*` CSS custom properties for colors, typography, 
 | Token                 | Default   | Usage                         |
 | --------------------- | --------- | ----------------------------- |
 | `--tm-text-primary`   | `#E2E2EE` | Primary readable text         |
-| `--tm-text-secondary` | `#7070A0` | Secondary / metadata text     |
-| `--tm-text-muted`     | `#3A3A5A` | Hints, placeholders, disabled |
+| `--tm-text-secondary` | `#9090C4` | Secondary / metadata text     |
+| `--tm-text-muted`     | `#8585B8` | Hints, placeholders, disabled |
 
 ### Borders
 
