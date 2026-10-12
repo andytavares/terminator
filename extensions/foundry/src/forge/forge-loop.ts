@@ -117,12 +117,12 @@ export function createForgeLoop(
       })
     }
 
-    return convergeOnce(
-      api,
-      dataRoot(),
+    return convergeOnce(api, {
+      root: dataRoot(),
       order,
       message,
-      (outcome) =>
+      loop: loopRound !== undefined,
+      onFinished: (outcome) =>
         deciding.during(order.id, async () => {
           const store = orderStoreAt(dataRoot())
           if (!outcome.ok) {
@@ -203,8 +203,7 @@ export function createForgeLoop(
           }
           await continueAutomatically(drafted, next, 'closing the failing checks on its own')
         }),
-      loopRound !== undefined ? { loop: true } : undefined
-    )
+    })
   }
 
   /**
