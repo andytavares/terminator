@@ -1,4 +1,4 @@
-import type { z } from 'zod'
+import { z } from 'zod'
 
 export type * from '../types/api'
 export type * from '../types/issues'
@@ -18,6 +18,12 @@ export interface ChannelSpec<S extends z.ZodType = z.ZodType> {
   /** Response when run() throws. Omit to let the error propagate. */
   onError?: (e: unknown) => unknown
 }
+
+/**
+ * Payload of a channel that takes none: the desktop renderer sends nothing,
+ * the remote bridge sends `{}` in its place.
+ */
+export const noPayload = z.union([z.undefined(), z.object({})])
 
 /** Identity helper so each channel infers its own schema's payload type. */
 export function defineChannel<S extends z.ZodType>(spec: ChannelSpec<S>): ChannelSpec {

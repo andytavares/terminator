@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { handleChannel } from './channel-registrar.js'
 
@@ -8,11 +7,7 @@ import { handleChannel } from './channel-registrar.js'
 // parse → dispatch → error-envelope skeleton is the SDK's dispatchChannel,
 // shared with extension channels.
 
-/**
- * Payload of a channel that takes none: the desktop renderer sends nothing,
- * the remote bridge sends `{}` in its place.
- */
-export const noPayload = z.union([z.undefined(), z.object({})])
+export { noPayload } from '@terminator/extension-sdk'
 
 const registeredSpecs = new Map<string, ChannelSpec>()
 

@@ -1,6 +1,7 @@
 import { networkInterfaces } from 'os'
 import { randomBytes } from 'crypto'
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { z } from 'zod'
+import { defineChannel, noPayload, type ExtensionAPI } from '@terminator/extension-sdk'
 import {
   createRemoteServer,
   PortInUseError,
@@ -190,151 +191,180 @@ export function activate(api: ExtensionAPI): void {
   // credentials, tunnel). A remote browser client must not control the server
   // it is connected through, so all of them are declared local-only.
   const LOCAL_ONLY = { remoteAccessible: false }
+  const VALIDATION_ERROR = { error: 'VALIDATION_ERROR' }
   api.ipc.registerHandler(
-    'remote:toggle',
-    async (payload) => {
-      const { enabled } = payload as { enabled: boolean }
-      if (enabled && !credentials.hasPassword()) {
-        refuseWithoutPassword()
-        return { error: 'PASSWORD_REQUIRED' }
-      }
-      api.settings.set(KEY.enabled, enabled)
-      enqueue(enabled ? startServer : stopServer)
-      return { ok: true }
-    },
+    defineChannel({
+      channel: 'remote:toggle',
+      schema: z.object({ enabled: z.boolean() }),
+      invalid: VALIDATION_ERROR,
+      run: async ({ enabled }) => {
+        if (enabled && !credentials.hasPassword()) {
+          refuseWithoutPassword()
+          return { error: 'PASSWORD_REQUIRED' }
+        }
+        api.settings.set(KEY.enabled, enabled)
+        enqueue(enabled ? startServer : stopServer)
+        return { ok: true }
+      },
+    }),
     LOCAL_ONLY
   )
 
   api.ipc.registerHandler(
-    'remote:port-change',
-    async (payload) => {
-      const { port } = payload as { port: number }
-      if (port < 1024 || port > 65535) return { error: 'INVALID_PORT' }
-      api.settings.set(KEY.port, port)
-      if (api.settings.get<boolean>(KEY.enabled)) enqueue(startServer)
-      return { ok: true }
-    },
+    defineChannel({
+      channel: 'remote:port-change',
+      schema: z.object({ port: z.number().int().min(1024).max(65535) }),
+      invalid: { error: 'INVALID_PORT' },
+      run: async ({ port }) => {
+        api.settings.set(KEY.port, port)
+        if (api.settings.get<boolean>(KEY.enabled)) enqueue(startServer)
+        return { ok: true }
+      },
+    }),
     LOCAL_ONLY
   )
 
   api.ipc.registerHandler(
-    'remote:update-password',
-    async (payload) => {
-      const { password } = payload as { password: string }
-      const generated = !password
-      const actual = password || randomBytes(16).toString('base64url')
-      await credentials.setPassword(actual)
-      remoteServer?.disconnectAllClients()
-      const listening = !!remoteServer?.isListening()
-      const port = api.settings.get<number>(KEY.port) ?? 7681
-      api.window.broadcast('remote:status', {
-        enabled: listening,
-        ...(listening && { port, lanUrl: getLanUrl(port), publicUrl: currentPublicUrl }),
-      })
-      // A generated password is the one value the owner has no other way to learn.
-      return generated ? { password: actual } : { ok: true }
-    },
+    defineChannel({
+      channel: 'remote:update-password',
+      schema: z.object({ password: z.string() }),
+      invalid: VALIDATION_ERROR,
+      run: async ({ password }) => {
+        const generated = !password
+        const actual = password || randomBytes(16).toString('base64url')
+        await credentials.setPassword(actual)
+        remoteServer?.disconnectAllClients()
+        const listening = !!remoteServer?.isListening()
+        const port = api.settings.get<number>(KEY.port) ?? 7681
+        api.window.broadcast('remote:status', {
+          enabled: listening,
+          ...(listening && { port, lanUrl: getLanUrl(port), publicUrl: currentPublicUrl }),
+        })
+        // A generated password is the one value the owner has no other way to learn.
+        return generated ? { password: actual } : { ok: true }
+      },
+    }),
     LOCAL_ONLY
   )
 
   api.ipc.registerHandler(
-    'remote:update-max-subscribers',
-    async (payload) => {
-      const { maxSubscribers } = payload as { maxSubscribers: number }
-      if (maxSubscribers < 1 || maxSubscribers > 20) return { error: 'INVALID_VALUE' }
-      api.settings.set(KEY.maxSubscribers, maxSubscribers)
-      return { ok: true }
-    },
+    defineChannel({
+      channel: 'remote:update-max-subscribers',
+      schema: z.object({ maxSubscribers: z.number().int().min(1).max(20) }),
+      invalid: { error: 'INVALID_VALUE' },
+      run: async ({ maxSubscribers }) => {
+        api.settings.set(KEY.maxSubscribers, maxSubscribers)
+        return { ok: true }
+      },
+    }),
     LOCAL_ONLY
   )
 
   api.ipc.registerHandler(
-    'remote:update-ngrok-token',
-    async (payload) => {
-      const { ngrokAuthToken } = payload as { ngrokAuthToken: string }
-      api.settings.set(KEY.ngrokAuthToken, ngrokAuthToken)
-      return { ok: true }
-    },
+    defineChannel({
+      channel: 'remote:update-ngrok-token',
+      schema: z.object({ ngrokAuthToken: z.string() }),
+      invalid: VALIDATION_ERROR,
+      run: async ({ ngrokAuthToken }) => {
+        api.settings.set(KEY.ngrokAuthToken, ngrokAuthToken)
+        return { ok: true }
+      },
+    }),
     LOCAL_ONLY
   )
 
   api.ipc.registerHandler(
-    'remote:caddyfile',
-    (_payload) => {
-      return generateCaddyfile(getPort())
-    },
+    defineChannel({
+      channel: 'remote:caddyfile',
+      schema: noPayload,
+      invalid: VALIDATION_ERROR,
+      run: () => {
+        return generateCaddyfile(getPort())
+      },
+    }),
     LOCAL_ONLY
   )
 
   // "Disconnect" in the view. The socket closing is what removes the row, so a
   // failure here leaves it visible rather than lying about what happened.
   api.ipc.registerHandler(
-    'remote:disconnect-device',
-    (payload) => {
-      const { id } = (payload ?? {}) as { id?: string }
-      if (!id || !remoteServer) return { ok: false }
-      return { ok: remoteServer.devices.disconnect(id) }
-    },
+    defineChannel({
+      channel: 'remote:disconnect-device',
+      schema: z.object({ id: z.string().min(1) }),
+      invalid: { ok: false },
+      run: ({ id }) => {
+        if (!remoteServer) return { ok: false }
+        return { ok: remoteServer.devices.disconnect(id) }
+      },
+    }),
     LOCAL_ONLY
   )
 
   api.ipc.registerHandler(
-    'remote:get-settings',
-    () => {
-      const listening = !!remoteServer?.isListening()
-      const port = getPort()
-      return {
-        enabled: api.settings.get<boolean>(KEY.enabled) ?? false,
-        port,
-        maxSubscribers: getMaxSubscribers(),
-        hasPassword: credentials.hasPassword(),
-        ngrokAuthToken: api.settings.get<string>(KEY.ngrokAuthToken) ?? '',
-        ...(listening && { lanUrl: getLanUrl(port), publicUrl: currentPublicUrl }),
-      }
-    },
-    LOCAL_ONLY
-  )
-
-  api.ipc.registerHandler(
-    'remote:tunnel-reconnect',
-    async () => {
-      if (!remoteServer?.isListening()) return { ok: false }
-      enqueue(async () => {
-        ngrokManager.stop()
+    defineChannel({
+      channel: 'remote:get-settings',
+      schema: noPayload,
+      invalid: VALIDATION_ERROR,
+      run: () => {
+        const listening = !!remoteServer?.isListening()
         const port = getPort()
-        const authToken = api.settings.get<string>(KEY.ngrokAuthToken) || undefined
-        try {
-          const publicUrl = await ngrokManager.start(port, authToken)
-          currentPublicUrl = publicUrl
-          ngrokManager.setOnCrash(() => {
+        return {
+          enabled: api.settings.get<boolean>(KEY.enabled) ?? false,
+          port,
+          maxSubscribers: getMaxSubscribers(),
+          hasPassword: credentials.hasPassword(),
+          ngrokAuthToken: api.settings.get<string>(KEY.ngrokAuthToken) ?? '',
+          ...(listening && { lanUrl: getLanUrl(port), publicUrl: currentPublicUrl }),
+        }
+      },
+    }),
+    LOCAL_ONLY
+  )
+
+  api.ipc.registerHandler(
+    defineChannel({
+      channel: 'remote:tunnel-reconnect',
+      schema: noPayload,
+      invalid: { ok: false },
+      run: async () => {
+        if (!remoteServer?.isListening()) return { ok: false }
+        enqueue(async () => {
+          ngrokManager.stop()
+          const port = getPort()
+          const authToken = api.settings.get<string>(KEY.ngrokAuthToken) || undefined
+          try {
+            const publicUrl = await ngrokManager.start(port, authToken)
+            currentPublicUrl = publicUrl
+            ngrokManager.setOnCrash(() => {
+              currentPublicUrl = null
+              api.window.broadcast('remote:tunnel-disconnected', {})
+              api.window.broadcast('remote:status', {
+                enabled: true,
+                port,
+                publicUrl: null,
+                lanUrl: getLanUrl(port),
+              })
+            })
+            api.window.broadcast('remote:status', {
+              enabled: true,
+              port,
+              publicUrl,
+              lanUrl: getLanUrl(port),
+            })
+          } catch (err) {
             currentPublicUrl = null
-            api.window.broadcast('remote:tunnel-disconnected', {})
             api.window.broadcast('remote:status', {
               enabled: true,
               port,
               publicUrl: null,
               lanUrl: getLanUrl(port),
+              ngrokError: String(err),
             })
-          })
-          api.window.broadcast('remote:status', {
-            enabled: true,
-            port,
-            publicUrl,
-            lanUrl: getLanUrl(port),
-          })
-        } catch (err) {
-          currentPublicUrl = null
-          api.window.broadcast('remote:status', {
-            enabled: true,
-            port,
-            publicUrl: null,
-            lanUrl: getLanUrl(port),
-            ngrokError: String(err),
-          })
-        }
-      })
-      return { ok: true }
-    },
+          }
+        })
+        return { ok: true }
+      },
+    }),
     LOCAL_ONLY
   )
 
