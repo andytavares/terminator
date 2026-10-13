@@ -256,8 +256,14 @@ test.describe.serial('cards, terminals and notifications in a plain folder', () 
       view.sendInputEvent({ type: 'keyDown', keyCode: 'P', modifiers })
       view.sendInputEvent({ type: 'keyUp', keyCode: 'P', modifiers })
     }, NOTES)
-    await expect(quickActionsPanel(handle.page)).toBeVisible()
+    const panel = quickActionsPanel(handle.page)
+    await expect(panel).toBeVisible()
+    // Escape closes the panel from inside it; pressed before focus has moved
+    // there from the extension's view, it closed nothing and the open panel
+    // covered the sidebar for the next test.
+    await expect(panel).toBeFocused()
     await handle.page.keyboard.press('Escape')
+    await expect(panel).toBeHidden()
   })
 
   test("an extension view's getActive names the workspace and branch on screen", async () => {
