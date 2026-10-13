@@ -5,36 +5,8 @@ import { installBridge, eventually, task } from './helpers/bridge'
 import type { IndexedTask } from '../../src/vault/types'
 
 vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
-vi.mock('../../src/components/SmartTaskInput', () => ({
-  SmartTaskInput: (props: {
-    value: string
-    onChange: (v: string) => void
-    onSubmit: () => void
-    onCancel?: () => void
-    placeholder?: string
-    disabled?: boolean
-  }) => (
-    <input
-      aria-label={props.placeholder ?? 'Task text'}
-      value={props.value}
-      disabled={props.disabled}
-      onChange={(e) => props.onChange(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') props.onSubmit()
-        if (e.key === 'Escape') props.onCancel?.()
-      }}
-    />
-  ),
-}))
-vi.mock('../../src/components/DateTimePicker', () => ({
-  DateTimePicker: (props: { mode: string; value: string; onChange: (v: string) => void }) => (
-    <input
-      aria-label={`${props.mode} picker`}
-      value={props.value}
-      onChange={(e) => props.onChange(e.target.value)}
-    />
-  ),
-}))
+vi.mock('../../src/components/SmartTaskInput', () => import('./helpers/input-stubs'))
+vi.mock('../../src/components/DateTimePicker', () => import('./helpers/input-stubs'))
 
 import { DailyLog } from '../../src/components/DailyLog'
 import { notify } from '../../src/utils/notify'

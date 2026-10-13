@@ -5,27 +5,7 @@ import { installBridge, eventually, task } from './helpers/bridge'
 import type { IndexedTask } from '../../src/vault/types'
 
 vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
-vi.mock('../../src/components/SmartTaskInput', () => ({
-  SmartTaskInput: (props: {
-    value: string
-    onChange: (v: string) => void
-    onSubmit: () => void
-    onCancel?: () => void
-    placeholder?: string
-    disabled?: boolean
-  }) => (
-    <input
-      aria-label={props.placeholder ?? 'Task text'}
-      value={props.value}
-      disabled={props.disabled}
-      onChange={(e) => props.onChange(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') props.onSubmit()
-        if (e.key === 'Escape') props.onCancel?.()
-      }}
-    />
-  ),
-}))
+vi.mock('../../src/components/SmartTaskInput', () => import('./helpers/input-stubs'))
 
 import { DailyLog } from '../../src/components/DailyLog'
 

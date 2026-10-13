@@ -5,21 +5,7 @@ import { installBridge, eventually, task } from './helpers/bridge'
 import type { IndexedTask } from '../../src/vault/types'
 
 vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
-vi.mock('../../src/components/DateTimePicker', () => ({
-  DateTimePicker: (props: {
-    mode: string
-    value: string
-    min?: string
-    onChange: (v: string) => void
-  }) => (
-    <input
-      aria-label={`${props.mode} picker`}
-      data-min={props.min}
-      value={props.value}
-      onChange={(e) => props.onChange(e.target.value)}
-    />
-  ),
-}))
+vi.mock('../../src/components/DateTimePicker', () => import('./helpers/input-stubs'))
 
 import { DailyLog } from '../../src/components/DailyLog'
 import { notify } from '../../src/utils/notify'
