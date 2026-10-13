@@ -61,7 +61,7 @@ afterEach(() => {
   }
 })
 
-describe('Foundry in a repository it has never seen', () => {
+describe('Foundry in a repository it has never seen: seeding an order', () => {
   it('seeds an order with no setup step of any kind', async () => {
     const result = (await forge().create({
       source: { kind: 'typed', text: 'add a docstring to greet' },
@@ -92,7 +92,9 @@ describe('Foundry in a repository it has never seen', () => {
     })) as { order: WorkOrder }
     expect(result.order.context.houseDocs).toEqual([])
   })
+})
 
+describe('Foundry in a repository it has never seen: the recipes on offer', () => {
   it('does not offer the specification pipeline where the toolkit is absent', async () => {
     const store = createOrderStore(dataRoot)
     const seeded = (await forge().create({
@@ -119,7 +121,9 @@ describe('Foundry in a repository it has never seen', () => {
     // is usable rather than merely refused.
     expect(offered.recipes.find((r) => r.name === 'direct')?.available).toBe(true)
   })
+})
 
+describe('Foundry in a repository it has never seen: the repository stays untouched', () => {
   it('leaves the repository exactly as it found it', async () => {
     await forge().create({ source: { kind: 'typed', text: 'x' }, repoPaths: [repo] })
     probeToolchain(repo)
@@ -134,18 +138,6 @@ describe('Foundry in a repository it has never seen', () => {
     expect(fs.existsSync(path.join(repo, '.gitignore'))).toBe(before)
   })
 
-  it('keeps every record under the configured location', async () => {
-    const seeded = (await forge().create({
-      source: { kind: 'typed', text: 'x' },
-      repoPaths: [repo],
-    })) as { order: WorkOrder }
-
-    const orderPath = path.join(dataRoot, 'orders', seeded.order.id)
-    for (const file of ['order.json', 'order.md', 'ledger.jsonl']) {
-      expect(fs.existsSync(path.join(orderPath, file)), file).toBe(true)
-    }
-  })
-
   it('runs a complete intake without the repository ever being written to', async () => {
     const head = git(repo, 'rev-parse', 'HEAD').trim()
     const seeded = (await forge().create({
@@ -156,5 +148,19 @@ describe('Foundry in a repository it has never seen', () => {
 
     expect(git(repo, 'rev-parse', 'HEAD').trim()).toBe(head)
     expect(git(repo, 'status', '--porcelain').trim()).toBe('')
+  })
+})
+
+describe('Foundry in a repository it has never seen: where the records go', () => {
+  it('keeps every record under the configured location', async () => {
+    const seeded = (await forge().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as { order: WorkOrder }
+
+    const orderPath = path.join(dataRoot, 'orders', seeded.order.id)
+    for (const file of ['order.json', 'order.md', 'ledger.jsonl']) {
+      expect(fs.existsSync(path.join(orderPath, file)), file).toBe(true)
+    }
   })
 })

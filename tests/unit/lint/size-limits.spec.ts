@@ -3,8 +3,7 @@ import { ESLint } from 'eslint'
 import path from 'node:path'
 
 /**
- * The function size limits `eslint.config.mjs` applies to the renderer, the
- * remote client, the extension SDK and design system, and their tests,
+ * The function size limits `eslint.config.mjs` applies to every file,
  * checked against the real config: at most 30 lines (blank lines and comments
  * aside), complexity 10 and three parameters. As in extension-rules.spec.ts,
  * loading the config imports typescript-eslint and the TypeScript compiler,
@@ -49,9 +48,14 @@ const COVERED = [
   'tests/unit/renderer-remote/example.spec.ts',
   'tests/unit/packages/example.spec.ts',
   'tests/unit/ConfirmDialog.spec.tsx',
+  'tests/integration/example.spec.ts',
+  'tests/perf/example.spec.ts',
+  'tests/unit/example.spec.ts',
+  'scripts/perf/example.mts',
+  'vitest.example.config.ts',
 ]
 
-describe('function size limits for the renderer and the packages', () => {
+describe('function size limits for every file', () => {
   it.each(COVERED)('reject a function over 30 lines in %s', async (file) => {
     expect(await sizeRulesBroken(longFunction, file)).toEqual(['max-lines-per-function'])
   })
@@ -59,5 +63,15 @@ describe('function size limits for the renderer and the packages', () => {
   it.each(COVERED)('reject four parameters and complexity 11 in %s', async (file) => {
     expect(await sizeRulesBroken(fourParams, file)).toEqual(['max-params'])
     expect(await sizeRulesBroken(branchy, file)).toEqual(['complexity'])
+  })
+})
+
+describe('no explicit any', () => {
+  it.each(COVERED)('is an error in %s', async (file) => {
+    const [result] = await eslint.lintText('export const v: any = 1\n', {
+      filePath: path.join(repoRoot, file),
+    })
+    const anyRule = result.messages.find((m) => m.ruleId === '@typescript-eslint/no-explicit-any')
+    expect(anyRule?.severity).toBe(2)
   })
 })
