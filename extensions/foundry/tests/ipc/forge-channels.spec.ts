@@ -1671,7 +1671,7 @@ function criticalPathsTests() {
 
   it("reads the critical paths of the order's repositories, a workspace-scoped list", async () => {
     const byRepository: Record<string, string[]> = { [repo]: ['src/main/auth/**'] }
-    const r = await seeded({
+    const r = await seededWith({
       criticalPaths: (repoPaths) => repoPaths.flatMap((path) => byRepository[path] ?? []),
     })
     expect(r.order.risk.criticalPaths).toEqual(['src/main/auth/**'])
