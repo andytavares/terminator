@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  terminalRowsIn,
+} from './helpers'
 
 // Regression guard for right-edge text clipping.
 //
@@ -81,8 +88,12 @@ async function measure(selector: string): Promise<Geometry> {
   }, selector)
 }
 
+// The single pane's terminal, the one these tests type into until the split test.
+const PANE_SCREEN = '.terminal-pane__container .xterm-screen'
+
+// The WebGL add-on draws into canvases inside the screen; xterm 6's DOM renderer has none.
 async function usesWebgl(): Promise<boolean> {
-  return handle.page.evaluate(() => !document.querySelector('.xterm-rows'))
+  return (await handle.page.locator(`${PANE_SCREEN} canvas`).count()) > 0
 }
 
 test('the terminal reserves real layout width for its scrollbar', async () => {
@@ -110,15 +121,14 @@ const STRIP_WIDTH_PX = 4
 
 async function lastColumnInk(): Promise<number> {
   const { page } = handle
-  const box = await page.evaluate(() => {
-    const canvas = document.querySelector('.xterm-screen canvas') as HTMLCanvasElement
-    const b = canvas.getBoundingClientRect()
-    return { right: b.right, top: b.top, height: b.height }
-  })
+  // The add-on's text canvas; its link layer is a second canvas of the same size.
+  const canvas = page.locator(`${PANE_SCREEN} canvas:not(.xterm-link-layer)`)
+  const box = (await canvas.boundingBox())!
+  const right = box.x + box.width
   const png = await page.screenshot({
     clip: {
-      x: box.right - STRIP_WIDTH_PX,
-      y: box.top,
+      x: right - STRIP_WIDTH_PX,
+      y: box.y,
       width: STRIP_WIDTH_PX,
       height: box.height,
     },
@@ -168,27 +178,24 @@ test('last-column glyph is not clipped', async () => {
   }
 
   await page.keyboard.type(RULER_COMMAND)
-  // Poll for the ruler row by content rather than waiting a fixed interval and assuming
-  // row 0 — on CI the shell prints a "default interactive shell is now zsh" notice first,
-  // so the ruler does not reliably land on any particular row.
-  const row = await page.waitForFunction(
-    () => {
-      const rows =
-        document.querySelector('.xterm-rows.xterm-focus') ?? document.querySelector('.xterm-rows')
-      if (!rows) return null
-      for (const el of Array.from(rows.children) as HTMLElement[]) {
-        const text = (el.textContent ?? '').replace(/\u00a0/g, ' ').trimEnd()
-        // Strictly the ruler: nothing but '#', and long enough to be a real full-width line.
-        if (/^#+$/.test(text) && text.length >= 40) {
-          return { cols: text.length, scrollW: el.scrollWidth, clientW: el.clientWidth }
-        }
-      }
-      return null
+  // Find the ruler row by content rather than assuming row 0 — on CI the shell prints a
+  // "default interactive shell is now zsh" notice first, so the ruler does not reliably
+  // land on any particular row. Strictly the ruler: nothing but '#', and long enough to
+  // be a real full-width line.
+  const screen = page.locator(PANE_SCREEN)
+  const rulerRow = async () =>
+    (await terminalRowsIn(screen)).findIndex((row) => /^#+$/.test(row) && row.length >= 40)
+  await expect.poll(rulerRow, { timeout: 30000 }).toBeGreaterThanOrEqual(0)
+  // The DOM renderer draws the screen's rows in order, one div each; its clip box is the
+  // thing under test, so this measures the DOM on purpose.
+  const m = await screen.evaluate(
+    (element, index) => {
+      const el = element.querySelector('.xterm-rows')!.children[index] as HTMLElement
+      const text = (el.textContent ?? '').replace(/\u00a0/g, ' ').trimEnd()
+      return { cols: text.length, scrollW: el.scrollWidth, clientW: el.clientWidth }
     },
-    undefined,
-    { timeout: 30000 }
+    await rulerRow()
   )
-  const m = (await row.jsonValue()) as { cols: number; scrollW: number; clientW: number }
 
   // Guard the guard: too few columns and the accumulated overhang rounds to zero, which
   // would make the assertion below vacuously true.

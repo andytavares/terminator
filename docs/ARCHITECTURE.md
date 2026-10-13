@@ -241,8 +241,16 @@ and a terminal past that stays on the DOM renderer. A lost context (`onContextLo
 WebGL2 also falls back to the DOM renderer. The DOM renderer clips the last column's glyph on macOS (about
 2px), which WebGL does not do because it has no row boxes to clip. The phone client keeps the DOM renderer.
 Because WebGL leaves no terminal text in the DOM, the renderer sets `window.terminatorE2E.terminalRows()`
-(`src/renderer/terminal/terminal-rows.ts`), which reads every terminal's visible rows from its xterm buffer;
-the end-to-end specs read terminals through it.
+(`src/renderer/terminal/terminal-rows.ts`), which reads every terminal's visible rows from its xterm buffer,
+one terminal after another, and `terminalRowsIn(element)`, which reads only the terminal drawn in that
+element; the end-to-end specs read terminals through them.
+
+**Links.** `src/renderer/terminal/terminal-links.ts` finds the URLs and paths on a row and declares them to
+xterm. `LinkPointer` (`src/renderer/terminal/link-pointer.ts`) underlines the link under the pointer while
+⌘ (Ctrl off macOS) is held and opens it on ⌘-click. It maps the pointer to a cell from the box of
+`.xterm-screen`, which both renderers size to exactly `cols × rows` cells inside the pane's padding
+(`WebglRenderer.ts` and `DomRenderer.ts` in xterm.js). It never measures `.xterm-rows`, which the WebGL
+renderer does not create.
 
 **Batching and flow control.** A PTY produces thousands of small chunks a second. `OutputRelay`
 (`src/main/terminal/output-relay.ts`) joins them in an `OutputBatcher` and sends one `terminal:output`

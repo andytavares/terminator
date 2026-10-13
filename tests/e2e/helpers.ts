@@ -1,4 +1,4 @@
-import { _electron as electron, ElectronApplication, Page, expect } from '@playwright/test'
+import { _electron as electron, ElectronApplication, Locator, Page, expect } from '@playwright/test'
 import { mkdtempSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -335,12 +335,27 @@ export function inExtensionView<T>(handle: AppHandle, urlPart: string, script: s
 }
 
 /** The window as the app sets it up, with `src/renderer/terminal/terminal-rows.ts`. */
-export type TerminalRowsWindow = Window & { terminatorE2E: { terminalRows(): string[] } }
+export type TerminalRowsWindow = Window & {
+  terminatorE2E: { terminalRows(): string[]; terminalRowsIn(element: Element): string[] }
+}
 
 /**
- * The rows every open terminal shows, read from xterm's buffer. Under the
- * WebGL renderer the terminal is a canvas and the DOM holds none of its text.
+ * The rows every open terminal shows, one terminal after another, read from
+ * xterm's buffer. Under the WebGL renderer the terminal is a canvas and the
+ * DOM holds none of its text. For a row's place on screen, use `terminalRowsIn`.
  */
 export function terminalRows(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as TerminalRowsWindow).terminatorE2E.terminalRows())
+}
+
+/** The screen (`.xterm-screen`) of the first terminal that is on screen. */
+export function visibleTerminalScreen(page: Page): Locator {
+  return page.locator('.xterm-screen').filter({ visible: true }).first()
+}
+
+/** The rows of the one terminal drawn in `screen`, a pane's `.xterm-screen`, top to bottom. */
+export function terminalRowsIn(screen: Locator): Promise<string[]> {
+  return screen.evaluate((element) =>
+    (window as unknown as TerminalRowsWindow).terminatorE2E.terminalRowsIn(element)
+  )
 }
