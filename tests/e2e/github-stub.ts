@@ -46,24 +46,9 @@ export interface GithubStub {
 
 /** Starts the stub; pass its `env` to `launchApp`. */
 export async function startGithubStub(options: GithubStubOptions): Promise<GithubStub> {
-  let lastId = 1000
-  const context: StubContext = {
-    bareRepo: options.bareRepo,
-    owner: options.owner ?? 'acme',
-    name: options.name ?? 'widgets',
-    viewer: options.viewer ?? 'e2e-reviewer',
-    pullRequests: [],
-    nextId: () => ++lastId,
-  }
+  const context = stubContext(options)
   const calls: GhCall[] = []
-  const server = createServer((request, response) => {
-    void readBody(request).then((raw) => {
-      const call = JSON.parse(raw) as GhCall
-      calls.push(call)
-      response.setHeader('content-type', 'application/json')
-      response.end(JSON.stringify(handleGhCall(context, call)))
-    })
-  })
+  const server = ghServer(context, calls)
   const configHome = await listen(server)
   return {
     owner: context.owner,
@@ -81,6 +66,30 @@ export async function startGithubStub(options: GithubStubOptions): Promise<Githu
       return new Promise((resolve) => server.close(() => resolve()))
     },
   }
+}
+
+function stubContext(options: GithubStubOptions): StubContext {
+  let lastId = 1000
+  return {
+    bareRepo: options.bareRepo,
+    owner: options.owner ?? 'acme',
+    name: options.name ?? 'widgets',
+    viewer: options.viewer ?? 'e2e-reviewer',
+    pullRequests: [],
+    nextId: () => ++lastId,
+  }
+}
+
+/** Answers each forwarded gh call, and records it in `calls`. */
+function ghServer(context: StubContext, calls: GhCall[]): Server {
+  return createServer((request, response) => {
+    void readBody(request).then((raw) => {
+      const call = JSON.parse(raw) as GhCall
+      calls.push(call)
+      response.setHeader('content-type', 'application/json')
+      response.end(JSON.stringify(handleGhCall(context, call)))
+    })
+  })
 }
 
 function readBody(request: IncomingMessage): Promise<string> {

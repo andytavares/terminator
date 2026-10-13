@@ -65,59 +65,16 @@ function useSuggestions(facts: SessionFacts): IssueSummary[] {
   return suggestWorkItems(facts, projectIssue, mine)
 }
 
-function Detail({
-  facts,
-  now,
-  onOpen,
-  onSaveDescription,
-  onLinkIssue,
-  onLink,
-  onResume,
-  onCloseSession,
-  onForgetSession,
-  renderAnswers,
-}: Omit<Props, 'groups' | 'selected' | 'titles' | 'onSelect'> & {
+type DetailProps = Omit<Props, 'groups' | 'selected' | 'titles' | 'onSelect'> & {
   facts: SessionFacts
-}): JSX.Element {
-  const [draft, setDraft] = useState(facts.description ?? '')
-  const suggestions = useSuggestions(facts)
-  const blank = facts.description === null && facts.workItem === null
+}
 
-  function save(): void {
-    const text = draft.trim()
-    onSaveDescription(facts, text === '' ? null : text)
-  }
-
-  const rows: Array<[string, string | null]> = [
-    ['Repo', facts.workspaceName],
-    ['Branch', facts.projectName],
-    ['Git branch', facts.branch !== facts.projectName ? facts.branch : null],
-    ['Shell', facts.shell],
-    ['Started', timeOf(facts.startedAt)],
-  ]
-
+/** One session in depth: where it is, what it is for, its terminal, and its facts. */
+function Detail(props: DetailProps): JSX.Element {
+  const { facts } = props
   return (
     <section role="region" aria-label="Session details" className="logbook__detail">
-      <div className="logbook__crumb">
-        <StateChip state={facts.state} />
-        <span className="logbook__where">{locationOf(facts)}</span>
-        {onResume && <ResumeButton facts={facts} onResume={onResume} />}
-        {!facts.isClosed && (
-          <button
-            type="button"
-            className="logbook__button"
-            aria-label={`Open ${facts.name}`}
-            onClick={() => onOpen(facts.sessionId)}
-          >
-            <SquareArrowOutUpRight aria-hidden="true" />
-            Open terminal
-          </button>
-        )}
-        {onCloseSession && (
-          <CloseSessionButton facts={facts} onClose={onCloseSession} onForget={onForgetSession} />
-        )}
-      </div>
-
+      <DetailCrumb {...props} />
       <div className="logbook__main">
         {facts.workItem !== null && (
           <div className="logbook__work">
@@ -129,101 +86,172 @@ function Detail({
             </span>
           </div>
         )}
-
-        {facts.isClosed ? (
-          <>
-            {facts.description !== null && (
-              <p className="logbook__closed-text">{facts.description}</p>
-            )}
-            <p className="logbook__muted">Closed {timeOf(facts.closedAt ?? facts.startedAt)}</p>
-          </>
-        ) : (
-          <div className="logbook__edit">
-            <label htmlFor={`logbook-description-${facts.sessionId}`}>{PROMPT}</label>
-            <textarea
-              id={`logbook-description-${facts.sessionId}`}
-              className="logbook__textarea"
-              maxLength={DESCRIPTION_MAX_LENGTH}
-              value={draft}
-              placeholder="Reproducing the staging 429s before the release"
-              autoFocus={blank}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save()
-              }}
-            />
-            <div className="logbook__actions">
-              <button
-                type="button"
-                className="logbook__button logbook__button--primary"
-                onClick={save}
-              >
-                Save description
-              </button>
-              {onLink !== undefined && (
-                <button type="button" className="logbook__button" onClick={() => onLink(facts)}>
-                  <Link aria-hidden="true" />
-                  Link a work item
-                </button>
-              )}
-              {renderAnswers?.(facts)}
-            </div>
-          </div>
-        )}
-
-        {!facts.isClosed && suggestions.length > 0 && (
-          <div className="logbook__suggest">
-            <h4 id={`logbook-suggest-${facts.sessionId}`}>Suggested work items</h4>
-            <ul aria-labelledby={`logbook-suggest-${facts.sessionId}`}>
-              {suggestions.map((issue) => (
-                <li key={`${issue.tracker}:${issue.key}`}>
-                  <button
-                    type="button"
-                    aria-label={`${issue.key} ${issue.title}`}
-                    onClick={() => onLinkIssue(facts, issue)}
-                  >
-                    <span className="logbook__key">{issue.key}</span>
-                    <span className="logbook__title">{issue.title}</span>
-                    {issue.state && <span className="logbook__muted">{issue.state.name}</span>}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
+        {facts.isClosed ? <ClosedSummary facts={facts} /> : <DescriptionForm {...props} />}
+        {!facts.isClosed && <Suggestions facts={facts} onLinkIssue={props.onLinkIssue} />}
         {!facts.isClosed && (
           <LivePreview sessionId={facts.sessionId} className="logbook__preview" />
         )}
       </div>
-
-      <aside className="logbook__facts">
-        <dl>
-          {rows
-            .filter((row): row is [string, string] => row[1] !== null)
-            .map(([label, value]) => (
-              <React.Fragment key={label}>
-                <dt>{label}</dt>
-                <dd>{value}</dd>
-              </React.Fragment>
-            ))}
-          {facts.tags.length > 0 && (
-            <>
-              <dt>Tags</dt>
-              <dd className="logbook__tags">
-                {facts.tags.map((tag) => (
-                  <span key={tag} className="logbook__tag">
-                    {tag}
-                  </span>
-                ))}
-              </dd>
-            </>
-          )}
-          <dt>Last active</dt>
-          <dd>{formatRelativeTime(facts.lastActivityAt, now)}</dd>
-        </dl>
-      </aside>
+      <FactList facts={facts} now={props.now} />
     </section>
+  )
+}
+
+/** State and location, then Resume, Open and Close as the session allows. */
+function DetailCrumb({ facts, onResume, onOpen, onCloseSession, onForgetSession }: DetailProps) {
+  return (
+    <div className="logbook__crumb">
+      <StateChip state={facts.state} />
+      <span className="logbook__where">{locationOf(facts)}</span>
+      {onResume && <ResumeButton facts={facts} onResume={onResume} />}
+      {!facts.isClosed && (
+        <button
+          type="button"
+          className="logbook__button"
+          aria-label={`Open ${facts.name}`}
+          onClick={() => onOpen(facts.sessionId)}
+        >
+          <SquareArrowOutUpRight aria-hidden="true" />
+          Open terminal
+        </button>
+      )}
+      {onCloseSession && (
+        <CloseSessionButton facts={facts} onClose={onCloseSession} onForget={onForgetSession} />
+      )}
+    </div>
+  )
+}
+
+function ClosedSummary({ facts }: { facts: SessionFacts }): JSX.Element {
+  return (
+    <>
+      {facts.description !== null && <p className="logbook__closed-text">{facts.description}</p>}
+      <p className="logbook__muted">Closed {timeOf(facts.closedAt ?? facts.startedAt)}</p>
+    </>
+  )
+}
+
+/** The description box (Cmd+Enter saves), Save, Link, and any answers. */
+function DescriptionForm({ facts, onSaveDescription, onLink, renderAnswers }: DetailProps) {
+  const [draft, setDraft] = useState(facts.description ?? '')
+  const blank = facts.description === null && facts.workItem === null
+  const save = (): void => {
+    const text = draft.trim()
+    onSaveDescription(facts, text === '' ? null : text)
+  }
+  return (
+    <div className="logbook__edit">
+      <label htmlFor={`logbook-description-${facts.sessionId}`}>{PROMPT}</label>
+      <textarea
+        id={`logbook-description-${facts.sessionId}`}
+        className="logbook__textarea"
+        maxLength={DESCRIPTION_MAX_LENGTH}
+        value={draft}
+        placeholder="Reproducing the staging 429s before the release"
+        autoFocus={blank}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save()
+        }}
+      />
+      <DescriptionActions facts={facts} save={save} onLink={onLink} renderAnswers={renderAnswers} />
+    </div>
+  )
+}
+
+interface DescriptionActionsProps extends Pick<DetailProps, 'onLink' | 'renderAnswers'> {
+  facts: SessionFacts
+  save: () => void
+}
+
+function DescriptionActions({ facts, save, onLink, renderAnswers }: DescriptionActionsProps) {
+  return (
+    <div className="logbook__actions">
+      <button type="button" className="logbook__button logbook__button--primary" onClick={save}>
+        Save description
+      </button>
+      {onLink !== undefined && (
+        <button type="button" className="logbook__button" onClick={() => onLink(facts)}>
+          <Link aria-hidden="true" />
+          Link a work item
+        </button>
+      )}
+      {renderAnswers?.(facts)}
+    </div>
+  )
+}
+
+interface SuggestionsProps {
+  facts: SessionFacts
+  onLinkIssue: Props['onLinkIssue']
+}
+
+/** Tickets worth linking, each linked in one click. */
+function Suggestions({ facts, onLinkIssue }: SuggestionsProps) {
+  const suggestions = useSuggestions(facts)
+  if (suggestions.length === 0) return null
+  return (
+    <div className="logbook__suggest">
+      <h4 id={`logbook-suggest-${facts.sessionId}`}>Suggested work items</h4>
+      <ul aria-labelledby={`logbook-suggest-${facts.sessionId}`}>
+        {suggestions.map((issue) => (
+          <li key={`${issue.tracker}:${issue.key}`}>
+            <button
+              type="button"
+              aria-label={`${issue.key} ${issue.title}`}
+              onClick={() => onLinkIssue(facts, issue)}
+            >
+              <span className="logbook__key">{issue.key}</span>
+              <span className="logbook__title">{issue.title}</span>
+              {issue.state && <span className="logbook__muted">{issue.state.name}</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** Repo, branch, git branch where it differs, shell, start, tags and last activity. */
+function FactList({ facts, now }: { facts: SessionFacts; now: number }): JSX.Element {
+  const rows: Array<[string, string | null]> = [
+    ['Repo', facts.workspaceName],
+    ['Branch', facts.projectName],
+    ['Git branch', facts.branch !== facts.projectName ? facts.branch : null],
+    ['Shell', facts.shell],
+    ['Started', timeOf(facts.startedAt)],
+  ]
+  return (
+    <aside className="logbook__facts">
+      <dl>
+        {rows
+          .filter((row): row is [string, string] => row[1] !== null)
+          .map(([label, value]) => (
+            <React.Fragment key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </React.Fragment>
+          ))}
+        {facts.tags.length > 0 && <TagFacts tags={facts.tags} />}
+        <dt>Last active</dt>
+        <dd>{formatRelativeTime(facts.lastActivityAt, now)}</dd>
+      </dl>
+    </aside>
+  )
+}
+
+function TagFacts({ tags }: { tags: string[] }): JSX.Element {
+  return (
+    <>
+      <dt>Tags</dt>
+      <dd className="logbook__tags">
+        {tags.map((tag) => (
+          <span key={tag} className="logbook__tag">
+            {tag}
+          </span>
+        ))}
+      </dd>
+    </>
   )
 }
 
@@ -237,49 +265,16 @@ export function LogbookView({ groups, selected, titles, onSelect, ...detail }: P
             <div className="logbook__group-label" aria-hidden="true">
               {group.label} <span>{group.facts.length}</span>
             </div>
-            {group.facts.map((facts) => {
-              const headline = headlineOf(facts, titles)
-              const isSelected = selected?.sessionId === facts.sessionId
-              return (
-                <div
-                  key={facts.sessionId}
-                  role="option"
-                  aria-selected={isSelected}
-                  tabIndex={0}
-                  className={`logbook__item${isSelected ? ' logbook__item--selected' : ''}`}
-                  style={
-                    facts.workspaceColor
-                      ? { ['--rail' as string]: facts.workspaceColor }
-                      : undefined
-                  }
-                  onClick={() => onSelect(facts.sessionId)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      onSelect(facts.sessionId)
-                    }
-                  }}
-                >
-                  <StateChip state={facts.state} compact />
-                  <span
-                    className={`logbook__headline${headline.blank ? ' logbook__headline--blank' : ''}`}
-                  >
-                    {headline.text}
-                  </span>
-                  <span className="logbook__meta">
-                    {facts.workItem && (
-                      <span className="logbook__key">{facts.workItem.ref.key}</span>
-                    )}
-                    <span className="logbook__where">
-                      {[facts.projectName, facts.branch].filter(Boolean).join(' / ') || facts.name}
-                    </span>
-                    <span className="logbook__age">
-                      {formatRelativeTime(facts.lastActivityAt, detail.now)}
-                    </span>
-                  </span>
-                </div>
-              )
-            })}
+            {group.facts.map((facts) => (
+              <LogbookItem
+                key={facts.sessionId}
+                facts={facts}
+                headline={headlineOf(facts, titles)}
+                selected={selected?.sessionId === facts.sessionId}
+                now={detail.now}
+                onSelect={onSelect}
+              />
+            ))}
           </div>
         ))}
       </div>
@@ -289,6 +284,46 @@ export function LogbookView({ groups, selected, titles, onSelect, ...detail }: P
       ) : (
         <Detail key={selected.sessionId} facts={selected} {...detail} />
       )}
+    </div>
+  )
+}
+
+interface ItemProps {
+  facts: SessionFacts
+  headline: ReturnType<typeof headlineOf>
+  selected: boolean
+  now: number
+  onSelect: Props['onSelect']
+}
+
+/** One entry: its state, its headline, and its key, place and age. */
+function LogbookItem({ facts, headline, selected, now, onSelect }: ItemProps): JSX.Element {
+  return (
+    <div
+      role="option"
+      aria-selected={selected}
+      tabIndex={0}
+      className={`logbook__item${selected ? ' logbook__item--selected' : ''}`}
+      style={facts.workspaceColor ? { ['--rail' as string]: facts.workspaceColor } : undefined}
+      onClick={() => onSelect(facts.sessionId)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect(facts.sessionId)
+        }
+      }}
+    >
+      <StateChip state={facts.state} compact />
+      <span className={`logbook__headline${headline.blank ? ' logbook__headline--blank' : ''}`}>
+        {headline.text}
+      </span>
+      <span className="logbook__meta">
+        {facts.workItem && <span className="logbook__key">{facts.workItem.ref.key}</span>}
+        <span className="logbook__where">
+          {[facts.projectName, facts.branch].filter(Boolean).join(' / ') || facts.name}
+        </span>
+        <span className="logbook__age">{formatRelativeTime(facts.lastActivityAt, now)}</span>
+      </span>
     </div>
   )
 }

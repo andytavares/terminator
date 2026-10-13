@@ -69,8 +69,7 @@ function inView<T>(handle: AppHandle, part: string, script: string): Promise<T> 
 async function keyInView(
   handle: AppHandle,
   part: string,
-  keyCode: string,
-  modifiers: string[] = []
+  { keyCode, modifiers = [] }: { keyCode: string; modifiers?: string[] }
 ): Promise<void> {
   await handle.app.evaluate(
     async ({ webContents }, { p, k, mods }) => {
@@ -102,19 +101,174 @@ async function setTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
 // A. Opening and running the panel from a plain (non-git) workspace.
 // ---------------------------------------------------------------------------
 
+// AC1 (part): a focused terminal.
+async function opensFromFocusedTerminal(handle: AppHandle): Promise<void> {
+  const { page } = handle
+  await openPanel(page)
+  await page.keyboard.press('Escape')
+  await expect(dialog(page)).toBeHidden()
+}
+
+// AC1 (part): Home.
+async function opensFromHome(handle: AppHandle): Promise<void> {
+  const { page } = handle
+  await page.getByRole('button', { name: /^Home/ }).click()
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
+  await openPanel(page)
+  await page.keyboard.press('Escape')
+  await expect(dialog(page)).toBeHidden()
+  // Back to the terminal for the rest of this describe block.
+  await handle.page.locator('.branch-row').filter({ hasText: 'scratch' }).click()
+  await expect(handle.page.locator('.xterm-helper-textarea').first()).toBeFocused({
+    timeout: 10000,
+  })
+}
+
+// AC16: the rail button.
+async function appBandButtonOpensPanel(handle: AppHandle): Promise<void> {
+  const { page } = handle
+  await page.locator('button[aria-label="Quick actions (⌘P)"]').click()
+  await expect(dialog(page)).toBeVisible({ timeout: 10000 })
+  await page.keyboard.press('Escape')
+  await expect(dialog(page)).toBeHidden()
+}
+
+// AC2 + AC14: ⌘P t d splits the pane, closes the panel, and teaches ⌘D.
+async function leaderTDSplitsAndTeachesShortcut(handle: AppHandle): Promise<void> {
+  const { page } = handle
+  await expect(page.locator('.xterm')).toHaveCount(1)
+  await openPanel(page)
+  await page.keyboard.press('t')
+  await page.keyboard.press('d')
+  await expect(dialog(page)).toBeHidden()
+  await expect(page.locator('.xterm')).toHaveCount(2, { timeout: 15000 })
+  await expect(page.locator('.tmui-toast__message', { hasText: 'Next time' })).toContainText(
+    'Next time: ⌘D',
+    {
+      timeout: 5000,
+    }
+  )
+}
+
+// AC3: `/` then "push" surfaces Git's Push action through its category.
+async function slashSearchFindsPush(handle: AppHandle): Promise<void> {
+  const { page } = handle
+  await openPanel(page)
+  await page.keyboard.press('/')
+  await expect(page.getByRole('combobox', { name: 'Search quick actions' })).toBeVisible()
+  await page.keyboard.type('push')
+  await expect(page.getByRole('option', { name: /Push/ })).toBeVisible({ timeout: 5000 })
+  await page.keyboard.press('Escape')
+  await expect(dialog(page)).toBeHidden()
+}
+
+// AC6 (part): Notepad's manifest command.
+async function leaderNNOpensNotepadQuickCreate(handle: AppHandle): Promise<void> {
+  const { page } = handle
+  await openPanel(page)
+  await page.keyboard.press('n')
+  // The keydown listener that reads mnemonics is rebound on every mode
+  // change (QuickActions.tsx useEffect depends on `mode`), so a second key
+  // sent before that rebind lands can still be seen by the stale "top mode"
+  // closure and do nothing — the dialog then never closes. Wait for the
+  // group's own listbox to render before sending the row's mnemonic.
+  await page.keyboard.press('n')
+  // Generous: the first time an extension's view is created it can cold-load,
+  // and closing the panel goes through the same main-process path.
+  await expect(dialog(page)).toBeHidden({ timeout: 15000 })
+  await expect
+    .poll(
+      async () =>
+        inView<boolean>(
+          handle,
+          'notepad',
+          `!!document.querySelector('[role="dialog"][data-tmui-surface]')`
+        ).catch(() => false),
+      { timeout: 15000, message: 'Notepad quick-create overlay never appeared' }
+    )
+    .toBe(true)
+}
+
+// AC6 (part): Task Vault's manifest command.
+async function leaderVCOpensTaskVaultCapture(handle: AppHandle): Promise<void> {
+  const { page } = handle
+  await openPanel(page)
+  await page.keyboard.press('v')
+  // See the Notepad test above: wait for the group's listbox to render
+  // before sending the row's mnemonic, or 'c' can be seen by the stale
+  // "top mode" keydown closure and do nothing.
+  await page.keyboard.press('c')
+  // Generous: the first time an extension's view is created it can cold-load,
+  // and closing the panel goes through the same main-process path.
+  await expect(dialog(page)).toBeHidden({ timeout: 15000 })
+  await expect
+    .poll(
+      async () => inView<string>(handle, 'task-vault', `document.body.innerText`).catch(() => ''),
+      { timeout: 15000, message: 'Task Vault capture overlay never appeared' }
+    )
+    .toContain('Capture to Inbox')
+}
+
+// AC1 (part) + AC15: the leader from inside an extension view, and Escape
+// closing only the panel — not the extension, and not counted twice.
+async function leaderInsideNotesOpensPanel(handle: AppHandle): Promise<void> {
+  const { page } = handle
+  // The previous test left Task Vault as the active extension panel — bring
+  // Notes forward explicitly rather than assuming what came before it.
+  const notesPanel = page.locator('[data-extension-panel="terminator.notepad"]')
+  if ((await notesPanel.count()) === 0) {
+    await page.locator('button[aria-label="Notes"]').click()
+  }
+  await expect(notesPanel).toHaveCount(1, { timeout: 10000 })
+  await expect
+    .poll(
+      () =>
+        handle.app.evaluate(({ webContents }) =>
+          webContents
+            .getAllWebContents()
+            .some((wc) => !wc.isDestroyed() && wc.getURL().includes('notepad') && !wc.isLoading())
+        ),
+      { timeout: 15000 }
+    )
+    .toBe(true)
+
+  await keyInView(handle, 'notepad', { keyCode: 'P', modifiers: [LEADER_MODIFIER] })
+  await expect(dialog(page)).toBeVisible({ timeout: 10000 })
+  // Escape closes the panel from inside it; pressed before focus has moved
+  // there from the extension's view, it closes nothing (as core-ipc found).
+  await expect(dialog(page)).toBeFocused()
+
+  // A single Escape closes only the panel — Notes stays the active surface.
+  await page.keyboard.press('Escape')
+  await expect(dialog(page)).toBeHidden()
+  await expect(page.locator('[data-extension-panel="terminator.notepad"]')).toHaveCount(1)
+
+  // A second Escape, close on the heels of the first, must not read as the
+  // second half of a double-Escape exit: the panel's own Escape must not
+  // have counted toward it.
+  await page.keyboard.press('Escape')
+  await expect(page.locator('[data-extension-panel="terminator.notepad"]')).toHaveCount(1)
+}
+
+/** The app on a plain workspace's scratch branch, its terminal focused. */
+async function appOnScratchTerminal(folder: string): Promise<AppHandle> {
+  const handle = await launchApp()
+  await createWorkspace(handle.page, 'QA Workspace', folder)
+  await addAndSelectProject(handle.page, 'QA Workspace', 'scratch')
+  await handle.page.locator('.xterm').first().click()
+  await expect(handle.page.locator('.xterm-helper-textarea').first()).toBeFocused({
+    timeout: 10000,
+  })
+  return handle
+}
+
 test.describe('opening and running the panel', () => {
   let handle: AppHandle
   let folder: string
 
   test.beforeAll(async () => {
     folder = e2eTempDir('terminator-e2e-qa-')
-    handle = await launchApp()
-    await createWorkspace(handle.page, 'QA Workspace', folder)
-    await addAndSelectProject(handle.page, 'QA Workspace', 'scratch')
-    await handle.page.locator('.xterm').first().click()
-    await expect(handle.page.locator('.xterm-helper-textarea').first()).toBeFocused({
-      timeout: 10000,
-    })
+    handle = await appOnScratchTerminal(folder)
   })
 
   test.afterAll(async () => {
@@ -122,151 +276,27 @@ test.describe('opening and running the panel', () => {
     rmSync(folder, { recursive: true, force: true })
   })
 
-  // AC1 (part): a focused terminal.
-  test('AC1: ⌘P opens the panel from a focused terminal', async () => {
-    const { page } = handle
-    await openPanel(page)
-    await page.keyboard.press('Escape')
-    await expect(dialog(page)).toBeHidden()
-  })
+  test('AC1: ⌘P opens the panel from a focused terminal', () => opensFromFocusedTerminal(handle))
 
-  // AC1 (part): Home.
-  test('AC1: ⌘P opens the panel from Home', async () => {
-    const { page } = handle
-    await page.getByRole('button', { name: /^Home/ }).click()
-    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
-    await openPanel(page)
-    await page.keyboard.press('Escape')
-    await expect(dialog(page)).toBeHidden()
-    // Back to the terminal for the rest of this describe block.
-    await handle.page.locator('.branch-row').filter({ hasText: 'scratch' }).click()
-    await expect(handle.page.locator('.xterm-helper-textarea').first()).toBeFocused({
-      timeout: 10000,
-    })
-  })
+  test('AC1: ⌘P opens the panel from Home', () => opensFromHome(handle))
 
-  // AC16: the rail button.
-  test('AC16: the AppBand "Quick actions (⌘P)" button opens the panel', async () => {
-    const { page } = handle
-    await page.locator('button[aria-label="Quick actions (⌘P)"]').click()
-    await expect(dialog(page)).toBeVisible({ timeout: 10000 })
-    await page.keyboard.press('Escape')
-    await expect(dialog(page)).toBeHidden()
-  })
+  test('AC16: the AppBand "Quick actions (⌘P)" button opens the panel', () =>
+    appBandButtonOpensPanel(handle))
 
-  // AC2 + AC14: ⌘P t d splits the pane, closes the panel, and teaches ⌘D.
-  test('AC2 + AC14: ⌘P t d splits the focused pane, closes the panel, and shows "Next time: ⌘D"', async () => {
-    const { page } = handle
-    await expect(page.locator('.xterm')).toHaveCount(1)
-    await openPanel(page)
-    await page.keyboard.press('t')
-    await page.keyboard.press('d')
-    await expect(dialog(page)).toBeHidden()
-    await expect(page.locator('.xterm')).toHaveCount(2, { timeout: 15000 })
-    await expect(page.locator('.tmui-toast__message', { hasText: 'Next time' })).toContainText(
-      'Next time: ⌘D',
-      {
-        timeout: 5000,
-      }
-    )
-  })
+  test('AC2 + AC14: ⌘P t d splits the focused pane, closes the panel, and shows "Next time: ⌘D"', () =>
+    leaderTDSplitsAndTeachesShortcut(handle))
 
-  // AC3: `/` then "push" surfaces Git's Push action through its category.
-  test('AC3: `/` then typing "push" lists an option whose name contains "Push"', async () => {
-    const { page } = handle
-    await openPanel(page)
-    await page.keyboard.press('/')
-    await expect(page.getByRole('combobox', { name: 'Search quick actions' })).toBeVisible()
-    await page.keyboard.type('push')
-    await expect(page.getByRole('option', { name: /Push/ })).toBeVisible({ timeout: 5000 })
-    await page.keyboard.press('Escape')
-    await expect(dialog(page)).toBeHidden()
-  })
+  test('AC3: `/` then typing "push" lists an option whose name contains "Push"', () =>
+    slashSearchFindsPush(handle))
 
-  // AC6 (part): Notepad's manifest command.
-  test('AC6: ⌘P n n shows the Notepad quick-create overlay', async () => {
-    const { page } = handle
-    await openPanel(page)
-    await page.keyboard.press('n')
-    // The keydown listener that reads mnemonics is rebound on every mode
-    // change (QuickActions.tsx useEffect depends on `mode`), so a second key
-    // sent before that rebind lands can still be seen by the stale "top mode"
-    // closure and do nothing — the dialog then never closes. Wait for the
-    // group's own listbox to render before sending the row's mnemonic.
-    await page.keyboard.press('n')
-    // Generous: the first time an extension's view is created it can cold-load,
-    // and closing the panel goes through the same main-process path.
-    await expect(dialog(page)).toBeHidden({ timeout: 15000 })
-    await expect
-      .poll(
-        async () =>
-          inView<boolean>(
-            handle,
-            'notepad',
-            `!!document.querySelector('[role="dialog"][data-tmui-surface]')`
-          ).catch(() => false),
-        { timeout: 15000, message: 'Notepad quick-create overlay never appeared' }
-      )
-      .toBe(true)
-  })
+  test('AC6: ⌘P n n shows the Notepad quick-create overlay', () =>
+    leaderNNOpensNotepadQuickCreate(handle))
 
-  // AC6 (part): Task Vault's manifest command.
-  test('AC6: ⌘P v c shows the Task Vault capture overlay', async () => {
-    const { page } = handle
-    await openPanel(page)
-    await page.keyboard.press('v')
-    // See the Notepad test above: wait for the group's listbox to render
-    // before sending the row's mnemonic, or 'c' can be seen by the stale
-    // "top mode" keydown closure and do nothing.
-    await page.keyboard.press('c')
-    // Generous: the first time an extension's view is created it can cold-load,
-    // and closing the panel goes through the same main-process path.
-    await expect(dialog(page)).toBeHidden({ timeout: 15000 })
-    await expect
-      .poll(
-        async () => inView<string>(handle, 'task-vault', `document.body.innerText`).catch(() => ''),
-        { timeout: 15000, message: 'Task Vault capture overlay never appeared' }
-      )
-      .toContain('Capture to Inbox')
-  })
+  test('AC6: ⌘P v c shows the Task Vault capture overlay', () =>
+    leaderVCOpensTaskVaultCapture(handle))
 
-  // AC1 (part) + AC15: the leader from inside an extension view, and Escape
-  // closing only the panel — not the extension, and not counted twice.
-  test('AC1 + AC15: ⌘P from inside the Notes view opens the panel; Escape closes only the panel', async () => {
-    const { page } = handle
-    // The previous test left Task Vault as the active extension panel — bring
-    // Notes forward explicitly rather than assuming what came before it.
-    const notesPanel = page.locator('[data-extension-panel="terminator.notepad"]')
-    if ((await notesPanel.count()) === 0) {
-      await page.locator('button[aria-label="Notes"]').click()
-    }
-    await expect(notesPanel).toHaveCount(1, { timeout: 10000 })
-    await expect
-      .poll(
-        () =>
-          handle.app.evaluate(({ webContents }) =>
-            webContents
-              .getAllWebContents()
-              .some((wc) => !wc.isDestroyed() && wc.getURL().includes('notepad') && !wc.isLoading())
-          ),
-        { timeout: 15000 }
-      )
-      .toBe(true)
-
-    await keyInView(handle, 'notepad', 'P', [LEADER_MODIFIER])
-    await expect(dialog(page)).toBeVisible({ timeout: 10000 })
-
-    // A single Escape closes only the panel — Notes stays the active surface.
-    await page.keyboard.press('Escape')
-    await expect(dialog(page)).toBeHidden()
-    await expect(page.locator('[data-extension-panel="terminator.notepad"]')).toHaveCount(1)
-
-    // A second Escape, close on the heels of the first, must not read as the
-    // second half of a double-Escape exit: the panel's own Escape must not
-    // have counted toward it.
-    await page.keyboard.press('Escape')
-    await expect(page.locator('[data-extension-panel="terminator.notepad"]')).toHaveCount(1)
-  })
+  test('AC1 + AC15: ⌘P from inside the Notes view opens the panel; Escape closes only the panel', () =>
+    leaderInsideNotesOpensPanel(handle))
 })
 
 // ---------------------------------------------------------------------------
@@ -311,81 +341,162 @@ test.describe('no repository focused', () => {
 // B. Pins and recent actions survive a relaunch.
 // ---------------------------------------------------------------------------
 
-test.describe('pins and recent survive a relaunch', () => {
-  let handle: AppHandle
+/** This story's app: launched by its test, and relaunched on the same profile. */
+let relaunched: AppHandle
 
-  test.afterAll(async () => {
-    await closeApp(handle)
-  })
+async function recentAndPinsSurviveRestart(): Promise<void> {
+  relaunched = await launchApp()
+  const { page } = relaunched
 
-  test('AC8: an action run 3 times appears in Recent; pinning puts it first, and both survive a restart', async () => {
-    handle = await launchApp()
-    const { page } = handle
-
-    for (let i = 0; i < 3; i++) {
-      await openPanel(page)
-      await page.keyboard.press('b') // core.toggle-sidebar: top-level, always enabled.
-      await expect(dialog(page)).toBeHidden()
-    }
-
+  for (let i = 0; i < 3; i++) {
     await openPanel(page)
-    const recentList = page.getByRole('listbox', { name: 'Pinned & recent' })
-    await expect(recentList).toBeVisible()
-    await expect(recentList.getByRole('option', { name: /Toggle sidebar/ })).toBeVisible()
-
-    // Highlight starts on the first row of "Pinned & recent" (no context group
-    // on Home), which is our just-used action — pin it.
-    await page.keyboard.press('ControlOrMeta+.')
-    await expect(recentList.getByRole('option').first()).toContainText('Toggle sidebar')
-    await page.keyboard.press('Escape')
+    await page.keyboard.press('b') // core.toggle-sidebar: top-level, always enabled.
     await expect(dialog(page)).toBeHidden()
+  }
 
-    // Reopen without restarting: still first.
-    await openPanel(page)
-    await expect(
-      page.getByRole('listbox', { name: 'Pinned & recent' }).getByRole('option').first()
-    ).toContainText('Toggle sidebar')
-    await page.keyboard.press('Escape')
+  await openPanel(page)
+  const recentList = page.getByRole('listbox', { name: 'Pinned & recent' })
+  await expect(recentList).toBeVisible()
+  await expect(recentList.getByRole('option', { name: /Toggle sidebar/ })).toBeVisible()
 
-    // Restart the app on the same profile.
-    const userDataDir = handle.userDataDir
-    await closeApp(handle)
-    handle = await launchApp(userDataDir)
+  // Highlight starts on the first row of "Pinned & recent" (no context group
+  // on Home), which is our just-used action — pin it.
+  await page.keyboard.press('ControlOrMeta+.')
+  await expect(recentList.getByRole('option').first()).toContainText('Toggle sidebar')
+  await page.keyboard.press('Escape')
+  await expect(dialog(page)).toBeHidden()
 
-    await openPanel(handle.page)
-    await expect(
-      handle.page.getByRole('listbox', { name: 'Pinned & recent' }).getByRole('option').first()
-    ).toContainText('Toggle sidebar')
+  // Reopen without restarting: still first.
+  await openPanel(page)
+  await expect(
+    page.getByRole('listbox', { name: 'Pinned & recent' }).getByRole('option').first()
+  ).toContainText('Toggle sidebar')
+  await page.keyboard.press('Escape')
+
+  // Restart the app on the same profile.
+  const userDataDir = relaunched.userDataDir
+  await closeApp(relaunched)
+  relaunched = await launchApp(userDataDir)
+
+  await openPanel(relaunched.page)
+  await expect(
+    relaunched.page.getByRole('listbox', { name: 'Pinned & recent' }).getByRole('option').first()
+  ).toContainText('Toggle sidebar')
+}
+
+test.describe('pins and recent survive a relaunch', () => {
+  test.afterAll(async () => {
+    await closeApp(relaunched)
   })
+
+  test(
+    'AC8: an action run 3 times appears in Recent; pinning puts it first, and both survive a restart',
+    recentAndPinsSurviveRestart
+  )
 })
+
+const WS = 'QA Git Workspace'
+
+function git(cwd: string, ...args: string[]): string {
+  return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+}
+
+/** A repository with a commit its origin does not have yet, for Push to push. */
+function repositoryAheadOfOrigin(): { bareDir: string; workDir: string } {
+  const bareDir = e2eTempDir('terminator-e2e-qa-bare-')
+  const workDir = e2eTempDir('terminator-e2e-qa-work-')
+  git(bareDir, 'init', '--bare', '-b', 'main')
+  git(workDir, 'init', '-b', 'main')
+  git(workDir, 'config', 'user.email', 'e2e@example.com')
+  git(workDir, 'config', 'user.name', 'E2E')
+  git(workDir, 'remote', 'add', 'origin', bareDir)
+  git(workDir, 'commit', '--allow-empty', '-m', 'root')
+  git(workDir, 'push', '-u', 'origin', 'main')
+  // A local commit not yet on the remote, for Push to have something to do.
+  git(workDir, 'commit', '--allow-empty', '-m', 'second')
+  return { bareDir, workDir }
+}
 
 // ---------------------------------------------------------------------------
 // C. Git push against a real bare remote, and a custom shell action.
 // ---------------------------------------------------------------------------
 
+// AC7 (part): the real push, verified against the remote.
+async function gitPushCatchesOriginUp(handle: AppHandle, workDir: string): Promise<void> {
+  const { page } = handle
+  const headBefore = git(workDir, 'rev-parse', 'HEAD')
+  const remoteBefore = git(workDir, 'rev-parse', 'origin/main')
+  expect(headBefore).not.toBe(remoteBefore)
+
+  await openPanel(page)
+  await page.keyboard.press('g')
+  await expect(page.getByRole('listbox', { name: 'Git' })).toBeVisible()
+  await expect(page.getByRole('option', { name: /^p Push/ })).toBeVisible()
+  await page.keyboard.press('p')
+  await expect(dialog(page)).toBeHidden({ timeout: 10000 })
+  await expect(page.locator('.tmui-toast__message', { hasText: 'Pushed' })).toContainText(
+    'Pushed main to origin',
+    {
+      timeout: 15000,
+    }
+  )
+
+  git(workDir, 'fetch', 'origin')
+  expect(git(workDir, 'rev-parse', 'origin/main')).toBe(headBefore)
+}
+
+/** Adds, in Settings, the "Echo branch" action on `x e`, which writes the branch to `echoed`. */
+async function addEchoBranchAction(page: Page, echoed: string): Promise<void> {
+  await page.keyboard.press('ControlOrMeta+,')
+  await page.waitForSelector('.settings-panel', { timeout: 5000 })
+  await page
+    .locator('.settings-section__title', { hasText: 'Quick actions' })
+    .scrollIntoViewIfNeeded()
+  await page.getByRole('button', { name: 'Add action' }).click()
+  await page.locator('#qa-action-label').fill('Echo branch')
+  await page.locator('#qa-action-key').fill('e')
+  await page.locator('#qa-action-target').selectOption('new-tab')
+  await page.locator('#qa-action-body').fill(`echo {branch} | tee '${echoed}'`)
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page.locator('.qa-settings-list__label', { hasText: 'Echo branch' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.settings-panel')).toBeHidden()
+}
+
+// AC10: a custom shell action with a variable, targeting a new tab.
+async function customShellActionEchoesBranch(handle: AppHandle, workDir: string): Promise<void> {
+  const { page } = handle
+  // tee: the branch goes to the terminal and to a file the test can read. The
+  // WebGL renderer draws to a canvas, so the terminal has no DOM text to read.
+  const echoed = join(workDir, 'echoed-branch.txt')
+  await addEchoBranchAction(page, echoed)
+
+  const tabsBefore = await page.locator('.tab-bar__tab--session').count()
+
+  await openPanel(page)
+  await page.keyboard.press('x')
+  await page.keyboard.press('e')
+  await expect(dialog(page)).toBeHidden()
+
+  await expect(page.locator('.tab-bar__tab--session')).toHaveCount(tabsBefore + 1, {
+    timeout: 15000,
+  })
+  await expect
+    .poll(() => (existsSync(echoed) ? readFileSync(echoed, 'utf8').trim() : ''), {
+      timeout: 15000,
+      message: 'the new tab never echoed the branch name',
+    })
+    .toBe('main')
+}
+
 test.describe('git push and a custom shell action', () => {
   let handle: AppHandle
   let bareDir: string
   let workDir: string
-  const WS = 'QA Git Workspace'
-
-  function git(cwd: string, ...args: string[]): string {
-    return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
-  }
-
   test.beforeAll(async () => {
-    bareDir = e2eTempDir('terminator-e2e-qa-bare-')
-    workDir = e2eTempDir('terminator-e2e-qa-work-')
-    git(bareDir, 'init', '--bare', '-b', 'main')
-    git(workDir, 'init', '-b', 'main')
-    git(workDir, 'config', 'user.email', 'e2e@example.com')
-    git(workDir, 'config', 'user.name', 'E2E')
-    git(workDir, 'remote', 'add', 'origin', bareDir)
-    git(workDir, 'commit', '--allow-empty', '-m', 'root')
-    git(workDir, 'push', '-u', 'origin', 'main')
-    // A local commit not yet on the remote, for Push to have something to do.
-    git(workDir, 'commit', '--allow-empty', '-m', 'second')
-
+    const repository = repositoryAheadOfOrigin()
+    bareDir = repository.bareDir
+    workDir = repository.workDir
     handle = await launchApp()
     await createWorkspace(handle.page, WS, workDir)
     await handle.page.locator('.branch-row').first().click()
@@ -401,74 +512,46 @@ test.describe('git push and a custom shell action', () => {
     rmSync(workDir, { recursive: true, force: true })
   })
 
-  // AC7 (part): the real push, verified against the remote.
-  test('AC7: Git Push runs in the focused worktree, and origin/main catches up to HEAD', async () => {
-    const { page } = handle
-    const headBefore = git(workDir, 'rev-parse', 'HEAD')
-    const remoteBefore = git(workDir, 'rev-parse', 'origin/main')
-    expect(headBefore).not.toBe(remoteBefore)
+  test('AC7: Git Push runs in the focused worktree, and origin/main catches up to HEAD', () =>
+    gitPushCatchesOriginUp(handle, workDir))
 
-    await openPanel(page)
-    await page.keyboard.press('g')
-    await expect(page.getByRole('listbox', { name: 'Git' })).toBeVisible()
-    await expect(page.getByRole('option', { name: /^p Push/ })).toBeVisible()
-    await page.keyboard.press('p')
-    await expect(dialog(page)).toBeHidden({ timeout: 10000 })
-    await expect(page.locator('.tmui-toast__message', { hasText: 'Pushed' })).toContainText(
-      'Pushed main to origin',
-      {
-        timeout: 15000,
-      }
-    )
-
-    git(workDir, 'fetch', 'origin')
-    expect(git(workDir, 'rev-parse', 'origin/main')).toBe(headBefore)
-  })
-
-  // AC10: a custom shell action with a variable, targeting a new tab.
-  test('AC10: a custom shell action "echo {branch}" targeting a new tab writes the branch to the terminal', async () => {
-    const { page } = handle
-
-    await page.keyboard.press('ControlOrMeta+,')
-    await page.waitForSelector('.settings-panel', { timeout: 5000 })
-    await page
-      .locator('.settings-section__title', { hasText: 'Quick actions' })
-      .scrollIntoViewIfNeeded()
-    await page.getByRole('button', { name: 'Add action' }).click()
-    await page.locator('#qa-action-label').fill('Echo branch')
-    await page.locator('#qa-action-key').fill('e')
-    await page.locator('#qa-action-target').selectOption('new-tab')
-    // tee: the branch goes to the terminal and to a file the test can read. The
-    // WebGL renderer draws to a canvas, so the terminal has no DOM text to read.
-    const echoed = join(workDir, 'echoed-branch.txt')
-    await page.locator('#qa-action-body').fill(`echo {branch} | tee '${echoed}'`)
-    await page.getByRole('button', { name: 'Save' }).click()
-    await expect(page.locator('.qa-settings-list__label', { hasText: 'Echo branch' })).toBeVisible()
-    await page.keyboard.press('Escape')
-    await expect(page.locator('.settings-panel')).toBeHidden()
-
-    const tabsBefore = await page.locator('.tab-bar__tab--session').count()
-
-    await openPanel(page)
-    await page.keyboard.press('x')
-    await page.keyboard.press('e')
-    await expect(dialog(page)).toBeHidden()
-
-    await expect(page.locator('.tab-bar__tab--session')).toHaveCount(tabsBefore + 1, {
-      timeout: 15000,
-    })
-    await expect
-      .poll(() => (existsSync(echoed) ? readFileSync(echoed, 'utf8').trim() : ''), {
-        timeout: 15000,
-        message: 'the new tab never echoed the branch name',
-      })
-      .toBe('main')
-  })
+  test('AC10: a custom shell action "echo {branch}" targeting a new tab writes the branch to the terminal', () =>
+    customShellActionEchoesBranch(handle, workDir))
 })
 
 // ---------------------------------------------------------------------------
 // D. Screenshots, top level and the Git group, dark and light.
 // ---------------------------------------------------------------------------
+
+async function capturesPanelInBothThemes(handle: AppHandle): Promise<void> {
+  const { page } = handle
+
+  // The panel and its overlay fade and scale in over ~120ms
+  // (QuickActions.css), and `toBeVisible` is satisfied well before that
+  // finishes — capturing immediately would screenshot mid-transition, so
+  // wait for the animation itself to finish rather than guessing its length.
+  await setTheme(page, 'dark')
+  await openPanel(page)
+  await waitForAnimationsToFinish(page, '.qa-panel')
+  await page.screenshot({ path: 'test-results/quick-actions/panel-top-dark.png' })
+  await page.keyboard.press('g')
+  await expect(page.getByRole('listbox', { name: 'Git' })).toBeVisible()
+  await waitForAnimationsToFinish(page, '.qa-panel')
+  await page.screenshot({ path: 'test-results/quick-actions/panel-git-dark.png' })
+  await page.keyboard.press('Escape')
+  await expect(dialog(page)).toBeHidden()
+
+  await setTheme(page, 'light')
+  await openPanel(page)
+  await waitForAnimationsToFinish(page, '.qa-panel')
+  await page.screenshot({ path: 'test-results/quick-actions/panel-top-light.png' })
+  await page.keyboard.press('g')
+  await expect(page.getByRole('listbox', { name: 'Git' })).toBeVisible()
+  await waitForAnimationsToFinish(page, '.qa-panel')
+  await page.screenshot({ path: 'test-results/quick-actions/panel-git-light.png' })
+  await page.keyboard.press('Escape')
+  await expect(dialog(page)).toBeHidden()
+}
 
 test.describe('panel screenshots', () => {
   let handle: AppHandle
@@ -486,33 +569,6 @@ test.describe('panel screenshots', () => {
     rmSync(folder, { recursive: true, force: true })
   })
 
-  test('the panel and the Git group are captured in dark and light themes', async () => {
-    const { page } = handle
-
-    // The panel and its overlay fade and scale in over ~120ms
-    // (QuickActions.css), and `toBeVisible` is satisfied well before that
-    // finishes — capturing immediately would screenshot mid-transition, so
-    // wait for the animation itself to finish rather than guessing its length.
-    await setTheme(page, 'dark')
-    await openPanel(page)
-    await waitForAnimationsToFinish(page, '.qa-panel')
-    await page.screenshot({ path: 'test-results/quick-actions/panel-top-dark.png' })
-    await page.keyboard.press('g')
-    await expect(page.getByRole('listbox', { name: 'Git' })).toBeVisible()
-    await waitForAnimationsToFinish(page, '.qa-panel')
-    await page.screenshot({ path: 'test-results/quick-actions/panel-git-dark.png' })
-    await page.keyboard.press('Escape')
-    await expect(dialog(page)).toBeHidden()
-
-    await setTheme(page, 'light')
-    await openPanel(page)
-    await waitForAnimationsToFinish(page, '.qa-panel')
-    await page.screenshot({ path: 'test-results/quick-actions/panel-top-light.png' })
-    await page.keyboard.press('g')
-    await expect(page.getByRole('listbox', { name: 'Git' })).toBeVisible()
-    await waitForAnimationsToFinish(page, '.qa-panel')
-    await page.screenshot({ path: 'test-results/quick-actions/panel-git-light.png' })
-    await page.keyboard.press('Escape')
-    await expect(dialog(page)).toBeHidden()
-  })
+  test('the panel and the Git group are captured in dark and light themes', () =>
+    capturesPanelInBothThemes(handle))
 })

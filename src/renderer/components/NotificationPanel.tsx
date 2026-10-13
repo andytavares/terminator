@@ -29,17 +29,11 @@ function TypeIcon({ type }: { type: string }): JSX.Element {
  */
 const OPEN_ACTION_ID = '__open__'
 
-function NotificationItem({
-  notification,
-  onNavigate,
-}: {
-  notification: Notification
-  onNavigate: () => void
-}): JSX.Element {
+/** What a row does: open what it is about, run one of its actions, or go away. */
+function useNotificationActions(notification: Notification, onNavigate: () => void) {
   const { dismiss, markRead, remove } = useNotificationStore(
     useShallow((s) => ({ dismiss: s.dismiss, markRead: s.markRead, remove: s.remove }))
   )
-
   // Either a local handler (core notifications, which are created in the
   // renderer) or a reserved callback in main (everything an extension raises).
   const canOpen = notification.onClick !== undefined || notification.clickable === true
@@ -48,10 +42,7 @@ function NotificationItem({
     if (!canOpen) return
     markRead(notification.id)
     onNavigate()
-    if (notification.onClick) {
-      notification.onClick()
-      return
-    }
+    if (notification.onClick) return notification.onClick()
     void window.electronAPI.notifications.triggerAction(notification.id, OPEN_ACTION_ID)
   }
 
@@ -70,41 +61,78 @@ function NotificationItem({
     remove(notification.id)
     onNavigate()
   }
+  return { canOpen, handleClick, handleDismiss, handleAction }
+}
 
+function NotificationItem({
+  notification,
+  onNavigate,
+}: {
+  notification: Notification
+  onNavigate: () => void
+}): JSX.Element {
+  const { canOpen, handleClick, handleDismiss, handleAction } = useNotificationActions(
+    notification,
+    onNavigate
+  )
   return (
     <div
       className={`notif-item${notification.read ? '' : ' notif-item--unread'}${canOpen ? ' notif-item--clickable' : ''}`}
       onClick={handleClick}
     >
       <TypeIcon type={notification.type} />
-      <div className="notif-item__body">
-        <div className="notif-item__title">{notification.title}</div>
-        {notification.message && <div className="notif-item__message">{notification.message}</div>}
-        <div className="notif-item__meta">
-          <span className="notif-item__time">
-            <RelativeTime value={notification.timestamp} />
-          </span>
-          {notification.source && notification.source !== 'core' && (
-            <span className="notif-item__source">{notification.source}</span>
-          )}
-        </div>
-        {notification.actions && notification.actions.length > 0 && (
-          <div className="notif-item__actions">
-            {notification.actions.map((action) => (
-              <button
-                key={action.id}
-                className="notif-item__action-btn"
-                onClick={(e) => void handleAction(e, action.id)}
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      <NotificationBody notification={notification} onAction={handleAction} />
       <button className="notif-item__dismiss" onClick={handleDismiss} title="Dismiss">
         ×
       </button>
+    </div>
+  )
+}
+
+function NotificationBody({
+  notification,
+  onAction,
+}: {
+  notification: Notification
+  onAction: (e: React.MouseEvent, actionId: string) => Promise<void>
+}): JSX.Element {
+  return (
+    <div className="notif-item__body">
+      <div className="notif-item__title">{notification.title}</div>
+      {notification.message && <div className="notif-item__message">{notification.message}</div>}
+      <div className="notif-item__meta">
+        <span className="notif-item__time">
+          <RelativeTime value={notification.timestamp} />
+        </span>
+        {notification.source && notification.source !== 'core' && (
+          <span className="notif-item__source">{notification.source}</span>
+        )}
+      </div>
+      {notification.actions && notification.actions.length > 0 && (
+        <NotificationActions actions={notification.actions} onAction={onAction} />
+      )}
+    </div>
+  )
+}
+
+function NotificationActions({
+  actions,
+  onAction,
+}: {
+  actions: NonNullable<Notification['actions']>
+  onAction: (e: React.MouseEvent, actionId: string) => Promise<void>
+}): JSX.Element {
+  return (
+    <div className="notif-item__actions">
+      {actions.map((action) => (
+        <button
+          key={action.id}
+          className="notif-item__action-btn"
+          onClick={(e) => void onAction(e, action.id)}
+        >
+          {action.label}
+        </button>
+      ))}
     </div>
   )
 }
@@ -129,30 +157,20 @@ export function BellButton({
   )
 }
 
-function NotificationPanelInner(): JSX.Element {
-  const { closePanel, notifications, markAllRead, clearAll } = useNotificationStore(
-    useShallow((s) => ({
-      closePanel: s.closePanel,
-      notifications: s.notifications,
-      markAllRead: s.markAllRead,
-      clearAll: s.clearAll,
-    }))
-  )
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  /**
-   * Reserve the strip this drawer sits in, rather than hiding what is under it.
-   *
-   * An extension's UI is a native `WebContentsView` that paints above the
-   * renderer's DOM, so a panel drawn over it would be invisible. This used to
-   * call `useModalEffect`, which is the blunt answer: it hides every extension
-   * view while a modal is open. That is right for a centred dialog and wrong
-   * here — opening the drawer blanked the whole application to show a 340px
-   * panel down the left edge.
-   *
-   * Measured from the rendered element rather than assumed, so the reservation
-   * cannot drift from the CSS the way a duplicated width would.
-   */
+/**
+ * Reserve the strip this drawer sits in, rather than hiding what is under it.
+ *
+ * An extension's UI is a native `WebContentsView` that paints above the
+ * renderer's DOM, so a panel drawn over it would be invisible. This used to
+ * call `useModalEffect`, which is the blunt answer: it hides every extension
+ * view while a modal is open. That is right for a centred dialog and wrong
+ * here — opening the drawer blanked the whole application to show a 340px
+ * panel down the left edge.
+ *
+ * Measured from the rendered element rather than assumed, so the reservation
+ * cannot drift from the CSS the way a duplicated width would.
+ */
+function useLeftInset(panelRef: React.RefObject<HTMLDivElement>): void {
   useEffect(() => {
     const setInset = (px: number): void => window.electronAPI?.extension?.setLeftInset?.(px)
     const reserve = (): void => {
@@ -165,8 +183,10 @@ function NotificationPanelInner(): JSX.Element {
       window.removeEventListener('resize', reserve)
       setInset(0)
     }
-  }, [])
+  }, [panelRef])
+}
 
+function useCloseOnEscape(closePanel: () => void): void {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent): void => {
       if (e.key === 'Escape') closePanel()
@@ -178,6 +198,20 @@ function NotificationPanelInner(): JSX.Element {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
+}
+
+function NotificationPanelInner(): JSX.Element {
+  const { closePanel, notifications, markAllRead, clearAll } = useNotificationStore(
+    useShallow((s) => ({
+      closePanel: s.closePanel,
+      notifications: s.notifications,
+      markAllRead: s.markAllRead,
+      clearAll: s.clearAll,
+    }))
+  )
+  const panelRef = useRef<HTMLDivElement>(null)
+  useLeftInset(panelRef)
+  useCloseOnEscape(closePanel)
 
   return (
     <>
@@ -186,33 +220,57 @@ function NotificationPanelInner(): JSX.Element {
         <div className="notif-panel__header">
           <span className="notif-panel__title">Notifications</span>
           {notifications.length > 0 && (
-            <>
-              <button className="notif-panel__action-btn" onClick={markAllRead}>
-                Mark all read
-              </button>
-              <button className="notif-panel__action-btn" onClick={clearAll}>
-                Clear all
-              </button>
-            </>
+            <ListActions onMarkAllRead={markAllRead} onClearAll={clearAll} />
           )}
           <button className="notif-panel__close" onClick={closePanel} title="Close">
             ×
           </button>
         </div>
-        <div className="notif-panel__list">
-          {notifications.length === 0 ? (
-            <div className="notif-panel__empty">
-              <Bell size={24} className="notif-panel__empty-icon" />
-              <span>No notifications</span>
-            </div>
-          ) : (
-            notifications.map((n) => (
-              <NotificationItem key={n.id} notification={n} onNavigate={closePanel} />
-            ))
-          )}
-        </div>
+        <NotificationList notifications={notifications} onNavigate={closePanel} />
       </div>
     </>
+  )
+}
+
+function ListActions({
+  onMarkAllRead,
+  onClearAll,
+}: {
+  onMarkAllRead: () => void
+  onClearAll: () => void
+}) {
+  return (
+    <>
+      <button className="notif-panel__action-btn" onClick={onMarkAllRead}>
+        Mark all read
+      </button>
+      <button className="notif-panel__action-btn" onClick={onClearAll}>
+        Clear all
+      </button>
+    </>
+  )
+}
+
+function NotificationList({
+  notifications,
+  onNavigate,
+}: {
+  notifications: Notification[]
+  onNavigate: () => void
+}): JSX.Element {
+  return (
+    <div className="notif-panel__list">
+      {notifications.length === 0 ? (
+        <div className="notif-panel__empty">
+          <Bell size={24} className="notif-panel__empty-icon" />
+          <span>No notifications</span>
+        </div>
+      ) : (
+        notifications.map((n) => (
+          <NotificationItem key={n.id} notification={n} onNavigate={onNavigate} />
+        ))
+      )}
+    </div>
   )
 }
 

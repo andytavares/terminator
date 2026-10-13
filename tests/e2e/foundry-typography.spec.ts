@@ -16,14 +16,8 @@ import { execFileSync } from 'node:child_process'
 let handle: AppHandle
 let repoPath: string
 
-test.beforeAll(async () => {
-  test.setTimeout(120_000)
-  const repo = e2eTempDir('fdry-type-')
-  repoPath = repo
-  execFileSync('git', ['init', '-q', repo])
-  execFileSync('git', ['-C', repo, 'commit', '-q', '--allow-empty', '-m', 'initial'])
-  handle = await launchApp()
-  await createWorkspace(handle.page, 'type', repo)
+/** Opens Foundry's panel, and waits for its channel and then its view to answer. */
+async function openFoundry(): Promise<void> {
   const panel = handle.page.locator('[data-extension-panel="terminator.foundry"]')
   await handle.page.locator('button[aria-label="Foundry"]').click()
   await expect(panel).toHaveCount(1, { timeout: 30_000 })
@@ -55,6 +49,17 @@ test.beforeAll(async () => {
       { timeout: 30_000 }
     )
     .toBeGreaterThan(0)
+}
+
+test.beforeAll(async () => {
+  test.setTimeout(120_000)
+  const repo = e2eTempDir('fdry-type-')
+  repoPath = repo
+  execFileSync('git', ['init', '-q', repo])
+  execFileSync('git', ['-C', repo, 'commit', '-q', '--allow-empty', '-m', 'initial'])
+  handle = await launchApp()
+  await createWorkspace(handle.page, 'type', repo)
+  await openFoundry()
 })
 
 test.afterAll(async () => {

@@ -1,4 +1,4 @@
-import { useSessionStore } from '../stores/session.store'
+import { useSessionStore, type NewSessionRequest } from '../stores/session.store'
 import { useWorkspaceStore } from '../stores/workspace.store'
 import { TerminalInstance } from '../components/terminal/TerminalSession'
 import { dispatchNotification } from '../lib/notifications'
@@ -74,46 +74,50 @@ function stampActivity(sessionId: string, force = false): boolean {
   return true
 }
 
+function onBusy(sessionId: string, instance: TerminalInstance): void {
+  clearPendingIdle(sessionId)
+  const stamped = stampActivity(sessionId)
+  const store = useSessionStore.getState()
+  store.setSessionBusy(sessionId)
+  // Output moving means a question was answered or redrawn; the next
+  // settle reads it again. A session that never settles still gets its
+  // latest line refreshed, on the activity stamp's once-a-second beat.
+  const session = store.sessions.get(sessionId)
+  if (stamped || session?.choicePrompt !== undefined) {
+    store.setSessionScreen(sessionId, {
+      latestLine: latestLineOf(instance.readVisibleRows(), instance.cursorRow()),
+      choicePrompt: null,
+    })
+  }
+}
+
+function onIdle(sessionId: string, instance: TerminalInstance): void {
+  // Unthrottled: idle is the end of a burst, and its timestamp is the one
+  // that decides how stale the session looks from here on.
+  stampActivity(sessionId, true)
+  // Read once per burst, when the screen has stopped moving, rather than
+  // per output chunk across every live terminal. Needs-you detection must
+  // not wait for the working-hold below.
+  const rows = instance.readVisibleRows()
+  useSessionStore.getState().setSessionScreen(sessionId, {
+    latestLine: latestLineOf(rows, instance.cursorRow()),
+    choicePrompt: parseChoicePrompt(rows),
+  })
+  clearPendingIdle(sessionId)
+  pendingIdle.set(
+    sessionId,
+    setTimeout(() => {
+      pendingIdle.delete(sessionId)
+      useSessionStore.getState().setSessionIdle(sessionId)
+    }, WORKING_HOLD_MS)
+  )
+}
+
 function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInstance {
   const instance: TerminalInstance = new TerminalInstance(sessionId, scrollbackLimit, {
     onBell: () => handleBell(sessionId),
-    onBusy: () => {
-      clearPendingIdle(sessionId)
-      const stamped = stampActivity(sessionId)
-      const store = useSessionStore.getState()
-      store.setSessionBusy(sessionId)
-      // Output moving means a question was answered or redrawn; the next
-      // settle reads it again. A session that never settles still gets its
-      // latest line refreshed, on the activity stamp's once-a-second beat.
-      const session = store.sessions.get(sessionId)
-      if (stamped || session?.choicePrompt !== undefined) {
-        store.setSessionScreen(sessionId, {
-          latestLine: latestLineOf(instance.readVisibleRows(), instance.cursorRow()),
-          choicePrompt: null,
-        })
-      }
-    },
-    onIdle: () => {
-      // Unthrottled: idle is the end of a burst, and its timestamp is the one
-      // that decides how stale the session looks from here on.
-      stampActivity(sessionId, true)
-      // Read once per burst, when the screen has stopped moving, rather than
-      // per output chunk across every live terminal. Needs-you detection must
-      // not wait for the working-hold below.
-      const rows = instance.readVisibleRows()
-      useSessionStore.getState().setSessionScreen(sessionId, {
-        latestLine: latestLineOf(rows, instance.cursorRow()),
-        choicePrompt: parseChoicePrompt(rows),
-      })
-      clearPendingIdle(sessionId)
-      pendingIdle.set(
-        sessionId,
-        setTimeout(() => {
-          pendingIdle.delete(sessionId)
-          useSessionStore.getState().setSessionIdle(sessionId)
-        }, WORKING_HOLD_MS)
-      )
-    },
+    onBusy: () => onBusy(sessionId, instance),
+    onIdle: () => onIdle(sessionId, instance),
     onDispose: () => clearPendingIdle(sessionId),
   })
   return instance
@@ -135,37 +139,20 @@ function reportStartFailure(error: unknown): void {
   })
 }
 
-export async function createTerminalSession(
-  projectId: string,
-  type: 'human' | 'agent',
-  title: string,
-  cwd: string,
-  scrollbackLimit: number,
-  parentSessionId?: string,
-  /** One line run in the terminal once it opens, for a terminal that resumes a conversation. */
-  initialCommand?: string
-): Promise<string> {
+export async function createTerminalSession(request: NewSessionRequest): Promise<string> {
   const store = useSessionStore.getState()
   let sessionId: string
   try {
-    sessionId = await store.createSession(
-      projectId,
-      type,
-      title,
-      cwd,
-      scrollbackLimit,
-      parentSessionId,
-      initialCommand
-    )
+    sessionId = await store.createSession(request)
   } catch (error) {
     reportStartFailure(error)
     throw error
   }
-  const instance = buildInstance(sessionId, scrollbackLimit)
+  const instance = buildInstance(sessionId, request.scrollbackLimit)
   // Store the instance first, then activate — TerminalPane's effect fires after
   // both updates land so getTerminalInstance() is guaranteed to return the instance.
   store.setTerminalInstance(sessionId, instance)
-  store.setActiveSessionForProject(projectId, sessionId)
+  store.setActiveSessionForProject(request.projectId, sessionId)
   store.requestFocus(sessionId)
   return sessionId
 }
@@ -197,11 +184,16 @@ export function adoptTerminalSession(adopted: {
   )
 }
 
+/** Where a new terminal opens, and how much of its output it keeps. */
+export interface TerminalPlace {
+  cwd: string
+  scrollbackLimit: number
+}
+
 export async function splitTerminalSession(
   projectId: string,
   direction: PaneSplitDirection,
-  cwd: string,
-  scrollbackLimit: number
+  { cwd, scrollbackLimit }: TerminalPlace
 ): Promise<void> {
   const store = useSessionStore.getState()
   const focusedId =
@@ -214,17 +206,17 @@ export async function splitTerminalSession(
 
   // Rejects to the caller rather than reporting here: the split shortcut has
   // its own notification key, and two toasts for one failure is noise.
-  const sessionId = await store.createSession(
+  const sessionId = await store.createSession({
     projectId,
-    'human',
-    '',
+    type: 'human',
+    title: '',
     cwd,
     scrollbackLimit,
-    parentSessionId
-  )
+    parentSessionId,
+  })
   const instance = buildInstance(sessionId, scrollbackLimit)
   store.setTerminalInstance(sessionId, instance)
-  store.activateSplit(projectId, focusedId, sessionId, direction)
+  store.activateSplit(projectId, { targetId: focusedId, newId: sessionId, direction })
 }
 
 /**

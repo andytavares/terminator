@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { create, type StoreApi } from 'zustand'
 import type { Workspace, Project } from '../../shared/types/index'
 import { useSessionStore } from './session.store'
 
@@ -36,9 +36,13 @@ interface WorkspaceState {
   setScratchActive: (value: boolean) => void
 }
 
-function loadExpandedIds(): Set<string> {
+const EXPANDED_KEY = 'terminator.workspace.expanded'
+const COLLAPSED_KEY = 'terminator.project.collapsed'
+
+/** The ids saved under `key`; none when nothing is saved or what is there is corrupt. */
+function loadIds(key: string): Set<string> {
   try {
-    const raw = localStorage.getItem('terminator.workspace.expanded')
+    const raw = localStorage.getItem(key)
     if (raw) {
       const parsed = JSON.parse(raw) as unknown
       if (Array.isArray(parsed)) return new Set(parsed as string[])
@@ -49,17 +53,20 @@ function loadExpandedIds(): Set<string> {
   return new Set()
 }
 
-function loadCollapsedProjectIds(): Set<string> {
+function saveIds(key: string, ids: Set<string>): void {
   try {
-    const raw = localStorage.getItem('terminator.project.collapsed')
-    if (raw) {
-      const parsed = JSON.parse(raw) as unknown
-      if (Array.isArray(parsed)) return new Set(parsed as string[])
-    }
+    localStorage.setItem(key, JSON.stringify([...ids]))
   } catch {
-    // ignore
+    // ignore write failures (private browsing, storage full)
   }
-  return new Set()
+}
+
+/** `ids` with `id` added when it was absent, removed when it was present. */
+function toggled(ids: Set<string>, id: string): Set<string> {
+  const next = new Set(ids)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  return next
 }
 
 /** The state with `project` listed under its workspace, unless it already is. */
@@ -72,6 +79,24 @@ function withProjectAdded(
   if (existing.some((p) => p.id === project.id)) return s
   map.set(project.workspaceId, [...existing, project])
   return { projectsByWorkspaceId: map }
+}
+
+/** The state without the project, which is no longer active if it was. */
+function withProjectRemoved(
+  s: WorkspaceState,
+  id: string
+): Pick<WorkspaceState, 'projectsByWorkspaceId' | 'activeProjectId'> {
+  const map = new Map(s.projectsByWorkspaceId)
+  for (const [wsId, projects] of map) {
+    map.set(
+      wsId,
+      projects.filter((p) => p.id !== id)
+    )
+  }
+  return {
+    projectsByWorkspaceId: map,
+    activeProjectId: s.activeProjectId === id ? null : s.activeProjectId,
+  }
 }
 
 /** The state with the project of the same id swapped for `project`. */
@@ -92,13 +117,209 @@ function withProjectReplaced(
   return { projectsByWorkspaceId: map }
 }
 
+type SetWorkspaces = StoreApi<WorkspaceState>['setState']
+type GetWorkspaces = StoreApi<WorkspaceState>['getState']
+type Slice<Keys extends keyof WorkspaceState> = Pick<WorkspaceState, Keys>
+type ProjectResult = { project: Project } | { error: string }
+
+/** Keeps a project main answered with, through `apply`; an error leaves the state alone. */
+function keepProject(
+  set: SetWorkspaces,
+  result: ProjectResult,
+  apply: (s: WorkspaceState, project: Project) => Partial<WorkspaceState>
+): ProjectResult {
+  if ('project' in result) {
+    const project = result.project
+    set((s) => apply(s, project))
+  }
+  return result
+}
+
+function withoutWorkspace(s: WorkspaceState, id: string): Partial<WorkspaceState> {
+  const map = new Map(s.projectsByWorkspaceId)
+  map.delete(id)
+  return {
+    workspaces: s.workspaces.filter((w) => w.id !== id),
+    projectsByWorkspaceId: map,
+    activeWorkspaceId: s.activeWorkspaceId === id ? null : s.activeWorkspaceId,
+    activeProjectId: s.activeWorkspaceId === id ? null : s.activeProjectId,
+  }
+}
+
+/** `items` in the order `ids` gives, then any it leaves out, in their old order. */
+function inOrder<Item extends { id: string }>(items: Item[], ids: string[]): Item[] {
+  const byId = new Map(items.map((item) => [item.id, item]))
+  const reordered = ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []))
+  const missing = items.filter((item) => !ids.includes(item.id))
+  return [...reordered, ...missing]
+}
+
+function withProjectsOrdered(
+  s: WorkspaceState,
+  workspaceId: string,
+  ids: string[]
+): Partial<WorkspaceState> {
+  const map = new Map(s.projectsByWorkspaceId)
+  map.set(workspaceId, inOrder(map.get(workspaceId) ?? [], ids))
+  return { projectsByWorkspaceId: map }
+}
+
+function withProjectsLoaded(
+  s: WorkspaceState,
+  workspaceId: string,
+  projects: Project[]
+): Partial<WorkspaceState> {
+  const map = new Map(s.projectsByWorkspaceId)
+  map.set(workspaceId, projects)
+  return { projectsByWorkspaceId: map }
+}
+
+type WorkspaceResult = Awaited<ReturnType<WorkspaceState['createWorkspace']>>
+
+async function createWorkspace(set: SetWorkspaces, input: unknown): Promise<WorkspaceResult> {
+  const result = await window.electronAPI.workspace.create(input)
+  if ('workspace' in result) set((s) => ({ workspaces: [...s.workspaces, result.workspace] }))
+  return result
+}
+
+async function updateWorkspace(set: SetWorkspaces, input: unknown): Promise<WorkspaceResult> {
+  const result = await window.electronAPI.workspace.update(input)
+  if ('workspace' in result) {
+    const updated = result.workspace
+    set((s) => ({ workspaces: s.workspaces.map((w) => (w.id === updated.id ? updated : w)) }))
+  }
+  return result
+}
+
+async function deleteWorkspace(set: SetWorkspaces, id: string): Promise<void> {
+  await window.electronAPI.workspace.delete(id)
+  set((s) => withoutWorkspace(s, id))
+}
+
+async function deleteProject(set: SetWorkspaces, id: string): Promise<void> {
+  await window.electronAPI.project.delete(id)
+  set((s) => withProjectRemoved(s, id))
+}
+
+async function loadProjects(set: SetWorkspaces, workspaceId: string): Promise<void> {
+  const result = await window.electronAPI.project.list(workspaceId)
+  set((s) => withProjectsLoaded(s, workspaceId, result.projects))
+}
+
+async function reorderProjects(
+  set: SetWorkspaces,
+  workspaceId: string,
+  ids: string[]
+): Promise<void> {
+  set((s) => withProjectsOrdered(s, workspaceId, ids))
+  await window.electronAPI.project.reorder(workspaceId, ids)
+}
+
+/** The repos themselves: listing, adding, editing, removing, ordering and choosing one. */
+function workspaceSlice(
+  set: SetWorkspaces,
+  get: GetWorkspaces
+): Slice<
+  | 'loadWorkspaces'
+  | 'createWorkspace'
+  | 'updateWorkspace'
+  | 'deleteWorkspace'
+  | 'setActiveWorkspace'
+  | 'reorderWorkspaces'
+> {
+  return {
+    loadWorkspaces: async () => {
+      const result = await window.electronAPI.workspace.list()
+      set({ workspaces: result.workspaces })
+    },
+    createWorkspace: (input) => createWorkspace(set, input),
+    updateWorkspace: (input) => updateWorkspace(set, input),
+    deleteWorkspace: (id) => deleteWorkspace(set, id),
+    setActiveWorkspace: (id) => {
+      set({ activeWorkspaceId: id, activeProjectId: null })
+      if (id) get().loadProjects(id)
+    },
+    reorderWorkspaces: async (ids) => {
+      set((s) => ({ workspaces: inOrder(s.workspaces, ids) }))
+      await window.electronAPI.workspace.reorder(ids)
+    },
+  }
+}
+
+/** The branches under each repo. */
+function projectSlice(
+  set: SetWorkspaces
+): Slice<
+  | 'loadProjects'
+  | 'createProject'
+  | 'updateProjectBranch'
+  | 'renameProject'
+  | 'reorderProjects'
+  | 'deleteProject'
+  | 'setActiveProject'
+> {
+  return {
+    loadProjects: (workspaceId) => loadProjects(set, workspaceId),
+    createProject: async (input) =>
+      keepProject(set, await window.electronAPI.project.create(input), withProjectAdded),
+    updateProjectBranch: async (id, gitBranch) =>
+      keepProject(
+        set,
+        await window.electronAPI.project.updateBranch(id, gitBranch),
+        withProjectReplaced
+      ),
+    renameProject: async (id, name) =>
+      keepProject(set, await window.electronAPI.project.rename(id, name), withProjectReplaced),
+    reorderProjects: (workspaceId, ids) => reorderProjects(set, workspaceId, ids),
+    deleteProject: (id) => deleteProject(set, id),
+    setActiveProject: (id) => set({ activeProjectId: id }),
+  }
+}
+
+/** Which repos are expanded and which branches collapsed, kept across launches. */
+function disclosureSlice(
+  set: SetWorkspaces,
+  get: GetWorkspaces
+): Slice<
+  | 'toggleWorkspaceCollapse'
+  | 'setExpandedWorkspaceIds'
+  | 'toggleProjectCollapse'
+  | 'ensureProjectExpanded'
+> {
+  const setExpanded = (ids: Set<string>) => {
+    saveIds(EXPANDED_KEY, ids)
+    set({ expandedWorkspaceIds: ids })
+  }
+  const setCollapsed = (ids: Set<string>) => {
+    saveIds(COLLAPSED_KEY, ids)
+    set({ collapsedProjectIds: ids })
+  }
+  return {
+    toggleWorkspaceCollapse: (id) => setExpanded(toggled(get().expandedWorkspaceIds, id)),
+    setExpandedWorkspaceIds: setExpanded,
+    toggleProjectCollapse: (id) => setCollapsed(toggled(get().collapsedProjectIds, id)),
+    ensureProjectExpanded: (id) => {
+      if (get().collapsedProjectIds.has(id)) setCollapsed(toggled(get().collapsedProjectIds, id))
+    },
+  }
+}
+
+function resolveActiveCwd(s: WorkspaceState): string {
+  const { activeWorkspaceId, activeProjectId, workspaces, projectsByWorkspaceId } = s
+  const workspace = workspaces.find((w) => w.id === activeWorkspaceId)
+  const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
+  const project = projects.find((p) => p.id === activeProjectId)
+  return project?.worktreePath ?? workspace?.folderPath ?? '~'
+}
+
+// One store built from slices: https://zustand.docs.pmnd.rs/guides/slices-pattern
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeWorkspaceId: null,
   activeProjectId: null,
   projectsByWorkspaceId: new Map(),
-  expandedWorkspaceIds: loadExpandedIds(),
-  collapsedProjectIds: loadCollapsedProjectIds(),
+  expandedWorkspaceIds: loadIds(EXPANDED_KEY),
+  collapsedProjectIds: loadIds(COLLAPSED_KEY),
   scratchActive: false,
   setScratchActive: (value) =>
     set(
@@ -106,182 +327,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         ? { scratchActive: true, activeWorkspaceId: null, activeProjectId: null }
         : { scratchActive: false }
     ),
-
-  loadWorkspaces: async () => {
-    const result = await window.electronAPI.workspace.list()
-    set({ workspaces: result.workspaces })
-  },
-
-  createWorkspace: async (input) => {
-    const result = await window.electronAPI.workspace.create(input)
-    if ('workspace' in result) {
-      set((s) => ({ workspaces: [...s.workspaces, result.workspace] }))
-    }
-    return result
-  },
-
-  updateWorkspace: async (input) => {
-    const result = await window.electronAPI.workspace.update(input)
-    if ('workspace' in result) {
-      set((s) => ({
-        workspaces: s.workspaces.map((w) => (w.id === result.workspace.id ? result.workspace : w)),
-      }))
-    }
-    return result
-  },
-
-  deleteWorkspace: async (id) => {
-    await window.electronAPI.workspace.delete(id)
-    set((s) => {
-      const map = new Map(s.projectsByWorkspaceId)
-      map.delete(id)
-      return {
-        workspaces: s.workspaces.filter((w) => w.id !== id),
-        projectsByWorkspaceId: map,
-        activeWorkspaceId: s.activeWorkspaceId === id ? null : s.activeWorkspaceId,
-        activeProjectId: s.activeWorkspaceId === id ? null : s.activeProjectId,
-      }
-    })
-  },
-
-  setActiveWorkspace: (id) => {
-    set({ activeWorkspaceId: id, activeProjectId: null })
-    if (id) get().loadProjects(id)
-  },
-
-  loadProjects: async (workspaceId) => {
-    const result = await window.electronAPI.project.list(workspaceId)
-    set((s) => {
-      const map = new Map(s.projectsByWorkspaceId)
-      map.set(workspaceId, result.projects)
-      return { projectsByWorkspaceId: map }
-    })
-  },
-
-  createProject: async (input) => {
-    const result = await window.electronAPI.project.create(input)
-    if ('project' in result) {
-      const project = result.project
-      set((s) => withProjectAdded(s, project))
-    }
-    return result
-  },
-
-  updateProjectBranch: async (id, gitBranch) => {
-    const result = await window.electronAPI.project.updateBranch(id, gitBranch)
-    if ('project' in result) {
-      const project = result.project
-      set((s) => withProjectReplaced(s, project))
-    }
-    return result
-  },
-
-  renameProject: async (id, name) => {
-    const result = await window.electronAPI.project.rename(id, name)
-    if ('project' in result) {
-      const project = result.project
-      set((s) => withProjectReplaced(s, project))
-    }
-    return result
-  },
-
-  reorderWorkspaces: async (ids) => {
-    set((s) => {
-      const map = new Map(s.workspaces.map((w) => [w.id, w]))
-      const reordered = ids.flatMap((id) => (map.get(id) ? [map.get(id)!] : []))
-      const missing = s.workspaces.filter((w) => !ids.includes(w.id))
-      return { workspaces: [...reordered, ...missing] }
-    })
-    await window.electronAPI.workspace.reorder(ids)
-  },
-
-  reorderProjects: async (workspaceId, ids) => {
-    set((s) => {
-      const map = new Map(s.projectsByWorkspaceId)
-      const existing = map.get(workspaceId) ?? []
-      const projectMap = new Map(existing.map((p) => [p.id, p]))
-      const reordered = ids.flatMap((id) => (projectMap.get(id) ? [projectMap.get(id)!] : []))
-      const missing = existing.filter((p) => !ids.includes(p.id))
-      map.set(workspaceId, [...reordered, ...missing])
-      return { projectsByWorkspaceId: map }
-    })
-    await window.electronAPI.project.reorder(workspaceId, ids)
-  },
-
-  deleteProject: async (id) => {
-    await window.electronAPI.project.delete(id)
-    set((s) => {
-      const map = new Map(s.projectsByWorkspaceId)
-      for (const [wsId, projects] of map) {
-        map.set(
-          wsId,
-          projects.filter((p) => p.id !== id)
-        )
-      }
-      return {
-        projectsByWorkspaceId: map,
-        activeProjectId: s.activeProjectId === id ? null : s.activeProjectId,
-      }
-    })
-  },
-
-  setActiveProject: (id) => set({ activeProjectId: id }),
-
-  toggleWorkspaceCollapse: (id) => {
-    const current = get().expandedWorkspaceIds
-    const next = new Set(current)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    try {
-      localStorage.setItem('terminator.workspace.expanded', JSON.stringify([...next]))
-    } catch {
-      // ignore write failures (private browsing, storage full)
-    }
-    set({ expandedWorkspaceIds: next })
-  },
-
-  setExpandedWorkspaceIds: (ids) => {
-    try {
-      localStorage.setItem('terminator.workspace.expanded', JSON.stringify([...ids]))
-    } catch {
-      // ignore write failures
-    }
-    set({ expandedWorkspaceIds: ids })
-  },
-
-  toggleProjectCollapse: (id) => {
-    const current = get().collapsedProjectIds
-    const next = new Set(current)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    try {
-      localStorage.setItem('terminator.project.collapsed', JSON.stringify([...next]))
-    } catch {
-      // ignore
-    }
-    set({ collapsedProjectIds: next })
-  },
-
-  ensureProjectExpanded: (id) => {
-    const current = get().collapsedProjectIds
-    if (!current.has(id)) return
-    const next = new Set(current)
-    next.delete(id)
-    try {
-      localStorage.setItem('terminator.project.collapsed', JSON.stringify([...next]))
-    } catch {
-      // ignore
-    }
-    set({ collapsedProjectIds: next })
-  },
-
-  resolveActiveCwd: () => {
-    const { activeWorkspaceId, activeProjectId, workspaces, projectsByWorkspaceId } = get()
-    const workspace = workspaces.find((w) => w.id === activeWorkspaceId)
-    const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
-    const project = projects.find((p) => p.id === activeProjectId)
-    return project?.worktreePath ?? workspace?.folderPath ?? '~'
-  },
+  ...workspaceSlice(set, get),
+  ...projectSlice(set),
+  ...disclosureSlice(set, get),
+  resolveActiveCwd: () => resolveActiveCwd(get()),
 }))
 
 // Subscribe to push notifications from the main process so the sidebar
@@ -295,16 +344,6 @@ if (typeof window !== 'undefined' && window.electronAPI?.project?.onAdded) {
 if (typeof window !== 'undefined' && window.electronAPI?.project?.onRemoved) {
   window.electronAPI.project.onRemoved((id) => {
     useSessionStore.getState().dropProjectSessions(id)
-    useWorkspaceStore.setState((s) => {
-      const map = new Map(s.projectsByWorkspaceId)
-      for (const [wsId, projects] of map) {
-        map.set(
-          wsId,
-          projects.filter((p) => p.id !== id)
-        )
-      }
-      const activeProjectId = s.activeProjectId === id ? null : s.activeProjectId
-      return { projectsByWorkspaceId: map, activeProjectId }
-    })
+    useWorkspaceStore.setState((s) => withProjectRemoved(s, id))
   })
 }

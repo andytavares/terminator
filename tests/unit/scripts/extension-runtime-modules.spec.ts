@@ -45,7 +45,9 @@ describe('extensionRuntimeModules', () => {
       'fastify, needed by extensions/server, is not in package-lock.json'
     )
   })
+})
 
+describe('extensionRuntimeModules — the built-in backends', () => {
   it('ships the server, parser and validation modules the built-in backends require', () => {
     const { EXTENSION_EXTERNALS } = require('../../../scripts/extension-externals.cjs')
     const modules = extensionRuntimeModules(REPO_ROOT, EXTENSION_EXTERNALS)

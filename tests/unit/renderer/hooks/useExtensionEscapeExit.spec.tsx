@@ -22,158 +22,164 @@ function pressEscape(target?: EventTarget): void {
   })
 }
 
-describe('useExtensionEscapeExit', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-    mockExit.mockReset().mockReturnValue(true)
-    mockFocusTerminal.mockReset()
-    mockUnsubscribe.mockReset()
-    exitEventHandler = null
+beforeEach(() => {
+  vi.useFakeTimers()
+  mockExit.mockReset().mockReturnValue(true)
+  mockFocusTerminal.mockReset()
+  mockUnsubscribe.mockReset()
+  exitEventHandler = null
 
-    useExtensionRegistry.setState({ exitExtensionToTerminal: mockExit })
-    useModalStore.setState({ depth: 0 })
-    installElectronApi({
-      extensionEvents: {
-        onExtensionExitToTerminal: (handler) => {
-          exitEventHandler = handler as (payload: unknown) => void
-          return mockUnsubscribe
-        },
+  useExtensionRegistry.setState({ exitExtensionToTerminal: mockExit })
+  useModalStore.setState({ depth: 0 })
+  installElectronApi({
+    extensionEvents: {
+      onExtensionExitToTerminal: (handler) => {
+        exitEventHandler = handler as (payload: unknown) => void
+        return mockUnsubscribe
       },
-    })
+    },
+  })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+  document.body.innerHTML = ''
+})
+
+describe('useExtensionEscapeExit — host renderer Escape handling', () => {
+  it('ignores a single Escape', () => {
+    renderHook(() => useExtensionEscapeExit())
+    pressEscape()
+    expect(mockExit).not.toHaveBeenCalled()
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-    document.body.innerHTML = ''
+  it('exits on a second Escape inside the window', () => {
+    renderHook(() => useExtensionEscapeExit())
+    pressEscape()
+    pressEscape()
+    expect(mockExit).toHaveBeenCalledWith(undefined)
   })
 
-  describe('host renderer Escape handling', () => {
-    it('ignores a single Escape', () => {
-      renderHook(() => useExtensionEscapeExit())
-      pressEscape()
-      expect(mockExit).not.toHaveBeenCalled()
-    })
-
-    it('exits on a second Escape inside the window', () => {
-      renderHook(() => useExtensionEscapeExit())
-      pressEscape()
-      pressEscape()
-      expect(mockExit).toHaveBeenCalledWith(undefined)
-    })
-
-    it('does not exit when the presses are too far apart', () => {
-      renderHook(() => useExtensionEscapeExit())
-      pressEscape()
-      vi.advanceTimersByTime(DOUBLE_ESCAPE_WINDOW_MS + 1)
-      pressEscape()
-      expect(mockExit).not.toHaveBeenCalled()
-    })
-
-    it('focuses the terminal after a successful exit', () => {
-      renderHook(() => useExtensionEscapeExit())
-      pressEscape()
-      pressEscape()
-      act(() => {
-        vi.runAllTimers()
-      })
-      expect(mockFocusTerminal).toHaveBeenCalled()
-    })
-
-    it('does not focus the terminal when there was nothing to exit', () => {
-      mockExit.mockReturnValue(false)
-      renderHook(() => useExtensionEscapeExit())
-      pressEscape()
-      pressEscape()
-      act(() => {
-        vi.runAllTimers()
-      })
-      expect(mockFocusTerminal).not.toHaveBeenCalled()
-    })
-
-    it('leaves Escape alone inside a terminal, where it belongs to the shell', () => {
-      const xterm = document.createElement('div')
-      xterm.className = 'xterm'
-      const child = document.createElement('div')
-      xterm.appendChild(child)
-      document.body.appendChild(xterm)
-
-      renderHook(() => useExtensionEscapeExit())
-      pressEscape(child)
-      pressEscape(child)
-
-      expect(mockExit).not.toHaveBeenCalled()
-    })
-
-    it('leaves Escape alone inside a text field', () => {
-      const input = document.createElement('input')
-      document.body.appendChild(input)
-
-      renderHook(() => useExtensionEscapeExit())
-      pressEscape(input)
-      pressEscape(input)
-
-      expect(mockExit).not.toHaveBeenCalled()
-    })
-
-    it('does not exit while a core modal is open', () => {
-      useModalStore.setState({ depth: 1 })
-      renderHook(() => useExtensionEscapeExit())
-      pressEscape()
-      pressEscape()
-      expect(mockExit).not.toHaveBeenCalled()
-    })
-
-    it('ignores keys other than Escape', () => {
-      renderHook(() => useExtensionEscapeExit())
-      act(() => {
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
-      })
-      expect(mockExit).not.toHaveBeenCalled()
-    })
-
-    it('removes its listener on unmount', () => {
-      const { unmount } = renderHook(() => useExtensionEscapeExit())
-      unmount()
-      pressEscape()
-      pressEscape()
-      expect(mockExit).not.toHaveBeenCalled()
-    })
+  it('does not exit when the presses are too far apart', () => {
+    renderHook(() => useExtensionEscapeExit())
+    pressEscape()
+    vi.advanceTimersByTime(DOUBLE_ESCAPE_WINDOW_MS + 1)
+    pressEscape()
+    expect(mockExit).not.toHaveBeenCalled()
   })
 
-  describe('exit requests relayed from an extension view', () => {
-    it('exits the full-screen surface when no sidebar panel is named', () => {
-      renderHook(() => useExtensionEscapeExit())
-      act(() => exitEventHandler?.({ extensionId: 'notepad', sidebarPanelId: null }))
-      expect(mockExit).toHaveBeenCalledWith(undefined)
+  it('focuses the terminal after a successful exit', () => {
+    renderHook(() => useExtensionEscapeExit())
+    pressEscape()
+    pressEscape()
+    act(() => {
+      vi.runAllTimers()
     })
+    expect(mockFocusTerminal).toHaveBeenCalled()
+  })
+})
 
-    it('closes the named sidebar panel', () => {
-      renderHook(() => useExtensionEscapeExit())
-      act(() =>
-        exitEventHandler?.({ extensionId: 'git-integration', sidebarPanelId: 'git-integration' })
-      )
-      expect(mockExit).toHaveBeenCalledWith('git-integration')
+describe('useExtensionEscapeExit — host renderer Escape handling — does not focus the terminal when there was nothing to exit', () => {
+  it('does not focus the terminal when there was nothing to exit', () => {
+    mockExit.mockReturnValue(false)
+    renderHook(() => useExtensionEscapeExit())
+    pressEscape()
+    pressEscape()
+    act(() => {
+      vi.runAllTimers()
     })
+    expect(mockFocusTerminal).not.toHaveBeenCalled()
+  })
 
-    it('focuses the terminal after exiting', () => {
-      renderHook(() => useExtensionEscapeExit())
-      act(() => exitEventHandler?.({ extensionId: 'notepad', sidebarPanelId: null }))
-      act(() => {
-        vi.runAllTimers()
-      })
-      expect(mockFocusTerminal).toHaveBeenCalled()
-    })
+  it('leaves Escape alone inside a terminal, where it belongs to the shell', () => {
+    const xterm = document.createElement('div')
+    xterm.className = 'xterm'
+    const child = document.createElement('div')
+    xterm.appendChild(child)
+    document.body.appendChild(xterm)
 
-    it('unsubscribes on unmount', () => {
-      const { unmount } = renderHook(() => useExtensionEscapeExit())
-      unmount()
-      expect(mockUnsubscribe).toHaveBeenCalled()
-    })
+    renderHook(() => useExtensionEscapeExit())
+    pressEscape(child)
+    pressEscape(child)
 
-    it('survives a transport without the exit event (remote shim)', () => {
-      installElectronApi({ extensionEvents: {} })
-      expect(() => renderHook(() => useExtensionEscapeExit())).not.toThrow()
+    expect(mockExit).not.toHaveBeenCalled()
+  })
+})
+
+describe('useExtensionEscapeExit — host renderer Escape handling — leaves Escape alone inside a text field', () => {
+  it('leaves Escape alone inside a text field', () => {
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+
+    renderHook(() => useExtensionEscapeExit())
+    pressEscape(input)
+    pressEscape(input)
+
+    expect(mockExit).not.toHaveBeenCalled()
+  })
+
+  it('does not exit while a core modal is open', () => {
+    useModalStore.setState({ depth: 1 })
+    renderHook(() => useExtensionEscapeExit())
+    pressEscape()
+    pressEscape()
+    expect(mockExit).not.toHaveBeenCalled()
+  })
+
+  it('ignores keys other than Escape', () => {
+    renderHook(() => useExtensionEscapeExit())
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
     })
+    expect(mockExit).not.toHaveBeenCalled()
+  })
+})
+
+describe('useExtensionEscapeExit — host renderer Escape handling — removes its listener on unmount', () => {
+  it('removes its listener on unmount', () => {
+    const { unmount } = renderHook(() => useExtensionEscapeExit())
+    unmount()
+    pressEscape()
+    pressEscape()
+    expect(mockExit).not.toHaveBeenCalled()
+  })
+})
+
+describe('useExtensionEscapeExit — exit requests relayed from an extension view', () => {
+  it('exits the full-screen surface when no sidebar panel is named', () => {
+    renderHook(() => useExtensionEscapeExit())
+    act(() => exitEventHandler?.({ extensionId: 'notepad', sidebarPanelId: null }))
+    expect(mockExit).toHaveBeenCalledWith(undefined)
+  })
+
+  it('closes the named sidebar panel', () => {
+    renderHook(() => useExtensionEscapeExit())
+    act(() =>
+      exitEventHandler?.({ extensionId: 'git-integration', sidebarPanelId: 'git-integration' })
+    )
+    expect(mockExit).toHaveBeenCalledWith('git-integration')
+  })
+
+  it('focuses the terminal after exiting', () => {
+    renderHook(() => useExtensionEscapeExit())
+    act(() => exitEventHandler?.({ extensionId: 'notepad', sidebarPanelId: null }))
+    act(() => {
+      vi.runAllTimers()
+    })
+    expect(mockFocusTerminal).toHaveBeenCalled()
+  })
+
+  it('unsubscribes on unmount', () => {
+    const { unmount } = renderHook(() => useExtensionEscapeExit())
+    unmount()
+    expect(mockUnsubscribe).toHaveBeenCalled()
+  })
+})
+
+describe('useExtensionEscapeExit — exit requests relayed from an extension view — survives a transport without the exit event (remote shim)', () => {
+  it('survives a transport without the exit event (remote shim)', () => {
+    installElectronApi({ extensionEvents: {} })
+    expect(() => renderHook(() => useExtensionEscapeExit())).not.toThrow()
   })
 })

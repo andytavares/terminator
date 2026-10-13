@@ -86,8 +86,8 @@ function reply(response: ServerResponse, status: number, body: unknown): void {
 }
 
 /** Answers TLS for both hosts itself, each request by the host it names. */
-function trackerServer(linear: LinearState, jira: JiraState, key: Buffer, cert: Buffer) {
-  return createHttpsServer({ key, cert }, (request, response) => {
+function trackerServer(linear: LinearState, jira: JiraState, tls: { key: Buffer; cert: Buffer }) {
+  return createHttpsServer(tls, (request, response) => {
     void readJson(request).then((body) => {
       const host = request.headers.host ?? ''
       const answer =
@@ -144,7 +144,7 @@ export async function startTrackerStub(linear: LinearState, jira: JiraState): Pr
     mkdtempSync(join(tmpdir(), 'terminator-e2e-trackers-'))
   )
   const diagnostics: string[] = []
-  const { proxy, tunnels } = trackerProxy(trackerServer(linear, jira, key, cert), diagnostics)
+  const { proxy, tunnels } = trackerProxy(trackerServer(linear, jira, { key, cert }), diagnostics)
   await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve))
   const url = `http://127.0.0.1:${(proxy.address() as AddressInfo).port}`
   return {

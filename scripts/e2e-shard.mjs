@@ -107,16 +107,43 @@ export function timingsFromReport(report) {
   return timings
 }
 
+/** Rewrites timings.json from the shard reports, sorted by key. */
+function recordTimings(reportFiles) {
+  const timings = Object.assign(
+    {},
+    ...reportFiles.map((file) => timingsFromReport(JSON.parse(readFileSync(file, 'utf8'))))
+  )
+  const sorted = Object.fromEntries(Object.entries(timings).sort(([a], [b]) => a.localeCompare(b)))
+  writeFileSync(TIMINGS, `${JSON.stringify(sorted, null, 2)}\n`)
+}
+
+/** Every test Playwright would run for these spec arguments. */
+function listTests(specArgs) {
+  const listed = JSON.parse(
+    execFileSync('npx', ['playwright', 'test', '--list', '--reporter=json', ...specArgs], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    })
+  )
+  return testsFromReport(listed)
+}
+
+/** The arguments for one shard of `total`. */
+function shardArgs(shard, total, specArgs) {
+  const tests = listTests(specArgs)
+  const parallelFiles = new Set(
+    [...new Set(tests.map((t) => t.file))].filter((file) =>
+      isParallelFile(readFileSync(join(REPO_ROOT, E2E_DIR, file), 'utf8'))
+    )
+  )
+  const timings = existsSync(TIMINGS) ? JSON.parse(readFileSync(TIMINGS, 'utf8')) : {}
+  return pack(units(tests, parallelFiles, timings), total)[shard - 1].args
+}
+
 function main(argv) {
   if (argv[0] === '--record') {
-    const timings = Object.assign(
-      {},
-      ...argv.slice(1).map((file) => timingsFromReport(JSON.parse(readFileSync(file, 'utf8'))))
-    )
-    const sorted = Object.fromEntries(
-      Object.entries(timings).sort(([a], [b]) => a.localeCompare(b))
-    )
-    writeFileSync(TIMINGS, `${JSON.stringify(sorted, null, 2)}\n`)
+    recordTimings(argv.slice(1))
     return
   }
   const shard = Number(argv[0])
@@ -124,21 +151,7 @@ function main(argv) {
   if (!Number.isInteger(shard) || !Number.isInteger(total) || shard < 1 || shard > total) {
     throw new Error('usage: e2e-shard.mjs <shard> <total> [spec ...]')
   }
-  const listed = JSON.parse(
-    execFileSync('npx', ['playwright', 'test', '--list', '--reporter=json', ...argv.slice(2)], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-      maxBuffer: 64 * 1024 * 1024,
-    })
-  )
-  const tests = testsFromReport(listed)
-  const parallelFiles = new Set(
-    [...new Set(tests.map((t) => t.file))].filter((file) =>
-      isParallelFile(readFileSync(join(REPO_ROOT, E2E_DIR, file), 'utf8'))
-    )
-  )
-  const timings = existsSync(TIMINGS) ? JSON.parse(readFileSync(TIMINGS, 'utf8')) : {}
-  process.stdout.write(pack(units(tests, parallelFiles, timings), total)[shard - 1].args.join(' '))
+  process.stdout.write(shardArgs(shard, total, argv.slice(2)).join(' '))
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(2))

@@ -41,7 +41,9 @@ describe('scripts/check-temp-leaks.mjs', () => {
     expect(run.status).toBe(1)
     expect(run.stderr).toContain(join('orders', 'WO-1', 'ledger.jsonl'))
   })
+})
 
+describe('scripts/check-temp-leaks.mjs — clean runs and failing commands', () => {
   it('passes when the command removes what it created', () => {
     const run = check(
       ...node(
@@ -69,7 +71,9 @@ describe('scripts/check-temp-leaks.mjs', () => {
 
     expect(run.status).toBe(0)
   })
+})
 
+describe("scripts/check-temp-leaks.mjs — the command's directory", () => {
   it('points the command at an empty directory of its own', () => {
     const run = check(
       ...node(

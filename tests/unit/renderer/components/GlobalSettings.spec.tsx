@@ -85,7 +85,9 @@ describe('GlobalSettings', () => {
     fireEvent.change(input, { target: { value: '8000' } })
     expect(mockUpdateScrollback).toHaveBeenCalledWith(8000)
   })
+})
 
+describe('GlobalSettings — does not call updateScrollbackLimit for below-minimum value', () => {
   it('does not call updateScrollbackLimit for below-minimum value', () => {
     render(<GlobalSettings />)
     const input = screen.getByDisplayValue('5000')
@@ -116,7 +118,9 @@ describe('GlobalSettings', () => {
     fireEvent.blur(shellInput)
     expect(mockUpdateGlobal).toHaveBeenCalledWith({ terminal: { defaultShell: '/bin/bash' } })
   })
+})
 
+describe('GlobalSettings — calls updateShowMetricsBar when metrics bar checkbox is toggled', () => {
   it('calls updateShowMetricsBar when metrics bar checkbox is toggled', () => {
     render(<GlobalSettings />)
     const checkbox = screen.getByRole('checkbox', { name: /show cpu/i })
@@ -143,62 +147,68 @@ describe('GlobalSettings', () => {
     fireEvent.click(checkbox)
     expect(mockUpdatePromptForName).toHaveBeenCalledWith(true)
   })
+})
 
-  describe('Notifications', () => {
-    it('renders the default target checkboxes, all checked by default', () => {
-      render(<GlobalSettings />)
-      expect(screen.getAllByRole('checkbox', { name: 'System' })[0]).toHaveProperty('checked', true)
-      expect(screen.getAllByRole('checkbox', { name: 'In-App' })[0]).toHaveProperty('checked', true)
-      expect(screen.getAllByRole('checkbox', { name: 'Toast' })[0]).toHaveProperty('checked', true)
-    })
-
-    it('unchecking a default target removes it from the array', () => {
-      render(<GlobalSettings />)
-      fireEvent.click(screen.getAllByRole('checkbox', { name: 'System' })[0])
-      expect(mockUpdateNotificationDefaultTargets).toHaveBeenCalledWith(['center', 'toast'])
-    })
-
-    it('checking an absent default target adds it back', () => {
-      seedStore(useSettingsStore, {
-        globalSettings: {
-          ...globalSettings,
-          notifications: { defaultTargets: ['toast'], overrides: {} },
-        },
-        updateGlobalTheme: mockUpdateTheme,
-        updateScrollbackLimit: mockUpdateScrollback,
-        updateWorktreeBaseDir: mockUpdateWorktreeBaseDir,
-        updateShowMetricsBar: mockUpdateShowMetrics,
-        updateBranchExcludePatterns: mockUpdateBranchExclude,
-        updatePromptForName: mockUpdatePromptForName,
-        updateNotificationDefaultTargets: mockUpdateNotificationDefaultTargets,
-        updateNotificationOverride: mockUpdateNotificationOverride,
-      })
-      render(<GlobalSettings />)
-      fireEvent.click(screen.getAllByRole('checkbox', { name: 'System' })[0])
-      expect(mockUpdateNotificationDefaultTargets).toHaveBeenCalledWith(['toast', 'system'])
-    })
-
-    it('renders a per-notification override row for each core notification kind', () => {
-      render(<GlobalSettings />)
-      expect(screen.getByText('Terminal bell (session needs attention)')).toBeTruthy()
-      expect(screen.getByText('Branch switch failed')).toBeTruthy()
-      expect(screen.getByText('Extension install failed')).toBeTruthy()
-    })
-
-    it('checking a target on a core notification override row calls updateNotificationOverride', () => {
-      render(<GlobalSettings />)
-      const row = screen.getByText('Terminal bell (session needs attention)').closest('div')!
-      const systemCheckbox = within(row.parentElement as HTMLElement).getAllByRole('checkbox')[0]
-      fireEvent.click(systemCheckbox)
-      expect(mockUpdateNotificationOverride).toHaveBeenCalledWith('terminalBell', ['system'])
-    })
-
-    it('does not show a per-extension table (extensions configure their own notifications)', () => {
-      render(<GlobalSettings />)
-      expect(screen.queryByText('Per-Extension Overrides')).toBeNull()
-    })
+describe('GlobalSettings — Notifications', () => {
+  it('renders the default target checkboxes, all checked by default', () => {
+    render(<GlobalSettings />)
+    expect(screen.getAllByRole('checkbox', { name: 'System' })[0]).toHaveProperty('checked', true)
+    expect(screen.getAllByRole('checkbox', { name: 'In-App' })[0]).toHaveProperty('checked', true)
+    expect(screen.getAllByRole('checkbox', { name: 'Toast' })[0]).toHaveProperty('checked', true)
   })
 
+  it('unchecking a default target removes it from the array', () => {
+    render(<GlobalSettings />)
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'System' })[0])
+    expect(mockUpdateNotificationDefaultTargets).toHaveBeenCalledWith(['center', 'toast'])
+  })
+})
+
+describe('GlobalSettings — Notifications — checking an absent default target adds it back', () => {
+  it('checking an absent default target adds it back', () => {
+    seedStore(useSettingsStore, {
+      globalSettings: {
+        ...globalSettings,
+        notifications: { defaultTargets: ['toast'], overrides: {} },
+      },
+      updateGlobalTheme: mockUpdateTheme,
+      updateScrollbackLimit: mockUpdateScrollback,
+      updateWorktreeBaseDir: mockUpdateWorktreeBaseDir,
+      updateShowMetricsBar: mockUpdateShowMetrics,
+      updateBranchExcludePatterns: mockUpdateBranchExclude,
+      updatePromptForName: mockUpdatePromptForName,
+      updateNotificationDefaultTargets: mockUpdateNotificationDefaultTargets,
+      updateNotificationOverride: mockUpdateNotificationOverride,
+    })
+    render(<GlobalSettings />)
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'System' })[0])
+    expect(mockUpdateNotificationDefaultTargets).toHaveBeenCalledWith(['toast', 'system'])
+  })
+
+  it('renders a per-notification override row for each core notification kind', () => {
+    render(<GlobalSettings />)
+    expect(screen.getByText('Terminal bell (session needs attention)')).toBeTruthy()
+    expect(screen.getByText('Branch switch failed')).toBeTruthy()
+    expect(screen.getByText('Extension install failed')).toBeTruthy()
+  })
+})
+
+describe('GlobalSettings — Notifications — checking a target on a core notification override row calls updateNotificationOverride', () => {
+  it('checking a target on a core notification override row calls updateNotificationOverride', () => {
+    render(<GlobalSettings />)
+    const row = screen.getByText('Terminal bell (session needs attention)').closest('div')!
+    const systemCheckbox = within(row.parentElement as HTMLElement).getAllByRole('checkbox')[0]
+    fireEvent.click(systemCheckbox)
+    expect(mockUpdateNotificationOverride).toHaveBeenCalledWith('terminalBell', ['system'])
+  })
+
+  it('does not show a per-extension table (extensions configure their own notifications)', () => {
+    render(<GlobalSettings />)
+    expect(screen.queryByText('Per-Extension Overrides')).toBeNull()
+  })
+})
+
+describe('GlobalSettings — mounts the Quick actions section', () => {
   it('mounts the Quick actions section', () => {
     render(<GlobalSettings />)
     expect(screen.getByText('Quick actions')).toBeTruthy()
@@ -206,9 +216,9 @@ describe('GlobalSettings', () => {
   })
 })
 
-describe('GlobalSettings — staleness threshold (FR-020)', () => {
-  const field = () => screen.getByLabelText('Mark sessions stale after (minutes)')
+const field = () => screen.getByLabelText('Mark sessions stale after (minutes)')
 
+describe('GlobalSettings — staleness threshold (FR-020)', () => {
   it('shows the current threshold in minutes', () => {
     render(<GlobalSettings />)
     expect((field() as HTMLInputElement).value).toBe('120')
@@ -237,7 +247,9 @@ describe('GlobalSettings — staleness threshold (FR-020)', () => {
     fireEvent.blur(field(), { target: { value: '43201' } })
     expect(mockUpdateGlobal).not.toHaveBeenCalled()
   })
+})
 
+describe('GlobalSettings — staleness threshold (FR-020) — rejects a non-numeric entry', () => {
   it('rejects a non-numeric entry', () => {
     render(<GlobalSettings />)
     fireEvent.blur(field(), { target: { value: '' } })
@@ -248,5 +260,15 @@ describe('GlobalSettings — staleness threshold (FR-020)', () => {
     render(<GlobalSettings />)
     fireEvent.blur(field(), { target: { value: '2.6' } })
     expect(mockUpdateGlobal).toHaveBeenCalledWith({ sidebar: { staleAfterMs: 180_000 } })
+  })
+})
+
+describe('GlobalSettings — values left unset', () => {
+  it('keeps the default shell when the field is cleared', () => {
+    render(<GlobalSettings />)
+    const shellInput = screen.getAllByRole('textbox')[0]
+    fireEvent.change(shellInput, { target: { value: '   ' } })
+    fireEvent.blur(shellInput)
+    expect(mockUpdateGlobal).not.toHaveBeenCalled()
   })
 })

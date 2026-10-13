@@ -63,7 +63,9 @@ describe('Tabs', () => {
     expect(tab('Checks').getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('tabpanel').textContent).toBe('Check list')
   })
+})
 
+describe('Tabs — moves focus and selection with the arrow keys', () => {
   it('moves focus and selection with the arrow keys', () => {
     render(<Harness />)
     tab('Files').focus()
@@ -87,7 +89,9 @@ describe('Tabs', () => {
     fireEvent.keyDown(tab('Files'), { key: 'ArrowLeft' })
     expect(tab('History').getAttribute('aria-selected')).toBe('true')
   })
+})
 
+describe('Tabs — jumps to the ends with Home and End', () => {
   it('jumps to the ends with Home and End', () => {
     render(<Harness initial="checks" />)
     fireEvent.keyDown(tab('Checks'), { key: 'End' })
@@ -149,16 +153,7 @@ function PartsHarness({
   return (
     <TabsRoot selectedId={selectedId} onSelect={setSelectedId}>
       <div role="toolbar" aria-label="Reviews toolbar">
-        <TabList label="Dashboard sections" orientation={orientation}>
-          <Tab id="needs" accessibleName="Needs you, 3">
-            Needs you<span>3</span>
-          </Tab>
-          <Tab id="mine">My PRs</Tab>
-          <Tab id="later" disabled>
-            Later
-          </Tab>
-          <Tab id="involved">Involved</Tab>
-        </TabList>
+        <HarnessTabList orientation={orientation} />
         <button type="button">Refresh</button>
       </div>
       <p>Loading reviews…</p>
@@ -170,6 +165,21 @@ function PartsHarness({
         </>
       )}
     </TabsRoot>
+  )
+}
+
+function HarnessTabList({ orientation }: { orientation?: 'horizontal' | 'vertical' }) {
+  return (
+    <TabList label="Dashboard sections" orientation={orientation}>
+      <Tab id="needs" accessibleName="Needs you, 3">
+        Needs you<span>3</span>
+      </Tab>
+      <Tab id="mine">My PRs</Tab>
+      <Tab id="later" disabled>
+        Later
+      </Tab>
+      <Tab id="involved">Involved</Tab>
+    </TabList>
   )
 }
 
@@ -202,7 +212,9 @@ describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel', () => {
     }
     expect(tab('My PRs').hasAttribute('aria-controls')).toBe(false)
   })
+})
 
+describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel — leaves aria-controls off when the caller renders no panel', () => {
   it('leaves aria-controls off when the caller renders no panel', () => {
     render(<PartsHarness withPanels={false} />)
     expect(tab('Needs you, 3').hasAttribute('aria-controls')).toBe(false)
@@ -230,7 +242,9 @@ describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel', () => {
     fireEvent.keyDown(tab('Needs you, 3'), { key: 'ArrowLeft' })
     expect(tab('Involved').getAttribute('aria-selected')).toBe('true')
   })
+})
 
+describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel — jumps to the ends with Home and End', () => {
   it('jumps to the ends with Home and End', () => {
     render(<PartsHarness initial="mine" />)
     fireEvent.keyDown(tab('My PRs'), { key: 'End' })

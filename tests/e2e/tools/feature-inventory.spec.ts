@@ -17,14 +17,8 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 let handle: AppHandle | undefined
 test.afterAll(async () => closeApp(handle))
 
-test('record the features the running app offers', async () => {
-  const output = process.env.FEATURE_INVENTORY
-  test.skip(!output, 'FEATURE_INVENTORY names the file to write')
-  handle = await launchApp()
-  const { app, page } = handle
-  const ids: string[] = bundledExtensionIds(join(REPO_ROOT, 'extensions'))
-
-  // Every backend registers its channels and commands before it logs that it activated.
+/** Every backend registers its channels and commands before it logs that it activated. */
+async function awaitActivated(app: AppHandle['app'], ids: string[]): Promise<void> {
   const logPath = join(
     await app.evaluate(({ app: electronApp }) => electronApp.getPath('logs')),
     'terminator.log'
@@ -34,11 +28,10 @@ test('record the features the running app offers', async () => {
       ids.filter((id) => readFileSync(logPath, 'utf8').includes(`Extension ${id} activated`))
     )
     .toEqual(ids)
+}
 
-  const channels = await app.evaluate(({ ipcMain }) => ({
-    invoke: [...(Reflect.get(ipcMain, '_invokeHandlers') as Map<string, unknown>).keys()],
-    send: ipcMain.eventNames().filter((name): name is string => typeof name === 'string'),
-  }))
+/** Every command, and every extension setting with the channel an action setting runs. */
+async function commandsAndSettings(page: AppHandle['page']) {
   const { commands, schemas } = await page.evaluate(async () => {
     const api = window.electronAPI.extension
     return {
@@ -55,6 +48,22 @@ test('record the features the running app offers', async () => {
       channel: property.channel,
     }))
   )
+  return { commands, settings }
+}
+
+test('record the features the running app offers', async () => {
+  const output = process.env.FEATURE_INVENTORY
+  test.skip(!output, 'FEATURE_INVENTORY names the file to write')
+  handle = await launchApp()
+  const { app, page } = handle
+  const ids: string[] = bundledExtensionIds(join(REPO_ROOT, 'extensions'))
+
+  await awaitActivated(app, ids)
+  const channels = await app.evaluate(({ ipcMain }) => ({
+    invoke: [...(Reflect.get(ipcMain, '_invokeHandlers') as Map<string, unknown>).keys()],
+    send: ipcMain.eventNames().filter((name): name is string => typeof name === 'string'),
+  }))
+  const { commands, settings } = await commandsAndSettings(page)
   writeFileSync(
     output as string,
     JSON.stringify({ extensions: ids, channels, commands, settings }, null, 2)

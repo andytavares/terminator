@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type APIRequestContext, type PlaywrightWorkerArgs } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 
 // End-to-end guard for the browser `/app/` remote surface — the feature that
@@ -30,10 +30,8 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-test('/app/ browser remote renderer loads and the IPC bridge serves workspace:list', async ({
-  playwright,
-}) => {
-  // 1. Create a workspace in the desktop app so we have something to observe remotely.
+/** 1. A workspace created in the desktop app, so there is something to observe remotely. */
+async function createDesktopWorkspace(): Promise<void> {
   await page.click('.sidebar-header__add')
   await page.waitForSelector('.tmui-dialog__title')
   await page.getByPlaceholder('My Workspace').fill(WS_NAME)
@@ -41,9 +39,13 @@ test('/app/ browser remote renderer loads and the IPC bridge serves workspace:li
   await page.getByPlaceholder('/path/to/folder').fill(userDataDir)
   await page.click('.tmui-dialog__actions .tmui-button--primary')
   await expect(page.locator('.repo-header__name').filter({ hasText: WS_NAME })).toBeVisible()
+}
 
-  // 2. Set a password, then enable the remote-control server on an isolated port.
-  //    The password is stored only as a hash, so the test keeps the one it chose.
+/**
+ * 2. Sets a password, then enables the remote-control server on an isolated
+ * port. The password is stored only as a hash, so the test keeps the one it chose.
+ */
+async function startRemoteServer(): Promise<void> {
   await page.evaluate(
     async ({ port, password }) => {
       const bridge = window.electronAPI.extensionBridge
@@ -63,20 +65,36 @@ test('/app/ browser remote renderer loads and the IPC bridge serves workspace:li
     },
     { port: TEST_PORT, password: TEST_PASSWORD }
   )
+}
 
-  const baseURL = `http://127.0.0.1:${TEST_PORT}`
+type Playwright = PlaywrightWorkerArgs['playwright']
 
-  // 3. Log in with the password; the session cookie authorises the ticket request.
+/** 3. Logs in with the password; the session cookie authorises the ticket request. */
+async function appTicket(
+  playwright: Playwright,
+  baseURL: string
+): Promise<{ api: APIRequestContext; ticket: string }> {
   const api = await playwright.request.newContext({ baseURL })
   const loginRes = await api.post('/api/login', { data: { password: TEST_PASSWORD } })
   expect(loginRes.status()).toBe(200)
   const ticketRes = await api.post('/api/app-ticket')
   expect(ticketRes.status()).toBe(201)
   const { ticket } = (await ticketRes.json()) as { ticket: string }
+  return { api, ticket }
+}
 
-  // 4. Load /app/ in a real browser that logged in the same way, so its IPC
-  //    shim can get a bridge ticket with the session cookie (no password is
-  //    stored in the page or sent in a header).
+/**
+ * 4. Loads /app/ in a real browser that logged in the same way, so its IPC
+ * shim can get a bridge ticket with the session cookie (no password is stored
+ * in the page or sent in a header). 5. The remote renderer must boot, connect
+ * the bridge, and render the desktop-created workspace — proving the bridge
+ * invoke path works.
+ */
+async function expectRemoteWorkspace(
+  playwright: Playwright,
+  baseURL: string,
+  ticket: string
+): Promise<void> {
   const browser = await playwright.chromium.launch()
   const context = await browser.newContext({ baseURL })
   expect(
@@ -84,14 +102,20 @@ test('/app/ browser remote renderer loads and the IPC bridge serves workspace:li
   ).toBe(200)
   const remotePage = await context.newPage()
   await remotePage.goto(`/app/?t=${ticket}`)
-
-  // 5. The remote renderer must boot, connect the bridge, and render the
-  //    desktop-created workspace — proving the bridge invoke path works.
   await expect(remotePage.locator('.repo-header__name').filter({ hasText: WS_NAME })).toBeVisible({
     timeout: 20000,
   })
-
   await browser.close()
+}
+
+test('/app/ browser remote renderer loads and the IPC bridge serves workspace:list', async ({
+  playwright,
+}) => {
+  await createDesktopWorkspace()
+  await startRemoteServer()
+  const baseURL = `http://127.0.0.1:${TEST_PORT}`
+  const { api, ticket } = await appTicket(playwright, baseURL)
+  await expectRemoteWorkspace(playwright, baseURL, ticket)
   await api.dispose()
 
   // Disable the server again so it doesn't linger past the test.

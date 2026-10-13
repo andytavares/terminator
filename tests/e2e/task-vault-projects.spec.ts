@@ -176,7 +176,8 @@ test('an archived project is restored from History, archived again and deleted',
   expect(await storedTask(vault, 'Write the hero copy')).toBeUndefined()
 })
 
-test('an area is created, given a task, renamed, archived, restored and deleted', async () => {
+/** Creates the Health area and gives it a task. */
+async function createHealthAreaWithTask(): Promise<void> {
   await goTo(vault, 'Areas')
   await vault.getByRole('button', { name: '+ New area' }).click()
   await vault.getByPlaceholder('Area name (e.g. health, finances, work)').fill('Health')
@@ -188,7 +189,10 @@ test('an area is created, given a task, renamed, archived, restored and deleted'
   await vault.getByPlaceholder('Add task to this area…').press('Enter')
   await expect(vault.getByText('Book a check-up', { exact: true })).toBeVisible()
   expect(await storedTask(vault, 'Book a check-up')).toMatchObject({ area: 'Health' })
+}
 
+/** Edits the area's task, completes it, and adds another. */
+async function editAndCompleteAreaTask(): Promise<void> {
   await vault.locator('.area-detail__task-text', { hasText: 'Book a check-up' }).dblclick()
   await vault.locator('.area-detail__task-edit input').fill('Book a dental check-up #Health')
   await vault.locator('.area-detail__task-edit').getByRole('button', { name: 'Save' }).click()
@@ -201,7 +205,10 @@ test('an area is created, given a task, renamed, archived, restored and deleted'
   await vault.getByPlaceholder('Add task to this area…').fill('Walk every day')
   await vault.getByPlaceholder('Add task to this area…').press('Enter')
   await expect(vault.locator('.area-detail__task-text')).toHaveText(['Walk every day'])
+}
 
+/** Renames Health to Wellbeing, then archives it. */
+async function renameAndArchiveArea(): Promise<void> {
   await vault.getByRole('button', { name: 'Rename area' }).click()
   await vault.locator('.area-detail__rename-input').fill('Wellbeing')
   await vault.locator('.area-detail__rename-input').press('Enter')
@@ -216,7 +223,10 @@ test('an area is created, given a task, renamed, archived, restored and deleted'
     .poll(async () => (await areas()).find((a) => a.name === 'Wellbeing')?.status)
     .toBe('archived')
   expect(await storedTask(vault, 'Walk every day')).toMatchObject({ status: 'cancelled' })
+}
 
+/** Restores Wellbeing from History. */
+async function restoreArchivedArea(): Promise<void> {
   await goTo(vault, 'History')
   await vault.getByRole('tab', { name: /Archived areas/ }).click()
   const archived = vault.locator('.archive-view__project-card', { hasText: 'Wellbeing' })
@@ -226,7 +236,10 @@ test('an area is created, given a task, renamed, archived, restored and deleted'
     status: 'active',
   })
   expect(await storedTask(vault, 'Walk every day')).toMatchObject({ status: 'open' })
+}
 
+/** Archives Wellbeing again, and deletes it for good. */
+async function deleteArchivedArea(): Promise<void> {
   await goTo(vault, 'Areas')
   vault.once('dialog', (dialog) => void dialog.accept())
   await areaCard('Wellbeing').getByRole('button', { name: 'Archive area' }).click()
@@ -235,6 +248,14 @@ test('an area is created, given a task, renamed, archived, restored and deleted'
   await areaCard('Wellbeing').getByRole('button', { name: 'Delete area permanently' }).click()
   await expect(areaCard('Wellbeing')).toHaveCount(0)
   expect((await areas()).map((area) => area.name)).not.toContain('Wellbeing')
+}
+
+test('an area is created, given a task, renamed, archived, restored and deleted', async () => {
+  await createHealthAreaWithTask()
+  await editAndCompleteAreaTask()
+  await renameAndArchiveArea()
+  await restoreArchivedArea()
+  await deleteArchivedArea()
 })
 
 test('History restores a finished task and deletes another for good', async () => {

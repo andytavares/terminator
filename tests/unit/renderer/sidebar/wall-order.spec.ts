@@ -51,7 +51,9 @@ describe('placeWall', () => {
       span: 2,
     })
   })
+})
 
+describe('placeWall — pins sessions that need you, oldest first, then the rest by state', () => {
   it('pins sessions that need you, oldest first, then the rest by state', () => {
     const wall = placeWall(facts, DEFAULT_WALL_PREFS)
     expect(wall.needsCount).toBe(2)
@@ -79,7 +81,9 @@ describe('placeWall', () => {
     expect(wall.placements.every((p) => p.band === 'rest' && p.span === 1)).toBe(true)
     expect(inOrder(wall)).toEqual(['a-needs-old', 'b-needs-new', 'c-work', 'd-idle', 'e-exited'])
   })
+})
 
+describe('placeWall — orders the rest by workspace and project when asked', () => {
   it('orders the rest by workspace and project when asked', () => {
     const wall = placeWall(facts, { ...DEFAULT_WALL_PREFS, thenBy: 'workspace-project' })
     expect(inOrder(wall).slice(2)).toEqual(['e-exited', 'd-idle', 'c-work'])
@@ -88,51 +92,51 @@ describe('placeWall', () => {
   it('places nothing for no sessions', () => {
     expect(placeWall([], DEFAULT_WALL_PREFS)).toEqual({ placements: [], needsCount: 0 })
   })
+})
 
-  describe('output never moves a session (055/058)', () => {
-    const running: SessionFacts[] = [
-      fact({ sessionId: 'r1', state: 'working', startedAt: T1, lastActivityAt: 100 }),
-      fact({ sessionId: 'r2', state: 'idle', startedAt: T2, lastActivityAt: 200 }),
-    ]
+describe('placeWall — output never moves a session (055/058)', () => {
+  const running: SessionFacts[] = [
+    fact({ sessionId: 'r1', state: 'working', startedAt: T1, lastActivityAt: 100 }),
+    fact({ sessionId: 'r2', state: 'idle', startedAt: T2, lastActivityAt: 200 }),
+  ]
 
-    it('keeps two running sessions in place when their lastActivityAt values swap', () => {
-      const before = inOrder(placeWall(running, DEFAULT_WALL_PREFS))
-      const swapped = running.map((f) => ({
-        ...f,
-        lastActivityAt: f.sessionId === 'r1' ? 999 : 1,
-      }))
-      const after = inOrder(placeWall(swapped, DEFAULT_WALL_PREFS))
-      expect(after).toEqual(before)
-    })
-
-    it('does not move a session when it flips from working to idle', () => {
-      const before = inOrder(placeWall(running, DEFAULT_WALL_PREFS))
-      const flipped = running.map((f) =>
-        f.sessionId === 'r1' ? { ...f, state: 'idle' as const } : f
-      )
-      const after = inOrder(placeWall(flipped, DEFAULT_WALL_PREFS))
-      expect(after).toEqual(before)
-    })
-
-    it('puts a session with a newer startedAt last within its rank', () => {
-      const wall = placeWall(
-        [...running, fact({ sessionId: 'r3', state: 'working', startedAt: T3 })],
-        DEFAULT_WALL_PREFS
-      )
-      expect(inOrder(wall)).toEqual(['r1', 'r2', 'r3'])
-    })
+  it('keeps two running sessions in place when their lastActivityAt values swap', () => {
+    const before = inOrder(placeWall(running, DEFAULT_WALL_PREFS))
+    const swapped = running.map((f) => ({
+      ...f,
+      lastActivityAt: f.sessionId === 'r1' ? 999 : 1,
+    }))
+    const after = inOrder(placeWall(swapped, DEFAULT_WALL_PREFS))
+    expect(after).toEqual(before)
   })
 
-  describe("thenBy 'recent' orders by when a session was last opened", () => {
-    const opened: SessionFacts[] = [
-      fact({ sessionId: 'never', state: 'working', startedAt: T1, lastAttendedAt: null }),
-      fact({ sessionId: 'older', state: 'working', startedAt: T2, lastAttendedAt: 100 }),
-      fact({ sessionId: 'newer', state: 'working', startedAt: T3, lastAttendedAt: 200 }),
-    ]
+  it('does not move a session when it flips from working to idle', () => {
+    const before = inOrder(placeWall(running, DEFAULT_WALL_PREFS))
+    const flipped = running.map((f) =>
+      f.sessionId === 'r1' ? { ...f, state: 'idle' as const } : f
+    )
+    const after = inOrder(placeWall(flipped, DEFAULT_WALL_PREFS))
+    expect(after).toEqual(before)
+  })
 
-    it('orders most recently opened first, with never-attended sessions last', () => {
-      const wall = placeWall(opened, { ...DEFAULT_WALL_PREFS, thenBy: 'recent' })
-      expect(inOrder(wall)).toEqual(['newer', 'older', 'never'])
-    })
+  it('puts a session with a newer startedAt last within its rank', () => {
+    const wall = placeWall(
+      [...running, fact({ sessionId: 'r3', state: 'working', startedAt: T3 })],
+      DEFAULT_WALL_PREFS
+    )
+    expect(inOrder(wall)).toEqual(['r1', 'r2', 'r3'])
+  })
+})
+
+describe("placeWall — thenBy 'recent' orders by when a session was last opened", () => {
+  const opened: SessionFacts[] = [
+    fact({ sessionId: 'never', state: 'working', startedAt: T1, lastAttendedAt: null }),
+    fact({ sessionId: 'older', state: 'working', startedAt: T2, lastAttendedAt: 100 }),
+    fact({ sessionId: 'newer', state: 'working', startedAt: T3, lastAttendedAt: 200 }),
+  ]
+
+  it('orders most recently opened first, with never-attended sessions last', () => {
+    const wall = placeWall(opened, { ...DEFAULT_WALL_PREFS, thenBy: 'recent' })
+    expect(inOrder(wall)).toEqual(['newer', 'older', 'never'])
   })
 })

@@ -107,7 +107,9 @@ describe('integrations store — connect', () => {
     await useIntegrationsStore.getState().connect({ tracker: 'linear', apiKey: 'x' })
     expect(useIntegrationsStore.getState().connectError.jira).toBeUndefined()
   })
+})
 
+describe('integrations store — connect — clears one tracker error without touching the other', () => {
   it('clears one tracker error without touching the other', async () => {
     api.connect.mockResolvedValue({ error: 'failed', message: 'boom' })
     await useIntegrationsStore.getState().connect({ tracker: 'linear', apiKey: 'x' })
@@ -171,7 +173,9 @@ describe('integrations store — subscription', () => {
 
     expect(useIntegrationsStore.getState().connections).toHaveLength(1)
   })
+})
 
+describe('integrations store — subscription — unsubscribes from both channels at once', () => {
   it('unsubscribes from both channels at once', () => {
     const offStatus = vi.fn()
     const offLink = vi.fn()
@@ -201,17 +205,19 @@ describe('integrations store — selectors', () => {
   })
 })
 
-describe('integrations store — links', () => {
-  const P = '11111111-1111-4111-8111-111111111111'
-  const LINK = {
-    projectId: P,
-    tracker: 'linear' as const,
-    key: 'TAV-42',
-    injectContext: true,
-    linkedAt: '2026-08-22T00:00:00.000Z',
-  }
-  const ISSUE = { tracker: 'linear', key: 'TAV-42', title: 'A thing' }
+const P = '11111111-1111-4111-8111-111111111111'
 
+const LINK = {
+  projectId: P,
+  tracker: 'linear' as const,
+  key: 'TAV-42',
+  injectContext: true,
+  linkedAt: '2026-08-22T00:00:00.000Z',
+}
+
+const ISSUE = { tracker: 'linear', key: 'TAV-42', title: 'A thing' }
+
+describe('integrations store — links', () => {
   it('loads a link and its issue', async () => {
     api.linkGet.mockResolvedValue({ link: LINK, issue: ISSUE })
     await useIntegrationsStore.getState().loadLink(P)
@@ -242,12 +248,16 @@ describe('integrations store — links', () => {
     await useIntegrationsStore.getState().loadLink(P)
     expect(useIntegrationsStore.getState().linkFor(P)?.key).toBe('TAV-42')
   })
+})
 
+describe('integrations store — links — links and reads back, so the badge gets the issue state', () => {
   it('links and reads back, so the badge gets the issue state', async () => {
     api.linkSet.mockResolvedValue({ link: LINK })
     api.linkGet.mockResolvedValue({ link: LINK, issue: ISSUE })
 
-    const ok = await useIntegrationsStore.getState().linkIssue(P, 'linear', 'TAV-42')
+    const ok = await useIntegrationsStore
+      .getState()
+      .linkIssue(P, { tracker: 'linear', key: 'TAV-42' })
 
     expect(ok).toBe(true)
     expect(api.linkGet).toHaveBeenCalledWith({ projectId: P })
@@ -256,7 +266,9 @@ describe('integrations store — links', () => {
 
   it('reports a link failure without touching state', async () => {
     api.linkSet.mockResolvedValue({ error: 'failed', message: 'read-only' })
-    const ok = await useIntegrationsStore.getState().linkIssue(P, 'linear', 'TAV-42')
+    const ok = await useIntegrationsStore
+      .getState()
+      .linkIssue(P, { tracker: 'linear', key: 'TAV-42' })
     expect(ok).toBe(false)
     expect(api.linkGet).not.toHaveBeenCalled()
     expect(useIntegrationsStore.getState().linkFor(P)).toBeNull()
@@ -272,7 +284,9 @@ describe('integrations store — links', () => {
     expect(useIntegrationsStore.getState().linkFor(P)).toBeNull()
     expect(useIntegrationsStore.getState().issueFor(P)).toBeNull()
   })
+})
 
+describe('integrations store — links — applies a link pushed from elsewhere', () => {
   it('applies a link pushed from elsewhere', () => {
     let push: ((payload: unknown) => void) | undefined
     api.onLinkChanged.mockImplementation((handler: (payload: unknown) => void) => {
@@ -300,7 +314,9 @@ describe('integrations store — links', () => {
 
     expect(useIntegrationsStore.getState().linkFor(P)).toBeNull()
   })
+})
 
+describe('integrations store — links — ignores a malformed link push', () => {
   it('ignores a malformed link push', () => {
     let push: ((payload: unknown) => void) | undefined
     api.onLinkChanged.mockImplementation((handler: (payload: unknown) => void) => {
@@ -332,39 +348,37 @@ describe('integrations store — links', () => {
   })
 })
 
-describe('integrations store — partial transports', () => {
-  const P = '11111111-1111-4111-8111-111111111111'
-
-  /** The remote /app/ shim deliberately omits connect and disconnect. */
-  function withoutCredentialWrites(): void {
-    Object.defineProperty(globalThis, 'window', {
-      value: {
-        electronAPI: {
-          integrations: {
-            status: api.status,
-            linkGet: api.linkGet,
-            onStatusChanged: api.onStatusChanged,
-          },
+/** The remote /app/ shim deliberately omits connect and disconnect. */
+function withoutCredentialWrites(): void {
+  Object.defineProperty(globalThis, 'window', {
+    value: {
+      electronAPI: {
+        integrations: {
+          status: api.status,
+          linkGet: api.linkGet,
+          onStatusChanged: api.onStatusChanged,
         },
       },
-      writable: true,
-    })
-  }
+    },
+    writable: true,
+  })
+}
 
-  function withNoIntegrationsAtAll(): void {
-    Object.defineProperty(globalThis, 'window', {
-      value: { electronAPI: {} },
-      writable: true,
-    })
-  }
+function withNoIntegrationsAtAll(): void {
+  Object.defineProperty(globalThis, 'window', {
+    value: { electronAPI: {} },
+    writable: true,
+  })
+}
 
-  function restore(): void {
-    Object.defineProperty(globalThis, 'window', {
-      value: { electronAPI: { integrations: api } },
-      writable: true,
-    })
-  }
+function restore(): void {
+  Object.defineProperty(globalThis, 'window', {
+    value: { electronAPI: { integrations: api } },
+    writable: true,
+  })
+}
 
+describe('integrations store — partial transports', () => {
   it('reports failure rather than crashing when connect is not carried', async () => {
     withoutCredentialWrites()
     const ok = await useIntegrationsStore.getState().connect({ tracker: 'linear', apiKey: 'k' })
@@ -385,6 +399,10 @@ describe('integrations store — partial transports', () => {
     expect(api.onStatusChanged).toHaveBeenCalled()
     restore()
   })
+})
+
+describe('integrations store — partial transports — survives an electronAPI with no integrations surface at all', () => {
+  const P = '11111111-1111-4111-8111-111111111111'
 
   it('survives an electronAPI with no integrations surface at all', async () => {
     withNoIntegrationsAtAll()
@@ -431,5 +449,21 @@ describe('integrations store — issues by key', () => {
     api.getIssue.mockResolvedValue({ error: 'network', message: 'offline' })
     await useIntegrationsStore.getState().loadIssue('linear', 'NW-88')
     expect(useIntegrationsStore.getState().issueByKey('linear', 'NW-88')).toBeNull()
+  })
+})
+
+describe('integrations store — the link dialog and the issue drawer', () => {
+  it('opens and closes the link picker for one project', () => {
+    useIntegrationsStore.getState().openLinkDialog(P)
+    expect(useIntegrationsStore.getState().linkDialogProjectId).toBe(P)
+    useIntegrationsStore.getState().closeLinkDialog()
+    expect(useIntegrationsStore.getState().linkDialogProjectId).toBeNull()
+  })
+
+  it('opens and closes the issue drawer for one project', () => {
+    useIntegrationsStore.getState().openDrawer(P)
+    expect(useIntegrationsStore.getState().drawerProjectId).toBe(P)
+    useIntegrationsStore.getState().closeDrawer()
+    expect(useIntegrationsStore.getState().drawerProjectId).toBeNull()
   })
 })

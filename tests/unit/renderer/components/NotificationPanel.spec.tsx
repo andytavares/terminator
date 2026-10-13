@@ -39,7 +39,8 @@ function resetStore() {
   useNotificationStore.setState({ notifications: [], panelOpen: false, unreadCount: 0 })
 }
 
-describe('NotificationPanel', () => {
+/** The hooks every "NotificationPanel" describe registers. */
+function setUpNotificationPanel(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     resetStore()
@@ -48,6 +49,10 @@ describe('NotificationPanel', () => {
   afterEach(() => {
     cleanup()
   })
+}
+
+describe('NotificationPanel', () => {
+  setUpNotificationPanel()
 
   it('renders nothing when panelOpen is false', () => {
     const { container } = render(<NotificationPanel />)
@@ -79,6 +84,10 @@ describe('NotificationPanel', () => {
     render(<NotificationPanel />)
     expect(screen.getByText('Detailed message')).toBeTruthy()
   })
+})
+
+describe('NotificationPanel — close button calls closePanel', () => {
+  setUpNotificationPanel()
 
   it('close button calls closePanel', () => {
     useNotificationStore.setState({ panelOpen: true })
@@ -102,6 +111,10 @@ describe('NotificationPanel', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(useNotificationStore.getState().panelOpen).toBe(false)
   })
+})
+
+describe('NotificationPanel — "Mark all read" button marks all notifications as read', () => {
+  setUpNotificationPanel()
 
   it('"Mark all read" button marks all notifications as read', () => {
     const n = makeNotif()
@@ -130,6 +143,10 @@ describe('NotificationPanel', () => {
     expect(useNotificationStore.getState().notifications).toHaveLength(0)
     expect(mockDismiss).toHaveBeenCalledWith('n1')
   })
+})
+
+describe('NotificationPanel — renders action buttons and calls triggerAction on click', () => {
+  setUpNotificationPanel()
 
   it('renders action buttons and calls triggerAction on click', () => {
     const n = makeNotif({
@@ -156,6 +173,10 @@ describe('NotificationPanel', () => {
     render(<NotificationPanel />)
     expect(screen.queryByText('core')).toBeNull()
   })
+})
+
+describe('NotificationPanel — draws each type as its own shape', () => {
+  setUpNotificationPanel()
 
   it('draws each type as its own shape', () => {
     useNotificationStore.setState({
@@ -182,6 +203,10 @@ describe('NotificationPanel', () => {
     expect(onClick).toHaveBeenCalled()
     expect(useNotificationStore.getState().panelOpen).toBe(false)
   })
+})
+
+describe('NotificationPanel — clicking a notification without onClick does not close panel', () => {
+  setUpNotificationPanel()
 
   it('clicking a notification without onClick does not close panel', () => {
     const n = makeNotif()
@@ -262,13 +287,18 @@ describe('opening the drawer without blanking what is behind it', () => {
   })
 })
 
-describe('taking you to the thing a notification is about', () => {
+/** The hooks every "taking you to the thing a notification is about" describe registers. */
+function setUpTakingYouToThe(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     mockTriggerAction.mockResolvedValue({ ok: true })
     resetStore()
   })
   afterEach(cleanup)
+}
+
+describe('taking you to the thing a notification is about', () => {
+  setUpTakingYouToThe()
 
   it('asks main for the destination when only main knows it', async () => {
     // An extension's notification carries a handler that lives in the main
@@ -297,6 +327,10 @@ describe('taking you to the thing a notification is about', () => {
     fireEvent.click(screen.getByText('Test notification'))
     expect(mockTriggerAction).not.toHaveBeenCalled()
   })
+})
+
+describe('taking you to the thing a notification is about — closes the drawer on the way, so it does not cover where you landed', () => {
+  setUpTakingYouToThe()
 
   it('closes the drawer on the way, so it does not cover where you landed', async () => {
     const n = makeNotif({ clickable: true })
@@ -307,13 +341,18 @@ describe('taking you to the thing a notification is about', () => {
   })
 })
 
-describe('acting on a notification settles it', () => {
+/** The hooks every "acting on a notification settles it" describe registers. */
+function setUpActingOnANotification(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     mockTriggerAction.mockResolvedValue({ ok: true })
     resetStore()
   })
   afterEach(cleanup)
+}
+
+describe('acting on a notification settles it', () => {
+  setUpActingOnANotification()
 
   it('takes the row away once its action has fired', async () => {
     // Approve a phase and the request to approve that phase should not still be

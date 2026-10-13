@@ -110,14 +110,16 @@ function machineArgs(): string[] {
   return (process.env.E2E_ELECTRON_ARGS ?? '').split(' ').filter(Boolean)
 }
 
-export async function launchApp(
-  userDataDir: string = e2eProfileDir(),
-  env: Record<string, string> = {}
-): Promise<AppHandle> {
-  const deadline = Date.now() + LAUNCH_DEADLINE_MS
-  const marker = launchMarker()
-  const remaining = () => Math.max(1, deadline - Date.now())
-  const app = await electron.launch({
+/**
+ * Starts Electron on the profile, with this machine's switches and the e2e
+ * environment beneath `env`.
+ */
+function startElectron(
+  userDataDir: string,
+  env: Record<string, string>,
+  timeout: number
+): Promise<ElectronApplication> {
+  return electron.launch({
     // closeApp SIGKILLs an app that will not close, and macOS then shows a
     // modal "reopen windows?" alert on the next launch of the same bundle,
     // which blocks startup until firstWindow times out. The argument domain
@@ -129,9 +131,13 @@ export async function launchApp(
       '-ApplePersistenceIgnoreState',
       'YES',
     ],
-    env: { ...e2eEnv(), ...env, ...marker.env },
-    timeout: remaining(),
+    env: { ...e2eEnv(), ...env },
+    timeout,
   })
+}
+
+/** The app's most recent output, stdout and stderr, kept for a failed launch to report. */
+function keepOutput(app: ElectronApplication): string[] {
   const output: string[] = []
   const keep = (chunk: Buffer): void => {
     output.push(chunk.toString())
@@ -139,22 +145,49 @@ export async function launchApp(
   }
   app.process().stdout?.on('data', keep)
   app.process().stderr?.on('data', keep)
+  return output
+}
+
+/** The first window, once it shows the sidebar, within what is left of the launch. */
+async function firstReadyWindow(app: ElectronApplication, remaining: () => number): Promise<Page> {
+  await startIpcTrace(app)
+  const page = await app.firstWindow({ timeout: remaining() })
+  await page.waitForLoadState('domcontentloaded', { timeout: remaining() })
+  await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
+  await moveWindowOffPointer(app)
+  return page
+}
+
+/** Stops an app that did not finish starting, and says what its windows were doing and what it printed. */
+async function launchFailure(
+  app: ElectronApplication,
+  output: string[],
+  error: unknown
+): Promise<Error> {
+  const windows = await windowStates(app)
+  await stopApp(app, FAILED_LAUNCH_CLOSE_MS)
+  return new Error(
+    `The app did not finish starting within ${LAUNCH_DEADLINE_MS / 1000}s: ${String(error)}\n` +
+      `--- its windows when it gave up ---\n${windows}\n` +
+      `--- the app's own output ---\n${output.join('').slice(-6000) || '(nothing)'}`,
+    { cause: error }
+  )
+}
+
+export async function launchApp(
+  userDataDir: string = e2eProfileDir(),
+  env: Record<string, string> = {}
+): Promise<AppHandle> {
+  const deadline = Date.now() + LAUNCH_DEADLINE_MS
+  const marker = launchMarker()
+  const remaining = () => Math.max(1, deadline - Date.now())
+  const app = await startElectron(userDataDir, { ...env, ...marker.env }, remaining())
+  const output = keepOutput(app)
   try {
-    await startIpcTrace(app)
-    const page = await app.firstWindow({ timeout: remaining() })
-    await page.waitForLoadState('domcontentloaded', { timeout: remaining() })
-    await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
-    await moveWindowOffPointer(app)
+    const page = await firstReadyWindow(app, remaining)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
-    const windows = await windowStates(app)
-    await stopApp(app, FAILED_LAUNCH_CLOSE_MS)
-    throw new Error(
-      `The app did not finish starting within ${LAUNCH_DEADLINE_MS / 1000}s: ${String(error)}\n` +
-        `--- its windows when it gave up ---\n${windows}\n` +
-        `--- the app's own output ---\n${output.join('').slice(-6000) || '(nothing)'}`,
-      { cause: error }
-    )
+    throw await launchFailure(app, output, error)
   }
 }
 

@@ -185,132 +185,163 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => closeApp(handle))
 
-test.describe.serial('every extension setting', () => {
-  for (const extension of [
-    'Foundry',
-    'Git Integration',
-    'Notepad',
-    'Remote Control',
-    'Task Vault',
-  ]) {
-    test(`${extension}: every setting is written from its settings page`, async () => {
-      test.setTimeout(120_000)
-      const schema = schemas.find((s) => s.label === extension)!
-      const panel = await openPage(handle.page, schema)
-      const folder = mkdtempSync(join(tmpdir(), 'terminator-e2e-setting-folder-'))
-      for (const [key, def] of Object.entries(schema.properties)) {
-        if (def.type === 'action') {
-          await runAction(handle, panel, def)
-          continue
-        }
-        const value = NOTIFY.test(key) ? false : chosenValue(key, def, folder)
-        await writeControl(handle, panel, { key, def, value })
-        expected.set(key, value)
-      }
-      await closeSettings(handle.page)
-      const keys = Object.keys(schema.properties).filter((key) => expected.has(key))
-      await expect
-        .poll(async () => {
-          const values = await storedValues(handle.page)
-          return keys.filter((key) => values[key] !== expected.get(key))
-        })
-        .toEqual([])
+/** Writes every setting of one extension from its settings page, and checks main stored each. */
+async function writesEverySetting(extension: string): Promise<void> {
+  test.setTimeout(120_000)
+  const schema = schemas.find((s) => s.label === extension)!
+  const panel = await openPage(handle.page, schema)
+  const folder = mkdtempSync(join(tmpdir(), 'terminator-e2e-setting-folder-'))
+  for (const [key, def] of Object.entries(schema.properties)) {
+    if (def.type === 'action') {
+      await runAction(handle, panel, def)
+      continue
+    }
+    const value = NOTIFY.test(key) ? false : chosenValue(key, def, folder)
+    await writeControl(handle, panel, { key, def, value })
+    expected.set(key, value)
+  }
+  await closeSettings(handle.page)
+  const keys = Object.keys(schema.properties).filter((key) => expected.has(key))
+  await expect
+    .poll(async () => {
+      const values = await storedValues(handle.page)
+      return keys.filter((key) => values[key] !== expected.get(key))
     })
+    .toEqual([])
+}
+
+async function valuesSurviveRestart(): Promise<void> {
+  test.setTimeout(180_000)
+  const { userDataDir } = handle
+  await closeApp(handle)
+  handle = await launchApp(userDataDir)
+  const values = await storedValues(handle.page)
+  expect([...expected].filter(([key, value]) => values[key] !== value)).toEqual([])
+  for (const schema of schemas) {
+    const panel = await openPage(handle.page, schema)
+    for (const [key, def] of Object.entries(schema.properties)) {
+      if (expected.has(key)) await expectControl(panel, { key, def, value: expected.get(key) })
+    }
+    await closeSettings(handle.page)
+  }
+}
+
+const EXTENSIONS_WITH_SETTINGS = [
+  'Foundry',
+  'Git Integration',
+  'Notepad',
+  'Remote Control',
+  'Task Vault',
+]
+
+test.describe.serial('every extension setting', () => {
+  for (const extension of EXTENSIONS_WITH_SETTINGS) {
+    test(`${extension}: every setting is written from its settings page`, () =>
+      writesEverySetting(extension))
   }
 
-  test('every value survives a restart, in main and on each settings page', async () => {
-    test.setTimeout(180_000)
-    const { userDataDir } = handle
-    await closeApp(handle)
-    handle = await launchApp(userDataDir)
-    const values = await storedValues(handle.page)
-    expect([...expected].filter(([key, value]) => values[key] !== value)).toEqual([])
-    for (const schema of schemas) {
-      const panel = await openPage(handle.page, schema)
-      for (const [key, def] of Object.entries(schema.properties)) {
-        if (expected.has(key)) await expectControl(panel, { key, def, value: expected.get(key) })
-      }
-      await closeSettings(handle.page)
-    }
-  })
+  test('every value survives a restart, in main and on each settings page', valuesSurviveRestart)
 })
 
-test.describe.serial('what the settings change', () => {
-  test('Git Integration switched off keeps its settings page, and registers no commands', async () => {
-    const { page } = handle
-    // Its page is the first thing it registers, so once the page is here its
-    // activation has run, and the commands it would register are not there.
-    const schema = schemas.find((s) => s.extensionId === 'terminator.git-integration')!
-    const panel = await openPage(page, schema)
-    await expect(settingRow(panel, 'Enable Git Integration').getByRole('switch')).toHaveAttribute(
-      'aria-checked',
-      'false'
+async function gitIntegrationOffRegistersNoCommands(): Promise<void> {
+  const { page } = handle
+  // Its page is the first thing it registers, so once the page is here its
+  // activation has run, and the commands it would register are not there.
+  const schema = schemas.find((s) => s.extensionId === 'terminator.git-integration')!
+  const panel = await openPage(page, schema)
+  await expect(settingRow(panel, 'Enable Git Integration').getByRole('switch')).toHaveAttribute(
+    'aria-checked',
+    'false'
+  )
+  await closeSettings(page)
+  const { commands } = await page.evaluate(() => window.electronAPI.extension.getCommands())
+  expect(commands.filter((c) => c.extensionId === 'terminator.git-integration')).toEqual([])
+}
+
+async function foundryOrderStartsWithSettings(): Promise<void> {
+  const created = (await foundryChannel(handle, 'foundry:order.create', {
+    source: { kind: 'typed', text: 'Tighten the login checks' },
+    repoPaths: [repo],
+  })) as { order?: { budgets: unknown; writeBack: unknown; risk: { criticalPaths: string[] } } }
+  expect(created.order?.budgets).toMatchObject({ agents: 7, wallClockMinutes: 50 })
+  expect(created.order?.writeBack).toEqual([])
+  expect(created.order?.risk.criticalPaths).toEqual(['src/auth/**'])
+}
+
+async function notepadNoteStartsWithDefaultTags(): Promise<void> {
+  await projectGroup(handle.page, 'main').click()
+  await runQuickAction(handle.page, 'New note')
+  await expect
+    .poll(() =>
+      inExtensionView<string>(handle, 'terminator.notepad', 'document.body.innerText').catch(
+        () => ''
+      )
     )
-    await closeSettings(page)
-    const { commands } = await page.evaluate(() => window.electronAPI.extension.getCommands())
-    expect(commands.filter((c) => c.extensionId === 'terminator.git-integration')).toEqual([])
-  })
+    .toContain('e2e-tag')
+}
 
-  test("Foundry's budgets, critical paths and write-backs are what a new order starts with", async () => {
-    const created = (await foundryChannel(handle, 'foundry:order.create', {
-      source: { kind: 'typed', text: 'Tighten the login checks' },
-      repoPaths: [repo],
-    })) as { order?: { budgets: unknown; writeBack: unknown; risk: { criticalPaths: string[] } } }
-    expect(created.order?.budgets).toMatchObject({ agents: 7, wallClockMinutes: 50 })
-    expect(created.order?.writeBack).toEqual([])
-    expect(created.order?.risk.criticalPaths).toEqual(['src/auth/**'])
-  })
+// Every notification row is switched off above. Task Vault raises "Task
+// completed" through the shared dispatcher exactly as here; switching one
+// target back on is what brings it back.
+async function notificationSwitchRoutesIt(): Promise<void> {
+  const { page } = handle
+  const raise = (title: string) =>
+    page.evaluate(async (t) => {
+      await window.electronAPI.notifications.create({
+        type: 'success',
+        title: t,
+        source: 'terminator.task-vault',
+        key: 'taskCompleted',
+      })
+      return (await window.electronAPI.notifications.list()).find((n) => n.title === t)?.targets
+    }, title)
+  // With every target off it is not recorded at all.
+  expect(await raise('Completed: muted')).toBeUndefined()
+  const schema = schemas.find((s) => s.extensionId === 'terminator.task-vault')!
+  const panel = await openPage(page, schema)
+  await panel.getByRole('checkbox', { name: 'Task completed → center', exact: true }).click()
+  await closeSettings(page)
+  await expect.poll(() => raise('Completed: heard')).toEqual(['center'])
+  await page.locator('.app-band__entry[aria-label^="Notifications"]').click()
+  await expect(page.locator('.notif-item', { hasText: 'Completed: heard' })).toBeVisible()
+  await expect(page.locator('.notif-item', { hasText: 'Completed: muted' })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+}
 
-  test("Notepad's default tags are on a new note before anything is typed", async () => {
-    await projectGroup(handle.page, 'main').click()
-    await runQuickAction(handle.page, 'New note')
-    await expect
-      .poll(() =>
-        inExtensionView<string>(handle, 'terminator.notepad', 'document.body.innerText').catch(
-          () => ''
-        )
+async function remoteControlViewerLimitMatchesPage(): Promise<void> {
+  await handle.page.locator('button[aria-label="Remote Control"]').click()
+  await expect
+    .poll(() =>
+      inExtensionView<string>(handle, 'terminator.remote-control', 'document.body.innerText').catch(
+        () => ''
       )
-      .toContain('e2e-tag')
-  })
+    )
+    .toContain('13')
+}
 
-  // Every notification row is switched off above. Task Vault raises "Task
-  // completed" through the shared dispatcher exactly as here; switching one
-  // target back on is what brings it back.
-  test('a notification switched off goes nowhere, and switched on reaches the centre', async () => {
-    const { page } = handle
-    const raise = (title: string) =>
-      page.evaluate(async (t) => {
-        await window.electronAPI.notifications.create({
-          type: 'success',
-          title: t,
-          source: 'terminator.task-vault',
-          key: 'taskCompleted',
-        })
-        return (await window.electronAPI.notifications.list()).find((n) => n.title === t)?.targets
-      }, title)
-    // With every target off it is not recorded at all.
-    expect(await raise('Completed: muted')).toBeUndefined()
-    const schema = schemas.find((s) => s.extensionId === 'terminator.task-vault')!
-    const panel = await openPage(page, schema)
-    await panel.getByRole('checkbox', { name: 'Task completed → center', exact: true }).click()
-    await closeSettings(page)
-    await expect.poll(() => raise('Completed: heard')).toEqual(['center'])
-    await page.locator('.app-band__entry[aria-label^="Notifications"]').click()
-    await expect(page.locator('.notif-item', { hasText: 'Completed: heard' })).toBeVisible()
-    await expect(page.locator('.notif-item', { hasText: 'Completed: muted' })).toHaveCount(0)
-    await page.keyboard.press('Escape')
-  })
+test.describe.serial('what the settings change', () => {
+  test(
+    'Git Integration switched off keeps its settings page, and registers no commands',
+    gitIntegrationOffRegistersNoCommands
+  )
 
-  test("Remote Control's viewer limit is the one its page shows", async () => {
-    await handle.page.locator('button[aria-label="Remote Control"]').click()
-    await expect
-      .poll(() =>
-        inExtensionView<string>(
-          handle,
-          'terminator.remote-control',
-          'document.body.innerText'
-        ).catch(() => '')
-      )
-      .toContain('13')
-  })
+  test(
+    "Foundry's budgets, critical paths and write-backs are what a new order starts with",
+    foundryOrderStartsWithSettings
+  )
+
+  test(
+    "Notepad's default tags are on a new note before anything is typed",
+    notepadNoteStartsWithDefaultTags
+  )
+
+  test(
+    'a notification switched off goes nowhere, and switched on reaches the centre',
+    notificationSwitchRoutesIt
+  )
+
+  test(
+    "Remote Control's viewer limit is the one its page shows",
+    remoteControlViewerLimitMatchesPage
+  )
 })

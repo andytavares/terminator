@@ -1,4 +1,3 @@
-import { useShallow } from 'zustand/react/shallow'
 import React, { useState } from 'react'
 import { useSettingsStore } from '../../stores/settings.store'
 import type { CustomAction, CustomActionKind, CustomActionTarget } from '../../../shared/types'
@@ -54,195 +53,233 @@ function draftFrom(a: CustomAction): Draft {
 }
 
 export function QuickActionsSettings(props: Props): JSX.Element {
-  const { globalSettings, workspaceSettings, updateQuickActions, updateWorkspaceQuickActions } =
-    useSettingsStore(
-      useShallow((s) => ({
-        globalSettings: s.globalSettings,
-        workspaceSettings: s.workspaceSettings,
-        updateQuickActions: s.updateQuickActions,
-        updateWorkspaceQuickActions: s.updateWorkspaceQuickActions,
-      }))
-    )
-  const [draft, setDraft] = useState<Draft | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const custom: CustomAction[] =
-    props.scope === 'global'
-      ? (globalSettings?.quickActions.custom ?? [])
-      : (workspaceSettings.get(props.workspaceId)?.overrides.quickActions?.custom ?? [])
-
-  function save(list: CustomAction[]): void {
-    if (props.scope === 'global') void updateQuickActions({ custom: list })
-    else void updateWorkspaceQuickActions(props.workspaceId, list)
-  }
-
-  function startAdd(): void {
-    setDraft(emptyDraft())
-    setError(null)
-  }
-
-  function startEdit(a: CustomAction): void {
-    setDraft(draftFrom(a))
-    setError(null)
-  }
-
-  function cancel(): void {
-    setDraft(null)
-    setError(null)
-  }
-
-  function remove(id: string): void {
-    save(custom.filter((a) => a.id !== id))
-  }
-
-  function validate(d: Draft): string | null {
-    if (!d.label.trim()) return 'Label is required'
-    if (!d.body.trim()) return 'Body is required'
-    if (d.mnemonic.length > 1) return 'Key must be a single character'
-    if (d.mnemonic) {
-      const clash = custom.find((a) => a.id !== d.id && a.mnemonic === d.mnemonic)
-      if (clash) return `Key already used by ${clash.label}`
-    }
-    return null
-  }
-
-  function handleSave(): void {
-    if (!draft) return
-    const err = validate(draft)
-    if (err) {
-      setError(err)
-      return
-    }
-    const action: CustomAction = {
-      id: draft.id ?? crypto.randomUUID(),
-      label: draft.label.trim(),
-      mnemonic: draft.mnemonic || undefined,
-      kind: draft.kind,
-      target: draft.target,
-      body: draft.body,
-    }
-    const next = draft.id
-      ? custom.map((a) => (a.id === draft.id ? action : a))
-      : [...custom, action]
-    save(next)
-    setDraft(null)
-    setError(null)
-  }
-
-  function handleKindChange(kind: CustomActionKind): void {
-    if (!draft) return
-    setDraft({ ...draft, kind, target: TARGET_OPTIONS[kind][0].value })
-  }
-
+  const { custom, save } = useCustomActions(props)
+  const form = useActionDraft(custom, save)
   return (
     <div className="settings-section">
       <h3 className="settings-section__title">Quick actions</h3>
-
-      {custom.length === 0 && !draft && (
+      {custom.length === 0 && !form.draft && (
         <p className="settings-section__empty">No custom actions yet.</p>
       )}
-
       {custom.length > 0 && (
-        <ul className="qa-settings-list">
-          {custom.map((a) => (
-            <li key={a.id} className="qa-settings-list__row">
-              <span className="qa-settings-list__key">{a.mnemonic ?? ''}</span>
-              <span className="qa-settings-list__label">{a.label}</span>
-              <span className="qa-settings-list__chip">{a.kind}</span>
-              <span className="qa-settings-list__target">{targetLabel(a)}</span>
-              <code className="qa-settings-list__body" title={a.body}>
-                {a.body}
-              </code>
-              <div className="qa-settings-list__actions">
-                <button className="ext-btn" onClick={() => startEdit(a)}>
-                  Edit
-                </button>
-                <button className="ext-btn ext-btn--danger" onClick={() => remove(a.id)}>
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <ActionList
+          custom={custom}
+          onEdit={form.startEdit}
+          onRemove={(id) => save(custom.filter((a) => a.id !== id))}
+        />
       )}
-
-      {!draft && (
-        <button className="settings-section__btn" onClick={startAdd}>
+      {form.draft ? (
+        <ActionForm form={form} draft={form.draft} />
+      ) : (
+        <button className="settings-section__btn" onClick={form.startAdd}>
           Add action
         </button>
       )}
+    </div>
+  )
+}
 
-      {draft && (
-        <div className="qa-settings-form">
-          <div className="settings-section__field">
-            <label className="settings-section__label" htmlFor="qa-action-label">
-              Label
-            </label>
-            <input
-              id="qa-action-label"
-              className="settings-section__input"
-              value={draft.label}
-              onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-            />
-          </div>
+/** The scope's custom actions, and writing the list back to that scope. */
+function useCustomActions(props: Props) {
+  const workspaceId = props.scope === 'workspace' ? props.workspaceId : null
+  const custom =
+    useSettingsStore((s) =>
+      workspaceId === null
+        ? s.globalSettings?.quickActions.custom
+        : s.workspaceSettings.get(workspaceId)?.overrides.quickActions?.custom
+    ) ?? NO_ACTIONS
+  const save = (list: CustomAction[]): void => {
+    const store = useSettingsStore.getState()
+    if (workspaceId === null) void store.updateQuickActions({ custom: list })
+    else void store.updateWorkspaceQuickActions(workspaceId, list)
+  }
+  return { custom, save }
+}
 
-          <div className="settings-section__field">
-            <label className="settings-section__label" htmlFor="qa-action-key">
-              Key
-            </label>
-            <input
-              id="qa-action-key"
-              className="settings-section__input"
-              maxLength={1}
-              value={draft.mnemonic}
-              onChange={(e) => setDraft({ ...draft, mnemonic: e.target.value.slice(0, 1) })}
-            />
-          </div>
+const NO_ACTIONS: CustomAction[] = []
 
-          <SelectField
-            id="qa-action-kind"
-            label="Kind"
-            value={draft.kind}
-            options={KIND_OPTIONS}
-            onChange={handleKindChange}
-          />
+/** Why the draft cannot be saved, or null when it can. */
+function validateDraft(d: Draft, custom: CustomAction[]): string | null {
+  if (!d.label.trim()) return 'Label is required'
+  if (!d.body.trim()) return 'Body is required'
+  if (d.mnemonic.length > 1) return 'Key must be a single character'
+  const clash = d.mnemonic ? custom.find((a) => a.id !== d.id && a.mnemonic === d.mnemonic) : null
+  return clash ? `Key already used by ${clash.label}` : null
+}
 
-          <SelectField
-            id="qa-action-target"
-            label="Target"
-            value={draft.target}
-            options={TARGET_OPTIONS[draft.kind]}
-            onChange={(target) => setDraft({ ...draft, target })}
-          />
+function actionFrom(draft: Draft): CustomAction {
+  return {
+    id: draft.id ?? crypto.randomUUID(),
+    label: draft.label.trim(),
+    mnemonic: draft.mnemonic || undefined,
+    kind: draft.kind,
+    target: draft.target,
+    body: draft.body,
+  }
+}
 
-          <div className="settings-section__field">
-            <label className="settings-section__label" htmlFor="qa-action-body">
-              Body
-            </label>
-            <textarea
-              id="qa-action-body"
-              className="settings-section__input settings-section__textarea qa-settings-form__mono"
-              rows={3}
-              value={draft.body}
-              onChange={(e) => setDraft({ ...draft, body: e.target.value })}
-            />
-            <span className="settings-section__hint">
-              Variables: {VARIABLES.map((v) => `{${v}}`).join(' ')}
-            </span>
-          </div>
+/** The action being added or edited, its error, and saving it in place or at the end. */
+function useActionDraft(custom: CustomAction[], save: (list: CustomAction[]) => void) {
+  const [draft, setDraft] = useState<Draft | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const open = (next: Draft | null): void => {
+    setDraft(next)
+    setError(null)
+  }
+  function handleSave(current: Draft): void {
+    const err = validateDraft(current, custom)
+    if (err) return setError(err)
+    const action = actionFrom(current)
+    save(current.id ? custom.map((a) => (a.id === current.id ? action : a)) : [...custom, action])
+    open(null)
+  }
+  return {
+    draft,
+    error,
+    update: (patch: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...patch } : d)),
+    startAdd: () => open(emptyDraft()),
+    startEdit: (a: CustomAction) => open(draftFrom(a)),
+    cancel: () => open(null),
+    handleSave,
+  }
+}
 
-          {error && <p className="qa-settings-form__error">{error}</p>}
+type ActionDraft = ReturnType<typeof useActionDraft>
 
-          <div className="qa-settings-form__actions">
-            <button className="settings-section__btn" onClick={handleSave}>
-              Save
+interface ActionListProps {
+  custom: CustomAction[]
+  onEdit: (action: CustomAction) => void
+  onRemove: (id: string) => void
+}
+
+function ActionList({ custom, onEdit, onRemove }: ActionListProps): JSX.Element {
+  return (
+    <ul className="qa-settings-list">
+      {custom.map((a) => (
+        <li key={a.id} className="qa-settings-list__row">
+          <span className="qa-settings-list__key">{a.mnemonic ?? ''}</span>
+          <span className="qa-settings-list__label">{a.label}</span>
+          <span className="qa-settings-list__chip">{a.kind}</span>
+          <span className="qa-settings-list__target">{targetLabel(a)}</span>
+          <code className="qa-settings-list__body" title={a.body}>
+            {a.body}
+          </code>
+          <div className="qa-settings-list__actions">
+            <button className="ext-btn" onClick={() => onEdit(a)}>
+              Edit
             </button>
-            <button className="settings-section__btn-link" onClick={cancel}>
-              Cancel
+            <button className="ext-btn ext-btn--danger" onClick={() => onRemove(a.id)}>
+              Delete
             </button>
           </div>
-        </div>
-      )}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Label, key, kind and target, and the body, then Save and Cancel. */
+function ActionForm({ form, draft }: { form: ActionDraft; draft: Draft }): JSX.Element {
+  const { update } = form
+  return (
+    <div className="qa-settings-form">
+      <TextField
+        id="qa-action-label"
+        label="Label"
+        value={draft.label}
+        onChange={(label) => update({ label })}
+      />
+      <TextField
+        id="qa-action-key"
+        label="Key"
+        value={draft.mnemonic}
+        maxLength={1}
+        onChange={(text) => update({ mnemonic: text.slice(0, 1) })}
+      />
+      <KindAndTarget draft={draft} update={update} />
+      <BodyField body={draft.body} onChange={(body) => update({ body })} />
+      {form.error && <p className="qa-settings-form__error">{form.error}</p>}
+      <FormButtons onSave={() => form.handleSave(draft)} onCancel={form.cancel} />
+    </div>
+  )
+}
+
+function FormButtons({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
+  return (
+    <div className="qa-settings-form__actions">
+      <button className="settings-section__btn" onClick={onSave}>
+        Save
+      </button>
+      <button className="settings-section__btn-link" onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
+  )
+}
+
+/** The kind, and a target that kind allows; changing kind resets the target to its first. */
+function KindAndTarget({ draft, update }: { draft: Draft; update: ActionDraft['update'] }) {
+  return (
+    <>
+      <SelectField
+        id="qa-action-kind"
+        label="Kind"
+        value={draft.kind}
+        options={KIND_OPTIONS}
+        onChange={(kind) => update({ kind, target: TARGET_OPTIONS[kind][0].value })}
+      />
+      <SelectField
+        id="qa-action-target"
+        label="Target"
+        value={draft.target}
+        options={TARGET_OPTIONS[draft.kind]}
+        onChange={(target) => update({ target })}
+      />
+    </>
+  )
+}
+
+interface TextFieldProps {
+  id: string
+  label: string
+  value: string
+  maxLength?: number
+  onChange: (value: string) => void
+}
+
+function TextField({ id, label, value, maxLength, onChange }: TextFieldProps): JSX.Element {
+  return (
+    <div className="settings-section__field">
+      <label className="settings-section__label" htmlFor={id}>
+        {label}
+      </label>
+      <input
+        id={id}
+        className="settings-section__input"
+        maxLength={maxLength}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
+
+function BodyField({ body, onChange }: { body: string; onChange: (body: string) => void }) {
+  return (
+    <div className="settings-section__field">
+      <label className="settings-section__label" htmlFor="qa-action-body">
+        Body
+      </label>
+      <textarea
+        id="qa-action-body"
+        className="settings-section__input settings-section__textarea qa-settings-form__mono"
+        rows={3}
+        value={body}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <span className="settings-section__hint">
+        Variables: {VARIABLES.map((v) => `{${v}}`).join(' ')}
+      </span>
     </div>
   )
 }

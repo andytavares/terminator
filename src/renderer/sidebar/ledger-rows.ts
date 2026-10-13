@@ -35,6 +35,38 @@ function compare(sort: HomePrefs['sort']) {
   }
 }
 
+/** The filters, and the issue titles the text filter also searches. */
+export interface LedgerQuery extends LedgerFilters {
+  titles: IssueTitles
+}
+
+function isVisible(f: SessionFacts, prefs: HomePrefs, query: LedgerQuery): boolean {
+  if (prefs.hideExited && !f.isClosed && f.state === 'exited') return false
+  if (query.needsYou && f.state !== 'awaiting-input') return false
+  return matchesFilter(f, query.text, query.titles)
+}
+
+/** Open sessions under their branch label, labels in order with "No branch" last. */
+function openGroups(open: SessionFacts[], prefs: HomePrefs): LedgerGroup[] {
+  const byLabel = new Map<string, SessionFacts[]>()
+  for (const f of open) {
+    const label = groupLabel(f, prefs.groupBy)
+    byLabel.set(label, [...(byLabel.get(label) ?? []), f])
+  }
+  return [...byLabel.entries()]
+    .sort(([a], [b]) => {
+      if (a === NO_BRANCH) return 1
+      if (b === NO_BRANCH) return -1
+      return a.localeCompare(b)
+    })
+    .map(([label, rows]) => ({ key: label, label, facts: rows.sort(compare(prefs.sort)) }))
+}
+
+/** A group of its own, or none when it would be empty. */
+function groupOf(key: string, label: string, facts: SessionFacts[]): LedgerGroup[] {
+  return facts.length === 0 ? [] : [{ key, label, facts }]
+}
+
 /**
  * The Ledger's rows, grouped and ordered.
  *
@@ -45,46 +77,20 @@ function compare(sort: HomePrefs['sort']) {
 export function buildLedger(
   facts: readonly SessionFacts[],
   prefs: HomePrefs,
-  filters: LedgerFilters,
-  titles: IssueTitles
+  query: LedgerQuery
 ): LedgerGroup[] {
-  const visible = facts.filter(
-    (f) =>
-      !(prefs.hideExited && !f.isClosed && f.state === 'exited') &&
-      !(filters.needsYou && f.state !== 'awaiting-input') &&
-      matchesFilter(f, filters.text, titles)
-  )
-
+  const visible = facts.filter((f) => isVisible(f, prefs, query))
   const openVisible = visible.filter((f) => !f.isClosed)
   const liftNeedsYou = prefs.sort === 'needs-you'
   const needsYou = liftNeedsYou ? openVisible.filter((f) => f.state === 'awaiting-input') : []
   const rest = liftNeedsYou ? openVisible.filter((f) => f.state !== 'awaiting-input') : openVisible
-
-  const byLabel = new Map<string, SessionFacts[]>()
-  for (const f of rest) {
-    const label = groupLabel(f, prefs.groupBy)
-    byLabel.set(label, [...(byLabel.get(label) ?? []), f])
-  }
-
-  const open = [...byLabel.entries()]
-    .sort(([a], [b]) => {
-      if (a === NO_BRANCH) return 1
-      if (b === NO_BRANCH) return -1
-      return a.localeCompare(b)
-    })
-    .map(([label, rows]) => ({ key: label, label, facts: rows.sort(compare(prefs.sort)) }))
-
-  const needsYouGroup: LedgerGroup[] =
-    needsYou.length === 0
-      ? []
-      : [{ key: NEEDS_YOU, label: 'Needs you', facts: needsYou.sort(compare(prefs.sort)) }]
-
   const closed = visible
     .filter((f) => f.isClosed)
     .sort((a, b) => Date.parse(b.closedAt ?? '') - Date.parse(a.closedAt ?? ''))
 
-  const closedGroup: LedgerGroup[] =
-    closed.length === 0 ? [] : [{ key: CLOSED, label: CLOSED, facts: closed }]
-
-  return [...needsYouGroup, ...open, ...closedGroup]
+  return [
+    ...groupOf(NEEDS_YOU, 'Needs you', needsYou.sort(compare(prefs.sort))),
+    ...openGroups(rest, prefs),
+    ...groupOf(CLOSED, CLOSED, closed),
+  ]
 }

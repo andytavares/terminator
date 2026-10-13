@@ -63,6 +63,32 @@ test('the review header menu is drawn above the file toolbar', async () => {
   }
 })
 
+/**
+ * Run in the page: scrolls the picker, then, for each row checkbox under the
+ * owner heading, whether the heading is what a click there would hit.
+ */
+function probeUnderHeading(): { n: number; probes: boolean[]; box: number } {
+  const list = document.querySelector('.rp-list')!
+  list.scrollTop = 300
+  const checkbox = document.querySelector('.rp-group-label input')!
+  const box = checkbox.getBoundingClientRect()
+  const heading = document.querySelector('.rp-group-label')!.getBoundingClientRect()
+  // Probe every row checkbox that sits under the heading band.
+  const under = [...document.querySelectorAll('.rp-row input')].filter((c) => {
+    const r = c.getBoundingClientRect()
+    return r.top < heading.bottom && r.bottom > heading.top
+  })
+  const probes = under.map((c) => {
+    const r = c.getBoundingClientRect()
+    const el = document.elementFromPoint(
+      r.x + r.width / 2,
+      Math.max(r.y + r.height / 2, heading.top + 1)
+    )
+    return !!el?.closest('.rp-group-label')
+  })
+  return { n: under.length, probes, box: box.width }
+}
+
 test('the sticky owner heading in the repository picker stays above scrolled rows', async () => {
   const rows = Array.from(
     { length: 30 },
@@ -74,27 +100,7 @@ test('the sticky owner heading in the repository picker stays above scrolled row
      </div>`
   )
   try {
-    const hit = await page.evaluate(() => {
-      const list = document.querySelector('.rp-list')!
-      list.scrollTop = 300
-      const checkbox = document.querySelector('.rp-group-label input')!
-      const box = checkbox.getBoundingClientRect()
-      const heading = document.querySelector('.rp-group-label')!.getBoundingClientRect()
-      // Probe every row checkbox that sits under the heading band.
-      const under = [...document.querySelectorAll('.rp-row input')].filter((c) => {
-        const r = c.getBoundingClientRect()
-        return r.top < heading.bottom && r.bottom > heading.top
-      })
-      const probes = under.map((c) => {
-        const r = c.getBoundingClientRect()
-        const el = document.elementFromPoint(
-          r.x + r.width / 2,
-          Math.max(r.y + r.height / 2, heading.top + 1)
-        )
-        return !!el?.closest('.rp-group-label')
-      })
-      return { n: under.length, probes, box: box.width }
-    })
+    const hit = await page.evaluate(probeUnderHeading)
     expect(hit.n, 'a row checkbox is scrolled under the heading').toBeGreaterThan(0)
     expect(hit.probes.every(Boolean), 'heading is topmost over scrolled checkboxes').toBe(true)
   } finally {

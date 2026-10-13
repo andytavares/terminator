@@ -220,15 +220,37 @@ export default defineConfig([
     },
   },
   {
-    // The same function size limits for the main process, the shared code and
-    // the tests that cover them. Add a directory here once all of its
-    // functions, tests included, meet them.
+    // The same function size limits for the main process, the shared code, the
+    // build and CI scripts, the e2e suite and its support, and the tests that
+    // cover them. Add a directory here once all of its functions, tests
+    // included, meet them.
     files: [
       'src/{main,shared}/**/*.{ts,tsx}',
+      'scripts/**/*.{js,mjs,cjs,ts,mts}',
       'tests/unit/{agents,db,extensions,fs,git,github,integrations,ipc,main,notifications,schemas,sessions,shared,shell,storage,terminal}/**/*.{ts,tsx}',
-      'tests/unit/logger.spec.ts',
-      'tests/integration/{ipc,terminal}/**/*.{ts,tsx}',
+      'tests/unit/{lint,scripts,config}/**/*.{js,ts,tsx}',
+      'tests/unit/{logger,git-test-env}.spec.ts',
+      'tests/integration/{ipc,terminal,scripts}/**/*.{js,ts,tsx}',
       'tests/integration/remote-bridge-allowlist.spec.ts',
+      'tests/support/**/*.{ts,tsx}',
+      'tests/e2e/**/*.{js,mjs,cjs,ts,tsx}',
+    ],
+    rules: {
+      'max-lines-per-function': ['error', { max: 30, skipBlankLines: true, skipComments: true }],
+      complexity: ['error', 10],
+      'max-params': ['error', 3],
+    },
+  },
+  {
+    // The same function size limits for the renderer, the remote client, the
+    // extension SDK and design system (their Storybook stories included), and
+    // the tests that cover them. Split a component that outgrows them into
+    // named subcomponents and hooks (https://react.dev/learn/thinking-in-react).
+    files: [
+      'src/{renderer,renderer-remote}/**/*.{ts,tsx}',
+      'packages/{extension-sdk,extension-ui}/**/*.{js,ts,tsx}',
+      'tests/unit/{renderer,renderer-remote,packages}/**/*.{ts,tsx}',
+      'tests/unit/{ConfirmDialog,ErrorBoundary}.spec.tsx',
     ],
     rules: {
       'max-lines-per-function': ['error', { max: 30, skipBlankLines: true, skipComments: true }],

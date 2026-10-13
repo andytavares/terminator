@@ -104,7 +104,9 @@ describe('generateIndex()', () => {
     const index = generateIndex('my-ext', 'com.example.my-ext')
     expect(index).not.toMatch(/v1\.\d\.\d/)
   })
+})
 
+describe('generateIndex() — commands, API members, imports and stubs', () => {
   it('registers a command and shows a toast', () => {
     const index = generateIndex('my-ext', 'com.example.my-ext')
     expect(index).toContain('commands.register')

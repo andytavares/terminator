@@ -29,7 +29,13 @@ export async function startSessionInBranch(projectId: string): Promise<void> {
     .resolveSettings(project.workspaceId).terminal
   const cwd = project.worktreePath ?? workspace?.folderPath ?? '~'
   try {
-    const sessionId = await createTerminalSession(projectId, 'human', '', cwd, scrollbackLimit)
+    const sessionId = await createTerminalSession({
+      projectId,
+      type: 'human',
+      title: '',
+      cwd,
+      scrollbackLimit,
+    })
     revealSession(sessionId)
   } catch {
     // The controller has already said why; Home stays where it is.
@@ -43,13 +49,13 @@ export async function startScratchSession(): Promise<void> {
     .getState()
     .resolveSettings(workspaces.activeWorkspaceId ?? null).terminal
   try {
-    await createTerminalSession(
-      SCRATCH_PROJECT_ID,
-      'human',
-      'Scratch',
-      workspaces.resolveActiveCwd(),
-      scrollbackLimit
-    )
+    await createTerminalSession({
+      projectId: SCRATCH_PROJECT_ID,
+      type: 'human',
+      title: 'Scratch',
+      cwd: workspaces.resolveActiveCwd(),
+      scrollbackLimit,
+    })
     workspaces.setScratchActive(true)
     useExtensionRegistry.getState().setActiveGlobalTab(null)
   } catch {
@@ -76,15 +82,15 @@ export async function resumeSession(facts: SessionFacts): Promise<void> {
 
   let sessionId: string
   try {
-    sessionId = await createTerminalSession(
-      plan.projectId,
-      'human',
-      '',
-      plan.cwd,
+    sessionId = await createTerminalSession({
+      projectId: plan.projectId,
+      type: 'human',
+      title: '',
+      cwd: plan.cwd,
       scrollbackLimit,
-      undefined,
-      plan.command
-    )
+      parentSessionId: undefined,
+      initialCommand: plan.command,
+    })
   } catch {
     // The controller has already said why. Nothing has moved.
     return

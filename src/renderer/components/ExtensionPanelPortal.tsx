@@ -11,49 +11,62 @@ interface Props {
   repoRoot?: string | null
 }
 
+type Surface = Pick<Props, 'extensionId' | 'viewParam'>
+
 // True only in the real Electron renderer — the remote shim does not expose this.
 function isElectronLocal(): boolean {
   return typeof window.electronAPI?.extensionEvents?.onExtensionPanelLoaded === 'function'
 }
 
-function RemoteIframe({ extensionId, viewParam, repoRoot, isActive }: Props): JSX.Element {
-  const iframeRef = useRef<HTMLIFrameElement>(null)
+/** A second Escape leaves the surface for the terminal: a sidebar panel closes, a tab clears. */
+function doubleEscapeListener({ extensionId, viewParam }: Surface): (e: KeyboardEvent) => void {
+  const detector = createDoubleEscapeDetector()
+  return (e) => {
+    if (e.key !== 'Escape') return
+    if (!detector.register(performance.now())) return
+    const { sidebarPanels, exitExtensionToTerminal } = useExtensionRegistry.getState()
+    const isSidebar = sidebarPanels.get(extensionId)?.view === viewParam
+    if (exitExtensionToTerminal(isSidebar ? extensionId : undefined)) {
+      setTimeout(focusActiveTerminal, 0)
+    }
+  }
+}
+
+/** Listens on the frame's window, and again on each new window a navigation brings. */
+function listenInFrame(iframe: HTMLIFrameElement, listener: (e: KeyboardEvent) => void) {
+  const attached = new Set<Window>()
+  const attach = (): void => {
+    const win = iframe.contentWindow
+    if (!win || attached.has(win)) return
+    win.addEventListener('keydown', listener)
+    attached.add(win)
+  }
+  attach()
+  iframe.addEventListener('load', attach)
+  return () => {
+    iframe.removeEventListener('load', attach)
+    for (const win of attached) win.removeEventListener('keydown', listener)
+  }
+}
+
+/** Where Remote Control serves the extension's view to a browser. */
+function frameSrc({ extensionId, viewParam, repoRoot }: Props): string {
   const params = new URLSearchParams({ viewParam })
   if (repoRoot) params.set('repoRoot', repoRoot)
-  const src = `/ext/${extensionId}/?${params.toString()}`
+  return `/ext/${extensionId}/?${params.toString()}`
+}
+
+function RemoteIframe(props: Props): JSX.Element {
+  const { extensionId, viewParam, isActive } = props
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const src = frameSrc(props)
 
   // Native panels get the double-Escape exit from the webview preload; browser
   // clients have no preload, so the host page listens on the same-origin frame.
   useEffect(() => {
     const iframe = iframeRef.current
     if (!iframe) return
-    const detector = createDoubleEscapeDetector()
-
-    function handleKeyDown(e: KeyboardEvent): void {
-      if (e.key !== 'Escape') return
-      if (!detector.register(performance.now())) return
-      const { sidebarPanels, exitExtensionToTerminal } = useExtensionRegistry.getState()
-      const isSidebar = sidebarPanels.get(extensionId)?.view === viewParam
-      if (exitExtensionToTerminal(isSidebar ? extensionId : undefined)) {
-        setTimeout(focusActiveTerminal, 0)
-      }
-    }
-
-    // The frame swaps its window on navigation, so re-attach on every load.
-    const attached = new Set<Window>()
-    const attach = (): void => {
-      const win = iframe.contentWindow
-      if (!win || attached.has(win)) return
-      win.addEventListener('keydown', handleKeyDown)
-      attached.add(win)
-    }
-    attach()
-    iframe.addEventListener('load', attach)
-
-    return () => {
-      iframe.removeEventListener('load', attach)
-      for (const win of attached) win.removeEventListener('keydown', handleKeyDown)
-    }
+    return listenInFrame(iframe, doubleEscapeListener({ extensionId, viewParam }))
   }, [extensionId, viewParam])
 
   return (
@@ -78,37 +91,38 @@ function RemoteIframe({ extensionId, viewParam, repoRoot, isActive }: Props): JS
   )
 }
 
-function LocalWebContentsPortal({
-  extensionId,
-  viewParam,
-  isActive,
-  repoRoot = null,
-}: Props): JSX.Element {
-  const modalOpen = useModalStore((s) => s.depth > 0)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [loading, setLoading] = useState(true)
+interface PanelPlacement extends Surface {
+  visible: boolean
+  repoRoot: string | null
+}
 
+function sendPanelBounds(el: HTMLElement, placement: PanelPlacement): void {
+  const rect = el.getBoundingClientRect()
+  window.electronAPI?.extension?.updatePanelBounds?.({
+    ...placement,
+    bounds: {
+      x: Math.round(rect.left),
+      y: Math.round(rect.top),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    },
+  })
+}
+
+/**
+ * Keeps the extension's WebContentsView over the container: its bounds follow
+ * every resize, and it hides while a modal is open or the panel is not active.
+ */
+function usePanelBounds(
+  containerRef: React.RefObject<HTMLDivElement>,
+  { extensionId, viewParam, isActive, repoRoot = null }: Props
+): void {
+  const modalOpen = useModalStore((s) => s.depth > 0)
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-
-    const sendBounds = () => {
-      const rect = el.getBoundingClientRect()
-      const x = Math.round(rect.left)
-      const y = Math.round(rect.top)
-      window.electronAPI?.extension?.updatePanelBounds?.({
-        extensionId,
-        viewParam,
-        bounds: {
-          x,
-          y,
-          width: Math.round(rect.width),
-          height: Math.round(rect.height),
-        },
-        visible: isActive && !modalOpen,
-        repoRoot,
-      })
-    }
+    const visible = isActive && !modalOpen
+    const sendBounds = () => sendPanelBounds(el, { extensionId, viewParam, visible, repoRoot })
     const observer = new ResizeObserver(sendBounds)
     observer.observe(el)
     sendBounds()
@@ -127,8 +141,12 @@ function LocalWebContentsPortal({
         repoRoot: null,
       })
     }
-  }, [extensionId, viewParam, isActive, repoRoot, modalOpen])
+  }, [containerRef, extensionId, viewParam, isActive, repoRoot, modalOpen])
+}
 
+/** Whether the spinner shows: until main says the panel loaded, on a host that says so at all. */
+function usePanelLoading(extensionId: string): boolean {
+  const [loading, setLoading] = useState(true)
   const reportsLoaded =
     typeof window.electronAPI?.extensionEvents?.onExtensionPanelLoaded === 'function'
 
@@ -139,6 +157,14 @@ function LocalWebContentsPortal({
     })
     return unsubscribe
   }, [extensionId, reportsLoaded])
+  return loading && reportsLoaded
+}
+
+function LocalWebContentsPortal(props: Props): JSX.Element {
+  const { extensionId, viewParam } = props
+  const containerRef = useRef<HTMLDivElement>(null)
+  usePanelBounds(containerRef, props)
+  const loading = usePanelLoading(extensionId)
 
   return (
     <div
@@ -147,7 +173,7 @@ function LocalWebContentsPortal({
       data-view-param={viewParam}
       style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}
     >
-      {loading && reportsLoaded && (
+      {loading && (
         <div
           data-testid="extension-loading"
           style={{

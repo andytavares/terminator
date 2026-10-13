@@ -139,6 +139,19 @@ test('dragging a note above another reorders the list', async () => {
   expect(stored.map((note) => note.title).slice(0, 2)).toEqual([second, first])
 })
 
+/** Deletes the one folder from its context menu, confirming. */
+async function deleteTheFolder(): Promise<void> {
+  await notepad.locator('.notepad-folder-header').click({ button: 'right' })
+  await notepad
+    .locator('.notepad-context-menu')
+    .getByRole('button', { name: 'Delete folder' })
+    .click()
+  await notepad
+    .getByRole('dialog', { name: 'Delete folder?' })
+    .getByRole('button', { name: 'Delete' })
+    .click()
+}
+
 test('a folder holds notes moved into it, is renamed, and on delete gives them back', async () => {
   await createItem(notepad, 'Folder', 'Household')
   const folder = notepad.locator('.notepad-folder-section', { hasText: 'Household' })
@@ -155,15 +168,7 @@ test('a folder holds notes moved into it, is renamed, and on delete gives them b
   await notepad.locator('.notepad-folder-header__rename-input').press('Enter')
   await expect(notepad.locator('.notepad-folder-header__name')).toHaveText(['Home admin'])
 
-  await notepad.locator('.notepad-folder-header').click({ button: 'right' })
-  await notepad
-    .locator('.notepad-context-menu')
-    .getByRole('button', { name: 'Delete folder' })
-    .click()
-  await notepad
-    .getByRole('dialog', { name: 'Delete folder?' })
-    .getByRole('button', { name: 'Delete' })
-    .click()
+  await deleteTheFolder()
   await expect(notepad.locator('.notepad-folder-section')).toHaveCount(0)
   await expect(noteRow(notepad, 'Reading list')).toBeVisible()
   expect((await storedNotes(notepad)).find((n) => n.title === 'Reading list')?.folderId).toBeNull()

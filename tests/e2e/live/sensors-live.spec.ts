@@ -108,10 +108,8 @@ interface SignalRow {
   evidence: { url: string }[]
 }
 
-test('a failing branch becomes one ranked signal, and promoting it starts nothing', async () => {
-  test.skip(BRANCH === '', 'set LIVE_SENSOR_BRANCH to a branch with failed runs')
-  test.setTimeout(600_000)
-
+/** A sensor on the failing branch's workflow runs. */
+function writeBranchSensor(): void {
   mkdirSync(join(repo, '.foundry', 'sensors'), { recursive: true })
   writeFileSync(
     join(repo, '.foundry', 'sensors', 'branch-red.yaml'),
@@ -128,7 +126,10 @@ test('a failing branch becomes one ranked signal, and promoting it starts nothin
       '',
     ].join('\n')
   )
+}
 
+/** Enables the sensor and runs it once, now. */
+async function enableAndRunSensor(): Promise<void> {
   const set = (await foundry('foundry:sensors.set', {
     id: 'branch-red',
     enabled: true,
@@ -142,7 +143,10 @@ test('a failing branch becomes one ranked signal, and promoting it starts nothin
 
   console.log(`run-now: ${JSON.stringify(ran)}`)
   expect(ran.problem ?? null).toBeNull()
+}
 
+/** The one signal for the failing branch, with one occurrence per failed run. */
+async function failingBranchSignal(): Promise<SignalRow | undefined> {
   const listed = (await foundry('foundry:signals.list')) as { signals: SignalRow[] }
 
   console.log(`signals: ${JSON.stringify(listed.signals.map((s) => [s.title, s.occurrences]))}`)
@@ -160,13 +164,12 @@ test('a failing branch becomes one ranked signal, and promoting it starts nothin
   expect(red?.occurrences, 'every failed run should be one occurrence of one signal').toBe(
     failed.length
   )
+  return red
+}
 
-  // It shows in the Inbox, under the gates.
-  // The Inbox reads signals again on its own poll, so one open since before
-  // the sensor ran still shows the signal.
-  await handle.page.locator('button[aria-label="Foundry"]').click()
-  await handle.page.waitForTimeout(6000)
-  const inbox = await handle.app.evaluate(async ({ webContents }) => {
+/** The Foundry Inbox's text, and a picture of it for the report. */
+async function inboxTextAndShot(): Promise<{ text: string; png: string }> {
+  return handle.app.evaluate(async ({ webContents }) => {
     const view = webContents
       .getAllWebContents()
       .find(
@@ -178,11 +181,24 @@ test('a failing branch becomes one ranked signal, and promoting it starts nothin
     const png = (await view.capturePage()).toPNG().toString('base64')
     return { text, png }
   })
+}
+
+/**
+ * It shows in the Inbox, under the gates. The Inbox reads signals again on its
+ * own poll, so one open since before the sensor ran still shows the signal.
+ */
+async function expectSignalInInbox(red: SignalRow | undefined): Promise<void> {
+  await handle.page.locator('button[aria-label="Foundry"]').click()
+  await handle.page.waitForTimeout(6000)
+  const inbox = await inboxTextAndShot()
   mkdirSync('test-results', { recursive: true })
   writeFileSync(join('test-results', 'inbox-signals.png'), Buffer.from(inbox.png, 'base64'))
   expect(inbox.text).toContain(red?.title as string)
   expect(inbox.text).toContain(`×${red?.occurrences}`)
+}
 
+/** Promoting the signal seeds a draft order, starts no run, and takes it off the list. */
+async function expectPromotedToDraft(red: SignalRow | undefined): Promise<void> {
   const promoted = (await foundry('foundry:signals.promote', {
     id: red?.id,
     repoPaths: [repo],
@@ -198,4 +214,15 @@ test('a failing branch becomes one ranked signal, and promoting it starts nothin
     after.signals.find((s) => s.id === red?.id),
     'a promoted signal is still listed'
   ).toBeUndefined()
+}
+
+test('a failing branch becomes one ranked signal, and promoting it starts nothing', async () => {
+  test.skip(BRANCH === '', 'set LIVE_SENSOR_BRANCH to a branch with failed runs')
+  test.setTimeout(600_000)
+
+  writeBranchSensor()
+  await enableAndRunSensor()
+  const red = await failingBranchSignal()
+  await expectSignalInInbox(red)
+  await expectPromotedToDraft(red)
 })

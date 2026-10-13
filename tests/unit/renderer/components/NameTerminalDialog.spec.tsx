@@ -3,22 +3,24 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { NameTerminalDialog } from '../../../../src/renderer/components/NameTerminalDialog'
 
+const defaultName = 'Terminal 1'
+
+let onConfirm: Mock<(name: string) => void>
+
+let onCancel: Mock<() => void>
+
+function renderDialog() {
+  return render(
+    <NameTerminalDialog defaultName={defaultName} onConfirm={onConfirm} onCancel={onCancel} />
+  )
+}
+
+beforeEach(() => {
+  onConfirm = vi.fn()
+  onCancel = vi.fn()
+})
+
 describe('NameTerminalDialog', () => {
-  const defaultName = 'Terminal 1'
-  let onConfirm: Mock<(name: string) => void>
-  let onCancel: Mock<() => void>
-
-  beforeEach(() => {
-    onConfirm = vi.fn()
-    onCancel = vi.fn()
-  })
-
-  function renderDialog() {
-    return render(
-      <NameTerminalDialog defaultName={defaultName} onConfirm={onConfirm} onCancel={onCancel} />
-    )
-  }
-
   it('renders the dialog title', () => {
     renderDialog()
     expect(screen.getByText('Name this terminal')).toBeTruthy()
@@ -49,7 +51,9 @@ describe('NameTerminalDialog', () => {
     fireEvent.click(screen.getByText('Cancel'))
     expect(onCancel).toHaveBeenCalled()
   })
+})
 
+describe('NameTerminalDialog — calls onCancel when overlay is clicked', () => {
   it('calls onCancel when overlay is clicked', () => {
     renderDialog()
     fireEvent.click(document.querySelector('.tmui-dialog__scrim')!)

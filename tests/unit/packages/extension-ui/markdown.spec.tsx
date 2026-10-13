@@ -26,7 +26,8 @@ describe('Markdown before its HTML renderer has loaded', () => {
   })
 })
 
-describe('Markdown raw HTML', () => {
+/** The hooks every "Markdown raw HTML" describe registers. */
+function setUpMarkdownRawHTML(): void {
   beforeAll(async () => {
     const el = renderBody('<sub>x</sub>')
     await waitFor(() => expect(el.querySelector('sub')).not.toBeNull())
@@ -35,6 +36,10 @@ describe('Markdown raw HTML', () => {
   beforeEach(() => {
     onOpenLink.mockClear()
   })
+}
+
+describe('Markdown raw HTML', () => {
+  setUpMarkdownRawHTML()
 
   it('renders <details>/<summary> as a disclosure, not tag text', () => {
     const el = renderBody('<details><summary>Logs</summary>body</details>')
@@ -65,6 +70,10 @@ describe('Markdown raw HTML', () => {
     expect(target?.textContent).toContain('note')
     expect(href).not.toContain('user-content-user-content-')
   })
+})
+
+describe('Markdown raw HTML — leaves a fenced block as plain code when no code renderer is given', () => {
+  setUpMarkdownRawHTML()
 
   it('leaves a fenced block as plain code when no code renderer is given', () => {
     const el = renderBody('```js\nconst a = 1\n```')
@@ -94,89 +103,105 @@ describe('Markdown raw HTML', () => {
     expect(renderCode).not.toHaveBeenCalled()
     expect(el.querySelector('code')?.textContent).toBe('npm ci')
   })
+})
 
-  describe('sanitising', () => {
-    it('drops <script>, <iframe> and <style>', () => {
-      const el = renderBody(
-        [
-          '<script>alert(1)</script>',
-          '<iframe src="https://evil.example"></iframe>',
-          '<style>body{display:none}</style>',
-          'after',
-        ].join('\n\n')
-      )
-      expect(el.querySelector('script')).toBeNull()
-      expect(el.querySelector('iframe')).toBeNull()
-      expect(el.querySelector('style')).toBeNull()
-      expect(el.textContent).not.toContain('alert(1)')
-      expect(el.textContent).not.toContain('display:none')
-      expect(el.textContent).toContain('after')
-    })
+describe('Markdown raw HTML — sanitising', () => {
+  setUpMarkdownRawHTML()
 
-    it('strips on* handlers from an allowed element', () => {
-      const el = renderBody('<img src="https://example.com/a.png" onerror="alert(1)">')
-      const img = el.querySelector('img')
-      expect(img?.getAttribute('src')).toBe('https://example.com/a.png')
-      const handlers = Array.from(el.querySelectorAll('*')).flatMap((node) =>
-        Array.from(node.attributes).filter((a) => a.name.toLowerCase().startsWith('on'))
-      )
-      expect(handlers).toEqual([])
-    })
+  it('drops <script>, <iframe> and <style>', () => {
+    const el = renderBody(
+      [
+        '<script>alert(1)</script>',
+        '<iframe src="https://evil.example"></iframe>',
+        '<style>body{display:none}</style>',
+        'after',
+      ].join('\n\n')
+    )
+    expect(el.querySelector('script')).toBeNull()
+    expect(el.querySelector('iframe')).toBeNull()
+    expect(el.querySelector('style')).toBeNull()
+    expect(el.textContent).not.toContain('alert(1)')
+    expect(el.textContent).not.toContain('display:none')
+    expect(el.textContent).toContain('after')
+  })
 
-    it('removes javascript: hrefs', () => {
-      const el = renderBody('<a href="javascript:alert(1)">click</a>')
-      const hrefs = Array.from(el.querySelectorAll('[href]')).map((n) => n.getAttribute('href'))
-      expect(hrefs.some((h) => h?.toLowerCase().includes('javascript:'))).toBe(false)
-    })
-
-    it('prefixes every id and name so a body cannot clobber document members', () => {
-      const el = renderBody(
-        '<img name="createElement" src="https://example.com/a.png">\n\n<div id="getElementById">x</div>\n\ntext[^1]\n\n[^1]: note'
-      )
-      document.body.appendChild(el)
-      const values = [
-        ...Array.from(el.querySelectorAll('[name]')).map((n) => n.getAttribute('name')),
-        ...Array.from(el.querySelectorAll('[id]')).map((n) => n.getAttribute('id')),
-      ]
-      expect(values).toContain('user-content-createElement')
-      expect(values).toContain('user-content-getElementById')
-      expect(values.every((v) => v?.startsWith('user-content-'))).toBe(true)
-      expect(values.some((v) => v?.startsWith('user-content-user-content-'))).toBe(false)
-      expect(typeof document.createElement).toBe('function')
-      expect(typeof document.getElementById).toBe('function')
-      el.remove()
-    })
-
-    it('points an in-page HTML anchor at the prefixed id', () => {
-      const el = renderBody('<a href="#notes">jump</a>\n\n<h3 id="notes">Notes</h3>')
-      const href = el.querySelector('a')?.getAttribute('href') ?? ''
-      expect(href).toBe('#user-content-notes')
-      expect(el.querySelector(`[id="${href.slice(1)}"]`)?.textContent).toBe('Notes')
-    })
-
-    it('opens an HTML <a href="https://…"> through onOpenLink', () => {
-      const el = renderBody('<a href="https://example.com/pr">PR</a>')
-      const link = el.querySelector('a')!
-      const event = new MouseEvent('click', { bubbles: true, cancelable: true })
-      link.dispatchEvent(event)
-      expect(onOpenLink).toHaveBeenCalledWith('https://example.com/pr')
-      expect(event.defaultPrevented).toBe(true)
-    })
+  it('strips on* handlers from an allowed element', () => {
+    const el = renderBody('<img src="https://example.com/a.png" onerror="alert(1)">')
+    const img = el.querySelector('img')
+    expect(img?.getAttribute('src')).toBe('https://example.com/a.png')
+    const handlers = Array.from(el.querySelectorAll('*')).flatMap((node) =>
+      Array.from(node.attributes).filter((a) => a.name.toLowerCase().startsWith('on'))
+    )
+    expect(handlers).toEqual([])
   })
 })
 
-describe('Markdown links', () => {
-  const link = (body: string) => {
-    const { container } = render(<Markdown onOpenLink={onOpenLink}>{body}</Markdown>)
-    return container.querySelector('a')!
-  }
-  const click = (anchor: HTMLElement) => {
-    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
-    anchor.dispatchEvent(event)
-    return event
-  }
+describe('Markdown raw HTML — sanitising — removes javascript: hrefs', () => {
+  setUpMarkdownRawHTML()
 
+  it('removes javascript: hrefs', () => {
+    const el = renderBody('<a href="javascript:alert(1)">click</a>')
+    const hrefs = Array.from(el.querySelectorAll('[href]')).map((n) => n.getAttribute('href'))
+    expect(hrefs.some((h) => h?.toLowerCase().includes('javascript:'))).toBe(false)
+  })
+
+  it('prefixes every id and name so a body cannot clobber document members', () => {
+    const el = renderBody(
+      '<img name="createElement" src="https://example.com/a.png">\n\n<div id="getElementById">x</div>\n\ntext[^1]\n\n[^1]: note'
+    )
+    document.body.appendChild(el)
+    const values = [
+      ...Array.from(el.querySelectorAll('[name]')).map((n) => n.getAttribute('name')),
+      ...Array.from(el.querySelectorAll('[id]')).map((n) => n.getAttribute('id')),
+    ]
+    expect(values).toContain('user-content-createElement')
+    expect(values).toContain('user-content-getElementById')
+    expect(values.every((v) => v?.startsWith('user-content-'))).toBe(true)
+    expect(values.some((v) => v?.startsWith('user-content-user-content-'))).toBe(false)
+    expect(typeof document.createElement).toBe('function')
+    expect(typeof document.getElementById).toBe('function')
+    el.remove()
+  })
+})
+
+describe('Markdown raw HTML — sanitising — points an in-page HTML anchor at the prefixed id', () => {
+  setUpMarkdownRawHTML()
+
+  it('points an in-page HTML anchor at the prefixed id', () => {
+    const el = renderBody('<a href="#notes">jump</a>\n\n<h3 id="notes">Notes</h3>')
+    const href = el.querySelector('a')?.getAttribute('href') ?? ''
+    expect(href).toBe('#user-content-notes')
+    expect(el.querySelector(`[id="${href.slice(1)}"]`)?.textContent).toBe('Notes')
+  })
+
+  it('opens an HTML <a href="https://…"> through onOpenLink', () => {
+    const el = renderBody('<a href="https://example.com/pr">PR</a>')
+    const link = el.querySelector('a')!
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+    link.dispatchEvent(event)
+    expect(onOpenLink).toHaveBeenCalledWith('https://example.com/pr')
+    expect(event.defaultPrevented).toBe(true)
+  })
+})
+
+const link = (body: string) => {
+  const { container } = render(<Markdown onOpenLink={onOpenLink}>{body}</Markdown>)
+  return container.querySelector('a')!
+}
+
+const click = (anchor: HTMLElement) => {
+  const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+  anchor.dispatchEvent(event)
+  return event
+}
+
+/** The hooks every "Markdown links" describe registers. */
+function setUpMarkdownLinks(): void {
   beforeEach(() => onOpenLink.mockClear())
+}
+
+describe('Markdown links', () => {
+  setUpMarkdownLinks()
 
   it('opens an https address through onOpenLink and keeps the view where it is', () => {
     const event = click(link('[PR](https://example.com/pr)'))
@@ -208,6 +233,10 @@ describe('Markdown links', () => {
     expect(event.defaultPrevented).toBe(true)
     expect(onOpenLink).not.toHaveBeenCalled()
   })
+})
+
+describe('Markdown links — keeps a protocol-relative href from navigating the view', () => {
+  setUpMarkdownLinks()
 
   it('keeps a protocol-relative href from navigating the view', () => {
     const event = click(link('[x](//evil.example/x)'))
@@ -256,15 +285,15 @@ describe('Markdown links to other schemes', () => {
 
 // Text from a tracker is written by anyone who can comment on the ticket. A remote
 // image in it is a tracking pixel aimed at whoever opens it, so nothing may fetch.
-describe('Markdown that fetches nothing', () => {
-  function renderUntrusted(body: string) {
-    return render(
-      <Markdown onOpenLink={onOpenLink} fetchesNothing>
-        {body}
-      </Markdown>
-    ).container
-  }
+function renderUntrusted(body: string) {
+  return render(
+    <Markdown onOpenLink={onOpenLink} fetchesNothing>
+      {body}
+    </Markdown>
+  ).container
+}
 
+describe('Markdown that fetches nothing', () => {
   it('drops a Markdown image instead of loading it', () => {
     const el = renderUntrusted('![tracker](https://evil.example/pixel.png)')
     expect(el.querySelector('img')).toBeNull()
@@ -289,7 +318,9 @@ describe('Markdown that fetches nothing', () => {
     expect(el.textContent).not.toContain('alert(1)')
     expect(el.querySelectorAll('[src]')).toHaveLength(0)
   })
+})
 
+describe('Markdown that fetches nothing — still renders headings, lists, tables, task lists, quotes and code', () => {
   it('still renders headings, lists, tables, task lists, quotes and code', () => {
     const el = renderUntrusted(
       [
@@ -317,7 +348,9 @@ describe('Markdown that fetches nothing', () => {
     expect(el.querySelector('pre code')?.textContent).toContain('window.__pwned = 4')
     expect(el.querySelector('script')).toBeNull()
   })
+})
 
+describe('Markdown that fetches nothing — still opens a link through onOpenLink', () => {
   it('still opens a link through onOpenLink', () => {
     onOpenLink.mockClear()
     const anchor = renderUntrusted('[docs](https://example.com/docs)').querySelector('a')!

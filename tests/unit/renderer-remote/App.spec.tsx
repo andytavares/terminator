@@ -51,7 +51,9 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
     await waitFor(() => expect(screen.getByText('Could not connect to server')).toBeTruthy())
   })
+})
 
+describe('App — shows "Could not connect" on non-success HTTP status (5xx)', () => {
   it('shows "Could not connect" on non-success HTTP status (5xx)', async () => {
     mockFetch.mockResolvedValueOnce({ status: 503, ok: false })
     render(<App />)
@@ -59,7 +61,9 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
     await waitFor(() => expect(screen.getByText('Could not connect to server')).toBeTruthy())
   })
+})
 
+describe('App — logs in once with the password in the body, keeps nothing, and redirects on success', () => {
   it('logs in once with the password in the body, keeps nothing, and redirects on success', async () => {
     Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true })
     mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
@@ -90,7 +94,9 @@ describe('App', () => {
     render(<App />)
     expect(localStorage.getItem('remote_token')).toBeNull()
   })
+})
 
+describe('App — says to wait after too many attempts (429)', () => {
   it('says to wait after too many attempts (429)', async () => {
     mockFetch.mockResolvedValueOnce({ status: 429, ok: false })
     render(<App />)
@@ -113,7 +119,9 @@ describe('App', () => {
     expect(mockFetch.mock.calls[1][0]).toBe('/api/mobile-ticket')
     Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true })
   })
+})
 
+describe('App — redirects to /app/ when viewport is 1400px or wider', () => {
   it('redirects to /app/ when viewport is 1400px or wider', async () => {
     Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true })
     mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({

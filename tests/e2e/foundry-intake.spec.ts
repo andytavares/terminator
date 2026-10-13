@@ -144,6 +144,23 @@ test('Foundry changes nothing in the repository it works on', async () => {
   expect(ignore.trim(), 'Foundry created a .gitignore').toBe('')
 })
 
+/** The architect was launched as an interactive, permission-asking session of its own. */
+async function expectReadOnlyLaunch(): Promise<void> {
+  // What the launch actually wrote, not the terminal's visible scrollback — a
+  // talkative agent scrolls the typed line out of view, which is a fact about
+  // the terminal, not about whether the launch happened.
+  await expect.poll(() => hasLaunchScript(handle), { timeout: 60_000 }).toBe(true)
+  const launched = launchScript(handle)
+  expect(launched).toContain('claude --session-id')
+  // Never the thing this replaced: an invisible agent approving its own calls.
+  expect(launched).not.toContain('bypassPermissions')
+  // A relative settings path resolves against the worktree, where it does not
+  // exist, and the run dies on "Settings file not found".
+  expect(launched).toMatch(/--settings '\//)
+  // And it does not carry the parent Claude Code session in with it.
+  expect(launched).toMatch(/^unset .*CLAUDE_CODE_BRIDGE_SESSION_ID/m)
+}
+
 /**
  * The claim the whole Line rests on: a unit runs as a real agent, in a real
  * terminal, in its own worktree, and you can see it.
@@ -188,19 +205,7 @@ test('intake launches the architect read-only in the order’s own project, and 
   await expect(page.locator('.branch-row__name').filter({ hasText: 'intake' })).toHaveCount(0)
   await project.click()
 
-  // What the launch actually wrote, not the terminal's visible scrollback — a
-  // talkative agent scrolls the typed line out of view, which is a fact about
-  // the terminal, not about whether the launch happened.
-  await expect.poll(() => hasLaunchScript(handle), { timeout: 60_000 }).toBe(true)
-  const launched = launchScript(handle)
-  expect(launched).toContain('claude --session-id')
-  // Never the thing this replaced: an invisible agent approving its own calls.
-  expect(launched).not.toContain('bypassPermissions')
-  // A relative settings path resolves against the worktree, where it does not
-  // exist, and the run dies on "Settings file not found".
-  expect(launched).toMatch(/--settings '\//)
-  // And it does not carry the parent Claude Code session in with it.
-  expect(launched).toMatch(/^unset .*CLAUDE_CODE_BRIDGE_SESSION_ID/m)
+  await expectReadOnlyLaunch()
 
   // The architect reads the order's lane checkout — the tree the builder
   // will change — cut under the data root, not inside the repository.

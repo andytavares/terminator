@@ -52,11 +52,8 @@ async function waitForChoice(page: Page): Promise<string[]> {
   return rows
 }
 
-test('a live Claude Code prompt is pinned on the wall and answered from its buttons', async () => {
-  test.setTimeout(240_000)
-  repo = e2eTempDir('choice-live-')
-  handle = await launchApp()
-  const { page } = handle
+/** Starts a real `claude` in a new terminal, asked for something that needs permission. */
+async function askForAFile(page: Page): Promise<void> {
   await createWorkspace(page, 'Live', repo)
   await addAndSelectProject(page, 'Live', 'prompt')
   await page.locator('.terminal-pane').click()
@@ -64,6 +61,29 @@ test('a live Claude Code prompt is pinned on the wall and answered from its butt
     'claude --permission-mode default "Create a file named a.txt containing the word hi. Do nothing else."'
   )
   await page.keyboard.press('Enter')
+}
+
+/**
+ * Answers from the wall, the way an operator would: the session is pinned in
+ * Needs you with the prompt's options as buttons. Records the buttons offered.
+ */
+async function answerFromTheWall(page: Page, outcome: Record<string, unknown>): Promise<void> {
+  await page.getByRole('button', { name: 'Overview' }).click()
+  await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible({ timeout: 15_000 })
+  const choices = page.getByRole('group', { name: /Do you want to create a\.txt\?/ })
+  await expect(choices).toBeVisible()
+  outcome.buttons = await choices
+    .getByRole('button')
+    .evaluateAll((b) => b.map((x) => x.getAttribute('aria-label')))
+  await choices.getByRole('button', { name: /^1\. Yes$/ }).click()
+}
+
+test('a live Claude Code prompt is pinned on the wall and answered from its buttons', async () => {
+  test.setTimeout(240_000)
+  repo = e2eTempDir('choice-live-')
+  handle = await launchApp()
+  const { page } = handle
+  await askForAFile(page)
 
   const outcome: Record<string, unknown> = {
     claude: execSync('claude --version').toString().trim(),
@@ -74,16 +94,7 @@ test('a live Claude Code prompt is pinned on the wall and answered from its butt
     rows.join('\n') + '\n'
   )
 
-  // Answer from the wall, the way an operator would: the session is pinned in
-  // Needs you with the prompt's options as buttons.
-  await page.getByRole('button', { name: 'Overview' }).click()
-  await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible({ timeout: 15_000 })
-  const choices = page.getByRole('group', { name: /Do you want to create a\.txt\?/ })
-  await expect(choices).toBeVisible()
-  outcome.buttons = await choices
-    .getByRole('button')
-    .evaluateAll((b) => b.map((x) => x.getAttribute('aria-label')))
-  await choices.getByRole('button', { name: /^1\. Yes$/ }).click()
+  await answerFromTheWall(page, outcome)
   const answered = 1
   await expect(page.getByRole('heading', { name: 'Needs you' })).toBeHidden({ timeout: 15_000 })
   await expect.poll(() => existsSync(join(repo, 'a.txt')), { timeout: 90_000 }).toBe(true)

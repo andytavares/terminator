@@ -13,13 +13,13 @@ const noop = (): void => {}
 // italic and offered nothing — a statement of absence where an invitation
 // belongs.
 
-describe('EmptyState', () => {
-  const base = {
-    heading: 'No notes yet',
-    description: 'Capture your first note from anywhere in Terminator.',
-    actions: [{ label: 'New note', onSelect: noop }] as const,
-  }
+const base = {
+  heading: 'No notes yet',
+  description: 'Capture your first note from anywhere in Terminator.',
+  actions: [{ label: 'New note', onSelect: noop }] as const,
+}
 
+describe('EmptyState', () => {
   it('states the situation as a heading', () => {
     render(<EmptyState {...base} />)
     expect(screen.getByRole('heading', { name: 'No notes yet' })).toBeTruthy()
@@ -42,7 +42,9 @@ describe('EmptyState', () => {
     fireEvent.click(screen.getByRole('button', { name: /New note/ }))
     expect(onSelect).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('EmptyState — renders a secondary action beside the primary', () => {
   it('renders a secondary action beside the primary', () => {
     render(
       <EmptyState
@@ -68,7 +70,9 @@ describe('EmptyState', () => {
     render(<EmptyState {...base} hint={<span>Press ⌘⇧N anytime.</span>} />)
     expect(screen.getByText('Press ⌘⇧N anytime.')).toBeTruthy()
   })
+})
 
+describe('EmptyState — renders an icon flat, with no colour of its own', () => {
   it('renders an icon flat, with no colour of its own', () => {
     const { container } = render(<EmptyState {...base} icon={FileText} />)
     const svg = container.querySelector('svg')
@@ -108,7 +112,9 @@ describe('IconButton', () => {
     fireEvent.click(screen.getByRole('button', { name: 'List view' }))
     expect(onClick).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('IconButton — hands its handler the click, so a control inside a clickable row can keep the click', () => {
   it('hands its handler the click, so a control inside a clickable row can keep the click', () => {
     const onRowClick = vi.fn()
     render(
@@ -137,7 +143,9 @@ describe('IconButton', () => {
       screen.getByRole('button', { name: 'Collapse folder' }).getAttribute('aria-expanded')
     ).toBe('true')
   })
+})
 
+describe('IconButton — comes in a small size for dense rows and chips', () => {
   it('comes in a small size for dense rows and chips', () => {
     render(<IconButton icon={FileText} label="Remove tag" size="sm" onClick={noop} />)
     expect(screen.getByRole('button', { name: 'Remove tag' }).className).toContain(
@@ -183,7 +191,9 @@ describe('Toast', () => {
     const { container } = render(<ToastRegion toasts={[]} onDismiss={noop} />)
     expect(container.querySelector('.tmui-toast')).toBeNull()
   })
+})
 
+describe('Toast — renders every queued toast', () => {
   it('renders every queued toast', () => {
     render(
       <ToastRegion

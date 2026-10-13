@@ -8,6 +8,26 @@ import { AppHandle, launchApp, closeApp } from './helpers'
 
 let handle: AppHandle
 
+/**
+ * Creates the fixture note and reloads the view. Seeded through the
+ * extension's own bridge: typing markdown through synthetic key events would
+ * be exercising the input plumbing, not this.
+ */
+async function seedOutlineNote(): Promise<void> {
+  await handle.app.evaluate(async ({ webContents }, body) => {
+    const view = webContents
+      .getAllWebContents()
+      .find((wc) => !wc.isDestroyed() && wc.getURL().startsWith('ext://'))
+    if (!view) throw new Error('no notepad view is loaded')
+    await view.executeJavaScript(
+      `window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.create', ${JSON.stringify(
+        { title: 'Outline fixture', body }
+      )})`
+    )
+    view.reload()
+  }, BODY)
+}
+
 test.beforeAll(async () => {
   handle = await launchApp()
 })
@@ -68,20 +88,7 @@ test.beforeAll(async () => {
     .poll(extensionViewReady, { timeout: 20000, message: 'notepad view never finished loading' })
     .toBe(true)
 
-  // Seeded through the extension's own bridge: typing markdown through
-  // synthetic key events would be exercising the input plumbing, not this.
-  await handle.app.evaluate(async ({ webContents }, body) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().startsWith('ext://'))
-    if (!view) throw new Error('no notepad view is loaded')
-    await view.executeJavaScript(
-      `window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.create', ${JSON.stringify(
-        { title: 'Outline fixture', body }
-      )})`
-    )
-    view.reload()
-  }, BODY)
+  await seedOutlineNote()
   await expect.poll(extensionViewReady, { timeout: 20000 }).toBe(true)
 
   await expect
@@ -237,6 +244,15 @@ test('closing both rail panels gives the width back to the editor', async () => 
   expect(widths.withoutRail).toBeGreaterThan(widths.withRail + 200)
 })
 
+/** Whether a popped-out note window has finished loading. */
+function noteWindowLoaded(): Promise<boolean> {
+  return handle.app.evaluate(({ webContents }) =>
+    webContents
+      .getAllWebContents()
+      .some((wc) => !wc.isDestroyed() && wc.getURL().includes('view=note') && !wc.isLoading())
+  )
+}
+
 test('a popped-out note window gets the same outline', async () => {
   await inNotepad(
     `window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.list', {}).then((r) =>
@@ -247,15 +263,7 @@ test('a popped-out note window gets the same outline', async () => {
   )
   // The auxiliary window loads its own copy of the extension renderer.
   await expect
-    .poll(
-      () =>
-        handle.app.evaluate(({ webContents }) =>
-          webContents
-            .getAllWebContents()
-            .some((wc) => !wc.isDestroyed() && wc.getURL().includes('view=note') && !wc.isLoading())
-        ),
-      { timeout: 20000, message: 'note window never finished loading' }
-    )
+    .poll(noteWindowLoaded, { timeout: 20000, message: 'note window never finished loading' })
     .toBe(true)
 
   const items = await inNotepad<string[]>(

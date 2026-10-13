@@ -59,6 +59,35 @@ async function openHome(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
 }
 
+/**
+ * 1. A conversation, started by hand, that remembers something. 2. Captured:
+ * the hook reported it against this terminal. Returns what the hook reported.
+ */
+async function startAndCapture(handle: AppHandle): Promise<unknown> {
+  const { page } = handle
+  await type(page, 'claude "remember the number 4242. reply with ok"')
+  await expect.poll(() => rows(page), { timeout: 120_000 }).toContain('4242')
+
+  const captured = join(handle.userDataDir, 'agent-sessions')
+  await expect
+    .poll(() => (existsSync(captured) ? readdirSync(captured).length : 0), { timeout: 30_000 })
+    .toBeGreaterThan(0)
+  const file = join(captured, readdirSync(captured)[0])
+  return JSON.parse(readFileSync(file, 'utf8'))
+}
+
+/** 3. Ends it, and its terminal with it. 4. Home offers to bring it back, and does. */
+async function endAndResume(page: Page): Promise<void> {
+  await type(page, '/exit')
+  await page.waitForTimeout(3000)
+  await type(page, 'exit')
+
+  await openHome(page)
+  const resume = page.getByRole('button', { name: /^Resume/ }).first()
+  await expect(resume).toBeVisible({ timeout: 30_000 })
+  await resume.click()
+}
+
 test('a real conversation is captured, ended, and brought back', async () => {
   test.setTimeout(300_000)
   folder = e2eTempDir('resume-live-')
@@ -71,28 +100,8 @@ test('a real conversation is captured, ended, and brought back', async () => {
   await createWorkspace(page, 'Live', folder)
   await addAndSelectProject(page, 'Live', 'resume')
 
-  // 1. A conversation, started by hand, that remembers something.
-  await type(page, 'claude "remember the number 4242. reply with ok"')
-  await expect.poll(() => rows(page), { timeout: 120_000 }).toContain('4242')
-
-  // 2. Captured: the hook reported it against this terminal.
-  const captured = join(handle.userDataDir, 'agent-sessions')
-  await expect
-    .poll(() => (existsSync(captured) ? readdirSync(captured).length : 0), { timeout: 30_000 })
-    .toBeGreaterThan(0)
-  const file = join(captured, readdirSync(captured)[0])
-  report.captured = JSON.parse(readFileSync(file, 'utf8'))
-
-  // 3. End it, and its terminal with it.
-  await type(page, '/exit')
-  await page.waitForTimeout(3000)
-  await type(page, 'exit')
-
-  // 4. Home offers to bring it back.
-  await openHome(page)
-  const resume = page.getByRole('button', { name: /^Resume/ }).first()
-  await expect(resume).toBeVisible({ timeout: 30_000 })
-  await resume.click()
+  report.captured = await startAndCapture(handle)
+  await endAndResume(page)
 
   // 5. One terminal for the conversation: the exited one is gone.
   await expect(page.locator('.tab-bar__tab--session')).toHaveCount(1, { timeout: 30_000 })

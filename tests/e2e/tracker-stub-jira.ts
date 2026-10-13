@@ -65,17 +65,19 @@ function search(state: JiraState, url: URL): StubAnswer {
   return { status: 200, body: { issues: issues.map(issueJson), isLast: true } }
 }
 
-function issueRoute(
-  state: JiraState,
-  request: IncomingMessage,
-  url: URL,
+/** What a route reads of a request: its method, URL and JSON body. */
+interface StubRequest {
+  method: string | undefined
+  url: URL
   body: unknown
-): StubAnswer {
+}
+
+function issueRoute(state: JiraState, { method, url, body }: StubRequest): StubAnswer {
   const [, key, sub] = url.pathname.match(/\/issue\/([^/]+)(\/comment)?$/) ?? []
   const issue = state.issues.find((i) => i.key === decodeURIComponent(key ?? ''))
   if (!issue) return { status: 404, body: { errorMessages: ['Issue does not exist'] } }
   if (!sub) return { status: 200, body: issueJson(issue) }
-  if (request.method === 'POST') {
+  if (method === 'POST') {
     const comment = {
       author: state.account.displayName,
       body: adfText((body as { body: unknown }).body),
@@ -100,6 +102,7 @@ export function answerJira(state: JiraState, request: IncomingMessage, body: unk
   const url = new URL(request.url ?? '/', 'https://stub')
   if (url.pathname === '/rest/api/3/myself') return { status: 200, body: state.account }
   if (url.pathname === '/rest/api/3/search/jql') return search(state, url)
-  if (url.pathname.startsWith('/rest/api/3/issue/')) return issueRoute(state, request, url, body)
+  if (url.pathname.startsWith('/rest/api/3/issue/'))
+    return issueRoute(state, { method: request.method, url, body })
   return { status: 404, body: { errorMessages: [`stub Jira has no ${url.pathname}`] } }
 }

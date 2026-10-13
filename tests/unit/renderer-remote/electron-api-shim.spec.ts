@@ -121,7 +121,9 @@ describe('electron-api-shim connection edge cases', () => {
     // No WebSocket should be created — the shim returned early after redirect
     expect(MockWebSocket.instances).toHaveLength(0)
   })
+})
 
+describe('electron-api-shim connection edge cases — does not open WebSocket when bridge-ticket returns a non-401 error (retry scheduled)', () => {
   it('does not open WebSocket when bridge-ticket returns a non-401 error (retry scheduled)', async () => {
     vi.resetModules()
     MockWebSocket.instances = []
@@ -151,7 +153,9 @@ describe('electron-api-shim connection edge cases', () => {
     ws.onclose?.()
     await expect(p).rejects.toThrow('bridge disconnected')
   })
+})
 
+describe('electron-api-shim connection edge cases — closes WebSocket on ws.onerror', () => {
   it('closes WebSocket on ws.onerror', async () => {
     const { ws } = await loadShim()
     const closeSpy = vi.spyOn(ws, 'close')
@@ -184,7 +188,9 @@ describe('electron-api-shim message dispatch', () => {
     ws.onmessage?.({ data: JSON.stringify({ type: 'error', id }) })
     await expect(p).rejects.toThrow('bridge error')
   })
+})
 
+describe('electron-api-shim message dispatch — fires event channel listeners on event messages', () => {
   it('fires event channel listeners on event messages', async () => {
     const { api, ws } = await loadShim()
     const handler = vi.fn()
@@ -212,7 +218,9 @@ describe('electron-api-shim message dispatch', () => {
     const { ws } = await loadShim()
     expect(() => ws.onmessage?.({ data: '{invalid json' })).not.toThrow()
   })
+})
 
+describe('electron-api-shim message dispatch — re-subscribes active channels on reconnect (onopen)', () => {
   it('re-subscribes active channels on reconnect (onopen)', async () => {
     const { api, ws } = await loadShim()
     api.terminal.onOutput(vi.fn())
@@ -269,7 +277,9 @@ describe('electron-api-shim surface, as the manifest declares it', () => {
     const envelope = spec.kind === 'invoke' ? { type: 'invoke', id: sent.id } : { type: 'send' }
     expect(sent).toEqual(overTheWire({ ...envelope, channel: spec.channel, args: [payload] }))
   })
+})
 
+describe('electron-api-shim surface, as the manifest declares it — every event subscribes and hands its handler what the manifest declares', () => {
   it.each(
     ELECTRON_API_MANIFEST.filter((spec) => overBridge(spec) && spec.kind === 'event').map(
       (spec) => [spec.path, spec] as const
@@ -316,6 +326,9 @@ describe('electron-api-shim: what reaches a handler, and the local stand-ins', (
     expect(spy).toHaveBeenCalledWith('https://example.com', '_blank')
     spy.mockRestore()
   })
+})
+
+describe('electron-api-shim: what reaches a handler, and the local stand-ins — fs.onChanged dispatches first arg when event fires', () => {
   it('fs.onChanged dispatches first arg when event fires', async () => {
     const { api, ws } = await loadShim()
     const handler = vi.fn()
@@ -335,6 +348,9 @@ describe('electron-api-shim: what reaches a handler, and the local stand-ins', (
       args: [{ data: 1 }],
     })
   })
+})
+
+describe('electron-api-shim: what reaches a handler, and the local stand-ins — extensionBridge.on subscribes to channel', () => {
   it('extensionBridge.on subscribes to channel', async () => {
     const { api, ws } = await loadShim()
     const handler = vi.fn()
@@ -359,6 +375,9 @@ describe('electron-api-shim: what reaches a handler, and the local stand-ins', (
     })
     expect(handler).toHaveBeenCalledWith('sidebar')
   })
+})
+
+describe('electron-api-shim: what reaches a handler, and the local stand-ins — extensionEvents.onSelectProjectTab dispatches tabId from args', () => {
   it('extensionEvents.onSelectProjectTab dispatches tabId from args', async () => {
     const { api, ws } = await loadShim()
     const handler = vi.fn()
@@ -386,6 +405,9 @@ describe('electron-api-shim: what reaches a handler, and the local stand-ins', (
     })
     expect(handler).not.toHaveBeenCalled()
   })
+})
+
+describe('electron-api-shim: what reaches a handler, and the local stand-ins — extensionEvents.onMenuOpenSettings dispatches void when event fires', () => {
   it('extensionEvents.onMenuOpenSettings dispatches void when event fires', async () => {
     const { api, ws } = await loadShim()
     const handler = vi.fn()

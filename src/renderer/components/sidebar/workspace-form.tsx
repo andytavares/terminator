@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
-import { Button } from '@terminator/extension-ui'
+import { Button, Dialog } from '@terminator/extension-ui'
+import type { Workspace } from '../../../shared/types/index'
+import { useModalEffect } from '../../stores/modal.store'
 import { WORKSPACE_PRESET_COLORS as PRESET_COLORS } from './workspace-colors'
 import './dialog-fields.css'
 
@@ -13,7 +15,7 @@ export interface WorkspaceDraft {
   tags: string
 }
 
-export const DUPLICATE_NAME = 'A workspace with this name already exists'
+const DUPLICATE_NAME = 'A workspace with this name already exists'
 
 /** The draft, its errors, and the checks a submit runs first. */
 export function useWorkspaceForm(initial: WorkspaceDraft, nameTaken: (name: string) => boolean) {
@@ -46,6 +48,55 @@ export function useWorkspaceForm(initial: WorkspaceDraft, nameTaken: (name: stri
 
 type WorkspaceForm = ReturnType<typeof useWorkspaceForm>
 
+/**
+ * Shows a refused save on the form: a taken name beside the name, anything
+ * else as `failure`. False, narrowing to the saved workspace, when it went through.
+ */
+export function showSaveError(
+  form: WorkspaceForm,
+  result: { workspace: Workspace } | { error: string },
+  failure: string
+): result is { error: string } {
+  if (!('error' in result)) return false
+  if (result.error === 'DUPLICATE_NAME') form.setNameError(DUPLICATE_NAME)
+  else form.setError(failure)
+  return true
+}
+
+interface WorkspaceDialogProps extends Pick<FieldsProps, 'form' | 'placeholders'> {
+  title: string
+  submitLabel: string
+  onSubmit: () => Promise<void>
+  onClose: () => void
+}
+
+/** The modal Create and Edit share: the fields, Cancel, and the submit action. */
+export function WorkspaceDialog({
+  title,
+  submitLabel,
+  onSubmit,
+  onClose,
+  ...fields
+}: WorkspaceDialogProps): JSX.Element {
+  useModalEffect()
+  const submit = {
+    label: submitLabel,
+    tone: 'primary' as const,
+    submit: true,
+    disabled: !!fields.form.nameError,
+    onSelect: onSubmit,
+  }
+  return (
+    <Dialog
+      title={title}
+      onDismiss={onClose}
+      actions={[{ label: 'Cancel', onSelect: onClose }, submit]}
+    >
+      <WorkspaceFields {...fields} />
+    </Dialog>
+  )
+}
+
 interface FieldsProps {
   form: WorkspaceForm
   /** Example values shown in the empty fields of a new workspace. */
@@ -53,7 +104,7 @@ interface FieldsProps {
 }
 
 /** Name, folder, colour and tags, in the dialog's field styles. */
-export function WorkspaceFields({ form, placeholders }: FieldsProps): JSX.Element {
+function WorkspaceFields({ form, placeholders }: FieldsProps): JSX.Element {
   return (
     <>
       <NameField form={form} placeholder={placeholders?.name} />

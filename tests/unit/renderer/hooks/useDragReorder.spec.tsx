@@ -43,7 +43,9 @@ describe('useDragReorder', () => {
     act(() => result.current.getItemProps(2).onDrop())
     expect(onReorder).toHaveBeenCalledWith(['b', 'c', 'a'])
   })
+})
 
+describe('useDragReorder — reorders backward on drop', () => {
   it('reorders backward on drop', () => {
     const { result } = renderHook(() => useDragReorder(items, onReorder))
     act(() => result.current.getItemProps(2).onDragStart())
@@ -71,7 +73,9 @@ describe('useDragReorder', () => {
     act(() => result.current.getItemProps(2).onDrop())
     expect(result.current.dragOverIndex).toBeNull()
   })
+})
 
+describe('useDragReorder — clears state on drag end so an abandoned drag cannot reorder later', () => {
   it('clears state on drag end so an abandoned drag cannot reorder later', () => {
     const { result } = renderHook(() => useDragReorder(items, onReorder))
     act(() => result.current.getItemProps(0).onDragStart())

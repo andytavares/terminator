@@ -40,7 +40,9 @@ describe('ToastContainer', () => {
     expect(useToastStore.getState().toasts).toEqual([])
     expect(screen.queryByText('Test')).toBeNull()
   })
+})
 
+describe('ToastContainer — leaves expiry to the store', () => {
   // The store already expires a toast; a second timer in the region would
   // remove it early and twice.
   it('leaves expiry to the store', () => {
