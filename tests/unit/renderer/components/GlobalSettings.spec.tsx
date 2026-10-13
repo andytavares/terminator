@@ -262,3 +262,13 @@ describe('GlobalSettings — staleness threshold (FR-020) — rejects a non-nume
     expect(mockUpdateGlobal).toHaveBeenCalledWith({ sidebar: { staleAfterMs: 180_000 } })
   })
 })
+
+describe('GlobalSettings — values left unset', () => {
+  it('keeps the default shell when the field is cleared', () => {
+    render(<GlobalSettings />)
+    const shellInput = screen.getAllByRole('textbox')[0]
+    fireEvent.change(shellInput, { target: { value: '   ' } })
+    fireEvent.blur(shellInput)
+    expect(mockUpdateGlobal).not.toHaveBeenCalled()
+  })
+})
