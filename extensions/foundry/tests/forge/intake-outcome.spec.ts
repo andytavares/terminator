@@ -312,6 +312,7 @@ describe('intakeRefusal', () => {
 
 describe('loopFacts', () => {
   describe('rounds', roundsTests)
+  describe('a refused round', refusedRoundTests)
   describe('holds', holdsTests)
   describe('exhaustion', exhaustionTests)
 })
@@ -344,6 +345,22 @@ function roundsTests() {
     expect(out.rounds).toEqual([
       { round: 1, startedAt: '2026-09-09T19:30:00Z', finishedAt: '2026-09-09T19:35:00Z' },
       { round: 2, startedAt: '2026-09-09T19:40:00Z', finishedAt: null },
+    ])
+  })
+}
+
+function refusedRoundTests() {
+  it('finishes a round the red team could not run at the moment it was refused', () => {
+    const out = loopFacts([
+      entry({ action: 'review.started', at: '2026-09-09T19:30:00Z', reason: 'round 1' }),
+      entry({
+        action: 'red-team.refused',
+        at: '2026-09-09T19:31:00Z',
+        reason: 'no terminal could be opened',
+      }),
+    ])
+    expect(out.rounds).toEqual([
+      { round: 1, startedAt: '2026-09-09T19:30:00Z', finishedAt: '2026-09-09T19:31:00Z' },
     ])
   })
 }
