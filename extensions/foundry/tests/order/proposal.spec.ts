@@ -32,6 +32,12 @@ const CRITERION = {
 }
 
 describe('what a proposal may contain', () => {
+  describe('taking', takingTests)
+  describe('refusing', refusingTests)
+  describe('empty proposals and unprovable criteria', emptyProposalsAndUnprovableCriteriaTests)
+})
+
+function takingTests() {
   it('takes criteria, a plan, a grade and budgets', () => {
     const proposal = parseProposal({
       acceptance: [CRITERION],
@@ -42,7 +48,9 @@ describe('what a proposal may contain', () => {
     expect(proposal.acceptance).toHaveLength(1)
     expect(proposal.note).toBe('first draft')
   })
+}
 
+function refusingTests() {
   it('refuses a status, rather than quietly dropping it', () => {
     // An agent that tried it will try again, and the operator should know.
     expect(() => parseProposal({ status: 'agreed' })).toThrow(ProposalRejected)
@@ -57,7 +65,9 @@ describe('what a proposal may contain', () => {
   it('says which field it refused and why', () => {
     expect(() => parseProposal({ acceptance: [{ id: 'AC-1' }] })).toThrow(/acceptance/)
   })
+}
 
+function emptyProposalsAndUnprovableCriteriaTests() {
   it('takes an empty proposal — an architect that changed nothing said so', () => {
     expect(parseProposal({}).note).toBe('')
   })
@@ -67,9 +77,18 @@ describe('what a proposal may contain', () => {
       parseProposal({ acceptance: [{ ...CRITERION, verify: { kind: 'test' } }] })
     ).toThrow(ProposalRejected)
   })
-})
+}
 
 describe('merging one in', () => {
+  describe('untouched fields and budgets', untouchedFieldsAndBudgetsTests)
+  describe('what it said', whatItSaidTests)
+  describe('struck assumptions', struckAssumptionsTests)
+  describe('answered questions', answeredQuestionsTests)
+  describe('new assumptions and plans', newAssumptionsAndPlansTests)
+  describe('intent, risk and refusals', intentRiskAndRefusalsTests)
+})
+
+function untouchedFieldsAndBudgetsTests() {
   it('leaves alone what the proposal did not mention', () => {
     const before = order({ title: 'kept' })
     const after = applyProposal(before, parseProposal({ acceptance: [CRITERION] }), NOW)
@@ -93,7 +112,9 @@ describe('merging one in', () => {
     )
     expect(after.budgets).toEqual(before.budgets)
   })
+}
 
+function whatItSaidTests() {
   it('records what the architect said it changed', () => {
     const after = applyProposal(order(), parseProposal({ note: 'added AC-1' }), NOW)
     expect(after.provenance.decisions.at(-1)).toContain('added AC-1')
@@ -103,7 +124,9 @@ describe('merging one in', () => {
     const after = applyProposal(order(), parseProposal({}), NOW)
     expect(after.provenance.decisions.at(-1)).toContain('redrafted the plan')
   })
+}
 
+function struckAssumptionsTests() {
   it('keeps a struck assumption struck, however the architect restates it', () => {
     const before = order({
       assumptions: [{ id: 'A-1', text: 'sessions are in Redis', struck: true, affects: [] }],
@@ -117,7 +140,9 @@ describe('merging one in', () => {
     )
     expect(after.assumptions[0].struck).toBe(true)
   })
+}
 
+function answeredQuestionsTests() {
   it('keeps an answered question answered', () => {
     const before = order({
       openQuestions: [
@@ -151,7 +176,9 @@ describe('merging one in', () => {
     )
     expect(after.openQuestions[0].answer).toBe('Redis')
   })
+}
 
+function newAssumptionsAndPlansTests() {
   it('lets the architect add a new assumption', () => {
     const after = applyProposal(
       order(),
@@ -180,7 +207,9 @@ describe('merging one in', () => {
     expect(after.plan.units.map((u) => u.id)).toEqual(['U-9'])
     expect(after.plan.lanes).toEqual(before.plan.lanes)
   })
+}
 
+function intentRiskAndRefusalsTests() {
   it('merges a partial intent over the one on the order', () => {
     const before = order({ intent: { problem: 'p', outcome: 'o', nonGoals: [] } })
     const after = applyProposal(
@@ -204,9 +233,15 @@ describe('merging one in', () => {
     const bad = { ...order(), plan: { units: [], lanes: [], sharedFiles: [] } }
     expect(() => applyProposal(bad as WorkOrder, parseProposal({}), NOW)).toThrow()
   })
-})
+}
 
 describe('what an agent read, as opposed to what Foundry measured', () => {
+  describe('findings', findingsTests)
+  describe('the measured half', theMeasuredHalfTests)
+  describe('leaving alone', leavingAloneTests)
+})
+
+function findingsTests() {
   it('takes the findings half of context', () => {
     const after = applyProposal(
       order(),
@@ -223,7 +258,9 @@ describe('what an agent read, as opposed to what Foundry measured', () => {
     expect(after.context.conventions).toEqual(['errors are returned, never thrown'])
     expect(after.context.priorArt).toEqual(['abc123 widened the same row'])
   })
+}
 
+function theMeasuredHalfTests() {
   it('refuses the measured half — a probe result is not the agent to rewrite', () => {
     // An agent that could rewrite the toolchain could tell the ladder a
     // command exists that does not.
@@ -235,7 +272,9 @@ describe('what an agent read, as opposed to what Foundry measured', () => {
   it('refuses `context` itself', () => {
     expect(() => parseProposal({ context: {} })).toThrow(ProposalRejected)
   })
+}
 
+function leavingAloneTests() {
   it('leaves the measured half exactly as it was', () => {
     const before = order()
     const after = applyProposal(before, parseProposal({ findings: { conventions: ['x'] } }), NOW)
@@ -249,7 +288,7 @@ describe('what an agent read, as opposed to what Foundry measured', () => {
     const after = applyProposal(before, parseProposal({ note: 'x' }), NOW)
     expect(after.context.conventions).toEqual(before.context.conventions)
   })
-})
+}
 
 describe('a lane branch the ticket fixed', () => {
   const lane = { ord: 1, repo: 'app', branch: '', role: null, blocks: [], blockedBy: [] }

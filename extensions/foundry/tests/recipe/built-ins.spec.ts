@@ -35,6 +35,18 @@ function recipe(file: string): Recipe {
 }
 
 describe('built-in recipes', () => {
+  describe('six shapes', sixShapesTests)
+  describe('steps and roles', stepsAndRolesTests)
+  describe('bugfix', bugfixTests)
+  describe('refactor and speckit', refactorAndSpeckitTests)
+  describe('requirements', requirementsTests)
+  describe('fresh verification', freshVerificationTests)
+  describe('lanes', lanesTests)
+  describe('the direct shape', theDirectShapeTests)
+  describe('the inspector', theInspectorTests)
+})
+
+function sixShapesTests() {
   it('ships six shapes: five that change the repository and one whose product is a document', () => {
     expect(recipeFiles.sort()).toEqual([
       'bugfix.yaml',
@@ -50,7 +62,9 @@ describe('built-in recipes', () => {
     const parsed = parseRecipe(read(recipesDir, file), file)
     expect(parsed.ok, parsed.ok ? '' : parsed.reason).toBe(true)
   })
+}
 
+function stepsAndRolesTests() {
   it.each(recipeFiles)('%s uses only the six step kinds', (file) => {
     for (const step of recipe(file).steps) {
       expect(STEP_KINDS).toContain(step.kind)
@@ -69,7 +83,9 @@ describe('built-in recipes', () => {
       if (step.kind === 'gate') expect(step.defaultIfIgnored).toBeTruthy()
     }
   })
+}
 
+function bugfixTests() {
   it('holds a bug reproduction to failing before the fix exists', () => {
     const reproduce = recipe('bugfix.yaml').steps.find((s) => s.id === 'reproduce')
     expect(reproduce?.expect).toEqual({ suite_exit_code: '!= 0' })
@@ -82,7 +98,9 @@ describe('built-in recipes', () => {
     // directly, but a skipped lint still settles for its dependants.
     expect(flip?.after).toContain('lint')
   })
+}
 
+function refactorAndSpeckitTests() {
   it('makes a refactor characterise the behaviour before changing it', () => {
     const steps = recipe('refactor.yaml').steps
     expect(steps.find((s) => s.id === 'characterise')?.expect).toEqual({ tests_added: '>= 1' })
@@ -105,7 +123,9 @@ describe('built-in recipes', () => {
       expect(ids).toContain(phase)
     }
   })
+}
 
+function requirementsTests() {
   it('offers the speckit recipe only where the toolkit is installed', () => {
     expect(recipe('speckit.yaml').requires).toEqual([{ kind: 'path_exists', value: '.specify' }])
   })
@@ -120,7 +140,9 @@ describe('built-in recipes', () => {
       expect(recipe(file).requires).toEqual([])
     }
   })
+}
 
+function freshVerificationTests() {
   it.each(['direct.yaml', 'bugfix.yaml', 'standard.yaml', 'refactor.yaml', 'speckit.yaml'])(
     '%s verifies with a fresh context, never a resumed one',
     (file) => {
@@ -149,7 +171,9 @@ describe('built-in recipes', () => {
       .map((step) => step.id)
     expect(architects).toEqual([])
   })
+}
 
+function lanesTests() {
   // A fan-out is a claim that work can happen at the same time. Units inside
   // one lane share a worktree and a branch, so they cannot.
   it.each(recipeFiles)('%s fans out over lanes, never over units in one lane', (file) => {
@@ -158,7 +182,9 @@ describe('built-in recipes', () => {
       expect(step.over).toMatch(/ by lane$/)
     }
   })
+}
 
+function theDirectShapeTests() {
   it('checks the direct shape with the test command when there is one and a verifier when there is not', () => {
     const steps = recipe('direct.yaml').steps
     const check = steps.find((s) => s.id === 'check')
@@ -189,7 +215,9 @@ describe('built-in recipes', () => {
   it('needs nothing from the repository for the direct shape', () => {
     expect(recipe('direct.yaml').requires).toEqual([])
   })
+}
 
+function theInspectorTests() {
   it.each(['direct.yaml', 'bugfix.yaml', 'standard.yaml', 'speckit.yaml'])(
     '%s runs the inspector only on a risk trigger',
     (file) => {
@@ -198,7 +226,7 @@ describe('built-in recipes', () => {
       )
     }
   )
-})
+}
 
 // The research shape's deliverable is a document rather than a code change.
 // It is still checked by a fresh reader, because the author's own summary is
@@ -221,63 +249,63 @@ describe('the shape whose product is a document', () => {
   })
 })
 
+const direct = recipe('direct.yaml')
+function graphFor(opts: { test: boolean; lint: boolean; grade: 'P2' | 'P3'; triggers?: boolean }) {
+  const base = draftOrder({
+    id: 'WO-1',
+    title: 'x',
+    source: { kind: 'typed', tracker: null, key: null, url: null },
+    repoPaths: ['/repo'],
+    now: '2026-10-05T10:00:00.000Z',
+  })
+  const found = (command: string) => ({ command, source: 'package.json' })
+  const o = {
+    ...base,
+    risk: {
+      ...base.risk,
+      grade: opts.grade,
+      triggers: opts.triggers === true ? ['secrets' as const] : [],
+    },
+    context: {
+      ...base.context,
+      toolchain: {
+        ...base.context.toolchain,
+        test: opts.test ? found('npm test') : null,
+        lint: opts.lint ? found('npm run lint') : null,
+      },
+    },
+    plan: {
+      ...base.plan,
+      units: [
+        {
+          id: 'U-1',
+          title: 'a',
+          role: 'builder',
+          lane: 1,
+          dependsOn: [],
+          satisfies: ['AC-1'],
+          touches: [],
+          verify: [],
+        },
+      ],
+    },
+  }
+  return buildRunGraph(o, direct)
+}
+const stateOf = (graph: ReturnType<typeof graphFor>, id: string) =>
+  graph.nodes.find((n) => n.stepId === id)?.state
+
 // The direct shape, built into a graph for the repositories it meets. Which of
 // its steps run is decided per order, and a step that does not apply must not
 // hold up the ones behind it.
 describe('the direct shape on a real graph', () => {
-  const direct = recipe('direct.yaml')
+  describe('test or verifier', testOrVerifierTests)
+  describe('documentation', documentationTests)
+  describe('the verifier start', theVerifierStartTests)
+  describe('the join', theJoinTests)
+})
 
-  function graphFor(opts: {
-    test: boolean
-    lint: boolean
-    grade: 'P2' | 'P3'
-    triggers?: boolean
-  }) {
-    const base = draftOrder({
-      id: 'WO-1',
-      title: 'x',
-      source: { kind: 'typed', tracker: null, key: null, url: null },
-      repoPaths: ['/repo'],
-      now: '2026-10-05T10:00:00.000Z',
-    })
-    const found = (command: string) => ({ command, source: 'package.json' })
-    const o = {
-      ...base,
-      risk: {
-        ...base.risk,
-        grade: opts.grade,
-        triggers: opts.triggers === true ? ['secrets' as const] : [],
-      },
-      context: {
-        ...base.context,
-        toolchain: {
-          ...base.context.toolchain,
-          test: opts.test ? found('npm test') : null,
-          lint: opts.lint ? found('npm run lint') : null,
-        },
-      },
-      plan: {
-        ...base.plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'a',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: [],
-            verify: [],
-          },
-        ],
-      },
-    }
-    return buildRunGraph(o, direct)
-  }
-
-  const stateOf = (graph: ReturnType<typeof graphFor>, id: string) =>
-    graph.nodes.find((n) => n.stepId === id)?.state
-
+function testOrVerifierTests() {
   it('checks with the test command and skips the verifier when the repository has one', () => {
     const graph = graphFor({ test: true, lint: true, grade: 'P2' })
     expect(stateOf(graph, 'check')).toBe('waiting')
@@ -289,7 +317,9 @@ describe('the direct shape on a real graph', () => {
     expect(stateOf(graph, 'check')).toBe('skipped')
     expect(stateOf(graph, 'verify')).toBe('waiting')
   })
+}
 
+function documentationTests() {
   it('skips the documentation pass for a P3 change and keeps it above that', () => {
     expect(stateOf(graphFor({ test: true, lint: true, grade: 'P3' }), 'document')).toBe('skipped')
     expect(stateOf(graphFor({ test: true, lint: true, grade: 'P2' }), 'document')).toBe('waiting')
@@ -301,7 +331,9 @@ describe('the direct shape on a real graph', () => {
       'runs only when the change is not graded P3; it is graded P3'
     )
   })
+}
 
+function theVerifierStartTests() {
   it('lets the verifier start once lint passes even though the test step was skipped', () => {
     const graph = graphFor({ test: false, lint: true, grade: 'P2' })
     const passed = {
@@ -315,7 +347,9 @@ describe('the direct shape on a real graph', () => {
     expect(ready).toContain('document')
     expect(ready).not.toContain('check')
   })
+}
 
+function theJoinTests() {
   it('lets the join through when every step that applied has passed and the rest were skipped', () => {
     const graph = graphFor({ test: true, lint: false, grade: 'P3' })
     const done = {
@@ -329,7 +363,7 @@ describe('the direct shape on a real graph', () => {
     const ready = readyNodes(done, { agents: null } as never).map((n) => n.stepId)
     expect(ready).toEqual(['integrate'])
   })
-})
+}
 
 describe('the author role', () => {
   const author = parseRole(read(rolesDir, 'author.yaml'), 'author.yaml')
@@ -348,6 +382,14 @@ describe('the author role', () => {
 })
 
 describe('built-in roles', () => {
+  describe('the roles', theRolesTests)
+  describe('resuming', resumingTests)
+  describe('writing', writingTests)
+  describe('hand-backs', handBacksTests)
+  describe('tools and prompts', toolsAndPromptsTests)
+})
+
+function theRolesTests() {
   it('ships the eight roles the shipped recipes use, and the author', () => {
     expect(roleFiles.map((f) => f.replace('.yaml', '')).sort()).toEqual([
       'architect',
@@ -365,7 +407,9 @@ describe('built-in roles', () => {
     const parsed = parseRole(read(rolesDir, file), file)
     expect(parsed.ok, parsed.ok ? '' : parsed.reason).toBe(true)
   })
+}
 
+function resumingTests() {
   it('forbids the verifier from resuming a conversation', () => {
     const parsed = parseRole(read(rolesDir, 'verifier.yaml'), 'verifier.yaml')
     expect(parsed.ok && parsed.value.allowResume).toBe(false)
@@ -377,7 +421,9 @@ describe('built-in roles', () => {
       expect(parsed.ok && parsed.value.allowResume).toBe(false)
     }
   })
+}
 
+function writingTests() {
   // The property that matters is narrower than "writes nothing": the red team
   // does produce output — findings — it just may not touch a checkout.
   it('lets only the builder, the scribe and the author write to a checkout', () => {
@@ -392,7 +438,9 @@ describe('built-in roles', () => {
       )
     }
   })
+}
 
+function handBacksTests() {
   // The verifier's verdict is an exit status, so it has nothing to hand back
   // and declares nothing (FR-033). The inspector is not the same case: it is
   // asked in its own prompt for findings with a severity and a line, and
@@ -410,7 +458,9 @@ describe('built-in roles', () => {
     expect(parsed.ok && parsed.value.writes).toEqual(['findings'])
     expect(parsed.ok && parsed.value.tools).not.toContain('edit')
   })
+}
 
+function toolsAndPromptsTests() {
   it('gives no role an editing tool unless it may write to a checkout', () => {
     for (const file of roleFiles) {
       const parsed = parseRole(read(rolesDir, file), file)
@@ -428,7 +478,7 @@ describe('built-in roles', () => {
     const parsed = parseRole(read(rolesDir, file), file)
     expect(parsed.ok && parsed.value.prompt.trim().length).toBeGreaterThan(40)
   })
-})
+}
 
 // Every shipped role resolves through the same registry the executor uses, and
 // briefs into a message an agent could actually be launched with.
@@ -526,6 +576,12 @@ describe('the effort each built-in shape asks for', () => {
 // so a repository with a lint command catches it before the work ever
 // reaches a reviewer. It costs a terminal tab, not a session.
 describe('the lint pass every code-producing shape adds after its build', () => {
+  describe('running lint', runningLintTests)
+  describe('waiting on lint', waitingOnLintTests)
+  describe('reworking', reworkingTests)
+})
+
+function runningLintTests() {
   it.each([
     ['direct.yaml', 'build'],
     ['standard.yaml', 'build'],
@@ -546,7 +602,9 @@ describe('the lint pass every code-producing shape adds after its build', () => 
     const lint = recipe(file).steps.find((s) => s.id === 'lint')
     expect(lint?.onFail).toEqual({ rework: buildStep, max: 1 })
   })
+}
 
+function waitingOnLintTests() {
   it.each(['direct.yaml', 'standard.yaml', 'bugfix.yaml'])(
     '%s waits its next step on lint rather than the build it followed',
     (file) => {
@@ -566,7 +624,9 @@ describe('the lint pass every code-producing shape adds after its build', () => 
   it('does not add a lint step to refactor', () => {
     expect(recipe('refactor.yaml').steps.find((s) => s.id === 'lint')).toBeUndefined()
   })
+}
 
+function reworkingTests() {
   // The test run steps that follow a build gain a rework target of their
   // own, so a failing suite sends the same builder back rather than holding
   // the whole order for an operator.
@@ -585,7 +645,7 @@ describe('the lint pass every code-producing shape adds after its build', () => 
     const baseline = recipe('refactor.yaml').steps.find((s) => s.id === 'baseline')
     expect(baseline?.onFail).toBeUndefined()
   })
-})
+}
 
 // CI is watched on the draft a `ready-for-review` gate opens: every shape
 // that opens one gets two rounds back to the lane's builder before it holds

@@ -75,178 +75,19 @@ describe('compileOrder', () => {
   })
 
   describe('1 — no open questions', () => {
-    it('fails while a question is unanswered', () => {
-      const order = complete({
-        openQuestions: [
-          {
-            id: 'Q-1',
-            text: 'does the web client render rows?',
-            why: '',
-            options: [],
-            recommended: null,
-            answer: null,
-            rank: 1,
-          },
-        ],
-      })
-      expect(failures(order)).toContain('questions')
-    })
-
-    it('passes once every question is answered', () => {
-      const order = complete({
-        openQuestions: [
-          { id: 'Q-1', text: 'q', why: '', options: [], recommended: null, answer: 'no', rank: 1 },
-        ],
-      })
-      expect(failures(order)).not.toContain('questions')
-    })
-
-    it('names the question that is holding it up', () => {
-      const order = complete({
-        openQuestions: [
-          { id: 'Q-7', text: 'q', why: '', options: [], recommended: null, answer: null, rank: 1 },
-        ],
-      })
-      const f = compileOrder(order).failures.find((x) => x.check === 'questions')
-      expect(f?.subjectIds).toEqual(['Q-7'])
-    })
+    describe('an unanswered question', anUnansweredQuestionTests)
+    describe('answered and named', answeredAndNamedTests)
   })
 
   describe('2 — every criterion is falsifiable', () => {
-    it('fails a criterion whose command is empty', () => {
-      const order = complete()
-      order.acceptance[0].verify = { kind: 'command', command: ' ', assert: 'exit_code == 0' }
-      expect(failures(order)).toContain('verifiable')
-    })
-
-    it('accepts a judge with a rubric and named evidence', () => {
-      const order = complete()
-      order.acceptance[0].verify = {
-        kind: 'judge',
-        rubric: 'measure rendered ink',
-        evidence: ['screenshot'],
-      }
-      expect(failures(order)).not.toContain('verifiable')
-    })
-
-    it('accepts a criterion explicitly accepted as unverifiable, because that was a decision', () => {
-      const order = complete()
-      order.acceptance[0].verify = { kind: 'command', command: '', assert: 'x' }
-      order.acceptance[0].unverifiable = { accepted: true, reason: 'nothing can run this here' }
-      expect(failures(order)).not.toContain('verifiable')
-    })
-
-    // Measured on WO-0910-1fb, an order whose whole content was "make all text
-    // red". The picture check fired because the plan touched CSS, and the
-    // architect closed it by inventing three screenshot criteria naming five
-    // extension views in two themes. Five criteria became eight, coverage then
-    // pulled every one of those views into the unit's `touches`, and a
-    // one-line ask became a 41-file plan the builder spent 53 minutes on.
-    //
-    // The check asks for a picture. It has never asked for three, and the
-    // failure it hands the architect is the only place that can say so.
-    it('says one picture closes it, on a surface the plan already touches', () => {
-      const order = complete()
-      order.acceptance = order.acceptance.filter((c) => c.verify.kind !== 'screenshot')
-      order.plan.units[0].satisfies = order.acceptance.map((c) => c.id)
-      const detail =
-        compileOrder(order).failures.find((f) => f.check === 'verifiable')?.detail ?? ''
-      expect(detail).toContain('One')
-      expect(detail).toMatch(/already touches|already changes/)
-      expect(detail).toContain('“widen the row container” changes what a person sees')
-      expect(detail).not.toContain('U-1')
-    })
-
-    it('names the criterion that cannot be proven', () => {
-      const order = complete()
-      order.acceptance[0].verify = { kind: 'test', command: '', assert: 'x' }
-      const f = compileOrder(order).failures.find((x) => x.check === 'verifiable')
-      expect(f?.subjectIds).toEqual(['AC-1'])
-    })
+    describe('falsifiable criteria', falsifiableCriteriaTests)
+    describe('pictures and names', picturesAndNamesTests)
   })
 
   describe('3 — coverage, both directions', () => {
-    it('fails when a criterion has no unit', () => {
-      const order = complete()
-      order.plan.units[0].satisfies = []
-      expect(failures(order)).toContain('coverage')
-    })
-
-    it('fails when a unit satisfies no criterion', () => {
-      const order = complete()
-      order.plan.units.push({
-        id: 'U-2',
-        title: 'extra',
-        role: 'builder',
-        lane: 1,
-        dependsOn: [],
-        satisfies: [],
-        touches: [],
-        verify: [],
-      })
-      const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
-      expect(f?.subjectIds).toContain('U-2')
-    })
-
-    // The detail is read by a person on the Plan step. "Nothing in the plan
-    // builds AC-1" names a code only an agent can look up.
-    it('quotes the uncovered criterion, not its id', () => {
-      const order = complete()
-      order.plan.units[0].satisfies = ['AC-2']
-      const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
-      expect(f?.detail).toContain('“a full-width row renders its final glyph”')
-      expect(f?.detail).not.toContain('AC-1')
-    })
-
-    it('quotes the orphan unit and a dangling claim by title, not id', () => {
-      const order = complete()
-      order.plan.units.push({
-        id: 'U-2',
-        title: 'rename the config key',
-        role: 'builder',
-        lane: 1,
-        dependsOn: [],
-        satisfies: [],
-        touches: [],
-        verify: [],
-      })
-      order.plan.units[0].satisfies.push('AC-9')
-      const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
-      expect(f?.detail).toContain('“rename the config key” satisfies no criterion.')
-      expect(f?.detail).toContain(
-        '“widen the row container” claims a criterion that does not exist'
-      )
-      expect(f?.detail).not.toMatch(/U-\d/)
-    })
-
-    it('fails an order with no criteria at all', () => {
-      expect(failures(complete({ acceptance: [] }))).toContain('coverage')
-    })
-
-    it('names both the uncovered criterion and the orphan unit in one failure', () => {
-      const order = complete()
-      // AC-3, because the fixture already carries the screenshot criterion
-      // FR-040 requires of a change to a stylesheet.
-      order.acceptance.push({
-        id: 'AC-3',
-        statement: 'x',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      })
-      order.plan.units.push({
-        id: 'U-2',
-        title: 'extra',
-        role: 'builder',
-        lane: 1,
-        dependsOn: [],
-        satisfies: [],
-        touches: [],
-        verify: [],
-      })
-      const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
-      expect(f?.subjectIds).toEqual(expect.arrayContaining(['AC-3', 'U-2']))
-    })
+    describe('criteria and units', criteriaAndUnitsTests)
+    describe('quoting', quotingTests)
+    describe('no criteria and both directions', noCriteriaAndBothDirectionsTests)
   })
 
   describe('4 — risk graded against the plan', () => {
@@ -281,101 +122,11 @@ describe('compileOrder', () => {
   })
 
   describe('5 — the adversarial pass is resolved', () => {
-    it('fails while a blocking finding is still open', () => {
-      const order = complete({
-        redTeam: [
-          {
-            id: 'RT-1',
-            severity: 'high',
-            text: 'ambiguous',
-            status: 'open',
-            reason: '',
-            category: 'wrong-outcome',
-            round: 0,
-          },
-        ],
-      })
-      expect(failures(order)).toContain('redTeam')
-    })
-
-    it('passes a resolved finding', () => {
-      const order = complete({
-        redTeam: [
-          {
-            id: 'RT-1',
-            severity: 'high',
-            text: 'x',
-            status: 'resolved',
-            reason: '',
-            category: 'wrong-outcome',
-            round: 0,
-          },
-        ],
-      })
-      expect(failures(order)).not.toContain('redTeam')
-    })
-
-    it('passes a finding explicitly accepted with a reason', () => {
-      const order = complete({
-        redTeam: [
-          {
-            id: 'RT-1',
-            severity: 'low',
-            text: 'x',
-            status: 'accepted',
-            reason: 'out of scope',
-            category: 'wrong-outcome',
-            round: 0,
-          },
-        ],
-      })
-      expect(failures(order)).not.toContain('redTeam')
-    })
-
-    it('does not fail on an open finding that is only a note, not a blocking category', () => {
-      const order = complete({
-        redTeam: [
-          {
-            id: 'RT-1',
-            severity: 'low',
-            text: 'no ADR',
-            status: 'open',
-            reason: '',
-            category: 'process',
-            round: 0,
-          },
-        ],
-      })
-      expect(failures(order)).not.toContain('redTeam')
-    })
-
-    it('names only the blocking findings, not the notes, in the failure detail', () => {
-      const order = complete({
-        redTeam: [
-          {
-            id: 'RT-block',
-            severity: 'high',
-            text: 'wrong',
-            status: 'open',
-            reason: '',
-            category: 'wrong-outcome',
-            round: 0,
-          },
-          {
-            id: 'RT-note',
-            severity: 'low',
-            text: 'missing docs',
-            status: 'open',
-            reason: '',
-            category: 'process',
-            round: 0,
-          },
-        ],
-      })
-      const failure = compileOrder(order).failures.find((f) => f.check === 'redTeam')
-      expect(failure?.subjectIds).toEqual(['RT-block'])
-      expect(failure?.subjectIds).not.toContain('RT-note')
-    })
+    describe('open blocking findings', openBlockingFindingsTests)
+    describe('resolved findings', resolvedFindingsTests)
+    describe('accepted findings', acceptedFindingsTests)
+    describe('notes', notesTests)
+    describe('the failure detail', theFailureDetailTests)
   })
 
   // ADR 056: a count of files is not a budget. It refused plans for being
@@ -409,6 +160,292 @@ describe('compileOrder', () => {
     expect(checks).toEqual(expect.arrayContaining(['questions', 'coverage', 'redTeam']))
   })
 })
+
+function anUnansweredQuestionTests() {
+  it('fails while a question is unanswered', () => {
+    const order = complete({
+      openQuestions: [
+        {
+          id: 'Q-1',
+          text: 'does the web client render rows?',
+          why: '',
+          options: [],
+          recommended: null,
+          answer: null,
+          rank: 1,
+        },
+      ],
+    })
+    expect(failures(order)).toContain('questions')
+  })
+}
+
+function answeredAndNamedTests() {
+  it('passes once every question is answered', () => {
+    const order = complete({
+      openQuestions: [
+        { id: 'Q-1', text: 'q', why: '', options: [], recommended: null, answer: 'no', rank: 1 },
+      ],
+    })
+    expect(failures(order)).not.toContain('questions')
+  })
+
+  it('names the question that is holding it up', () => {
+    const order = complete({
+      openQuestions: [
+        { id: 'Q-7', text: 'q', why: '', options: [], recommended: null, answer: null, rank: 1 },
+      ],
+    })
+    const f = compileOrder(order).failures.find((x) => x.check === 'questions')
+    expect(f?.subjectIds).toEqual(['Q-7'])
+  })
+}
+
+function falsifiableCriteriaTests() {
+  it('fails a criterion whose command is empty', () => {
+    const order = complete()
+    order.acceptance[0].verify = { kind: 'command', command: ' ', assert: 'exit_code == 0' }
+    expect(failures(order)).toContain('verifiable')
+  })
+
+  it('accepts a judge with a rubric and named evidence', () => {
+    const order = complete()
+    order.acceptance[0].verify = {
+      kind: 'judge',
+      rubric: 'measure rendered ink',
+      evidence: ['screenshot'],
+    }
+    expect(failures(order)).not.toContain('verifiable')
+  })
+
+  it('accepts a criterion explicitly accepted as unverifiable, because that was a decision', () => {
+    const order = complete()
+    order.acceptance[0].verify = { kind: 'command', command: '', assert: 'x' }
+    order.acceptance[0].unverifiable = { accepted: true, reason: 'nothing can run this here' }
+    expect(failures(order)).not.toContain('verifiable')
+  })
+}
+
+function picturesAndNamesTests() {
+  // Measured on WO-0910-1fb, an order whose whole content was "make all text
+  // red". The picture check fired because the plan touched CSS, and the
+  // architect closed it by inventing three screenshot criteria naming five
+  // extension views in two themes. Five criteria became eight, coverage then
+  // pulled every one of those views into the unit's `touches`, and a
+  // one-line ask became a 41-file plan the builder spent 53 minutes on.
+  //
+  // The check asks for a picture. It has never asked for three, and the
+  // failure it hands the architect is the only place that can say so.
+  it('says one picture closes it, on a surface the plan already touches', () => {
+    const order = complete()
+    order.acceptance = order.acceptance.filter((c) => c.verify.kind !== 'screenshot')
+    order.plan.units[0].satisfies = order.acceptance.map((c) => c.id)
+    const detail = compileOrder(order).failures.find((f) => f.check === 'verifiable')?.detail ?? ''
+    expect(detail).toContain('One')
+    expect(detail).toMatch(/already touches|already changes/)
+    expect(detail).toContain('“widen the row container” changes what a person sees')
+    expect(detail).not.toContain('U-1')
+  })
+
+  it('names the criterion that cannot be proven', () => {
+    const order = complete()
+    order.acceptance[0].verify = { kind: 'test', command: '', assert: 'x' }
+    const f = compileOrder(order).failures.find((x) => x.check === 'verifiable')
+    expect(f?.subjectIds).toEqual(['AC-1'])
+  })
+}
+
+function criteriaAndUnitsTests() {
+  it('fails when a criterion has no unit', () => {
+    const order = complete()
+    order.plan.units[0].satisfies = []
+    expect(failures(order)).toContain('coverage')
+  })
+
+  it('fails when a unit satisfies no criterion', () => {
+    const order = complete()
+    order.plan.units.push({
+      id: 'U-2',
+      title: 'extra',
+      role: 'builder',
+      lane: 1,
+      dependsOn: [],
+      satisfies: [],
+      touches: [],
+      verify: [],
+    })
+    const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
+    expect(f?.subjectIds).toContain('U-2')
+  })
+}
+
+function quotingTests() {
+  // The detail is read by a person on the Plan step. "Nothing in the plan
+  // builds AC-1" names a code only an agent can look up.
+  it('quotes the uncovered criterion, not its id', () => {
+    const order = complete()
+    order.plan.units[0].satisfies = ['AC-2']
+    const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
+    expect(f?.detail).toContain('“a full-width row renders its final glyph”')
+    expect(f?.detail).not.toContain('AC-1')
+  })
+
+  it('quotes the orphan unit and a dangling claim by title, not id', () => {
+    const order = complete()
+    order.plan.units.push({
+      id: 'U-2',
+      title: 'rename the config key',
+      role: 'builder',
+      lane: 1,
+      dependsOn: [],
+      satisfies: [],
+      touches: [],
+      verify: [],
+    })
+    order.plan.units[0].satisfies.push('AC-9')
+    const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
+    expect(f?.detail).toContain('“rename the config key” satisfies no criterion.')
+    expect(f?.detail).toContain('“widen the row container” claims a criterion that does not exist')
+    expect(f?.detail).not.toMatch(/U-\d/)
+  })
+}
+
+function noCriteriaAndBothDirectionsTests() {
+  it('fails an order with no criteria at all', () => {
+    expect(failures(complete({ acceptance: [] }))).toContain('coverage')
+  })
+
+  it('names both the uncovered criterion and the orphan unit in one failure', () => {
+    const order = complete()
+    // AC-3, because the fixture already carries the screenshot criterion
+    // FR-040 requires of a change to a stylesheet.
+    order.acceptance.push({
+      id: 'AC-3',
+      statement: 'x',
+      priority: 'P1',
+      verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+      unverifiable: null,
+    })
+    order.plan.units.push({
+      id: 'U-2',
+      title: 'extra',
+      role: 'builder',
+      lane: 1,
+      dependsOn: [],
+      satisfies: [],
+      touches: [],
+      verify: [],
+    })
+    const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
+    expect(f?.subjectIds).toEqual(expect.arrayContaining(['AC-3', 'U-2']))
+  })
+}
+
+function openBlockingFindingsTests() {
+  it('fails while a blocking finding is still open', () => {
+    const order = complete({
+      redTeam: [
+        {
+          id: 'RT-1',
+          severity: 'high',
+          text: 'ambiguous',
+          status: 'open',
+          reason: '',
+          category: 'wrong-outcome',
+          round: 0,
+        },
+      ],
+    })
+    expect(failures(order)).toContain('redTeam')
+  })
+}
+
+function resolvedFindingsTests() {
+  it('passes a resolved finding', () => {
+    const order = complete({
+      redTeam: [
+        {
+          id: 'RT-1',
+          severity: 'high',
+          text: 'x',
+          status: 'resolved',
+          reason: '',
+          category: 'wrong-outcome',
+          round: 0,
+        },
+      ],
+    })
+    expect(failures(order)).not.toContain('redTeam')
+  })
+}
+
+function acceptedFindingsTests() {
+  it('passes a finding explicitly accepted with a reason', () => {
+    const order = complete({
+      redTeam: [
+        {
+          id: 'RT-1',
+          severity: 'low',
+          text: 'x',
+          status: 'accepted',
+          reason: 'out of scope',
+          category: 'wrong-outcome',
+          round: 0,
+        },
+      ],
+    })
+    expect(failures(order)).not.toContain('redTeam')
+  })
+}
+
+function notesTests() {
+  it('does not fail on an open finding that is only a note, not a blocking category', () => {
+    const order = complete({
+      redTeam: [
+        {
+          id: 'RT-1',
+          severity: 'low',
+          text: 'no ADR',
+          status: 'open',
+          reason: '',
+          category: 'process',
+          round: 0,
+        },
+      ],
+    })
+    expect(failures(order)).not.toContain('redTeam')
+  })
+}
+
+function theFailureDetailTests() {
+  it('names only the blocking findings, not the notes, in the failure detail', () => {
+    const order = complete({
+      redTeam: [
+        {
+          id: 'RT-block',
+          severity: 'high',
+          text: 'wrong',
+          status: 'open',
+          reason: '',
+          category: 'wrong-outcome',
+          round: 0,
+        },
+        {
+          id: 'RT-note',
+          severity: 'low',
+          text: 'missing docs',
+          status: 'open',
+          reason: '',
+          category: 'process',
+          round: 0,
+        },
+      ],
+    })
+    const failure = compileOrder(order).failures.find((f) => f.check === 'redTeam')
+    expect(failure?.subjectIds).toEqual(['RT-block'])
+    expect(failure?.subjectIds).not.toContain('RT-note')
+  })
+}
 
 describe('agreeOrder', () => {
   it('moves a complete order to agreed and stamps when', () => {

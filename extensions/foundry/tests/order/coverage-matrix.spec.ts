@@ -45,6 +45,16 @@ function order(criteria: string[], units: { id: string; satisfies: string[] }[])
 }
 
 describe('coverageMatrix', () => {
+  describe('covered and uncovered', coveredAndUncoveredTests)
+  describe('orphan units', orphanUnitsTests)
+  describe('both directions', bothDirectionsTests)
+  describe('dangling references', danglingReferencesTests)
+  describe('the grid', theGridTests)
+  describe('empty orders', emptyOrdersTests)
+  describe('double coverage', doubleCoverageTests)
+})
+
+function coveredAndUncoveredTests() {
   it('reports a complete order as covered in both directions', () => {
     const m = coverageMatrix(order(['AC-1', 'AC-2'], [{ id: 'U-1', satisfies: ['AC-1', 'AC-2'] }]))
     expect(m.uncoveredCriteria).toEqual([])
@@ -60,7 +70,9 @@ describe('coverageMatrix', () => {
     expect(m.uncoveredCriteria).toEqual(['AC-3'])
     expect(m.complete).toBe(false)
   })
+}
 
+function orphanUnitsTests() {
   it('names a unit that satisfies nothing — scope nobody asked for', () => {
     const m = coverageMatrix(
       order(
@@ -74,7 +86,9 @@ describe('coverageMatrix', () => {
     expect(m.orphanUnits).toEqual(['U-2'])
     expect(m.complete).toBe(false)
   })
+}
 
+function bothDirectionsTests() {
   it('reports both directions at once rather than stopping at the first', () => {
     const m = coverageMatrix(
       order(
@@ -88,7 +102,9 @@ describe('coverageMatrix', () => {
     expect(m.uncoveredCriteria).toEqual(['AC-2'])
     expect(m.orphanUnits).toEqual(['U-2'])
   })
+}
 
+function danglingReferencesTests() {
   it('catches a unit pointing at a criterion that does not exist', () => {
     const m = coverageMatrix(order(['AC-1'], [{ id: 'U-1', satisfies: ['AC-1', 'AC-9'] }]))
     expect(m.danglingRefs).toEqual([{ unitId: 'U-1', criterionId: 'AC-9' }])
@@ -100,7 +116,9 @@ describe('coverageMatrix', () => {
     expect(m.orphanUnits).toEqual(['U-1'])
     expect(m.uncoveredCriteria).toEqual(['AC-1'])
   })
+}
 
+function theGridTests() {
   it('lays out a grid a surface can render directly', () => {
     const m = coverageMatrix(
       order(
@@ -118,7 +136,9 @@ describe('coverageMatrix', () => {
       [false, true],
     ])
   })
+}
 
+function emptyOrdersTests() {
   it('treats an empty order as incomplete — there is nothing to prove', () => {
     const m = coverageMatrix(order([], []))
     expect(m.complete).toBe(false)
@@ -130,7 +150,9 @@ describe('coverageMatrix', () => {
     expect(m.complete).toBe(false)
     expect(m.uncoveredCriteria).toEqual(['AC-1'])
   })
+}
 
+function doubleCoverageTests() {
   it('counts a criterion covered by more than one unit once', () => {
     const m = coverageMatrix(
       order(
@@ -144,4 +166,4 @@ describe('coverageMatrix', () => {
     expect(m.complete).toBe(true)
     expect(m.cells).toEqual([[true, true]])
   })
-})
+}

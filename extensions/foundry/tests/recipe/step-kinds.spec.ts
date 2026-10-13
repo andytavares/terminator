@@ -80,6 +80,13 @@ describe('selectOver', () => {
 })
 
 describe('evaluateWhen', () => {
+  describe('collections', collectionsTests)
+  describe('grades', gradesTests)
+  describe('counts, reach and unreadable', countsReachAndUnreadableTests)
+  describe('toolchain', toolchainTests)
+})
+
+function collectionsTests() {
   it('is true when there is no condition — a step with no `when` always runs', () => {
     expect(evaluateWhen(undefined, order())).toBe(true)
     expect(evaluateWhen('   ', order())).toBe(true)
@@ -96,7 +103,9 @@ describe('evaluateWhen', () => {
     expect(evaluateWhen('risk.triggers is not empty', o)).toBe(true)
     expect(evaluateWhen('risk.triggers is empty', o)).toBe(false)
   })
+}
 
+function gradesTests() {
   it('tests the grade, with or without a negation', () => {
     const o = order()
     o.risk.grade = 'P3'
@@ -111,7 +120,9 @@ describe('evaluateWhen', () => {
     expect(evaluateWhen('risk.grade is P9', order())).toBe(false)
     expect(evaluateWhen('risk.grade is not P9', order())).toBe(false)
   })
+}
 
+function countsReachAndUnreadableTests() {
   it('compares a collection count', () => {
     expect(evaluateWhen('plan.units count > 1', order())).toBe(true)
     expect(evaluateWhen('plan.units count > 5', order())).toBe(false)
@@ -127,7 +138,9 @@ describe('evaluateWhen', () => {
     expect(evaluateWhen('risk.grade == P0 && something', order())).toBe(false)
     expect(evaluateWhen('if risk then run', order())).toBe(false)
   })
+}
 
+function toolchainTests() {
   it('is set when the toolchain probed a command for that check', () => {
     const o = order()
     o.context.toolchain.test = { command: 'npm test', source: 'package.json' }
@@ -145,7 +158,7 @@ describe('evaluateWhen', () => {
     expect(evaluateWhen('toolchain.nonesuch is set', order())).toBe(false)
     expect(evaluateWhen('toolchain.nonesuch is not set', order())).toBe(false)
   })
-})
+}
 
 describe('resolveCommand', () => {
   it('resolves a single placeholder to the probed command', () => {
@@ -174,6 +187,13 @@ describe('resolveCommand', () => {
 })
 
 describe('checkExpect', () => {
+  describe('reproduction', reproductionTests)
+  describe('numbers', numbersTests)
+  describe('literals and missing keys', literalsAndMissingKeysTests)
+  describe('reporting', reportingTests)
+})
+
+function reproductionTests() {
   it('passes when there is nothing to expect', () => {
     expect(checkExpect(undefined, { exit_code: 0 })).toEqual([])
   })
@@ -184,7 +204,9 @@ describe('checkExpect', () => {
     expect(wrong).toHaveLength(1)
     expect(wrong[0].key).toBe('suite_exit_code')
   })
+}
 
+function numbersTests() {
   it('compares numbers with every operator', () => {
     expect(checkExpect({ n: '>= 1' }, { n: 1 })).toEqual([])
     expect(checkExpect({ n: '<= 1' }, { n: 2 })).toHaveLength(1)
@@ -200,7 +222,9 @@ describe('checkExpect', () => {
   it('fails a comparison against something that is not a number at all', () => {
     expect(checkExpect({ n: '>= 2' }, { n: 'many' })).toHaveLength(1)
   })
+}
 
+function literalsAndMissingKeysTests() {
   it('compares a bare literal for equality, as text', () => {
     expect(checkExpect({ status: 'passed' }, { status: 'passed' })).toEqual([])
     expect(checkExpect({ status: 'passed' }, { status: 'failed' })).toHaveLength(1)
@@ -211,7 +235,9 @@ describe('checkExpect', () => {
     expect(failures).toHaveLength(1)
     expect(failures[0].actual).toBeUndefined()
   })
+}
 
+function reportingTests() {
   it('reports every failing expectation, not just the first', () => {
     expect(checkExpect({ a: '>= 1', b: '>= 1' }, { a: 0, b: 0 })).toHaveLength(2)
   })
@@ -221,9 +247,16 @@ describe('checkExpect', () => {
     expect(failure.expected).toBe('== 0')
     expect(failure.actual).toBe(2)
   })
-})
+}
 
 describe('whenSkipReason', () => {
+  describe('risk triggers', riskTriggersTests)
+  describe('toolchain names', toolchainNamesTests)
+  describe('collection tests', collectionTestsTests)
+  describe('grade names', gradeNamesTests)
+})
+
+function riskTriggersTests() {
   it('says risk triggers did not fire', () => {
     expect(whenSkipReason('risk.triggers is not empty', order())).toBe(
       'runs only when risk triggers fire; this order has none'
@@ -237,7 +270,9 @@ describe('whenSkipReason', () => {
       'runs only when no risk triggers fire; this order has 1'
     )
   })
+}
 
+function toolchainNamesTests() {
   it('names the toolchain command the repository lacks', () => {
     expect(whenSkipReason('toolchain.lint is set', order())).toBe(
       'runs only when the repository has a lint command; it has none'
@@ -249,7 +284,9 @@ describe('whenSkipReason', () => {
       'runs only when the repository has no lint command; it has one'
     )
   })
+}
 
+function collectionTestsTests() {
   it('states a collection count that did not hold', () => {
     expect(whenSkipReason('plan.units count > 5', order())).toBe(
       'runs only when plan.units count > 5; it has 2'
@@ -267,7 +304,9 @@ describe('whenSkipReason', () => {
       'condition "risk.owner is nobody" was false'
     )
   })
+}
 
+function gradeNamesTests() {
   it('names the grade a step wanted and the grade the order has', () => {
     const o = order()
     o.risk.grade = 'P3'
@@ -279,4 +318,4 @@ describe('whenSkipReason', () => {
       'runs only when the change is graded P3; it is graded P1'
     )
   })
-})
+}

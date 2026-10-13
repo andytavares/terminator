@@ -71,6 +71,31 @@ function input(over: Partial<StandingInput> = {}): StandingInput {
 }
 
 describe('standingOf', () => {
+  describe('working', workingTests)
+  describe('sent back', sentBackTests)
+  describe('ordinary work', ordinaryWorkTests)
+  describe('halted', haltedTests)
+  describe('adrift and asking', adriftAndAskingTests)
+  describe('stranded and stalled', strandedAndStalledTests)
+  describe('stopped', stoppedTests)
+  describe('stopped for no reason', stoppedForNoReasonTests)
+  describe('between steps and drafts', betweenStepsAndDraftsTests)
+  describe('draft questions', draftQuestionsTests)
+  describe('refused intake', refusedIntakeTests)
+  describe('draft checks', draftChecksTests)
+  describe('draft wording', draftWordingTests)
+  describe('agreed orders', agreedOrdersTests)
+  describe('shipped', shippedTests)
+  describe('answered shipped gates', answeredShippedGatesTests)
+  describe('always says something', alwaysSaysSomethingTests)
+})
+
+const finished = graph([
+  node({ id: 'write', state: 'passed' }),
+  node({ id: 'ship', state: 'waiting' }),
+])
+
+function workingTests() {
   it('counts finished steps out of every step, and says who is working', () => {
     const standing = standingOf(
       input({
@@ -88,7 +113,9 @@ describe('standingOf', () => {
     expect(standing.total).toBe(4)
     expect(standing.detail).toContain('2 of 4')
   })
+}
 
+function sentBackTests() {
   it('says which check sent the work back, while the run is still working it', () => {
     const standing = standingOf(
       input({
@@ -116,7 +143,9 @@ describe('standingOf', () => {
     expect(standing.kind).toBe('working')
     expect(standing.detail).toBe('Reworking after lint failed.')
   })
+}
 
+function ordinaryWorkTests() {
   it('leaves the ordinary working detail alone when nothing has been sent back', () => {
     const standing = standingOf(
       input({ graph: graph([node({ id: 'a', state: 'running' }), node({ id: 'b' })]) })
@@ -132,7 +161,9 @@ describe('standingOf', () => {
     expect(standing.kind).not.toBe('done')
     expect(standing.label).not.toContain('hand off')
   })
+}
 
+function haltedTests() {
   it('is halted, and names the gate, when an undecided gate stopped the line', () => {
     const standing = standingOf(input({ gates: [gate()] }))
     expect(standing.kind).toBe('halted')
@@ -154,7 +185,9 @@ describe('standingOf', () => {
   it('puts a gate ahead of a held tool call', () => {
     expect(standingOf(input({ gates: [gate()], asks: 2 })).kind).toBe('halted')
   })
+}
 
+function adriftAndAskingTests() {
   it('is adrift when the graph calls a step running and nothing is', () => {
     const standing = standingOf(input({ orphaned: ['build'] }))
     expect(standing.kind).toBe('adrift')
@@ -167,7 +200,9 @@ describe('standingOf', () => {
     expect(standing.turn).toBe('you')
     expect(standing.detail).toContain('1 agent')
   })
+}
 
+function strandedAndStalledTests() {
   // The failure that killed the run this whole change came out of. A tool call
   // nobody answered in time is handed back to the terminal's own prompt, and an
   // unattended run never reaches it — so the agent's process stays alive, the
@@ -191,7 +226,9 @@ describe('standingOf', () => {
     expect(standing.kind).toBe('stalled')
     expect(standing.turn).toBe('you')
   })
+}
 
+function stoppedTests() {
   // The defect this change fixes. WO-0913-0bd: every node passed, the order
   // still said `running`, and the ledger's tail was `run.complete` then
   // `run.failed` ("Opening the pull request for terminator failed: "). Before
@@ -224,7 +261,9 @@ describe('standingOf', () => {
     expect(standing.headline).toBe('The run stopped on an error')
     expect(standing.detail).toContain('no worktree could be prepared')
   })
+}
 
+function stoppedForNoReasonTests() {
   it('says so when the run failed for no recorded reason', () => {
     const standing = standingOf(
       input({
@@ -241,7 +280,9 @@ describe('standingOf', () => {
     const standing = standingOf(input({ gates: [gate()], runFailure: 'boom' }))
     expect(standing.kind).toBe('halted')
   })
+}
 
+function betweenStepsAndDraftsTests() {
   it('leaves a running order between steps when nothing has failed', () => {
     const standing = standingOf(input({ runFailure: null }))
     expect(standing.kind).toBe('working')
@@ -259,7 +300,9 @@ describe('standingOf', () => {
     expect(standing.kind).toBe('failed')
     expect(standing.turn).toBe('you')
   })
+}
 
+function draftQuestionsTests() {
   it('counts the questions a draft order is still asking', () => {
     const standing = standingOf(input({ status: 'draft', graph: null, openQuestions: 3 }))
     expect(standing.kind).toBe('shaping')
@@ -281,7 +324,9 @@ describe('standingOf', () => {
     expect(standing.turn).toBe('foundry')
     expect(standing.detail).toContain('3')
   })
+}
 
+function refusedIntakeTests() {
   // A refusal moves nothing. Before it was an input here, a draft whose
   // architect had been refused an hour earlier stood exactly where one being
   // actively drafted stood — "Foundry is still shaping this", turn `foundry` —
@@ -309,7 +354,9 @@ describe('standingOf', () => {
     )
     expect(standing.headline).toMatch(/refused/i)
   })
+}
 
+function draftChecksTests() {
   // WO-1008-287: the architect amended the order, every check passed, and
   // nothing ran after it. The standing said "It starts on its own" — nothing
   // starts a draft on its own — so the order sat there with every surface
@@ -340,7 +387,9 @@ describe('standingOf', () => {
     expect(standing.detail).toContain('RT-6 is open and blocks hand-off')
     expect(standing.detail).toContain('2 checks')
   })
+}
 
+function draftWordingTests() {
   it('ends the blocker sentence once when the check\u2019s own text ends in a full stop', () => {
     const standing = standingOf(
       input({ status: 'draft', graph: null, shaping: false, failures: 1, blocker: 'Resolve each.' })
@@ -353,7 +402,9 @@ describe('standingOf', () => {
     expect(standing.turn).toBe('foundry')
     expect(standing.detail).not.toMatch(/on its own/i)
   })
+}
 
+function agreedOrdersTests() {
   // The other half of the same gap: an agreed order whose run refused to
   // start never becomes `running`, and the reason lived only in the Forge's
   // local error line.
@@ -371,7 +422,9 @@ describe('standingOf', () => {
     expect(standing.kind).toBe('ready')
     expect(standing.turn).toBe('foundry')
   })
+}
 
+function shippedTests() {
   it('is done when the order shipped', () => {
     const standing = standingOf(input({ status: 'shipped' }))
     expect(standing.kind).toBe('done')
@@ -392,7 +445,9 @@ describe('standingOf', () => {
     expect(standing.label).toBe('Mark the draft pull request ready?')
     expect(standing.gateId).toBe('WO-1-ready-for-review-1')
   })
+}
 
+function answeredShippedGatesTests() {
   it('stays done when the order shipped and its gate was answered', () => {
     const answered = gate({ rule: 'ready-for-review' })
     const standing = standingOf(
@@ -417,7 +472,9 @@ describe('standingOf', () => {
     expect(standing.kind).toBe('ready')
     expect(standing.total).toBe(0)
   })
+}
 
+function alwaysSaysSomethingTests() {
   // Every kind carries a sentence and a badge. A standing that renders as an
   // empty band is the defect all over again.
   it('always says something', () => {
@@ -444,14 +501,14 @@ describe('standingOf', () => {
       expect(standing.detail.trim()).not.toBe('')
     }
   })
-})
+}
 
 describe('a run that finished on a document', () => {
-  const finished = graph([
-    node({ id: 'write', state: 'passed' }),
-    node({ id: 'ship', state: 'waiting' }),
-  ])
+  describe('done', doneTests)
+  describe('not running', notRunningTests)
+})
 
+function doneTests() {
   it('is done, with foundry holding the turn, and never says it was not shipped', () => {
     const standing = standingOf(
       input({ graph: finished, documentReady: 'outputs: /data/orders/WO-1/outputs/answer.md' })
@@ -468,7 +525,9 @@ describe('a run that finished on a document', () => {
     const standing = standingOf(input({ graph: finished, gates: [gate()], documentReady: 'x' }))
     expect(standing.kind).toBe('halted')
   })
+}
 
+function notRunningTests() {
   it('is not read for an order that is not running', async () => {
     const sources = {
       graphFor: async () => finished,
@@ -486,9 +545,15 @@ describe('a run that finished on a document', () => {
   it('is working as before when no document is ready', () => {
     expect(standingOf(input({ documentReady: null })).kind).toBe('working')
   })
-})
+}
 
 describe('readStanding', () => {
+  describe('sources', sourcesTests)
+  describe('asking the caller', askingTheCallerTests)
+  describe('refusals', refusalsTests)
+})
+
+function sourcesTests() {
   // One assembly point for the inputs, so the order list and the Floor cannot
   // disagree about where the same order stands — which is the defect, stated
   // as a rule.
@@ -513,7 +578,9 @@ describe('readStanding', () => {
     expect(standing.kind).toBe('shaping')
     expect(standing.detail.trim()).not.toBe('')
   })
+}
 
+function askingTheCallerTests() {
   // Which nodes nothing is running is a runtime fact, not a record on disk, so
   // the caller owns the answer and this only has to ask for it.
   it('asks the caller which nodes nothing is running', async () => {
@@ -535,7 +602,9 @@ describe('readStanding', () => {
     expect(standing.turn).toBe('you')
     expect(standing.detail).toContain('plan — no units')
   })
+}
 
+function refusalsTests() {
   it('reads why the run refused to start for an agreed order', async () => {
     const standing = await readStanding(
       { id: 'WO-1', status: 'agreed', openQuestions: [] } as unknown as WorkOrder,
@@ -543,4 +612,4 @@ describe('readStanding', () => {
     )
     expect(standing.headline).toBe('The run did not start')
   })
-})
+}

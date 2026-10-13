@@ -24,6 +24,15 @@ function input(files: string[], over: Partial<Parameters<typeof inspectionFor>[1
 }
 
 describe('inspectionFor', () => {
+  describe('risky areas', riskyAreasTests)
+  describe('dependencies and critical paths', dependenciesAndCriticalPathsTests)
+  describe('the blast radius', theBlastRadiusTests)
+  describe('unplanned triggers', unplannedTriggersTests)
+  describe('staying inside', stayingInsideTests)
+  describe('grading', gradingTests)
+})
+
+function riskyAreasTests() {
   it('runs no inspection on a change that trips nothing', () => {
     const i = inspectionFor(order(), input(['src/components/Button.tsx']))
     expect(i.required).toBe(false)
@@ -45,7 +54,9 @@ describe('inspectionFor', () => {
       'migration'
     )
   })
+}
 
+function dependenciesAndCriticalPathsTests() {
   it('triggers on a new dependency, which the grader does not speak to', () => {
     expect(inspectionFor(order(), input(['package.json'])).triggers).toContain('new_dependency')
   })
@@ -69,7 +80,9 @@ describe('inspectionFor', () => {
       'critical_path'
     )
   })
+}
 
+function theBlastRadiusTests() {
   it('triggers when the change goes outside what the order declared', () => {
     const o = order()
     o.risk.blastRadius = ['src/renderer/']
@@ -86,7 +99,9 @@ describe('inspectionFor', () => {
     )
     expect(i.triggers).not.toContain('outside_blast_radius')
   })
+}
 
+function unplannedTriggersTests() {
   it('names as unplanned only the triggers the agreed plan did not declare', () => {
     const o = order()
     o.risk.triggers = ['new_dependency']
@@ -100,7 +115,9 @@ describe('inspectionFor', () => {
     o.risk.triggers = ['new_dependency']
     expect(inspectionFor(o, input(['package.json'])).unplanned).toEqual([])
   })
+}
 
+function stayingInsideTests() {
   it('does not trigger while the change stays inside the blast radius', () => {
     const o = order()
     o.risk.blastRadius = ['src/renderer/']
@@ -112,7 +129,9 @@ describe('inspectionFor', () => {
   it('keeps the grader own words, so a gate can show the specific reason', () => {
     expect(inspectionFor(order(), input(['src/auth/session.ts'])).reason).toBeTruthy()
   })
+}
 
+function gradingTests() {
   it('grades a change that also touches something trivial by the worst thing in it', () => {
     // The grader checks P3 last on purpose: a lockfile change that also touches
     // authentication must not slip into the quiet lane.
@@ -130,7 +149,7 @@ describe('inspectionFor', () => {
     const i = inspectionFor(order(), input(['package.json', 'Cargo.toml']))
     expect(i.triggers.filter((t) => t === 'new_dependency')).toHaveLength(1)
   })
-})
+}
 
 describe('regrade', () => {
   it('brings the order risk block up to date with what the change actually did', () => {

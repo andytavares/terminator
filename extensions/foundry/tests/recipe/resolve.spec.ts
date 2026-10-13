@@ -48,6 +48,12 @@ afterEach(() => {
 })
 
 describe('resolveFile', () => {
+  describe('overrides', overridesTests)
+  describe('names', namesTests)
+  describe('the repository', theRepositoryTests)
+})
+
+function overridesTests() {
   it('finds a built-in when nothing else defines the name', () => {
     put(builtIn, 'recipes', 'direct', recipe('direct'))
     expect(resolveFile('recipes', 'direct', sources())?.rung).toBe('built-in')
@@ -65,7 +71,9 @@ describe('resolveFile', () => {
     put(dataRoot, 'recipes', 'direct', recipe('direct'))
     expect(resolveFile('recipes', 'direct', sources())?.rung).toBe('data-root')
   })
+}
 
+function namesTests() {
   it('accepts a .yml file as readily as .yaml', () => {
     fs.mkdirSync(path.join(builtIn, 'recipes'), { recursive: true })
     fs.writeFileSync(path.join(builtIn, 'recipes', 'direct.yml'), recipe('direct'))
@@ -75,7 +83,9 @@ describe('resolveFile', () => {
   it('returns nothing for a name nobody defines', () => {
     expect(resolveFile('recipes', 'nowhere', sources())).toBeNull()
   })
+}
 
+function theRepositoryTests() {
   it('never requires a repository to carry a .foundry directory', () => {
     put(builtIn, 'recipes', 'direct', recipe('direct'))
     expect(resolveFile('recipes', 'direct', sources())).not.toBeNull()
@@ -88,7 +98,7 @@ describe('resolveFile', () => {
     resolveFile('recipes', 'direct', sources())
     expect(fs.readdirSync(repo)).toEqual(before)
   })
-})
+}
 
 describe('resolveRecipe', () => {
   it('parses and reports which rung it came from', () => {
@@ -220,18 +230,25 @@ describe('availableSkills', () => {
   })
 })
 
-describe('checkRequirements', () => {
-  function order(over: Partial<WorkOrder> = {}): WorkOrder {
-    const base = draftOrder({
-      id: 'WO-1',
-      title: 'x',
-      source: { kind: 'typed', tracker: null, key: null, url: null },
-      repoPaths: [repo],
-      now: '2026-09-06T10:00:00.000Z',
-    })
-    return { ...base, ...over }
-  }
+function order(over: Partial<WorkOrder> = {}): WorkOrder {
+  const base = draftOrder({
+    id: 'WO-1',
+    title: 'x',
+    source: { kind: 'typed', tracker: null, key: null, url: null },
+    repoPaths: [repo],
+    now: '2026-09-06T10:00:00.000Z',
+  })
+  return { ...base, ...over }
+}
 
+describe('checkRequirements', () => {
+  describe('paths', pathsTests)
+  describe('toolchain', toolchainTests)
+  describe('counts and unknown kinds', countsAndUnknownKindsTests)
+  describe('every unmet requirement', everyUnmetRequirementTests)
+})
+
+function pathsTests() {
   it('offers a recipe with no requirements', () => {
     expect(checkRequirements([], order()).available).toBe(true)
   })
@@ -248,7 +265,9 @@ describe('checkRequirements', () => {
       true
     )
   })
+}
 
+function toolchainTests() {
   it('withholds a recipe needing a toolchain command this repository lacks', () => {
     const r = checkRequirements([{ kind: 'toolchain', value: 'test' }], order())
     expect(r.available).toBe(false)
@@ -266,7 +285,9 @@ describe('checkRequirements', () => {
       false
     )
   })
+}
 
+function countsAndUnknownKindsTests() {
   it('compares repository counts', () => {
     expect(checkRequirements([{ kind: 'repos', value: '>1' }], order()).available).toBe(false)
     expect(checkRequirements([{ kind: 'repos', value: '>=1' }], order()).available).toBe(true)
@@ -278,7 +299,9 @@ describe('checkRequirements', () => {
     expect(r.available).toBe(false)
     expect(r.unmet[0]).toContain('phase_of_moon')
   })
+}
 
+function everyUnmetRequirementTests() {
   it('reports every unmet requirement, not just the first', () => {
     const r = checkRequirements(
       [
@@ -289,4 +312,4 @@ describe('checkRequirements', () => {
     )
     expect(r.unmet).toHaveLength(2)
   })
-})
+}

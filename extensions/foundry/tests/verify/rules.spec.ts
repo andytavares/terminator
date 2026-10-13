@@ -62,6 +62,11 @@ afterEach(() => {
 })
 
 describe('accepting a proposal', () => {
+  describe('writing', writingTests)
+  describe('rungs and later work', rungsAndLaterWorkTests)
+})
+
+function writingTests() {
   it('writes a rule the ordinary parser can read', async () => {
     const p = proposal()
     await acceptProposal(root, p)
@@ -84,7 +89,9 @@ describe('accepting a proposal', () => {
     expect(resolved.resolved.value.origin).toMatch(/^curator:/)
     expect(resolved.resolved.value.origin).toContain('2026-09-01T10:00:00.000Z/U-1')
   })
+}
 
+function rungsAndLaterWorkTests() {
   it('keeps the rung the proposal chose', async () => {
     const p = proposal()
     await acceptProposal(root, p)
@@ -106,9 +113,17 @@ describe('accepting a proposal', () => {
     expect(file.startsWith(root)).toBe(true)
     expect(fs.existsSync(file)).toBe(true)
   })
-})
+}
 
 describe('declining a proposal', () => {
+  describe('remembering', rememberingTests)
+  describe('the curator', theCuratorTests)
+  describe('the assertion', theAssertionTests)
+  describe('removed rules', removedRulesTests)
+  describe('unreadable records', unreadableRecordsTests)
+})
+
+function rememberingTests() {
   it('is remembered, so it is never offered again', async () => {
     const p = proposal()
     await declineProposal(root, p.id, 'we do that on purpose')
@@ -131,7 +146,9 @@ describe('declining a proposal', () => {
     await declineProposal(root, 'curator-a', 'no')
     expect(resolveRule('curator-a', sources()).ok).toBe(false)
   })
+}
 
+function theCuratorTests() {
   it('stops the curator proposing it again', async () => {
     const p = proposal()
     await declineProposal(root, p.id, 'no')
@@ -140,7 +157,9 @@ describe('declining a proposal', () => {
     )
     expect(propose({ entries, rejectedIds: await declinedProposals(root) })).toEqual([])
   })
+}
 
+function theAssertionTests() {
   it('keeps what the check would have asserted, so it can be shown in words', async () => {
     await declineProposal(
       root,
@@ -168,14 +187,18 @@ describe('declining a proposal', () => {
     ])
     expect(await declinedProposals(root)).toEqual(['curator-hardcodes-the-timeout'])
   })
+}
 
+function removedRulesTests() {
   it('keeps the assertion of a removed rule', async () => {
     await removeRule(root, 'docs-in-pr', 'too strict', 'Docs change in the same PR.')
     expect(await declinedWithReasons(root)).toEqual([
       { id: 'docs-in-pr', reason: 'too strict', asserts: 'Docs change in the same PR.' },
     ])
   })
+}
 
+function unreadableRecordsTests() {
   it('reads an unreadable record as nothing declined', async () => {
     fs.mkdirSync(path.join(root, 'rules'), { recursive: true })
     fs.writeFileSync(path.join(root, 'rules', 'declined.json'), '{{{')
@@ -187,7 +210,7 @@ describe('declining a proposal', () => {
     fs.writeFileSync(path.join(root, 'rules', 'declined.json'), '["nope"]')
     expect(await declinedProposals(root)).toEqual([])
   })
-})
+}
 
 describe('removing an accepted rule', () => {
   it('takes it out of force', async () => {

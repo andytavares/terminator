@@ -60,6 +60,19 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 }
 
 describe('renderOrder', () => {
+  describe('the head', theHeadTests)
+  describe('criteria', criteriaTests)
+  describe('coverage', coverageTests)
+  describe('non-goals and assumptions', nonGoalsAndAssumptionsTests)
+  describe('checks', checksTests)
+  describe('blocking findings', blockingFindingsTests)
+  describe('notes', notesTests)
+  describe('settled findings', settledFindingsTests)
+  describe('questions', questionsTests)
+  describe('budgets and empty drafts', budgetsAndEmptyDraftsTests)
+})
+
+function theHeadTests() {
   it('leads with the title and the identifying facts', () => {
     const out = renderOrder(order())
     expect(out).toContain('# Terminal clips the last glyph')
@@ -77,7 +90,9 @@ describe('renderOrder', () => {
   it('says nothing about a source when the idea was typed', () => {
     expect(renderOrder(order())).not.toContain('Source:')
   })
+}
 
+function criteriaTests() {
   it('shows every criterion with the thing that proves it', () => {
     const out = renderOrder(order())
     expect(out).toContain('**AC-1** (P0) a full-width row renders its final glyph')
@@ -99,7 +114,9 @@ describe('renderOrder', () => {
     o.acceptance[0].verify = { kind: 'screenshot', target: 'terminal pane' }
     expect(renderOrder(o)).toContain('screenshot · terminal pane')
   })
+}
 
+function coverageTests() {
   it('plots coverage as a grid a reader can scan', () => {
     const out = renderOrder(order())
     expect(out).toContain('| AC-1 | ● |')
@@ -116,7 +133,9 @@ describe('renderOrder', () => {
       'Nothing to plot yet'
     )
   })
+}
 
+function nonGoalsAndAssumptionsTests() {
   it('lists what the order deliberately does not do', () => {
     expect(renderOrder(order())).toContain('scrollbar styling')
   })
@@ -132,7 +151,9 @@ describe('renderOrder', () => {
     expect(out).toContain('xterm 5.x')
     expect(out).not.toContain('fix belongs in the component')
   })
+}
 
+function checksTests() {
   it('reports a passing order as ready to hand off', () => {
     expect(renderOrder(order())).toContain('All checks pass')
   })
@@ -142,7 +163,9 @@ describe('renderOrder', () => {
     expect(out).toContain('**coverage**')
     expect(out).toContain('no acceptance criteria')
   })
+}
 
+function blockingFindingsTests() {
   it('shows an open blocking finding under its own heading', () => {
     const o = order({
       redTeam: [
@@ -162,7 +185,9 @@ describe('renderOrder', () => {
     expect(out).toContain('RT-1')
     expect(out).toContain('(wrong-outcome, high)')
   })
+}
 
+function notesTests() {
   it('shows an open non-blocking finding as a note, not a blocker', () => {
     const o = order({
       redTeam: [
@@ -182,7 +207,9 @@ describe('renderOrder', () => {
     expect(out).toContain('RT-2')
     expect(out).not.toContain('## Red team — blocking')
   })
+}
 
+function settledFindingsTests() {
   it('shows a settled finding with its status and reason, headline only', () => {
     const o = order({
       redTeam: [
@@ -204,7 +231,9 @@ describe('renderOrder', () => {
     expect(out).toContain('settled thing')
     expect(out).not.toContain('the evidence')
   })
+}
 
+function questionsTests() {
   it('shows unanswered questions and hides answered ones', () => {
     const o = order({
       openQuestions: [
@@ -232,7 +261,9 @@ describe('renderOrder', () => {
     expect(out).toContain('still open?')
     expect(out).not.toContain('already settled?')
   })
+}
 
+function budgetsAndEmptyDraftsTests() {
   it('states the budgets, including an uncapped token spend', () => {
     expect(renderOrder(order())).toContain('tokens uncapped')
   })
@@ -257,4 +288,4 @@ describe('renderOrder', () => {
     expect(() => renderOrder(empty)).not.toThrow()
     expect(renderOrder(empty)).toContain('No criteria yet')
   })
-})
+}

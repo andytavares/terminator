@@ -30,6 +30,16 @@ afterEach(() => {
 })
 
 describe('probeToolchain', () => {
+  describe('empty repositories', emptyRepositoriesTests)
+  describe('package.json', packageJsonTests)
+  describe('coverage and configs', coverageAndConfigsTests)
+  describe('other languages', otherLanguagesTests)
+  describe('makefiles and CI', makefilesAndCiTests)
+  describe('precedence and e2e', precedenceAndE2eTests)
+  describe('nothing executed or written', nothingExecutedOrWrittenTests)
+})
+
+function emptyRepositoriesTests() {
   it('reports every check as null in a repository with nothing in it', () => {
     const t = probeToolchain(repo)
     for (const name of CHECK_NAMES) expect(t[name]).toBeNull()
@@ -39,7 +49,9 @@ describe('probeToolchain', () => {
     const t = probeToolchain(repo)
     expect(Object.values(t).every((v) => v === null)).toBe(true)
   })
+}
 
+function packageJsonTests() {
   it('reads package.json scripts', () => {
     write(
       'package.json',
@@ -57,7 +69,9 @@ describe('probeToolchain', () => {
     expect(() => probeToolchain(repo)).not.toThrow()
     expect(probeToolchain(repo).test).toBeNull()
   })
+}
 
+function coverageAndConfigsTests() {
   it('recognises a coverage script separately from the test script', () => {
     write(
       'package.json',
@@ -74,7 +88,9 @@ describe('probeToolchain', () => {
     write('vitest.config.ts', 'export default {}')
     expect(probeToolchain(repo).test).toEqual({ command: 'npx vitest run', source: 'config' })
   })
+}
 
+function otherLanguagesTests() {
   it('recognises a python project with no package.json at all', () => {
     write('pyproject.toml', '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n')
     expect(probeToolchain(repo).test).toEqual({ command: 'pytest', source: 'config' })
@@ -86,7 +102,9 @@ describe('probeToolchain', () => {
     expect(t.test).toEqual({ command: 'cargo test', source: 'config' })
     expect(t.build).toEqual({ command: 'cargo build', source: 'config' })
   })
+}
 
+function makefilesAndCiTests() {
   it('reads a Makefile target when nothing else supplies the check', () => {
     write('Makefile', 'test:\n\tgo test ./...\n\nlint:\n\tgolangci-lint run\n')
     const t = probeToolchain(repo)
@@ -98,7 +116,9 @@ describe('probeToolchain', () => {
     write('.github/workflows/ci.yml', 'jobs:\n  a:\n    steps:\n      - run: bun test\n')
     expect(probeToolchain(repo).test).toEqual({ command: 'bun test', source: 'ci' })
   })
+}
 
+function precedenceAndE2eTests() {
   it('prefers package.json over a tool config over CI', () => {
     write('package.json', JSON.stringify({ scripts: { test: 'vitest run' } }))
     write('vitest.config.ts', 'export default {}')
@@ -115,7 +135,9 @@ describe('probeToolchain', () => {
     expect(t.test?.command).toBe('npm run test')
     expect(t.e2e).toEqual({ command: 'npm run test:e2e', source: 'package.json' })
   })
+}
 
+function nothingExecutedOrWrittenTests() {
   it('does not execute anything it finds', () => {
     // A script that would leave a trace if it were ever run.
     write('package.json', JSON.stringify({ scripts: { test: `touch ${repo}/EXECUTED` } }))
@@ -129,7 +151,7 @@ describe('probeToolchain', () => {
     probeToolchain(repo)
     expect(fs.readdirSync(repo).sort()).toEqual(before)
   })
-})
+}
 
 // Read from the lockfile, like every other command here: a reinstall that
 // ignores the lockfile installs something other than what the project pinned.
