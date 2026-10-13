@@ -193,7 +193,7 @@ export async function settleShipNode(
   const { root, recipe, graphRef } = run
   const shipId = shipNodeId(recipe)
   if (shipId === null) return
-  const settled = settleShip(graphRef.current, shipId, asked, new Date().toISOString())
+  const settled = settleShip(graphRef.current, shipId, { asked, at: new Date().toISOString() })
   if (settled === graphRef.current) return
   graphRef.current = settled
   await writeGraph(root, graphRef.current)

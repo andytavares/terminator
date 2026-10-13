@@ -48,7 +48,25 @@ describe('ciRounds', () => {
   describe('exhausted rounds', exhaustedRoundsTests)
   describe('halting', haltingTests)
   describe('two pulls', twoPullsTests)
+  describe('a write that fails mid-watch', aWriteThatFailsMidWatchTests)
 })
+
+function aWriteThatFailsMidWatchTests() {
+  it('keeps watching when writing the checks so far fails, and names cancelled checks', async () => {
+    const h = harness([])
+    h.state.mockImplementation(async (s: Omit<CiState, 'at'>) => {
+      if (s.status === 'watching' && s.pulls[0].checks.length > 0) throw new Error('disk full')
+      h.states.push({ ...s, at: 'x' })
+    })
+    h.watch.mockImplementation(async (_pull, onPoll) => {
+      onPoll([check({ bucket: 'pending' })])
+      return { kind: 'red', checks: [check({ name: 'e2e', bucket: 'cancel' })] }
+    })
+    const outcome = await ciRounds({ pulls: [PULL], rounds: 0, ...h })
+    expect(outcome).toMatchObject({ kind: 'red', rounds: 0 })
+    expect(h.record).toHaveBeenCalledWith('ci.exhausted', PULL.url, 'CI red on e2e after 0 rounds')
+  })
+}
 
 function theNextRoundTests() {
   it('watches the next round past the runs the last one judged', async () => {
@@ -384,25 +402,28 @@ describe('settleShip', () => {
   const stateOf = (g: RunGraph) => g.nodes[0].state
 
   it('passes a running ship node once the ready question is raised', () => {
-    const settled = settleShip(graph('running'), 'ship', true, '2026-10-05T10:00:00.000Z')
+    const settled = settleShip(graph('running'), 'ship', {
+      asked: true,
+      at: '2026-10-05T10:00:00.000Z',
+    })
     expect(stateOf(settled)).toBe('passed')
     expect(settled.nodes[0].endedAt).toBe('2026-10-05T10:00:00.000Z')
   })
 
   it('sends it back to waiting when shipping stopped before the question', () => {
-    expect(stateOf(settleShip(graph('running'), 'ship', false, 'x'))).toBe('waiting')
+    expect(stateOf(settleShip(graph('running'), 'ship', { asked: false, at: 'x' }))).toBe('waiting')
   })
 
   it('passes a waiting one when the question was raised after a send-back reset it', () => {
-    expect(stateOf(settleShip(graph('waiting'), 'ship', true, 'x'))).toBe('passed')
+    expect(stateOf(settleShip(graph('waiting'), 'ship', { asked: true, at: 'x' }))).toBe('passed')
   })
 
   it('leaves a node that is not owed alone', () => {
     const passed = graph('passed')
-    expect(settleShip(passed, 'ship', false, 'x')).toBe(passed)
+    expect(settleShip(passed, 'ship', { asked: false, at: 'x' })).toBe(passed)
     const waiting = graph('waiting')
-    expect(settleShip(waiting, 'ship', false, 'x')).toBe(waiting)
-    expect(settleShip(waiting, 'nonesuch', true, 'x')).toBe(waiting)
+    expect(settleShip(waiting, 'ship', { asked: false, at: 'x' })).toBe(waiting)
+    expect(settleShip(waiting, 'nonesuch', { asked: true, at: 'x' })).toBe(waiting)
   })
 })
 

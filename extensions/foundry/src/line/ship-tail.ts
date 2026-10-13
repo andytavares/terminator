@@ -70,116 +70,141 @@ function subjectOf(pulls: readonly Pull[]): string {
 
 export async function ciRounds(input: CiRoundsInput): Promise<CiOutcome> {
   if (input.rounds === null) return { kind: 'none' }
-  const rounds = input.rounds
-  const subject = subjectOf(input.pulls)
-  const latest = new Map<string, readonly Check[]>()
-  const judged = new Map<string, Set<string>>(input.pulls.map((p) => [p.url, new Set<string>()]))
+  const watch = new CiWatch(input, input.rounds)
+  for (let round = 0; ; round += 1) {
+    const results = await watch.watchRound(round)
+    const combined = combine(results)
+    if (combined.kind === 'green') return watch.green(round, results)
+    if (combined.kind === 'not_measured') return watch.notMeasured(round, combined.reason)
+    const red = await watch.redOf(combined.reds)
+    if (round >= watch.max) return watch.exhausted(round, red)
+    if (!(await watch.sendBack(round, red, results))) {
+      return { kind: 'halted', reason: 'the fix round could not finish' }
+    }
+  }
+}
 
-  const snapshot = (): readonly { url: string; checks: readonly Check[] }[] =>
-    input.pulls.map((p) => ({ url: p.url, checks: latest.get(p.url) ?? [] }))
+/** What a red round found: the checks, the names of the failing ones, and their logs. */
+interface Red {
+  readonly checks: readonly Check[]
+  readonly names: string
+  readonly excerpt: string
+}
 
-  for (let round = 0; ; ) {
-    await input.state({ round, max: rounds, status: 'watching', pulls: snapshot(), reason: '' })
-    await input.record('ci.watching', subject, 'Watching CI')
-    let shown = JSON.stringify(snapshot().map((p) => p.checks.map((c) => c.bucket)))
-    const writes: Promise<void>[] = []
+/** One order's CI watch across its rounds: the latest checks per pull, and the runs judged. */
+class CiWatch {
+  private readonly subject: string
+  private readonly latest = new Map<string, readonly Check[]>()
+  private readonly judged: Map<string, Set<string>>
 
-    const results: Result[] = await Promise.all(
-      input.pulls.map(async (pull) => {
-        const verdict = await input.watch(
+  constructor(
+    private readonly input: CiRoundsInput,
+    readonly max: number
+  ) {
+    this.subject = subjectOf(input.pulls)
+    this.judged = new Map(input.pulls.map((p) => [p.url, new Set<string>()]))
+  }
+
+  private snapshot(): readonly { url: string; checks: readonly Check[] }[] {
+    return this.input.pulls.map((p) => ({ url: p.url, checks: this.latest.get(p.url) ?? [] }))
+  }
+
+  private buckets(): string {
+    return JSON.stringify(this.snapshot().map((p) => p.checks.map((c) => c.bucket)))
+  }
+
+  private state(round: number, status: CiState['status'], reason = ''): Promise<void> {
+    return this.input.state({ round, max: this.max, status, pulls: this.snapshot(), reason })
+  }
+
+  async watchRound(round: number): Promise<Result[]> {
+    await this.state(round, 'watching')
+    await this.input.record('ci.watching', this.subject, 'Watching CI')
+    const progress = { shown: this.buckets(), writes: [] as Promise<void>[] }
+    const results = await Promise.all(
+      this.input.pulls.map(async (pull) => {
+        const verdict = await this.input.watch(
           pull,
-          (checks) => {
-            latest.set(pull.url, checks)
-            // Written when what is passing changes, not on every poll.
-            const seen = JSON.stringify(snapshot().map((p) => p.checks.map((c) => c.bucket)))
-            if (seen === shown) return
-            shown = seen
-            writes.push(
-              input
-                .state({ round, max: rounds, status: 'watching', pulls: snapshot(), reason: '' })
-                .catch(() => undefined)
-            )
-          },
-          new Set(judged.get(pull.url))
+          (checks) => this.polled(round, { pull, checks }, progress),
+          new Set(this.judged.get(pull.url))
         )
-        latest.set(pull.url, verdict.checks)
+        this.latest.set(pull.url, verdict.checks)
         return { pull, verdict }
       })
     )
-
     // Settled before the result is written, so a late poll cannot overwrite it.
-    await Promise.all(writes)
-    const combined = combine(results)
+    await Promise.all(progress.writes)
+    return results
+  }
 
-    if (combined.kind === 'green') {
-      const checks = results.flatMap((r) => r.verdict.checks)
-      await input.record('ci.green', subject, 'CI is green')
-      await input.state({ round, max: rounds, status: 'green', pulls: snapshot(), reason: '' })
-      return { kind: 'green', checks }
-    }
+  /** Written when what is passing changes, not on every poll. */
+  private polled(
+    round: number,
+    { pull, checks }: { pull: Pull; checks: readonly Check[] },
+    progress: { shown: string; writes: Promise<void>[] }
+  ): void {
+    this.latest.set(pull.url, checks)
+    const seen = this.buckets()
+    if (seen === progress.shown) return
+    progress.shown = seen
+    progress.writes.push(this.state(round, 'watching').catch(() => undefined))
+  }
 
-    if (combined.kind === 'not_measured') {
-      await input.record('ci.not_measured', subject, combined.reason)
-      await input.state({
-        round,
-        max: rounds,
-        status: 'not_measured',
-        pulls: snapshot(),
-        reason: combined.reason,
-      })
-      return { kind: 'not_measured', reason: combined.reason }
-    }
+  async green(round: number, results: readonly Result[]): Promise<CiOutcome> {
+    const checks = results.flatMap((r) => r.verdict.checks)
+    await this.input.record('ci.green', this.subject, 'CI is green')
+    await this.state(round, 'green')
+    return { kind: 'green', checks }
+  }
 
-    const redChecks = combined.reds.flatMap((r) => r.verdict.checks)
-    const names = redChecks
+  async notMeasured(round: number, reason: string): Promise<CiOutcome> {
+    await this.input.record('ci.not_measured', this.subject, reason)
+    await this.state(round, 'not_measured', reason)
+    return { kind: 'not_measured', reason }
+  }
+
+  async redOf(reds: readonly Result[]): Promise<Red> {
+    const checks = reds.flatMap((r) => r.verdict.checks)
+    const names = checks
       .filter((c) => c.bucket === 'fail' || c.bucket === 'cancel')
       .map((c) => c.name)
       .join(', ')
-    const excerpt = (
-      await Promise.all(combined.reds.map((r) => input.failedLogs(r.verdict.checks, r.pull.cwd)))
-    ).join('\n\n')
+    const logs = await Promise.all(
+      reds.map((r) => this.input.failedLogs(r.verdict.checks, r.pull.cwd))
+    )
+    return { checks, names, excerpt: logs.join('\n\n') }
+  }
 
-    if (round < rounds) {
-      const feedback: Feedback = {
-        from: 'ci',
-        attempt: round + 1,
-        source: 'ci',
-        command: null,
-        exitCode: null,
-        excerpt,
-        logPath: null,
+  async exhausted(round: number, red: Red): Promise<CiOutcome> {
+    const reason = `CI red on ${red.names} after ${this.max} rounds`
+    await this.input.record('ci.exhausted', this.subject, reason)
+    await this.state(round, 'red', reason)
+    return { kind: 'red', checks: red.checks, excerpt: red.excerpt, rounds: this.max }
+  }
+
+  /** Hands a red round back to the builder; false when that round could not finish. */
+  async sendBack(round: number, red: Red, results: readonly Result[]): Promise<boolean> {
+    await this.input.record(
+      'ci.round',
+      this.subject,
+      `CI red on ${red.names}; round ${round + 1} of ${this.max}, back to the builder`
+    )
+    await this.state(round, 'reworking', `CI red on ${red.names}`)
+    for (const { pull, verdict } of results) {
+      for (const c of verdict.checks) {
+        const id = runIdFrom(c.link)
+        if (id !== null) (this.judged.get(pull.url) as Set<string>).add(id)
       }
-
-      await input.record(
-        'ci.round',
-        subject,
-        `CI red on ${names}; round ${round + 1} of ${rounds}, back to the builder`
-      )
-      await input.state({
-        round,
-        max: rounds,
-        status: 'reworking',
-        pulls: snapshot(),
-        reason: `CI red on ${names}`,
-      })
-
-      for (const { pull, verdict } of results) {
-        for (const c of verdict.checks) {
-          const id = runIdFrom(c.link)
-          if (id !== null) (judged.get(pull.url) as Set<string>).add(id)
-        }
-      }
-      const ok = await input.sendBack(feedback)
-      if (!ok) return { kind: 'halted', reason: 'the fix round could not finish' }
-
-      round += 1
-      continue
     }
-
-    const reason = `CI red on ${names} after ${rounds} rounds`
-    await input.record('ci.exhausted', subject, reason)
-    await input.state({ round, max: rounds, status: 'red', pulls: snapshot(), reason })
-    return { kind: 'red', checks: redChecks, excerpt, rounds }
+    return this.input.sendBack({
+      from: 'ci',
+      attempt: round + 1,
+      source: 'ci',
+      command: null,
+      exitCode: null,
+      excerpt: red.excerpt,
+      logPath: null,
+    })
   }
 }
 
@@ -223,7 +248,11 @@ export function shipNodeId(recipe: Recipe): string | null {
  * and goes back to `waiting` when shipping stopped short of it, so a resume
  * owes the tail again. A node in any other state is returned untouched.
  */
-export function settleShip(graph: RunGraph, shipId: string, asked: boolean, at: string): RunGraph {
+export function settleShip(
+  graph: RunGraph,
+  shipId: string,
+  { asked, at }: { asked: boolean; at: string }
+): RunGraph {
   const node = nodeById(graph, shipId)
   if (node === undefined) return graph
   if (node.state !== 'running' && !(asked && node.state === 'waiting')) return graph
