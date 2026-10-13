@@ -85,10 +85,10 @@ describe('OutputRelay', () => {
     })
 
     it('ignores acknowledgements and resets for sessions it does not relay', () => {
-      expect(() => {
-        relay.acknowledge('other', 5)
-        relay.reset('other')
-      }).not.toThrow()
+      flood(HIGH_WATERMARK_CHARS + 1)
+      relay.acknowledge('other', HIGH_WATERMARK_CHARS + 1)
+      relay.reset('other')
+      expect(ptyManager.resume).not.toHaveBeenCalled()
     })
 
     it('ignores acknowledgements after the session has exited', () => {

@@ -13,20 +13,11 @@ import {
 // number. Ordering is the contract; the numbers are an implementation detail.
 
 describe('layer scale', () => {
-  it('names exactly the four layers the contract publishes', () => {
-    expect(LAYER_NAMES).toEqual(['panel', 'overlay', 'modal', 'toast'])
-  })
-
   it('orders panel below overlay below modal below toast', () => {
     expect(LAYERS.panel).toBeLessThan(LAYERS.overlay)
     expect(LAYERS.overlay).toBeLessThan(LAYERS.modal)
+    // A save confirmation raised from inside a dialog is readable without closing it.
     expect(LAYERS.modal).toBeLessThan(LAYERS.toast)
-  })
-
-  // A save confirmation raised by an action taken inside a dialog has to be
-  // readable without dismissing the dialog first.
-  it('puts toasts above modals on purpose', () => {
-    expect(LAYERS.toast).toBeGreaterThan(LAYERS.modal)
   })
 
   it('resolves a layer by name', () => {

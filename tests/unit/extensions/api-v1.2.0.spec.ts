@@ -85,6 +85,9 @@ vi.mock('../../../src/main/logger', () => ({
 import { createExtensionAPI } from '../../../src/main/extensions/api'
 import { setExtensionSetting } from '../../../src/main/storage/extension-settings-store'
 import { EventEmitter } from 'events'
+import type { SessionInfo } from '@terminator/extension-sdk'
+import type { PtyManager } from '../../../src/main/terminal/pty-manager'
+import { partialFake } from '../../support/fakes'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -116,7 +119,7 @@ describe('api.globalShortcut.register', () => {
 
   it('rejects if Electron reports the accelerator is already registered', async () => {
     const { globalShortcut: electronGS } = await import('electron')
-    vi.mocked(electronGS.register).mockReturnValueOnce(false as unknown as boolean)
+    vi.mocked(electronGS.register).mockReturnValueOnce(false)
     const api = createExtensionAPI('test.gs3', '0.1.0')
 
     await expect(api.globalShortcut.register('CmdOrCtrl+Shift+Q', vi.fn())).rejects.toThrow(
@@ -280,15 +283,16 @@ describe('api.ipc bridge channels', () => {
 // ── pty ──────────────────────────────────────────────────────────────────────
 
 describe('api.pty', () => {
-  const sessionInfo = {
+  const sessionInfo: SessionInfo = {
     sessionId: 's1',
     cwd: '/cwd',
-    type: 'human' as const,
-    origin: 'app' as const,
+    type: 'human',
+    origin: 'app',
     createdAt: 't',
     pid: 1,
   }
-  const mockPtyManager = {
+  const otherSession: SessionInfo = { ...sessionInfo, sessionId: 's2' }
+  const mockPtyManager = partialFake<PtyManager>({
     spawnSession: vi.fn(() => sessionInfo),
     onData: vi.fn(() => () => {}),
     onExit: vi.fn(() => () => {}),
@@ -297,8 +301,8 @@ describe('api.pty', () => {
     write: vi.fn(),
     resize: vi.fn(),
     kill: vi.fn(),
-    listSessions: vi.fn(() => ['s1', 's2']),
-  }
+    listSessions: vi.fn(() => [sessionInfo, otherSession]),
+  })
 
   describe('session authority surface (v1.4.0)', () => {
     it('spawnSession delegates and returns the session info', async () => {
@@ -327,13 +331,15 @@ describe('api.pty', () => {
       ).rejects.toThrow('PTY access not available')
     })
 
-    it('onData/onExit delegate and return a disposer that does nothing without a ptyManager', () => {
+    it('onData/onExit subscribe to the session, and do nothing without a ptyManager', () => {
       const api = createExtensionAPI('test.pty12', '0.1.0', { ptyManager: mockPtyManager })
-      expect(api.pty.onData('s1', vi.fn())).toBeTypeOf('function')
-      expect(api.pty.onExit('s1', vi.fn())).toBeTypeOf('function')
+      api.pty.onData('s1', vi.fn())
+      api.pty.onExit('s1', vi.fn())
+      expect(mockPtyManager.onData).toHaveBeenCalledWith('s1', expect.any(Function))
+      expect(mockPtyManager.onExit).toHaveBeenCalledWith('s1', expect.any(Function))
       const bare = createExtensionAPI('test.pty13', '0.1.0', {})
-      expect(bare.pty.onData('s1', vi.fn())).toBeTypeOf('function')
-      expect(bare.pty.onExit('s1', vi.fn())).toBeTypeOf('function')
+      expect(bare.pty.onData('s1', vi.fn())()).toBeUndefined()
+      expect(bare.pty.onExit('s1', vi.fn())()).toBeUndefined()
     })
 
     it('getSession and setWorkspace delegate, defaulting without a ptyManager', async () => {
@@ -368,7 +374,7 @@ describe('api.pty', () => {
 
     it('listSessions returns the manager session list', async () => {
       const api = createExtensionAPI('test.pty5', '0.1.0', { ptyManager: mockPtyManager })
-      expect(await api.pty.listSessions()).toEqual(['s1', 's2'])
+      expect(await api.pty.listSessions()).toEqual([sessionInfo, otherSession])
     })
   })
 

@@ -201,31 +201,33 @@ The built-in extensions in `extensions/` are the working examples, and `tests/fi
 
 ## Key Design Decisions
 
-| Decision                                              | Record                                                               |
-| ----------------------------------------------------- | -------------------------------------------------------------------- |
-| PTY processes live in main process only               | [ADR-001](docs/adr/001-pty-in-main-process.md)                       |
-| electron-store for persistence                        | [ADR-003](docs/adr/003-electron-store-for-persistence.md)            |
-| xterm.js instances are never destroyed on tab switch  | [ADR-004](docs/adr/004-xterm-instances-persist-on-tab-switch.md)     |
-| Native fs.watch instead of chokidar                   | [ADR-005](docs/adr/005-native-fswatcher-over-chokidar.md)            |
-| Sandboxed shell execution for extensions              | [ADR-006](docs/adr/006-sandboxed-shell-exec-for-extensions.md)       |
-| Bundled-first extension distribution (no marketplace) | [ADR-007](docs/adr/007-bundled-first-extension-distribution.md)      |
-| Extensions compile to CommonJS with esbuild           | [ADR-008](docs/adr/008-extension-commonjs-compilation.md)            |
-| `gh` CLI for all GitHub PR review operations          | [ADR-009](docs/adr/009-gh-cli-for-review-ops.md)                     |
-| Heuristic file ordering for code review (v1)          | [ADR-010](docs/adr/010-heuristic-file-ordering-v1.md)                |
-| Sanitised HTML in PR comments                         | [ADR-091](docs/adr/091-sanitised-html-in-pr-comments.md)             |
-| The Inbox is a band on the Forge                      | [ADR-092](docs/adr/092-the-inbox-is-a-band-on-the-forge.md)          |
-| Stay on Electron and TypeScript                       | [ADR-093](docs/adr/093-stay-on-electron-and-typescript.md)           |
-| Extensions follow the VS Code model (extension host)  | [ADR-094](docs/adr/094-extensions-follow-the-vs-code-model.md)       |
-| Coverage is gated by Codecov                          | [ADR-095](docs/adr/095-coverage-is-gated-by-codecov.md)              |
-| Every IPC channel has a schema                        | [ADR-096](docs/adr/096-every-ipc-channel-has-a-schema.md)            |
-| One version per dependency                            | [ADR-097](docs/adr/097-one-version-per-dependency.md)                |
-| One design system, documented in Storybook            | [ADR-098](docs/adr/098-one-design-system-documented-in-storybook.md) |
-| `node:sqlite` replaces PGlite                         | [ADR-099](docs/adr/099-node-sqlite-replaces-pglite.md)               |
-| Remote Control credentials                            | [ADR-100](docs/adr/100-remote-control-credentials.md)                |
-| No native terminal daemon                             | [ADR-101](docs/adr/101-no-terminal-daemon.md)                        |
-| Extension shell commands run only in declared roots   | [ADR-102](docs/adr/102-shell-exec-runs-in-declared-roots.md)         |
-| Unused code is a CI gate (knip)                       | [ADR-104](docs/adr/104-unused-code-is-a-ci-gate.md)                  |
-| Duplicate code is a CI gate (jscpd)                   | [ADR-105](docs/adr/105-duplicate-code-is-a-ci-gate.md)               |
+| Decision                                              | Record                                                                      |
+| ----------------------------------------------------- | --------------------------------------------------------------------------- |
+| PTY processes live in main process only               | [ADR-001](docs/adr/001-pty-in-main-process.md)                              |
+| electron-store for persistence                        | [ADR-003](docs/adr/003-electron-store-for-persistence.md)                   |
+| xterm.js instances are never destroyed on tab switch  | [ADR-004](docs/adr/004-xterm-instances-persist-on-tab-switch.md)            |
+| Native fs.watch instead of chokidar                   | [ADR-005](docs/adr/005-native-fswatcher-over-chokidar.md)                   |
+| Sandboxed shell execution for extensions              | [ADR-006](docs/adr/006-sandboxed-shell-exec-for-extensions.md)              |
+| Bundled-first extension distribution (no marketplace) | [ADR-007](docs/adr/007-bundled-first-extension-distribution.md)             |
+| Extensions compile to CommonJS with esbuild           | [ADR-008](docs/adr/008-extension-commonjs-compilation.md)                   |
+| `gh` CLI for all GitHub PR review operations          | [ADR-009](docs/adr/009-gh-cli-for-review-ops.md)                            |
+| Heuristic file ordering for code review (v1)          | [ADR-010](docs/adr/010-heuristic-file-ordering-v1.md)                       |
+| Sanitised HTML in PR comments                         | [ADR-091](docs/adr/091-sanitised-html-in-pr-comments.md)                    |
+| The Inbox is a band on the Forge                      | [ADR-092](docs/adr/092-the-inbox-is-a-band-on-the-forge.md)                 |
+| Stay on Electron and TypeScript                       | [ADR-093](docs/adr/093-stay-on-electron-and-typescript.md)                  |
+| Extensions follow the VS Code model (extension host)  | [ADR-094](docs/adr/094-extensions-follow-the-vs-code-model.md)              |
+| Coverage is gated by Codecov                          | [ADR-095](docs/adr/095-coverage-is-gated-by-codecov.md)                     |
+| Every IPC channel has a schema                        | [ADR-096](docs/adr/096-every-ipc-channel-has-a-schema.md)                   |
+| One version per dependency                            | [ADR-097](docs/adr/097-one-version-per-dependency.md)                       |
+| One design system, documented in Storybook            | [ADR-098](docs/adr/098-one-design-system-documented-in-storybook.md)        |
+| `node:sqlite` replaces PGlite                         | [ADR-099](docs/adr/099-node-sqlite-replaces-pglite.md)                      |
+| Remote Control credentials                            | [ADR-100](docs/adr/100-remote-control-credentials.md)                       |
+| No native terminal daemon                             | [ADR-101](docs/adr/101-no-terminal-daemon.md)                               |
+| Extension shell commands run only in declared roots   | [ADR-102](docs/adr/102-shell-exec-runs-in-declared-roots.md)                |
+| Each extension has its own data folder                | [ADR-103](docs/adr/103-each-extension-has-its-own-data-folder.md)           |
+| Unused code is a CI gate (knip)                       | [ADR-104](docs/adr/104-unused-code-is-a-ci-gate.md)                         |
+| Duplicate code is a CI gate (jscpd)                   | [ADR-105](docs/adr/105-duplicate-code-is-a-ci-gate.md)                      |
+| TypeScript 6.0.3 until typescript-eslint supports 7   | [ADR-106](docs/adr/106-typescript-6-until-the-lint-toolchain-supports-7.md) |
 
 ## Contributing
 

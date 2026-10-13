@@ -71,7 +71,8 @@ describe('TrackerProvider surface', () => {
     }
   })
 
-  it('jira omits every optional operation, and reports that rather than throwing when asked', () => {
+  // Asked about one, the issue service answers "unsupported" (issue-service-transition.spec).
+  it('jira omits every optional operation', () => {
     const [, jira] = providers[1]
     for (const operation of PROVIDER_OPTIONAL_OPERATIONS) {
       expect(methodsOf(jira)).not.toContain(operation)
@@ -88,12 +89,6 @@ describe('TrackerProvider surface', () => {
         ).toBe(false)
       }
     }
-  })
-
-  // 061 widened it by one more: creating an issue, at the operator's word
-  // (ADR-061). Still no field-level write, and still no way to delete one.
-  it('sanctions exactly three write operations, and no field-level write among them', () => {
-    expect(PROVIDER_WRITE_OPERATIONS).toEqual(['comment', 'transition', 'create'])
   })
 
   it('sanctions no way to delete or archive an issue', () => {

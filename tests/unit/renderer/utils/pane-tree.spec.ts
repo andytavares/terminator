@@ -42,19 +42,6 @@ describe('splitLeaf', () => {
       split('s1', 'vertical', leaf('a'), split('test-uuid', 'horizontal', leaf('b'), leaf('c')))
     )
   })
-
-  it('sets ratio to 0.5 on the new split', () => {
-    const result = splitLeaf(leaf('a'), 'a', 'b', 'horizontal')
-    if (result.type !== 'split') throw new Error('expected split')
-    expect(result.ratio).toBe(0.5)
-  })
-
-  it('positions the new leaf as the second child', () => {
-    const result = splitLeaf(leaf('a'), 'a', 'new', 'vertical')
-    if (result.type !== 'split') throw new Error('expected split')
-    expect(result.first).toEqual(leaf('a'))
-    expect(result.second).toEqual(leaf('new'))
-  })
 })
 
 describe('removeLeaf', () => {
@@ -110,21 +97,11 @@ describe('updateSplitRatio', () => {
     expect(updateSplitRatio(leaf('a'), 'does-not-exist', 0.7)).toEqual(leaf('a'))
   })
 
-  it('updates the ratio of a matching split node', () => {
+  it('updates the ratio of a matching split node and nothing else', () => {
     const tree = split('s1', 'vertical', leaf('a'), leaf('b'), 0.5)
-    const result = updateSplitRatio(tree, 's1', 0.7)
-    if (result.type !== 'split') throw new Error('expected split')
-    expect(result.ratio).toBe(0.7)
-  })
-
-  it('does not change other properties when updating ratio', () => {
-    const tree = split('s1', 'vertical', leaf('a'), leaf('b'), 0.5)
-    const result = updateSplitRatio(tree, 's1', 0.3)
-    if (result.type !== 'split') throw new Error('expected split')
-    expect(result.id).toBe('s1')
-    expect(result.direction).toBe('vertical')
-    expect(result.first).toEqual(leaf('a'))
-    expect(result.second).toEqual(leaf('b'))
+    expect(updateSplitRatio(tree, 's1', 0.3)).toEqual(
+      split('s1', 'vertical', leaf('a'), leaf('b'), 0.3)
+    )
   })
 
   it('updates a nested split node', () => {

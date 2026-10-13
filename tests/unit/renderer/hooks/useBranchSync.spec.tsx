@@ -3,9 +3,11 @@ import { renderHook, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useBranchSync, type BranchSyncTarget } from '../../../../src/renderer/hooks/useBranchSync'
 import { seedStore } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 
 const mockUpdateProjectBranch = vi.fn()
-const mockCurrentBranch = vi.fn()
+const mockCurrentBranch = vi.fn<ElectronAPI['git']['currentBranch']>()
 
 const target = (over: Partial<BranchSyncTarget> = {}): BranchSyncTarget => ({
   id: 'proj-1',
@@ -26,9 +28,7 @@ async function settle(): Promise<void> {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers({ shouldAdvanceTime: true })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    git: { currentBranch: mockCurrentBranch },
-  }
+  installElectronApi({ git: { currentBranch: mockCurrentBranch } })
   seedStore(useWorkspaceStore, {
     updateProjectBranch: mockUpdateProjectBranch,
   })
@@ -38,7 +38,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('useBranchSync — the name on the card is the branch in the tree', () => {
@@ -123,7 +122,7 @@ describe('useBranchSync — the name on the card is the branch in the tree', () 
 
   it('ignores a folder that is not a repository', async () => {
     mockCurrentBranch.mockRejectedValue(new Error('not a git repo'))
-    expect(() => renderHook(() => useBranchSync([target()]))).not.toThrow()
+    renderHook(() => useBranchSync([target()]))
     await settle()
     expect(mockUpdateProjectBranch).not.toHaveBeenCalled()
   })

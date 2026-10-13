@@ -134,7 +134,7 @@ describe('useNotificationStore', () => {
       useNotificationStore.getState().addNotification(makeNotif({ id: 'd1' }))
       useNotificationStore.getState().addNotification(makeNotif({ id: 'd2' }))
       useNotificationStore.getState().clearAll()
-      expect(mockDismiss).toHaveBeenCalledTimes(2)
+      expect(mockDismiss.mock.calls).toEqual([['d2'], ['d1']])
     })
   })
 

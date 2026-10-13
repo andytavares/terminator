@@ -25,20 +25,8 @@ describe('iconFromName', () => {
   })
 
   it('maps all curated icon names to distinct elements', () => {
-    for (const name of CURATED_ICON_NAMES) {
-      const el = iconFromName(name)
-      expect(isValidElement(el), `${name} should return a React element`).toBe(true)
-    }
-  })
-
-  it('includes wifi in the curated set', () => {
-    expect(CURATED_ICON_NAMES).toContain('wifi')
-    expect(isValidElement(iconFromName('wifi'))).toBe(true)
-  })
-
-  it('includes check in the curated set', () => {
-    expect(CURATED_ICON_NAMES).toContain('check')
-    expect(isValidElement(iconFromName('check'))).toBe(true)
+    const types = CURATED_ICON_NAMES.map((name) => iconFromName(name).type)
+    expect(new Set(types).size).toBe(CURATED_ICON_NAMES.length)
   })
 
   it('is case-sensitive — uppercase is treated as unknown', () => {

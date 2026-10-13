@@ -57,9 +57,6 @@ test('a folder that is not there is refused rather than launching anything', asy
 // to launch, from a fixed list. A channel that took a command would be a way to
 // run anything.
 test('the channel takes a folder, never a command', async () => {
-  const result = await handle.page.evaluate(() =>
-    // @ts-expect-error deliberately wrong shape
-    window.electronAPI.editor.open('')
-  )
+  const result = await handle.page.evaluate(() => window.electronAPI.editor.open(''))
   expect(result).toEqual({ error: 'VALIDATION_ERROR' })
 })

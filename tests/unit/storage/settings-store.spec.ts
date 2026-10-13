@@ -110,22 +110,4 @@ describe('settings-store', () => {
     const ws = getWorkspaceSettings('ws-1')
     expect(ws.overrides?.appearance?.theme).toBe('light')
   })
-
-  it('workspace override takes precedence — test via resolveSettings logic', async () => {
-    const {
-      updateGlobalSettings,
-      updateWorkspaceSettings,
-      getGlobalSettings,
-      getWorkspaceSettings,
-    } = await import('../../../src/main/storage/settings-store')
-    updateGlobalSettings({ appearance: { theme: 'dark' } })
-    updateWorkspaceSettings('ws-override', { appearance: { theme: 'light' } })
-    const global = getGlobalSettings()
-    const ws = getWorkspaceSettings('ws-override')
-    const resolved = {
-      ...global,
-      appearance: { ...global.appearance, ...ws.overrides?.appearance },
-    }
-    expect(resolved.appearance.theme).toBe('light')
-  })
 })

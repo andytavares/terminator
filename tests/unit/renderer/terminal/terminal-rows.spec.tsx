@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { partialFake } from '../../../support/fakes'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import type { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
 import { exposeTerminalRows } from '../../../../src/renderer/terminal/terminal-rows'
@@ -8,7 +9,7 @@ function openTerminals(screens: Record<string, string[]>): HTMLElement[] {
   const instances = Object.entries(screens).map(([id, rows]) => {
     const element = document.createElement('div')
     element.appendChild(document.createElement('div')).className = 'xterm-screen'
-    return [id, { element, readVisibleRows: () => rows } as unknown as TerminalInstance] as const
+    return [id, partialFake<TerminalInstance>({ element, readVisibleRows: () => rows })] as const
   })
   useSessionStore.setState({ terminalInstances: new Map(instances) })
   return instances.map(([, instance]) => instance.element)

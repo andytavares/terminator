@@ -3,7 +3,9 @@ import { loginShellPathReady } from './login-shell-path.js'
 import { realpath } from 'fs/promises'
 import { basename, dirname, isAbsolute, join, relative, sep } from 'path'
 
-const ALLOWED_COMMANDS = new Set(['git', 'gh'])
+/** The only commands any caller may run; the shell:exec channel's schema is built from it. */
+export const ALLOWED_COMMAND_NAMES = ['git', 'gh'] as const
+const ALLOWED_COMMANDS = new Set<string>(ALLOWED_COMMAND_NAMES)
 
 export interface ShellExecInput {
   command: string

@@ -2,7 +2,9 @@
 // The preload runs in a renderer context: it needs a real `window` to attach
 // the double-Escape exit listener to.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { IpcRendererEvent } from 'electron'
 import { ELECTRON_API_MANIFEST } from '../../../src/shared/electron-api/manifest.js'
+import { partialFake } from '../../support/fakes'
 
 const exposed: Record<string, unknown> = {}
 const mockSend = vi.fn()
@@ -109,21 +111,12 @@ describe('preload-webview', () => {
     api[namespace][name](handler)
 
     const pushed = { sessionId: 's1', data: 'd', exitCode: 0, id: 'x' }
-    const [channel, listener] = vi.mocked(ipcRenderer.on).mock.calls[0] as unknown as [
-      string,
-      (event: unknown, ...wire: unknown[]) => void,
-    ]
-    listener({}, pushed)
+    const [channel, listener] = vi.mocked(ipcRenderer.on).mock.calls[0]
+    listener(partialFake<IpcRendererEvent>({}), pushed)
     expect(channel).toBe(spec.channel)
     expect(handler).toHaveBeenCalledWith(
       ...(spec.toHandlerArgs ? spec.toHandlerArgs([pushed]) : [pushed])
     )
-  })
-
-  it('exposes extensionBridge.on and extensionBridge.invoke', () => {
-    const api = exposed['electronAPI'] as Record<string, Record<string, unknown>>
-    expect(typeof api['extensionBridge']['on']).toBe('function')
-    expect(typeof api['extensionBridge']['invoke']).toBe('function')
   })
 
   it('runCommand and hasCommand invoke the extension channels with key and args', async () => {
@@ -141,11 +134,6 @@ describe('preload-webview', () => {
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('extension:has-command', {
       key: 'ext.command.open',
     })
-  })
-
-  it('exposes workspace.list as a function', () => {
-    const api = exposed['electronAPI'] as Record<string, Record<string, unknown>>
-    expect(typeof api['workspace']['list']).toBe('function')
   })
 
   describe('double-Escape exit gesture', () => {

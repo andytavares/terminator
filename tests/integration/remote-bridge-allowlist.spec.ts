@@ -68,11 +68,6 @@ describe('remote bridge allowlist (integration: real route + real allowlist)', (
     await app.close()
   })
 
-  it('documents the allowlist intent for the two channels under test', () => {
-    expect(REMOTE_ACCESSIBLE_CHANNELS.has('workspace:list')).toBe(true)
-    expect(REMOTE_ACCESSIBLE_CHANNELS.has('dialog:open-directory')).toBe(false)
-  })
-
   it('invokes an allowlisted channel end-to-end and returns its handler result', async () => {
     const ticket = ticketStore.createTicket('__bridge__', 'bridge')
     const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)

@@ -161,9 +161,7 @@ describe('createTerminalSession', () => {
     const { sessionId, scrollbackLimit, hooks } = capturedCtorArgs[0]
     expect(sessionId).toBe('session-123')
     expect(scrollbackLimit).toBe(7777)
-    expect(hooks?.onBell).toBeTypeOf('function')
-    expect(hooks?.onBusy).toBeTypeOf('function')
-    expect(hooks?.onIdle).toBeTypeOf('function')
+    expect(Object.keys(hooks ?? {}).sort()).toEqual(['onBell', 'onBusy', 'onDispose', 'onIdle'])
   })
 
   it('marks the session busy on output, and idle after the working hold', async () => {

@@ -39,7 +39,7 @@ export function Popover({ label, children, onDismiss, className }: PopoverProps)
   })
 
   useEffect(() => {
-    const registry = createModalDepthRegistry(window as unknown as Record<string, unknown>)
+    const registry = createModalDepthRegistry(window)
     const release = registry.release()
     // Focus moves in, but is not trapped: Tab may leave, and that is correct for
     // a surface the rest of the view is still usable behind.

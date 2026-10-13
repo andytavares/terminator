@@ -1,84 +1,87 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-
-const registry = vi.hoisted(() => ({
-  setActiveGlobalTab: vi.fn(),
-  setActiveWorkspaceTab: vi.fn(),
-  setActiveProjectTab: vi.fn(),
-}))
-
-vi.mock('../../../../src/renderer/extensions/registry', () => ({
-  useExtensionRegistry: { getState: () => registry },
-}))
-
+// @vitest-environment jsdom
+import { describe, it, expect, beforeEach } from 'vitest'
 import { revealSession } from '../../../../src/renderer/terminal/navigate-to-session'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
-import {
-  projectOf,
-  seedStore,
-  terminalSessionOf,
-  type SeededStore,
-} from '../../../support/renderer-stores'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import { projectOf, resetStore, terminalSessionOf } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
 
-let session: SeededStore<typeof useSessionStore>
-let workspace: SeededStore<typeof useWorkspaceStore>
+const P1 = projectOf({ id: 'p1', workspaceId: 'w1' })
+const P2 = projectOf({ id: 'p2', workspaceId: 'w2' })
+const projectsByWorkspaceId = new Map([
+  ['w1', [P1]],
+  ['w2', [P2]],
+])
+
+const sessions = () => useSessionStore.getState()
+const workspaces = () => useWorkspaceStore.getState()
+const registry = () => useExtensionRegistry.getState()
+
+function withSessions(...list: ReturnType<typeof terminalSessionOf>[]): void {
+  useSessionStore.setState({ sessions: new Map(list.map((s) => [s.id, s])) })
+}
 
 beforeEach(() => {
-  vi.clearAllMocks()
-  session = seedStore(useSessionStore, { sessions: new Map() })
-  workspace = seedStore(useWorkspaceStore, {
-    activeWorkspaceId: 'w1',
-    projectsByWorkspaceId: new Map([
-      ['w1', [projectOf({ id: 'p1', workspaceId: 'w1' })]],
-      ['w2', [projectOf({ id: 'p2', workspaceId: 'w2' })]],
-    ]),
+  resetStore(useSessionStore)
+  resetStore(useWorkspaceStore, { activeWorkspaceId: 'w1', projectsByWorkspaceId })
+  resetStore(useExtensionRegistry, {
+    activeGlobalTabId: 'core.home',
+    activeWorkspaceTabId: 'reviews',
+    activeProjectTabId: 'git',
+  })
+  // Switching workspace reloads its projects from main.
+  installElectronApi({
+    project: { list: async (id: string) => ({ projects: projectsByWorkspaceId.get(id) ?? [] }) },
   })
 })
 
 describe('revealSession', () => {
   it('leaves the global, workspace and project tabs and shows the session in its project', () => {
-    session.sessions.set('s1', terminalSessionOf({ id: 's1', projectId: 'p1' }))
+    withSessions(terminalSessionOf({ id: 's1', projectId: 'p1' }))
     revealSession('s1')
-    expect(registry.setActiveGlobalTab).toHaveBeenCalledWith(null)
-    expect(registry.setActiveWorkspaceTab).toHaveBeenCalledWith(null)
-    expect(registry.setActiveProjectTab).toHaveBeenCalledWith(null)
-    expect(workspace.setActiveWorkspace).not.toHaveBeenCalled()
-    expect(workspace.setActiveProject).toHaveBeenCalledWith('p1')
-    expect(session.setActiveSessionForProject).toHaveBeenCalledWith('p1', 's1')
+    expect(registry()).toMatchObject({
+      activeGlobalTabId: null,
+      activeWorkspaceTabId: null,
+      activeProjectTabId: null,
+    })
+    expect(workspaces()).toMatchObject({ activeWorkspaceId: 'w1', activeProjectId: 'p1' })
+    expect(sessions().getActiveSessionForProject('p1')).toBe('s1')
   })
 
   it('switches workspace when the session lives in another one', () => {
-    session.sessions.set('s2', terminalSessionOf({ id: 's2', projectId: 'p2' }))
+    withSessions(terminalSessionOf({ id: 's2', projectId: 'p2' }))
     revealSession('s2')
-    expect(workspace.setActiveWorkspace).toHaveBeenCalledWith('w2')
+    expect(workspaces()).toMatchObject({ activeWorkspaceId: 'w2', activeProjectId: 'p2' })
+    expect(sessions().getActiveSessionForProject('p2')).toBe('s2')
   })
 
   it('opens a scratch terminal in the scratch view', () => {
-    session.sessions.set('s3', terminalSessionOf({ id: 's3', projectId: SCRATCH_PROJECT_ID }))
+    withSessions(terminalSessionOf({ id: 's3', projectId: SCRATCH_PROJECT_ID }))
     revealSession('s3')
-    expect(session.setActiveSessionForProject).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 's3')
-    expect(workspace.setScratchActive).toHaveBeenCalledWith(true)
-    expect(workspace.setActiveProject).not.toHaveBeenCalled()
-    expect(session.requestFocus).toHaveBeenCalledWith('s3')
+    expect(sessions().getActiveSessionForProject(SCRATCH_PROJECT_ID)).toBe('s3')
+    expect(workspaces()).toMatchObject({ scratchActive: true, activeProjectId: null })
+    expect(sessions().focusRequest?.sessionId).toBe('s3')
   })
 
   it('does nothing for a session that has gone', () => {
     revealSession('nobody')
-    expect(registry.setActiveGlobalTab).not.toHaveBeenCalled()
+    expect(registry().activeGlobalTabId).toBe('core.home')
   })
 
   it('stays put when the project has gone', () => {
-    session.sessions.set('s4', terminalSessionOf({ id: 's4', projectId: 'deleted' }))
+    withSessions(terminalSessionOf({ id: 's4', projectId: 'deleted' }))
     revealSession('s4')
-    expect(workspace.setActiveProject).not.toHaveBeenCalled()
+    expect(workspaces().activeProjectId).toBeNull()
+    expect(sessions().focusRequest).toBeNull()
   })
 
   it('bumps the focus request even when the session is already the active one', () => {
-    session.sessions.set('s1', terminalSessionOf({ id: 's1', projectId: 'p1' }))
+    withSessions(terminalSessionOf({ id: 's1', projectId: 'p1' }))
     revealSession('s1')
-    expect(session.requestFocus).toHaveBeenCalledWith('s1')
+    const first = sessions().focusRequest
     revealSession('s1')
-    expect(session.requestFocus).toHaveBeenCalledTimes(2)
+    expect(sessions().focusRequest).toEqual({ sessionId: 's1', nonce: first!.nonce + 1 })
   })
 })

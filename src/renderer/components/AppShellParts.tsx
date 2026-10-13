@@ -22,12 +22,15 @@ export function HomeBadge(): null {
       [...sessions.values()].filter((s) => needsYouSource.derive(s) === 'awaiting-input').length,
     [sessions]
   )
+  // App registers Home in its own effect, which runs after this child's, so
+  // the badge is written again once Home is there.
+  const homeRegistered = useExtensionRegistry((s) => s.globalTabs.has('core.home'))
   useEffect(() => {
     useExtensionRegistry.getState().updateGlobalTab('core.home', {
       badge: needsYouCount,
       badgeLabel: `${needsYouCount} need you`,
     })
-  }, [needsYouCount])
+  }, [needsYouCount, homeRegistered])
   return null
 }
 

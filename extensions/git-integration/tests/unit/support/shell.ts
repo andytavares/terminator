@@ -11,7 +11,7 @@ type ExecFileStub = (...args: unknown[]) => unknown
 type Exec = ExtensionAPI['shell']['exec']
 
 interface StubError extends Error {
-  code?: string | number
+  code?: string | number | null
   stdout?: string
   stderr?: string
 }

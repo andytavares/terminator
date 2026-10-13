@@ -36,29 +36,11 @@ test('record the features the running app offers', async () => {
     .toEqual(ids)
 
   const channels = await app.evaluate(({ ipcMain }) => ({
-    invoke: [
-      ...(ipcMain as unknown as { _invokeHandlers: Map<string, unknown> })._invokeHandlers.keys(),
-    ],
+    invoke: [...(Reflect.get(ipcMain, '_invokeHandlers') as Map<string, unknown>).keys()],
     send: ipcMain.eventNames().filter((name): name is string => typeof name === 'string'),
   }))
   const { commands, schemas } = await page.evaluate(async () => {
-    const api = (
-      window as unknown as {
-        electronAPI: {
-          extension: {
-            getCommands(): Promise<{
-              commands: Array<{ key: string; extensionId: string; label: string }>
-            }>
-            getSettingsSchemas(): Promise<{
-              schemas: Array<{
-                extensionId: string
-                properties: Record<string, { label: string; type: string; channel?: string }>
-              }>
-            }>
-          }
-        }
-      }
-    ).electronAPI.extension
+    const api = window.electronAPI.extension
     return {
       commands: (await api.getCommands()).commands,
       schemas: (await api.getSettingsSchemas()).schemas,

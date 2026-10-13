@@ -50,7 +50,7 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
     ws?.overrides?.git?.worktreeBaseDir ?? globalSettings.git.worktreeBaseDir
   const hasBranchExcludeOverride = ws?.overrides?.git?.branchExcludePatterns !== undefined
   const effectiveBranchExcludePatterns =
-    ws?.overrides?.git?.branchExcludePatterns ?? globalSettings.git.branchExcludePatterns ?? []
+    ws?.overrides?.git?.branchExcludePatterns ?? globalSettings.git.branchExcludePatterns
 
   return (
     <>

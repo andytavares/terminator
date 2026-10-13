@@ -60,14 +60,13 @@ describe('rankFirstScreen', () => {
       { id: 'c', count: 5, lastUsedAt: now },
     ]
     const { recent } = rankFirstScreen(actions, { pins: ['a'], usage, now })
-    expect(recent[0].id).toBe('c')
-    expect(recent.map((a) => a.id)).not.toContain('a')
+    expect(recent.map((a) => a.id)).toEqual(['c', 'b'])
   })
 
   it('drops stale usage ids that are no longer live actions', () => {
     const usage: ActionUsage[] = [{ id: 'ghost', count: 100, lastUsedAt: now }]
     const { recent } = rankFirstScreen(actions, { pins: [], usage, now })
-    expect(recent.map((a) => a.id)).not.toContain('ghost')
+    expect(recent).toEqual([])
   })
 
   it('limits the recent row to the given limit, defaulting to 4', () => {

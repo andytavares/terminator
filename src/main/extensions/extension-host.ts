@@ -304,7 +304,7 @@ export class ExtensionHost {
     })
   }
 
-  getExtensionContributes(id: string) {
+  getExtensionContributes(id: string): Extension['contributes'] | null {
     const record = store.get('extensions').find((e) => e.id === id)
     return record?.contributes ?? null
   }

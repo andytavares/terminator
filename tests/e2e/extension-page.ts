@@ -41,12 +41,7 @@ export function invokeChannel<T = unknown>(
   payload?: unknown
 ): Promise<T> {
   return page.evaluate(
-    ([name, body]) =>
-      (
-        window as unknown as {
-          electronAPI: { extensionBridge: { invoke(c: string, p?: unknown): Promise<unknown> } }
-        }
-      ).electronAPI.extensionBridge.invoke(name as string, body),
+    ([name, body]) => window.electronAPI.extensionBridge.invoke(name as string, body),
     [channel, payload] as const
   ) as Promise<T>
 }

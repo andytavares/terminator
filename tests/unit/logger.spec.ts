@@ -47,15 +47,6 @@ describe('logger (src/main/logger.ts)', () => {
 
   // ── makeLogger ─────────────────────────────────────────────────────────
 
-  it('makeLogger returns an object with debug/info/warn/error methods', async () => {
-    const { makeLogger } = await import('../../src/main/logger')
-    const log = makeLogger('test-ns')
-    expect(typeof log.debug).toBe('function')
-    expect(typeof log.info).toBe('function')
-    expect(typeof log.warn).toBe('function')
-    expect(typeof log.error).toBe('function')
-  })
-
   it('debug writes a DEBUG line to the stream', async () => {
     const { makeLogger } = await import('../../src/main/logger')
     const log = makeLogger('myns')
@@ -126,8 +117,7 @@ describe('logger (src/main/logger.ts)', () => {
 
   it('getLogPath returns the path to the log file', async () => {
     const { getLogPath } = await import('../../src/main/logger')
-    const p = getLogPath()
-    expect(p).toContain('terminator.log')
+    expect(getLogPath()).toBe('/tmp/testlogs/terminator.log')
   })
 
   // ── getStream / rotatIfNeeded ──────────────────────────────────────────
@@ -172,14 +162,16 @@ describe('logger (src/main/logger.ts)', () => {
     expect(mockRenameSync).not.toHaveBeenCalled()
   })
 
-  it('swallows statSync errors without crashing', async () => {
+  it('still writes the line when the size of the old log cannot be read', async () => {
     mockExistsSync = vi.fn(() => true)
     mockStatSync.mockImplementationOnce(() => {
       throw new Error('EACCES')
     })
 
     const { makeLogger } = await import('../../src/main/logger')
-    expect(() => makeLogger('stat-err').info('ping')).not.toThrow()
+    makeLogger('stat-err').info('ping')
+    expect(mockRenameSync).not.toHaveBeenCalled()
+    expect(mockStream.write).toHaveBeenCalledWith(expect.stringContaining('[stat-err] ping'))
   })
 
   it('swallows stream.write errors without crashing', async () => {

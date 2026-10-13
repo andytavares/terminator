@@ -97,14 +97,10 @@ describe('integrations composition root', () => {
       .getIssueService()
       .get('linear', 'TAV-1')
       .catch(() => null)
-    // The error is written to the store in the background; under a loaded
-    // pre-commit run that took longer than vi.waitFor's 1 s default.
-    await vi.waitFor(
-      async () =>
-        expect(await trackers.listConnections()).toContainEqual(
-          expect.objectContaining({ tracker: 'linear', lastError: 'auth-failed' })
-        ),
-      { timeout: 5000 }
+    // The store answers a read after the writes asked for before it, and the
+    // error was recorded before get() rejected.
+    expect(await trackers.listConnections()).toContainEqual(
+      expect.objectContaining({ tracker: 'linear', lastError: 'auth-failed' })
     )
   })
 

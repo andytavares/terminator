@@ -109,7 +109,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   loadWorkspaces: async () => {
     const result = await window.electronAPI.workspace.list()
-    set({ workspaces: result.workspaces ?? [] })
+    set({ workspaces: result.workspaces })
   },
 
   createWorkspace: async (input) => {
@@ -153,7 +153,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const result = await window.electronAPI.project.list(workspaceId)
     set((s) => {
       const map = new Map(s.projectsByWorkspaceId)
-      map.set(workspaceId, result.projects ?? [])
+      map.set(workspaceId, result.projects)
       return { projectsByWorkspaceId: map }
     })
   },

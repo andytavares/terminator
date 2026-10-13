@@ -24,6 +24,12 @@ vi.mock('child_process', () => ({
 }))
 vi.mock('fs/promises', () => ({ readFile: mockReadFile }))
 
+const realPlatform = process.platform
+function setPlatform(value: NodeJS.Platform) {
+  Object.defineProperty(process, 'platform', { value, configurable: true })
+}
+afterEach(() => setPlatform(realPlatform))
+
 function makeCpus(idle: number, total: number) {
   return [
     {
@@ -57,28 +63,35 @@ describe('registerMetricsHandlers', () => {
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
     registerMetricsHandlers(getPtyManager() as never)
     const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1]
-    const result = (await handler()) as { data: Record<string, number> }
-    expect(result.data.cpuPercent).toBeGreaterThanOrEqual(0)
-    expect(result.data.memUsedBytes).toBeGreaterThan(0)
-    expect(result.data.memTotalBytes).toBe(8 * 1024 ** 3)
-    expect(result.data.netInBytesPerSec).toBeGreaterThanOrEqual(0)
-    expect(result.data.netOutBytesPerSec).toBeGreaterThanOrEqual(0)
+    // No interval has been measured yet on the first poll, so every rate is zero.
+    expect(await handler()).toEqual({
+      data: {
+        cpuPercent: 0,
+        memUsedBytes: 6 * 1024 ** 3,
+        memTotalBytes: 8 * 1024 ** 3,
+        netInBytesPerSec: 0,
+        netOutBytesPerSec: 0,
+      },
+    })
+  })
+
+  it('metrics:system measures CPU busy time between samples', async () => {
+    vi.resetModules()
+    const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
+    registerMetricsHandlers(getPtyManager() as never)
+    const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1]
+    await handler()
+    // 200 ms more in total, 100 of them idle: half busy.
+    mockCpus.mockReturnValue(makeCpus(900, 1200))
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(await handler()).toMatchObject({ data: { cpuPercent: 50 } })
   })
 
   describe('sampler lifecycle', () => {
     const netstat = (bytesIn: number, bytesOut: number) => ({
       stdout: `Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Drop\nen0 1500 <Link> aa:bb 1 0 ${bytesIn} 1 0 ${bytesOut} 0\n`,
     })
-    let originalPlatform: NodeJS.Platform
-
-    beforeEach(() => {
-      originalPlatform = process.platform
-      Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    })
-
-    afterEach(() => {
-      Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
-    })
+    beforeEach(() => setPlatform('darwin'))
 
     async function registerAndGetSystemHandler() {
       vi.resetModules()
@@ -168,16 +181,11 @@ describe('registerMetricsHandlers', () => {
   })
 
   it('readNetBytes tolerates truncated /proc/net/dev rows on linux', async () => {
-    const originalPlatform = process.platform
-    Object.defineProperty(process, 'platform', { value: 'linux' })
-    try {
-      mockReadFile.mockResolvedValue('header\nheader\neth0:\nlo: 1 2 3 4 5 6 7 8 9\n')
-      vi.resetModules()
-      const { readNetBytes } = await import('../../../src/main/ipc/metrics.ipc.js')
-      expect(await readNetBytes()).toEqual({ bytesIn: 0, bytesOut: 0 })
-    } finally {
-      Object.defineProperty(process, 'platform', { value: originalPlatform })
-    }
+    setPlatform('linux')
+    mockReadFile.mockResolvedValue('header\nheader\neth0:\nlo: 1 2 3 4 5 6 7 8 9\n')
+    vi.resetModules()
+    const { readNetBytes } = await import('../../../src/main/ipc/metrics.ipc.js')
+    expect(await readNetBytes()).toEqual({ bytesIn: 0, bytesOut: 0 })
   })
 
   it('metrics:processes parses ps output', async () => {
@@ -234,33 +242,31 @@ describe('registerMetricsHandlers', () => {
     expect(result.data).toEqual([])
   })
 
-  it('metrics:system reads linux /proc/net/dev when on linux', async () => {
-    const originalPlatform = process.platform
-    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
-    mockReadFile.mockResolvedValue(
-      'Inter-|   Receive\nIface |bytes packets\neth0: 1000 0 0 0 0 0 0 0 0 500\n'
-    )
+  it('metrics:system measures network rates from /proc/net/dev on linux', async () => {
+    setPlatform('linux')
+    const procNetDev = (bytesIn: number, bytesOut: number) =>
+      `Inter-|   Receive\nIface |bytes packets\neth0: ${bytesIn} 0 0 0 0 0 0 0 ${bytesOut}\n`
+    mockReadFile
+      .mockResolvedValueOnce(procNetDev(1000, 500))
+      .mockResolvedValue(procNetDev(4000, 2000))
     vi.resetModules()
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
     registerMetricsHandlers(getPtyManager() as never)
     const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1]
-    await expect(handler()).resolves.toBeDefined()
-    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+    await handler()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(await handler()).toMatchObject({
+      data: { netInBytesPerSec: 3000, netOutBytesPerSec: 1500 },
+    })
+    expect(mockReadFile).toHaveBeenCalledWith('/proc/net/dev', 'utf-8')
   })
 
-  it('readNetBytes falls back to zero when proc/net/dev read fails on linux', async () => {
-    const originalPlatform = process.platform
-    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+  it('readNetBytes falls back to zero when /proc/net/dev cannot be read on linux', async () => {
+    setPlatform('linux')
     mockReadFile.mockRejectedValue(new Error('read failed'))
     vi.resetModules()
-    const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
-    registerMetricsHandlers(getPtyManager() as never)
-    const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1]
-    const result = (await handler()) as {
-      data: { netInBytesPerSec: number; netOutBytesPerSec: number }
-    }
-    expect(result.data.netInBytesPerSec).toBeGreaterThanOrEqual(0)
-    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+    const { readNetBytes } = await import('../../../src/main/ipc/metrics.ipc.js')
+    expect(await readNetBytes()).toEqual({ bytesIn: 0, bytesOut: 0 })
   })
 })
 
@@ -272,8 +278,7 @@ describe('readNetBytes (exported)', () => {
   })
 
   it('parses /proc/net/dev on Linux, sums non-loopback interfaces, skips lo', async () => {
-    const originalPlatform = process.platform
-    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+    setPlatform('linux')
     // Two header lines then interface lines
     const procNetDev = [
       'Inter-|   Receive                                                |  Transmit',
@@ -292,12 +297,10 @@ describe('readNetBytes (exported)', () => {
     // lo is skipped
     expect(result.bytesIn).toBe(3000)
     expect(result.bytesOut).toBe(1500)
-    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
   })
 
   it('parses netstat -ib on Darwin, reads correct columns, skips lo0', async () => {
-    const originalPlatform = process.platform
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    setPlatform('darwin')
     // netstat -ib output: Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Drop
     const netstatOutput = [
       'Name       Mtu  Network       Address       Ipkts Ierrs    Ibytes    Opkts Oerrs    Obytes  Drop',
@@ -314,12 +317,10 @@ describe('readNetBytes (exported)', () => {
     // en0: Ibytes=200000 (col 6), Obytes=100000 (col 9); en1: 120000/60000; lo0 skipped
     expect(result.bytesIn).toBe(320000)
     expect(result.bytesOut).toBe(160000)
-    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
   })
 
   it('returns { bytesIn: 0, bytesOut: 0 } when read/exec throws', async () => {
-    const originalPlatform = process.platform
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    setPlatform('darwin')
     mockExecFile.mockRejectedValue(new Error('exec failed'))
 
     vi.resetModules()
@@ -327,7 +328,6 @@ describe('readNetBytes (exported)', () => {
     const result = await readNetBytes()
 
     expect(result).toEqual({ bytesIn: 0, bytesOut: 0 })
-    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
   })
 })
 
@@ -346,8 +346,7 @@ describe('queryProcessMetrics (exported)', () => {
   })
 
   it('parses ps output on Linux and returns { pid, cpuPercent, rssBytes } with rssBytes = rssKb * 1024', async () => {
-    const originalPlatform = process.platform
-    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+    setPlatform('linux')
     mockExecFile.mockImplementation(async (cmd: string) => ({
       stdout: cmd === 'ps' ? '1234 25.0 8192\n5678 0.5 4096\n' : '',
     }))
@@ -359,12 +358,15 @@ describe('queryProcessMetrics (exported)', () => {
     expect(result).toHaveLength(2)
     expect(result[0]).toEqual({ pid: 1234, cpuPercent: 25.0, rssBytes: 8192 * 1024 })
     expect(result[1]).toEqual({ pid: 5678, cpuPercent: 0.5, rssBytes: 4096 * 1024 })
-    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'ps',
+      ['-p', '1234,5678', '-o', 'pid,%cpu,rss', '--no-headers'],
+      expect.anything()
+    )
   })
 
   it('parses ps output on Darwin and returns the same shape', async () => {
-    const originalPlatform = process.platform
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    setPlatform('darwin')
     mockExecFile.mockImplementation(async (cmd: string) => ({
       stdout: cmd === 'ps' ? '9999 10.2 16384\n' : '',
     }))
@@ -375,7 +377,11 @@ describe('queryProcessMetrics (exported)', () => {
 
     expect(result).toHaveLength(1)
     expect(result[0]).toEqual({ pid: 9999, cpuPercent: 10.2, rssBytes: 16384 * 1024 })
-    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'ps',
+      ['-p', '9999', '-o', 'pid=,%cpu=,rss='],
+      expect.anything()
+    )
   })
 
   it('skips malformed lines that have fewer than 3 parts', async () => {

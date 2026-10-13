@@ -236,7 +236,7 @@ describe('PtyManager', () => {
   it('cleanupOrphans returns 0 when registry JSON is malformed', async () => {
     const fs = await import('fs')
     vi.mocked(fs.existsSync).mockReturnValue(true)
-    vi.mocked(fs.readFileSync).mockReturnValue('NOT_JSON' as unknown as Buffer)
+    vi.mocked(fs.readFileSync).mockReturnValue('NOT_JSON')
 
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
@@ -250,9 +250,7 @@ describe('PtyManager', () => {
     // Provide a registry with one orphan PID
     const orphanPid = 99999
     vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify([
-        { sessionId: 'orphan', pid: orphanPid, cwd: '/', shell: '/bin/sh' },
-      ]) as unknown as Buffer
+      JSON.stringify([{ sessionId: 'orphan', pid: orphanPid, cwd: '/', shell: '/bin/sh' }])
     )
 
     // Spy on process.kill — first call (signal 0) returns true (process running),
@@ -276,9 +274,7 @@ describe('PtyManager', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
     const orphanPid = 88888
     vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify([
-        { sessionId: 'zombie', pid: orphanPid, cwd: '/', shell: '/bin/sh' },
-      ]) as unknown as Buffer
+      JSON.stringify([{ sessionId: 'zombie', pid: orphanPid, cwd: '/', shell: '/bin/sh' }])
     )
 
     // isProcessRunning returns true, SIGTERM throws
@@ -289,8 +285,8 @@ describe('PtyManager', () => {
 
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
-    // Should not throw
-    expect(() => mgr.cleanupOrphans()).not.toThrow()
+    // The process went between the check and the signal: nothing was cleaned.
+    expect(mgr.cleanupOrphans()).toEqual({ cleanedCount: 0 })
     killSpy.mockRestore()
   })
 
@@ -298,9 +294,7 @@ describe('PtyManager', () => {
     const fs = await import('fs')
     vi.mocked(fs.existsSync).mockReturnValue(true)
     vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify([
-        { sessionId: 'dead', pid: 77777, cwd: '/', shell: '/bin/sh' },
-      ]) as unknown as Buffer
+      JSON.stringify([{ sessionId: 'dead', pid: 77777, cwd: '/', shell: '/bin/sh' }])
     )
 
     // isProcessRunning signal 0 throws → process not running

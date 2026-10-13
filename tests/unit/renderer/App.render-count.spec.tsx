@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, act } from '@testing-library/react'
 import { useSessionStore } from '../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../src/renderer/stores/workspace.store'
@@ -7,7 +7,9 @@ import { useSettingsStore } from '../../../src/renderer/stores/settings.store'
 import { useMetricsStore } from '../../../src/renderer/stores/metrics.store'
 import { useSessionRecordsStore } from '../../../src/renderer/stores/session-records.store'
 import { App } from '../../../src/renderer/App'
+import { DEFAULT_GLOBAL_SETTINGS } from '../../../src/shared/schemas/settings.schema'
 import type { SystemMetrics, TerminalSession } from '../../../src/shared/types/index'
+import { installElectronApi } from '../../support/electron-api'
 
 // The app shell is what is measured here. Everything it draws is a stub that
 // subscribes to nothing, and the sidebar stub counts its renders: it renders
@@ -60,18 +62,23 @@ const busyTerminal: TerminalSession = {
   busy: true,
 }
 
-const system = { cpuPercent: 10, memUsedBytes: 1, memTotalBytes: 2 } as unknown as SystemMetrics
+const system: SystemMetrics = {
+  cpuPercent: 10,
+  memUsedBytes: 1,
+  memTotalBytes: 2,
+  netInBytesPerSec: 0,
+  netOutBytesPerSec: 0,
+}
 
 function stubElectronApi(): void {
-  const unsubscribe = vi.fn()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    terminal: { onProcessExit: vi.fn(() => unsubscribe), input: vi.fn() },
-    notifications: { list: vi.fn().mockResolvedValue([]), onPush: vi.fn(() => unsubscribe) },
-    extensionBridge: { on: vi.fn(() => unsubscribe) },
-    extension: { setBottomInset: vi.fn() },
-    quickActions: { onOpen: vi.fn(() => unsubscribe) },
-    extensionEvents: null,
-  }
+  const unsubscribe = () => {}
+  installElectronApi({
+    terminal: { onProcessExit: () => unsubscribe, input: () => {} },
+    notifications: { list: async () => [], onPush: () => unsubscribe },
+    extensionBridge: { on: () => unsubscribe },
+    extension: { setBottomInset: () => {} },
+    quickActions: { onOpen: () => unsubscribe },
+  })
 }
 
 /** Renders the app and returns how many times the shell has rendered since. */
@@ -89,22 +96,18 @@ beforeEach(() => {
     activeProjectId: 'p1',
   })
   useSettingsStore.setState({
-    loadSettings: vi.fn().mockResolvedValue(undefined),
-    globalSettings: { ui: { hasSeenWelcome: true, showMetricsBar: true } },
-  } as unknown as Parameters<typeof useSettingsStore.setState>[0])
-  useSessionRecordsStore.setState({
-    load: vi.fn().mockResolvedValue(undefined),
-    subscribe: vi.fn(() => vi.fn()),
-  } as unknown as Parameters<typeof useSessionRecordsStore.setState>[0])
+    loadSettings: async () => {},
+    globalSettings: {
+      ...DEFAULT_GLOBAL_SETTINGS,
+      ui: { ...DEFAULT_GLOBAL_SETTINGS.ui, hasSeenWelcome: true, showMetricsBar: true },
+    },
+  })
+  useSessionRecordsStore.setState({ load: async () => {}, subscribe: () => () => {} })
   useMetricsStore.setState({ enableGlobalMetrics: vi.fn(), disableGlobalMetrics: vi.fn() })
   useSessionStore.setState({
     sessions: new Map([['s1', busyTerminal]]),
     projectViews: new Map([['p1', { activeSessionId: 's1', order: ['s1'], terminalCounter: 1 }]]),
-  } as unknown as Parameters<typeof useSessionStore.setState>[0])
-})
-
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  })
 })
 
 describe('the app shell while a terminal is busy', () => {

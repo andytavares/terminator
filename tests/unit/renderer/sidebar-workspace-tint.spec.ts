@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { WORKSPACE_PRESET_COLORS } from '../../../src/renderer/components/sidebar/workspace-colors'
 
 /**
  * The repo's colour used to wash every surface in the sidebar — 10% on a group
@@ -117,21 +116,8 @@ describe('the repo name is text, not colour (FR-043)', () => {
     )
   })
 
-  /**
-   * The defect this fixes. Painting a repo name in its own swatch put the text
-   * between 1.08:1 and 1.52:1 against the surface behind it in the light theme,
-   * measured in a browser — against the 4.5:1 AA asks for. Every preset failed;
-   * the fix is to stop using the swatch as a text colour at all.
-   */
-  it.each(['dark', 'light'] as const)(
-    'every preset repo colour would have failed AA as text in the %s theme',
-    (theme) => {
-      const surface = hex(token('--tm-bg-base', theme))
-      const failing = WORKSPACE_PRESET_COLORS.filter((c) => contrast(hex(c), surface) < 4.5)
-      expect(failing.length).toBeGreaterThan(0)
-    }
-  )
-
+  // Painting a repo name in its own swatch put the text between 1.08:1 and
+  // 1.52:1 against the light surface; the name now uses a text token instead.
   it.each(['dark', 'light'] as const)('the name token clears AA in the %s theme', (theme) => {
     const surface = hex(token('--tm-bg-base', theme))
     expect(contrast(hex(token('--tm-text-primary', theme)), surface)).toBeGreaterThanOrEqual(4.5)
