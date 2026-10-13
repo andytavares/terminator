@@ -73,11 +73,8 @@ interface ForgeView {
   readonly reset: () => void
 }
 
-/**
- * The Forge's own view: a list of orders, or a hall drawn from the run graph.
- * Per-operator (`terminator.foundry.view`), never per-order — the Ledger and
- * Settings are unaffected either way.
- */
+// The Forge's view: a list of orders, or a hall drawn from the run graph. Per operator
+// (`terminator.foundry.view`), never per order; the Ledger and Settings are unaffected.
 function useForgeView(): ForgeView {
   const [view, setView] = useState<ForgeViewKind>('list')
   // The hall currently open, or null for the site (the grid of every hall).
@@ -130,22 +127,16 @@ function useSavedForgeView(setView: (view: ForgeViewKind) => void): void {
   }, [setView])
 }
 
-/**
- * Where an order opened from the site goes: the hall if a line is actually
- * running it, back to the list — open — if it is still being agreed. A gate
- * order the recipe never started has no run graph for a hall to draw.
- */
+// Where an order opened from the site goes: the hall if a line is running it, the
+// list (opened) while it is being agreed, since such an order has no graph to draw.
 function isShaping(order: FactoryOrderRow): boolean {
   return (
     order.standing?.kind === 'shaping' || (order.standing === undefined && order.status === 'draft')
   )
 }
 
-/**
- * The "New work order…" quick action, whether the extension's own view was
- * open when it ran or not: a request now, or one that fired before this view
- * existed, picked up on first mount.
- */
+// The "New work order…" quick action, whether or not this view was open: a request
+// now, or one that fired before the view existed, picked up on first mount.
 function useNewOrderRequests(open: () => void): void {
   const latest = useRef(open)
   useEffect(() => {
@@ -167,13 +158,8 @@ function useNewOrderRequests(open: () => void): void {
   }, [])
 }
 
-/**
- * The counts, on the one piece of chrome that is on screen whatever surface
- * you are looking at. Everything Foundry holds for a person lives behind one
- * of these tabs, and until this existed a tab said nothing until you clicked
- * it — so an open question or a held tool call was only ever found by
- * somebody who went looking for it on the off chance.
- */
+// The counts, on the one piece of chrome on screen whatever the surface, so an open
+// question or a held tool call is seen without clicking each tab to look.
 function useAttention(): Attention {
   const [waiting, setWaiting] = useState<Attention>({ inbox: 0, forge: 0 })
   const show = useCallback((next: Attention | null): void => {

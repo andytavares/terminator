@@ -144,10 +144,8 @@ async function sensorsSet(
   const { id, enabled, repoPath } = payload
 
   const states = await deps.store.sensorState()
-  // The store keeps only what was ever patched — an id absent from
-  // `state.json` is absent, not defaulted (see store.ts). Merged against the
-  // default here, once, so what gets written is always a whole state and a
-  // later reader never has to apply the default itself.
+  // The store keeps only what was patched (store.ts); merged with the default once
+  // here, so a whole state is written and no reader applies the default itself.
   const current: SensorState = { ...DEFAULT_STATE, ...states[id] }
   const next: SensorState = {
     ...current,

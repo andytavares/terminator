@@ -34,10 +34,7 @@ import { FindingsSchema } from '../order/proposal.js'
 // difference here is that a role may only write the artefacts its own
 // `writes:` declares, so the channel is a permission rather than an open door.
 
-/**
- * What each `writes:` target is, as JSON, and where it lands on the order.
- * @internal
- */
+/** What each `writes:` target is, as JSON, and where it lands on the order. @internal */
 export const COLLECTABLE = {
   /**
    * What the agent *read*. Not what Foundry measured.
@@ -267,12 +264,8 @@ function whereToWrite(file: string): string[] {
   ]
 }
 
-/**
- * What to write, and where.
- *
- * Empty for a role with nothing to hand back — a contract offering no keys is
- * an instruction to write `{}`, which is a turn spent producing nothing.
- */
+// What to write and where; empty for a role with nothing to hand back, since a
+// contract with no keys asks for `{}` and spends a turn on nothing.
 export function rungOutputContract(
   file: string,
   writes: readonly Collectable[],
@@ -466,10 +459,8 @@ interface RedTeamMerge {
   readonly fresh: RedTeam[number][]
   /** What forces the order back to draft, named for the defect message. */
   readonly blockingReasons: string[]
-  /**
-   * True only when a red-team finding is the reason — a disputed plan or
-   * acceptance list is reported as a question and never amends the order.
-   */
+  // True only when a red-team finding is why: a disputed plan or acceptance list is a
+  // question and never amends the order.
   redTeamBlocked: boolean
   /** Findings that landed but changed nothing an operator has to act on. */
   notesAdded: number
@@ -511,10 +502,8 @@ function countFresh(merge: RedTeamMerge): void {
   )
 }
 
-/**
- * Numbered from what is already there rather than from this batch, so a second
- * turn's first finding is not the first turn's first finding under a new name.
- */
+// Numbered from what is there, not this batch, so a second turn's first finding is
+// not the first turn's under a new name.
 function nextNumber(merge: RedTeamMerge): number {
   return merge.redTeam.length + merge.fresh.length + 1
 }
@@ -551,11 +540,8 @@ function isRepeat(
   )
 }
 
-/**
- * Reopen a settled finding with the new evidence that answers what settled it.
- * Dropped, not raised: a reopen with nothing the earlier reason did not
- * already answer is the same finding a second time.
- */
+// Reopen a settled finding with new evidence answering what settled it. Without any,
+// it is dropped: the same finding a second time.
 function reopen(merge: RedTeamMerge, finding: IncomingFinding): void {
   const target = merge.redTeam.find((f) => f.id === finding.reopens && f.status !== 'open')
   const evidence = (finding.newEvidence ?? '').trim()
@@ -571,13 +557,9 @@ function reopen(merge: RedTeamMerge, finding: IncomingFinding): void {
   }
 }
 
-/**
- * Both kinds are the same thing to an operator: a reader with no stake in the
- * draft has said the order is wrong, while the work is being done from it. At
- * intake a finding is refused by the compile gate; on the Line there is no
- * compile gate, so a finding that raised nothing would revert the order to
- * draft under a run that carried on regardless.
- */
+// Both kinds mean an outside reader called the order wrong while work proceeds from
+// it. On the Line there is no compile gate to refuse it, so a finding that raised
+// nothing would revert the order to draft under a run carrying on.
 function disputed(
   order: WorkOrder,
   dispute: {

@@ -88,10 +88,7 @@ function roundIn(reason: string, pattern: RegExp): number | null {
   return match === null ? null : Number(match[1])
 }
 
-/**
- * Which automatic follow-up this is: every `converge.followed_up` since the
- * most recent `converge.started`, this one included.
- */
+/** Which automatic follow-up this is: the `converge.followed_up`s since the last start. */
 function autoTurnAt(entries: readonly LedgerEntry[], i: number): number {
   let autoTurn = 0
   for (let j = i; j >= 0; j -= 1) {

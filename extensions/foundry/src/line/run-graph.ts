@@ -151,11 +151,8 @@ function fanoutNodes(step: Step, order: WorkOrder, placed: Placement): RunNode[]
   })
 }
 
-/**
- * The nodes carrying what these units depend on. A dependency this node
- * already carries is its own internal order, not something to wait for; a
- * node that waited on itself would never become ready.
- */
+// The nodes carrying what these units depend on. A dependency this node carries
+// itself is internal order, not a wait: waiting on itself, it would never be ready.
 function outsideDependencies(
   units: readonly { dependsOn: readonly string[] }[],
   nodeOfUnit: ReadonlyMap<string, string>,

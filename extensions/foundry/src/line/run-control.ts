@@ -4,23 +4,12 @@ import { orderStoreAt, gateStoreAt, readGraph } from '../state/live-index.js'
 import { runtime, isLiveSession } from '../runtime/runtime-state.js'
 import type { RunNode } from './run-graph.js'
 
-/**
- * The orders an executor in this process is currently driving.
- *
- * Not decoration: a node is written down as `running` before its agent has
- * reported a session, so for a second or two it is indistinguishable from a
- * node whose agent is gone. Reclaiming it there would put a second agent into
- * the same worktree. While an order is in here, nothing reclaims its nodes.
- */
+// The orders this process's executor drives. A node is `running` a moment before its
+// agent reports a session, looking like one whose agent is gone; reclaiming it would
+// put a second agent in the worktree, so nothing reclaims these orders' nodes.
 export const executingOrders = new Set<string>()
-/**
- * Data roots already looked at for runs the last application left behind.
- *
- * Once per root rather than once per process: activation runs before there is
- * a workspace, and the records location follows the workspace, so the answer
- * to "what did the last session leave here" is per-root and changes when the
- * operator switches.
- */
+// Data roots already checked for runs the last application left. Per root, not per
+// process: activation precedes the workspace, and the records follow the workspace.
 export const adoptedRoots = new Set<string>()
 
 /** Stops every node's agent that is still alive, and names the nodes it stopped. */
@@ -39,19 +28,9 @@ function stopLiveAgents(nodes: readonly RunNode[], reason: string): string[] {
   return stopped
 }
 
-/**
- * Stop a run, and mean it.
- *
- * Every gate that offers "Stop here" said the order would be cancelled, and
- * nothing did it: the decision seam returned early on `stop`, the order stayed
- * `running` for ever, and `order.cancel` refuses a running order and tells you
- * to stop it at its gate — the gate that did nothing. There was no way out of
- * a run at all.
- *
- * The worktrees and their changes are deliberately left alone. Cancelling the
- * order is a decision about the order; throwing away work an agent already did
- * is a different decision, and nothing here is entitled to take it silently.
- */
+// Stop a run and mean it: cancel the order, since "Stop here" once did nothing and
+// `order.cancel` refuses a running order. Worktrees and changes are left alone:
+// discarding an agent's work is a separate decision, never taken silently.
 export async function stopOrder(root: string, orderId: string, reason: string): Promise<void> {
   const store = orderStoreAt(root)
   const stopped = stopLiveAgents((await readGraph(root, orderId))?.nodes ?? [], reason)
@@ -73,19 +52,9 @@ export async function stopOrder(root: string, orderId: string, reason: string): 
   })
 }
 
-/**
- * What the last application left behind, said out loud the first time this one
- * looks at a records location.
- *
- * An agent's terminal is a child of the process that started it, so a run in
- * flight when the application closed has no agents left — while its order, its
- * graph and every surface go on saying `running`. Nothing looked, so the only
- * way to find out was to come back hours later and notice nothing had moved.
- *
- * Once per records location rather than once per process: activation runs
- * before there is a workspace, and where the records live follows the
- * workspace.
- */
+// What the last application left behind, said the first time this one looks at a
+// records location: an agent's terminal dies with its process, while the graph goes
+// on saying `running`. Per records location, which follows the workspace.
 export async function adoptInterruptedRuns(root: string): Promise<void> {
   if (adoptedRoots.has(root)) return
   adoptedRoots.add(root)

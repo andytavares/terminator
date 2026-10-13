@@ -103,17 +103,9 @@ export function evaluateStall(
 
 /** The values a firing is judged on, at `now`. */
 function stallInputs(facts: SessionFacts, now: number): StallFiring['inputs'] {
-  // An agent that has never called a tool has been quiet since it started, and
-  // one that has never changed a line has changed nothing since it started.
-  //
-  // The later of the two, not the tool call alone. A session spans turns — the
-  // architect's intake conversation is one session the operator comes back to
-  // — and the transcript keeps every turn's tool calls, so a session given a
-  // new turn after a long gap carried the *previous* turn's last call as its
-  // most recent activity. Measured on a live run: a run twenty-three seconds
-  // old was reported silent for twenty-one minutes and `run.stalled` was on
-  // the order before the builder's third command. Silence belongs to the state
-  // the session is in now, and `stateSince` is when that state began.
+  // Silence counts from the later of the last activity and `stateSince`: a session
+  // spans turns, and a new turn carried the previous turn's last call, reporting a
+  // 23-second-old run silent for 21 minutes (SUPERVISION.md, "Incidents behind the code").
   const since = (at: number | null): number => Math.max(at ?? facts.stateSince, facts.stateSince)
   return {
     toolSilenceMs: now - since(facts.lastToolActivityAt),

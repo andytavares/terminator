@@ -63,11 +63,8 @@ function lineClass(line: TranscriptLine): 'tool' | 'say' | 'you' {
   return line.role === 'user' ? 'you' : 'say'
 }
 
-/**
- * Draws the case at the size the section is laid out at. Paint has no
- * clearRect: assigning a canvas its width is what empties it, even to the
- * same value.
- */
+// Draws the case at the section's laid-out size. Paint has no clearRect: setting a
+// canvas's width empties it, even to the same value.
 function fitCase(root: HTMLElement, canvas: HTMLCanvasElement): void {
   const frame = root.parentElement
   const px = frame !== null && frame.clientWidth < NARROW_FRAME_PX ? PX_NARROW : PX
@@ -123,10 +120,7 @@ interface FollowDeps {
   readonly status: MonitorStatus
 }
 
-/**
- * Follow the newest line, unless the reader has scrolled up to read; the
- * scroll handler that notices which.
- */
+/** Follow the newest line unless the reader scrolled up; returns the scroll handler. */
 function useFollowLog(logRef: ElementRef<HTMLPreElement>, { lines, status }: FollowDeps) {
   const stuckRef = useRef(true)
   useLayoutEffect(() => {
@@ -160,10 +154,8 @@ function powerOff(
   closingRef.current = setTimeout(onClose, POWER_OFF_MS)
 }
 
-/**
- * The station's own standing first — a step can be running with nobody left
- * to run it, or running and waiting on you — then its attempt and role.
- */
+// The station's own standing first (running with nobody left to run it, or waiting
+// on you), then its attempt and role.
 function metaLine(
   node: StationMonitorProps['node'],
   { status, automatic }: { status: MonitorStatus; automatic: boolean }

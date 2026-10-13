@@ -69,12 +69,8 @@ function whatTheChangeTripped(order: WorkOrder, files: readonly string[]): Trigg
   return tripped
 }
 
-/**
- * Writing outside what the order declared is itself a trigger: a plan that has
- * quietly grown past what was assessed is the case worth catching.
- * Documentation is not growth: the scribe writes the README and CHANGELOG
- * every order owes, wherever the plan's code lives.
- */
+// Writing outside what the order declared is a trigger: the plan grew past what was
+// assessed. Documentation is not growth: the scribe writes the README and CHANGELOG.
 function outsideBlastRadius(order: WorkOrder, files: readonly string[]): boolean {
   const { blastRadius } = order.risk
   if (blastRadius.length === 0) return false

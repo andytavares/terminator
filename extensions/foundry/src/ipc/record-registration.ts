@@ -20,12 +20,8 @@ export function registerRecordChannels(context: ActivationContext, signalStore: 
 }
 
 function registerLedger({ api, dataRoot }: ActivationContext): void {
-  // ── The record ─────────────────────────────────────────────────────────
-  //
-  // Every decision, by whom or by what rule, and why. The one place the
-  // factory ever argues back — and only when asked: `rules.propose` is a
-  // channel the operator's own button reaches, never a subscription and never
-  // anything the append path can trigger.
+  // The record: every decision, by whom or what rule, and why. `rules.propose` is
+  // the one place it argues back, reached only by the operator's own button.
   const ledger = createLedgerChannels({
     store: createLiveOrderStore(dataRoot, indexFor),
     dataRoot,

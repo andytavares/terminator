@@ -152,10 +152,8 @@ function liveEntries(rows: readonly FeedRow[]): FeedEntry[] {
   return entries
 }
 
-/**
- * A session can be forgotten and then, in principle, seen again — so this
- * drops what came before rather than filtering the whole file.
- */
+// A forgotten session may in principle be seen again, so this drops what came before
+// rather than filtering the whole file.
 function forgetSession(entries: FeedEntry[], sessionId: string): void {
   for (let index = entries.length - 1; index >= 0; index--) {
     if (entries[index].sessionId === sessionId) entries.splice(index, 1)

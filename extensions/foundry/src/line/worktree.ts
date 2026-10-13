@@ -98,12 +98,8 @@ interface CheckoutPlan {
   readonly branch: string
 }
 
-/**
- * Whether git has a worktree registered at `target`. Asked of git rather than
- * the filesystem: a directory that exists but is not a registered worktree is
- * not a checkout, and reusing it would put the agent somewhere git does not
- * know about.
- */
+// Whether git has a worktree registered at `target`. Asked of git: a directory that
+// exists but is not registered is not a checkout git knows.
 async function isRegistered(origin: string, target: string, deps: CheckoutDeps): Promise<boolean> {
   const listed = await deps.exec({
     command: 'git',
@@ -114,10 +110,8 @@ async function isRegistered(origin: string, target: string, deps: CheckoutDeps):
   return listed.exitCode === 0 && listed.stdout.includes(`worktree ${target}`)
 }
 
-/**
- * Adds `target` as a worktree of `repo` at its base branch, the way `how`
- * says, unless it already is one; whether it already was.
- */
+// Adds `target` as a worktree of `repo` at its base branch as `how` says, unless it
+// already is one; whether it already was.
 async function addWorktree(
   repo: CheckoutPlan['repo'],
   { target, how }: { target: string; how: readonly string[] },
@@ -285,10 +279,7 @@ export async function ensureCheckouts(
   return out
 }
 
-/**
- * Take a lane's checkout away again. Best effort; never throws.
- * @internal
- */
+/** Take a lane's checkout away again. Best effort; never throws. @internal */
 export async function removeCheckout(checkout: Checkout, deps: CheckoutDeps): Promise<boolean> {
   const removed = await deps.exec({
     command: 'git',

@@ -12,13 +12,8 @@ import type { GateRuleId } from '../gates/rules.js'
 // a node's agent is launched with. Pure, so each is the same answer wherever
 // the executor asks for it.
 
-/**
- * Whether this shape of work ends in a pull request at all.
- *
- * A recipe that is a question, not a change, opens nothing (FR-019), and says
- * so by having no ship step rather than by a flag. A caller that shipped
- * regardless would turn every investigation into a branch.
- */
+// Whether this shape ends in a pull request: a recipe that is a question has no ship
+// step and opens nothing (FR-019), so an investigation never becomes a branch.
 export function opensPullRequest(recipe: Recipe): boolean {
   return recipe.steps.some((step) => step.kind === 'gate' && step.rule === 'ready-for-review')
 }
@@ -44,14 +39,8 @@ function stepSkillsOf(step: Step): readonly string[] {
   return [...own, ...innerSkills]
 }
 
-/**
- * Which skills a node's agent gets: the union of its role's and its step's,
- * de-duplicated.
- *
- * A fan-out's inner `step:` may carry its own `skills:` alongside the outer
- * step's, the way `wantsFreshContext` reads `context` off the same object —
- * so both are read here rather than only the one a plain step has.
- */
+// The skills a node's agent gets: its role's and its step's, de-duplicated, reading a
+// fan-out's inner `step:` too, as `wantsFreshContext` reads `context` there.
 export function skillsFor(recipe: Recipe, node: RunNode, roles: RoleRegistry): string[] {
   const step = stepFor(recipe, node)
   const role = node.role === null ? null : roles.get(node.role)
@@ -83,13 +72,8 @@ export interface BriefSource {
   readonly rules: readonly Rule[]
 }
 
-/**
- * What this node's agent is told.
- *
- * The role's prompt plus whatever that role declared it may read, resolved
- * against this order and this unit. The bare prompt on its own describes a
- * job and names no work, which is every "it built the wrong thing" failure.
- */
+// What this node's agent is told: the role's prompt plus what the role may read,
+// resolved for this order and unit. A bare prompt names no work.
 export function promptFor(
   source: BriefSource,
   node: RunNode,

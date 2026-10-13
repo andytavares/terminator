@@ -11,17 +11,11 @@ import type { ActivationContext } from '../ipc/register.js'
 import { resolveSources } from '../workspace-root.js'
 import { isoNow, shellExecOf } from '../host-calls.js'
 
-/**
- * The sensor tick (ADR-066): every due, enabled sensor runs sequentially once
- * a minute while the app is open. Nothing runs when no sensor is enabled —
- * `dueSensors` filters on that before anything is collected.
- */
+// The sensor tick (ADR-066): every due, enabled sensor, in turn, once a minute while
+// the app is open; `dueSensors` makes it nothing when none is enabled.
 let sensorTimer: NodeJS.Timeout | null = null
 
-/**
- * The application's tracker connection, narrowed to what a sensor's `tracker`
- * source needs (`collect.ts`).
- */
+/** The tracker connection, narrowed to what a sensor's `tracker` source needs. */
 function sensorIssuesFor(api: ExtensionAPI): CollectDeps['issues'] {
   const issues = api.issues
   return {
@@ -40,10 +34,7 @@ function sensorIssuesFor(api: ExtensionAPI): CollectDeps['issues'] {
   }
 }
 
-/**
- * One `CollectDeps` for a sensor watching `repoPath`, over the extension's own
- * `gh`/`git` exec and tracker connection.
- */
+/** One `CollectDeps` for a sensor on `repoPath`, over the extension's exec and tracker. */
 export function sensorCollectDepsFor(api: ExtensionAPI, repoPath: string): CollectDeps {
   return {
     exec: shellExecOf(api),
@@ -53,10 +44,8 @@ export function sensorCollectDepsFor(api: ExtensionAPI, repoPath: string): Colle
   }
 }
 
-/**
- * A signal store whose root is resolved on every call — the records location
- * follows the open workspace, the same reason `createLiveOrderStore` exists.
- */
+// A signal store resolving its root on every call: the records location follows the
+// open workspace, as with `createLiveOrderStore`.
 function liveSignalStore(root: () => string): SignalStore {
   return {
     list: () => createSignalStore(root()).list(),
@@ -67,10 +56,7 @@ function liveSignalStore(root: () => string): SignalStore {
   }
 }
 
-/**
- * Every due, enabled sensor, run once, sequentially — one interval tick,
- * whether it is the live 60-second one or a manual "run now".
- */
+/** Every due, enabled sensor, once, in turn: one tick, the 60-second one or "run now". */
 async function tickSensors(api: ExtensionAPI, root: string, store: SignalStore): Promise<void> {
   const sources = resolveSources(api, root)
   const defs = availableSensors(sources).map(({ def }) => def)
@@ -94,14 +80,9 @@ async function tickSensors(api: ExtensionAPI, root: string, store: SignalStore):
   }
 }
 
-/**
- * Signals read the product back into the factory while the app is open. One
- * tick a minute, over whichever sensors are enabled and have a repository —
- * nothing runs while none are, which is the default. Resolved on every tick
- * rather than once, the same reason `dataRoot` is a function: the records
- * location, and which repository each sensor watches, both follow the
- * operator's own configuration.
- */
+// Sensors read the product back into the factory: one tick a minute over the enabled
+// sensors with a repository (none by default), resolved each tick because the records
+// location and the watched repositories follow the operator's configuration.
 export function startSensorTick({ api, dataRoot }: ActivationContext): SignalStore {
   const signalStore = liveSignalStore(dataRoot)
   sensorTimer = setInterval(() => {

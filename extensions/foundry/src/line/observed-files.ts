@@ -2,13 +2,8 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
 
-// The files an order's checkouts have changed, as of the last step that
-// settled.
-//
-// Recorded when the work moves, because the refinery's queue asks for them on
-// every read and reading them means running git in each checkout. A record
-// written at the step boundary is the same answer to the question the queue
-// asks — which in-flight orders touch the same files — without a process.
+// The files an order's checkouts changed as of the last settled step, recorded at
+// that boundary so the refinery's queue, read constantly, never runs git per checkout.
 
 function observedPath(root: string, orderId: string): string {
   return path.join(orderDir(root, orderId), 'observed-files.json')

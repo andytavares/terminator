@@ -307,11 +307,8 @@ function applyRework(world: World, event: Extract<FactoryEvent, { kind: 'rework'
   }))
 }
 
-/**
- * Where the box goes: from the walker straight to the node when it is the
- * sender's own, else fetched from the check's station first — then home.
- * Null when either station has nowhere to stand.
- */
+// Where the box goes: straight to the node when it is the sender's own, else via the
+// check's station first, then home. Null when either station has nowhere to stand.
 function reworkStops(
   map: World['map'],
   event: Extract<FactoryEvent, { kind: 'rework' }>,

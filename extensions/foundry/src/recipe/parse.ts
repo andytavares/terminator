@@ -34,15 +34,9 @@ function badSkillIds(ids: readonly string[]): string[] {
 
 // ── recipes ──────────────────────────────────────────────────────────────
 
-/**
- * Five step kinds, and there is no sixth.
- *
- * They exist because concrete recipes need them, not in anticipation: fan out
- * over units, a barrier for lane merge order, a human decision, an agent role
- * and a shell command. A recipe that wants arbitrary logic wants a role — a
- * prompt and an output schema — not code in a data file.
- * @internal
- */
+// Five step kinds, each one recipes need (fan-out, lane barrier, human decision, agent,
+// shell command); arbitrary logic belongs in a role, not in a data file.
+/** @internal */
 export const STEP_KINDS = ['agent', 'run', 'gate', 'fanout', 'join'] as const
 export type StepKind = (typeof STEP_KINDS)[number]
 

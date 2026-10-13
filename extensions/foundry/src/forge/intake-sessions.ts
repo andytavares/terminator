@@ -7,12 +7,7 @@
  */
 export const intakeSessions = new Map<string, string>()
 
-/**
- * Orders deleted while a Forge session was still running for them.
- *
- * Deleting the project ends the session's terminal, and a session ending is
- * what moves the Forge on: the scout's end starts the architect, the
- * architect's end saves its redraft. Arriving after the delete, each of those
- * cut the checkout again, opened a new project, or wrote the order back.
- */
+// Orders deleted while a Forge session ran for them. A session's end moves the Forge
+// on (scout starts architect, architect saves its redraft); arriving after the delete,
+// that would recreate the checkout, project or order.
 export const deletedOrders = new Set<string>()

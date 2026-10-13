@@ -140,14 +140,8 @@ function chainOf(group: ReadonlySet<string>, { title, position, shared }: QueueF
   return { tokens, joins }
 }
 
-/**
- * The refinery's queues, as chains of orders that overlap on disk.
- *
- * Grouped by connected component rather than by repository: the list gives
- * each order's own position and who it sits directly behind, not which
- * repository named that queue, and two orders sharing files are one queue
- * whichever repository it is.
- */
+// The refinery's queues as chains of orders that overlap on disk, grouped by
+// connected component: two orders sharing files are one queue whatever repository.
 function refineryChains(rows: readonly FactoryOrderRow[]): QueueChain[] {
   const facts = queueFacts(rows)
   return groupsOf(facts)
@@ -371,10 +365,7 @@ function OrderHalls({ rows, onOpen }: GridProps) {
   )
 }
 
-/**
- * The refinery: which orders sit behind which on disk. Nothing here when no
- * order is queued behind another (R5).
- */
+/** Which orders sit behind which on disk; nothing when none is queued (R5). */
 function Refinery({ chains }: { readonly chains: readonly QueueChain[] }) {
   if (chains.length === 0) return null
   return (

@@ -14,12 +14,8 @@ import type { Execution } from './execution.js'
 import { launchNode } from './execution-launch.js'
 import { settleNode } from './execution-settle.js'
 
-// Running everything that can run, one wave at a time, until nothing else can.
-//
-// A wave rather than a loop over nodes because the agent budget is a property
-// of the whole graph: what may start depends on what is already running, so
-// starting them one at a time and asking again is the only way the limit means
-// anything.
+// Runs everything that can run, a wave at a time: the agent budget is the whole
+// graph's, so what may start depends on what already runs.
 
 export async function runWaves(run: Execution): Promise<void> {
   while (!isComplete(run.current) && !run.halted) {
@@ -32,10 +28,8 @@ export async function runWaves(run: Execution): Promise<void> {
       await noteStall(run)
       break
     }
-    // A join is a synchronisation point, not work. Its dependencies are what
-    // it was waiting for, and the scheduler only offered it because they are
-    // done — so it passes here rather than being launched as an agent with
-    // nothing to do, which is what it used to be.
+    // A join is a synchronisation point, not work: the scheduler offered it because
+    // its dependencies are done, so it passes here instead of launching an agent.
     const joins = ready.filter((node) => node.kind === 'join')
     if (joins.length > 0) {
       for (const join of joins) await run.advance(markPassed(run.current, join.id, run.deps.now()))
@@ -61,11 +55,8 @@ async function stoppedByBudget(run: Execution): Promise<boolean> {
   return run.halted
 }
 
-/**
- * Nothing running, nothing runnable, and not finished: the graph cannot move
- * on its own. Said out loud, because reporting it as "waiting on a gate" when
- * no gate exists is a run that looks answerable and is not.
- */
+// Nothing running, nothing runnable, not finished: the graph cannot move. Said out
+// loud, not as "waiting on a gate" when no gate exists.
 async function noteStall(run: Execution): Promise<void> {
   const { current, order } = run
   if (!hasStalled(current, order.budgets)) return
@@ -80,15 +71,8 @@ async function noteStall(run: Execution): Promise<void> {
   run.stalled = true
 }
 
-/**
- * A gate node in the recipe is a stated pause. It is not the executor's to
- * answer: it is raised, and the run stops until the inbox comes back. True
- * when the run stops here.
- *
- * The rule is the recipe's own — every shipped recipe declares one, and
- * ignoring it in favour of a hardcoded rule would give the operator the wrong
- * question, the wrong options and the wrong default.
- */
+// A gate node is a stated pause, the recipe's own rule, options and default: raised,
+// and the run stops until the inbox answers. True when the run stops here.
 async function stopsAt(run: Execution, blocking: RunNode): Promise<boolean> {
   const step = stepFor(run.recipe, blocking)
   const declared = step?.rule
@@ -109,18 +93,9 @@ async function stopsAt(run: Execution, blocking: RunNode): Promise<boolean> {
   return run.halted
 }
 
-/**
- * A recipe's terminal `ready-for-review` gate is its way of saying "shipping
- * happens here". It is not a pause: the real decision is raised once the
- * drafts exist, by whatever opens them, because "mark it ready?" asked before
- * there is anything to mark is a question with no answer. So it passes, and
- * the tail takes it from here.
- *
- * It is left `running`, not passed: the final check and the CI watch still
- * stand between here and the question, and a graph that reads complete while
- * minutes of work remain is a lie on the Floor. The tail marks it passed when
- * the ready gate is raised.
- */
+// A terminal `ready-for-review` gate means "shipping happens here": the question is
+// raised once the drafts exist. Left `running` meanwhile, since the final check and
+// CI still stand before it; the tail marks it passed when the ready gate is raised.
 async function holdForShipping(run: Execution, gate: RunNode): Promise<void> {
   await run.advance(
     withNode(run.current, gate.id, {

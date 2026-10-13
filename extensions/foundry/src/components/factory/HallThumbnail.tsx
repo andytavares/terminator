@@ -28,11 +28,8 @@ export interface HallThumbnailProps {
 
 const PLACEHOLDER_TEXT = 'Not started yet — the floor appears when the work starts.'
 
-/**
- * Whether the element has come within 200px of the screen. Lazy: a card
- * off-screen never fetches. Without an `IntersectionObserver` (a test or odd
- * runtime) there is nothing to wait for, so the card is visible right away.
- */
+// Whether the element is within 200px of the screen, so an off-screen card never
+// fetches. With no `IntersectionObserver` (a test) it is visible at once.
 function useOnScreen(containerRef: React.MutableRefObject<HTMLDivElement | null>): boolean {
   const canObserve = typeof IntersectionObserver !== 'undefined'
   const [intersected, setIntersected] = useState(false)
@@ -81,10 +78,7 @@ interface StillDeps {
   readonly worldRef: React.MutableRefObject<World | null>
 }
 
-/**
- * The hall laid out once for the order's graph, fetched again only when
- * `refreshKey` changes; `draft` when there is no graph yet.
- */
+/** The hall laid out once per graph, fetched again on `refreshKey`; `draft` with no graph. */
 function useStillHall({ orderId, refreshKey, visible, worldRef }: StillDeps) {
   const [map, setMap] = useState<HallMap | null>(null)
   const [draft, setDraft] = useState(false)

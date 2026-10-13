@@ -190,11 +190,8 @@ function useRules() {
   return { rules, refreshRules }
 }
 
-/**
- * The factory's numbers, fetched only once the operator asks for the Factory
- * view — the same discipline as the proposals panel: a surface that fetches
- * before it is looked at is a surface whose numbers go stale unnoticed.
- */
+// The factory's numbers, fetched only once the Factory view is asked for: a surface
+// that fetches before it is looked at goes stale unnoticed.
 function useFactoryMetrics(tab: LedgerTab): FactoryViewProps {
   const [metricsWindow, setMetricsWindow] = useState<'30d' | 'all'>('30d')
   const [metrics, setMetrics] = useState<FactoryMetrics | null>(null)
@@ -248,13 +245,8 @@ async function sendProposalDecision(proposal: Proposal, accept: boolean): Promis
   return result.error ?? null
 }
 
-/**
- * Take an accepted check back out.
- *
- * The counterpart to accepting one. A rule the operator can add but never
- * remove is one they stop accepting at all, and the removal is recorded so
- * the same proposal is not offered back next week.
- */
+// Take an accepted check back out. A rule that cannot be removed is one the operator
+// stops accepting; the removal is recorded so the proposal is not offered back.
 function useRemoveRule(setNote: (note: string | null) => void, refreshRules: () => Promise<void>) {
   return useCallback(
     async (rule: AcceptedRule) => {

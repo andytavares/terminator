@@ -19,10 +19,7 @@ export interface Tile {
 
 export type { Side, BeltTile } from './belts.js'
 
-/**
- * The five prop kinds that carry a `RunNode`; every other kind is decor.
- * @internal
- */
+/** The five prop kinds that carry a `RunNode`; every other kind is decor. @internal */
 export type StationKind = 'desk' | 'rig' | 'press' | 'gate'
 
 export type PropKind =
@@ -138,7 +135,6 @@ const FIXTURE_KINDS: readonly FixtureKind[] = ['shelves', 'racks', 'statuswall',
 /** A node crewed by someone, and so one that needs a place to sit when idle. */
 const CREWED_KINDS: readonly StepKind[] = ['agent', 'fanout', 'run']
 
-/** The nearest column in `row` that isn't solid, scanning outward from `preferred`. */
 /** The two tiles either side of a belt tile, across the way the belt runs. */
 function flankingTiles(t: Tile, horizontal: boolean): readonly [Tile, Tile] {
   return horizontal
@@ -152,7 +148,8 @@ function flankingTiles(t: Tile, horizontal: boolean): readonly [Tile, Tile] {
       ]
 }
 
-// On a tie the right-hand column wins; with no clear column, the preferred one.
+// The clear column in `row` nearest `preferred`; on a tie the right-hand one wins,
+// and with no clear column, `preferred` itself.
 function nearestClearColumn(solid: boolean[][], row: number, preferred: number): number {
   const width = solid[row].length
   const clamped = Math.min(Math.max(preferred, 1), width - 2)
@@ -379,10 +376,7 @@ function rowsOf(nodes: readonly RunNode[], offshoots: ReadonlySet<string>): Rows
   }
 }
 
-/**
- * Row roles, for where a belt may run horizontally (and where crossing a
- * seat or an aisle costs a walk more).
- */
+/** Row roles: where a belt may run across, and where crossing a seat or aisle costs more. */
 function rowRoles(rows: Rows): string[] {
   const role: string[] = Array(rows.height).fill('wall')
   role[TOP_WALL_ROWS] = 'head'
@@ -527,11 +521,8 @@ class HallBuilder {
     }
   }
 
-  /**
-   * A run's CI, drawn as a small tower beside the exit — only when the
-   * observation actually carries one (ADR-060: nothing is drawn that the
-   * observation does not report).
-   */
+  // A run's CI as a small tower beside the exit, only when the observation carries
+  // one (ADR-060: nothing is drawn that the observation does not report).
   dispatchProps(hasCi: boolean | undefined): HallProp[] {
     if (!hasCi) return []
     const { exit } = this
@@ -551,10 +542,8 @@ class HallBuilder {
     ]
   }
 
-  /**
-   * Stations go down first: fixtures and the breakroom are dressing placed
-   * *around* them, and need to know which floor tiles are already taken.
-   */
+  // Stations go down first: fixtures and the breakroom are placed around them and
+  // need to know which floor tiles are taken.
   placeStations(): void {
     for (const node of this.graph.nodes) this.placeStation(node)
   }
@@ -597,13 +586,9 @@ class HallBuilder {
       : this.rows.yardStationRow
   }
 
-  /**
-   * Wall fixtures spread across the whole top wall — decor on row
-   * `TOP_WALL_ROWS - 1`, which no station ever touches, so their columns are
-   * free to land anywhere. Their floor-level anchor (where an agent actually
-   * stands to use one) nudges to the nearest clear column when a station
-   * happens to sit directly under the fixture's own column.
-   */
+  // Wall fixtures spread across the top wall's row, which no station touches. Where
+  // an agent stands to use one nudges to the nearest clear column when a station
+  // sits right under it.
   placeFixtures(): void {
     for (const [index, kind] of FIXTURE_KINDS.entries()) {
       const col = Math.round(2 + ((this.width - 4) * (index + 1)) / (FIXTURE_KINDS.length + 1))
@@ -620,11 +605,8 @@ class HallBuilder {
     return prop.x + Math.floor(prop.w / 2)
   }
 
-  /**
-   * Where a crew member waits for a gate: under a station's body, beside its
-   * seat — a gap between two stations is where a belt turns down to get round
-   * the next one — as near the scoreboard as there is one.
-   */
+  // Where a crew member waits for a gate: under a station's body beside its seat (a
+  // gap between stations is where a belt turns down), as near the scoreboard as can be.
   waitTile(): Tile {
     const { solid, width } = this
     const { yardStationRow, yardSeatRow } = this.rows
@@ -648,11 +630,8 @@ class HallBuilder {
     return wait
   }
 
-  /**
-   * Breakroom: a room in the bottom band, centred on the median crewed
-   * station column and clamped inside the hall, with a two-tile door in the
-   * middle of its partition.
-   */
+  // The breakroom: a room in the bottom band, centred on the median crewed station
+  // and clamped inside the hall, with a two-tile door mid-partition.
   placeBreakroom(): { x: number; door: Tile[]; restSeats: RestSeat[] } {
     const { roomRow } = this.rows
     const roomX = this.roomX()
@@ -738,11 +717,8 @@ class HallBuilder {
     return lights
   }
 
-  /**
-   * Belts: one routed path per `dependsOn` edge, sharing tiles only within a
-   * split (same source) or merge (same target) group — and the walk grid over
-   * them.
-   */
+  // Belts: one routed path per `dependsOn` edge, sharing tiles only within a split
+  // (same source) or merge (same target), and the walk grid over them.
   crossings(restSeats: readonly RestSeat[]): Crossings {
     const byNode = new Map(
       this.props.filter((p) => p.nodeId !== null).map((p) => [p.nodeId as string, p])
@@ -785,13 +761,9 @@ class HallBuilder {
   }
 }
 
-/**
- * The walk grid over the belts, and the crossovers opened in it.
- *
- * Walk grid: solid ∪ belt tiles ∪ every seat. Crossovers open only where the
- * floor would otherwise split, or a station's walk to the breakroom door
- * detours badly around belts.
- */
+// The walk grid over the belts (solid, belt tiles and every seat), with crossovers
+// opened only where the floor would split or a station's walk to the breakroom door
+// detours badly around belts.
 class Crossings {
   readonly belts: readonly HallBelt[]
   readonly beltTiles: readonly BeltTile[]
@@ -893,10 +865,7 @@ class Crossings {
     return partner !== null && this.isClear(t) && this.isClear(partner)
   }
 
-  /**
-   * A crossover is a pair of neighbouring straight tiles of one belt, opened
-   * together so two people can pass.
-   */
+  /** A crossover: two neighbouring straight tiles of one belt, opened so two can pass. */
   private openPair(t: Tile): void {
     const partner = this.partnerOf(t) as Tile
     this.open(t)
@@ -959,10 +928,7 @@ class Crossings {
   }
 }
 
-/**
- * The row above a station is where its screens and nameplate are drawn, so a
- * crew member walking there disappears behind the station.
- */
+/** The row above a station holds its screens and plate; a walker there is hidden. */
 function behindStations(props: readonly HallProp[]): Set<string> {
   const behind = new Set<string>()
   for (const p of props.filter((q) => q.nodeId !== null)) {

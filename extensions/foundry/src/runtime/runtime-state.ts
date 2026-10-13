@@ -10,12 +10,8 @@ import { type MuteStore } from './feed/mutes.js'
 import type { StallFiring } from './evaluate-stall.js'
 import { endAndWait } from './end-session.js'
 
-/**
- * The supervision runtime's parts, held for the life of the extension.
- *
- * One record rather than module-level `let`s, so every module that reads them
- * sees the value `startSupervisionRuntime` set and `deactivate` cleared.
- */
+// The supervision runtime's parts for the life of the extension: one record, not
+// module `let`s, so every reader sees what `startSupervisionRuntime` set.
 export const runtime: {
   // The loopback endpoint the agents' hooks answer on, and the runner that owns
   // their terminals. Started once for the extension rather than per run: a port
@@ -26,12 +22,8 @@ export const runtime: {
   // What is running, what it changed, what needs looking at, and what must not
   // start yet.
   supervision: Supervision | null
-  /**
-   * Which runs are allowed to interrupt you.
-   *
-   * Muting suppresses the notification, never the entry: the feed's record stays
-   * complete whether or not it interrupted anyone.
-   */
+  // Which runs may interrupt you. Muting stops the notification, never the entry: the
+  // feed stays complete.
   mutes: MuteStore | null
 } = {
   control: null,
@@ -45,67 +37,32 @@ export const runtime: {
 // hold these the surface has nothing to render and a phase sits at its hook.
 export const pendingPermissions = createPendingPermissions()
 
-/**
- * Where the supervision runtime keeps its files.
- *
- * Absolute, and outside every repository. It used to be
- * `resolveWorktreeBaseDir('')`, which is `join('', '.worktrees')` — a
- * *relative* path — so the `--settings` handed to claude read
- * `.worktrees/.foundry-runtime/settings/<id>.json`, which the runtime
- * resolved against the worktree it was started in. It was never there, so every
- * supervised run died on "Settings file not found" the moment it launched: the
- * card sat at WORKING with 0 turns and the console stayed empty forever.
- *
- * In Foundry's own `api.paths.globalStorage`: this is the pilot's own state,
- * not repository content, and nothing here should ever land in a diff.
- */
+// Where the supervision runtime keeps its files: absolute, in Foundry's
+// `globalStorage`, outside every repository. A relative path once made every
+// supervised run die on "Settings file not found" (SUPERVISION.md, "Incidents behind the code").
 export function runtimeStateDir(globalStorage: string): string {
   return path.join(globalStorage, 'runtime')
 }
-/**
- * The notification a held tool call raised, so answering it takes the
- * notification away too. A console that leaves them behind teaches you to
- * dismiss without reading.
- */
+// The notification each held call raised, so answering it removes the notification:
+// leftovers teach you to dismiss without reading.
 export const raisedNotifications = new Map<string, Disposable>()
 
-/**
- * Stalls that have fired, newest first, and whether they were judged right.
- *
- * Kept in memory rather than persisted: the point of the record is tuning the
- * thresholds against a week of real use, and a firing about a run that no longer
- * exists is not something to reload on the next start.
- */
+// Stalls that fired, newest first, and whether they were judged right. In memory: they
+// tune thresholds over a week of use, and a dead run's firing is not worth reloading.
 export const stallFirings: Array<{ firing: StallFiring; featureDir: string; shadow: boolean }> = []
 
-/**
- * Agents whose tool call was handed back to the terminal's own prompt.
- *
- * The bridge does that when nobody answers in time, and an unattended run
- * never reaches the prompt — so the agent stops there with its process alive
- * and its node still `running`, which every surface drew as a working build.
- * Keyed by session: one agent is stranded once, however many calls it lost.
- */
+// Agents whose tool call went back to the terminal's prompt, which an unattended run
+// never reaches: alive, still `running`, and drawn as working unless recorded here.
+// Keyed by session: an agent is stranded once, however many calls it lost.
 export const strandedAgents = new Map<string, { orderId: string; sessionId: string; at: number }>()
 
-/**
- * How many firings to keep.
- *
- * Enough to judge a week of them by hand, which is what shadow mode is for, and
- * bounded because this is an application that stays open for days and an
- * unbounded list is a leak with a UI on it.
- */
+// How many firings to keep: enough to judge a week by hand (what shadow mode is for),
+// bounded because the application stays open for days.
 export const MAX_STALL_FIRINGS = 200
 
-/**
- * Whether this process is still running that agent's session.
- *
- * The runner's own register, which is emptied by `end` on a `SessionEnd`, a
- * closed tab or a dead process — and which is simply empty in a fresh
- * application. That is the whole point: every session a previous process
- * started is gone, and a graph that still says `running` is describing agents
- * that no longer exist.
- */
+// Whether this process runs that agent's session: the runner's register, emptied on
+// session end and empty in a fresh application, so a graph still saying `running`
+// for a previous process's agents is recognised as describing nothing.
 export function isLiveSession(sessionId: string): boolean {
   return runtime.supervisedRunner?.terminalFor(sessionId) != null
 }

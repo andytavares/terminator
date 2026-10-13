@@ -141,12 +141,8 @@ function contextSection(order: WorkOrder, role: Role | null): string[] {
   return lines
 }
 
-/**
- * The commands the probe found. A role that may not run them is told so,
- * rather than invited to. The architect was handed "use these; do not invent
- * others" and then refused `npm test` by the policy, so it spent three turns
- * on an instruction the factory would never have let it follow.
- */
+// The commands the probe found. A role that may not run them is told so: an architect
+// told "use these" and then refused `npm test` spent three turns on it.
 function commandsLine(order: WorkOrder, role: Role | null): string {
   const commands = Object.entries(order.context.toolchain)
     .filter(([, found]) => found !== null)
@@ -284,12 +280,8 @@ function knowledgeSections(input: BriefInput, reads: ReadonlySet<string>): strin
   return lines
 }
 
-/**
- * Last, because it is what the agent does with everything above it. The Forge
- * has always ended its brief this way; the Line ended without one, so four of
- * the standard shape's nine steps were told what to think about and never
- * where to put it.
- */
+// Last, because it is what the agent does with everything above: without it, steps
+// were told what to think about and never where to put it.
 function outputSection({ role, outputPath, outputsDir }: BriefInput): string[] {
   if (outputPath === undefined) return []
   const contract = rungOutputContract(outputPath, collectableWrites(role ?? null), { outputsDir })

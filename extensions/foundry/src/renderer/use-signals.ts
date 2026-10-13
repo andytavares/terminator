@@ -7,11 +7,8 @@ import { readSignals, type SensorRow, type SignalsRead } from '../components/sig
 // The sensors' signals as the Inbox and the factory's front door both show
 // them, and promoting one into a draft order from either.
 
-/**
- * The signals and the sensors that raised them, read every `pollMs`. Sensors
- * record signals on their own tick and tell nobody, so this is asked for on a
- * timer — and not while the view is hidden.
- */
+// The signals and the sensors that raised them, read every `pollMs` while visible:
+// sensors record signals on their own tick and tell nobody.
 export function useSignalFeed(pollMs: number) {
   const [signals, setSignals] = useState<Signal[]>([])
   const [sensors, setSensors] = useState<SensorRow[]>([])
@@ -49,10 +46,8 @@ async function requestPromotion(
   }
 }
 
-/**
- * Promoting a signal into a draft: opened with the sensor's own repository
- * as the default, confirmed into an order, and the signals read again.
- */
+// Promoting a signal into a draft: opened with the sensor's repository as the
+// default, confirmed into an order, then the signals read again.
 export function usePromotion(sensors: readonly SensorRow[], refreshSignals: () => Promise<void>) {
   const [state, setState] = useState<Promotion>(NO_PROMOTION)
   const patchPromotion = (next: Partial<Promotion>): void =>

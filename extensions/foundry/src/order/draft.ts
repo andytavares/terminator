@@ -47,13 +47,8 @@ function laneFor(repo: DraftRepo) {
   return { ord: repo.lane, repo: repo.name, branch: '', role: null, blocks: [], blockedBy: [] }
 }
 
-/**
- * A valid, empty draft.
- *
- * The Forge always has a real document to show, from the first turn — never a
- * progress bar over nothing (FR-003). One lane per repository from the start,
- * because a two-repository order has to be expressible before anyone plans it.
- */
+// A valid, empty draft, so the Forge shows a real document from the first turn
+// (FR-003); one lane per repository, so two repositories are expressible at once.
 export function draftOrder(input: DraftOrderInput): WorkOrder {
   const repos = reposOf(input)
   return WorkOrderSchema.parse({

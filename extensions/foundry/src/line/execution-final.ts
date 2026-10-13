@@ -26,12 +26,8 @@ const MAX_FINAL_SEND_BACKS = 2
 interface Change {
   readonly touched: readonly string[]
   readonly inspection: Inspection
-  /**
-   * The grade the change turned out to deserve, not the one the plan
-   * predicted. Shipping reads this: a change planned as P3 that turns out to
-   * touch authentication must take the operator's decision before it reaches
-   * the remote, and reading the stale grade is how it would not have.
-   */
+  // The grade the change turned out to deserve, which shipping reads: a P3 plan that
+  // touches authentication must reach the operator before the remote.
   readonly risk: RiskAssessment
 }
 
@@ -51,24 +47,17 @@ export async function finishExecution(run: Execution): Promise<RunOutcome> {
   return runOutcomeOf(run, { change, workDone, ladder: climbed.ladder })
 }
 
-/**
- * The drafts open first when nothing needs the operator before they exist: no
- * inspection is owed, and the caller judges the shipping mode. True when they
- * are open.
- */
+// Opens the drafts first when nothing needs the operator before they exist (no
+// inspection owed; the caller judges the shipping mode). True when they are open.
 async function openDraftsEarly(run: Execution, change: Change): Promise<boolean> {
   const { beforeFinalCheck } = run.deps
   if (change.inspection.required || beforeFinalCheck === undefined) return false
   return beforeFinalCheck({ risk: change.risk, verdicts: run.verdicts })
 }
 
-/**
- * The accumulated change, not any single unit — which is what stops a unit
- * finishing early from skipping the inspection. What the plan said, plus what
- * the work did. Combined rather than swapped, because git reporting nothing
- * means it could not be read — and reading that as "nothing touched
- * authentication" is how a P0 quietly grades P3.
- */
+// The accumulated change, so a unit finishing early cannot skip the inspection: the
+// plan's files plus the work's, combined because git reporting nothing means it could
+// not be read, and "nothing touched authentication" is how a P0 grades P3.
 async function assessChange(run: Execution): Promise<Change> {
   const { order, deps } = run
   const declared = order.plan.units.flatMap((u) => u.touches)
@@ -85,10 +74,7 @@ async function assessChange(run: Execution): Promise<Change> {
   return { touched, inspection, risk }
 }
 
-/**
- * The graph's work is done when everything but the held ship node has
- * passed. That node is the tail's to settle, so it is not waited for here.
- */
+/** The work is done when all but the held ship node passed; that node is the tail's. */
 function isWorkDone(run: Execution): boolean {
   const { current, recipe } = run
   const isShipNode = (n: RunNode) =>
@@ -167,11 +153,8 @@ class FinalClimb {
     return this.mendInstall(await this.retryFailure(first))
   }
 
-  /**
-   * A check that fails once and passes on the same commit is not the change's
-   * doing. Passes on this commit are cached by the caller, so only the failed
-   * step and those after it run again.
-   */
+  // A check that fails once and passes on the same commit is not the change's doing.
+  // Passes on this commit are cached, so only the failed step and later ones rerun.
   private async retryFailure(first: { outcome: LadderOutcome; logs: Map<string, string> }) {
     const firstFailed = first.outcome.ok
       ? undefined
@@ -189,10 +172,8 @@ class FinalClimb {
     return retry
   }
 
-  /**
-   * A missing package or a half-downloaded binary is mended here rather than
-   * asked about: reinstalling is the whole answer, and the code is not at fault.
-   */
+  // A missing package or half-downloaded binary is mended, not asked about:
+  // reinstalling is the whole answer, and the code is not at fault.
   private async mendInstall(climbed: {
     outcome: LadderOutcome
     logs: Map<string, string>
@@ -222,11 +203,8 @@ class FinalClimb {
     return brokenInstall(fs.readFileSync(logPath, 'utf8'))
   }
 
-  /**
-   * Run the same rungs on the base branch, up to the one that failed, so a
-   * failure that was already there is not sent back to a builder who did not
-   * cause it. The base checkout is let go whatever happens.
-   */
+  // The same rungs on the base branch, up to the failed one, so a failure already
+  // there is not sent back to a builder; the base checkout is let go regardless.
   async onBase(failedStep: StepOutcome): Promise<BaseCheck> {
     const upTo = this.steps.findIndex((s) => s.name === failedStep.name)
     const baseSteps = this.steps.slice(0, upTo + 1)
@@ -282,11 +260,8 @@ interface AfterWork {
   readonly climber: FinalClimb
 }
 
-/**
- * The three rules that fire on what the change turned out to be, rather than
- * on what the plan said it would be. Raised after the work, because that is
- * when the answer exists.
- */
+// The three rules that fire on what the change turned out to be, raised after the
+// work, when that answer exists.
 async function raiseAfterWork(run: Execution, after: AfterWork): Promise<void> {
   const { inspection, risk } = after.change
   const { order } = run
@@ -431,10 +406,8 @@ function runOutcomeOf(
       reason: inspection.reason,
     },
     risk: change.risk,
-    // Everything done, nothing waiting on a person, and the climb either
-    // passed or was never owed. A complete graph with an open gate is not
-    // shippable, which is the distinction this field exists to make. A shape
-    // with no ship step never ships, however well it went.
+    // Done, nothing waiting on a person, and the climb passed or was not owed: a
+    // complete graph with an open gate is not shippable, nor is a shape with no ship step.
     shippable:
       opensPullRequest(run.recipe) &&
       workDone &&

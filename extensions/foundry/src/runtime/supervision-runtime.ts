@@ -22,15 +22,9 @@ import {
 import { notifyPerson } from './held-calls.js'
 import { gotoRun, startPaletteRefresh, stopPaletteRefresh } from './palette-commands.js'
 
-/**
- * A stall, written where the order's history is read.
- *
- * The feature directory *is* the order directory, `<root>/orders/<id>`, so its
- * basename is the order id. A firing for a run whose feature directory is not
- * one writes nothing rather than inventing a place for it: reading any
- * directory's grandparent as the root wrote `<parent>/orders/<name>/ledger.jsonl`.
- * @internal
- */
+// A stall, written to the order's ledger. The feature directory is
+// `<root>/orders/<id>`; a firing for any other writes nothing rather than invent a place.
+/** @internal */
 export async function recordStall(
   featureDir: string,
   firing: { sessionId: string; signal: string; firedAt: number }
@@ -57,13 +51,9 @@ export async function recordStall(
   }
 }
 
-/**
- * Brings up the control server, the runner, the supervision layer and the stall
- * detector, and returns the layer so a caller can read what is running.
- *
- * Returns null when the runtime could not start: phases then fall back to the
- * unsupervised spawn, and every surface reads empty rather than throwing.
- */
+// Brings up the control server, runner, supervision layer and stall detector, and
+// returns the layer; null when it cannot start, so phases run unsupervised and
+// surfaces read empty rather than throw.
 export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Supervision | null> {
   try {
     runtime.control = await createControlServer()
@@ -94,10 +84,8 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
   }
 }
 
-/**
- * Without it, phases fall back to the headless spawn. Said out loud: the
- * difference is whether tool calls are asked about or approved silently.
- */
+// Without the runtime, phases fall back to the headless spawn. Said out loud: it
+// decides whether tool calls are asked about or approved silently.
 function runtimeUnavailable(api: ExtensionAPI, error: unknown): void {
   api.log.error('supervised runtime unavailable — phases will run unsupervised', error)
   closeHalfStartedRuntime()
@@ -151,19 +139,9 @@ function onStallFiring(api: ExtensionAPI, firing: StallFiring, featureDir: strin
   if (stallFirings.length > MAX_STALL_FIRINGS) stallFirings.length = MAX_STALL_FIRINGS
   runtime.supervision?.runs.setState(firing.sessionId, 'stalled', firing.firedAt)
 
-  // On the order's own record as well as the console's.
-  //
-  // The detector is timely and nothing consumes it. Measured on a live
-  // run: the builder fell silent at 07:27:08, this fired at 07:34:21,
-  // and the run went on waiting until the wall-clock budget stopped it
-  // at 07:52:10 — eighteen minutes after the console already knew. The
-  // executor is not told, and shadow mode is on by default, so those
-  // eighteen minutes left no trace anywhere an operator reads afterwards:
-  // the ledger said "budget exceeded", which is true and explains nothing.
-  //
-  // This does not stop the run — doing that needs a gate rule, which is a
-  // decision about FR-049 rather than a fix. It makes the silence
-  // legible, which is the part that was simply missing.
+  // On the order's record as well as the console's, so the silence is legible
+  // afterwards. It does not stop the run, which would need a gate rule (FR-049).
+  // Why: SUPERVISION.md, "Incidents behind the code".
   void recordStall(featureDir, firing)
 
   // Attributed to the pilot, not the agent: the agent did not say this,

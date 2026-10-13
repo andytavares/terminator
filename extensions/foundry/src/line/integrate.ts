@@ -24,10 +24,7 @@ import { gradeInWords } from '../runtime/review/risk-grade.js'
 // operator decides before anything reaches the remote, because a force-pushed
 // branch is cheap to undo and a leaked migration is not.
 
-/**
- * The grades whose decision is taken before anything is pushed.
- * @internal
- */
+/** The grades whose decision is taken before anything is pushed. @internal */
 export const GATED_GRADES = ['P0', 'P1'] as const
 
 export type ShipMode = 'gate_then_push' | 'push_then_gate'
@@ -715,11 +712,8 @@ export async function openDrafts(
   return { pulls, bodyPaths, held: false, reason: '' }
 }
 
-/**
- * Written before anything is pushed, so the operator can read what would have
- * shipped even when nothing does. Rewritten per lane afterwards once the
- * sibling URLs exist.
- */
+// Written before anything is pushed, so the operator can read what would have shipped
+// even if nothing does; rewritten per lane once the sibling URLs exist.
 async function writeFirstBodies(
   { order, shipment, deps }: Shipping,
   repos: readonly ResolvedRepo[]
@@ -782,12 +776,8 @@ async function openLanes(
   return { pulls, created }
 }
 
-/**
- * Push one lane and open its draft, or adopt the one already open on its
- * branch. The lanes this one waits on are open by now — the caller runs in
- * merge order — so the cross-links in its body are real URLs rather than
- * "merges before this".
- */
+// Push one lane and open its draft, or adopt the one open on its branch. Lanes run in
+// merge order, so the ones it waits on are open and its cross-links are real URLs.
 async function openLane(
   { order, shipment, deps }: Shipping,
   { repo, opened }: { repo: ResolvedRepo; opened: readonly LanePullRequest[] }
@@ -825,13 +815,9 @@ function openedNote(
     : `Draft pull request for lane ${repo.lane}, held from merging: ${held.reason ?? ''}`
 }
 
-/**
- * Now every sibling URL exists, so the earlier lanes can name the later ones.
- * This has to go back to GitHub — `gh pr create` read the file once and
- * rewriting it afterwards changes a local file and nothing else, which would
- * leave lane 1 permanently saying "merges after this". Never for the last
- * lane, whose body already had every URL when it was created.
- */
+// With every sibling URL known, earlier lanes name the later ones on GitHub itself:
+// `gh pr create` read the body file once, so editing it later changes nothing there.
+// Never for the last lane, which had every URL when created.
 async function crossLink({ order, shipment, deps }: Shipping, pulls: readonly LanePullRequest[]) {
   for (const pull of pulls.slice(0, -1)) {
     const body = prBody(order, shipment, { lane: pull.lane, opened: pulls })

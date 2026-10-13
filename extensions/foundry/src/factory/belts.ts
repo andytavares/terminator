@@ -339,11 +339,9 @@ class BeltSearch {
     return role === 'station' || role === 'belt'
   }
 
-  /**
-   * What stepping onto a tile another belt uses costs: almost nothing along a
-   * compatible belt's own way, a little more against it, and a lot to cross an
-   * unrelated straight at a right angle — null for any other crossing.
-   */
+  // What stepping onto another belt's tile costs: almost nothing along a compatible
+  // belt's way, more against it, a lot to cross an unrelated straight square on, and
+  // null for any other crossing.
   private sharedCost(
     n: Tile,
     { dir, cost, isGoal }: { dir: Side; cost: number; isGoal: boolean }

@@ -18,10 +18,7 @@ import type { OrderRun } from '../line/run-context.js'
 import type { LiveStandingSources } from './standing.js'
 import { isoNow, shellExecOf } from '../host-calls.js'
 
-/**
- * The Line's channels: the run channels, stopping a whole order, and starting
- * one over.
- */
+/** The Line's channels: the run channels, stopping a whole order, starting one over. */
 export function registerLineChannels(
   context: ActivationContext,
   standingSources: LiveStandingSources
@@ -33,12 +30,9 @@ export function registerLineChannels(
   return runs
 }
 
-// ── The Line ───────────────────────────────────────────────────────────
-//
-// An agreed order plus a shape of work becomes a run graph. Everything that
-// can refuse does so before any agent starts: the order has to be agreed,
-// the shape has to be one this repository can actually support, and the
-// records location has to be writable.
+// The Line: an agreed order plus a shape becomes a run graph. Everything that can
+// refuse does so before any agent starts: the order agreed, the shape supported here,
+// the records location writable.
 function createRuns(context: ActivationContext, standingSources: LiveStandingSources): RunChannels {
   const { dataRoot } = context
   return createRunChannels({
@@ -93,12 +87,8 @@ function transcriptActivity(sessionId: string): ReturnType<typeof readTranscript
   return run ? readTranscript(run.transcriptPath) : []
 }
 
-// Stop the whole order, as opposed to one agent.
-//
-// `foundry:run-stop` ends one session; this ends the run. The distinction is
-// the reason a dead run could never be got rid of: the only order-level stop
-// was a gate option that did nothing, and `order.cancel` refuses a running
-// order and points back at that gate.
+// Stop the whole order, where `foundry:run-stop` ends one session: without it a
+// dead run could not be got rid of, since `order.cancel` refuses a running order.
 function registerRunStop({ api, dataRoot }: ActivationContext): void {
   reg(
     api,
@@ -109,13 +99,9 @@ function registerRunStop({ api, dataRoot }: ActivationContext): void {
   )
 }
 
-// Start the same order over.
-//
-// Stop whatever is still running, destroy everything the run made — every
-// lane's checkout and branch, the graph, the gates, the rung outputs — and
-// put the order back to `agreed` so it can be run again from node zero. The
-// ask, the criteria and the plan survive, which is the whole difference
-// between this and making a fourth order for the same sentence.
+// Start the same order over: stop what runs, destroy every lane checkout and branch,
+// the graph, gates and rung outputs, and put the order back to `agreed`. The ask,
+// criteria and plan survive.
 function registerRunReset(context: ActivationContext): void {
   reg(
     context.api,

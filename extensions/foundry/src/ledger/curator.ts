@@ -11,10 +11,7 @@ import type { Rung } from '../verify/ladder.js'
 // A proposal is only ever an argument: here is what you rejected, three times,
 // for the same reason, and here are the entries. The operator decides.
 
-/**
- * Actions that mean "the operator turned work away".
- * @internal
- */
+/** Actions that mean "the operator turned work away". @internal */
 export const REJECTION_ACTIONS = [
   'gate.decided',
   'verify.failed',
@@ -26,10 +23,7 @@ export const REJECTION_ACTIONS = [
 /** Gate outcomes that are a rejection rather than an approval. */
 const REJECTING_OPTIONS = ['send_back', 'skip', 'stop', 'accept_debt']
 
-/**
- * Three. Twice is a coincidence; a third time is a pattern worth a rule.
- * @internal
- */
+/** Twice is a coincidence; a third time is a pattern worth a rule. @internal */
 export const REPETITION_THRESHOLD = 3
 
 interface Citation {
@@ -53,10 +47,7 @@ export interface Proposal {
   readonly occurrences: number
 }
 
-/**
- * A stable reference to one ledger line.
- * @internal
- */
+/** A stable reference to one ledger line. @internal */
 export function citationRef(entry: LedgerEntry): string {
   return `${entry.at}/${entry.subject}`
 }

@@ -240,10 +240,7 @@ function withUnitIds(node: RunNode): RunNode {
   return { ...node, unitIds, reworks, feedback }
 }
 
-/**
- * A proposed shape and the reason it fits this order (FR-014).
- * @internal
- */
+/** A proposed shape and the reason it fits this order (FR-014). @internal */
 export interface ProposedRecipe {
   readonly name: string
   readonly why: string
@@ -300,10 +297,7 @@ function recipeLadder(order: WorkOrder): ProposedRecipe[] {
   return [heaviest]
 }
 
-/**
- * The lightest shape that fits, ignoring whether this repository can run it.
- * @internal
- */
+/** The lightest shape that fits, ignoring whether this repository can run it. @internal */
 export function proposeRecipe(order: WorkOrder): ProposedRecipe {
   return recipeLadder(order)[0]
 }
@@ -368,14 +362,9 @@ export function createRunChannels(deps: RunDeps): RunChannels {
   }
 }
 
-/**
- * The nodes nothing is running, for one order.
- *
- * Empty while an executor in this process is driving the order, because a
- * node marked `running` before its agent has reported a session is
- * indistinguishable from one whose agent is gone — and only one of those is
- * safe to restart.
- */
+// The nodes nothing is running, for one order. Empty while this process's executor
+// drives it: a node marked `running` before its agent reports a session looks just
+// like one whose agent is gone, and only the second is safe to restart.
 function orphansOf(deps: RunDeps, orderId: string, graph: RunGraph): string[] {
   if (deps.executing(orderId)) return []
   return orphanedNodes(graph, deps.isLive).map((node) => node.id)
@@ -421,23 +410,16 @@ async function start(deps: RunDeps, payload: z.infer<typeof StartPayload>): Prom
   await saveGraph(deps, graph)
   const running = await markRunning(deps, order, { ...fitted, chosenByOperator })
 
-  // Not awaited: a run outlives the call that started it, and a channel that
-  // blocked until the last agent finished would hold the bridge for the
-  // length of the work. Failures reach the ledger and the graph, which is
-  // where a surface reads them.
+  // Not awaited: a run outlives the call that started it. Failures reach the ledger
+  // and the graph, where a surface reads them.
   recordFailureOf(deps, running, deps.execute(running, recipe, graph))
 
   return { graph, order: running, started: true }
 }
 
-/**
- * The first skill a node declares that resolves nowhere, said as the refusal.
- *
- * Every node's skills, resolved before anything is cut. An unknown one
- * discovered mid-run has already spent agent time on a node that was
- * going to fail the moment its agent tried to read a directory nobody
- * mounted; refusing here costs nothing.
- */
+// The first skill a node declares that resolves nowhere, as the refusal: checked for
+// every node before anything is cut, so no agent time is spent on a node that would
+// fail reading a directory nobody mounted.
 function unknownSkillIn(deps: RunDeps, recipe: Recipe, graph: RunGraph): string | null {
   const roleRegistry = createRoleRegistry(deps.sources())
   for (const node of graph.nodes) {
@@ -479,10 +461,8 @@ async function markRunning(
     actor: chosenByOperator ? 'operator' : 'role:architect',
     action: 'run.started',
     subject: proposal.name,
-    // Both halves of "why this shape": the grounds for choosing it, and
-    // which rung it was read from. Either alone leaves a surprising run
-    // unexplained — the first says why this shape, the second says why this
-    // version of it.
+    // Both halves of "why this shape": the grounds for choosing it, and the rung it
+    // was read from, which says why this version of it.
     reason: `${
       chosenByOperator ? 'chosen by the operator' : proposal.why
     }; recipe resolved from ${fitted.rung}`,
@@ -540,12 +520,8 @@ async function observe(deps: RunDeps, payload: z.infer<typeof ObservePayload>): 
   }
 }
 
-/**
- * Every node's skills, resolved the way `start` resolves them.
- *
- * An order whose recipe no longer resolves — removed from disk after the run
- * began — has nothing to report rather than a thrown surface.
- */
+// Every node's skills, resolved as `start` resolves them. A recipe removed from disk
+// after the run began reports nothing rather than throwing.
 function nodeSkills(
   deps: RunDeps,
   order: WorkOrder | null,
@@ -563,10 +539,7 @@ function nodeSkills(
   return skills
 }
 
-/**
- * Where the pull requests are, so the Floor can link them. `cwd` is the
- * checkout a review opens against.
- */
+/** Where the pull requests are, for the Floor's links; `cwd` is a review's checkout. */
 async function observedPulls(deps: RunDeps, orderId: string) {
   const pulls = await readPulls(deps.dataRoot(), orderId)
   return pulls.map((pull) => ({
@@ -593,16 +566,9 @@ interface ObservedRun {
   readonly orphaned: string[]
 }
 
-/**
- * Where this order stands, and whose move it is, decided once here rather
- * than five times over in five surfaces from whatever each of them happened
- * to hold.
- *
- * Through `readStanding` with what is already in hand rather than a second
- * assembly of the same inputs: two callers assembling them separately is how
- * the order list and this surface came to describe one halted run as "ready
- * to hand off" and "building" at once.
- */
+// Where this order stands and whose move it is, through `readStanding` with what is
+// in hand: two callers assembling its inputs separately once called one halted run
+// "ready to hand off" and "building" at once.
 function observedStanding(deps: RunDeps, { id, order, graph, gates, orphaned }: ObservedRun) {
   return readStanding(order ?? ({ id, status: 'running' } as WorkOrder), {
     graphFor: async () => graph,
@@ -627,11 +593,8 @@ function blockedNodes(
     .filter((b) => b.reason !== null)
 }
 
-/**
- * What each lane is, what it shares, and what it is waiting for. One
- * unremarkable row for a single-repository order — the surface decides not
- * to draw it.
- */
+// What each lane is, shares and waits for; a single-repository order gets one plain
+// row, which the surface chooses not to draw.
 function laneRows(order: WorkOrder) {
   return laneViews(order).map((view) => ({
     ord: view.lane.ord,
@@ -645,27 +608,17 @@ function laneRows(order: WorkOrder) {
   }))
 }
 
-/**
- * Pick a halted run back up.
- *
- * The graph on disk is the run's state, so resuming is re-entering the
- * executor over it — there is no second notion of "where it got to" that
- * could disagree. A node the operator sent back is retried; everything else
- * carries on from where the wave stopped.
- *
- * Idempotent against a run that is already going: `execute` starts only what
- * the scheduler offers, and a running node is not offered.
- */
+// Pick a halted run back up by re-entering the executor over the graph on disk, the
+// one statement of where it got to. A node sent back is retried; a run already going
+// is unaffected, since the scheduler never offers a running node.
 async function resume(deps: RunDeps, payload: z.infer<typeof ObservePayload>): Promise<unknown> {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
   if (order.status !== 'running') {
     return { error: `Only a running order can be resumed; this one is ${order.status}.` }
   }
-  // An executor already going for this order needs no second one — the
-  // scheduler it is already inside offers the same nodes this call would.
-  // Starting another produced `run.halted: waiting on a gate` three times
-  // in 23 seconds on WO-0927-4fd.
+  // An executor already driving this order is the one to keep: a second one halted it
+  // over and over (SUPERVISION.md, "Incidents behind the code").
   if (deps.executing(order.id)) {
     return { error: 'This run is already going; nothing to resume.' }
   }
@@ -685,22 +638,15 @@ async function resume(deps: RunDeps, payload: z.infer<typeof ObservePayload>): P
   const retried = (payload.retry ?? []).reduce((g, id) => retryNode(g, id), taken.graph)
   await saveGraph(deps, retried)
 
-  // Clears any failure the previous attempt left in the ledger: without
-  // this, a resumed run that goes on to succeed still reads `stopped` from
-  // the attempt before it, because `runFailure` has nothing newer to stop
-  // its backward scan on.
+  // Clears the previous attempt's failure: without a newer line to stop at,
+  // `runFailure` would read a resumed run that succeeds as `stopped`.
   await recordLine(deps, order.id, { action: 'run.resumed', reason: 'picked up by the operator' })
   recordFailureOf(deps, order, deps.execute(order, resolved.resolved.value, retried))
   return { graph: retried, reclaimed: taken.reclaimed, started: true }
 }
 
-/**
- * Whatever was left mid-flight by an application that closed, back in the queue.
- *
- * Without this the scheduler has nothing to offer — it offers only `waiting`
- * and `ready` — so a resumed run started nothing and said nothing, which
- * reads exactly like a run that had finished.
- */
+// What an application that closed left mid-flight, back in the queue: the scheduler
+// offers only `waiting` and `ready`, so a resumed run would otherwise start nothing.
 async function reclaimOrphans(
   deps: RunDeps,
   orderId: string,
@@ -750,11 +696,8 @@ async function recipes(deps: RunDeps, payload: z.infer<typeof ObservePayload>): 
     }
   })
 
-  // The same walk `start` does, so the shape the surface shows is the shape
-  // that would run — but over the order's own statement of itself, with the
-  // operator's pick set aside: `proposed` is "what the ladder would choose",
-  // not "what is already chosen", or overriding one recipe with another
-  // would say it was the ladder's idea.
+  // The walk `start` does, so the surface shows the shape that would run, but with
+  // the operator's pick set aside: `proposed` is what the ladder would choose.
   const forProposal: WorkOrder = { ...order, recipe: null }
   const fitted = fitRecipe(recipeLadder(forProposal), forProposal, deps.sources())
   const proposal = 'error' in fitted ? proposeRecipe(forProposal) : fitted.proposal
@@ -776,13 +719,7 @@ async function recipes(deps: RunDeps, payload: z.infer<typeof ObservePayload>): 
   }
 }
 
-/**
- * Where the agent actually is.
- *
- * The backstop: however good the structured view gets, there are moments
- * when the only useful thing is to be in the session typing at it. One
- * action, from any surface.
- */
+/** Where the agent is: the backstop, one action from any surface, to type at it. */
 async function attach(deps: RunDeps, payload: z.infer<typeof AttachPayload>): Promise<unknown> {
   const graph = await loadGraph(deps, payload.orderId)
   if (graph === null) return { error: `No run for ${payload.orderId}.` }
@@ -810,13 +747,8 @@ async function attach(deps: RunDeps, payload: z.infer<typeof AttachPayload>): Pr
   return { terminalSessionId: node.sessionId, nodeId: node.id }
 }
 
-/**
- * Why a finished step has no agent to go to, or null while it has not finished.
- *
- * A finished step's session is closed (ADR 076); the resume advice `attach`
- * gives is for a run that died, and sent people to resume a step that had
- * succeeded.
- */
+// Why a finished step has no agent to go to, or null before it finishes: its session
+// is closed (ADR 076), and `attach`'s resume advice is for a run that died.
 function finishedAgent(step: string, node: RunNode): string | null {
   if (node.state !== 'passed' && node.state !== 'failed' && node.state !== 'skipped') return null
   return node.endedAt === null
@@ -824,13 +756,8 @@ function finishedAgent(step: string, node: RunNode): string | null {
     : `${step} finished at ${clockTime(node.endedAt)}; its agent has closed.`
 }
 
-/**
- * What each node's agent has been doing lately.
- *
- * The Factory view draws a station's activity, not its whole transcript —
- * the last 20 entries are plenty to say "reading" or "running a shell
- * command" and drop off as soon as the agent moves on.
- */
+// What each node's agent has been doing lately: the last 20 transcript entries, enough
+// for a station to say "reading" or "running a shell command".
 async function activity(deps: RunDeps, payload: z.infer<typeof ActivityPayload>): Promise<unknown> {
   const graph = await loadGraph(deps, payload.id)
   if (graph === null) return { error: `No run for ${payload.id}.` }
@@ -844,11 +771,8 @@ async function activity(deps: RunDeps, payload: z.infer<typeof ActivityPayload>)
   return { activity }
 }
 
-/**
- * What the run did, as recorded while it did it: the graph for its shape,
- * each frame of node states and each tool call, and every gate the order
- * raised — decided ones included, since a replay shows the waits too.
- */
+// The run as recorded while it ran: the graph, each frame of node states and tool
+// calls, and every gate raised, decided ones too, since a replay shows the waits.
 async function timeline(deps: RunDeps, payload: z.infer<typeof ActivityPayload>): Promise<unknown> {
   const graph = await loadGraph(deps, payload.id)
   if (graph === null) return { error: `No run for ${payload.id}.` }

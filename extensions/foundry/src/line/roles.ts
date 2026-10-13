@@ -114,18 +114,9 @@ function mayUseTool(role: Role | null, tool: string): boolean {
   return role.tools.includes(needed)
 }
 
-/**
- * Whether this role may write to the checkout.
- *
- * Not "does it write anything": the red team writes findings, a scheduler
- * writes a schedule and the architect writes a plan, and none of them
- * touches the repository. This asked `writes.length > 0`, so all three
- * came back true, and the executor installs its read-only policy on the
- * answer — the adversarial pass could edit the code it was reviewing.
- *
- * Three destinations are the checkout, and they are the same three the
- * built-in role tests already name.
- */
+// Whether this role may write to the checkout, not whether it writes anything: the
+// red team, scheduler and architect write elsewhere, and asking `writes.length > 0`
+// let the adversarial pass edit the code it reviewed.
 function mayWrite(role: Role | null): boolean {
   return role !== null && role.writes.some((target) => CHECKOUT_WRITES.has(target))
 }

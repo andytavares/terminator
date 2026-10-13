@@ -4,10 +4,8 @@ import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 /** What a Foundry channel answers to a payload its schema rejects. */
 const MALFORMED_REQUEST = { error: 'Malformed request.' }
 
-/**
- * One Foundry channel: the host parses the payload with `schema` before `run`
- * sees it, and answers a rejected one with `MALFORMED_REQUEST` (ADR 096).
- */
+// One Foundry channel: the host parses the payload with `schema` before `run` sees it
+// and answers a rejected one with `MALFORMED_REQUEST` (ADR 096).
 export function foundryChannel<S extends z.ZodType>(
   channel: string,
   schema: S,

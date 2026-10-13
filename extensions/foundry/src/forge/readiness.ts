@@ -224,11 +224,9 @@ function openBlockingFindings(order: WorkOrder): WorkOrder['redTeam'] {
   return order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
 }
 
-/**
- * What is open on the order: its blocking red-team findings, its unanswered
- * questions, and whether the findings now wait on the operator (rule 5)
- * because the machine is not acting on them or has run out of rounds.
- */
+// What is open on the order: blocking red-team findings, unanswered questions, and
+// whether the findings now wait on the operator (rule 5): the machine is not acting
+// on them, or has run out of rounds.
 function openWorkOf(input: Pick<ReadinessInput, 'order' | 'intake' | 'loop'>) {
   const { order, intake, loop } = input
   const openBlocking = openBlockingFindings(order)
@@ -482,10 +480,7 @@ const questionsToAnswer: StripRule = ({ openQuestions }) => {
   }
 }
 
-/**
- * 7. Nothing drafted yet. Criteria alone are not a plan: an order seeded from
- * a ticket arrives with them, and no unit to satisfy them.
- */
+/** 7. Nothing drafted yet: a ticket-seeded order arrives with criteria and no unit. */
 const noPlan: StripRule = ({ input }) => {
   if (input.order.plan.units.length > 0) return null
   return {
@@ -845,11 +840,8 @@ function buildSteps(
   return draftSteps(ids, context)
 }
 
-/**
- * A draft's steps in order. The first step that is bad, the operator's, or
- * being worked while findings are open stops the ones after it — every later
- * step but hand-off reads "not yet".
- */
+// A draft's steps in order. The first step that is bad, the operator's, or worked
+// while findings are open stops the rest: every later step but hand-off is "not yet".
 function draftSteps(ids: readonly StepId[], context: StepContext): StepView[] {
   const openBlocking = openBlockingFindings(context.input.order)
   const views: StepView[] = []
@@ -941,11 +933,8 @@ function buildFindings(input: ReadinessInput): readonly FindingView[] {
 
 // ── Locks ────────────────────────────────────────────────────────────────
 
-/**
- * One reason hand-off may be locked. A string is the lock, null is "not
- * locked" said for certain, and undefined is "not this reason" — the next one
- * is asked.
- */
+// One reason hand-off may be locked: a string is the lock, null is "not locked" for
+// certain, undefined is "not this reason" and the next one is asked.
 type LockRule = (facts: StripFacts) => string | null | undefined
 
 function buildHandOffLock(input: ReadinessInput): string | null {

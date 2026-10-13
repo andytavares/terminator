@@ -718,10 +718,8 @@ function stepsAround(
   }
 }
 
-/**
- * Findings grouped by who acts on them, in the fixed order the rendering
- * shows: fixing, needs-you, notes, resolved. An empty group is not shown.
- */
+// Findings grouped by who acts on them, in the order the rendering shows: fixing,
+// needs-you, notes, resolved. An empty group is not shown.
 function groupFindings(findings: readonly FindingView[]): Record<FindingGroup, FindingView[]> {
   const byGroup: Record<FindingGroup, FindingView[]> = {
     fixing: [],
@@ -1153,12 +1151,8 @@ function CheckRow({ forge, row }: ForgeProp & { readonly row: Row }) {
   )
 }
 
-/**
- * What the operator can do about a row.
- *
- * A row the machine is closing offers nothing but the "Asked" marker for the
- * ask it is answering; a failing or needs-you row offers its moves.
- */
+// What the operator can do about a row: one the machine is closing shows only the
+// "Asked" marker; a failing or needs-you row offers its moves.
 function RowMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
   if (row.state === 'passed') return null
   if (row.id === 'turn') return <TurnMoves forge={forge} row={row} />

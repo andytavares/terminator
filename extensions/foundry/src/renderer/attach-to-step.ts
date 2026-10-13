@@ -1,9 +1,7 @@
 import { invoke } from '@terminator/extension-sdk/renderer'
 
-/**
- * Attaches to a step's agent and goes to its terminal, as the Floor and the
- * factory hall both offer; why not, when it could not.
- */
+// Attaches to a step's agent and goes to its terminal, as the Floor and the hall
+// offer; why not, when it could not.
 export async function attachTo(orderId: string, nodeId: string): Promise<string | null> {
   const r = (await invoke('foundry:session.attach', { orderId, nodeId })) as
     | { terminalSessionId: string }

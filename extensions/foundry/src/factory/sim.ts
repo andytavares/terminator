@@ -312,10 +312,8 @@ function placedCrew(map: HallMap, observation: Observation): Crew[] {
   return crew
 }
 
-/**
- * Work already finished and not yet taken in shows as a crate waiting at the
- * step it feeds, so a hall opened mid-run reads the queue at a glance.
- */
+// Work finished and not yet taken in shows as a crate at the step it feeds, so a hall
+// opened mid-run reads the queue at a glance.
 function queuedCrates(map: HallMap, graph: Observation['graph']): Crate[] {
   const states = new Map(graph.nodes.map((n) => [n.id, n.state]))
   return map.belts
@@ -442,10 +440,8 @@ function reroute(jam: Jam, path: readonly Tile[]): Crew {
   return { ...jam.waiting, path, blockedMs: 0 }
 }
 
-/**
- * A tile to step to, then on to the goal: aside first, then back where it came
- * from, then back along the other's own way so the other can still pass.
- */
+// A tile to step to, then on to the goal: aside first, then back, then along the
+// other's own way so the other can still pass.
 function stepAway(jam: Jam, other: Crew): Crew | null {
   const { map, crew, here, goal, claimed } = jam
   const theirs = new Set([key(tileOf(other.x, other.y)), ...other.path.map(key)])

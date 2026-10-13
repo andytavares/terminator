@@ -230,11 +230,8 @@ async function finishTail(
   // (FR-053). Work that is waiting on somebody does not — the run halts, the
   // inbox has the question, and answering it resumes from here.
   if (!ran.outcome.shippable) {
-    // Out loud. A run that finishes every node and then quietly does not ship
-    // is indistinguishable, from every surface, from one that shipped — the
-    // graph is all green either way, and the only way to find out was to go
-    // and look at GitHub. Watched on a live run: every node passed, nothing
-    // was pushed, and nothing anywhere said why.
+    // Said out loud: a run that passes every node and does not ship looks, on every
+    // surface, just like one that shipped.
     await recordTailEntry(tail, {
       action: 'ship.refused',
       reason: whyNotShipped(tail.recipe, ran.outcome),
@@ -245,10 +242,8 @@ async function finishTail(
   await shipFinishedRun(tail, ran)
 }
 
-// A shape whose product is a document ends on where its author put it. In
-// the checkout it ships as a pull request below; anywhere else there is no
-// change to open one on, and an author that handed nothing back has not
-// finished.
+// A document shape ends on where its author put it: in the checkout it ships as a
+// pull request below; elsewhere, an author that handed nothing back has not finished.
 async function endedOnDocument(tail: RunTail, outcome: RunOutcome): Promise<boolean> {
   const latest = await tail.store.load(tail.order.id)
   const documentEnd = outcome.shippable

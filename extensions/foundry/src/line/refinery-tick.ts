@@ -82,10 +82,8 @@ export async function refineryTick(deps: RefineryTickDeps): Promise<void> {
   }
 }
 
-/**
- * Whether every pull of the order has merged, recording the moment it is
- * first seen. An order with no pulls has nothing to watch yet.
- */
+// Whether every pull of the order merged, recording when that is first seen. An order
+// with no pulls has nothing to watch yet.
 async function hasMerged(
   deps: RefineryTickDeps,
   { order, pulls }: RefineryCandidate

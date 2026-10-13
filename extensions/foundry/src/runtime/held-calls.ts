@@ -17,16 +17,9 @@ export interface Notice {
   readonly onClick?: () => void
 }
 
-/**
- * Says something, through the channel the event's kind is allowed.
- *
- * Automation complacency is the documented failure mode of supervisory control:
- * a console that only speaks when something is wrong teaches you that silence
- * means fine — and silence is also what a crashed console looks like. So the
- * rule is fixed rather than per-call: only a blocking permission request may
- * interrupt, everything else that needs a person is an indication, and routine
- * progress goes to the feed and nowhere else.
- */
+// Says something through the channel its kind is allowed, fixed, not per call: only a
+// blocking permission request interrupts, anything else needing a person is an
+// indication, and progress goes to the feed. A console that only speaks up teaches silence.
 export function notifyPerson(api: ExtensionAPI, notice: Notice): Disposable | null {
   const { event, message, actions, onClick } = notice
   switch (channelFor(event)) {
@@ -46,22 +39,14 @@ export function notifyPerson(api: ExtensionAPI, notice: Notice): Disposable | nu
   }
 }
 
-/**
- * A tool call is being held, and somebody has to see it.
- *
- * The one thing allowed to interrupt: the run is stopped dead until it is
- * answered, and a request nobody sees is a twelve-hour hang. This used to live
- * inside a sink that nothing called, so every held call was silent.
- */
+// A tool call is held and somebody must see it: the one thing allowed to interrupt,
+// since the run is stopped dead until it is answered.
 export function notePending(api: ExtensionAPI, ask: PendingAsk, order?: OrderRef): void {
   pendingPermissions.add(ask)
   announceLive('')
 
-  // A question asked *during execution* is a defect of intake (FR-083): the
-  // Forge is where questions are supposed to be settled, and one arriving now
-  // means the order was handed off with something unanswered in it. Recorded
-  // against the order as well as answered — answering it alone loses the fact
-  // that it should never have been asked here.
+  // A question during execution is an intake defect (FR-083): questions belong in the
+  // Forge. Recorded against the order as well as answered, so that fact is kept.
   if (order !== undefined && (ask.questions?.length ?? 0) > 0) {
     void orderStoreAt(order.root).record({
       at: new Date().toISOString(),

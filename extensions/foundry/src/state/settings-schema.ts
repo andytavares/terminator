@@ -7,11 +7,9 @@ type SettingsProperties = Parameters<ExtensionAPI['settings']['register']>[0]['p
 
 /** Where the records go, and whether a finished run opens its draft itself. */
 const RECORDS: SettingsProperties = {
-  // Where the records go (FR-074). Empty means <workdir>/.foundry, which
-  // leaves an untracked directory behind in every repository you run an
-  // order in; Foundry says so once and never edits your .gitignore.
-  // Setting one location avoids it, and is the only workable answer once
-  // an order spans repositories.
+  // Where the records go (FR-074). Empty means <workdir>/.foundry, untracked in every
+  // repository (said once; .gitignore is never edited); one location also suits orders
+  // that span repositories.
   'terminator.foundry.dataDir': {
     type: 'folder',
     label: 'Where Foundry keeps its records',
@@ -104,10 +102,8 @@ const WRITE_BACKS: SettingsProperties = {
 
 /** Lists only the operator writes, and what the extension remembers for itself. */
 const POLICY: SettingsProperties = {
-  // Operator-declared, never inferred. Per-repository lists live in
-  // config.yaml under the data root; this is the workspace-wide list.
-  // Named by the operator, never inferred: an MCP server's tools are
-  // named by somebody else, and a name is not a contract about writing.
+  // The workspace-wide list of read-only tools, named by the operator, never inferred
+  // from names; per-repository lists live in config.yaml under the data root.
   'terminator.foundry.readOnlyTools': {
     type: 'list',
     label: 'Tools a review may also use, one per line',

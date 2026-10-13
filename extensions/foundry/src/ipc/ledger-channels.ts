@@ -97,14 +97,8 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
   }
 }
 
-/**
- * Every entry across every order, or one order's own.
- *
- * Read per order because that is how the ledger is stored — one file each,
- * which is what makes concurrent appends safe. Reading them all is a fan-out
- * rather than one big file, and a corrupt line in one order costs that order
- * rather than the record.
- */
+// Every entry across every order, or one order's. Read per order as stored, one file
+// each so appends are safe concurrently, and a corrupt line costs one order only.
 async function entriesFor(deps: LedgerDeps, orderId: string | undefined): Promise<LedgerEntry[]> {
   const ids = orderId === undefined ? (await deps.store.list()).map((order) => order.id) : [orderId]
   const perOrder = await Promise.all(ids.map((id) => deps.store.entries(id)))
@@ -177,10 +171,7 @@ async function decideProposal(
   return { ok: true, accepted: true, file, rule: found.id }
 }
 
-/**
- * The checks in force that the operator put there, and the ones they turned
- * down — the two halves of the record FR-081 asks for.
- */
+/** The checks the operator put in force and the ones they turned down (FR-081). */
 async function rulesInForce(deps: LedgerDeps): Promise<unknown> {
   return {
     rules: deps.acceptedRules(),
@@ -189,13 +180,8 @@ async function rulesInForce(deps: LedgerDeps): Promise<unknown> {
   }
 }
 
-/**
- * Remove an accepted check.
- *
- * Refused for anything the operator did not accept: deleting a built-in
- * would leave the tool quietly weaker than the one it ships as, and a
- * removal that silently did nothing is worse than a refusal that says why.
- */
+// Remove an accepted check. Anything the operator did not accept is refused, with
+// why: deleting a built-in would leave the tool quietly weaker than it ships.
 async function removeAcceptedRule(
   deps: LedgerDeps,
   payload: z.infer<typeof RemovePayload>
@@ -214,11 +200,8 @@ async function removeAcceptedRule(
   return { ok: true, removed, reason, at: deps.now() }
 }
 
-/**
- * The factory's own dashboard: every order's ledger, gates and run graph,
- * reduced by `factoryMetrics`. Nothing here is stored — it is recomputed on
- * every call from the same records the order screens already read.
- */
+// The factory's dashboard: every order's ledger, gates and run graph reduced by
+// `factoryMetrics`, recomputed per call from the records, never stored.
 async function factoryMetrics(
   deps: LedgerDeps,
   payload: z.infer<typeof FactoryMetricsPayload>

@@ -24,10 +24,7 @@ export interface Callout {
   readonly at: number
 }
 
-/**
- * The pinned wait's id: one at a time, so it keeps its place in a stack.
- * @internal
- */
+/** The pinned wait's id: one at a time, so it keeps its place in a stack. @internal */
 export const CI_WAITING_ID = 'ci-waiting'
 
 /**

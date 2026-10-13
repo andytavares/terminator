@@ -75,29 +75,15 @@ function allowedDiffCommand(exec: ShellExec): RunCommand {
   }
 }
 
-/**
- * Lane and role together, because the role is the guard.
- *
- * A node can only ever be offered the conversation its own role has been
- * having. A bare command — a recipe's `run` step, a ladder rung — has no
- * role and gets its own, so eight rungs are still one conversation rather
- * than eight fresh agents each re-reading the repository to run one command,
- * and none of them arrives carrying the builder's identity.
- */
+// Lane and role together, the role being the guard: a node is offered only its own
+// role's conversation. A bare command has no role and shares one, so eight rungs are
+// one conversation, none carrying the builder's identity.
 export const conversationKey = (lane: number, role: string | null): string =>
   `${lane}:${role ?? 'command'}`
 
-// One conversation per role, per lane. A fresh agent per node is a terminal
-// per node and an agent that has read nothing — the failure `continueRun`
-// exists to avoid — but a conversation carried across a change of role
-// carries the last role's identity with it, which broke three live runs.
-// The executor decides; this only remembers what is open.
-//
-// Seeded from the graph rather than started empty. A resumed run's agents
-// are gone but their transcripts are not — `claude --resume` picks the
-// conversation back up — so without this a run picked back up after a
-// restart put a cold agent that had read nothing into a worktree half full
-// of somebody else's work.
+// The open conversation per role per lane (the executor decides which to resume),
+// seeded from the graph: `claude --resume` outlives a restart, and a resumed run
+// otherwise puts a cold agent into a worktree half full of someone else's work.
 function seededConversations(graph: RunGraph): Map<string, string> {
   const conversations = new Map<string, string>()
   for (const node of graph.nodes) {

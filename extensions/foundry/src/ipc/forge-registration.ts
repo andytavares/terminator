@@ -23,13 +23,9 @@ import type { LiveStandingSources } from './standing.js'
 import type { ForgeLoop } from '../forge/forge-loop.js'
 import { isoNow, shellExecOf } from '../host-calls.js'
 
-/**
- * What the record already says about these files (FR-077).
- *
- * One line per past decision, newest first and bounded — the point is to tell
- * the Architect "this was decided before", not to hand it the whole ledger.
- * @internal
- */
+// What the record already says about these files (FR-077): one line per past
+// decision, newest first and bounded, to tell the Architect it was decided before.
+/** @internal */
 export async function priorArtInRecords(root: string, paths: readonly string[]): Promise<string[]> {
   const store = orderStoreAt(root)
   const orders = await store.list()
@@ -48,11 +44,8 @@ export interface ForgeRegistrationDeps {
   readonly loop: ForgeLoop
 }
 
-/**
- * The Forge: an idea or a tracker issue in, a compilable work order out, and
- * the channels around it — your tickets, a ticket for a typed idea, and
- * deleting an order outright.
- */
+// The Forge: an idea or tracker issue in, a compilable work order out, and the
+// channels around it (your tickets, a ticket for a typed idea, deleting an order).
 export function registerForgeChannels(
   context: ActivationContext,
   deps: ForgeRegistrationDeps
@@ -114,13 +107,8 @@ async function readTrackerIssue(
 }
 
 function registerIssueChannels(api: ExtensionAPI): void {
-  // Your tickets, so a ticket can be picked rather than typed from memory.
-  //
-  // The Forge has always taken a tracker key, and the only way to give it one
-  // was to know it already. The host lists and searches issues — `listMine`
-  // and `search` have been there the whole time — and nothing here asked.
-  // Importing work is the front door of a tool that does work, and it did not
-  // have one.
+  // Your tickets, so one can be picked rather than typed from memory, through the
+  // host's `listMine` and `search`.
   const myIssues = foundryChannel('foundry:issues.mine', IssuesMinePayload, (payload) =>
     listMyIssues(api, payload?.term ?? '')
   )
@@ -166,12 +154,8 @@ async function listMyIssues(api: ExtensionAPI, rawTerm: string) {
   }
 }
 
-// Gone, rather than hidden.
-//
-// `order.cancel` marks an order `cancelled` and drops it off the list, and
-// leaves its directory, its ledger, its worktree and its branch exactly
-// where they were — so the records location and the target repository fill
-// up with work nobody can reach or restart. This is the other answer.
+// Deletes an order outright. `order.cancel` only marks it, leaving its directory,
+// ledger, worktree and branch to fill the records and the repository.
 function registerOrderDelete({ api, dataRoot }: ActivationContext): void {
   reg(
     api,

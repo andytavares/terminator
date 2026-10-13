@@ -56,11 +56,7 @@ export interface SupervisionOptions {
 interface SupervisionContext {
   readonly runs: RunRegistry
   readonly feed: FeedLog
-  /**
-   * Whatever the card was actually branched from. Measuring against a fixed
-   * `main` reported the difference between two branches rather than the work
-   * this run did.
-   */
+  /** What the card was branched from; a fixed `main` measured two branches, not the run. */
   readonly baseBranch: string
   readonly runCommand: RunCommand
 }
@@ -120,10 +116,8 @@ async function finishTurn(
 
   const changed = runs.get(sessionId)?.diff ?? { files: 0, added: 0, removed: 0 }
   if (changed.files === 0) {
-    // Nothing to look at, and nothing is over: in a terminal the session
-    // stays open and the next turn may well change something. Calling it
-    // `finished` retired a run that was still going, and took it off every
-    // surface that reads live runs.
+    // Nothing to look at, and nothing over: the terminal session stays open for the
+    // next turn, so `finished` here would take a live run off every surface.
     runs.setState(sessionId, 'waiting', at)
     return
   }

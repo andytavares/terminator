@@ -71,11 +71,9 @@ interface ArchitectAsk {
   readonly order: WorkOrder
   readonly message: string
   readonly autoTurns: number
-  // Set only for a turn the review loop started to fix its own findings —
-  // it names which round of that loop this is, and it is what keeps this
-  // turn on the draft model rather than the ask model (`architectModel`).
-  // Undefined for every operator- or auto-turn-started call, which is a
-  // fresh chain: the next review the redraft earns starts at round 1.
+  // Set only for a turn the review loop started to fix its own findings: its round,
+  // which keeps the turn on the draft model (`architectModel`). Undefined starts a
+  // fresh chain, so the next review the redraft earns is round 1.
   readonly loopRound?: number
   /** Writes the turn's start to the ledger; see `convergeWithFollowUps`. */
   readonly recordStart?: RecordStart
@@ -105,10 +103,7 @@ interface LoopEntry {
   readonly reason: string
 }
 
-/**
- * The Forge's own loop: an architect turn, the follow-ups it earns, the red
- * team's rounds, and the hand-off once nothing is left to close.
- */
+/** The Forge's loop: an architect turn, its follow-ups, red-team rounds, the hand-off. */
 export function createForgeLoop(
   { api, dataRoot }: ActivationContext,
   { deciding, channels }: ForgeLoopDeps
@@ -129,21 +124,14 @@ async function recordLoopEntry(root: string, entry: LoopEntry): Promise<void> {
 const nextReviewRound = async (forge: Forge, orderId: string): Promise<number> =>
   nextRound(loopFacts(await orderStoreAt(forge.dataRoot()).entries(orderId)))
 
-/**
- * One architect turn, and the ones the Forge starts on its own after it.
- *
- * A plan that still fails a check the architect can close goes straight
- * back to it, up to MAX_AUTO_TURNS times, instead of waiting for someone to
- * click "Ask for the gap to be closed" (spec 062). Only unanswered questions,
- * or a plan still failing when the turns run out, reach the operator.
- */
+// One architect turn and the ones the Forge starts after it: a plan still failing a
+// check the architect can close goes back up to MAX_AUTO_TURNS times (spec 062).
+// Only open questions, or a plan failing when the turns run out, reach the operator.
 async function convergeWithFollowUps(forge: Forge, ask: ArchitectAsk): Promise<ConvergeStarted> {
   const { order } = ask
-  // The turn's end waits for its start to be on the ledger. A turn can end
-  // before the caller has written that it started, and what happens next is
-  // read from the ledger: a start written after the redraft reads as an
-  // architect still running, and a follow-up's start written late is missing
-  // from the count of follow-ups.
+  // The turn's end waits for its start to be on the ledger, which decides what comes
+  // next: a start written late reads as an architect still running, or goes
+  // missing from the follow-up count.
   let startWritten = (): void => undefined
   const written = new Promise<void>((resolve) => {
     startWritten = resolve
@@ -242,11 +230,8 @@ async function afterRefusedProposal(
   sayPlanRefused(forge.api, order)
 }
 
-// Out loud, once, because a refusal changes nothing and therefore
-// shows up nowhere the operator happens to be looking. The Forge
-// renders it whenever they open the order; this is for the minutes
-// between the turn ending and them going back to look — which on
-// the run that found this was the rest of the afternoon.
+// Said once, out loud: a refusal changes nothing, so nothing the operator is looking
+// at shows it until they reopen the order.
 function sayPlanRefused(api: ExtensionAPI, order: WorkOrder): void {
   api.notifications.showToast(
     'warning',
@@ -313,14 +298,9 @@ async function reviewOrHandOff(
   await startReviewRound(forge, { order: drafted, round, changed })
 }
 
-/**
- * One red-team round, and what happens with what it finds.
- *
- * `fix` sends every open blocking finding back to the architect as one
- * turn, on the loop's own model tier. `operator` is the loop giving up after
- * `MAX_REVIEW_ROUNDS` — the one point this whole feature still reaches the
- * operator. `clean` hands the order off, or says it is ready to.
- */
+// One red-team round and what follows: `fix` sends the open blocking findings back as
+// one architect turn on the loop's tier, `operator` gives up after MAX_REVIEW_ROUNDS
+// (the one point that reaches the operator), `clean` hands the order off.
 async function startReviewRound(forge: Forge, review: Review): Promise<void> {
   const { api } = forge
   const { order, round } = review
@@ -455,11 +435,8 @@ async function reviewExhausted(forge: Forge, { root, order: updated }: ReviewAt)
   )
 }
 
-// Recorded here, and not left to `convergeWithFollowUps`'s own
-// finish-time bookkeeping: the loop's fix turn is `converge.started`,
-// not `review.started`, and nothing recorded it starting at all —
-// the Forge read the ledger and saw no turn running while an
-// architect was in fact fixing the findings.
+// Recorded here: the fix turn is `converge.started`, not `review.started`, and left
+// to `convergeWithFollowUps` nothing recorded it, so the Forge saw no turn running.
 async function startFixTurn(forge: Forge, review: ReviewAt, message: string): Promise<void> {
   const { root, order: updated, round } = review
   await convergeWithFollowUps(forge, {
@@ -478,11 +455,8 @@ async function startFixTurn(forge: Forge, review: ReviewAt, message: string): Pr
   })
 }
 
-/**
- * A draft that passes every check. One the operator never released waits
- * for their Hand off; one they released that a defect sent back is agreed
- * again and restarted (`forge/release-again.ts`).
- */
+// A draft that passes every check. One never released waits for Hand off; one a
+// defect sent back after release is agreed again and restarted (release-again.ts).
 async function handOffWhenReady(forge: Forge, order: WorkOrder): Promise<void> {
   await readyToHandOff(order, releaseDepsFor(forge))
 }
@@ -552,16 +526,9 @@ async function refuseRestart(
   )
 }
 
-/**
- * Releasing a hold picks the loop back up from wherever it would have gone
- * on its own — the same three moves a finished turn already makes, just
- * entered from "the operator let go" rather than "a turn just finished".
- *
- * A draft only, and only once nothing is already running: a hold recorded
- * while nothing was in flight has nothing to resume, and one recorded over
- * a running turn is released the moment that turn's own `onFinished` reads
- * the ledger — starting a second thing here would race it.
- */
+// Releasing a hold makes the move a finished turn would have made. A draft only, and
+// only with nothing running: a hold over a running turn is released by that turn's
+// own `onFinished`, and starting a second thing here would race it.
 async function resumeAfterRelease(forge: Forge, order: WorkOrder): Promise<void> {
   if (order.status !== 'draft') return
   const root = forge.dataRoot()
@@ -606,18 +573,9 @@ async function convergeAfterRelease(
   })
 }
 
-/**
- * Beside the very first draft, the scout reads the repository; the
- * architect does not wait for it (ADR 084).
- *
- * Only for a first draft: `provenance.decisions` is empty until a proposal
- * has been applied, and `context.entryPoints` is empty until something has
- * populated it — an amending turn has both, and gets no scout of its own.
- *
- * The orchestration itself lives in `forge/scouted-converge.ts`, over
- * injected collaborators, so it is testable without a runner. This is just
- * the wiring.
- */
+// A first draft only (no applied decisions, no entry points): the scout reads the
+// repository beside it and the architect does not wait (ADR 084). The orchestration
+// is `forge/scouted-converge.ts`; this is the wiring.
 function convergeForForge(
   forge: Forge,
   { order, message, recordStart }: Pick<ArchitectAsk, 'order' | 'message' | 'recordStart'>

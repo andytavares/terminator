@@ -65,10 +65,7 @@ async function writeAtomically(file: string, content: string): Promise<void> {
   await fs.promises.rename(tmp, file)
 }
 
-/**
- * With an index, reads come from memory and each successful write tells the
- * index; without one every read parses the files again.
- */
+/** With an index, reads come from memory and writes tell it; without, files are reparsed. */
 export function createOrderStore(root: string, index?: FoundryIndex): OrderStore {
   const list = (): Promise<WorkOrder[]> =>
     index === undefined ? readAllOrders(root) : index.orders()

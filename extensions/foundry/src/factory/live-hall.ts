@@ -9,13 +9,9 @@ import { createBeats, release, schedule } from './beats.js'
 import type { Beats } from './beats.js'
 import type { NodeState, RunGraph } from '../line/run-graph.js'
 
-// The hall of a run as it is now: the world the scene draws, and the beats
-// that hold what happened until it can play out in order.
-//
-// It lives outside React because the world moves every animation frame and is
-// written back by the scene itself, while the parts a render needs — the map,
-// the states the stations show, the queue — change only when an observation
-// or a due beat says so. A component subscribes to exactly those.
+// A run's hall as it is now: the world the scene draws, and beats holding events until
+// they can play in order. Outside React: the world moves every frame, but what a render
+// needs changes only on an observation or a due beat, and a component subscribes to that.
 
 export function statesOf(graph: RunGraph): Record<string, NodeState> {
   return Object.fromEntries(graph.nodes.map((n) => [n.id, n.state]))

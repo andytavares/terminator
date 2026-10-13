@@ -15,10 +15,7 @@ export interface ExpectFailure {
   readonly actual: unknown
 }
 
-/**
- * `plan.units`, optionally filtered: `plan.units[role=builder]`.
- * @internal
- */
+/** `plan.units`, optionally filtered: `plan.units[role=builder]`. @internal */
 export function selectOver(expression: string, order: WorkOrder): PlanUnit[] {
   const match = /^plan\.units(?:\[(\w+)=([\w.-]+)\])?(?:\s+by\s+lane)?$/.exec(expression.trim())
   if (match === null) return []
@@ -210,12 +207,8 @@ function formOf(text: string): { form: ConditionForm; match: RegExpExecArray } |
   return null
 }
 
-/**
- * `risk.triggers is not empty`, `plan.lanes count > 1`.
- *
- * An expression this cannot parse is **false**, never true: a step that runs
- * because nobody could read its condition is worse than one that does not run.
- */
+// `risk.triggers is not empty`, `plan.lanes count > 1`. An unparseable expression is
+// false, never true: a step run because nobody could read its condition is worse.
 export function evaluateWhen(expression: string | undefined, order: WorkOrder): boolean {
   if (expression === undefined || expression.trim() === '') return true
   const read = formOf(expression.trim())

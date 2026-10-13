@@ -88,10 +88,8 @@ async function list(deps: InboxDeps): Promise<unknown> {
   const rows = await orderRows(deps, orders, settled)
   return {
     gates: rankInbox(settled).map((gate) => ({ ...gate, ...rows(gate.orderId) })),
-    // What this setting is *not* asking about. "Nothing needs you" means
-    // something different at each rung of the dial, and an operator who
-    // cannot see which rules are silenced cannot tell a quiet factory from
-    // a deaf one.
+    // What this setting does not ask about: without it an operator cannot tell a
+    // quiet factory from a deaf one.
     waiting: await deps.waiting(),
     autonomy,
     silenced: silencedRules(autonomy),
@@ -103,13 +101,8 @@ async function list(deps: InboxDeps): Promise<unknown> {
   }
 }
 
-/**
- * The gates this setting shows, each overdue one settled on its default.
- *
- * A gate whose rule this setting silences is not shown, and a gate whose
- * deadline has passed takes its stated default rather than sitting there
- * for ever pretending to wait.
- */
+// The gates this setting shows: one whose rule it silences is hidden, and one past
+// its deadline takes its stated default rather than waiting for ever.
 async function settleOverdue(deps: InboxDeps, autonomy: Autonomy): Promise<Gate[]> {
   const now = deps.now()
   const live = (await deps.gates.list()).filter((gate) => isLive(gate.rule, autonomy))
@@ -130,12 +123,9 @@ async function takeDefault(deps: InboxDeps, gate: Gate, option: string): Promise
     subject: gate.id,
     reason: `${ruleInWords(gate.rule)}: no answer by the deadline`,
   })
-  // Acted on, not only recorded. A default that changes the row and
-  // leaves the run halted is not a default — the line waits for ever on
-  // a decision that has already been taken, and the record says it was
-  // taken. Same seam the operator's own decision goes through, and the
-  // same treatment for a failure: written down, never thrown at a caller
-  // that was only asking what is waiting.
+  // Acted on, not only recorded: a default that leaves the run halted is no default.
+  // The operator's own seam, and a failure is written down, never thrown at a caller
+  // that only asked what is waiting.
   await actOrRecord(deps, gate, option)
 }
 
@@ -221,12 +211,8 @@ interface Raise {
   readonly limit: number | null
 }
 
-/**
- * The raise a decision asks for, none, or why it cannot be taken.
- *
- * A gate without a breach predates it being recorded; resuming raises a
- * fresh one that has it.
- */
+// The raise a decision asks for, none, or why it cannot be taken. A gate without a
+// breach predates recording it; resuming raises a fresh one that has it.
 async function raiseFor(
   deps: InboxDeps,
   gate: Gate,

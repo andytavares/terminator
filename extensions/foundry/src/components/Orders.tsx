@@ -163,13 +163,8 @@ function useOpenOrder(openOrderId: string | null | undefined) {
   return [open, setOpen] as const
 }
 
-/**
- * Where a new order starts from. An order starts from something you typed or
- * from a ticket. The second was built end to end — read the issue, refuse a
- * duplicate, write back to it — and had no way in: the only control here sent
- * `kind: 'typed'`, so the half of the description that says "or tracker
- * issue" was unreachable. A new focus request turns it back to an idea.
- */
+// Where a new order starts from: something typed, or a tracker ticket. A new focus
+// request turns it back to an idea.
 function useFrom(focusIdeaSignal: number | undefined) {
   const [seenFocusSignal, setSeenFocusSignal] = useState(0)
   const [from, setFrom] = useState<'typed' | 'tracker'>('typed')
@@ -210,10 +205,7 @@ function useOrderRows(setProblem: (problem: string | null) => void) {
   return { rows, refresh, answering, answer }
 }
 
-/**
- * Your tickets, listed rather than remembered. Refreshed when the picker opens
- * and when you search, not on every keystroke.
- */
+/** Your tickets, listed; refreshed when the picker opens and on search, not per keystroke. */
 function useTickets(from: 'typed' | 'tracker', setProblem: (problem: string | null) => void) {
   const [term, setTerm] = useState('')
   const [tickets, setTickets] = useState<Ticket[] | null>(null)
@@ -239,13 +231,9 @@ function useTickets(from: 'typed' | 'tracker', setProblem: (problem: string | nu
   return { term, setTerm, tickets, connected, loadTickets }
 }
 
-/**
- * The idea box, focused when the quick action asks. 0 is "never asked" — the
- * counter the quick action bumps starts there, and a mount must not steal
- * focus nobody requested. Switching `from` unmounts the ticket-search input
- * and mounts this one, so the focus itself has to wait for that render rather
- * than fire on the same pass as the switch.
- */
+// The idea box, focused when the quick action asks; 0 means never asked, so a mount
+// steals no focus. Switching `from` swaps the input, so the focus waits for that
+// render rather than firing on the same pass.
 function useIdeaFocus(focusIdeaSignal: number | undefined, from: 'typed' | 'tracker') {
   const ideaInputRef = useRef<HTMLInputElement | null>(null)
   const handledFocusSignal = useRef(0)
@@ -462,13 +450,8 @@ function OrderForge({
   )
 }
 
-/**
- * Getting rid of the order, under everything that describes it.
- *
- * These were the second and third things on the screen, above the order's own
- * title: a destructive control read before the operator had been told what they
- * were looking at.
- */
+// Getting rid of the order, placed under everything that describes it, not above the
+// title the operator has not read yet.
 interface OrderControlsProps {
   readonly open: string
   readonly running: boolean
@@ -828,19 +811,9 @@ function OrderMain({ row }: { readonly row: OrderRow }) {
   )
 }
 
-/**
- * Where the order stands, said once, by the one derivation every surface reads.
- *
- * This used to be `failures === 0 ? 'ready to hand off' : …`, and `failures` is
- * a draft-time compile result that is zero for every running order for ever.
- * Every running order therefore claimed to be ready to hand off — including one
- * that had been halted at an undecided gate for two hours, with an agent sitting
- * at a terminal prompt nobody was at.
- *
- * While CI is working the pill says so, with the wording the Floor uses, and
- * spins: a standing of "building" for the whole of a CI watch is true and tells
- * you nothing.
- */
+// Where the order stands, from the one derivation every surface reads, not a
+// draft-time compile count that called every running order "ready to hand off".
+// While CI works the pill says so, as the Floor does, and spins.
 function OrderState({ row }: { readonly row: OrderRow }) {
   const { ci, standing } = row
   if (ci != null && (ci.status === 'watching' || ci.status === 'reworking')) {

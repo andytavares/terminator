@@ -70,15 +70,9 @@ export async function queueEntries(
   return entries
 }
 
-/**
- * Every in-flight order's queue entries, for the refinery's file-overlap
- * queue: the observe/list channels' `queue` field, and the advisory shown on
- * agreement.
- *
- * Reads records only. The files a checkout changed are the ones recorded when
- * its last step settled (`observed-files.ts`), so asking for the queue never
- * starts a process.
- */
+// Every in-flight order's entries in the refinery's file-overlap queue (the channels'
+// `queue` field and the agreement advisory), from records only: the files recorded
+// when a step settled (`observed-files.ts`), so no process starts.
 export async function computeQueueEntries(
   root: string,
   store: Pick<OrderStore, 'list'>

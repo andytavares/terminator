@@ -19,13 +19,8 @@ import type { WorkOrder } from '../order/schema.js'
 import { indexFor, orderStoreAt, writeGraph } from '../state/live-index.js'
 import { isoNow, shellExecOf } from '../host-calls.js'
 
-/**
- * Why a finished run did not open anything, in one sentence.
- *
- * Read off the outcome in the order `shippable` itself checks, so the sentence
- * names the first thing that actually stopped it rather than the last thing
- * that happens to be false.
- */
+// Why a finished run opened nothing, in one sentence, read in the order `shippable`
+// checks so it names the first thing that stopped it.
 export function whyNotShipped(recipe: Recipe, outcome: RunOutcome): string {
   if (!opensPullRequest(recipe)) {
     return `the "${recipe.id}" shape opens nothing — it is a question, not a change`
@@ -44,21 +39,9 @@ export function whyNotShipped(recipe: Recipe, outcome: RunOutcome): string {
   return 'it was not shippable, and this build cannot say which check said so'
 }
 
-/**
- * @param orderId Which order's ledger these entries belong in.
- *
- * Not `subject`, which is what this used. A shipping entry's subject is
- * whatever the entry is about — the order for `ship.ready_asked`, and the
- * **pull request URL** for `ship.draft_opened`. Filing by subject sent the most
- * important entry the feature writes to a ledger named after a URL, and built
- * the directories to match:
- *
- *   .foundry/orders/https:/github.com/owner/repo/pull/8/ledger.jsonl
- *
- * So a live run opened a real draft and its own ledger never said so — the
- * evidence for the one thing the Line exists to do, filed under a path made of
- * somebody else's text.
- */
+// Files the shipping entries under `orderId`, never the entry's subject: that is the
+// pull request URL for `ship.draft_opened`, which once filed the run's draft under a
+// ledger at `.foundry/orders/https:/github.com/...`.
 export function integrateDepsFor(api: ExtensionAPI, root: string, orderId: string): IntegrateDeps {
   return {
     exec: shellExecOf(api),
@@ -95,16 +78,9 @@ export interface CiRoundDeps {
   state: (state: Omit<CiState, 'at'>) => Promise<void>
 }
 
-/**
- * The parts of a CI round that never change between the run that opened the
- * draft and a later "another round" answered from the inbox: how a pull's
- * checks are watched, how a failure's log is read, and where the round's own
- * ledger entry and live state go.
- *
- * `sendBack` is deliberately not here — the run and the inbox each build a
- * different one, because the run already has a graph and executor deps in
- * hand and the inbox has to rebuild them.
- */
+// The parts of a CI round shared by the run that opened the drafts and a later
+// "another round": watching checks, reading a failure's log, recording the round.
+// `sendBack` differs (the inbox must rebuild graph and deps), so it is not here.
 export function ciRoundDepsFor(root: string, orderId: string, exec: ShellExec): CiRoundDeps {
   return {
     watch: (pull, onPoll, judged) =>
@@ -138,15 +114,9 @@ async function recordCiEntry(
   })
 }
 
-/**
- * Where a run's tail works: its records, its shape, its order, and its graph
- * as each round leaves it.
- *
- * `graphRef` is a box rather than a plain graph because a CI round shared
- * between a run in flight and a `ci.red` gate answered later from the inbox
- * has to see the graph the previous round left, and the inbox path has no
- * closure over a running executor to hold it for it.
- */
+// Where a run's tail works: records, shape, order, and the graph each round leaves.
+// `graphRef` is a box because a `ci.red` round answered later from the inbox must see
+// the graph the previous round left, with no running executor holding it.
 export interface ShipRun {
   readonly root: string
   readonly order: WorkOrder
@@ -154,11 +124,8 @@ export interface ShipRun {
   readonly graphRef: { current: RunGraph }
 }
 
-/**
- * The fix round a red CI check gets: rework the graph back to the builder,
- * re-run the executor from there, and — if that leaves the order shippable —
- * push the fixed branches onto the drafts that are already open.
- */
+// The fix round for a red check: rework back to the builder, rerun the executor from
+// there, and if shippable, push the fixed branches onto the open drafts.
 export function ciSendBackFor(
   run: ShipRun,
   deps: { executorDeps: ExecutorDeps; integrateDeps: IntegrateDeps }
@@ -182,11 +149,8 @@ export function ciSendBackFor(
   }
 }
 
-/**
- * Settle the recipe's ship node once the tail has finished: passed when the
- * ready-for-review question was raised, waiting otherwise. A ship node that is
- * neither running nor (when asked) waiting is left as it is.
- */
+// Settle the ship node after the tail: passed once the ready-for-review question was
+// raised, waiting otherwise; one neither running nor (when asked) waiting is left.
 export async function settleShipNode(
   run: Pick<ShipRun, 'root' | 'recipe' | 'graphRef'>,
   asked: boolean
