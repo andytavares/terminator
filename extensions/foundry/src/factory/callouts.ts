@@ -1,4 +1,4 @@
-import { gateNodeId } from './events.js'
+import { gateNodeId, nodeOfSession } from './events.js'
 import type { FactoryEvent, ToolProp } from './events.js'
 import { ordinal } from './format.js'
 import type { Gate } from '../gates/rules.js'
@@ -192,11 +192,6 @@ export interface InterruptionInput {
 /** Everything in this hall waiting on the operator, each pinned to a station where one owns it. */
 export function interruptionsFor(input: InterruptionInput): Interruption[] {
   return [...asksOf(input), ...gatesOf(input), ...parkedOf(input)]
-}
-
-/** The node whose agent runs in `sessionId`, when one does. */
-function nodeOfSession(graph: RunGraph, sessionId: string): string | null {
-  return graph.nodes.find((n) => n.sessionId === sessionId)?.id ?? null
 }
 
 /** The held tool calls, each over its agent's station. */

@@ -9,6 +9,7 @@ import { availableSensors } from '../recipe/resolve.js'
 
 import type { ActivationContext } from '../ipc/register.js'
 import { resolveSources } from '../workspace-root.js'
+import { isoNow, shellExecOf } from '../host-calls.js'
 
 /**
  * The sensor tick (ADR-066): every due, enabled sensor runs sequentially once
@@ -45,10 +46,10 @@ function sensorIssuesFor(api: ExtensionAPI): CollectDeps['issues'] {
  */
 export function sensorCollectDepsFor(api: ExtensionAPI, repoPath: string): CollectDeps {
   return {
-    exec: (options) => api.shell.exec(options),
+    exec: shellExecOf(api),
     cwd: repoPath,
     issues: sensorIssuesFor(api),
-    now: () => new Date().toISOString(),
+    now: isoNow,
   }
 }
 
@@ -84,7 +85,7 @@ async function tickSensors(api: ExtensionAPI, root: string, store: SignalStore):
       await runSensor(def, {
         store,
         collectDeps: sensorCollectDepsFor(api, repoPath),
-        now: () => new Date().toISOString(),
+        now: isoNow,
         newId: () => randomUUID(),
       })
     } catch (error) {

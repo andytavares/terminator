@@ -17,6 +17,7 @@ import type { IntegrateDeps } from './integrate.js'
 import type { WorkOrder } from '../order/schema.js'
 
 import { indexFor, orderStoreAt, writeGraph } from '../state/live-index.js'
+import { isoNow, shellExecOf } from '../host-calls.js'
 
 /**
  * Why a finished run did not open anything, in one sentence.
@@ -60,9 +61,9 @@ export function whyNotShipped(recipe: Recipe, outcome: RunOutcome): string {
  */
 export function integrateDepsFor(api: ExtensionAPI, root: string, orderId: string): IntegrateDeps {
   return {
-    exec: (options) => api.shell.exec(options),
+    exec: shellExecOf(api),
     root,
-    now: () => new Date().toISOString(),
+    now: isoNow,
     autoOpen: api.settings?.get<boolean>('terminator.foundry.autoOpenDraftPr') ?? true,
     // Nothing in the extension host answers a gate; the operator does, through
     // the inbox. A shipping decision reaching this seam means it was never

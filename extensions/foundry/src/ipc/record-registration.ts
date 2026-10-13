@@ -8,9 +8,10 @@ import { createLiveOrderStore } from '../order/store.js'
 
 import { reg } from './register.js'
 import type { ActivationContext } from './register.js'
-import { resolveSources } from '../workspace-root.js'
+import { resolveSources, sourcesOf } from '../workspace-root.js'
 import { indexFor } from '../state/live-index.js'
 import { sensorCollectDepsFor } from '../sensors/sensor-tick.js'
+import { isoNow } from '../host-calls.js'
 
 /** The record (the ledger) and the signals the sensors collect. */
 export function registerRecordChannels(context: ActivationContext, signalStore: SignalStore): void {
@@ -39,8 +40,8 @@ function registerLedger({ api, dataRoot }: ActivationContext): void {
     // is theirs to remove whether or not it applies to the repository they
     // happen to have open.
     acceptedRules: () => acceptedRulesIn(resolveSources(api, dataRoot())),
-    sources: () => resolveSources(api, dataRoot()),
-    now: () => new Date().toISOString(),
+    sources: sourcesOf({ api, dataRoot }),
+    now: isoNow,
   })
   reg(api, ...ledgerChannelSpecs(ledger))
 }
@@ -69,7 +70,7 @@ function registerSensors({ api, dataRoot }: ActivationContext, signalStore: Sign
     orderStore: createLiveOrderStore(dataRoot, indexFor),
     availableSensors: () => availableSensors(resolveSources(api, dataRoot())),
     collectDepsFor: (repoPath) => sensorCollectDepsFor(api, repoPath),
-    now: () => new Date().toISOString(),
+    now: isoNow,
     newId: () => newOrderId(new Date()),
   })
   reg(api, ...sensorChannelSpecs(sensors))

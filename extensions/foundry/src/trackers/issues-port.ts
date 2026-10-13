@@ -4,6 +4,7 @@ import type { IssuesPort, WriteBackDeps } from './write-back.js'
 import type { WorkOrder } from '../order/schema.js'
 
 import { orderStoreAt } from '../state/live-index.js'
+import { isoNow } from '../host-calls.js'
 
 /** The application's tracker connection, narrowed to what write-back needs. */
 export function issuesPortFor(api: ExtensionAPI): IssuesPort {
@@ -24,7 +25,7 @@ export function writeBackDepsFor(
 ): WriteBackDeps {
   return {
     issues,
-    now: () => new Date().toISOString(),
+    now: isoNow,
     // Null means "let the tracker resolve it", which is not the same as an
     // empty override, so the nulls are stripped rather than passed through.
     mapping: Object.fromEntries(

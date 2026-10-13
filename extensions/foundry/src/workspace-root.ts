@@ -4,6 +4,7 @@ import * as path from 'node:path'
 import type { ResolveSources } from './recipe/resolve.js'
 import { resolveDataRoot, untrackedNotice } from './data-root.js'
 import { fallbackRecordsBase } from './storage-folder.js'
+import type { ActivationContext } from './ipc/register.js'
 
 /** Where the chosen model lives, on the side of the bridge that launches runs. */
 /**
@@ -51,6 +52,11 @@ export function noteUntrackedDataRoot(api: ExtensionAPI, root: string): void {
  * are open — and therefore which `.foundry/` directories are honoured — is not
  * known when the host loads the extension.
  */
+/** `resolveSources` read afresh each call, as the channels' `sources` takes it. */
+export function sourcesOf({ api, dataRoot }: ActivationContext): () => ResolveSources {
+  return () => resolveSources(api, dataRoot())
+}
+
 export function resolveSources(api: ExtensionAPI, root: string): ResolveSources {
   return {
     dataRoot: root,

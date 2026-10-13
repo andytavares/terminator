@@ -28,6 +28,7 @@ import { ciRoundAgain } from '../line/ci-round-again.js'
 import { readLiveStandings } from './standing.js'
 import type { LiveStandingSources } from './standing.js'
 import type { ForgeLoop } from '../forge/forge-loop.js'
+import { isoNow } from '../host-calls.js'
 
 /** What answering a gate reaches beyond the host: the run channels and the Forge's loop. */
 export interface InboxRegistrationDeps {
@@ -68,7 +69,7 @@ function createInbox(context: ActivationContext, deps: InboxRegistrationDeps): I
     waiting: () => ordersWaitingOnSomething(dataRoot, deps.standingSources),
     autonomy: () => autonomyFor(api),
     readPulls: (orderId) => readPulls(dataRoot(), orderId),
-    now: () => new Date().toISOString(),
+    now: isoNow,
     record: async (orderId, line) => {
       await orderStoreAt(dataRoot()).record({
         at: new Date().toISOString(),

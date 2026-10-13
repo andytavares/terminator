@@ -8,6 +8,7 @@ import { type StallWatcher } from './stall-watcher.js'
 import { type Supervision } from './supervision.js'
 import { type MuteStore } from './feed/mutes.js'
 import type { StallFiring } from './evaluate-stall.js'
+import { endAndWait } from './end-session.js'
 
 /**
  * The supervision runtime's parts, held for the life of the extension.
@@ -107,4 +108,13 @@ export const MAX_STALL_FIRINGS = 200
  */
 export function isLiveSession(sessionId: string): boolean {
   return runtime.supervisedRunner?.terminalFor(sessionId) != null
+}
+
+/** Stop a session this process runs and wait until it is gone: one process per conversation. */
+export async function endLiveSession(sessionId: string, reason: string): Promise<void> {
+  await endAndWait({ stop: stopSupervisedSession, isLive: isLiveSession }, { sessionId, reason })
+}
+
+function stopSupervisedSession(sessionId: string, reason: string): boolean {
+  return runtime.supervisedRunner?.stop(sessionId, reason) ?? false
 }

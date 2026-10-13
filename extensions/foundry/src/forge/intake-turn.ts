@@ -25,6 +25,7 @@ import { askModel, modelForTier } from '../state/settings.js'
 import { trustRepository, readOnlyAutoDecide } from '../runtime/agent-policy.js'
 import { runtime } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
+import { shellExecOf } from '../host-calls.js'
 
 /** One architect turn: the order, what it is told, and who hears how it ended. */
 export interface ArchitectTurn {
@@ -120,7 +121,7 @@ async function prepareArchitect(api: ExtensionAPI, turn: ArchitectTurn): Promise
   // The lane's own checkout, so the order is one project from its first turn
   // (ADR-061) and the architect reads the base the builder will change.
   try {
-    const checkout = await ensureCheckout(order, 1, { exec: (o) => api.shell.exec(o), root })
+    const checkout = await ensureCheckout(order, 1, { exec: shellExecOf(api), root })
     return { ok: true, plan, featureDir, checkout }
   } catch (error) {
     return { ok: false, reason: reasonOf(error) }
@@ -367,7 +368,7 @@ export async function readOnlyRound(input: ReadOnlyRound): Promise<void> {
   const featureDir = orderDir(root, order.id)
   let checkout: Checkout
   try {
-    checkout = await ensureCheckout(order, 1, { exec: (o) => api.shell.exec(o), root })
+    checkout = await ensureCheckout(order, 1, { exec: shellExecOf(api), root })
   } catch (error) {
     await refuseRound(input, store, reasonOf(error))
     return

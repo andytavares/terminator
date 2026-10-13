@@ -7,7 +7,6 @@ import type { Gate } from '../gates/rules.js'
 import type { OrderStore } from '../order/store.js'
 import type { ShellExec } from './integrate.js'
 import { writeObservedFiles } from './observed-files.js'
-import { endAndWait } from '../runtime/end-session.js'
 import { readChangedFiles, readDiffSummary } from '../runtime/diff-metrics.js'
 import { isLockfile } from '../runtime/review/risk-grader.js'
 import { createRoleRegistry } from './roles.js'
@@ -19,7 +18,7 @@ import { collectableWrites, readRungOutput } from './rung-output.js'
 import { resolveSources } from '../workspace-root.js'
 import { indexFor, writeGraph } from '../state/live-index.js'
 import { autonomyFor } from '../state/settings.js'
-import { runtime, isLiveSession } from '../runtime/runtime-state.js'
+import { endLiveSession } from '../runtime/runtime-state.js'
 import { baseBranchOf, conversationKey, createRunContext } from './run-context.js'
 import type { OrderRun, RunContext } from './run-context.js'
 import { runNode } from './node-session.js'
@@ -30,6 +29,7 @@ import {
   runStep,
   runStepOnBase,
 } from './lane-commands.js'
+import { isoNow } from '../host-calls.js'
 
 export type { OrderRun } from './run-context.js'
 
@@ -92,7 +92,7 @@ async function executorDepsFor(
   graph: RunGraph
 ): Promise<ExecutorDeps> {
   return {
-    now: () => new Date().toISOString(),
+    now: isoNow,
     sources: parts.sources,
     run: (input) => runNode(context, input),
     sessionFor: (lane, role) => context.conversations.get(conversationKey(lane, role)),
@@ -237,13 +237,7 @@ async function raiseGate(context: RunContext, gates: GateStore, gate: Gate): Pro
 // prompt when a node resumes it. Two processes must not share one
 // conversation — the same reason `endAndWait` exists for a follow-up turn.
 function endSession(sessionId: string): Promise<void> {
-  return endAndWait(
-    {
-      stop: (id, reason) => runtime.supervisedRunner?.stop(id, reason) ?? false,
-      isLive: isLiveSession,
-    },
-    { sessionId, reason: 'continuing the lane in its next step' }
-  ).then(() => undefined)
+  return endLiveSession(sessionId, 'continuing the lane in its next step')
 }
 
 function recordVerdict(context: RunContext, event: ExecutorEvent): void {

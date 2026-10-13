@@ -7,6 +7,8 @@ import { diskSourceFor } from './disk-source.js'
 import { createGateStore } from '../gates/store.js'
 import { createOrderStore } from '../order/store.js'
 import type { RunGraph } from '../line/run-graph.js'
+import { computeQueueEntries } from '../line/refinery-entries.js'
+import type { QueueEntry } from '../line/refinery.js'
 
 /**
  * What Foundry holds of its own records in memory, one index per data root.
@@ -40,6 +42,11 @@ export const readGraph = (root: string, orderId: string): ReturnType<typeof read
   readRunGraph(root, orderId, indexFor(root))
 export const writeGraph = (root: string, graph: RunGraph): Promise<void> =>
   writeRunGraph(root, graph, indexFor(root))
+
+/** The refinery queue, read afresh each call from wherever the records are then. */
+export function queueEntriesOf(root: () => string): () => Promise<QueueEntry[]> {
+  return () => computeQueueEntries(root(), orderStoreAt(root()))
+}
 
 /** Replace the index with one that tells every window what changed. */
 export function connectIndexes(api: ExtensionAPI): void {

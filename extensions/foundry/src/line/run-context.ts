@@ -13,6 +13,7 @@ import type { RunGraph } from './run-graph.js'
 import { ensureCheckouts } from './worktree.js'
 import type { Checkout } from './worktree.js'
 import { workspaceFor } from './order-project.js'
+import { shellExecOf } from '../host-calls.js'
 
 /** One order's run: the order, its recipe, its graph, and where its records live. */
 export interface OrderRun {
@@ -41,7 +42,7 @@ export interface RunContext {
 
 export async function createRunContext(api: ExtensionAPI, run: OrderRun): Promise<RunContext> {
   const { root, order } = run
-  const exec: ShellExec = (options) => api.shell.exec(options)
+  const exec = shellExecOf(api)
   // Every checkout before any agent starts: a run that provisions lane 2 half
   // way through and fails has already spent lane 1's agent budget.
   const checkouts = await ensureCheckouts(order, { exec, root })

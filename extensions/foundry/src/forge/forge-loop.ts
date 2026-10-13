@@ -5,7 +5,6 @@ import { followUpFor, retryForRefusal, REWRITING_UNREADABLE } from './autonomy.j
 import { anotherPassWanted, loopFacts, lastIntake, reviewedCurrentPlan } from './intake-outcome.js'
 import { readyToHandOff } from './release-again.js'
 import type { ReleaseDeps, Step } from './release-again.js'
-import { endAndWait } from '../runtime/end-session.js'
 import { compileOrder } from '../order/compile.js'
 import {
   convergeMaybeScouted as scoutedConverge,
@@ -39,9 +38,10 @@ import { resolveSources } from '../workspace-root.js'
 import { orderStoreAt } from '../state/live-index.js'
 import { intakeSessions } from './intake-sessions.js'
 import { lighterRedTeam, defaultModel } from '../state/settings.js'
-import { runtime, isLiveSession } from '../runtime/runtime-state.js'
+import { endLiveSession } from '../runtime/runtime-state.js'
 import { convergeOnce, readOnlyRound } from './intake-turn.js'
 import type { Deciding } from '../ipc/standing.js'
+import { plural } from '../order/standing.js'
 
 /** What the loop needs that is built after it: the channels an order is agreed and started through. */
 export interface ForgeLoopDeps {
@@ -129,8 +129,6 @@ async function recordLoopEntry(root: string, entry: LoopEntry): Promise<void> {
 const nextReviewRound = async (forge: Forge, orderId: string): Promise<number> =>
   nextRound(loopFacts(await orderStoreAt(forge.dataRoot()).entries(orderId)))
 
-const plural = (count: number, word: string): string => `${word}${count === 1 ? '' : 's'}`
-
 /**
  * One architect turn, and the ones the Forge starts on its own after it.
  *
@@ -197,13 +195,7 @@ async function continueAutomatically(
 async function endPreviousTurn(orderId: string): Promise<void> {
   const previous = intakeSessions.get(orderId)
   if (previous === undefined) return
-  await endAndWait(
-    {
-      stop: (id, reason) => runtime.supervisedRunner?.stop(id, reason) ?? false,
-      isLive: isLiveSession,
-    },
-    { sessionId: previous, reason: 'continuing in a follow-up turn' }
-  )
+  await endLiveSession(previous, 'continuing in a follow-up turn')
 }
 
 async function afterArchitectTurn(
@@ -435,7 +427,7 @@ async function recordReviewRound(
   await recordLoopEntry(root, {
     ...entry,
     action: 'review.round',
-    reason: `round ${round}: ${blocking} blocking, ${notes} ${plural(notes, 'note')}`,
+    reason: `round ${round}: ${blocking} blocking, ${notes} ${plural(notes, 'note', 'notes')}`,
   })
   if (anotherPass === true) {
     await recordLoopEntry(root, {
@@ -448,7 +440,7 @@ async function recordReviewRound(
 
 async function reviewExhausted(forge: Forge, { root, order: updated }: ReviewAt): Promise<void> {
   const stillOpen = updated.redTeam.filter((f) => f.status === 'open' && isBlocking(f)).length
-  const findings = `${stillOpen} blocking ${plural(stillOpen, 'finding')}`
+  const findings = `${stillOpen} blocking ${plural(stillOpen, 'finding', 'findings')}`
   await recordLoopEntry(root, {
     orderId: updated.id,
     actor: 'role:red-team',
@@ -700,6 +692,6 @@ async function recordScoutCollected(root: string, updated: WorkOrder): Promise<v
     actor: 'role:scout',
     action: 'scout.collected',
     subject: updated.id,
-    reason: `found ${found} ${plural(found, 'entry point')}`,
+    reason: `found ${found} ${plural(found, 'entry point', 'entry points')}`,
   })
 }

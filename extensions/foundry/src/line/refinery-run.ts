@@ -4,7 +4,6 @@ import { createLiveGateStore } from '../gates/store.js'
 import { raiseGate } from '../gates/rules.js'
 import { readPulls } from './integrate.js'
 import { branchFor, checkoutPath } from './worktree.js'
-import { computeQueueEntries } from './refinery-entries.js'
 import { readRefineryState, writeRefineryState } from './refinery-state.js'
 import { refineryTick } from './refinery-tick.js'
 import type { RefineryTickDeps } from './refinery-tick.js'
@@ -13,9 +12,10 @@ import { writeBack } from '../trackers/write-back.js'
 import type { OrderStore } from '../order/store.js'
 
 import type { ActivationContext } from '../ipc/register.js'
-import { indexFor, orderStoreAt } from '../state/live-index.js'
+import { indexFor, orderStoreAt, queueEntriesOf } from '../state/live-index.js'
 import { issuesPortFor, writeBackDepsFor } from '../trackers/issues-port.js'
 import { ciRoundAgain } from './ci-round-again.js'
+import { isoNow, shellExecOf } from '../host-calls.js'
 
 /**
  * The refinery tick: once a minute, watch merged predecessors and restack
@@ -94,9 +94,9 @@ function refineryDepsFor(place: RefineryPlace): RefineryTickDeps {
       indexFor(root).announce({ kind: 'graph', orderId })
     },
     viewPr: (url) => viewPullRequest(place, url),
-    entries: () => computeQueueEntries(root, orderStoreAt(root)),
+    entries: queueEntriesOf(() => root),
     lanesFor: (orderId) => lanesOf(place, orderId),
-    restack: (lane) => restack(lane, (options) => api.shell.exec(options)),
+    restack: (lane) => restack(lane, shellExecOf(api)),
     watchCi: (orderId) => watchRestackedCi(api, root, orderId),
     raiseConflict: (orderId, why, files) => raiseRefineryConflict(root, { orderId, why, files }),
     record: ({ orderId, action, subject, reason }) =>
@@ -111,7 +111,7 @@ function refineryDepsFor(place: RefineryPlace): RefineryTickDeps {
       }),
     titleOf: async (orderId) => (await store.load(orderId))?.title ?? orderId,
     onMerged: (orderId) => moveIssueToDone(place, orderId),
-    now: () => new Date().toISOString(),
+    now: isoNow,
   }
 }
 

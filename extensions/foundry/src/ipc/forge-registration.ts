@@ -6,7 +6,6 @@ import { foundryChannel } from './channel.js'
 import { IssuesMinePayload, OrderIdPayload, TicketCreatePayload } from './payloads.js'
 import { createLiveOrderStore } from '../order/store.js'
 import { deleteOrder } from '../line/teardown.js'
-import { computeQueueEntries } from '../line/refinery-entries.js'
 import { projectRemover } from '../line/order-project.js'
 import { fileTicket, ticketOffer } from '../forge/ticket-offer.js'
 import { checkCapability, writeBack } from '../trackers/write-back.js'
@@ -14,7 +13,7 @@ import { checkCapability, writeBack } from '../trackers/write-back.js'
 import type { ForgeChannels, ForgeDeps } from './forge-channels.js'
 import { reg } from './register.js'
 import type { ActivationContext } from './register.js'
-import { announceLive, indexFor, orderStoreAt } from '../state/live-index.js'
+import { announceLive, indexFor, orderStoreAt, queueEntriesOf } from '../state/live-index.js'
 import { intakeSessions, deletedOrders } from '../forge/intake-sessions.js'
 import { defaultWriteBack, defaultBudgets, declaredCriticalPaths } from '../state/settings.js'
 import { runtime } from '../runtime/runtime-state.js'
@@ -22,6 +21,7 @@ import { issuesPortFor, writeBackDepsFor } from '../trackers/issues-port.js'
 import { stopOrder } from '../line/run-control.js'
 import type { LiveStandingSources } from './standing.js'
 import type { ForgeLoop } from '../forge/forge-loop.js'
+import { isoNow, shellExecOf } from '../host-calls.js'
 
 /**
  * What the record already says about these files (FR-077).
@@ -72,7 +72,7 @@ function createForge(
   return createForgeChannels({
     store: createLiveOrderStore(dataRoot, indexFor),
     dataRoot,
-    now: () => new Date().toISOString(),
+    now: isoNow,
     standingSources,
     writeBackDefault: () => defaultWriteBack(api),
     budgetDefaults: () => defaultBudgets(api),
@@ -89,7 +89,7 @@ function createForge(
       await writeBack(order, { event: 'agreed' }, writeBackDepsFor(dataRoot(), order, issuesPort))
     },
     readIssue: (tracker, key) => readIssue(api, tracker, key),
-    queueEntries: () => computeQueueEntries(dataRoot(), orderStoreAt(dataRoot())),
+    queueEntries: queueEntriesOf(dataRoot),
     onReleased: loop.onReleased,
   })
 }
@@ -193,7 +193,7 @@ function registerOrderDelete({ api, dataRoot }: ActivationContext): void {
         announceLive(id)
       }
       const result = await deleteOrder(order, {
-        exec: (o) => api.shell.exec(o),
+        exec: shellExecOf(api),
         root,
         removeProjectAt: projectRemover(api.workspace),
       })
