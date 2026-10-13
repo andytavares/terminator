@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import {
   AppHandle,
   launchApp,
@@ -157,27 +157,23 @@ async function lastColumnInk(): Promise<number> {
 const RULER_COMMAND =
   'clear; C=$(tput cols); awk -v c=$C \'BEGIN{s="";for(i=0;i<c;i++)s=s"#";printf "%s",s}\'\n'
 
-// Must run on a FULL-WIDTH single pane, hence its position before the split test below:
-// the overhang is cols x per-column drift, so a half-width pane roughly halves it and
-// can round away to nothing.
-test('last-column glyph is not clipped', async () => {
-  const { page } = handle
-  test.setTimeout(120000)
-
-  if (await usesWebgl()) {
-    await page.keyboard.type('clear\n')
-    await expect.poll(lastColumnInk, { timeout: 15000 }).toBe(0)
-    await page.keyboard.type(RULER_COMMAND)
-    await expect
-      .poll(lastColumnInk, {
-        message: 'the last column of the full-width ruler line was not drawn',
-        timeout: 30000,
-      })
-      .toBeGreaterThan(0)
-    return
-  }
-
+/** WebGL draws to a canvas, so the ruler's last column is read as ink in the pixels. */
+async function expectRulerInkInLastColumn(page: Page): Promise<void> {
+  await page.keyboard.type('clear\n')
+  await expect.poll(lastColumnInk, { timeout: 15000 }).toBe(0)
   await page.keyboard.type(RULER_COMMAND)
+  await expect
+    .poll(lastColumnInk, {
+      message: 'the last column of the full-width ruler line was not drawn',
+      timeout: 30000,
+    })
+    .toBeGreaterThan(0)
+}
+
+/** The ruler row's columns, and its content width against its clip box. */
+async function measureRulerRow(
+  page: Page
+): Promise<{ cols: number; scrollW: number; clientW: number }> {
   // Find the ruler row by content rather than assuming row 0 — on CI the shell prints a
   // "default interactive shell is now zsh" notice first, so the ruler does not reliably
   // land on any particular row. Strictly the ruler: nothing but '#', and long enough to
@@ -188,7 +184,7 @@ test('last-column glyph is not clipped', async () => {
   await expect.poll(rulerRow, { timeout: 30000 }).toBeGreaterThanOrEqual(0)
   // The DOM renderer draws the screen's rows in order, one div each; its clip box is the
   // thing under test, so this measures the DOM on purpose.
-  const m = await screen.evaluate(
+  return screen.evaluate(
     (element, index) => {
       const el = element.querySelector('.xterm-rows')!.children[index] as HTMLElement
       const text = (el.textContent ?? '').replace(/\u00a0/g, ' ').trimEnd()
@@ -196,6 +192,22 @@ test('last-column glyph is not clipped', async () => {
     },
     await rulerRow()
   )
+}
+
+// Must run on a FULL-WIDTH single pane, hence its position before the split test below:
+// the overhang is cols x per-column drift, so a half-width pane roughly halves it and
+// can round away to nothing.
+test('last-column glyph is not clipped', async () => {
+  const { page } = handle
+  test.setTimeout(120000)
+
+  if (await usesWebgl()) {
+    await expectRulerInkInLastColumn(page)
+    return
+  }
+
+  await page.keyboard.type(RULER_COMMAND)
+  const m = await measureRulerRow(page)
 
   // Guard the guard: too few columns and the accumulated overhang rounds to zero, which
   // would make the assertion below vacuously true.

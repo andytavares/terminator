@@ -145,28 +145,47 @@ test.afterAll(async () => {
   await browser?.close()
 })
 
+/** Renders one surface of the bundle in a theme, settled and ready to measure. */
+async function renderSurface(page: Page, surface: Surface, theme: 'dark' | 'light'): Promise<void> {
+  const themeAttr = theme === 'light' ? ' data-theme="light"' : ''
+  await page.setContent(
+    `<!doctype html><html lang="en"${themeAttr}><head><meta charset="utf-8"><title>${surface.name}</title>` +
+      `<style>${extensionBaseCss(ROOT)}</style><style>${bundleCss}</style></head><body><div id="app"></div></body></html>`
+  )
+  await page.evaluate(
+    (n) => {
+      window.__SURFACE__ = n
+    },
+    surface.name.replace('-mine', '')
+  )
+  await page.addScriptTag({ content: bundleJs })
+  await page.waitForSelector(surface.ready)
+  await surface.act?.(page)
+  await page.evaluate(() => document.fonts.ready)
+}
+
+/** A selected row stands out from its panel by 3:1 at least (WCAG 1.4.11). */
+async function expectSelectedRowContrast(
+  page: Page,
+  selected: string,
+  surface: Surface
+): Promise<void> {
+  const measured = (await page.evaluate(
+    `(${MEASURE})(${JSON.stringify(selected)}, ${JSON.stringify(surface.indicator ?? 'background')})`
+  )) as { ratio: number } | null
+  expect(measured, `${selected} is rendered`).not.toBeNull()
+  expect(measured!.ratio, `selected row vs its panel (1.4.11), ${selected}`).toBeGreaterThanOrEqual(
+    3
+  )
+}
+
 for (const theme of ['dark', 'light'] as const) {
   for (const surface of SURFACES) {
     test(`${surface.name} meets WCAG 2.1 AA contrast in the ${theme} theme`, async () => {
       const context = await browser.newContext({ viewport: { width: 1200, height: 700 } })
       const page = await context.newPage()
       try {
-        const themeAttr = theme === 'light' ? ' data-theme="light"' : ''
-        await page.setContent(
-          `<!doctype html><html lang="en"${themeAttr}><head><meta charset="utf-8"><title>${surface.name}</title>` +
-            `<style>${extensionBaseCss(ROOT)}</style><style>${bundleCss}</style></head><body><div id="app"></div></body></html>`
-        )
-        await page.evaluate(
-          (n) => {
-            window.__SURFACE__ = n
-          },
-          surface.name.replace('-mine', '')
-        )
-        await page.addScriptTag({ content: bundleJs })
-        await page.waitForSelector(surface.ready)
-        await surface.act?.(page)
-        await page.evaluate(() => document.fonts.ready)
-
+        await renderSurface(page, surface, theme)
         await page.screenshot({ path: join(SHOTS, `${surface.name}-${theme}.png`) })
 
         const axe = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze()
@@ -175,16 +194,7 @@ for (const theme of ['dark', 'light'] as const) {
         )
         expect(failures, 'axe color-contrast violations').toEqual([])
 
-        if (surface.selected) {
-          const measured = (await page.evaluate(
-            `(${MEASURE})(${JSON.stringify(surface.selected)}, ${JSON.stringify(surface.indicator ?? 'background')})`
-          )) as { ratio: number } | null
-          expect(measured, `${surface.selected} is rendered`).not.toBeNull()
-          expect(
-            measured!.ratio,
-            `selected row vs its panel (1.4.11), ${surface.selected}`
-          ).toBeGreaterThanOrEqual(3)
-        }
+        if (surface.selected) await expectSelectedRowContrast(page, surface.selected, surface)
       } finally {
         await context.close()
       }

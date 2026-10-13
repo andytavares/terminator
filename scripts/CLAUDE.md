@@ -2,7 +2,7 @@
 
 ## create-extension.cjs
 
-When updating the extension scaffold template (`generateIndex`), enforce these rules in the generated code and comments:
+When updating the extension scaffold template (`generateIndex`), enforce these rules in the generated code and comments. `generateIndex` joins one function per part of the generated file, from `indexHeader` to `indexFooter`; a new stub is a new part, which keeps each within the function size limits.
 
 ### Extension Isolation Rules (embed in generated template comments)
 

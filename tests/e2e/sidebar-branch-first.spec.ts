@@ -170,6 +170,18 @@ test('the retired chrome is gone entirely', async () => {
   await expect(handle.page.locator('.filter-notice')).toHaveCount(0)
 })
 
+/** Run in the page: whether the open menu reaches past the sidebar, and is drawn on top there. */
+function menuPastSidebar(): { overhangs: boolean; onTop: boolean } {
+  const sidebar = document.querySelector('.unified-sidebar')!.getBoundingClientRect()
+  const panel = document.querySelector('[role="menu"]')!.getBoundingClientRect()
+  const x = sidebar.right + 4
+  const y = panel.top + panel.height / 2
+  return {
+    overhangs: panel.right > x,
+    onTop: document.elementFromPoint(x, y)?.closest('[role="menu"]') !== null,
+  }
+}
+
 test('every view, grouping and sort control lives in two menus (FR-034)', async () => {
   const filter = handle.page.getByRole('button', { name: /^Filter/ })
   const display = handle.page.getByRole('button', { name: 'Display' })
@@ -186,16 +198,7 @@ test('every view, grouping and sort control lives in two menus (FR-034)', async 
     const sidebar = document.querySelector('.unified-sidebar') as HTMLElement
     sidebar.style.width = '200px'
   })
-  const covered = await handle.page.evaluate(() => {
-    const sidebar = document.querySelector('.unified-sidebar')!.getBoundingClientRect()
-    const panel = document.querySelector('[role="menu"]')!.getBoundingClientRect()
-    const x = sidebar.right + 4
-    const y = panel.top + panel.height / 2
-    return {
-      overhangs: panel.right > x,
-      onTop: document.elementFromPoint(x, y)?.closest('[role="menu"]') !== null,
-    }
-  })
+  const covered = await handle.page.evaluate(menuPastSidebar)
   expect(covered).toEqual({ overhangs: true, onTop: true })
   await handle.page.keyboard.press('Escape')
   await handle.page.locator('.unified-sidebar__list').click({ position: { x: 5, y: 5 } })

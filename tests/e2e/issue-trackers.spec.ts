@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, createWorkspace, launchApp, projectGroup, type AppHandle } from './helpers'
 import { git } from './git-harness'
+import { allowCredentialsWithoutKeychain } from './main-stubs'
 import { JIRA_SITE, startTrackerStub, type TrackerStub } from './tracker-stub'
+import type { JiraState } from './tracker-stub-jira'
+import type { LinearState } from './tracker-stub-linear'
 
 /**
  * Linear and Jira, end to end, against stub servers at their real addresses
@@ -22,50 +25,58 @@ const BRANCH = 'main'
 
 test.describe.configure({ mode: 'serial' })
 
+/** Linear's state: Ada's API key, and one issue of hers beside one of Grace's. */
+function linearState(): LinearState {
+  return {
+    apiKey: 'lin_api_e2e',
+    viewer: { name: 'Ada Lovelace', email: 'ada@acme.dev' },
+    issues: [
+      {
+        identifier: 'ENG-12',
+        title: 'Sidebar crashes on resize',
+        description: 'Dragging the divider past 600px throws.',
+        state: { name: 'In Progress', type: 'started' },
+        assigneeEmail: 'ada@acme.dev',
+        comments: [],
+      },
+      {
+        identifier: 'ENG-40',
+        title: 'Add dark mode to the drawer',
+        description: '',
+        state: { name: 'Todo', type: 'unstarted' },
+        assigneeEmail: 'grace@acme.dev',
+        comments: [],
+      },
+    ],
+    operations: [],
+  }
+}
+
+/** Jira's state: Ada's credential and one issue. */
+function jiraState(): JiraState {
+  return {
+    account: { displayName: 'Ada L', emailAddress: 'ada@acme.dev' },
+    credential: 'ada@acme.dev:jira-token',
+    issues: [
+      {
+        key: 'OPS-7',
+        summary: 'Rotate the deploy keys',
+        status: { name: 'To Do', category: 'new' },
+        description: 'Quarterly.',
+        comments: [],
+      },
+    ],
+    searches: [],
+  }
+}
+
 test.beforeAll(async () => {
   repo = mkdtempSync(join(tmpdir(), 'terminator-e2e-trackers-repo-'))
   git(repo, 'init', '--quiet', '-b', BRANCH)
   git(repo, 'commit', '--quiet', '--allow-empty', '-m', 'root')
-  stub = await startTrackerStub(
-    {
-      apiKey: 'lin_api_e2e',
-      viewer: { name: 'Ada Lovelace', email: 'ada@acme.dev' },
-      issues: [
-        {
-          identifier: 'ENG-12',
-          title: 'Sidebar crashes on resize',
-          description: 'Dragging the divider past 600px throws.',
-          state: { name: 'In Progress', type: 'started' },
-          assigneeEmail: 'ada@acme.dev',
-          comments: [],
-        },
-        {
-          identifier: 'ENG-40',
-          title: 'Add dark mode to the drawer',
-          description: '',
-          state: { name: 'Todo', type: 'unstarted' },
-          assigneeEmail: 'grace@acme.dev',
-          comments: [],
-        },
-      ],
-      operations: [],
-    },
-    {
-      account: { displayName: 'Ada L', emailAddress: 'ada@acme.dev' },
-      credential: 'ada@acme.dev:jira-token',
-      issues: [
-        {
-          key: 'OPS-7',
-          summary: 'Rotate the deploy keys',
-          status: { name: 'To Do', category: 'new' },
-          description: 'Quarterly.',
-          comments: [],
-        },
-      ],
-      searches: [],
-    }
-  )
+  stub = await startTrackerStub(linearState(), jiraState())
   handle = await launchApp(undefined, stub.env)
+  await allowCredentialsWithoutKeychain(handle.app)
   credentialStore = await handle.app.evaluate(({ safeStorage }) =>
     safeStorage.isEncryptionAvailable()
   )
@@ -74,10 +85,12 @@ test.beforeAll(async () => {
 })
 
 // The core refuses to store a tracker credential without OS encryption. On
-// macOS Playwright's --use-mock-keychain provides it; on Linux Playwright's
-// Electron loader appends --password-store=basic
-// (playwright-core/lib/server/electron/loader.js), under which safeStorage
-// reports no encryption, so nothing here can connect.
+// macOS Playwright's --use-mock-keychain provides it, so the keychain path is
+// what runs there; on Linux Playwright's Electron loader appends
+// --password-store=basic (playwright-core/lib/server/electron/loader.js), under
+// which safeStorage reports no encryption, and allowCredentialsWithoutKeychain
+// switches it to Electron's plain-text backend, as integrations.spec.ts does.
+// The skip is for a platform that has neither.
 test.beforeEach(() => {
   test.skip(!credentialStore, 'safeStorage has no OS encryption under Playwright here')
 })

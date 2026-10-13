@@ -1,8 +1,10 @@
 import { _electron as electron, ElectronApplication, Locator, Page, expect } from '@playwright/test'
+import type { ChildProcess } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
+import { expectNoProcessesLeft, launchMarker } from './leftover-processes'
 
 // Shared e2e harness. Every spec launches the real Electron app in an isolated,
 // throwaway profile (via Chromium's --user-data-dir, which Electron honours for
@@ -13,6 +15,8 @@ export interface AppHandle {
   app: ElectronApplication
   page: Page
   userDataDir: string
+  /** The marker in this launch's environment; closeApp finds what it left by it. */
+  launchId: string
 }
 
 /**
@@ -91,7 +95,11 @@ function e2eEnv(): Record<string, string> {
  */
 // Inside the 30s hook timeout, so a launch that hangs fails with the app's own
 // output instead of a bare "hook timeout exceeded" that says nothing about why.
+// What a failed launch spends after it must fit in the rest:
+// 25 s + 1 s reading the windows + 2.5 s to close + 1 s for a kill = 29.5 s.
 const LAUNCH_DEADLINE_MS = 25_000
+const WINDOW_STATE_READ_MS = 1000
+const FAILED_LAUNCH_CLOSE_MS = 2500
 
 /**
  * Extra Electron switches for this machine, space-separated in
@@ -102,13 +110,16 @@ function machineArgs(): string[] {
   return (process.env.E2E_ELECTRON_ARGS ?? '').split(' ').filter(Boolean)
 }
 
-export async function launchApp(
-  userDataDir: string = e2eProfileDir(),
-  env: Record<string, string> = {}
-): Promise<AppHandle> {
-  const deadline = Date.now() + LAUNCH_DEADLINE_MS
-  const remaining = () => Math.max(1, deadline - Date.now())
-  const app = await electron.launch({
+/**
+ * Starts Electron on the profile, with this machine's switches and the e2e
+ * environment beneath `env`.
+ */
+function startElectron(
+  userDataDir: string,
+  env: Record<string, string>,
+  timeout: number
+): Promise<ElectronApplication> {
+  return electron.launch({
     // closeApp SIGKILLs an app that will not close, and macOS then shows a
     // modal "reopen windows?" alert on the next launch of the same bundle,
     // which blocks startup until firstWindow times out. The argument domain
@@ -121,8 +132,12 @@ export async function launchApp(
       'YES',
     ],
     env: { ...e2eEnv(), ...env },
-    timeout: remaining(),
+    timeout,
   })
+}
+
+/** The app's most recent output, stdout and stderr, kept for a failed launch to report. */
+function keepOutput(app: ElectronApplication): string[] {
   const output: string[] = []
   const keep = (chunk: Buffer): void => {
     output.push(chunk.toString())
@@ -130,27 +145,60 @@ export async function launchApp(
   }
   app.process().stdout?.on('data', keep)
   app.process().stderr?.on('data', keep)
+  return output
+}
+
+/** The first window, once it shows the sidebar, within what is left of the launch. */
+async function firstReadyWindow(app: ElectronApplication, remaining: () => number): Promise<Page> {
+  await startIpcTrace(app)
+  const page = await app.firstWindow({ timeout: remaining() })
+  await page.waitForLoadState('domcontentloaded', { timeout: remaining() })
+  await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
+  await moveWindowOffPointer(app)
+  return page
+}
+
+/** Stops an app that did not finish starting, and says what its windows were doing and what it printed. */
+async function launchFailure(
+  app: ElectronApplication,
+  output: string[],
+  error: unknown
+): Promise<Error> {
+  const windows = await windowStates(app)
+  await stopApp(app, FAILED_LAUNCH_CLOSE_MS)
+  return new Error(
+    `The app did not finish starting within ${LAUNCH_DEADLINE_MS / 1000}s: ${String(error)}\n` +
+      `--- its windows when it gave up ---\n${windows}\n` +
+      `--- the app's own output ---\n${output.join('').slice(-6000) || '(nothing)'}`,
+    { cause: error }
+  )
+}
+
+export async function launchApp(
+  userDataDir: string = e2eProfileDir(),
+  env: Record<string, string> = {}
+): Promise<AppHandle> {
+  const deadline = Date.now() + LAUNCH_DEADLINE_MS
+  const marker = launchMarker()
+  const remaining = () => Math.max(1, deadline - Date.now())
+  const app = await startElectron(userDataDir, { ...env, ...marker.env }, remaining())
+  const output = keepOutput(app)
   try {
-    await startIpcTrace(app)
-    const page = await app.firstWindow({ timeout: remaining() })
-    await page.waitForLoadState('domcontentloaded', { timeout: remaining() })
-    await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
-    await moveWindowOffPointer(app)
-    return { app, page, userDataDir }
+    const page = await firstReadyWindow(app, remaining)
+    return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
-    const windows = await windowStates(app)
-    await closeApp({ app, userDataDir })
-    throw new Error(
-      `The app did not finish starting within ${LAUNCH_DEADLINE_MS / 1000}s: ${String(error)}\n` +
-        `--- its windows when it gave up ---\n${windows}\n` +
-        `--- the app's own output ---\n${output.join('').slice(-6000) || '(nothing)'}`,
-      { cause: error }
-    )
+    throw await launchFailure(app, output, error)
   }
 }
 
-// Short: it is spent after the launch deadline, inside the same 30s hook timeout.
-const WINDOW_STATE_READ_MS = 1000
+/** Resolves after `ms`: the losing side of a race that bounds a wait. */
+function deadline(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    // A deadline, not a sleep: whatever it races ends the wait as soon as it settles.
+    // eslint-disable-next-line no-restricted-syntax
+    setTimeout(resolve, ms)
+  })
+}
 
 /**
  * What each window was doing when a launch gave up: the document it was on,
@@ -173,11 +221,7 @@ async function windowStates(app: ElectronApplication): Promise<string> {
     )
     .then((states) => states.join('\n') || '(no windows)')
     .catch((error: unknown) => `(could not ask the main process: ${String(error)})`)
-  const unanswered = new Promise<string>((resolve) => {
-    // A deadline, not a sleep: the race ends as soon as main answers.
-    // eslint-disable-next-line no-restricted-syntax
-    setTimeout(() => resolve('(the main process did not answer)'), WINDOW_STATE_READ_MS)
-  })
+  const unanswered = deadline(WINDOW_STATE_READ_MS).then(() => '(the main process did not answer)')
   return Promise.race([read, unanswered])
 }
 
@@ -207,33 +251,55 @@ async function moveWindowOffPointer(app: ElectronApplication): Promise<void> {
 // never blow the afterAll hook (which cascades into a worker-teardown timeout
 // and fails the whole job as a non-test error).
 const GRACEFUL_CLOSE_MS = 5000
+// SIGKILL cannot be caught, so the process is gone almost at once; a second is
+// only a guard against a kernel that never reaps it.
+const KILLED_EXIT_MS = 1000
+
+/**
+ * Whether the process has ended. `killed` is not it: Node sets that when the
+ * signal is sent, not when the process exits
+ * (https://nodejs.org/api/child_process.html#subprocesskilled).
+ */
+function hasExited(proc: ChildProcess): boolean {
+  return proc.exitCode !== null || proc.signalCode !== null
+}
+
+/** Settles on the process's 'exit' event (https://nodejs.org/api/child_process.html#event-exit). */
+function exited(proc: ChildProcess): Promise<void> {
+  return new Promise((resolve) => {
+    if (hasExited(proc)) resolve()
+    else proc.once('exit', () => resolve())
+  })
+}
+
+/**
+ * Quits the app and returns once its process has exited, so it can never
+ * overlap the next launch. A lingering PTY, git watcher or extension host can
+ * keep app.close() from ever resolving, so the close gets `graceMs` before the
+ * process is killed. The .catch keeps a close() that loses the race from
+ * surfacing as an unhandled rejection after the SIGKILL.
+ */
+async function stopApp(app: ElectronApplication, graceMs: number): Promise<void> {
+  // Taken up front: once app.close() resolves, app.process() throws.
+  const proc = app.process()
+  await Promise.race([app.close().catch(() => {}), deadline(graceMs)])
+  if (hasExited(proc)) return
+  proc.kill('SIGKILL')
+  await Promise.race([exited(proc), deadline(KILLED_EXIT_MS)])
+  if (!hasExited(proc)) {
+    throw new Error(
+      `The app (pid ${proc.pid}) was still running ${KILLED_EXIT_MS} ms after SIGKILL`
+    )
+  }
+}
 
 export async function closeApp(
-  handle: Pick<AppHandle, 'app' | 'userDataDir'> | undefined
+  handle: Pick<AppHandle, 'app' | 'userDataDir' | 'launchId'> | undefined
 ): Promise<void> {
   if (!handle) return
-  // Capture the OS process up front: once app.close() resolves, Playwright
-  // tears down its internal handle and app.process() would throw.
-  const proc = handle.app.process()
   await saveIpcTrace(handle.app)
-  // Bound the graceful close: a lingering PTY, git watcher, or extension host
-  // can keep the process alive so app.close() never resolves. Race it against a
-  // timeout, then force-kill whatever is left. The .catch keeps a close() that
-  // loses the race from surfacing as an unhandled rejection after the SIGKILL.
-  const closed = handle.app.close().catch(() => {})
-  await Promise.race([
-    closed,
-    // A deadline, not a sleep: the race ends as soon as the app closes.
-    // eslint-disable-next-line no-restricted-syntax
-    new Promise<void>((resolve) => setTimeout(resolve, GRACEFUL_CLOSE_MS)),
-  ])
-  if (proc.exitCode === null && !proc.killed) {
-    try {
-      proc.kill('SIGKILL')
-    } catch {
-      // Process already exited between the check and the kill — nothing to do.
-    }
-  }
+  await stopApp(handle.app, GRACEFUL_CLOSE_MS)
+  await expectNoProcessesLeft(handle.launchId)
   // The profile is not deleted here. It is still being written to as the app
   // dies — a terminal's scrollback, an extension's state, a transcript — and
   // the directory disappearing out from under those raced the delete: a spec

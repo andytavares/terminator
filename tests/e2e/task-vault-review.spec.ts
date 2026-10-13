@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp } from './helpers'
@@ -168,8 +168,10 @@ test('a past review exports to the markdown file chosen', async () => {
     .getByRole('button', { name: /^Export review from / })
     .click()
 
+  // Until the save lands the file is not there, and a poll whose callback
+  // throws stops at once rather than trying again.
   await expect
-    .poll(() => readFileSync(file, 'utf8'), { timeout: 10_000 })
+    .poll(() => (existsSync(file) ? readFileSync(file, 'utf8') : ''), { timeout: 10_000 })
     .toContain('Mornings without meetings')
   expect(readFileSync(file, 'utf8')).toContain('Garden Shed')
 })

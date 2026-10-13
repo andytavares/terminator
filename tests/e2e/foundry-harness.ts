@@ -229,6 +229,50 @@ export async function openForge(handle: AppHandle): Promise<void> {
     .toMatch(/New order|Steps|All orders|STATUS WALL/)
 }
 
+/** Run in Foundry's view: whether some button's text contains `id`. */
+function orderRowListed(id: string): string {
+  return `(function () {
+        var all = document.querySelectorAll('button')
+        for (var i = 0; i < all.length; i++) {
+          if ((all[i].textContent || '').indexOf(${JSON.stringify(id)}) !== -1) return true
+        }
+        return false
+      })()`
+}
+
+/** Run in Foundry's view: clicks the first button whose text contains `id`, and says whether one did. */
+function clickOrderRow(id: string): string {
+  return `(function () {
+    var all = document.querySelectorAll('button')
+    for (var i = 0; i < all.length; i++) {
+      if ((all[i].textContent || '').indexOf(${JSON.stringify(id)}) !== -1) {
+        all[i].click()
+        return true
+      }
+    }
+    return false
+  })()`
+}
+
+/** Shows every order in the Forge, and waits until the row for `id` is among them. */
+export async function listOrdersInForge(handle: AppHandle, id: string): Promise<void> {
+  expect(await clickByName(handle, 'button', 'Forge')).toBe(true)
+  await expect
+    .poll(() => bodyText(handle), { timeout: 15_000 })
+    .toMatch(/New order|Steps|All orders/)
+  // An earlier order may already be open; get back to the list first.
+  await clickByName(handle, 'button', 'All orders')
+  await expect
+    .poll(() => inFoundry<boolean>(handle, orderRowListed(id)), { timeout: 15_000 })
+    .toBe(true)
+}
+
+/** Clicks the listed Forge row whose visible text contains `id`, opening it. */
+export async function openListedOrder(handle: AppHandle, id: string): Promise<void> {
+  const opened = await inFoundry<boolean>(handle, clickOrderRow(id))
+  expect(opened, `no row for ${id} in the Forge`).toBe(true)
+}
+
 /**
  * The launch script the terminal was told to run, and what is in it.
  *

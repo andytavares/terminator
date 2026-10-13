@@ -33,27 +33,27 @@ function realSpecs() {
   )
 }
 
-describe('select()', () => {
-  const specs = [
-    'foundry.spec.ts',
-    'foundry-factory-view.spec.ts',
-    'git-sidebar.spec.ts',
-    'git-integration-smoke.spec.ts',
-    'merge-flow.spec.ts',
-    'notepad-outline.spec.ts',
-    'dismiss-surface-on-click.spec.ts',
-    'extension-escape-exit.spec.ts',
-    'quick-actions.spec.ts',
-    'remote-app.spec.ts',
-    'extension-smoke.spec.ts',
-    'extension-keyboard.spec.ts',
-    'extension-themes.spec.ts',
-    'extension-escape.spec.ts',
-    'terminal.spec.ts',
-    'workspace.spec.ts',
-    'session-home.spec.ts',
-  ]
+const specs = [
+  'foundry.spec.ts',
+  'foundry-factory-view.spec.ts',
+  'git-sidebar.spec.ts',
+  'git-integration-smoke.spec.ts',
+  'merge-flow.spec.ts',
+  'notepad-outline.spec.ts',
+  'dismiss-surface-on-click.spec.ts',
+  'extension-escape-exit.spec.ts',
+  'quick-actions.spec.ts',
+  'remote-app.spec.ts',
+  'extension-smoke.spec.ts',
+  'extension-keyboard.spec.ts',
+  'extension-themes.spec.ts',
+  'extension-escape.spec.ts',
+  'terminal.spec.ts',
+  'workspace.spec.ts',
+  'session-home.spec.ts',
+]
 
+describe('select()', () => {
   it('selects all when a path is unmatched by every rule', () => {
     const result = select({ changed: ['some/unknown/path.ts'], specs, isMainPush: false })
     expect(result.mode).toBe('all')
@@ -72,7 +72,9 @@ describe('select()', () => {
     expect(result.mode).toBe('none')
     expect(result.specs).toEqual([])
   })
+})
 
+describe('select() — a foundry-only diff', () => {
   it('selects exactly the foundry set plus smoke for a foundry-only diff', () => {
     const result = select({
       changed: ['extensions/foundry/src/index.ts'],
@@ -93,7 +95,9 @@ describe('select()', () => {
       ].sort()
     )
   })
+})
 
+describe('select() — changed specs and main pushes', () => {
   it('includes a changed spec file itself', () => {
     const result = select({
       changed: ['tests/e2e/session-home.spec.ts'],
@@ -108,7 +112,9 @@ describe('select()', () => {
     expect(result.mode).toBe('all')
     expect(result.specs).toEqual(specs.slice().sort())
   })
+})
 
+describe('select() — mixed diffs', () => {
   it('unions rules for a mixed docs + notepad diff', () => {
     const result = select({
       changed: ['docs/README.md', 'extensions/notepad/src/index.ts'],
@@ -131,7 +137,9 @@ describe('select()', () => {
       ].sort()
     )
   })
+})
 
+describe('select() — unmatched paths and empty diffs', () => {
   it('an unmatched tests/e2e path other than a spec file selects all', () => {
     const result = select({
       changed: ['tests/e2e/helpers.ts'],
@@ -145,7 +153,29 @@ describe('select()', () => {
     const result = select({ changed: [], specs, isMainPush: false })
     expect(result).toEqual({ mode: 'none', specs: [] })
   })
+})
 
+describe('select() — specs the suite lacks', () => {
+  it('leaves out a changed spec file the suite no longer has, and still runs the smoke set', () => {
+    const result = select({ changed: ['tests/e2e/deleted.spec.ts'], specs, isMainPush: false })
+    expect(result).toEqual({ mode: 'some', specs: [...SMOKE_SPECS].sort() })
+  })
+
+  it('adds only the smoke specs the suite has', () => {
+    const withoutTerminal = specs.filter((spec) => spec !== 'terminal.spec.ts')
+    const result = select({
+      changed: ['tests/e2e/session-home.spec.ts'],
+      specs: withoutTerminal,
+      isMainPush: false,
+    })
+    expect(result).toEqual({
+      mode: 'some',
+      specs: ['extension-smoke.spec.ts', 'session-home.spec.ts', 'workspace.spec.ts'],
+    })
+  })
+})
+
+describe('select() — reachability of every real spec', () => {
   it('every real tests/e2e/*.spec.ts file is placed in a rule, the smoke set or the core set', () => {
     const specFiles = realSpecs()
     const mappedGlobs = IMPACT_MAP.flatMap((rule) => rule.specs)

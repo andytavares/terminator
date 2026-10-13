@@ -132,6 +132,21 @@ function assertClean(view: string, report: Report): void {
   ).toHaveLength(0)
 }
 
+/** Whether git-integration's project view has finished loading. */
+function projectViewLoaded(): Promise<boolean> {
+  return handle.app.evaluate(({ webContents }) =>
+    webContents
+      .getAllWebContents()
+      .some(
+        (wc) =>
+          !wc.isDestroyed() &&
+          wc.getURL().includes('git-integration') &&
+          wc.getURL().includes('view=project') &&
+          !wc.isLoading()
+      )
+  )
+}
+
 test('the git project view renders, and everything on it is styled', async () => {
   await handle.page
     .locator('.tab-bar--primary .tab-bar__tab')
@@ -142,21 +157,10 @@ test('the git project view renders, and everything on it is styled', async () =>
     timeout: 15000,
   })
   await expect
-    .poll(
-      () =>
-        handle.app.evaluate(({ webContents }) =>
-          webContents
-            .getAllWebContents()
-            .some(
-              (wc) =>
-                !wc.isDestroyed() &&
-                wc.getURL().includes('git-integration') &&
-                wc.getURL().includes('view=project') &&
-                !wc.isLoading()
-            )
-        ),
-      { timeout: 20000, message: 'git-integration project view never finished loading' }
-    )
+    .poll(projectViewLoaded, {
+      timeout: 20000,
+      message: 'git-integration project view never finished loading',
+    })
     .toBe(true)
   // The view is its own chunk (React.lazy), so it renders after the load event.
   await expect

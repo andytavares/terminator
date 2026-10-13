@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { spawnSync } from 'child_process'
-import { existsSync, readFileSync, rmSync, mkdirSync } from 'fs'
+import { existsSync, readFileSync, rmSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomBytes } from 'crypto'
@@ -48,7 +48,9 @@ describe('create-extension.js CLI', () => {
     const manifest = JSON.parse(readFileSync(join(tempDir, 'my-tool', 'manifest.json'), 'utf8'))
     expect(manifest.id).toBe('com.acme.my-tool')
   })
+})
 
+describe('create-extension.js CLI — collisions, bad names and the guide', () => {
   it('exits 2 on directory collision', () => {
     const dir = join(tempDir, 'existing-ext')
     mkdirSync(dir, { recursive: true })
@@ -69,7 +71,9 @@ describe('create-extension.js CLI', () => {
     expect(result.stdout).not.toContain('useExtensionRegistry')
     expect(result.stdout).not.toMatch(/v1\.\d\.\d/)
   })
+})
 
+describe('create-extension.js CLI — help and a runnable entry', () => {
   it('exits 0 with --help', () => {
     const result = run(['--help'])
     expect(result.status).toBe(0)
@@ -86,5 +90,50 @@ describe('create-extension.js CLI', () => {
       activate: expect.any(Function),
       deactivate: expect.any(Function),
     })
+  })
+})
+
+describe('create-extension.js CLI — refusals', () => {
+  it('exits 1 with the usage when no name is given', () => {
+    const result = run([])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Error: Extension name is required.')
+    expect(result.stdout).toContain('Usage: npm run create-extension -- <name> [options]')
+  })
+
+  it('exits 1 for an invalid --id', () => {
+    const result = run(['my-ext', '--id', 'Bad', '--dir', join(tempDir, 'my-ext')])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Error: Invalid ID "Bad".')
+    expect(existsSync(join(tempDir, 'my-ext'))).toBe(false)
+  })
+
+  it('exits 3 when the files cannot be written', () => {
+    writeFileSync(join(tempDir, 'blocker'), '')
+    const result = run(['my-ext', '--dir', join(tempDir, 'blocker', 'my-ext')])
+    expect(result.status).toBe(3)
+    expect(result.stderr).toContain('Error writing extension files:')
+  })
+})
+
+describe('create-extension.js CLI — defaults and report', () => {
+  it('writes to extensions/<name> under the working directory, as com.example.<name>', () => {
+    const result = run(['my-ext'], { cwd: tempDir })
+    const outDir = join(tempDir, 'extensions', 'my-ext')
+    const manifest = JSON.parse(readFileSync(join(outDir, 'manifest.json'), 'utf8'))
+    expect(manifest.id).toBe('com.example.my-ext')
+    expect(result.stdout).toBe(
+      [
+        `✓ Created extension "my-ext" at ${outDir}`,
+        '  package.json  — workspace package (add npm deps here)',
+        '  manifest.json — id: com.example.my-ext',
+        '  src/index.js  — backend entry, run in the extension host, with commented API stubs',
+        '',
+        'To contribute UI (a tab, a sidebar panel), add a view: a "renderer" in manifest.json',
+        'and its "contributes" surfaces (see "The view" in docs/EXTENSION-DEVELOPMENT.md).',
+        '\nRun "npm install" then "npm run dev" to load the extension automatically.',
+        '',
+      ].join('\n')
+    )
   })
 })

@@ -30,6 +30,54 @@ function git(...args: string[]): void {
 
 const ORDER_ID = 'WO-INTERRUPTED'
 
+/** The fixture repository and its toolchain. */
+function orderContext(): unknown {
+  return {
+    repos: [{ name: 'fixture', path: repo, lane: 1, baseBranch: 'main', headBranch: '' }],
+    toolchain: {
+      test: { command: 'npm test', source: 'package.json' },
+      lint: null,
+      format: null,
+      coverage: null,
+      e2e: null,
+      build: null,
+    },
+    entryPoints: [],
+    priorArt: [],
+    conventions: [],
+    houseDocs: [],
+  }
+}
+
+/** One builder unit on one lane, satisfying AC-1. */
+function orderPlan(): unknown {
+  return {
+    units: [
+      {
+        id: 'U-1',
+        title: 'refresh the token on a 401',
+        role: 'builder',
+        lane: 1,
+        dependsOn: [],
+        satisfies: ['AC-1'],
+        touches: ['src/client.ts'],
+        verify: [],
+      },
+    ],
+    lanes: [{ ord: 1, repo: 'fixture', branch: '', role: null, blocks: [], blockedBy: [] }],
+    sharedFiles: [],
+  }
+}
+
+/** The order's one criterion, verified by its tests. */
+const REFRESHES_ONCE = {
+  id: 'AC-1',
+  statement: 'A 401 refreshes once and retries once.',
+  priority: 'P1',
+  verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+  unverifiable: null,
+}
+
 /**
  * The order, as the Forge would have saved it before the run started.
  *
@@ -55,48 +103,11 @@ function order(): unknown {
       outcome: 'It refreshes once and retries once.',
       nonGoals: [],
     },
-    context: {
-      repos: [{ name: 'fixture', path: repo, lane: 1, baseBranch: 'main', headBranch: '' }],
-      toolchain: {
-        test: { command: 'npm test', source: 'package.json' },
-        lint: null,
-        format: null,
-        coverage: null,
-        e2e: null,
-        build: null,
-      },
-      entryPoints: [],
-      priorArt: [],
-      conventions: [],
-      houseDocs: [],
-    },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'A 401 refreshes once and retries once.',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    context: orderContext(),
+    acceptance: [REFRESHES_ONCE],
     risk: { grade: 'P2', triggers: [], blastRadius: [], criticalPaths: [] },
     budgets: { agents: 3, wallClockMinutes: 45, tokens: null },
-    plan: {
-      units: [
-        {
-          id: 'U-1',
-          title: 'refresh the token on a 401',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/client.ts'],
-          verify: [],
-        },
-      ],
-      lanes: [{ ord: 1, repo: 'fixture', branch: '', role: null, blocks: [], blockedBy: [] }],
-      sharedFiles: [],
-    },
+    plan: orderPlan(),
     assumptions: [],
     openQuestions: [],
     redTeam: [],
@@ -272,9 +283,8 @@ async function openFoundry(): Promise<void> {
     .toBeGreaterThan(0)
 }
 
-test.beforeAll(async () => {
-  test.setTimeout(180_000)
-  repo = e2eTempDir('foundry-resume-repo-')
+/** The fixture repository's one commit: a README and a package whose test passes. */
+function commitFixture(): void {
   git('init', '-b', 'main')
   git('config', 'user.email', 'e2e@example.com')
   git('config', 'user.name', 'E2E')
@@ -285,23 +295,37 @@ test.beforeAll(async () => {
   )
   git('add', '.')
   git('commit', '-m', 'initial')
+}
 
-  // Written before the application exists. This is what the last session left.
-  const dir = join(dataRoot(), 'orders', ORDER_ID)
+/** Writes `files` into the data root's directory for `id`, each as pretty JSON or text. */
+function writeOrderFiles(id: string, files: Record<string, string>): void {
+  const dir = join(dataRoot(), 'orders', id)
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'order.json'), `${JSON.stringify(order(), null, 2)}\n`)
-  writeFileSync(join(dir, 'run-graph.json'), `${JSON.stringify(graph(), null, 2)}\n`)
+  for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text)
+}
 
-  // A second order, left the way WO-0913-0bd was: every node passed, status
-  // still `running`, and the ledger's last word is a failure to ship.
-  const unshippedDir = join(dataRoot(), 'orders', UNSHIPPED_ID)
-  mkdirSync(unshippedDir, { recursive: true })
-  writeFileSync(join(unshippedDir, 'order.json'), `${JSON.stringify(unshippedOrder(), null, 2)}\n`)
-  writeFileSync(
-    join(unshippedDir, 'run-graph.json'),
-    `${JSON.stringify(unshippedGraph(), null, 2)}\n`
-  )
-  writeFileSync(join(unshippedDir, 'ledger.jsonl'), unshippedLedger())
+const pretty = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`
+
+/**
+ * The run frozen mid-step; and a second order, left the way WO-0913-0bd was:
+ * every node passed, status still `running`, and the ledger's last word is a
+ * failure to ship.
+ */
+function writeLeftOrders(): void {
+  writeOrderFiles(ORDER_ID, { 'order.json': pretty(order()), 'run-graph.json': pretty(graph()) })
+  writeOrderFiles(UNSHIPPED_ID, {
+    'order.json': pretty(unshippedOrder()),
+    'run-graph.json': pretty(unshippedGraph()),
+    'ledger.jsonl': unshippedLedger(),
+  })
+}
+
+test.beforeAll(async () => {
+  test.setTimeout(180_000)
+  repo = e2eTempDir('foundry-resume-repo-')
+  commitFixture()
+  // Written before the application exists. This is what the last session left.
+  writeLeftOrders()
 
   handle = await launchApp()
   await createWorkspace(handle.page, 'Foundry', repo)
@@ -395,12 +419,8 @@ test('the inbox renders the row with its move on it', async () => {
   )
 })
 
-test('the Floor carries the same move, above the graph', async () => {
-  test.setTimeout(90_000)
-  await openFoundry()
-
-  // The Forge tab, then the running order — which opens on the Floor.
-  expect(await clickByName('Forge')).toBe(true)
+/** Waits for the order's row in the Forge list, then opens it. */
+async function openOrderRow(id: string, missing: string): Promise<void> {
   await expect
     .poll(
       () =>
@@ -409,19 +429,56 @@ test('the Floor carries the same move, above the graph', async () => {
         ),
       { timeout: 15_000 }
     )
-    .toContain(ORDER_ID)
+    .toContain(id)
   expect(
     await inFoundry<boolean>(`(function () {
       var rows = document.querySelectorAll('.fdry-orders button')
       for (var i = 0; i < rows.length; i++) {
-        if ((rows[i].textContent || '').indexOf(${JSON.stringify(ORDER_ID)}) >= 0) {
+        if ((rows[i].textContent || '').indexOf(${JSON.stringify(id)}) >= 0) {
           rows[i].click(); return true
         }
       }
       return false
     })()`),
-    'no row for the running order'
+    missing
   ).toBe(true)
+}
+
+/** Run in Foundry's view: opens the collapsed gate's reason, and says whether there was one. */
+const SHOW_THE_REASON = `(function () {
+      var b = document.querySelector('button[aria-label="Show the reason"]')
+      if (!b) return false
+      b.click(); return true
+    })()`
+
+/** Run in Foundry's view: whether a "Try again" button is on screen. */
+const HAS_TRY_AGAIN = `(function () {
+      var all = document.querySelectorAll('button')
+      for (var i = 0; i < all.length; i++) {
+        var label = (all[i].getAttribute('aria-label') || all[i].textContent || '').trim()
+        if (label === 'Try again') return true
+      }
+      return false
+    })()`
+
+/** A PNG of the Foundry view as it is now, base64. */
+async function foundryShot(): Promise<string> {
+  return (await handle.app.evaluate(async ({ webContents }) => {
+    const view = webContents
+      .getAllWebContents()
+      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
+    if (!view) throw new Error('the Foundry view is not loaded')
+    return (await view.capturePage()).toPNG().toString('base64')
+  })) as string
+}
+
+test('the Floor carries the same move, above the graph', async () => {
+  test.setTimeout(90_000)
+  await openFoundry()
+
+  // The Forge tab, then the running order — which opens on the Floor.
+  expect(await clickByName('Forge')).toBe(true)
+  await openOrderRow(ORDER_ID, 'no row for the running order')
 
   await expect.poll(() => bodyText(), { timeout: 15_000 }).toContain('Halted — your move')
   const text = await bodyText()
@@ -433,30 +490,16 @@ test('the Floor carries the same move, above the graph', async () => {
   // ordering.
   expect(text, `the Floor rendered:\n${text}`).toContain('Halted — your move')
   // A gate is one line until it is opened; its reason is behind the chevron.
-  expect(
-    await inFoundry<boolean>(`(function () {
-      var b = document.querySelector('button[aria-label="Show the reason"]')
-      if (!b) return false
-      b.click(); return true
-    })()`),
-    'no collapsed gate to open'
-  ).toBe(true)
+  expect(await inFoundry<boolean>(SHOW_THE_REASON), 'no collapsed gate to open').toBe(true)
   // The interrupted gate's own words, so this proves the resume band rendered
   // rather than any halt at any gate.
   await expect.poll(() => bodyText(), { timeout: 5_000 }).toContain('Nothing is moving this run')
   expect(text).toContain('builder · U-1 refresh the token on a 401')
   expect(text).toContain('Pick it back up')
 
-  const shot = (await handle.app.evaluate(async ({ webContents }) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
-    if (!view) throw new Error('the Foundry view is not loaded')
-    return (await view.capturePage()).toPNG().toString('base64')
-  })) as string
   writeFileSync(
     join(process.cwd(), 'test-results', 'foundry-interrupted-floor.png'),
-    Buffer.from(shot, 'base64')
+    Buffer.from(await foundryShot(), 'base64')
   )
 })
 
@@ -474,27 +517,7 @@ test('a run that finished every step and still failed to ship says so, with a mo
   await clickByName('All orders')
   // The list refetches on its own 4s timer, and the previous test left the
   // view mid-navigation — a fixed pause here was a flake waiting to happen.
-  await expect
-    .poll(
-      () =>
-        inFoundry<string>(
-          `Array.from(document.querySelectorAll('.fdry-orders button')).map(b => b.textContent || '').join('|')`
-        ),
-      { timeout: 15_000 }
-    )
-    .toContain(UNSHIPPED_ID)
-  expect(
-    await inFoundry<boolean>(`(function () {
-      var rows = document.querySelectorAll('.fdry-orders button')
-      for (var i = 0; i < rows.length; i++) {
-        if ((rows[i].textContent || '').indexOf(${JSON.stringify(UNSHIPPED_ID)}) >= 0) {
-          rows[i].click(); return true
-        }
-      }
-      return false
-    })()`),
-    'no row for the unshipped order'
-  ).toBe(true)
+  await openOrderRow(UNSHIPPED_ID, 'no row for the unshipped order')
 
   await expect.poll(() => bodyText(), { timeout: 15_000 }).toContain('Finished, but not shipped')
   const text = await bodyText()
@@ -504,20 +527,7 @@ test('a run that finished every step and still failed to ship says so, with a mo
 
   // The standing text also shows in the order's list row, so it can be on
   // screen before the Floor renders its move: wait for the button itself.
-  await expect
-    .poll(
-      () =>
-        inFoundry<boolean>(`(function () {
-      var all = document.querySelectorAll('button')
-      for (var i = 0; i < all.length; i++) {
-        var label = (all[i].getAttribute('aria-label') || all[i].textContent || '').trim()
-        if (label === 'Try again') return true
-      }
-      return false
-    })()`),
-      { timeout: 15_000 }
-    )
-    .toBe(true)
+  await expect.poll(() => inFoundry<boolean>(HAS_TRY_AGAIN), { timeout: 15_000 }).toBe(true)
 })
 
 test('answering it puts the abandoned step back in the queue', async () => {

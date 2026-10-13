@@ -3,7 +3,8 @@
 # script's directory to PATH so no e2e run can ever launch a real Claude Code
 # agent (which on a developer machine costs quota and takes real time, and on
 # CI simply isn't there). It announces itself and its argv, then idles until
-# whatever spawned it kills it — a real launch never exits on its own either.
+# whatever spawned it kills it — a real launch never exits on its own either —
+# or until that spawner is gone.
 #
 # The review agent's headless run (`claude -p ... --json-schema ...`) answers
 # with the file E2E_CLAUDE_REVIEW_REPLY names, when a spec has written it, as
@@ -18,4 +19,11 @@ case " $* " in
     ;;
 esac
 echo "claude-stub $*"
-exec sleep 86400
+# An app that is force-killed takes its extension host with it but not this
+# process, which init adopts: a plain `sleep 86400` outlived every such run.
+# So the idle ends when the parent it started under ($PPID) no longer exists,
+# checked each second with `kill -0`, or after a hangup or a terminate.
+trap 'exit 0' HUP INT TERM
+while kill -0 "$PPID" 2>/dev/null; do
+  sleep 1
+done
