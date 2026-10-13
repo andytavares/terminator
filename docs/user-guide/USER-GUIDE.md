@@ -1067,6 +1067,10 @@ Threshold (days)** (Settings → Extensions → Task Vault, 7 by default), Today
 the review's **Stale** step lists it. A project is stale for a different reason: it has no open
 next action.
 
+On **Weekly Review Day** (0 = Sunday … 6 = Saturday, Sunday by default) a notification says the
+review is ready; clicking it opens the review. The day is checked each day, so a new choice
+applies from the next check.
+
 ### Quick capture
 
 Press **`Cmd+Shift+Space`** from anywhere to open the capture dialog. Type using the natural syntax:

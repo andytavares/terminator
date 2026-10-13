@@ -311,7 +311,7 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
   await initializeSchema(api, db)
   registerNavigation(ownIpc, api)
   addCalendarMenuItem(api)
-  scheduleWeeklyReviewNudge(api, weeklyReviewDay(api))
+  scheduleWeeklyReviewNudge(api)
   registerPendingCapture(ownIpc)
   await registerCaptureShortcut(api)
   registerCaptureCommand(api)
@@ -323,14 +323,15 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
 
 let reviewNudgeInterval: ReturnType<typeof setInterval> | null = null
 
-function scheduleWeeklyReviewNudge(api: ExtensionAPI, reviewDay: number): void {
+/** Checks daily whether today is the review day; the setting is read at each check, so a change applies. */
+function scheduleWeeklyReviewNudge(api: ExtensionAPI): void {
   if (reviewNudgeInterval !== null) {
     clearInterval(reviewNudgeInterval)
     reviewNudgeInterval = null
   }
   function checkAndNudge() {
     const now = new Date()
-    if (now.getDay() !== reviewDay) return
+    if (now.getDay() !== weeklyReviewDay(api)) return
     // A notification rather than a toast: a toast is transient and has nothing
     // to click, so "open Task Vault to start" was an instruction to go and do
     // the navigation yourself. This one is the link.

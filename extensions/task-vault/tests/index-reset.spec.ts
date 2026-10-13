@@ -92,6 +92,24 @@ describe('task-vault activation', () => {
   })
 })
 
+describe('task-vault re-initialize', () => {
+  it('puts back a table the schema declares, and keeps the tasks', async () => {
+    const { handlers } = await activateTaskVault()
+    await db.run(
+      `INSERT INTO tasks (id, text, status, source, created_at, updated_at) VALUES ('t1', 'Call', 'open', 'inbox', 'now', 'now')`
+    )
+    await db.exec('DROP TABLE weekly_review_actions')
+
+    expect(await handlers.get('task-vault:db.reinit')!()).toEqual({ data: { ok: true } })
+
+    const tables = await db.query<{ name: string }>(
+      `SELECT name FROM sqlite_master WHERE type='table'`
+    )
+    expect(tables.map((t) => t.name)).toContain('weekly_review_actions')
+    expect(await db.query(`SELECT id FROM tasks`)).toEqual([{ id: 't1' }])
+  })
+})
+
 describe('task-vault reset', () => {
   it('removes its own settings and leaves another extension settings alone', async () => {
     const reset = await activateAndGetResetHandler()
