@@ -3,7 +3,7 @@
 type IpcHandler = (event: never, payload: unknown) => unknown
 type IpcSendHandler = (event: never, payload: unknown) => void
 
-export type { IpcHandler, IpcSendHandler }
+export type { IpcSendHandler }
 
 export interface IpcRegistryEntry {
   handler: IpcHandler
