@@ -67,226 +67,274 @@ function cacheKey(tracker: TrackerId, key: string): string {
   return `${tracker}:${key}`
 }
 
-export function createIssueService(deps: IssueServiceDeps): IssueService {
-  const now = deps.now ?? Date.now
-  const ttlMs = deps.ttlMs ?? DEFAULT_TTL_MS
-  const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)))
+type TransitionTarget =
+  Parameters<IssueService['transition']> extends [TrackerId, string, ...infer Target]
+    ? Target
+    : never
 
-  const cache = new Map<string, CacheEntry>()
-  // Concurrent asks for one issue share one request. Without this, opening a
-  // project with a badge, a drawer and a board row costs three.
-  const inFlight = new Map<string, Promise<Issue | null>>()
+/** What every method shares: the deps, the clock, the cache and one way to ask a tracker. */
+interface ServiceContext {
+  deps: IssueServiceDeps
+  now: () => number
+  ttlMs: number
+  cache: Map<string, CacheEntry>
+  /** Runs `work` with the tracker's credential, retrying a rate limit once. */
+  call<T>(tracker: TrackerId, work: (cred: StoredCredential) => Promise<T>): Promise<T>
+  get: IssueService['get']
+}
 
-  async function credentialFor(tracker: TrackerId): Promise<StoredCredential> {
-    const cred = await deps.getCredential(tracker)
-    if (cred === null) {
-      throw new TrackerError('not-connected', `${tracker} is not connected`)
-    }
-    return cred
+async function credentialFor(
+  deps: IssueServiceDeps,
+  tracker: TrackerId
+): Promise<StoredCredential> {
+  const cred = await deps.getCredential(tracker)
+  if (cred === null) {
+    throw new TrackerError('not-connected', `${tracker} is not connected`)
   }
+  return cred
+}
 
-  /**
-   * Run a provider call, honouring a rate-limit refusal by waiting exactly as
-   * long as the tracker asked and trying once more.
-   *
-   * Only rate limits are retried: an auth failure will not fix itself, and
-   * retrying it just spends the operator's remaining budget.
-   */
-  async function withRetry<T>(tracker: TrackerId, work: () => Promise<T>): Promise<T> {
-    for (let attempt = 0; ; attempt++) {
-      try {
-        const result = await work()
-        await deps.onTrackerError(tracker, null)
-        return result
-      } catch (error) {
-        const kind = toErrorKind(error)
-        if (kind === 'rate-limited' && attempt < MAX_RATE_LIMIT_RETRIES) {
-          const wait =
-            error instanceof TrackerError && error.retryAfterMs !== undefined
-              ? error.retryAfterMs
-              : DEFAULT_RATE_LIMIT_WAIT_MS
-          await sleep(wait)
-          continue
-        }
-        if (kind === 'auth-failed') await deps.onTrackerError(tracker, kind)
-        throw error instanceof TrackerError
-          ? error
-          : new TrackerError(kind, toErrorMessage(error), { cause: error })
+interface RetryPolicy {
+  onTrackerError: IssueServiceDeps['onTrackerError']
+  sleep: (ms: number) => Promise<void>
+}
+
+function retryWaitMs(error: unknown): number {
+  return error instanceof TrackerError && error.retryAfterMs !== undefined
+    ? error.retryAfterMs
+    : DEFAULT_RATE_LIMIT_WAIT_MS
+}
+
+/**
+ * Run a provider call, honouring a rate-limit refusal by waiting exactly as
+ * long as the tracker asked and trying once more.
+ *
+ * Only rate limits are retried: an auth failure will not fix itself, and
+ * retrying it just spends the operator's remaining budget.
+ */
+async function withRetry<T>(
+  policy: RetryPolicy,
+  tracker: TrackerId,
+  work: () => Promise<T>
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const result = await work()
+      await policy.onTrackerError(tracker, null)
+      return result
+    } catch (error) {
+      const kind = toErrorKind(error)
+      if (kind === 'rate-limited' && attempt < MAX_RATE_LIMIT_RETRIES) {
+        await policy.sleep(retryWaitMs(error))
+        continue
       }
+      if (kind === 'auth-failed') await policy.onTrackerError(tracker, kind)
+      throw error instanceof TrackerError
+        ? error
+        : new TrackerError(kind, toErrorMessage(error), { cause: error })
     }
   }
+}
 
-  /**
-   * A capability this tracker does not have, said in a way a caller can act
-   * on. Its own kind rather than 'failed', because the two are handled
-   * differently: a failure is retried, an unsupported capability is recorded
-   * once and never asked about again.
-   */
-  function unsupported(tracker: TrackerId, what = 'move an issue'): TrackerError {
-    return new TrackerError('unsupported', `${tracker} cannot be asked to ${what}`)
-  }
+/**
+ * A capability this tracker does not have, said in a way a caller can act
+ * on. Its own kind rather than 'failed', because the two are handled
+ * differently: a failure is retried, an unsupported capability is recorded
+ * once and never asked about again.
+ */
+function unsupported(tracker: TrackerId, what = 'move an issue'): TrackerError {
+  return new TrackerError('unsupported', `${tracker} cannot be asked to ${what}`)
+}
 
-  async function fetchIssue(tracker: TrackerId, key: string): Promise<Issue | null> {
-    const cred = await credentialFor(tracker)
-    return withRetry(tracker, () => deps.providers[tracker].get(cred, key))
-  }
-
-  async function get(
-    tracker: TrackerId,
-    key: string,
-    opts: { refresh?: boolean } = {}
-  ): Promise<Issue | null> {
+/** `get` through the cache, with concurrent asks for one issue sharing one request. */
+function cachedGet(context: Omit<ServiceContext, 'get'>): IssueService['get'] {
+  // Without single flight, opening a project with a badge, a drawer and a
+  // board row costs three requests.
+  const inFlight = new Map<string, Promise<Issue | null>>()
+  const { cache, now, deps } = context
+  return async (tracker, key, opts = {}) => {
     const id = cacheKey(tracker, key)
-
     if (opts.refresh !== true) {
       const hit = cache.get(id)
-      if (hit !== undefined && now() - hit.at < ttlMs) return hit.issue
+      if (hit !== undefined && now() - hit.at < context.ttlMs) return hit.issue
       const pending = inFlight.get(id)
       if (pending !== undefined) return pending
     }
-
-    const request = fetchIssue(tracker, key)
+    const request = context
+      .call(tracker, (cred) => deps.providers[tracker].get(cred, key))
       .then((issue) => {
         cache.set(id, { issue, at: now() })
         return issue
       })
-      .finally(() => {
-        // Cleared on failure too, or one dropped connection would poison this
-        // key for the life of the process.
-        inFlight.delete(id)
-      })
-
+      // Cleared on failure too, or one dropped connection would poison this
+      // key for the life of the process.
+      .finally(() => inFlight.delete(id))
     inFlight.set(id, request)
     return request
   }
+}
 
-  /**
-   * Ask every connected tracker and keep what comes back.
-   *
-   * A tracker that fails does not fail the call — the operator sees the issues
-   * that arrived and is told which tracker is missing and why. A partial list
-   * presented as complete is the failure this shape exists to prevent.
-   */
-  async function gather(
-    trackers: readonly TrackerId[],
-    work: (tracker: TrackerId, cred: StoredCredential) => Promise<IssueSummary[]>
-  ): Promise<IssueListResult> {
-    const issues: IssueSummary[] = []
-    const failures: TrackerFailure[] = []
-
-    const settled = await Promise.all(
-      trackers.map(async (tracker): Promise<TrackerFailure | IssueSummary[]> => {
-        try {
-          const cred = await credentialFor(tracker)
-          return await withRetry(tracker, () => work(tracker, cred))
-        } catch (error) {
-          return { tracker, error: toErrorKind(error) }
-        }
-      })
-    )
-
-    for (const result of settled) {
-      if (Array.isArray(result)) issues.push(...result)
-      else failures.push(result)
-    }
-    return { issues, failures }
+/**
+ * Ask every connected tracker and keep what comes back.
+ *
+ * A tracker that fails does not fail the call — the operator sees the issues
+ * that arrived and is told which tracker is missing and why. A partial list
+ * presented as complete is the failure this shape exists to prevent.
+ */
+async function gather(
+  context: ServiceContext,
+  trackers: readonly TrackerId[],
+  work: (tracker: TrackerId, cred: StoredCredential) => Promise<IssueSummary[]>
+): Promise<IssueListResult> {
+  const settled = await Promise.all(
+    trackers.map(async (tracker): Promise<TrackerFailure | IssueSummary[]> => {
+      try {
+        return await context.call(tracker, (cred) => work(tracker, cred))
+      } catch (error) {
+        return { tracker, error: toErrorKind(error) }
+      }
+    })
+  )
+  const issues: IssueSummary[] = []
+  const failures: TrackerFailure[] = []
+  for (const result of settled) {
+    if (Array.isArray(result)) issues.push(...result)
+    else failures.push(result)
   }
+  return { issues, failures }
+}
 
+/** The exact matches first, then the text results that are not one of them. */
+function exactMatchesFirst(found: Issue[], result: IssueListResult): IssueListResult {
+  const foundIds = new Set(found.map((i) => cacheKey(i.tracker, i.key)))
+  return {
+    issues: [...found, ...result.issues.filter((i) => !foundIds.has(cacheKey(i.tracker, i.key)))],
+    failures: result.failures,
+  }
+}
+
+function trackersFor(opts: { tracker?: TrackerId }): readonly TrackerId[] {
+  return opts.tracker === undefined ? TRACKERS : [opts.tracker]
+}
+
+function searchMethods(context: ServiceContext): Pick<IssueService, 'listMine' | 'search'> {
+  const { deps } = context
   return {
     async listMine(opts = {}): Promise<IssueListResult> {
-      const trackers = opts.tracker === undefined ? TRACKERS : [opts.tracker]
       const limit = opts.limit ?? DEFAULT_LIMIT
-      return gather(trackers, async (tracker, cred) =>
+      return gather(context, trackersFor(opts), async (tracker, cred) =>
         deps.providers[tracker].listMine(cred, await deps.getMine(tracker), limit)
       )
     },
 
     async search(term, opts = {}): Promise<IssueListResult> {
-      const trackers = opts.tracker === undefined ? TRACKERS : [opts.tracker]
+      const trackers = trackersFor(opts)
       const limit = opts.limit ?? DEFAULT_LIMIT
-      const result = await gather(trackers, (tracker, cred) =>
+      const result = await gather(context, trackers, (tracker, cred) =>
         deps.providers[tracker].search(cred, term, limit)
       )
-
       // Typing a key exactly means that issue, and it may not be in the
       // operator's own search scope at all.
       if (!ISSUE_KEY.test(term)) return result
-
       const exact = await Promise.all(
-        trackers.map((tracker) => get(tracker, term).catch(() => null))
+        trackers.map((tracker) => context.get(tracker, term).catch(() => null))
       )
       const found = exact.filter((issue): issue is Issue => issue !== null)
-      if (found.length === 0) return result
-
-      const foundIds = new Set(found.map((i) => cacheKey(i.tracker, i.key)))
-      return {
-        issues: [
-          ...found,
-          ...result.issues.filter((i) => !foundIds.has(cacheKey(i.tracker, i.key))),
-        ],
-        failures: result.failures,
-      }
+      return found.length === 0 ? result : exactMatchesFirst(found, result)
     },
+  }
+}
 
-    get,
-
+function workflowMethods(
+  context: ServiceContext
+): Pick<IssueService, 'comment' | 'supportsTransitions' | 'states' | 'transition'> {
+  const { deps, cache } = context
+  return {
     async comment(tracker, key, body): Promise<void> {
-      const cred = await credentialFor(tracker)
-      await withRetry(tracker, () => deps.providers[tracker].comment(cred, key, body))
+      await context.call(tracker, (cred) => deps.providers[tracker].comment(cred, key, body))
       // The cached copy no longer has every comment on it.
       cache.delete(cacheKey(tracker, key))
     },
-
     supportsTransitions(tracker): boolean {
       const provider = deps.providers[tracker]
       return typeof provider?.states === 'function' && typeof provider.transition === 'function'
     },
-
     async states(tracker, key): Promise<TrackerStateOption[]> {
       const states = deps.providers[tracker]?.states
       if (states === undefined) throw unsupported(tracker)
-      const cred = await credentialFor(tracker)
-      return withRetry(tracker, () => states(cred, key))
+      return context.call(tracker, (cred) => states(cred, key))
     },
-
-    async transition(tracker, key, intent, optionId): Promise<void> {
+    async transition(tracker, key, ...target: TransitionTarget): Promise<void> {
       const move = deps.providers[tracker]?.transition
       if (move === undefined) throw unsupported(tracker)
-      const cred = await credentialFor(tracker)
-      await withRetry(tracker, () => move(cred, key, intent, optionId))
+      await context.call(tracker, (cred) => move(cred, key, ...target))
       // Its state is exactly what just changed.
       cache.delete(cacheKey(tracker, key))
     },
+  }
+}
 
+function createMethods(
+  context: ServiceContext
+): Pick<IssueService, 'supportsCreate' | 'teams' | 'create'> {
+  const { deps, cache, now } = context
+  return {
     supportsCreate(tracker): boolean {
       const provider = deps.providers[tracker]
       return typeof provider?.teams === 'function' && typeof provider.create === 'function'
     },
-
     async teams(tracker): Promise<TrackerTeam[]> {
       const list = deps.providers[tracker]?.teams
       if (list === undefined) throw unsupported(tracker, 'create an issue')
-      const cred = await credentialFor(tracker)
-      return withRetry(tracker, () => list(cred))
+      return context.call(tracker, (cred) => list(cred))
     },
-
     async create(tracker, input): Promise<Issue> {
       const file = deps.providers[tracker]?.create
       if (file === undefined) throw unsupported(tracker, 'create an issue')
-      const cred = await credentialFor(tracker)
-      const issue = await withRetry(tracker, () => file(cred, input))
+      const issue = await context.call(tracker, (cred) => file(cred, input))
       cache.set(cacheKey(tracker, issue.key), { issue, at: now() })
       return issue
     },
+  }
+}
 
-    invalidate(tracker): void {
-      if (tracker === undefined) {
-        cache.clear()
-        return
-      }
-      for (const key of cache.keys()) {
-        if (key.startsWith(`${tracker}:`)) cache.delete(key)
-      }
+function invalidator(cache: Map<string, CacheEntry>): IssueService['invalidate'] {
+  return (tracker) => {
+    if (tracker === undefined) {
+      cache.clear()
+      return
+    }
+    for (const key of cache.keys()) {
+      if (key.startsWith(`${tracker}:`)) cache.delete(key)
+    }
+  }
+}
+
+function serviceContext(deps: IssueServiceDeps): ServiceContext {
+  const policy: RetryPolicy = {
+    onTrackerError: deps.onTrackerError,
+    sleep: deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms))),
+  }
+  const base = {
+    deps,
+    now: deps.now ?? Date.now,
+    ttlMs: deps.ttlMs ?? DEFAULT_TTL_MS,
+    cache: new Map<string, CacheEntry>(),
+    async call<T>(tracker: TrackerId, work: (cred: StoredCredential) => Promise<T>): Promise<T> {
+      const cred = await credentialFor(deps, tracker)
+      return withRetry(policy, tracker, () => work(cred))
     },
+  }
+  return { ...base, get: cachedGet(base) }
+}
+
+export function createIssueService(deps: IssueServiceDeps): IssueService {
+  const context = serviceContext(deps)
+  return {
+    ...searchMethods(context),
+    get: context.get,
+    ...workflowMethods(context),
+    ...createMethods(context),
+    invalidate: invalidator(context.cache),
   }
 }
