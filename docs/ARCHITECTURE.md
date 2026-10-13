@@ -961,11 +961,12 @@ Notes and diagrams are stored in the shared SQLite database at `<userData>/app.s
 
 #### Data flow
 
-1. **Create and autosave**: view → `notes.autosave` → the `notes` table. Inline `#tag` parsing on autosave reconciles the `note_tags` join table (`reconcileTags`).
-2. **Search**: view → `search.query` → `LIKE '%query%'` across `title` and `body`; `tag:foo` / `-tag:bar` tokens are resolved to tag ids before the main query.
-3. **Folders**: notes and diagrams each carry a nullable `folder_id`. `folders.create/rename/delete` manage the `folders` table; `notes.reorder` and `folders.move` update `sort_order` and `folder_id` through an explicit `{ note: 'notes', diagram: 'diagrams' }` table map, never string interpolation.
-4. **Comment anchoring**: a selection becomes `comments.create` with `startOffset`, `endOffset`, `quote`, `prefix` and `suffix`. On load `reanchorComment()` tries the offsets first and falls back to a text-quote search (the W3C TextQuoteSelector pattern). The CodeMirror `commentAnchorField` remaps positions on every transaction, and anchors that collapse or are not found are listed as orphaned in `CommentMargin`.
-5. **Export and import**: `export.run` writes `.md` files with YAML front matter (`src/ipc/front-matter.ts`, on `js-yaml`) and diagrams as `.excalidraw` files (Excalidraw JSON, in a diagrams folder). Re-export matches existing files by the front matter's `id`, and `import.run` upserts by `id`. `GROUP_CONCAT` aggregates tags in the export query.
+1. **Open**: selecting a note reads its body (`notes.get`, or the in-session cache) and its comments; the editor mounts only once that body is in, so nothing typed can land in an editor that the load then replaces.
+2. **Create and autosave**: view → `notes.autosave` → the `notes` table. Inline `#tag` parsing on autosave reconciles the `note_tags` join table (`reconcileTags`).
+3. **Search**: view → `search.query` → `LIKE '%query%'` across `title` and `body`; `tag:foo` / `-tag:bar` tokens are resolved to tag ids before the main query.
+4. **Folders**: notes and diagrams each carry a nullable `folder_id`. `folders.create/rename/delete` manage the `folders` table; `notes.reorder` and `folders.move` update `sort_order` and `folder_id` through an explicit `{ note: 'notes', diagram: 'diagrams' }` table map, never string interpolation.
+5. **Comment anchoring**: a selection becomes `comments.create` with `startOffset`, `endOffset`, `quote`, `prefix` and `suffix`. On load `reanchorComment()` tries the offsets first and falls back to a text-quote search (the W3C TextQuoteSelector pattern). The CodeMirror `commentAnchorField` remaps positions on every transaction, and anchors that collapse or are not found are listed as orphaned in `CommentMargin`.
+6. **Export and import**: `export.run` writes `.md` files with YAML front matter (`src/ipc/front-matter.ts`, on `js-yaml`) and diagrams as `.excalidraw` files (Excalidraw JSON, in a diagrams folder). Re-export matches existing files by the front matter's `id`, and `import.run` upserts by `id`. `GROUP_CONCAT` aggregates tags in the export query.
 
 The channels and their payloads are in `src/ipc/` and the feature's contract, `specs/010-markdown-notepad/contracts/ipc-channels.md`.
 

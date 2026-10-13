@@ -87,6 +87,24 @@ describe('NotepadView loading', () => {
   })
 })
 
+describe('NotepadView opening a note', () => {
+  // An editor mounted before the body arrives is thrown away when it does: what
+  // was typed into it is lost, and anything holding its DOM holds a dead node.
+  it('mounts the editor only once the opened note has loaded', async () => {
+    let answerBody: (value: unknown) => void = () => {}
+    bridge.responses['terminator.notepad:notes.list'] = { data: [listItem('n1', 'Plan')] }
+    bridge.responses['terminator.notepad:notes.get'] = new Promise((r) => (answerBody = r))
+    useNotesStore.setState({ notes: [listItem('n1', 'Plan')], selectedNoteId: 'n1' })
+    render(<NotepadView />)
+    await eventually(() => expect(bridge.calls('terminator.notepad:notes.get')).toHaveLength(1))
+    await act(() => elapse(50))
+    expect(document.querySelector('.cm-editor')).toBeNull()
+
+    await act(async () => answerBody({ data: { body: BODY } }))
+    await eventually(() => expect(editorView().state.doc.toString()).toBe(BODY))
+  })
+})
+
 describe('NotepadView re-anchoring comments on load', () => {
   it('moves a comment to where its quote now is, and orphans one whose quote is gone', async () => {
     await openNote([comment('c1', 'hello', [0, 5]), comment('c2', 'vanished', [0, 8])])
