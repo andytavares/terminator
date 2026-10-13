@@ -46,26 +46,39 @@ export function ConfirmButton({
   }
 
   return (
+    <ArmedConfirm
+      {...{ label, confirmLabel, warning, disabled, onConfirm }}
+      onDisarm={() => setArmed(false)}
+    />
+  )
+}
+
+/** The armed control: the sentence saying what goes, the verb that does it, and a way back. */
+function ArmedConfirm({
+  label,
+  confirmLabel,
+  warning,
+  disabled,
+  onConfirm,
+  onDisarm,
+}: Required<ConfirmButtonProps> & { readonly onDisarm: () => void }) {
+  // Disarmed before the work, not after: the second run of a
+  // destructive action is a second decision, and leaving it armed
+  // through a slow teardown invites a double click into being one.
+  const confirm = (): void => {
+    onDisarm()
+    onConfirm()
+  }
+  return (
     <div className="fdry-confirm" role="group" aria-label={label}>
       <p className="fdry-note">
         <TriangleAlert aria-hidden="true" /> {warning}
       </p>
       <div className="fdry-ask-actions">
-        <Button
-          variant="danger"
-          size="sm"
-          disabled={disabled}
-          onClick={() => {
-            // Disarmed before the work, not after: the second run of a
-            // destructive action is a second decision, and leaving it armed
-            // through a slow teardown invites a double click into being one.
-            setArmed(false)
-            onConfirm()
-          }}
-        >
+        <Button variant="danger" size="sm" disabled={disabled} onClick={confirm}>
           {confirmLabel}
         </Button>
-        <Button size="sm" disabled={disabled} onClick={() => setArmed(false)}>
+        <Button size="sm" disabled={disabled} onClick={onDisarm}>
           Cancel
         </Button>
       </div>
