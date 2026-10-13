@@ -9,7 +9,15 @@ beforeEach(() => {
   })
 })
 
-describe('useFilterStore', () => {
+describe('useFilterStore', useFilterStoreTests)
+
+function useFilterStoreTests() {
+  describe('query', useFilterStoreQueryTests)
+  describe('tags', useFilterStoreTagsTests)
+  describe('archived', useFilterStoreArchivedTests)
+}
+
+function useFilterStoreQueryTests() {
   it('initializes with empty query, no active tags, archived off', () => {
     const state = useFilterStore.getState()
     expect(state.searchQuery).toBe('')
@@ -21,7 +29,9 @@ describe('useFilterStore', () => {
     useFilterStore.getState().setQuery('rust lang')
     expect(useFilterStore.getState().searchQuery).toBe('rust lang')
   })
+}
 
+function useFilterStoreTagsTests() {
   it('toggleTag adds a tag id', () => {
     useFilterStore.getState().toggleTag('tag-abc')
     expect(useFilterStore.getState().activeTagIds).toEqual(['tag-abc'])
@@ -45,7 +55,9 @@ describe('useFilterStore', () => {
     useFilterStore.getState().clearTags()
     expect(useFilterStore.getState().activeTagIds).toEqual([])
   })
+}
 
+function useFilterStoreArchivedTests() {
   it('toggleArchived flips includeArchived', () => {
     expect(useFilterStore.getState().includeArchived).toBe(false)
     useFilterStore.getState().toggleArchived()
@@ -53,4 +65,4 @@ describe('useFilterStore', () => {
     useFilterStore.getState().toggleArchived()
     expect(useFilterStore.getState().includeArchived).toBe(false)
   })
-})
+}

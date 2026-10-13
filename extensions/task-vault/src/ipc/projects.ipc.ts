@@ -1,10 +1,10 @@
+import type { z } from 'zod'
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 import { noPayload } from '@terminator/extension-sdk'
-import { createIpcRegistrar, errorResult } from './register'
+import { registerRoutes, route, type IpcContext } from './register'
 import { lastCompletedReviewDate } from '../vault/weekly-review-repository'
 import { randomUUID } from '../vault/db'
 import { toDisplayName } from '../vault/tags'
-import { broadcast } from '../notifications/task-scheduler.js'
 import {
   ListProjectsRequestSchema,
   UpdateProjectStatusRequestSchema,
@@ -24,238 +24,225 @@ import {
   TASK_COLS,
   TASK_JOINS,
 } from '../vault/mappers'
+import { findOrCreateArea, indexUpdated, nowIso } from './vault-shared'
 
-export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handleRemote, cleanup } = createIpcRegistrar(api, errorResult)
+type Row = Record<string, unknown>
 
-  handleRemote('task-vault:projects:list', ListProjectsRequestSchema.default({}), async (args) => {
-    const statusFilter: ProjectStatus[] = args.status
-      ? Array.isArray(args.status)
-        ? (args.status as ProjectStatus[])
-        : [args.status as ProjectStatus]
-      : ['active']
+/** A project with how many open next actions it has; none makes it stale. */
+async function withNextActions(db: ExtensionDB, p: Row) {
+  const ncRow = await db.get<{ c: string }>(
+    `SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status='open'`,
+    [p.id as string]
+  )
+  const nextActionCount = Number(ncRow?.c ?? 0)
+  return { ...rowToProject(p), nextActionCount, isStale: nextActionCount === 0 }
+}
 
-    const placeholders = statusFilter.map(() => '?').join(',')
-    const rows = await db.query<Record<string, unknown>>(
-      `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status IN (${placeholders}) ORDER BY p.name`,
-      statusFilter
-    )
+function statusFilterOf(status: unknown): ProjectStatus[] {
+  if (!status) return ['active']
+  if (Array.isArray(status)) return status as ProjectStatus[]
+  return [status as ProjectStatus]
+}
 
-    const projects = await Promise.all(
-      rows.map(async (p) => {
-        const ncRow = await db.get<{ c: string }>(
-          `SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status='open'`,
-          [p.id as string]
-        )
-        const nextActionCount = Number(ncRow?.c ?? 0)
-        const isStale = nextActionCount === 0
-        return { ...rowToProject(p), nextActionCount, isStale }
-      })
-    )
+async function listProjects({ db }: IpcContext, args: z.infer<typeof ListProjectsRequestSchema>) {
+  const statusFilter = statusFilterOf(args.status)
+  const placeholders = statusFilter.map(() => '?').join(',')
+  const rows = await db.query<Row>(
+    `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status IN (${placeholders}) ORDER BY p.name`,
+    statusFilter
+  )
+  return { projects: await Promise.all(rows.map((p) => withNextActions(db, p))) }
+}
 
-    return { projects }
-  })
+/** The configured stale threshold in days; 7 when unset or unreadable. */
+async function staleDaysThreshold(db: ExtensionDB): Promise<number> {
+  const thresholdRow = await db.get<{ value: string }>(
+    `SELECT value FROM settings WHERE extension_id='task-vault' AND key='stale_days_threshold'`
+  )
+  if (!thresholdRow?.value) return 7
+  const parsed = parseInt(thresholdRow.value, 10)
+  if (Number.isFinite(parsed)) return parsed
+  return 7
+}
 
-  handleRemote('task-vault:projects:weekly-review', noPayload, async () => {
-    const inboxRows = await db.query<Record<string, unknown>>(
-      `SELECT * FROM tasks WHERE source='inbox' AND status='open'`
-    )
-    const inboxItems = inboxRows.map(rowToTask)
+/** The local date `days` days ago, as YYYY-MM-DD. */
+function localDateDaysAgo(days: number): string {
+  const staleDate = new Date()
+  staleDate.setDate(staleDate.getDate() - days)
+  return [
+    staleDate.getFullYear(),
+    String(staleDate.getMonth() + 1).padStart(2, '0'),
+    String(staleDate.getDate()).padStart(2, '0'),
+  ].join('-')
+}
 
-    const activeRows = await db.query<Record<string, unknown>>(
-      `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='active'`
-    )
-    const activeProjects = await Promise.all(
-      activeRows.map(async (p) => {
-        const ncRow = await db.get<{ c: string }>(
-          `SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status='open'`,
-          [p.id as string]
-        )
-        const nextActionCount = Number(ncRow?.c ?? 0)
-        return { ...rowToProject(p), nextActionCount, isStale: nextActionCount === 0 }
-      })
-    )
-    const staleProjects = activeProjects.filter((p) => p.isStale)
-
-    const somedayRows = await db.query<Record<string, unknown>>(
-      `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='someday'`
-    )
-    const somedayProjects = somedayRows.map(rowToProject)
-
-    const somedayTaskRows = await db.query<Record<string, unknown>>(
-      `SELECT * FROM tasks WHERE source='someday' AND status='open' AND parent_id IS NULL ORDER BY created_at ASC`
-    )
-    const somedayTasks = somedayTaskRows.map(rowToTask)
-
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    const completedRows = await db.query<Record<string, unknown>>(
-      `SELECT * FROM tasks WHERE status='done' AND updated_at >= ?`,
-      [sevenDaysAgo]
-    )
-    const completedLastWeek = completedRows.map(rowToTask)
-
-    const thresholdRow = await db.get<{ value: string }>(
-      `SELECT value FROM settings WHERE extension_id='task-vault' AND key='stale_days_threshold'`
-    )
-    const parsedThreshold = thresholdRow?.value ? parseInt(thresholdRow.value, 10) : NaN
-    const staleDaysThreshold = Number.isFinite(parsedThreshold) ? parsedThreshold : 7
-    const staleDate = new Date()
-    staleDate.setDate(staleDate.getDate() - staleDaysThreshold)
-    const staleDateStr = [
-      staleDate.getFullYear(),
-      String(staleDate.getMonth() + 1).padStart(2, '0'),
-      String(staleDate.getDate()).padStart(2, '0'),
-    ].join('-')
-    const staleTaskRows = await db.query<Record<string, unknown>>(
-      `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+/** Daily tasks that have sat on the log since the threshold date or earlier. */
+async function staleTasks(db: ExtensionDB, thresholdDays: number) {
+  const rows = await db.query<Row>(
+    `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
        WHERE t.source='daily' AND t.parent_id IS NULL
          AND t.status IN ('open','in-progress','blocked')
          AND t.today_since IS NOT NULL AND t.today_since <= ?`,
-      [staleDateStr]
-    )
-    const staleTasks = staleTaskRows.map(rowToTask)
+    [localDateDaysAgo(thresholdDays)]
+  )
+  return rows.map(rowToTask)
+}
 
-    return {
-      inboxItems,
-      activeProjects,
-      staleProjects,
-      somedayProjects,
-      somedayTasks,
-      completedLastWeek,
-      staleTasks,
-      staleDaysThreshold,
-      lastReviewDate: await lastCompletedReviewDate(db),
-    }
-  })
+async function reviewProjects(db: ExtensionDB) {
+  const activeRows = await db.query<Row>(
+    `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='active'`
+  )
+  const activeProjects = await Promise.all(activeRows.map((p) => withNextActions(db, p)))
+  const somedayRows = await db.query<Row>(
+    `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='someday'`
+  )
+  return {
+    activeProjects,
+    staleProjects: activeProjects.filter((p) => p.isStale),
+    somedayProjects: somedayRows.map(rowToProject),
+  }
+}
 
-  handleRemote('task-vault:projects:create', CreateProjectRequestSchema, async (args) => {
-    const { name, area, deadline, outcome } = args
-    const displayName = toDisplayName(name.trim())
-    const displayArea = area ? toDisplayName(area.trim()) : undefined
-    const existing = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [
-      displayName,
-    ])
-    if (existing) return { error: 'PROJECT_EXISTS' }
-    const now = new Date().toISOString()
-    let areaId: string | null = null
-    if (displayArea) {
-      const existingArea = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [
-        displayArea,
-      ])
-      if (existingArea) {
-        areaId = existingArea.id
-      } else {
-        areaId = randomUUID()
-        await db.run(
-          `INSERT INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`,
-          [areaId, displayArea, now, now]
-        )
-      }
-    }
-    await db.run(
-      `INSERT INTO projects (id,name,status,area_id,deadline,outcome,created_at,updated_at)
+async function reviewTasks(db: ExtensionDB) {
+  const tasks = async (sql: string, params?: unknown[]) =>
+    (await db.query<Row>(sql, params)).map(rowToTask)
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  return {
+    inboxItems: await tasks(`SELECT * FROM tasks WHERE source='inbox' AND status='open'`),
+    somedayTasks: await tasks(
+      `SELECT * FROM tasks WHERE source='someday' AND status='open' AND parent_id IS NULL ORDER BY created_at ASC`
+    ),
+    completedLastWeek: await tasks(`SELECT * FROM tasks WHERE status='done' AND updated_at >= ?`, [
+      sevenDaysAgo,
+    ]),
+  }
+}
+
+async function weeklyReview({ db }: IpcContext) {
+  const { inboxItems, somedayTasks, completedLastWeek } = await reviewTasks(db)
+  const projects = await reviewProjects(db)
+  const threshold = await staleDaysThreshold(db)
+  return {
+    inboxItems,
+    ...projects,
+    somedayTasks,
+    completedLastWeek,
+    staleTasks: await staleTasks(db, threshold),
+    staleDaysThreshold: threshold,
+    lastReviewDate: await lastCompletedReviewDate(db),
+  }
+}
+
+async function createProject({ db }: IpcContext, args: z.infer<typeof CreateProjectRequestSchema>) {
+  const { name, area, deadline, outcome } = args
+  const displayName = toDisplayName(name.trim())
+  const existing = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [
+    displayName,
+  ])
+  if (existing) return { error: 'PROJECT_EXISTS' }
+  const now = nowIso()
+  const areaId = area ? await findOrCreateArea(db, toDisplayName(area.trim()), now) : null
+  await db.run(
+    `INSERT INTO projects (id,name,status,area_id,deadline,outcome,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?)`,
-      [randomUUID(), displayName, 'active', areaId, deadline ?? null, outcome ?? null, now, now]
-    )
-    broadcast('task-vault:push:index-updated', {})
-    return { success: true, filePath: displayName }
-  })
+    [randomUUID(), displayName, 'active', areaId, deadline ?? null, outcome ?? null, now, now]
+  )
+  indexUpdated()
+  return { success: true, filePath: displayName }
+}
 
-  handleRemote('task-vault:projects:delete', DeleteProjectRequestSchema, async (args) => {
-    const { projectFilePath: projectName } = args
-
-    const proj = await db.get<{ id: string; status: string }>(
-      `SELECT id, status FROM projects WHERE name=?`,
-      [projectName]
-    )
-    if (!proj) return { error: 'NOT_FOUND' }
-    if (proj.status !== 'archived') return { error: 'MUST_ARCHIVE_FIRST' }
-
-    await db.run(
-      `WITH RECURSIVE subtree(id) AS (
+async function deleteProject({ db }: IpcContext, args: z.infer<typeof DeleteProjectRequestSchema>) {
+  const proj = await db.get<{ id: string; status: string }>(
+    `SELECT id, status FROM projects WHERE name=?`,
+    [args.projectFilePath]
+  )
+  if (!proj) return { error: 'NOT_FOUND' }
+  if (proj.status !== 'archived') return { error: 'MUST_ARCHIVE_FIRST' }
+  await db.run(
+    `WITH RECURSIVE subtree(id) AS (
          SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
          UNION ALL
          SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
        )
        DELETE FROM tasks WHERE id IN (SELECT id FROM subtree)`,
-      [proj.id]
-    )
-    await db.run(`DELETE FROM tasks WHERE project_id=?`, [proj.id])
-    await db.run(`DELETE FROM projects WHERE id=?`, [proj.id])
-    broadcast('task-vault:push:index-updated', {})
-    return { success: true }
-  })
-
-  handleRemote(
-    'task-vault:projects:update-status',
-    UpdateProjectStatusRequestSchema,
-    async (args) => {
-      const { projectFilePath: projectName, status } = args
-      if (!(await setProjectStatus(db, projectName, status))) return { error: 'NOT_FOUND' }
-      broadcast('task-vault:push:index-updated', {})
-      return { success: true }
-    }
+    [proj.id]
   )
+  await db.run(`DELETE FROM tasks WHERE project_id=?`, [proj.id])
+  await db.run(`DELETE FROM projects WHERE id=?`, [proj.id])
+  indexUpdated()
+  return { success: true }
+}
 
-  handleRemote('task-vault:projects:update-area', UpdateProjectAreaRequestSchema, async (args) => {
-    const { projectFilePath: projectName, area } = args
-    const now = new Date().toISOString()
-    let areaId: string | null = null
-    if (area) {
-      const existingArea = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [area])
-      if (existingArea) {
-        areaId = existingArea.id
-      } else {
-        areaId = randomUUID()
-        await db.run(
-          `INSERT INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`,
-          [areaId, area, now, now]
-        )
-      }
-    }
-    await db.run(`UPDATE projects SET area_id=?, updated_at=? WHERE name=?`, [
-      areaId,
-      now,
-      projectName,
-    ])
-    broadcast('task-vault:push:index-updated', {})
-    return { success: true }
-  })
+async function updateStatus(
+  { db }: IpcContext,
+  args: z.infer<typeof UpdateProjectStatusRequestSchema>
+) {
+  const { projectFilePath: projectName, status } = args
+  if (!(await setProjectStatus(db, projectName, status))) return { error: 'NOT_FOUND' }
+  indexUpdated()
+  return { success: true }
+}
 
-  handleRemote(
-    'task-vault:projects:update-deadline',
-    UpdateProjectDeadlineRequestSchema,
-    async (args) => {
-      const { projectFilePath: projectName, deadline } = args
-      const now = new Date().toISOString()
-      await db.run(`UPDATE projects SET deadline=?, updated_at=? WHERE name=?`, [
-        deadline || null,
-        now,
-        projectName,
-      ])
-      broadcast('task-vault:push:index-updated', {})
-      return { success: true }
-    }
+async function updateArea(
+  { db }: IpcContext,
+  args: z.infer<typeof UpdateProjectAreaRequestSchema>
+) {
+  const { projectFilePath: projectName, area } = args
+  const now = nowIso()
+  const areaId = area ? await findOrCreateArea(db, area, now) : null
+  await db.run(`UPDATE projects SET area_id=?, updated_at=? WHERE name=?`, [
+    areaId,
+    now,
+    projectName,
+  ])
+  indexUpdated()
+  return { success: true }
+}
+
+async function updateDeadline(
+  { db }: IpcContext,
+  args: z.infer<typeof UpdateProjectDeadlineRequestSchema>
+) {
+  const { projectFilePath: projectName, deadline } = args
+  await db.run(`UPDATE projects SET deadline=?, updated_at=? WHERE name=?`, [
+    deadline || null,
+    nowIso(),
+    projectName,
+  ])
+  indexUpdated()
+  return { success: true }
+}
+
+async function renameProject({ db }: IpcContext, args: z.infer<typeof RenameProjectRequestSchema>) {
+  const { projectFilePath: projectName, newName } = args
+  const now = nowIso()
+  const proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [projectName])
+  if (!proj) return { error: 'NOT_FOUND' }
+  const existing = await db.get<{ id: string }>(
+    `SELECT id FROM projects WHERE name=? AND id != ?`,
+    [newName.trim(), proj.id]
   )
+  if (existing) return { error: 'PROJECT_EXISTS' }
+  await db.run(`UPDATE projects SET name=?, updated_at=? WHERE id=?`, [
+    newName.trim(),
+    now,
+    proj.id,
+  ])
+  indexUpdated()
+  return { success: true }
+}
 
-  handleRemote('task-vault:projects:rename', RenameProjectRequestSchema, async (args) => {
-    const { projectFilePath: projectName, newName } = args
-    const now = new Date().toISOString()
-    const proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [projectName])
-    if (!proj) return { error: 'NOT_FOUND' }
-    const existing = await db.get<{ id: string }>(
-      `SELECT id FROM projects WHERE name=? AND id != ?`,
-      [newName.trim(), proj.id]
-    )
-    if (existing) return { error: 'PROJECT_EXISTS' }
-    await db.run(`UPDATE projects SET name=?, updated_at=? WHERE id=?`, [
-      newName.trim(),
-      now,
-      proj.id,
-    ])
-    broadcast('task-vault:push:index-updated', {})
-    return { success: true }
-  })
+const PROJECT_ROUTES = [
+  route('task-vault:projects:list', ListProjectsRequestSchema.default({}), listProjects),
+  route('task-vault:projects:weekly-review', noPayload, weeklyReview),
+  route('task-vault:projects:create', CreateProjectRequestSchema, createProject),
+  route('task-vault:projects:delete', DeleteProjectRequestSchema, deleteProject),
+  route('task-vault:projects:update-status', UpdateProjectStatusRequestSchema, updateStatus),
+  route('task-vault:projects:update-area', UpdateProjectAreaRequestSchema, updateArea),
+  route('task-vault:projects:update-deadline', UpdateProjectDeadlineRequestSchema, updateDeadline),
+  route('task-vault:projects:rename', RenameProjectRequestSchema, renameProject),
+]
 
-  return cleanup
+export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  return registerRoutes({ api, db }, PROJECT_ROUTES)
 }

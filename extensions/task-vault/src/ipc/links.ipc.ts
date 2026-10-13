@@ -1,83 +1,102 @@
+import type { z } from 'zod'
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
-import { createIpcRegistrar, errorResult } from './register'
+import { registerRoutes, route, type IpcContext } from './register'
 import {
   LinksCreateRequestSchema,
   LinksRemoveRequestSchema,
   LinksGetForTargetRequestSchema,
 } from '../schemas/vault.schema'
 import { rowToTask, rowToProject, PROJECT_COLS, PROJECT_JOINS } from '../vault/mappers'
+import { nowIso, orErrorString } from './vault-shared'
 
-export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handleRemote, cleanup } = createIpcRegistrar(api, errorResult)
+type LinkArgs = z.infer<typeof LinksCreateRequestSchema>
 
-  handleRemote('task-vault:links:create', LinksCreateRequestSchema, (args) =>
-    // A task links to exactly one terminal at a time; a project to any number.
-    changeLinks(db, args, (links, isTask) =>
-      isTask ? [args.targetId] : links.includes(args.targetId) ? links : [...links, args.targetId]
-    )
-  )
+/** Where a task's or a project's terminal links live: its table and the key column. */
+interface LinkOwner {
+  table: 'tasks' | 'projects'
+  column: 'id' | 'name'
+  key: string
+}
 
-  handleRemote('task-vault:links:remove', LinksRemoveRequestSchema, (args) =>
-    changeLinks(db, args, (links) => links.filter((l) => l !== args.targetId))
-  )
-
-  handleRemote(
-    'task-vault:links:get-for-terminator-target',
-    LinksGetForTargetRequestSchema,
-    async (args) => {
-      const { targetId } = args
-      const escapedId = targetId.replace(/[%_]/g, '\\$&')
-      const taskRows = await db.query<Record<string, unknown>>(
-        `SELECT * FROM tasks WHERE terminator_links LIKE ? ESCAPE '\\'`,
-        [`%${escapedId}%`]
-      )
-      const tasks = taskRows.map(rowToTask).filter((t) => t.terminatorLinks.includes(targetId))
-
-      const projectRows = await db.query<Record<string, unknown>>(
-        `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.terminator_links LIKE ? ESCAPE '\\'`,
-        [`%${escapedId}%`]
-      )
-      const projects = projectRows
-        .map(rowToProject)
-        .filter((p) => p.terminatorLinks.includes(targetId))
-
-      return { tasks, projects }
-    }
-  )
-
-  return cleanup
+function ownerOf(args: LinkArgs): LinkOwner | null {
+  if (args.taskId) return { table: 'tasks', column: 'id', key: args.taskId }
+  if (args.projectFilePath) return { table: 'projects', column: 'name', key: args.projectFilePath }
+  return null
 }
 
 /**
- * Rewrites the terminal links of the task `taskId`, or else the project named
- * `projectFilePath`, to `change(current links, isTask)`.
+ * Rewrites an owner's link list with `change`; answers NOT_FOUND for an unknown owner
+ * and does nothing when the payload names no owner.
  */
-async function changeLinks(
-  db: ExtensionDB,
-  owner: { taskId?: string; projectFilePath?: string },
-  change: (links: string[], isTask: boolean) => string[]
-): Promise<{ success: true } | { error: string }> {
-  const { taskId, projectFilePath } = owner
-  const at = taskId
-    ? { table: 'tasks', key: 'id', value: taskId }
-    : projectFilePath
-      ? { table: 'projects', key: 'name', value: projectFilePath }
-      : null
-  if (!at) return { success: true }
-  try {
-    const row = await db.get<{ terminator_links: string }>(
-      `SELECT terminator_links FROM ${at.table} WHERE ${at.key}=?`,
-      [at.value]
-    )
-    if (!row) return { error: 'NOT_FOUND' }
-    const links = change(JSON.parse(row.terminator_links || '[]') as string[], at.table === 'tasks')
-    await db.run(`UPDATE ${at.table} SET terminator_links=?, updated_at=? WHERE ${at.key}=?`, [
-      JSON.stringify(links),
-      new Date().toISOString(),
-      at.value,
-    ])
-    return { success: true }
-  } catch (err) {
-    return { error: String(err) }
+async function updateLinks(db: ExtensionDB, args: LinkArgs, change: (links: string[]) => string[]) {
+  const owner = ownerOf(args)
+  if (!owner) return { success: true }
+  const { table, column, key } = owner
+  const row = await db.get<{ terminator_links: string }>(
+    `SELECT terminator_links FROM ${table} WHERE ${column}=?`,
+    [key]
+  )
+  if (!row) return { error: 'NOT_FOUND' }
+  const links = change(JSON.parse(row.terminator_links || '[]') as string[])
+  await db.run(`UPDATE ${table} SET terminator_links=?, updated_at=? WHERE ${column}=?`, [
+    JSON.stringify(links),
+    nowIso(),
+    key,
+  ])
+  return { success: true }
+}
+
+/**
+ * A task links to exactly one terminal at a time, so linking replaces its list;
+ * a project collects links.
+ */
+function createLink({ db }: IpcContext, args: LinkArgs) {
+  const { targetId } = args
+  return orErrorString(() =>
+    updateLinks(db, args, (links) => {
+      if (args.taskId) return [targetId]
+      if (links.includes(targetId)) return links
+      return [...links, targetId]
+    })
+  )
+}
+
+function removeLink({ db }: IpcContext, args: z.infer<typeof LinksRemoveRequestSchema>) {
+  return orErrorString(() =>
+    updateLinks(db, args, (links) => links.filter((l) => l !== args.targetId))
+  )
+}
+
+async function linkedToTarget(
+  { db }: IpcContext,
+  args: z.infer<typeof LinksGetForTargetRequestSchema>
+) {
+  const { targetId } = args
+  const pattern = `%${targetId.replace(/[%_]/g, '\\$&')}%`
+  const taskRows = await db.query<Record<string, unknown>>(
+    `SELECT * FROM tasks WHERE terminator_links LIKE ? ESCAPE '\\'`,
+    [pattern]
+  )
+  const projectRows = await db.query<Record<string, unknown>>(
+    `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.terminator_links LIKE ? ESCAPE '\\'`,
+    [pattern]
+  )
+  return {
+    tasks: taskRows.map(rowToTask).filter((t) => t.terminatorLinks.includes(targetId)),
+    projects: projectRows.map(rowToProject).filter((p) => p.terminatorLinks.includes(targetId)),
   }
+}
+
+const LINK_ROUTES = [
+  route('task-vault:links:create', LinksCreateRequestSchema, createLink),
+  route('task-vault:links:remove', LinksRemoveRequestSchema, removeLink),
+  route(
+    'task-vault:links:get-for-terminator-target',
+    LinksGetForTargetRequestSchema,
+    linkedToTarget
+  ),
+]
+
+export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  return registerRoutes({ api, db }, LINK_ROUTES)
 }

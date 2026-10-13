@@ -59,7 +59,19 @@ const ON = {
   publicUrl: 'https://tender-lynx-42.ngrok.app',
 }
 
-describe('RemoteControlView', () => {
+describe('RemoteControlView', remoteViewTests)
+
+function remoteViewTests() {
+  describe('status band', remoteViewBandTests)
+  describe('reach', remoteViewReachTests)
+  describe('what the address permits', remoteViewPermitTests)
+  describe('refusing to start', remoteViewRefusalTests)
+  remoteViewDeviceTests()
+  remoteViewFailureTests()
+  describe('configuration and control', remoteViewControlTests)
+}
+
+function remoteViewBandTests() {
   it('says it is off, and offers one control to turn it on', async () => {
     render(<RemoteControlView />)
     await waitFor(() => expect(screen.getByText('Off')).toBeTruthy())
@@ -81,7 +93,9 @@ describe('RemoteControlView', () => {
     expect(screen.getByText('https://tender-lynx-42.ngrok.app')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Turn off' })).toBeTruthy()
   })
+}
 
+function remoteViewReachTests() {
   it('distinguishes local-only from public', async () => {
     render(<RemoteControlView />)
     await waitFor(() => screen.getByText('Off'))
@@ -103,7 +117,9 @@ describe('RemoteControlView', () => {
       expect(screen.queryByRole('button', { name: 'Copy password' })).toBeNull()
     })
   })
+}
 
+function remoteViewPermitTests() {
   it('states in plain language what the address and password permit', async () => {
     render(<RemoteControlView />)
     await waitFor(() => screen.getByText('Off'))
@@ -121,47 +137,22 @@ describe('RemoteControlView', () => {
     expect(qrValues.length).toBeGreaterThan(0)
     expect(new Set(qrValues)).toEqual(new Set([address]))
   })
+}
 
+function remoteViewRefusalTests() {
   it('explains a refusal to start for want of a password', async () => {
     render(<RemoteControlView />)
     await waitFor(() => screen.getByText('Off'))
     emit('remote:status', { enabled: false, error: 'PASSWORD_REQUIRED' })
     expect(screen.getByRole('alert').textContent).toContain('password')
   })
+}
 
-  describe('connected devices', () => {
-    it('lists what is connected', async () => {
-      render(<RemoteControlView />)
-      await waitFor(() => screen.getByText('Off'))
-      emit('remote:status', ON)
-      emit('remote:devices', {
-        devices: [
-          { id: 'a', label: 'iPhone', viewing: 'fix/sidebar-sorting', connectedAt: Date.now() },
-        ],
-      })
-      expect(screen.getByText('iPhone')).toBeTruthy()
-      expect(screen.getByText('fix/sidebar-sorting')).toBeTruthy()
-    })
+function remoteViewDeviceTests() {
+  describe('connected devices', remoteViewDeviceListTests)
+}
 
-    it('offers to disconnect one', async () => {
-      render(<RemoteControlView />)
-      await waitFor(() => screen.getByText('Off'))
-      emit('remote:status', ON)
-      emit('remote:devices', {
-        devices: [{ id: 'a', label: 'iPad', viewing: 'scratch', connectedAt: Date.now() }],
-      })
-      fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }))
-      expect(invoke).toHaveBeenCalledWith('remote:disconnect-device', { id: 'a' })
-    })
-
-    it('says what to do when nothing is connected yet', async () => {
-      render(<RemoteControlView />)
-      await waitFor(() => screen.getByText('Off'))
-      emit('remote:status', ON)
-      expect(screen.getByText(/Scan the code to add this phone/)).toBeTruthy()
-    })
-  })
-
+function remoteViewFailureTests() {
   describe('failure', () => {
     it('names a port clash and offers a way forward', async () => {
       render(<RemoteControlView />)
@@ -181,7 +172,9 @@ describe('RemoteControlView', () => {
       expect(screen.queryByText('https://tender-lynx-42.ngrok.app')).toBeNull()
     })
   })
+}
 
+function remoteViewControlTests() {
   it('keeps configuration out of the way until it is wanted', async () => {
     render(<RemoteControlView />)
     await waitFor(() => screen.getByText('Off'))
@@ -196,4 +189,44 @@ describe('RemoteControlView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Turn on' }))
     expect(invoke).toHaveBeenCalledWith('remote:toggle', { enabled: true })
   })
-})
+}
+
+function remoteViewDeviceListTests() {
+  describe('listing', remoteViewDeviceListingTests)
+  describe('nothing connected', remoteViewNoDeviceTests)
+}
+
+function remoteViewDeviceListingTests() {
+  it('lists what is connected', async () => {
+    render(<RemoteControlView />)
+    await waitFor(() => screen.getByText('Off'))
+    emit('remote:status', ON)
+    emit('remote:devices', {
+      devices: [
+        { id: 'a', label: 'iPhone', viewing: 'fix/sidebar-sorting', connectedAt: Date.now() },
+      ],
+    })
+    expect(screen.getByText('iPhone')).toBeTruthy()
+    expect(screen.getByText('fix/sidebar-sorting')).toBeTruthy()
+  })
+
+  it('offers to disconnect one', async () => {
+    render(<RemoteControlView />)
+    await waitFor(() => screen.getByText('Off'))
+    emit('remote:status', ON)
+    emit('remote:devices', {
+      devices: [{ id: 'a', label: 'iPad', viewing: 'scratch', connectedAt: Date.now() }],
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }))
+    expect(invoke).toHaveBeenCalledWith('remote:disconnect-device', { id: 'a' })
+  })
+}
+
+function remoteViewNoDeviceTests() {
+  it('says what to do when nothing is connected yet', async () => {
+    render(<RemoteControlView />)
+    await waitFor(() => screen.getByText('Off'))
+    emit('remote:status', ON)
+    expect(screen.getByText(/Scan the code to add this phone/)).toBeTruthy()
+  })
+}

@@ -75,6 +75,7 @@ export async function createComment(
   args: z.infer<typeof CreatePayload>
 ): Promise<unknown> {
   const { noteId, body, startOffset, endOffset, quote, prefix, suffix } = args
+  const anchor = [startOffset, endOffset, quote, prefix, suffix]
   const id = randomUUID()
   const now = new Date().toISOString()
 
@@ -82,18 +83,7 @@ export async function createComment(
     `INSERT INTO comments (id, note_id, parent_id, body, author, status,
       start_offset, end_offset, quote, prefix, suffix, created_at, updated_at)
      VALUES (?, ?, NULL, ?, 'me', 'open', ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      noteId,
-      body,
-      startOffset ?? null,
-      endOffset ?? null,
-      quote ?? null,
-      prefix ?? null,
-      suffix ?? null,
-      now,
-      now,
-    ]
+    [id, noteId, body, ...anchor.map((value) => value ?? null), now, now]
   )
 
   return { data: { id, createdAt: now } }

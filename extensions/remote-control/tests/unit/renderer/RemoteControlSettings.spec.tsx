@@ -28,7 +28,16 @@ beforeEach(() => {
   Object.assign(navigator, { clipboard: { writeText: vi.fn() } })
 })
 
-describe('RemoteControlSettings password', () => {
+describe('RemoteControlSettings password', settingsPasswordTests)
+
+function settingsPasswordTests() {
+  describe('saying whether one is set', settingsPasswordStateTests)
+  describe('setting a typed password', settingsPasswordSetTests)
+  describe('not sending a password', settingsPasswordWithholdTests)
+  describe('generating one', settingsPasswordGenerateTests)
+}
+
+function settingsPasswordStateTests() {
   it('says whether a password is set without showing it', async () => {
     respond(true)
     render(<RemoteControlSettings />)
@@ -40,7 +49,9 @@ describe('RemoteControlSettings password', () => {
     render(<RemoteControlSettings />)
     await waitFor(() => expect(screen.getByText(/No password is set/)).toBeTruthy())
   })
+}
 
+function settingsPasswordSetTests() {
   it('sets the typed password on request and clears the field', async () => {
     respond(false)
     render(<RemoteControlSettings />)
@@ -53,7 +64,9 @@ describe('RemoteControlSettings password', () => {
     await waitFor(() => expect((field as HTMLInputElement).value).toBe(''))
     expect(screen.queryByText('chosen-secret')).toBeNull()
   })
+}
 
+function settingsPasswordWithholdTests() {
   it('does not send a password merely because the field lost focus', async () => {
     respond(true)
     render(<RemoteControlSettings />)
@@ -70,7 +83,9 @@ describe('RemoteControlSettings password', () => {
     const button = screen.getByRole('button', { name: 'Set password' }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
   })
+}
 
+function settingsPasswordGenerateTests() {
   it('shows a generated password once, with a warning that it cannot be shown again', async () => {
     respond(true, { password: 'generated-abc123' })
     render(<RemoteControlSettings />)
@@ -81,4 +96,4 @@ describe('RemoteControlSettings password', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(screen.queryByText('generated-abc123')).toBeNull()
   })
-})
+}

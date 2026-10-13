@@ -18,7 +18,15 @@ function makeView(doc: string, cursor = 0) {
   } as unknown as EditorView & { dispatch: ReturnType<typeof vi.fn> }
 }
 
-describe('applyExternalDoc', () => {
+describe('applyExternalDoc', applyExternalDocTests)
+
+function applyExternalDocTests() {
+  describe('replacing the body', applyExternalDocReplacingBodyTests)
+  describe('nothing to change', applyExternalDocNothingChangeTests)
+  describe('local edits', applyExternalDocLocalEditsTests)
+}
+
+function applyExternalDocReplacingBodyTests() {
   it('replaces the document with the incoming body', () => {
     const view = makeView('stale body')
     applyExternalDoc(view, 'fresh body from the other window')
@@ -36,7 +44,9 @@ describe('applyExternalDoc', () => {
     applyExternalDoc(view, 'short')
     expect(view.state.selection.main.head).toBe(5)
   })
+}
 
+function applyExternalDocNothingChangeTests() {
   it('does nothing when the text already matches, so an echo is free', () => {
     const view = makeView('same text')
     applyExternalDoc(view, 'same text')
@@ -53,11 +63,13 @@ describe('applyExternalDoc', () => {
     expect(view.state.doc.toString()).toBe('')
     expect(view.state.selection.main.head).toBe(0)
   })
+}
 
+function applyExternalDocLocalEditsTests() {
   it('marks the transaction so it is not reported as a local edit', () => {
     const view = makeView('before')
     applyExternalDoc(view, 'after')
     const spec = view.dispatch.mock.calls[0][0] as { annotations?: unknown }
     expect(spec.annotations).toBeDefined()
   })
-})
+}

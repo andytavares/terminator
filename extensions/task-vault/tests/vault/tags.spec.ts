@@ -1,7 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import { extractTags } from '../../src/vault/tags'
 
-describe('extractTags', () => {
+describe('extractTags', extractTagsTests)
+
+function extractTagsTests() {
+  describe('single tags', extractTagsSingleTagsTests)
+  describe('metadata', extractTagsMetadataTests)
+  describe('links', extractTagsLinksTests)
+  describe('everything', extractTagsEverythingTests)
+  describe('first occurrences', extractTagsFirstOccurrencesTests)
+  describe('no tags', extractTagsNoTagsTests)
+}
+
+function extractTagsSingleTagsTests() {
+  describe('returns empty fields', extractTagsSingleTagsReturnsEmptyFieldsTests)
+  describe('extracts context tag', extractTagsSingleTagsExtractsContextTagTests)
+}
+
+function extractTagsSingleTagsReturnsEmptyFieldsTests() {
   it('returns empty fields for plain text', () => {
     const result = extractTags('Buy groceries')
     expect(result.text).toBe('Buy groceries')
@@ -19,7 +35,9 @@ describe('extractTags', () => {
     expect(result.text).not.toContain('@my-project')
     expect(result.text.trim()).toBe('Fix bug')
   })
+}
 
+function extractTagsSingleTagsExtractsContextTagTests() {
   it('extracts +context tag and removes it from text', () => {
     const result = extractTags('Call client +phone')
     expect(result.context).toBe('Phone')
@@ -31,7 +49,9 @@ describe('extractTags', () => {
     expect(result.area).toBe('Work')
     expect(result.text).not.toContain('#work')
   })
+}
 
+function extractTagsMetadataTests() {
   it('extracts due: metadata and sets dueDate', () => {
     // Lines 52-59: the while loop for TAG_META — key==='due' branch
     const result = extractTags('Task due:2026-06-01')
@@ -45,7 +65,9 @@ describe('extractTags', () => {
     expect(result.metadata['priority']).toBe('high')
     expect(result.dueDate).toBeUndefined()
   })
+}
 
+function extractTagsLinksTests() {
   it('extracts terminator:<uuid> links and lowercases them (lines 29-31)', () => {
     // Lines 29-31: the while loop body — terminatorLinks.push
     const uuid = '550E8400-E29B-41D4-A716-446655440000'
@@ -70,7 +92,9 @@ describe('extractTags', () => {
     const result = extractTags(`Task terminator:${uuid}`)
     expect(result.metadata['terminator']).toBeUndefined()
   })
+}
 
+function extractTagsEverythingTests() {
   it('handles all tag types together and strips them from text', () => {
     const uuid = '550e8400-e29b-41d4-a716-446655440000'
     const raw = `Review report @my-project +office #work due:2026-07-01 priority:low terminator:${uuid}`
@@ -83,7 +107,9 @@ describe('extractTags', () => {
     expect(result.terminatorLinks).toContain(uuid)
     expect(result.text.trim()).toBe('Review report')
   })
+}
 
+function extractTagsFirstOccurrencesTests() {
   it('only takes first @project occurrence', () => {
     const result = extractTags('Task @proj-one @proj-two')
     expect(result.project).toBe('Proj One')
@@ -99,7 +125,9 @@ describe('extractTags', () => {
     const result = extractTags('Task #area-one #area-two')
     expect(result.area).toBe('Area One')
   })
+}
 
+function extractTagsNoTagsTests() {
   it('handles raw text with no tags, returns clean text', () => {
     const result = extractTags('   Just a plain task   ')
     expect(result.text).toBe('Just a plain task')
@@ -118,4 +146,4 @@ describe('extractTags', () => {
     const result = extractTags('Simple task @project')
     expect(result.metadata).toEqual({})
   })
-})
+}

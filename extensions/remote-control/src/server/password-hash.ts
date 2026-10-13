@@ -27,7 +27,8 @@ function deriveKey(password: string, salt: Buffer, params: ScryptParams): Promis
 }
 
 function parsePositiveInteger(text: string): number | null {
-  return /^\d+$/.test(text) && Number(text) > 0 ? Number(text) : null
+  if (!/^\d+$/.test(text) || Number(text) === 0) return null
+  return Number(text)
 }
 
 /** `scrypt$cost$blockSize$parallelism$salt$key`, salt and key in base64url. */

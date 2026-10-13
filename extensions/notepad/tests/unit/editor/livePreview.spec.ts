@@ -4,15 +4,32 @@ import { GFM } from '@lezer/markdown'
 import { buildDecorations } from '../../../src/editor/livePreview'
 import { parsedState } from '../support/parsed-state'
 
-describe('buildDecorations', () => {
-  function makeState(doc: string) {
-    return parsedState({ doc, extensions: [markdown()] })
-  }
+function makeState(doc: string) {
+  return parsedState({ doc, extensions: [markdown()] })
+}
 
-  function makeStateGFM(doc: string) {
-    return parsedState({ doc, extensions: [markdown({ extensions: [GFM] })] })
-  }
+function makeStateGFM(doc: string) {
+  return parsedState({ doc, extensions: [markdown({ extensions: [GFM] })] })
+}
 
+describe('buildDecorations', buildDecorationsTests)
+
+function buildDecorationsTests() {
+  describe('headings', buildDecorationsHeadingsTests)
+  describe('the cursor line', buildDecorationsCursorLineTests)
+  describe('plain text and bold', buildDecorationsPlainTextBoldTests)
+  describe('italic', buildDecorationsItalicTests)
+  describe('inline code', buildDecorationsInlineCodeTests)
+  describe('code markers', buildDecorationsCodeMarkersTests)
+  describe('fenced code', buildDecorationsFencedCodeTests)
+  describe('quotes and strikethrough', buildDecorationsQuotesStrikethroughTests)
+  describe('rules and tasks', buildDecorationsRulesTasksTests)
+  describe('multi-line code and images', buildDecorationsMultiLineCodeTests)
+  describe('lists and links', buildDecorationsListsLinksTests)
+  describe('list items', buildDecorationsListItemsTests)
+}
+
+function buildDecorationsHeadingsTests() {
   it('marks heading # text with a heading decoration (cursor off heading line)', () => {
     // Put heading on line 1, cursor on line 2
     const state = makeState('# Hello World\nother line\n')
@@ -29,7 +46,9 @@ describe('buildDecorations', () => {
     const decos = buildDecorations(state, { anchor: 0 })
     expect(decos).toBeDefined()
   })
+}
 
+function buildDecorationsCursorLineTests() {
   it('suppresses heading decorations on the cursor line', () => {
     const state = makeState('# Hello\nSecond line\n')
     // Cursor on heading line (pos 3 = within "# Hello")
@@ -49,7 +68,9 @@ describe('buildDecorations', () => {
     expect(foundOnCursor).toBe(false)
     expect(foundOffCursor).toBe(true)
   })
+}
 
+function buildDecorationsPlainTextBoldTests() {
   it('returns empty decoration set for plain text', () => {
     const state = makeState('just plain text\n')
     const decos = buildDecorations(state, { anchor: 0 })
@@ -72,7 +93,9 @@ describe('buildDecorations', () => {
     })
     expect(found).toBe(true)
   })
+}
 
+function buildDecorationsItalicTests() {
   it('marks italic _text_ with italic class (cursor off italic line)', () => {
     const state = makeState('other\n_italic text_\n')
     const decos = buildDecorations(state, { anchor: 0 }) // cursor on line 1
@@ -92,7 +115,9 @@ describe('buildDecorations', () => {
     })
     expect(found).toBe(false)
   })
+}
 
+function buildDecorationsInlineCodeTests() {
   it('marks inline code with code class (cursor off code line)', () => {
     const state = makeState('other\n`code here`\n')
     const decos = buildDecorations(state, { anchor: 0 }) // cursor on line 1
@@ -112,7 +137,9 @@ describe('buildDecorations', () => {
     })
     expect(foundH2).toBe(true)
   })
+}
 
+function buildDecorationsCodeMarkersTests() {
   it('hides inline code backtick markers (cursor off code line)', () => {
     const state = makeState('other\n`code here`\n')
     const decos = buildDecorations(state, { anchor: 0 })
@@ -129,7 +156,9 @@ describe('buildDecorations', () => {
     })
     expect(foundCode).toBe(true)
   })
+}
 
+function buildDecorationsFencedCodeTests() {
   it('produces a line deco for fenced code block content (cursor outside block)', () => {
     const state = makeState('other\n```\ncode\n```\n')
     const decos = buildDecorations(state, { anchor: 0 })
@@ -153,7 +182,9 @@ describe('buildDecorations', () => {
     })
     expect(foundHiddenFence).toBe(false)
   })
+}
 
+function buildDecorationsQuotesStrikethroughTests() {
   it('produces a blockquote line deco (cursor off quote line)', () => {
     const state = makeState('other\n> quoted text\n')
     const decos = buildDecorations(state, { anchor: 0 })
@@ -174,7 +205,9 @@ describe('buildDecorations', () => {
     })
     expect(found).toBe(true)
   })
+}
 
+function buildDecorationsRulesTasksTests() {
   it('replaces horizontal rule with HR widget (cursor off rule line)', () => {
     // Need blank line before --- so it's not parsed as a Setext heading underline
     const state = makeState('other\n\n---\n')
@@ -195,7 +228,9 @@ describe('buildDecorations', () => {
     })
     expect(widgetCount).toBeGreaterThanOrEqual(2)
   })
+}
 
+function buildDecorationsMultiLineCodeTests() {
   it('produces code-block-line decorations for multi-line fenced code (cursor outside)', () => {
     const state = makeState('other\n```\nline one\nline two\n```\n')
     const decos = buildDecorations(state, { anchor: 0 })
@@ -216,7 +251,9 @@ describe('buildDecorations', () => {
     })
     expect(foundWidget).toBe(true)
   })
+}
 
+function buildDecorationsListsLinksTests() {
   it('applies ordered list mark class for ordered lists (cursor off line)', () => {
     const state = makeState('other\n1. first item\n2. second item\n')
     const decos = buildDecorations(state, { anchor: 0 })
@@ -236,7 +273,9 @@ describe('buildDecorations', () => {
     })
     expect(foundWidget).toBe(true)
   })
+}
 
+function buildDecorationsListItemsTests() {
   it('applies list-item-line decoration for bullet list items (cursor off line)', () => {
     const state = makeState('other\n- item one\n- item two\n')
     const decos = buildDecorations(state, { anchor: 0 })
@@ -246,4 +285,4 @@ describe('buildDecorations', () => {
     })
     expect(found).toBe(true)
   })
-})
+}

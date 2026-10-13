@@ -17,11 +17,14 @@ type SearchRow = {
   tags: string | null
 }
 
-function parseTagFilters(query: string): {
+/** A query's free text, and the tags it requires and excludes. */
+interface TagFilters {
   textQuery: string
   includeTags: string[]
   excludeTags: string[]
-} {
+}
+
+function parseTagFilters(query: string): TagFilters {
   const includeTags: string[] = []
   const excludeTags: string[] = []
 
@@ -40,35 +43,40 @@ function parseTagFilters(query: string): {
 }
 
 function makeSnippet(body: string, query: string): string {
-  if (!query) return escapeHtml(body.slice(0, 120))
+  const words = snippetWords(query)
+  if (words.length === 0) return escapeHtml(body.slice(0, 120))
 
-  const words = query
+  const start = snippetStart(body, words)
+  const end = Math.min(body.length, start + 160)
+  const prefix = start > 0 ? '…' : ''
+  const suffix = end < body.length ? '…' : ''
+
+  let marked = escapeHtml(body.slice(start, end))
+  for (const word of words) {
+    marked = marked.replace(new RegExp(`(${escapeRegex(word)})`, 'gi'), '<mark>$1</mark>')
+  }
+
+  return `${prefix}${marked}${suffix}`
+}
+
+/** The lower-cased words of a query, without the FTS operators `*` and `"`. */
+function snippetWords(query: string): string[] {
+  return query
     .replace(/[*"]/g, '')
     .split(/\s+/)
     .filter(Boolean)
     .map((w) => w.toLowerCase())
+}
 
-  if (words.length === 0) return escapeHtml(body.slice(0, 120))
-
+/** Where the snippet starts: shortly before the earliest matched word, or at the top. */
+function snippetStart(body: string, words: string[]): number {
   const bodyLower = body.toLowerCase()
   let anchorIdx = -1
   for (const word of words) {
     const idx = bodyLower.indexOf(word)
     if (idx !== -1 && (anchorIdx === -1 || idx < anchorIdx)) anchorIdx = idx
   }
-
-  const start = anchorIdx === -1 ? 0 : Math.max(0, anchorIdx - 40)
-  const end = Math.min(body.length, start + 160)
-  const prefix = start > 0 ? '…' : ''
-  const suffix = end < body.length ? '…' : ''
-  const slice = body.slice(start, end)
-
-  let marked = escapeHtml(slice)
-  for (const word of words) {
-    marked = marked.replace(new RegExp(`(${escapeRegex(word)})`, 'gi'), '<mark>$1</mark>')
-  }
-
-  return `${prefix}${marked}${suffix}`
+  return anchorIdx === -1 ? 0 : Math.max(0, anchorIdx - 40)
 }
 
 function escapeHtml(s: string): string {

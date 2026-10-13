@@ -250,63 +250,88 @@ export async function exportNotes(
 
 const importSchema = z.object({ folder: z.string() })
 
+type ImportOutcome = 'imported' | 'updated' | 'skipped'
+
+/** A note read back from an exported file's front matter and body. */
+interface ImportedNote {
+  id: string
+  title: string
+  body: string
+  tags: string[]
+  createdAt: string
+  updatedAt: string
+}
+
 export async function importNotes(
   db: ExtensionDB,
   args: z.infer<typeof importSchema>
 ): Promise<{ data: { imported: number; updated: number; skipped: number } } | { error: string }> {
   const { folder } = args
-  let imported = 0
-  let updated = 0
-  let skipped = 0
+  const counts: Record<ImportOutcome, number> = { imported: 0, updated: 0, skipped: 0 }
 
   const files = fs.existsSync(folder) ? fs.readdirSync(folder).filter((f) => f.endsWith('.md')) : []
 
   for (const file of files) {
     try {
       const content = fs.readFileSync(path.join(folder, file), 'utf-8')
-      const { data: fm, content: body } = parseFrontMatter(content)
-
-      if (typeof fm.id !== 'string') {
-        skipped++
-        continue
-      }
-
-      const id = fm.id
-      const title = typeof fm.title === 'string' ? fm.title : 'Imported note'
-      const tags: string[] = Array.isArray(fm.tags) ? fm.tags : []
-      const now = new Date().toISOString()
-      const createdAt = typeof fm.created === 'string' ? fm.created : now
-      const updatedAt = now
-
-      const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [id])
-
-      if (existing) {
-        await db.transaction(async (tx) => {
-          await tx.run('UPDATE notes SET title=?, body=?, updated_at=? WHERE id=?', [
-            title,
-            body.trim(),
-            updatedAt,
-            id,
-          ])
-          await reconcileTags(tx, id, tags)
-        })
-        updated++
-      } else {
-        await db.transaction(async (tx) => {
-          await tx.run(
-            'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-            [id, title, body.trim(), createdAt, updatedAt]
-          )
-          await reconcileTags(tx, id, tags)
-        })
-        imported++
-      }
+      counts[await importNoteFile(db, content)]++
     } catch {
-      skipped++
+      counts.skipped++
     }
   }
 
-  return { data: { imported, updated, skipped } }
+  return { data: counts }
+}
+
+async function importNoteFile(db: ExtensionDB, content: string): Promise<ImportOutcome> {
+  const note = parseImportedNote(content)
+  if (!note) return 'skipped'
+
+  const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [note.id])
+  if (existing) {
+    await updateImportedNote(db, note)
+    return 'updated'
+  }
+  await insertImportedNote(db, note)
+  return 'imported'
+}
+
+/** The note an exported file holds, or null when its front matter carries no id. */
+function parseImportedNote(content: string): ImportedNote | null {
+  const { data: fm, content: body } = parseFrontMatter(content)
+  if (typeof fm.id !== 'string') return null
+
+  const now = new Date().toISOString()
+  return {
+    id: fm.id,
+    title: typeof fm.title === 'string' ? fm.title : 'Imported note',
+    body: body.trim(),
+    tags: Array.isArray(fm.tags) ? fm.tags : [],
+    createdAt: typeof fm.created === 'string' ? fm.created : now,
+    updatedAt: now,
+  }
+}
+
+async function updateImportedNote(db: ExtensionDB, note: ImportedNote): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.run('UPDATE notes SET title=?, body=?, updated_at=? WHERE id=?', [
+      note.title,
+      note.body,
+      note.updatedAt,
+      note.id,
+    ])
+    await reconcileTags(tx, note.id, note.tags)
+  })
+}
+
+async function insertImportedNote(db: ExtensionDB, note: ImportedNote): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.run(
+      'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+      [note.id, note.title, note.body, note.createdAt, note.updatedAt]
+    )
+    await reconcileTags(tx, note.id, note.tags)
+  })
 }
 
 // ──────────────────────────────────────────────────────────────

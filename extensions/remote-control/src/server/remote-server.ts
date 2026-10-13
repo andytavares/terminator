@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from 'fastify'
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import staticPlugin from '@fastify/static'
 import { join, resolve, dirname } from 'path'
@@ -48,6 +48,40 @@ export interface RemoteServerHandle {
   inject: FastifyInstance['inject']
 }
 
+interface ExtensionRendererDir {
+  id: string
+  dir: string
+  rendererRelPath: string
+}
+
+/** The session store of each browser surface. */
+interface SurfaceSessions {
+  app: SessionStore
+  mobile: SessionStore
+  /** Issued by POST /api/login; it authorises every /api request after the password check. */
+  login: SessionStore
+}
+
+/** What the server is built from, shared by the steps that build it. */
+interface RemoteServerParts {
+  fastify: FastifyInstance
+  options: RemoteServerOptions
+  sessions: SurfaceSessions
+  ticketStore: WsTicketStore
+  subscriberManager: WsSubscriberManager
+  deviceRegistry: ConnectedDeviceRegistry
+}
+
+/** What `stop` and `disconnectAllClients` tear down besides the session stores. */
+interface ServerConnections {
+  terminalCleanup: { cleanup: () => Promise<void> }
+  bridgeCleanup: { disconnectAll: () => void }
+}
+
+// One session store per browser surface; 8-hour cookie lifetime.
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000
+const SHIM_TAG = '<script type="module" src="/remote-shim.js"></script>'
+
 function getRemoteRendererDir(appPath: string): string {
   const candidates = [
     join(appPath, 'out', 'renderer-remote'),
@@ -64,169 +98,177 @@ function getRendererDir(appPath: string): string {
   return candidates.find(existsSync) ?? candidates[0]
 }
 
-function getExtensionRendererDirs(
-  appPath: string
-): Array<{ id: string; dir: string; rendererRelPath: string }> {
-  const results: Array<{ id: string; dir: string; rendererRelPath: string }> = []
+function getExtensionRendererDirs(appPath: string): ExtensionRendererDir[] {
   const candidates = [
     join(appPath, 'extensions'),
     resolve(__dirname, '..', '..', '..', '..', 'extensions'),
   ]
   const extensionsRoot = candidates.find(existsSync)
-  if (!extensionsRoot) return results
+  if (!extensionsRoot) return []
 
   let entries: string[]
   try {
     entries = readdirSync(extensionsRoot)
   } catch {
-    return results
+    return []
   }
-
-  for (const name of entries) {
-    const manifestPath = join(extensionsRoot, name, 'manifest.json')
-    if (!existsSync(manifestPath)) continue
-    try {
-      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-        id?: string
-        renderer?: string
-      }
-      if (!manifest.id || !manifest.renderer) continue
-      const rendererDir = join(extensionsRoot, name, dirname(manifest.renderer))
-      if (existsSync(rendererDir)) {
-        results.push({ id: manifest.id, dir: rendererDir, rendererRelPath: manifest.renderer })
-      }
-    } catch {
-      // skip malformed manifests
-    }
-  }
-  return results
+  return entries.flatMap((name) => readExtensionRendererDir(join(extensionsRoot, name)))
 }
 
-export async function createRemoteServer(
-  options: RemoteServerOptions
-): Promise<RemoteServerHandle> {
-  const { port, appPath, ptyManager, deps } = options
+/** The renderer an installed extension declares, or none when it declares none. */
+function readExtensionRendererDir(extensionDir: string): ExtensionRendererDir[] {
+  const manifestPath = join(extensionDir, 'manifest.json')
+  if (!existsSync(manifestPath)) return []
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      id?: string
+      renderer?: string
+    }
+    if (!manifest.id || !manifest.renderer) return []
+    const rendererDir = join(extensionDir, dirname(manifest.renderer))
+    if (!existsSync(rendererDir)) return []
+    return [{ id: manifest.id, dir: rendererDir, rendererRelPath: manifest.renderer }]
+  } catch {
+    // skip malformed manifests
+    return []
+  }
+}
 
-  const ticketStore = new WsTicketStore()
-  const subscriberManager = new WsSubscriberManager()
-  // Who is watching, so the Remote Control view can say so and disconnect one.
-  const deviceRegistry = new ConnectedDeviceRegistry()
-  // One session store per browser surface; 8-hour cookie lifetime.
-  const SESSION_TTL_MS = 8 * 60 * 60 * 1000
-  const appSessionStore = new SessionStore({
-    cookieName: 'app-session',
-    cookiePath: '/app',
-    ttlMs: SESSION_TTL_MS,
-  })
-  const mobileSessionStore = new SessionStore({
-    cookieName: 'mobile-session',
-    cookiePath: '/mobile',
-    ttlMs: SESSION_TTL_MS,
-  })
-  // Issued by POST /api/login; it authorises every /api request after the password check.
-  const loginSessionStore = new SessionStore({
-    cookieName: 'remote-session',
-    cookiePath: '/',
-    ttlMs: SESSION_TTL_MS,
-  })
-  let sessionCleanupTimer: ReturnType<typeof setInterval> | null = null
+function createSurfaceSessions(): SurfaceSessions {
+  const surfaceStore = (cookieName: string, cookiePath: string) =>
+    new SessionStore({ cookieName, cookiePath, ttlMs: SESSION_TTL_MS })
+  return {
+    app: surfaceStore('app-session', '/app'),
+    mobile: surfaceStore('mobile-session', '/mobile'),
+    login: surfaceStore('remote-session', '/'),
+  }
+}
 
-  const fastify = Fastify({ logger: false })
+function forEachSessionStore(sessions: SurfaceSessions, act: (store: SessionStore) => void) {
+  act(sessions.app)
+  act(sessions.mobile)
+  act(sessions.login)
+}
 
-  // Gate /app/* and /mobile/* static assets behind their respective session cookies
+/** True when a gated surface's asset is requested without that surface's session. */
+function lacksSurfaceSession(request: FastifyRequest, surface: string, store: SessionStore) {
+  const pathname = request.url.split('?')[0]
+  const prefix = `/${surface}/`
+  if (!pathname.startsWith(prefix) || pathname === prefix) return false
+  return !store.hasValidSession(request.headers.cookie ?? '')
+}
+
+// Gate /app/* and /mobile/* static assets behind their respective session cookies.
+// /ext/* serves extension static assets (JS/HTML/CSS) without a cookie gate: the
+// extension bundle has no user data; auth happens via the bridge WebSocket.
+function gateSurfaceAssets(fastify: FastifyInstance, sessions: SurfaceSessions): void {
   fastify.addHook('onRequest', async (request, reply) => {
-    const pathname = request.url.split('?')[0]
-    if (pathname.startsWith('/app/') && pathname !== '/app/') {
-      if (!appSessionStore.hasValidSession(request.headers.cookie ?? '')) {
-        return reply.status(403).send({ error: 'FORBIDDEN' })
-      }
+    if (
+      lacksSurfaceSession(request, 'app', sessions.app) ||
+      lacksSurfaceSession(request, 'mobile', sessions.mobile)
+    ) {
+      return reply.status(403).send({ error: 'FORBIDDEN' })
     }
-    if (pathname.startsWith('/mobile/') && pathname !== '/mobile/') {
-      if (!mobileSessionStore.hasValidSession(request.headers.cookie ?? '')) {
-        return reply.status(403).send({ error: 'FORBIDDEN' })
-      }
-    }
-    // /ext/* serves extension static assets (JS/HTML/CSS). No cookie gate here —
-    // the extension bundle has no user data; auth happens via the bridge WebSocket.
   })
+}
 
-  await fastify.register(websocketPlugin)
-
-  const loginStaticDir = getRemoteRendererDir(appPath)
-  await fastify.register(staticPlugin, { root: loginStaticDir, prefix: '/', decorateReply: false })
-
-  const rendererDir = getRendererDir(appPath)
-  await fastify.register(staticPlugin, { root: rendererDir, prefix: '/app', decorateReply: false })
-
-  // Serve each installed extension's renderer under /ext/<extensionId>/
-  const extensionDirs = getExtensionRendererDirs(appPath)
-  for (const { id, dir } of extensionDirs) {
-    await fastify.register(staticPlugin, {
-      root: dir,
-      prefix: `/ext/${id}`,
-      decorateReply: false,
-    })
+// Serve each installed extension's renderer under /ext/<extensionId>/
+async function registerExtensionRenderers(fastify: FastifyInstance, appPath: string) {
+  for (const { id, dir } of getExtensionRendererDirs(appPath)) {
+    await fastify.register(staticPlugin, { root: dir, prefix: `/ext/${id}`, decorateReply: false })
     // Serve index.html with the shim + base CSS injected (provides --tm-* variables and #app height)
     fastify.get(`/ext/${id}/`, async (_request, reply) => {
-      const shimTag = '<script type="module" src="/remote-shim.js"></script>'
       const styleTag = `<style>${EXTENSION_BASE_CSS}</style>`
       try {
         let html = readFileSync(join(dir, 'index.html'), 'utf8')
-        html = html.replace(/<head[^>]*>/i, (m) => `${m}\n    ${shimTag}\n    ${styleTag}`)
+        html = html.replace(/<head[^>]*>/i, (m) => `${m}\n    ${SHIM_TAG}\n    ${styleTag}`)
         return reply.type('text/html').send(html)
       } catch {
         return reply.status(503).send(`Extension renderer not built for ${id}`)
       }
     })
   }
+}
+
+/** A request for a surface's entry page, and its reply. */
+interface SurfaceExchange {
+  request: FastifyRequest<{ Querystring: { t?: string } }>
+  reply: FastifyReply
+}
+
+/**
+ * Admit a request to a surface's entry page: an existing valid session cookie is
+ * accepted (allows page refresh without re-auth); otherwise a one-use ticket
+ * issues one. False when the request has neither.
+ */
+function admitToSurface(
+  parts: RemoteServerParts,
+  surface: 'app' | 'mobile',
+  exchange: SurfaceExchange
+): boolean {
+  const { request, reply } = exchange
+  const store = parts.sessions[surface]
+  if (store.hasValidSession(request.headers.cookie ?? '')) return true
+  const t = request.query.t ?? ''
+  if (!t || !parts.ticketStore.consumeTicket(t, surface)) return false
+  reply.header('Set-Cookie', store.issueSession().setCookie)
+  return true
+}
+
+async function sendAppPage(
+  parts: RemoteServerParts,
+  rendererDir: string,
+  exchange: SurfaceExchange
+) {
+  const { reply } = exchange
+  if (!admitToSurface(parts, 'app', exchange)) return reply.redirect('/')
+  try {
+    let html = readFileSync(join(rendererDir, 'index.html'), 'utf8')
+    html = html.replace(/<head[^>]*>/i, (m) => `${m}\n    ${SHIM_TAG}`)
+    return reply.type('text/html').send(html)
+  } catch {
+    return reply.status(503).send('Renderer not built. Run: npm run build')
+  }
+}
+
+async function sendMobilePage(
+  parts: RemoteServerParts,
+  loginStaticDir: string,
+  exchange: SurfaceExchange
+) {
+  const { reply } = exchange
+  if (!admitToSurface(parts, 'mobile', exchange)) return reply.redirect('/')
+  try {
+    const html = readFileSync(join(loginStaticDir, 'mobile.html'), 'utf8')
+    return reply.type('text/html').send(html)
+  } catch {
+    return reply.status(503).send('Mobile renderer not built. Run: npm run build:remote')
+  }
+}
+
+async function registerSurfaces(parts: RemoteServerParts): Promise<void> {
+  const { fastify, options } = parts
+  const loginStaticDir = getRemoteRendererDir(options.appPath)
+  await fastify.register(staticPlugin, { root: loginStaticDir, prefix: '/', decorateReply: false })
+
+  const rendererDir = getRendererDir(options.appPath)
+  await fastify.register(staticPlugin, { root: rendererDir, prefix: '/app', decorateReply: false })
+
+  await registerExtensionRenderers(fastify, options.appPath)
 
   // Mobile static assets share the same renderer-remote output directory
-  await fastify.register(staticPlugin, {
-    root: loginStaticDir,
-    prefix: '/mobile',
-    decorateReply: false,
-  })
+  const mobileStatic = { root: loginStaticDir, prefix: '/mobile', decorateReply: false }
+  await fastify.register(staticPlugin, mobileStatic)
 
-  fastify.get<{ Querystring: { t?: string } }>('/app/', async (request, reply) => {
-    // Accept an existing valid session cookie (allows page refresh without re-auth)
-    const hasSession = appSessionStore.hasValidSession(request.headers.cookie ?? '')
+  fastify.get<{ Querystring: { t?: string } }>('/app/', async (request, reply) =>
+    sendAppPage(parts, rendererDir, { request, reply })
+  )
+  fastify.get<{ Querystring: { t?: string } }>('/mobile/', async (request, reply) =>
+    sendMobilePage(parts, loginStaticDir, { request, reply })
+  )
+}
 
-    if (!hasSession) {
-      const t = request.query.t ?? ''
-      if (!t || !ticketStore.consumeTicket(t, 'app')) {
-        return reply.redirect('/')
-      }
-      reply.header('Set-Cookie', appSessionStore.issueSession().setCookie)
-    }
-
-    const shimTag = '<script type="module" src="/remote-shim.js"></script>'
-    try {
-      let html = readFileSync(join(rendererDir, 'index.html'), 'utf8')
-      html = html.replace(/<head[^>]*>/i, (m) => `${m}\n    ${shimTag}`)
-      return reply.type('text/html').send(html)
-    } catch {
-      return reply.status(503).send('Renderer not built. Run: npm run build')
-    }
-  })
-
-  fastify.get<{ Querystring: { t?: string } }>('/mobile/', async (request, reply) => {
-    const hasSession = mobileSessionStore.hasValidSession(request.headers.cookie ?? '')
-
-    if (!hasSession) {
-      const t = request.query.t ?? ''
-      if (!t || !ticketStore.consumeTicket(t, 'mobile')) {
-        return reply.redirect('/')
-      }
-      reply.header('Set-Cookie', mobileSessionStore.issueSession().setCookie)
-    }
-    try {
-      const html = readFileSync(join(loginStaticDir, 'mobile.html'), 'utf8')
-      return reply.type('text/html').send(html)
-    } catch {
-      return reply.status(503).send('Mobile renderer not built. Run: npm run build:remote')
-    }
-  })
-
+function registerSurfaceTickets(fastify: FastifyInstance, ticketStore: WsTicketStore): void {
   fastify.post('/api/app-ticket', async (_request, reply) => {
     const ticket = ticketStore.createTicket('__app__', 'app')
     return reply.status(201).send({ ticket })
@@ -236,26 +278,33 @@ export async function createRemoteServer(
     const ticket = ticketStore.createTicket('__mobile__', 'mobile')
     return reply.status(201).send({ ticket })
   })
+}
 
+async function registerLogin(parts: RemoteServerParts): Promise<void> {
+  const { fastify, sessions } = parts
   await registerAuthMiddleware(fastify, {
-    hasValidSession: (cookieHeader) => loginSessionStore.hasValidSession(cookieHeader),
+    hasValidSession: (cookieHeader) => sessions.login.hasValidSession(cookieHeader),
   })
   await registerLoginRoute(fastify, {
-    getPasswordHash: deps.getPasswordHash,
-    sessionStore: loginSessionStore,
+    getPasswordHash: parts.options.deps.getPasswordHash,
+    sessionStore: sessions.login,
     rateLimiter: new AuthRateLimiter(),
   })
+}
 
+async function registerApi(parts: RemoteServerParts): Promise<ServerConnections> {
+  const { fastify, options, ticketStore } = parts
+  const { deps } = options
   await registerHealthRoute(fastify)
   await registerWorkspaceRoutes(fastify, {
     listWorkspaces: deps.listWorkspaces,
     listProjects: deps.listProjects,
   })
   const terminalCleanup = await registerTerminalRoutes(fastify, {
-    ptyManager,
+    ptyManager: options.ptyManager,
     ticketStore,
-    subscriberManager,
-    deviceRegistry,
+    subscriberManager: parts.subscriberManager,
+    deviceRegistry: parts.deviceRegistry,
     getMaxSubscribers: deps.getMaxSubscribers,
   })
   const bridgeCleanup = await registerBridgeRoute(fastify, {
@@ -265,69 +314,95 @@ export async function createRemoteServer(
     onWindowEvent: deps.onWindowEvent,
     isRemoteAccessible: deps.isRemoteAccessible,
   })
+  return { terminalCleanup, bridgeCleanup }
+}
 
-  let listening = false
+export async function createRemoteServer(
+  options: RemoteServerOptions
+): Promise<RemoteServerHandle> {
+  const parts: RemoteServerParts = {
+    fastify: Fastify({ logger: false }),
+    options,
+    sessions: createSurfaceSessions(),
+    ticketStore: new WsTicketStore(),
+    subscriberManager: new WsSubscriberManager(),
+    // Who is watching, so the Remote Control view can say so and disconnect one.
+    deviceRegistry: new ConnectedDeviceRegistry(),
+  }
+  gateSurfaceAssets(parts.fastify, parts.sessions)
+  await parts.fastify.register(websocketPlugin)
+  await registerSurfaces(parts)
+  registerSurfaceTickets(parts.fastify, parts.ticketStore)
+  await registerLogin(parts)
+  const connections = await registerApi(parts)
+  return new RemoteServer(parts, connections).handle()
+}
 
-  return {
-    async start() {
-      try {
-        await fastify.listen({ port, host: '0.0.0.0' })
-        ticketStore.startCleanup()
-        // Purge expired app-session tokens once per hour
-        sessionCleanupTimer = setInterval(
-          () => {
-            appSessionStore.sweep()
-            mobileSessionStore.sweep()
-            loginSessionStore.sweep()
-          },
-          60 * 60 * 1000
-        )
-        listening = true
-      } catch (err) {
-        await fastify.close().catch(() => {})
-        const code = (err as NodeJS.ErrnoException).code
-        if (code === 'EADDRINUSE') {
-          deps.onPortInUse(port)
-          throw new PortInUseError(port)
-        }
-        throw err
+/** The running state of a built server: whether it listens, and its sweep timer. */
+class RemoteServer {
+  private listening = false
+  private sessionCleanupTimer: ReturnType<typeof setInterval> | null = null
+
+  constructor(
+    private parts: RemoteServerParts,
+    private connections: ServerConnections
+  ) {}
+
+  handle(): RemoteServerHandle {
+    const { fastify, deviceRegistry } = this.parts
+    return {
+      start: () => this.start(),
+      stop: () => this.stop(),
+      disconnectAllClients: () => this.disconnectAllClients(),
+      isListening: () => this.listening,
+      /** The live device list, and a subscription to changes. */
+      devices: deviceRegistry,
+      inject: fastify.inject.bind(fastify),
+    }
+  }
+
+  private async start(): Promise<void> {
+    const { fastify, options, ticketStore, sessions } = this.parts
+    try {
+      await fastify.listen({ port: options.port, host: '0.0.0.0' })
+      ticketStore.startCleanup()
+      // Purge expired session tokens once per hour
+      this.sessionCleanupTimer = setInterval(
+        () => forEachSessionStore(sessions, (store) => store.sweep()),
+        60 * 60 * 1000
+      )
+      this.listening = true
+    } catch (err) {
+      await fastify.close().catch(() => {})
+      const code = (err as NodeJS.ErrnoException).code
+      if (code === 'EADDRINUSE') {
+        options.deps.onPortInUse(options.port)
+        throw new PortInUseError(options.port)
       }
-    },
+      throw err
+    }
+  }
 
-    async stop() {
-      if (!listening) return
-      ticketStore.stopCleanup()
-      if (sessionCleanupTimer) {
-        clearInterval(sessionCleanupTimer)
-        sessionCleanupTimer = null
-      }
-      appSessionStore.clear()
-      mobileSessionStore.clear()
-      loginSessionStore.clear()
-      await terminalCleanup.cleanup()
-      bridgeCleanup.disconnectAll()
-      subscriberManager.destroyAll()
-      await fastify.close()
-      listening = false
-    },
+  private async stop(): Promise<void> {
+    if (!this.listening) return
+    this.parts.ticketStore.stopCleanup()
+    if (this.sessionCleanupTimer) {
+      clearInterval(this.sessionCleanupTimer)
+      this.sessionCleanupTimer = null
+    }
+    forEachSessionStore(this.parts.sessions, (store) => store.clear())
+    await this.connections.terminalCleanup.cleanup()
+    this.connections.bridgeCleanup.disconnectAll()
+    this.parts.subscriberManager.destroyAll()
+    await this.parts.fastify.close()
+    this.listening = false
+  }
 
-    disconnectAllClients() {
-      appSessionStore.clear()
-      mobileSessionStore.clear()
-      loginSessionStore.clear()
-      // Kill all remote PTYs — password rotation invalidates existing sessions
-      void terminalCleanup.cleanup()
-      bridgeCleanup.disconnectAll()
-      subscriberManager.destroyAll()
-    },
-
-    isListening() {
-      return listening
-    },
-
-    /** The live device list, and a subscription to changes. */
-    devices: deviceRegistry,
-
-    inject: fastify.inject.bind(fastify),
+  private disconnectAllClients(): void {
+    forEachSessionStore(this.parts.sessions, (store) => store.clear())
+    // Kill all remote PTYs — password rotation invalidates existing sessions
+    void this.connections.terminalCleanup.cleanup()
+    this.connections.bridgeCleanup.disconnectAll()
+    this.parts.subscriberManager.destroyAll()
   }
 }

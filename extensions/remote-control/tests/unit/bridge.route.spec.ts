@@ -59,12 +59,44 @@ async function buildBridgeApp(): Promise<{
   return { app, ticketStore, bridgeCleanup }
 }
 
-describe('bridge.route', () => {
-  let app: FastifyInstance
-  let ticketStore: WsTicketStore
-  let bridgeCleanup: { disconnectAll: () => void }
-  let baseUrl: string
+/** Long enough for the server to act on a message that has no reply. */
+function settleBridge(): Promise<void> {
+  return new Promise((r) => setTimeout(r, 30))
+}
 
+async function openBridge(): Promise<WebSocket> {
+  const ticket = ticketStore.createTicket('__bridge__', 'bridge')
+  const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
+  await waitForOpen(ws)
+  return ws
+}
+
+/** Send one message and parse the reply. */
+async function requestOverBridge(ws: WebSocket, message: object): Promise<Record<string, unknown>> {
+  ws.send(JSON.stringify(message))
+  return JSON.parse(await waitForMessage(ws))
+}
+
+function invokeOverBridge(
+  ws: WebSocket,
+  request: { id: string; channel: string; args?: unknown[] }
+) {
+  return requestOverBridge(ws, { type: 'invoke', ...request })
+}
+
+async function closeBridge(ws: WebSocket): Promise<void> {
+  ws.close()
+  await waitForClose(ws)
+}
+
+let app: FastifyInstance
+let ticketStore: WsTicketStore
+let bridgeCleanup: { disconnectAll: () => void }
+let baseUrl: string
+
+describe('bridge.route', bridgeRouteTests)
+
+function bridgeRouteTests() {
   beforeEach(async () => {
     vi.resetModules()
     mockInvokeChannel = vi.fn().mockResolvedValue(undefined)
@@ -81,355 +113,339 @@ describe('bridge.route', () => {
     await app.close()
   })
 
-  describe('POST /api/bridge-ticket', () => {
-    it('returns 201 with a ticket string', async () => {
-      const res = await app.inject({ method: 'POST', url: '/api/bridge-ticket' })
-      expect(res.statusCode).toBe(201)
-      const body = JSON.parse(res.body) as { ticket: string }
-      expect(typeof body.ticket).toBe('string')
-      expect(body.ticket.length).toBeGreaterThan(0)
-    })
+  describe('POST /api/bridge-ticket', bridgeTicketEndpointTests)
+  describe('authentication', bridgeAuthenticationTests)
+  describe('subscribe messages', bridgeSubscribeTests)
+  describe('invoke messages', bridgeInvokeTests)
+  describe('send messages', bridgeSendTests)
+  describe('event forwarding', bridgeEventForwardingTests)
+  describe('disconnectAll()', bridgeDisconnectAllTests)
+  describe('close cleanup', bridgeCloseCleanupTests)
+  describe('ticket purpose scoping', bridgeTicketPurposeTests)
+  describe('invalid messages', bridgeInvalidMessageTests)
+  describe('remote-access allowlist', bridgeAllowlistTests)
+}
+
+function bridgeTicketEndpointTests() {
+  it('returns 201 with a ticket string', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/bridge-ticket' })
+    expect(res.statusCode).toBe(201)
+    const body = JSON.parse(res.body) as { ticket: string }
+    expect(typeof body.ticket).toBe('string')
+    expect(body.ticket.length).toBeGreaterThan(0)
+  })
+}
+
+function bridgeAuthenticationTests() {
+  it('closes connection when no ticket provided', async () => {
+    const ws = new WebSocket(`${baseUrl}/api/bridge`)
+    await waitForClose(ws)
   })
 
-  describe('authentication', () => {
-    it('closes connection when no ticket provided', async () => {
-      const ws = new WebSocket(`${baseUrl}/api/bridge`)
-      await waitForClose(ws)
-    })
-
-    it('closes connection when invalid ticket provided', async () => {
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=invalid-ticket`)
-      await waitForClose(ws)
-    })
-
-    it('accepts connection with a valid ticket', async () => {
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.close()
-      await waitForClose(ws)
-    })
-
-    it('rejects a ticket that has already been consumed', async () => {
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      ticketStore.consumeTicket(ticket, 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForClose(ws)
-    })
+  it('closes connection when invalid ticket provided', async () => {
+    const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=invalid-ticket`)
+    await waitForClose(ws)
   })
 
-  describe('subscribe messages', () => {
-    it('subscribes to a channel via onWindowEvent', async () => {
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-
-      ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-      await new Promise((r) => setTimeout(r, 30))
-
-      expect(mockOnWindowEvent).toHaveBeenCalledWith('terminal:output', expect.any(Function))
-      ws.close()
-      await waitForClose(ws)
-    })
-
-    it('does not double-subscribe to the same channel', async () => {
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-
-      ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-      ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-      await new Promise((r) => setTimeout(r, 30))
-
-      const calls = mockOnWindowEvent.mock.calls.filter(([ch]) => ch === 'terminal:output')
-      expect(calls.length).toBe(1)
-      ws.close()
-      await waitForClose(ws)
-    })
+  it('accepts connection with a valid ticket', async () => {
+    const ws = await openBridge()
+    await closeBridge(ws)
   })
 
-  describe('invoke messages', () => {
-    it('dispatches invoke to invokeChannel and sends result back', async () => {
-      mockInvokeChannel.mockImplementation(async (ch: string) => {
-        if (ch === 'workspace:list') return [{ id: 'ws-1', name: 'Test' }]
+  it('rejects a ticket that has already been consumed', async () => {
+    const ticket = ticketStore.createTicket('__bridge__', 'bridge')
+    ticketStore.consumeTicket(ticket, 'bridge')
+    const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
+    await waitForClose(ws)
+  })
+}
+
+function bridgeSubscribeTests() {
+  it('subscribes to a channel via onWindowEvent', async () => {
+    const ws = await openBridge()
+
+    ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
+    await settleBridge()
+
+    expect(mockOnWindowEvent).toHaveBeenCalledWith('terminal:output', expect.any(Function))
+    await closeBridge(ws)
+  })
+
+  it('does not double-subscribe to the same channel', async () => {
+    const ws = await openBridge()
+
+    ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
+    ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
+    await settleBridge()
+
+    const calls = mockOnWindowEvent.mock.calls.filter(([ch]) => ch === 'terminal:output')
+    expect(calls.length).toBe(1)
+    await closeBridge(ws)
+  })
+}
+
+function bridgeInvokeTests() {
+  describe('with a result', bridgeInvokeResultTests)
+  describe('with an empty or failed result', bridgeInvokeEdgeTests)
+}
+
+function bridgeInvokeResultTests() {
+  it('dispatches invoke to invokeChannel and sends result back', async () => {
+    mockInvokeChannel.mockImplementation(async (ch: string) => {
+      if (ch === 'workspace:list') return [{ id: 'ws-1', name: 'Test' }]
+    })
+
+    const ws = await openBridge()
+    const parsed = await invokeOverBridge(ws, { id: 'r1', channel: 'workspace:list', args: [{}] })
+
+    expect(parsed.type).toBe('result')
+    expect(parsed.id).toBe('r1')
+    expect(parsed.result).toEqual([{ id: 'ws-1', name: 'Test' }])
+    await closeBridge(ws)
+  })
+
+  it('defaults to {} when an invoke message omits args', async () => {
+    mockInvokeChannel.mockResolvedValue('ok')
+
+    const ws = await openBridge()
+    const parsed = await invokeOverBridge(ws, { id: 'r0', channel: 'workspace:list' })
+
+    expect(parsed.type).toBe('result')
+    expect(parsed.id).toBe('r0')
+    expect(mockInvokeChannel).toHaveBeenCalledWith('workspace:list', {})
+    await closeBridge(ws)
+  })
+}
+
+function bridgeInvokeEdgeTests() {
+  it('sends result: undefined when invokeChannel returns undefined', async () => {
+    mockInvokeChannel.mockResolvedValue(undefined)
+
+    const ws = await openBridge()
+    const parsed = await invokeOverBridge(ws, { id: 'r2', channel: 'nonexistent', args: [{}] })
+
+    expect(parsed.type).toBe('result')
+    expect(parsed.id).toBe('r2')
+    await closeBridge(ws)
+  })
+
+  it('sends error response when invokeChannel throws', async () => {
+    mockInvokeChannel.mockRejectedValue(new Error('validation failed'))
+
+    const ws = await openBridge()
+    const parsed = await invokeOverBridge(ws, { id: 'r3', channel: 'workspace:create', args: [{}] })
+
+    expect(parsed.type).toBe('error')
+    expect(parsed.id).toBe('r3')
+    expect(parsed.error).toContain('validation failed')
+    await closeBridge(ws)
+  })
+}
+
+function bridgeSendTests() {
+  describe('dispatching', bridgeSendDispatchTests)
+  describe('missing args and unknown channels', bridgeSendEdgeTests)
+}
+
+function bridgeSendDispatchTests() {
+  it('dispatches fire-and-forget via sendChannel', async () => {
+    const ws = await openBridge()
+    ws.send(
+      JSON.stringify({
+        type: 'send',
+        channel: 'terminal:input',
+        args: [{ sessionId: 's1', data: 'ls' }],
       })
+    )
+    await settleBridge()
 
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.send(JSON.stringify({ type: 'invoke', id: 'r1', channel: 'workspace:list', args: [{}] }))
-
-      const msg = await waitForMessage(ws)
-      const parsed = JSON.parse(msg)
-
-      expect(parsed.type).toBe('result')
-      expect(parsed.id).toBe('r1')
-      expect(parsed.result).toEqual([{ id: 'ws-1', name: 'Test' }])
-      ws.close()
-      await waitForClose(ws)
+    expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {
+      sessionId: 's1',
+      data: 'ls',
     })
+    await closeBridge(ws)
+  })
+}
 
-    it('defaults to {} when an invoke message omits args', async () => {
-      mockInvokeChannel.mockResolvedValue('ok')
+function bridgeSendEdgeTests() {
+  it('defaults to {} when a send message omits args', async () => {
+    const ws = await openBridge()
+    ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input' }))
+    await settleBridge()
 
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.send(JSON.stringify({ type: 'invoke', id: 'r0', channel: 'workspace:list' }))
-
-      const msg = await waitForMessage(ws)
-      const parsed = JSON.parse(msg)
-
-      expect(parsed.type).toBe('result')
-      expect(parsed.id).toBe('r0')
-      expect(mockInvokeChannel).toHaveBeenCalledWith('workspace:list', {})
-      ws.close()
-      await waitForClose(ws)
-    })
-
-    it('sends result: undefined when invokeChannel returns undefined', async () => {
-      mockInvokeChannel.mockResolvedValue(undefined)
-
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.send(JSON.stringify({ type: 'invoke', id: 'r2', channel: 'nonexistent', args: [{}] }))
-
-      const msg = await waitForMessage(ws)
-      const parsed = JSON.parse(msg)
-
-      expect(parsed.type).toBe('result')
-      expect(parsed.id).toBe('r2')
-      ws.close()
-      await waitForClose(ws)
-    })
-
-    it('sends error response when invokeChannel throws', async () => {
-      mockInvokeChannel.mockRejectedValue(new Error('validation failed'))
-
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.send(JSON.stringify({ type: 'invoke', id: 'r3', channel: 'workspace:create', args: [{}] }))
-
-      const msg = await waitForMessage(ws)
-      const parsed = JSON.parse(msg)
-
-      expect(parsed.type).toBe('error')
-      expect(parsed.id).toBe('r3')
-      expect(parsed.error).toContain('validation failed')
-      ws.close()
-      await waitForClose(ws)
-    })
+    expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {})
+    await closeBridge(ws)
   })
 
-  describe('send messages', () => {
-    it('dispatches fire-and-forget via sendChannel', async () => {
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.send(
-        JSON.stringify({
-          type: 'send',
-          channel: 'terminal:input',
-          args: [{ sessionId: 's1', data: 'ls' }],
-        })
-      )
-      await new Promise((r) => setTimeout(r, 30))
+  it('ignores send for unknown channel (no crash)', async () => {
+    const ws = await openBridge()
+    ws.send(JSON.stringify({ type: 'send', channel: 'no:handler', args: [{}] }))
+    await settleBridge()
+    await closeBridge(ws)
+  })
+}
 
-      expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {
-        sessionId: 's1',
-        data: 'ls',
-      })
-      ws.close()
-      await waitForClose(ws)
-    })
+function bridgeEventForwardingTests() {
+  it('forwards onWindowEvent events to subscribed client', async () => {
+    const ws = await openBridge()
+    ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
+    await settleBridge()
 
-    it('defaults to {} when a send message omits args', async () => {
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input' }))
-      await new Promise((r) => setTimeout(r, 30))
+    const [[, forwarder]] = mockOnWindowEvent.mock.calls as [[string, (...a: unknown[]) => void]]
+    forwarder({ sessionId: 's1', data: 'hello' })
 
-      expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {})
-      ws.close()
-      await waitForClose(ws)
-    })
+    const parsed = JSON.parse(await waitForMessage(ws))
+    expect(parsed.type).toBe('event')
+    expect(parsed.channel).toBe('terminal:output')
+    await closeBridge(ws)
+  })
+}
 
-    it('ignores send for unknown channel (no crash)', async () => {
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.send(JSON.stringify({ type: 'send', channel: 'no:handler', args: [{}] }))
-      await new Promise((r) => setTimeout(r, 30))
-      ws.close()
-      await waitForClose(ws)
-    })
+function bridgeDisconnectAllTests() {
+  it('closes all active bridge connections', async () => {
+    const ticket1 = ticketStore.createTicket('__bridge__', 'bridge')
+    const ticket2 = ticketStore.createTicket('__bridge__', 'bridge')
+    const ws1 = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket1}`)
+    const ws2 = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket2}`)
+    await waitForOpen(ws1)
+    await waitForOpen(ws2)
+
+    bridgeCleanup.disconnectAll()
+
+    await waitForClose(ws1)
+    await waitForClose(ws2)
+  }, 20000)
+
+  it('is safe to call when no connections are open', () => {
+    expect(() => bridgeCleanup.disconnectAll()).not.toThrow()
+  })
+}
+
+function bridgeCloseCleanupTests() {
+  it('calls the unsub function returned by onWindowEvent on disconnect', async () => {
+    const unsub = vi.fn()
+    mockOnWindowEvent.mockReturnValue(unsub)
+
+    const ws = await openBridge()
+    ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
+    await settleBridge()
+
+    await closeBridge(ws)
+    await settleBridge()
+
+    expect(unsub).toHaveBeenCalled()
+  })
+}
+
+function bridgeTicketPurposeTests() {
+  it('rejects a terminal-purpose ticket on the bridge endpoint', async () => {
+    const terminalTicket = ticketStore.createTicket('some-session-id', 'terminal')
+    const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${terminalTicket}`)
+    await waitForClose(ws)
   })
 
-  describe('event forwarding', () => {
-    it('forwards onWindowEvent events to subscribed client', async () => {
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-      await new Promise((r) => setTimeout(r, 30))
+  it('rejects an app-purpose ticket on the bridge endpoint', async () => {
+    const appTicket = ticketStore.createTicket('__app__', 'app')
+    const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${appTicket}`)
+    await waitForClose(ws)
+  })
+}
 
-      const [[, forwarder]] = mockOnWindowEvent.mock.calls as [[string, (...a: unknown[]) => void]]
-      forwarder({ sessionId: 's1', data: 'hello' })
-
-      const msg = await waitForMessage(ws)
-      const parsed = JSON.parse(msg)
-      expect(parsed.type).toBe('event')
-      expect(parsed.channel).toBe('terminal:output')
-      ws.close()
-      await waitForClose(ws)
-    })
+function bridgeInvalidMessageTests() {
+  it('ignores non-JSON messages without crashing', async () => {
+    const ws = await openBridge()
+    ws.send('not json at all')
+    await settleBridge()
+    await closeBridge(ws)
   })
 
-  describe('disconnectAll()', () => {
-    it('closes all active bridge connections', async () => {
-      const ticket1 = ticketStore.createTicket('__bridge__', 'bridge')
-      const ticket2 = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws1 = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket1}`)
-      const ws2 = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket2}`)
-      await waitForOpen(ws1)
-      await waitForOpen(ws2)
-
-      bridgeCleanup.disconnectAll()
-
-      await waitForClose(ws1)
-      await waitForClose(ws2)
-    }, 20000)
-
-    it('is safe to call when no connections are open', () => {
-      expect(() => bridgeCleanup.disconnectAll()).not.toThrow()
-    })
+  it('ignores a message without a channel, and an invoke without an id', async () => {
+    const ws = await openBridge()
+    ws.send(JSON.stringify({ type: 'invoke', id: 'r1' }))
+    ws.send(JSON.stringify({ type: 'invoke', channel: 'workspace:list' }))
+    ws.send(JSON.stringify({ type: 'subscribe' }))
+    await settleBridge()
+    expect(mockInvokeChannel).not.toHaveBeenCalled()
+    expect(mockIsRemoteAccessible).not.toHaveBeenCalled()
+    await closeBridge(ws)
   })
+}
 
-  describe('close cleanup', () => {
-    it('calls the unsub function returned by onWindowEvent on disconnect', async () => {
-      const unsub = vi.fn()
-      mockOnWindowEvent.mockReturnValue(unsub)
+function bridgeAllowlistTests() {
+  describe('denying invoke', bridgeAllowlistInvokeDenyTests)
+  describe('allowing invoke', bridgeAllowlistInvokeAllowTests)
+  describe('denying subscribe and send', bridgeAllowlistDenyTests)
+  describe('allowing subscribe and send', bridgeAllowlistAllowTests)
+}
 
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-      await new Promise((r) => setTimeout(r, 30))
+function bridgeAllowlistInvokeDenyTests() {
+  it('rejects invoke for a non-allowlisted channel with type:error', async () => {
+    mockIsRemoteAccessible.mockReturnValue(false)
 
-      ws.close()
-      await waitForClose(ws)
-      await new Promise((r) => setTimeout(r, 30))
-
-      expect(unsub).toHaveBeenCalled()
+    const ws = await openBridge()
+    const parsed = await invokeOverBridge(ws, {
+      id: 'sec1',
+      channel: 'dialog:open-directory',
+      args: [{}],
     })
+
+    expect(parsed.type).toBe('error')
+    expect(parsed.id).toBe('sec1')
+    expect(parsed.error).toBe('channel not remote-accessible')
+    expect(mockInvokeChannel).not.toHaveBeenCalled()
+    await closeBridge(ws)
   })
+}
 
-  describe('ticket purpose scoping', () => {
-    it('rejects a terminal-purpose ticket on the bridge endpoint', async () => {
-      const terminalTicket = ticketStore.createTicket('some-session-id', 'terminal')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${terminalTicket}`)
-      await waitForClose(ws)
+function bridgeAllowlistInvokeAllowTests() {
+  it('executes handler for an allowlisted channel', async () => {
+    mockIsRemoteAccessible.mockImplementation((ch: string) => ch === 'terminal:create')
+    mockInvokeChannel.mockResolvedValue({ sessionId: 's1' })
+
+    const ws = await openBridge()
+    const parsed = await invokeOverBridge(ws, {
+      id: 'sec2',
+      channel: 'terminal:create',
+      args: [{}],
     })
 
-    it('rejects an app-purpose ticket on the bridge endpoint', async () => {
-      const appTicket = ticketStore.createTicket('__app__', 'app')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${appTicket}`)
-      await waitForClose(ws)
-    })
+    expect(parsed.type).toBe('result')
+    expect(parsed.id).toBe('sec2')
+    expect(mockInvokeChannel).toHaveBeenCalledWith('terminal:create', {})
+    await closeBridge(ws)
   })
+}
 
-  describe('invalid messages', () => {
-    it('ignores non-JSON messages without crashing', async () => {
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.send('not json at all')
-      await new Promise((r) => setTimeout(r, 30))
-      ws.close()
-      await waitForClose(ws)
-    })
+function bridgeAllowlistDenyTests() {
+  it('rejects subscribe and send for non-allowlisted channels (default-deny)', async () => {
+    mockIsRemoteAccessible.mockReturnValue(false)
+
+    const ws = await openBridge()
+
+    ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
+    ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input', args: [{}] }))
+    await settleBridge()
+
+    expect(mockOnWindowEvent).not.toHaveBeenCalled()
+    expect(mockSendChannel).not.toHaveBeenCalled()
+    await closeBridge(ws)
   })
+}
 
-  describe('remote-access allowlist', () => {
-    it('rejects invoke for a non-allowlisted channel with type:error', async () => {
-      mockIsRemoteAccessible.mockReturnValue(false)
+function bridgeAllowlistAllowTests() {
+  it('allows subscribe and send for allowlisted channels', async () => {
+    mockIsRemoteAccessible.mockImplementation((ch: string) =>
+      ['terminal:output', 'terminal:input'].includes(ch)
+    )
 
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.send(
-        JSON.stringify({ type: 'invoke', id: 'sec1', channel: 'dialog:open-directory', args: [{}] })
-      )
+    const ws = await openBridge()
 
-      const msg = await waitForMessage(ws)
-      const parsed = JSON.parse(msg)
+    ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
+    ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input', args: [{}] }))
+    await settleBridge()
 
-      expect(parsed.type).toBe('error')
-      expect(parsed.id).toBe('sec1')
-      expect(parsed.error).toBe('channel not remote-accessible')
-      expect(mockInvokeChannel).not.toHaveBeenCalled()
-      ws.close()
-      await waitForClose(ws)
-    })
-
-    it('executes handler for an allowlisted channel', async () => {
-      mockIsRemoteAccessible.mockImplementation((ch: string) => ch === 'terminal:create')
-      mockInvokeChannel.mockResolvedValue({ sessionId: 's1' })
-
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-      ws.send(
-        JSON.stringify({ type: 'invoke', id: 'sec2', channel: 'terminal:create', args: [{}] })
-      )
-
-      const msg = await waitForMessage(ws)
-      const parsed = JSON.parse(msg)
-
-      expect(parsed.type).toBe('result')
-      expect(parsed.id).toBe('sec2')
-      expect(mockInvokeChannel).toHaveBeenCalledWith('terminal:create', {})
-      ws.close()
-      await waitForClose(ws)
-    })
-
-    it('rejects subscribe and send for non-allowlisted channels (default-deny)', async () => {
-      mockIsRemoteAccessible.mockReturnValue(false)
-
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-
-      ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-      ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input', args: [{}] }))
-      await new Promise((r) => setTimeout(r, 30))
-
-      expect(mockOnWindowEvent).not.toHaveBeenCalled()
-      expect(mockSendChannel).not.toHaveBeenCalled()
-      ws.close()
-      await waitForClose(ws)
-    })
-
-    it('allows subscribe and send for allowlisted channels', async () => {
-      mockIsRemoteAccessible.mockImplementation((ch: string) =>
-        ['terminal:output', 'terminal:input'].includes(ch)
-      )
-
-      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-      await waitForOpen(ws)
-
-      ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-      ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input', args: [{}] }))
-      await new Promise((r) => setTimeout(r, 30))
-
-      expect(mockOnWindowEvent).toHaveBeenCalledWith('terminal:output', expect.any(Function))
-      expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {})
-      ws.close()
-      await waitForClose(ws)
-    })
+    expect(mockOnWindowEvent).toHaveBeenCalledWith('terminal:output', expect.any(Function))
+    expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {})
+    await closeBridge(ws)
   })
-})
+}

@@ -45,68 +45,7 @@ function cookieOf(response: { headers: Record<string, unknown> }): string {
   return String(response.headers['set-cookie']).split(';')[0]
 }
 
-describe('POST /api/login', () => {
-  it('answers a correct password with a session cookie that authorises later requests', async () => {
-    const res = await login(PASSWORD)
-    expect(res.statusCode).toBe(200)
-    const protectedRes = await app.inject({
-      method: 'GET',
-      url: '/api/protected',
-      headers: { cookie: cookieOf(res) },
-    })
-    expect(protectedRes.statusCode).toBe(200)
-  })
-
-  it('issues an HttpOnly, SameSite=Strict cookie that is not the password', async () => {
-    const res = await login(PASSWORD)
-    const setCookie = String(res.headers['set-cookie'])
-    expect(setCookie).toMatch(/HttpOnly/)
-    expect(setCookie).toMatch(/SameSite=Strict/)
-    expect(setCookie).not.toContain(PASSWORD)
-    expect(res.body).not.toContain(PASSWORD)
-  })
-
-  it('rejects a wrong password without issuing a cookie', async () => {
-    const res = await login('wrong-password')
-    expect(res.statusCode).toBe(401)
-    expect(res.headers['set-cookie']).toBeUndefined()
-  })
-
-  it('rejects a missing, non-string or empty password', async () => {
-    for (const password of [undefined, 42, '']) {
-      expect((await login(password)).statusCode).toBe(401)
-    }
-  })
-
-  it('rejects every login while no password is set', async () => {
-    storedHash = ''
-    const res = await login('')
-    storedHash = await hashPassword(PASSWORD)
-    expect(res.statusCode).toBe(401)
-  })
-
-  it('locks a client out after repeated wrong passwords, even for the right one', async () => {
-    // Every password is wrong while none is set, without a scrypt derivation
-    // for each of the ten (16 MiB each, seconds in all on a busy machine).
-    const realHash = storedHash
-    storedHash = ''
-    for (let attempt = 0; attempt < 10; attempt++) {
-      expect((await login('wrong-password')).statusCode).toBe(401)
-    }
-    storedHash = realHash
-    expect((await login(PASSWORD)).statusCode).toBe(429)
-  })
-
-  it('refuses a request whose Host is not local, LAN or tunnel', async () => {
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/login',
-      headers: { host: 'evil.attacker.com' },
-      payload: { password: PASSWORD },
-    })
-    expect(res.statusCode).toBe(403)
-  })
-})
+describe('POST /api/login', loginRouteTests)
 
 describe('requests after login', () => {
   it('are refused without the session cookie', async () => {
@@ -131,3 +70,76 @@ describe('requests after login', () => {
     expect(res.statusCode).toBe(401)
   })
 })
+
+function loginRouteTests() {
+  describe('accepting the password', loginAcceptTests)
+  describe('rejecting a login', loginRejectTests)
+  describe('lockout and Host checks', loginLockoutTests)
+}
+
+function loginAcceptTests() {
+  it('answers a correct password with a session cookie that authorises later requests', async () => {
+    const res = await login(PASSWORD)
+    expect(res.statusCode).toBe(200)
+    const protectedRes = await app.inject({
+      method: 'GET',
+      url: '/api/protected',
+      headers: { cookie: cookieOf(res) },
+    })
+    expect(protectedRes.statusCode).toBe(200)
+  })
+
+  it('issues an HttpOnly, SameSite=Strict cookie that is not the password', async () => {
+    const res = await login(PASSWORD)
+    const setCookie = String(res.headers['set-cookie'])
+    expect(setCookie).toMatch(/HttpOnly/)
+    expect(setCookie).toMatch(/SameSite=Strict/)
+    expect(setCookie).not.toContain(PASSWORD)
+    expect(res.body).not.toContain(PASSWORD)
+  })
+}
+
+function loginRejectTests() {
+  it('rejects a wrong password without issuing a cookie', async () => {
+    const res = await login('wrong-password')
+    expect(res.statusCode).toBe(401)
+    expect(res.headers['set-cookie']).toBeUndefined()
+  })
+
+  it('rejects a missing, non-string or empty password', async () => {
+    for (const password of [undefined, 42, '']) {
+      expect((await login(password)).statusCode).toBe(401)
+    }
+  })
+
+  it('rejects every login while no password is set', async () => {
+    storedHash = ''
+    const res = await login('')
+    storedHash = await hashPassword(PASSWORD)
+    expect(res.statusCode).toBe(401)
+  })
+}
+
+function loginLockoutTests() {
+  it('locks a client out after repeated wrong passwords, even for the right one', async () => {
+    // Every password is wrong while none is set, without a scrypt derivation
+    // for each of the ten (16 MiB each, seconds in all on a busy machine).
+    const realHash = storedHash
+    storedHash = ''
+    for (let attempt = 0; attempt < 10; attempt++) {
+      expect((await login('wrong-password')).statusCode).toBe(401)
+    }
+    storedHash = realHash
+    expect((await login(PASSWORD)).statusCode).toBe(429)
+  })
+
+  it('refuses a request whose Host is not local, LAN or tunnel', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/login',
+      headers: { host: 'evil.attacker.com' },
+      payload: { password: PASSWORD },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+}

@@ -50,7 +50,70 @@ describe('startOrResumeReview', () => {
   })
 })
 
-describe('logReviewAction', () => {
+describe('logReviewAction', logReviewActionTests)
+describe('completeReview', completeReviewTests)
+describe('listReviews', listReviewsTests)
+
+describe('getReview', () => {
+  it('returns null for an unknown id', async () => {
+    expect(await getReview(db, 'nope')).toBeNull()
+  })
+})
+
+describe('lastCompletedReviewDate', () => {
+  it('is null before any review is completed', async () => {
+    await startOrResumeReview(db)
+    expect(await lastCompletedReviewDate(db)).toBeNull()
+  })
+
+  it('returns the most recent completion', async () => {
+    const first = await startOrResumeReview(db, '2026-01-05T09:00:00.000Z')
+    await completeReview(db, { reviewId: first.review.id }, '2026-01-05T10:00:00.000Z')
+    const second = await startOrResumeReview(db, '2026-01-12T09:00:00.000Z')
+    await completeReview(db, { reviewId: second.review.id }, '2026-01-12T10:00:00.000Z')
+
+    expect(await lastCompletedReviewDate(db)).toBe('2026-01-12T10:00:00.000Z')
+  })
+})
+
+function makeDetail(overrides: Partial<WeeklyReviewDetail> = {}): WeeklyReviewDetail {
+  return {
+    id: 'r1',
+    startedAt: '2026-01-05T09:00:00.000Z',
+    completedAt: '2026-01-05T10:00:00.000Z',
+    status: 'completed',
+    worked: null,
+    didntWork: null,
+    tryNext: null,
+    actions: [],
+    ...overrides,
+  }
+}
+
+function action(over: Partial<WeeklyReviewDetail['actions'][number]>) {
+  return {
+    id: 'a1',
+    reviewId: 'r1',
+    step: 1,
+    action: 'captured' as const,
+    entityType: 'task' as const,
+    entityId: null,
+    entityLabel: 'something',
+    detail: null,
+    createdAt: '2026-01-05T09:05:00.000Z',
+    ...over,
+  }
+}
+
+describe('formatReviewMarkdown', formatReviewMarkdownTests)
+
+function logReviewActionTests() {
+  describe('recording', logReviewActionRecordingTests)
+  describe('detail', logReviewActionDetailTests)
+  describe('order', logReviewActionOrderTests)
+}
+
+function logReviewActionRecordingTests() {
   it('records an action against the review', async () => {
     const { review } = await startOrResumeReview(db)
     await logReviewAction(db, {
@@ -73,7 +136,9 @@ describe('logReviewAction', () => {
       detail: null,
     })
   })
+}
 
+function logReviewActionDetailTests() {
   it('records optional detail such as a new project status', async () => {
     const { review } = await startOrResumeReview(db)
     await logReviewAction(db, {
@@ -88,7 +153,9 @@ describe('logReviewAction', () => {
     const stored = await getReview(db, review.id)
     expect(stored?.actions[0].detail).toBe('archived')
   })
+}
 
+function logReviewActionOrderTests() {
   it('keeps actions in the order they happened', async () => {
     const { review } = await startOrResumeReview(db)
     for (const [i, label] of ['first', 'second', 'third'].entries()) {
@@ -108,9 +175,14 @@ describe('logReviewAction', () => {
     const stored = await getReview(db, review.id)
     expect(stored?.actions.map((a) => a.entityLabel)).toEqual(['first', 'second', 'third'])
   })
-})
+}
 
-describe('completeReview', () => {
+function completeReviewTests() {
+  describe('completing', completeReviewCompletingTests)
+  describe('blanks', completeReviewBlanksTests)
+}
+
+function completeReviewCompletingTests() {
   it('stores the reflection answers and marks the review complete', async () => {
     const { review } = await startOrResumeReview(db)
     await completeReview(
@@ -133,7 +205,9 @@ describe('completeReview', () => {
       tryNext: 'Block mornings',
     })
   })
+}
 
+function completeReviewBlanksTests() {
   it('stores blank answers as null rather than empty strings', async () => {
     const { review } = await startOrResumeReview(db)
     await completeReview(db, { reviewId: review.id, worked: '   ', didntWork: '' })
@@ -143,13 +217,20 @@ describe('completeReview', () => {
     expect(stored?.didntWork).toBeNull()
     expect(stored?.tryNext).toBeNull()
   })
-})
+}
 
-describe('listReviews', () => {
+function listReviewsTests() {
+  describe('empty', listReviewsEmptyTests)
+  describe('ordering and limits', listReviewsOrderingLimitsTests)
+}
+
+function listReviewsEmptyTests() {
   it('returns nothing before any review exists', async () => {
     expect(await listReviews(db)).toEqual([])
   })
+}
 
+function listReviewsOrderingLimitsTests() {
   it('returns newest first with an action count', async () => {
     const older = await startOrResumeReview(db, '2026-01-05T09:00:00.000Z')
     await logReviewAction(db, {
@@ -178,60 +259,15 @@ describe('listReviews', () => {
     }
     expect(await listReviews(db, 2)).toHaveLength(2)
   })
-})
+}
 
-describe('getReview', () => {
-  it('returns null for an unknown id', async () => {
-    expect(await getReview(db, 'nope')).toBeNull()
-  })
-})
+function formatReviewMarkdownTests() {
+  describe('header', formatReviewMarkdownHeaderTests)
+  describe('actions', formatReviewMarkdownActionsTests)
+  describe('reflection and ending', formatReviewMarkdownReflectionEndingTests)
+}
 
-describe('lastCompletedReviewDate', () => {
-  it('is null before any review is completed', async () => {
-    await startOrResumeReview(db)
-    expect(await lastCompletedReviewDate(db)).toBeNull()
-  })
-
-  it('returns the most recent completion', async () => {
-    const first = await startOrResumeReview(db, '2026-01-05T09:00:00.000Z')
-    await completeReview(db, { reviewId: first.review.id }, '2026-01-05T10:00:00.000Z')
-    const second = await startOrResumeReview(db, '2026-01-12T09:00:00.000Z')
-    await completeReview(db, { reviewId: second.review.id }, '2026-01-12T10:00:00.000Z')
-
-    expect(await lastCompletedReviewDate(db)).toBe('2026-01-12T10:00:00.000Z')
-  })
-})
-
-describe('formatReviewMarkdown', () => {
-  function makeDetail(overrides: Partial<WeeklyReviewDetail> = {}): WeeklyReviewDetail {
-    return {
-      id: 'r1',
-      startedAt: '2026-01-05T09:00:00.000Z',
-      completedAt: '2026-01-05T10:00:00.000Z',
-      status: 'completed',
-      worked: null,
-      didntWork: null,
-      tryNext: null,
-      actions: [],
-      ...overrides,
-    }
-  }
-
-  function action(over: Partial<WeeklyReviewDetail['actions'][number]>) {
-    return {
-      id: 'a1',
-      reviewId: 'r1',
-      step: 1,
-      action: 'captured' as const,
-      entityType: 'task' as const,
-      entityId: null,
-      entityLabel: 'something',
-      detail: null,
-      createdAt: '2026-01-05T09:05:00.000Z',
-      ...over,
-    }
-  }
-
+function formatReviewMarkdownHeaderTests() {
   it('titles the document with the review date', () => {
     expect(formatReviewMarkdown(makeDetail())).toContain('# Weekly Review — 2026-01-05')
   })
@@ -240,7 +276,14 @@ describe('formatReviewMarkdown', () => {
     const md = formatReviewMarkdown(makeDetail({ completedAt: null, status: 'in_progress' }))
     expect(md).toContain('Completed: not completed')
   })
+}
 
+function formatReviewMarkdownActionsTests() {
+  describe('groups actions under', formatReviewMarkdownActionsGroupsActionsUnderTests)
+  describe('appends action detail', formatReviewMarkdownActionsAppendsActionDetailTests)
+}
+
+function formatReviewMarkdownActionsGroupsActionsUnderTests() {
   it('groups actions under a heading per kind', () => {
     const md = formatReviewMarkdown(
       makeDetail({
@@ -255,7 +298,9 @@ describe('formatReviewMarkdown', () => {
     expect(md).toContain('## Archived')
     expect(md).toContain('- Old idea')
   })
+}
 
+function formatReviewMarkdownActionsAppendsActionDetailTests() {
   it('appends action detail after the label', () => {
     const md = formatReviewMarkdown(
       makeDetail({
@@ -270,7 +315,9 @@ describe('formatReviewMarkdown', () => {
     expect(md).toContain('## Captured')
     expect(md).not.toContain('## Deleted')
   })
+}
 
+function formatReviewMarkdownReflectionEndingTests() {
   it('includes the reflection when answers were given', () => {
     const md = formatReviewMarkdown(makeDetail({ worked: 'small PRs', tryNext: 'more of that' }))
     expect(md).toContain('## Reflection')
@@ -287,4 +334,4 @@ describe('formatReviewMarkdown', () => {
     expect(md.endsWith('\n')).toBe(true)
     expect(md.endsWith('\n\n')).toBe(false)
   })
-})
+}
