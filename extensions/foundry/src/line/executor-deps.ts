@@ -305,12 +305,10 @@ async function readObservedChange(
     const against = baseBranchOf(context.order, checkout)
     changedFiles.push(...(await readChangedFiles(checkout.path, against, context.diffCommand)))
     // A lockfile's lines would turn every new dependency into a "large change".
-    const summary = await readDiffSummary(
-      checkout.path,
-      against,
-      context.diffCommand,
-      (file) => !isLockfile(file)
-    )
+    const summary = await readDiffSummary(checkout.path, against, {
+      run: context.diffCommand,
+      weighLines: (file) => !isLockfile(file),
+    })
     linesChanged += summary.added + summary.removed
   }
   return { changedFiles, linesChanged }

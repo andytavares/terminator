@@ -83,7 +83,8 @@ function git(over: { diff?: string; untracked?: string; ok?: boolean } = {}) {
 // A new file's lines count towards the change like any other, so the
 // 300-line review trigger sees work that arrived as new files.
 let dir: string
-const summarise = (untracked: string) => readDiffSummary(dir, 'main', git({ diff: '', untracked }))
+const summarise = (untracked: string) =>
+  readDiffSummary(dir, 'main', { run: git({ diff: '', untracked }) })
 
 describe('counting the lines in a file git has never seen', () => {
   beforeEach(() => {
@@ -133,7 +134,7 @@ function binaryHugeAndUnreadableFilesTests() {
 function anUnlistableTreeTests() {
   it('reports nothing untracked when git cannot list it', async () => {
     const run = vi.fn(async () => ({ ok: false, stdout: '', stderr: 'no' }))
-    await expect(readDiffSummary(dir, 'main', run)).resolves.toEqual({
+    await expect(readDiffSummary(dir, 'main', { run })).resolves.toEqual({
       files: 0,
       added: 0,
       removed: 0,
@@ -150,7 +151,7 @@ describe('readDiffSummary', () => {
 function askingTests() {
   it('asks git for numeric stats against the merge base', async () => {
     const run = vi.fn().mockResolvedValue({ ok: true, stdout: '1\t1\ta.ts\n', stderr: '' })
-    await readDiffSummary('/wt/s1', 'main', run)
+    await readDiffSummary('/wt/s1', 'main', { run })
     const [command, args, cwd] = run.mock.calls[0]
     expect(command).toBe('git')
     expect(args).toContain('--numstat')
@@ -158,13 +159,13 @@ function askingTests() {
   })
 
   it('returns the parsed summary', async () => {
-    await expect(readDiffSummary('/wt/s1', 'main', git({ diff: '5\t2\ta.ts\n' }))).resolves.toEqual(
-      {
-        files: 1,
-        added: 5,
-        removed: 2,
-      }
-    )
+    await expect(
+      readDiffSummary('/wt/s1', 'main', { run: git({ diff: '5\t2\ta.ts\n' }) })
+    ).resolves.toEqual({
+      files: 1,
+      added: 5,
+      removed: 2,
+    })
   })
 }
 
@@ -173,17 +174,15 @@ function untrackedAndIgnoredFilesTests() {
     // Creating files is most of what an agent does. Missed, an agent whose
     // whole job was to add them reported having changed nothing — no review, no
     // `ready`, and a session recorded as having finished without doing anything.
-    const summary = await readDiffSummary(
-      '/wt/s1',
-      'main',
-      git({ diff: '5\t2\ta.ts\n', untracked: 'new.ts\n' })
-    )
+    const summary = await readDiffSummary('/wt/s1', 'main', {
+      run: git({ diff: '5\t2\ta.ts\n', untracked: 'new.ts\n' }),
+    })
     expect(summary.files).toBe(2)
   })
 
   it('asks git to honour .gitignore, so build output is not a change', async () => {
     const run = git({ untracked: '' })
-    await readDiffSummary('/wt/s1', 'main', run)
+    await readDiffSummary('/wt/s1', 'main', { run })
     const lsFiles = run.mock.calls.find((call) => call[1].includes('ls-files'))
     expect(lsFiles?.[1]).toContain('--exclude-standard')
   })
@@ -192,7 +191,7 @@ function untrackedAndIgnoredFilesTests() {
 function failuresTests() {
   it('reports an empty summary when git fails, rather than throwing', async () => {
     const run = vi.fn().mockResolvedValue({ ok: false, stdout: '', stderr: 'not a repository' })
-    await expect(readDiffSummary('/wt/s1', 'main', run)).resolves.toEqual({
+    await expect(readDiffSummary('/wt/s1', 'main', { run })).resolves.toEqual({
       files: 0,
       added: 0,
       removed: 0,
@@ -201,7 +200,7 @@ function failuresTests() {
 
   it('reports an empty summary when git cannot be run at all', async () => {
     const run = vi.fn().mockRejectedValue(new Error('ENOENT'))
-    await expect(readDiffSummary('/wt/s1', 'main', run)).resolves.toEqual({
+    await expect(readDiffSummary('/wt/s1', 'main', { run })).resolves.toEqual({
       files: 0,
       added: 0,
       removed: 0,
