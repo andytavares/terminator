@@ -1,28 +1,13 @@
 import { test, expect, chromium, type Browser } from '@playwright/test'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { cssFiles, extensionBaseCss } from './extension-base-css'
 
 // Stacking and sizing gates for the git-integration review surfaces.
 // elementFromPoint and computed geometry need a rendered document.
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-
-// The stylesheet core injects into every extension view (EXTENSION_BASE_CSS).
-function baseCss(): string {
-  const ui = join(ROOT, 'packages/extension-ui/src')
-  return ['tokens.css', 'extension-base.css']
-    .map((f) => readFileSync(join(ui, f), 'utf8'))
-    .join('\n')
-}
-
-function cssFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const p = join(dir, name)
-    if (statSync(p).isDirectory()) return cssFiles(p)
-    return name.endsWith('.css') ? [p] : []
-  })
-}
 
 function allCss(): string {
   const files = [
@@ -47,7 +32,7 @@ async function render(body: string) {
   const page = await context.newPage()
   await page.setContent(
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>stacking</title>` +
-      `<style>${baseCss()}</style><style>${allCss()}</style></head><body>${body}</body></html>`
+      `<style>${extensionBaseCss(ROOT)}</style><style>${allCss()}</style></head><body>${body}</body></html>`
   )
   return { page, context }
 }
