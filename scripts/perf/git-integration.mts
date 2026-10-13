@@ -5,30 +5,38 @@ import { createRequire, syncBuiltinESMExports } from 'node:module'
 import { promisify } from 'node:util'
 
 const require = createRequire(import.meta.url)
-const cp = require('node:child_process')
+const cp: typeof import('node:child_process') = require('node:child_process')
 const log: { cmd: string; ms: number; start: number }[] = []
 const T0 = performance.now()
 const orig = cp.execFile
-const custom = (orig as any)[promisify.custom]
-const labelOf = (a: any[]) =>
-  [a[0].split('/').pop(), ...(a[1] ?? []).slice(0, 4)].join(' ').slice(0, 90)
-function wrapped(this: unknown, ...a: any[]) {
+type ExecFileAsync = (...a: unknown[]) => Promise<unknown>
+const custom: ExecFileAsync = Reflect.get(orig, promisify.custom)
+const labelOf = (a: unknown[]) =>
+  [String(a[0]).split('/').pop(), ...((a[1] as string[] | undefined) ?? []).slice(0, 4)]
+    .join(' ')
+    .slice(0, 90)
+function wrapped(this: unknown, ...a: unknown[]) {
   const s = performance.now()
   const label = labelOf(a)
-  const cb = typeof a[a.length - 1] === 'function' ? a.pop() : null
-  return orig.call(this, ...a, (...r: any[]) => {
-    log.push({ cmd: label, ms: performance.now() - s, start: s - T0 })
-    cb?.(...r)
-  })
+  const last = a[a.length - 1]
+  const cb = typeof last === 'function' ? (a.pop() as (...r: unknown[]) => void) : null
+  return Reflect.apply(orig, this, [
+    ...a,
+    (...r: unknown[]) => {
+      log.push({ cmd: label, ms: performance.now() - s, start: s - T0 })
+      cb?.(...r)
+    },
+  ])
 }
-;(wrapped as any)[promisify.custom] = (...a: any[]) => {
+const wrappedAsync: ExecFileAsync = (...a) => {
   const s = performance.now()
   const label = labelOf(a)
   return custom(...a).finally(() =>
     log.push({ cmd: label, ms: performance.now() - s, start: s - T0 })
   )
 }
-cp.execFile = wrapped
+Object.assign(wrapped, { [promisify.custom]: wrappedAsync })
+Object.assign(cp, { execFile: wrapped })
 syncBuiltinESMExports()
 
 // The handlers log one line per call; the steps below summarise them.
@@ -44,9 +52,14 @@ const repoRoot = process.argv[3] ?? process.cwd()
 const { registerGithubHandlers } = await import(
   '../../extensions/git-integration/src/ipc/github.ipc.ts'
 )
-const handlers: Record<string, (p: unknown) => Promise<any>> = {}
+interface HandlerResult {
+  error?: string
+  pr?: { chapters?: { files: { path: string }[] }[]; baseRefName: string; headSHA: string }
+}
+type Handler = (p: unknown) => Promise<HandlerResult>
+const handlers: Record<string, Handler> = {}
 registerGithubHandlers(
-  (channel: string, fn: any) => {
+  (channel: string, fn: Handler) => {
     handlers[channel] = fn
   },
   { getGhPath: () => '', getToken: () => '' },
@@ -54,7 +67,7 @@ registerGithubHandlers(
   () => []
 )
 
-async function step(name: string, fn: () => Promise<any>) {
+async function step(name: string, fn: () => Promise<HandlerResult | void>) {
   const before = log.length
   const s = performance.now()
   const result = await fn()
@@ -77,7 +90,7 @@ const detail = await step('pr-review-detail', call('github:pr-review-detail', { 
 await step('pr-inline-comments', call('github:pr-inline-comments', { prNumber }))
 
 const pr = detail?.pr
-const files: string[] = (pr?.chapters ?? []).flatMap((c: any) => c.files.map((f: any) => f.path))
+const files: string[] = (pr?.chapters ?? []).flatMap((c) => c.files.map((f) => f.path))
 if (!pr || files.length === 0) {
   console.log('\nNo files in the detail; stopping before the per-file steps.')
   process.exit(1)

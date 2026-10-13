@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { buildElectronApi, type ApiTransport } from '../build-api.js'
 import { ELECTRON_API_MANIFEST } from '../manifest.js'
+import type { ElectronAPI } from '../api-type.js'
+import { methodAt } from './method-at'
 
 function makeTransport() {
   const listeners = new Map<string, Set<(args: unknown[]) => void>>()
@@ -39,17 +41,14 @@ const REMOTE_LOCALS = {
   'extensionBridge.on': vi.fn(),
 }
 
-// The built object is data-driven; type it loosely for property access in tests.
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 function nativeBridge() {
   const t = makeTransport()
-  return { t, api: buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any }
+  return { t, api: buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as ElectronAPI }
 }
 
 function remoteBridge() {
   const t = makeTransport()
-  return { t, api: buildElectronApi(t, { mode: 'remote', locals: REMOTE_LOCALS }) as any }
+  return { t, api: buildElectronApi(t, { mode: 'remote', locals: REMOTE_LOCALS }) as ElectronAPI }
 }
 
 describe('buildElectronApi — native mode', () => {
@@ -164,8 +163,7 @@ describe('buildElectronApi — native mode payloads', () => {
     '$path puts its arguments on the wire',
     async ({ path, args, kind, channel, payload }) => {
       const { t, api } = nativeBridge()
-      const [ns, method] = path.split('.')
-      await api[ns][method](...args)
+      await methodAt(api, path)(...args)
       expect(t[kind]).toHaveBeenCalledWith(channel, payload)
     }
   )
@@ -221,9 +219,8 @@ describe('buildElectronApi — native mode handler arguments', () => {
     '$path hands its handler only what it needs',
     ({ path, channel, pushed, expected }) => {
       const { t, api } = nativeBridge()
-      const [ns, method] = path.split('.')
       const handler = vi.fn()
-      api[ns][method](handler)
+      methodAt(api, path)(handler)
       t.push(channel, ...pushed)
       expect(handler).toHaveBeenCalledWith(...expected)
     }
@@ -233,7 +230,7 @@ describe('buildElectronApi — native mode handler arguments', () => {
 describe('buildElectronApi — native mode surface', () => {
   it('uses the supplied local implementations', () => {
     const { api } = nativeBridge()
-    expect(api.getFilePath()).toBe('/tmp/file')
+    expect(api.getFilePath(new File([], 'notes.md'))).toBe('/tmp/file')
   })
 
   it('includes native-only methods', () => {
@@ -275,8 +272,14 @@ describe('buildElectronApi — remote mode', () => {
   it('keeps flow-control acknowledgements off the wire, but sends them natively', () => {
     const remote = makeTransport()
     const native = makeTransport()
-    const remoteApi = buildElectronApi(remote, { mode: 'remote', locals: REMOTE_LOCALS }) as any
-    const nativeApi = buildElectronApi(native, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const remoteApi = buildElectronApi(remote, {
+      mode: 'remote',
+      locals: REMOTE_LOCALS,
+    }) as ElectronAPI
+    const nativeApi = buildElectronApi(native, {
+      mode: 'native',
+      locals: NATIVE_LOCALS,
+    }) as ElectronAPI
 
     remoteApi.terminal.acknowledge('s1', 5)
     nativeApi.terminal.acknowledge('s1', 5)
@@ -299,7 +302,12 @@ describe('buildElectronApi — remote mode transport', () => {
   it('replaces stub methods with the supplied local implementation', async () => {
     const { t, api } = remoteBridge()
     await expect(api.dialog.openDirectory()).resolves.toEqual({ cancelled: true })
-    api.extension.updatePanelBounds({})
+    api.extension.updatePanelBounds({
+      extensionId: 'notepad',
+      viewParam: 'main',
+      bounds: { x: 0, y: 0, width: 100, height: 100 },
+      visible: true,
+    })
     expect(t.invoke).not.toHaveBeenCalled()
   })
 
@@ -351,9 +359,9 @@ describe('buildElectronApi — the manifest is the whole surface', () => {
   it('keeps extension-view-only methods off the app renderer and the remote client', () => {
     const native = buildElectronApi(makeTransport(), { mode: 'native', locals: NATIVE_LOCALS })
     const remote = buildElectronApi(makeTransport(), { mode: 'remote', locals: REMOTE_LOCALS })
-    for (const api of [native, remote] as any[]) {
-      expect(api.extension.runCommand).toBeUndefined()
-      expect(api.terminal.listSessions).toBeUndefined()
+    for (const api of [native, remote]) {
+      expect(methodAt(api, 'extension.runCommand')).toBeUndefined()
+      expect(methodAt(api, 'terminal.listSessions')).toBeUndefined()
       expect(api.ui).toBeUndefined()
     }
   })

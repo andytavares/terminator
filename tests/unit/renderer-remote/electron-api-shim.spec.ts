@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ELECTRON_API_MANIFEST, type ChannelSpec } from '../../../src/shared/electron-api/manifest'
+import { methodAt } from '../../../src/shared/electron-api/__tests__/method-at'
 
 class MockWebSocket {
   static instances: MockWebSocket[] = []
@@ -22,8 +23,7 @@ class MockWebSocket {
   close() {}
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type API = any
+type API = Window['electronAPI']
 
 const mockFetch = vi.fn()
 
@@ -40,17 +40,15 @@ async function loadShim(): Promise<{ api: API; ws: MockWebSocket }> {
   await new Promise((r) => setTimeout(r, 0))
   const ws = MockWebSocket.instances[0]
   ws.onopen?.()
-  return { api: (window as API).electronAPI, ws }
+  return { api: window.electronAPI, ws }
 }
 
 beforeEach(() => {
   MockWebSocket.instances = []
   mockFetch.mockReset()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(global as any).WebSocket = MockWebSocket
+  vi.stubGlobal('WebSocket', MockWebSocket)
   localStorage.clear()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  delete (window as any).electronAPI
+  Reflect.deleteProperty(window, 'electronAPI')
 })
 
 afterEach(() => {
@@ -83,7 +81,7 @@ describe('electron-api-shim bootstrap', () => {
     await import('../../../src/renderer-remote/electron-api-shim')
     await new Promise((r) => setTimeout(r, 0))
     const ws = MockWebSocket.instances[0]
-    const api: API = (window as API).electronAPI
+    const api = window.electronAPI
     void api.workspace.list()
     expect(ws.sentMessages.length).toBe(0)
     ws.onopen?.()
@@ -148,8 +146,8 @@ describe('electron-api-shim connection edge cases — does not open WebSocket wh
 
   it('rejects pending invokes on ws.onclose', async () => {
     const { ws } = await loadShim()
-    const api: API = (window as API).electronAPI
-    const p = (api as API).workspace.list() as Promise<unknown>
+    const api = window.electronAPI
+    const p = api.workspace.list() as Promise<unknown>
     ws.onclose?.()
     await expect(p).rejects.toThrow('bridge disconnected')
   })
@@ -243,11 +241,6 @@ function methodPaths(api: Record<string, unknown>, prefix = ''): string[] {
       ? [prefix + name]
       : methodPaths(value as Record<string, unknown>, `${prefix}${name}.`)
   )
-}
-
-function methodAt(api: API, path: string): (...args: unknown[]) => unknown {
-  const [namespace, name] = path.split('.')
-  return api[namespace][name]
 }
 
 /** What a value looks like after a trip through the bridge's JSON. */

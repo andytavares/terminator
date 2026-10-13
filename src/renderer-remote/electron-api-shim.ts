@@ -156,25 +156,26 @@ forgetLegacyToken()
     subscribe: (channel, listener) => on(channel, (...args) => listener(args)),
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(window as any).electronAPI = buildElectronApi(transport, {
-    mode: 'remote',
-    locals: {
-      // A browser client cannot open a native directory picker.
-      'dialog.openDirectory': () => Promise.resolve({ cancelled: true }),
-      // Open in a new browser tab instead of the host OS.
-      'shell.openExternal': (url: string) => {
-        window.open(url, '_blank')
-        return Promise.resolve()
+  Object.assign(window, {
+    electronAPI: buildElectronApi(transport, {
+      mode: 'remote',
+      locals: {
+        // A browser client cannot open a native directory picker.
+        'dialog.openDirectory': () => Promise.resolve({ cancelled: true }),
+        // Open in a new browser tab instead of the host OS.
+        'shell.openExternal': (url: string) => {
+          window.open(url, '_blank')
+          return Promise.resolve()
+        },
+        // Flow control is between the desktop renderer and its own main process.
+        'terminal.acknowledge': () => {},
+        // No-op in remote mode: WebContentsView positioning is an Electron-only concept.
+        'extension.updatePanelBounds': () => {},
+        // Dynamic passthrough for extension-owned channels.
+        'extensionBridge.invoke': (channel: string, payload?: unknown) => invoke(channel, payload),
+        'extensionBridge.on': (channel: string, handler: (data: unknown) => void) =>
+          on(channel, (data) => handler(data)),
       },
-      // Flow control is between the desktop renderer and its own main process.
-      'terminal.acknowledge': () => {},
-      // No-op in remote mode: WebContentsView positioning is an Electron-only concept.
-      'extension.updatePanelBounds': () => {},
-      // Dynamic passthrough for extension-owned channels.
-      'extensionBridge.invoke': (channel: string, payload?: unknown) => invoke(channel, payload),
-      'extensionBridge.on': (channel: string, handler: (data: unknown) => void) =>
-        on(channel, (data) => handler(data)),
-    },
+    }),
   })
 })()
