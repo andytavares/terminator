@@ -70,7 +70,7 @@ export function createOrderStore(root: string, index?: FoundryIndex): OrderStore
   const list = (): Promise<WorkOrder[]> =>
     index === undefined ? readAllOrders(root) : index.orders()
   return {
-    save: (order) => saveOrder(root, order, index),
+    save: (order) => persistOrder(root, order, index),
     load: async (id) => (index === undefined ? readOrder(root, id) : index.order(id)),
     list,
     findByIssue: async (tracker, key) => openFromIssue(await list(), { tracker, key }),
@@ -84,7 +84,7 @@ export function createOrderStore(root: string, index?: FoundryIndex): OrderStore
   }
 }
 
-async function saveOrder(root: string, order: WorkOrder, index?: FoundryIndex): Promise<void> {
+async function persistOrder(root: string, order: WorkOrder, index?: FoundryIndex): Promise<void> {
   const dir = orderDir(root, order.id)
   const json = `${JSON.stringify(order, null, 2)}\n`
   await fs.promises.mkdir(dir, { recursive: true })

@@ -172,12 +172,12 @@ export function standingOf(input: StandingInput): Standing {
     const standing = rule(input, facts)
     if (standing !== null) return standing
   }
-  return working(facts)
+  return workingStanding(facts)
 }
 
 // A shipped order can still wait: the draft's ready-for-review gate opens after the
 // work, and it is the operator's.
-const shipped: Rule = (input, { counts, holding }) => {
+const shippedRule: Rule = (input, { counts, holding }) => {
   if (input.status !== 'shipped') return null
   if (holding !== undefined) {
     return {
@@ -200,7 +200,7 @@ const shipped: Rule = (input, { counts, holding }) => {
   }
 }
 
-const draft: Rule = (input, { counts }) => {
+const draftingRule: Rule = (input, { counts }) => {
   if (input.status !== 'draft') return null
   const shaping = (over: Omit<Standing, 'kind' | 'done' | 'total' | 'gateId'>): Standing => ({
     ...counts,
@@ -277,7 +277,7 @@ function idleDraft(input: StandingInput, shaping: Shaping): Standing {
 
 // Halted comes first: nothing is scheduled until it is answered, so every condition
 // below is a symptom of it.
-const halted: Rule = (_input, { counts, holding }) => {
+const haltedRule: Rule = (_input, { counts, holding }) => {
   if (holding === undefined) return null
   return {
     ...counts,
@@ -290,7 +290,7 @@ const halted: Rule = (_input, { counts, holding }) => {
   }
 }
 
-const adrift: Rule = (input, { counts }) => {
+const adriftRule: Rule = (input, { counts }) => {
   const n = input.orphaned.length
   if (n === 0) return null
   return {
@@ -303,7 +303,7 @@ const adrift: Rule = (input, { counts }) => {
   }
 }
 
-const asking: Rule = (input, { counts }) => {
+const askingRule: Rule = (input, { counts }) => {
   const n = input.asks
   if (n <= 0) return null
   return {
@@ -318,7 +318,7 @@ const asking: Rule = (input, { counts }) => {
 
 // After `asking` on purpose: a held call is answered in one click, this one only by
 // going to the terminal.
-const stranded: Rule = (input, { counts }) => {
+const strandedRule: Rule = (input, { counts }) => {
   const n = input.stranded
   if (n <= 0) return null
   return {
@@ -335,7 +335,7 @@ const stranded: Rule = (input, { counts }) => {
   }
 }
 
-const stalled: Rule = (input, { counts }) => {
+const stalledRule: Rule = (input, { counts }) => {
   const n = input.stalls
   if (n <= 0) return null
   return {
@@ -348,7 +348,7 @@ const stalled: Rule = (input, { counts }) => {
   }
 }
 
-const documentReady: Rule = (input, { counts }) => {
+const documentReadyRule: Rule = (input, { counts }) => {
   if (input.documentReady === undefined || input.documentReady === null) return null
   return {
     ...counts,
@@ -360,7 +360,7 @@ const documentReady: Rule = (input, { counts }) => {
   }
 }
 
-const runFailed: Rule = (input, { counts }) => {
+const runFailedRule: Rule = (input, { counts }) => {
   if (input.runFailure === null) return null
   const { label, headline } = howFarItGot(counts)
   return {
@@ -382,7 +382,7 @@ function howFarItGot({ done, total }: Facts['counts']): Pick<Standing, 'label' |
   return { label: 'stopped', headline: 'The run stopped on an error' }
 }
 
-const failedSteps: Rule = (_input, { counts, failed }) => {
+const failedStepsRule: Rule = (_input, { counts, failed }) => {
   if (failed <= 0) return null
   return {
     ...counts,
@@ -395,7 +395,7 @@ const failedSteps: Rule = (_input, { counts, failed }) => {
 }
 
 /** No graph is an order the line has not picked up, not "0 of 0 steps done". */
-const starting: Rule = (_input, { counts }) => {
+const startingRule: Rule = (_input, { counts }) => {
   if (counts.total !== 0) return null
   return {
     ...counts,
@@ -408,20 +408,20 @@ const starting: Rule = (_input, { counts }) => {
 }
 
 const RULES: readonly Rule[] = [
-  shipped,
-  draft,
-  halted,
-  adrift,
-  asking,
-  stranded,
-  stalled,
-  documentReady,
-  runFailed,
-  failedSteps,
-  starting,
+  shippedRule,
+  draftingRule,
+  haltedRule,
+  adriftRule,
+  askingRule,
+  strandedRule,
+  stalledRule,
+  documentReadyRule,
+  runFailedRule,
+  failedStepsRule,
+  startingRule,
 ]
 
-function working({ nodes, running, counts }: Facts): Standing {
+function workingStanding({ nodes, running, counts }: Facts): Standing {
   const { done, total } = counts
   return {
     ...counts,

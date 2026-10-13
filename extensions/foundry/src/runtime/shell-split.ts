@@ -240,10 +240,10 @@ function parenSubstitution(command: string, from: number): { inner: string; end:
 }
 
 export function readShell(command: string): ShellReading {
-  return new ShellReader(command).readAll()
+  return new ShellReader(command).reading()
 }
 
-// One pass over a command, a character at a time: the first reader in `consume` to
+// One pass over a command, a character at a time: the first reader in `takeChar` to
 // take a character decides what it was; otherwise it is command text.
 class ShellReader {
   private readonly segments: string[] = []
@@ -264,9 +264,9 @@ class ShellReader {
     this.command = command
   }
 
-  readAll(): ShellReading {
+  reading(): ShellReading {
     for (this.i = 0; this.i < this.command.length && !this.stopped; this.i += 1) {
-      this.consume(this.command[this.i])
+      this.takeChar(this.command[this.i])
     }
     this.segments.push(this.current)
     return {
@@ -280,7 +280,7 @@ class ShellReader {
     }
   }
 
-  private consume(char: string): void {
+  private takeChar(char: string): void {
     if (this.escape(char)) return
     if (this.quote !== null) {
       this.inQuote(char)

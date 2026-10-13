@@ -137,7 +137,7 @@ export function routeBelts(
       })
     }
   }
-  return router.finish()
+  return router.routedBelts()
 }
 
 /** The belts laid so far, and the tiles they share. */
@@ -210,7 +210,7 @@ class BeltRouter {
     return c
   }
 
-  finish(): RouteBeltsResult {
+  routedBelts(): RouteBeltsResult {
     for (const c of this.cells.values()) c.kind = kindOf(c)
     const beltTiles: BeltTile[] = [...this.cells.entries()].map(([k, c]) => {
       const [x, y] = k.split(',').map(Number)
