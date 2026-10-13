@@ -1017,6 +1017,7 @@ The **new item dialog** offers three types:
 - **Full-text search** — type in the search bar to filter notes by content.
 - **Multi-tag filter** — click the Tags button in the sidebar to open a multiselect dropdown and filter by one or more tags simultaneously.
 - **Import/export** — export all notes and diagrams as a zip (`.md` files + `.excalidraw.json` files).
+- **Settings** — in **Settings → Extensions → Notepad**: **Editor font size** (14 px by default, 8–32) and **Autosave debounce**, how long typing must pause before a note is saved (800 ms by default, 100–10000). Both apply as soon as they are changed, in the panel and in popped-out note windows. Diagrams keep their own 1.2 s save delay.
 
 ### Diagram features
 

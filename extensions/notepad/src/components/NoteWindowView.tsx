@@ -7,12 +7,8 @@ import { useCommentsStore } from '../stores/comments.store'
 import { NoteOutline } from './NoteOutline'
 import { NoteEditor, applyExternalDoc, scrollToPosition } from '../editor/NoteEditor'
 import { ORIGIN_ID, onForeignNoteChange } from '../editor/noteSync'
-import {
-  AUTOSAVE_DELAY_MS,
-  reanchorAfterSave,
-  reanchorComments,
-  schedulePersist,
-} from './noteComments'
+import { reanchorAfterSave, reanchorComments, schedulePersist } from './noteComments'
+import { useNotepadSettings, useNotepadSettingsStore } from '../stores/settings.store'
 import {
   CommentColumn,
   EditorCommentOverlays,
@@ -45,6 +41,7 @@ function setWindowTitle(title: string): void {
 
 export function NoteWindowView(): React.JSX.Element {
   const noteWindow = useNoteWindow()
+  useNotepadSettings()
   const { note, loadError } = noteWindow
 
   if (loadError) {
@@ -181,7 +178,7 @@ function useWindowAutosave(note: NoteData | null, setNote: SetNote, editorViewRe
         setWindowTitle(title)
         useEditorStore.getState().markSaved()
         await reanchorAfterSave(editorViewRef.current?.state.doc.toString() ?? newBody)
-      }, AUTOSAVE_DELAY_MS)
+      }, useNotepadSettingsStore.getState().autosaveMs)
     },
     [note] // eslint-disable-line react-hooks/exhaustive-deps
   )

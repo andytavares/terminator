@@ -1,7 +1,15 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, act } from '@testing-library/react'
-import { installBridge, comment, editorView, eventually, typeAtEnd } from './helpers/note-surface'
+import {
+  installBridge,
+  comment,
+  editorView,
+  eventually,
+  typeAtEnd,
+  storeSettings,
+  elapse,
+} from './helpers/note-surface'
 
 // The window reads its note id from the URL once, when the module loads.
 vi.hoisted(() => window.history.replaceState({}, '', '/?noteId=n1'))
@@ -14,6 +22,8 @@ import { NoteWindowView } from '../../src/components/NoteWindowView'
 import { useEditorStore } from '../../src/stores/editor.store'
 import { useCommentsStore } from '../../src/stores/comments.store'
 import { NOTES_CHANGED_CHANNEL } from '../../src/editor/noteSync'
+import { useNotepadSettingsStore } from '../../src/stores/settings.store'
+import { notepadSettingsFrom } from '../../src/notepad-settings'
 
 const BODY = '# Plan\nhello world'
 const NOTE = { id: 'n1', title: 'Plan', body: BODY, tags: ['work'] }
@@ -91,5 +101,22 @@ describe('NoteWindowView saving and syncing', () => {
     expect(editorView().state.doc.toString()).toBe('# New\nbody')
     expect(document.title).toBe('New')
     expect(screen.getByText('#x')).toBeTruthy()
+  })
+})
+
+describe('NoteWindowView with Notepad settings changed', () => {
+  beforeEach(() => useNotepadSettingsStore.setState(notepadSettingsFrom({})))
+  afterEach(() => storeSettings({}))
+
+  it('waits the configured autosave delay before saving an edit', async () => {
+    storeSettings({ 'terminator.notepad.autosaveMs': 2000 })
+    await openWindow()
+    await eventually(() => expect(useNotepadSettingsStore.getState().autosaveMs).toBe(2000))
+    act(() => typeAtEnd('!'))
+    await elapse(1200)
+    expect(bridge.calls('terminator.notepad:notes.autosave')).toEqual([])
+    await eventually(() =>
+      expect(bridge.calls('terminator.notepad:notes.autosave')).toHaveLength(1)
+    )
   })
 })

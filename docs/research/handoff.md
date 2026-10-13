@@ -84,6 +84,13 @@ Each entry: what was decided, why, and how to undo it.
     settings migration: a stored value is inert, since nothing reads it and the settings page lists
     only declared keys, and the extension-settings store has no delete. Undo: put the declaration
     back in `extensions/notepad/src/index.ts`.
+17. Notepad's **Autosave debounce** and **Editor font size** are implemented. The delay applies
+    to notes in the panel and in pop-out windows; diagrams keep their own 1.2 s, since a scene is
+    written whole and the setting speaks of notes. Each is clamped (100–10000 ms, 8–32 px) and an
+    emptied field falls back to its default (`src/notepad-settings.ts`). A view re-reads them on
+    the new `extension.onSettingsChanged` (the core broadcasts `extension:settings-changed`): an
+    extension view gets no focus or visibility event when Settings closes, measured under xvfb.
+    Undo: revert the notepad commit; the SDK event can stay, it has no other cost.
 
 ## Known advisories
 
