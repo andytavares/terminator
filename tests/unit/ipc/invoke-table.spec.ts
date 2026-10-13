@@ -42,6 +42,12 @@ describe('registerInvokeTable', () => {
     ])
     await expect(capturedHandler('a:echo')({}, { name: 'x' })).resolves.toEqual({ hello: 'x' })
   })
+})
+
+describe('registerInvokeTable — invalid payloads', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns the static invalid response when validation fails', async () => {
     registerInvokeTable([
@@ -55,6 +61,12 @@ describe('registerInvokeTable', () => {
     await expect(capturedHandler('a:strict')({}, { id: '' })).resolves.toEqual({
       error: 'VALIDATION_ERROR',
     })
+  })
+})
+
+describe('registerInvokeTable — functional invalid responses', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
   })
 
   it('passes the zod error to a functional invalid response', async () => {
@@ -72,6 +84,12 @@ describe('registerInvokeTable', () => {
       message: error!.message,
     })
   })
+})
+
+describe('registerInvokeTable — errors', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('maps thrown errors through onError', async () => {
     registerInvokeTable([
@@ -88,6 +106,12 @@ describe('registerInvokeTable', () => {
     await expect(capturedHandler('a:boom')({}, {})).resolves.toEqual({
       error: 'Error: kaput',
     })
+  })
+})
+
+describe('registerInvokeTable — errors without onError', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
   })
 
   it('lets errors propagate when no onError is declared', async () => {
