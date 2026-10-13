@@ -408,7 +408,10 @@ function offCursorLine(decorate: NodeDecorator): NodeDecorator {
 }
 
 /** Hides `markLen` characters at each end of the node and styles what lies between. */
-function wrapped(markLen: (node: SyntaxNodeRef) => number, className: string): NodeDecorator {
+function hideMarksAround(
+  markLen: (node: SyntaxNodeRef) => number,
+  className: string
+): NodeDecorator {
   return offCursorLine((node, { builder }) => {
     const length = markLen(node)
     const contentFrom = node.from + length
@@ -636,9 +639,9 @@ const NODE_DECORATORS: Record<string, NodeDecorator> = {
   ATXHeading4: decorateHeading,
   ATXHeading5: decorateHeading,
   ATXHeading6: decorateHeading,
-  StrongEmphasis: wrapped(() => 2, 'notepad-bold'),
-  Emphasis: wrapped(() => 1, 'notepad-italic'),
-  Strikethrough: wrapped(strikethroughMarkLength, 'notepad-strikethrough'),
+  StrongEmphasis: hideMarksAround(() => 2, 'notepad-bold'),
+  Emphasis: hideMarksAround(() => 1, 'notepad-italic'),
+  Strikethrough: hideMarksAround(strikethroughMarkLength, 'notepad-strikethrough'),
   InlineCode: decorateInlineCode,
   FencedCode: decorateFencedCode,
   Table: decorateTable,

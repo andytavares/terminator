@@ -36,7 +36,7 @@ export function CommentComposer(props: CommentComposerProps): React.JSX.Element 
         placeholder="Add a comment…"
         rows={3}
       />
-      <ComposerActions
+      <AddCommentActions
         onClose={onClose}
         onSubmit={handleSubmit}
         canSubmit={!!body.trim() && !submitting}
@@ -87,7 +87,7 @@ interface ComposerActionsProps {
   canSubmit: boolean
 }
 
-function ComposerActions(props: ComposerActionsProps): React.JSX.Element {
+function AddCommentActions(props: ComposerActionsProps): React.JSX.Element {
   const { onClose, onSubmit, canSubmit } = props
   return (
     <div className="notepad-composer__actions">

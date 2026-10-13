@@ -134,7 +134,7 @@ function CommentTextarea(props: CommentTextareaProps): React.JSX.Element {
 function ReplyBox({ onReply }: { onReply: (body: string) => void }): React.JSX.Element {
   const [replyText, setReplyText] = useState('')
 
-  function handleReply() {
+  function submitReply() {
     const trimmed = replyText.trim()
     if (!trimmed) return
     onReply(trimmed)
@@ -148,13 +148,13 @@ function ReplyBox({ onReply }: { onReply: (body: string) => void }): React.JSX.E
         rows={2}
         value={replyText}
         onChange={setReplyText}
-        onSend={handleReply}
+        onSend={submitReply}
       />
       <Button
         variant="primary"
         size="sm"
         className="diagram-comment-popover__send"
-        onClick={handleReply}
+        onClick={submitReply}
         disabled={!replyText.trim()}
       >
         Reply
@@ -167,7 +167,7 @@ export function NewCommentComposer(props: NewCommentComposerProps): React.JSX.El
   const { screenX, screenY, onSubmit, onCancel } = props
   const [body, setBody] = useState('')
 
-  function handleSubmit() {
+  function submitNewComment() {
     const trimmed = body.trim()
     if (trimmed) onSubmit(trimmed)
   }
@@ -181,10 +181,10 @@ export function NewCommentComposer(props: NewCommentComposerProps): React.JSX.El
           rows={3}
           value={body}
           onChange={setBody}
-          onSend={handleSubmit}
+          onSend={submitNewComment}
           onEscape={onCancel}
         />
-        <ComposerFooter canSave={!!body.trim()} onCancel={onCancel} onSave={handleSubmit} />
+        <ComposerFooter canSave={!!body.trim()} onCancel={onCancel} onSave={submitNewComment} />
       </div>
     </div>
   )

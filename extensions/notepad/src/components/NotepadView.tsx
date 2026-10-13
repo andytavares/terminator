@@ -20,7 +20,7 @@ import {
   applyStoredAnchors,
   hoveredAnchor,
   useCommentCards,
-  useCommentDraft,
+  useCommentAnchors,
   useCommentHover,
   useMarginScrollSync,
   type ViewRef,
@@ -211,7 +211,7 @@ function useNoteSession(selectedNoteId: string | null) {
   const commentPanelRef = useRef<HTMLDivElement>(null)
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeIdRef = useRef<string | null>(null)
-  const draft = useCommentDraft()
+  const draft = useCommentAnchors()
   const hover = useCommentHover()
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
 
@@ -353,7 +353,7 @@ function useAutosave(noteId: string | null, autosaveTimerRef: TimerRef) {
       if (!noteId) return
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
       autosaveTimerRef.current = setTimeout(
-        () => void autosaveNote(noteId, newBody),
+        () => void saveNoteAndSync(noteId, newBody),
         useNotepadSettingsStore.getState().autosaveMs
       )
     },
@@ -362,7 +362,7 @@ function useAutosave(noteId: string | null, autosaveTimerRef: TimerRef) {
 }
 
 /** Saves the body, then keeps the sidebar and body cache in step and re-anchors comments. */
-async function autosaveNote(noteId: string, body: string): Promise<void> {
+async function saveNoteAndSync(noteId: string, body: string): Promise<void> {
   const editor = useEditorStore.getState()
   editor.markSaving()
   const note = useNotesStore.getState().notes.find((n) => n.id === noteId)

@@ -29,6 +29,7 @@ import {
   setHoveredAnchor,
   type CommentAnchor,
 } from './commentField'
+import { useLatest } from '../components/useLatest'
 
 // Marks a transaction as adopting a body written by another surface, so the
 // update listener does not report it back as a local edit and trigger an
@@ -260,15 +261,6 @@ function readOnlyExtension(readOnly: boolean | undefined): Extension {
 /** Raw markdown in source mode, the live-preview rendering otherwise. */
 function previewExtension(sourceMode: boolean | undefined): Extension {
   return sourceMode ? NO_EXTENSIONS : livePreviewPlugin
-}
-
-/** A ref that always holds the latest value, for listeners created once. */
-function useLatest<T>(value: T): React.MutableRefObject<T> {
-  const ref = useRef(value)
-  useEffect(() => {
-    ref.current = value
-  }, [value])
-  return ref
 }
 
 /** Reconfigures a compartment whenever its content changes after mount. */

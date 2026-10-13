@@ -74,12 +74,12 @@ export async function loadLibrary(): Promise<void> {
       bridge.invoke('terminator.notepad:folders.list', {}),
     ])
     const store = useNotesStore.getState()
-    const listed = (result: unknown) => (result as { data?: unknown[] }).data
-    const notesData = listed(notes)
+    const listResultData = (result: unknown) => (result as { data?: unknown[] }).data
+    const notesData = listResultData(notes)
     if (Array.isArray(notesData)) store.setNotes(notesData as NoteListItem[])
-    const diagramsData = listed(diagrams)
+    const diagramsData = listResultData(diagrams)
     if (Array.isArray(diagramsData)) store.setDiagrams(diagramsData as DiagramListItem[])
-    const foldersData = listed(folders)
+    const foldersData = listResultData(folders)
     if (Array.isArray(foldersData)) store.setFolders(foldersData as Folder[])
   } catch (err) {
     console.error('[notepad] Failed to load the lists', err)

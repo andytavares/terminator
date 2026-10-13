@@ -115,7 +115,7 @@ export function applyStoredAnchors(view: EditorView): void {
 }
 
 /** The selection a comment may be added to, and the one being commented on. */
-export function useCommentDraft() {
+export function useCommentAnchors() {
   const [pendingAnchor, setPendingAnchor] = useState<SelectionAnchor | null>(null)
   const [composingAnchor, setComposingAnchor] = useState<SelectionAnchor | null>(null)
   const onSelectionChange = useCallback((sel: SelectionAnchor | null) => {
@@ -129,7 +129,7 @@ export function useCommentDraft() {
   return { pendingAnchor, composingAnchor, setComposingAnchor, onSelectionChange, startComposing }
 }
 
-type CommentDraft = ReturnType<typeof useCommentDraft>
+type CommentDraft = ReturnType<typeof useCommentAnchors>
 
 interface EditorOverlayProps {
   draft: CommentDraft
@@ -196,7 +196,7 @@ export function CommentColumn(props: CommentColumnProps): React.JSX.Element {
   return (
     <>
       {draft.composingAnchor && (
-        <NewCommentComposer noteId={noteId} draft={draft} anchor={draft.composingAnchor} />
+        <NoteCommentComposer noteId={noteId} draft={draft} anchor={draft.composingAnchor} />
       )}
       <CommentMargin
         noteId={noteId}
@@ -216,7 +216,7 @@ interface NewCommentComposerProps {
   anchor: SelectionAnchor
 }
 
-function NewCommentComposer({ noteId, draft, anchor }: NewCommentComposerProps) {
+function NoteCommentComposer({ noteId, draft, anchor }: NewCommentComposerProps) {
   const { from, to, quote, prefix, suffix } = anchor
   return (
     <CommentComposer

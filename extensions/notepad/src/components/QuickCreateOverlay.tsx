@@ -6,6 +6,7 @@ import { NoteEditor } from '../editor/NoteEditor'
 import { noteTitle } from '../db/note-title'
 import type { DiagramListItem } from '../db/types'
 import { Button, SegmentedControl, useDismissible } from '@terminator/extension-ui'
+import { tagEditing, withTag } from './tagEditing'
 
 function toFilenameSlug(title: string): string {
   return (
@@ -16,12 +17,6 @@ function toFilenameSlug(title: string): string {
       .replace(/^-+|-+$/g, '')
       .slice(0, 40) || 'new-note') + '.md'
   )
-}
-
-/** The tags with `raw` added as a tag (lower case, spaces as dashes), unless blank or present. */
-function withTag(tags: string[], raw: string): string[] {
-  const tag = raw.trim().toLowerCase().replace(/\s+/g, '-')
-  return tag && !tags.includes(tag) ? [...tags, tag] : tags
 }
 
 type CreateKind = 'note' | 'diagram' | 'folder'
@@ -103,7 +98,7 @@ async function listInto<T>(channel: string, payload: object, store: (items: T[])
   return data
 }
 
-async function createFolder(name: string): Promise<void> {
+async function createFolderAndRelist(name: string): Promise<void> {
   await window.electronAPI.extensionBridge.invoke('terminator.notepad:folders.create', { name })
   await listInto('terminator.notepad:folders.list', {}, useNotesStore.getState().setFolders)
 }
@@ -114,13 +109,13 @@ interface NewNote {
   tags: string[]
 }
 
-async function createNote(note: NewNote): Promise<void> {
+async function createNoteAndRelist(note: NewNote): Promise<void> {
   await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.create', note)
   const { setNotes } = useNotesStore.getState()
   await listInto('terminator.notepad:notes.list', { includeArchived: true }, setNotes)
 }
 
-async function createDiagram(diagram: Omit<NewNote, 'body'>): Promise<void> {
+async function createDiagramAndOpen(diagram: Omit<NewNote, 'body'>): Promise<void> {
   const createResult = await window.electronAPI.extensionBridge.invoke(
     'terminator.notepad:diagrams.create',
     diagram
@@ -142,11 +137,11 @@ async function saveDraft(draft: QuickCreateDraft): Promise<void> {
   // batching means its setTags may not have applied yet.
   const tags = withTag(draft.tags, draft.tagInput)
   if (type === 'folder') {
-    await createFolder(title.trim())
+    await createFolderAndRelist(title.trim())
   } else if (type === 'diagram') {
-    await createDiagram({ title: title.trim() || 'Untitled diagram', tags })
+    await createDiagramAndOpen({ title: title.trim() || 'Untitled diagram', tags })
   } else {
-    await createNote({ title: title.trim() || noteTitle(body), body, tags })
+    await createNoteAndRelist({ title: title.trim() || noteTitle(body), body, tags })
   }
 }
 
@@ -222,24 +217,10 @@ function useOpenDefaults(open: boolean, draft: QuickCreateDraft, titleRef: Title
 /** Adding, removing and keyboard-editing the draft's tags. */
 function useTagEditing(draft: QuickCreateDraft) {
   const { tags, setTags, tagInput, setTagInput } = draft
-  function addTag(raw: string) {
-    setTags((prev) => withTag(prev, raw))
-    setTagInput('')
-  }
-
   function removeTag(tag: string) {
     setTags((prev) => prev.filter((t) => t !== tag))
   }
-
-  function handleTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault()
-      addTag(tagInput)
-    } else if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) {
-      setTags((prev) => prev.slice(0, -1))
-    }
-  }
-  return { addTag, removeTag, handleTagKeyDown }
+  return { ...tagEditing({ tags, updateTags: setTags, tagInput, setTagInput }), removeTag }
 }
 
 /** useDismissible counts this overlay as an open surface, so double-Escape cannot close Notepad

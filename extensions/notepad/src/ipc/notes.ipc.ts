@@ -206,7 +206,7 @@ function withInlineTags(tags: string[], body: string): string[] {
 }
 
 /** Writes the note's title, body and tags; answers the title and tags it stored. */
-async function saveNote(
+async function writeNoteRow(
   db: ExtensionDB,
   args: z.infer<typeof AutosaveNotePayload>,
   now: string
@@ -238,7 +238,7 @@ export async function autosaveNote(
   const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [id])
   if (!existing) return { error: 'NOTE_NOT_FOUND' }
 
-  const { title, tags: mergedTags } = await saveNote(db, args, now)
+  const { title, tags: mergedTags } = await writeNoteRow(db, args, now)
 
   // The docked panel and a popped-out note window are separate renderers with
   // separate in-memory body caches. Without this push each keeps serving (and
@@ -365,12 +365,13 @@ export async function reorderItems(
 
 export function registerNotesIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handleRemote, cleanup } = createIpcRegistrar(api)
-  const broadcast = (channel: string, data: unknown) => api.window.broadcast(channel, data)
+  const broadcastToSurfaces = (channel: string, data: unknown) =>
+    api.window.broadcast(channel, data)
   handleRemote('terminator.notepad:notes.create', CreateNotePayload, (args) => createNote(db, args))
   handleRemote('terminator.notepad:notes.list', ListNotesPayload, (args) => listNotes(db, args))
   handleRemote('terminator.notepad:notes.get', IdPayload, (args) => getNote(db, args))
   handleRemote('terminator.notepad:notes.autosave', AutosaveNotePayload, (args) =>
-    autosaveNote(db, args, broadcast)
+    autosaveNote(db, args, broadcastToSurfaces)
   )
   handleRemote('terminator.notepad:notes.archive', IdPayload, (args) => archiveNote(db, args))
   handleRemote('terminator.notepad:notes.restore', IdPayload, (args) => restoreNote(db, args))

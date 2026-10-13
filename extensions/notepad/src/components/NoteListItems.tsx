@@ -6,6 +6,7 @@ import { LayoutTemplate, X } from 'lucide-react'
 import { Dialog, RelativeTime } from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
 import type { ItemKind, MixedItem } from './noteListModel'
+import { tagEditing } from './tagEditing'
 
 /** The drag-and-drop wiring of one row. */
 export interface DragProps {
@@ -49,16 +50,16 @@ const ROW_KINDS = {
   note: {
     modifier: '',
     openChannel: 'terminator.notepad:notes.openWindow',
-    select: (id: string) => useNotesStore.getState().setSelected(id),
+    selectItem: (id: string) => useNotesStore.getState().setSelected(id),
   },
   diagram: {
     modifier: ' notepad-note-row--diagram',
     openChannel: 'terminator.notepad:diagrams.openWindow',
-    select: (id: string) => useNotesStore.getState().setSelectedDiagram(id),
+    selectItem: (id: string) => useNotesStore.getState().setSelectedDiagram(id),
   },
 }
 
-function rowClassName(entry: MixedItem, isSelected: boolean, props: ItemRowProps): string {
+function noteRowClassName(entry: MixedItem, isSelected: boolean, props: ItemRowProps): string {
   const position = props.dragProps?.dragOverPosition
   return [
     'notepad-note-row',
@@ -70,7 +71,7 @@ function rowClassName(entry: MixedItem, isSelected: boolean, props: ItemRowProps
 }
 
 /** A note or diagram: click selects it, double-click opens it in its own window. */
-export function ItemRow(props: ItemRowProps): React.JSX.Element {
+export function NoteOrDiagramRow(props: ItemRowProps): React.JSX.Element {
   const { entry, dragProps } = props
   const kind = ROW_KINDS[entry.kind]
   const selectedId = useNotesStore((s) =>
@@ -80,9 +81,9 @@ export function ItemRow(props: ItemRowProps): React.JSX.Element {
   return (
     <button
       aria-selected={isSelected}
-      className={rowClassName(entry, isSelected, props)}
+      className={noteRowClassName(entry, isSelected, props)}
       draggable={dragProps?.draggable}
-      onClick={() => kind.select(entry.item.id)}
+      onClick={() => kind.selectItem(entry.item.id)}
       onDoubleClick={() => {
         window.electronAPI.extensionBridge
           .invoke(kind.openChannel, { id: entry.item.id })
@@ -146,28 +147,17 @@ function InlineTags({ tags }: { tags: string[] }): React.JSX.Element | null {
 
 /** The tag being typed: Enter or comma adds it, Backspace on empty removes the last. */
 function useTagDraft({ tags, onChange }: TagChipInputProps) {
-  const [inputVal, setInputVal] = useState('')
-
-  function addTag(raw: string) {
-    const trimmed = raw.trim().toLowerCase().replace(/\s+/g, '-')
-    if (trimmed && !tags.includes(trimmed)) onChange([...tags, trimmed])
-    setInputVal('')
+  const [tagInput, setTagInput] = useState('')
+  const updateTags = (change: (tags: string[]) => string[]) => {
+    const next = change(tags)
+    if (next !== tags) onChange(next)
   }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault()
-      addTag(inputVal)
-    } else if (e.key === 'Backspace' && inputVal === '' && tags.length > 0) {
-      onChange(tags.slice(0, -1))
-    }
-  }
-  return { inputVal, setInputVal, addTag, handleKeyDown }
+  return { tagInput, setTagInput, ...tagEditing({ tags, updateTags, tagInput, setTagInput }) }
 }
 
 function TagChipInput(props: TagChipInputProps): React.JSX.Element {
   const { tags, onChange } = props
-  const { inputVal, setInputVal, addTag, handleKeyDown } = useTagDraft(props)
+  const { tagInput, setTagInput, addTag, handleTagKeyDown } = useTagDraft(props)
   const inputRef = useRef<HTMLInputElement>(null)
   return (
     <div className="notepad-tag-chip-input" onClick={() => inputRef.current?.focus()}>
@@ -176,10 +166,10 @@ function TagChipInput(props: TagChipInputProps): React.JSX.Element {
         ref={inputRef}
         className="notepad-tag-chip-input__field"
         placeholder={tags.length === 0 ? 'Add tags…' : ''}
-        value={inputVal}
-        onChange={(e) => setInputVal(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={() => inputVal.trim() && addTag(inputVal)}
+        value={tagInput}
+        onChange={(e) => setTagInput(e.target.value)}
+        onKeyDown={handleTagKeyDown}
+        onBlur={() => tagInput.trim() && addTag(tagInput)}
       />
     </div>
   )
@@ -238,7 +228,7 @@ function useItemEdit(props: ItemEditModalProps) {
   const [tags, setTags] = useState(state.tags)
   const [saving, setSaving] = useState(false)
 
-  async function handleSave() {
+  async function submitItemEdit() {
     if (saving) return
     setSaving(true)
     try {
@@ -250,7 +240,7 @@ function useItemEdit(props: ItemEditModalProps) {
       setSaving(false)
     }
   }
-  return { title, setTitle, tags, setTags, saving, handleSave }
+  return { title, setTitle, tags, setTags, saving, submitItemEdit }
 }
 
 function editDialogActions(saving: boolean, onClose: () => void, onSave: () => Promise<void>) {
@@ -269,12 +259,12 @@ function editDialogActions(saving: boolean, onClose: () => void, onSave: () => P
 
 export function ItemEditModal(props: ItemEditModalProps): React.JSX.Element {
   const { state, onClose } = props
-  const { title, setTitle, tags, setTags, saving, handleSave } = useItemEdit(props)
+  const { title, setTitle, tags, setTags, saving, submitItemEdit } = useItemEdit(props)
   return (
     <Dialog
       title={state.itemType === 'diagram' ? 'Edit diagram' : 'Edit note'}
       onDismiss={onClose}
-      actions={editDialogActions(saving, onClose, handleSave)}
+      actions={editDialogActions(saving, onClose, submitItemEdit)}
     >
       <div className="notepad-edit-fields">
         <input

@@ -18,7 +18,7 @@ interface TextQuote {
 export function reanchorComment(comment: Comment, body: string): ReanchorResult {
   const { startOffset, endOffset, quote, prefix, suffix } = comment
 
-  if (startOffset == null || endOffset == null || !quote) return orphaned(comment)
+  if (startOffset == null || endOffset == null || !quote) return orphanedResult(comment)
 
   // 1. Offset-first: verify quote still matches at the stored offset
   if (body.slice(startOffset, endOffset) === quote) {
@@ -32,12 +32,12 @@ export function reanchorComment(comment: Comment, body: string): ReanchorResult 
   const from =
     findByTextQuote(body, { quote, prefix: prefix ?? '', suffix: suffix ?? '' }) ??
     nearestOccurrence(body, quote, startOffset)
-  if (from === null) return orphaned(comment)
+  if (from === null) return orphanedResult(comment)
   const to = from + quote.length
   return { anchor: { id: comment.id, from, to }, status: 'ok', newFrom: from, newTo: to }
 }
 
-function orphaned(comment: Comment): ReanchorResult {
+function orphanedResult(comment: Comment): ReanchorResult {
   return { anchor: { id: comment.id, from: 0, to: 0 }, status: 'orphaned' }
 }
 

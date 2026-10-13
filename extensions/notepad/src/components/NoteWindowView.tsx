@@ -15,7 +15,7 @@ import {
   applyStoredAnchors,
   hoveredAnchor,
   useCommentCards,
-  useCommentDraft,
+  useCommentAnchors,
   useCommentHover,
   useMarginScrollSync,
   type ViewRef,
@@ -109,7 +109,7 @@ function useNoteWindow() {
   return {
     ...{ note, loadError, showOutline, setShowOutline, activeCommentId, setActiveCommentId },
     ...{ editorViewRef, commentPanelRef, scheduleAutosave, ...cards },
-    ...{ draft: useCommentDraft(), hover: useCommentHover() },
+    ...{ draft: useCommentAnchors(), hover: useCommentHover() },
   }
 }
 
