@@ -65,6 +65,11 @@ export type OpenResult = { ok: true; editor: string } | { error: string }
  * `execFile`, never `exec`: the folder is an argument rather than part of a
  * shell string, so a path containing a space or a semicolon cannot become a
  * second command. The command itself is one of a fixed list, never user text.
+ *
+ * Unlike git and gh (src/main/shell/command-runner.ts), this is not stopped when
+ * the app quits: the editor is the person's, and stays open after the app has
+ * gone. The launcher (`open -a`, or the editor's own CLI) hands the folder to
+ * the editor and returns.
  */
 export async function openInEditor(folderPath: string, configuredId?: string): Promise<OpenResult> {
   if (!(await exists(folderPath))) return { error: 'FOLDER_NOT_FOUND' }
