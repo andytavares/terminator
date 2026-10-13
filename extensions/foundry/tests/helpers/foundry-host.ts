@@ -236,6 +236,11 @@ export function fakeHost(dataDir: () => string): FoundryHost {
   }
 }
 
+/** What a command that exited 0 and printed `stdout` hands back. */
+export function execSucceeded(stdout: string): ExecResult {
+  return { exitCode: 0, stdout, stderr: '', timedOut: false }
+}
+
 /** The message of every toast the host has shown, oldest first. */
 export function toastsShown(host: FoundryHost): string[] {
   return host.showToast.mock.calls.map((call) => call[1] as string)

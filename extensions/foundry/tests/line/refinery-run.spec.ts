@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { fakeHost, realGit, temporaryDirectory } from '../helpers/foundry-host.js'
+import { fakeHost, realGit, temporaryDirectory, execSucceeded } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { agentsAnswer, agreedOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
@@ -49,21 +49,20 @@ afterAll(async () => {
 })
 
 /** GitHub: one draft per order's branch, green checks, and merged once `merged` says so. */
-function githubAnswers(): void {
+function githubWithADraftPerOrder(): void {
   let run = 0
   host.gh.mockImplementation(async ({ args }: { args: string[] }) => {
-    const answer = (stdout: string) => ({ exitCode: 0, stdout, stderr: '', timedOut: false })
     const verb = `${args[0]} ${args[1]}`
-    if (verb === 'pr list') return answer('[]')
+    if (verb === 'pr list') return execSucceeded('[]')
     if (verb === 'pr create') {
       const head = args[args.indexOf('--head') + 1]
-      return answer(`${pullOf(head.replace('foundry/wo-', 'WO-'))}\n`)
+      return execSucceeded(`${pullOf(head.replace('foundry/wo-', 'WO-'))}\n`)
     }
-    if (verb === 'pr checks') return answer(checks('pass', ++run))
+    if (verb === 'pr checks') return execSucceeded(checks('pass', ++run))
     if (verb === 'pr view') {
-      return answer(JSON.stringify({ state: merged.has(args[2]) ? 'MERGED' : 'OPEN' }))
+      return execSucceeded(JSON.stringify({ state: merged.has(args[2]) ? 'MERGED' : 'OPEN' }))
     }
-    return answer('')
+    return execSucceeded('')
   })
 }
 
@@ -96,7 +95,7 @@ beforeEach(async () => {
   merged.clear()
   theRunner.runCommand.mockReset().mockResolvedValue(0)
   agentsAnswer(theRunner, parent)
-  githubAnswers()
+  githubWithADraftPerOrder()
 })
 
 describe('a minute after an order merged', () => {

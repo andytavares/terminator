@@ -25,7 +25,6 @@ vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervis
 
 let dataDir = ''
 let host: FoundryHost
-const call = (channel: string, payload: unknown = {}) => host.call(channel, payload)
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -66,11 +65,11 @@ describe('deleting an order while its scout is still reading', () => {
     await createOrderStore(dataDir).save(order())
 
     // The architect starts at seed, beside the scout rather than after it.
-    await call('foundry:order.converge', { id: 'WO-1' })
+    await host.call('foundry:order.converge', { id: 'WO-1' })
     expect(theRunner.start).toHaveBeenCalledTimes(2)
     const started = theRunner.start.mock.calls.map((c) => c[0] as Started)
 
-    await call('foundry:order.delete', { id: 'WO-1' })
+    await host.call('foundry:order.delete', { id: 'WO-1' })
     // Deleting the project closes both terminals.
     for (const run of started) run.onEnd?.(0)
     // What would follow is a chain of file reads and writes; let it run out.

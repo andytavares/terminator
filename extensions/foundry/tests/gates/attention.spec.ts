@@ -7,6 +7,7 @@ import { standingOf } from '../../src/order/standing.js'
 import type { StandingInput } from '../../src/order/standing.js'
 import type { Gate, GateRuleId } from '../../src/gates/rules.js'
 import type { OpenQuestion, WorkOrder } from '../../src/order/schema.js'
+import { openQuestion } from '../helpers/order-parts.js'
 
 // The count behind the tab badge. It exists because Foundry holds work for a
 // person on three surfaces and, before this, said so on none of them until you
@@ -24,17 +25,9 @@ function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}): Gate {
   })
 }
 
-function question(id: string): OpenQuestion {
-  return {
-    id,
-    text: `What about ${id}?`,
-    why: '',
-    options: ['yes', 'no'],
-    recommended: 0,
-    answer: null,
-    rank: 1,
-    confidence: null,
-  }
+/** An unanswered yes-or-no question that recommends yes. */
+function yesOrNoQuestion(id: string): OpenQuestion {
+  return openQuestion(id, { text: `What about ${id}?`, options: ['yes', 'no'], recommended: 0 })
 }
 
 function order(id: string, questions: OpenQuestion[], status?: WorkOrder['status']): WorkOrder {
@@ -107,7 +100,10 @@ function silencedGatesAndQuestionsTests() {
     const counts = countAttention({
       gates: [],
       autonomy: 'standard',
-      orders: [order('WO-1', [question('q1'), question('q2')]), order('WO-2', [question('q3')])],
+      orders: [
+        order('WO-1', [yesOrNoQuestion('q1'), yesOrNoQuestion('q2')]),
+        order('WO-2', [yesOrNoQuestion('q3')]),
+      ],
       pendingAsks: 0,
       waiting: [],
     })
@@ -118,7 +114,7 @@ function silencedGatesAndQuestionsTests() {
 
 function answeredAndStaleQuestionsTests() {
   it('leaves an answered question out', () => {
-    const answered = { ...question('q1'), answer: 'yes' }
+    const answered = { ...yesOrNoQuestion('q1'), answer: 'yes' }
     const counts = countAttention({
       gates: [],
       autonomy: 'standard',
@@ -138,7 +134,7 @@ function answeredAndStaleQuestionsTests() {
       const counts = countAttention({
         gates: [],
         autonomy: 'standard',
-        orders: [order('WO-1', [question('q1')], status)],
+        orders: [order('WO-1', [yesOrNoQuestion('q1')], status)],
         pendingAsks: 0,
         waiting: [],
       })
@@ -154,7 +150,7 @@ function heldCallsAndSignalsTests() {
     const counts = countAttention({
       gates: [],
       autonomy: 'standard',
-      orders: [order('WO-1', [question('q1')])],
+      orders: [order('WO-1', [yesOrNoQuestion('q1')])],
       pendingAsks: 2,
       waiting: [],
     })
@@ -233,7 +229,7 @@ function doubleCountingTests() {
     const counts = countAttention({
       gates: [],
       autonomy: 'standard',
-      orders: [order('WO-1', [question('q1')])],
+      orders: [order('WO-1', [yesOrNoQuestion('q1')])],
       pendingAsks: 0,
       waiting: [
         { orderId: 'WO-1', standing: standingOf(standing({ status: 'draft', openQuestions: 1 })) },

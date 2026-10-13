@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { fakeHost, temporaryDirectory } from '../helpers/foundry-host.js'
+import { fakeHost, temporaryDirectory, execSucceeded } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { agentsAnswer, agreedOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
@@ -46,14 +46,13 @@ afterAll(async () => {
 })
 
 /** GitHub with no pull request open yet, reporting `checksFor()` for the draft. */
-function githubAnswers(checksFor: () => string): void {
+function githubWithOneDraft(checksFor: () => string): void {
   host.gh.mockImplementation(async ({ args }: { args: string[] }) => {
-    const answer = (stdout: string) => ({ exitCode: 0, stdout, stderr: '', timedOut: false })
     const verb = `${args[0]} ${args[1]}`
-    if (verb === 'pr list') return answer('[]')
-    if (verb === 'pr create') return answer(`${PULL}\n`)
-    if (verb === 'pr checks') return answer(checksFor())
-    return answer('')
+    if (verb === 'pr list') return execSucceeded('[]')
+    if (verb === 'pr create') return execSucceeded(`${PULL}\n`)
+    if (verb === 'pr checks') return execSucceeded(checksFor())
+    return execSucceeded('')
   })
 }
 
@@ -95,7 +94,7 @@ beforeEach(async () => {
 
 describe('an agreed order whose checks pass', () => {
   it('opens a draft, watches CI to green, asks whether it is ready, and is shipped', async () => {
-    githubAnswers(() => checks('pass'))
+    githubWithOneDraft(() => checks('pass'))
     await started(order())
     await shipped()
     expect(await ledgerActions(dataDir)).toEqual(
@@ -107,7 +106,7 @@ describe('an agreed order whose checks pass', () => {
 
 describe('an order taken from a tracker issue', () => {
   it('moves the issue to in progress when work starts and to in review when the draft opens', async () => {
-    githubAnswers(() => checks('pass'))
+    githubWithOneDraft(() => checks('pass'))
     vi.mocked(host.issues.supportsTransitions).mockReturnValue(true)
     vi.mocked(host.issues.transition).mockClear()
     await started(
@@ -127,7 +126,7 @@ describe('an order taken from a tracker issue', () => {
 describe('an order whose CI goes red', () => {
   it('sends the failure back to the builder and ships once the fix is green', async () => {
     let round = 0
-    githubAnswers(() => (++round === 1 ? checks('fail', 11) : checks('pass', 12)))
+    githubWithOneDraft(() => (++round === 1 ? checks('fail', 11) : checks('pass', 12)))
     await started(order())
     await shipped()
     const builders = theRunner.start.mock.calls.filter(
@@ -173,7 +172,7 @@ describe('answering the inbox after a run shipped', () => {
 
 function markingReadyTests() {
   it('marks the drafts ready for review when the operator says so', async () => {
-    githubAnswers(() => checks('pass'))
+    githubWithOneDraft(() => checks('pass'))
     await started(order())
     await shipped()
     const decided = await host.call('foundry:inbox.decide', {
@@ -192,14 +191,14 @@ function redCiSentBackTests() {
     const recipe = buildAndShip()
     // A fresh failing run for every pushed fix, the way CI reports one.
     let run = 20
-    githubAnswers(() => checks('fail', ++run))
+    githubWithOneDraft(() => checks('fail', ++run))
     await started(order(), recipe)
     await vi.waitFor(async () => expect(await gateFor('ci.red')).toBeTruthy(), {
       timeout: 20_000,
       interval: 100,
     })
 
-    githubAnswers(() => checks('pass', 99))
+    githubWithOneDraft(() => checks('pass', 99))
     await host.call('foundry:inbox.decide', {
       gateId: await gateFor('ci.red'),
       option: 'send_back',
@@ -213,7 +212,7 @@ function redCiSentBackTests() {
 
 describe('an order whose check keeps failing', () => {
   it('does not ship, and says on the ledger why not', async () => {
-    githubAnswers(() => '[]')
+    githubWithOneDraft(() => '[]')
     theRunner.runCommand.mockResolvedValue(1)
     await started(order())
     await vi.waitFor(
@@ -227,7 +226,7 @@ describe('an order whose check keeps failing', () => {
 })
 
 async function halted(): Promise<void> {
-  githubAnswers(() => '[]')
+  githubWithOneDraft(() => '[]')
   theRunner.runCommand.mockResolvedValue(1)
   await started(order())
   await vi.waitFor(

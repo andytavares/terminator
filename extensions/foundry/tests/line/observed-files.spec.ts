@@ -4,9 +4,8 @@ import * as path from 'node:path'
 import { readObservedFiles, writeObservedFiles } from '../../src/line/observed-files.js'
 import { computeQueueEntries } from '../../src/line/refinery-entries.js'
 import { createOrderStore } from '../../src/order/store.js'
-import { draftOrder } from '../../src/order/draft.js'
-import type { WorkOrder } from '../../src/order/schema.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { runningOrder } from '../helpers/order-parts.js'
 
 let root: string
 
@@ -17,35 +16,6 @@ beforeEach(() => {
 afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true })
 })
-
-function runningOrder(id: string, touches: string[]): WorkOrder {
-  const base = draftOrder({
-    id,
-    title: id,
-    source: { kind: 'typed', tracker: null, key: null, url: null },
-    repoPaths: ['/repos/a'],
-    now: '2026-09-06T10:00:00.000Z',
-  })
-  return {
-    ...base,
-    status: 'running',
-    plan: {
-      ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'one',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches,
-          verify: [],
-        },
-      ],
-    },
-  }
-}
 
 describe('the files an order has changed', () => {
   it('reads back what was recorded, each file once', async () => {

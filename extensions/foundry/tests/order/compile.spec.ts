@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { builderUnit, testCriterion } from '../helpers/order-parts.js'
+import { builderUnit, glyphCriteria, openQuestion, testCriterion } from '../helpers/order-parts.js'
 import { compileOrder, agreeOrder, CHECK_IDS } from '../../src/order/compile.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -10,24 +10,6 @@ import type { WorkOrder } from '../../src/order/schema.js'
 // Every check has teeth on purpose. A check that cannot fail is decoration,
 // and decoration in a gate is worse than no gate — it teaches you to trust a
 // green you have not earned.
-
-/** The row's last glyph: a command proves it renders, a screenshot that it is not clipped. */
-function glyphCriteria(): WorkOrder['acceptance'] {
-  return [
-    testCriterion('AC-1', {
-      statement: 'a full-width row renders its final glyph',
-      priority: 'P0',
-      verify: { kind: 'test', command: 'npx vitest run', assert: 'exit_code == 0' },
-    }),
-    // The unit touches a stylesheet, and a command cannot say whether the
-    // glyph renders — which is the whole of FR-040, and the reason this
-    // fixture used to be refused by the check that enforces it.
-    testCriterion('AC-2', {
-      statement: 'the last column is not clipped, in the running application',
-      verify: { kind: 'screenshot', target: 'a full-width terminal row' },
-    }),
-  ]
-}
 
 function complete(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -54,20 +36,6 @@ function complete(over: Partial<WorkOrder> = {}): WorkOrder {
     ...over,
   }
 }
-
-type Question = WorkOrder['openQuestions'][number]
-
-/** A question with nothing but its id and, when given, its answer. */
-const question = (id: string, answer: string | null = null): Question => ({
-  id,
-  text: 'q',
-  why: '',
-  options: [],
-  recommended: null,
-  answer,
-  rank: 1,
-  confidence: null,
-})
 
 function failures(order: WorkOrder): string[] {
   return compileOrder(order).failures.map((f) => f.check)
@@ -159,7 +127,7 @@ function countsAndEveryFailureTests() {
   it('reports every failing check at once, not the first', () => {
     const order = complete({
       acceptance: [],
-      openQuestions: [question('Q-1')],
+      openQuestions: [openQuestion('Q-1')],
       redTeam: [
         {
           id: 'RT-1',
@@ -200,14 +168,14 @@ function anUnansweredQuestionTests() {
 function answeredAndNamedTests() {
   it('passes once every question is answered', () => {
     const order = complete({
-      openQuestions: [question('Q-1', 'no')],
+      openQuestions: [openQuestion('Q-1', { answer: 'no' })],
     })
     expect(failures(order)).not.toContain('questions')
   })
 
   it('names the question that is holding it up', () => {
     const order = complete({
-      openQuestions: [question('Q-7')],
+      openQuestions: [openQuestion('Q-7')],
     })
     const f = compileOrder(order).failures.find((x) => x.check === 'questions')
     expect(f?.subjectIds).toEqual(['Q-7'])

@@ -30,7 +30,6 @@ vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervis
 
 let dataDir = ''
 let host: FoundryHost
-const call = (channel: string, payload: unknown = {}) => host.call(channel, payload)
 // One order per test: the run a send-back resumes is still in flight when the
 // test ends, and this process runs one execution per order.
 let orderId = ''
@@ -115,7 +114,7 @@ describe('sending a failed final check back', () => {
 function whoGetsItTests() {
   it('gives the failure to every node that wrote the work, and reopens what came after', async () => {
     await seedFailedFinalCheck([finalCheckGate('G-final', [])])
-    await call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
+    await host.call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
 
     const graph = await sentBack()
     expect(node(graph, 'build:U-1')?.feedback).toHaveLength(1)
@@ -130,7 +129,7 @@ function whoGetsItTests() {
       decision: { option: 'send_back', by: 'operator' as const, at: AT, note: '' },
     }
     await seedFailedFinalCheck([earlier, finalCheckGate('G-final', [])])
-    await call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
+    await host.call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
 
     const graph = await sentBack()
     expect(node(graph, 'build:U-1')?.feedback[0]?.attempt).toBe(2)
@@ -148,7 +147,7 @@ const FAILED_OUTPUT: Evidence = {
 function whatTheyAreToldTests() {
   it('hands over why the check failed with its output, exit code and log', async () => {
     await seedFailedFinalCheck([finalCheckGate('G-final', [FAILED_OUTPUT])])
-    await call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
+    await host.call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
 
     expect(node(await sentBack(), 'build:U-1')?.feedback).toEqual([
       {
@@ -165,7 +164,7 @@ function whatTheyAreToldTests() {
 
   it('hands over only why, when the check left no output', async () => {
     await seedFailedFinalCheck([finalCheckGate('G-final', [])])
-    await call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
+    await host.call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
 
     expect(node(await sentBack(), 'build:U-1')?.feedback[0]).toMatchObject({
       exitCode: null,
@@ -192,7 +191,7 @@ function stepGate(id: string): Gate {
 describe('sending a step back', () => {
   it('retries the step its gate names, and leaves the others as they were', async () => {
     await seedFailedFinalCheck([stepGate('G-step')])
-    await call('foundry:inbox.decide', { gateId: 'G-step', option: 'send_back' })
+    await host.call('foundry:inbox.decide', { gateId: 'G-step', option: 'send_back' })
 
     const graph = await sentBack()
     expect(node(graph, 'docs')?.state).not.toBe('passed')

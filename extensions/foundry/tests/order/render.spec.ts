@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { builderUnit, testCriterion } from '../helpers/order-parts.js'
+import { builderUnit, glyphCriteria, openQuestion } from '../helpers/order-parts.js'
 import { renderOrder } from '../../src/order/render.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -8,21 +8,6 @@ import type { WorkOrder } from '../../src/order/schema.js'
 // application, in a bare terminal and as a tracker comment, which is why it is
 // plain markdown — the least decorated version is the one that survives all
 // three.
-
-/** The row's last glyph: a command proves it renders, a screenshot that it is not clipped. */
-function glyphCriteria(): WorkOrder['acceptance'] {
-  return [
-    testCriterion('AC-1', {
-      statement: 'a full-width row renders its final glyph',
-      priority: 'P0',
-      verify: { kind: 'test', command: 'npx vitest run', assert: 'exit_code == 0' },
-    }),
-    testCriterion('AC-2', {
-      statement: 'the last column is not clipped, in the running application',
-      verify: { kind: 'screenshot', target: 'a full-width row' },
-    }),
-  ]
-}
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -253,25 +238,12 @@ function settledFindingsTests() {
   })
 }
 
-type Question = WorkOrder['openQuestions'][number]
-
-const question = (id: string, text: string, answer: string | null): Question => ({
-  id,
-  text,
-  why: '',
-  options: [],
-  recommended: null,
-  answer,
-  rank: 1,
-  confidence: null,
-})
-
 function renderQuestionsTests() {
   it('shows unanswered questions and hides answered ones', () => {
     const o = order({
       openQuestions: [
-        question('Q-1', 'still open?', null),
-        question('Q-2', 'already settled?', 'yes'),
+        openQuestion('Q-1', { text: 'still open?' }),
+        openQuestion('Q-2', { text: 'already settled?', answer: 'yes' }),
       ],
     })
     const out = renderOrder(o)

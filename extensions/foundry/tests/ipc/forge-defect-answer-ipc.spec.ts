@@ -29,7 +29,6 @@ vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervis
 
 let dataDir = ''
 let host: FoundryHost
-const call = (channel: string, payload: unknown = {}) => host.call(channel, payload)
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -205,7 +204,7 @@ function startingTheArchitectTests() {
     await store.save(order({ redTeam: [regression('RT-2', 'drops canceled tickets')] }))
     saveGate(forgeDefectGate())
 
-    const r = (await call('foundry:inbox.decide', {
+    const r = (await host.call('foundry:inbox.decide', {
       gateId: 'WO-1-forge-defect',
       option: 'answer',
     })) as { ok: boolean; actionError?: string }
@@ -236,7 +235,7 @@ function resumeFailuresTests() {
       ],
     })
 
-    const r = (await call('foundry:inbox.decide', {
+    const r = (await host.call('foundry:inbox.decide', {
       gateId: 'WO-1-unit-boundary',
       option: 'approve',
     })) as { ok: boolean; actionError?: string }
@@ -262,7 +261,7 @@ describe('after the architect amends an answered defect', () => {
 function agreeingAgainTests() {
   it('agrees the released order again and starts its run', async () => {
     await seed(true)
-    await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+    await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
 
     await vi.waitFor(() => expect(ledgerFileText(dataDir)).toContain('"action":"run.started"'), {
       timeout: 5000,
@@ -280,14 +279,14 @@ function agreeingAgainTests() {
 function theInboxTests() {
   it('lists an order nobody released on the Inbox, and counts it on the badge', async () => {
     await seed(false)
-    await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+    await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
 
     await vi.waitFor(() => expect(ledgerFileText(dataDir)).toContain('order.redrafted'), {
       timeout: 5000,
     })
     await vi.waitFor(
       async () => {
-        const inbox = (await call('foundry:inbox.list')) as {
+        const inbox = (await host.call('foundry:inbox.list')) as {
           waiting: { orderId: string; headline: string }[]
         }
         expect(inbox.waiting).toEqual([
@@ -296,7 +295,7 @@ function theInboxTests() {
       },
       { timeout: 5000 }
     )
-    expect(((await call('foundry:attention')) as { inbox: number }).inbox).toBe(1)
+    expect(((await host.call('foundry:attention')) as { inbox: number }).inbox).toBe(1)
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('draft')
     expect(ledgerFileText(dataDir)).not.toContain('run.started')
   })
@@ -314,7 +313,7 @@ function theOrderBeforeTests() {
     architectAmendsThenReadsLate(slow.arm)
 
     try {
-      await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+      await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
       await vi.waitFor(
         () => expect(ledgerFileText(dataDir)).toMatch(/"action":"run\.(started|refused)"/),
         {
