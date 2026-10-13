@@ -22,6 +22,10 @@ null }` whatever was on screen: nothing told the core what the main window showe
 - A view's `extensionEvents.onSelectProjectTab` subscription is driven by a broadcast of
   `extension:select-project-tab` with `{ tabId }`, the payload the core always read; the
   e2e probe extension (`tests/e2e/fixtures/extensions/probe`) is its first sender.
+- `shell.exec` stopped only the command itself on a timeout, and nothing when the app quit, so
+  what a command had started outlived it (on macOS `/usr/bin/git` is an xcrun shim that can start
+  `xcodebuild`). Each command now runs in a process group of its own, which a timeout and the
+  app quitting stop whole. The result is unchanged.
 
 ## 4.0.0
 

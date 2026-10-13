@@ -92,40 +92,66 @@ function markedPids(launchId: string): Set<number> {
   )
 }
 
-/** What outlived the app, as `pid command`: marked processes and survivors of its tree. */
-function leftovers(launchId: string, started: ProcessRow[]): string[] {
+/** What outlived the app: marked processes and survivors of its tree. */
+function leftovers(launchId: string, started: ProcessRow[]): ProcessRow[] {
   const marked = markedPids(launchId)
   const now = processTable()
-  const left = [
+  return [
     ...now.filter((row) => marked.has(row.pid)),
     ...stillRunning(started, now).filter((row) => !marked.has(row.pid)),
   ]
-  return left.map((row) => `${row.pid} ${row.command}`.slice(0, 160))
+}
+
+function describeRow(row: ProcessRow): string {
+  return `${row.pid} ${row.command}`.slice(0, 160)
 }
 
 /**
- * Fails when processes the app started outlive it, after killing them so one
- * leak does not carry into the next spec. `started` is the app's process tree
- * taken before it was closed (`appProcessTree`).
+ * Fails when processes the app started outlive it, after killing them and
+ * everything they started, so one leak does not carry into the next spec.
+ * `started` is the app's process tree taken before it was closed (`appProcessTree`).
  */
 export async function expectNoProcessesLeft(
   launchId: string,
   started: ProcessRow[]
 ): Promise<void> {
+  const describeLeft = (): string[] => leftovers(launchId, started).map(describeRow)
   try {
-    await expect.poll(() => leftovers(launchId, started), { timeout: LEFT_BEHIND_MS }).toEqual([])
+    await expect.poll(describeLeft, { timeout: LEFT_BEHIND_MS }).toEqual([])
   } catch {
     const left = leftovers(launchId, started)
-    for (const line of left) killQuietly(Number.parseInt(line, 10))
     if (left.length === 0) return
-    throw new Error(`The app left ${left.length} process(es) running:\n${left.join('\n')}`)
+    const killed = killTrees(left.map((row) => row.pid))
+    const summary = `The app left ${left.length} process(es) running, and killed ${killed - left.length} it started`
+    throw new Error(`${summary}:\n${left.map(describeRow).join('\n')}`)
   }
 }
 
-function killQuietly(pid: number): void {
+/**
+ * Kills `roots` and every process under them, and returns how many. A leftover
+ * can still be starting processes (the gh stub that ran itself, macOS run
+ * 38380127678), and killing it first hands its children to init, out of reach.
+ * So the whole tree is stopped first, until a listing finds nothing new in it,
+ * and only then killed: https://man7.org/linux/man-pages/man7/signal.7.html
+ */
+function killTrees(roots: number[]): number {
+  const stopped = new Set<number>()
+  for (let grew = true; grew; ) {
+    const table = processTable()
+    const tree = roots.flatMap((pid) => [pid, ...descendantsOf(table, pid).map((row) => row.pid)])
+    const fresh = tree.filter((pid) => !stopped.has(pid))
+    for (const pid of fresh) signalQuietly(pid, 'SIGSTOP')
+    for (const pid of fresh) stopped.add(pid)
+    grew = fresh.length > 0
+  }
+  for (const pid of stopped) signalQuietly(pid, 'SIGKILL')
+  return stopped.size
+}
+
+function signalQuietly(pid: number, signal: NodeJS.Signals): void {
   try {
-    process.kill(pid, 'SIGKILL')
+    process.kill(pid, signal)
   } catch {
-    // Gone between the listing and the kill.
+    // Gone between the listing and the signal.
   }
 }
