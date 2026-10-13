@@ -123,24 +123,25 @@ function invalidStringVariable(query: string, variables: Record<string, unknown>
   return null
 }
 
+/** What Linear answers a request without the right API key. */
+const NOT_AUTHENTICATED: StubAnswer = {
+  status: 400,
+  body: {
+    errors: [
+      {
+        message: 'Authentication required, not authenticated',
+        extensions: { type: 'authentication error', code: 'AUTHENTICATION_ERROR' },
+      },
+    ],
+  },
+}
+
 export function answerLinear(
   state: LinearState,
   request: IncomingMessage,
   body: unknown
 ): StubAnswer {
-  if (request.headers.authorization !== state.apiKey) {
-    return {
-      status: 400,
-      body: {
-        errors: [
-          {
-            message: 'Authentication required, not authenticated',
-            extensions: { type: 'authentication error', code: 'AUTHENTICATION_ERROR' },
-          },
-        ],
-      },
-    }
-  }
+  if (request.headers.authorization !== state.apiKey) return NOT_AUTHENTICATED
   const { query, variables = {} } = body as { query: string; variables?: Record<string, unknown> }
   const name = query.match(/(?:query|mutation) (\w+)/)?.[1] ?? ''
   state.operations.push({ name, variables })

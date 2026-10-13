@@ -481,15 +481,25 @@ function submitReview(context: StubContext, request: ApiRequest, match: RegExpMa
     submitted_at: at,
   }
   pullRequest.reviews.push(review)
-  for (const comment of input.comments ?? []) addReviewComment(context, pullRequest, comment, id)
+  for (const comment of input.comments ?? []) {
+    addReviewComment(context, pullRequest, { ...comment, reviewId: id })
+  }
   return review
+}
+
+/** A review's inline comment, with the review it belongs to. */
+interface ReviewCommentInput {
+  path: string
+  line: number
+  side: 'LEFT' | 'RIGHT'
+  body: string
+  reviewId: number
 }
 
 function addReviewComment(
   context: StubContext,
   pullRequest: StubPullRequest,
-  comment: { path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string },
-  reviewId: number
+  comment: ReviewCommentInput
 ): void {
   pullRequest.reviewComments.push({
     ...stamp(context, comment.body),
@@ -499,7 +509,7 @@ function addReviewComment(
     side: comment.side,
     diff_hunk: '',
     in_reply_to_id: null,
-    pull_request_review_id: reviewId,
+    pull_request_review_id: comment.reviewId,
   })
 }
 
