@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -13,7 +13,7 @@ import {
   projectGroup,
   quickActionsPanel,
   runQuickAction,
-  terminalRows,
+  terminalRowsIn,
   workspaceRow,
 } from './helpers'
 import { git, makeFixtureRepo } from './foundry-harness'
@@ -47,22 +47,25 @@ function currentBranch(repo: string): string {
 }
 
 /**
- * Prints `line` alone on a row of the branch's one terminal and ⌘-clicks it
- * (Ctrl-click off macOS), at the row's first characters.
+ * Prints `line` alone on a row of the terminal drawn in `screen`, a pane's
+ * `.xterm-screen`, and ⌘-clicks it (Ctrl-click off macOS) at the row's first
+ * characters. xterm sizes the screen to exactly its rows, so a row is the
+ * screen's height over the number of rows that terminal shows.
  */
-async function printAndModClick(page: Page, line: string): Promise<void> {
-  await page.locator('.terminal-pane .xterm').first().click()
+async function printAndModClick(screen: Locator, line: string): Promise<void> {
+  const page = screen.page()
+  await screen.click()
   await page.keyboard.type(`printf '%s\\n' '${line}'`)
   await page.keyboard.press('Enter')
-  await expect
-    .poll(async () => (await terminalRows(page)).filter((row) => row.startsWith(line)).length)
-    .toBe(1)
-  const texts = await terminalRows(page)
-  const index = texts.findIndex((text) => text.startsWith(line))
-  const screen = (await page.locator('.terminal-pane .xterm-screen').first().boundingBox())!
+  const rowsOfLine = async () =>
+    (await terminalRowsIn(screen)).filter((row) => row.startsWith(line)).length
+  await expect.poll(rowsOfLine).toBe(1)
+  const rows = await terminalRowsIn(screen)
+  const index = rows.findIndex((row) => row.startsWith(line))
+  const box = (await screen.boundingBox())!
   const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
   await page.keyboard.down(modifier)
-  await page.mouse.click(screen.x + 20, screen.y + ((index + 0.5) * screen.height) / texts.length)
+  await page.mouse.click(box.x + 20, box.y + ((index + 0.5) * box.height) / rows.length)
   await page.keyboard.up(modifier)
 }
 
@@ -202,7 +205,11 @@ test.describe.serial('cards, terminals and notifications in a plain folder', () 
   test('a URL in a terminal opens in the browser on ⌘-click (Ctrl-click off macOS)', async () => {
     const { page, app } = handle
     await projectGroup(page, 'notebook').click()
-    await printAndModClick(page, 'https://example.com/e2e-link')
+    // Two terminals on screen, so the click has to find the row in the right one.
+    await runQuickAction(page, 'Split down')
+    const screens = page.locator('.terminal-pane .xterm-screen')
+    await expect(screens).toHaveCount(2, { timeout: 15000 })
+    await printAndModClick(screens.last(), 'https://example.com/e2e-link')
     await expect.poll(() => shellOpens(app)).toContain('https://example.com/e2e-link')
   })
 
@@ -210,7 +217,7 @@ test.describe.serial('cards, terminals and notifications in a plain folder', () 
     const { page, app } = handle
     const file = join(folder, 'notes.txt')
     writeFileSync(file, 'hello')
-    await printAndModClick(page, file)
+    await printAndModClick(page.locator('.terminal-pane .xterm-screen').first(), file)
     await expect.poll(() => shellOpens(app)).toContain(file)
   })
 

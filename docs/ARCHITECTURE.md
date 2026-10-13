@@ -241,8 +241,9 @@ and a terminal past that stays on the DOM renderer. A lost context (`onContextLo
 WebGL2 also falls back to the DOM renderer. The DOM renderer clips the last column's glyph on macOS (about
 2px), which WebGL does not do because it has no row boxes to clip. The phone client keeps the DOM renderer.
 Because WebGL leaves no terminal text in the DOM, the renderer sets `window.terminatorE2E.terminalRows()`
-(`src/renderer/terminal/terminal-rows.ts`), which reads every terminal's visible rows from its xterm buffer;
-the end-to-end specs read terminals through it.
+(`src/renderer/terminal/terminal-rows.ts`), which reads every terminal's visible rows from its xterm buffer,
+one terminal after another, and `terminalRowsIn(element)`, which reads only the terminal drawn in that
+element; the end-to-end specs read terminals through them.
 
 **Links.** `src/renderer/terminal/terminal-links.ts` finds the URLs and paths on a row and declares them to
 xterm. `LinkPointer` (`src/renderer/terminal/link-pointer.ts`) underlines the link under the pointer while
