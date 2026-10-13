@@ -5,14 +5,15 @@ import { defineChannel } from '@terminator/extension-sdk'
 import { registerInvokeTable } from './invoke-table.js'
 import {
   execShell,
-  assertCommandAllowed,
   assertCwdInScope,
-  CommandNotAllowedError,
+  ALLOWED_COMMAND_NAMES,
   CwdOutOfScopeError,
 } from '../shell/shell-executor.js'
 
+// The allowlist is the schema: a command outside it is a validation error
+// before anything runs.
 const ShellExecPayloadSchema = z.object({
-  command: z.enum(['git', 'gh']),
+  command: z.enum(ALLOWED_COMMAND_NAMES),
   args: z.array(z.string()),
   cwd: z.string().min(1),
   timeoutMs: z.number().int().positive().optional(),
@@ -47,12 +48,10 @@ export function registerShellHandlers(): void {
       schema: ShellExecPayloadSchema,
       invalid: (error: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: error.message }),
       run: async ({ command, args, cwd, timeoutMs = 10000, workspaceRoot }) => {
-        assertCommandAllowed(command)
         if (workspaceRoot) await assertCwdInScope(cwd, [workspaceRoot])
         return await execShell({ command, args, cwd, timeoutMs })
       },
       onError: (err) => {
-        if (err instanceof CommandNotAllowedError) return { error: 'COMMAND_NOT_ALLOWED' }
         if (err instanceof CwdOutOfScopeError) return { error: 'CWD_OUT_OF_SCOPE' }
         return { error: String(err) }
       },
