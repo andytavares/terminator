@@ -16,10 +16,11 @@ import {
 import type { Gate, GateRuleId } from '../gates/rules.js'
 import { ExternalLink } from './ExternalLink.js'
 import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
-import { Button, usePolling } from '@terminator/extension-ui'
+import { Button } from '@terminator/extension-ui'
 import type { Signal } from '../sensors/types.js'
 import { invoke } from '@terminator/extension-sdk/renderer'
-import { readSignals, type SensorRow, type SignalsRead } from './signals-read.js'
+import type { SensorRow } from './signals-read.js'
+import { usePromotion, useSignalFeed } from '../renderer/use-signals.js'
 
 // Everything waiting on the operator, as a band above the Forge.
 //
@@ -140,16 +141,7 @@ function useAnswers(refreshList: () => Promise<void>, refreshSignals: () => Prom
 
 /** The sensors' signals, and promoting one into a draft. */
 function useSignals() {
-  const [signals, setSignals] = useState<Signal[]>([])
-  const [sensors, setSensors] = useState<SensorRow[]>([])
-  const showSignals = useCallback((read: SignalsRead): void => {
-    setSignals(read.signals)
-    setSensors(read.sensors)
-  }, [])
-  const refreshSignals = useCallback(() => readSignals().then(showSignals), [showSignals])
-  // Sensors record signals on their own tick and tell nobody, so this is the
-  // one thing here still asked for on a timer — and not while hidden.
-  usePolling(readSignals, showSignals, SIGNAL_POLL_MS)
+  const { signals, sensors, refreshSignals } = useSignalFeed(SIGNAL_POLL_MS)
   const promotion = usePromotion(sensors, refreshSignals)
   const dismissSignal = useCallback(
     async (id: string) => {
@@ -159,61 +151,6 @@ function useSignals() {
     [refreshSignals]
   )
   return { signals, sensors, refreshSignals, dismissSignal, ...promotion }
-}
-
-/** Promoting a signal: which one is open, the repository typed for it, and what it said. */
-interface Promotion {
-  readonly promoting: string | null
-  readonly repoDraft: string
-  readonly signalProblem: string | null
-  readonly promoted: string | null
-}
-
-const NO_PROMOTION: Promotion = {
-  promoting: null,
-  repoDraft: '',
-  signalProblem: null,
-  promoted: null,
-}
-
-async function promoteSignal(
-  id: string,
-  repoPath: string
-): Promise<{ order?: { id: string }; error?: string }> {
-  return (await invoke('foundry:signals.promote', { id, repoPaths: [repoPath] })) as {
-    order?: { id: string }
-    error?: string
-  }
-}
-
-function usePromotion(sensors: readonly SensorRow[], refreshSignals: () => Promise<void>) {
-  const [state, setState] = useState<Promotion>(NO_PROMOTION)
-  const patch = (next: Partial<Promotion>): void => setState((current) => ({ ...current, ...next }))
-  const startPromote = (signal: Signal) => {
-    const sensor = sensors.find((s) => s.def.id === signal.sensorId)
-    patch({
-      signalProblem: null,
-      promoted: null,
-      repoDraft: sensor?.state.repoPath ?? '',
-      promoting: signal.id,
-    })
-  }
-  const confirmPromote = async (id: string) => {
-    patch({ signalProblem: null })
-    const result = await promoteSignal(id, state.repoDraft)
-    if (result.error !== undefined) {
-      patch({ signalProblem: result.error })
-      return
-    }
-    patch({
-      promoting: null,
-      promoted: `Draft ${result.order?.id ?? ''} created — open it in the Forge`,
-    })
-    await refreshSignals()
-  }
-  const setPromoting = (promoting: string | null): void => patch({ promoting })
-  const setRepoDraft = (repoDraft: string): void => patch({ repoDraft })
-  return { ...state, setPromoting, setRepoDraft, startPromote, confirmPromote }
 }
 
 type Signals = ReturnType<typeof useSignals>
