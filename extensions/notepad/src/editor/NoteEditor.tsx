@@ -38,7 +38,6 @@ const externalUpdate = Annotation.define<boolean>()
 
 /** A fenced-code language, loaded the first time a block uses it. */
 function codeLanguage(name: string, alias: string[], load: () => LanguageSupport) {
-  /* v8 ignore next */
   return LanguageDescription.of({ name, alias, load: async () => load() })
 }
 
@@ -197,16 +196,14 @@ export function NoteEditor(props: NoteEditorProps): React.JSX.Element {
   const onSelectionChangeRef = useLatest(props.onSelectionChange)
 
   useEffect(() => {
-    /* v8 ignore next */
-    if (!containerRef.current) return
-    const view = createEditorView(containerRef.current, props, {
+    // React attaches a host element's ref before it runs effects.
+    const view = createEditorView(containerRef.current!, props, {
       ...compartments,
       onSelectionChangeRef,
     })
     viewRef.current = view
     props.onAnchorsReady?.(() => viewRef.current)
 
-    /* v8 ignore next 4 */
     return () => {
       view.destroy()
       viewRef.current = null
@@ -270,10 +267,8 @@ function useCompartmentSync(
   content: Extension
 ): void {
   useEffect(() => {
-    const view = viewRef.current
-    /* v8 ignore next 3 */
-    if (!view) return
-    view.dispatch({ effects: compartment.reconfigure(content) })
+    // Effects run in the order they are declared, so NoteEditor's mount effect made the view.
+    viewRef.current!.dispatch({ effects: compartment.reconfigure(content) })
   }, [content]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
@@ -284,12 +279,10 @@ function changeListener(
   onChange: (doc: string) => void,
   onSelectionChangeRef: SelectionCallbackRef
 ) {
-  /* v8 ignore next 3 */
   return EditorView.updateListener.of((update) => {
     const isExternal = update.transactions.some((tr) => tr.annotation(externalUpdate))
     if (update.docChanged && !isExternal) onChange(update.state.doc.toString())
 
-    /* v8 ignore next 4 */
     if (!update.docChanged && !update.selectionSet) return
     const cb = onSelectionChangeRef.current
     if (!cb) return
@@ -297,7 +290,6 @@ function changeListener(
   })
 }
 
-/* v8 ignore start */
 function selectionAnchorOf(view: EditorView): SelectionAnchor | null {
   const sel = view.state.selection.main
   if (sel.empty) return null
@@ -314,7 +306,6 @@ function selectionAnchorOf(view: EditorView): SelectionAnchor | null {
     lineTop: coords ? coords.top - containerRect.top : 0,
   }
 }
-/* v8 ignore stop */
 
 /**
  * Replaces the document with a body saved by another surface, keeping the
@@ -333,19 +324,16 @@ export function applyExternalDoc(view: EditorView | null, body: string): void {
 }
 
 export function applyAnchors(view: EditorView | null, anchors: CommentAnchor[]): void {
-  /* v8 ignore next */
   if (!view) return
   view.dispatch({ effects: [setAnchors.of(anchors)] })
 }
 
 export function setEditorHoverAnchor(view: EditorView | null, id: string | null): void {
-  /* v8 ignore next */
   if (!view) return
   view.dispatch({ effects: [setHoveredAnchor.of(id)] })
 }
 
 export function scrollToAnchor(view: EditorView | null, from: number, to: number): void {
-  /* v8 ignore next */
   if (!view) return
   view.dispatch({
     selection: { anchor: from, head: to },

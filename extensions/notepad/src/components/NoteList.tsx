@@ -134,7 +134,6 @@ function useSearchResults(searchQuery: string): SearchResult[] | null {
 
   useEffect(() => {
     const gen = ++searchGenRef.current
-    /* v8 ignore next */
     if (!searchQuery) return
     void window.electronAPI.extensionBridge
       .invoke('terminator.notepad:search.query', { query: searchQuery, includeArchived: true })

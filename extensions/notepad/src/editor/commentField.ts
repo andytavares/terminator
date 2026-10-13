@@ -56,7 +56,6 @@ export const commentAnchorField = StateField.define<CommentAnchor[]>({
   },
 })
 
-/* v8 ignore start */
 function buildAnchorDecorations(anchors: CommentAnchor[], hoveredId: string | null): DecorationSet {
   if (anchors.length === 0) return Decoration.none
 
@@ -109,4 +108,3 @@ export const commentAnchorDecorations = ViewPlugin.fromClass(
   },
   { decorations: (v) => v.decorations }
 )
-/* v8 ignore stop */
