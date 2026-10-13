@@ -67,6 +67,13 @@ function mount(over: Record<string, unknown> = {}) {
 beforeEach(() => vi.clearAllMocks())
 
 describe('the sensors panel', () => {
+  describe('enabling', enablingTests)
+  describe('enabling with a repository', enablingWithARepositoryTests)
+  describe('the last run', theLastRunTests)
+  describe('running now', runningNowTests)
+})
+
+function enablingTests() {
   it('shows one row per sensor, with its description and rung', async () => {
     mount()
     await waitFor(() => expect(screen.getByText('CI flake watch')).toBeTruthy())
@@ -81,7 +88,9 @@ describe('the sensors panel', () => {
       expect(screen.getByText('A sensor needs a repository before it can be enabled.')).toBeTruthy()
     )
   })
+}
 
+function enablingWithARepositoryTests() {
   it('enables once a repository is given', async () => {
     mount()
     await waitFor(() => screen.getByText('CI flake watch'))
@@ -103,7 +112,9 @@ describe('the sensors panel', () => {
       ).toBe(true)
     )
   })
+}
 
+function theLastRunTests() {
   it('shows the last run, next due and last problem', async () => {
     mount({
       sensors: [
@@ -123,7 +134,9 @@ describe('the sensors panel', () => {
     expect(screen.getByText(/2026-09-20T12:00:00.000Z/)).toBeTruthy()
     expect(screen.getByText(/the toolchain was unavailable/)).toBeTruthy()
   })
+}
 
+function runningNowTests() {
   it('runs a sensor now and shows what it recorded', async () => {
     mount({ runNow: { recorded: 3, problem: null } })
     await waitFor(() => screen.getByText('CI flake watch'))
@@ -140,7 +153,7 @@ describe('the sensors panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
     expect(await screen.findByText(/could not reach the repository/)).toBeTruthy()
   })
-})
+}
 
 describe('the model that answers asks', () => {
   it('shows Sonnet chosen by default', async () => {

@@ -53,6 +53,22 @@ function fakeContext2D(fillRectSpy: ReturnType<typeof vi.fn>) {
   }
 }
 
+const standAt = (tile: { x: number; y: number }, over: Partial<Crew> = {}): Crew => ({
+  nodeId: 'N-1',
+  role: null,
+  x: tile.x * 16 + 8,
+  y: tile.y * 16 + 12,
+  facing: 'down',
+  anim: 'reach',
+  path: [],
+  goal: null,
+  then: 'idle',
+  present: true,
+  restSeat: null,
+  settle: null,
+  ...over,
+})
+
 describe('components/factory/HallScene', () => {
   let fillRectSpy: ReturnType<typeof vi.fn>
   let rafSpy: ReturnType<typeof vi.fn>
@@ -170,52 +186,43 @@ describe('components/factory/HallScene', () => {
   })
 
   describe('sceneActivity', () => {
-    const standAt = (tile: { x: number; y: number }, over: Partial<Crew> = {}): Crew => ({
-      nodeId: 'N-1',
-      role: null,
-      x: tile.x * 16 + 8,
-      y: tile.y * 16 + 12,
-      facing: 'down',
-      anim: 'reach',
-      path: [],
-      goal: null,
-      then: 'idle',
-      present: true,
-      restSeat: null,
-      settle: null,
-      ...over,
-    })
-
-    it('keeps the newest open tool per station and passes the verdicts through', () => {
-      const map = fakeMap()
-      const verdicts = [{ nodeId: 'N-2', pass: false, at: 40 }]
-      const world: World = {
-        ...fakeWorld(map),
-        verdicts,
-        openCalls: [
-          { nodeId: 'N-1', prop: 'archive', callId: 'a', at: 10 },
-          { nodeId: 'N-1', prop: 'rack', callId: 'b', at: 30 },
-          { nodeId: 'N-1', prop: 'desk', callId: 'c', at: 20 },
-          { nodeId: 'N-2', prop: 'archive', callId: 'd', at: 5 },
-        ],
-      }
-      const activity = sceneActivity(world)
-      expect(activity.tools).toEqual({ 'N-1': 'rack', 'N-2': 'archive' })
-      expect(activity.verdicts).toBe(verdicts)
-    })
-
-    it('reports a fixture only for a present crew member reaching at it', () => {
-      const map = fakeMap()
-      const { archive, rack } = map.anchors
-      const crew = [
-        standAt(archive),
-        standAt(rack, { present: false }),
-        standAt(rack, { goal: { x: 2, y: 2 } }),
-        standAt({ x: 4, y: 4 }),
-        standAt(rack, { anim: 'type' }),
-      ]
-      expect(sceneActivity({ ...fakeWorld(map), crew }).reaching).toEqual(['archive'])
-      expect(sceneActivity({ ...fakeWorld(map), crew: [standAt(rack)] }).reaching).toEqual(['rack'])
-    })
+    describe('tools', toolsTests)
+    describe('fixtures', fixturesTests)
   })
 })
+
+function toolsTests() {
+  it('keeps the newest open tool per station and passes the verdicts through', () => {
+    const map = fakeMap()
+    const verdicts = [{ nodeId: 'N-2', pass: false, at: 40 }]
+    const world: World = {
+      ...fakeWorld(map),
+      verdicts,
+      openCalls: [
+        { nodeId: 'N-1', prop: 'archive', callId: 'a', at: 10 },
+        { nodeId: 'N-1', prop: 'rack', callId: 'b', at: 30 },
+        { nodeId: 'N-1', prop: 'desk', callId: 'c', at: 20 },
+        { nodeId: 'N-2', prop: 'archive', callId: 'd', at: 5 },
+      ],
+    }
+    const activity = sceneActivity(world)
+    expect(activity.tools).toEqual({ 'N-1': 'rack', 'N-2': 'archive' })
+    expect(activity.verdicts).toBe(verdicts)
+  })
+}
+
+function fixturesTests() {
+  it('reports a fixture only for a present crew member reaching at it', () => {
+    const map = fakeMap()
+    const { archive, rack } = map.anchors
+    const crew = [
+      standAt(archive),
+      standAt(rack, { present: false }),
+      standAt(rack, { goal: { x: 2, y: 2 } }),
+      standAt({ x: 4, y: 4 }),
+      standAt(rack, { anim: 'type' }),
+    ]
+    expect(sceneActivity({ ...fakeWorld(map), crew }).reaching).toEqual(['archive'])
+    expect(sceneActivity({ ...fakeWorld(map), crew: [standAt(rack)] }).reaching).toEqual(['rack'])
+  })
+}

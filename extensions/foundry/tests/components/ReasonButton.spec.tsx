@@ -8,6 +8,13 @@ import { ReasonButton } from '../../src/components/ReasonButton.js'
 // and shows it inline on click instead of firing the action.
 
 describe('ReasonButton', () => {
+  describe('with and without a reason', withAndWithoutAReasonTests)
+  describe('the click', theClickTests)
+  describe('the inline reason', theInlineReasonTests)
+  describe('a changed reason and focus', aChangedReasonAndFocusTests)
+})
+
+function withAndWithoutAReasonTests() {
   it('without a reason renders a plain, enabled button and fires onClick', async () => {
     const onClick = vi.fn()
     const user = userEvent.setup()
@@ -35,7 +42,9 @@ describe('ReasonButton', () => {
     expect(tip.getAttribute('id')).toBe(describedBy)
     expect(tip.textContent).toBe('The red team is reviewing the plan.')
   })
+}
 
+function theClickTests() {
   it('swallows the click, never calls onClick, and does not submit a form', async () => {
     const onClick = vi.fn()
     const onSubmit = vi.fn((e: React.FormEvent) => e.preventDefault())
@@ -51,7 +60,9 @@ describe('ReasonButton', () => {
     expect(onClick).not.toHaveBeenCalled()
     expect(onSubmit).not.toHaveBeenCalled()
   })
+}
 
+function theInlineReasonTests() {
   it('shows the reason inline after a click, and clears it when the reason goes away', async () => {
     const user = userEvent.setup()
     const { rerender } = render(
@@ -74,7 +85,9 @@ describe('ReasonButton', () => {
     )
     expect(screen.queryByText('The red team is reviewing the plan.')).toBeNull()
   })
+}
 
+function aChangedReasonAndFocusTests() {
   it('clears the inline reason when the reason text changes', async () => {
     const user = userEvent.setup()
     const { rerender } = render(
@@ -105,4 +118,4 @@ describe('ReasonButton', () => {
     button.focus()
     expect(document.activeElement).toBe(button)
   })
-})
+}

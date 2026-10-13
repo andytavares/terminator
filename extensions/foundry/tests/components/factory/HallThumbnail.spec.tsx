@@ -84,6 +84,12 @@ afterEach(() => {
 })
 
 describe('components/factory/HallThumbnail', () => {
+  describe('the picture', thePictureTests)
+  describe('fetching', fetchingTests)
+  describe('visibility', visibilityTests)
+})
+
+function thePictureTests() {
   it('renders a picture region labelled for the order once its graph arrives', async () => {
     const invoke = vi.fn(async () => ({ graph: GRAPH }))
     mockBridge(invoke)
@@ -103,7 +109,9 @@ describe('components/factory/HallThumbnail', () => {
       ).toBeTruthy()
     )
   })
+}
 
+function fetchingTests() {
   it('fetches the graph only once per order', async () => {
     const invoke = vi.fn(async () => ({ graph: GRAPH }))
     mockBridge(invoke)
@@ -126,7 +134,9 @@ describe('components/factory/HallThumbnail', () => {
     rerender(<HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="halted" />)
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2))
   })
+}
 
+function visibilityTests() {
   it('fetches nothing until the card is actually visible', async () => {
     const io = stubIntersectionObserver()
     const invoke = vi.fn(async () => ({ graph: GRAPH }))
@@ -144,4 +154,4 @@ describe('components/factory/HallThumbnail', () => {
     render(<HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="running" />)
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1))
   })
-})
+}

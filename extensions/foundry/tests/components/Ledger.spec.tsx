@@ -121,15 +121,22 @@ describe('the record while it is open', () => {
   })
 })
 
-describe('reading the record', () => {
-  /** The rows, not the filter options, which carry the same words. */
-  function rowText(): string[] {
-    return screen
-      .getAllByRole('row')
-      .slice(1)
-      .map((row) => row.textContent ?? '')
-  }
+/** The rows, not the filter options, which carry the same words. */
+function rowText(): string[] {
+  return screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => row.textContent ?? '')
+}
 
+describe('reading the record', () => {
+  describe('who decided', whoDecidedTests)
+  describe('filters', filtersTests)
+  describe('filtering by who and what', filteringByWhoAndWhatTests)
+  describe('counts and empty', countsAndEmptyTests)
+})
+
+function whoDecidedTests() {
   it('shows who decided, what, about what and why', async () => {
     mount()
     await waitFor(() => expect(screen.getByText('G-1')).toBeTruthy())
@@ -145,7 +152,9 @@ describe('reading the record', () => {
     await waitFor(() => screen.getByText('G-1'))
     expect(rowText()[1]).toContain('rule:budget.exceeded')
   })
+}
 
+function filtersTests() {
   it('offers only the filter values that occur', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
@@ -164,7 +173,9 @@ describe('reading the record', () => {
       )
     )
   })
+}
 
+function filteringByWhoAndWhatTests() {
   it('filters by who decided', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
@@ -188,7 +199,9 @@ describe('reading the record', () => {
       )
     )
   })
+}
 
+function countsAndEmptyTests() {
   it('says how much of the record it is showing', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
@@ -199,9 +212,28 @@ describe('reading the record', () => {
     mount({ entries: [], total: 0, actors: [], actions: [], orders: [] })
     await waitFor(() => expect(screen.getByText('Nothing recorded yet.')).toBeTruthy())
   })
-})
+}
 
 describe('asking what it keeps rejecting (FR-076)', () => {
+  describe('asking', askingTests)
+  describe('citations and threshold', citationsAndThresholdTests)
+  describe('accepting', acceptingTests)
+  describe('declining and refusals', decliningAndRefusalsTests)
+})
+
+const IN_FORCE = {
+  rules: [
+    {
+      id: 'curator-hardcodes-the-timeout',
+      asserts: 'no unit hardcodes a timeout',
+      rung: 'data-root',
+      origin: 'curator:2026-09-01T10:00:00.000Z/U-1',
+    },
+  ],
+  declined: [],
+}
+
+function askingTests() {
   it('proposes nothing until asked', async () => {
     mount({ proposals: [PROPOSAL] })
     await waitFor(() => screen.getByText('G-1'))
@@ -215,7 +247,9 @@ describe('asking what it keeps rejecting (FR-076)', () => {
     fireEvent.click(screen.getByRole('button', { name: /keep rejecting/ }))
     await waitFor(() => expect(screen.getByText('Proposed rules')).toBeTruthy())
   })
+}
 
+function citationsAndThresholdTests() {
   it('shows the citations the proposal derives from', async () => {
     mount({ proposals: [PROPOSAL] })
     await waitFor(() => screen.getByText('G-1'))
@@ -233,7 +267,9 @@ describe('asking what it keeps rejecting (FR-076)', () => {
     fireEvent.click(screen.getByRole('button', { name: /keep rejecting/ }))
     await waitFor(() => expect(screen.getByText(/three times/)).toBeTruthy())
   })
+}
 
+function acceptingTests() {
   it('accepts one, and says what that means', async () => {
     mount({ proposals: [PROPOSAL] })
     await waitFor(() => screen.getByText('G-1'))
@@ -249,7 +285,9 @@ describe('asking what it keeps rejecting (FR-076)', () => {
     )
     expect(screen.getByText(/in force from the next run/)).toBeTruthy()
   })
+}
 
+function decliningAndRefusalsTests() {
   it('turns one down for good', async () => {
     mount({ proposals: [PROPOSAL] })
     await waitFor(() => screen.getByText('G-1'))
@@ -277,21 +315,17 @@ describe('asking what it keeps rejecting (FR-076)', () => {
     // Still listed, because it was not decided.
     expect(screen.getByText(PROPOSAL.asserts)).toBeTruthy()
   })
-})
+}
 
 describe('removing an accepted check (FR-081)', () => {
-  const IN_FORCE = {
-    rules: [
-      {
-        id: 'curator-hardcodes-the-timeout',
-        asserts: 'no unit hardcodes a timeout',
-        rung: 'data-root',
-        origin: 'curator:2026-09-01T10:00:00.000Z/U-1',
-      },
-    ],
-    declined: [],
-  }
+  describe('in force', inForceTests)
+  describe('removing', removingTests)
+  describe('what was turned down', whatWasTurnedDownTests)
+  describe('declined checks', declinedChecksTests)
+  describe('an empty panel', anEmptyPanelTests)
+})
 
+function inForceTests() {
   it('shows the checks the operator accepted, with what each asserts', async () => {
     mount({ inForce: IN_FORCE })
     await waitFor(() => expect(screen.getByText('Checks you accepted')).toBeTruthy())
@@ -308,7 +342,9 @@ describe('removing an accepted check (FR-081)', () => {
       })
     )
   })
+}
 
+function removingTests() {
   it('says it is gone and will not come back', async () => {
     mount({ inForce: IN_FORCE })
     await waitFor(() => screen.getByText('Checks you accepted'))
@@ -323,7 +359,9 @@ describe('removing an accepted check (FR-081)', () => {
     await waitFor(() => expect(screen.getByText(/not yours to remove/)).toBeTruthy())
     expect(screen.queryByText(/no longer in force/)).toBeNull()
   })
+}
 
+function whatWasTurnedDownTests() {
   it('shows what was turned down, and why, so the removal is readable back', async () => {
     mount({
       inForce: {
@@ -334,7 +372,9 @@ describe('removing an accepted check (FR-081)', () => {
     await waitFor(() => expect(screen.getByText('Checks you accepted')).toBeTruthy())
     expect(screen.getByText(/it fired on everything/)).toBeTruthy()
   })
+}
 
+function declinedChecksTests() {
   it('names a declined check by what it would have checked, never by its id', async () => {
     mount({
       inForce: {
@@ -354,13 +394,15 @@ describe('removing an accepted check (FR-081)', () => {
     expect(screen.getByText(/Skips the lint step/)).toBeTruthy()
     expect(document.body.textContent).not.toContain('curator-')
   })
+}
 
+function anEmptyPanelTests() {
   it('shows the panel not at all when there is nothing in force and nothing declined', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
     expect(screen.queryByText('Checks you accepted')).toBeNull()
   })
-})
+}
 
 describe('the skills in force', () => {
   it('lists a skill available across the rungs, with the rung it came from', async () => {
@@ -377,22 +419,28 @@ describe('the skills in force', () => {
   })
 })
 
+function tileValue(label: string): string | null {
+  const tiles = document.querySelectorAll('.fdry-metrics-tile')
+  for (const tile of Array.from(tiles)) {
+    if (within(tile as HTMLElement).queryByText(label) !== null) {
+      return tile.querySelector('.fdry-metrics-tile__value')?.textContent ?? null
+    }
+  }
+  return null
+}
+
 describe('the Factory view (FR: the factory’s numbers)', () => {
+  describe('switching', switchingTests)
+  describe('null numbers', nullNumbersTests)
+  describe('windows', windowsTests)
+})
+
+function switchingTests() {
   it('stays on Record until asked', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
     expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:factory.metrics')).toHaveLength(0)
   })
-
-  function tileValue(label: string): string | null {
-    const tiles = document.querySelectorAll('.fdry-metrics-tile')
-    for (const tile of Array.from(tiles)) {
-      if (within(tile as HTMLElement).queryByText(label) !== null) {
-        return tile.querySelector('.fdry-metrics-tile__value')?.textContent ?? null
-      }
-    }
-    return null
-  }
 
   it('shows the 30-day tiles and a per-order row when switched to Factory', async () => {
     mount()
@@ -408,7 +456,9 @@ describe('the Factory view (FR: the factory’s numbers)', () => {
     expect(row?.textContent).toContain('✓')
     expect(row?.textContent).toContain('1 h 20 min')
   })
+}
 
+function nullNumbersTests() {
   it('renders a null number as —, never 0', async () => {
     mount({
       factoryMetrics: {
@@ -427,7 +477,9 @@ describe('the Factory view (FR: the factory’s numbers)', () => {
     const row = screen.getByText('Ship the thing').closest('tr')
     expect(row?.textContent).toContain('—')
   })
+}
 
+function windowsTests() {
   it('refetches with the chosen window', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
@@ -438,7 +490,7 @@ describe('the Factory view (FR: the factory’s numbers)', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )
   })
-})
+}
 
 describe('the reasons in the record', () => {
   it('renders a reason as markdown — an architect note is written that way', async () => {

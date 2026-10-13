@@ -144,6 +144,11 @@ function mountForgeWithOrder(over: Partial<WorkOrder>) {
 }
 
 describe('the Red team step holds open findings, but only the ones that block need a decision', () => {
+  describe('blocking findings', blockingFindingsTests)
+  describe('notes', notesTests)
+})
+
+function blockingFindingsTests() {
   it('puts a blocking finding in the "Needs your decision" group, with a way to decide it', async () => {
     mountForgeWithOrder({
       redTeam: [
@@ -164,7 +169,9 @@ describe('the Red team step holds open findings, but only the ones that block ne
     expect(within(group).getByText('the change would leave the outcome false')).toBeTruthy()
     expect(within(group).getByRole('button', { name: 'Ask the architect' })).toBeTruthy()
   })
+}
 
+function notesTests() {
   it('puts a non-blocking finding in the neutral "Notes" group instead', async () => {
     mountForgeWithOrder({
       redTeam: [
@@ -183,7 +190,7 @@ describe('the Red team step holds open findings, but only the ones that block ne
     await waitFor(() => screen.getByText('Notes, nothing to do'))
     expect(screen.queryByText('Needs your decision')).toBeNull()
   })
-})
+}
 
 // The Floor's half of the same problem.
 

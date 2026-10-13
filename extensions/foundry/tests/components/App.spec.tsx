@@ -131,6 +131,16 @@ const waitingRow = {
 }
 
 describe('App', () => {
+  describe('the Forge', theForgeTests)
+  describe('what is waiting', whatIsWaitingTests)
+  describe('the surface showing', theSurfaceShowingTests)
+  describe('settings', settingsTests)
+  describe('leaving settings', leavingSettingsTests)
+  describe('a waiting order', aWaitingOrderTests)
+  describe('a workspace change', aWorkspaceChangeTests)
+})
+
+function theForgeTests() {
   it('opens on the Forge', async () => {
     render(<App />)
     expect(screen.getByText('Foundry')).toBeTruthy()
@@ -151,7 +161,9 @@ describe('App', () => {
     await waitFor(() => expect(mockBridgeInvoke).toHaveBeenCalledWith('foundry:inbox.list', {}))
     expect(screen.queryByRole('region', { name: 'Waiting on you' })).toBeNull()
   })
+}
 
+function whatIsWaitingTests() {
   it('puts what is waiting above the Forge, before anything else on it', async () => {
     inboxWaiting = [waitingRow]
     render(<App />)
@@ -181,7 +193,9 @@ describe('App', () => {
     await waitFor(() => screen.getByText('Nothing recorded yet.'))
     expect(screen.queryByRole('region', { name: 'Waiting on you' })).toBeNull()
   })
+}
 
+function theSurfaceShowingTests() {
   it('marks which surface is showing, for anything reading state rather than colour', () => {
     render(<App />)
     expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe('true')
@@ -189,7 +203,9 @@ describe('App', () => {
       'false'
     )
   })
+}
 
+function settingsTests() {
   it('opens settings and comes back', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
@@ -223,7 +239,9 @@ describe('App', () => {
       )
     )
   })
+}
 
+function leavingSettingsTests() {
   it('leaves settings when a surface tab is clicked, rather than doing nothing visible', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
@@ -232,7 +250,9 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: /back/i })).toBeNull())
     expect(screen.getByRole('button', { name: 'Ledger' }).getAttribute('aria-pressed')).toBe('true')
   })
+}
 
+function aWaitingOrderTests() {
   // A waiting row names an order; its button has to land on that order, not on
   // the Forge's list where it is one row of many.
   it('opens a waiting order in the Forge', async () => {
@@ -263,7 +283,9 @@ describe('App', () => {
     )
     await waitFor(() => expect(screen.getByRole('button', { name: 'All orders' })).toBeTruthy())
   })
+}
 
+function aWorkspaceChangeTests() {
   it('closes settings when the workspace changes underneath it', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
@@ -271,7 +293,7 @@ describe('App', () => {
     bridgeHandlers['workspace:changed']({ repoRoot: '/other' })
     await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
   })
-})
+}
 
 describe('the counts on the chrome', () => {
   const asked = () => mockBridgeInvoke.mock.calls.filter((c) => c[0] === 'foundry:attention')
@@ -317,6 +339,11 @@ describe('the Ledger surface', () => {
 })
 
 describe('the New work order quick action', () => {
+  describe('the Forge brought forward', theForgeBroughtForwardTests)
+  describe('an earlier request', anEarlierRequestTests)
+})
+
+function theForgeBroughtForwardTests() {
   it('brings the Forge forward and focuses the idea box when the extension asks', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
@@ -342,7 +369,9 @@ describe('the New work order quick action', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: /back/i })).toBeNull())
     expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe('true')
   })
+}
 
+function anEarlierRequestTests() {
   it('picks up a request made before this view existed', async () => {
     pendingNewOrder = true
     render(<App />)
@@ -357,11 +386,21 @@ describe('the New work order quick action', () => {
       )
     )
   })
-})
+}
 
 // The toggle only exists on the Forge surface — the Ledger and Settings draw
 // exactly as they did before this feature.
 describe('the Factory view toggle', () => {
+  describe('where it is offered and starts', whereItIsOfferedAndStartsTests)
+  describe('switching', switchingTests)
+  describe('opening orders', openingOrdersTests)
+  describe('a shaping order', aShapingOrderTests)
+  describe('flipping back', flippingBackTests)
+  describe('a gated hall', aGatedHallTests)
+  describe('a hall band without a gate', aHallBandWithoutAGateTests)
+})
+
+function whereItIsOfferedAndStartsTests() {
   it('is not offered outside the Forge', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
@@ -378,7 +417,9 @@ describe('the Factory view toggle', () => {
     )
     expect(screen.getByText(/no orders yet/i)).toBeTruthy()
   })
+}
 
+function switchingTests() {
   it('switches to the hall grid and persists the choice', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
@@ -404,7 +445,9 @@ describe('the Factory view toggle', () => {
       ).toBe('true')
     )
   })
+}
 
+function openingOrdersTests() {
   it('opens a working order in the hall, and a shaping one back in the list', async () => {
     orderRows = [
       {
@@ -434,7 +477,9 @@ describe('the Factory view toggle', () => {
     fireEvent.click(screen.getByRole('button', { name: /Working order/ }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'All halls' })).toBeTruthy())
   })
+}
 
+function aShapingOrderTests() {
   it('sends a shaping order back to the list, open', async () => {
     orderRows = [
       {
@@ -459,7 +504,9 @@ describe('the Factory view toggle', () => {
     )
     expect(screen.queryByRole('button', { name: 'All halls' })).toBeNull()
   })
+}
 
+function flippingBackTests() {
   it('flips back to List from Factory through the toggle', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
@@ -474,7 +521,9 @@ describe('the Factory view toggle', () => {
     )
     expect(screen.getByText(/no orders yet/i)).toBeTruthy()
   })
+}
 
+function aGatedHallTests() {
   // The gate is in the queue above the hall, so the hall's own band no longer
   // sends you anywhere to find it.
   it('keeps a gated hall under the queue that answers it', async () => {
@@ -519,7 +568,9 @@ describe('the Factory view toggle', () => {
     expect(screen.getByRole('region', { name: 'Waiting on you' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
   })
+}
 
+function aHallBandWithoutAGateTests() {
   it('opens a hall band with no gate behind it in the List view', async () => {
     orderRows = [
       {
@@ -566,4 +617,4 @@ describe('the Factory view toggle', () => {
     )
     expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe('true')
   })
-})
+}

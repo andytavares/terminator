@@ -90,6 +90,17 @@ describe('FactorySite reading', () => {
 })
 
 describe('FactorySite', () => {
+  describe('the cards', theCardsTests)
+  describe('completed orders', completedOrdersTests)
+  describe('no Completed section', noCompletedSectionTests)
+  describe('waiting shipped orders', waitingShippedOrdersTests)
+  describe('beacons', beaconsTests)
+  describe('CI', ciTests)
+  describe('the refinery track', theRefineryTrackTests)
+  describe('opening', openingTests)
+})
+
+function theCardsTests() {
   it('says there is nothing yet', async () => {
     mount([])
     await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
@@ -107,7 +118,9 @@ describe('FactorySite', () => {
       expect.stringContaining('Older'),
     ])
   })
+}
 
+function completedOrdersTests() {
   it('puts finished orders in their own section, marked done, newest first', async () => {
     const done = (label: string) => ({
       kind: 'done' as const,
@@ -150,13 +163,17 @@ describe('FactorySite', () => {
     expect(finished.every((c) => c.classList.contains('is-done'))).toBe(true)
     expect(active.querySelector('.fdry-hall-card.is-done')).toBeNull()
   })
+}
 
+function noCompletedSectionTests() {
   it('shows no Completed section until an order finishes', async () => {
     mount([{ id: 'WO-1', title: 'Building', status: 'running' }])
     await waitFor(() => screen.getByText('Building'))
     expect(screen.queryByRole('region', { name: 'Completed' })).toBeNull()
   })
+}
 
+function waitingShippedOrdersTests() {
   // A shipped order still holding the ready-for-review gate is the operator's
   // move, so it stays with the active work.
   it('keeps a shipped order that is still waiting on you with the active ones', async () => {
@@ -181,7 +198,9 @@ describe('FactorySite', () => {
     expect(screen.getByRole('region', { name: 'Active' }).textContent).toContain('Awaiting review')
     expect(screen.queryByRole('region', { name: 'Completed' })).toBeNull()
   })
+}
 
+function beaconsTests() {
   it('beacons a card whose standing says the operator’s move', async () => {
     mount([
       {
@@ -205,7 +224,9 @@ describe('FactorySite', () => {
       screen.getByRole('button', { name: /Halted/ }).querySelector('.fdry-hall-card-beacon')
     ).not.toBeNull()
   })
+}
 
+function ciTests() {
   it('shows the CI round and status in plain words, never a raw code', async () => {
     mount([
       { id: 'WO-1', title: 'Shipping', status: 'running', ci: { status: 'red', round: 2, max: 3 } },
@@ -219,7 +240,9 @@ describe('FactorySite', () => {
     await waitFor(() => screen.getByText('Fresh'))
     expect(screen.queryByText(/CI \d/)).toBeNull()
   })
+}
 
+function theRefineryTrackTests() {
   it('shows no refinery track when nothing is queued behind anything', async () => {
     mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
     await waitFor(() => screen.getByText('Only one'))
@@ -243,14 +266,16 @@ describe('FactorySite', () => {
     const track = screen.getByLabelText('Refinery').querySelector('.fdry-refinery-track')
     expect(track?.textContent).toBe('First2 shared filesSecond')
   })
+}
 
+function openingTests() {
   it('opens the order it is given', async () => {
     const { onOpen } = mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
     await waitFor(() => screen.getByText('Only one'))
     fireEvent.click(screen.getByRole('button', { name: /Only one/ }))
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'WO-1', title: 'Only one' }))
   })
-})
+}
 
 describe('FactorySite status wall', () => {
   it('shows the 30-day numbers as tiles', async () => {
@@ -279,6 +304,11 @@ describe('FactorySite status wall', () => {
 })
 
 describe('the Dock', () => {
+  describe('crates', cratesTests)
+  describe('promoting', promotingTests)
+})
+
+function cratesTests() {
   it('shows nothing when there are no open signals', async () => {
     mount([])
     await waitFor(() => screen.getByText(/no orders yet/i))
@@ -291,7 +321,9 @@ describe('the Dock', () => {
     expect(screen.getByText(/×4/)).toBeTruthy()
     expect(screen.getByText(/high/)).toBeTruthy()
   })
+}
 
+function promotingTests() {
   it('promotes a crate the same way the Inbox does', async () => {
     const { invoke } = mount([], METRICS, {
       signals: [dockSignal()],
@@ -317,4 +349,4 @@ describe('the Dock', () => {
     )
     expect(await screen.findByText(/Draft WO-9 created — open it in the Forge/)).toBeTruthy()
   })
-})
+}
