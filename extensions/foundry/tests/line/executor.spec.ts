@@ -4,7 +4,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execute, opensPullRequest, skillsFor } from '../../src/line/executor.js'
-import type { ExecutorEvent, StartedRun } from '../../src/line/executor.js'
+import type { ExecutorEvent, RunPlan, StartedRun } from '../../src/line/executor.js'
 import { buildRunGraph } from '../../src/line/run-graph.js'
 import { idleExecutorSeams } from './idle-executor-seams.js'
 import { retry } from '../../src/line/scheduler.js'
@@ -111,6 +111,11 @@ function unit(id: string, over: Record<string, unknown> = {}) {
   }
 }
 
+/** The run of `o` along `shape`, over the graph built from both. */
+function planOf(o: WorkOrder, shape: Recipe = recipe()): RunPlan {
+  return { order: o, recipe: shape, graph: buildRunGraph(o, shape) }
+}
+
 function order(units = [unit('U-1'), unit('U-2')], over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
     id: 'WO-1',
@@ -189,7 +194,7 @@ function runningUnitsTests() {
   it('runs every unit that can run', async () => {
     const run = vi.fn(ok)
     const o = order()
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    const outcome = await execute(planOf(o), deps(run))
     // Two units. The third node is the recipe's own ship gate, which is
     // reached rather than run — nothing was launched for it, and it is left
     // running because the tail has not shipped anything yet.
@@ -213,7 +218,7 @@ function runningUnitsTests() {
     const o = order([unit('U-1'), unit('U-2'), unit('U-3'), unit('U-4')], {
       budgets: { agents: 2, wallClockMinutes: 45, tokens: null },
     })
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    await execute(planOf(o), deps(run))
     expect(peak).toBeLessThanOrEqual(2)
     expect(run).toHaveBeenCalledTimes(4)
   })
@@ -223,7 +228,7 @@ function sessionsAndReadOnlyRolesTests() {
   it('never hands a role a session to resume', async () => {
     const run = vi.fn(ok)
     const o = order()
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    await execute(planOf(o), deps(run))
     expect(run.mock.calls.length).toBeGreaterThan(0)
     for (const call of run.mock.calls) {
       expect(call[0].resumeSessionId).toBeUndefined()
@@ -234,14 +239,14 @@ function sessionsAndReadOnlyRolesTests() {
     const run = vi.fn(ok)
     const verifying = RECIPE.replace('role: builder', 'role: verifier')
     const o = order()
-    await execute(o, recipe(verifying), buildRunGraph(o, recipe(verifying)), deps(run))
+    await execute(planOf(o, recipe(verifying)), deps(run))
     expect(run.mock.calls.every((c) => c[0].readOnly)).toBe(true)
   })
 
   it('does not mark a builder read-only — it is the one role that writes', async () => {
     const run = vi.fn(ok)
     const o = order()
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    await execute(planOf(o), deps(run))
     expect(run.mock.calls.every((c) => c[0].readOnly)).toBe(false)
   })
 }
@@ -253,7 +258,7 @@ function aChangeOfRoleTests() {
     // The architect has a conversation open in this lane. Nothing else does,
     // which is exactly what the real map looks like at this point.
     const open = new Map([['1:architect', 'sess-architect']])
-    await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), {
+    await execute(planOf(o, recipe(CHECKED)), {
       ...deps(run),
       sessionFor: (lane, role) => open.get(`${lane}:${role ?? 'command'}`),
     })
@@ -268,7 +273,7 @@ function aChangeOfRoleTests() {
     // Two units for one builder: the second keeps everything the first
     // learned about this repository.
     const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(run),
       sessionFor: (_lane, role) => (role === 'builder' ? 'sess-builder' : undefined),
     })
@@ -281,16 +286,14 @@ function thePromptAndTheVerdictTests() {
   it('gives each run the role prompt rather than an empty instruction', async () => {
     const run = vi.fn(ok)
     const o = order()
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    await execute(planOf(o), deps(run))
     expect(run.mock.calls[0][0].prompt).toContain('Build one unit')
   })
 
   it('takes the verdict from the exit status', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
-      o,
-      recipe(CHECKED),
-      buildRunGraph(o, recipe(CHECKED)),
+      planOf(o, recipe(CHECKED)),
       deps(async (i) => ({
         sessionId: `s-${i.node.id}`,
         exitCode: i.node.id.startsWith('verify') ? 1 : 0,
@@ -305,7 +308,7 @@ function thePromptAndTheVerdictTests() {
   // said it satisfied, from the builder's own exit code, labelled `verifier`.
   it('stamps no verdict when nothing has checked the work', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(ok))
+    const outcome = await execute(planOf(o), deps(ok))
     // RECIPE builds and stops. An unchecked criterion is "not measured" by
     // absence — which is what both the ladder and the pull request body read.
     expect(outcome.verdicts).toEqual([])
@@ -315,7 +318,7 @@ function thePromptAndTheVerdictTests() {
 function whoChecksTheWorkTests() {
   it('never lets the working session produce its own verdict', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), deps(ok))
+    const outcome = await execute(planOf(o, recipe(CHECKED)), deps(ok))
     expect(outcome.verdicts.length).toBeGreaterThan(0)
     for (const verdict of outcome.verdicts) {
       expect(verdict.producedBy.role).toBe('verifier')
@@ -332,7 +335,7 @@ function whoChecksTheWorkTests() {
   // session now, so the refusal can actually fire.
   it('holds the checker against the session that did the work', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), deps(ok))
+    const outcome = await execute(planOf(o, recipe(CHECKED)), deps(ok))
     expect(outcome.verdicts).toHaveLength(1)
     expect(() =>
       makeVerdict({
@@ -348,9 +351,7 @@ function failuresTests() {
   it('reports a run with no exit status as not measured, not as a failure', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
-      o,
-      recipe(CHECKED),
-      buildRunGraph(o, recipe(CHECKED)),
+      planOf(o, recipe(CHECKED)),
       // The build lands; it is the *check* that never reported an exit, which
       // is the case this is about. A build with no exit never passes, so the
       // verify node it gates would not run at all.
@@ -365,9 +366,7 @@ function failuresTests() {
   it('blocks what a failure stopped rather than leaving it waiting', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
     )
     expect(outcome.graph.nodes.find((n) => n.id === 'ship')?.state).toBe('blocked')
@@ -379,9 +378,7 @@ function gatesTests() {
   it('says on the stall gate which step failed, why, and what it holds up', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
     )
     const gate = outcome.gates.find((g) => g.summary.endsWith('cannot go any further on its own'))
@@ -394,7 +391,7 @@ function gatesTests() {
   it('raises a gate rather than answering it, and stops', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), deps(run))
+    const outcome = await execute(planOf(o, recipe(PAUSING)), deps(run))
 
     // Never launched as work, and never silently stepped over: the run halts
     // and the operator is asked.
@@ -408,7 +405,7 @@ function silencedCheckpointsAndDecisionsTests() {
   it('does not stop at a checkpoint the autonomy setting silences', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), {
+    const outcome = await execute(planOf(o, recipe(PAUSING)), {
       ...deps(run),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -421,7 +418,7 @@ function silencedCheckpointsAndDecisionsTests() {
     const o = order([unit('U-1')])
     const failing = deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
     let graph = buildRunGraph(o, recipe())
-    graph = (await execute(o, recipe(), graph, failing)).graph
+    graph = (await execute({ order: o, recipe: recipe(), graph }, failing)).graph
     // Put it back in the queue as a decision would, then fail it again.
     graph = {
       ...graph,
@@ -429,7 +426,7 @@ function silencedCheckpointsAndDecisionsTests() {
         n.id === 'build:U-1' ? { ...n, state: 'waiting' as const } : n
       ),
     }
-    const second = await execute(o, recipe(), graph, failing)
+    const second = await execute({ order: o, recipe: recipe(), graph }, failing)
     expect(second.awaitingDecision).toContain('build:U-1')
   })
 }
@@ -438,7 +435,7 @@ function eventsAndInspectionTests() {
   it('reports every event a surface needs to follow along', async () => {
     const events: ExecutorEvent[] = []
     const o = order([unit('U-1')])
-    await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), deps(ok, events))
+    await execute(planOf(o, recipe(CHECKED)), deps(ok, events))
     const kinds = events.map((e) => e.type)
     expect(kinds).toContain('started')
     expect(kinds).toContain('verdict')
@@ -449,7 +446,7 @@ function eventsAndInspectionTests() {
   it('inspects the accumulated change, not one unit, and says when it did not', async () => {
     const events: ExecutorEvent[] = []
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(ok, events))
+    await execute(planOf(o), deps(ok, events))
     const inspection = events.find((e) => e.type === 'inspection')
     expect(inspection).toMatchObject({ required: false })
   })
@@ -457,7 +454,7 @@ function eventsAndInspectionTests() {
   it('requires an inspection once the change touches something that warrants one', async () => {
     const events: ExecutorEvent[] = []
     const o = order([unit('U-1', { touches: ['src/auth/session.ts'] })])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(ok, events))
+    await execute(planOf(o), deps(ok, events))
     const inspection = events.find((e) => e.type === 'inspection')
     expect(inspection).toMatchObject({ required: true })
   })
@@ -467,7 +464,7 @@ function anEmptyGraphTests() {
   it('does nothing at all with a graph that has nothing runnable', async () => {
     const run = vi.fn(ok)
     const o = order([])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    const outcome = await execute(planOf(o), deps(run))
     expect(run).not.toHaveBeenCalled()
     expect(outcome.verdicts).toEqual([])
   })
@@ -496,7 +493,7 @@ function unplannedFilesTests() {
   it('grades a file the plan never mentioned', async () => {
     const events: ExecutorEvent[] = []
     const o = order([unit('U-1', { touches: ['src/harmless.ts'] })])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(ok, events),
       observedChange: async () => ({
         // The unit said it would touch one innocuous file and the agent went
@@ -525,7 +522,7 @@ function theBlastRadiusTriggerTests() {
         criticalPaths: [],
       },
     })
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(ok, events),
       observedChange: async () => ({
         changedFiles: ['src/session.ts', 'src/billing/invoice.ts'],
@@ -543,7 +540,7 @@ function declarationsTests() {
   it('keeps what the plan declared as well, rather than swapping one for the other', async () => {
     const events: ExecutorEvent[] = []
     const o = order([unit('U-1', { touches: ['src/auth/session.ts'] })])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(ok, events),
       // Git could not be read. An empty answer means "unknown", and reading it
       // as "nothing touched authentication" is how a P0 quietly grades P3.
@@ -555,7 +552,7 @@ function declarationsTests() {
   it('falls back to the declaration when nothing can tell it what changed', async () => {
     const events: ExecutorEvent[] = []
     const o = order([unit('U-1', { touches: ['src/auth/session.ts'] })])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(ok, events))
+    await execute(planOf(o), deps(ok, events))
     expect(events.find((e) => e.type === 'inspection')).toMatchObject({ required: true })
   })
 }
@@ -579,7 +576,7 @@ steps:
     command: /speckit-plan
 `
     const o = order([])
-    await execute(o, recipe(shell), buildRunGraph(o, recipe(shell)), deps(run))
+    await execute(planOf(o, recipe(shell)), deps(run))
     // The command, and an instruction not to reinterpret it. A command handed
     // to an agent is an invitation to fix what it reports.
     expect(run.mock.calls[0][0].prompt).toContain('/speckit-plan')
@@ -599,7 +596,7 @@ steps:
     order: lane.ord
 `
     const o = order([])
-    const outcome = await execute(o, recipe(nameless), buildRunGraph(o, recipe(nameless)), {
+    const outcome = await execute(planOf(o, recipe(nameless)), {
       ...deps(run),
       runStep: async () => 0,
     })
@@ -619,7 +616,7 @@ steps:
     command: npm test
 `
     const o = order([])
-    const outcome = await execute(o, recipe(shell), buildRunGraph(o, recipe(shell)), deps(ok))
+    const outcome = await execute(planOf(o, recipe(shell)), deps(ok))
     expect(outcome.verdicts).toEqual([])
   })
 
@@ -633,7 +630,7 @@ steps:
     command: npm test
 `
     const o = order([])
-    const outcome = await execute(o, recipe(shell), buildRunGraph(o, recipe(shell)), deps(ok))
+    const outcome = await execute(planOf(o, recipe(shell)), deps(ok))
     expect(outcome.complete).toBe(true)
   })
 }
@@ -658,7 +655,7 @@ function verdictsPerCriterionTests() {
         },
       ],
     })
-    const outcome = await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), deps(ok))
+    const outcome = await execute(planOf(o, recipe(CHECKED)), deps(ok))
     expect(outcome.verdicts.map((v) => v.criterionId).sort()).toEqual(['AC-1', 'AC-2'])
   })
 }
@@ -675,7 +672,7 @@ function theOrderAndTheUnitTests() {
       title: 'Refuse an expired refresh token',
       intent: { problem: 'expired tokens are accepted', outcome: 'they are refused', nonGoals: [] },
     })
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    await execute(planOf(o), deps(run))
 
     const prompt = run.mock.calls[0][0].prompt
     expect(prompt).toContain('Build one unit') // the role's own words
@@ -686,7 +683,7 @@ function theOrderAndTheUnitTests() {
   it('names the unit, what it may touch, and what makes it done', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    await execute(planOf(o), deps(run))
 
     const prompt = run.mock.calls[0][0].prompt
     expect(prompt).toContain('U-1')
@@ -699,7 +696,7 @@ function houseRulesTests() {
   it('carries the house rules it was given', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(run),
       rules: [
         {
@@ -726,7 +723,7 @@ function aBreachTests() {
   it('stops and asks rather than running past a wall-clock breach', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1'), unit('U-2')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(run),
       observe: () => ({ elapsedMinutes: 10_000 }),
     })
@@ -739,7 +736,7 @@ function aBreachTests() {
 
   it('says which budget, in the operator own terms', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       observe: () => ({ elapsedMinutes: 10_000 }),
     })
@@ -750,7 +747,7 @@ function aBreachTests() {
 function theRecordAndNormalRunsTests() {
   it('records which budget it stopped at, with the limit and the count', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       observe: () => ({ elapsedMinutes: 10_000 }),
     })
@@ -764,7 +761,7 @@ function theRecordAndNormalRunsTests() {
   it('runs normally when it is inside them', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(run),
       observe: () => ({ elapsedMinutes: 1 }),
     })
@@ -778,11 +775,11 @@ describe('a repeated failure becomes a decision', () => {
     const failing = deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
 
     let graph = buildRunGraph(o, recipe())
-    graph = (await execute(o, recipe(), graph, failing)).graph
+    graph = (await execute({ order: o, recipe: recipe(), graph }, failing)).graph
     // Retried deliberately, as the operator's "send back" does: the scheduler
     // does not re-offer a failed node on its own.
     graph = retry(graph, 'build:U-1')
-    const second = await execute(o, recipe(), graph, failing)
+    const second = await execute({ order: o, recipe: recipe(), graph }, failing)
 
     expect(second.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
     expect(second.gates.find((g) => g.rule === 'verify.repeat-fail')?.why).toMatch(/not a retry/)
@@ -791,9 +788,7 @@ describe('a repeated failure becomes a decision', () => {
   it('does not ask about the node on its first failure — once is bad luck', async () => {
     const o = order([unit('U-1')])
     const first = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
     )
     // A second attempt is owed first, so nothing here is "attempt three is a
@@ -861,7 +856,7 @@ function whenItIsClimbedTests() {
   it('is climbed once the units are done', async () => {
     const steps: string[] = []
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async (step) => {
@@ -876,7 +871,7 @@ function whenItIsClimbedTests() {
   it('is not climbed when the run halted at a gate — there is nothing to judge yet', async () => {
     const runStep = vi.fn(async () => 0)
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), {
+    const outcome = await execute(planOf(o, recipe(PAUSING)), {
       ...deps(vi.fn(ok)),
       runStep,
     })
@@ -888,7 +883,7 @@ function whenItIsClimbedTests() {
 function whatItReportsTests() {
   it('carries what it could not measure, rather than reporting a pass', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       // No runStep at all, which is a repository with no tooling.
@@ -904,7 +899,7 @@ function whatItReportsTests() {
 
   it('is not shippable when a rung actually failed', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 1,
@@ -918,7 +913,7 @@ function stepOutputTests() {
   it("keeps each step's output and shows the failed step's last lines on the gate", async () => {
     const o = order([unit('U-1')])
     const logs: string[] = []
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'standard',
       runStep: async (step, logPath) => {
@@ -945,7 +940,7 @@ function stepOutputTests() {
 function theQuestionItAsksTests() {
   it('asks about a failed climb where the setting is asking at all', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'standard',
       runStep: async () => 1,
@@ -955,7 +950,7 @@ function theQuestionItAsksTests() {
 
   it('names the step and its command in plain words, never a rung code', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'standard',
       runStep: async () => 1,
@@ -972,7 +967,7 @@ function theQuestionItAsksTests() {
 function lightsOutRunsTests() {
   it('does not interrupt a lights-out run over it, and still refuses to ship', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 1,
@@ -1003,9 +998,7 @@ function flakyChecksTests() {
     const o = order([unit('U-1')])
     const record = vi.fn(async () => undefined)
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       base({ runStep: lintRunner((n) => (n === 1 ? 1 : 0)), record })
     )
     expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.repeat-fail')
@@ -1041,9 +1034,7 @@ function theBaseBranchFailsTooTests() {
     const o = order([unit('U-1')])
     const releaseBase = vi.fn(async () => undefined)
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       base({
         runStep: lintRunner(() => 1),
         runStepOnBase: lintRunner(() => 2),
@@ -1060,9 +1051,7 @@ function sendingBackTests() {
   it('sends the change back when the base passes the same check', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       base({ runStep: lintRunner(() => 1), runStepOnBase: lintRunner(() => 0) })
     )
     const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
@@ -1076,9 +1065,7 @@ function theSendBackLimitTests() {
   it('stops offering send back after two of them', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       base({
         runStep: lintRunner(() => 1),
         runStepOnBase: lintRunner(() => 0),
@@ -1093,9 +1080,7 @@ function theSendBackLimitTests() {
   it('still offers send back after one', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       base({ runStep: lintRunner(() => 1), priorGates: sentBack(o, 1) })
     )
     const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
@@ -1107,9 +1092,7 @@ function anUncheckedBaseTests() {
   it('says so when the base branch could not be checked, and never counts it as a pass', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       base({ runStep: lintRunner(() => 1), runStepOnBase: async () => null })
     )
     const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
@@ -1124,9 +1107,7 @@ function releasingTheBaseCheckoutTests() {
     const releaseBase = vi.fn(async () => undefined)
     await expect(
       execute(
-        o,
-        recipe(),
-        buildRunGraph(o, recipe()),
+        planOf(o),
         base({
           runStep: lintRunner(() => 1),
           runStepOnBase: async () => {
@@ -1154,9 +1135,7 @@ function reinstallingTests() {
     })
     const record = vi.fn(async () => undefined)
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       base({
         runStep: logRunner(() => (healed ? { code: 0, text: 'ok' } : { code: 1, text: TRUNCATED })),
         reinstall,
@@ -1180,9 +1159,7 @@ function anInstallThatStaysBrokenTests() {
     const o = order([unit('U-1')])
     const reinstall = vi.fn(async () => 1)
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       base({ runStep: logRunner(() => ({ code: 1, text: MISSING })), reinstall })
     )
     expect(reinstall).toHaveBeenCalledTimes(1)
@@ -1199,9 +1176,7 @@ function theBaseCheckoutInstallTests() {
     const o = order([unit('U-1')])
     const reinstall = vi.fn(async () => 1)
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       base({
         runStep: lintRunner(() => 1),
         runStepOnBase: logRunner(() => ({ code: 1, text: MISSING })),
@@ -1226,9 +1201,7 @@ function aMendedBaseTests() {
       return 0
     })
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       base({
         runStep: lintRunner(() => 1),
         runStepOnBase: logRunner(() =>
@@ -1247,12 +1220,7 @@ function aPassingLadderTests() {
     const o = order([unit('U-1')])
     const runStepOnBase = vi.fn(async () => 0)
     const releaseBase = vi.fn(async () => undefined)
-    await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
-      base({ runStep: async () => 0, runStepOnBase, releaseBase })
-    )
+    await execute(planOf(o), base({ runStep: async () => 0, runStepOnBase, releaseBase }))
     expect(runStepOnBase).not.toHaveBeenCalled()
     expect(releaseBase).not.toHaveBeenCalled()
   })
@@ -1266,7 +1234,7 @@ describe('shippable', () => {
 function everythingPassedTests() {
   it('is true only when everything passed and nothing is waiting on a person', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -1280,7 +1248,7 @@ function everythingPassedTests() {
 function openGatesAndFailuresTests() {
   it('is false for a complete graph with an open gate', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), {
+    const outcome = await execute(planOf(o, recipe(PAUSING)), {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
@@ -1290,7 +1258,7 @@ function openGatesAndFailuresTests() {
 
   it('is false when a unit failed', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 })),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -1302,12 +1270,7 @@ function openGatesAndFailuresTests() {
 describe('raising a gate where nobody can see it', () => {
   it('still stops, rather than continuing past a decision nobody took', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(
-      o,
-      recipe(PAUSING),
-      buildRunGraph(o, recipe(PAUSING)),
-      deps(vi.fn(ok))
-    )
+    const outcome = await execute(planOf(o, recipe(PAUSING)), deps(vi.fn(ok)))
     // No `raise` seam at all — the gate is still on the outcome, and the run
     // is still not shippable.
     expect(outcome.gates.length).toBeGreaterThan(0)
@@ -1317,7 +1280,7 @@ describe('raising a gate where nobody can see it', () => {
   it('hands each gate to the seam when there is one', async () => {
     const raise = vi.fn(async () => undefined)
     const o = order([unit('U-1')])
-    await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), {
+    await execute(planOf(o, recipe(PAUSING)), {
       ...deps(vi.fn(ok)),
       raise,
     })
@@ -1352,7 +1315,7 @@ function resumableRolesTests() {
     // its second unit continues where its first left off rather than being a
     // fresh agent that has read nothing.
     const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(run),
       sessionFor: (_lane, role) => (role === 'builder' ? 'sess-lane-1' : undefined),
     })
@@ -1366,7 +1329,7 @@ function resumableRolesTests() {
     const run = vi.fn(ok)
     const asked: (string | null)[] = []
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(run),
       sessionFor: (_lane, role) => {
         asked.push(role)
@@ -1390,7 +1353,7 @@ steps:
 `
     const run = vi.fn(ok)
     const o = order([])
-    await execute(o, recipe(verifying), buildRunGraph(o, recipe(verifying)), {
+    await execute(planOf(o, recipe(verifying)), {
       ...deps(run),
       sessionFor: (_lane, role) => (role === 'builder' ? 'sess-lane-1' : undefined),
       runStep: async () => 0,
@@ -1403,7 +1366,7 @@ steps:
   it('starts fresh when the lane has no conversation yet', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    await execute(planOf(o), deps(run))
     expect(run.mock.calls[0][0].resumeSessionId).toBeUndefined()
   })
 }
@@ -1427,7 +1390,7 @@ steps:
 function theRuleRaisedTests() {
   it('is the one raised, not a hardcoded default', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(risky), buildRunGraph(o, recipe(risky)), {
+    const outcome = await execute(planOf(o, recipe(risky)), {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
@@ -1437,7 +1400,7 @@ function theRuleRaisedTests() {
 
   it('brings the options that rule offers with it', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(risky), buildRunGraph(o, recipe(risky)), {
+    const outcome = await execute(planOf(o, recipe(risky)), {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
@@ -1452,7 +1415,7 @@ function shipMarkersTests() {
     // "Mark it ready?" before a draft exists is a question with no answer. The
     // real one is raised once shipping has opened something.
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
@@ -1479,7 +1442,7 @@ steps:
     after: [build]
 `
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(odd), buildRunGraph(o, recipe(odd)), deps(vi.fn(ok)))
+    const outcome = await execute(planOf(o, recipe(odd)), deps(vi.fn(ok)))
     expect(outcome.gates.map((g) => g.rule)).toContain('unit.boundary')
   })
 }
@@ -1495,7 +1458,7 @@ function keptAndBrokenPromisesTests() {
     // passing command is the wrong answer.
     const o = order([])
     const record = vi.fn(async () => undefined)
-    const outcome = await execute(o, recipe(bugfix), buildRunGraph(o, recipe(bugfix)), {
+    const outcome = await execute(planOf(o, recipe(bugfix)), {
       ...deps(vi.fn(ok)),
       record,
       runStep: async () => 0,
@@ -1510,7 +1473,7 @@ function keptAndBrokenPromisesTests() {
 
   it('passes when it was kept', async () => {
     const o = order([])
-    const outcome = await execute(o, recipe(bugfix), buildRunGraph(o, recipe(bugfix)), {
+    const outcome = await execute(planOf(o, recipe(bugfix)), {
       ...deps(vi.fn(ok)),
       runCommand: async () => 1,
       autonomy: 'lights-out',
@@ -1523,7 +1486,7 @@ function keptAndBrokenPromisesTests() {
 function noPromiseTests() {
   it('leaves a step that promised nothing judged on its exit status alone', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -1546,7 +1509,7 @@ function regradingTests() {
     const o = order([unit('U-1', { touches: ['src/main/auth/session.ts'] })], {
       risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
     })
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -1565,7 +1528,7 @@ function declaredTriggersTests() {
     const o = order([unit('U-1', { touches: ['src/package.json'] })], {
       risk: { grade: 'P3', triggers: ['new_dependency'], blastRadius: ['src/'], criticalPaths: [] },
     })
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
@@ -1576,7 +1539,7 @@ function declaredTriggersTests() {
     const o = order([unit('U-1', { touches: ['src/package.json'] })], {
       risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
     })
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
@@ -1589,7 +1552,7 @@ function thePlannedGradeTests() {
     const o = order([unit('U-1', { touches: ['src/main/auth/session.ts'] })], {
       risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
     })
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
@@ -1604,7 +1567,7 @@ function anApprovedRegradeTests() {
     const o = order([unit('U-1', { touches: ['src/main/auth/session.ts'] })], {
       risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
     })
-    const first = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const first = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
@@ -1612,11 +1575,14 @@ function anApprovedRegradeTests() {
     if (asked === undefined) throw new Error('expected the regrade to be asked about')
     const approved = decide(asked, { option: 'approve', note: '', at: '2026-09-28T19:12:26.193Z' })
 
-    const resumed = await execute(o, recipe(), first.graph, {
-      ...deps(vi.fn(ok)),
-      runStep: async () => 0,
-      priorGates: [approved],
-    })
+    const resumed = await execute(
+      { order: o, recipe: recipe(), graph: first.graph },
+      {
+        ...deps(vi.fn(ok)),
+        runStep: async () => 0,
+        priorGates: [approved],
+      }
+    )
     expect(resumed.gates.filter((g) => g.rule === 'risk.p0')).toEqual([])
     expect(resumed.shippable).toBe(true)
   })
@@ -1627,7 +1593,7 @@ function aHeldRegradeTests() {
     const o = order([unit('U-1', { touches: ['src/main/auth/session.ts'] })], {
       risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
     })
-    const first = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const first = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
@@ -1635,11 +1601,14 @@ function aHeldRegradeTests() {
     if (asked === undefined) throw new Error('expected the regrade to be asked about')
     const held = decide(asked, { option: 'hold', note: '', at: '2026-09-28T19:12:26.193Z' })
 
-    const resumed = await execute(o, recipe(), first.graph, {
-      ...deps(vi.fn(ok)),
-      runStep: async () => 0,
-      priorGates: [held],
-    })
+    const resumed = await execute(
+      { order: o, recipe: recipe(), graph: first.graph },
+      {
+        ...deps(vi.fn(ok)),
+        runStep: async () => 0,
+        priorGates: [held],
+      }
+    )
     const again = resumed.gates.find((g) => g.rule === 'risk.p0')
     expect(again).toBeDefined()
     // A fresh id, or saving it overwrites the decision already on file.
@@ -1652,7 +1621,7 @@ function anOrdinaryChangeTests() {
     const o = order([unit('U-1', { touches: ['src/readme.ts'] })], {
       risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
     })
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -1668,8 +1637,8 @@ describe('a graph that cannot move on its own', () => {
     const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
     const failing = deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
     let graph = buildRunGraph(o, recipe())
-    graph = (await execute(o, recipe(), graph, failing)).graph
-    const stalled = await execute(o, recipe(), graph, failing)
+    graph = (await execute({ order: o, recipe: recipe(), graph }, failing)).graph
+    const stalled = await execute({ order: o, recipe: recipe(), graph }, failing)
 
     expect(stalled.shippable).toBe(false)
     const gate = stalled.gates.find((g) => g.summary.endsWith('cannot go any further on its own'))
@@ -1681,7 +1650,7 @@ describe('a graph that cannot move on its own', () => {
 
   it('does not call a finished run stalled', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -1722,7 +1691,7 @@ steps:
 function neverShippableTests() {
   it('is never shippable, however well it went', async () => {
     const o = order([])
-    const outcome = await execute(o, recipe(question), buildRunGraph(o, recipe(question)), {
+    const outcome = await execute(planOf(o, recipe(question)), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -1743,7 +1712,7 @@ function neverShippableTests() {
 function aShapeThatShipsTests() {
   it('leaves a shape that does ship shipping', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -1781,7 +1750,7 @@ async function tiers(): Promise<{ role: string | null; modelTier: string }[]> {
   )
   const o = order([unit('U-1')])
   const r = recipe(TIERED)
-  await execute(o, r, buildRunGraph(o, r), deps(run as never))
+  await execute(planOf(o, r), deps(run as never))
   return seen
 }
 
@@ -1789,7 +1758,7 @@ function recordedAndJudgedOnExitStatusTests() {
   it('is recorded, and the step is judged on its exit status instead', async () => {
     const record = vi.fn(async () => undefined)
     const o = order([])
-    const outcome = await execute(o, recipe(refactorish), buildRunGraph(o, recipe(refactorish)), {
+    const outcome = await execute(planOf(o, recipe(refactorish)), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       record,
@@ -1820,7 +1789,7 @@ steps:
     const o = order([])
     // The suite passing is the wrong answer for a reproduction, and that half
     // is measurable.
-    const outcome = await execute(o, recipe(both), buildRunGraph(o, recipe(both)), {
+    const outcome = await execute(planOf(o, recipe(both)), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -1841,7 +1810,7 @@ steps:
     expect: { suite_exit_code: '!= 0' }
 `
     const o = order([])
-    const outcome = await execute(o, recipe(repro), buildRunGraph(o, recipe(repro)), {
+    const outcome = await execute(planOf(o, recipe(repro)), {
       ...deps(vi.fn(ok)),
       runCommand: async () => 1,
       autonomy: 'lights-out',
@@ -1927,7 +1896,7 @@ steps:
     command: /review the change
 `
     const o = order([unit('U-1')])
-    await execute(o, recipe(roleless), buildRunGraph(o, recipe(roleless)), deps(run as never))
+    await execute(planOf(o, recipe(roleless)), deps(run as never))
     // Said out loud: with no role-less node reached, the check below asserts nothing.
     expect(seen.length).toBeGreaterThan(0)
     expect(seen.every((tier) => tier === 'deep')).toBe(true)
@@ -1948,7 +1917,7 @@ function deadlinesTests() {
     const raised: Gate[] = []
     const o = order([unit('U-1')])
     const r = recipe(DEADLINE)
-    await execute(o, r, buildRunGraph(o, r), {
+    await execute(planOf(o, r), {
       ...deps(ok),
       autonomy: 'escorted' as const,
       raise: async (gate: Gate) => {
@@ -1964,7 +1933,7 @@ function deadlinesTests() {
     const raised: Gate[] = []
     const o = order([unit('U-1')])
     const r = recipe(PAUSING)
-    await execute(o, r, buildRunGraph(o, r), {
+    await execute(planOf(o, r), {
       ...deps(ok),
       autonomy: 'escorted' as const,
       raise: async (gate: Gate) => {
@@ -1988,7 +1957,7 @@ function freshConversationsTests() {
     // into — which is the case the step's `context: fresh` has to override.
     const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
     const r = recipe(FRESH)
-    await execute(o, r, buildRunGraph(o, r), {
+    await execute(planOf(o, r), {
       ...deps(run as never),
       // The builder may resume, and one is on offer for its lane. The step is
       // the only thing that should stop it being taken.
@@ -2018,7 +1987,7 @@ function everyStateTests() {
   it('persists every state the run passes through, not only the last', async () => {
     const seen: string[][] = []
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2039,7 +2008,7 @@ function runningBeforePassedTests() {
   it('records a node as running before it records it as passed', async () => {
     const order_ = order([unit('U-1')])
     const states: string[] = []
-    await execute(order_, recipe(), buildRunGraph(order_, recipe()), {
+    await execute(planOf(order_), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2056,7 +2025,7 @@ function runningBeforePassedTests() {
 function anUnwritableGraphTests() {
   it('carries on when the graph cannot be written — a run is not a report', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2112,7 +2081,7 @@ async function runFrom(minutes: number) {
   const o = order([unit('U-1')], {
     budgets: { agents: 2, wallClockMinutes: 20, tokens: null },
   })
-  return execute(o, recipe(), buildRunGraph(o, recipe()), {
+  return execute(planOf(o), {
     ...deps(hangs as never),
     autonomy: 'escorted',
     ...from(minutes),
@@ -2124,7 +2093,7 @@ function stoppingTests() {
     const o = order([unit('U-1')], {
       budgets: { agents: 2, wallClockMinutes: 20, tokens: null },
     })
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(hangs as never),
       autonomy: 'escorted',
       ...clock(),
@@ -2136,7 +2105,7 @@ function stoppingTests() {
     const o = order([unit('U-1')], {
       budgets: { agents: 2, wallClockMinutes: 20, tokens: null },
     })
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(hangs as never),
       autonomy: 'escorted',
       ...clock(),
@@ -2151,7 +2120,7 @@ function aSilencedRuleTests() {
     const o = order([unit('U-1')], {
       budgets: { agents: 2, wallClockMinutes: 20, tokens: null },
     })
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(hangs as never),
       autonomy: 'lights-out',
       ...clock(),
@@ -2166,7 +2135,7 @@ function aSilencedRuleTests() {
 function insideTheBudgetTests() {
   it('leaves a wave that finishes inside its budget completely alone', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2180,7 +2149,7 @@ function insideTheBudgetTests() {
 
   it('still works with no clock injected at all, which is every existing caller', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2220,7 +2189,7 @@ function aRunWellInsideItsBudgetTests() {
     const o = order([unit('U-1')], {
       budgets: { agents: 2, wallClockMinutes: 20, tokens: null },
     })
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2288,7 +2257,7 @@ function theMomentTheAgentExistsTests() {
     const seen: (string | null)[] = []
     const { run, release: released } = heldAgent()
 
-    const running = execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const running = execute(planOf(o), {
       ...deps(run as never),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2319,7 +2288,7 @@ function announcingOnceTests() {
       return { sessionId: `sess-${input.node.id}`, exitCode: 0 }
     }
 
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(run as never, events),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2335,7 +2304,7 @@ function callersThatNeverReportAStartTests() {
     // Every ladder rung and every test stub resolves without one.
     const o = order([unit('U-1')])
     const events: ExecutorEvent[] = []
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(vi.fn(ok), events),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2378,7 +2347,7 @@ function whereToWriteTests() {
   it('tells the rung where to write, under the order', async () => {
     const o = order([unit('U-1')])
     const run = vi.fn(ok)
-    await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+    await execute(planOf(o, recipe(READS)), {
       ...deps(run),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2395,7 +2364,7 @@ function whereToWriteTests() {
   it('offers no destination to a role whose product is the diff', async () => {
     const o = order([unit('U-1')])
     const run = vi.fn(ok)
-    await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+    await execute(planOf(o, recipe(READS)), {
       ...deps(run),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2411,7 +2380,7 @@ function collectingTests() {
   it('collects what the rung wrote and records it', async () => {
     const o = order([unit('U-1')])
     const recorded: string[][] = []
-    await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+    await execute(planOf(o, recipe(READS)), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2429,7 +2398,7 @@ function collectingTests() {
     // in the record rather than passing as an ordinary turn.
     const o = order([unit('U-1')])
     const recorded: string[][] = []
-    await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+    await execute(planOf(o, recipe(READS)), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2447,7 +2416,7 @@ function aContradictingRungTests() {
   it('raises forge-defect when a rung contradicts the order being built', async () => {
     const o = order([unit('U-1')])
     const gates: string[] = []
-    const outcome = await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+    const outcome = await execute(planOf(o, recipe(READS)), {
       ...deps(vi.fn(ok)),
       autonomy: 'standard',
       runStep: async () => 0,
@@ -2474,7 +2443,7 @@ function aContradictingRungTests() {
 function silencedDefectsAndFailuresToCollectTests() {
   it('does not stop for a defect the autonomy setting silences', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+    const outcome = await execute(planOf(o, recipe(READS)), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2485,7 +2454,7 @@ function silencedDefectsAndFailuresToCollectTests() {
 
   it('carries on when collecting throws — a run is not a filing cabinet', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+    const outcome = await execute(planOf(o, recipe(READS)), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2536,7 +2505,7 @@ async function efforts(text = SHAPED): Promise<{ role: string | null; effort: un
   )
   const o = order([unit('U-1')])
   const r = recipe(text)
-  await execute(o, r, buildRunGraph(o, r), deps(run as never))
+  await execute(planOf(o, r), deps(run as never))
   return seen
 }
 
@@ -2544,7 +2513,7 @@ function rebuildingTheBriefTests() {
   it('rebuilds the brief from what the rung before it wrote', async () => {
     const o = order([unit('U-1')])
     const run = vi.fn(ok)
-    await execute(o, recipe(READS_THEN_BUILDS), buildRunGraph(o, recipe(READS_THEN_BUILDS)), {
+    await execute(planOf(o, recipe(READS_THEN_BUILDS)), {
       ...deps(run),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -2568,21 +2537,16 @@ function theAgreementStaysPutTests() {
     // Budgets and risk are the agreement. A rung that could raise its own
     // budget mid-run is a run with no budget.
     const o = order([unit('U-1')])
-    const outcome = await execute(
-      o,
-      recipe(READS_THEN_BUILDS),
-      buildRunGraph(o, recipe(READS_THEN_BUILDS)),
-      {
-        ...deps(vi.fn(ok)),
-        autonomy: 'lights-out',
-        runStep: async () => 0,
-        collect: async () => ({
-          order: { ...o, risk: { ...o.risk, grade: 'P0' as const } },
-          note: '',
-          defect: null,
-        }),
-      }
-    )
+    const outcome = await execute(planOf(o, recipe(READS_THEN_BUILDS)), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      collect: async () => ({
+        order: { ...o, risk: { ...o.risk, grade: 'P0' as const } },
+        note: '',
+        defect: null,
+      }),
+    })
     expect(outcome.risk.grade).not.toBe('P0')
   })
 }
@@ -2657,7 +2621,7 @@ function commandStepsTests() {
     const o = order([])
     const buildRuns = vi.fn(ok)
     const runCommand = vi.fn(async () => 0)
-    await execute(o, recipe(REWORK), buildRunGraph(o, recipe(REWORK)), {
+    await execute(planOf(o, recipe(REWORK)), {
       ...deps(buildRuns),
       runCommand,
     })
@@ -2686,7 +2650,7 @@ function reworkingTests() {
     const buildRuns = vi.fn(ok)
     const record = vi.fn(async () => undefined)
     const runCommand = vi.fn(failsOnceThenPasses())
-    const outcome = await execute(o, recipe(REWORK), buildRunGraph(o, recipe(REWORK)), {
+    const outcome = await execute(planOf(o, recipe(REWORK)), {
       ...deps(buildRuns),
       runCommand,
       record,
@@ -2708,7 +2672,7 @@ function usedUpReworksTests() {
   it('stops asking once reworks and attempts are both used up, naming the check', async () => {
     const o = order([])
     const runCommand = vi.fn(async () => 1)
-    const outcome = await execute(o, recipe(REWORK), buildRunGraph(o, recipe(REWORK)), {
+    const outcome = await execute(planOf(o, recipe(REWORK)), {
       ...deps(vi.fn(ok)),
       runCommand,
     })
@@ -2730,7 +2694,7 @@ function unknownCommandsTests() {
     }
     const record = vi.fn(async () => undefined)
     const runCommand = vi.fn(async () => 0)
-    const outcome = await execute(o, recipe(REWORK), buildRunGraph(o, recipe(REWORK)), {
+    const outcome = await execute(planOf(o, recipe(REWORK)), {
       ...deps(vi.fn(ok)),
       runCommand,
       record,
@@ -2757,7 +2721,7 @@ function slashCommandsStayWithAgentsTests() {
     const o = order([])
     const runCommand = vi.fn(async () => 0)
     const run = vi.fn(ok)
-    await execute(o, recipe(slash), buildRunGraph(o, recipe(slash)), {
+    await execute(planOf(o, recipe(slash)), {
       ...deps(run),
       runCommand,
     })
@@ -2770,9 +2734,7 @@ describe('the stalled gate names what it would retry', () => {
   it("names the failed node with a dependant, so the Inbox's Send back retries something", async () => {
     const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
     const outcome = await execute(
-      o,
-      recipe(),
-      buildRunGraph(o, recipe()),
+      planOf(o),
       deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
     )
     const stalled = outcome.gates.find((g) =>
@@ -2791,7 +2753,7 @@ describe('a resumed session is ended before it is resumed', () => {
       if (input.resumeSessionId !== undefined) seenAtRunTime.add(input.resumeSessionId)
       return ok(input)
     })
-    await execute(order2, recipe(), buildRunGraph(order2, recipe()), {
+    await execute(planOf(order2), {
       ...deps(run),
       sessionFor: (_lane, role) => (role === 'builder' ? 'sess-builder' : undefined),
       endSession: async (sessionId) => {
@@ -2887,7 +2849,7 @@ function mountingTests() {
   it('hands the run its mounted skills, and null when it has none', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1')])
-    await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), deps(run))
+    await execute(planOf(o, recipe(CHECKED)), deps(run))
 
     // The builder role declares `ci-fix`.
     const build = run.mock.calls.find((c) => c[0].node.id === 'build:U-1')?.[0]
@@ -2906,7 +2868,7 @@ function mountingTests() {
   it('records skills.mounted, naming each skill and the rung it came from', async () => {
     const recorded: string[][] = []
     const o = order([unit('U-1')])
-    await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), {
+    await execute(planOf(o, recipe(CHECKED)), {
       ...deps(vi.fn(ok)),
       record: async (action, subject, reason) => {
         recorded.push([action, subject, reason])
@@ -2929,7 +2891,7 @@ steps:
     command: make
 `
     const recorded: string[][] = []
-    await execute(o, recipe(RUN_AS_COMMAND), buildRunGraph(o, recipe(RUN_AS_COMMAND)), {
+    await execute(planOf(o, recipe(RUN_AS_COMMAND)), {
       ...deps(vi.fn(ok)),
       runCommand: async () => 0,
       record: async (action, subject, reason) => {
@@ -2989,7 +2951,7 @@ function openingFirstTests() {
   it('opens the drafts before the final check climbs, for a change nobody has to inspect', async () => {
     const seen = log()
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async (step, logPath) => (seen.runStep(step, logPath), 0),
@@ -3007,7 +2969,7 @@ function notOpeningFirstTests() {
   it('does not open anything first when an inspection is owed', async () => {
     const beforeFinalCheck = vi.fn(async () => true)
     const o = order([unit('U-1', { touches: ['src/auth/session.ts'] })])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -3019,7 +2981,7 @@ function notOpeningFirstTests() {
   it('does not open anything first when the run halted at a gate', async () => {
     const beforeFinalCheck = vi.fn(async () => true)
     const o = order([unit('U-1')])
-    await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), {
+    await execute(planOf(o, recipe(PAUSING)), {
       ...deps(vi.fn(ok)),
       beforeFinalCheck,
     })
@@ -3031,7 +2993,7 @@ function aFailedFinalCheckTests() {
   it('records ship.final_check_failed and raises the executor gate when the draft is already open', async () => {
     const seen = log()
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'standard',
       record: seen.record,
@@ -3046,7 +3008,7 @@ function aFailedFinalCheckTests() {
   it('records no ship.final_check_failed when nothing was opened first', async () => {
     const seen = log()
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'standard',
       record: seen.record,
@@ -3059,7 +3021,7 @@ function aFailedFinalCheckTests() {
 function theTailOwedTests() {
   it('leaves the ship node running while the tail is owed, and still counts the work as done', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -3071,13 +3033,16 @@ function theTailOwedTests() {
 
   it('treats a ship node already running (a resume) as the tail owed, not as a stall', async () => {
     const o = order([unit('U-1')])
-    const first = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(vi.fn(ok)))
+    const first = await execute(planOf(o), deps(vi.fn(ok)))
     const run = vi.fn(ok)
-    const again = await execute(o, recipe(), first.graph, {
-      ...deps(run),
-      autonomy: 'lights-out',
-      runStep: async () => 0,
-    })
+    const again = await execute(
+      { order: o, recipe: recipe(), graph: first.graph },
+      {
+        ...deps(run),
+        autonomy: 'lights-out',
+        runStep: async () => 0,
+      }
+    )
     expect(run).not.toHaveBeenCalled()
     expect(again.gates).toHaveLength(0)
     expect(again.shippable).toBe(true)
@@ -3116,7 +3081,7 @@ function whatIsCommittedTests() {
   it('commits the builder once it passes, naming the step and its units', async () => {
     const { commitNode } = committing(() => true)
     const order1 = o()
-    const outcome = await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+    const outcome = await execute(planOf(order1, recipe(WRITING)), {
       ...deps(vi.fn(ok)),
       runCommand: async () => 0,
       commitNode,
@@ -3129,7 +3094,7 @@ function whatIsCommittedTests() {
   it('commits a scribe by its step id, which has no units', async () => {
     const { commitNode } = committing(() => true)
     const order1 = o()
-    await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+    await execute(planOf(order1, recipe(WRITING)), {
       ...deps(vi.fn(ok)),
       runCommand: async () => 0,
       commitNode,
@@ -3143,7 +3108,7 @@ function whatIsNotTests() {
   it('never commits a role that may not write, nor a command', async () => {
     const { commitNode } = committing(() => true)
     const order1 = o()
-    await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+    await execute(planOf(order1, recipe(WRITING)), {
       ...deps(vi.fn(ok)),
       runCommand: async () => 0,
       commitNode,
@@ -3156,7 +3121,7 @@ function whatIsNotTests() {
   it('does not commit a builder that failed', async () => {
     const { commitNode } = committing(() => true)
     const order1 = o()
-    await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+    await execute(planOf(order1, recipe(WRITING)), {
       ...deps(async (input) => ({ sessionId: `s-${input.node.id}`, exitCode: 1 })),
       runCommand: async () => 0,
       commitNode,
@@ -3170,7 +3135,7 @@ function noChangeTests() {
     const { commitNode } = committing((id) => id !== 'build:lane-1')
     const record = vi.fn(async () => undefined)
     const order1 = o()
-    const outcome = await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+    const outcome = await execute(planOf(order1, recipe(WRITING)), {
       ...deps(vi.fn(ok)),
       runCommand: async () => 0,
       commitNode,
@@ -3194,7 +3159,7 @@ function aRefusedCommitTests() {
     const { commitNode } = committing((id) => (id === 'build:lane-1' ? HOOK_FAILED : true))
     const record = vi.fn(async () => undefined)
     const order1 = o()
-    const outcome = await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+    const outcome = await execute(planOf(order1, recipe(WRITING)), {
       ...deps(vi.fn(ok)),
       runCommand: async () => 0,
       commitNode,
@@ -3216,7 +3181,7 @@ function theNextAttemptTests() {
   it('hands the refused commit\u2019s output to the builder\u2019s next attempt', async () => {
     const { commitNode } = committing((id) => (id === 'build:lane-1' ? HOOK_FAILED : true))
     const order1 = o()
-    const outcome = await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+    const outcome = await execute(planOf(order1, recipe(WRITING)), {
       ...deps(vi.fn(ok)),
       runCommand: async () => 0,
       commitNode,
@@ -3242,9 +3207,9 @@ function aSecondRefusalTests() {
       commitNode,
     })
     let graph = buildRunGraph(order1, recipe(WRITING))
-    graph = (await execute(order1, recipe(WRITING), graph, run())).graph
+    graph = (await execute({ order: order1, recipe: recipe(WRITING), graph }, run())).graph
     graph = retry(graph, 'build:lane-1')
-    const second = await execute(order1, recipe(WRITING), graph, run())
+    const second = await execute({ order: order1, recipe: recipe(WRITING), graph }, run())
 
     const gate = second.gates.find((g) => g.rule === 'verify.repeat-fail')
     expect(gate?.why).toContain('changed the checkout, but `git commit` exited 1')
@@ -3264,7 +3229,7 @@ function nothingToCommitTests() {
   it('lets a scribe with nothing to document pass', async () => {
     const { commitNode } = committing((id) => id !== 'document')
     const order1 = o()
-    const outcome = await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+    const outcome = await execute(planOf(order1, recipe(WRITING)), {
       ...deps(vi.fn(ok)),
       runCommand: async () => 0,
       commitNode,
@@ -3274,7 +3239,7 @@ function nothingToCommitTests() {
 
   it('changes nothing for a caller that commits nothing', async () => {
     const order1 = o()
-    const outcome = await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+    const outcome = await execute(planOf(order1, recipe(WRITING)), {
       ...deps(vi.fn(ok)),
       runCommand: async () => 0,
     })
@@ -3296,7 +3261,7 @@ function theOutputsDirectoryTests() {
   it('is given the order\u2019s outputs directory, and a builder is not', async () => {
     const run = vi.fn(ok)
     const order1 = order([])
-    await execute(order1, recipe(AUTHORING), buildRunGraph(order1, recipe(AUTHORING)), {
+    await execute(planOf(order1, recipe(AUTHORING)), {
       ...deps(run),
       collect: collecting(null),
     })
@@ -3304,7 +3269,7 @@ function theOutputsDirectoryTests() {
 
     const run2 = vi.fn(ok)
     const order2 = order()
-    await execute(order2, recipe(), buildRunGraph(order2, recipe()), {
+    await execute(planOf(order2), {
       ...deps(run2),
       collect: collecting(null),
     })
@@ -3316,7 +3281,7 @@ function recordingTheDocumentTests() {
   it('is recorded when it is handed back', async () => {
     const record = vi.fn(async () => undefined)
     const order1 = order([])
-    await execute(order1, recipe(AUTHORING), buildRunGraph(order1, recipe(AUTHORING)), {
+    await execute(planOf(order1, recipe(AUTHORING)), {
       ...deps(vi.fn(ok)),
       collect: collecting({
         path: '/data/orders/WO-1/outputs/answer.md',
@@ -3337,16 +3302,11 @@ function recordingTheDocumentTests() {
 function aDocumentOutsideTheCheckoutTests() {
   it('passes with nothing to commit when the document is outside the checkout', async () => {
     const order1 = order([])
-    const outcome = await execute(
-      order1,
-      recipe(AUTHORING),
-      buildRunGraph(order1, recipe(AUTHORING)),
-      {
-        ...deps(vi.fn(ok)),
-        collect: collecting({ path: '/o/answer.md', location: 'outputs' }),
-        commitNode: async () => ({ kind: 'clean' }) as const,
-      }
-    )
+    const outcome = await execute(planOf(order1, recipe(AUTHORING)), {
+      ...deps(vi.fn(ok)),
+      collect: collecting({ path: '/o/answer.md', location: 'outputs' }),
+      commitNode: async () => ({ kind: 'clean' }) as const,
+    })
     expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('passed')
   })
 }
@@ -3354,16 +3314,11 @@ function aDocumentOutsideTheCheckoutTests() {
 function aDocumentSaidToBeInTheCheckoutTests() {
   it('fails when the document is said to be in the checkout and nothing changed there', async () => {
     const order1 = order([])
-    const outcome = await execute(
-      order1,
-      recipe(AUTHORING),
-      buildRunGraph(order1, recipe(AUTHORING)),
-      {
-        ...deps(vi.fn(ok)),
-        collect: collecting({ path: 'docs/answer.md', location: 'checkout' }),
-        commitNode: async () => ({ kind: 'clean' }) as const,
-      }
-    )
+    const outcome = await execute(planOf(order1, recipe(AUTHORING)), {
+      ...deps(vi.fn(ok)),
+      collect: collecting({ path: 'docs/answer.md', location: 'checkout' }),
+      commitNode: async () => ({ kind: 'clean' }) as const,
+    })
     expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('failed')
   })
 }
@@ -3371,31 +3326,21 @@ function aDocumentSaidToBeInTheCheckoutTests() {
 function nothingHandedBackTests() {
   it('fails when it handed back nothing and changed nothing', async () => {
     const order1 = order([])
-    const outcome = await execute(
-      order1,
-      recipe(AUTHORING),
-      buildRunGraph(order1, recipe(AUTHORING)),
-      {
-        ...deps(vi.fn(ok)),
-        collect: collecting(null),
-        commitNode: async () => ({ kind: 'clean' }) as const,
-      }
-    )
+    const outcome = await execute(planOf(order1, recipe(AUTHORING)), {
+      ...deps(vi.fn(ok)),
+      collect: collecting(null),
+      commitNode: async () => ({ kind: 'clean' }) as const,
+    })
     expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('failed')
   })
 
   it('passes when it handed back nothing but did commit a change', async () => {
     const order1 = order([])
-    const outcome = await execute(
-      order1,
-      recipe(AUTHORING),
-      buildRunGraph(order1, recipe(AUTHORING)),
-      {
-        ...deps(vi.fn(ok)),
-        collect: collecting(null),
-        commitNode: async () => ({ kind: 'committed' }) as const,
-      }
-    )
+    const outcome = await execute(planOf(order1, recipe(AUTHORING)), {
+      ...deps(vi.fn(ok)),
+      collect: collecting(null),
+      commitNode: async () => ({ kind: 'committed' }) as const,
+    })
     expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('passed')
   })
 }
@@ -3409,7 +3354,7 @@ function documentationOnlyTests() {
   it('runs format and lint, and marks the rest not run as documentation only', async () => {
     const o = order([docsUnit('U-1')])
     const ran: string[] = []
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       observedChange: async () => ({ changedFiles: ['docs/U-1.md'], linesChanged: 3 }),
@@ -3432,10 +3377,13 @@ function codeTooTests() {
   it('runs the tests as well once the work touched code', async () => {
     const o = order([docsUnit('U-1')])
     const ran: string[] = []
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(planOf(o), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
-      observedChange: async () => ({ changedFiles: ['docs/U-1.md', 'src/a.ts'], linesChanged: 3 }),
+      observedChange: async () => ({
+        changedFiles: ['docs/U-1.md', 'src/a.ts'],
+        linesChanged: 3,
+      }),
       runStep: async (step) => {
         ran.push(step.name)
         return 0

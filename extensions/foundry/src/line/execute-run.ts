@@ -172,16 +172,19 @@ async function executeGraph(tail: RunTail, early: EarlyShip, graph: RunGraph): P
   const { order, recipe, store } = tail
   let outcome: RunOutcome
   try {
-    outcome = await execute(order, recipe, graph, {
-      ...tail.executorDeps,
-      beforeFinalCheck: async (found) => {
-        tail.shippedOrderRef.current = { ...order, risk: found.risk }
-        // A document outside the checkout has no change to open a draft on.
-        const end = documentOutcome(recipe, (await store.load(order.id))?.document ?? null)
-        if (end.kind === 'ready' || end.kind === 'missing') return false
-        return early.beforeFinalCheck(found)
-      },
-    })
+    outcome = await execute(
+      { order, recipe, graph },
+      {
+        ...tail.executorDeps,
+        beforeFinalCheck: async (found) => {
+          tail.shippedOrderRef.current = { ...order, risk: found.risk }
+          // A document outside the checkout has no change to open a draft on.
+          const end = documentOutcome(recipe, (await store.load(order.id))?.document ?? null)
+          if (end.kind === 'ready' || end.kind === 'missing') return false
+          return early.beforeFinalCheck(found)
+        },
+      }
+    )
   } catch (error) {
     tail.finalCheck.settle(false)
     throw error

@@ -171,7 +171,7 @@ export function ciSendBackFor(
     graphRef.current = rework(graphRef.current, shipId, { to: target, feedback })
     await writeGraph(root, graphRef.current)
 
-    const outcome = await execute(order, recipe, graphRef.current, deps.executorDeps)
+    const outcome = await execute({ order, recipe, graph: graphRef.current }, deps.executorDeps)
     graphRef.current = outcome.graph
     await writeGraph(root, graphRef.current)
 

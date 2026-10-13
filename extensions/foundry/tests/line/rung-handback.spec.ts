@@ -143,18 +143,21 @@ function runOrder(
   over: Partial<ExecutorDeps> = {}
 ) {
   const o = order()
-  return execute(o, recipe(), buildRunGraph(o, recipe()), {
-    ...idleExecutorSeams(),
-    onEvent: () => undefined,
-    run: agent as never,
-    now: () => '2026-09-08T02:00:00.000Z',
-    sources: { dataRoot, repoPaths: [repo], builtInDir },
-    autonomy: 'lights-out',
-    runStep: async () => 0,
-    runCommand: async () => 0,
-    collect: collector.collect,
-    ...over,
-  })
+  return execute(
+    { order: o, recipe: recipe(), graph: buildRunGraph(o, recipe()) },
+    {
+      ...idleExecutorSeams(),
+      onEvent: () => undefined,
+      run: agent as never,
+      now: () => '2026-09-08T02:00:00.000Z',
+      sources: { dataRoot, repoPaths: [repo], builtInDir },
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      runCommand: async () => 0,
+      collect: collector.collect,
+      ...over,
+    }
+  )
 }
 
 /**
