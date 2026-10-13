@@ -705,6 +705,7 @@ async function agreeable(): Promise<WorkOrder> {
 describe('the capability check at agreement (FR-059a)', () => {
   describe('asking at agreement', askingAtAgreementTests)
   describe('tracker failures', trackerFailuresTests)
+  describe('agreeing twice', agreeingTwiceTests)
   describe('writing back', writingBackTests)
 })
 
@@ -763,6 +764,25 @@ function trackerFailuresTests() {
     const result = (await channels.compile({ id: 'WO-1', commit: true })) as { order: WorkOrder }
     expect(result.order.status).toBe('agreed')
     expect((await store.load('WO-1'))?.status).toBe('agreed')
+  })
+}
+
+function agreeingTwiceTests() {
+  it('does not agree an order a second time, and says why', async () => {
+    const onAgreed = vi.fn(async () => undefined)
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    const channels = createForgeChannels(forgeDeps({ onAgreed }))
+    await channels.compile({ id: 'WO-1', commit: true })
+
+    const again = (await channels.compile({ id: 'WO-1', commit: true })) as {
+      compile: { ok: boolean; failures: { detail: string }[] }
+    }
+    expect(again.compile.ok).toBe(false)
+    expect(again.compile.failures[0].detail).toBe(
+      'Only a draft can be agreed; this order is agreed.'
+    )
+    expect(onAgreed).toHaveBeenCalledTimes(1)
   })
 }
 
@@ -1844,6 +1864,11 @@ describe('foundry:order.compile — who agrees', () => {
 })
 
 describe('foundry:order.recipe', () => {
+  describe('choosing', choosingARecipeTests)
+  describe('refusals', recipeRefusalsTests)
+})
+
+function choosingARecipeTests() {
   it('sets the recipe and records who chose it', async () => {
     const seed = await drafted()
     const c = channels()
@@ -1866,7 +1891,9 @@ describe('foundry:order.recipe', () => {
     const last = entries[entries.length - 1]
     expect(last.reason).toBe('the proposal')
   })
+}
 
+function recipeRefusalsTests() {
   it('refuses on anything but a draft', async () => {
     const seed = await drafted()
     const c = channels()
@@ -1874,7 +1901,13 @@ describe('foundry:order.recipe', () => {
     const r = (await c.recipe({ id: seed.order.id, recipe: 'direct' })) as { error?: string }
     expect(r.error).toBe('Only a draft can have its shape chosen; this order is agreed.')
   })
-})
+
+  it('refuses an order it has no record of', async () => {
+    expect(await channels().recipe({ id: 'WO-nope', recipe: 'direct' })).toEqual({
+      error: 'No order WO-nope.',
+    })
+  })
+}
 
 describe('foundry:order.hold', () => {
   it('records a hold and releases it, calling onReleased only on release', async () => {
