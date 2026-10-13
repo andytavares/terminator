@@ -5,9 +5,9 @@ import {
   OUTPUT_FLUSH_MAX_CHARS,
 } from '../../../src/main/terminal/output-batcher'
 
-describe('OutputBatcher', () => {
-  const send = vi.fn()
+const send = vi.fn()
 
+function useFakeFrameClock(): void {
   beforeEach(() => {
     vi.useFakeTimers()
     send.mockClear()
@@ -16,6 +16,10 @@ describe('OutputBatcher', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
+}
+
+describe('OutputBatcher', () => {
+  useFakeFrameClock()
 
   it('sends the chunks of one frame as a single message, in order', () => {
     const batcher = new OutputBatcher(send)
@@ -49,6 +53,10 @@ describe('OutputBatcher', () => {
 
     expect(send).toHaveBeenCalledWith('ab')
   })
+})
+
+describe('OutputBatcher — size cap and flushing', () => {
+  useFakeFrameClock()
 
   it('sends at once when the batch reaches the size cap', () => {
     const batcher = new OutputBatcher(send)
