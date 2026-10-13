@@ -4,7 +4,7 @@ import type { ChannelSpec, ExtensionAPI } from '@terminator/extension-sdk'
 import { activate, deactivate } from '../../../src/index.ts'
 import { makeTempDir } from '../../../../../tests/support/temp-dir'
 
-export interface RegisteredChannel {
+interface RegisteredChannel {
   spec: ChannelSpec
   remoteAccessible: boolean
 }

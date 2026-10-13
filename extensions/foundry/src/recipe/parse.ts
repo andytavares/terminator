@@ -1,6 +1,7 @@
-import * as path from 'node:path'
-import { load } from 'js-yaml'
 import { z } from 'zod'
+import { checkVersion, fail, idMatchesFile, loadYaml, type ParseResult } from './yaml-file.js'
+
+export type { ParseResult } from './yaml-file.js'
 
 // Recipes, roles and rules: the extension point.
 //
@@ -14,41 +15,6 @@ import { z } from 'zod'
 // one bad file in the operator's directory cannot take the whole surface down.
 
 export const RECIPE_SCHEMA_VERSION = 1
-
-export type ParseResult<T> = { ok: true; value: T } | { ok: false; reason: string }
-
-function fail(file: string, message: string): { ok: false; reason: string } {
-  return { ok: false, reason: `${file}: ${message}` }
-}
-
-function loadYaml(text: string, file: string): ParseResult<unknown> {
-  try {
-    return { ok: true, value: load(text) }
-  } catch (error) {
-    return fail(file, `could not be read as YAML — ${(error as Error).message}`)
-  }
-}
-
-function checkVersion(value: unknown, file: string): { ok: false; reason: string } | null {
-  // Arrays are objects, and a YAML list is a common hand-authoring slip. Say
-  // what is wrong with the file rather than letting zod report a type mismatch
-  // several levels down.
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return fail(file, 'is not a mapping')
-  }
-  const declared = (value as { schemaVersion?: unknown }).schemaVersion
-  if (typeof declared === 'number' && declared > RECIPE_SCHEMA_VERSION) {
-    return fail(
-      file,
-      `declares schema version ${declared}; this build knows version ${RECIPE_SCHEMA_VERSION}`
-    )
-  }
-  return null
-}
-
-function idMatchesFile(id: string, file: string): boolean {
-  return id === path.basename(file).replace(/\.ya?ml$/, '')
-}
 
 // A skill id becomes a directory name — `<dir>/skills/<id>/SKILL.md` — so it
 // is held to the shape a directory name can take, not the looser rule for a
@@ -80,7 +46,7 @@ export type StepKind = (typeof STEP_KINDS)[number]
  * chooses a default: a recipe that declares none launches at whatever the
  * operator's own runtime configuration says.
  */
-export const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 export type EffortLevel = (typeof EFFORT_LEVELS)[number]
 
 const StepSchema = z
@@ -181,7 +147,7 @@ function findCycle(steps: readonly Step[]): string | null {
 export function parseRecipe(text: string, file: string): ParseResult<Recipe> {
   const loaded = loadYaml(text, file)
   if (!loaded.ok) return loaded
-  const versionProblem = checkVersion(loaded.value, file)
+  const versionProblem = checkVersion(loaded.value, file, RECIPE_SCHEMA_VERSION)
   if (versionProblem !== null) return versionProblem
 
   const parsed = RecipeSchema.safeParse(loaded.value)
@@ -299,7 +265,7 @@ export type Role = z.infer<typeof RoleSchema>
 export function parseRole(text: string, file: string): ParseResult<Role> {
   const loaded = loadYaml(text, file)
   if (!loaded.ok) return loaded
-  const versionProblem = checkVersion(loaded.value, file)
+  const versionProblem = checkVersion(loaded.value, file, RECIPE_SCHEMA_VERSION)
   if (versionProblem !== null) return versionProblem
 
   const parsed = RoleSchema.safeParse(loaded.value)
@@ -319,8 +285,7 @@ export function parseRole(text: string, file: string): ParseResult<Role> {
 
 // ── rules ────────────────────────────────────────────────────────────────
 
-export const RUNGS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'] as const
-export type Rung = (typeof RUNGS)[number]
+const RUNGS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'] as const
 
 const RuleSchema = z.object({
   schemaVersion: z.number().int().default(RECIPE_SCHEMA_VERSION),
@@ -341,7 +306,7 @@ export type Rule = z.infer<typeof RuleSchema>
 export function parseRule(text: string, file: string): ParseResult<Rule> {
   const loaded = loadYaml(text, file)
   if (!loaded.ok) return loaded
-  const versionProblem = checkVersion(loaded.value, file)
+  const versionProblem = checkVersion(loaded.value, file, RECIPE_SCHEMA_VERSION)
   if (versionProblem !== null) return versionProblem
 
   const parsed = RuleSchema.safeParse(loaded.value)

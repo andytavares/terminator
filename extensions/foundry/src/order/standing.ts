@@ -18,7 +18,7 @@ import type { WorkOrder } from './schema.js'
 // state is and which gate is holding it, and each surface decides what
 // controls that deserves.
 
-export type StandingKind =
+type StandingKind =
   | 'shaping'
   | 'ready'
   | 'working'
@@ -36,7 +36,7 @@ export type StandingKind =
  *
  * The only thing a badge needs in order to decide whether to be loud.
  */
-export type Turn = 'you' | 'foundry'
+type Turn = 'you' | 'foundry'
 
 export interface Standing {
   readonly kind: StandingKind

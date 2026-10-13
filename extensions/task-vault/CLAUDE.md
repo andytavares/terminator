@@ -2,14 +2,7 @@
 
 ## Extension Isolation (MANDATORY)
 
-This is a **fully isolated extension**. The core application knows nothing about this extension until it is installed. Violations break the architecture.
-
-### What extensions MAY do
-
-- Import `@terminator/extension-sdk`, `@terminator/extension-ui` and this extension's own dependencies — nothing from the core's `src/` and nothing from another extension (ADR 094; `npm run lint` rejects any other import)
-- Call core IPC via `window.electronAPI.{terminal,workspace,project,git,shell,fs,settings,...}` for **core-owned channels only**
-- Call own IPC via `window.electronAPI.extensionBridge.invoke('task-vault:...')`
-- Register IPC handlers in `src/index.ts` via `api.ipc.registerHandler()`
+The rules every extension follows are in `extensions/CLAUDE.md`; this extension's channels are `task-vault:*`.
 
 ### Core git channels available (core-owned, safe to call directly)
 

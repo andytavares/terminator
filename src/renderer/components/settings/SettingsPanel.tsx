@@ -6,6 +6,7 @@ import { WorkspaceSettings } from './WorkspaceSettings'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useModalEffect } from '../../stores/modal.store'
 import { dispatchNotification } from '../../lib/notifications'
+import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
 
 type Section = 'global' | 'workspace' | 'integrations' | 'extensions'

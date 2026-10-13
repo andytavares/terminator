@@ -4,11 +4,7 @@ import { runGit } from '../shell/run-git.js'
 
 const DEFAULT_MAX_WORKTREES = 5
 
-export type ExecFn = (
-  cmd: 'git',
-  args: string[],
-  opts: { cwd: string }
-) => Promise<{ stdout: string }>
+type ExecFn = (cmd: 'git', args: string[], opts: { cwd: string }) => Promise<{ stdout: string }>
 
 export interface WorktreeDeps {
   exec?: ExecFn

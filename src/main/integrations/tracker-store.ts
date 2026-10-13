@@ -204,37 +204,41 @@ export async function migrateLegacyCredentials(): Promise<void> {
   }
 
   try {
-    const data = await read()
-
-    if (legacy.linearKey !== undefined && data.linear?.secret === undefined) {
-      const key = decrypt(legacy.linearKey)
-      if (key !== null) {
-        data.linear = {
-          ...data.linear,
-          secret: encrypt(key),
-          mine: { kind: 'assignee', email: legacy.linearEmail ?? null },
-        }
-      }
-    }
-
-    const jira = legacy.jiraCreds
-    if (jira?.apiToken !== undefined && data.jira?.secret === undefined) {
-      const token = decrypt(jira.apiToken)
-      if (token !== null && jira.domain !== undefined && jira.email !== undefined) {
-        data.jira = {
-          ...data.jira,
-          secret: encrypt(token),
-          site: jira.domain,
-          email: jira.email,
-          mine: { kind: 'query', jql: jira.jql ?? DEFAULT_JIRA_JQL },
-        }
-      }
-    }
-
-    await write(data)
+    await change((data) => adoptLegacy(data, legacy))
     await fs.rename(legacyPath(), `${legacyPath()}.bak`)
   } catch {
     // A migration that cannot finish leaves the legacy file in place so it can
     // be retried, and the operator can still connect by hand.
+  }
+}
+
+/** The legacy file's credentials, for any tracker that has none yet. */
+function adoptLegacy(data: StoreFile, legacy: LegacyFile): void {
+  adoptLegacyLinear(data, legacy)
+  adoptLegacyJira(data, legacy)
+}
+
+function adoptLegacyLinear(data: StoreFile, legacy: LegacyFile): void {
+  if (legacy.linearKey === undefined || data.linear?.secret !== undefined) return
+  const key = decrypt(legacy.linearKey)
+  if (key === null) return
+  data.linear = {
+    ...data.linear,
+    secret: encrypt(key),
+    mine: { kind: 'assignee', email: legacy.linearEmail ?? null },
+  }
+}
+
+function adoptLegacyJira(data: StoreFile, legacy: LegacyFile): void {
+  const jira = legacy.jiraCreds
+  if (jira?.apiToken === undefined || data.jira?.secret !== undefined) return
+  const token = decrypt(jira.apiToken)
+  if (token === null || jira.domain === undefined || jira.email === undefined) return
+  data.jira = {
+    ...data.jira,
+    secret: encrypt(token),
+    site: jira.domain,
+    email: jira.email,
+    mine: { kind: 'query', jql: jira.jql ?? DEFAULT_JIRA_JQL },
   }
 }

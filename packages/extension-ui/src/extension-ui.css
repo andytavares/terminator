@@ -219,6 +219,21 @@
   height: 15px;
 }
 
+/* A single-line text field an extension draws itself. */
+.tmui-input {
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm, 6px);
+  color: var(--tm-text-primary);
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+}
+
+.tmui-input:focus {
+  border-color: var(--tm-accent);
+}
+
 .tmui-kbd {
   padding: 0 4px;
   border: 1px solid var(--tm-border-strong);
@@ -296,18 +311,23 @@
   max-width: 380px;
 }
 
-.tmui-toast {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--tm-space-3, 12px);
-  padding: 10px 12px;
+/* A surface raised over the view: a toast, a popover. */
+.tmui-toast,
+.tmui-popover {
   border: 1px solid var(--tm-border-strong);
-  border-left-width: 2px;
   border-radius: var(--tm-radius-sm, 6px);
   background: var(--tm-bg-elevated);
   color: var(--tm-text-primary);
   font-family: var(--tm-font-ui);
   font-size: 13px;
+}
+
+.tmui-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tm-space-3, 12px);
+  padding: 10px 12px;
+  border-left-width: 2px;
   line-height: 1.45;
 }
 
@@ -345,12 +365,6 @@
   position: absolute;
   min-width: 200px;
   padding: var(--tm-space-2, 8px);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm, 6px);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-primary);
-  font-family: var(--tm-font-ui);
-  font-size: 13px;
 }
 
 .tmui-toast__action {

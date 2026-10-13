@@ -26,7 +26,7 @@ const REJECTING_OPTIONS = ['send_back', 'skip', 'stop', 'accept_debt']
 /** Three. Twice is a coincidence; a third time is a pattern worth a rule. */
 export const REPETITION_THRESHOLD = 3
 
-export interface Citation {
+interface Citation {
   /** `<timestamp>/<subject>` — the ledger is append-only, so this is stable. */
   readonly ref: string
   readonly at: string

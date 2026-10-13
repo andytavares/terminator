@@ -22,8 +22,6 @@ import {
 // app exactly as it fetches them from GitHub. What gh answers is in
 // `github-stub-gh.ts`.
 
-export type { StubPullRequest } from './github-stub-gh'
-
 export interface GithubStubOptions {
   /** The bare repository standing in for github.com/<owner>/<name>. */
   bareRepo: string

@@ -49,7 +49,7 @@ export function WeeklyReviewStep1GetClear({ onComplete, reviewId }: Props): Reac
 
       <div className="wr-step__capture-row">
         <input
-          className="wr-step__capture-input"
+          className="tmui-input wr-step__capture-input"
           placeholder="Add to inbox…"
           value={text}
           onChange={(e) => setText(e.target.value)}

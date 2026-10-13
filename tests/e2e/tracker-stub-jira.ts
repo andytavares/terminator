@@ -4,7 +4,7 @@ import type { IncomingMessage } from 'node:http'
 // reads, https://developer.atlassian.com/cloud/jira/platform/rest/v3/.
 // Descriptions and comments are Atlassian Document Format, as Jira stores them.
 
-export interface JiraStubIssue {
+interface JiraStubIssue {
   key: string
   summary: string
   status: { name: string; category: 'new' | 'indeterminate' | 'done' }

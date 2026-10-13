@@ -4,7 +4,7 @@
 
 export type Severity = 'low' | 'medium' | 'high'
 
-export const SEVERITY_WEIGHT: Readonly<Record<Severity, number>> = { low: 1, medium: 3, high: 9 }
+const SEVERITY_WEIGHT: Readonly<Record<Severity, number>> = { low: 1, medium: 3, high: 9 }
 
 export type SensorSource =
   | { readonly kind: 'github-runs'; readonly branch: string | null; readonly limit: number }
@@ -20,7 +20,7 @@ export interface SensorDef {
   readonly severity: Severity
 }
 
-export interface SignalEvidence {
+interface SignalEvidence {
   readonly kind: 'ci-run' | 'issue'
   readonly title: string
   readonly url: string

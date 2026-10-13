@@ -6,7 +6,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 // language gh embeds, https://cli.github.com/manual/gh_api), and on failure
 // GitHub's JSON error on stdout with gh's one-line summary on stderr.
 
-export interface StubComment {
+interface StubComment {
   id: number
   user: { login: string }
   body: string
@@ -14,7 +14,7 @@ export interface StubComment {
   updated_at: string
 }
 
-export interface StubReviewComment extends StubComment {
+interface StubReviewComment extends StubComment {
   path: string
   line: number
   start_line: number | null
@@ -24,7 +24,7 @@ export interface StubReviewComment extends StubComment {
   pull_request_review_id: number | null
 }
 
-export interface StubReview {
+interface StubReview {
   id: number
   user: { login: string }
   body: string

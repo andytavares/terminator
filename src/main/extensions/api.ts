@@ -33,7 +33,7 @@ import { branchExcludePatternsFor } from '../git/branch-exclude-settings.js'
 /** Outcome of running a command by id: `reason` is 'not-registered' or 'invalid-args: …'. */
 export type CommandRunResult = { ok: true } | { ok: false; reason: string }
 
-export interface BridgeDeps {
+interface BridgeDeps {
   invokeRegistry: Map<string, import('../remote/ipc-registry.js').IpcRegistryEntry>
   sendRegistry: Map<string, (event: never, payload: unknown) => void>
   eventBus: import('events').EventEmitter

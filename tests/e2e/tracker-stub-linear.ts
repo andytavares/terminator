@@ -7,7 +7,7 @@ import type { StubAnswer } from './tracker-stub-jira'
 // Variables are checked against their declared GraphQL types, as Linear's
 // server does (https://spec.graphql.org/October2021/#sec-Coercing-Variable-Values).
 
-export interface LinearStubIssue {
+interface LinearStubIssue {
   identifier: string
   title: string
   description: string

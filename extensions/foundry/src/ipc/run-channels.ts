@@ -268,7 +268,7 @@ export interface ProposedRecipe {
  * operator asked to accept or override that needs the grounds, not just the
  * answer.
  */
-export function recipeLadder(order: WorkOrder): ProposedRecipe[] {
+function recipeLadder(order: WorkOrder): ProposedRecipe[] {
   if (order.recipe !== null) {
     return [{ name: order.recipe, why: 'the order already names this shape' }]
   }
@@ -332,6 +332,21 @@ function fitRecipe(
     reasons.push(`the "${proposal.name}" shape cannot run here: ${availability.unmet.join('; ')}`)
   }
   return { error: `${reasons.join('. ')}.` }
+}
+
+/** A run nobody awaits records its failure on the ledger, where a surface reads it. */
+function recordFailureOf(deps: RunDeps, order: WorkOrder, run: Promise<void>): void {
+  void run.catch(async (error: unknown) => {
+    await deps.store.record({
+      at: deps.now(),
+      orderId: order.id,
+      actor: 'rule:line',
+      action: 'run.failed',
+      subject: order.id,
+      reason: error instanceof Error ? error.message : String(error),
+      evidence: [],
+    })
+  })
 }
 
 export function createRunChannels(deps: RunDeps): RunChannels {
@@ -432,17 +447,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     // blocked until the last agent finished would hold the bridge for the
     // length of the work. Failures reach the ledger and the graph, which is
     // where a surface reads them.
-    void deps.execute(running, recipe.value, graph).catch(async (error: unknown) => {
-      await deps.store.record({
-        at: deps.now(),
-        orderId: order.id,
-        actor: 'rule:line',
-        action: 'run.failed',
-        subject: order.id,
-        reason: error instanceof Error ? error.message : String(error),
-        evidence: [],
-      })
-    })
+    recordFailureOf(deps, running, deps.execute(running, recipe.value, graph))
 
     return { graph, order: running, started: true }
   }
@@ -628,17 +633,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       reason: 'picked up by the operator',
       evidence: [],
     })
-    void deps.execute(order, resolved.resolved.value, retried).catch(async (error: unknown) => {
-      await deps.store.record({
-        at: deps.now(),
-        orderId: order.id,
-        actor: 'rule:line',
-        action: 'run.failed',
-        subject: order.id,
-        reason: error instanceof Error ? error.message : String(error),
-        evidence: [],
-      })
-    })
+    recordFailureOf(deps, order, deps.execute(order, resolved.resolved.value, retried))
     return { graph: retried, reclaimed: taken.reclaimed, started: true }
   }
 

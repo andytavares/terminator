@@ -266,6 +266,23 @@ function toRawStates(nodes: readonly unknown[]): RawState[] {
   })
 }
 
+/** The issue behind `key`, or a not-found TrackerError. */
+async function issueOrThrow(client: LinearLike, key: string): Promise<RawIssue> {
+  const raw = (await client.issue(key)) as RawIssue | null
+  if (raw === null || raw === undefined) {
+    throw new TrackerError('not-found', `Issue ${key} not found`)
+  }
+  return raw
+}
+
+/** The workflow states of the issue's team, each with the intent it satisfies. */
+async function stateOptionsOf(raw: RawIssue): Promise<TrackerStateOption[]> {
+  const team = (await Promise.resolve(raw.team)) as { states?: () => unknown } | null
+  if (team === null || team === undefined || typeof team.states !== 'function') return []
+  const connection = (await team.states()) as { nodes?: unknown[] } | null
+  return withIntents(toRawStates(connection?.nodes ?? []))
+}
+
 export function createLinearProvider(
   makeClient: LinearClientFactory = defaultFactory
 ): TrackerProvider {
@@ -337,10 +354,7 @@ export function createLinearProvider(
         // even where Linear would accept one. One addressing mechanism means
         // one thing to be right about, and the UUID is the one Linear
         // documents as working for every operation including this one.
-        const raw = (await client.issue(key)) as RawIssue | null
-        if (raw === null || raw === undefined) {
-          throw new TrackerError('not-found', `Issue ${key} not found`)
-        }
+        const raw = await issueOrThrow(client, key)
         const result = (await client.createComment({ issueId: raw.id, body })) as {
           success?: boolean
         } | null
@@ -353,32 +367,15 @@ export function createLinearProvider(
     async states(cred, key): Promise<TrackerStateOption[]> {
       const client = clientFor(cred)
       return run(async () => {
-        const raw = (await client.issue(key)) as RawIssue | null
-        if (raw === null || raw === undefined) {
-          throw new TrackerError('not-found', `Issue ${key} not found`)
-        }
-        const team = (await Promise.resolve(raw.team)) as {
-          states?: () => unknown
-        } | null
-        if (team === null || team === undefined || typeof team.states !== 'function') return []
-        const connection = (await team.states()) as { nodes?: unknown[] } | null
-        return withIntents(toRawStates(connection?.nodes ?? []))
+        return stateOptionsOf(await issueOrThrow(client, key))
       })
     },
 
     async transition(cred, key, intent, optionId): Promise<void> {
       const client = clientFor(cred)
       return run(async () => {
-        const raw = (await client.issue(key)) as RawIssue | null
-        if (raw === null || raw === undefined) {
-          throw new TrackerError('not-found', `Issue ${key} not found`)
-        }
-        const team = (await Promise.resolve(raw.team)) as { states?: () => unknown } | null
-        const connection =
-          team !== null && team !== undefined && typeof team.states === 'function'
-            ? ((await team.states()) as { nodes?: unknown[] } | null)
-            : null
-        const options = withIntents(toRawStates(connection?.nodes ?? []))
+        const raw = await issueOrThrow(client, key)
+        const options = await stateOptionsOf(raw)
 
         // The operator's own mapping wins over the type rule, which is the
         // whole point of presenting it to them. An override naming a state

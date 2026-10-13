@@ -1,10 +1,12 @@
 import { useShallow } from 'zustand/react/shallow'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { Dialog } from '@terminator/extension-ui'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useModalEffect } from '../../stores/modal.store'
-import type { IssueListResult, IssueSummary, TrackerId } from '../../../shared/types/index'
+import type { IssueSummary } from '../../../shared/types/index'
+import { ERROR_TEXT, TRACKER_LABELS, useIssueSearch } from './use-issue-search'
+import './issue-search.css'
 import './LinkIssueDialog.css'
 
 // Picking the issue a project is for.
@@ -12,18 +14,6 @@ import './LinkIssueDialog.css'
 // Opens on the operator's own assigned issues, because that is what they are
 // almost always reaching for — a picker that demands a search first makes the
 // common case the slow one.
-
-const TRACKER_LABELS: Record<TrackerId, string> = { linear: 'Linear', jira: 'Jira' }
-const SEARCH_DEBOUNCE_MS = 250
-
-const ERROR_TEXT: Record<string, string> = {
-  'not-connected': 'not connected',
-  'auth-failed': 'credential rejected',
-  'rate-limited': 'rate limited',
-  unavailable: 'unreachable',
-  'not-found': 'not found',
-  failed: 'failed',
-}
 
 export interface LinkIssueDialogProps {
   projectId: string
@@ -42,54 +32,26 @@ export function LinkIssueDialog({
   onLinked,
 }: LinkIssueDialogProps): JSX.Element {
   useModalEffect()
-  const { listMine, searchIssues, linkIssue, isAnyConnected, loadConnections } =
-    useIntegrationsStore(
-      useShallow((s) => ({
-        listMine: s.listMine,
-        searchIssues: s.searchIssues,
-        linkIssue: s.linkIssue,
-        isAnyConnected: s.isAnyConnected,
-        loadConnections: s.loadConnections,
-        connections: s.connections,
-      }))
-    )
+  const { linkIssue, isAnyConnected, loadConnections } = useIntegrationsStore(
+    useShallow((s) => ({
+      linkIssue: s.linkIssue,
+      isAnyConnected: s.isAnyConnected,
+      loadConnections: s.loadConnections,
+      connections: s.connections,
+    }))
+  )
 
   const [term, setTerm] = useState('')
-  const [result, setResult] = useState<IssueListResult>({ issues: [], failures: [] })
   const [selected, setSelected] = useState<IssueSummary | null>(null)
-  const [answeredTerm, setAnsweredTerm] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Guards against a slow earlier request landing after a faster later one and
-  // replacing the results the operator is currently looking at.
-  const requestId = useRef(0)
 
   const connected = isAnyConnected()
-  const loading = connected && answeredTerm !== term.trim()
+  const { result, loading } = useIssueSearch(term, connected)
 
   useEffect(() => {
     void loadConnections()
   }, [loadConnections])
-
-  useEffect(() => {
-    if (!connected) return
-    const id = ++requestId.current
-    const trimmed = term.trim()
-
-    const run = async (): Promise<void> => {
-      const next = trimmed.length === 0 ? await listMine() : await searchIssues(trimmed)
-      if (id !== requestId.current) return
-      setResult(next)
-      setAnsweredTerm(trimmed)
-    }
-
-    if (trimmed.length === 0) {
-      void run()
-      return
-    }
-    const timer = setTimeout(() => void run(), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
-  }, [term, connected, listMine, searchIssues])
 
   const heading = useMemo(() => (term.trim().length === 0 ? 'Assigned to you' : 'Results'), [term])
 

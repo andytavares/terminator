@@ -28,6 +28,7 @@ import type { DailyLog as DailyLogData, IndexedTask } from '../vault/types'
 import { SmartTaskInput } from './SmartTaskInput'
 import { notify } from '../utils/notify'
 import { useVaultNavStore } from '../stores/vault-nav.store'
+import { SessionOptions, useTerminalSessions } from './terminal-sessions'
 
 interface DailyLogProps {
   log: DailyLogData
@@ -101,44 +102,7 @@ function SessionPicker({
   onSelect: (session: { sessionId: string; projectId: string }) => void
   onClose: () => void
 }): React.JSX.Element {
-  const [activeSessions, setActiveSessions] = useState<
-    Array<{ sessionId: string; projectId: string; tabTitle: string }>
-  >([])
-  const [projectLabels, setProjectLabels] = useState<
-    Map<string, { wsName: string; projName: string }>
-  >(new Map())
-
-  useEffect(() => {
-    async function load() {
-      const [sessions, wsResult] = await Promise.all([
-        window.electronAPI.terminal.listSessions(),
-        window.electronAPI.workspace.list(),
-      ])
-      setActiveSessions(sessions)
-
-      const workspaces = wsResult.workspaces
-      const labels = new Map<string, { wsName: string; projName: string }>()
-      await Promise.all(
-        workspaces.map(async (ws) => {
-          const { projects } = await window.electronAPI.project.list(ws.id)
-          for (const p of projects) {
-            labels.set(p.id, { wsName: ws.name, projName: p.name })
-          }
-        })
-      )
-      setProjectLabels(labels)
-    }
-    void load()
-  }, [])
-
-  function sessionLabel(s: { sessionId: string; tabTitle: string; projectId: string }): string {
-    const ctx = projectLabels.get(s.projectId)
-    const parts: string[] = []
-    if (ctx?.wsName) parts.push(ctx.wsName)
-    if (ctx?.projName) parts.push(ctx.projName)
-    if (s.tabTitle) parts.push(s.tabTitle)
-    return parts.length ? parts.join(' › ') : s.sessionId.slice(0, 8)
-  }
+  const { sessions: activeSessions, labelOf } = useTerminalSessions(true)
 
   if (activeSessions.length === 0) {
     return (
@@ -158,18 +122,25 @@ function SessionPicker({
         }}
         defaultValue=""
       >
-        <option value="" disabled>
-          Select a terminal session…
-        </option>
-        {activeSessions.map((s) => (
-          <option key={s.sessionId} value={s.sessionId}>
-            {sessionLabel(s)}
-          </option>
-        ))}
+        <SessionOptions
+          sessions={activeSessions}
+          labelOf={labelOf}
+          placeholder="Select a terminal session…"
+        />
       </select>
       <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
     </span>
   )
+}
+
+/** A task as typed in the smart input: text, then @project, +context, #area and due: tokens. */
+function rawText(task: IndexedTask): string {
+  const parts = [task.text]
+  if (task.project) parts.push(`@${task.project.replace(/ /g, '-')}`)
+  if (task.context) parts.push(`+${task.context.replace(/ /g, '-')}`)
+  if (task.area) parts.push(`#${task.area.replace(/ /g, '-')}`)
+  if (task.dueDate) parts.push(`due:${task.dueDate}`)
+  return parts.join(' ')
 }
 
 function makeTaskNavHandler(taskId: string): () => void {
@@ -751,17 +722,8 @@ function TaskRow({
     }
   }, [])
 
-  function rawText(): string {
-    const parts = [task.text]
-    if (task.project) parts.push(`@${task.project.replace(/ /g, '-')}`)
-    if (task.context) parts.push(`+${task.context.replace(/ /g, '-')}`)
-    if (task.area) parts.push(`#${task.area.replace(/ /g, '-')}`)
-    if (task.dueDate) parts.push(`due:${task.dueDate}`)
-    return parts.join(' ')
-  }
-
   function startEdit() {
-    setEditText(rawText())
+    setEditText(rawText(task))
     setEditing(true)
   }
 
@@ -1360,15 +1322,6 @@ function BacklogTaskRow({
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(task.text)
 
-  function rawText(): string {
-    const parts = [task.text]
-    if (task.project) parts.push(`@${task.project.replace(/ /g, '-')}`)
-    if (task.context) parts.push(`+${task.context.replace(/ /g, '-')}`)
-    if (task.area) parts.push(`#${task.area.replace(/ /g, '-')}`)
-    if (task.dueDate) parts.push(`due:${task.dueDate}`)
-    return parts.join(' ')
-  }
-
   async function saveEdit() {
     if (!editText.trim()) {
       setEditing(false)
@@ -1414,7 +1367,7 @@ function BacklogTaskRow({
           className="daily-log__backlog-task-text"
           onClick={onSelect ? () => onSelect(task.id) : undefined}
           onDoubleClick={() => {
-            setEditText(rawText())
+            setEditText(rawText(task))
             setEditing(true)
           }}
           style={{ cursor: onSelect ? 'pointer' : undefined }}

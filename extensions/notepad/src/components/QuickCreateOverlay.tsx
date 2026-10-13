@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { useNotesStore } from '../stores/notes.store'
 import { NoteEditor } from '../editor/NoteEditor'
+import { noteTitle } from '../db/note-title'
 import type { DiagramListItem } from '../db/types'
 import { Button, SegmentedControl, useDismissible } from '@terminator/extension-ui'
 
@@ -17,12 +18,10 @@ function toFilenameSlug(title: string): string {
   )
 }
 
-function deriveTitle(body: string): string {
-  const headingMatch = /^#{1,6}\s+(.+)/m.exec(body)
-  if (headingMatch) return headingMatch[1].trim()
-  const firstLine = body.split('\n').find((l) => l.trim().length > 0)
-  if (firstLine) return firstLine.trim().slice(0, 120)
-  return 'Untitled note'
+/** The tags with `raw` added as a tag (lower case, spaces as dashes), unless blank or present. */
+function withTag(tags: string[], raw: string): string[] {
+  const tag = raw.trim().toLowerCase().replace(/\s+/g, '-')
+  return tag && !tags.includes(tag) ? [...tags, tag] : tags
 }
 
 interface TagChipBarProps {
@@ -153,9 +152,8 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
     setSaving(true)
     // Flush any uncommitted tag from the input field (onBlur fires before onClick
     // but React 18 batching means the setTags update may not have applied yet)
-    const pendingTag = tagInput.trim().toLowerCase().replace(/\s+/g, '-')
-    const finalTags = pendingTag && !tags.includes(pendingTag) ? [...tags, pendingTag] : tags
-    const resolvedTitle = title.trim() || deriveTitle(body)
+    const finalTags = withTag(tags, tagInput)
+    const resolvedTitle = title.trim() || noteTitle(body)
     try {
       await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.create', {
         title: resolvedTitle,
@@ -178,8 +176,7 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
   const handleSaveDiagram = useCallback(async () => {
     if (saving) return
     setSaving(true)
-    const pendingTag = tagInput.trim().toLowerCase().replace(/\s+/g, '-')
-    const finalTags = pendingTag && !tags.includes(pendingTag) ? [...tags, pendingTag] : tags
+    const finalTags = withTag(tags, tagInput)
     const resolvedTitle = title.trim() || 'Untitled diagram'
     try {
       const createResult = await window.electronAPI.extensionBridge.invoke(
@@ -233,10 +230,7 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
   })
 
   function addTag(raw: string) {
-    const trimmed = raw.trim().toLowerCase().replace(/\s+/g, '-')
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags((prev) => [...prev, trimmed])
-    }
+    setTags((prev) => withTag(prev, raw))
     setTagInput('')
   }
 

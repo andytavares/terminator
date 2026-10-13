@@ -62,12 +62,12 @@ export const ExtensionContributesSchema = z
     }
   })
 
-export type ExtensionContributes = z.infer<typeof ExtensionContributesSchema>
-
 const ExtensionIdSchema = z
   .string()
   .min(1)
   .regex(/^[a-z0-9]+(\.[a-z0-9-]+)+$/, 'ID must be a reverse-domain identifier')
+
+type ExtensionContributes = z.infer<typeof ExtensionContributesSchema>
 
 /** A shell root names a setting in the extension's own namespace, `<id>.…`; no other extension's. */
 function refuseForeignShellRoots(
@@ -98,5 +98,3 @@ export const ExtensionManifestSchema = z
     extensionDependencies: z.array(ExtensionIdSchema).optional(),
   })
   .superRefine(refuseForeignShellRoots)
-
-export type ExtensionManifestData = z.infer<typeof ExtensionManifestSchema>

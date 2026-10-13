@@ -14,7 +14,7 @@ export interface ReviewAction {
   createdAt: string
 }
 
-export interface ReviewSummary {
+interface ReviewSummary {
   id: string
   startedAt: string
   completedAt: string | null
@@ -22,7 +22,7 @@ export interface ReviewSummary {
   actionCount: number
 }
 
-export interface ReviewDetail extends ReviewSummary {
+interface ReviewDetail extends ReviewSummary {
   worked: string | null
   didntWork: string | null
   tryNext: string | null

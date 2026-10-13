@@ -5,7 +5,7 @@
  * repository, GitHub or the stores (fetching a ref counts), runs the review
  * agent or a terminal, or returns a file's content or diff.
  */
-export const REMOTE_READ_CHANNELS: ReadonlySet<string> = new Set([
+const REMOTE_READ_CHANNELS: ReadonlySet<string> = new Set([
   'git:conflicts-list',
   'git:pr-status',
   'git:status',

@@ -49,6 +49,16 @@ export interface SessionFacts {
   snapshot: SessionSnapshot
 }
 
+/** What a Home row or a wall tile can do to the session it shows. */
+export interface SessionActions {
+  onOpen: (sessionId: string) => void
+  onSaveDescription: (facts: SessionFacts, description: string | null) => void
+  onLink?: (facts: SessionFacts) => void
+  onResume?: (facts: SessionFacts) => void
+  onCloseSession?: (facts: SessionFacts) => void
+  onForgetSession?: (facts: SessionFacts) => void
+}
+
 export interface SessionFactsInput {
   sessions: readonly TerminalSession[]
   records: readonly SessionRecordListing[]
@@ -161,4 +171,16 @@ export function buildSessionFacts(input: SessionFactsInput): SessionFacts[] {
     .filter((r) => !openIds.has(r.sessionId))
     .map(closedFacts)
   return [...open, ...closed]
+}
+
+/** Oldest first. */
+export const byStarted = (a: SessionFacts, b: SessionFacts): number =>
+  Date.parse(a.startedAt) - Date.parse(b.startedAt)
+
+/** Most recently opened first, a session that has never been attended sorting last. */
+export const byRecentlyOpened = (a: SessionFacts, b: SessionFacts): number => {
+  if (a.lastAttendedAt === null && b.lastAttendedAt === null) return byStarted(a, b)
+  if (a.lastAttendedAt === null) return 1
+  if (b.lastAttendedAt === null) return -1
+  return b.lastAttendedAt - a.lastAttendedAt || byStarted(a, b)
 }

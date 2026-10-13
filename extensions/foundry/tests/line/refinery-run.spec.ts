@@ -15,6 +15,10 @@ import { createGateStore } from '../../src/gates/store.js'
 import { writeObservedFiles } from '../../src/line/observed-files.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 
+// These cases drive real git and give each step up to 20 s (the vi.waitFor
+// calls below); the 5 s default case timeout cut them off first on a busy machine.
+vi.setConfig({ testTimeout: 45_000 })
+
 const runner = vi.hoisted(() => ({ current: null as unknown }))
 
 vi.mock('../../src/runtime/supervised-runner.js', () => ({

@@ -271,30 +271,8 @@ export function PrDialog({
             onChange={(e) => setBase(e.target.value)}
             size={6}
           >
-            {localBranches.filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
-              .length > 0 && (
-              <optgroup label="Local">
-                {localBranches
-                  .filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
-                  .map((b) => (
-                    <option key={b.name} value={b.name}>
-                      {b.name}
-                    </option>
-                  ))}
-              </optgroup>
-            )}
-            {remoteBranches.filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
-              .length > 0 && (
-              <optgroup label="Remote">
-                {remoteBranches
-                  .filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
-                  .map((b) => (
-                    <option key={b.name} value={b.name}>
-                      {b.name}
-                    </option>
-                  ))}
-              </optgroup>
-            )}
+            <BranchGroup label="Local" branches={localBranches} filter={baseFilter} />
+            <BranchGroup label="Remote" branches={remoteBranches} filter={baseFilter} />
           </select>
         </div>
 
@@ -308,5 +286,28 @@ export function PrDialog({
 
       {isCreating && creatingStatus && <p className="pr-dialog__status">{creatingStatus}</p>}
     </Dialog>
+  )
+}
+
+/** One group of the base-branch list: the branches whose name contains `filter`. */
+function BranchGroup({
+  label,
+  branches,
+  filter,
+}: {
+  label: string
+  branches: readonly { name: string }[]
+  filter: string
+}): JSX.Element | null {
+  const shown = branches.filter((b) => b.name.toLowerCase().includes(filter.toLowerCase()))
+  if (shown.length === 0) return null
+  return (
+    <optgroup label={label}>
+      {shown.map((b) => (
+        <option key={b.name} value={b.name}>
+          {b.name}
+        </option>
+      ))}
+    </optgroup>
   )
 }

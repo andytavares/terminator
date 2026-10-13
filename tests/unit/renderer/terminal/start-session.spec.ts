@@ -7,7 +7,7 @@ vi.mock('../../../../src/renderer/terminal/session-controller', () => ({
   createTerminalSession: create,
 }))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
-  navigateToSession: navigate,
+  revealSession: navigate,
 }))
 
 import {

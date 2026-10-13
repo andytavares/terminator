@@ -7,12 +7,12 @@ export interface CoreSessionSummary {
   projectName: string
 }
 
-export interface CoreWorkspaceSummary {
+interface CoreWorkspaceSummary {
   id: string
   name: string
 }
 
-export interface CoreIssueLink {
+interface CoreIssueLink {
   key: string
   tracker: 'linear' | 'jira'
 }
@@ -55,7 +55,7 @@ export interface CoreActionDeps {
   onToggleLog(): void
 }
 
-export interface ShortcutEvent {
+interface ShortcutEvent {
   key: string
   metaKey: boolean
   ctrlKey: boolean

@@ -22,7 +22,7 @@ export interface HostProcessOptions {
 }
 
 /** How many times a host that exits on its own is started again before its extensions fail. */
-export const HOST_RESTARTS = 1
+const HOST_RESTARTS = 1
 
 interface Running {
   host: SpawnedHost

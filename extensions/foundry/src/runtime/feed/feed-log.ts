@@ -8,9 +8,9 @@ import { createJsonlLog } from '../jsonl-log.js'
 // (FR-092). The operator has to be able to tell "the agent told me it was
 // stuck" from "nobody told me anything and Terminator noticed".
 
-export type FeedAuthor = 'agent' | 'console'
+type FeedAuthor = 'agent' | 'console'
 
-export interface FeedEntry {
+interface FeedEntry {
   readonly id: string
   readonly at: number
   readonly sessionId: string

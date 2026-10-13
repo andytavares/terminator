@@ -58,7 +58,7 @@ export function loadLanguageFor(path: string): Promise<Language | null> {
 
 // ─── AST analysis ───────────────────────────────────────────────────────────────
 
-export interface SnippetFunction {
+interface SnippetFunction {
   name: string
   line: number
   branches: number

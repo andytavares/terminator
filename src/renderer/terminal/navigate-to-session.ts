@@ -40,6 +40,3 @@ export function revealSession(sessionId: string): void {
   useSessionStore.getState().setActiveSessionForProject(project.id, sessionId)
   useSessionStore.getState().requestFocus(sessionId)
 }
-
-/** Back-compat alias: every existing call site keeps working unchanged. */
-export const navigateToSession = revealSession

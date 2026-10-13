@@ -9,11 +9,11 @@ const GIT_TIMEOUT = 10_000
 const HOOK_TIMEOUT = 120_000
 const DIFF_MAX_BYTES = 500 * 1024
 
-export interface CommitSuccess {
+interface CommitSuccess {
   commitHash: string
 }
 
-export interface CommitError {
+interface CommitError {
   error: string
   hookOutput?: string
   isHookFailure?: boolean

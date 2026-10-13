@@ -20,7 +20,7 @@ vi.mock('../../../../src/renderer/components/session/LivePreview', () => ({
   ),
 }))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
-  navigateToSession: navigate,
+  revealSession: navigate,
 }))
 vi.mock('../../../../src/renderer/terminal/start-session', () => ({
   resumeSession: vi.fn(),

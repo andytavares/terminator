@@ -14,7 +14,7 @@ export interface StoredNote {
   archivedAt: string | null
 }
 
-export const NOTEPAD_URL = 'terminator.notepad/dist/index.html?view=main'
+const NOTEPAD_URL = 'terminator.notepad/dist/index.html?view=main'
 
 /** Opens Notepad from the app band and waits for it to render. */
 export async function openNotepad(handle: AppHandle): Promise<Page> {

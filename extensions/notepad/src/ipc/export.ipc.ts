@@ -3,9 +3,9 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { parseFrontMatter, stringifyFrontMatter } from './front-matter'
-import { randomUUID } from '../db/db'
 import { noPayload, type ExtensionDB, type ExtensionAPI } from '@terminator/extension-sdk'
 import { createIpcRegistrar } from './register'
+import { reconcileTags } from './notes.ipc'
 
 // ──────────────────────────────────────────────────────────────
 // Pure utilities
@@ -288,23 +288,7 @@ export async function importNotes(
             updatedAt,
             id,
           ])
-          await tx.run('DELETE FROM note_tags WHERE note_id=?', [id])
-          for (const tagName of tags) {
-            const normalized = tagName.toLowerCase().trim()
-            if (!normalized) continue
-            let tagRow = await tx.get<{ id: string }>('SELECT id FROM tags WHERE name=?', [
-              normalized,
-            ])
-            if (!tagRow) {
-              const tagId = randomUUID()
-              await tx.run('INSERT INTO tags (id, name) VALUES (?, ?)', [tagId, normalized])
-              tagRow = { id: tagId }
-            }
-            await tx.run(
-              'INSERT INTO note_tags (note_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
-              [id, tagRow.id]
-            )
-          }
+          await reconcileTags(tx, id, tags)
         })
         updated++
       } else {
@@ -313,22 +297,7 @@ export async function importNotes(
             'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
             [id, title, body.trim(), createdAt, updatedAt]
           )
-          for (const tagName of tags) {
-            const normalized = tagName.toLowerCase().trim()
-            if (!normalized) continue
-            let tagRow = await tx.get<{ id: string }>('SELECT id FROM tags WHERE name=?', [
-              normalized,
-            ])
-            if (!tagRow) {
-              const tagId = randomUUID()
-              await tx.run('INSERT INTO tags (id, name) VALUES (?, ?)', [tagId, normalized])
-              tagRow = { id: tagId }
-            }
-            await tx.run(
-              'INSERT INTO note_tags (note_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
-              [id, tagRow.id]
-            )
-          }
+          await reconcileTags(tx, id, tags)
         })
         imported++
       }

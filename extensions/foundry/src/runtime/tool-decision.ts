@@ -93,7 +93,7 @@ export interface ToolRequest {
  * Whether a path is documentation, by `isDocumentationRelative`'s rule once it
  * is made relative to the checkout. Outside the checkout it never is.
  */
-export function isDocumentationPath(target: string, worktreePath: string): boolean {
+function isDocumentationPath(target: string, worktreePath: string): boolean {
   const relative = path.isAbsolute(target) ? path.relative(worktreePath, target) : target
   if (relative.startsWith('..') || path.isAbsolute(relative)) return false
   return isDocumentationRelative(path.normalize(relative).split(path.sep).join('/'))

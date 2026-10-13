@@ -59,16 +59,6 @@ export interface SearchResult {
   archivedAt: string | null
 }
 
-export interface Diagram {
-  id: string
-  title: string
-  tags: string[]
-  sceneJson: string
-  createdAt: string
-  updatedAt: string
-  archivedAt: string | null
-}
-
 export interface DiagramListItem {
   id: string
   title: string
@@ -93,12 +83,4 @@ export interface DiagramComment {
   createdAt: string
   updatedAt: string
   replies: DiagramComment[]
-}
-
-export interface ExportFrontmatter {
-  id: string
-  title: string
-  tags: string[]
-  created: string
-  updated: string
 }

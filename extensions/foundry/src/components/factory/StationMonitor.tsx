@@ -1,10 +1,10 @@
 import React, { useEffect, useLayoutEffect, useRef } from 'react'
 import { Power, Terminal } from 'lucide-react'
 import { drawMonitorCase } from '../../factory/art/monitor.js'
-import type { Paint, PaintGradient } from '../../factory/art/kit.js'
 import type { NodeState } from '../../line/run-graph.js'
 import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
 import { stateWord } from '../../factory/callouts.js'
+import { prefersReducedMotion, toPaint } from './canvas.js'
 
 // One station's terminal, drawn as a green-phosphor monitor.
 //
@@ -57,33 +57,6 @@ const MIN_ART_W = 30
 const MIN_ART_H = 40
 const POWER_OFF_MS = 300
 const STICK_SLACK_PX = 4
-
-function toPaint(ctx: CanvasRenderingContext2D): Paint {
-  return {
-    get fillStyle() {
-      return ctx.fillStyle as unknown as string
-    },
-    set fillStyle(value: string | PaintGradient) {
-      ctx.fillStyle = value as unknown as string
-    },
-    get globalCompositeOperation() {
-      return ctx.globalCompositeOperation
-    },
-    set globalCompositeOperation(value: string) {
-      ctx.globalCompositeOperation = value as GlobalCompositeOperation
-    },
-    fillRect: (x, y, w, h) => ctx.fillRect(x, y, w, h),
-    createRadialGradient: (x0, y0, r0, x1, y1, r1) =>
-      ctx.createRadialGradient(x0, y0, r0, x1, y1, r1),
-    drawImage: (image, dx, dy) => ctx.drawImage(image, dx, dy),
-  }
-}
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia !== undefined
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false
-}
 
 function lineClass(line: TranscriptLine): 'tool' | 'say' | 'you' {
   if (line.kind === 'tool') return 'tool'

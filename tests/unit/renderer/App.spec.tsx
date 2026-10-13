@@ -23,7 +23,6 @@ vi.mock('../../../src/renderer/stores/session.store', () => ({
   useSessionStore: Object.assign(vi.fn(), { getState: vi.fn() }),
 }))
 vi.mock('../../../src/renderer/stores/toast.store', () => ({ useToastStore: vi.fn() }))
-vi.mock('../../../src/renderer/stores/log.store', () => ({ installLogInterceptor: vi.fn() }))
 vi.mock('../../../src/renderer/extensions/registry', () => {
   const useExtensionRegistry = vi.fn()
   ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({

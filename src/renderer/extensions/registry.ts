@@ -28,7 +28,7 @@ export interface WorkspaceTabRegistration {
   view?: string
 }
 
-export interface SidebarPanelRegistration {
+interface SidebarPanelRegistration {
   id: string
   label: string
   component: ComponentType<{ repoRoot: string | null; onClose: () => void }>
@@ -45,14 +45,14 @@ export interface ProjectTabRegistration {
   view?: string
 }
 
-export interface KeyboardShortcutRegistration {
+interface KeyboardShortcutRegistration {
   /** Electron-style accelerator, e.g. "CmdOrCtrl+Shift+G" */
   accelerator: string
   action: () => void
   description?: string
 }
 
-export interface CommandRegistration {
+interface CommandRegistration {
   id: string
   label: string
   description?: string
@@ -99,20 +99,6 @@ interface ExtensionRegistry {
   setActiveGlobalTabWithNavigation(tabId: string, navigationData: unknown): void
   clearPendingNavigation(extensionId: string): void
 }
-
-export type ExtensionRendererAPI = Pick<
-  ExtensionRegistry,
-  | 'registerGlobalTab'
-  | 'registerWorkspaceTab'
-  | 'registerSidebarPanel'
-  | 'registerProjectTab'
-  | 'registerWindowView'
-  | 'registerOverlay'
-  | 'registerKeyboardShortcut'
-  | 'registerCommand'
-  | 'updateGlobalTab'
-  | 'updateCommand'
->
 
 // Core-contributed surfaces use this id prefix (see the sort weight in App.tsx).
 // They are not extensions, so the Escape exit gesture leaves them alone.

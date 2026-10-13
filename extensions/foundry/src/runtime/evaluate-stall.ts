@@ -45,7 +45,7 @@ export interface SessionFacts {
  * needs a per-edit history of the working copy, and nothing records one. It was
  * removed rather than left as a threshold no input could ever cross.
  */
-export type StallSignal = 'silence' | 'loop'
+type StallSignal = 'silence' | 'loop'
 
 export interface StallFiring {
   readonly sessionId: string

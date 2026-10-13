@@ -235,7 +235,7 @@ export const ReorderTasksRequestSchema = z.object({
 
 // ── vault:set-recurrence ──────────────────────────────────────────────────────
 
-export const RecurrenceIntervalSchema = z.enum(['daily', 'weekly', 'biweekly', 'monthly'])
+const RecurrenceIntervalSchema = z.enum(['daily', 'weekly', 'biweekly', 'monthly'])
 
 export const SetRecurrenceRequestSchema = z.object({
   taskId: TaskIdSchema,

@@ -118,42 +118,7 @@ export function activate(api: ExtensionAPI): void {
       })
 
       if (NgrokManager.isInstalled()) {
-        const authToken = api.settings.get<string>(KEY.ngrokAuthToken) || undefined
-        try {
-          const publicUrl = await ngrokManager.start(port, authToken)
-          currentPublicUrl = publicUrl
-          ngrokManager.setOnCrash(() => {
-            currentPublicUrl = null
-            api.window.broadcast('remote:tunnel-disconnected', {})
-            api.window.broadcast('remote:status', {
-              enabled: true,
-              port,
-              publicUrl: null,
-              lanUrl: getLanUrl(port),
-            })
-          })
-          api.window.broadcast('remote:status', {
-            enabled: true,
-            port,
-            publicUrl,
-            lanUrl: getLanUrl(port),
-            ngrokInstalled: true,
-            ngrokError: null,
-          })
-        } catch (err) {
-          currentPublicUrl = null
-          const needsAuth = !authToken
-          api.window.broadcast('remote:status', {
-            enabled: true,
-            port,
-            publicUrl: null,
-            lanUrl: getLanUrl(port),
-            ngrokInstalled: true,
-            ngrokError: needsAuth
-              ? 'ngrok requires an auth token — add yours in Settings'
-              : String(err),
-          })
-        }
+        await openTunnel(port)
       } else {
         currentPublicUrl = null
         api.window.broadcast('remote:status', {
@@ -169,6 +134,31 @@ export function activate(api: ExtensionAPI): void {
       if (err instanceof PortInUseError) return
       api.settings.set(KEY.enabled, false)
       api.window.broadcast('remote:status', { enabled: false, error: 'START_FAILED' })
+    }
+  }
+
+  /**
+   * Opens the ngrok tunnel to `port` and broadcasts the public address, or why
+   * there is none. A tunnel that later drops broadcasts the local address alone.
+   */
+  async function openTunnel(port: number): Promise<void> {
+    const authToken = api.settings.get<string>(KEY.ngrokAuthToken) || undefined
+    const status = { enabled: true, port, lanUrl: getLanUrl(port), ngrokInstalled: true }
+    try {
+      const publicUrl = await ngrokManager.start(port, authToken)
+      currentPublicUrl = publicUrl
+      ngrokManager.setOnCrash(() => {
+        currentPublicUrl = null
+        api.window.broadcast('remote:tunnel-disconnected', {})
+        api.window.broadcast('remote:status', { ...status, publicUrl: null })
+      })
+      api.window.broadcast('remote:status', { ...status, publicUrl, ngrokError: null })
+    } catch (err) {
+      currentPublicUrl = null
+      const ngrokError = authToken
+        ? String(err)
+        : 'ngrok requires an auth token — add yours in Settings'
+      api.window.broadcast('remote:status', { ...status, publicUrl: null, ngrokError })
     }
   }
 
@@ -330,37 +320,7 @@ export function activate(api: ExtensionAPI): void {
         if (!remoteServer?.isListening()) return { ok: false }
         enqueue(async () => {
           ngrokManager.stop()
-          const port = getPort()
-          const authToken = api.settings.get<string>(KEY.ngrokAuthToken) || undefined
-          try {
-            const publicUrl = await ngrokManager.start(port, authToken)
-            currentPublicUrl = publicUrl
-            ngrokManager.setOnCrash(() => {
-              currentPublicUrl = null
-              api.window.broadcast('remote:tunnel-disconnected', {})
-              api.window.broadcast('remote:status', {
-                enabled: true,
-                port,
-                publicUrl: null,
-                lanUrl: getLanUrl(port),
-              })
-            })
-            api.window.broadcast('remote:status', {
-              enabled: true,
-              port,
-              publicUrl,
-              lanUrl: getLanUrl(port),
-            })
-          } catch (err) {
-            currentPublicUrl = null
-            api.window.broadcast('remote:status', {
-              enabled: true,
-              port,
-              publicUrl: null,
-              lanUrl: getLanUrl(port),
-              ngrokError: String(err),
-            })
-          }
+          await openTunnel(getPort())
         })
         return { ok: true }
       },

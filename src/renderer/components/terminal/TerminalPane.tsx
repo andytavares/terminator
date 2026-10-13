@@ -9,6 +9,7 @@ import { SplitContainer } from './SplitContainer'
 import { LeafPane } from './LeafPane'
 import { leafIds } from '../../utils/pane-tree'
 import './TerminalPane.css'
+import { droppedPaths } from './dropped-paths'
 
 interface Props {
   projectId: string
@@ -181,11 +182,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     if (!activeSessionId) return
     const instance = getTerminalInstance(activeSessionId)
     if (!instance) return
-    const paths = Array.from(e.dataTransfer.files)
-      .map((f) => window.electronAPI.getFilePath(f))
-      .filter(Boolean)
-      .map((p) => (/\s/.test(p) ? `'${p.replace(/'/g, "'\\''")}'` : p))
-      .join(' ')
+    const paths = droppedPaths(e.dataTransfer.files)
     if (paths) instance.terminal.paste(paths)
   }
 

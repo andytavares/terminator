@@ -30,7 +30,7 @@ import { gotoRun, startPaletteRefresh, stopPaletteRefresh } from './palette-comm
  * one writes nothing rather than inventing a place for it: reading any
  * directory's grandparent as the root wrote `<parent>/orders/<name>/ledger.jsonl`.
  */
-export async function recordStall(
+async function recordStall(
   featureDir: string,
   firing: { sessionId: string; signal: string; firedAt: number }
 ): Promise<void> {

@@ -19,7 +19,7 @@ export interface StoredTask {
   subtasks?: StoredTask[]
 }
 
-export const VAULT_URL = 'terminator.task-vault/dist/index.html?view=main'
+const VAULT_URL = 'terminator.task-vault/dist/index.html?view=main'
 
 /** Opens Task Vault from the app band and waits for its navigation. */
 export async function openVault(handle: AppHandle): Promise<Page> {

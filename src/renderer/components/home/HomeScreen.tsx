@@ -8,7 +8,7 @@ import { StateChip } from '../session/StateChip'
 import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
-import { navigateToSession } from '../../terminal/navigate-to-session'
+import { revealSession } from '../../terminal/navigate-to-session'
 import { closeSessionFromFacts } from '../../terminal/close-session'
 import {
   resumeSession,
@@ -28,6 +28,7 @@ import { buildLedger } from '../../sidebar/ledger-rows'
 import { buildLogbook } from '../../sidebar/logbook-groups'
 import type { SessionFacts } from '../../sidebar/session-facts'
 import type { IssueSummary } from '../../../shared/types/index'
+import '../screen-chrome.css'
 import './HomeScreen.css'
 
 const LAYOUTS: Array<{ value: HomeLayout; label: string }> = [
@@ -197,7 +198,7 @@ export function HomeScreen({ onOpenQuickActions }: HomeScreenProps = {}): JSX.El
               titles={titles}
               now={now}
               onSelect={setSelectedId}
-              onOpen={navigateToSession}
+              onOpen={revealSession}
               onSaveDescription={saveDescription}
               onLinkIssue={linkIssue}
               onLink={setLinking}
@@ -214,7 +215,7 @@ export function HomeScreen({ onOpenQuickActions }: HomeScreenProps = {}): JSX.El
               selectedId={selectedId}
               now={now}
               onSelect={setSelectedId}
-              onOpen={navigateToSession}
+              onOpen={revealSession}
               onSaveDescription={saveDescription}
               onLink={setLinking}
               onResume={(facts) => void resumeSession(facts)}

@@ -83,7 +83,7 @@ const StatusCheckSchema = z.object({
 
 // ─── PR approval ─────────────────────────────────────────────────────────────
 
-export const PrApprovalSchema = z.object({
+const PrApprovalSchema = z.object({
   author: z.string(),
   authorAvatarUrl: z.string(),
   submittedAt: z.string(),
@@ -91,7 +91,7 @@ export const PrApprovalSchema = z.object({
 
 // ─── Issue references ─────────────────────────────────────────────────────────
 
-export const IssueRefSchema = z.object({
+const IssueRefSchema = z.object({
   type: z.enum(['github', 'linear', 'jira']),
   ref: z.string(),
   url: z.string().optional(),
@@ -106,7 +106,7 @@ export const IssueRefSchema = z.object({
 
 // ─── DRY violations ───────────────────────────────────────────────────────────
 
-export const DryViolationSchema = z.object({
+const DryViolationSchema = z.object({
   files: z.array(z.string()),
   fingerprint: z.string(),
   lineCount: z.number(),
@@ -114,14 +114,14 @@ export const DryViolationSchema = z.object({
 
 // ─── Reading order (R3) ─────────────────────────────────────────────────────────
 
-export const SymbolUseSchema = z.object({
+const SymbolUseSchema = z.object({
   symbol: z.string(),
   /** 1-based step that defines it, when a file in this PR defines it. */
   definedInStep: z.number().nullable(),
   definedInPath: z.string().nullable(),
 })
 
-export const ReadingStepSchema = z.object({
+const ReadingStepSchema = z.object({
   step: z.number(),
   path: z.string(),
   /** The main symbol this step changes, shown after the file name. */
@@ -133,7 +133,7 @@ export const ReadingStepSchema = z.object({
 
 // ─── Moved blocks (S4) ────────────────────────────────────────────────────────
 
-export const MovedBlockSchema = z.object({
+const MovedBlockSchema = z.object({
   fromPath: z.string(),
   fromLine: z.number(),
   toPath: z.string(),
@@ -144,9 +144,9 @@ export const MovedBlockSchema = z.object({
 
 // ─── Insights (R4) ────────────────────────────────────────────────────────────
 
-export const InsightSourceSchema = z.string()
+const InsightSourceSchema = z.string()
 
-export const FunctionComplexitySchema = z.object({
+const FunctionComplexitySchema = z.object({
   path: z.string(),
   name: z.string(),
   /** New-side line of the function's declaration, when it is in the diff. */
@@ -154,7 +154,7 @@ export const FunctionComplexitySchema = z.object({
   branchDelta: z.number(),
 })
 
-export const PrInsightsSchema = z.object({
+const PrInsightsSchema = z.object({
   complexity: z.object({
     branchDelta: z.number(),
     functions: z.array(FunctionComplexitySchema),
@@ -252,7 +252,7 @@ export const ReviewQueuePRSchema = z.object({
 
 // ─── Review dashboard (R1) ─────────────────────────────────────────────────────
 
-export const DashboardSectionSchema = z.enum(['re-review', 'requested', 'team', 'mine', 'involved'])
+const DashboardSectionSchema = z.enum(['re-review', 'requested', 'team', 'mine', 'involved'])
 
 export const DashboardPRSchema = z.object({
   /** owner/name */
@@ -283,14 +283,14 @@ export const DashboardPRSchema = z.object({
 
 // ─── PR issue (conversation) comments ────────────────────────────────────────
 
-export const IssueCommentSchema = z.object({
-  id: z.number(),
-  author: z.string(),
-  authorAvatarUrl: z.string(),
-  body: z.string(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-})
+export interface IssueComment {
+  id: number
+  author: string
+  authorAvatarUrl: string
+  body: string
+  createdAt: string
+  updatedAt: string
+}
 
 // ─── Inline comments ─────────────────────────────────────────────────────────
 
@@ -326,7 +326,7 @@ export const ThreadSchema = z.object({
 
 // ─── Notes and draft comments (S2, S5) ─────────────────────────────────────────
 
-export const ReviewNoteSchema = z.object({
+const ReviewNoteSchema = z.object({
   id: z.string(),
   path: z.string(),
   line: z.number(),
@@ -335,7 +335,7 @@ export const ReviewNoteSchema = z.object({
   createdAt: z.string(),
 })
 
-export const DraftCommentSchema = z.object({
+const DraftCommentSchema = z.object({
   id: z.string(),
   path: z.string(),
   line: z.number(),
@@ -371,7 +371,6 @@ export const ReviewSessionSchema = z.object({
 
 // ─── Type exports ─────────────────────────────────────────────────────────────
 
-export type SignalValue = z.infer<typeof SignalValueSchema>
 export type SignalDots = z.infer<typeof SignalDotsSchema>
 export type RiskScore = z.infer<typeof RiskScoreSchema>
 export type FileMetrics = z.infer<typeof FileMetricsSchema>
@@ -380,7 +379,6 @@ export type Chapter = z.infer<typeof ChapterSchema>
 export type PrReviewDetail = z.infer<typeof PrReviewDetailSchema>
 export type ReviewQueuePR = z.infer<typeof ReviewQueuePRSchema>
 export type StatusCheck = z.infer<typeof StatusCheckSchema>
-export type IssueComment = z.infer<typeof IssueCommentSchema>
 export type InlineComment = z.infer<typeof InlineCommentSchema>
 export type Thread = z.infer<typeof ThreadSchema>
 export type ReviewSession = z.infer<typeof ReviewSessionSchema>

@@ -154,13 +154,13 @@ export function RemoteControlSettings(): React.JSX.Element {
                     alignSelf: 'stretch',
                     display: 'flex',
                     alignItems: 'center',
-                    background: 'var(--bg-input)',
-                    border: '1px solid var(--border-strong)',
-                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--tm-bg-input)',
+                    border: '1px solid var(--tm-border-strong)',
+                    borderRadius: 'var(--tm-radius-sm)',
                     padding: '6px 9px',
                     fontSize: '11px',
-                    fontFamily: 'var(--font-mono)',
-                    color: 'var(--text-primary)',
+                    fontFamily: 'var(--tm-font-mono)',
+                    color: 'var(--tm-text-primary)',
                   }}
                 >
                   {status.publicUrl}
@@ -227,13 +227,13 @@ export function RemoteControlSettings(): React.JSX.Element {
                     alignSelf: 'stretch',
                     display: 'flex',
                     alignItems: 'center',
-                    background: 'var(--bg-input)',
-                    border: '1px solid var(--border-strong)',
-                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--tm-bg-input)',
+                    border: '1px solid var(--tm-border-strong)',
+                    borderRadius: 'var(--tm-radius-sm)',
                     padding: '6px 9px',
                     fontSize: '11px',
-                    fontFamily: 'var(--font-mono)',
-                    color: 'var(--text-primary)',
+                    fontFamily: 'var(--tm-font-mono)',
+                    color: 'var(--tm-text-primary)',
                   }}
                 >
                   {status.lanUrl ?? `http://…:${port}`}

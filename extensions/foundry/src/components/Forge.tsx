@@ -56,7 +56,7 @@ import { invoke } from '@terminator/extension-sdk/renderer'
 // them, and why every control that can be unavailable is unavailable. This
 // component draws what it returns and decides nothing about state itself.
 
-export interface OrderView {
+interface OrderView {
   order: WorkOrder
   compile: CompileResult
   changed?: string[]
@@ -329,6 +329,24 @@ const GROUP_META: Record<FindingGroup, { readonly heading: string; readonly cls:
   resolved: { heading: 'Resolved', cls: 'done' },
 }
 
+/** A group's findings, each its text and where it came from. */
+function FindingRows({ findings }: { readonly findings: readonly FindingView[] }): JSX.Element {
+  return (
+    <>
+      {findings.map((finding) => (
+        <div key={finding.id} className="fdry-fnd">
+          <span className="fdry-fnd-text">
+            <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
+              {finding.text}
+            </Markdown>
+          </span>
+          <span className="fdry-fnd-meta">{finding.meta}</span>
+        </div>
+      ))}
+    </>
+  )
+}
+
 export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element {
   const [view, setView] = useState<OrderView | null>(null)
   const [busy, setBusy] = useState(false)
@@ -444,15 +462,15 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
     [orderId]
   )
 
-  const converge = useCallback(
-    async (message?: string) => {
+  /** One converge turn: a message from the operator, or a settle of the plan. */
+  const sendConverge = useCallback(
+    async (turn: { message?: string; settle?: Settle }) => {
       setBusy(true)
       setProblem(null)
       try {
-        const next = (await invoke('foundry:order.converge', {
-          id: orderId,
-          ...(message === undefined ? {} : { message }),
-        })) as (OrderView & { error?: string; converging?: string }) | { error: string }
+        const next = (await invoke('foundry:order.converge', { id: orderId, ...turn })) as
+          | (OrderView & { error?: string; converging?: string })
+          | { error: string }
         if ('order' in next) setView(next)
         if (next.error !== undefined) setProblem(next.error)
       } finally {
@@ -460,6 +478,11 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
       }
     },
     [orderId]
+  )
+
+  const converge = useCallback(
+    (message?: string) => sendConverge(message === undefined ? {} : { message }),
+    [sendConverge]
   )
 
   const holdOrder = useCallback(
@@ -488,22 +511,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
   const asked = intake.kind === 'running' ? intake.asked : null
   const locked = busy || drafting
 
-  const applySettle = useCallback(
-    async (settle: Settle) => {
-      setBusy(true)
-      setProblem(null)
-      try {
-        const next = (await invoke('foundry:order.converge', { id: orderId, settle })) as
-          | (OrderView & { error?: string; converging?: string })
-          | { error: string }
-        if ('order' in next) setView(next)
-        if (next.error !== undefined) setProblem(next.error)
-      } finally {
-        setBusy(false)
-      }
-    },
-    [orderId]
-  )
+  const applySettle = useCallback((settle: Settle) => sendConverge({ settle }), [sendConverge])
 
   // The turn that was queued behind is sent once; it clears when it has been.
   const sentSettle = useRef<Settle | null>(null)
@@ -1180,21 +1188,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                       {GROUP_META.fixing.heading}{' '}
                       <span className="fdry-cnt">{findingsByGroup.fixing.length}</span>
                     </div>
-                    {findingsByGroup.fixing.map((finding) => (
-                      <div key={finding.id} className="fdry-fnd">
-                        <span className="fdry-fnd-text">
-                          <Markdown
-                            inline
-                            fetchesNothing
-                            className="fdry-md-inline"
-                            onOpenLink={openInBrowser}
-                          >
-                            {finding.text}
-                          </Markdown>
-                        </span>
-                        <span className="fdry-fnd-meta">{finding.meta}</span>
-                      </div>
-                    ))}
+                    <FindingRows findings={findingsByGroup.fixing} />
                   </div>
                 ) : null}
 
@@ -1312,21 +1306,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                       {GROUP_META.notes.heading}{' '}
                       <span className="fdry-cnt">{findingsByGroup.notes.length}</span>
                     </div>
-                    {findingsByGroup.notes.map((finding) => (
-                      <div key={finding.id} className="fdry-fnd">
-                        <span className="fdry-fnd-text">
-                          <Markdown
-                            inline
-                            fetchesNothing
-                            className="fdry-md-inline"
-                            onOpenLink={openInBrowser}
-                          >
-                            {finding.text}
-                          </Markdown>
-                        </span>
-                        <span className="fdry-fnd-meta">{finding.meta}</span>
-                      </div>
-                    ))}
+                    <FindingRows findings={findingsByGroup.notes} />
                   </div>
                 ) : null}
 
@@ -1337,21 +1317,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                       {GROUP_META.resolved.heading}{' '}
                       <span className="fdry-cnt">{findingsByGroup.resolved.length}</span>
                     </summary>
-                    {findingsByGroup.resolved.map((finding) => (
-                      <div key={finding.id} className="fdry-fnd">
-                        <span className="fdry-fnd-text">
-                          <Markdown
-                            inline
-                            fetchesNothing
-                            className="fdry-md-inline"
-                            onOpenLink={openInBrowser}
-                          >
-                            {finding.text}
-                          </Markdown>
-                        </span>
-                        <span className="fdry-fnd-meta">{finding.meta}</span>
-                      </div>
-                    ))}
+                    <FindingRows findings={findingsByGroup.resolved} />
                   </details>
                 ) : null}
 

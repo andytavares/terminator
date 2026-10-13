@@ -34,6 +34,14 @@ jobs:
       - name: Dependency versions
         run: npm run lint:deps
 
+      # Unused files, exports and dependencies (knip.jsonc, ADR 104).
+      - name: Unused code
+        run: npm run lint:unused
+
+      # Copy-pasted code in src, packages and extensions (.jscpd.json, ADR 105).
+      - name: Duplicate code
+        run: npm run lint:duplicates
+
       - name: Lint
         run: npm run lint
 

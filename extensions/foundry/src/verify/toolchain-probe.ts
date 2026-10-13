@@ -15,9 +15,9 @@ import { CHECK_NAMES, type CheckName } from './check-names.js'
 // and a check that reports a pass it did not earn is the failure mode that
 // makes an unattended factory dangerous.
 
-export type ProbeSource = 'package.json' | 'config' | 'makefile' | 'ci'
+type ProbeSource = 'package.json' | 'config' | 'makefile' | 'ci'
 
-export interface ProbedCommand {
+interface ProbedCommand {
   readonly command: string
   readonly source: ProbeSource
 }

@@ -52,6 +52,21 @@ const focusTrackPlugin = ViewPlugin.define((view) => {
 // ── Widgets ──────────────────────────────────────────────────────
 
 /* v8 ignore start */
+/** A click on the link opens `url` in the system browser (a new window outside the app). */
+function openOnClick(link: HTMLAnchorElement, url: string): void {
+  link.addEventListener('click', (e) => {
+    e.preventDefault()
+    const api = (
+      window as unknown as { electronAPI?: { shell?: { openExternal?: (u: string) => void } } }
+    ).electronAPI
+    if (api?.shell?.openExternal) {
+      api.shell.openExternal(url)
+    } else {
+      window.open(url, '_blank', 'noopener')
+    }
+  })
+}
+
 class BulletWidget extends WidgetType {
   toDOM(): HTMLElement {
     const span = document.createElement('span')
@@ -123,17 +138,7 @@ class LinkWidget extends WidgetType {
     a.textContent = this.label
     a.className = 'notepad-link-widget'
     a.title = this.url
-    a.addEventListener('click', (e) => {
-      e.preventDefault()
-      const api = (
-        window as unknown as { electronAPI?: { shell?: { openExternal?: (u: string) => void } } }
-      ).electronAPI
-      if (api?.shell?.openExternal) {
-        api.shell.openExternal(this.url)
-      } else {
-        window.open(this.url, '_blank', 'noopener')
-      }
-    })
+    openOnClick(a, this.url)
     return a
   }
 
@@ -224,17 +229,7 @@ function inlineSpanToDOM(span: InlineSpan): Node {
       el.textContent = span.text
       el.href = span.href ?? ''
       el.title = span.href ?? ''
-      el.addEventListener('click', (e) => {
-        e.preventDefault()
-        const api = (
-          window as unknown as { electronAPI?: { shell?: { openExternal?: (u: string) => void } } }
-        ).electronAPI
-        if (api?.shell?.openExternal) {
-          api.shell.openExternal(span.href ?? '')
-        } else {
-          window.open(span.href ?? '', '_blank', 'noopener')
-        }
-      })
+      openOnClick(el, span.href ?? '')
       return el
     }
   }

@@ -67,7 +67,7 @@ interface Forge extends ForgeLoopDeps {
 }
 
 /** One architect turn the loop asked for, and where in the loop it sits. */
-export interface ArchitectAsk {
+interface ArchitectAsk {
   readonly order: WorkOrder
   readonly message: string
   readonly autoTurns: number
@@ -82,7 +82,7 @@ export interface ArchitectAsk {
 }
 
 /** Writes the ledger line that says an architect turn started, or could not. */
-export type RecordStart = (started: ConvergeStarted) => Promise<void>
+type RecordStart = (started: ConvergeStarted) => Promise<void>
 
 /** One red-team round: the order it attacks, which round, and what changed since the last. */
 interface Review {

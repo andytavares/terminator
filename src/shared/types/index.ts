@@ -1,4 +1,4 @@
-export type { NotificationTarget, NotificationType } from '../notifications/resolve-targets'
+export type { NotificationTarget } from '../notifications/resolve-targets'
 import type { NotificationTarget, NotificationType } from '../notifications/resolve-targets'
 
 export interface NotificationAction {
@@ -57,8 +57,8 @@ export interface WorktreeInfo {
   head: string
 }
 
-export type SessionStatus = 'active' | 'backgrounded' | 'closed'
-export type SessionType = 'human' | 'agent'
+type SessionStatus = 'active' | 'backgrounded' | 'closed'
+type SessionType = 'human' | 'agent'
 
 /**
  * What a session appears to be doing. Derived on read from the bell, byte-flow
@@ -112,16 +112,16 @@ export interface ChoicePrompt {
   options: ChoiceOption[]
 }
 
-export type ExtensionStatus = 'enabled' | 'disabled' | 'error'
+type ExtensionStatus = 'enabled' | 'disabled' | 'error'
 
-export interface ExtensionSurfaceContribution {
+interface ExtensionSurfaceContribution {
   label: string
   icon?: string
   view?: string
   defaultOpen?: boolean
 }
 
-export interface ExtensionContributes {
+interface ExtensionContributes {
   globalTab?: ExtensionSurfaceContribution
   workspaceTab?: ExtensionSurfaceContribution
   projectTab?: ExtensionSurfaceContribution
@@ -155,16 +155,6 @@ export interface Extension {
   contributes?: ExtensionContributes
 }
 
-export interface ExtensionManifest {
-  id: string
-  name: string
-  version: string
-  description: string
-  main: string
-  renderer?: string
-  minAppVersion: string
-}
-
 export type {
   ActionUsage,
   CustomAction,
@@ -175,8 +165,6 @@ export type {
   QuickActionsSettings,
   WorkspaceSettings,
 } from '../schemas/settings.schema'
-
-export type SettingsScope = 'global' | 'workspace'
 
 export interface SystemMetrics {
   cpuPercent: number
@@ -218,7 +206,6 @@ import type { TrackerId } from '@terminator/extension-sdk'
 
 export type {
   TrackerId,
-  IssueRef,
   TrackerErrorKind,
   MineSelector,
   TrackerAccount,

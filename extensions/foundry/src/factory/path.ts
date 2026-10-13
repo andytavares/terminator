@@ -11,6 +11,16 @@ function key(tile: Tile): string {
   return `${tile.x},${tile.y}`
 }
 
+/** The four tiles a step can reach from `tile`. */
+function neighboursOf(tile: Tile): Tile[] {
+  return [
+    { x: tile.x + 1, y: tile.y },
+    { x: tile.x - 1, y: tile.y },
+    { x: tile.x, y: tile.y + 1 },
+    { x: tile.x, y: tile.y - 1 },
+  ]
+}
+
 function passable(
   solid: HallMap['solid'],
   tile: Tile,
@@ -36,13 +46,7 @@ export function distancesFrom(grid: HallMap['solid'], from: Tile): Map<string, n
   for (let head = 0; head < queue.length; head++) {
     const current = queue[head]
     const currentDistance = distances.get(key(current)) as number
-    const neighbours: Tile[] = [
-      { x: current.x + 1, y: current.y },
-      { x: current.x - 1, y: current.y },
-      { x: current.x, y: current.y + 1 },
-      { x: current.x, y: current.y - 1 },
-    ]
-    for (const next of neighbours) {
+    for (const next of neighboursOf(current)) {
       const k = key(next)
       if (distances.has(k)) continue
       if (grid[next.y]?.[next.x] !== false) continue
@@ -73,13 +77,7 @@ export function findPath(
   let found = false
   for (let head = 0; head < queue.length && !found; head++) {
     const current = queue[head]
-    const neighbours: Tile[] = [
-      { x: current.x + 1, y: current.y },
-      { x: current.x - 1, y: current.y },
-      { x: current.x, y: current.y + 1 },
-      { x: current.x, y: current.y - 1 },
-    ]
-    for (const next of neighbours) {
+    for (const next of neighboursOf(current)) {
       const k = key(next)
       if (visited.has(k)) continue
       if (!passable(solid, next, to, blocked)) continue

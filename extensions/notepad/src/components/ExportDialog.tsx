@@ -140,7 +140,7 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
           <div className="notepad-export-dialog__field-label">Destination folder</div>
           <div className="notepad-export-dialog__folder-row">
             <input
-              className="notepad-export-dialog__folder-input"
+              className="tmui-input notepad-export-dialog__folder-input"
               value={folder}
               onChange={(e) => setFolder(e.target.value)}
               spellCheck={false}

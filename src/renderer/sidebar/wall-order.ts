@@ -1,4 +1,4 @@
-import type { SessionFacts } from './session-facts'
+import { byRecentlyOpened, byStarted, type SessionFacts } from './session-facts'
 import type { WallPrefs } from './wall-prefs'
 import { standingRank } from './view-model'
 
@@ -13,17 +13,6 @@ export interface WallPlacement {
 export interface WallLayout {
   placements: WallPlacement[]
   needsCount: number
-}
-
-const byStarted = (a: SessionFacts, b: SessionFacts): number =>
-  Date.parse(a.startedAt) - Date.parse(b.startedAt)
-
-/** Most recently opened first, a session that has never been attended sorting last. */
-const byRecentlyOpened = (a: SessionFacts, b: SessionFacts): number => {
-  if (a.lastAttendedAt === null && b.lastAttendedAt === null) return byStarted(a, b)
-  if (a.lastAttendedAt === null) return 1
-  if (b.lastAttendedAt === null) return -1
-  return b.lastAttendedAt - a.lastAttendedAt || byStarted(a, b)
 }
 
 function thenBy(prefs: WallPrefs) {

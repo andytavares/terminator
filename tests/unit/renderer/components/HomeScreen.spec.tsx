@@ -25,7 +25,7 @@ vi.mock('../../../../src/renderer/terminal/start-session', () => ({
   startScratchSession: started.scratch,
 }))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
-  navigateToSession: navigate,
+  revealSession: navigate,
 }))
 
 vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => ({

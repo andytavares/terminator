@@ -10,7 +10,7 @@ import { reviveCallbacks } from './callbacks.js'
  * `settings.get` and `workspace.list`) or registered through their own methods
  * below (`ipc.registerHandler`, `commands.register`, whose schemas cannot cross).
  */
-export const CROSSING_MEMBERS: ReadonlySet<string> = new Set([
+const CROSSING_MEMBERS: ReadonlySet<string> = new Set([
   'log.debug',
   'log.info',
   'log.warn',

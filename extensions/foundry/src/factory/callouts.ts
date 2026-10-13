@@ -14,7 +14,7 @@ import type { Check } from '../line/ci.js'
 // interruption is pinned over the station that is waiting on you. Both are
 // derived here, purely, so the surface only decides how they look.
 
-export type CalloutTone = 'start' | 'done' | 'fail' | 'tool' | 'handoff'
+type CalloutTone = 'start' | 'done' | 'fail' | 'tool' | 'handoff'
 
 export interface Callout {
   readonly id: string
@@ -155,7 +155,7 @@ export function calloutFor(
 }
 
 /** A held tool call, as the permissions list reports it. */
-export interface HeldCall {
+interface HeldCall {
   readonly requestId: string
   readonly sessionId: string
   readonly toolName: string

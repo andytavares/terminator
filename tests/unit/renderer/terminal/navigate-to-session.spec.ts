@@ -10,10 +10,7 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: { getState: () => registry },
 }))
 
-import {
-  revealSession,
-  navigateToSession,
-} from '../../../../src/renderer/terminal/navigate-to-session'
+import { revealSession } from '../../../../src/renderer/terminal/navigate-to-session'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
@@ -83,9 +80,5 @@ describe('revealSession', () => {
     expect(session.requestFocus).toHaveBeenCalledWith('s1')
     revealSession('s1')
     expect(session.requestFocus).toHaveBeenCalledTimes(2)
-  })
-
-  it('exposes navigateToSession as an alias', () => {
-    expect(navigateToSession).toBe(revealSession)
   })
 })

@@ -164,23 +164,31 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     [setCommitMessage]
   )
 
-  const handleCommit = useCallback(
-    async (noVerify = false) => {
-      if (!canCommit || !repoRoot) return
+  /** Commits what is staged; true when the commit was made. */
+  const commitStaged = useCallback(
+    async (root: string, noVerify: boolean): Promise<boolean> => {
       setIsCommitting(true)
       setCommitError(null)
       setHookOutput(null)
       setIsHookFailure(false)
-      startCommitPhase(repoRoot)
+      startCommitPhase(root)
+      const result = await gitAPI.commit(root, commitMessage.trim(), false, noVerify)
+      return applyCommitResult(result)
+    },
+    [commitMessage, startCommitPhase, applyCommitResult]
+  )
+
+  const handleCommit = useCallback(
+    async (noVerify = false) => {
+      if (!canCommit || !repoRoot) return
       try {
-        const result = await gitAPI.commit(repoRoot, commitMessage.trim(), false, noVerify)
-        applyCommitResult(result)
+        await commitStaged(repoRoot, noVerify)
       } finally {
         setIsCommitting(false)
         endCommitPhase()
       }
     },
-    [repoRoot, commitMessage, canCommit, startCommitPhase, endCommitPhase, applyCommitResult]
+    [repoRoot, canCommit, commitStaged, endCommitPhase]
   )
 
   const handleOpenPr = useCallback(async () => {
@@ -196,14 +204,8 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
   const handleCommitAndPush = useCallback(
     async (noVerify = false) => {
       if (!canCommit || !repoRoot) return
-      setIsCommitting(true)
-      setCommitError(null)
-      setHookOutput(null)
-      setIsHookFailure(false)
-      startCommitPhase(repoRoot)
       try {
-        const result = await gitAPI.commit(repoRoot, commitMessage.trim(), false, noVerify)
-        if (!applyCommitResult(result)) return
+        if (!(await commitStaged(repoRoot, noVerify))) return
         setIsCommitting(false)
         endCommitPhase()
         setIsPushing(true)
@@ -221,7 +223,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
         endCommitPhase()
       }
     },
-    [repoRoot, commitMessage, canCommit, startCommitPhase, endCommitPhase, applyCommitResult]
+    [repoRoot, canCommit, commitStaged, endCommitPhase]
   )
 
   const handlePrCreated = useCallback((pr: PullRequest) => {

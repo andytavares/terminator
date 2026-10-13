@@ -99,11 +99,27 @@ npm run build:extensions   # compile all extensions
 ```bash
 npm run lint       # ESLint (zero errors required)
 npm run lint:deps  # syncpack: exact versions, one per package
+npm run lint:unused  # knip: no unused files, exports or dependencies
+npm run lint:duplicates  # jscpd: no copy-pasted code
 npm run typecheck  # TypeScript type check (no emit — zero errors required)
 npm run format     # Prettier (auto-fixes)
 ```
 
 The root `npx tsc --noEmit` checks nothing; use `npm run typecheck`, which checks main, renderer, shared, the core's specs (`tsconfig.test.json`: `tests/unit` and `tests/integration` outside the extension and package directories), both packages and every extension. Both `lint` and `typecheck` must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
+
+`npm run lint:unused` runs [knip](https://knip.dev) with `knip.jsonc` and must report nothing ([ADR 104](adr/104-unused-code-is-a-ci-gate.md)). Its plugins find the entry points: electron-vite's main, preload and renderer inputs, each extension's `src/index.ts` and view, Vite, Vitest, Playwright and Storybook configs, and the `exports` of the SDK and the design system, which are their public API. When it reports something:
+
+- Unused and unreachable: delete it, with any test that covers only it (Constitution VI).
+- Exported but used only in its own file: drop the `export`.
+- Reached in a way knip cannot see (loaded by path at run time, a global declaration): add it to `knip.jsonc` with a comment that says how it is reached, and check that claim with `grep`.
+
+`npm run lint:duplicates` runs [jscpd](https://github.com/kucherenko/jscpd) with `.jscpd.json` and must find no clones ([ADR 105](adr/105-duplicate-code-is-a-ci-gate.md)). A clone is a block of at least 6 lines and 60 tokens that appears twice in `src`, `packages` or `extensions`. Specs, `tests` and `stories` folders are not checked. When it reports one, move the code to the one place both copies may import:
+
+- Inside one extension: a module of that extension.
+- Between the core and an extension, or between two extensions: `@terminator/extension-ui` (views, styles) or `@terminator/extension-sdk` (everything else). An extension never imports another extension or the core.
+- CSS: group the shared declarations into one rule. Put it where no selector in it loses to a rule it used to follow.
+
+Do not add a path to `ignore` to make a clone go away. The gate uses jscpd 5.4.1 ([npm](https://www.npmjs.com/package/jscpd/v/5.4.1)), the Rust rewrite with no JavaScript dependencies. It does not use 4.x, which pulls in `braces` through `fast-glob`, affected by [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) with no patched release.
 
 ---
 
@@ -232,7 +248,7 @@ Per the constitution (Principle IV):
 Before opening a PR, verify:
 
 - [ ] All tests pass (`npm test`)
-- [ ] `npm run lint`, `npm run lint:deps` and `npm run typecheck` pass with 0 errors
+- [ ] `npm run lint`, `npm run lint:deps`, `npm run lint:unused`, `npm run lint:duplicates` and `npm run typecheck` pass with 0 errors
 - [ ] `npm run format:check` passes
 - [ ] `npm run build:extensions` succeeds (no compile errors)
 - [ ] No unused imports, variables, or dead code introduced

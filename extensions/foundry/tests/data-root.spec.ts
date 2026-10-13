@@ -97,11 +97,10 @@ describe('ensureWritable', () => {
   })
 
   it('reports a root it cannot create, naming the path', async () => {
+    // A file where the parent directory should be: no one can create under it.
     const wall = path.join(tmp, 'wall')
-    fs.mkdirSync(wall)
-    fs.chmodSync(wall, 0o500)
+    fs.writeFileSync(wall, '')
     const r = await ensureWritable(path.join(wall, 'foundry'))
-    fs.chmodSync(wall, 0o700)
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toContain(path.join(wall, 'foundry'))
   })

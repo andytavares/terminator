@@ -22,7 +22,7 @@ import { answerLinear, type LinearState } from './tracker-stub-linear'
 // answer TLS for those hosts itself. Every other host is refused: nothing
 // leaves the machine.
 
-export const LINEAR_HOST = 'api.linear.app'
+const LINEAR_HOST = 'api.linear.app'
 export const JIRA_SITE = 'acme.atlassian.net'
 
 export interface TrackerStub {

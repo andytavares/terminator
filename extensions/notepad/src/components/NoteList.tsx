@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   ChevronDown,
@@ -17,7 +17,7 @@ import {
   RelativeTime,
   useDismissible,
 } from '@terminator/extension-ui'
-import { useNotesStore } from '../stores/notes.store'
+import { loadLibrary, useNotesStore } from '../stores/notes.store'
 import { useFilterStore } from '../stores/filter.store'
 import { EmptyState } from './EmptyState'
 import type { NoteListItem, DiagramListItem, SearchResult, Tag } from '../db/types'
@@ -375,17 +375,8 @@ function saveDrop(
 }
 
 export function NoteList(): React.JSX.Element {
-  const {
-    notes,
-    setNotes,
-    diagrams,
-    setDiagrams,
-    folders,
-    setFolders,
-    selectedNoteId,
-    setSelected,
-    setShowQuickCreate,
-  } = useNotesStore()
+  const { notes, diagrams, folders, selectedNoteId, setSelected, setShowQuickCreate } =
+    useNotesStore()
   const { searchQuery, activeTagIds, setQuery, toggleTag, clearTags } = useFilterStore()
 
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
@@ -497,7 +488,7 @@ export function NoteList(): React.JSX.Element {
     await window.electronAPI.extensionBridge
       .invoke(`${baseChannel}.${action}`, { id: itemId })
       .catch(console.error)
-    await reloadAll()
+    await loadLibrary()
   }
 
   async function handleDelete(itemId: string, itemType: 'note' | 'diagram', isArchived: boolean) {
@@ -515,31 +506,8 @@ export function NoteList(): React.JSX.Element {
     if (itemType === 'note' && selectedNoteId === itemId) setSelected(null)
     if (itemType === 'diagram' && useNotesStore.getState().selectedDiagramId === itemId)
       useNotesStore.getState().setSelectedDiagram(null)
-    await reloadAll()
+    await loadLibrary()
   }
-
-  const reloadAll = useCallback(async () => {
-    try {
-      const [notesResult, diagramsResult, foldersResult] = await Promise.all([
-        window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.list', {
-          includeArchived: true,
-        }),
-        window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.list', {
-          includeArchived: true,
-        }),
-        window.electronAPI.extensionBridge.invoke('terminator.notepad:folders.list', {}),
-      ])
-      const notesData = (notesResult as { data?: unknown[] }).data
-      if (Array.isArray(notesData)) setNotes(notesData as Parameters<typeof setNotes>[0])
-      const diagramsData = (diagramsResult as { data?: unknown[] }).data
-      if (Array.isArray(diagramsData))
-        setDiagrams(diagramsData as Parameters<typeof setDiagrams>[0])
-      const foldersData = (foldersResult as { data?: unknown[] }).data
-      if (Array.isArray(foldersData)) setFolders(foldersData as Parameters<typeof setFolders>[0])
-    } catch (err) {
-      console.error('[notepad] Failed to reload', err)
-    }
-  }, [setNotes, setDiagrams, setFolders])
 
   // Resolve active tag names for client-side filtering
   const activeTagNames = activeTagIds
@@ -637,7 +605,7 @@ export function NoteList(): React.JSX.Element {
         folderId,
       })
       .catch(console.error)
-    await reloadAll()
+    await loadLibrary()
   }
 
   async function handleFolderRename(folderId: string, name: string) {
@@ -645,7 +613,7 @@ export function NoteList(): React.JSX.Element {
       .invoke('terminator.notepad:folders.rename', { id: folderId, name })
       .catch(console.error)
     setFolderRenameState(null)
-    await reloadAll()
+    await loadLibrary()
   }
 
   async function handleFolderDelete(folderId: string) {
@@ -657,7 +625,7 @@ export function NoteList(): React.JSX.Element {
       next.delete(folderId)
       return next
     })
-    await reloadAll()
+    await loadLibrary()
   }
 
   function renderMixedItem(entry: MixedItem) {
@@ -707,7 +675,7 @@ export function NoteList(): React.JSX.Element {
     if (!order) return
     const movedFolder = folderOf(dragged.id) === dropFolderId ? undefined : dropFolderId
     saveDrop(order, dragged, movedFolder)
-      .then(() => reloadAll())
+      .then(() => loadLibrary())
       .catch(console.error)
   }
 
@@ -773,7 +741,7 @@ export function NoteList(): React.JSX.Element {
             items: [{ id, type }],
             folderId,
           })
-          .then(() => reloadAll())
+          .then(() => loadLibrary())
           .catch(console.error)
       },
     }
@@ -871,7 +839,7 @@ export function NoteList(): React.JSX.Element {
               items: [{ id, type }],
               folderId: null,
             })
-            .then(() => reloadAll())
+            .then(() => loadLibrary())
             .catch(console.error)
         }}
       >
@@ -1136,7 +1104,7 @@ export function NoteList(): React.JSX.Element {
         <ItemEditModal
           state={editModal}
           onClose={() => setEditModal(null)}
-          onSaved={() => void reloadAll()}
+          onSaved={() => void loadLibrary()}
         />
       )}
 
