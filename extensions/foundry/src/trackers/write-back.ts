@@ -26,7 +26,7 @@ interface TrackerStateOption {
 
 /** The slice of `ExtensionAPI.issues` this needs. Nothing else is reachable. */
 /** One issue, on one tracker. */
-export interface IssueRef {
+interface IssueRef {
   readonly tracker: string
   readonly key: string
 }

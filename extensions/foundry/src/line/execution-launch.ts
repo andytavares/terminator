@@ -26,7 +26,7 @@ export interface Ran {
 }
 
 /** A command this repository's toolchain could not resolve, so it never ran. */
-export interface Skipped {
+interface Skipped {
   readonly node: RunNode
   readonly skipped: true
   readonly skipReason: string

@@ -12,8 +12,6 @@ import {
   AlertCircle,
   Loader,
   CheckCircle2,
-  GitPullRequest,
-  Ticket,
   Eye,
   ExternalLink as OpenOutside,
 } from 'lucide-react'
@@ -26,6 +24,8 @@ import { ordinal } from '../factory/format.js'
 import { Button, IconButton, Markdown, RelativeTime, usePolling } from '@terminator/extension-ui'
 import { usePushed } from '../renderer/use-pushed.js'
 import { ExternalLink, openInBrowser } from './ExternalLink.js'
+import { OrderLinks } from './OrderLinks.js'
+import { attachTo } from '../renderer/attach-to-step.js'
 import {
   useRunObservation,
   type FloorView,
@@ -394,21 +394,6 @@ function useReview(view: FloorView | null, setProblem: SetProblem) {
   return { reviewable, review }
 }
 
-/** Attaches to a step's agent and goes to its terminal; why not, when it could not. */
-async function attachTo(orderId: string, nodeId: string): Promise<string | null> {
-  const r = (await invoke('foundry:session.attach', { orderId, nodeId })) as
-    | { terminalSessionId: string }
-    | { error: string }
-  if ('error' in r) return r.error
-  // And then actually go there. This resolved the session and dropped it,
-  // so the button labelled "Attach" navigated nowhere at all — the one
-  // control on a read-only surface, and it did nothing.
-  const gone = (await invoke('foundry:run-terminal', {
-    sessionId: r.terminalSessionId,
-  })) as { ok?: boolean }
-  return gone.ok === true ? null : 'That agent is no longer in a terminal.'
-}
-
 /** The refusals by step, with this one's said or cleared. */
 function withRefusal(
   was: Record<string, string>,
@@ -615,17 +600,7 @@ function FloorLinks({ view, reviewable, review }: FloorLinksProps) {
   if (pulls.length === 0 && source === null) return null
   return (
     <p className="fdry-order-links">
-      {pulls.map((pull) => (
-        <ExternalLink key={pull.url} href={pull.url}>
-          <GitPullRequest aria-hidden="true" />#{pull.number}
-        </ExternalLink>
-      ))}
-      {source === null ? null : (
-        <ExternalLink href={source.url}>
-          <Ticket aria-hidden="true" />
-          {source.key}
-        </ExternalLink>
-      )}
+      <OrderLinks pulls={pulls} source={source} />
       {pulls.map((pull) => (
         <Button
           key={pull.url}

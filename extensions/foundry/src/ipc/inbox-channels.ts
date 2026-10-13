@@ -54,7 +54,7 @@ export interface InboxDeps {
 }
 
 /** One line of an order's ledger, as the operator's decision writes it. */
-export interface InboxLine {
+interface InboxLine {
   readonly action: string
   readonly subject: string
   readonly reason: string

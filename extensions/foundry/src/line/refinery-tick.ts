@@ -24,7 +24,7 @@ interface RefineryLane {
 }
 
 /** One line the refinery writes to an order's ledger. */
-export interface RefineryRecord {
+interface RefineryRecord {
   readonly orderId: string
   readonly action: string
   readonly subject: string

@@ -114,23 +114,35 @@ async function isRegistered(origin: string, target: string, deps: CheckoutDeps):
   return listed.exitCode === 0 && listed.stdout.includes(`worktree ${target}`)
 }
 
+/**
+ * Adds `target` as a worktree of `repo` at its base branch, the way `how`
+ * says, unless it already is one; whether it already was.
+ */
+async function addWorktree(
+  repo: CheckoutPlan['repo'],
+  { target, how }: { target: string; how: readonly string[] },
+  deps: CheckoutDeps
+): Promise<boolean> {
+  const existing = await isRegistered(repo.path, target, deps)
+  if (existing) return true
+  const added = await deps.exec({
+    command: 'git',
+    args: ['worktree', 'add', ...how, target, repo.baseBranch],
+    cwd: repo.path,
+    timeoutMs: 120_000,
+  })
+  if (added.exitCode !== 0) throw new CheckoutFailedError(repo.name, added.stderr)
+  return false
+}
+
 async function prepareCheckout(
   { repo, target, branch }: CheckoutPlan,
   deps: CheckoutDeps
 ): Promise<Checkout> {
-  const existing = await isRegistered(repo.path, target, deps)
-  if (!existing) {
-    // `-B` rather than `-b`: a branch left over from a previous attempt is reset
-    // onto the base rather than failing the run with "already exists". The base
-    // is named explicitly so this does not depend on what is checked out.
-    const added = await deps.exec({
-      command: 'git',
-      args: ['worktree', 'add', '-B', branch, target, repo.baseBranch],
-      cwd: repo.path,
-      timeoutMs: 120_000,
-    })
-    if (added.exitCode !== 0) throw new CheckoutFailedError(repo.name, added.stderr)
-  }
+  // `-B` rather than `-b`: a branch left over from a previous attempt is reset
+  // onto the base rather than failing the run with "already exists". The base
+  // is named explicitly so this does not depend on what is checked out.
+  const existing = await addWorktree(repo, { target, how: ['-B', branch] }, deps)
   const checkout = { repo: repo.name, origin: repo.path, path: target, branch, created: !existing }
   await provisionDependencies(checkout, deps)
   return checkout
@@ -305,16 +317,7 @@ export async function ensureBaseCheckout(
     throw new CheckoutFailedError(`lane ${lane}`, 'the order has no such lane')
 
   const target = `${checkoutPath(deps.root, order, repo.name)}@base`
-  const existing = await isRegistered(repo.path, target, deps)
-  if (!existing) {
-    const added = await deps.exec({
-      command: 'git',
-      args: ['worktree', 'add', '--detach', target, repo.baseBranch],
-      cwd: repo.path,
-      timeoutMs: 120_000,
-    })
-    if (added.exitCode !== 0) throw new CheckoutFailedError(repo.name, added.stderr)
-  }
+  const existing = await addWorktree(repo, { target, how: ['--detach'] }, deps)
 
   const checkout = {
     repo: repo.name,

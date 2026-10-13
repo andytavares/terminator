@@ -44,6 +44,7 @@ import type { NodeState, RunGraph } from '../../line/run-graph.js'
 import type { ToolActivity } from '../../runtime/transcript-tailer.js'
 import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
 import { openInBrowser } from '../ExternalLink.js'
+import { attachTo } from '../../renderer/attach-to-step.js'
 import { GateCard } from '../GateCard.js'
 import { OrderLinks } from '../OrderLinks.js'
 import { Markdown, usePolling, everyWhileVisible } from '@terminator/extension-ui'
@@ -636,18 +637,6 @@ function useForgetTranscript(
     setTranscriptFor(selectedSessionId)
     setTranscript([])
   }
-}
-
-/** Attaches to a step's agent and goes to its terminal; why not, when it could not. */
-async function attachTo(orderId: string, nodeId: string): Promise<string | null> {
-  const r = (await invoke('foundry:session.attach', { orderId, nodeId })) as
-    | { terminalSessionId: string }
-    | { error: string }
-  if ('error' in r) return r.error
-  const gone = (await invoke('foundry:run-terminal', {
-    sessionId: r.terminalSessionId,
-  })) as { ok?: boolean }
-  return gone.ok === true ? null : 'That agent is no longer in a terminal.'
 }
 
 function sessionOf(view: FloorView | null, selected: string | null): string | null {
