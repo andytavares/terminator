@@ -95,11 +95,11 @@ function gate(raisedAt: number, decidedAt: number | null): Gate {
 }
 
 describe('observationAt', () => {
-  describe('frames', framesTests)
+  describe('frames', replayFramesTests)
   describe('tools, gates and liveness', toolsGatesAndLivenessTests)
 })
 
-function framesTests() {
+function replayFramesTests() {
   it('shows the states of the latest frame at or before the moment', () => {
     const at3 = observationAt({ timeline, gates: [], base }, 3000)
     expect(at3.graph.nodes.map((n) => [n.id, n.state])).toEqual([

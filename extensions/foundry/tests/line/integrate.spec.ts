@@ -119,7 +119,7 @@ describe('the command line', () => {
   describe('the draft command', theDraftCommandTests)
   describe('the body and the worktree', theBodyAndTheWorktreeTests)
   describe('pushing', pushingTests)
-  describe('push failures', pushFailuresTests)
+  describe('push failures', integratePushFailuresTests)
   describe('carrying failures through', carryingFailuresThroughTests)
   describe('gh failing silently', ghFailingSilentlyTests)
   describe('both streams', bothStreamsTests)
@@ -210,7 +210,7 @@ function pushingTests() {
   })
 }
 
-function pushFailuresTests() {
+function integratePushFailuresTests() {
   it('refuses to open a pull request when the push failed', async () => {
     const exec = vi.fn(async () => ({
       exitCode: 1,
@@ -357,7 +357,7 @@ describe('marking ready', () => {
 describe('risk-ordered shipping (FR-055)', () => {
   describe('when to gate', whenToGateTests)
   describe('P0', p0Tests)
-  describe('holding', holdingTests)
+  describe('holding', integrateHoldingTests)
   describe('P2 and naming the grade', p2AndNamingTheGradeTests)
 })
 
@@ -401,7 +401,7 @@ function p0Tests() {
   })
 }
 
-function holdingTests() {
+function integrateHoldingTests() {
   it('pushes nothing when the operator holds a P0', async () => {
     const d = deps({ decide: vi.fn(async () => 'hold') })
     const result = await shipOrder(
@@ -466,7 +466,7 @@ describe('the setting that turns pushing off (FR-054)', () => {
 
 describe('the pull request body (FR-056)', () => {
   describe('summary and verdicts', summaryAndVerdictsTests)
-  describe('inspection', inspectionTests)
+  describe('inspection', integrateInspectionTests)
   describe('provenance', provenanceTests)
 })
 
@@ -498,7 +498,7 @@ function summaryAndVerdictsTests() {
   })
 }
 
-function inspectionTests() {
+function integrateInspectionTests() {
   it('carries inspection findings when there were any', () => {
     const body = prBody(order(), {
       verdicts: [verdict()],
@@ -566,7 +566,7 @@ describe('remembering what was opened', () => {
 
 describe('the branches a happy path never reaches', () => {
   describe('the worst verdict', theWorstVerdictTests)
-  describe('units', unitsTests)
+  describe('units', integrateUnitsTests)
   describe('criteria and intent', criteriaAndIntentTests)
   describe('triggers', triggersTests)
   describe('what gh printed', whatGhPrintedTests)
@@ -652,7 +652,7 @@ function theWorstVerdictTests() {
   })
 }
 
-function unitsTests() {
+function integrateUnitsTests() {
   it('lists the units that did the work', () => {
     const withUnits = order({
       plan: {
@@ -853,7 +853,7 @@ function oneShippingDecisionTests() {
 
 describe('the decision the operator is finally offered (FR-057)', () => {
   describe('the question', theQuestionTests)
-  describe('not measured', notMeasuredTests)
+  describe('not measured', integrateNotMeasuredTests)
   describe('the inspection', theInspectionTests)
   describe('markdown', markdownTests)
   describe('no verdicts and the body', noVerdictsAndTheBodyTests)
@@ -884,7 +884,7 @@ function theQuestionTests() {
   })
 }
 
-function notMeasuredTests() {
+function integrateNotMeasuredTests() {
   it('says what was never measured, so a bare repository cannot look checked', async () => {
     const result = await shipOrder(
       order(),
@@ -1413,7 +1413,7 @@ function noGhTests() {
 }
 
 describe('opening drafts apart from watching them (ADR 085)', () => {
-  describe('opening', openingTests)
+  describe('opening', integrateOpeningTests)
 
   describe('a pull request that is already open on the branch', () => {
     describe('adopting', adoptingTests)
@@ -1424,7 +1424,7 @@ describe('opening drafts apart from watching them (ADR 085)', () => {
   describe('committing', committingTests)
 })
 
-function openingTests() {
+function integrateOpeningTests() {
   it('opens and records the drafts without watching CI or raising the ready question', async () => {
     const watchCi = vi.fn(async () => ({ kind: 'none' }) as CiOutcome)
     const raise = vi.fn(async () => undefined)

@@ -246,11 +246,11 @@ function theBeaconTests() {
 }
 
 describe('the vending decor', () => {
-  describe('wall fixtures', wallFixturesTests)
+  describe('wall fixtures', hallLabelsWallFixturesTests)
   describe('baking', bakingTests)
 })
 
-function wallFixturesTests() {
+function hallLabelsWallFixturesTests() {
   it('stands clear of every wall fixture', () => {
     const fixtures: HallProp[] = [
       fixture('shelves', { id: 'a', x: 8, y: 2 }),

@@ -42,7 +42,7 @@ const risky: RiskAssessment = {
 describe('ladderFor', () => {
   describe('rungs and commands', rungsAndCommandsTests)
   describe('builds', buildsTests)
-  describe('inspection', inspectionTests)
+  describe('inspection', ladderInspectionTests)
   describe('decided elsewhere', decidedElsewhereTests)
   describe('an empty repository', anEmptyRepositoryTests)
 })
@@ -105,7 +105,7 @@ function buildsTests() {
   })
 }
 
-function inspectionTests() {
+function ladderInspectionTests() {
   it('does not trigger the inspection when nothing warrants one, and says so', () => {
     const inspection = ladderFor({ toolchain: full, risk: noRisk, touchesUi: false }).find(
       (s) => s.rung === 'L4'
@@ -264,7 +264,7 @@ function unknownChangesAndInspectionTests() {
 }
 
 describe('climb', () => {
-  describe('stopping', stoppingTests)
+  describe('stopping', ladderStoppingTests)
   describe('unmeasured rungs', unmeasuredRungsTests)
   describe('untriggered and empty results', untriggeredAndEmptyResultsTests)
 })
@@ -275,7 +275,7 @@ function sources() {
   return { dataRoot, repoPaths: [repo], builtInDir }
 }
 
-function stoppingTests() {
+function ladderStoppingTests() {
   it('climbs everything when nothing fails', async () => {
     const outcome = await climb(steps([{}, {}, {}]), async () => 0)
     expect(outcome.ok).toBe(true)
@@ -441,11 +441,11 @@ const step = (name: string, command: string): LadderStep => ({
 })
 
 describe('climb with two steps that resolve to the same command', () => {
-  describe('reusing', reusingTests)
+  describe('reusing', ladderReusingTests)
   describe('distinct commands and failures', distinctCommandsAndFailuresTests)
 })
 
-function reusingTests() {
+function ladderReusingTests() {
   it('runs the command once and says the later step reused it', async () => {
     const run = vi.fn(async () => 0)
     const outcome = await climb(

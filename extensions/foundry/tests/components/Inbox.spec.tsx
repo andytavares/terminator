@@ -143,9 +143,9 @@ beforeEach(() => {
 
 describe('a row the operator can act on', () => {
   describe('the rule and the evidence', theRuleAndTheEvidenceTests)
-  describe('links', linksTests)
+  describe('links', inboxLinksTests)
   describe('options', optionsTests)
-  describe('deciding', decidingTests)
+  describe('deciding', inboxDecidingTests)
 })
 
 const budgetGate = () =>
@@ -178,7 +178,7 @@ function theRuleAndTheEvidenceTests() {
   })
 }
 
-function linksTests() {
+function inboxLinksTests() {
   it('links the order\u2019s pull request and ticket from the gate', async () => {
     const pullUrl = 'https://github.com/andytavares/terminator/pull/233'
     const ticketUrl = 'https://linear.app/team/issue/TAV-15'
@@ -214,7 +214,7 @@ function optionsTests() {
   })
 }
 
-function decidingTests() {
+function inboxDecidingTests() {
   it('sends the decision, and asks again afterwards', async () => {
     mount({ gates: [gate()] })
     await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
@@ -236,11 +236,11 @@ function decidingTests() {
 }
 
 describe('raising a budget from the inbox', () => {
-  describe('the new limit', theNewLimitTests)
+  describe('the new limit', inboxTheNewLimitTests)
   describe('no recorded budget', noRecordedBudgetTests)
 })
 
-function theNewLimitTests() {
+function inboxTheNewLimitTests() {
   it('asks for the new limit, then sends it with the decision', async () => {
     mount({ gates: [budgetGate()] })
     await waitFor(() => screen.getByText(ruleInWords('budget.exceeded')))
@@ -428,15 +428,15 @@ const lowSignal = () =>
 // gates band, because gates are the surface's whole point and a heuristic's
 // hunch is not the same class of interruption as a gate that blocks work.
 describe("from the factory's sensors", () => {
-  describe('listing', listingTests)
+  describe('listing', inboxListingTests)
   describe('several signals and arrivals', severalSignalsAndArrivalsTests)
   describe('refreshing and empty', refreshingAndEmptyTests)
-  describe('promoting', promotingTests)
+  describe('promoting', inboxPromotingTests)
   describe('changing the repository', changingTheRepositoryTests)
   describe('dismissing and the badge', dismissingAndTheBadgeTests)
 })
 
-function listingTests() {
+function inboxListingTests() {
   it('lists open signals, each with its count, severity, sensor and evidence link', async () => {
     mount({
       signals: [highSignal()],
@@ -514,7 +514,7 @@ function refreshingAndEmptyTests() {
   })
 }
 
-function promotingTests() {
+function inboxPromotingTests() {
   it('promotes with the repository, defaulting to the sensor’s own', async () => {
     mount({
       signals: [highSignal()],

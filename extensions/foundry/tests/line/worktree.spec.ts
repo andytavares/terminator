@@ -68,7 +68,7 @@ describe('where a checkout goes', () => {
 
 describe('which branch a lane works on', () => {
   describe('tracker names', trackerNamesTests)
-  describe('fallbacks', fallbacksTests)
+  describe('fallbacks', worktreeFallbacksTests)
 })
 
 function trackerNamesTests() {
@@ -95,7 +95,7 @@ function trackerNamesTests() {
   })
 }
 
-function fallbacksTests() {
+function worktreeFallbacksTests() {
   it('falls back to the repository own head branch', () => {
     const seeded = order()
     const withHead: WorkOrder = {
@@ -114,11 +114,11 @@ function fallbacksTests() {
 }
 
 describe('preparing a checkout', () => {
-  describe('adding', addingTests)
-  describe('reusing', reusingTests)
-  describe('failures', failuresTests)
+  describe('adding', worktreeAddingTests)
+  describe('reusing', worktreeReusingTests)
+  describe('failures', worktreeFailuresTests)
   describe('concurrent callers', concurrentCallersTests)
-  describe('retrying', retryingTests)
+  describe('retrying', worktreeRetryingTests)
 })
 
 function twoLanes(): WorkOrder {
@@ -142,7 +142,7 @@ function twoLanes(): WorkOrder {
   }
 }
 
-function addingTests() {
+function worktreeAddingTests() {
   it('adds a worktree on a branch cut from the base', async () => {
     const d = deps()
     const checkout = await ensureCheckout(order(), 1, d)
@@ -168,7 +168,7 @@ function addingTests() {
   })
 }
 
-function reusingTests() {
+function worktreeReusingTests() {
   it('reuses the worktree git already has, rather than adding a second', async () => {
     const target = path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app')
     const exec = vi.fn(async (options: { args: string[] }) =>
@@ -190,7 +190,7 @@ function reusingTests() {
   })
 }
 
-function failuresTests() {
+function worktreeFailuresTests() {
   it('says which repository failed, and why', async () => {
     const exec = vi.fn(async (options: { args: string[] }) =>
       options.args[1] === 'add'
@@ -249,7 +249,7 @@ function concurrentCallersTests() {
   })
 }
 
-function retryingTests() {
+function worktreeRetryingTests() {
   it('tries again after a failed attempt rather than repeating its error', async () => {
     let failNext = true
     const exec = vi.fn(async (options: { args: string[] }) => {
@@ -267,10 +267,10 @@ function retryingTests() {
 }
 
 describe('preparing every lane', () => {
-  describe('every lane', everyLaneTests)
+  describe('every lane', worktreeEveryLaneTests)
 })
 
-function everyLaneTests() {
+function worktreeEveryLaneTests() {
   it('prepares all of them, in lane order', async () => {
     const d = deps()
     const checkouts = await ensureCheckouts(twoLanes(), d)

@@ -242,13 +242,13 @@ prompt: You are checking work you did not do.
 `
 
 describe('parseRole', () => {
-  describe('parsing', parsingTests)
+  describe('parsing', parseParsingTests)
   describe('required fields', requiredFieldsTests)
   describe('versions and tiers', versionsAndTiersTests)
   describe('role skills', roleSkillsTests)
 })
 
-function parsingTests() {
+function parseParsingTests() {
   it('parses a well-formed role', () => {
     const r = parseRole(ROLE, 'verifier.yaml')
     expect(r.ok).toBe(true)
@@ -349,7 +349,7 @@ origin: built-in
 describe('parseRule', () => {
   describe('rungs and scopes', rungsAndScopesTests)
   describe('origins and ids', originsAndIdsTests)
-  describe('malformed and newer', malformedAndNewerTests)
+  describe('malformed and newer', parseMalformedAndNewerTests)
   describe('assertions and defaults', assertionsAndDefaultsTests)
 })
 
@@ -417,7 +417,7 @@ function originsAndIdsTests() {
   })
 }
 
-function malformedAndNewerTests() {
+function parseMalformedAndNewerTests() {
   it('reports malformed YAML by path', () => {
     const r = parseRule('scope: [unclosed\n', 'exit-code-not-count.yaml')
     expect(r.ok).toBe(false)

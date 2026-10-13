@@ -132,9 +132,9 @@ describe('a node with no role', () => {
 
 describe('what each role may read is declared, not assumed', () => {
   describe('the builder brief', theBuilderBriefTests)
-  describe('open findings', openFindingsTests)
-  describe('blocking findings', blockingFindingsTests)
-  describe('lanes', lanesTests)
+  describe('open findings', briefOpenFindingsTests)
+  describe('blocking findings', briefBlockingFindingsTests)
+  describe('lanes', briefLanesTests)
   describe('verifiers and silent roles', verifiersAndSilentRolesTests)
 })
 
@@ -148,7 +148,7 @@ function theBuilderBriefTests() {
   })
 }
 
-function openFindingsTests() {
+function briefOpenFindingsTests() {
   it('tells a builder about an open non-blocking finding, and to leave it if it is not theirs', () => {
     const text = brief({
       order: order({
@@ -175,7 +175,7 @@ function openFindingsTests() {
   })
 }
 
-function blockingFindingsTests() {
+function briefBlockingFindingsTests() {
   it('says nothing about a blocking finding — that never reaches a builder', () => {
     const text = brief({
       order: order({
@@ -199,7 +199,7 @@ function blockingFindingsTests() {
   })
 }
 
-function lanesTests() {
+function briefLanesTests() {
   // A fan-out `by lane` gives one agent a whole lane. The plan's detail is
   // the point of keeping units at all, so the brief lists every one of them,
   // in the order the graph resolved — not a summary and not just the first.
@@ -359,7 +359,7 @@ describe('the repository, for a role that reads it', () => {
   describe('no commands and the project notes', noCommandsAndTheProjectNotesTests)
   describe('earlier decisions', earlierDecisionsTests)
   describe('assumptions', assumptionsTests)
-  describe('struck assumptions', struckAssumptionsTests)
+  describe('struck assumptions', briefStruckAssumptionsTests)
 })
 
 function theCommandsTests() {
@@ -445,7 +445,7 @@ function assumptionsTests() {
   })
 }
 
-function struckAssumptionsTests() {
+function briefStruckAssumptionsTests() {
   it('leaves out an assumption the operator struck', () => {
     const base = order()
     const text = brief({

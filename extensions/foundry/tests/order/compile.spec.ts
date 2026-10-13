@@ -87,7 +87,7 @@ describe('compileOrder', () => {
   })
 
   describe('3 — coverage, both directions', () => {
-    describe('criteria and units', criteriaAndUnitsTests)
+    describe('criteria and units', compileCriteriaAndUnitsTests)
     describe('quoting', quotingTests)
     describe('no criteria and both directions', noCriteriaAndBothDirectionsTests)
   })
@@ -96,8 +96,8 @@ describe('compileOrder', () => {
   describe('5 — the adversarial pass is resolved', () => {
     describe('open blocking findings', openBlockingFindingsTests)
     describe('resolved findings', resolvedFindingsTests)
-    describe('accepted findings', acceptedFindingsTests)
-    describe('notes', notesTests)
+    describe('accepted findings', compileAcceptedFindingsTests)
+    describe('notes', compileNotesTests)
     describe('the failure detail', theFailureDetailTests)
   })
   describe('counts and every failure', countsAndEveryFailureTests)
@@ -262,7 +262,7 @@ function picturesAndNamesTests() {
   })
 }
 
-function criteriaAndUnitsTests() {
+function compileCriteriaAndUnitsTests() {
   it('fails when a criterion has no unit', () => {
     const order = complete()
     order.plan.units[0].satisfies = []
@@ -353,7 +353,7 @@ function resolvedFindingsTests() {
   })
 }
 
-function acceptedFindingsTests() {
+function compileAcceptedFindingsTests() {
   it('passes a finding explicitly accepted with a reason', () => {
     const order = complete({
       redTeam: [
@@ -372,7 +372,7 @@ function acceptedFindingsTests() {
   })
 }
 
-function notesTests() {
+function compileNotesTests() {
   it('does not fail on an open finding that is only a note, not a blocking category', () => {
     const order = complete({
       redTeam: [

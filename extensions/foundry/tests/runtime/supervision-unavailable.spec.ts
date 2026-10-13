@@ -74,7 +74,7 @@ function readyDraft() {
 
 describe('a supervision runtime that could not start', () => {
   describe('saying so', sayingSoTests)
-  describe('refusals', refusalsTests)
+  describe('refusals', supervisionUnavailableRefusalsTests)
 })
 
 function sayingSoTests() {
@@ -96,7 +96,7 @@ function sayingSoTests() {
   })
 }
 
-function refusalsTests() {
+function supervisionUnavailableRefusalsTests() {
   it('refuses an architect turn and says why', async () => {
     await createOrderStore(dataDir).save(readyDraft())
     const started = (await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })) as {

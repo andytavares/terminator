@@ -45,7 +45,7 @@ function question(over: Record<string, unknown> = {}) {
 }
 
 describe('decideConfidentQuestions', () => {
-  describe('deciding', decidingTests)
+  describe('deciding', autonomyDecidingTests)
   describe('leaving it to the operator', leavingItToTheOperatorTests)
 })
 
@@ -79,7 +79,7 @@ const findings = [
   },
 ]
 
-function decidingTests() {
+function autonomyDecidingTests() {
   it('takes the recommended option when the architect is at least 90% sure', () => {
     const next = decideConfidentQuestions(
       order({ openQuestions: [question({ confidence: 0.92 })] })

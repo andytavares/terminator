@@ -58,7 +58,7 @@ afterEach(() => {
 describe('what the architect is told', () => {
   describe('lane branches', laneBranchesTests)
   describe('deciding and dismissing', decidingAndDismissingTests)
-  describe('open findings', openFindingsTests)
+  describe('open findings', convergeOpenFindingsTests)
   describe('the prompt and the file', thePromptAndTheFileTests)
   describe('triggers and evidence', triggersAndEvidenceTests)
   describe('lane roles and closed sets', laneRolesAndClosedSetsTests)
@@ -124,7 +124,7 @@ function decidingAndDismissingTests() {
   })
 }
 
-function openFindingsTests() {
+function convergeOpenFindingsTests() {
   it('names each open finding, so the architect can close it rather than the operator', () => {
     const plan = convergeBrief({
       order: order({
@@ -327,7 +327,7 @@ describe('reading back what it wrote', () => {
   describe('nothing, bad or stale files', nothingBadOrStaleFilesTests)
   describe('cleared findings', clearedFindingsTests)
   describe('reviewer findings', reviewerFindingsTests)
-  describe('accepted findings', acceptedFindingsTests)
+  describe('accepted findings', convergeAcceptedFindingsTests)
   describe('refusals and drafts', refusalsAndDraftsTests)
 })
 
@@ -454,7 +454,7 @@ function reviewerFindingsTests() {
   })
 }
 
-function acceptedFindingsTests() {
+function convergeAcceptedFindingsTests() {
   it('does not reopen or rewrite a finding the operator already accepted', () => {
     const file = write({ resolveFindings: [{ id: 'RT-red-team-1', how: 'changed it' }] })
     const accepted = {

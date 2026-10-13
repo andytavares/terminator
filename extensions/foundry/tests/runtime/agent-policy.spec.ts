@@ -84,10 +84,10 @@ describe('trusting the repository an agent starts in', () => {
 
   afterEach(() => vi.unstubAllEnvs())
 
-  describe('trusting', trustingTests)
+  describe('trusting', agentPolicyTrustingTests)
 })
 
-function trustingTests() {
+function agentPolicyTrustingTests() {
   const store = { record: async (entry: LedgerEntry) => void entries.push(entry) }
 
   it('marks it trusted in the Claude Code configuration and says so on the order', async () => {

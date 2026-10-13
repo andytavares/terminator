@@ -147,7 +147,7 @@ describe('readiness — holder and strip', () => {
   describe('held and exhausted', heldAndExhaustedTests)
   describe('one blocking finding', oneBlockingFindingTests)
   describe('three blocking findings', threeBlockingFindingsTests)
-  describe('open questions', openQuestionsTests)
+  describe('open questions', readinessOpenQuestionsTests)
   describe('no criteria', noCriteriaTests)
   describe('compile failures and ok', compileFailuresAndOkTests)
 })
@@ -458,7 +458,7 @@ function threeBlockingFindingsTests() {
   })
 }
 
-function openQuestionsTests() {
+function readinessOpenQuestionsTests() {
   it('6. unanswered open questions', () => {
     const order = wo0928Order({
       openQuestions: [
@@ -883,7 +883,7 @@ function notDraftTests() {
 describe('readiness — findings', () => {
   describe('fixing', fixingTests)
   describe('needs you', needsYouTests)
-  describe('notes', notesTests)
+  describe('notes', readinessNotesTests)
   describe('resolved and text', resolvedAndTextTests)
 })
 
@@ -928,7 +928,7 @@ function needsYouTests() {
   })
 }
 
-function notesTests() {
+function readinessNotesTests() {
   it('groups non-blocking open findings as notes, by category', () => {
     const order = wo0928Order({
       redTeam: [

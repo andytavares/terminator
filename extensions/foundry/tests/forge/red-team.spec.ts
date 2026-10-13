@@ -67,7 +67,7 @@ function ids(o: WorkOrder): string[] {
 
 describe('structuralFindings', () => {
   describe('outcomes and scope', outcomesAndScopeTests)
-  describe('criteria and units', criteriaAndUnitsTests)
+  describe('criteria and units', redTeamCriteriaAndUnitsTests)
   describe('dependency chains', dependencyChainsTests)
   describe('judgements', judgementsTests)
   describe('untouched files and unavailable checks', untouchedFilesAndUnavailableChecksTests)
@@ -92,7 +92,7 @@ function outcomesAndScopeTests() {
   })
 }
 
-function criteriaAndUnitsTests() {
+function redTeamCriteriaAndUnitsTests() {
   it('attacks a criterion whose statement is not falsifiable', () => {
     const o = order()
     o.acceptance[0].statement = 'the terminal works better'
@@ -200,11 +200,11 @@ function categoriesTests() {
 }
 
 describe('applyFindings', () => {
-  describe('adding', addingTests)
+  describe('adding', redTeamAddingTests)
   describe('repeats and non-blocking', repeatsAndNonBlockingTests)
 })
 
-function addingTests() {
+function redTeamAddingTests() {
   it('adds every finding as open, so none can be forgotten', () => {
     const o = applyFindings(
       order({ intent: { problem: 'p', outcome: 'p', nonGoals: [] } }),

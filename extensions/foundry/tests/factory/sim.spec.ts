@@ -226,7 +226,7 @@ describe('createWorld', () => {
   describe('running and failed nodes', runningAndFailedNodesTests)
   describe('resting nodes', restingNodesTests)
   describe('absent crew', absentCrewTests)
-  describe('waiting gates', waitingGatesTests)
+  describe('waiting gates', simWaitingGatesTests)
   describe('stationless and determinism', stationlessAndDeterminismTests)
   describe('distinct rest seats', distinctRestSeatsTests)
 })
@@ -300,7 +300,7 @@ function absentCrewTests() {
   })
 }
 
-function waitingGatesTests() {
+function simWaitingGatesTests() {
   it('gatesWaiting is empty unless a gate is waiting', () => {
     const g = graph()
     const map = layoutHall(g)
@@ -462,7 +462,7 @@ describe('tick', () => {
   describe('arriving', arrivingTests)
   describe('rest seat facing', restSeatFacingTests)
   describe('releasing seats', releasingSeatsTests)
-  describe('crates', cratesTests)
+  describe('crates', simCratesTests)
   describe('queued work and unknown belts', queuedWorkAndUnknownBeltsTests)
   describe('the clock and replays', theClockAndReplaysTests)
   describe('empty paths', emptyPathsTests)
@@ -563,7 +563,7 @@ function releasingSeatsTests() {
   })
 }
 
-function cratesTests() {
+function simCratesTests() {
   it('a crate bound for a started step advances and is consumed on arrival', () => {
     const g = graph()
     const map = layoutHall(g)
@@ -1022,7 +1022,7 @@ function absentCrewAndDeterminismTests() {
 }
 
 describe('tick: a box carried back to an earlier station', () => {
-  describe('carrying the box', carryingTheBoxTests)
+  describe('carrying the box', simCarryingTheBoxTests)
   describe('cancelled errands', cancelledErrandsTests)
 })
 
@@ -1039,7 +1039,7 @@ function walkTheErrand(start: World): { world: World; carried: boolean } {
   return { world, carried }
 }
 
-function carryingTheBoxTests() {
+function simCarryingTheBoxTests() {
   it.each([
     ['build:lane-1', 0],
     ['lint', 1],

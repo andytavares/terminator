@@ -23,12 +23,12 @@ function entry(over: Partial<LedgerEntry> & Pick<LedgerEntry, 'action'>): Ledger
 }
 
 describe('runFailure', () => {
-  describe('refusals', refusalsTests)
+  describe('refusals', runOutcomeRefusalsTests)
   describe('shipping failures', shippingFailuresTests)
   describe('resumed and clean runs', resumedAndCleanRunsTests)
 })
 
-function refusalsTests() {
+function runOutcomeRefusalsTests() {
   // An agreed order whose run refused to start never reached `running`, so
   // the refusal is the only record of why nothing is building.
   it('is the reason when the run refused to start', () => {
@@ -102,7 +102,7 @@ function resumedAndCleanRunsTests() {
 
 describe('runDocumentReady', () => {
   describe('the latest attempt', theLatestAttemptTests)
-  describe('failures', failuresTests)
+  describe('failures', runOutcomeFailuresTests)
 })
 
 function theLatestAttemptTests() {
@@ -133,7 +133,7 @@ function theLatestAttemptTests() {
   })
 }
 
-function failuresTests() {
+function runOutcomeFailuresTests() {
   it('is not a failure, and a failure after it is', () => {
     const ready = [
       entry({ action: 'run.started' }),

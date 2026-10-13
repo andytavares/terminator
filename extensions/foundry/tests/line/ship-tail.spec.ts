@@ -46,7 +46,7 @@ describe('ciRounds', () => {
   describe('writing the checks', writingTheChecksTests)
   describe('no ci', noCiTests)
   describe('green', greenTests)
-  describe('not measured', notMeasuredTests)
+  describe('not measured', shipTailNotMeasuredTests)
   describe('red then green', redThenGreenTests)
   describe('exhausted rounds', exhaustedRoundsTests)
   describe('halting', haltingTests)
@@ -151,7 +151,7 @@ function greenTests() {
   })
 }
 
-function notMeasuredTests() {
+function shipTailNotMeasuredTests() {
   it('is not_measured the first time and never turns green', async () => {
     const h = harness([{ kind: 'not_measured', checks: [], reason: 'no checks were reported' }])
     const outcome = await ciRounds({

@@ -97,9 +97,9 @@ describe('FactorySite', () => {
   describe('no Completed section', noCompletedSectionTests)
   describe('waiting shipped orders', waitingShippedOrdersTests)
   describe('beacons', beaconsTests)
-  describe('CI', ciTests)
+  describe('CI', factorySiteCiTests)
   describe('the refinery track', theRefineryTrackTests)
-  describe('opening', openingTests)
+  describe('opening', factorySiteOpeningTests)
 })
 
 function theCardsTests() {
@@ -233,7 +233,7 @@ function beaconsTests() {
   })
 }
 
-function ciTests() {
+function factorySiteCiTests() {
   it('shows the CI round and status in plain words, never a raw code', async () => {
     mount([
       { id: 'WO-1', title: 'Shipping', status: 'running', ci: { status: 'red', round: 2, max: 3 } },
@@ -275,7 +275,7 @@ function theRefineryTrackTests() {
   })
 }
 
-function openingTests() {
+function factorySiteOpeningTests() {
   it('opens the order it is given', async () => {
     const { onOpen } = mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
     await waitFor(() => screen.getByText('Only one'))
@@ -311,11 +311,11 @@ describe('FactorySite status wall', () => {
 })
 
 describe('the Dock', () => {
-  describe('crates', cratesTests)
-  describe('promoting', promotingTests)
+  describe('crates', factorySiteCratesTests)
+  describe('promoting', factorySitePromotingTests)
 })
 
-function cratesTests() {
+function factorySiteCratesTests() {
   it('shows nothing when there are no open signals', async () => {
     mount([])
     await waitFor(() => screen.getByText(/no orders yet/i))
@@ -330,7 +330,7 @@ function cratesTests() {
   })
 }
 
-function promotingTests() {
+function factorySitePromotingTests() {
   it('promotes a crate the same way the Inbox does', async () => {
     const { invoke } = mount([], METRICS, {
       signals: [dockSignal()],

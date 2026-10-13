@@ -150,7 +150,7 @@ describe('an agent node', () => {
   describe('failing and never starting', failingAndNeverStartingTests)
   describe('asking about a tool', askingAboutAToolTests)
   describe('refused tools', refusedToolsTests)
-  describe('resuming', resumingTests)
+  describe('resuming', executorDepsResumingTests)
 })
 
 const step: LadderStep = {
@@ -261,7 +261,7 @@ function refusedToolsTests() {
   })
 }
 
-function resumingTests() {
+function executorDepsResumingTests() {
   it('carries on the conversation a resumed run recorded on its graph', async () => {
     const resumed = withNode(graph, builderNode().id, { sessionId: 'earlier-builder' })
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph: resumed })
@@ -430,13 +430,13 @@ function whatItWroteTests() {
 }
 
 describe('the run’s records', () => {
-  describe('gates', gatesTests)
-  describe('verdicts', verdictsTests)
-  describe('the graph', theGraphTests)
+  describe('gates', executorDepsGatesTests)
+  describe('verdicts', executorDepsVerdictsTests)
+  describe('the graph', executorDepsTheGraphTests)
   describe('measuring the change', measuringTheChangeTests)
 })
 
-function gatesTests() {
+function executorDepsGatesTests() {
   it('raises a gate on the inbox and names it on the ledger', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     await deps.raise(
@@ -455,7 +455,7 @@ function gatesTests() {
   })
 }
 
-function verdictsTests() {
+function executorDepsVerdictsTests() {
   it('records a verdict and nothing for any other event', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     deps.onEvent({
@@ -480,7 +480,7 @@ function verdictsTests() {
   })
 }
 
-function theGraphTests() {
+function executorDepsTheGraphTests() {
   it('writes the graph on every change, and the files a checkout changed once a step settles', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const checkout = checkoutPath(root, order, 'app')

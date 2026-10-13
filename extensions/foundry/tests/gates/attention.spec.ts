@@ -53,7 +53,7 @@ describe('countAttention', () => {
   describe('silenced gates and questions', silencedGatesAndQuestionsTests)
   describe('answered and stale questions', answeredAndStaleQuestionsTests)
   describe('held calls and signals', heldCallsAndSignalsTests)
-  describe('nothing waiting', nothingWaitingTests)
+  describe('nothing waiting', attentionNothingWaitingTests)
   describe('orders waiting on you', ordersWaitingOnYouTests)
   describe('double counting', doubleCountingTests)
   describe("Foundry's move", foundrysMoveTests)
@@ -180,7 +180,7 @@ function heldCallsAndSignalsTests() {
   })
 }
 
-function nothingWaitingTests() {
+function attentionNothingWaitingTests() {
   it('is zero across the board when nothing is waiting', () => {
     expect(
       countAttention({

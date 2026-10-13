@@ -31,8 +31,8 @@ beforeEach(() => {
 })
 
 describe('a gate collapsed to one line', () => {
-  describe('what it shows', whatItShowsTests)
-  describe('links', linksTests)
+  describe('what it shows', gateCardWhatItShowsTests)
+  describe('links', gateCardLinksTests)
   describe('answering', answeringTests)
 })
 
@@ -40,7 +40,7 @@ function open() {
   fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
 }
 
-function whatItShowsTests() {
+function gateCardWhatItShowsTests() {
   it('shows the question, the grade, the default and the answers, and nothing else', () => {
     render(<GateCard gate={gate()} onDecide={vi.fn()} />)
     expect(screen.getByText('U-4 rewrites session token refresh')).toBeTruthy()
@@ -57,7 +57,7 @@ function whatItShowsTests() {
   })
 }
 
-function linksTests() {
+function gateCardLinksTests() {
   it('links the pull request and the ticket, opened outside the application', () => {
     render(
       <GateCard
@@ -93,7 +93,7 @@ function answeringTests() {
 }
 
 describe('a gate opened', () => {
-  describe('the reason', theReasonTests)
+  describe('the reason', gateCardTheReasonTests)
   describe('evidence and answers', evidenceAndAnswersTests)
   describe('closing', closingTests)
 })
@@ -106,7 +106,7 @@ const budget = () =>
     breach: { kind: 'wall_clock', limit: 45, actual: 45.6 },
   })
 
-function theReasonTests() {
+function gateCardTheReasonTests() {
   it('shows why as markdown, so a list is a list', () => {
     const { container } = render(<GateCard gate={gate()} onDecide={vi.fn()} />)
     open()
@@ -165,10 +165,10 @@ function closingTests() {
 }
 
 describe('raising a budget from the card', () => {
-  describe('the new limit', theNewLimitTests)
+  describe('the new limit', gateCardTheNewLimitTests)
 })
 
-function theNewLimitTests() {
+function gateCardTheNewLimitTests() {
   it('asks for the new limit instead of deciding, then sends it', () => {
     const onDecide = vi.fn()
     render(<GateCard gate={budget()} onDecide={onDecide} />)

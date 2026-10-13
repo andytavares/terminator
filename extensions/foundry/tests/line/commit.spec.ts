@@ -23,7 +23,7 @@ function exec(responses: Record<string, { exitCode: number; stdout?: string; std
 
 describe('commitWorktree', () => {
   describe('commits', commitsTests)
-  describe('refusals', refusalsTests)
+  describe('refusals', commitRefusalsTests)
 })
 
 function commitsTests() {
@@ -44,7 +44,7 @@ function commitsTests() {
   })
 }
 
-function refusalsTests() {
+function commitRefusalsTests() {
   it('reports a refusal when git could not stage or commit, so nothing is pushed as if it had', async () => {
     const staged = exec({ status: { exitCode: 0, stdout: 'M a' }, add: { exitCode: 1 } })
     expect((await commitWorktree('/work', 'm', staged.run)).kind).toBe('refused')

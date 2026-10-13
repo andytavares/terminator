@@ -64,7 +64,7 @@ afterEach(() => {
 
 describe('orders through the index', () => {
   describe('listing and reading', listingAndReadingTests)
-  describe('loading', loadingTests)
+  describe('loading', indexedStoresLoadingTests)
 })
 
 function listingAndReadingTests() {
@@ -87,7 +87,7 @@ function listingAndReadingTests() {
   })
 }
 
-function loadingTests() {
+function indexedStoresLoadingTests() {
   it('does not read an order file again once it has been loaded', async () => {
     const store = createOrderStore(root, indexOver(root))
     await store.save(order('WO-1'))

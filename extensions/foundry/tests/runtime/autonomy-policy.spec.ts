@@ -73,7 +73,7 @@ const DESTRUCTIVE = [
 
 describe('a destructive action (FR-050)', () => {
   describe('destructive commands', destructiveCommandsTests)
-  describe('parsing', parsingTests)
+  describe('parsing', autonomyPolicyParsingTests)
   describe('a command joined to another command', aCommandJoinedToAnotherCommandTests)
 })
 
@@ -89,7 +89,7 @@ function destructiveCommandsTests() {
   })
 }
 
-function parsingTests() {
+function autonomyPolicyParsingTests() {
   it('asks about anything it cannot parse, rather than assuming it is safe', () => {
     // The hole the read-only policy documents: reading `git status` off the
     // front of `git status; rm -rf .` is reading the wrong command.

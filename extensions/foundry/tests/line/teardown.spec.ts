@@ -100,8 +100,8 @@ afterEach(() => {
 describe('tearDownRun', () => {
   describe('the worktree', theWorktreeTests)
   describe('the sidebar project', theSidebarProjectTests)
-  describe('the branch', theBranchTests)
-  describe('every lane', everyLaneTests)
+  describe('the branch', teardownTheBranchTests)
+  describe('every lane', teardownEveryLaneTests)
   describe('records', recordsTests)
   describe('git failures', gitFailuresTests)
   describe('unremovable records and twice', unremovableRecordsAndTwiceTests)
@@ -146,7 +146,7 @@ function theSidebarProjectTests() {
   })
 }
 
-function theBranchTests() {
+function teardownTheBranchTests() {
   it('deletes the branch the lane was working on', async () => {
     const { calls, exec } = recorder()
     await tearDownRun(order(), { exec, root })
@@ -177,7 +177,7 @@ function withSecondLane(second: string): WorkOrder {
   }
 }
 
-function everyLaneTests() {
+function teardownEveryLaneTests() {
   it('takes every lane, not just the first', async () => {
     const second = makeTempDir('fdry-teardown-repo2-')
     const two = withSecondLane(second)

@@ -155,7 +155,7 @@ describe('opening before the final check', () => {
 
 describe('after the final check', () => {
   describe('the ready question', theReadyQuestionTests)
-  describe('CI', ciTests)
+  describe('CI', earlyShipCiTests)
   describe('after the check wrote', afterTheCheckWroteTests)
   describe('failures and re-entry', failuresAndReEntryTests)
 })
@@ -180,7 +180,7 @@ function theReadyQuestionTests() {
   })
 }
 
-function ciTests() {
+function earlyShipCiTests() {
   it('waits for CI before asking, even when the check finished first', async () => {
     let release: (value: CiOutcome) => void = () => undefined
     const slow = new Promise<CiOutcome>((resolve) => (release = resolve))

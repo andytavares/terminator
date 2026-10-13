@@ -12,10 +12,10 @@ const allowedTool = (tool: string, input?: unknown) => decideReadOnly(tool, inpu
 describe('what a review may do', () => {
   describe('reading and writing', readingAndWritingTests)
   describe('git commands', gitCommandsTests)
-  describe('inspection', inspectionTests)
+  describe('inspection', readOnlyPolicyInspectionTests)
   describe('chains and redirection', chainsAndRedirectionTests)
   describe('substitution and empty calls', substitutionAndEmptyCallsTests)
-  describe('the reason', theReasonTests)
+  describe('the reason', readOnlyPolicyTheReasonTests)
 })
 
 function readingAndWritingTests() {
@@ -52,7 +52,7 @@ function gitCommandsTests() {
   })
 }
 
-function inspectionTests() {
+function readOnlyPolicyInspectionTests() {
   it('allows plain inspection commands', () => {
     expect(allowedTool('Bash', { command: 'cat package.json' })).toBe(true)
     expect(allowedTool('Bash', { command: 'rg TODO src' })).toBe(true)
@@ -97,7 +97,7 @@ function substitutionAndEmptyCallsTests() {
   })
 }
 
-function theReasonTests() {
+function readOnlyPolicyTheReasonTests() {
   it('says why, in words the agent reads and a person can act on', () => {
     expect(decideReadOnly('Write', {}).reason).toMatch(/may only read/)
     expect(decideReadOnly('Bash', { command: 'git diff > x' }).reason).toMatch(/redirect/)

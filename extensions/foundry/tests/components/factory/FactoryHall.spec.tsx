@@ -219,10 +219,10 @@ describe('FactoryHall', () => {
   describe('the order bar', theOrderBarTests)
   describe('callouts raised together', calloutsRaisedTogetherTests)
   describe('callouts on state change', calloutsOnStateChangeTests)
-  describe('held tool calls', heldToolCallsTests)
+  describe('held tool calls', factoryHallHeldToolCallsTests)
   describe('markdown questions', markdownQuestionsTests)
-  describe('waiting gates', waitingGatesTests)
-  describe('parked agents', parkedAgentsTests)
+  describe('waiting gates', factoryHallWaitingGatesTests)
+  describe('parked agents', factoryHallParkedAgentsTests)
   describe('replaying', replayingTests)
   describe('replaying CI', replayingCiTests)
   describe('playback', playbackTests)
@@ -428,7 +428,7 @@ function calloutsOnStateChangeTests() {
   })
 }
 
-function heldToolCallsTests() {
+function factoryHallHeldToolCallsTests() {
   it('pins a held tool call over its station and answers it there', async () => {
     mount({
       pending: [
@@ -483,7 +483,7 @@ function markdownQuestionsTests() {
   })
 }
 
-function waitingGatesTests() {
+function factoryHallWaitingGatesTests() {
   it('pins a waiting gate over the gate and decides it with the gate’s own options', async () => {
     mount({ view: waitingAtTheGate() })
     const card = await screen.findByRole('group', { name: 'Merge the pull request?' })
@@ -497,7 +497,7 @@ function waitingGatesTests() {
   })
 }
 
-function parkedAgentsTests() {
+function factoryHallParkedAgentsTests() {
   it('pins an agent parked at its terminal and takes you there', async () => {
     mount({ view: view({ stranded: ['s-1'] }) })
     const card = await screen.findByRole('group', { name: 'Waiting at its terminal' })
@@ -634,7 +634,7 @@ function theSiteAndFailuresTests() {
 
 describe('an open station monitor is live', () => {
   describe('reading the transcript', readingTheTranscriptTests)
-  describe('no session', noSessionTests)
+  describe('no session', factoryHallNoSessionTests)
 })
 
 const pull = (buckets: ('pass' | 'pending')[]) => ({
@@ -708,7 +708,7 @@ function readingTheTranscriptTests() {
   })
 }
 
-function noSessionTests() {
+function factoryHallNoSessionTests() {
   it('does not read a transcript for a station with no session', async () => {
     mount({
       view: view({
@@ -723,7 +723,7 @@ function noSessionTests() {
 }
 
 describe('FactoryHall labels what it draws', () => {
-  describe('the scoreboard', theScoreboardTests)
+  describe('the scoreboard', factoryHallTheScoreboardTests)
   describe('tower callouts', towerCalloutsTests)
   describe('finished monitors', finishedMonitorsTests)
 })
@@ -740,7 +740,7 @@ function readyGate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
   })
 }
 
-function theScoreboardTests() {
+function factoryHallTheScoreboardTests() {
   it("names the scoreboard with this order's real figures", async () => {
     mount({
       metrics: [{ orderId: 'WO-1', leadTimeMs: 25 * 60_000, reworks: 0, ciRounds: 0 }],
@@ -817,13 +817,13 @@ function finishedMonitorsTests() {
 // A gate is one line with its answers on it, the reason a click away and written
 // in markdown — the same card the list views draw, not a second rendering of it.
 describe('FactoryHall gates and links', () => {
-  describe('links', linksTests)
+  describe('links', factoryHallLinksTests)
   describe('gate cards', gateCardsTests)
   describe('a ready-for-review gate', aReadyForReviewGateTests)
   describe('a new limit', aNewLimitTests)
 })
 
-function linksTests() {
+function factoryHallLinksTests() {
   const pullUrl = 'https://github.com/andytavares/terminator/pull/233'
 
   const ticketUrl = 'https://linear.app/team/issue/TAV-15'

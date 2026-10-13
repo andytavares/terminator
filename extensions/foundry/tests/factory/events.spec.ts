@@ -119,11 +119,11 @@ describe('toolProp', () => {
 describe('diffObservation', () => {
   describe('first loads and no change', firstLoadsAndNoChangeTests)
   describe('node states', nodeStatesTests)
-  describe('orphans and strands', orphansAndStrandsTests)
-  describe('tools', toolsTests)
+  describe('orphans and strands', eventsOrphansAndStrandsTests)
+  describe('tools', eventsToolsTests)
   describe('handoffs', handoffsTests)
   describe('passed sources', passedSourcesTests)
-  describe('gates', gatesTests)
+  describe('gates', eventsGatesTests)
   describe('no open gate', noOpenGateTests)
 })
 
@@ -154,7 +154,7 @@ function nodeStatesTests() {
   })
 }
 
-function orphansAndStrandsTests() {
+function eventsOrphansAndStrandsTests() {
   it('emits orphaned only for a node newly orphaned', () => {
     const g = graph()
     const first = diffObservation(obs(g, { orphaned: [] }), obs(g, { orphaned: ['a'] }))
@@ -180,7 +180,7 @@ function orphansAndStrandsTests() {
   })
 }
 
-function toolsTests() {
+function eventsToolsTests() {
   it('emits a tool event for a new activity, by callId+kind, and not for a repeat', () => {
     const g = graph()
     const started = activity({ kind: 'tool_started', callId: 'c1', toolName: 'Read', at: 100 })
@@ -244,7 +244,7 @@ function passedSourcesTests() {
   })
 }
 
-function gatesTests() {
+function eventsGatesTests() {
   it('emits gate on/off, resolving a null nodeId to the first open gate node', () => {
     const g = graph()
     const raised = gate({ id: 'gate-1', nodeId: null })
@@ -398,14 +398,14 @@ describe('describeEvent', () => {
 })
 
 describe('CI events', () => {
-  describe('rounds', roundsTests)
-  describe('checks', checksTests)
+  describe('rounds', eventsRoundsTests)
+  describe('checks', eventsChecksTests)
   describe('repeats', repeatsTests)
 })
 
 const queue1 = { position: 2, behind: [{ orderId: 'WO-2', title: 'Other order' }] }
 
-function roundsTests() {
+function eventsRoundsTests() {
   it('raises no event before there is CI to report', () => {
     const g = graph()
     expect(diffObservation(obs(g), obs(g))).toEqual([])
@@ -428,7 +428,7 @@ function roundsTests() {
   })
 }
 
-function checksTests() {
+function eventsChecksTests() {
   it('raises a ci-check event for a new check, and for one whose bucket changed', () => {
     const g = graph()
     const prev = obs(g, {
@@ -471,7 +471,7 @@ function repeatsTests() {
 describe('queue events', () => {
   describe('first positions', firstPositionsTests)
   describe('moves', movesTests)
-  describe('clearing', clearingTests)
+  describe('clearing', eventsClearingTests)
 })
 
 function firstPositionsTests() {
@@ -520,7 +520,7 @@ function movesTests() {
   })
 }
 
-function clearingTests() {
+function eventsClearingTests() {
   it('raises nothing when the queue clears — nothing here can spell "unqueued"', () => {
     const g = graph()
     const events = diffObservation(obs(g, { queue: queue1 }), obs(g, { queue: null }))

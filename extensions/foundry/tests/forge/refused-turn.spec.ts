@@ -139,12 +139,12 @@ function writeProposal(body: unknown): string {
 }
 
 describe('a proposal refused after the turn ended', () => {
-  describe('refusing', refusingTests)
+  describe('refusing', refusedTurnRefusingTests)
   describe('the surface', theSurfaceTests)
   describe('the corrected proposal', theCorrectedProposalTests)
 })
 
-function refusingTests() {
+function refusedTurnRefusingTests() {
   it('refuses a file path where an evidence kind belongs, and names the field', async () => {
     await finish(seeded(), writeProposal(BAD_PROPOSAL))
 

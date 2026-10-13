@@ -183,7 +183,7 @@ describe('App', () => {
   describe('the Forge', theForgeTests)
   describe('what is waiting', whatIsWaitingTests)
   describe('the surface showing', theSurfaceShowingTests)
-  describe('settings', settingsTests)
+  describe('settings', appSettingsTests)
   describe('leaving settings', leavingSettingsTests)
   describe('a waiting order', aWaitingOrderTests)
   describe('a workspace change', aWorkspaceChangeTests)
@@ -254,7 +254,7 @@ function theSurfaceShowingTests() {
   })
 }
 
-function settingsTests() {
+function appSettingsTests() {
   it('opens settings and comes back', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
@@ -472,7 +472,7 @@ function anEarlierRequestTests() {
 // exactly as they did before this feature.
 describe('the Factory view toggle', () => {
   describe('where it is offered and starts', whereItIsOfferedAndStartsTests)
-  describe('switching', switchingTests)
+  describe('switching', appSwitchingTests)
   describe('opening orders', openingOrdersTests)
   describe('a shaping order', aShapingOrderTests)
   describe('flipping back', flippingBackTests)
@@ -501,7 +501,7 @@ function whereItIsOfferedAndStartsTests() {
   })
 }
 
-function switchingTests() {
+function appSwitchingTests() {
   it('switches to the hall grid and persists the choice', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Forge' }))

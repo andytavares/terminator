@@ -110,7 +110,7 @@ describe('components/factory/HallScene', () => {
   describe('drawOrderY', draworderyTests)
 
   describe('sceneActivity', () => {
-    describe('tools', toolsTests)
+    describe('tools', hallSceneToolsTests)
     describe('fixtures', fixturesTests)
   })
 })
@@ -213,7 +213,7 @@ function draworderyTests() {
   })
 }
 
-function toolsTests() {
+function hallSceneToolsTests() {
   it('keeps the newest open tool per station and passes the verdicts through', () => {
     const map = fakeMap()
     const verdicts = [{ nodeId: 'N-2', pass: false, at: 40 }]

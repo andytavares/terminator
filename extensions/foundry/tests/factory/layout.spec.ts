@@ -144,7 +144,7 @@ function laidOutTests(file: string, lanes: number[]) {
   describe('reachability', () => reachabilityTests({ map }))
   describe('belt paths', () => beltPathsTests({ map }))
   describe('no fallback and the back row', () => noFallbackAndTheBackRowTests({ map }))
-  describe('wall fixtures', () => wallFixturesTests({ map }))
+  describe('wall fixtures', () => layoutWallFixturesTests({ map }))
 }
 
 describe('layoutHall — properties, across every recipe and lane count', () => {
@@ -317,7 +317,7 @@ function noFallbackAndTheBackRowTests({ map }: Pick<LaidOut, 'map'>) {
   })
 }
 
-function wallFixturesTests({ map }: Pick<LaidOut, 'map'>) {
+function layoutWallFixturesTests({ map }: Pick<LaidOut, 'map'>) {
   it('gives the scoreboard three tiles, and no wall fixture overlaps another', () => {
     const board = map.props.find((p) => p.kind === 'statuswall') as HallProp
     expect(board.w).toBe(3)
@@ -370,7 +370,7 @@ describe('layoutHall', () => {
     describe('overlaps', overlapsTests)
     describe('the yard', theYardTests)
     describe('a single lane', aSingleLaneTests)
-    describe('joins', joinsTests)
+    describe('joins', layoutJoinsTests)
     describe('unknown dependencies and cycles', unknownDependenciesAndCyclesTests)
     describe('labels and width', labelsAndWidthTests)
     describe('empty graphs and towers', emptyGraphsAndTowersTests)
@@ -543,7 +543,7 @@ function aSingleLaneTests() {
   })
 }
 
-function joinsTests() {
+function layoutJoinsTests() {
   it('spans a join across the two lane stations it depends on directly', () => {
     const g = graph([
       rn({ id: 'build:lane-1', kind: 'fanout', lane: 1 }),

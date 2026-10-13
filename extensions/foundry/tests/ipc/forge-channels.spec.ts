@@ -220,9 +220,9 @@ function freeTextAndUnknownOrdersTests() {
 
 describe('foundry:order.compile', () => {
   describe('previewing and agreeing', previewingAndAgreeingTests)
-  describe('the ledger', theLedgerTests)
+  describe('the ledger', forgeChannelsTheLedgerTests)
   describe('unknown orders and no refinery', unknownOrdersAndNoRefineryTests)
-  describe('the refinery advisory', theRefineryAdvisoryTests)
+  describe('the refinery advisory', forgeChannelsTheRefineryAdvisoryTests)
 })
 
 function previewingAndAgreeingTests() {
@@ -252,7 +252,7 @@ function previewingAndAgreeingTests() {
   })
 }
 
-function theLedgerTests() {
+function forgeChannelsTheLedgerTests() {
   it('records the agreement in the ledger', async () => {
     const order = await completeOrder()
     await channels().compile(compiling(order.id, true))
@@ -293,7 +293,7 @@ function unknownOrdersAndNoRefineryTests() {
   })
 }
 
-function theRefineryAdvisoryTests() {
+function forgeChannelsTheRefineryAdvisoryTests() {
   it('advises when the newly agreed order overlaps an in-flight one', async () => {
     const order = await completeOrder()
     const c = createForgeChannels(
@@ -320,10 +320,10 @@ function theRefineryAdvisoryTests() {
 
 describe('foundry:order.list', () => {
   describe('nothing and no queue', nothingAndNoQueueTests)
-  describe('the queue position', theQueuePositionTests)
+  describe('the queue position', forgeChannelsTheQueuePositionTests)
   describe('checks and running orders', checksAndRunningOrdersTests)
   describe('halted orders', haltedOrdersTests)
-  describe('open questions', openQuestionsTests)
+  describe('open questions', forgeChannelsOpenQuestionsTests)
   describe('when it was made', whenItWasMadeTests)
   describe('finished checks and pulls', finishedChecksAndPullsTests)
   describe('the open gate', theOpenGateTests)
@@ -343,7 +343,7 @@ function nothingAndNoQueueTests() {
   })
 }
 
-function theQueuePositionTests() {
+function forgeChannelsTheQueuePositionTests() {
   it('carries the queue position when the refinery is wired and this order overlaps another', async () => {
     const seeded = (await channels().create({
       source: { kind: 'typed', text: 'first idea' },
@@ -426,7 +426,7 @@ function haltedOrdersTests() {
   })
 }
 
-function openQuestionsTests() {
+function forgeChannelsOpenQuestionsTests() {
   // A draft's standing is the questions it is asking, which is the count the
   // tab badge sends the operator here to find.
   it('counts the questions a draft is still asking', async () => {
@@ -710,7 +710,7 @@ async function agreeable(): Promise<WorkOrder> {
 
 describe('the capability check at agreement (FR-059a)', () => {
   describe('asking at agreement', askingAtAgreementTests)
-  describe('tracker failures', trackerFailuresTests)
+  describe('tracker failures', forgeChannelsTrackerFailuresTests)
   describe('agreeing twice', agreeingTwiceTests)
   describe('writing back', writingBackTests)
 })
@@ -748,7 +748,7 @@ function askingAtAgreementTests() {
   })
 }
 
-function trackerFailuresTests() {
+function forgeChannelsTrackerFailuresTests() {
   it('agrees the order even when the tracker cannot be reached', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
@@ -809,8 +809,8 @@ function writingBackTests() {
 describe('the intent-to-state mapping (FR-060)', () => {
   describe('the states', theStatesTests)
   describe('no tracker or a failing one', noTrackerOrAFailingOneTests)
-  describe('overrides', overridesTests)
-  describe('refusals', refusalsTests)
+  describe('overrides', forgeChannelsOverridesTests)
+  describe('refusals', forgeChannelsRefusalsTests)
 })
 
 function theStatesTests() {
@@ -858,7 +858,7 @@ function noTrackerOrAFailingOneTests() {
   })
 }
 
-function overridesTests() {
+function forgeChannelsOverridesTests() {
   it('stores the operator override and keeps it', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
@@ -879,7 +879,7 @@ function overridesTests() {
   })
 }
 
-function refusalsTests() {
+function forgeChannelsRefusalsTests() {
   it('refuses an intent that is not one of the three', async () => {
     await createOrderStore(root).save(await agreeable())
     expect(
@@ -898,10 +898,10 @@ function refusalsTests() {
 
 describe('foundry:order.converge — the half that was missing', () => {
   describe('starting', startingTests)
-  describe('recording', recordingTests)
+  describe('recording', forgeChannelsRecordingTests)
   describe('refused proposals', refusedProposalsTests)
   describe('the last turn', theLastTurnTests)
-  describe('a running turn', aRunningTurnTests)
+  describe('a running turn', forgeChannelsARunningTurnTests)
   describe('a refused draft in the list', aRefusedDraftInTheListTests)
   describe('non-drafts and unknown orders', nonDraftsAndUnknownOrdersTests)
 })
@@ -987,7 +987,7 @@ function startingTests() {
   })
 }
 
-function recordingTests() {
+function forgeChannelsRecordingTests() {
   it('records that it started, and what it was asked', async () => {
     const seed = await drafted()
     const c = createForgeChannels(
@@ -1046,7 +1046,7 @@ function theLastTurnTests() {
   })
 }
 
-function aRunningTurnTests() {
+function forgeChannelsARunningTurnTests() {
   it('says a turn is running the moment it starts one', async () => {
     const seed = await drafted()
     const c = createForgeChannels(
@@ -1472,7 +1472,7 @@ function theFalsifiableCheckTests() {
 }
 
 describe('turning a write-back off for one order (FR-062)', () => {
-  describe('choosing', choosingTests)
+  describe('choosing', forgeChannelsChoosingTests)
   describe('recording, refusing and unknown orders', recordingRefusingAndUnknownOrdersTests)
 })
 
@@ -1483,7 +1483,7 @@ async function seed(): Promise<OrderView> {
   })) as OrderView
 }
 
-function choosingTests() {
+function forgeChannelsChoosingTests() {
   it('keeps what the operator chose', async () => {
     const seed = (await channels().create({
       source: { kind: 'typed', text: 'x' },
@@ -1719,7 +1719,7 @@ function criticalPathsTests() {
 // written them.
 describe('an order seeded from a ticket that states its criteria', () => {
   describe('stated criteria', statedCriteriaTests)
-  describe('nothing stated', nothingStatedTests)
+  describe('nothing stated', forgeChannelsNothingStatedTests)
 })
 
 function statedCriteriaTests() {
@@ -1756,7 +1756,7 @@ function statedCriteriaTests() {
   })
 }
 
-function nothingStatedTests() {
+function forgeChannelsNothingStatedTests() {
   it('takes nothing from a ticket that states nothing', async () => {
     const bare = vi.fn(async () => ({
       key: 'TAV-15',

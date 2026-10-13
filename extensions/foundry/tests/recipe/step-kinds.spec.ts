@@ -66,7 +66,7 @@ describe('evaluateWhen', () => {
   describe('collections', collectionsTests)
   describe('grades', gradesTests)
   describe('counts, reach and unreadable', countsReachAndUnreadableTests)
-  describe('toolchain', toolchainTests)
+  describe('toolchain', stepKindsToolchainTests)
 })
 
 function collectionsTests() {
@@ -125,7 +125,7 @@ function countsReachAndUnreadableTests() {
   })
 }
 
-function toolchainTests() {
+function stepKindsToolchainTests() {
   it('is set when the toolchain probed a command for that check', () => {
     const o = order()
     o.context.toolchain.test = { command: 'npm test', source: 'package.json' }

@@ -28,7 +28,7 @@ describe('mergeSensed', () => {
   describe('collapsing', collapsingTests)
   describe('duplicates', duplicatesTests)
   describe('distinct keys', distinctKeysTests)
-  describe('reopening', reopeningTests)
+  describe('reopening', clusterReopeningTests)
   describe('untouched keys', untouchedKeysTests)
   describe('no recorded count', noRecordedCountTests)
   describe('promoted signals', promotedSignalsTests)
@@ -130,7 +130,7 @@ function runsOfA(...runs: number[]): SensedItem[] {
   return runs.map((run) => item('wf-a', `https://ci/run/${run}`))
 }
 
-function reopeningTests() {
+function clusterReopeningTests() {
   it('reopens a dismissed signal only once occurrences reach ceil(dismissedAt * 1.5)', () => {
     // Build a dismissed signal at occurrences=4 -> dismissedAt=4, reopen threshold=ceil(6)=6
     let signals: Signal[] = mergeSensed(
@@ -208,7 +208,7 @@ function otherSensorsTests() {
 }
 
 describe('ranked', () => {
-  describe('ordering', orderingTests)
+  describe('ordering', clusterOrderingTests)
   describe('ties', tiesTests)
 })
 
@@ -231,7 +231,7 @@ function openSignal(id: string, urls: string[], over: Partial<Signal> = {}): Sig
   }
 }
 
-function orderingTests() {
+function clusterOrderingTests() {
   it('orders open signals by impact desc, hides dismissed/promoted', () => {
     const high = openSignal('high', ['u1', 'u2'], {
       title: 'High',

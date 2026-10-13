@@ -183,7 +183,7 @@ function nothingQueuedTests() {
 
 describe('the merge order section', () => {
   describe('lanes and shared files', lanesAndSharedFilesTests)
-  describe('holds', holdsTests)
+  describe('holds', floorHoldsTests)
   describe('nothing to show', nothingToShowTests)
 })
 
@@ -238,7 +238,7 @@ function lanesAndSharedFilesTests() {
   })
 }
 
-function holdsTests() {
+function floorHoldsTests() {
   it("gives the rule's own reason for a hold, not a lane number", async () => {
     mount(reply({ lanes: TWO_LANES }))
     await waitFor(() => screen.getByText('Merge order'))
@@ -510,7 +510,7 @@ describe('a held tool call', () => {
   describe('the ask', theAskTests)
   describe('answering and refusing', answeringAndRefusingTests)
   describe('silent clicks and the terminal', silentClicksAndTheTerminalTests)
-  describe('nothing waiting', nothingWaitingTests)
+  describe('nothing waiting', floorNothingWaitingTests)
 })
 
 function theAskTests() {
@@ -576,7 +576,7 @@ function silentClicksAndTheTerminalTests() {
   })
 }
 
-function nothingWaitingTests() {
+function floorNothingWaitingTests() {
   it('shows no panel when nothing is waiting', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
@@ -810,7 +810,7 @@ const FIRING = {
 }
 
 describe('work that stopped making progress', () => {
-  describe('what it shows', whatItShowsTests)
+  describe('what it shows', floorWhatItShowsTests)
   describe('reading and taking over', readingAndTakingOverTests)
   describe('ending it', endingItTests)
   describe('shadow mode and nothing stalled', shadowModeAndNothingStalledTests)
@@ -818,7 +818,7 @@ describe('work that stopped making progress', () => {
 
 const LABELS = { 'N-1': 'builder · U-1 refresh the token on a 401', 'N-2': 'verifier · U-2' }
 
-function whatItShowsTests() {
+function floorWhatItShowsTests() {
   it('shows it — the failure nobody instruments looks exactly like work', async () => {
     mount(reply(), { stalls: [FIRING] })
     await waitFor(() => expect(screen.getByText(/Stopped making progress/)).toBeTruthy())
@@ -1030,7 +1030,7 @@ describe('a run whose agents are gone', () => {
   describe('the band', theBandTests)
   describe('picking up and stopping', pickingUpAndStoppingTests)
   describe('a way out', aWayOutTests)
-  describe('starting over', startingOverTests)
+  describe('starting over', floorStartingOverTests)
   describe('the building chip', theBuildingChipTests)
   describe('terminals and nothing gone', terminalsAndNothingGoneTests)
 })
@@ -1110,7 +1110,7 @@ function aWayOutTests() {
   })
 }
 
-function startingOverTests() {
+function floorStartingOverTests() {
   it('starts the same order over, rather than making a fourth one for the same ask', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
@@ -1580,11 +1580,11 @@ function noLimitAndCancelTests() {
 // An agent's own words are markdown and shown as markdown; a command it wants
 // to run is shown literally, because rendering it would eat its `*`s.
 describe('agent text on the Floor', () => {
-  describe('questions', questionsTests)
+  describe('questions', floorQuestionsTests)
   describe('commands and activity', commandsAndActivityTests)
 })
 
-function questionsTests() {
+function floorQuestionsTests() {
   it("renders an agent's question as markdown", async () => {
     mount(reply(), {
       pending: [
@@ -1764,14 +1764,14 @@ function chipOf(label: string): HTMLElement {
 }
 
 describe('the step chips', () => {
-  describe('done', doneTests)
+  describe('done', floorDoneTests)
   describe('skipped steps', skippedStepsTests)
   describe('tooltips and the terminal', tooltipsAndTheTerminalTests)
-  describe('the transcript', theTranscriptTests)
+  describe('the transcript', floorTheTranscriptTests)
   describe('refusals beside the step', refusalsBesideTheStepTests)
 })
 
-function doneTests() {
+function floorDoneTests() {
   it('reads done for a step that passed, whatever the step was', async () => {
     mount(
       reply({
@@ -1842,7 +1842,7 @@ function tooltipsAndTheTerminalTests() {
   })
 }
 
-function theTranscriptTests() {
+function floorTheTranscriptTests() {
   it('opens the transcript directly under the row of the step it belongs to', async () => {
     mount(
       reply({

@@ -32,14 +32,14 @@ afterEach(() => {
 })
 
 describe('ensureTrusted', () => {
-  describe('trusting', trustingTests)
+  describe('trusting', workspaceTrustTrustingTests)
   describe('keeping other entries', keepingOtherEntriesTests)
   describe('configs it will not touch', configsItWillNotTouchTests)
   describe('empty paths and no projects', emptyPathsAndNoProjectsTests)
   describe('temporary files', temporaryFilesTests)
 })
 
-function trustingTests() {
+function workspaceTrustTrustingTests() {
   it('trusts a repository Claude Code has never seen', () => {
     writeConfig({ projects: {} })
     expect(ensureTrusted(REPO, home)).toEqual({ changed: true })

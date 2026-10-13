@@ -166,11 +166,11 @@ describe('foundry:sensors.list', () => {
 })
 
 describe('foundry:sensors.set', () => {
-  describe('enabling', enablingTests)
+  describe('enabling', sensorChannelsEnablingTests)
   describe('disabling and clearing', disablingAndClearingTests)
 })
 
-function enablingTests() {
+function sensorChannelsEnablingTests() {
   it('refuses to enable a sensor with no repository', async () => {
     const { c } = channels()
     expect(await c.sensorsSet({ id: 'ci-flake', enabled: true })).toEqual({

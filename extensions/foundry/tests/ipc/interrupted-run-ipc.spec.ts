@@ -232,11 +232,11 @@ function theFloorAndTerminalsTests() {
 }
 
 describe('answering the gate', () => {
-  describe('picking up', pickingUpTests)
+  describe('picking up', interruptedRunIpcPickingUpTests)
   describe('stopping and holding', stoppingAndHoldingTests)
 })
 
-function pickingUpTests() {
+function interruptedRunIpcPickingUpTests() {
   it('picks the run back up, putting the abandoned step back in the queue', async () => {
     await seedInterruptedRun()
     await call('foundry:attention')

@@ -44,7 +44,7 @@ describe('beat scheduler', () => {
   describe('dwell and order', dwellAndOrderTests)
   describe('dropping and lag', droppingAndLagTests)
   describe('determinism and free events', determinismAndFreeEventsTests)
-  describe('held tool calls', heldToolCallsTests)
+  describe('held tool calls', beatsHeldToolCallsTests)
   describe('parked handoffs', parkedHandoffsTests)
   describe('join strokes', joinStrokesTests)
 })
@@ -121,7 +121,7 @@ function determinismAndFreeEventsTests() {
   })
 }
 
-function heldToolCallsTests() {
+function beatsHeldToolCallsTests() {
   it("holds a step's tool calls and handoff behind its own held events", () => {
     const tool: FactoryEvent = {
       kind: 'tool',

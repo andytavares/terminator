@@ -202,7 +202,7 @@ describe('the record of earlier decisions', () => {
 
 describe('deleting an order', () => {
   describe('an unknown order', anUnknownOrderTests)
-  describe('deleting', deletingTests)
+  describe('deleting', forgeRegistrationDeletingTests)
 })
 
 function anUnknownOrderTests() {
@@ -213,7 +213,7 @@ function anUnknownOrderTests() {
   })
 }
 
-function deletingTests() {
+function forgeRegistrationDeletingTests() {
   it('stops its architect, removes its records, and leaves no trace on the list', async () => {
     const repo = await seededRepository(parent)
     const order = draftOrder({

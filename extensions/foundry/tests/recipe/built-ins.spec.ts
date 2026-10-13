@@ -42,7 +42,7 @@ describe('built-in recipes', () => {
   describe('refactor and speckit', refactorAndSpeckitTests)
   describe('requirements', requirementsTests)
   describe('fresh verification', freshVerificationTests)
-  describe('lanes', lanesTests)
+  describe('lanes', builtInsLanesTests)
   describe('the direct shape', theDirectShapeTests)
   describe('the inspector', theInspectorTests)
 })
@@ -174,7 +174,7 @@ function freshVerificationTests() {
   })
 }
 
-function lanesTests() {
+function builtInsLanesTests() {
   // A fan-out is a claim that work can happen at the same time. Units inside
   // one lane share a worktree and a branch, so they cannot.
   it.each(recipeFiles)('%s fans out over lanes, never over units in one lane', (file) => {
@@ -375,8 +375,8 @@ describe('the author role', () => {
 
 describe('built-in roles', () => {
   describe('the roles', theRolesTests)
-  describe('resuming', resumingTests)
-  describe('writing', writingTests)
+  describe('resuming', builtInsResumingTests)
+  describe('writing', builtInsWritingTests)
   describe('hand-backs', handBacksTests)
   describe('tools and prompts', toolsAndPromptsTests)
 })
@@ -401,7 +401,7 @@ function theRolesTests() {
   })
 }
 
-function resumingTests() {
+function builtInsResumingTests() {
   it('forbids the verifier from resuming a conversation', () => {
     const parsed = parseRole(read(rolesDir, 'verifier.yaml'), 'verifier.yaml')
     expect(parsed.ok && parsed.value.allowResume).toBe(false)
@@ -415,7 +415,7 @@ function resumingTests() {
   })
 }
 
-function writingTests() {
+function builtInsWritingTests() {
   // The property that matters is narrower than "writes nothing": the red team
   // does produce output — findings — it just may not touch a checkout.
   it('lets only the builder, the scribe and the author write to a checkout', () => {
@@ -570,7 +570,7 @@ describe('the effort each built-in shape asks for', () => {
 describe('the lint pass every code-producing shape adds after its build', () => {
   describe('running lint', runningLintTests)
   describe('waiting on lint', waitingOnLintTests)
-  describe('reworking', reworkingTests)
+  describe('reworking', builtInsReworkingTests)
 })
 
 function runningLintTests() {
@@ -618,7 +618,7 @@ function waitingOnLintTests() {
   })
 }
 
-function reworkingTests() {
+function builtInsReworkingTests() {
   // The test run steps that follow a build gain a rework target of their
   // own, so a failing suite sends the same builder back rather than holding
   // the whole order for an operator.

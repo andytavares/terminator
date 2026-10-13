@@ -394,7 +394,7 @@ function mountForStart(over: StartReplies = {}) {
 describe('handing off', () => {
   describe('starting the Line', startingTheLineTests)
   describe('no start', noStartTests)
-  describe('the refinery advisory', theRefineryAdvisoryTests)
+  describe('the refinery advisory', forgeTheRefineryAdvisoryTests)
 })
 
 function startingTheLineTests() {
@@ -434,7 +434,7 @@ function noStartTests() {
   })
 }
 
-function theRefineryAdvisoryTests() {
+function forgeTheRefineryAdvisoryTests() {
   it('shows the refinery advisory as a note, once agreeing returns one (R4/R5)', async () => {
     mountForStart({ advisory: 'This queues behind WO-2 on src/a.ts.' })
     await waitFor(() => handOffButton())
@@ -454,14 +454,14 @@ function theRefineryAdvisoryTests() {
 }
 
 describe('choosing the shape of work', () => {
-  describe('the proposal', theProposalTests)
+  describe('the proposal', forgeTheProposalTests)
   describe('shapes it cannot run', shapesItCannotRunTests)
-  describe('choosing', choosingTests)
+  describe('choosing', forgeChoosingTests)
   describe('nothing supported', nothingSupportedTests)
   describe('choosing mid-turn', choosingMidTurnTests)
 })
 
-function theProposalTests() {
+function forgeTheProposalTests() {
   it('offers the shapes this repository can support, marking the proposal', async () => {
     mountForStart()
     await openStep('Shape')
@@ -504,7 +504,7 @@ function shapesItCannotRunTests() {
   })
 }
 
-function choosingTests() {
+function forgeChoosingTests() {
   it('starts with the proposal when the operator says nothing', async () => {
     mountForStart()
     await waitFor(() => handOffButton())
@@ -586,7 +586,7 @@ function choosingMidTurnTests() {
 
 describe('drafting the plan', () => {
   describe('asking the architect', askingTheArchitectTests)
-  describe('refusals', refusalsTests)
+  describe('refusals', forgeRefusalsTests)
   describe('drafts', draftsTests)
   describe('redrafts', redraftsTests)
   describe('after hand-off', afterHandOffTests)
@@ -629,7 +629,7 @@ function askingTheArchitectTests() {
   })
 }
 
-function refusalsTests() {
+function forgeRefusalsTests() {
   it('says why intake refused, rather than looking as though nothing happened', async () => {
     invoke = vi.fn(async (channel: string) => {
       if (channel === 'foundry:order.compile') {
@@ -837,7 +837,7 @@ describe('deciding a blocking finding, in the band', () => {
   describe('sending a fix', sendingAFixTests)
   describe('the fix box and clearing', theFixBoxAndClearingTests)
   describe('while the architect works', whileTheArchitectWorksTests)
-  describe('accepting', acceptingTests)
+  describe('accepting', forgeAcceptingTests)
 })
 
 const TWO_QUESTIONS = [
@@ -965,7 +965,7 @@ function whileTheArchitectWorksTests() {
   })
 }
 
-function acceptingTests() {
+function forgeAcceptingTests() {
   it('asks for the reason before accepting one', async () => {
     withFinding()
     await openStep('Red team')
@@ -1283,7 +1283,7 @@ const REDRAFTED = { kind: 'redrafted', at: '2026-09-09T19:33:00Z', note: 'redraf
 
 describe('while the architect is working', () => {
   describe('reading again', readingAgainTests)
-  describe('clearing', clearingTests)
+  describe('clearing', forgeClearingTests)
 })
 
 function refused() {
@@ -1336,7 +1336,7 @@ function readingAgainTests() {
   })
 }
 
-function clearingTests() {
+function forgeClearingTests() {
   // The view listens to a draft whether or not a turn runs, so there is no "poll stopped"
   // moment to assert; what is left to check is the "architect is working" strip clearing.
   it('clears "the architect is working" once the redraft lands', async () => {
@@ -1369,11 +1369,11 @@ function clearingTests() {
 }
 
 describe('a turn that was refused', () => {
-  describe('the reason', theReasonTests)
-  describe('starting over', startingOverTests)
+  describe('the reason', forgeTheReasonTests)
+  describe('starting over', forgeStartingOverTests)
 })
 
-function theReasonTests() {
+function forgeTheReasonTests() {
   it('says so, and says why, in the validator\u2019s own words', async () => {
     refused()
     await waitFor(() => expect(screen.getByText(/plan was refused/i)).toBeTruthy())
@@ -1399,7 +1399,7 @@ function theReasonTests() {
   })
 }
 
-function startingOverTests() {
+function forgeStartingOverTests() {
   it('can also start the turn over, carrying nothing', async () => {
     refused()
     await waitFor(() => screen.getByText(/plan was refused/i))
@@ -1657,7 +1657,7 @@ describe('a failing check says how to clear it', () => {
   describe('proof and the escape', proofAndTheEscapeTests)
   describe('accepting as unverifiable', acceptingAsUnverifiableTests)
   describe('the accepted reason', theAcceptedReasonTests)
-  describe('open questions', openQuestionsTests)
+  describe('open questions', forgeOpenQuestionsTests)
   describe('no remedy', noRemedyTests)
 })
 
@@ -1743,7 +1743,7 @@ function theAcceptedReasonTests() {
   })
 }
 
-function openQuestionsTests() {
+function forgeOpenQuestionsTests() {
   it('sends the open questions to the band rather than to the architect', async () => {
     mountBlocked({
       openQuestions: [
@@ -2194,13 +2194,13 @@ function orderHoldTests() {
 // needing a decision, a step whose shape has an unmet requirement, and a
 // handed-off order.
 describe('every unavailable control names why, everywhere (ADR 074)', () => {
-  describe('a running turn', aRunningTurnTests)
+  describe('a running turn', forgeARunningTurnTests)
   describe('a refused turn', aRefusedTurnTests)
   describe('a finding needing a decision', aFindingNeedingADecisionTests)
   describe('the shape step', theShapeStepTests)
 })
 
-function aRunningTurnTests() {
+function forgeARunningTurnTests() {
   it('holds on a running turn', async () => {
     mountForStart({
       intake: {

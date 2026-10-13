@@ -56,7 +56,7 @@ const none = { labels, metrics: null, queue: null, ci: null }
 
 describe('factory/signs', () => {
   describe('junctions and names', junctionsAndNamesTests)
-  describe('the scoreboard', theScoreboardTests)
+  describe('the scoreboard', signsTheScoreboardTests)
   describe('queue and tower', queueAndTowerTests)
 })
 
@@ -74,7 +74,7 @@ function junctionsAndNamesTests() {
   })
 }
 
-function theScoreboardTests() {
+function signsTheScoreboardTests() {
   it('labels the scoreboard with the real figures, in words', () => {
     const board = hallSigns(map, {
       ...none,

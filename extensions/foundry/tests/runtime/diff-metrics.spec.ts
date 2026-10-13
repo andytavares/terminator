@@ -13,11 +13,11 @@ import { makeTempDir } from '../../../../tests/support/temp-dir'
 // review queue at all (FR-045), and the >300-line P1 trigger (FR-048).
 
 describe('parseDiffStat', () => {
-  describe('counting', countingTests)
+  describe('counting', diffMetricsCountingTests)
   describe('odd rows', oddRowsTests)
 })
 
-function countingTests() {
+function diffMetricsCountingTests() {
   it('sums added and removed lines across files', () => {
     expect(parseDiffStat('12\t3\tsrc/a.ts\n4\t1\tsrc/b.ts\n')).toEqual({
       files: 2,
@@ -143,12 +143,12 @@ function anUnlistableTreeTests() {
 }
 
 describe('readDiffSummary', () => {
-  describe('asking', askingTests)
+  describe('asking', diffMetricsAskingTests)
   describe('untracked and ignored files', untrackedAndIgnoredFilesTests)
-  describe('failures', failuresTests)
+  describe('failures', diffMetricsFailuresTests)
 })
 
-function askingTests() {
+function diffMetricsAskingTests() {
   it('asks git for numeric stats against the merge base', async () => {
     const run = vi.fn().mockResolvedValue({ ok: true, stdout: '1\t1\ta.ts\n', stderr: '' })
     await readDiffSummary('/wt/s1', 'main', { run })
@@ -188,7 +188,7 @@ function untrackedAndIgnoredFilesTests() {
   })
 }
 
-function failuresTests() {
+function diffMetricsFailuresTests() {
   it('reports an empty summary when git fails, rather than throwing', async () => {
     const run = vi.fn().mockResolvedValue({ ok: false, stdout: '', stderr: 'not a repository' })
     await expect(readDiffSummary('/wt/s1', 'main', { run })).resolves.toEqual({

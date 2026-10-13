@@ -52,7 +52,7 @@ function setup() {
 describe('the Foundry index', () => {
   describe('reading from disk', readingFromDiskTests)
   describe('orders', ordersTests)
-  describe('gates', gatesTests)
+  describe('gates', foundryIndexGatesTests)
   describe('ledgers', ledgersTests)
   describe('graphs and resets', graphsAndResetsTests)
   describe('deletion, roots and live changes', deletionRootsAndLiveChangesTests)
@@ -120,7 +120,7 @@ function ordersTests() {
   })
 }
 
-function gatesTests() {
+function foundryIndexGatesTests() {
   it('replaces the gates of one order and announces the order they belong to', async () => {
     const { index, changes } = setup()
     await index.gates()

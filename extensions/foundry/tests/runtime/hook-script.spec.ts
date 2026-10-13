@@ -70,7 +70,7 @@ describe('installHookScript', () => {
 describe('the hook script, run the way Claude Code runs it', () => {
   describe('allow and defer', allowAndDeferTests)
   describe('the tool and input', theToolAndInputTests)
-  describe('the reason', theReasonTests)
+  describe('the reason', hookScriptTheReasonTests)
   describe('edited input', editedInputTests)
   describe('an unreachable or refusing console', anUnreachableOrRefusingConsoleTests)
   describe('unrecognisable answers and input', unrecognisableAnswersAndInputTests)
@@ -128,7 +128,7 @@ function theToolAndInputTests() {
   })
 }
 
-function theReasonTests() {
+function hookScriptTheReasonTests() {
   it('carries the operator words back to the agent as the decision reason', async () => {
     server = await createControlServer()
     server.register('s1', {

@@ -81,7 +81,7 @@ describe('foundry:run.start', () => {
   describe('building', buildingTests)
   describe('unknown skills', unknownSkillsTests)
   describe('shapes', shapesTests)
-  describe('recording', recordingTests)
+  describe('recording', runChannelsRecordingTests)
   describe('unknown recipes and orders', unknownRecipesAndOrdersTests)
 })
 
@@ -154,7 +154,7 @@ function shapesTests() {
   })
 }
 
-function recordingTests() {
+function runChannelsRecordingTests() {
   it('records an operator override as an operator decision', async () => {
     await store.save(order())
     await channels().start({ id: 'WO-1', recipe: 'direct' })
@@ -194,16 +194,16 @@ function unknownRecipesAndOrdersTests() {
 }
 
 describe('foundry:run.observe', () => {
-  describe('the graph', theGraphTests)
-  describe('CI', ciTests)
+  describe('the graph', runChannelsTheGraphTests)
+  describe('CI', runChannelsCiTests)
   describe('pull requests', pullRequestsTests)
   describe('no pulls and the ticket', noPullsAndTheTicketTests)
   describe('no CI and skills', noCiAndSkillsTests)
   describe('unresolved skills and no queue', unresolvedSkillsAndNoQueueTests)
-  describe('the queue position', theQueuePositionTests)
+  describe('the queue position', runChannelsTheQueuePositionTests)
 })
 
-function theGraphTests() {
+function runChannelsTheGraphTests() {
   it('reports the graph, what can start and what is waiting', async () => {
     await store.save(order())
     await channels().start({ id: 'WO-1' })
@@ -222,7 +222,7 @@ function theGraphTests() {
   })
 }
 
-function ciTests() {
+function runChannelsCiTests() {
   it('reports the CI state a written ci.json carries', async () => {
     await store.save(order())
     await channels().start({ id: 'WO-1' })
@@ -337,7 +337,7 @@ function unresolvedSkillsAndNoQueueTests() {
   })
 }
 
-function theQueuePositionTests() {
+function runChannelsTheQueuePositionTests() {
   it('carries the queue position when the refinery is wired and this order overlaps another', async () => {
     await store.save(order())
     await channels().start({ id: 'WO-1' })
@@ -360,7 +360,7 @@ function theQueuePositionTests() {
 describe('foundry:run.recipes', () => {
   describe('offering', offeringTests)
   describe('the choice', theChoiceTests)
-  describe('the proposal', theProposalTests)
+  describe('the proposal', runChannelsTheProposalTests)
 })
 
 function unit(over: Partial<WorkOrder['plan']['units'][number]> = {}) {
@@ -432,7 +432,7 @@ function theChoiceTests() {
   })
 }
 
-function theProposalTests() {
+function runChannelsTheProposalTests() {
   // The ladder's own proposal ignores the operator's pick — overriding one
   // recipe with another must not read back as "the ladder proposed this".
   it('proposes what the ladder would choose, ignoring the operator’s own pick', async () => {
@@ -886,10 +886,10 @@ interface Observed {
 }
 
 describe('what run.observe says about lanes (FR-067, FR-068)', () => {
-  describe('lanes', lanesTests)
+  describe('lanes', runChannelsLanesTests)
 })
 
-function lanesTests() {
+function runChannelsLanesTests() {
   it('reports each lane in merge order, by repository', async () => {
     await store.save(twoLanes())
     await channels().start({ id: 'WO-1' })
@@ -1012,13 +1012,13 @@ function failuresAndRefusalsTests() {
 }
 
 describe('foundry:run.resume', () => {
-  describe('picking up', pickingUpTests)
-  describe('retrying', retryingTests)
+  describe('picking up', runChannelsPickingUpTests)
+  describe('retrying', runChannelsRetryingTests)
   describe('recording the resume', recordingTheResumeTests)
-  describe('refusals', refusalsTests)
+  describe('refusals', runChannelsRefusalsTests)
 })
 
-function pickingUpTests() {
+function runChannelsPickingUpTests() {
   it('picks the run back up from the graph on disk', async () => {
     const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await started(execute)
@@ -1034,7 +1034,7 @@ function pickingUpTests() {
   })
 }
 
-function retryingTests() {
+function runChannelsRetryingTests() {
   it('retries the node the operator sent back', async () => {
     const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await started(execute)
@@ -1087,7 +1087,7 @@ function recordingTheResumeTests() {
   })
 }
 
-function refusalsTests() {
+function runChannelsRefusalsTests() {
   it('refuses an order that is not running', async () => {
     await store.save(order({ status: 'agreed' }))
     expect(await live().resume({ id: 'WO-1' })).toEqual({

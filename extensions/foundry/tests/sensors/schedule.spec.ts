@@ -73,8 +73,8 @@ function fakeCollectDeps(over: Partial<CollectDeps> = {}): CollectDeps {
 }
 
 describe('runSensor', () => {
-  describe('recording', recordingTests)
-  describe('failures', failuresTests)
+  describe('recording', scheduleRecordingTests)
+  describe('failures', scheduleFailuresTests)
 })
 
 /** gh listing one open bug. */
@@ -87,7 +87,7 @@ const LOGIN_CRASHES = {
   timedOut: false,
 }
 
-function recordingTests() {
+function scheduleRecordingTests() {
   it('records a signal collected this run and remembers when it ran', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -116,7 +116,7 @@ function recordingTests() {
   })
 }
 
-function failuresTests() {
+function scheduleFailuresTests() {
   it('stores the problem and records nothing when the collector fails', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)

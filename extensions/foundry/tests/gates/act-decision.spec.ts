@@ -9,7 +9,7 @@ import { forgeDefectAnswer } from '../../src/gates/act-decision.js'
 
 describe('forgeDefectAnswer', () => {
   describe('sent back to draft', sentBackToDraftTests)
-  describe('resuming', resumingTests)
+  describe('resuming', actDecisionResumingTests)
 })
 
 function sentBackToDraftTests() {
@@ -36,7 +36,7 @@ function sentBackToDraftTests() {
   })
 }
 
-function resumingTests() {
+function actDecisionResumingTests() {
   it('resumes when the order is still running', () => {
     expect(
       forgeDefectAnswer({

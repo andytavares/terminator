@@ -157,7 +157,7 @@ describe('starting a supervised run', () => {
   describe('the project', theProjectTests)
   describe('the terminal and session', theTerminalAndSessionTests)
   describe('skills and transcripts', skillsAndTranscriptsTests)
-  describe('resuming', resumingTests)
+  describe('resuming', supervisedRunnerResumingTests)
   describe('nothing started', nothingStartedTests)
 })
 
@@ -239,7 +239,7 @@ function skillsAndTranscriptsTests() {
   })
 }
 
-function resumingTests() {
+function supervisedRunnerResumingTests() {
   it('resumes an existing conversation rather than starting a second one', async () => {
     const run = await runner().start({ ...start, resumeSessionId: 'earlier-session' })
     expect(run?.sessionId).toBe('earlier-session')
@@ -859,7 +859,7 @@ function theHeredocTests() {
 // live runs died on it.
 describe('the parent session it must not inherit', () => {
   describe('unsetting', unsettingTests)
-  describe('what it keeps', whatItKeepsTests)
+  describe('what it keeps', supervisedRunnerWhatItKeepsTests)
 })
 
 function unsettingTests() {
@@ -879,7 +879,7 @@ function unsettingTests() {
   })
 }
 
-function whatItKeepsTests() {
+function supervisedRunnerWhatItKeepsTests() {
   it('still forces session persistence, which is the other half of the same problem', async () => {
     await runner().start(start)
     expect(launchScriptBody()).toContain('CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1')
@@ -936,7 +936,7 @@ const command = {
 
 describe('running one command in a terminal, with no agent', () => {
   describe('opening the tab', openingTheTabTests)
-  describe('exit statuses', exitStatusesTests)
+  describe('exit statuses', supervisedRunnerExitStatusesTests)
 })
 
 function openingTheTabTests() {
@@ -972,7 +972,7 @@ function openingTheTabTests() {
   })
 }
 
-function exitStatusesTests() {
+function supervisedRunnerExitStatusesTests() {
   it('resolves 0 for a command that exited 0, and closes its tab', async () => {
     exitWith({ exitCode: 0 })
     await expect(runner().runCommand(command)).resolves.toBe(0)

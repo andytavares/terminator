@@ -188,9 +188,9 @@ function handingBackTests() {
 
 describe('the actions on one run', () => {
   describe('the terminal', theTerminalTests)
-  describe('the transcript', theTranscriptTests)
+  describe('the transcript', supervisionConsoleTheTranscriptTests)
   describe('redirecting and interrupting', redirectingAndInterruptingTests)
-  describe('stopping', stoppingTests)
+  describe('stopping', supervisionConsoleStoppingTests)
 })
 
 function theTerminalTests() {
@@ -209,7 +209,7 @@ function theTerminalTests() {
   })
 }
 
-function theTranscriptTests() {
+function supervisionConsoleTheTranscriptTests() {
   it('reads what the agent was doing from its transcript, and nothing for a run it does not know', async () => {
     const transcript = path.join(dataDir, 'transcript.jsonl')
     fs.writeFileSync(
@@ -252,7 +252,7 @@ function redirectingAndInterruptingTests() {
   })
 }
 
-function stoppingTests() {
+function supervisionConsoleStoppingTests() {
   it('stops a run and keeps it in the history as stopped', async () => {
     registerRun('stopped-1')
     expect(

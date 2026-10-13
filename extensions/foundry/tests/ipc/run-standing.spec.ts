@@ -104,13 +104,13 @@ beforeEach(() => {
 })
 
 describe('what run.observe says about where an order stands', () => {
-  describe('halted', haltedTests)
+  describe('halted', runStandingHaltedTests)
   describe('asking and stalled', askingAndStalledTests)
-  describe('stopped', stoppedTests)
+  describe('stopped', runStandingStoppedTests)
   describe('resumed', resumedTests)
 })
 
-function haltedTests() {
+function runStandingHaltedTests() {
   it('carries a standing with the graph', async () => {
     await store.save(order())
     await channels().start({ id: 'WO-1' })
@@ -160,7 +160,7 @@ function askingAndStalledTests() {
   })
 }
 
-function stoppedTests() {
+function runStandingStoppedTests() {
   // The WO-0913-0bd shape: every node in the graph finished, but the ledger's
   // tail says the run went on to fail — here, opening the pull request.
   // Before `runFailureFor` was wired in, this read `working`/"Between steps.

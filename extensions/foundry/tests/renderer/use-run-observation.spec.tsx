@@ -70,13 +70,13 @@ const observed = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:run.obs
 const settle = () => act(async () => void (await vi.advanceTimersByTimeAsync(200)))
 
 describe('useRunObservation', () => {
-  describe('reading', readingTests)
+  describe('reading', runObservationReadingTests)
   describe('live changes', liveChangesTests)
   describe('errors and unmount', errorsAndUnmountTests)
   describe('a new order id', aNewOrderIdTests)
 })
 
-function readingTests() {
+function runObservationReadingTests() {
   it('reads the observation and the pending asks on mount', async () => {
     mockBridge(reply(), [ASK])
     const { result } = renderHook(() => useRunObservation('WO-1'))

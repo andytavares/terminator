@@ -142,7 +142,7 @@ function nothingToPickTests() {
 describe('an open order', () => {
   describe('the way back', theWayBackTests)
   describe('discarding', discardingTests)
-  describe('deleting', deletingTests)
+  describe('deleting', ordersSeedAndEndDeletingTests)
 })
 
 function openOn(status: string, answers: Record<string, Answer> = {}): void {
@@ -196,7 +196,7 @@ async function confirmDelete(): Promise<void> {
   fireEvent.click(await screen.findByRole('button', { name: 'Delete it and everything it made' }))
 }
 
-function deletingTests() {
+function ordersSeedAndEndDeletingTests() {
   it('deletes the order, whatever its status, and goes back to the list', async () => {
     openOn('running', { 'foundry:order.delete': () => ({}) })
     await confirmDelete()

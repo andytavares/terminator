@@ -64,9 +64,9 @@ afterEach(() => {
 })
 
 describe('the run timeline', () => {
-  describe('frames', framesTests)
+  describe('frames', timelineStoreFramesTests)
   describe('tool calls', toolCallsTests)
-  describe('reading', readingTests)
+  describe('reading', timelineStoreReadingTests)
 })
 
 const ci = (status: string, buckets: Record<string, 'pass' | 'pending' | 'fail'>, round = 0) => ({
@@ -88,7 +88,7 @@ const ci = (status: string, buckets: Record<string, 'pass' | 'pending' | 'fail'>
   ],
 })
 
-function framesTests() {
+function timelineStoreFramesTests() {
   it('records a frame each time the graph is written with different states, and only then', async () => {
     await recordGraph(dir, graph({ a: 'running', b: 'waiting' }), 1000)
     await recordGraph(dir, graph({ a: 'running', b: 'waiting' }), 2000)
@@ -123,7 +123,7 @@ function toolCallsTests() {
   })
 }
 
-function readingTests() {
+function timelineStoreReadingTests() {
   it('reads an absent timeline as empty, and skips a line it cannot parse', async () => {
     expect(await readTimeline(dir)).toEqual({ frames: [], tools: [], ci: [] })
     await recordGraph(dir, graph({ a: 'running' }), 1000)

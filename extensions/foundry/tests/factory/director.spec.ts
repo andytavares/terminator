@@ -258,11 +258,11 @@ function noStationTests() {
 }
 
 describe('direct: orphaned / stranded', () => {
-  describe('orphans and strands', orphansAndStrandsTests)
+  describe('orphans and strands', directorOrphansAndStrandsTests)
   describe('clearing a strand', clearingAStrandTests)
 })
 
-function orphansAndStrandsTests() {
+function directorOrphansAndStrandsTests() {
   it('marks an orphaned node not present', () => {
     const g = withNode(graph(), 'a', { state: 'running' })
     const world = worldFor(g)
@@ -559,11 +559,11 @@ function seenCallsAndNoStationTests() {
 }
 
 describe('direct: verdicts', () => {
-  describe('recording', recordingTests)
+  describe('recording', directorRecordingTests)
   describe('nothing and expiry', nothingAndExpiryTests)
 })
 
-function recordingTests() {
+function directorRecordingTests() {
   it('records a pass at the world clock when a step passes', () => {
     const world = { ...worldFor(runningGraph()), clockMs: 4200 }
     expect(direct(world, [finish('passed')], 0).verdicts).toEqual([
@@ -606,14 +606,14 @@ function nothingAndExpiryTests() {
 }
 
 describe('direct: handoff', () => {
-  describe('crates', cratesTests)
+  describe('crates', directorCratesTests)
   describe('taking in and no belt', takingInAndNoBeltTests)
 })
 
 const realGraph = (): RunGraph =>
   JSON.parse(readFileSync(join(__dirname, 'fixtures', 'run-graph-real.json'), 'utf-8')) as RunGraph
 
-function cratesTests() {
+function directorCratesTests() {
   it('adds a crate on the matching belt, at progress 0', () => {
     const g = graph()
     const world = worldFor(g)
@@ -667,7 +667,7 @@ function takingInAndNoBeltTests() {
 }
 
 describe('direct: rework', () => {
-  describe('carrying the box', carryingTheBoxTests)
+  describe('carrying the box', directorCarryingTheBoxTests)
   describe('neither side crewed', neitherSideCrewedTests)
 })
 
@@ -682,7 +682,7 @@ const adjacent = (a: { x: number; y: number }, b: { x: number; y: number }): boo
 const reworked = (world: World, fromNodeId: string, toNodeId: string): World =>
   direct(world, [{ kind: 'rework', fromNodeId, toNodeId, round: 1 }], 0)
 
-function carryingTheBoxTests() {
+function directorCarryingTheBoxTests() {
   it('has the check carry the box to the node it sent back, with no crate on a belt', () => {
     const world = realWorld()
     const next = reworked(world, 'verify', 'build:lane-1')

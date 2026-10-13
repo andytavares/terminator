@@ -61,11 +61,11 @@ describe('renderOrder', () => {
   describe('the plan', thePlanTests)
   describe('coverage', coverageTests)
   describe('non-goals and assumptions', nonGoalsAndAssumptionsTests)
-  describe('checks', checksTests)
-  describe('blocking findings', blockingFindingsTests)
-  describe('notes', notesTests)
+  describe('checks', renderChecksTests)
+  describe('blocking findings', renderBlockingFindingsTests)
+  describe('notes', renderNotesTests)
   describe('settled findings', settledFindingsTests)
-  describe('questions', questionsTests)
+  describe('questions', renderQuestionsTests)
   describe('budgets and empty drafts', budgetsAndEmptyDraftsTests)
 })
 
@@ -173,7 +173,7 @@ function nonGoalsAndAssumptionsTests() {
   })
 }
 
-function checksTests() {
+function renderChecksTests() {
   it('reports a passing order as ready to hand off', () => {
     expect(renderOrder(order())).toContain('All checks pass')
   })
@@ -185,7 +185,7 @@ function checksTests() {
   })
 }
 
-function blockingFindingsTests() {
+function renderBlockingFindingsTests() {
   it('shows an open blocking finding under its own heading', () => {
     const o = order({
       redTeam: [
@@ -207,7 +207,7 @@ function blockingFindingsTests() {
   })
 }
 
-function notesTests() {
+function renderNotesTests() {
   it('shows an open non-blocking finding as a note, not a blocker', () => {
     const o = order({
       redTeam: [
@@ -266,7 +266,7 @@ const question = (id: string, text: string, answer: string | null): Question => 
   confidence: null,
 })
 
-function questionsTests() {
+function renderQuestionsTests() {
   it('shows unanswered questions and hides answered ones', () => {
     const o = order({
       openQuestions: [

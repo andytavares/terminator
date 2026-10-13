@@ -142,12 +142,12 @@ function partiesAndDerivationTests() {
 }
 
 describe('compiling an order with a collision', () => {
-  describe('refusing', refusingTests)
+  describe('refusing', lanesRefusingTests)
   describe('producers', producersTests)
   describe('single lanes and coverage', singleLanesAndCoverageTests)
 })
 
-function refusingTests() {
+function lanesRefusingTests() {
   it('refuses one where nobody owns the shared change', () => {
     const result = compileOrder(order())
     expect(result.ok).toBe(false)
@@ -198,11 +198,11 @@ function singleLanesAndCoverageTests() {
 }
 
 describe('writing the merge order down at agreement', () => {
-  describe('holds', holdsTests)
+  describe('holds', lanesHoldsTests)
   describe('stale and unowned holds', staleAndUnownedHoldsTests)
 })
 
-function holdsTests() {
+function lanesHoldsTests() {
   it('records the derived collisions on the agreed order', () => {
     const agreed = agreeOrder(withProducer(), '2026-09-06T12:00:00.000Z')
     expect(agreed.ok && agreed.order.plan.sharedFiles).toEqual(['proto/session.proto'])

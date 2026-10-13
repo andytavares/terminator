@@ -33,7 +33,7 @@ describe('the tail of a conversation', () => {
   describe('tool call summaries', toolCallSummariesTests)
   describe('identifying arguments', identifyingArgumentsTests)
   describe('multi-line commands and the tail', multiLineCommandsAndTheTailTests)
-  describe('skipping', skippingTests)
+  describe('skipping', transcriptExcerptSkippingTests)
   describe('no transcript and bad timestamps', noTranscriptAndBadTimestampsTests)
 })
 
@@ -225,7 +225,7 @@ function multiLineCommandsAndTheTailTests() {
   })
 }
 
-function skippingTests() {
+function transcriptExcerptSkippingTests() {
   it('skips a line it cannot parse without losing the rest', () => {
     write(
       'not json at all',

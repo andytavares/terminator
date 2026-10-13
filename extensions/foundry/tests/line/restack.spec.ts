@@ -65,8 +65,8 @@ beforeEach(() => {
 
 describe('restack', () => {
   describe('rebasing', rebasingTests)
-  describe('conflicts', conflictsTests)
-  describe('push failures', pushFailuresTests)
+  describe('conflicts', restackConflictsTests)
+  describe('push failures', restackPushFailuresTests)
 })
 
 function rebasingTests() {
@@ -93,7 +93,7 @@ function rebasingTests() {
   })
 }
 
-function conflictsTests() {
+function restackConflictsTests() {
   it('aborts and reports the conflicting file when the same line changed on both sides', async () => {
     // The lane edits line one.
     fs.writeFileSync(path.join(lane, 'file.txt'), 'lane change\nline two\nline three\n')
@@ -119,7 +119,7 @@ function conflictsTests() {
   })
 }
 
-function pushFailuresTests() {
+function restackPushFailuresTests() {
   it('fails when the force-with-lease is refused because origin moved underneath it', async () => {
     // Someone else pushes a new commit to the lane branch on origin, out from
     // under the local clone's tracking ref.
