@@ -33,37 +33,27 @@ const editorFocusedField = StateField.define<boolean>({
     return focused
   },
 })
-/* v8 ignore next 16 */
-const focusTrackPlugin = ViewPlugin.define((view) => {
-  // Seed from the live focus state. `focusChanged` only fires on a transition,
-  // so a view created while already focused would stay marked unfocused and
-  // render as though the user were not editing. Deferred because a view may not
-  // dispatch during its own construction.
+// CodeMirror reports focus changes from inside an update, where a plugin may not dispatch;
+// focusChangeEffect is its hook for turning one into a state effect.
+const focusChangeTracker = EditorView.focusChangeEffect.of((_state, focusing) =>
+  setEditorFocused.of(focusing)
+)
+// A preview switched on in an editor that already has focus sees no focus change, so it is
+// seeded here; deferred because a view may not dispatch while it is being updated.
+const focusSeedPlugin = ViewPlugin.define((view) => {
   if (view.hasFocus) {
     setTimeout(() => view.dispatch({ effects: setEditorFocused.of(true) }), 0)
   }
-  return {
-    update(update) {
-      if (update.focusChanged) {
-        view.dispatch({ effects: setEditorFocused.of(view.hasFocus) })
-      }
-    },
-  }
+  return {}
 })
 
 // ── Widgets ──────────────────────────────────────────────────────
 
-/* v8 ignore start */
 /** A click on the link opens `url` in the system browser (a new window outside the app). */
 function openOnClick(link: HTMLAnchorElement, url: string): void {
   link.addEventListener('click', (e) => {
     e.preventDefault()
-    const api: { shell?: { openExternal?: (u: string) => void } } | undefined = window.electronAPI
-    if (api?.shell?.openExternal) {
-      api.shell.openExternal(url)
-    } else {
-      window.open(url, '_blank', 'noopener')
-    }
+    void window.electronAPI.shell.openExternal(url)
   })
 }
 
@@ -113,10 +103,6 @@ class CheckboxWidget extends WidgetType {
     })
     wrap.appendChild(cb)
     return wrap
-  }
-
-  ignoreEvent(): boolean {
-    return false
   }
 
   eq(other: CheckboxWidget): boolean {
@@ -202,7 +188,7 @@ const INLINE_SPAN_TAGS = { code: 'code', strong: 'strong', em: 'em', del: 'del' 
 
 function inlineSpanToDOM(span: InlineSpan): Node {
   if (span.type === 'text') return document.createTextNode(span.text)
-  if (span.type === 'link') return inlineLinkToDOM(span.text, span.href ?? '')
+  if (span.type === 'link') return inlineLinkToDOM(span.text, span.href)
   const el = document.createElement(INLINE_SPAN_TAGS[span.type])
   if (span.type === 'code') el.className = 'notepad-code'
   el.textContent = span.text
@@ -351,8 +337,6 @@ class ImageWidget extends WidgetType {
   }
 }
 
-/* v8 ignore stop */
-
 // ── Decoration builder ────────────────────────────────────────────
 
 /** A span of the document. */
@@ -433,26 +417,12 @@ const decorateHeading = offCursorLine((node, { builder }) => {
   }
 })
 
-function strikethroughMarkLength(node: SyntaxNodeRef): number {
-  const firstChild = node.node.firstChild
-  /* v8 ignore next 2 */
-  if (firstChild?.name === 'StrikethroughMark') return firstChild.to - firstChild.from
-  return 2
-}
-
 const decorateInlineCode = offCursorLine((node, { builder }) => {
-  // Hide backtick markers, style only the inner content
-  const firstChild = node.node.firstChild
-  const lastChild = node.node.lastChild
-  /* v8 ignore next */
-  const openEnd = firstChild?.name === 'CodeMark' ? firstChild.to : node.from + 1
-  /* v8 ignore next */
-  const closeStart = lastChild?.name === 'CodeMark' ? lastChild.from : node.to - 1
-  if (openEnd < closeStart) {
-    builder.add(node.from, openEnd, Decoration.replace({}))
-    builder.add(openEnd, closeStart, Decoration.mark({ class: 'notepad-code' }))
-    builder.add(closeStart, node.to, Decoration.replace({}))
-  }
+  // Hide the backtick runs (lezer always gives both), style only the inner content
+  const [open, close] = node.node.getChildren('CodeMark')
+  builder.add(node.from, open.to, Decoration.replace({}))
+  builder.add(open.to, close.from, Decoration.mark({ class: 'notepad-code' }))
+  builder.add(close.from, node.to, Decoration.replace({}))
 })
 
 /** Adds a line decoration to every line from `from` up to (not including) `to`. */
@@ -519,9 +489,7 @@ function decorateTable(node: SyntaxNodeRef, ctx: DecorationContext): false {
   const { state, builder } = ctx
   const source = state.sliceDoc(node.from, node.to)
   const parsed = parseTable(source)
-  /* v8 ignore next */
   if (!parsed) return false
-  /* v8 ignore next */
   const wholeLines =
     node.from === state.doc.lineAt(node.from).from && node.to === state.doc.lineAt(node.to).to
   builder.add(
@@ -627,8 +595,8 @@ const decorateLink = offCursorLine((node, { state, builder }) => {
   const urlChild = node.node.getChild('URL')
   if (!urlChild) return
   const url = state.sliceDoc(urlChild.from, urlChild.to)
-  const raw = state.sliceDoc(node.from, urlChild.from - 2)
-  const label = raw.startsWith('[') ? raw.slice(1, raw.lastIndexOf(']')) : url
+  const [open, close] = node.node.getChildren('LinkMark')
+  const label = state.sliceDoc(open.to, close.from)
   builder.add(node.from, node.to, Decoration.replace({ widget: new LinkWidget(label || url, url) }))
 })
 
@@ -641,7 +609,8 @@ const NODE_DECORATORS: Record<string, NodeDecorator> = {
   ATXHeading6: decorateHeading,
   StrongEmphasis: hideMarksAround(() => 2, 'notepad-bold'),
   Emphasis: hideMarksAround(() => 1, 'notepad-italic'),
-  Strikethrough: hideMarksAround(strikethroughMarkLength, 'notepad-strikethrough'),
+  // GFM strikethrough is always `~~` (lezer's Strikethrough parser accepts no other delimiter).
+  Strikethrough: hideMarksAround(() => 2, 'notepad-strikethrough'),
   InlineCode: decorateInlineCode,
   FencedCode: decorateFencedCode,
   Table: decorateTable,
@@ -675,4 +644,9 @@ const livePreviewDecorations = StateField.define<DecorationSet>({
 })
 
 // Export as an array so callers add all required extensions at once
-export const livePreviewPlugin = [editorFocusedField, focusTrackPlugin, livePreviewDecorations]
+export const livePreviewPlugin = [
+  editorFocusedField,
+  focusChangeTracker,
+  focusSeedPlugin,
+  livePreviewDecorations,
+]
