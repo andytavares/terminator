@@ -59,7 +59,7 @@ function renderer(channel: string, data: unknown): void {
 
 /** The API as an extension backend in the extension host holds it. */
 function hostApi(): ExtensionAPI {
-  const coreApi = createExtensionAPI('test.runner', '0.1.0', {
+  const coreApi = createExtensionAPI('test.runner', {
     ptyManager,
     terminalRelay: { start: () => {} } as never,
     broadcastToWindows: renderer,
@@ -125,7 +125,7 @@ describe('pty.runInTerminal, over a real PTY and the extension host port', () =>
   })
 
   it('resolves null, opening nothing, when there is no window to show the tab in', async () => {
-    const api = createExtensionAPI('test.runner', '0.1.0', { ptyManager })
+    const api = createExtensionAPI('test.runner', { ptyManager })
     await expect(run(api, 'exit 0')).resolves.toBeNull()
     expect(ptyManager.listSessions()).toEqual([])
   })

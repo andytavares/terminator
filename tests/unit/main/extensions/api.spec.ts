@@ -89,12 +89,12 @@ beforeEach(() => {
 
 describe('api.commands.register', () => {
   it('has no keyboard.register member — the interface was deleted', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     expect('keyboard' in api).toBe(false)
   })
 
   it('registers a command with mnemonic and requires', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     api.commands.register({ id: 'push', label: 'Push', mnemonic: 'p', requires: 'repo' }, vi.fn())
     const cmd = listExtensionCommands().find((c) => c.id === 'push')
     expect(cmd).toMatchObject({
@@ -107,7 +107,7 @@ describe('api.commands.register', () => {
   })
 
   it('passes CommandContext through to the handler', async () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     const handler = vi.fn()
     api.commands.register({ id: 'push', label: 'Push' }, handler)
     const key = listExtensionCommands().find((c) => c.id === 'push')!.key
@@ -119,7 +119,7 @@ describe('api.commands.register', () => {
   })
 
   it('zero-arg handlers still work when a ctx is passed', async () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     const handler = vi.fn(() => {})
     api.commands.register({ id: 'noop', label: 'Noop' }, handler)
     const key = listExtensionCommands().find((c) => c.id === 'noop')!.key
@@ -138,7 +138,7 @@ describe('executeExtensionCommand', () => {
   })
 
   it('logs, and does not throw, when the handler rejects', async () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     api.commands.register(
       { id: 'boom', label: 'Boom' },
       vi.fn().mockRejectedValue(new Error('kaboom'))
@@ -151,7 +151,7 @@ describe('executeExtensionCommand', () => {
   })
 
   it('logs, and does not throw, when the handler throws synchronously', async () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     api.commands.register(
       { id: 'boom', label: 'Boom' },
       vi.fn(() => {
@@ -171,7 +171,7 @@ describe('executeExtensionCommand with args', () => {
   const schema = z.object({ repoRoot: z.string(), number: z.number() })
 
   function register(handler = vi.fn()) {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     api.commands.register({ id: 'review', label: 'Review', args: schema }, handler)
     return { handler, key: 'test.ext.command.review' }
   }
@@ -204,7 +204,7 @@ describe('executeExtensionCommand with args', () => {
   })
 
   it('a command without a schema receives no args', async () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     const handler = vi.fn()
     api.commands.register({ id: 'plain', label: 'Plain' }, handler)
 
@@ -221,7 +221,7 @@ describe('executeExtensionCommand with args', () => {
       reason: 'not-registered',
     })
 
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     api.commands.register({ id: 'gone', label: 'Gone' }, vi.fn()).dispose()
     expect(isExtensionCommandRegistered('test.ext.command.gone')).toBe(false)
   })
@@ -234,7 +234,7 @@ describe('executeExtensionCommand with args', () => {
 
 describe('api.window.showSelf', () => {
   it('broadcasts extension:show-surface with the extension id and default view', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     api.window.showSelf()
 
     expect(mockSend).toHaveBeenCalledWith('extension:show-surface', {
@@ -244,7 +244,7 @@ describe('api.window.showSelf', () => {
   })
 
   it('broadcasts the given view', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     api.window.showSelf('sidebar')
 
     expect(mockSend).toHaveBeenCalledWith('extension:show-surface', {
@@ -260,7 +260,7 @@ describe('api.window.showSelf', () => {
 describe('api.settings.register', () => {
   it('announces the change when a page is registered and when it is removed', () => {
     const broadcastToWindows = vi.fn()
-    const api = createExtensionAPI('test.ext', '0.1.0', { broadcastToWindows })
+    const api = createExtensionAPI('test.ext', { broadcastToWindows })
     const page = api.settings.register({ label: 'Test', properties: {} })
     expect(broadcastToWindows).toHaveBeenCalledWith('extension:list-changed', null)
     broadcastToWindows.mockClear()

@@ -67,7 +67,7 @@ let mainWindow: BrowserWindow | null = null
 let viewHost: ExtensionViewHost | null = null
 const ptyManager = new PtyManager()
 // Reads core state the way an extension's API does, for the extension host's snapshot.
-const coreView = createExtensionAPI('terminator.extension-host', app.getVersion())
+const coreView = createExtensionAPI('terminator.extension-host')
 /** Extension backends run in one utilityProcess (ADR 094), started on the first activation. */
 const extensionHostProcess: ExtensionHostProcess = new ExtensionHostProcess({
   spawn: spawnUtilityHost(join(__dirname, 'extension-host.js')),

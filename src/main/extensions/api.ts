@@ -22,7 +22,6 @@ import type {
   TrackerStateOption,
   TerminalExit,
   TrackerTeam,
-  TransitionIntent,
   WorkspaceSnapshot,
 } from '@terminator/extension-sdk'
 import type { PtyManager } from '../terminal/pty-manager.js'
@@ -373,453 +372,593 @@ function raiseAllWindows(): void {
   }
 }
 
-export function createExtensionAPI(
-  extensionId: string,
-  appVersion: string,
-  deps?: ExtensionAPIDeps,
-  rendererUrl?: string
-): ExtensionAPI {
-  const disposables: Disposable[] = []
+/** What every part of one extension's API is built from. */
+interface ApiContext {
+  extensionId: string
+  deps: ExtensionAPIDeps | undefined
+  rendererUrl: string | undefined
+  paths: ExtensionAPI['paths']
+  /** Records a registration so unloading the extension ends it. */
+  disposable(dispose: () => void): Disposable
+  /** Runs git or gh for this extension, inside one of its shell roots (ADR 102). */
+  execInScope(input: ShellExecInput): ReturnType<typeof execShell>
+  requirePty(): PtyManager
+}
 
-  function disposable(dispose: () => void): Disposable {
-    const d = { dispose }
-    disposables.push(d)
-    return d
-  }
-
-  const extLogger = makeLogger(extensionId)
-
+/** A database whose every call says the app database is not open yet. */
+function closedDb(extensionId: string): ExtensionDB {
   const notReady = (): never => {
     throw new Error(`Extension "${extensionId}": AppDB not initialized`)
   }
-  const dbStub: ExtensionDB = {
-    exec: notReady,
-    query: notReady,
-    get: notReady,
-    run: notReady,
-    transaction: notReady,
-  }
+  return { exec: notReady, query: notReady, get: notReady, run: notReady, transaction: notReady }
+}
 
-  const requirePty = (): PtyManager => {
-    if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
-    return deps.ptyManager
+/** A setting's stored value, or the default this extension's schema gives it. */
+function extensionSettingValue<T>(extensionId: string, key: string): T | undefined {
+  const stored = getExtensionSetting(key)
+  if (stored !== undefined) return stored as T
+  const schema = globalRegistry.settingsSections.get(`${extensionId}.settings`)
+  if (schema?.properties[key] !== undefined) {
+    return schema.properties[key].default as T
   }
+  return undefined
+}
 
-  const paths = extensionPaths(deps?.paths ?? { app: '', userData: '' }, extensionId)
-  // Every git and gh this extension runs, through shell or github, starts inside a root (ADR 102).
-  const execInScope = async (input: ShellExecInput) => {
+/** Runs git or gh for one extension, refusing a cwd outside its shell roots (ADR 102). */
+function scopedExec(
+  extensionId: string,
+  deps: ExtensionAPIDeps | undefined,
+  paths: ExtensionAPI['paths']
+): ApiContext['execInScope'] {
+  return async (input) => {
     const roots = extensionShellRoots({
       globalStorage: paths.globalStorage,
       declaredKeys: deps?.shellRootSettings ?? [],
       schema: globalRegistry.settingsSections.get(`${extensionId}.settings`),
-      readSetting: (key) => api.settings.get(key),
+      readSetting: (key) => extensionSettingValue(extensionId, key),
     })
     await assertCwdInScope(input.cwd, roots)
     return execShell(input)
   }
+}
 
-  const api: ExtensionAPI = {
-    db: deps?.db ?? dbStub,
+function apiContext(
+  extensionId: string,
+  deps: ExtensionAPIDeps | undefined,
+  rendererUrl: string | undefined
+): ApiContext & { disposables: Disposable[] } {
+  const disposables: Disposable[] = []
+  const paths = extensionPaths(deps?.paths ?? { app: '', userData: '' }, extensionId)
+  return {
+    extensionId,
+    deps,
+    rendererUrl,
     paths,
-    dialog: {
-      async showOpenDialog(options) {
-        const parent = focusedOrFirstWindow()
-        const result = parent
-          ? await dialog.showOpenDialog(parent, options)
-          : await dialog.showOpenDialog(options)
-        return { canceled: result.canceled, filePaths: result.filePaths }
-      },
-      async showSaveDialog(options) {
-        const parent = focusedOrFirstWindow()
-        const result = parent
-          ? await dialog.showSaveDialog(parent, options)
-          : await dialog.showSaveDialog(options)
-        return { canceled: result.canceled, filePath: result.filePath }
-      },
+    disposables,
+    disposable(dispose) {
+      const d = { dispose }
+      disposables.push(d)
+      return d
     },
-    log: extLogger,
-    settings: {
-      register(schema: ExtensionSettingsSchema): Disposable {
-        const key = `${extensionId}.settings`
-        globalRegistry.settingsSections.set(key, schema)
-        // Settings → Extensions re-reads on this, as Quick Actions does on
-        // commands-changed: a page registered after the panel opened shows.
-        deps?.broadcastToWindows?.('extension:list-changed', null)
-        return disposable(() => {
-          globalRegistry.settingsSections.delete(key)
-          deps?.broadcastToWindows?.('extension:list-changed', null)
-        })
-      },
-      get<T>(key: string): T | undefined {
-        const stored = getExtensionSetting(key)
-        if (stored !== undefined) return stored as T
-        // Fall back to the registered default
-        const sectionKey = `${extensionId}.settings`
-        const schema = globalRegistry.settingsSections.get(sectionKey)
-        if (schema?.properties[key] !== undefined) {
-          return schema.properties[key].default as T
-        }
-        return undefined
-      },
-      set(key: string, value: unknown): void {
-        setExtensionSetting(key, value)
-      },
-      async isBranchExcluded(branch: string, repoPath?: string): Promise<boolean> {
-        return branchExcludePatternsFor(repoPath).some((p) => matchesBranchPattern(p, branch))
-      },
-    },
-    globalShortcut: {
-      async register(accelerator: string, handler: () => void): Promise<Disposable> {
-        const registered = electronGlobalShortcut.register(accelerator, handler)
-        if (!registered) {
-          throw new Error(
-            `ACCELERATOR_TAKEN: "${accelerator}" could not be registered (already in use by OS or another app)`
-          )
-        }
-        return disposable(() => electronGlobalShortcut.unregister(accelerator))
-      },
-    },
-    workspace: {
-      list(): WorkspaceSnapshot[] {
-        return listWorkspaces().map(({ id, name, folderPath }) => ({ id, name, folderPath }))
-      },
-      listProjects(workspaceId: string): ProjectSnapshot[] {
-        return listProjectsFromStore(workspaceId).map(
-          ({ id, workspaceId: wsId, name, worktreePath }) => ({
-            id,
-            workspaceId: wsId,
-            name,
-            worktreePath,
-          })
-        )
-      },
-      async addProject(input): Promise<ProjectSnapshot | null> {
-        // Reused rather than duplicated: provisioning the same worktree twice
-        // should land in the project you were already looking at.
-        //
-        // By path only. Matching on the name as well meant two cards whose
-        // branches happened to share a name got one project — pointing at
-        // whichever worktree was registered first — and the snapshot returned
-        // described a different directory than the caller had asked for.
-        const existing = listProjectsFromStore(input.workspaceId).find(
-          (project) => project.worktreePath === input.worktreePath
-        )
-        if (existing !== undefined) {
-          attachIssueToProject(existing.id, input.issue)
-          return { id: existing.id, workspaceId: existing.workspaceId, name: existing.name }
-        }
-        const create = (name: string) =>
-          createProjectInStore({
-            workspaceId: input.workspaceId,
-            name,
-            worktreePath: input.worktreePath,
-            gitBranch: input.gitBranch,
-            isWorktree: input.isWorktree ?? true,
-          })
-
-        let created = create(input.name)
-        if ('error' in created && created.error === 'DUPLICATE_NAME') {
-          // A different worktree that happens to share a branch name. The store
-          // keeps names unique per workspace, so disambiguate rather than
-          // return null — the caller's alternative is running the agent with
-          // nowhere to show it.
-          created = create(`${input.name} (${basename(input.worktreePath)})`)
-        }
-        if (!('project' in created)) return null
-        const { id, workspaceId, name } = created.project
-        attachIssueToProject(id, input.issue)
-        deps?.broadcastToWindows?.('workspace:project-added', created.project)
-        return { id, workspaceId, name }
-      },
-      deleteProject(projectId: string): void {
-        deleteProjectFromStore(projectId)
-        emitProjectDelete(projectId)
-        deps?.broadcastToWindows?.('workspace:project-removed', { id: projectId })
-      },
-    },
-    extensions: {
-      // Exports live with the backends: the extension host answers this (host-runtime.ts).
-      get(dependencyId: string): never {
-        throw new Error(`"${dependencyId}" exports are only reachable in the extension host`)
-      },
-    },
-    shell: {
-      // One implementation for both overloads; the encoding decides which output type it is.
-      exec: (async (options: ShellExecOptions) => {
-        assertCommandAllowed(options.command)
-        return execInScope({ ...options, timeoutMs: options.timeoutMs ?? 10000 })
-      }) as ExtensionAPI['shell']['exec'],
-    },
-    github: createGithubApi(execInScope),
-    issues: {
-      async connections(): Promise<TrackerConnection[]> {
-        return listTrackerConnections()
-      },
-      async listMine(opts = {}): Promise<IssueListResult> {
-        return getIssueService().listMine(opts)
-      },
-      async search(term: string, opts = {}): Promise<IssueListResult> {
-        return getIssueService().search(term, opts)
-      },
-      async get(
-        tracker: TrackerId,
-        key: string,
-        opts: { refresh?: boolean } = {}
-      ): Promise<Issue | null> {
-        return getIssueService().get(tracker, key, opts)
-      },
-      async comment(tracker: TrackerId, key: string, body: string): Promise<void> {
-        // Deliberately not caught here: an extension that swallows a failed
-        // write is exactly the defect this feature exists to remove.
-        await getIssueService().comment(tracker, key, body)
-      },
-      async states(tracker: TrackerId, key: string): Promise<TrackerStateOption[]> {
-        return getIssueService().states(tracker, key)
-      },
-      async transition(
-        tracker: TrackerId,
-        key: string,
-        intent: TransitionIntent,
-        optionId?: string
-      ): Promise<void> {
-        // Uncaught for the same reason as comment: the caller decides whether
-        // a refused move matters, and it cannot decide what it never hears.
-        await getIssueService().transition(tracker, key, intent, optionId)
-      },
-      supportsTransitions(tracker: TrackerId): boolean {
-        return getIssueService().supportsTransitions(tracker)
-      },
-      async teams(tracker: TrackerId): Promise<TrackerTeam[]> {
-        return getIssueService().teams(tracker)
-      },
-      async create(tracker: TrackerId, input: NewIssueInput): Promise<Issue> {
-        return getIssueService().create(tracker, input)
-      },
-      supportsCreate(tracker: TrackerId): boolean {
-        return getIssueService().supportsCreate(tracker)
-      },
-    },
-    notifications: {
-      showToast(type: ToastType, message: string, key: string): void {
-        notificationManager.create({ type, title: message, source: extensionId, key })
-      },
-      createNotification(opts: {
-        type: ToastType
-        title: string
-        message?: string
-        key: string
-        actions?: Array<{ id: string; label: string; handler: () => void }>
-        onClick?: () => void
-      }): Disposable {
-        const id = notificationManager.create({
-          type: opts.type,
-          title: opts.title,
-          message: opts.message,
-          source: extensionId,
-          key: opts.key,
-          actions: opts.actions,
-          onClick: opts.onClick,
-        })
-        return disposable(() => notificationManager.dismiss(id))
-      },
-    },
-    nativeMenu: {
-      addViewMenuItem(item: NativeMenuItemContribution): Disposable {
-        const key = `${extensionId}.nativemenu.${item.id}`
-        globalRegistry.nativeMenuItems.set(key, item)
-        rebuildViewMenu()
-        return disposable(() => {
-          globalRegistry.nativeMenuItems.delete(key)
-          rebuildViewMenu()
-        })
-      },
-    },
-    commands: {
-      register(
-        command: CommandContribution,
-        handler: (ctx: CommandContext, args?: never) => void | Promise<void>
-      ): Disposable {
-        const key = `${extensionId}.command.${command.id}`
-        globalRegistry.commandContributions.set(key, command)
-        globalRegistry.commandHandlers.set(
-          key,
-          handler as (ctx: CommandContext, args?: unknown) => void | Promise<void>
-        )
-        // Quick Actions re-reads the list: a backend that activates after the
-        // panel opened would otherwise stay missing from it.
-        deps?.broadcastToWindows?.('extension:commands-changed', null)
-        return disposable(() => {
-          globalRegistry.commandContributions.delete(key)
-          globalRegistry.commandHandlers.delete(key)
-          deps?.broadcastToWindows?.('extension:commands-changed', null)
-        })
-      },
-    },
-    ipc: {
-      registerHandler(spec: ChannelSpec, options?: RegisterHandlerOptions): Disposable {
-        assertChannelSpec(spec)
-        handleChannel(spec.channel, (_event, payload) => dispatchChannel(spec, payload), {
-          remoteAccessible: options?.remoteAccessible ?? false,
-        })
-        return disposable(() => removeChannel(spec.channel))
-      },
-      async invokeChannel(channel: string, payload: unknown): Promise<unknown> {
-        const entry = deps?.bridge?.invokeRegistry.get(channel)
-        if (!entry) return undefined
-        return entry.handler(null as never, payload)
-      },
-      async isRemoteAccessible(channel: string): Promise<boolean> {
-        // Core channels (invoke, send, and push/subscribe) are declared in the
-        // channel manifest, which REMOTE_ACCESSIBLE_CHANNELS is derived from.
-        if (REMOTE_ACCESSIBLE_CHANNELS.has(channel)) return true
-        // Everything else is decided by what was declared at registration.
-        // Registered-but-undeclared channels are NOT reachable: the old rule
-        // ("any registered channel is extension-owned and safe") also exposed
-        // every internal core invoke channel to authenticated remote clients.
-        return deps?.bridge?.invokeRegistry.get(channel)?.remoteAccessible ?? false
-      },
-      sendChannel(channel: string, payload: unknown): void {
-        const handler = deps?.bridge?.sendRegistry.get(channel)
-        if (handler) handler(null as never, payload)
-      },
-      onWindowEvent(channel: string, handler: (...args: unknown[]) => void): () => void {
-        deps?.bridge?.eventBus.on(channel, handler)
-        return () => deps?.bridge?.eventBus.off(channel, handler)
-      },
-    },
-    terminal: {
-      onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable {
-        globalRegistry.sessionCreateHandlers.add(handler)
-        return disposable(() => globalRegistry.sessionCreateHandlers.delete(handler))
-      },
-      onSessionClose(handler: (sessionId: string) => void): Disposable {
-        globalRegistry.sessionCloseHandlers.add(handler)
-        return disposable(() => globalRegistry.sessionCloseHandlers.delete(handler))
-      },
-    },
-    pty: {
-      async spawnSession(opts) {
-        return requirePty().spawnSession(opts)
-      },
-      async openTerminal(input): Promise<string | null> {
-        const shell = input.shell ?? getGlobalSettings().terminal.defaultShell
-        return openTab(requirePty(), deps, { ...input, shell })
-      },
-      async runInTerminal(input): Promise<TerminalExit | null> {
-        const ptyManager = requirePty()
-        const sessionId = openTab(ptyManager, deps, { ...input, shell: input.file })
-        return sessionId === null ? null : exitOf(ptyManager, sessionId)
-      },
-      closeTerminalTab(sessionId): void {
-        // The renderer owns the tab list; its close also ends the process
-        // and marks the session record closed.
-        if (deps?.broadcastToWindows) {
-          deps.broadcastToWindows('terminal:close-tab', { sessionId })
-          return
-        }
-        deps?.ptyManager?.kill(sessionId)
-      },
-      onData(sessionId, listener) {
-        if (!deps?.ptyManager) return () => {}
-        return ptyStreamOf(deps.ptyManager).onData(sessionId, listener)
-      },
-      onExit(sessionId, listener) {
-        if (!deps?.ptyManager) return () => {}
-        return ptyStreamOf(deps.ptyManager).onExit(sessionId, listener)
-      },
-      async getSession(sessionId) {
-        return deps?.ptyManager?.getSession(sessionId)
-      },
-      async setWorkspace(sessionId, workspaceId) {
-        return deps?.ptyManager?.setWorkspace(sessionId, workspaceId) ?? false
-      },
-      write(sessionId, data) {
-        deps?.ptyManager?.write(sessionId, data)
-      },
-      resize(sessionId, cols, rows) {
-        deps?.ptyManager?.resize(sessionId, cols, rows)
-      },
-      kill(sessionId) {
-        deps?.ptyManager?.kill(sessionId)
-      },
-      async listSessions() {
-        return deps?.ptyManager?.listSessions() ?? []
-      },
-    },
-    window: {
-      openAuxiliary(view: string, params?: Record<string, string>): void {
-        const navigate = (win: BrowserWindow): void => {
-          const query: Record<string, string> = { view, ...params }
-          if (rendererUrl) {
-            const url = new URL(rendererUrl)
-            for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
-            win.loadURL(url.toString())
-          } else {
-            const devUrl = process.env['ELECTRON_RENDERER_URL']
-            if (devUrl) {
-              win.loadURL(`${devUrl}?${new URLSearchParams(query).toString()}`)
-            } else {
-              win.loadFile(join(__dirname, '../renderer/index.html'), { query })
-            }
-          }
-        }
-
-        const existing = auxiliaryWindows.get(view)
-        if (existing && !existing.isDestroyed()) {
-          // Re-navigate an already-open auxiliary window when the caller hands
-          // through specific context (e.g. the active PR being reviewed) —
-          // otherwise a bare re-open (no params) just refocuses it as-is.
-          if (params && Object.keys(params).length > 0) navigate(existing)
-          existing.focus()
-          return
-        }
-        const win = new BrowserWindow({
-          width: 1400,
-          height: 900,
-          webPreferences: {
-            contextIsolation: true,
-            nodeIntegration: false,
-            preload: join(__dirname, '../preload/index.js'),
-          },
-        })
-        auxiliaryWindows.set(view, win)
-        win.on('closed', () => {
-          auxiliaryWindows.delete(view)
-        })
-        if (rendererUrl) {
-          // Load the extension's own renderer directly so it handles the view param natively,
-          // without needing to create a WebContentsView inside the auxiliary window.
-          win.webContents.on('did-finish-load', () => {
-            win.webContents.insertCSS(EXTENSION_BASE_CSS).catch(() => {})
-          })
-        }
-        navigate(win)
-      },
-      broadcast(channel: string, data: unknown): void {
-        if (deps?.broadcastToWindows) {
-          deps.broadcastToWindows(channel, data)
-        } else {
-          for (const win of BrowserWindow.getAllWindows()) {
-            sendToWindow(win, channel, data)
-          }
-        }
-      },
-      focusSelf(viewParam = 'main'): void {
-        deps?.focusExtensionView?.(extensionId, viewParam)
-      },
-      showSelf(view = 'main'): void {
-        api.window.broadcast('extension:show-surface', { extensionId, view })
-      },
-      raise(): void {
-        raiseAllWindows()
-      },
+    execInScope: scopedExec(extensionId, deps, paths),
+    requirePty() {
+      if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
+      return deps.ptyManager
     },
   }
+}
 
+function dialogApi(): ExtensionAPI['dialog'] {
+  return {
+    async showOpenDialog(options) {
+      const parent = focusedOrFirstWindow()
+      const result = parent
+        ? await dialog.showOpenDialog(parent, options)
+        : await dialog.showOpenDialog(options)
+      return { canceled: result.canceled, filePaths: result.filePaths }
+    },
+    async showSaveDialog(options) {
+      const parent = focusedOrFirstWindow()
+      const result = parent
+        ? await dialog.showSaveDialog(parent, options)
+        : await dialog.showSaveDialog(options)
+      return { canceled: result.canceled, filePath: result.filePath }
+    },
+  }
+}
+
+function settingsApi({ extensionId, deps, disposable }: ApiContext): ExtensionAPI['settings'] {
+  return {
+    register(schema: ExtensionSettingsSchema): Disposable {
+      const key = `${extensionId}.settings`
+      globalRegistry.settingsSections.set(key, schema)
+      // Settings → Extensions re-reads on this, as Quick Actions does on
+      // commands-changed: a page registered after the panel opened shows.
+      deps?.broadcastToWindows?.('extension:list-changed', null)
+      return disposable(() => {
+        globalRegistry.settingsSections.delete(key)
+        deps?.broadcastToWindows?.('extension:list-changed', null)
+      })
+    },
+    get: <T>(key: string): T | undefined => extensionSettingValue<T>(extensionId, key),
+    set(key: string, value: unknown): void {
+      setExtensionSetting(key, value)
+    },
+    async isBranchExcluded(branch: string, repoPath?: string): Promise<boolean> {
+      return branchExcludePatternsFor(repoPath).some((p) => matchesBranchPattern(p, branch))
+    },
+  }
+}
+
+function globalShortcutApi({ disposable }: ApiContext): ExtensionAPI['globalShortcut'] {
+  return {
+    async register(accelerator: string, handler: () => void): Promise<Disposable> {
+      const registered = electronGlobalShortcut.register(accelerator, handler)
+      if (!registered) {
+        throw new Error(
+          `ACCELERATOR_TAKEN: "${accelerator}" could not be registered (already in use by OS or another app)`
+        )
+      }
+      return disposable(() => electronGlobalShortcut.unregister(accelerator))
+    },
+  }
+}
+
+type AddProjectInput = Parameters<ExtensionAPI['workspace']['addProject']>[0]
+
+/**
+ * Registers a worktree as a project, or reuses the one already pointing at it.
+ *
+ * Reused by path only. Matching on the name as well meant two cards whose
+ * branches happened to share a name got one project — pointing at whichever
+ * worktree was registered first — and the snapshot returned described a
+ * different directory than the caller had asked for.
+ */
+function addProject(context: ApiContext, input: AddProjectInput): ProjectSnapshot | null {
+  const existing = listProjectsFromStore(input.workspaceId).find(
+    (project) => project.worktreePath === input.worktreePath
+  )
+  if (existing !== undefined) {
+    attachIssueToProject(existing.id, input.issue)
+    return { id: existing.id, workspaceId: existing.workspaceId, name: existing.name }
+  }
+  const created = createProjectWithUniqueName(input)
+  if (!('project' in created)) return null
+  const { id, workspaceId, name } = created.project
+  attachIssueToProject(id, input.issue)
+  context.deps?.broadcastToWindows?.('workspace:project-added', created.project)
+  return { id, workspaceId, name }
+}
+
+function createProjectWithUniqueName(input: AddProjectInput) {
+  const create = (name: string) =>
+    createProjectInStore({
+      workspaceId: input.workspaceId,
+      name,
+      worktreePath: input.worktreePath,
+      gitBranch: input.gitBranch,
+      isWorktree: input.isWorktree ?? true,
+    })
+  const created = create(input.name)
+  if (!('error' in created && created.error === 'DUPLICATE_NAME')) return created
+  // A different worktree that happens to share a branch name. The store keeps
+  // names unique per workspace, so disambiguate rather than return null — the
+  // caller's alternative is running the agent with nowhere to show it.
+  return create(`${input.name} (${basename(input.worktreePath)})`)
+}
+
+function workspaceApi(context: ApiContext): ExtensionAPI['workspace'] {
+  return {
+    list(): WorkspaceSnapshot[] {
+      return listWorkspaces().map(({ id, name, folderPath }) => ({ id, name, folderPath }))
+    },
+    listProjects(workspaceId: string): ProjectSnapshot[] {
+      return listProjectsFromStore(workspaceId).map(
+        ({ id, workspaceId: wsId, name, worktreePath }) => ({
+          id,
+          workspaceId: wsId,
+          name,
+          worktreePath,
+        })
+      )
+    },
+    addProject: async (input) => addProject(context, input),
+    deleteProject(projectId: string): void {
+      deleteProjectFromStore(projectId)
+      emitProjectDelete(projectId)
+      context.deps?.broadcastToWindows?.('workspace:project-removed', { id: projectId })
+    },
+  }
+}
+
+// Exports live with the backends: the extension host answers this (host-runtime.ts).
+function extensionsApi(): ExtensionAPI['extensions'] {
+  return {
+    get(dependencyId: string): never {
+      throw new Error(`"${dependencyId}" exports are only reachable in the extension host`)
+    },
+  }
+}
+
+function shellApi({ execInScope }: ApiContext): ExtensionAPI['shell'] {
+  return {
+    // One implementation for both overloads; the encoding decides which output type it is.
+    exec: (async (options: ShellExecOptions) => {
+      assertCommandAllowed(options.command)
+      return execInScope({ ...options, timeoutMs: options.timeoutMs ?? 10000 })
+    }) as ExtensionAPI['shell']['exec'],
+  }
+}
+
+type IssuesApi = ExtensionAPI['issues']
+
+function issueReadApi(): Pick<IssuesApi, 'connections' | 'listMine' | 'search' | 'get'> {
+  return {
+    async connections(): Promise<TrackerConnection[]> {
+      return listTrackerConnections()
+    },
+    async listMine(opts = {}): Promise<IssueListResult> {
+      return getIssueService().listMine(opts)
+    },
+    async search(term: string, opts = {}): Promise<IssueListResult> {
+      return getIssueService().search(term, opts)
+    },
+    async get(tracker, key, opts = {}): Promise<Issue | null> {
+      return getIssueService().get(tracker, key, opts)
+    },
+  }
+}
+
+function issueWorkflowApi(): Pick<
+  IssuesApi,
+  'comment' | 'states' | 'transition' | 'supportsTransitions'
+> {
+  return {
+    async comment(tracker: TrackerId, key: string, body: string): Promise<void> {
+      // Deliberately not caught here: an extension that swallows a failed
+      // write is exactly the defect this feature exists to remove.
+      await getIssueService().comment(tracker, key, body)
+    },
+    async states(tracker: TrackerId, key: string): Promise<TrackerStateOption[]> {
+      return getIssueService().states(tracker, key)
+    },
+    // Uncaught for the same reason as comment: the caller decides whether
+    // a refused move matters, and it cannot decide what it never hears.
+    // Forwarded as the SDK declares it: tracker, key, intent and the operator's option.
+    async transition(...move): Promise<void> {
+      await getIssueService().transition(...move)
+    },
+    supportsTransitions(tracker: TrackerId): boolean {
+      return getIssueService().supportsTransitions(tracker)
+    },
+  }
+}
+
+function issueCreateApi(): Pick<IssuesApi, 'teams' | 'create' | 'supportsCreate'> {
+  return {
+    async teams(tracker: TrackerId): Promise<TrackerTeam[]> {
+      return getIssueService().teams(tracker)
+    },
+    async create(tracker: TrackerId, input: NewIssueInput): Promise<Issue> {
+      return getIssueService().create(tracker, input)
+    },
+    supportsCreate(tracker: TrackerId): boolean {
+      return getIssueService().supportsCreate(tracker)
+    },
+  }
+}
+
+type CreateNotificationOptions = Parameters<ExtensionAPI['notifications']['createNotification']>[0]
+
+function notificationsApi({ extensionId, disposable }: ApiContext): ExtensionAPI['notifications'] {
+  return {
+    showToast(type: ToastType, message: string, key: string): void {
+      notificationManager.create({ type, title: message, source: extensionId, key })
+    },
+    createNotification(opts: CreateNotificationOptions): Disposable {
+      const id = notificationManager.create({
+        type: opts.type,
+        title: opts.title,
+        message: opts.message,
+        source: extensionId,
+        key: opts.key,
+        actions: opts.actions,
+        onClick: opts.onClick,
+      })
+      return disposable(() => notificationManager.dismiss(id))
+    },
+  }
+}
+
+function nativeMenuApi({ extensionId, disposable }: ApiContext): ExtensionAPI['nativeMenu'] {
+  return {
+    addViewMenuItem(item: NativeMenuItemContribution): Disposable {
+      const key = `${extensionId}.nativemenu.${item.id}`
+      globalRegistry.nativeMenuItems.set(key, item)
+      rebuildViewMenu()
+      return disposable(() => {
+        globalRegistry.nativeMenuItems.delete(key)
+        rebuildViewMenu()
+      })
+    },
+  }
+}
+
+type CommandHandler = (ctx: CommandContext, args?: unknown) => void | Promise<void>
+
+function commandsApi({ extensionId, deps, disposable }: ApiContext): ExtensionAPI['commands'] {
+  return {
+    register(command: CommandContribution, handler): Disposable {
+      const key = `${extensionId}.command.${command.id}`
+      globalRegistry.commandContributions.set(key, command)
+      globalRegistry.commandHandlers.set(key, handler as CommandHandler)
+      // Quick Actions re-reads the list: a backend that activates after the
+      // panel opened would otherwise stay missing from it.
+      deps?.broadcastToWindows?.('extension:commands-changed', null)
+      return disposable(() => {
+        globalRegistry.commandContributions.delete(key)
+        globalRegistry.commandHandlers.delete(key)
+        deps?.broadcastToWindows?.('extension:commands-changed', null)
+      })
+    },
+  }
+}
+
+type IpcApi = ExtensionAPI['ipc']
+
+function ipcRegistrationApi({
+  deps,
+  disposable,
+}: ApiContext): Pick<IpcApi, 'registerHandler' | 'onWindowEvent'> {
+  return {
+    registerHandler(spec: ChannelSpec, options?: RegisterHandlerOptions): Disposable {
+      assertChannelSpec(spec)
+      handleChannel(spec.channel, (_event, payload) => dispatchChannel(spec, payload), {
+        remoteAccessible: options?.remoteAccessible ?? false,
+      })
+      return disposable(() => removeChannel(spec.channel))
+    },
+    onWindowEvent(channel: string, handler: (...args: unknown[]) => void): () => void {
+      deps?.bridge?.eventBus.on(channel, handler)
+      return () => deps?.bridge?.eventBus.off(channel, handler)
+    },
+  }
+}
+
+function ipcBridgeApi({
+  deps,
+}: ApiContext): Pick<IpcApi, 'invokeChannel' | 'isRemoteAccessible' | 'sendChannel'> {
+  return {
+    async invokeChannel(channel: string, payload: unknown): Promise<unknown> {
+      const entry = deps?.bridge?.invokeRegistry.get(channel)
+      if (!entry) return undefined
+      return entry.handler(null as never, payload)
+    },
+    async isRemoteAccessible(channel: string): Promise<boolean> {
+      // Core channels (invoke, send, and push/subscribe) are declared in the
+      // channel manifest, which REMOTE_ACCESSIBLE_CHANNELS is derived from.
+      if (REMOTE_ACCESSIBLE_CHANNELS.has(channel)) return true
+      // Everything else is decided by what was declared at registration.
+      // Registered-but-undeclared channels are NOT reachable: the old rule
+      // ("any registered channel is extension-owned and safe") also exposed
+      // every internal core invoke channel to authenticated remote clients.
+      return deps?.bridge?.invokeRegistry.get(channel)?.remoteAccessible ?? false
+    },
+    sendChannel(channel: string, payload: unknown): void {
+      const handler = deps?.bridge?.sendRegistry.get(channel)
+      if (handler) handler(null as never, payload)
+    },
+  }
+}
+
+function terminalApi({ disposable }: ApiContext): ExtensionAPI['terminal'] {
+  return {
+    onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable {
+      globalRegistry.sessionCreateHandlers.add(handler)
+      return disposable(() => globalRegistry.sessionCreateHandlers.delete(handler))
+    },
+    onSessionClose(handler: (sessionId: string) => void): Disposable {
+      globalRegistry.sessionCloseHandlers.add(handler)
+      return disposable(() => globalRegistry.sessionCloseHandlers.delete(handler))
+    },
+  }
+}
+
+type PtyApi = ExtensionAPI['pty']
+
+function ptyTabsApi({
+  deps,
+  requirePty,
+}: ApiContext): Pick<
+  PtyApi,
+  'spawnSession' | 'openTerminal' | 'runInTerminal' | 'closeTerminalTab'
+> {
+  return {
+    async spawnSession(opts) {
+      return requirePty().spawnSession(opts)
+    },
+    async openTerminal(input): Promise<string | null> {
+      const shell = input.shell ?? getGlobalSettings().terminal.defaultShell
+      return openTab(requirePty(), deps, { ...input, shell })
+    },
+    async runInTerminal(input): Promise<TerminalExit | null> {
+      const ptyManager = requirePty()
+      const sessionId = openTab(ptyManager, deps, { ...input, shell: input.file })
+      return sessionId === null ? null : exitOf(ptyManager, sessionId)
+    },
+    closeTerminalTab(sessionId): void {
+      // The renderer owns the tab list; its close also ends the process
+      // and marks the session record closed.
+      if (deps?.broadcastToWindows) {
+        deps.broadcastToWindows('terminal:close-tab', { sessionId })
+        return
+      }
+      deps?.ptyManager?.kill(sessionId)
+    },
+  }
+}
+
+function ptyStreamApi({ deps }: ApiContext): Pick<PtyApi, 'onData' | 'onExit'> {
+  return {
+    onData(sessionId, listener) {
+      if (!deps?.ptyManager) return () => {}
+      return ptyStreamOf(deps.ptyManager).onData(sessionId, listener)
+    },
+    onExit(sessionId, listener) {
+      if (!deps?.ptyManager) return () => {}
+      return ptyStreamOf(deps.ptyManager).onExit(sessionId, listener)
+    },
+  }
+}
+
+function ptySessionApi({
+  deps,
+}: ApiContext): Omit<PtyApi, keyof ReturnType<typeof ptyTabsApi> | 'onData' | 'onExit'> {
+  return {
+    async getSession(sessionId) {
+      return deps?.ptyManager?.getSession(sessionId)
+    },
+    async setWorkspace(sessionId, workspaceId) {
+      return deps?.ptyManager?.setWorkspace(sessionId, workspaceId) ?? false
+    },
+    write(sessionId, data) {
+      deps?.ptyManager?.write(sessionId, data)
+    },
+    resize(sessionId, cols, rows) {
+      deps?.ptyManager?.resize(sessionId, cols, rows)
+    },
+    kill(sessionId) {
+      deps?.ptyManager?.kill(sessionId)
+    },
+    async listSessions() {
+      return deps?.ptyManager?.listSessions() ?? []
+    },
+  }
+}
+
+/** Points an auxiliary window at `query`: the extension's own renderer, the dev server, or the app. */
+function navigateAuxiliary(
+  win: BrowserWindow,
+  query: Record<string, string>,
+  rendererUrl: string | undefined
+): void {
+  if (rendererUrl) {
+    const url = new URL(rendererUrl)
+    for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
+    win.loadURL(url.toString())
+    return
+  }
+  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  if (devUrl) {
+    win.loadURL(`${devUrl}?${new URLSearchParams(query).toString()}`)
+  } else {
+    win.loadFile(join(__dirname, '../renderer/index.html'), { query })
+  }
+}
+
+function newAuxiliaryWindow(view: string, rendererUrl: string | undefined): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: join(__dirname, '../preload/index.js'),
+    },
+  })
+  auxiliaryWindows.set(view, win)
+  win.on('closed', () => {
+    auxiliaryWindows.delete(view)
+  })
+  if (rendererUrl) {
+    // Load the extension's own renderer directly so it handles the view param natively,
+    // without needing to create a WebContentsView inside the auxiliary window.
+    win.webContents.on('did-finish-load', () => {
+      win.webContents.insertCSS(EXTENSION_BASE_CSS).catch(() => {})
+    })
+  }
+  return win
+}
+
+function openAuxiliary(
+  view: string,
+  params: Record<string, string> | undefined,
+  rendererUrl: string | undefined
+): void {
+  const query: Record<string, string> = { view, ...params }
+  const existing = auxiliaryWindows.get(view)
+  if (existing && !existing.isDestroyed()) {
+    // Re-navigate an already-open auxiliary window when the caller hands
+    // through specific context (e.g. the active PR being reviewed) —
+    // otherwise a bare re-open (no params) just refocuses it as-is.
+    if (params && Object.keys(params).length > 0) navigateAuxiliary(existing, query, rendererUrl)
+    existing.focus()
+    return
+  }
+  navigateAuxiliary(newAuxiliaryWindow(view, rendererUrl), query, rendererUrl)
+}
+
+function broadcastToAllWindows({ deps }: ApiContext, channel: string, data: unknown): void {
+  if (deps?.broadcastToWindows) {
+    deps.broadcastToWindows(channel, data)
+    return
+  }
+  for (const win of BrowserWindow.getAllWindows()) {
+    sendToWindow(win, channel, data)
+  }
+}
+
+function windowApi(context: ApiContext): ExtensionAPI['window'] {
+  const { extensionId, deps } = context
+  return {
+    openAuxiliary(view: string, params?: Record<string, string>): void {
+      openAuxiliary(view, params, context.rendererUrl)
+    },
+    broadcast(channel: string, data: unknown): void {
+      broadcastToAllWindows(context, channel, data)
+    },
+    focusSelf(viewParam = 'main'): void {
+      deps?.focusExtensionView?.(extensionId, viewParam)
+    },
+    showSelf(view = 'main'): void {
+      broadcastToAllWindows(context, 'extension:show-surface', { extensionId, view })
+    },
+    raise(): void {
+      raiseAllWindows()
+    },
+  }
+}
+
+export function createExtensionAPI(
+  extensionId: string,
+  deps?: ExtensionAPIDeps,
+  rendererUrl?: string
+): ExtensionAPI {
+  const context = apiContext(extensionId, deps, rendererUrl)
+  const api: ExtensionAPI = {
+    db: deps?.db ?? closedDb(extensionId),
+    paths: context.paths,
+    dialog: dialogApi(),
+    log: makeLogger(extensionId),
+    settings: settingsApi(context),
+    globalShortcut: globalShortcutApi(context),
+    workspace: workspaceApi(context),
+    extensions: extensionsApi(),
+    shell: shellApi(context),
+    github: createGithubApi(context.execInScope),
+    issues: { ...issueReadApi(), ...issueWorkflowApi(), ...issueCreateApi() },
+    notifications: notificationsApi(context),
+    nativeMenu: nativeMenuApi(context),
+    commands: commandsApi(context),
+    ipc: { ...ipcRegistrationApi(context), ...ipcBridgeApi(context) },
+    terminal: terminalApi(context),
+    pty: { ...ptyTabsApi(context), ...ptyStreamApi(context), ...ptySessionApi(context) },
+    window: windowApi(context),
+  }
   // The live disposables array (registrations keep pushing into it after
   // activate) is exposed to the ExtensionHost via getApiDisposables so
   // unload/reload/toggle can dispose everything the extension registered.
-  apiDisposables.set(api, disposables)
+  apiDisposables.set(api, context.disposables)
   return api
 }
 

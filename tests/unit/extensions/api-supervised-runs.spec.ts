@@ -36,11 +36,16 @@ const projects: Array<{
   isWorktree?: boolean
 }> = []
 
+/** What the store answers the next createProject with, instead of creating it. */
+const refusals: Array<{ error: string }> = []
+
 vi.mock('../../../src/main/storage/workspace-store', () => ({
   listWorkspaces: () => [{ id: 'ws-1', name: 'Alpha', folderPath: '/projects/alpha' }],
   listProjects: (workspaceId: string) => projects.filter((p) => p.workspaceId === workspaceId),
   deleteProject: vi.fn(),
   createProject: (input: Record<string, unknown>) => {
+    const refusal = refusals.shift()
+    if (refusal !== undefined) return refusal
     const project = { id: `proj-${projects.length + 1}`, ...input } as (typeof projects)[number]
     projects.push(project)
     return { project }
@@ -86,7 +91,7 @@ function build(withWindow = true) {
       return () => {}
     },
   }
-  return createExtensionAPI('test.pilot', '0.1.0', {
+  return createExtensionAPI('test.pilot', {
     ptyManager: ptyManager as never,
     terminalRelay: { start: (id: string) => relayed.push(id) } as never,
     broadcastToWindows: withWindow
@@ -98,6 +103,31 @@ function build(withWindow = true) {
 
 beforeEach(() => {
   projects.length = 0
+  refusals.length = 0
+})
+
+describe('workspace.addProject when the store refuses', () => {
+  it('names the project after its directory when the store refuses the name', async () => {
+    refusals.push({ error: 'DUPLICATE_NAME' })
+    const project = await build().workspace.addProject({
+      workspaceId: 'ws-1',
+      name: 'fix/login',
+      worktreePath: '/wt/two',
+    })
+    expect(project).toMatchObject({ name: 'fix/login (two)' })
+  })
+
+  it('answers null when the store refuses the project for another reason', async () => {
+    refusals.push({ error: 'VALIDATION_ERROR' })
+    const api = build()
+    const project = await api.workspace.addProject({
+      workspaceId: 'ws-1',
+      name: 'a',
+      worktreePath: '/wt/a',
+    })
+    expect(project).toBeNull()
+    expect(broadcasts).toEqual([])
+  })
 })
 
 describe('workspace.addProject', () => {
