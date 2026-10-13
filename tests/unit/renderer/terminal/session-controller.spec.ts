@@ -50,8 +50,6 @@ import {
   adoptTerminalSession,
   createTerminalSession,
   splitTerminalSession,
-  setActivityClock,
-  resetActivityThrottle,
   answerChoice,
 } from '../../../../src/renderer/terminal/session-controller'
 
@@ -82,8 +80,14 @@ beforeEach(() => {
   terminalApi.create.mockResolvedValue({ sessionId: 'session-123' })
   useSessionStore.setState(useSessionStore.getInitialState(), true)
   useWorkspaceStore.setState({ activeProjectId: 'other-project' })
-  resetActivityThrottle()
-  setActivityClock(() => 0)
+  // The activity throttle reads the wall clock; each spec sets it.
+  vi.useFakeTimers({ toFake: ['Date'], now: 0 })
+})
+
+afterEach(() => {
+  // Every terminal a spec opened is disposed, as closing its tab does, so none outlives it.
+  for (const { hooks } of capturedCtorArgs) hooks?.onDispose?.()
+  vi.useRealTimers()
 })
 
 describe('createTerminalSession', () => {
@@ -390,59 +394,68 @@ describe('activity stamping throttle (FR-002)', () => {
   }
 
   it('writes once for a burst of output inside one second', async () => {
-    setActivityClock(() => 1_000)
     const onBusy = await busyHookFor('s1')
     const stamps = countStamps()
+    vi.setSystemTime(1_000)
     for (let i = 0; i < 100; i++) onBusy()
     expect(stamps.of('s1')).toEqual([1_000])
   })
 
   it('writes again once the clock passes one second', async () => {
-    let now = 1_000
-    setActivityClock(() => now)
     const onBusy = await busyHookFor('s1')
     const stamps = countStamps()
+    vi.setSystemTime(1_000)
     onBusy()
-    now = 2_001
+    vi.setSystemTime(2_001)
     onBusy()
     expect(stamps.of('s1')).toEqual([1_000, 2_001])
   })
 
   it('writes again exactly at the one-second boundary — "at most once per second" allows it', async () => {
-    let now = 1_000
-    setActivityClock(() => now)
     const onBusy = await busyHookFor('s1')
     const stamps = countStamps()
+    vi.setSystemTime(1_000)
     onBusy()
-    now = 2_000
+    vi.setSystemTime(2_000)
     onBusy()
     expect(stamps.of('s1')).toEqual([1_000, 2_000])
   })
 
   it('suppresses a write one millisecond short of the boundary', async () => {
-    let now = 1_000
-    setActivityClock(() => now)
     const onBusy = await busyHookFor('s1')
     const stamps = countStamps()
+    vi.setSystemTime(1_000)
     onBusy()
-    now = 1_999
+    vi.setSystemTime(1_999)
     onBusy()
     expect(stamps.of('s1')).toEqual([1_000])
   })
 
   it('throttles each session independently', async () => {
-    setActivityClock(() => 5_000)
     const first = await busyHookFor('s1')
     const second = await busyHookFor('s2')
     const stamps = countStamps()
+    vi.setSystemTime(5_000)
     first()
     second()
     expect(stamps.of('s1')).toEqual([5_000])
     expect(stamps.of('s2')).toEqual([5_000])
   })
 
+  it('forgets a terminal once it is disposed, so one reopened on its session stamps at once', async () => {
+    const first = await busyHookFor('s1')
+    vi.setSystemTime(1_000)
+    first()
+    capturedCtorArgs.at(-1)!.hooks!.onDispose!()
+    const reopened = await busyHookFor('s1')
+    const stamps = countStamps()
+    vi.setSystemTime(1_500)
+    reopened()
+    expect(stamps.of('s1')).toEqual([1_500])
+  })
+
   it('still marks the session busy on every chunk — only the stamp is throttled', async () => {
-    setActivityClock(() => 1_000)
+    vi.setSystemTime(1_000)
     const onBusy = await busyHookFor('s1')
     onBusy()
     useSessionStore.getState().setSessionIdle('s1')
@@ -451,7 +464,7 @@ describe('activity stamping throttle (FR-002)', () => {
   })
 
   it('stamps activity when the session goes idle so the last byte counts', async () => {
-    setActivityClock(() => 9_000)
+    vi.setSystemTime(9_000)
     terminalApi.create.mockResolvedValue({ sessionId: 's1' })
     await createTerminalSession('proj-1', 'agent', 'A', '/repo', 5000)
     const hooks = capturedCtorArgs.at(-1)!.hooks!
@@ -505,7 +518,7 @@ describe('reading a choice prompt off the screen (054)', () => {
     screenRows = ['17:02:22 15 passed', '']
     capturedCtorArgs[0].hooks!.onBusy!()
     expect(sessionOf('session-123')!.latestLine).toBe('17:02:21 14 passed')
-    setActivityClock(() => 1000)
+    vi.setSystemTime(1000)
     capturedCtorArgs[0].hooks!.onBusy!()
     expect(sessionOf('session-123')!.latestLine).toBe('17:02:22 15 passed')
   })

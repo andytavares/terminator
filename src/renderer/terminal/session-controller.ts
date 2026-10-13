@@ -35,7 +35,6 @@ function handleBell(sessionId: string): void {
  */
 const ACTIVITY_STAMP_INTERVAL_MS = 1000
 const lastStampedAt = new Map<string, number>()
-let now: () => number = Date.now
 
 // The needs-you read (latestLine/choicePrompt) settles at IDLE_DEBOUNCE_MS so
 // detection stays fast; the state icon itself waits this much longer so a
@@ -52,21 +51,15 @@ function clearPendingIdle(sessionId: string): void {
   }
 }
 
-/** Test seam: lets a spec drive the throttle without timers. */
-export function setActivityClock(clock: () => number): void {
-  now = clock
-}
-
-/** Test seam: clears the per-session throttle state between specs. */
-export function resetActivityThrottle(): void {
-  lastStampedAt.clear()
-  for (const timer of pendingIdle.values()) clearTimeout(timer)
-  pendingIdle.clear()
+/** A disposed terminal's throttle and pending idle, which nothing will read again. */
+function forgetTerminal(sessionId: string): void {
+  clearPendingIdle(sessionId)
+  lastStampedAt.delete(sessionId)
 }
 
 /** Returns whether it stamped, so a caller can do its own throttled work on the same beat. */
 function stampActivity(sessionId: string, force = false): boolean {
-  const at = now()
+  const at = Date.now()
   const last = lastStampedAt.get(sessionId)
   if (!force && last !== undefined && at - last < ACTIVITY_STAMP_INTERVAL_MS) return false
   lastStampedAt.set(sessionId, at)
@@ -114,7 +107,7 @@ function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInst
         }, WORKING_HOLD_MS)
       )
     },
-    onDispose: () => clearPendingIdle(sessionId),
+    onDispose: () => forgetTerminal(sessionId),
   })
   return instance
 }
