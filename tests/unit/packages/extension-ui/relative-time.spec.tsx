@@ -40,7 +40,9 @@ describe('formatRelativeTime', () => {
     expect(ago(119 * SECOND)).toBe('1 minute ago')
     expect(ago(2 * HOUR - SECOND)).toBe('1 hour ago')
   })
+})
 
+describe('formatRelativeTime — looks forward as well as back', () => {
   it('looks forward as well as back', () => {
     expect(ahead(2 * HOUR)).toBe('in 2 hours')
     expect(ahead(DAY)).toBe('tomorrow')

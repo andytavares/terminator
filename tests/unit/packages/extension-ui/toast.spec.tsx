@@ -36,7 +36,9 @@ describe('Toast', () => {
     act(() => void vi.advanceTimersByTime(60_000))
     expect(onDismiss).not.toHaveBeenCalled()
   })
+})
 
+describe('Toast — offers somewhere to go as a named button', () => {
   /**
    * The container this replaced made the whole toast a click target with
    * nothing on screen to say so — an affordance the reader cannot see is one

@@ -24,7 +24,9 @@ describe('Button', () => {
     expect(onClick).not.toHaveBeenCalled()
     expect((button as HTMLButtonElement).disabled).toBe(true)
   })
+})
 
+describe('Button — never submits a form it happens to sit in unless it is asked to', () => {
   it('never submits a form it happens to sit in unless it is asked to', () => {
     const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault())
     render(
@@ -53,7 +55,9 @@ describe('Button', () => {
     expect(classes).toContain('tmui-button--secondary')
     expect(classes).toContain('tmui-button--md')
   })
+})
 
+describe('Button — marks the small size for the stylesheet', () => {
   it('marks the small size for the stylesheet', () => {
     render(<Button size="sm">Go</Button>)
     expect(screen.getByRole('button').className).toContain('tmui-button--sm')
