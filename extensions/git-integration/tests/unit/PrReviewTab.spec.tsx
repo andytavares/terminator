@@ -297,9 +297,10 @@ describe('PrReviewTab — closes PR view and persists paused session when onClos
   })
 })
 
-describe('PrReviewTab (continued) — after an approval', () => {
-  const activePr = { number: 7, title: 'My PR', headSHA: 'abc123' } as unknown as PrReviewDetail
+/** PR 7, open in the tab. */
+const pr7 = { number: 7, title: 'My PR', headSHA: 'abc123' } as unknown as PrReviewDetail
 
+describe('PrReviewTab (continued) — after an approval', () => {
   afterEach(() => {
     window.history.replaceState(null, '', '/')
   })
@@ -309,7 +310,7 @@ describe('PrReviewTab (continued) — after an approval', () => {
     const close = vi.spyOn(window, 'close').mockImplementation(() => {})
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
-      activePr,
+      activePr: pr7,
     } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByText('Approved'))
@@ -320,8 +321,6 @@ describe('PrReviewTab (continued) — after an approval', () => {
 })
 
 describe('PrReviewTab (continued) — after an approval — returns the docked panel to its queue', () => {
-  const activePr = { number: 7, title: 'My PR', headSHA: 'abc123' } as unknown as PrReviewDetail
-
   afterEach(() => {
     window.history.replaceState(null, '', '/')
   })
@@ -330,7 +329,7 @@ describe('PrReviewTab (continued) — after an approval — returns the docked p
     const close = vi.spyOn(window, 'close').mockImplementation(() => {})
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
-      activePr,
+      activePr: pr7,
     } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByText('Approved'))

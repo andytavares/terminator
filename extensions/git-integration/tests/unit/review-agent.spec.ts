@@ -250,7 +250,7 @@ const baseInput: RunAgentReviewInput = {
 async function startFakeRun(input: RunAgentReviewInput = baseInput) {
   const exec = vi.fn(async () => ({ stdout: 'diff' }))
   const fake = makeFakeProcess()
-  const spawn = vi.fn(() => fake)
+  const spawn = vi.fn((..._args: Parameters<SpawnFn>) => fake)
   const { done, cancel } = runAgentReview(input, { exec, spawn, resolveClaude })
   // let the diff/prompt build settle before the process "runs"
   await new Promise((r) => setTimeout(r, 10))
@@ -282,7 +282,7 @@ describe('runAgentReview — a run that completes', () => {
     expect(run.summary).toBe('looks fine')
 
     expect(spawn).toHaveBeenCalledTimes(1)
-    const [cmd, args, opts] = spawn.mock.calls[0] as unknown as Parameters<SpawnFn>
+    const [cmd, args, opts] = spawn.mock.calls[0]
     expect(cmd).toBe('/Users/me/.local/bin/claude')
     expect(args).toContain('--tools')
     expect(args[args.indexOf('--tools') + 1]).toBe('Read,Grep,Glob')
@@ -433,7 +433,7 @@ describe('runAgentReview — child environment', () => {
         printAndExit(fake, { structured_output: { summary: 's', findings: [] } })
         await done
 
-        const [, , opts] = spawn.mock.calls[0] as unknown as Parameters<SpawnFn>
+        const [, , opts] = spawn.mock.calls[0]
         expect(opts.env.CLAUDE_CODE_BRIDGE_SESSION_ID).toBeUndefined()
         expect(opts.env.CLAUDECODE).toBeUndefined()
       }
