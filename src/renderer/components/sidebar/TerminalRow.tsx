@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { StateChip } from '../session/StateChip'
 import type { BranchTerminal } from '../../sidebar/branch-rows'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
+import { activateOnKey, afterClosing, clickOnly } from './row-events'
 import './TerminalRow.css'
 
 export interface TerminalRowProps {
@@ -55,7 +56,7 @@ export function TerminalRow(props: TerminalRowProps): JSX.Element {
       role="button"
       tabIndex={0}
       onClick={onSelect}
-      onKeyDown={selectOnKey(onSelect)}
+      onKeyDown={activateOnKey(onSelect)}
       onContextMenu={openMenu}
     >
       <TerminalRowContent terminal={terminal} linkKey={key} onClose={onClose} />
@@ -69,15 +70,6 @@ export function TerminalRow(props: TerminalRowProps): JSX.Element {
       )}
     </div>
   )
-}
-
-/** Enter or Space selects the row, as a click does. */
-function selectOnKey(onSelect: () => void) {
-  return (e: React.KeyboardEvent): void => {
-    if (e.key !== 'Enter' && e.key !== ' ') return
-    e.preventDefault()
-    onSelect()
-  }
 }
 
 /** Where the link menu is open, if it is; no menu at all when nothing can link. */
@@ -100,10 +92,7 @@ function linkItems(
   key: string | null,
   closeMenu: () => void
 ): ContextMenuItem[] {
-  const run = (fn?: () => void) => () => {
-    closeMenu()
-    fn?.()
-  }
+  const run = (fn?: () => void) => afterClosing(closeMenu, () => fn?.())
   if (key === null) return [{ label: 'Link issue…', onSelect: run(onLinkIssue) }]
   return [
     { label: 'Change linked issue…', onSelect: run(onLinkIssue) },
@@ -138,10 +127,7 @@ function TerminalRowContent({ terminal, linkKey, onClose }: ContentProps): JSX.E
         className="terminal-row__close"
         aria-label={`Close ${terminal.title}`}
         title="Close terminal"
-        onClick={(e) => {
-          e.stopPropagation()
-          onClose()
-        }}
+        onClick={clickOnly(onClose)}
       >
         <X aria-hidden="true" />
       </button>

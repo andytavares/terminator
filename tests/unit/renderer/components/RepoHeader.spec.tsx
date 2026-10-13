@@ -264,3 +264,25 @@ describe('RepoHeader — open in editor', () => {
     expect(screen.queryByText(/Open in/)).toBeNull()
   })
 })
+
+describe('RepoHeader — keyboard, drop target and a pathless repo', () => {
+  it.each(['Enter', ' '])('collapses on %s, and ignores other keys', (key) => {
+    const onToggleCollapse = vi.fn()
+    const { container } = renderHeader({}, { onToggleCollapse })
+    const header = container.querySelector('.repo-header')!
+    fireEvent.keyDown(header, { key: 'a' })
+    expect(onToggleCollapse).not.toHaveBeenCalled()
+    fireEvent.keyDown(header, { key })
+    expect(onToggleCollapse).toHaveBeenCalledOnce()
+  })
+
+  it('marks itself while a dragged repo is over it', () => {
+    const { container } = renderHeader({}, { dragOver: true })
+    expect(container.querySelector('.repo-header--dnd-over')).toBeTruthy()
+  })
+
+  it('puts no tooltip on the name of a repo with no folder', () => {
+    const { container } = renderHeader({ folderPath: '' })
+    expect(container.querySelector('.repo-header__name')!.hasAttribute('title')).toBe(false)
+  })
+})

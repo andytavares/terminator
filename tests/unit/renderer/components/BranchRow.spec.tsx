@@ -455,3 +455,63 @@ describe('BranchRow — open in editor — session issue keys', () => {
     expect(container.querySelector('.branch-row__issue')).toBeNull()
   })
 })
+
+const TERMINAL = {
+  sessionId: 'ses-1',
+  title: 'Terminal 1',
+  state: 'idle' as const,
+  bellCount: 0,
+  panes: [],
+  workItem: null,
+}
+
+describe('BranchRow — the disclosure for its terminals', () => {
+  it('draws an empty slot rather than a button when there are no terminals', () => {
+    const { container } = renderRow({}, { onToggleExpanded: vi.fn(), expanded: false })
+    expect(container.querySelector('.branch-row__disclosure--empty')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /terminals in/ })).toBeNull()
+  })
+
+  it('shows or hides them without selecting the branch', () => {
+    const onSelect = vi.fn()
+    const onToggleExpanded = vi.fn()
+    renderRow({ terminals: [TERMINAL] }, { onSelect, onToggleExpanded, expanded: false })
+    fireEvent.click(screen.getByRole('button', { name: 'Show terminals in 034-declutter' }))
+    expect(onToggleExpanded).toHaveBeenCalledOnce()
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('says it hides them once expanded', () => {
+    renderRow({ terminals: [TERMINAL] }, { onToggleExpanded: vi.fn(), expanded: true })
+    const button = screen.getByRole('button', { name: 'Hide terminals in 034-declutter' })
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+  })
+})
+
+describe('BranchRow — the menu and the keyboard', () => {
+  it('closes the menu before running an issue action', () => {
+    const onOpenIssue = vi.fn()
+    const { container } = renderRow(
+      {},
+      { issueActions: { issueKey: 'TAV-14', onLinkIssue: vi.fn(), onOpenIssue } }
+    )
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    fireEvent.click(screen.getByText('Open TAV-14 in tracker'))
+    expect(onOpenIssue).toHaveBeenCalledOnce()
+    expect(document.querySelector('.ctx-menu')).toBeNull()
+  })
+
+  it('closes the menu on a click elsewhere', () => {
+    const { container } = renderRow({}, { onRemove: vi.fn() })
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    fireEvent.click(document.body)
+    expect(document.querySelector('.ctx-menu')).toBeNull()
+  })
+
+  it('ignores keys other than Enter and Space', () => {
+    const onSelect = vi.fn()
+    const { container } = renderRow({}, { onSelect })
+    fireEvent.keyDown(container.querySelector('.branch-row')!, { key: 'a' })
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+})
