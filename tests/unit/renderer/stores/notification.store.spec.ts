@@ -36,136 +36,124 @@ beforeEach(() => {
   resetStore()
 })
 
-describe('useNotificationStore', () => {
-  describe('addNotification', () => {
-    it('adds notification with read=false and increments unreadCount', () => {
-      const n = makeNotif()
-      useNotificationStore.getState().addNotification(n)
-      const { notifications, unreadCount } = useNotificationStore.getState()
-      expect(notifications).toHaveLength(1)
-      expect(notifications[0].read).toBe(false)
-      expect(notifications[0].title).toBe(n.title)
-      expect(unreadCount).toBe(1)
-    })
+describe('useNotificationStore — addNotification', () => {
+  it('adds notification with read=false and increments unreadCount', () => {
+    const n = makeNotif()
+    useNotificationStore.getState().addNotification(n)
+    const { notifications, unreadCount } = useNotificationStore.getState()
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0].read).toBe(false)
+    expect(notifications[0].title).toBe(n.title)
+    expect(unreadCount).toBe(1)
+  })
 
-    it('is a no-op when same id is added twice', () => {
-      const n = makeNotif({ id: 'dup-id' })
-      useNotificationStore.getState().addNotification(n)
-      useNotificationStore.getState().addNotification(n)
-      expect(useNotificationStore.getState().notifications).toHaveLength(1)
-      expect(useNotificationStore.getState().unreadCount).toBe(1)
-    })
+  it('is a no-op when same id is added twice', () => {
+    const n = makeNotif({ id: 'dup-id' })
+    useNotificationStore.getState().addNotification(n)
+    useNotificationStore.getState().addNotification(n)
+    expect(useNotificationStore.getState().notifications).toHaveLength(1)
+    expect(useNotificationStore.getState().unreadCount).toBe(1)
+  })
 
-    it('prepends newest notification to front of list', () => {
-      useNotificationStore.getState().addNotification(makeNotif({ id: 'first', title: 'A' }))
-      useNotificationStore.getState().addNotification(makeNotif({ id: 'second', title: 'B' }))
-      const { notifications } = useNotificationStore.getState()
-      expect(notifications[0].title).toBe('B')
-      expect(notifications[1].title).toBe('A')
-    })
+  it('prepends newest notification to front of list', () => {
+    useNotificationStore.getState().addNotification(makeNotif({ id: 'first', title: 'A' }))
+    useNotificationStore.getState().addNotification(makeNotif({ id: 'second', title: 'B' }))
+    const { notifications } = useNotificationStore.getState()
+    expect(notifications[0].title).toBe('B')
+    expect(notifications[1].title).toBe('A')
   })
 })
 
 describe('useNotificationStore — markRead', () => {
-  describe('markRead', () => {
-    it('marks notification as read and decrements unreadCount', () => {
-      const n = makeNotif()
-      useNotificationStore.getState().addNotification(n)
-      useNotificationStore.getState().markRead(n.id)
-      const { notifications, unreadCount } = useNotificationStore.getState()
-      expect(notifications[0].read).toBe(true)
-      expect(unreadCount).toBe(0)
-    })
+  it('marks notification as read and decrements unreadCount', () => {
+    const n = makeNotif()
+    useNotificationStore.getState().addNotification(n)
+    useNotificationStore.getState().markRead(n.id)
+    const { notifications, unreadCount } = useNotificationStore.getState()
+    expect(notifications[0].read).toBe(true)
+    expect(unreadCount).toBe(0)
+  })
 
-    it('does not change other notifications', () => {
-      const a = makeNotif({ id: 'a' })
-      const b = makeNotif({ id: 'b' })
-      useNotificationStore.getState().addNotification(a)
-      useNotificationStore.getState().addNotification(b)
-      useNotificationStore.getState().markRead(a.id)
-      const { notifications } = useNotificationStore.getState()
-      const bNotif = notifications.find((n) => n.id === 'b')
-      expect(bNotif?.read).toBe(false)
-    })
+  it('does not change other notifications', () => {
+    const a = makeNotif({ id: 'a' })
+    const b = makeNotif({ id: 'b' })
+    useNotificationStore.getState().addNotification(a)
+    useNotificationStore.getState().addNotification(b)
+    useNotificationStore.getState().markRead(a.id)
+    const { notifications } = useNotificationStore.getState()
+    const bNotif = notifications.find((n) => n.id === 'b')
+    expect(bNotif?.read).toBe(false)
   })
 })
 
 describe('useNotificationStore — markAllRead', () => {
-  describe('markAllRead', () => {
-    it('marks all notifications as read and zeroes unreadCount', () => {
-      useNotificationStore.getState().addNotification(makeNotif({ id: 'x' }))
-      useNotificationStore.getState().addNotification(makeNotif({ id: 'y' }))
-      useNotificationStore.getState().markAllRead()
-      const { notifications, unreadCount } = useNotificationStore.getState()
-      expect(notifications.every((n) => n.read)).toBe(true)
-      expect(unreadCount).toBe(0)
-    })
+  it('marks all notifications as read and zeroes unreadCount', () => {
+    useNotificationStore.getState().addNotification(makeNotif({ id: 'x' }))
+    useNotificationStore.getState().addNotification(makeNotif({ id: 'y' }))
+    useNotificationStore.getState().markAllRead()
+    const { notifications, unreadCount } = useNotificationStore.getState()
+    expect(notifications.every((n) => n.read)).toBe(true)
+    expect(unreadCount).toBe(0)
   })
 })
 
 describe('useNotificationStore — dismiss', () => {
-  describe('dismiss', () => {
-    it('removes notification from list', () => {
-      const n = makeNotif()
-      useNotificationStore.getState().addNotification(n)
-      useNotificationStore.getState().dismiss(n.id)
-      expect(useNotificationStore.getState().notifications).toHaveLength(0)
-    })
+  it('removes notification from list', () => {
+    const n = makeNotif()
+    useNotificationStore.getState().addNotification(n)
+    useNotificationStore.getState().dismiss(n.id)
+    expect(useNotificationStore.getState().notifications).toHaveLength(0)
+  })
 
-    it('calls electronAPI.notifications.dismiss with the id', () => {
-      const n = makeNotif({ id: 'to-dismiss' })
-      useNotificationStore.getState().addNotification(n)
-      useNotificationStore.getState().dismiss(n.id)
-      expect(mockDismiss).toHaveBeenCalledWith('to-dismiss')
-    })
+  it('calls electronAPI.notifications.dismiss with the id', () => {
+    const n = makeNotif({ id: 'to-dismiss' })
+    useNotificationStore.getState().addNotification(n)
+    useNotificationStore.getState().dismiss(n.id)
+    expect(mockDismiss).toHaveBeenCalledWith('to-dismiss')
+  })
 
-    it('updates unreadCount after dismissing unread notification', () => {
-      const n = makeNotif()
-      useNotificationStore.getState().addNotification(n)
-      useNotificationStore.getState().dismiss(n.id)
-      expect(useNotificationStore.getState().unreadCount).toBe(0)
-    })
+  it('updates unreadCount after dismissing unread notification', () => {
+    const n = makeNotif()
+    useNotificationStore.getState().addNotification(n)
+    useNotificationStore.getState().dismiss(n.id)
+    expect(useNotificationStore.getState().unreadCount).toBe(0)
   })
 })
 
 describe('useNotificationStore — clearAll', () => {
-  describe('clearAll', () => {
-    it('empties notifications list and zeroes unreadCount', () => {
-      useNotificationStore.getState().addNotification(makeNotif({ id: 'c1' }))
-      useNotificationStore.getState().addNotification(makeNotif({ id: 'c2' }))
-      useNotificationStore.getState().clearAll()
-      expect(useNotificationStore.getState().notifications).toHaveLength(0)
-      expect(useNotificationStore.getState().unreadCount).toBe(0)
-    })
+  it('empties notifications list and zeroes unreadCount', () => {
+    useNotificationStore.getState().addNotification(makeNotif({ id: 'c1' }))
+    useNotificationStore.getState().addNotification(makeNotif({ id: 'c2' }))
+    useNotificationStore.getState().clearAll()
+    expect(useNotificationStore.getState().notifications).toHaveLength(0)
+    expect(useNotificationStore.getState().unreadCount).toBe(0)
+  })
 
-    it('calls dismiss on each notification', () => {
-      useNotificationStore.getState().addNotification(makeNotif({ id: 'd1' }))
-      useNotificationStore.getState().addNotification(makeNotif({ id: 'd2' }))
-      useNotificationStore.getState().clearAll()
-      expect(mockDismiss.mock.calls).toEqual([['d2'], ['d1']])
-    })
+  it('calls dismiss on each notification', () => {
+    useNotificationStore.getState().addNotification(makeNotif({ id: 'd1' }))
+    useNotificationStore.getState().addNotification(makeNotif({ id: 'd2' }))
+    useNotificationStore.getState().clearAll()
+    expect(mockDismiss.mock.calls).toEqual([['d2'], ['d1']])
   })
 })
 
 describe('useNotificationStore — panel state', () => {
-  describe('panel state', () => {
-    it('togglePanel flips panelOpen', () => {
-      expect(useNotificationStore.getState().panelOpen).toBe(false)
-      useNotificationStore.getState().togglePanel()
-      expect(useNotificationStore.getState().panelOpen).toBe(true)
-      useNotificationStore.getState().togglePanel()
-      expect(useNotificationStore.getState().panelOpen).toBe(false)
-    })
+  it('togglePanel flips panelOpen', () => {
+    expect(useNotificationStore.getState().panelOpen).toBe(false)
+    useNotificationStore.getState().togglePanel()
+    expect(useNotificationStore.getState().panelOpen).toBe(true)
+    useNotificationStore.getState().togglePanel()
+    expect(useNotificationStore.getState().panelOpen).toBe(false)
+  })
 
-    it('openPanel sets panelOpen to true', () => {
-      useNotificationStore.getState().openPanel()
-      expect(useNotificationStore.getState().panelOpen).toBe(true)
-    })
+  it('openPanel sets panelOpen to true', () => {
+    useNotificationStore.getState().openPanel()
+    expect(useNotificationStore.getState().panelOpen).toBe(true)
+  })
 
-    it('closePanel sets panelOpen to false', () => {
-      useNotificationStore.getState().openPanel()
-      useNotificationStore.getState().closePanel()
-      expect(useNotificationStore.getState().panelOpen).toBe(false)
-    })
+  it('closePanel sets panelOpen to false', () => {
+    useNotificationStore.getState().openPanel()
+    useNotificationStore.getState().closePanel()
+    expect(useNotificationStore.getState().panelOpen).toBe(false)
   })
 })

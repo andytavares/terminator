@@ -84,29 +84,27 @@ describe('useToastStore — addToast — generates unique ids for multiple toast
 })
 
 describe('useToastStore — removeToast', () => {
-  describe('removeToast', () => {
-    it('removes the toast with the given id', () => {
-      useToastStore.getState().addToast({ type: 'warning', message: 'Watch out' })
-      const { toasts } = useToastStore.getState()
-      const { id } = toasts[0]
-      useToastStore.getState().removeToast(id)
-      expect(useToastStore.getState().toasts).toHaveLength(0)
-    })
+  it('removes the toast with the given id', () => {
+    useToastStore.getState().addToast({ type: 'warning', message: 'Watch out' })
+    const { toasts } = useToastStore.getState()
+    const { id } = toasts[0]
+    useToastStore.getState().removeToast(id)
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+  })
 
-    it('does not remove other toasts', () => {
-      useToastStore.getState().addToast({ type: 'info', message: 'Keep' })
-      useToastStore.getState().addToast({ type: 'error', message: 'Remove' })
-      const { toasts } = useToastStore.getState()
-      const removeId = toasts[1].id
-      useToastStore.getState().removeToast(removeId)
-      expect(useToastStore.getState().toasts).toHaveLength(1)
-      expect(useToastStore.getState().toasts[0].message).toBe('Keep')
-    })
+  it('does not remove other toasts', () => {
+    useToastStore.getState().addToast({ type: 'info', message: 'Keep' })
+    useToastStore.getState().addToast({ type: 'error', message: 'Remove' })
+    const { toasts } = useToastStore.getState()
+    const removeId = toasts[1].id
+    useToastStore.getState().removeToast(removeId)
+    expect(useToastStore.getState().toasts).toHaveLength(1)
+    expect(useToastStore.getState().toasts[0].message).toBe('Keep')
+  })
 
-    it('is a no-op for unknown id', () => {
-      useToastStore.getState().addToast({ type: 'info', message: 'Stays' })
-      useToastStore.getState().removeToast('nonexistent-id')
-      expect(useToastStore.getState().toasts).toHaveLength(1)
-    })
+  it('is a no-op for unknown id', () => {
+    useToastStore.getState().addToast({ type: 'info', message: 'Stays' })
+    useToastStore.getState().removeToast('nonexistent-id')
+    expect(useToastStore.getState().toasts).toHaveLength(1)
   })
 })

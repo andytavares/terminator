@@ -630,7 +630,9 @@ describe('CreateProjectDialog — from an issue — honours an edit made after p
 
     fireEvent.click(screen.getByText('Create'))
     await vi.waitFor(() => expect(mockCreateProject).toHaveBeenCalled())
-    await vi.waitFor(() => expect(linkIssue).toHaveBeenCalledWith('p-new', 'linear', 'TAV-42'))
+    await vi.waitFor(() =>
+      expect(linkIssue).toHaveBeenCalledWith('p-new', { tracker: 'linear', key: 'TAV-42' })
+    )
   })
 })
 

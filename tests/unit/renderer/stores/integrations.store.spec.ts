@@ -255,7 +255,9 @@ describe('integrations store — links — links and reads back, so the badge ge
     api.linkSet.mockResolvedValue({ link: LINK })
     api.linkGet.mockResolvedValue({ link: LINK, issue: ISSUE })
 
-    const ok = await useIntegrationsStore.getState().linkIssue(P, 'linear', 'TAV-42')
+    const ok = await useIntegrationsStore
+      .getState()
+      .linkIssue(P, { tracker: 'linear', key: 'TAV-42' })
 
     expect(ok).toBe(true)
     expect(api.linkGet).toHaveBeenCalledWith({ projectId: P })
@@ -264,7 +266,9 @@ describe('integrations store — links — links and reads back, so the badge ge
 
   it('reports a link failure without touching state', async () => {
     api.linkSet.mockResolvedValue({ error: 'failed', message: 'read-only' })
-    const ok = await useIntegrationsStore.getState().linkIssue(P, 'linear', 'TAV-42')
+    const ok = await useIntegrationsStore
+      .getState()
+      .linkIssue(P, { tracker: 'linear', key: 'TAV-42' })
     expect(ok).toBe(false)
     expect(api.linkGet).not.toHaveBeenCalled()
     expect(useIntegrationsStore.getState().linkFor(P)).toBeNull()
@@ -445,5 +449,21 @@ describe('integrations store — issues by key', () => {
     api.getIssue.mockResolvedValue({ error: 'network', message: 'offline' })
     await useIntegrationsStore.getState().loadIssue('linear', 'NW-88')
     expect(useIntegrationsStore.getState().issueByKey('linear', 'NW-88')).toBeNull()
+  })
+})
+
+describe('integrations store — the link dialog and the issue drawer', () => {
+  it('opens and closes the link picker for one project', () => {
+    useIntegrationsStore.getState().openLinkDialog(P)
+    expect(useIntegrationsStore.getState().linkDialogProjectId).toBe(P)
+    useIntegrationsStore.getState().closeLinkDialog()
+    expect(useIntegrationsStore.getState().linkDialogProjectId).toBeNull()
+  })
+
+  it('opens and closes the issue drawer for one project', () => {
+    useIntegrationsStore.getState().openDrawer(P)
+    expect(useIntegrationsStore.getState().drawerProjectId).toBe(P)
+    useIntegrationsStore.getState().closeDrawer()
+    expect(useIntegrationsStore.getState().drawerProjectId).toBeNull()
   })
 })

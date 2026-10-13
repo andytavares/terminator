@@ -177,7 +177,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
     if (issue === null) return
     const project = (result as { project?: { id?: string } }).project
     if (project?.id === undefined) return
-    await linkIssue(project.id, issue.tracker, issue.key)
+    await linkIssue(project.id, { tracker: issue.tracker, key: issue.key })
   }
 
   async function handleSubmit(): Promise<void> {

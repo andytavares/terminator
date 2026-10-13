@@ -193,3 +193,32 @@ describe('useMetricsStore — stopPolling keeps system polling when globalMetric
     expect(mockGetSystem).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('useMetricsStore — restarting and stray answers', () => {
+  it('starting again replaces the running poll rather than adding a second', async () => {
+    mockGetSystem.mockResolvedValue({ data: sysData })
+    mockGetProcesses.mockResolvedValue({ data: [] })
+    useMetricsStore.getState().startPolling([{ sessionId: 's1', pid: 1 }])
+    useMetricsStore.getState().startPolling([{ sessionId: 's1', pid: 1 }])
+    await vi.advanceTimersByTimeAsync(0)
+    mockGetSystem.mockClear()
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(mockGetSystem).toHaveBeenCalledTimes(1)
+  })
+
+  it('stopping when nothing polls just clears the metrics', () => {
+    useMetricsStore.getState().setSystem(sysData)
+    useMetricsStore.getState().stopPolling()
+    expect(useMetricsStore.getState()).toMatchObject({ system: null, pollingActive: false })
+  })
+
+  it('ignores a failed process read and a pid no session owns', async () => {
+    mockGetSystem.mockResolvedValue({ data: sysData })
+    mockGetProcesses
+      .mockResolvedValueOnce({ error: 'unavailable' })
+      .mockResolvedValue({ data: [{ pid: 99, cpuPercent: 1, memBytes: 1 }] })
+    useMetricsStore.getState().startPolling([{ sessionId: 's1', pid: 1 }])
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(useMetricsStore.getState().processesBySessionId.size).toBe(0)
+  })
+})

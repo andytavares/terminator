@@ -64,7 +64,7 @@ function setUpUseSessionStore(): void {
   })
 }
 
-describe('useSessionStore', () => {
+describe('useSessionStore — dropProjectSessions', () => {
   setUpUseSessionStore()
 
   it("removes the deleted project's tabs and disposes their terminals, leaving others", () => {
@@ -1060,7 +1060,7 @@ function setUpActivityAttentionAndNotes(): void {
   })
 }
 
-describe('activity, attention and notes (feature 030)', () => {
+describe('activity, attention and notes (feature 030) — stampActivity', () => {
   setUpActivityAttentionAndNotes()
 
   it('records the supplied time without reading the clock itself', () => {

@@ -145,3 +145,11 @@ describe('change-stats store — lazy, cached, never awaited by render — recor
     expect(store().statsFor('b1')).toMatchObject({ state: 'error', stats: null })
   })
 })
+
+describe('change-stats store — invalidating a branch it never asked about', () => {
+  it('changes nothing', () => {
+    const before = store().entries
+    store().invalidate('never-seen')
+    expect(store().entries).toBe(before)
+  })
+})

@@ -156,7 +156,9 @@ describe('LinkIssueDialog — linking', () => {
     fireEvent.click(await screen.findByText('TAV-42'))
     fireEvent.click(screen.getByText('Link TAV-42'))
 
-    await waitFor(() => expect(linkIssue).toHaveBeenCalledWith(P, 'linear', 'TAV-42'))
+    await waitFor(() =>
+      expect(linkIssue).toHaveBeenCalledWith(P, { tracker: 'linear', key: 'TAV-42' })
+    )
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 })

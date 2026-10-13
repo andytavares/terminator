@@ -58,7 +58,7 @@ export function LinkIssueDialog({
   async function commit(): Promise<void> {
     if (selected === null) return
     setBusy(true)
-    const ok = await linkIssue(projectId, selected.tracker, selected.key)
+    const ok = await linkIssue(projectId, { tracker: selected.tracker, key: selected.key })
     setBusy(false)
     if (!ok) {
       setError('Could not attach that issue. Nothing was changed.')
