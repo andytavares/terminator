@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import {
@@ -31,6 +32,24 @@ import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let root: string
 
+/** The one repository the order changes, on its own head branch. */
+const APP_REPO = {
+  name: 'app',
+  path: '/repos/app',
+  lane: 1,
+  baseBranch: 'main',
+  headBranch: 'foundry/wo-1',
+}
+
+/** The one criterion the order is held to. */
+const REFUSED_CRITERION: WorkOrder['acceptance'][number] = {
+  id: 'AC-1',
+  statement: 'An expired token is refused',
+  priority: 'P0',
+  verify: { kind: 'test', command: 'npm test', assert: 'exit 0' },
+  unverifiable: null,
+}
+
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
     id: 'WO-1',
@@ -42,27 +61,8 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
   return {
     ...base,
     status: 'running',
-    context: {
-      ...base.context,
-      repos: [
-        {
-          name: 'app',
-          path: '/repos/app',
-          lane: 1,
-          baseBranch: 'main',
-          headBranch: 'foundry/wo-1',
-        },
-      ],
-    },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'An expired token is refused',
-        priority: 'P0',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit 0' },
-        unverifiable: null,
-      },
-    ],
+    context: { ...base.context, repos: [APP_REPO] },
+    acceptance: [REFUSED_CRITERION],
     ...over,
   }
 }
@@ -559,56 +559,43 @@ describe('the branches a happy path never reaches', () => {
   describe('what gh printed', whatGhPrintedTests)
 })
 
+/** A producer lane (proto) whose contract a consumer lane (cli) adopts. */
+const TWO_LANE_REPOS = [
+  { name: 'proto', path: '/repos/proto', lane: 1, baseBranch: 'main', headBranch: 'f/wo-1' },
+  { name: 'cli', path: '/repos/cli', lane: 2, baseBranch: 'main', headBranch: 'f/wo-1' },
+]
+
+const TWO_LANE_PLAN: Pick<WorkOrder['plan'], 'sharedFiles' | 'lanes' | 'units'> = {
+  sharedFiles: ['proto/session.proto'],
+  lanes: [
+    { ord: 1, repo: 'proto', branch: '', role: 'producer', blocks: [2], blockedBy: [] },
+    { ord: 2, repo: 'cli', branch: '', role: 'consumer', blocks: [], blockedBy: [1] },
+  ],
+  units: [
+    builderUnit('U-1', {
+      title: 'the contract',
+      satisfies: ['AC-1'],
+      touches: ['proto/session.proto'],
+    }),
+    builderUnit('U-2', {
+      title: 'adopt it',
+      lane: 2,
+      satisfies: ['AC-1'],
+      touches: ['proto/session.proto'],
+    }),
+  ],
+}
+
 function twoLanes(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = order()
   return {
     ...base,
-    context: {
-      ...base.context,
-      repos: [
-        {
-          name: 'proto',
-          path: '/repos/proto',
-          lane: 1,
-          baseBranch: 'main',
-          headBranch: 'f/wo-1',
-        },
-        { name: 'cli', path: '/repos/cli', lane: 2, baseBranch: 'main', headBranch: 'f/wo-1' },
-      ],
-    },
-    plan: {
-      ...base.plan,
-      sharedFiles: ['proto/session.proto'],
-      lanes: [
-        { ord: 1, repo: 'proto', branch: '', role: 'producer', blocks: [2], blockedBy: [] },
-        { ord: 2, repo: 'cli', branch: '', role: 'consumer', blocks: [], blockedBy: [1] },
-      ],
-      units: [
-        {
-          id: 'U-1',
-          title: 'the contract',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['proto/session.proto'],
-          verify: [],
-        },
-        {
-          id: 'U-2',
-          title: 'adopt it',
-          role: 'builder',
-          lane: 2,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['proto/session.proto'],
-          verify: [],
-        },
-      ],
-    },
+    context: { ...base.context, repos: TWO_LANE_REPOS },
+    plan: { ...base.plan, ...TWO_LANE_PLAN },
     ...over,
   }
 }
+
 /** A client that hands each `gh pr create` its own URL. */
 function multiDeps() {
   let created = 0
@@ -658,16 +645,11 @@ function unitsTests() {
       plan: {
         ...order().plan,
         units: [
-          {
-            id: 'U-1',
+          builderUnit('U-1', {
             title: 'reject expired tokens',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
             satisfies: ['AC-1'],
             touches: ['src/auth.ts'],
-            verify: [],
-          },
+          }),
         ],
       },
     })
@@ -1417,6 +1399,18 @@ function noGhTests() {
 }
 
 describe('opening drafts apart from watching them (ADR 085)', () => {
+  describe('opening', openingTests)
+
+  describe('a pull request that is already open on the branch', () => {
+    describe('adopting', adoptingTests)
+    describe('failed edits', failedEditsTests)
+    describe('creating one', creatingOneTests)
+  })
+  describe('watching', watchingTests)
+  describe('committing', committingTests)
+})
+
+function openingTests() {
   it('opens and records the drafts without watching CI or raising the ready question', async () => {
     const watchCi = vi.fn(async () => ({ kind: 'none' }) as CiOutcome)
     const raise = vi.fn(async () => undefined)
@@ -1442,13 +1436,9 @@ describe('opening drafts apart from watching them (ADR 085)', () => {
     expect(reopened.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
     expect(onDraftOpened).toHaveBeenCalledTimes(1)
   })
+}
 
-  describe('a pull request that is already open on the branch', () => {
-    describe('adopting', adoptingTests)
-    describe('failed edits', failedEditsTests)
-    describe('creating one', creatingOneTests)
-  })
-
+function watchingTests() {
   it('shipOrder is still opening then watching, in that order', async () => {
     const seen: string[] = []
     const d = deps({
@@ -1467,7 +1457,9 @@ describe('opening drafts apart from watching them (ADR 085)', () => {
     expect(result.gate?.rule).toBe('ready-for-review')
     expect(raise).toHaveBeenCalledTimes(1)
   })
+}
 
+function committingTests() {
   it('commits and pushes a lane only when the check wrote something', async () => {
     const dirty = deps()
     dirty.exec.mockImplementation(async (options: { args: string[] }) => ({
@@ -1483,7 +1475,7 @@ describe('opening drafts apart from watching them (ADR 085)', () => {
     expect(await commitAndPushLanes(order(), 'final check: format', clean)).toBe(false)
     expect(callsTo(clean.exec, 'git').some((c) => c.args[0] === 'push')).toBe(false)
   })
-})
+}
 
 function adoptingTests() {
   it('adopts it: retitles it, takes it back to draft, and opens no second one', async () => {

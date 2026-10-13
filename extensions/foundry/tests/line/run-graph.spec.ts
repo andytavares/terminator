@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import {
   buildRunGraph,
   nodeById,
@@ -62,36 +63,9 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
     plan: {
       ...base.plan,
       units: [
-        {
-          id: 'U-1',
-          title: 'a',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
-        {
-          id: 'U-2',
-          title: 'b',
-          role: 'builder',
-          lane: 1,
-          dependsOn: ['U-1'],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
-        {
-          id: 'U-3',
-          title: 'c',
-          role: 'scribe',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
+        builderUnit('U-1', { title: 'a', satisfies: ['AC-1'] }),
+        builderUnit('U-2', { title: 'b', dependsOn: ['U-1'], satisfies: ['AC-1'] }),
+        builderUnit('U-3', { title: 'c', role: 'scribe', satisfies: ['AC-1'] }),
       ],
     },
     ...over,
@@ -235,10 +209,9 @@ function laneOrder(units: WorkOrder['plan']['units'], lanes = [1]): WorkOrder {
 function unit(
   id: string,
   lane: number,
-  dependsOn: string[] = [],
-  role = 'builder'
+  dependsOn: string[] = []
 ): WorkOrder['plan']['units'][number] {
-  return { id, title: id, role, lane, dependsOn, satisfies: ['AC-1'], touches: [], verify: [] }
+  return builderUnit(id, { lane, dependsOn, satisfies: ['AC-1'] })
 }
 
 describe('a fan-out by lane', () => {
@@ -285,7 +258,7 @@ function unitsAndFiltersTests() {
   })
 
   it("honours the filter, so a scribe unit is not the builder lane node's work", () => {
-    const o = laneOrder([unit('U-1', 1), unit('U-2', 1, [], 'scribe')])
+    const o = laneOrder([unit('U-1', 1), { ...unit('U-2', 1), role: 'scribe' }])
     const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
     expect(nodeById(graph, 'build:lane-1')?.unitIds).toEqual(['U-1'])
   })
@@ -313,7 +286,7 @@ function waitingTests() {
 
 function emptyFiltersAndPlanOrderTests() {
   it('produces nothing when the filter selects nothing', () => {
-    const o = laneOrder([unit('U-1', 1, [], 'scribe')])
+    const o = laneOrder([{ ...unit('U-1', 1), role: 'scribe' }])
     const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
     expect(graph.nodes.filter((n) => n.stepId === 'build')).toEqual([])
   })
@@ -430,18 +403,7 @@ const withUnit = (): WorkOrder => {
     ...base,
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'refresh the token on a 401',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: [],
-          touches: [],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'refresh the token on a 401' })],
     },
   }
 }

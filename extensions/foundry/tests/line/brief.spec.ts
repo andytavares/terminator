@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { testCriterion } from '../helpers/order-parts.js'
 import { brief, READABLE } from '../../src/line/brief.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { PlanUnit, WorkOrder } from '../../src/order/schema.js'
@@ -57,13 +58,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
       nonGoals: ['rotating the signing key'],
     },
     acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'an expired token is refused',
-        priority: 'P0',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
+      testCriterion('AC-1', { statement: 'an expired token is refused', priority: 'P0' }),
     ],
     context: {
       ...base.context,

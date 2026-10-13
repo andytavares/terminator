@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as nodePath from 'node:path'
 import {
@@ -466,40 +467,37 @@ function reviewRoundsTests() {
   })
 }
 
+/** A finding a previous round settled: the architect answered it with a command. */
+const SETTLED_FINDING: WorkOrder['redTeam'][number] = {
+  id: 'RT-red-team-1',
+  severity: 'high',
+  category: 'unprovable',
+  text: 'AC-2 cannot be falsified.',
+  status: 'resolved',
+  reason: 'the architect added a command',
+  round: 0,
+}
+
+/** The red team's rung writing `redTeam` as its findings onto `before`. */
+function redTeamWrote(before: WorkOrder, redTeam: unknown[]) {
+  return applyRungOutput(before, {
+    role: 'red-team',
+    output: parseRungOutput({ redTeam }, ['findings']),
+    writes: ['findings'],
+    at: AT,
+  })
+}
+
 function reopeningTests() {
   it('reopens a settled finding when new evidence answers what settled it', () => {
-    const settled: WorkOrder = {
-      ...order(),
-      redTeam: [
-        {
-          id: 'RT-red-team-1',
-          severity: 'high',
-          category: 'unprovable',
-          text: 'AC-2 cannot be falsified.',
-          status: 'resolved',
-          reason: 'the architect added a command',
-          round: 0,
-        },
-      ],
-    }
-    const after = applyRungOutput(settled, {
-      role: 'red-team',
-      output: parseRungOutput(
-        {
-          redTeam: [
-            {
-              category: 'unprovable',
-              text: 'ignored',
-              reopens: 'RT-red-team-1',
-              newEvidence: 'the command the architect added does not run in CI',
-            },
-          ],
-        },
-        ['findings']
-      ),
-      writes: ['findings'],
-      at: AT,
-    })
+    const after = redTeamWrote({ ...order(), redTeam: [SETTLED_FINDING] }, [
+      {
+        category: 'unprovable',
+        text: 'ignored',
+        reopens: 'RT-red-team-1',
+        newEvidence: 'the command the architect added does not run in CI',
+      },
+    ])
     expect(after.order.redTeam).toHaveLength(1)
     expect(after.order.redTeam[0]?.status).toBe('open')
     expect(after.order.redTeam[0]?.text).toContain(
@@ -512,29 +510,9 @@ function reopeningTests() {
 
 function reopensWithoutEvidenceTests() {
   it('drops a reopen with no new evidence, leaving the settled finding alone', () => {
-    const settled: WorkOrder = {
-      ...order(),
-      redTeam: [
-        {
-          id: 'RT-red-team-1',
-          severity: 'high',
-          category: 'unprovable',
-          text: 'AC-2 cannot be falsified.',
-          status: 'resolved',
-          reason: 'the architect added a command',
-          round: 0,
-        },
-      ],
-    }
-    const after = applyRungOutput(settled, {
-      role: 'red-team',
-      output: parseRungOutput(
-        { redTeam: [{ category: 'unprovable', text: 'ignored', reopens: 'RT-red-team-1' }] },
-        ['findings']
-      ),
-      writes: ['findings'],
-      at: AT,
-    })
+    const after = redTeamWrote({ ...order(), redTeam: [SETTLED_FINDING] }, [
+      { category: 'unprovable', text: 'ignored', reopens: 'RT-red-team-1' },
+    ])
     expect(after.order.redTeam[0]?.status).toBe('resolved')
     expect(after.order.status).toBe('agreed')
     expect(after.defect).toBeNull()
@@ -557,25 +535,24 @@ function nearDuplicatesTests() {
         },
       ],
     }
-    const after = applyRungOutput(before, {
-      role: 'red-team',
-      output: parseRungOutput(
-        {
-          redTeam: [
-            {
-              severity: 'low',
-              category: 'process',
-              text: 'The empty state has no copy at all.\n\n- different evidence this time',
-            },
-          ],
-        },
-        ['findings']
-      ),
-      writes: ['findings'],
-      at: AT,
-    })
+    const after = redTeamWrote(before, [
+      {
+        severity: 'low',
+        category: 'process',
+        text: 'The empty state has no copy at all.\n\n- different evidence this time',
+      },
+    ])
     expect(after.order.redTeam).toHaveLength(1)
   })
+}
+
+/** A plan of one unit, `id`, touching `file` in the one lane. */
+function onePlan(id: string, title: string, file: string): WorkOrder['plan'] {
+  return {
+    units: [builderUnit(id, { title, touches: [file] })],
+    lanes: [{ ord: 1, repo: 'repo', branch: '', role: null, blocks: [], blockedBy: [] }],
+    sharedFiles: [],
+  }
 }
 
 function aDisagreeingArchitectTests() {
@@ -583,45 +560,13 @@ function aDisagreeingArchitectTests() {
     // The graph was compiled from the agreed plan before this rung ran, so
     // swapping the plan underneath running builders would orphan every node
     // already in flight. It becomes a question for the operator instead.
-    const before = order({
-      plan: {
-        units: [
-          {
-            id: 'U-1',
-            title: 'one',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: [],
-            touches: ['src/a.ts'],
-            verify: [],
-          },
-        ],
-        lanes: [{ ord: 1, repo: 'repo', branch: '', role: null, blocks: [], blockedBy: [] }],
-        sharedFiles: [],
-      },
-    })
+    const before = order({ plan: onePlan('U-1', 'one', 'src/a.ts') })
 
     const after = applyRungOutput(before, {
       role: 'architect',
       output: parseRungOutput(
         {
-          plan: {
-            units: [
-              {
-                id: 'U-9',
-                title: 'nine',
-                role: 'builder',
-                lane: 1,
-                dependsOn: [],
-                satisfies: [],
-                touches: ['src/b.ts'],
-                verify: [],
-              },
-            ],
-            lanes: [{ ord: 1, repo: 'repo', branch: '', role: null, blocks: [], blockedBy: [] }],
-            sharedFiles: [],
-          },
+          plan: onePlan('U-9', 'nine', 'src/b.ts'),
           note: 'three things in the order are wrong',
         },
         ['plan', 'acceptance']

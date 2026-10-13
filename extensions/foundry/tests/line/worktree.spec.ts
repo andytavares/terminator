@@ -210,6 +210,14 @@ function failuresTests() {
   })
 }
 
+/** What git prints when a second `worktree add` races the first for the same branch. */
+const CANNOT_LOCK = {
+  exitCode: 128,
+  stdout: '',
+  stderr: 'fatal: cannot lock ref: reference already exists',
+  timedOut: false,
+}
+
 function concurrentCallersTests() {
   it('gives two callers asking at once the same checkout, not a second add', async () => {
     // The scout and the architect's first turn both prepare lane 1 as an order
@@ -224,13 +232,7 @@ function concurrentCallersTests() {
         return { exitCode: 0, stdout, stderr: '', timedOut: false }
       }
       if (options.args[1] === 'add') {
-        if (adding || added)
-          return {
-            exitCode: 128,
-            stdout: '',
-            stderr: 'fatal: cannot lock ref: reference already exists',
-            timedOut: false,
-          }
+        if (adding || added) return CANNOT_LOCK
         adding = true
         await new Promise((r) => setTimeout(r, 5))
         added = true

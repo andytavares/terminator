@@ -4,6 +4,7 @@
  * and the records the run leaves behind.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -55,18 +56,7 @@ function agreed(repoPath: string): WorkOrder {
     recipe: 'direct',
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'red text',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: [],
-          touches: ['src/a.ts'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'red text', touches: ['src/a.ts'] })],
     },
   }
 }

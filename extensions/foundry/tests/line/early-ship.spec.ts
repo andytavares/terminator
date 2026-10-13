@@ -78,20 +78,20 @@ function outcome(over: Partial<RunOutcome> = {}): RunOutcome {
   } as RunOutcome
 }
 
+/** What git and gh print: the new pull request's address, and a dirty checkout when it is one. */
+function printed(options: { command: string; args: string[] }, dirty: boolean): string {
+  if (options.command === 'gh' && options.args[1] === 'create') {
+    return 'https://github.com/tav/app/pull/7\n'
+  }
+  const status = options.command === 'git' && options.args[0] === 'status'
+  return status && dirty ? ' M a.ts\n' : ''
+}
+
 function setup(over: Partial<IntegrateDeps> = {}, dirty = false) {
   const calls: string[] = []
   const exec = vi.fn(async (options: { command: string; args: string[] }) => {
     calls.push(`${options.command} ${options.args.slice(0, 2).join(' ')}`)
-    if (options.command === 'gh' && options.args[1] === 'create') {
-      return {
-        exitCode: 0,
-        stdout: 'https://github.com/tav/app/pull/7\n',
-        stderr: '',
-        timedOut: false,
-      }
-    }
-    const status = options.command === 'git' && options.args[0] === 'status'
-    return { exitCode: 0, stdout: status && dirty ? ' M a.ts\n' : '', stderr: '', timedOut: false }
+    return { exitCode: 0, stdout: printed(options, dirty), stderr: '', timedOut: false }
   })
   const raised: string[] = []
   const deps = {

@@ -154,34 +154,33 @@ function theBranchTests() {
   })
 }
 
+/** The order with a second lane, working in the repository at `second`. */
+function withSecondLane(second: string): WorkOrder {
+  const base = order()
+  const repo = path.basename(second)
+  return {
+    ...base,
+    context: {
+      ...base.context,
+      repos: [
+        { ...base.context.repos[0], lane: 1 },
+        { ...base.context.repos[0], name: repo, path: second, lane: 2 },
+      ],
+    },
+    plan: {
+      ...base.plan,
+      lanes: [
+        ...base.plan.lanes,
+        { ord: 2, repo, branch: 'wip-2', role: null, blocks: [], blockedBy: [] },
+      ],
+    },
+  }
+}
+
 function everyLaneTests() {
   it('takes every lane, not just the first', async () => {
     const second = makeTempDir('fdry-teardown-repo2-')
-    const base = order()
-    const two: WorkOrder = {
-      ...base,
-      context: {
-        ...base.context,
-        repos: [
-          { ...base.context.repos[0], lane: 1 },
-          { ...base.context.repos[0], name: path.basename(second), path: second, lane: 2 },
-        ],
-      },
-      plan: {
-        ...base.plan,
-        lanes: [
-          ...base.plan.lanes,
-          {
-            ord: 2,
-            repo: path.basename(second),
-            branch: 'wip-2',
-            role: null,
-            blocks: [],
-            blockedBy: [],
-          },
-        ],
-      },
-    }
+    const two = withSecondLane(second)
     const { calls, exec } = recorder()
     await tearDownRun(two, { exec, root })
     expect(calls.filter((c) => c.args[0] === 'worktree' && c.args[1] === 'remove')).toHaveLength(2)

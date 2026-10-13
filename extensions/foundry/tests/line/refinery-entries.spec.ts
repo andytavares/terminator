@@ -1,8 +1,18 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import { queueEntries } from '../../src/line/refinery-entries.js'
 import type { QueueEntriesDeps } from '../../src/line/refinery-entries.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+
+/** The one repository the order changes, on its own head branch. */
+const APP_REPO = {
+  name: 'app',
+  path: '/repos/app',
+  lane: 1,
+  baseBranch: 'main',
+  headBranch: 'foundry/wo-1',
+}
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -16,32 +26,10 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
     ...base,
     status: 'running',
     agreedAt: '2026-09-06T09:00:00.000Z',
-    context: {
-      ...base.context,
-      repos: [
-        {
-          name: 'app',
-          path: '/repos/app',
-          lane: 1,
-          baseBranch: 'main',
-          headBranch: 'foundry/wo-1',
-        },
-      ],
-    },
+    context: { ...base.context, repos: [APP_REPO] },
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U1',
-          title: 'Refuse the token',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: [],
-          touches: ['src/auth.ts'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U1', { title: 'Refuse the token', touches: ['src/auth.ts'] })],
       lanes: [{ ord: 1, repo: 'app', branch: '', role: null, blocks: [], blockedBy: [] }],
     },
     ...over,

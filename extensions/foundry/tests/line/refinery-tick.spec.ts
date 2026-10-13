@@ -21,42 +21,53 @@ function entry(over: Partial<QueueEntry> & Pick<QueueEntry, 'orderId'>): QueueEn
   }
 }
 
-function baseDeps(over: Partial<RefineryTickDeps> = {}): RefineryTickDeps & {
+/** What a tick wrote: refinery states, ledger records, conflicts raised, orders whose CI it watched. */
+interface Written {
   states: Map<string, RefineryState>
   records: { orderId: string; action: string; subject: string; reason: string }[]
   conflicts: { orderId: string; why: string; files: readonly string[] }[]
   watched: string[]
-} {
-  const states = new Map<string, RefineryState>()
-  const records: { orderId: string; action: string; subject: string; reason: string }[] = []
-  const conflicts: { orderId: string; why: string; files: readonly string[] }[] = []
-  const watched: string[] = []
+}
 
+type WritingDeps = Pick<
+  RefineryTickDeps,
+  'readState' | 'writeState' | 'watchCi' | 'raiseConflict' | 'record'
+>
+
+/** The deps a tick writes through, each keeping what it was handed in `written`. */
+function writingDeps(written: Written): WritingDeps {
+  return {
+    readState: async (orderId) =>
+      written.states.get(orderId) ?? { mergedAt: null, restackedFor: [] },
+    writeState: async (orderId, state) => {
+      written.states.set(orderId, state)
+    },
+    watchCi: async (orderId) => {
+      written.watched.push(orderId)
+    },
+    raiseConflict: async (orderId, why, files) => {
+      written.conflicts.push({ orderId, why, files })
+    },
+    record: async (orderId, action, subject, reason) => {
+      written.records.push({ orderId, action, subject, reason })
+    },
+  }
+}
+
+function baseDeps(over: Partial<RefineryTickDeps> = {}): RefineryTickDeps & Written {
+  const written: Written = { states: new Map(), records: [], conflicts: [], watched: [] }
   const deps: RefineryTickDeps = {
     candidates: async () => [],
-    readState: async (orderId) => states.get(orderId) ?? { mergedAt: null, restackedFor: [] },
-    writeState: async (orderId, state) => {
-      states.set(orderId, state)
-    },
     viewPr: async () => ({ merged: false }),
     entries: async () => [],
     lanesFor: async () => [{ cwd: '/lane', branch: 'foundry/wo', base: 'main' }],
     restack: async () => ({ kind: 'rebased', pushed: true }),
-    watchCi: async (orderId) => {
-      watched.push(orderId)
-    },
-    raiseConflict: async (orderId, why, files) => {
-      conflicts.push({ orderId, why, files })
-    },
-    record: async (orderId, action, subject, reason) => {
-      records.push({ orderId, action, subject, reason })
-    },
     titleOf: async (orderId) => orderId,
     now: () => '2026-09-06T12:00:00.000Z',
+    ...writingDeps(written),
     ...over,
   }
-
-  return Object.assign(deps, { states, records, conflicts, watched })
+  return Object.assign(deps, written)
 }
 
 describe('refineryTick', () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -15,6 +16,7 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import { ResumeForbiddenError, createRoleRegistry } from '../../src/line/roles.js'
 import { makeVerdict, SelfVerificationError } from '../../src/verify/verdict.js'
 import { decide, raiseGate } from '../../src/gates/rules.js'
+import type { Gate } from '../../src/gates/rules.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The executor is where the scheduler, the roles and a session finally meet.
@@ -132,15 +134,7 @@ function order(units = [unit('U-1'), unit('U-2')], over: Partial<WorkOrder> = {}
         format: { command: 'npm run format', source: 'package.json' },
       },
     },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a' })],
     plan: { ...base.plan, units },
     ...over,
   }
@@ -1027,6 +1021,21 @@ function flakyChecksTests() {
   })
 }
 
+/** The gate a check failing on the base branch too raises: both runs, as evidence. */
+function expectBlockedOnBase(gate: Gate | undefined): void {
+  if (gate === undefined) throw new Error('no verify.base-fail gate was raised')
+  expect(gate.summary).toBe('x is blocked by a check that already fails on main')
+  expect(gate.why).toContain('Lint fails on main with exit code 2')
+  expect(gate.why).toContain('also fails without this change')
+  expect(gate.options.map((o) => o.id)).toEqual(['send_back', 'accept_debt', 'hold'])
+  expect(gate.evidence).toHaveLength(2)
+  expect(gate.evidence[0]).toMatchObject({ exitCode: 1 })
+  expect(gate.evidence[0].excerpt).toContain('.retry.log')
+  expect(gate.evidence[1]).toMatchObject({ exitCode: 2, step: 'Lint' })
+  expect(gate.evidence[1].command).toBeTruthy()
+  expect(gate.evidence[1].excerpt).toContain('.base.log')
+}
+
 function theBaseBranchFailsTooTests() {
   it('blocks on the base branch when the same check fails there too', async () => {
     const o = order([unit('U-1')])
@@ -1041,18 +1050,8 @@ function theBaseBranchFailsTooTests() {
         releaseBase,
       })
     )
-    const gate = outcome.gates.find((g) => g.rule === 'verify.base-fail')
     expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.repeat-fail')
-    expect(gate?.summary).toBe('x is blocked by a check that already fails on main')
-    expect(gate?.why).toContain('Lint fails on main with exit code 2')
-    expect(gate?.why).toContain('also fails without this change')
-    expect(gate?.options.map((o) => o.id)).toEqual(['send_back', 'accept_debt', 'hold'])
-    expect(gate?.evidence).toHaveLength(2)
-    expect(gate?.evidence[0]).toMatchObject({ exitCode: 1 })
-    expect(gate?.evidence[0].excerpt).toContain('.retry.log')
-    expect(gate?.evidence[1]).toMatchObject({ exitCode: 2, step: 'Lint' })
-    expect(gate?.evidence[1].command).toBeTruthy()
-    expect(gate?.evidence[1].excerpt).toContain('.base.log')
+    expectBlockedOnBase(outcome.gates.find((g) => g.rule === 'verify.base-fail'))
     expect(releaseBase).toHaveBeenCalledTimes(1)
   })
 }
@@ -1141,10 +1140,11 @@ function releasingTheBaseCheckoutTests() {
   })
 }
 
-function reinstallingTests() {
-  const TRUNCATED =
-    'dyld[1]: Library not loaded: @rpath/Electron Framework.framework/Electron Framework'
+/** What a check prints when the install it runs against lost part of Electron. */
+const TRUNCATED =
+  'dyld[1]: Library not loaded: @rpath/Electron Framework.framework/Electron Framework'
 
+function reinstallingTests() {
   it('reinstalls a broken install in its own checkout and checks again without asking', async () => {
     const o = order([unit('U-1')])
     let healed = false
@@ -2260,23 +2260,33 @@ steps:
     step: { kind: agent, role: builder }
 `
 
+interface HeldAgent {
+  run: (input: {
+    node: { id: string }
+    onStarted?: (sessionId: string) => void
+  }) => Promise<StartedRun>
+  release: () => void
+}
+
+/** An agent that reports its session at once and ends its turn only when released. */
+function heldAgent(): HeldAgent {
+  let release: () => void = () => {}
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const run: HeldAgent['run'] = async (input) => {
+    input.onStarted?.(`sess-${input.node.id}`)
+    await blocked
+    return { sessionId: `sess-${input.node.id}`, exitCode: 0 }
+  }
+  return { run, release: () => release() }
+}
+
 function theMomentTheAgentExistsTests() {
   it('puts the session on the node the moment the agent exists', async () => {
     const o = order([unit('U-1')])
     const seen: (string | null)[] = []
-    let released: () => void = () => {}
-    const blocked = new Promise<void>((resolve) => {
-      released = resolve
-    })
-
-    const run = async (input: {
-      node: { id: string }
-      onStarted?: (sessionId: string) => void
-    }): Promise<StartedRun> => {
-      input.onStarted?.(`sess-${input.node.id}`)
-      await blocked
-      return { sessionId: `sess-${input.node.id}`, exitCode: 0 }
-    }
+    const { run, release: released } = heldAgent()
 
     const running = execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(run as never),
@@ -2658,21 +2668,24 @@ function commandStepsTests() {
   })
 }
 
+/** A check command that fails its first run, logging why, and passes every run after. */
+function failsOnceThenPasses(): (input: { logPath: string }) => Promise<number> {
+  let call = 0
+  return async (input) => {
+    call += 1
+    if (call > 1) return 0
+    fs.mkdirSync(path.dirname(input.logPath), { recursive: true })
+    fs.writeFileSync(input.logPath, 'lint: unexpected token at line 4\n')
+    return 1
+  }
+}
+
 function reworkingTests() {
   it('reworks the target instead of failing, and carries the excerpt forward', async () => {
     const o = order([])
     const buildRuns = vi.fn(ok)
     const record = vi.fn(async () => undefined)
-    let call = 0
-    const runCommand = vi.fn(async (input: { logPath: string }) => {
-      call += 1
-      if (call === 1) {
-        fs.mkdirSync(path.dirname(input.logPath), { recursive: true })
-        fs.writeFileSync(input.logPath, 'lint: unexpected token at line 4\n')
-        return 1
-      }
-      return 0
-    })
+    const runCommand = vi.fn(failsOnceThenPasses())
     const outcome = await execute(o, recipe(REWORK), buildRunGraph(o, recipe(REWORK)), {
       ...deps(buildRuns),
       runCommand,
