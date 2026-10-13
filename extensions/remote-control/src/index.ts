@@ -370,6 +370,9 @@ function connectionChannels(api: ExtensionAPI): ChannelSpec[] {
 }
 
 export async function deactivate(): Promise<void> {
+  // Stopped before the queue is awaited: a start still waiting up to 30 s for
+  // its tunnel would otherwise hold ngrok open past the extension host's exit.
+  ngrokManager.stop()
   await queue.catch(() => {})
   ngrokManager.stop()
   if (remoteServer) {
