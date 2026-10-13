@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { EditorView, keymap } from '@codemirror/view'
-import { Annotation, Compartment, EditorState } from '@codemirror/state'
+import { Annotation, Compartment, EditorState, type Extension } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import { LanguageDescription, LanguageSupport, syntaxHighlighting } from '@codemirror/language'
@@ -34,6 +34,137 @@ import {
 // autosave/broadcast loop.
 const externalUpdate = Annotation.define<boolean>()
 
+/** A fenced-code language, loaded the first time a block uses it. */
+function codeLanguage(name: string, alias: string[], load: () => LanguageSupport) {
+  /* v8 ignore next */
+  return LanguageDescription.of({ name, alias, load: async () => load() })
+}
+
+const CODE_LANGUAGES = [
+  codeLanguage('JavaScript', ['js', 'javascript', 'jsx', 'ts', 'tsx', 'typescript'], javascript),
+  codeLanguage('CSS', ['css'], css),
+  codeLanguage('HTML', ['html'], html),
+  codeLanguage('Python', ['python', 'py'], python),
+  codeLanguage('Java', ['java'], java),
+  codeLanguage('JSON', ['json'], json),
+  codeLanguage('C++', ['c', 'cpp', 'c++', 'cxx', 'cc'], cpp),
+  codeLanguage('YAML', ['yaml', 'yml'], yaml),
+  codeLanguage('Go', ['go', 'golang'], () => new LanguageSupport(StreamLanguage.define(go))),
+  codeLanguage(
+    'Shell',
+    ['sh', 'bash', 'shell', 'zsh'],
+    () => new LanguageSupport(StreamLanguage.define(shell))
+  ),
+]
+
+/** Everything an editor carries that does not depend on its props. */
+const BASE_EXTENSIONS: Extension[] = [
+  history(),
+  markdown({ extensions: [GFM], codeLanguages: CODE_LANGUAGES }),
+  syntaxHighlighting(oneDarkHighlightStyle),
+  commentAnchorField,
+  hoveredAnchorField,
+  commentAnchorDecorations,
+  EditorView.lineWrapping,
+  keymap.of([
+    // Ahead of defaultKeymap so Enter at the start of a heading keeps
+    // the heading marker with its text.
+    { key: 'Enter', run: insertNewlineKeepingHeadingMarker },
+    ...defaultKeymap,
+    ...historyKeymap,
+    ...searchKeymap,
+    indentWithTab,
+  ]),
+]
+
+const EDITOR_THEME = EditorView.theme({
+  '&': { height: '100%', fontFamily: 'inherit', caretColor: 'rgba(255,255,255,0.9)' },
+  '.cm-content': {
+    padding: '16px',
+    minHeight: '100%',
+    caretColor: 'rgba(255,255,255,0.9)',
+  },
+  '.cm-focused': { outline: 'none' },
+  '.cm-cursor, .cm-dropCursor': {
+    borderLeftWidth: '2px',
+    borderLeftColor: 'rgba(255,255,255,0.9)',
+    marginLeft: '-1px',
+  },
+  '.notepad-heading': { fontWeight: '600' },
+  '.notepad-h1': { fontSize: '1.8em' },
+  '.notepad-h2': { fontSize: '1.5em' },
+  '.notepad-h3': { fontSize: '1.25em' },
+  '.notepad-bold': { fontWeight: '700' },
+  '.notepad-italic': { fontStyle: 'italic' },
+  '.notepad-code': {
+    fontFamily: 'monospace',
+    background: 'rgba(128,128,128,0.1)',
+    padding: '0 2px',
+  },
+  '.notepad-link': { textDecoration: 'underline', opacity: '0.8' },
+  '.notepad-comment-highlight': {
+    background: 'rgba(250,210,50,0.35)',
+  },
+  '.notepad-comment-highlight .notepad-comment-highlight': {
+    background: 'transparent',
+  },
+  '.notepad-comment-highlight--hover': {
+    textDecoration: 'underline',
+    textDecorationColor: 'rgba(120,200,255,0.9)',
+    textDecorationThickness: '2px',
+    textUnderlineOffset: '2px',
+  },
+  '.notepad-list-item-line': {
+    paddingLeft: '4px',
+  },
+  '.notepad-strikethrough': {
+    textDecoration: 'line-through',
+    opacity: '0.6',
+  },
+  '.notepad-fence-hidden': {
+    maxHeight: '0px',
+    overflow: 'hidden',
+    paddingTop: '0px',
+    paddingBottom: '0px',
+    fontSize: '0px',
+    lineHeight: '0px',
+  },
+  '.notepad-code-block-line': {
+    fontFamily: 'monospace',
+    background: 'rgba(128,128,128,0.18)',
+    borderLeft: '2px solid rgba(255,255,255,0.15)',
+    padding: '0 8px',
+  },
+  '.notepad-blockquote-line': {
+    borderLeft: '3px solid rgba(255,255,255,0.25)',
+    paddingLeft: '12px',
+    opacity: '0.75',
+  },
+  '.notepad-hr': {
+    border: 'none',
+    borderTop: '1px solid rgba(255,255,255,0.2)',
+    margin: '0',
+    display: 'block',
+    width: '100%',
+  },
+  '.notepad-image-widget': {
+    maxWidth: '100%',
+    maxHeight: '300px',
+    display: 'block',
+    margin: '4px 0',
+  },
+  '.notepad-mermaid': {
+    display: 'block',
+    margin: '8px 0',
+    maxWidth: '100%',
+    overflow: 'auto',
+  },
+  '.notepad-mermaid svg': {
+    maxWidth: '100%',
+    height: 'auto',
+  },
+})
+
 export interface SelectionAnchor {
   from: number
   to: number
@@ -53,229 +184,25 @@ interface NoteEditorProps {
   sourceMode?: boolean
 }
 
-export function NoteEditor({
-  initialDoc,
-  onChange,
-  onAnchorsReady,
-  onSelectionChange,
-  readOnly,
-  sourceMode,
-}: NoteEditorProps): React.JSX.Element {
+export function NoteEditor(props: NoteEditorProps): React.JSX.Element {
+  const { readOnly, sourceMode } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
-  const readOnlyCompartment = useRef(new Compartment())
-  const previewCompartment = useRef(new Compartment())
-  const onSelectionChangeRef = useRef(onSelectionChange)
-  useEffect(() => {
-    onSelectionChangeRef.current = onSelectionChange
-  }, [onSelectionChange])
+  const [compartments] = useState(() => ({
+    readOnly: new Compartment(),
+    preview: new Compartment(),
+  }))
+  const onSelectionChangeRef = useLatest(props.onSelectionChange)
 
   useEffect(() => {
     /* v8 ignore next */
     if (!containerRef.current) return
-
-    const view = new EditorView({
-      state: EditorState.create({
-        doc: initialDoc,
-        extensions: [
-          history(),
-          markdown({
-            extensions: [GFM],
-            codeLanguages: [
-              LanguageDescription.of({
-                name: 'JavaScript',
-                alias: ['js', 'javascript', 'jsx', 'ts', 'tsx', 'typescript'],
-                /* v8 ignore next */ load: async () => javascript(),
-              }),
-              LanguageDescription.of({
-                name: 'CSS',
-                alias: ['css'],
-                /* v8 ignore next */ load: async () => css(),
-              }),
-              LanguageDescription.of({
-                name: 'HTML',
-                alias: ['html'],
-                /* v8 ignore next */ load: async () => html(),
-              }),
-              LanguageDescription.of({
-                name: 'Python',
-                alias: ['python', 'py'],
-                /* v8 ignore next */ load: async () => python(),
-              }),
-              LanguageDescription.of({
-                name: 'Java',
-                alias: ['java'],
-                /* v8 ignore next */ load: async () => java(),
-              }),
-              LanguageDescription.of({
-                name: 'JSON',
-                alias: ['json'],
-                /* v8 ignore next */ load: async () => json(),
-              }),
-              LanguageDescription.of({
-                name: 'C++',
-                alias: ['c', 'cpp', 'c++', 'cxx', 'cc'],
-                /* v8 ignore next */ load: async () => cpp(),
-              }),
-              LanguageDescription.of({
-                name: 'YAML',
-                alias: ['yaml', 'yml'],
-                /* v8 ignore next */ load: async () => yaml(),
-              }),
-              LanguageDescription.of({
-                name: 'Go',
-                alias: ['go', 'golang'],
-                /* v8 ignore next */ load: async () =>
-                  new LanguageSupport(StreamLanguage.define(go)),
-              }),
-              LanguageDescription.of({
-                name: 'Shell',
-                alias: ['sh', 'bash', 'shell', 'zsh'],
-                /* v8 ignore next */ load: async () =>
-                  new LanguageSupport(StreamLanguage.define(shell)),
-              }),
-            ],
-          }),
-          syntaxHighlighting(oneDarkHighlightStyle),
-          previewCompartment.current.of(sourceMode ? [] : livePreviewPlugin),
-          commentAnchorField,
-          hoveredAnchorField,
-          commentAnchorDecorations,
-          readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly ?? false)),
-          EditorView.lineWrapping,
-          keymap.of([
-            // Ahead of defaultKeymap so Enter at the start of a heading keeps
-            // the heading marker with its text.
-            { key: 'Enter', run: insertNewlineKeepingHeadingMarker },
-            ...defaultKeymap,
-            ...historyKeymap,
-            ...searchKeymap,
-            indentWithTab,
-          ]),
-          /* v8 ignore next 3 */
-          EditorView.updateListener.of((update) => {
-            const isExternal = update.transactions.some((tr) => tr.annotation(externalUpdate))
-            if (update.docChanged && !isExternal) onChange(update.state.doc.toString())
-
-            /* v8 ignore next 20 */
-            if (update.docChanged || update.selectionSet) {
-              const sel = update.state.selection.main
-              const cb = onSelectionChangeRef.current
-              if (!cb) return
-              if (sel.empty) {
-                cb(null)
-                return
-              }
-              const doc = update.state.doc.toString()
-              const from = sel.from
-              const to = sel.to
-              const coords = update.view.coordsAtPos(from)
-              const containerRect = update.view.dom.getBoundingClientRect()
-              const lineTop = coords ? coords.top - containerRect.top : 0
-              cb({
-                from,
-                to,
-                quote: doc.slice(from, to),
-                prefix: doc.slice(Math.max(0, from - 32), from),
-                suffix: doc.slice(to, Math.min(doc.length, to + 32)),
-                lineTop,
-              })
-            }
-          }),
-          EditorView.theme({
-            '&': { height: '100%', fontFamily: 'inherit', caretColor: 'rgba(255,255,255,0.9)' },
-            '.cm-content': {
-              padding: '16px',
-              minHeight: '100%',
-              caretColor: 'rgba(255,255,255,0.9)',
-            },
-            '.cm-focused': { outline: 'none' },
-            '.cm-cursor, .cm-dropCursor': {
-              borderLeftWidth: '2px',
-              borderLeftColor: 'rgba(255,255,255,0.9)',
-              marginLeft: '-1px',
-            },
-            '.notepad-heading': { fontWeight: '600' },
-            '.notepad-h1': { fontSize: '1.8em' },
-            '.notepad-h2': { fontSize: '1.5em' },
-            '.notepad-h3': { fontSize: '1.25em' },
-            '.notepad-bold': { fontWeight: '700' },
-            '.notepad-italic': { fontStyle: 'italic' },
-            '.notepad-code': {
-              fontFamily: 'monospace',
-              background: 'rgba(128,128,128,0.1)',
-              padding: '0 2px',
-            },
-            '.notepad-link': { textDecoration: 'underline', opacity: '0.8' },
-            '.notepad-comment-highlight': {
-              background: 'rgba(250,210,50,0.35)',
-            },
-            '.notepad-comment-highlight .notepad-comment-highlight': {
-              background: 'transparent',
-            },
-            '.notepad-comment-highlight--hover': {
-              textDecoration: 'underline',
-              textDecorationColor: 'rgba(120,200,255,0.9)',
-              textDecorationThickness: '2px',
-              textUnderlineOffset: '2px',
-            },
-            '.notepad-list-item-line': {
-              paddingLeft: '4px',
-            },
-            '.notepad-strikethrough': {
-              textDecoration: 'line-through',
-              opacity: '0.6',
-            },
-            '.notepad-fence-hidden': {
-              maxHeight: '0px',
-              overflow: 'hidden',
-              paddingTop: '0px',
-              paddingBottom: '0px',
-              fontSize: '0px',
-              lineHeight: '0px',
-            },
-            '.notepad-code-block-line': {
-              fontFamily: 'monospace',
-              background: 'rgba(128,128,128,0.18)',
-              borderLeft: '2px solid rgba(255,255,255,0.15)',
-              padding: '0 8px',
-            },
-            '.notepad-blockquote-line': {
-              borderLeft: '3px solid rgba(255,255,255,0.25)',
-              paddingLeft: '12px',
-              opacity: '0.75',
-            },
-            '.notepad-hr': {
-              border: 'none',
-              borderTop: '1px solid rgba(255,255,255,0.2)',
-              margin: '0',
-              display: 'block',
-              width: '100%',
-            },
-            '.notepad-image-widget': {
-              maxWidth: '100%',
-              maxHeight: '300px',
-              display: 'block',
-              margin: '4px 0',
-            },
-            '.notepad-mermaid': {
-              display: 'block',
-              margin: '8px 0',
-              maxWidth: '100%',
-              overflow: 'auto',
-            },
-            '.notepad-mermaid svg': {
-              maxWidth: '100%',
-              height: 'auto',
-            },
-          }),
-        ],
-      }),
-      parent: containerRef.current,
+    const view = createEditorView(containerRef.current, props, {
+      ...compartments,
+      onSelectionChangeRef,
     })
-
     viewRef.current = view
-    onAnchorsReady?.(() => viewRef.current)
+    props.onAnchorsReady?.(() => viewRef.current)
 
     /* v8 ignore next 4 */
     return () => {
@@ -284,26 +211,111 @@ export function NoteEditor({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    const view = viewRef.current
-    /* v8 ignore next 3 */
-    if (!view) return
-    view.dispatch({
-      effects: readOnlyCompartment.current.reconfigure(EditorState.readOnly.of(readOnly ?? false)),
-    })
-  }, [readOnly])
-
-  useEffect(() => {
-    const view = viewRef.current
-    /* v8 ignore next 3 */
-    if (!view) return
-    view.dispatch({
-      effects: previewCompartment.current.reconfigure(sourceMode ? [] : livePreviewPlugin),
-    })
-  }, [sourceMode])
+  useCompartmentSync(viewRef, compartments.readOnly, readOnlyExtension(readOnly))
+  useCompartmentSync(viewRef, compartments.preview, previewExtension(sourceMode))
 
   return <div ref={containerRef} className="notepad-editor-cm" style={{ height: '100%' }} />
 }
+
+/** The compartments a mounted editor reconfigures, and the latest selection callback. */
+interface EditorWiring {
+  readOnly: Compartment
+  preview: Compartment
+  onSelectionChangeRef: SelectionCallbackRef
+}
+
+function createEditorView(parent: HTMLElement, props: NoteEditorProps, wiring: EditorWiring) {
+  return new EditorView({
+    state: EditorState.create({
+      doc: props.initialDoc,
+      extensions: [
+        ...BASE_EXTENSIONS,
+        wiring.preview.of(previewExtension(props.sourceMode)),
+        wiring.readOnly.of(readOnlyExtension(props.readOnly)),
+        changeListener(props.onChange, wiring.onSelectionChangeRef),
+        EDITOR_THEME,
+      ],
+    }),
+    parent,
+  })
+}
+
+// Built once, so a compartment's content keeps its identity across renders and
+// only a real change reconfigures it.
+const READ_ONLY = EditorState.readOnly.of(true)
+const EDITABLE = EditorState.readOnly.of(false)
+const NO_EXTENSIONS: Extension[] = []
+
+function readOnlyExtension(readOnly: boolean | undefined): Extension {
+  return readOnly ? READ_ONLY : EDITABLE
+}
+
+/** Raw markdown in source mode, the live-preview rendering otherwise. */
+function previewExtension(sourceMode: boolean | undefined): Extension {
+  return sourceMode ? NO_EXTENSIONS : livePreviewPlugin
+}
+
+/** A ref that always holds the latest value, for listeners created once. */
+function useLatest<T>(value: T): React.MutableRefObject<T> {
+  const ref = useRef(value)
+  useEffect(() => {
+    ref.current = value
+  }, [value])
+  return ref
+}
+
+/** Reconfigures a compartment whenever its content changes after mount. */
+function useCompartmentSync(
+  viewRef: React.MutableRefObject<EditorView | null>,
+  compartment: Compartment,
+  content: Extension
+): void {
+  useEffect(() => {
+    const view = viewRef.current
+    /* v8 ignore next 3 */
+    if (!view) return
+    view.dispatch({ effects: compartment.reconfigure(content) })
+  }, [content]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+type SelectionCallbackRef = React.MutableRefObject<NoteEditorProps['onSelectionChange']>
+
+/** Reports local edits, and the selection (with its quote context) whenever it moves. */
+function changeListener(
+  onChange: (doc: string) => void,
+  onSelectionChangeRef: SelectionCallbackRef
+) {
+  /* v8 ignore next 3 */
+  return EditorView.updateListener.of((update) => {
+    const isExternal = update.transactions.some((tr) => tr.annotation(externalUpdate))
+    if (update.docChanged && !isExternal) onChange(update.state.doc.toString())
+
+    /* v8 ignore next 4 */
+    if (!update.docChanged && !update.selectionSet) return
+    const cb = onSelectionChangeRef.current
+    if (!cb) return
+    cb(selectionAnchorOf(update.view))
+  })
+}
+
+/* v8 ignore start */
+function selectionAnchorOf(view: EditorView): SelectionAnchor | null {
+  const sel = view.state.selection.main
+  if (sel.empty) return null
+  const doc = view.state.doc.toString()
+  const { from, to } = sel
+  const coords = view.coordsAtPos(from)
+  const containerRect = view.dom.getBoundingClientRect()
+  return {
+    from,
+    to,
+    quote: doc.slice(from, to),
+    prefix: doc.slice(Math.max(0, from - 32), from),
+    suffix: doc.slice(to, Math.min(doc.length, to + 32)),
+    lineTop: coords ? coords.top - containerRect.top : 0,
+  }
+}
+/* v8 ignore stop */
 
 /**
  * Replaces the document with a body saved by another surface, keeping the

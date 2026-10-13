@@ -138,13 +138,47 @@ export async function launchApp(
     await moveWindowOffPointer(app)
     return { app, page, userDataDir }
   } catch (error) {
+    const windows = await windowStates(app)
     await closeApp({ app, userDataDir })
     throw new Error(
       `The app did not finish starting within ${LAUNCH_DEADLINE_MS / 1000}s: ${String(error)}\n` +
+        `--- its windows when it gave up ---\n${windows}\n` +
         `--- the app's own output ---\n${output.join('').slice(-6000) || '(nothing)'}`,
       { cause: error }
     )
   }
+}
+
+// Short: it is spent after the launch deadline, inside the same 30s hook timeout.
+const WINDOW_STATE_READ_MS = 1000
+
+/**
+ * What each window was doing when a launch gave up: the document it was on,
+ * whether that was still loading, and whether its renderer had gone. A main
+ * process that no longer answers says so instead, so a failed launch tells a
+ * hung main, a dead renderer and a page that never loaded apart.
+ */
+async function windowStates(app: ElectronApplication): Promise<string> {
+  const read = app
+    .evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().map((window) => {
+        const contents = window.webContents
+        return JSON.stringify({
+          url: contents.getURL(),
+          loading: contents.isLoading(),
+          crashed: contents.isCrashed(),
+          visible: window.isVisible(),
+        })
+      })
+    )
+    .then((states) => states.join('\n') || '(no windows)')
+    .catch((error: unknown) => `(could not ask the main process: ${String(error)})`)
+  const unanswered = new Promise<string>((resolve) => {
+    // A deadline, not a sleep: the race ends as soon as main answers.
+    // eslint-disable-next-line no-restricted-syntax
+    setTimeout(() => resolve('(the main process did not answer)'), WINDOW_STATE_READ_MS)
+  })
+  return Promise.race([read, unanswered])
 }
 
 /**

@@ -72,12 +72,62 @@ function buildNotificationSettingProperties(): Record<string, SettingDefinition>
   return properties
 }
 
+/** The extension's own settings, before the per-notification delivery toggles. */
+const BASE_SETTINGS: Record<string, SettingDefinition> = {
+  'terminator.task-vault.staleThresholdDays': {
+    type: 'number',
+    label: 'Stale Project Threshold (days)',
+    description: 'Days without modification before a project is considered stale',
+    default: 14,
+    min: 1,
+    max: 365,
+  },
+  'terminator.task-vault.weeklyReviewDay': {
+    type: 'string',
+    label: 'Weekly Review Day',
+    description: 'Day of the week for weekly review reminder (0=Sun, 6=Sat)',
+    default: '0',
+  },
+  'terminator.task-vault.contexts': {
+    type: 'string',
+    label: 'Contexts',
+    description:
+      'Comma-separated list of contexts shown in the + picker (e.g. home,work,computer,phone,errands)',
+    default: 'home,work,computer,phone,errands',
+  },
+  'terminator.task-vault.dueDateAlertTime': {
+    type: 'string',
+    label: 'Due Date Alert Time',
+    description: 'Time of day to send due-date notifications (24-hour HH:MM format, e.g. 09:00)',
+    default: '09:00',
+  },
+  'terminator.task-vault.db.reinit': {
+    type: 'action',
+    label: 'Re-initialize',
+    description: 'Re-run schema checks and startup gap-fill. Use if tasks stop loading.',
+    channel: 'task-vault:db.reinit',
+    default: null,
+  },
+  'terminator.task-vault.db.reset': {
+    type: 'action',
+    label: 'Reset (delete all data)',
+    description: 'Permanently delete all tasks and projects. This cannot be undone.',
+    channel: 'task-vault:db.reset',
+    danger: true,
+    confirmMessage:
+      'This will permanently delete ALL your tasks and projects. This cannot be undone. Continue?',
+    default: null,
+  },
+}
+
 /** The terminal a task links to, for jumping to its tab. */
 const TerminalTarget = z.object({ sessionId: z.string().min(1), projectId: z.string().min(1) })
 /** The day or task the vault panel opens on. */
 const VaultTarget = z
   .object({ date: z.string().optional(), taskId: z.string().optional() })
   .default({})
+
+type OwnIpc = ReturnType<typeof createIpcRegistrar>
 
 const disposables: Disposable[] = []
 let _api: ExtensionAPI | null = null
@@ -97,67 +147,8 @@ function maybeStartScheduler(db: ExtensionDB): void {
   }
 }
 
-export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
-  _api = api
-  bindBroadcast((channel, data) => api.window.broadcast(channel, data))
-  const db: ExtensionDB = api.db
-
-  disposables.push(
-    api.settings.register({
-      label: 'Task Vault',
-      properties: {
-        'terminator.task-vault.staleThresholdDays': {
-          type: 'number',
-          label: 'Stale Project Threshold (days)',
-          description: 'Days without modification before a project is considered stale',
-          default: 14,
-          min: 1,
-          max: 365,
-        },
-        'terminator.task-vault.weeklyReviewDay': {
-          type: 'string',
-          label: 'Weekly Review Day',
-          description: 'Day of the week for weekly review reminder (0=Sun, 6=Sat)',
-          default: '0',
-        },
-        'terminator.task-vault.contexts': {
-          type: 'string',
-          label: 'Contexts',
-          description:
-            'Comma-separated list of contexts shown in the + picker (e.g. home,work,computer,phone,errands)',
-          default: 'home,work,computer,phone,errands',
-        },
-        'terminator.task-vault.dueDateAlertTime': {
-          type: 'string',
-          label: 'Due Date Alert Time',
-          description:
-            'Time of day to send due-date notifications (24-hour HH:MM format, e.g. 09:00)',
-          default: '09:00',
-        },
-        'terminator.task-vault.db.reinit': {
-          type: 'action',
-          label: 'Re-initialize',
-          description: 'Re-run schema checks and startup gap-fill. Use if tasks stop loading.',
-          channel: 'task-vault:db.reinit',
-          default: null,
-        },
-        'terminator.task-vault.db.reset': {
-          type: 'action',
-          label: 'Reset (delete all data)',
-          description: 'Permanently delete all tasks and projects. This cannot be undone.',
-          channel: 'task-vault:db.reset',
-          danger: true,
-          confirmMessage:
-            'This will permanently delete ALL your tasks and projects. This cannot be undone. Continue?',
-          default: null,
-        },
-        ...buildNotificationSettingProperties(),
-      },
-    })
-  )
-
-  const ownIpc = createIpcRegistrar(api, errorResult)
-  disposables.push({ dispose: ownIpc.cleanup })
+/** The settings page's Re-initialize and Reset actions. */
+function registerDbActions(ownIpc: OwnIpc, db: ExtensionDB): void {
   ownIpc.handle('task-vault:db.reinit', noPayload, async () => {
     await applyTaskVaultSchema(db)
     await backfillRecurringTasks(db)
@@ -179,20 +170,22 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
     maybeStartScheduler(db)
     return { data: { ok: true } }
   })
+}
 
-  const disposeIpc = registerVaultIpcHandlers(api, db)
-  disposables.push({ dispose: disposeIpc })
-  const disposeProjectsIpc = registerProjectsIpcHandlers(api, db)
-  disposables.push({ dispose: disposeProjectsIpc })
-  const disposeLinksIpc = registerLinksIpcHandlers(api, db)
-  disposables.push({ dispose: disposeLinksIpc })
-  const disposeKanbanIpc = registerKanbanIpcHandlers(api, db)
-  disposables.push({ dispose: disposeKanbanIpc })
-  const disposeAdminIpc = registerAdminIpcHandlers(api, db)
-  disposables.push({ dispose: disposeAdminIpc })
-  const disposeWeeklyReviewIpc = registerWeeklyReviewIpcHandlers(api, db)
-  disposables.push({ dispose: disposeWeeklyReviewIpc })
+const FEATURE_IPC = [
+  registerVaultIpcHandlers,
+  registerProjectsIpcHandlers,
+  registerLinksIpcHandlers,
+  registerKanbanIpcHandlers,
+  registerAdminIpcHandlers,
+  registerWeeklyReviewIpcHandlers,
+]
 
+function registerFeatureIpc(api: ExtensionAPI, db: ExtensionDB): void {
+  for (const register of FEATURE_IPC) disposables.push({ dispose: register(api, db) })
+}
+
+async function initializeSchema(api: ExtensionAPI, db: ExtensionDB): Promise<void> {
   try {
     await applyTaskVaultSchema(db)
     await backfillRecurringTasks(db)
@@ -205,21 +198,23 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
       'schemaInitFailed'
     )
   }
+}
 
+function registerNavigation(ownIpc: OwnIpc, api: ExtensionAPI): void {
   ownIpc.handle('task-vault:navigate-to-terminal', TerminalTarget, ({ sessionId, projectId }) => {
     api.window.broadcast('terminal:navigate-to-session', { sessionId, projectId })
     return { ok: true }
   })
-
   ownIpc.handle('task-vault:open-panel', VaultTarget, ({ date, taskId }) => {
     openInVault(api, { date, taskId })
     return { ok: true }
   })
-
   // Consumed by TaskVaultView on cold-start mount, when the broadcast above
   // was sent before its WebContentsView existed to hear it.
   ownIpc.handle('task-vault:pop-pending-navigation', noPayload, () => popPendingNavigation())
+}
 
+function addCalendarMenuItem(api: ExtensionAPI): void {
   disposables.push(
     api.nativeMenu.addViewMenuItem({
       id: 'vault-calendar-toggle',
@@ -231,24 +226,25 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
       },
     })
   )
+}
 
-  const reviewDay = parseInt(
-    api.settings.get<string>('terminator.task-vault.weeklyReviewDay') ?? '0',
-    10
-  )
-  scheduleWeeklyReviewNudge(api, reviewDay)
+function clearPendingCaptureTimer(): void {
+  if (_pendingCaptureTimer === null) return
+  clearTimeout(_pendingCaptureTimer)
+  _pendingCaptureTimer = null
+}
 
-  // Renderer calls this on mount to pick up a capture triggered before the view existed.
+/** Renderer calls this on mount to pick up a capture triggered before the view existed. */
+function registerPendingCapture(ownIpc: OwnIpc): void {
   ownIpc.handle('task-vault:ui.consumePendingCapture', noPayload, () => {
     const pending = _pendingCapture
     _pendingCapture = false
-    if (_pendingCaptureTimer !== null) {
-      clearTimeout(_pendingCaptureTimer)
-      _pendingCaptureTimer = null
-    }
+    clearPendingCaptureTimer()
     return { data: { pending } }
   })
+}
 
+async function registerCaptureShortcut(api: ExtensionAPI): Promise<void> {
   try {
     const hotkeyDisposable = await api.globalShortcut.register(DEFAULT_CAPTURE_HOTKEY, () => {
       openCaptureOverlay(api)
@@ -266,9 +262,13 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
       'globalShortcutTaken'
     )
   }
+}
 
-  // Registered unconditionally: the quick-actions command must not depend on
-  // the global hotkey above having claimed its accelerator.
+/**
+ * Registered unconditionally: the quick-actions command must not depend on
+ * the global hotkey having claimed its accelerator.
+ */
+function registerCaptureCommand(api: ExtensionAPI): void {
   disposables.push(
     api.commands.register(
       {
@@ -280,8 +280,34 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
       () => openCaptureOverlay(api)
     )
   )
+}
 
-  // What other extensions may use, through extensionDependencies (ADR 094).
+function weeklyReviewDay(api: ExtensionAPI): number {
+  return parseInt(api.settings.get<string>('terminator.task-vault.weeklyReviewDay') ?? '0', 10)
+}
+
+/** Activates task-vault; returns what other extensions may use, through extensionDependencies (ADR 094). */
+export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
+  _api = api
+  bindBroadcast((channel, data) => api.window.broadcast(channel, data))
+  const db: ExtensionDB = api.db
+  disposables.push(
+    api.settings.register({
+      label: 'Task Vault',
+      properties: { ...BASE_SETTINGS, ...buildNotificationSettingProperties() },
+    })
+  )
+  const ownIpc = createIpcRegistrar(api, errorResult)
+  disposables.push({ dispose: ownIpc.cleanup })
+  registerDbActions(ownIpc, db)
+  registerFeatureIpc(api, db)
+  await initializeSchema(api, db)
+  registerNavigation(ownIpc, api)
+  addCalendarMenuItem(api)
+  scheduleWeeklyReviewNudge(api, weeklyReviewDay(api))
+  registerPendingCapture(ownIpc)
+  await registerCaptureShortcut(api)
+  registerCaptureCommand(api)
   return {
     open: (destination) => openInVault(api, destination),
     openCapture: () => openCaptureOverlay(api),
@@ -340,10 +366,7 @@ export async function deactivate(): Promise<void> {
   _api = null
   _schedulerStarted = false
   _pendingCapture = false
-  if (_pendingCaptureTimer !== null) {
-    clearTimeout(_pendingCaptureTimer)
-    _pendingCaptureTimer = null
-  }
+  clearPendingCaptureTimer()
   if (reviewNudgeInterval !== null) {
     clearInterval(reviewNudgeInterval)
     reviewNudgeInterval = null

@@ -14,7 +14,33 @@ const ON: RemoteStatus = {
   reach: 'public',
 }
 
-describe('reduceStatus', () => {
+describe('reduceStatus', reduceStatusTests)
+
+describe('tunnelDropped', () => {
+  it('moves a running server to a named failure', () => {
+    const next = tunnelDropped(ON)
+    expect(next.kind).toBe('failed')
+    if (next.kind !== 'failed') throw new Error('unreachable')
+    expect(next.failure.reason).toBe('tunnel-dropped')
+    expect(next.failure.resolution).toBeTruthy()
+  })
+
+  it('leaves a status that was never on alone', () => {
+    expect(tunnelDropped(OFF)).toBe(OFF)
+  })
+})
+
+function reduceStatusTests() {
+  describe('coming up', reduceStatusStartupTests)
+  describe('reach', reduceStatusReachTests)
+  describe('tunnel failures', reduceStatusTunnelFailureTests)
+  reduceStatusNoPasswordTests()
+  reduceStatusPortInUseTests()
+  describe('partial broadcasts', reduceStatusPartialBroadcastTests)
+  reduceStatusReplayTests()
+}
+
+function reduceStatusStartupTests() {
   it('starts off', () => {
     expect(OFF.kind).toBe('off')
   })
@@ -37,7 +63,9 @@ describe('reduceStatus', () => {
     })
     expect(next.kind).toBe('on')
   })
+}
 
+function reduceStatusReachTests() {
   it('reports public reach once a tunnel address arrives', () => {
     const next = reduceStatus(OFF, {
       enabled: true,
@@ -60,7 +88,9 @@ describe('reduceStatus', () => {
     })
     expect(next).toMatchObject({ kind: 'on', reach: 'local-only', publicUrl: null })
   })
+}
 
+function reduceStatusTunnelFailureTests() {
   it('treats any other tunnel error as a failure with a stated resolution', () => {
     const next = reduceStatus(OFF, {
       enabled: true,
@@ -73,7 +103,9 @@ describe('reduceStatus', () => {
     expect(next.failure.reason).toBe('tunnel-unreachable')
     expect(next.failure.resolution).toBe('upstream refused the connection')
   })
+}
 
+function reduceStatusNoPasswordTests() {
   describe('no password set', () => {
     it('fails with a way forward instead of going quietly off', () => {
       const status = reduceStatus(OFF, { enabled: false, error: 'PASSWORD_REQUIRED' })
@@ -91,7 +123,9 @@ describe('reduceStatus', () => {
       })
     })
   })
+}
 
+function reduceStatusPortInUseTests() {
   describe('port already in use', () => {
     it('fails, naming the port', () => {
       const next = reduceStatus(OFF, { error: 'PORT_IN_USE', port: 7681 })
@@ -113,7 +147,9 @@ describe('reduceStatus', () => {
       expect(next.failure.message).toContain('7681')
     })
   })
+}
 
+function reduceStatusPartialBroadcastTests() {
   it('ignores a broadcast that says nothing about enablement', () => {
     expect(reduceStatus(ON, {})).toBe(ON)
   })
@@ -122,7 +158,9 @@ describe('reduceStatus', () => {
     const next = reduceStatus(ON, { enabled: true, lanUrl: 'http://192.168.1.4:7681' })
     expect(next).toMatchObject({ port: 7681 })
   })
+}
 
+function reduceStatusReplayTests() {
   it('replays a whole start sequence', () => {
     let status = OFF
     status = reduceStatus(status, { enabled: true, port: 7681 })
@@ -144,18 +182,4 @@ describe('reduceStatus', () => {
     status = reduceStatus(status, { enabled: false })
     expect(status.kind).toBe('off')
   })
-})
-
-describe('tunnelDropped', () => {
-  it('moves a running server to a named failure', () => {
-    const next = tunnelDropped(ON)
-    expect(next.kind).toBe('failed')
-    if (next.kind !== 'failed') throw new Error('unreachable')
-    expect(next.failure.reason).toBe('tunnel-dropped')
-    expect(next.failure.resolution).toBeTruthy()
-  })
-
-  it('leaves a status that was never on alone', () => {
-    expect(tunnelDropped(OFF)).toBe(OFF)
-  })
-})
+}

@@ -45,7 +45,15 @@ afterEach(() => {
   mockSetShowCaptureModal.mockReset()
 })
 
-describe('task-vault renderer App', () => {
+describe('task-vault renderer App', taskVaultRendererAppTests)
+
+function taskVaultRendererAppTests() {
+  describe('views', taskVaultRendererAppViewsTests)
+  describe('capture command', taskVaultRendererAppCaptureCommandTests)
+  describe('pending capture', taskVaultRendererAppPendingCaptureTests)
+}
+
+function taskVaultRendererAppViewsTests() {
   it('renders TaskVaultView by default', async () => {
     setSearch({})
     const { App } = await import('../../src/renderer/App')
@@ -59,7 +67,9 @@ describe('task-vault renderer App', () => {
     render(<App />)
     expect(screen.getByTestId('calendar-drawer')).toBeDefined()
   })
+}
 
+function taskVaultRendererAppCaptureCommandTests() {
   it('subscribes to capture command on mount', async () => {
     setSearch({})
     const { App } = await import('../../src/renderer/App')
@@ -85,7 +95,9 @@ describe('task-vault renderer App', () => {
     unmount()
     expect(unsubscribe).toHaveBeenCalled()
   })
+}
 
+function taskVaultRendererAppPendingCaptureTests() {
   it('invokes consumePendingCapture on mount', async () => {
     setSearch({})
     const { App } = await import('../../src/renderer/App')
@@ -102,4 +114,4 @@ describe('task-vault renderer App', () => {
     await act(async () => {})
     expect(mockSetShowCaptureModal).toHaveBeenCalledWith(true)
   })
-})
+}

@@ -8,14 +8,17 @@ export interface ReanchorResult {
   newTo?: number
 }
 
-const orphaned = (id: string): ReanchorResult => ({
-  anchor: { id, from: 0, to: 0 },
-  status: 'orphaned',
-})
+/** The quoted text and the context that pins it to one occurrence. */
+interface TextQuote {
+  quote: string
+  prefix: string
+  suffix: string
+}
 
 export function reanchorComment(comment: Comment, body: string): ReanchorResult {
   const { startOffset, endOffset, quote, prefix, suffix } = comment
-  if (startOffset == null || endOffset == null || !quote) return orphaned(comment.id)
+
+  if (startOffset == null || endOffset == null || !quote) return orphaned(comment)
 
   // 1. Offset-first: verify quote still matches at the stored offset
   if (body.slice(startOffset, endOffset) === quote) {
@@ -27,19 +30,19 @@ export function reanchorComment(comment: Comment, body: string): ReanchorResult 
   // https://www.w3.org/TR/annotation-model/#text-quote-selector): an edit inside
   // it must not orphan a quote that is still there.
   const from =
-    findByTextQuote(body, quote, prefix ?? '', suffix ?? '') ??
+    findByTextQuote(body, { quote, prefix: prefix ?? '', suffix: suffix ?? '' }) ??
     nearestOccurrence(body, quote, startOffset)
-  if (from === null) return orphaned(comment.id)
+  if (from === null) return orphaned(comment)
   const to = from + quote.length
   return { anchor: { id: comment.id, from, to }, status: 'ok', newFrom: from, newTo: to }
 }
 
-function findByTextQuote(
-  body: string,
-  quote: string,
-  prefix: string,
-  suffix: string
-): number | null {
+function orphaned(comment: Comment): ReanchorResult {
+  return { anchor: { id: comment.id, from: 0, to: 0 }, status: 'orphaned' }
+}
+
+function findByTextQuote(body: string, textQuote: TextQuote): number | null {
+  const { quote, prefix, suffix } = textQuote
   let idx = body.indexOf(quote)
   while (idx !== -1) {
     const before = body.slice(Math.max(0, idx - prefix.length), idx)

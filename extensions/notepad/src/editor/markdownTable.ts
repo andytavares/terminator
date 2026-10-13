@@ -31,32 +31,7 @@ export interface ParsedTable {
  * kept so columns stay aligned.
  */
 export function splitTableRow(line: string): TableCell[] {
-  const segments: { raw: string; start: number }[] = []
-  let current = ''
-  let start = 0
-  let escaped = false
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-    if (escaped) {
-      current += char
-      escaped = false
-      continue
-    }
-    if (char === '\\') {
-      current += char
-      escaped = true
-      continue
-    }
-    if (char === '|') {
-      segments.push({ raw: current, start })
-      current = ''
-      start = i + 1
-      continue
-    }
-    current += char
-  }
-  segments.push({ raw: current, start })
+  const segments = splitOnUnescapedPipes(line)
 
   // A row is conventionally fenced by pipes; those produce an empty leading and
   // trailing segment that is not a column.
@@ -69,6 +44,33 @@ export function splitTableRow(line: string): TableCell[] {
     const leading = raw.length - raw.trimStart().length
     return { text: raw.trim(), offset: segmentStart + leading }
   })
+}
+
+/** A row's text between pipes, and where it starts in the row. */
+interface RowSegment {
+  raw: string
+  start: number
+}
+
+function splitOnUnescapedPipes(line: string): RowSegment[] {
+  const segments: RowSegment[] = []
+  let current = ''
+  let start = 0
+  let escaped = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (char === '|' && !escaped) {
+      segments.push({ raw: current, start })
+      current = ''
+      start = i + 1
+      continue
+    }
+    current += char
+    escaped = !escaped && char === '\\'
+  }
+  segments.push({ raw: current, start })
+  return segments
 }
 
 const DELIMITER_CELL = /^:?-+:?$/
@@ -101,40 +103,47 @@ export function parseTable(source: string): ParsedTable | null {
   const lines = source.split('\n')
   if (lines.length < 2) return null
 
-  // Absolute start of each line within the source, so cell offsets can be
-  // reported against the table as a whole.
+  const lineStarts = lineStartOffsets(lines)
+  const header = shiftCells(splitTableRow(lines[0]), lineStarts[0])
+  const align = parseDelimiterRow(lines[1])
+  if (!align) return null
+
+  const columnCount = header.length
+  return {
+    header,
+    align: Array.from({ length: columnCount }, (_, i) => align[i] ?? null),
+    rows: parseBodyRows(lines, lineStarts, columnCount),
+  }
+}
+
+/** Absolute start of each line within the source, so cell offsets can be
+ * reported against the table as a whole. */
+function lineStartOffsets(lines: string[]): number[] {
   const lineStarts: number[] = []
   let cursor = 0
   for (const line of lines) {
     lineStarts.push(cursor)
     cursor += line.length + 1
   }
+  return lineStarts
+}
 
-  const shift = (cells: TableCell[], lineIndex: number): TableCell[] =>
-    cells.map((cell) => ({ ...cell, offset: cell.offset + lineStarts[lineIndex] }))
+function shiftCells(cells: TableCell[], lineStart: number): TableCell[] {
+  return cells.map((cell) => ({ ...cell, offset: cell.offset + lineStart }))
+}
 
-  const header = shift(splitTableRow(lines[0]), 0)
-  const align = parseDelimiterRow(lines[1])
-  if (!align) return null
-
-  const columnCount = header.length
-  const rows = lines
+function parseBodyRows(lines: string[], lineStarts: number[], columnCount: number): TableCell[][] {
+  return lines
     .map((line, index) => ({ line, index }))
     .slice(2)
     .filter(({ line }) => line.trim() !== '')
     .map(({ line, index }) => {
-      const cells = shift(splitTableRow(line), index)
+      const cells = shiftCells(splitTableRow(line), lineStarts[index])
       // Pad short rows so the grid stays rectangular; a padded cell points at
       // the end of its row, which is where new text would go.
-      const rowEnd = lineStarts[index] + line.length
-      return Array.from({ length: columnCount }, (_, i) => cells[i] ?? { text: '', offset: rowEnd })
+      const padding = { text: '', offset: lineStarts[index] + line.length }
+      return Array.from({ length: columnCount }, (_, i) => cells[i] ?? padding)
     })
-
-  return {
-    header,
-    align: Array.from({ length: columnCount }, (_, i) => align[i] ?? null),
-    rows,
-  }
 }
 
 // ── Inline spans ──────────────────────────────────────────────────
@@ -160,17 +169,17 @@ const INLINE_PATTERNS: { type: InlineSpanType; re: RegExp }[] = [
   { type: 'em', re: /\*([^*]+)\*/ },
 ]
 
+/** The first inline construct in some text, by position. */
+interface InlineMatch {
+  type: InlineSpanType
+  index: number
+  match: RegExpMatchArray
+}
+
 export function parseInlineSpans(text: string): InlineSpan[] {
   if (text === '') return []
 
-  let earliest: { type: InlineSpanType; index: number; match: RegExpMatchArray } | null = null
-  for (const { type, re } of INLINE_PATTERNS) {
-    const match = re.exec(text)
-    if (match && (earliest === null || match.index! < earliest.index)) {
-      earliest = { type, index: match.index!, match }
-    }
-  }
-
+  const earliest = earliestInlineMatch(text)
   if (!earliest) return [{ type: 'text', text: unescapePipes(text) }]
 
   const { type, index, match } = earliest
@@ -187,6 +196,17 @@ export function parseInlineSpans(text: string): InlineSpan[] {
     span,
     ...parseInlineSpans(after),
   ]
+}
+
+function earliestInlineMatch(text: string): InlineMatch | null {
+  let earliest: InlineMatch | null = null
+  for (const { type, re } of INLINE_PATTERNS) {
+    const match = re.exec(text)
+    if (match && (earliest === null || match.index! < earliest.index)) {
+      earliest = { type, index: match.index!, match }
+    }
+  }
+  return earliest
 }
 
 /** `\|` is how a literal pipe survives cell splitting; it is not literal text. */

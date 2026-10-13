@@ -12,6 +12,23 @@ export async function archiveAreaContents(
   areaId: string,
   now: string
 ): Promise<void> {
+  await recordArchiveChanges(db, areaId)
+  await db.run(
+    `UPDATE tasks SET status='cancelled', updated_at=?
+     WHERE status IN (${UNFINISHED_STATUSES}) AND id IN (
+       SELECT entity_id FROM area_archive_changes WHERE area_id=? AND entity_type='task')`,
+    [now, areaId]
+  )
+  await db.run(
+    `UPDATE projects SET status='archived', updated_at=?
+     WHERE id IN (
+       SELECT entity_id FROM area_archive_changes WHERE area_id=? AND entity_type='project')`,
+    [now, areaId]
+  )
+}
+
+/** Records the current status of every project and unfinished task the archive will change. */
+async function recordArchiveChanges(db: ExtensionDB, areaId: string): Promise<void> {
   await db.run(
     `INSERT INTO area_archive_changes (area_id, entity_type, entity_id, previous_status)
      SELECT ?, 'project', id, status FROM projects WHERE area_id=? AND status != 'archived'
@@ -31,18 +48,6 @@ export async function archiveAreaContents(
      WHERE id IN (SELECT id FROM subtree) AND status IN (${UNFINISHED_STATUSES})
      ON CONFLICT DO UPDATE SET previous_status=excluded.previous_status`,
     [areaId, areaId, areaId]
-  )
-  await db.run(
-    `UPDATE tasks SET status='cancelled', updated_at=?
-     WHERE status IN (${UNFINISHED_STATUSES}) AND id IN (
-       SELECT entity_id FROM area_archive_changes WHERE area_id=? AND entity_type='task')`,
-    [now, areaId]
-  )
-  await db.run(
-    `UPDATE projects SET status='archived', updated_at=?
-     WHERE id IN (
-       SELECT entity_id FROM area_archive_changes WHERE area_id=? AND entity_type='project')`,
-    [now, areaId]
   )
 }
 

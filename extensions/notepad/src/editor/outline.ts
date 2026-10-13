@@ -31,31 +31,38 @@ export function parseOutline(body: string): OutlineHeading[] {
 
   for (const line of body.split('\n')) {
     if (openFence !== null) {
-      const close = FENCE_CLOSE.exec(line)
-      if (close && close[1][0] === openFence[0] && close[1].length >= openFence.length) {
-        openFence = null
-      }
-      offset += line.length + 1
-      continue
-    }
-
-    const fence = FENCE_OPEN.exec(line)
-    // An info string may not contain a backtick when the fence is backticks,
-    // which is what keeps inline code (`` `x` ``) from opening a block.
-    if (fence && !(fence[1][0] === '`' && fence[2].includes('`'))) {
-      openFence = fence[1]
-      offset += line.length + 1
-      continue
-    }
-
-    const heading = ATX_HEADING.exec(line)
-    if (heading) {
-      const text = (heading[2] ?? '').replace(CLOSING_SEQUENCE, '').trim()
-      // A heading with no text has nothing to offer an outline reader.
-      if (text) headings.push({ from: offset, level: heading[1].length, text })
+      if (closesFence(line, openFence)) openFence = null
+    } else {
+      openFence = fenceOpenedBy(line)
+      const heading = openFence === null ? headingAt(line, offset) : null
+      if (heading) headings.push(heading)
     }
     offset += line.length + 1
   }
 
   return headings
+}
+
+function closesFence(line: string, openFence: string): boolean {
+  const close = FENCE_CLOSE.exec(line)
+  return !!close && close[1][0] === openFence[0] && close[1].length >= openFence.length
+}
+
+/** The fence a line opens, or null when it opens none. */
+function fenceOpenedBy(line: string): string | null {
+  const fence = FENCE_OPEN.exec(line)
+  if (!fence) return null
+  // An info string may not contain a backtick when the fence is backticks,
+  // which is what keeps inline code (`` `x` ``) from opening a block.
+  if (fence[1][0] === '`' && fence[2].includes('`')) return null
+  return fence[1]
+}
+
+function headingAt(line: string, offset: number): OutlineHeading | null {
+  const heading = ATX_HEADING.exec(line)
+  if (!heading) return null
+  const text = (heading[2] ?? '').replace(CLOSING_SEQUENCE, '').trim()
+  // A heading with no text has nothing to offer an outline reader.
+  if (!text) return null
+  return { from: offset, level: heading[1].length, text }
 }

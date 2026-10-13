@@ -37,46 +37,44 @@ export interface NewTaskRow {
   terminatorLinks?: string
 }
 
+/** Every column insertTask writes: [column, row field, value when the field is absent]. */
+const TASK_INSERT_COLUMNS: [string, keyof NewTaskRow, unknown][] = [
+  ['id', 'id', null],
+  ['text', 'text', null],
+  ['status', 'status', null],
+  ['project_id', 'projectId', null],
+  ['context', 'context', null],
+  ['area_id', 'areaId', null],
+  ['due_date', 'dueDate', null],
+  ['completed_date', 'completedDate', null],
+  ['migrated_to', 'migratedTo', null],
+  ['source', 'source', null],
+  ['source_ref', 'sourceRef', null],
+  ['parent_id', 'parentId', null],
+  ['sort_order', 'sortOrder', 0],
+  ['today_since', 'todaySince', null],
+  ['recurrence_rule', 'recurrenceRule', null],
+  ['recurrence_template_id', 'recurrenceTemplateId', null],
+  ['recurrence_notify_at', 'recurrenceNotifyAt', null],
+  ['recurrence_end_type', 'recurrenceEndType', null],
+  ['recurrence_end_date', 'recurrenceEndDate', null],
+  ['recurrence_end_count', 'recurrenceEndCount', null],
+  ['recurrence_completed_count', 'recurrenceCompletedCount', null],
+  ['metadata', 'metadata', '{}'],
+  ['terminator_links', 'terminatorLinks', '[]'],
+  ['created_at', 'createdAt', null],
+  ['updated_at', 'updatedAt', null],
+]
+
+const INSERT_SQL = `INSERT INTO tasks (${TASK_INSERT_COLUMNS.map(([c]) => c).join(', ')})
+     VALUES (${TASK_INSERT_COLUMNS.map(() => '?').join(',')})`
+
 /** Runs against a db or an open transaction (both expose run()). */
 export async function insertTask(
   db: Pick<ExtensionDB, 'run'>,
   row: NewTaskRow,
   opts?: { orIgnore?: boolean }
 ): Promise<void> {
-  await db.run(
-    `INSERT INTO tasks
-       (id, text, status, project_id, context, area_id, due_date, completed_date, migrated_to,
-        source, source_ref, parent_id, sort_order, today_since,
-        recurrence_rule, recurrence_template_id, recurrence_notify_at,
-        recurrence_end_type, recurrence_end_date, recurrence_end_count, recurrence_completed_count,
-        metadata, terminator_links, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)${opts?.orIgnore ? ' ON CONFLICT DO NOTHING' : ''}`,
-    [
-      row.id,
-      row.text,
-      row.status,
-      row.projectId ?? null,
-      row.context ?? null,
-      row.areaId ?? null,
-      row.dueDate ?? null,
-      row.completedDate ?? null,
-      row.migratedTo ?? null,
-      row.source,
-      row.sourceRef ?? null,
-      row.parentId ?? null,
-      row.sortOrder ?? 0,
-      row.todaySince ?? null,
-      row.recurrenceRule ?? null,
-      row.recurrenceTemplateId ?? null,
-      row.recurrenceNotifyAt ?? null,
-      row.recurrenceEndType ?? null,
-      row.recurrenceEndDate ?? null,
-      row.recurrenceEndCount ?? null,
-      row.recurrenceCompletedCount ?? null,
-      row.metadata ?? '{}',
-      row.terminatorLinks ?? '[]',
-      row.createdAt,
-      row.updatedAt,
-    ]
-  )
+  const values = TASK_INSERT_COLUMNS.map(([, field, fallback]) => row[field] ?? fallback)
+  await db.run(`${INSERT_SQL}${opts?.orIgnore ? ' ON CONFLICT DO NOTHING' : ''}`, values)
 }

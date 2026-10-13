@@ -30,7 +30,14 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('notify', () => {
+describe('notify', notifyTests)
+
+function notifyTests() {
+  describe('local toasts', notifyLocalToastsTests)
+  describe('dispatcher', notifyDispatcherTests)
+}
+
+function notifyLocalToastsTests() {
   it('adds a local toast with the correct type and message', () => {
     notify('success', 'Task done', 'taskCompleted')
     expect(mockAddToast).toHaveBeenCalledWith('success', 'Task done', { onClick: undefined })
@@ -46,14 +53,16 @@ describe('notify', () => {
 
   it('passes onClick through to the toast store', () => {
     const onClick = vi.fn()
-    notify('info', 'Hello', 'testKey', { onClick })
+    notify('info', 'Hello', { key: 'testKey', onClick })
     expect(mockAddToast).toHaveBeenCalledWith('info', 'Hello', { onClick })
   })
 
   it('does not throw when called without options', () => {
     expect(() => notify('error', 'Oops', 'testKey')).not.toThrow()
   })
+}
 
+function notifyDispatcherTests() {
   it('routes through the shared dispatcher tagged with this extension source and key', () => {
     notify('warning', 'Task overdue', 'dueTaskReminder')
     expect(mockCreate).toHaveBeenCalledWith({
@@ -70,4 +79,4 @@ describe('notify', () => {
     expect(() => notify('info', 'Oops', 'testKey')).not.toThrow()
     ;(window as unknown as Record<string, unknown>).electronAPI = orig
   })
-})
+}

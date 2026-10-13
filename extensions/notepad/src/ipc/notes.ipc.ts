@@ -73,6 +73,18 @@ const ListNotesPayload = z
   })
   .default({})
 
+type NoteListRow = {
+  id: string
+  title: string
+  updated_at: string
+  created_at: string
+  archived_at: string | null
+  body: string
+  tags: string
+  sort_order: number
+  folder_id: string | null
+}
+
 export async function listNotes(
   db: ExtensionDB,
   args: z.infer<typeof ListNotesPayload>
@@ -83,21 +95,9 @@ export async function listNotes(
   const tagFilter = tagId
     ? 'AND EXISTS (SELECT 1 FROM note_tags nt WHERE nt.note_id = n.id AND nt.tag_id = ?)'
     : ''
-  const orderCol = ['title', 'created_at', 'updated_at'].includes(sortBy) ? sortBy : 'updated_at'
-  const orderDir = sortDir === 'asc' ? 'ASC' : 'DESC'
   const params: unknown[] = tagId ? [tagId] : []
 
-  const rows = await db.query<{
-    id: string
-    title: string
-    updated_at: string
-    created_at: string
-    archived_at: string | null
-    body: string
-    tags: string
-    sort_order: number
-    folder_id: string | null
-  }>(
+  const rows = await db.query<NoteListRow>(
     `SELECT n.id, n.title, n.updated_at, n.created_at, n.archived_at,
             n.body,
             COALESCE(n.sort_order, 0) AS sort_order,
@@ -109,23 +109,40 @@ export async function listNotes(
             ), '') AS tags
      FROM notes n
      WHERE 1=1 ${tagFilter} ${archivedFilter}
-     ORDER BY COALESCE(n.sort_order, 0) ASC, n.${orderCol} ${orderDir}`,
+     ORDER BY COALESCE(n.sort_order, 0) ASC, ${noteListOrder(sortBy, sortDir)}`,
     params
   )
+  return { data: rows.map(toNoteListItem) }
+}
 
-  const data = rows.map((r) => ({
+const NOTE_SORT_COLUMNS = ['title', 'created_at', 'updated_at']
+
+/** An unknown column sorts by last update; any direction but ascending is descending. */
+function noteListOrder(sortBy: string, sortDir: string): string {
+  let orderCol = 'updated_at'
+  if (NOTE_SORT_COLUMNS.includes(sortBy)) orderCol = sortBy
+  if (sortDir === 'asc') return `n.${orderCol} ASC`
+  return `n.${orderCol} DESC`
+}
+
+function toNoteListItem(r: NoteListRow) {
+  return {
     id: r.id,
     title: r.title,
     updatedAt: r.updated_at,
     createdAt: r.created_at,
     archivedAt: r.archived_at,
-    tags: r.tags ? r.tags.split(',').filter(Boolean) : [],
+    tags: splitTagNames(r.tags),
     bodyPreview: r.body.slice(0, 120),
     sortOrder: r.sort_order ?? 0,
     folderId: r.folder_id ?? null,
-  }))
+  }
+}
 
-  return { data }
+/** The comma-joined tag names a GROUP_CONCAT produced, as a list. */
+function splitTagNames(tags: string): string[] {
+  if (!tags) return []
+  return tags.split(',').filter(Boolean)
 }
 
 export async function getNote(
@@ -142,7 +159,6 @@ export async function getNote(
      FROM notes n WHERE n.id=?`,
     [args.id]
   )
-
   if (!row) return { error: 'NOTE_NOT_FOUND' }
 
   return { data: rowToNote(row) }
@@ -163,6 +179,7 @@ const AutosaveNotePayload = z.object({
 /** Push channel announcing a saved note body to every open notepad surface. */
 export const NOTES_CHANGED_CHANNEL = 'terminator.notepad:notes.changed'
 
+type NotesBroadcast = (channel: string, data: unknown) => void
 /**
  * The title to store: one set by hand now or before wins over the one the
  * renderer derived from the body.
@@ -212,7 +229,7 @@ async function saveNote(
 export async function autosaveNote(
   db: ExtensionDB,
   args: z.infer<typeof AutosaveNotePayload>,
-  broadcast?: (channel: string, data: unknown) => void
+  broadcast?: NotesBroadcast
 ): Promise<Record<string, unknown>> {
   const { id, body, originId } = args
   const now = new Date().toISOString()

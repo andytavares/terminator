@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { parseOutline } from '../../../src/editor/outline'
 
-describe('parseOutline', () => {
+describe('parseOutline', parseOutlineTests)
+
+function parseOutlineTests() {
+  describe('headings', parseOutlineHeadingsTests)
+  describe('not headings', parseOutlineNotHeadingsTests)
+  describe('fences', parseOutlineFencesTests)
+  describe('empty headings', parseOutlineEmptyHeadingsTests)
+}
+
+function parseOutlineHeadingsTests() {
   it('returns nothing for a body with no headings', () => {
     expect(parseOutline('just some prose\nand more of it')).toEqual([])
   })
@@ -23,7 +32,9 @@ describe('parseOutline', () => {
     const body = 'intro\n\n## Second\n'
     expect(parseOutline(body)[0].from).toBe(body.indexOf('## Second'))
   })
+}
 
+function parseOutlineNotHeadingsTests() {
   it('ignores seven hashes — that is not a heading', () => {
     expect(parseOutline('####### Nope')).toEqual([])
   })
@@ -39,7 +50,9 @@ describe('parseOutline', () => {
   it('ignores four leading spaces — that is an indented code block', () => {
     expect(parseOutline('    ### Code')).toEqual([])
   })
+}
 
+function parseOutlineFencesTests() {
   it('skips headings inside a backtick fence', () => {
     const body = '# Real\n\n```md\n# Fake\n```\n\n## Also real'
     expect(parseOutline(body).map((h) => h.text)).toEqual(['Real', 'Also real'])
@@ -62,7 +75,9 @@ describe('parseOutline', () => {
     const body = '````\n```\n# Fake\n````\n# Real'
     expect(parseOutline(body).map((h) => h.text)).toEqual(['Real'])
   })
+}
 
+function parseOutlineEmptyHeadingsTests() {
   it('drops a heading with no text — an outline entry with no label says nothing', () => {
     expect(parseOutline('##\n## Real').map((h) => h.text)).toEqual(['Real'])
   })
@@ -70,4 +85,4 @@ describe('parseOutline', () => {
   it('drops a heading that is only a closing sequence', () => {
     expect(parseOutline('## ##')).toEqual([])
   })
-})
+}

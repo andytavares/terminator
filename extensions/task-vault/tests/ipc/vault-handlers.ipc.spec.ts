@@ -27,7 +27,6 @@ beforeEach(async () => {
 })
 
 const invoke = (channel: string, payload?: unknown) => harness.invoke(channel, payload)
-
 const taskIds = async (where = '1=1') =>
   (await db.query<{ id: string }>(`SELECT id FROM tasks WHERE ${where} ORDER BY id`)).map(
     (row) => row.id
@@ -74,57 +73,7 @@ describe('task-vault:vault:get-inbox', () => {
   })
 })
 
-describe('task-vault:vault:complete-task', () => {
-  it('marks the task done with today as its completion date', async () => {
-    await seedTask(db, { id: 'task-1' })
-
-    expect(await invoke('task-vault:vault:complete-task', { taskId: 'task-1' })).toEqual({
-      success: true,
-    })
-    expect(await taskRow(db, 'task-1')).toMatchObject({
-      status: 'done',
-      completed_date: localDate(),
-    })
-  })
-
-  it('returns STALE_ID for an unknown task', async () => {
-    expect(await invoke('task-vault:vault:complete-task', { taskId: 'missing-id' })).toEqual({
-      error: 'STALE_ID',
-    })
-  })
-
-  it('spawns no new task for a task without recurrence', async () => {
-    await seedTask(db, { id: 'task-1', dueDate: '2026-01-10' })
-
-    await invoke('task-vault:vault:complete-task', { taskId: 'task-1' })
-
-    expect(await taskIds()).toEqual(['task-1'])
-  })
-
-  it('spawns the next occurrence of a recurring task in the same transaction', async () => {
-    await seedTask(db, {
-      id: 'daily',
-      source: 'daily',
-      sourceRef: localDate(),
-      dueDate: localDate(),
-      recurrenceRule: 'daily',
-    })
-
-    await invoke('task-vault:vault:complete-task', { taskId: 'daily' })
-
-    const next = await db.get<Record<string, unknown>>(
-      `SELECT * FROM tasks WHERE recurrence_template_id = 'daily'`
-    )
-    expect(next).toMatchObject({ status: 'open', recurrence_rule: 'daily' })
-    expect((next?.due_date as string) > localDate()).toBe(true)
-  })
-
-  it('does not create a notification (the renderer owns that event)', async () => {
-    await seedTask(db, { id: 'task-1' })
-    await invoke('task-vault:vault:complete-task', { taskId: 'task-1' })
-    expect(harness.createNotification).not.toHaveBeenCalled()
-  })
-})
+describe('task-vault:vault:complete-task', taskVaultVaultCompleteTaskTests)
 
 describe('task-vault:vault:delete-task', () => {
   it('deletes the task and its subtasks at every depth, leaving others', async () => {
@@ -165,7 +114,11 @@ describe('task-vault:vault:cancel-task', () => {
 
 describe.each(['restore-task', 'reopen-task'])('task-vault:vault:%s', (action) => {
   const channel = `task-vault:vault:${action}`
+  describe('reopening', () => reopeningTests(channel))
+  describe('migrations', () => migrationTests(channel))
+})
 
+function reopeningTests(channel: string) {
   it('reopens a finished task and clears its completion', async () => {
     await seedTask(db, { id: 'task-1', status: 'done', completedDate: '2026-01-05' })
 
@@ -173,6 +126,17 @@ describe.each(['restore-task', 'reopen-task'])('task-vault:vault:%s', (action) =
     expect(await taskRow(db, 'task-1')).toMatchObject({ status: 'open', completed_date: null })
   })
 
+  it('returns STALE_ID for an unknown task', async () => {
+    expect(await invoke(channel, { taskId: 'gone' })).toEqual({ error: 'STALE_ID' })
+  })
+}
+
+function migrationTests(channel: string) {
+  describe('twins', () => migrationTwinTests(channel))
+  describe('subtasks', () => migrationSubtaskTests(channel))
+}
+
+function migrationTwinTests(channel: string) {
   it('deletes the migration twin and its subtasks and forgets the twin id', async () => {
     await seedTask(db, {
       id: 'original',
@@ -187,7 +151,9 @@ describe.each(['restore-task', 'reopen-task'])('task-vault:vault:%s', (action) =
     expect(await taskIds()).toEqual(['original'])
     expect(await metadataOf('original')).toEqual({ keep: 'me' })
   })
+}
 
+function migrationSubtaskTests(channel: string) {
   it('reopens the migrated subtasks of the task', async () => {
     await seedTask(db, { id: 'parent-1', status: 'migrated' })
     await seedTask(db, {
@@ -203,11 +169,7 @@ describe.each(['restore-task', 'reopen-task'])('task-vault:vault:%s', (action) =
     expect(await taskRow(db, 'sub')).toMatchObject({ status: 'open', migrated_to: null })
     expect(await metadataOf('sub')).toEqual({})
   })
-
-  it('returns STALE_ID for an unknown task', async () => {
-    expect(await invoke(channel, { taskId: 'gone' })).toEqual({ error: 'STALE_ID' })
-  })
-})
+}
 
 describe('task-vault:vault:restore-task', () => {
   it('moves the task to today, unlike reopen-task which keeps its source', async () => {
@@ -255,9 +217,169 @@ describe('task-vault:vault:edit-task', () => {
   })
 })
 
-describe('task-vault:vault:add-task', () => {
-  const addTask = (payload: unknown) => invoke('task-vault:vault:add-task', payload)
+const addTask = (payload: unknown) => invoke('task-vault:vault:add-task', payload)
 
+describe('task-vault:vault:add-task', taskVaultVaultAddTaskTests)
+
+describe('task-vault:vault:add-subtask', () => {
+  it('adds a subtask that inherits the parent source', async () => {
+    await seedTask(db, { id: 'task-1', source: 'daily', sourceRef: '2026-05-20' })
+
+    expect(
+      await invoke('task-vault:vault:add-subtask', { taskId: 'task-1', text: '  Sub item  ' })
+    ).toEqual({ success: true })
+
+    const child = await db.get<Record<string, unknown>>(
+      `SELECT * FROM tasks WHERE parent_id = 'task-1'`
+    )
+    expect(child).toMatchObject({ text: 'Sub item', source: 'daily', source_ref: '2026-05-20' })
+  })
+
+  it('returns STALE_ID when the parent does not exist', async () => {
+    expect(
+      await invoke('task-vault:vault:add-subtask', { taskId: 'gone', text: 'Sub item' })
+    ).toEqual({ error: 'STALE_ID' })
+  })
+})
+
+type Today = {
+  date: string
+  tasks: { id: string; subtasks?: { id: string }[] }[]
+  rolledOver: number
+  rolledOverIds: string[]
+  exists: boolean
+  staleDaysThreshold: number
+}
+
+const getToday = () => invoke('task-vault:vault:get-today') as Promise<Today>
+
+describe('task-vault:vault:get-today', taskVaultVaultGetTodayTests)
+
+describe('task-vault:vault:get-daily', () => {
+  it('returns the tasks of the given date only', async () => {
+    await seedTask(db, { id: 'on-date', source: 'daily', sourceRef: '2026-05-20' })
+    await seedTask(db, { id: 'other-date', source: 'daily', sourceRef: '2026-05-21' })
+
+    const result = (await invoke('task-vault:vault:get-daily', { date: '2026-05-20' })) as {
+      date: string
+      tasks: { id: string }[]
+      exists: boolean
+    }
+
+    expect(result.date).toBe('2026-05-20')
+    expect(result.tasks.map((task) => task.id)).toEqual(['on-date'])
+    expect(result.exists).toBe(true)
+  })
+})
+
+const migrate = (payload: unknown) => invoke('task-vault:vault:migrate-task', payload)
+
+describe('task-vault:vault:migrate-task', taskVaultVaultMigrateTaskTests)
+
+const ids = async (payload: unknown) =>
+  ((await invoke('task-vault:vault:query', payload)) as { tasks: { id: string }[] }).tasks.map(
+    (task) => task.id
+  )
+
+describe('task-vault:vault:query', taskVaultVaultQueryTests)
+
+describe('task-vault:projects:get-tasks', () => {
+  it("returns the project's tasks and no others", async () => {
+    await seedProject(db, 'p1', 'MyProject')
+    await seedTask(db, { id: 'in-project', projectId: 'p1' })
+    await seedTask(db, { id: 'elsewhere' })
+
+    const result = (await invoke('task-vault:projects:get-tasks', {
+      projectName: 'MyProject',
+    })) as { tasks: { id: string }[] }
+
+    expect(result.tasks.map((task) => task.id)).toEqual(['in-project'])
+  })
+})
+
+describe('task-vault:vault:block-task and unblock-task', taskVaultVaultBlockTaskTests)
+
+describe('task-vault:vault:reorder-tasks', () => {
+  it('sets sort_order to the position in the given list', async () => {
+    for (const id of ['id-1', 'id-2', 'id-3']) await seedTask(db, { id })
+
+    expect(
+      await invoke('task-vault:vault:reorder-tasks', { orderedIds: ['id-3', 'id-1', 'id-2'] })
+    ).toEqual({ success: true })
+
+    const order = await db.query<{ id: string }>(`SELECT id FROM tasks ORDER BY sort_order`)
+    expect(order.map((row) => row.id)).toEqual(['id-3', 'id-1', 'id-2'])
+  })
+})
+
+describe('task-vault:vault task detail', taskVaultVaultTaskDetailTests)
+describe('task-vault:vault:list-archive', taskVaultVaultListArchiveTests)
+
+function taskVaultVaultCompleteTaskTests() {
+  describe('completing', taskVaultVaultCompleteTaskCompletingTests)
+  describe('recurrence', taskVaultVaultCompleteTaskRecurrenceTests)
+}
+
+function taskVaultVaultCompleteTaskCompletingTests() {
+  it('marks the task done with today as its completion date', async () => {
+    await seedTask(db, { id: 'task-1' })
+
+    expect(await invoke('task-vault:vault:complete-task', { taskId: 'task-1' })).toEqual({
+      success: true,
+    })
+    expect(await taskRow(db, 'task-1')).toMatchObject({
+      status: 'done',
+      completed_date: localDate(),
+    })
+  })
+
+  it('returns STALE_ID for an unknown task', async () => {
+    expect(await invoke('task-vault:vault:complete-task', { taskId: 'missing-id' })).toEqual({
+      error: 'STALE_ID',
+    })
+  })
+
+  it('spawns no new task for a task without recurrence', async () => {
+    await seedTask(db, { id: 'task-1', dueDate: '2026-01-10' })
+
+    await invoke('task-vault:vault:complete-task', { taskId: 'task-1' })
+
+    expect(await taskIds()).toEqual(['task-1'])
+  })
+}
+
+function taskVaultVaultCompleteTaskRecurrenceTests() {
+  it('spawns the next occurrence of a recurring task in the same transaction', async () => {
+    await seedTask(db, {
+      id: 'daily',
+      source: 'daily',
+      sourceRef: localDate(),
+      dueDate: localDate(),
+      recurrenceRule: 'daily',
+    })
+
+    await invoke('task-vault:vault:complete-task', { taskId: 'daily' })
+
+    const next = await db.get<Record<string, unknown>>(
+      `SELECT * FROM tasks WHERE recurrence_template_id = 'daily'`
+    )
+    expect(next).toMatchObject({ status: 'open', recurrence_rule: 'daily' })
+    expect((next?.due_date as string) > localDate()).toBe(true)
+  })
+
+  it('does not create a notification (the renderer owns that event)', async () => {
+    await seedTask(db, { id: 'task-1' })
+    await invoke('task-vault:vault:complete-task', { taskId: 'task-1' })
+    expect(harness.createNotification).not.toHaveBeenCalled()
+  })
+}
+
+function taskVaultVaultAddTaskTests() {
+  describe('inbox and daily', taskVaultVaultAddTaskInboxDailyTests)
+  describe('tags', taskVaultVaultAddTaskTagsTests)
+}
+
+function taskVaultVaultAddTaskInboxDailyTests() {
   it('inserts an inbox task and returns its id', async () => {
     const { taskId } = (await addTask({ filePath: 'inbox', text: 'New task' })) as {
       taskId: string
@@ -282,7 +404,9 @@ describe('task-vault:vault:add-task', () => {
       today_since: '2026-05-20',
     })
   })
+}
 
+function taskVaultVaultAddTaskTagsTests() {
   it('applies the tags it is given', async () => {
     const { taskId } = (await addTask({
       filePath: 'inbox',
@@ -304,40 +428,16 @@ describe('task-vault:vault:add-task', () => {
       area: 'Work',
     })
   })
-})
+}
 
-describe('task-vault:vault:add-subtask', () => {
-  it('adds a subtask that inherits the parent source', async () => {
-    await seedTask(db, { id: 'task-1', source: 'daily', sourceRef: '2026-05-20' })
+function taskVaultVaultGetTodayTests() {
+  describe('empty and listing', taskVaultVaultGetTodayEmptyListingTests)
+  describe('threshold', taskVaultVaultGetTodayThresholdTests)
+  describe('rolling over', taskVaultVaultGetTodayRollingOverTests)
+  describe('not rolling over', taskVaultVaultGetTodayNotRollingOverTests)
+}
 
-    expect(
-      await invoke('task-vault:vault:add-subtask', { taskId: 'task-1', text: '  Sub item  ' })
-    ).toEqual({ success: true })
-
-    const child = await db.get<Record<string, unknown>>(
-      `SELECT * FROM tasks WHERE parent_id = 'task-1'`
-    )
-    expect(child).toMatchObject({ text: 'Sub item', source: 'daily', source_ref: '2026-05-20' })
-  })
-
-  it('returns STALE_ID when the parent does not exist', async () => {
-    expect(
-      await invoke('task-vault:vault:add-subtask', { taskId: 'gone', text: 'Sub item' })
-    ).toEqual({ error: 'STALE_ID' })
-  })
-})
-
-describe('task-vault:vault:get-today', () => {
-  type Today = {
-    date: string
-    tasks: { id: string; subtasks?: { id: string }[] }[]
-    rolledOver: number
-    rolledOverIds: string[]
-    exists: boolean
-    staleDaysThreshold: number
-  }
-  const getToday = () => invoke('task-vault:vault:get-today') as Promise<Today>
-
+function taskVaultVaultGetTodayEmptyListingTests() {
   it("returns today's date and no tasks for an empty database", async () => {
     const result = await getToday()
 
@@ -361,31 +461,34 @@ describe('task-vault:vault:get-today', () => {
     expect(result.tasks.map((task) => task.id)).toEqual(['today-1'])
     expect(result.tasks[0].subtasks?.map((task) => task.id)).toEqual(['sub'])
   })
+}
 
+function taskVaultVaultGetTodayThresholdTests() {
   it('reads the stale threshold from settings', async () => {
     await db.run(
       `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'stale_days_threshold', '12')`
     )
     expect((await getToday()).staleDaysThreshold).toBe(12)
   })
+}
 
+/** A task with one subtask on an earlier day's log, there since 2026-04-28. */
+async function seedPastTaskWithSubtask(status: string): Promise<void> {
+  await seedTask(db, {
+    id: 'old',
+    status,
+    source: 'daily',
+    sourceRef: '2026-05-01',
+    todaySince: '2026-04-28',
+  })
+  await seedTask(db, { id: 'old-sub', parentId: 'old', source: 'daily', sourceRef: '2026-05-01' })
+}
+
+function taskVaultVaultGetTodayRollingOverTests() {
   it.each(['open', 'blocked', 'in-progress'])(
     'rolls a %s task from a past day over to today and marks the original migrated',
     async (status) => {
-      await seedTask(db, {
-        id: 'old',
-        status,
-        source: 'daily',
-        sourceRef: '2026-05-01',
-        todaySince: '2026-04-28',
-      })
-      await seedTask(db, {
-        id: 'old-sub',
-        parentId: 'old',
-        source: 'daily',
-        sourceRef: '2026-05-01',
-      })
-
+      await seedPastTaskWithSubtask(status)
       const result = await getToday()
 
       expect(result.rolledOver).toBe(1)
@@ -404,7 +507,9 @@ describe('task-vault:vault:get-today', () => {
       expect(result.tasks.map((task) => task.id)).toContain(newId)
     }
   )
+}
 
+function taskVaultVaultGetTodayNotRollingOverTests() {
   it('does not roll over recurring, finished or sub tasks', async () => {
     await seedTask(db, {
       id: 'recurring',
@@ -430,38 +535,27 @@ describe('task-vault:vault:get-today', () => {
       error: expect.stringContaining('no such table'),
     })
   })
-})
+}
 
-describe('task-vault:vault:get-daily', () => {
-  it('returns the tasks of the given date only', async () => {
-    await seedTask(db, { id: 'on-date', source: 'daily', sourceRef: '2026-05-20' })
-    await seedTask(db, { id: 'other-date', source: 'daily', sourceRef: '2026-05-21' })
+function taskVaultVaultMigrateTaskTests() {
+  describe('migrating', taskVaultVaultMigrateTaskMigratingTests)
+  describe('subtasks', taskVaultVaultMigrateTaskSubtasksTests)
+  describe('no-ops and errors', taskVaultVaultMigrateTaskNoOpsErrorsTests)
+}
 
-    const result = (await invoke('task-vault:vault:get-daily', { date: '2026-05-20' })) as {
-      date: string
-      tasks: { id: string }[]
-      exists: boolean
-    }
+const CARRY_ON = {
+  id: 'task-1',
+  text: 'Carry on',
+  projectId: 'p1',
+  context: 'Home',
+  source: 'daily',
+  sourceRef: '2026-05-20',
+}
 
-    expect(result.date).toBe('2026-05-20')
-    expect(result.tasks.map((task) => task.id)).toEqual(['on-date'])
-    expect(result.exists).toBe(true)
-  })
-})
-
-describe('task-vault:vault:migrate-task', () => {
-  const migrate = (payload: unknown) => invoke('task-vault:vault:migrate-task', payload)
-
+function taskVaultVaultMigrateTaskMigratingTests() {
   it('marks the task migrated and creates an open twin on the target date', async () => {
     await seedProject(db, 'p1', 'Alpha')
-    await seedTask(db, {
-      id: 'task-1',
-      text: 'Carry on',
-      projectId: 'p1',
-      context: 'Home',
-      source: 'daily',
-      sourceRef: '2026-05-20',
-    })
+    await seedTask(db, CARRY_ON)
 
     const { newTaskId } = (await migrate({ taskId: 'task-1', targetDate: '2026-05-21' })) as {
       newTaskId: string
@@ -481,7 +575,9 @@ describe('task-vault:vault:migrate-task', () => {
       source_ref: '2026-05-21',
     })
   })
+}
 
+function taskVaultVaultMigrateTaskSubtasksTests() {
   it('migrates subtasks too, as twins under the new parent', async () => {
     await seedTask(db, { id: 'task-1', source: 'daily', sourceRef: '2026-05-20' })
     await seedTask(db, { id: 'sub-1', parentId: 'task-1', text: 'Subtask one', sortOrder: 0 })
@@ -508,7 +604,9 @@ describe('task-vault:vault:migrate-task', () => {
       { text: 'Subtask two', status: 'done', source_ref: '2026-05-21' },
     ])
   })
+}
 
+function taskVaultVaultMigrateTaskNoOpsErrorsTests() {
   it('is a no-op when the task is already on the target date', async () => {
     await seedTask(db, { id: 'task-1', source: 'daily', sourceRef: '2026-05-21' })
 
@@ -525,41 +623,44 @@ describe('task-vault:vault:migrate-task', () => {
       error: 'STALE_ID',
     })
   })
-})
+}
 
-describe('task-vault:vault:query', () => {
-  beforeEach(async () => {
-    await seedProject(db, 'p1', 'Alpha')
-    await seedArea(db, 'a1', 'Work')
-    await seedTask(db, {
-      id: 'match',
-      context: 'office',
-      projectId: 'p1',
-      areaId: 'a1',
-      dueDate: '2026-05-01',
-      createdAt: '2026-01-01T00:00:00.000Z',
-    })
-    await seedTask(db, {
-      id: 'in-progress',
-      status: 'in-progress',
-      createdAt: '2026-01-02T00:00:00.000Z',
-    })
-    await seedTask(db, {
-      id: 'late',
-      context: 'office',
-      projectId: 'p1',
-      areaId: 'a1',
-      dueDate: '2026-08-01',
-      createdAt: '2026-01-03T00:00:00.000Z',
-    })
-    await seedTask(db, { id: 'done', status: 'done', createdAt: '2026-01-04T00:00:00.000Z' })
+function taskVaultVaultQueryTests() {
+  beforeEach(seedQueryTasks)
+
+  describe('unfiltered', taskVaultVaultQueryUnfilteredTests)
+  describe('filtered', taskVaultVaultQueryFilteredTests)
+}
+
+/** Four tasks, oldest first: one matching every filter, and three that each miss one. */
+async function seedQueryTasks() {
+  await seedProject(db, 'p1', 'Alpha')
+  await seedArea(db, 'a1', 'Work')
+  await seedTask(db, {
+    id: 'match',
+    context: 'office',
+    projectId: 'p1',
+    areaId: 'a1',
+    dueDate: '2026-05-01',
+    createdAt: '2026-01-01T00:00:00.000Z',
   })
+  await seedTask(db, {
+    id: 'in-progress',
+    status: 'in-progress',
+    createdAt: '2026-01-02T00:00:00.000Z',
+  })
+  await seedTask(db, {
+    id: 'late',
+    context: 'office',
+    projectId: 'p1',
+    areaId: 'a1',
+    dueDate: '2026-08-01',
+    createdAt: '2026-01-03T00:00:00.000Z',
+  })
+  await seedTask(db, { id: 'done', status: 'done', createdAt: '2026-01-04T00:00:00.000Z' })
+}
 
-  const ids = async (payload: unknown) =>
-    ((await invoke('task-vault:vault:query', payload)) as { tasks: { id: string }[] }).tasks.map(
-      (task) => task.id
-    )
-
+function taskVaultVaultQueryUnfilteredTests() {
   it('returns every task, oldest first, when no filter is given', async () => {
     expect(await ids({})).toEqual(['match', 'in-progress', 'late', 'done'])
   })
@@ -567,7 +668,9 @@ describe('task-vault:vault:query', () => {
   it('filters by a list of statuses', async () => {
     expect(await ids({ status: ['open', 'in-progress'] })).toEqual(['match', 'in-progress', 'late'])
   })
+}
 
+function taskVaultVaultQueryFilteredTests() {
   it('filters by a single status', async () => {
     expect(await ids({ status: 'done' })).toEqual(['done'])
   })
@@ -581,23 +684,14 @@ describe('task-vault:vault:query', () => {
   it('returns nothing when no task matches every filter', async () => {
     expect(await ids({ context: 'elsewhere' })).toEqual([])
   })
-})
+}
 
-describe('task-vault:projects:get-tasks', () => {
-  it("returns the project's tasks and no others", async () => {
-    await seedProject(db, 'p1', 'MyProject')
-    await seedTask(db, { id: 'in-project', projectId: 'p1' })
-    await seedTask(db, { id: 'elsewhere' })
+function taskVaultVaultBlockTaskTests() {
+  describe('blocking', taskVaultVaultBlockTaskBlockingTests)
+  describe('unblocking', taskVaultVaultBlockTaskUnblockingTests)
+}
 
-    const result = (await invoke('task-vault:projects:get-tasks', {
-      projectName: 'MyProject',
-    })) as { tasks: { id: string }[] }
-
-    expect(result.tasks.map((task) => task.id)).toEqual(['in-project'])
-  })
-})
-
-describe('task-vault:vault:block-task and unblock-task', () => {
+function taskVaultVaultBlockTaskBlockingTests() {
   it('blocks a task, recording the reason and check interval in the columns and metadata', async () => {
     await seedTask(db, { id: 'task-1', metadata: JSON.stringify({ keep: 'me' }) })
 
@@ -619,7 +713,14 @@ describe('task-vault:vault:block-task and unblock-task', () => {
       blocked_check_interval: '1-day',
     })
   })
+}
 
+function taskVaultVaultBlockTaskUnblockingTests() {
+  describe('reopening', taskVaultVaultBlockTaskUnblockingReopeningTests)
+  describe('missing tasks', taskVaultVaultBlockTaskUnblockingMissingTasksTests)
+}
+
+function taskVaultVaultBlockTaskUnblockingReopeningTests() {
   it('unblocking reopens the task and clears the reason everywhere', async () => {
     await seedTask(db, { id: 'task-1' })
     await invoke('task-vault:vault:block-task', {
@@ -638,7 +739,9 @@ describe('task-vault:vault:block-task and unblock-task', () => {
     })
     expect(await metadataOf('task-1')).toEqual({})
   })
+}
 
+function taskVaultVaultBlockTaskUnblockingMissingTasksTests() {
   it.each(['block-task', 'unblock-task'])(
     '%s returns STALE_ID for an unknown task',
     async (name) => {
@@ -651,22 +754,14 @@ describe('task-vault:vault:block-task and unblock-task', () => {
       ).toEqual({ error: 'STALE_ID' })
     }
   )
-})
+}
 
-describe('task-vault:vault:reorder-tasks', () => {
-  it('sets sort_order to the position in the given list', async () => {
-    for (const id of ['id-1', 'id-2', 'id-3']) await seedTask(db, { id })
+function taskVaultVaultTaskDetailTests() {
+  describe('reading', taskVaultVaultTaskDetailReadingTests)
+  describe('saving', taskVaultVaultTaskDetailSavingTests)
+}
 
-    expect(
-      await invoke('task-vault:vault:reorder-tasks', { orderedIds: ['id-3', 'id-1', 'id-2'] })
-    ).toEqual({ success: true })
-
-    const order = await db.query<{ id: string }>(`SELECT id FROM tasks ORDER BY sort_order`)
-    expect(order.map((row) => row.id)).toEqual(['id-3', 'id-1', 'id-2'])
-  })
-})
-
-describe('task-vault:vault task detail', () => {
+function taskVaultVaultTaskDetailReadingTests() {
   it('returns the detail fields stored in metadata, empty when absent', async () => {
     await seedTask(db, {
       id: 'detailed',
@@ -689,7 +784,14 @@ describe('task-vault:vault task detail', () => {
       devHints: '',
     })
   })
+}
 
+function taskVaultVaultTaskDetailSavingTests() {
+  describe('merging', taskVaultVaultTaskDetailSavingMergingTests)
+  describe('missing tasks', taskVaultVaultTaskDetailSavingMissingTasksTests)
+}
+
+function taskVaultVaultTaskDetailSavingMergingTests() {
   it('save-task-detail merges the fields into existing metadata', async () => {
     await seedTask(db, { id: 'task-1', metadata: JSON.stringify({ other: 'value' }) })
 
@@ -709,7 +811,9 @@ describe('task-vault:vault task detail', () => {
       dev_hints: 'Hint',
     })
   })
+}
 
+function taskVaultVaultTaskDetailSavingMissingTasksTests() {
   it('reports a missing task', async () => {
     expect(await invoke('task-vault:vault:get-task-detail', { taskId: 'nope' })).toEqual({
       error: 'Task not found',
@@ -723,18 +827,23 @@ describe('task-vault:vault task detail', () => {
       })
     ).toEqual({ error: 'Task not found' })
   })
-})
+}
 
-describe('task-vault:vault:list-archive', () => {
+function taskVaultVaultListArchiveTests() {
+  describe('listing', taskVaultVaultListArchiveListingTests)
+  describe('areas and errors', taskVaultVaultListArchiveAreasErrorsTests)
+}
+
+function taskVaultVaultListArchiveListingTests() {
   it('returns finished tasks within the window, archived projects and archived areas', async () => {
     const recent = new Date().toISOString()
     await seedTask(db, { id: 'recent-done', status: 'done', updatedAt: recent })
     await seedTask(db, { id: 'recent-cancelled', status: 'cancelled', updatedAt: recent })
     await seedTask(db, { id: 'ancient', status: 'done', updatedAt: '2020-01-01T00:00:00.000Z' })
     await seedTask(db, { id: 'open', updatedAt: recent })
-    await seedArea(db, 'a-old', 'Old Area', 'archived')
+    await seedArea(db, 'a-old', { name: 'Old Area', status: 'archived' })
     await seedArea(db, 'a-live', 'Live Area')
-    await seedProject(db, 'p-old', 'Old Project', { status: 'archived', areaId: 'a-old' })
+    await seedProject(db, 'p-old', { name: 'Old Project', status: 'archived', areaId: 'a-old' })
     await seedProject(db, 'p-live', 'Live Project')
 
     const result = (await invoke('task-vault:vault:list-archive', { days: 30 })) as {
@@ -747,10 +856,12 @@ describe('task-vault:vault:list-archive', () => {
     expect(result.projects.map((project) => project.name)).toEqual(['Old Project'])
     expect(result.areas).toEqual([{ id: 'a-old', name: 'Old Area', updatedAt: expect.any(String) }])
   })
+}
 
+function taskVaultVaultListArchiveAreasErrorsTests() {
   it('names the area of an archived project', async () => {
-    await seedArea(db, 'a1', 'Work', 'archived')
-    await seedProject(db, 'p1', 'Old Project', { status: 'archived', areaId: 'a1' })
+    await seedArea(db, 'a1', { name: 'Work', status: 'archived' })
+    await seedProject(db, 'p1', { name: 'Old Project', status: 'archived', areaId: 'a1' })
 
     const result = (await invoke('task-vault:vault:list-archive', {})) as {
       projects: { name: string; area?: string }[]
@@ -765,4 +876,4 @@ describe('task-vault:vault:list-archive', () => {
       error: expect.stringContaining('no such table'),
     })
   })
-})
+}

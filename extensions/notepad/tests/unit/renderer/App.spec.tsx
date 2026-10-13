@@ -48,7 +48,17 @@ afterEach(() => {
   vi.resetModules()
 })
 
-describe('notepad renderer App', () => {
+describe('notepad renderer App', notepadRendererAppTests)
+
+function notepadRendererAppTests() {
+  describe('main view', notepadRendererAppMainViewTests)
+  describe('window views', notepadRendererAppWindowViewsTests)
+  describe('quick create command', notepadRendererAppQuickCreateCommandTests)
+  describe('unsubscribing', notepadRendererAppUnsubscribingTests)
+  describe('pending quick create', notepadRendererAppPendingQuickCreateTests)
+}
+
+function notepadRendererAppMainViewTests() {
   it('renders NotepadView for ?view=main', async () => {
     setView('main')
     const { App } = await import('../../../src/renderer/App')
@@ -63,7 +73,9 @@ describe('notepad renderer App', () => {
     render(<App />)
     expect(screen.getByTestId('notepad-view')).toBeDefined()
   })
+}
 
+function notepadRendererAppWindowViewsTests() {
   it('renders NoteWindowView for ?view=note', async () => {
     setView('note')
     const { App } = await import('../../../src/renderer/App')
@@ -78,7 +90,9 @@ describe('notepad renderer App', () => {
     render(<App />)
     expect(screen.getByTestId('diagram-window-view')).toBeDefined()
   })
+}
 
+function notepadRendererAppQuickCreateCommandTests() {
   it('subscribes to terminator.notepad:ui.openQuickCreate on mount', async () => {
     setView('main')
     const { App } = await import('../../../src/renderer/App')
@@ -102,7 +116,9 @@ describe('notepad renderer App', () => {
     })
     expect(mockSetShowQuickCreate).toHaveBeenCalledWith(true)
   })
+}
 
+function notepadRendererAppUnsubscribingTests() {
   it('unsubscribes from command on unmount', async () => {
     setView('main')
     const { App } = await import('../../../src/renderer/App')
@@ -110,7 +126,9 @@ describe('notepad renderer App', () => {
     unmount()
     expect(mockBridgeOff).toHaveBeenCalled()
   })
+}
 
+function notepadRendererAppPendingQuickCreateTests() {
   it('invokes consumePendingQuickCreate on mount', async () => {
     setView('main')
     const { App } = await import('../../../src/renderer/App')
@@ -127,4 +145,4 @@ describe('notepad renderer App', () => {
     await act(async () => {})
     expect(mockSetShowQuickCreate).toHaveBeenCalledWith(true)
   })
-})
+}

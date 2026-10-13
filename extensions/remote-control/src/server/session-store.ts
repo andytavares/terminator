@@ -8,6 +8,12 @@ interface SessionStoreOptions {
   ttlMs: number
 }
 
+/** A minted token and the Set-Cookie header value that carries it. */
+interface IssuedSession {
+  token: string
+  setCookie: string
+}
+
 /**
  * Bearer-token session store for one browser surface. The /app/ and /mobile/
  * surfaces each get an instance — issue/validate/expiry/sweep exist once,
@@ -23,7 +29,7 @@ export class SessionStore {
   }
 
   /** Mints a token and returns it with the Set-Cookie header value. */
-  issueSession(): { token: string; setCookie: string } {
+  issueSession(): IssuedSession {
     const token = randomBytes(32).toString('hex')
     this.sessions.set(token, Date.now() + this.opts.ttlMs)
     const maxAge = Math.floor(this.opts.ttlMs / 1000)

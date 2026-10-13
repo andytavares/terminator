@@ -30,40 +30,7 @@ function clickTrigger(container: HTMLElement): void {
   fireEvent.click(trigger)
 }
 
-describe('DateTimePicker — trigger display', () => {
-  it('renders placeholder when value is empty (date mode)', () => {
-    const { container } = render(
-      <DateTimePicker mode="date" value="" onChange={vi.fn()} placeholder="Pick a date" />
-    )
-    expect(container.querySelector('.dtp__trigger-label')?.textContent).toBe('Pick a date')
-  })
-
-  it('renders placeholder when value is empty (time mode)', () => {
-    const { container } = render(
-      <DateTimePicker mode="time" value="" onChange={vi.fn()} placeholder="Pick a time" />
-    )
-    expect(container.querySelector('.dtp__trigger-label')?.textContent).toBe('Pick a time')
-  })
-
-  it('renders formatted date when value is provided', () => {
-    const { container } = render(
-      <DateTimePicker mode="date" value="2026-06-13" onChange={vi.fn()} />
-    )
-    const label = container.querySelector('.dtp__trigger-label')?.textContent ?? ''
-    expect(label).toContain('Jun')
-    expect(label).toContain('2026')
-  })
-
-  it('renders 12h formatted time when value is provided', () => {
-    const { container } = render(<DateTimePicker mode="time" value="14:30" onChange={vi.fn()} />)
-    expect(container.querySelector('.dtp__trigger-label')?.textContent).toContain('2:30 PM')
-  })
-
-  it('renders AM time correctly', () => {
-    const { container } = render(<DateTimePicker mode="time" value="09:15" onChange={vi.fn()} />)
-    expect(container.querySelector('.dtp__trigger-label')?.textContent).toContain('9:15 AM')
-  })
-})
+describe('DateTimePicker — trigger display', dateTimePickerTriggerDisplayTests)
 
 describe('DateTimePicker — open / close', () => {
   it('opens the popover when trigger is clicked', () => {
@@ -89,7 +56,59 @@ describe('DateTimePicker — open / close', () => {
   })
 })
 
-describe('DateTimePicker — date mode', () => {
+describe('DateTimePicker — date mode', dateTimePickerDateModeTests)
+describe('DateTimePicker — time mode (12h + AM/PM toggle)', dateTimePickerTimeMode12hAMTests)
+describe('DateTimePicker — datetime mode', dateTimePickerDatetimeModeTests)
+
+function dateTimePickerTriggerDisplayTests() {
+  describe('placeholders', dateTimePickerTriggerDisplayPlaceholdersTests)
+  describe('values', dateTimePickerTriggerDisplayValuesTests)
+}
+
+function dateTimePickerTriggerDisplayPlaceholdersTests() {
+  it('renders placeholder when value is empty (date mode)', () => {
+    const { container } = render(
+      <DateTimePicker mode="date" value="" onChange={vi.fn()} placeholder="Pick a date" />
+    )
+    expect(container.querySelector('.dtp__trigger-label')?.textContent).toBe('Pick a date')
+  })
+
+  it('renders placeholder when value is empty (time mode)', () => {
+    const { container } = render(
+      <DateTimePicker mode="time" value="" onChange={vi.fn()} placeholder="Pick a time" />
+    )
+    expect(container.querySelector('.dtp__trigger-label')?.textContent).toBe('Pick a time')
+  })
+}
+
+function dateTimePickerTriggerDisplayValuesTests() {
+  it('renders formatted date when value is provided', () => {
+    const { container } = render(
+      <DateTimePicker mode="date" value="2026-06-13" onChange={vi.fn()} />
+    )
+    const label = container.querySelector('.dtp__trigger-label')?.textContent ?? ''
+    expect(label).toContain('Jun')
+    expect(label).toContain('2026')
+  })
+
+  it('renders 12h formatted time when value is provided', () => {
+    const { container } = render(<DateTimePicker mode="time" value="14:30" onChange={vi.fn()} />)
+    expect(container.querySelector('.dtp__trigger-label')?.textContent).toContain('2:30 PM')
+  })
+
+  it('renders AM time correctly', () => {
+    const { container } = render(<DateTimePicker mode="time" value="09:15" onChange={vi.fn()} />)
+    expect(container.querySelector('.dtp__trigger-label')?.textContent).toContain('9:15 AM')
+  })
+}
+
+function dateTimePickerDateModeTests() {
+  describe('shortcuts', dateTimePickerDateModeShortcutsTests)
+  describe('calendar', dateTimePickerDateModeCalendarTests)
+  describe('clearing and limits', dateTimePickerDateModeClearingLimitsTests)
+}
+
+function dateTimePickerDateModeShortcutsTests() {
   it('shows date shortcut chips', () => {
     const { container } = render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
     act(() => clickTrigger(container))
@@ -115,7 +134,14 @@ describe('DateTimePicker — date mode', () => {
     act(() => fireEvent.click(screen.getByText('Tomorrow')))
     expect(onChange).toHaveBeenCalledWith('2026-06-14')
   })
+}
 
+function dateTimePickerDateModeCalendarTests() {
+  describe('navigation', dateTimePickerDateModeCalendarNavigationTests)
+  describe('days', dateTimePickerDateModeCalendarDaysTests)
+}
+
+function dateTimePickerDateModeCalendarNavigationTests() {
   it('navigates to previous month', () => {
     const { container } = render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
     act(() => clickTrigger(container))
@@ -123,7 +149,9 @@ describe('DateTimePicker — date mode', () => {
     act(() => fireEvent.click(screen.getByRole('button', { name: 'Previous month' })))
     expect(screen.getByText('May 2026')).toBeTruthy()
   })
+}
 
+function dateTimePickerDateModeCalendarDaysTests() {
   it('shows selected day with selected class', () => {
     const { container } = render(
       <DateTimePicker mode="date" value="2026-06-13" onChange={vi.fn()} />
@@ -145,7 +173,9 @@ describe('DateTimePicker — date mode', () => {
     act(() => fireEvent.click(day20))
     expect(onChange).toHaveBeenCalledWith('2026-06-20')
   })
+}
 
+function dateTimePickerDateModeClearingLimitsTests() {
   it('Clear button calls onChange with empty string', () => {
     const onChange = vi.fn()
     const { container } = render(
@@ -164,9 +194,15 @@ describe('DateTimePicker — date mode', () => {
     const disabledDays = container.querySelectorAll('.dtp__cal-day--disabled')
     expect(disabledDays.length).toBeGreaterThan(0)
   })
-})
+}
 
-describe('DateTimePicker — time mode (12h + AM/PM toggle)', () => {
+function dateTimePickerTimeMode12hAMTests() {
+  describe('shortcuts and halves', dateTimePickerTimeMode12hAMShortcutsHalvesTests)
+  describe('slots', dateTimePickerTimeMode12hAMSlotsTests)
+  describe('selection', dateTimePickerTimeMode12hAMSelectionTests)
+}
+
+function dateTimePickerTimeMode12hAMShortcutsHalvesTests() {
   it('shows time shortcut chips', () => {
     const { container } = render(<DateTimePicker mode="time" value="" onChange={vi.fn()} />)
     act(() => clickTrigger(container))
@@ -183,7 +219,14 @@ describe('DateTimePicker — time mode (12h + AM/PM toggle)', () => {
     expect(container.querySelector('.dtp__ampm-toggle')).toBeTruthy()
     expect(container.querySelector('.dtp__ampm-btn--active')?.textContent).toBe('AM')
   })
+}
 
+function dateTimePickerTimeMode12hAMSlotsTests() {
+  describe('halves', dateTimePickerTimeMode12hAMSlotsHalvesTests)
+  describe('choosing', dateTimePickerTimeMode12hAMSlotsChoosingTests)
+}
+
+function dateTimePickerTimeMode12hAMSlotsHalvesTests() {
   it('renders time slots in 12h format', () => {
     const { container } = render(<DateTimePicker mode="time" value="" onChange={vi.fn()} />)
     act(() => clickTrigger(container))
@@ -207,7 +250,9 @@ describe('DateTimePicker — time mode (12h + AM/PM toggle)', () => {
     expect(slots[0]?.textContent).toBe('12:00')
     expect(container.querySelector('.dtp__ampm-btn--active')?.textContent).toBe('PM')
   })
+}
 
+function dateTimePickerTimeMode12hAMSlotsChoosingTests() {
   it('calls onChange when a time slot is clicked', () => {
     const onChange = vi.fn()
     const { container } = render(<DateTimePicker mode="time" value="" onChange={onChange} />)
@@ -224,7 +269,9 @@ describe('DateTimePicker — time mode (12h + AM/PM toggle)', () => {
     act(() => fireEvent.click(slot))
     expect(onChange).toHaveBeenCalledWith('17:00')
   })
+}
 
+function dateTimePickerTimeMode12hAMSelectionTests() {
   it('End of day shortcut calls onChange with 17:00', () => {
     const onChange = vi.fn()
     const { container } = render(<DateTimePicker mode="time" value="" onChange={onChange} />)
@@ -252,9 +299,14 @@ describe('DateTimePicker — time mode (12h + AM/PM toggle)', () => {
     act(() => clickTrigger(container))
     expect(container.querySelector('.dtp__popover--time-only')).toBeTruthy()
   })
-})
+}
 
-describe('DateTimePicker — datetime mode', () => {
+function dateTimePickerDatetimeModeTests() {
+  describe('layout', dateTimePickerDatetimeModeLayoutTests)
+  describe('updates', dateTimePickerDatetimeModeUpdatesTests)
+}
+
+function dateTimePickerDatetimeModeLayoutTests() {
   it('shows both calendar and time panel with AM/PM toggle', () => {
     const { container } = render(
       <DateTimePicker mode="datetime" value="2026-06-13T14:00" onChange={vi.fn()} />
@@ -263,7 +315,9 @@ describe('DateTimePicker — datetime mode', () => {
     expect(screen.getByText('June 2026')).toBeTruthy()
     expect(container.querySelector('.dtp__ampm-toggle')).toBeTruthy()
   })
+}
 
+function dateTimePickerDatetimeModeUpdatesTests() {
   it('updates date part when a day is clicked', () => {
     const onChange = vi.fn()
     const { container } = render(
@@ -289,4 +343,4 @@ describe('DateTimePicker — datetime mode', () => {
     act(() => fireEvent.click(slot))
     expect(onChange).toHaveBeenCalledWith('2026-06-13T16:00')
   })
-})
+}

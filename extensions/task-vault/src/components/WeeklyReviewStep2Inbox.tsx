@@ -9,11 +9,8 @@ interface Props {
   reviewId: string | null
 }
 
-export function WeeklyReviewStep2Inbox({
-  inboxItems,
-  onComplete,
-  reviewId,
-}: Props): React.JSX.Element {
+export function WeeklyReviewStep2Inbox(props: Props): React.JSX.Element {
+  const { inboxItems, onComplete, reviewId } = props
   const [skipped, setSkipped] = useState(false)
   const [items, setItems] = useState(inboxItems)
 

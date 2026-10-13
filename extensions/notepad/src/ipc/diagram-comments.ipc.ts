@@ -92,6 +92,17 @@ export async function listDiagramComments(
   )
 
   const roots = rows.filter((r) => r.parent_id === null)
+  const childMap = repliesByParent(rows)
+  const data = roots.map((r) =>
+    mapComment(
+      r,
+      (childMap.get(r.id) ?? []).map((c) => mapComment(c))
+    )
+  )
+  return { data }
+}
+
+function repliesByParent(rows: DbDiagramComment[]): Map<string, DbDiagramComment[]> {
   const childMap = new Map<string, DbDiagramComment[]>()
   for (const r of rows) {
     if (r.parent_id) {
@@ -100,14 +111,7 @@ export async function listDiagramComments(
       childMap.set(r.parent_id, list)
     }
   }
-
-  const data = roots.map((r) =>
-    mapComment(
-      r,
-      (childMap.get(r.id) ?? []).map((c) => mapComment(c))
-    )
-  )
-  return { data }
+  return childMap
 }
 
 export async function resolveDiagramComment(
