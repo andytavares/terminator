@@ -16,7 +16,7 @@ const WITH_DISABLED: SegmentedOption<string>[] = [
   { value: 'year', label: 'This year', disabled: true },
 ]
 
-function Controlled({
+function ControlledSegmentedControl({
   options,
   initial,
   size,
@@ -41,7 +41,7 @@ const meta = {
   title: 'Components/SegmentedControl',
   component: SegmentedControl,
   args: { label: 'Kind', options: KINDS, value: 'note', onChange: () => {} },
-  render: () => <Controlled options={KINDS} initial="note" />,
+  render: () => <ControlledSegmentedControl options={KINDS} initial="note" />,
 } satisfies Meta<typeof SegmentedControl>
 
 export default meta
@@ -51,12 +51,12 @@ export const Default: Story = {}
 export const DefaultLight = inLight(Default)
 
 export const Small: Story = {
-  render: () => <Controlled options={KINDS} initial="diagram" size="sm" />,
+  render: () => <ControlledSegmentedControl options={KINDS} initial="diagram" size="sm" />,
 }
 export const SmallLight = inLight(Small)
 
 export const WithDisabledOption: Story = {
-  render: () => <Controlled options={WITH_DISABLED} initial="30d" />,
+  render: () => <ControlledSegmentedControl options={WITH_DISABLED} initial="30d" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await expect(canvas.getByRole('radio', { name: 'This year' })).toBeDisabled()

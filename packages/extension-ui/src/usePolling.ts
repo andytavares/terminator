@@ -4,26 +4,26 @@ import { useEffect } from 'react'
  * coming back to visible ticks once at once. Returns what stops it. */
 export function everyWhileVisible(tick: () => void, intervalMs: number): () => void {
   let timer: ReturnType<typeof setInterval> | null = null
-  const start = (): void => {
+  const startTicking = (): void => {
     timer ??= setInterval(tick, intervalMs)
   }
-  const stop = (): void => {
+  const stopTicking = (): void => {
     if (timer !== null) clearInterval(timer)
     timer = null
   }
-  const onVisibility = (): void => {
+  const followVisibility = (): void => {
     if (document.hidden) {
-      stop()
+      stopTicking()
       return
     }
     tick()
-    start()
+    startTicking()
   }
-  if (!document.hidden) start()
-  document.addEventListener('visibilitychange', onVisibility)
+  if (!document.hidden) startTicking()
+  document.addEventListener('visibilitychange', followVisibility)
   return () => {
-    stop()
-    document.removeEventListener('visibilitychange', onVisibility)
+    stopTicking()
+    document.removeEventListener('visibilitychange', followVisibility)
   }
 }
 
@@ -37,15 +37,15 @@ export function usePolling<T>(
 ): void {
   useEffect(() => {
     let mounted = true
-    const poll = (): void =>
+    const readAndShow = (): void =>
       void read().then((answer) => {
         if (mounted) show(answer)
       })
-    poll()
-    const stop = everyWhileVisible(poll, intervalMs)
+    readAndShow()
+    const stopTicking = everyWhileVisible(readAndShow, intervalMs)
     return () => {
       mounted = false
-      stop()
+      stopTicking()
     }
   }, [read, show, intervalMs])
 }

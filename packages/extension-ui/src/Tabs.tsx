@@ -80,7 +80,7 @@ export function TabList({
   children,
 }: TabListProps): JSX.Element {
   const { onSelect } = useTabsContext('TabList')
-  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
+  const moveFocusByKey = (event: React.KeyboardEvent<HTMLDivElement>): void => {
     const move = MOVES[orientation][event.key]
     const tabs = enabledTabs(event.currentTarget)
     const current = tabs.indexOf(event.target as HTMLButtonElement)
@@ -97,7 +97,7 @@ export function TabList({
       aria-label={label}
       aria-orientation={orientation}
       className={classes}
-      onKeyDown={onKeyDown}
+      onKeyDown={moveFocusByKey}
     >
       {children}
     </div>

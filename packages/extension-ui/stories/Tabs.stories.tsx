@@ -12,7 +12,7 @@ const TABS: TabItem[] = [
   { id: 'history', label: 'History', panel: <p>Three commits.</p> },
 ]
 
-function Controlled({ tabs, initial }: { tabs: TabItem[]; initial: string }): JSX.Element {
+function ControlledTabs({ tabs, initial }: { tabs: TabItem[]; initial: string }): JSX.Element {
   const [selectedId, setSelectedId] = useState(initial)
   return (
     <Tabs
@@ -28,7 +28,7 @@ const meta = {
   title: 'Components/Tabs',
   component: Tabs,
   args: { label: 'Pull request sections', tabs: TABS, selectedId: 'files', onSelect: () => {} },
-  render: () => <Controlled tabs={TABS} initial="files" />,
+  render: () => <ControlledTabs tabs={TABS} initial="files" />,
 } satisfies Meta<typeof Tabs>
 
 export default meta
@@ -37,7 +37,7 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = {}
 
 export const SecondSelected: Story = {
-  render: () => <Controlled tabs={TABS} initial="checks" />,
+  render: () => <ControlledTabs tabs={TABS} initial="checks" />,
 }
 
 export const WithDisabledTab: Story = {

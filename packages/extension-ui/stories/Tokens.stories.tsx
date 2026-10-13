@@ -50,19 +50,19 @@ const meta = { title: 'Foundations/Tokens', component: Tokens } satisfies Meta<t
 export default meta
 type Story = StoryObj<typeof meta>
 
-const token = (name: string): string =>
+const tokenValue = (name: string): string =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
 export const Dark: Story = {
   play: async () => {
     await expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
-    await expect(token('--tm-bg-base')).toBe('#0c0c0f')
+    await expect(tokenValue('--tm-bg-base')).toBe('#0c0c0f')
   },
 }
 
 export const Light: Story = inLight({
   play: async () => {
     await expect(document.documentElement.getAttribute('data-theme')).toBe('light')
-    await expect(token('--tm-bg-base')).toBe('#f0f0f5')
+    await expect(tokenValue('--tm-bg-base')).toBe('#f0f0f5')
   },
 } satisfies Story)
