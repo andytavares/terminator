@@ -18,7 +18,9 @@ describe('ExtensionContributesSchema — quick actions', () => {
     })
     expect(result.success).toBe(true)
   })
+})
 
+describe('ExtensionContributesSchema — quick action mnemonics and transform', () => {
   it('rejects a mnemonic longer than one character', () => {
     const result = ExtensionContributesSchema.safeParse({
       quickActions: { group: { mnemonic: 'gi', label: 'Git' } },
@@ -37,7 +39,9 @@ describe('ExtensionContributesSchema — quick actions', () => {
       expect(result.data.globalTab?.label).toBe('Git')
     }
   })
+})
 
+describe('ExtensionContributesSchema — command mnemonics and requires', () => {
   it('accepts a command with a mnemonic and requires', () => {
     const result = ExtensionContributesSchema.safeParse({
       commands: [{ id: 'git:push', label: 'Push', mnemonic: 'p', requires: 'repo' }],

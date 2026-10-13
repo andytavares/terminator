@@ -36,7 +36,9 @@ describe('parseHookReport', () => {
   it.each([[null], [undefined], ['a string'], [42], [[]]])('refuses %s', (payload) => {
     expect(parseHookReport(payload)).toBeNull()
   })
+})
 
+describe('parseHookReport — trigger, source and time', () => {
   it('carries whether the conversation was started or resumed', () => {
     expect(parseHookReport({ ...FULL, source: 'resume' })?.source).toBe('resume')
   })

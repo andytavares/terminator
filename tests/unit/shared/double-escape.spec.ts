@@ -23,7 +23,9 @@ describe('createDoubleEscapeDetector', () => {
     detector.register(1000)
     expect(detector.register(1000 + DOUBLE_ESCAPE_WINDOW_MS)).toBe(false)
   })
+})
 
+describe('createDoubleEscapeDetector — repeated presses and reset', () => {
   it('requires a fresh pair after triggering, so a third press does not re-trigger', () => {
     const detector = createDoubleEscapeDetector()
     detector.register(1000)
