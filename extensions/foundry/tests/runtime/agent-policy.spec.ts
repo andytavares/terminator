@@ -91,7 +91,7 @@ function trustingTests() {
 
   it('marks it trusted in the Claude Code configuration and says so on the order', async () => {
     fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ projects: {} }))
-    trustRepository(api, '/repos/app', 'WO-1', store)
+    trustRepository(api, '/repos/app', { orderId: 'WO-1', store })
     const config = JSON.parse(fs.readFileSync(path.join(home, '.claude.json'), 'utf8'))
     expect(config.projects['/repos/app'].hasTrustDialogAccepted).toBe(true)
     await vi.waitFor(() => expect(entries.map((e) => e.action)).toEqual(['workspace.trusted']))
@@ -103,7 +103,7 @@ function trustingTests() {
       path.join(home, '.claude.json'),
       JSON.stringify({ projects: { '/repos/app': { hasTrustDialogAccepted: true } } })
     )
-    trustRepository(api, '/repos/app', 'WO-1', store)
+    trustRepository(api, '/repos/app', { orderId: 'WO-1', store })
     await Promise.resolve()
     expect(entries).toEqual([])
     expect(api.log.error).not.toHaveBeenCalled()
@@ -114,7 +114,7 @@ function trustingTests() {
     fs.writeFileSync(config, JSON.stringify({ projects: {} }))
     // Something already sits where the new configuration is written first.
     fs.mkdirSync(`${config}.foundry-${process.pid}.tmp`)
-    trustRepository(api, '/repos/app', 'WO-1', store)
+    trustRepository(api, '/repos/app', { orderId: 'WO-1', store })
     expect(api.log.error).toHaveBeenCalledWith(expect.stringContaining('trust dialog'))
     expect(entries).toEqual([])
   })

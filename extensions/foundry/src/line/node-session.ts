@@ -72,7 +72,7 @@ function startNode(
   // Keyed to the repository rather than the worktree, because that is what
   // the documentation says trust is keyed to for a worktree.
   const { context, checkout } = launch
-  trustRepository(context.api, checkout.origin, context.order.id, context.store)
+  trustRepository(context.api, checkout.origin, { orderId: context.order.id, store: context.store })
   void runner
     .start(startOptions(launch, turn))
     .then((run) => {

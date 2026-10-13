@@ -242,8 +242,7 @@ function endSession(sessionId: string): Promise<void> {
       stop: (id, reason) => runtime.supervisedRunner?.stop(id, reason) ?? false,
       isLive: isLiveSession,
     },
-    sessionId,
-    'continuing the lane in its next step'
+    { sessionId, reason: 'continuing the lane in its next step' }
   ).then(() => undefined)
 }
 
