@@ -8,5 +8,5 @@ import { extensionViewConfig } from '@terminator/extension-sdk/vite'
 // views share with CodeMirror and highlight.js, is 771 kB. A chunk past the
 // budget warns, and CI fails the build on any warning.
 export default defineConfig(
-  extensionViewConfig(__dirname, { plugins: [react()], chunkSizeWarningLimit: 1200 })
+  extensionViewConfig(__dirname, { plugins: [react()], chunkSizeWarningLimit: 850 })
 )
