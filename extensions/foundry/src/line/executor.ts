@@ -1180,7 +1180,7 @@ export async function execute(
             excerpt,
             logPath,
           }
-          await advance(rework(current, node.id, onFail.rework, feedback))
+          await advance(rework(current, node.id, { to: onFail.rework, feedback }))
           await deps.record(
             'rework.started',
             node.id,
@@ -1196,7 +1196,7 @@ export async function execute(
                 : `exited ${result.exitCode ?? 'without a status'}${
                     command ? ` running \`${command}\`` : ''
                   }${logPath ? `. The output is in \`${logPath}\`` : ''}`
-          const failure = markFailed(current, node.id, deps.now(), reason)
+          const failure = markFailed(current, node.id, { at: deps.now(), reason })
           await advance(failure.graph)
           deps.onEvent({ type: 'failed', nodeId: node.id, needsDecision: failure.needsDecision })
 

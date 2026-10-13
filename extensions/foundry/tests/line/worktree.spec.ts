@@ -356,7 +356,72 @@ describe('provisioning dependencies', () => {
   describe('nothing to link', nothingToLinkTests)
   describe('check-ignore', checkIgnoreTests)
   describe('reused checkouts', reusedCheckoutsTests)
+  describe('git unable to list', gitUnableToListTests)
 })
+
+/** git refusing every command, as in a directory that is no longer a repository. */
+const refusingGit = vi.fn(async () => ({
+  exitCode: 128,
+  stdout: '',
+  stderr: 'fatal: not a git repository',
+  timedOut: false,
+}))
+
+function gitUnableToListTests() {
+  it('lends nothing when git cannot list the manifests', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'node_modules'))
+    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+
+    const linked = await provisionDependencies(checkout, deps({ exec: refusingGit as never }))
+
+    expect(linked).toEqual([])
+    expect(fs.existsSync(path.join(wt, 'node_modules'))).toBe(false)
+  })
+
+  it('takes nothing back when git cannot list the manifests', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'node_modules'))
+    fs.symlinkSync(path.join(origin, 'node_modules'), path.join(wt, 'node_modules'), 'dir')
+    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+
+    const unlinked = await unlinkBorrowedDependencies(
+      checkout,
+      deps({ exec: refusingGit as never })
+    )
+
+    expect(unlinked).toEqual([])
+    expect(fs.lstatSync(path.join(wt, 'node_modules')).isSymbolicLink()).toBe(true)
+  })
+
+  it('lends nothing into a package directory the checkout does not have', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'packages', 'gone', 'node_modules'), { recursive: true })
+    const exec = lsFilesAnd('packages/gone/package.json')
+    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+
+    const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
+
+    expect(linked).toEqual([])
+  })
+
+  it('never throws at a caller when git itself throws', async () => {
+    const exec = vi.fn(async () => {
+      throw new Error('spawn git ENOENT')
+    })
+    const checkout: Checkout = { repo: 'app', origin: '/o', path: '/w', branch: 'b', created: true }
+
+    await expect(provisionDependencies(checkout, deps({ exec: exec as never }))).resolves.toEqual(
+      []
+    )
+    await expect(
+      unlinkBorrowedDependencies(checkout, deps({ exec: exec as never }))
+    ).resolves.toEqual([])
+  })
+}
 
 const baseTarget = path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app@base')
 

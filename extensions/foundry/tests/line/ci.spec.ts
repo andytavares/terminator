@@ -47,6 +47,7 @@ describe('watchChecks', () => {
   describe('runs already judged', runsAlreadyJudgedTests)
   describe('cancel and unreadable output', cancelAndUnreadableOutputTests)
   describe('timing out and polling', timingOutAndPollingTests)
+  describe('odd output', oddOutputTests)
 })
 
 function passingAndFailingTests() {
@@ -156,6 +157,33 @@ function cancelAndUnreadableOutputTests() {
   })
 }
 
+function oddOutputTests() {
+  it('is not measured when gh prints something other than a list of checks', async () => {
+    const exec = queuedExec([ok({ checks: [] })])
+    const verdict = await watchChecks(pull, exec, { sleep: noopSleep() })
+    expect(verdict).toEqual({
+      kind: 'not_measured',
+      checks: [],
+      reason: 'unparseable checks output',
+    })
+  })
+
+  it('gives what gh printed as the reason when it failed saying nothing on stderr', async () => {
+    const exec = queuedExec([{ exitCode: 4, stdout: 'HTTP 502', stderr: '', timedOut: false }])
+    const verdict = await watchChecks(pull, exec, { sleep: noopSleep() })
+    expect(verdict).toEqual({ kind: 'not_measured', checks: [], reason: 'HTTP 502' })
+  })
+
+  it('reads a check with no run in its link as a fresh one', async () => {
+    const exec = queuedExec([ok([check({ bucket: 'pass', link: 'https://example.com/status' })])])
+    const verdict = await watchChecks(pull, exec, {
+      sleep: noopSleep(),
+      ignoreRuns: new Set(['111']),
+    })
+    expect(verdict.kind).toBe('green')
+  })
+}
+
 function timingOutAndPollingTests() {
   it('times out after timeoutMs/pollMs polls while still pending', async () => {
     const results = Array.from({ length: 4 }, () => ok([check({ bucket: 'pending' })]))
@@ -202,7 +230,7 @@ function runLogsTests() {
       expect(args).toContain('36256477669')
       return { exitCode: 0, stdout: lines, stderr: '', timedOut: false }
     }) as unknown as ShellExec
-    const out = await failedLogs(checks, '/repos/app', exec, 200)
+    const out = await failedLogs(checks, '/repos/app', exec)
     expect(exec).toHaveBeenCalledTimes(1)
     expect(out.split('\n').length).toBeLessThanOrEqual(200)
     expect(out).toContain('line 249')
@@ -232,5 +260,16 @@ function checksWithoutARunAndFailuresTests() {
     }) as unknown as ShellExec
     const out = await failedLogs(checks, '/repos/app', exec)
     expect(out).toContain('could not be read')
+  })
+
+  it('says what was thrown when it was not an Error', async () => {
+    const checks: Check[] = [
+      check({ bucket: 'fail', link: 'https://github.com/o/r/actions/runs/1/job/2' }),
+    ]
+    const exec = vi.fn(async () => {
+      throw 'gh went away'
+    }) as unknown as ShellExec
+    const out = await failedLogs(checks, '/repos/app', exec)
+    expect(out).toBe('## CI/Test (run 1)\nlog could not be read: gh went away')
   })
 }

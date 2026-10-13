@@ -12,10 +12,9 @@ export type RestackResult =
   | { readonly kind: 'conflict'; readonly files: readonly string[] }
   | { readonly kind: 'failed'; readonly reason: string }
 
-export async function restack(
-  lane: { cwd: string; branch: string; base: string },
-  exec: ShellExec
-): Promise<RestackResult> {
+type Lane = { cwd: string; branch: string; base: string }
+
+export async function restack(lane: Lane, exec: ShellExec): Promise<RestackResult> {
   const fetch = await exec({
     command: 'git',
     args: ['fetch', 'origin', lane.base],
@@ -24,32 +23,36 @@ export async function restack(
   if (fetch.exitCode !== 0) {
     return { kind: 'failed', reason: fetch.stderr }
   }
+  return (await rebaseOntoBase(lane, exec)) ?? pushRestacked(lane, exec)
+}
 
+/** Rebases the lane onto its fetched base; null when that went through cleanly. */
+async function rebaseOntoBase(lane: Lane, exec: ShellExec): Promise<RestackResult | null> {
   const rebase = await exec({
     command: 'git',
     args: ['rebase', `origin/${lane.base}`],
     cwd: lane.cwd,
     timeoutMs: NETWORK_STEP_TIMEOUT_MS,
   })
-
   if (rebase.timedOut) {
     await exec({ command: 'git', args: ['rebase', '--abort'], cwd: lane.cwd })
     return { kind: 'failed', reason: timeoutNotice('git rebase', NETWORK_STEP_TIMEOUT_MS) }
   }
-  if (rebase.exitCode !== 0) {
-    const diff = await exec({
-      command: 'git',
-      args: ['diff', '--name-only', '--diff-filter=U'],
-      cwd: lane.cwd,
-    })
-    await exec({ command: 'git', args: ['rebase', '--abort'], cwd: lane.cwd })
-    const files = diff.stdout
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line !== '')
-    return { kind: 'conflict', files }
-  }
+  if (rebase.exitCode === 0) return null
+  const diff = await exec({
+    command: 'git',
+    args: ['diff', '--name-only', '--diff-filter=U'],
+    cwd: lane.cwd,
+  })
+  await exec({ command: 'git', args: ['rebase', '--abort'], cwd: lane.cwd })
+  const files = diff.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+  return { kind: 'conflict', files }
+}
 
+async function pushRestacked(lane: Lane, exec: ShellExec): Promise<RestackResult> {
   const push = await exec({
     command: 'git',
     args: ['push', '--force-with-lease', 'origin', `HEAD:${lane.branch}`],

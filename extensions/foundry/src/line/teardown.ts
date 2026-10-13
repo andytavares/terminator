@@ -41,15 +41,41 @@ function reason(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+/** What one teardown has removed and failed to remove so far. */
+type Tally = { removed: string[]; failed: string[] }
+
 /** Remove a path if it is there. Absence is the goal, not an error. */
-function rmIfPresent(target: string, label: string, removed: string[], failed: string[]): void {
+function rmIfPresent(target: string, label: string, tally: Tally): void {
   try {
     if (!fs.existsSync(target)) return
     fs.rmSync(target, { recursive: true, force: true })
-    removed.push(label)
+    tally.removed.push(label)
   } catch (error) {
-    failed.push(`${label}: ${reason(error)}`)
+    tally.failed.push(`${label}: ${reason(error)}`)
   }
+}
+
+/** Runs one git command in a lane's repository, tallying `what` as removed or not. */
+async function gitRemove(
+  deps: TeardownDeps,
+  call: { cwd: string; args: string[]; timeoutMs: number; what: string },
+  tally: Tally
+): Promise<void> {
+  const result = await deps.exec({
+    command: 'git',
+    args: call.args,
+    cwd: call.cwd,
+    timeoutMs: call.timeoutMs,
+  })
+  if (result.exitCode === 0) tally.removed.push(call.what)
+  else tally.failed.push(`${call.what}: ${result.stderr.trim()}`)
+}
+
+/** One order's teardown: what it reads, and the tally it writes into. */
+interface Teardown {
+  readonly order: WorkOrder
+  readonly deps: TeardownDeps
+  readonly tally: Tally
 }
 
 /**
@@ -61,51 +87,27 @@ function rmIfPresent(target: string, label: string, removed: string[], failed: s
  * `worktree add` onto the same path would fail. `prune` afterwards is what
  * makes starting over work a second time.
  */
-async function tearDownLane(
-  order: WorkOrder,
-  lane: number,
-  deps: TeardownDeps,
-  removed: string[],
-  failed: string[]
-): Promise<void> {
+async function tearDownLane({ order, deps, tally }: Teardown, lane: number): Promise<void> {
   const repo = order.context.repos.find((r) => r.lane === lane)
   if (repo === undefined) return
 
   const branch = branchFor(order, lane)
   const target = checkoutPath(deps.root, order, repo.name)
-
-  const gone = await deps.exec({
-    command: 'git',
-    args: ['worktree', 'remove', '--force', target],
-    cwd: repo.path,
-    timeoutMs: 60_000,
-  })
-  if (gone.exitCode === 0) removed.push(`the checkout at ${target}`)
-  else failed.push(`the checkout at ${target}: ${gone.stderr.trim()}`)
-
-  if (deps.removeProjectAt?.(target) === true) removed.push(`the project ${branch}`)
+  const cwd = repo.path
+  const args = ['worktree', 'remove', '--force', target]
+  await gitRemove(deps, { cwd, args, timeoutMs: 60_000, what: `the checkout at ${target}` }, tally)
+  if (deps.removeProjectAt?.(target) === true) tally.removed.push(`the project ${branch}`)
 
   // Unconditional: the point of pruning is the registration left by a
   // directory that is already gone, which is exactly the case where the
   // removal above just failed.
-  await deps.exec({
-    command: 'git',
-    args: ['worktree', 'prune'],
-    cwd: repo.path,
-    timeoutMs: 30_000,
-  })
+  await deps.exec({ command: 'git', args: ['worktree', 'prune'], cwd, timeoutMs: 30_000 })
 
   // `-D`, not `-d`: the branch holds work that was deliberately thrown away,
   // and git refusing to delete it because it is unmerged is the normal case
   // rather than a warning worth stopping for. The operator confirmed this.
-  const branchGone = await deps.exec({
-    command: 'git',
-    args: ['branch', '-D', branch],
-    cwd: repo.path,
-    timeoutMs: 30_000,
-  })
-  if (branchGone.exitCode === 0) removed.push(`the branch ${branch}`)
-  else failed.push(`the branch ${branch}: ${branchGone.stderr.trim()}`)
+  const deleteBranch = { cwd, args: ['branch', '-D', branch], timeoutMs: 30_000 }
+  await gitRemove(deps, { ...deleteBranch, what: `the branch ${branch}` }, tally)
 }
 
 /**
@@ -117,29 +119,28 @@ async function tearDownLane(
  * happened to it, which a restart has no reason to lose.
  */
 export async function tearDownRun(order: WorkOrder, deps: TeardownDeps): Promise<TeardownResult> {
-  const removed: string[] = []
-  const failed: string[] = []
+  const tally: Tally = { removed: [], failed: [] }
 
   let dir: string
   try {
     dir = orderDir(deps.root, order.id)
   } catch (error) {
-    return { removed, failed: [reason(error)] }
+    return { removed: tally.removed, failed: [reason(error)] }
   }
 
   for (const lane of [...order.plan.lanes].sort((a, b) => a.ord - b.ord)) {
-    await tearDownLane(order, lane.ord, deps, removed, failed)
+    await tearDownLane({ order, deps, tally }, lane.ord)
   }
 
-  rmIfPresent(path.join(dir, 'run-graph.json'), 'the run graph', removed, failed)
-  rmIfPresent(path.join(dir, 'gates.json'), 'the gates it raised', removed, failed)
-  rmIfPresent(path.join(dir, 'rungs'), 'what its rungs handed back', removed, failed)
-  rmIfPresent(path.join(dir, 'lanes'), 'its lane records', removed, failed)
+  rmIfPresent(path.join(dir, 'run-graph.json'), 'the run graph', tally)
+  rmIfPresent(path.join(dir, 'gates.json'), 'the gates it raised', tally)
+  rmIfPresent(path.join(dir, 'rungs'), 'what its rungs handed back', tally)
+  rmIfPresent(path.join(dir, 'lanes'), 'its lane records', tally)
   // Last, and after git has been told: an empty `worktrees` directory is
   // normal, and a non-empty one means a removal above failed.
-  rmIfPresent(path.join(dir, 'worktrees'), 'its worktrees directory', removed, failed)
+  rmIfPresent(path.join(dir, 'worktrees'), 'its worktrees directory', tally)
 
-  return { removed, failed }
+  return tally
 }
 
 /**
@@ -153,8 +154,7 @@ export async function tearDownRun(order: WorkOrder, deps: TeardownDeps): Promise
  */
 export async function deleteOrder(order: WorkOrder, deps: TeardownDeps): Promise<TeardownResult> {
   const run = await tearDownRun(order, deps)
-  const removed = [...run.removed]
-  const failed = [...run.failed]
+  const tally: Tally = { removed: [...run.removed], failed: [...run.failed] }
 
   let dir: string
   try {
@@ -163,9 +163,9 @@ export async function deleteOrder(order: WorkOrder, deps: TeardownDeps): Promise
     // everything else it protects writes a file, and this one removes a tree.
     dir = orderDir(deps.root, order.id)
   } catch (error) {
-    return { removed, failed: [...failed, reason(error)] }
+    return { removed: tally.removed, failed: [...tally.failed, reason(error)] }
   }
 
-  rmIfPresent(dir, `the order ${order.id} and its whole record`, removed, failed)
-  return { removed, failed }
+  rmIfPresent(dir, `the order ${order.id} and its whole record`, tally)
+  return tally
 }

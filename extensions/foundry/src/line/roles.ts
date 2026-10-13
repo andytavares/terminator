@@ -87,56 +87,52 @@ export function createRoleRegistry(sources: ResolveSources): RoleRegistry {
 
   return {
     get,
-
     assertResumable(id, resumeSessionId) {
       if (resumeSessionId === undefined) return
-      const role = get(id)
       // An unknown role is treated as non-resumable. Defaulting the other way
       // would mean a typo in a recipe silently produced a verifier that could
       // read the builder's reasoning.
-      if (role === null || !role.allowResume) throw new ResumeForbiddenError(id)
+      if (get(id)?.allowResume !== true) throw new ResumeForbiddenError(id)
     },
-
-    mayResume(id) {
-      // Unknown is non-resumable, for the same reason `assertResumable`
-      // treats it that way: a typo in a recipe must not produce a verifier
-      // that can read the builder's reasoning.
-      return get(id)?.allowResume === true
-    },
-
-    mayUseTool(id, tool) {
-      const role = get(id)
-      if (role === null) return false
-      const needed = TOOL_CLASS[tool]
-      // A tool this vocabulary says nothing about. Allowed — refusing every
-      // unlisted tool would refuse the ones every agent uses to think.
-      if (needed === undefined) return true
-      return role.tools.includes(needed)
-    },
-
-    /**
-     * Whether this role may write to the checkout.
-     *
-     * Not "does it write anything": the red team writes findings, a scheduler
-     * writes a schedule and the architect writes a plan, and none of them
-     * touches the repository. This asked `writes.length > 0`, so all three
-     * came back true, and the executor installs its read-only policy on the
-     * answer — the adversarial pass could edit the code it was reviewing.
-     *
-     * Three destinations are the checkout, and they are the same three the
-     * built-in role tests already name.
-     */
-    writesOnlyDocs(id) {
-      const role = get(id)
-      if (role === null) return false
-      // `document` is what the role reports, not somewhere it edits.
-      const edited = role.writes.filter((target) => target !== 'document')
-      return edited.length === 1 && edited[0] === 'docs'
-    },
-
-    mayWrite(id) {
-      const role = get(id)
-      return role !== null && role.writes.some((target) => CHECKOUT_WRITES.has(target))
-    },
+    // Unknown is non-resumable, for the same reason `assertResumable` treats
+    // it that way: a typo in a recipe must not produce a verifier that can
+    // read the builder's reasoning.
+    mayResume: (id) => get(id)?.allowResume === true,
+    mayUseTool: (id, tool) => mayUseTool(get(id), tool),
+    writesOnlyDocs: (id) => writesOnlyDocs(get(id)),
+    mayWrite: (id) => mayWrite(get(id)),
   }
+}
+
+function mayUseTool(role: Role | null, tool: string): boolean {
+  if (role === null) return false
+  const needed = TOOL_CLASS[tool]
+  // A tool this vocabulary says nothing about. Allowed — refusing every
+  // unlisted tool would refuse the ones every agent uses to think.
+  if (needed === undefined) return true
+  return role.tools.includes(needed)
+}
+
+/**
+ * Whether this role may write to the checkout.
+ *
+ * Not "does it write anything": the red team writes findings, a scheduler
+ * writes a schedule and the architect writes a plan, and none of them
+ * touches the repository. This asked `writes.length > 0`, so all three
+ * came back true, and the executor installs its read-only policy on the
+ * answer — the adversarial pass could edit the code it was reviewing.
+ *
+ * Three destinations are the checkout, and they are the same three the
+ * built-in role tests already name.
+ */
+function mayWrite(role: Role | null): boolean {
+  return role !== null && role.writes.some((target) => CHECKOUT_WRITES.has(target))
+}
+
+/** Whether the only part of the checkout this role edits is its documentation. */
+function writesOnlyDocs(role: Role | null): boolean {
+  if (role === null) return false
+  // `document` is what the role reports, not somewhere it edits.
+  const edited = role.writes.filter((target) => target !== 'document')
+  return edited.length === 1 && edited[0] === 'docs'
 }

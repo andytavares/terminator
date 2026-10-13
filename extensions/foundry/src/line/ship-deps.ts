@@ -168,7 +168,7 @@ export function ciSendBackFor(
     const shipId = shipNodeId(recipe)
     if (target === null || shipId === null) return false
 
-    graphRef.current = rework(graphRef.current, shipId, target, feedback)
+    graphRef.current = rework(graphRef.current, shipId, { to: target, feedback })
     await writeGraph(root, graphRef.current)
 
     const outcome = await execute(order, recipe, graphRef.current, deps.executorDeps)

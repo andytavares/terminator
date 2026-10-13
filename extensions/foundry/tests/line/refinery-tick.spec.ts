@@ -48,8 +48,8 @@ function writingDeps(written: Written): WritingDeps {
     raiseConflict: async (orderId, why, files) => {
       written.conflicts.push({ orderId, why, files })
     },
-    record: async (orderId, action, subject, reason) => {
-      written.records.push({ orderId, action, subject, reason })
+    record: async (entry) => {
+      written.records.push({ ...entry })
     },
   }
 }
@@ -95,6 +95,20 @@ function nothingMergedTests() {
     expect(deps.states.size).toBe(0)
     expect(deps.records).toEqual([])
     expect(deps.entries).not.toHaveBeenCalled()
+  })
+
+  it('watches nothing for an order that has opened no pull yet', async () => {
+    const deps = baseDeps({
+      candidates: async () => [{ order: { id: 'WO-1', title: 'A' }, pulls: [] }],
+      readState: vi.fn(async () => ({ mergedAt: null, restackedFor: [] })),
+      viewPr: vi.fn(async () => ({ merged: true })),
+    })
+
+    await refineryTick(deps)
+
+    expect(deps.readState).not.toHaveBeenCalled()
+    expect(deps.viewPr).not.toHaveBeenCalled()
+    expect(deps.records).toEqual([])
   })
 }
 

@@ -23,6 +23,14 @@ interface RefineryLane {
   readonly base: string
 }
 
+/** One line the refinery writes to an order's ledger. */
+export interface RefineryRecord {
+  readonly orderId: string
+  readonly action: string
+  readonly subject: string
+  readonly reason: string
+}
+
 export interface RefineryTickDeps {
   /** Every shipped/running order that has opened at least one pull. */
   readonly candidates: () => Promise<readonly RefineryCandidate[]>
@@ -38,12 +46,7 @@ export interface RefineryTickDeps {
   /** One CI watch for the order's drafts, once its lanes are rebased. */
   readonly watchCi: (orderId: string) => Promise<void>
   readonly raiseConflict: (orderId: string, why: string, files: readonly string[]) => Promise<void>
-  readonly record: (
-    orderId: string,
-    action: string,
-    subject: string,
-    reason: string
-  ) => Promise<void>
+  readonly record: (entry: RefineryRecord) => Promise<void>
   readonly titleOf: (orderId: string) => Promise<string>
   /** An order's pulls were all seen merged for the first time. Never throws into the tick. */
   readonly onMerged?: (orderId: string) => Promise<void>
@@ -64,76 +67,74 @@ async function restackLanes(
 }
 
 export async function refineryTick(deps: RefineryTickDeps): Promise<void> {
-  const candidates = await deps.candidates()
   const mergedIds: string[] = []
-
-  for (const { order, pulls } of candidates) {
-    if (pulls.length === 0) continue
-    let state = await deps.readState(order.id)
-
-    if (state.mergedAt === null) {
-      let merged = true
-      for (const pull of pulls) {
-        const result = await deps.viewPr(pull.url)
-        if (!result.merged) {
-          merged = false
-          break
-        }
-      }
-      if (merged) {
-        state = { ...state, mergedAt: deps.now() }
-        await deps.writeState(order.id, state)
-        await deps.record(order.id, 'refinery.merged', order.id, `${order.title} merged`)
-        try {
-          await deps.onMerged?.(order.id)
-        } catch {
-          // The tracker being briefly wrong must not stop the restack of what queued behind.
-        }
-      }
-    }
-
-    if (state.mergedAt !== null) mergedIds.push(order.id)
+  for (const candidate of await deps.candidates()) {
+    if (await hasMerged(deps, candidate)) mergedIds.push(candidate.order.id)
   }
-
   if (mergedIds.length === 0) return
 
   const entries = await deps.entries()
-
   for (const mergedId of mergedIds) {
-    const mergedTitle = await deps.titleOf(mergedId)
+    const merged = { id: mergedId, title: await deps.titleOf(mergedId) }
     const overlapping = laterOverlapping(entries, mergedId)
     if (overlapping.length === 0) continue
-
-    for (const { orderId, files } of overlapping) {
-      const state = await deps.readState(orderId)
-      if (state.restackedFor.includes(mergedId)) continue
-
-      const { conflictFiles, failedReason } = await restackLanes(deps, orderId)
-
-      if (conflictFiles !== null) {
-        const title = await deps.titleOf(orderId)
-        const why = `${title} no longer rebases onto its base after ${mergedTitle} merged`
-        await deps.raiseConflict(orderId, why, conflictFiles)
-        await deps.record(orderId, 'refinery.conflict', orderId, why)
-        continue
-      }
-
-      if (failedReason !== null) {
-        await deps.record(orderId, 'refinery.failed', orderId, failedReason)
-        continue
-      }
-
-      await deps.writeState(orderId, {
-        ...state,
-        restackedFor: [...state.restackedFor, mergedId],
-      })
-      await deps.record(
-        orderId,
-        'refinery.rebased',
-        orderId,
-        `Rebased onto its base after ${mergedTitle} merged; shared files: ${files.join(', ')}.`
-      )
-      await deps.watchCi(orderId)
-    }
+    for (const overlap of overlapping) await restackBehind(deps, overlap, merged)
   }
+}
+
+/**
+ * Whether every pull of the order has merged, recording the moment it is
+ * first seen. An order with no pulls has nothing to watch yet.
+ */
+async function hasMerged(
+  deps: RefineryTickDeps,
+  { order, pulls }: RefineryCandidate
+): Promise<boolean> {
+  if (pulls.length === 0) return false
+  const state = await deps.readState(order.id)
+  if (state.mergedAt !== null) return true
+  for (const pull of pulls) {
+    if (!(await deps.viewPr(pull.url)).merged) return false
+  }
+  await deps.writeState(order.id, { ...state, mergedAt: deps.now() })
+  const reason = `${order.title} merged`
+  await deps.record({ orderId: order.id, action: 'refinery.merged', subject: order.id, reason })
+  try {
+    await deps.onMerged?.(order.id)
+  } catch {
+    // The tracker being briefly wrong must not stop the restack of what queued behind.
+  }
+  return true
+}
+
+/** Restacks one order that queued behind a merge, once per merge, and rechecks it. */
+async function restackBehind(
+  deps: RefineryTickDeps,
+  { orderId, files }: { orderId: string; files: readonly string[] },
+  merged: { id: string; title: string }
+): Promise<void> {
+  const state = await deps.readState(orderId)
+  if (state.restackedFor.includes(merged.id)) return
+
+  const { conflictFiles, failedReason } = await restackLanes(deps, orderId)
+  const record = (action: string, reason: string) =>
+    deps.record({ orderId, action, subject: orderId, reason })
+  if (conflictFiles !== null) {
+    const title = await deps.titleOf(orderId)
+    const why = `${title} no longer rebases onto its base after ${merged.title} merged`
+    await deps.raiseConflict(orderId, why, conflictFiles)
+    await record('refinery.conflict', why)
+    return
+  }
+  if (failedReason !== null) {
+    await record('refinery.failed', failedReason)
+    return
+  }
+
+  await deps.writeState(orderId, { ...state, restackedFor: [...state.restackedFor, merged.id] })
+  await record(
+    'refinery.rebased',
+    `Rebased onto its base after ${merged.title} merged; shared files: ${files.join(', ')}.`
+  )
+  await deps.watchCi(orderId)
 }
