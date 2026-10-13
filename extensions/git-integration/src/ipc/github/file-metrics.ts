@@ -35,7 +35,7 @@ const TEST_PATH_PATTERNS = [
   /Spec\.[^.]+$/, // JVM/C#: FooSpec.kt
 ]
 
-function isTestPath(path: string): boolean {
+function matchesTestPattern(path: string): boolean {
   return TEST_PATH_PATTERNS.some((re) => re.test(path))
 }
 
@@ -173,14 +173,14 @@ async function churnFor(repoRoot: string, wanted: Set<string>): Promise<Map<stri
 
 /** Every test file in the checkout; none needed when every path is itself a test. */
 async function testFileList(repoRoot: string, paths: string[]): Promise<string[]> {
-  if (!paths.some((p) => !isTestPath(p))) return []
+  if (!paths.some((p) => !matchesTestPattern(p))) return []
   const args = ['ls-files', '--', '**/*.spec.*', '**/*.test.*']
   const raw = await runGit(repoRoot, args, { maxBuffer: BATCH_MAX_BUFFER }).catch(() => '')
   return raw.split('\n').filter(Boolean)
 }
 
 /** Metrics for every path from three git processes in total, not three per path. */
-export async function filesMetrics(
+export async function measureFiles(
   repoRoot: string,
   paths: string[]
 ): Promise<Record<string, FileMetrics>> {
@@ -200,7 +200,7 @@ export async function filesMetrics(
       blastRadius: importers.length,
       topImporters: importers,
       importerCount: importers.length,
-      testFilePresent: isTestPath(path) || hasTestFile(testList, path),
+      testFilePresent: matchesTestPattern(path) || hasTestFile(testList, path),
       patchCoverage: await coverage(path),
     }
   }

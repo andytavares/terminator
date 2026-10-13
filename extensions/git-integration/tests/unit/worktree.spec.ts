@@ -131,14 +131,14 @@ const git = (cwd: string, args: string[], input?: string) =>
 
 /** fast-import input: an empty `main`, a PR head adding shard.ts, then the head's SHA on stdout. */
 function pullRequestStream(): string {
-  const data = (text: string) => `data ${Buffer.byteLength(text)}\n${text}\n`
+  const fastImportData = (text: string) => `data ${Buffer.byteLength(text)}\n${text}\n`
   const signature = 'Reviewer <reviewer@example.com> 1700000000 +0000'
-  const commit = (ref: string, mark: number, message: string) =>
-    `commit ${ref}\nmark :${mark}\nauthor ${signature}\ncommitter ${signature}\n${data(message)}`
+  const fastImportCommit = (ref: string, mark: number, message: string) =>
+    `commit ${ref}\nmark :${mark}\nauthor ${signature}\ncommitter ${signature}\n${fastImportData(message)}`
   return [
-    `blob\nmark :1\n${data('export const shards = 2\n')}`,
-    commit('refs/heads/main', 2, 'base'),
-    `${commit('refs/pull/212/head', 3, 'feature')}from :2\nM 100644 :1 shard.ts\n`,
+    `blob\nmark :1\n${fastImportData('export const shards = 2\n')}`,
+    fastImportCommit('refs/heads/main', 2, 'base'),
+    `${fastImportCommit('refs/pull/212/head', 3, 'feature')}from :2\nM 100644 :1 shard.ts\n`,
     'get-mark :3\n',
   ].join('')
 }

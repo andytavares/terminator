@@ -143,7 +143,7 @@ export function ManualEditor(props: Props) {
     setIsEmpty(!doc.toString().trim())
   })
   useSuggestedText(viewRef, props.suggestedText)
-  const save = () => onSave(viewRef.current?.state.doc.toString() ?? '')
+  const saveEditorText = () => onSave(viewRef.current?.state.doc.toString() ?? '')
   return (
     <div className="manual-editor">
       <EditorHeader blockId={block.blockId} lineCount={lineCount} onCancel={onCancel} />
@@ -152,7 +152,7 @@ export function ManualEditor(props: Props) {
       </div>
       <div className="manual-editor__actions">
         <span className="manual-editor__hint">Tab inserts 2 spaces</span>
-        <Button variant="primary" size="sm" onClick={save} disabled={isEmpty}>
+        <Button variant="primary" size="sm" onClick={saveEditorText} disabled={isEmpty}>
           Save &amp; confirm
         </Button>
       </div>

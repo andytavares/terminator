@@ -76,7 +76,7 @@ const LANG_BADGES: Record<string, { label: string; bg: string }> = {
   md: { label: 'MD', bg: '#6b7280' },
 }
 
-function getLangBadge(filePath: string): { label: string; bg: string } {
+function languageBadgeOf(filePath: string): { label: string; bg: string } {
   const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
   if (Object.hasOwn(LANG_BADGES, ext)) return LANG_BADGES[ext]
   return { label: ext.slice(0, 3).toUpperCase() || '?', bg: '#4b5563' }
@@ -200,7 +200,7 @@ function SummaryStats({ totals }: { totals: StrategyCount }) {
 }
 
 function FileRow({ file }: { file: ConflictFile }) {
-  const badge = getLangBadge(file.filePath)
+  const badge = languageBadgeOf(file.filePath)
   const { dir, name } = splitPath(file.filePath)
   return (
     <div className="completion-screen__file-row">

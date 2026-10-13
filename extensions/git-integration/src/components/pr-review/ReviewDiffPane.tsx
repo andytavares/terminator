@@ -309,7 +309,7 @@ function useReviewDiffPane(props: Props, scrollRef: ScrollRef, listRef: ListRef)
   return { ctx: paneContext({ w, tests, layout, actions }), w, usesWithDef, nav }
 }
 
-function DiffBody(props: { pane: PaneState; scrollRef: ScrollRef; listRef: ListRef }) {
+function PaneDiffBody(props: { pane: PaneState; scrollRef: ScrollRef; listRef: ListRef }) {
   const { ctx, w } = props.pane
   const { diff, diffLoading, diffError } = w.view.loaded
   if (ctx.file.isBinary)
@@ -338,7 +338,7 @@ function menuNote(pane: PaneState): string | null {
   return pane.w.view.loaded.sinceNote ?? historyNote
 }
 
-function setViewed(store: ReviewStore) {
+function toggleFileViewed(store: ReviewStore) {
   return (head: PrHead, path: string, viewed: boolean) => {
     if (viewed) store.markFileViewed(head, path)
     else store.unmarkFileViewed(head, path)
@@ -359,7 +359,7 @@ function PaneHeader({ pane, props }: { pane: PaneState; props: Props }) {
       menuNote={menuNote(pane)}
       onShowRisk={props.onShowRisk}
       onPeekDefinition={pane.nav.peekDefinition}
-      setViewed={setViewed(store)}
+      setViewed={toggleFileViewed(store)}
     />
   )
 }
@@ -376,7 +376,7 @@ export function ReviewDiffPane(props: Props) {
         ref={scrollRef}
         onClick={pane.ctx.drag.clearSelectionOnBackgroundClick}
       >
-        <DiffBody pane={pane} scrollRef={scrollRef} listRef={listRef} />
+        <PaneDiffBody pane={pane} scrollRef={scrollRef} listRef={listRef} />
       </div>
     </div>
   )

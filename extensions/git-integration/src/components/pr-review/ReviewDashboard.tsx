@@ -16,7 +16,7 @@ import { useReviewUiStore } from '../../stores/review-ui.store'
 import { PrRow, shortAge, type MetaPart } from './DiffSize'
 import { SortSelect } from './SortSelect'
 import { RepoPicker } from './RepoPicker'
-import { choose, plural } from '../text'
+import { choose, errorText, plural } from '../text'
 import './review-dashboard.css'
 
 type Tab = 'needs' | 'mine' | 'involved'
@@ -108,12 +108,7 @@ function formatMinutes(total: number): string {
   return `${m} min`
 }
 
-function errorText(err: unknown): string {
-  if (err instanceof Error) return err.message
-  return String(err)
-}
-
-function ciLabel(pr: DashboardPR): string {
+function dashboardCiLabel(pr: DashboardPR): string {
   if (pr.ciStatus === 'none') return 'no checks'
   return `CI ${pr.ciStatus}`
 }
@@ -121,7 +116,7 @@ function ciLabel(pr: DashboardPR): string {
 function ciPart(pr: DashboardPR): MetaPart | null {
   if (pr.ciStatus === 'passing') return null
   return {
-    text: ciLabel(pr),
+    text: dashboardCiLabel(pr),
     tone: choose(pr.ciStatus === 'failing', 'danger' as const, undefined),
   }
 }
@@ -178,14 +173,14 @@ interface RowContext {
   onClone: (pr: DashboardPR) => void
 }
 
-function hasSession(pr: DashboardPR): boolean {
+function hasStartedSession(pr: DashboardPR): boolean {
   return pr.sessionStatus !== 'not-started'
 }
 
 /** Resume a paused review, continue a started one, or the row's own action. */
 function rowButtonLabel(cfg: RowConfig): string {
   if (cfg.pr.sessionStatus === 'paused') return 'Resume'
-  if (hasSession(cfg.pr)) return 'Continue'
+  if (hasStartedSession(cfg.pr)) return 'Continue'
   return cfg.buttonLabel
 }
 
@@ -198,7 +193,7 @@ function rowParts(cfg: RowConfig, showRepo: boolean): (MetaPart | null | false)[
     { text: pr.author },
     { text: shortAge(pr.createdAt) },
     ...cfg.parts,
-    hasSession(pr) && progress,
+    hasStartedSession(pr) && progress,
     !pr.localRepoRoot && { text: 'Not cloned · diff only' },
   ]
 }
@@ -239,9 +234,9 @@ function CloneActions({ pr, ctx }: { pr: DashboardPR; ctx: RowContext }) {
   )
 }
 
-function Row({ cfg, ctx }: { cfg: RowConfig; ctx: RowContext }): JSX.Element {
+function DashboardRow({ cfg, ctx }: { cfg: RowConfig; ctx: RowContext }): JSX.Element {
   const { pr } = cfg
-  const session = hasSession(pr)
+  const session = hasStartedSession(pr)
   return (
     <PrRow
       pr={pr}
@@ -454,7 +449,7 @@ function DashboardSection(props: { spec: SectionSpec; ctx: RowContext; capped: s
       </div>
       <div className="rd-rows">
         {spec.rows.map((pr) => (
-          <Row key={`${pr.repo}#${pr.number}`} cfg={spec.toRow(pr)} ctx={ctx} />
+          <DashboardRow key={`${pr.repo}#${pr.number}`} cfg={spec.toRow(pr)} ctx={ctx} />
         ))}
       </div>
     </section>

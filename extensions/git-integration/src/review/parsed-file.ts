@@ -1,4 +1,4 @@
-import { parseDiff } from '../github/pr-review-service'
+import { parsePrFileDiff } from '../github/pr-review-service'
 import type { FileDiff } from '../schemas/git.schema'
 
 interface RawPrFile {
@@ -31,7 +31,7 @@ export function parsePrFiles(files: unknown[]): ParsedPrFile[] {
       additions: file.additions ?? 0,
       deletions: file.deletions ?? 0,
       patch: file.patch,
-      diff: parseDiff(file.patch ?? '', path),
+      diff: parsePrFileDiff(file.patch ?? '', path),
     }
   })
 }

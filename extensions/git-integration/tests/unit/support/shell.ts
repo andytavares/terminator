@@ -16,7 +16,7 @@ interface StubError extends Error {
   stderr?: string
 }
 
-function toResult(error: StubError | null, out?: { stdout?: string; stderr?: string }) {
+function execResultOf(error: StubError | null, out?: { stdout?: string; stderr?: string }) {
   if (!error) {
     const stdout = out?.stdout ?? ''
     const stderr = out?.stderr ?? ''
@@ -70,7 +70,7 @@ function execOverStub(stub: ExecFileStub): Exec {
       const stubOptions = { cwd, env, timeout: timeoutMs, maxBuffer, input }
       stub(options.command, options.args, stubOptions, resolve$)
       function resolve$(error: StubError | null, out?: { stdout?: string; stderr?: string }) {
-        resolve(toResult(error, out))
+        resolve(execResultOf(error, out))
       }
     })) as Exec
 }
@@ -87,8 +87,8 @@ export function bindShellToAnswers(
   bindShell({
     exec: (async (options: Parameters<Exec>[0]) => {
       const out = answer(options.command, options.args, { cwd: options.cwd })
-      if (out instanceof Error) return toResult(out)
-      return toResult(null, { stdout: typeof out === 'string' ? out : '' })
+      if (out instanceof Error) return execResultOf(out)
+      return execResultOf(null, { stdout: typeof out === 'string' ? out : '' })
     }) as Exec,
   })
 }
@@ -99,9 +99,9 @@ type PromisedStub = (...args: unknown[]) => Promise<{ stdout?: string; stderr?: 
 export function execOverPromisedStub(stub: PromisedStub): Exec {
   return (async (options: Parameters<Exec>[0]) => {
     try {
-      return toResult(null, await stub(options.command, options.args, { cwd: options.cwd }))
+      return execResultOf(null, await stub(options.command, options.args, { cwd: options.cwd }))
     } catch (error) {
-      return toResult(error as StubError)
+      return execResultOf(error as StubError)
     }
   }) as Exec
 }
@@ -128,7 +128,10 @@ export function bindRealShell(env: NodeJS.ProcessEnv): void {
           { cwd: options.cwd, env },
           (error, stdout, stderr) =>
             resolve(
-              toResult(error ? Object.assign(error, { stdout, stderr }) : null, { stdout, stderr })
+              execResultOf(error ? Object.assign(error, { stdout, stderr }) : null, {
+                stdout,
+                stderr,
+              })
             )
         )
       })) as Exec,

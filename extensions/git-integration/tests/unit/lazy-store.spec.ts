@@ -31,7 +31,9 @@ afterEach(() => {
 
 describe('the stores', () => {
   it('are not loaded at activation, and are by the first channel that reads one', async () => {
-    const { activateCapturingChannels, freshGlobalStorage } = await import('./support/activate')
+    const { activateCapturingChannels, freshExtensionStorage: freshGlobalStorage } = await import(
+      './support/activate'
+    )
     globalStorage = freshGlobalStorage()
     const { channels } = activateCapturingChannels(undefined, globalStorage)
     expect(loaded.store).toBe(false)

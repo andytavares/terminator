@@ -3,6 +3,7 @@ import { ChevronLeft } from 'lucide-react'
 import { Button, IconButton } from '@terminator/extension-ui'
 import type { DraftComment } from '../../schemas/pr-review.schema'
 import './review-footer.css'
+import { plural } from '../text'
 
 export interface ReviewFooterProps {
   drafts: DraftComment[]
@@ -16,17 +17,13 @@ export interface ReviewFooterProps {
   onOpenShortcuts: () => void
 }
 
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? '' : 's'}`
-}
-
 /** "N drafts on M files · K from an agent finding", or null with no drafts. */
 function draftsLabelOf(drafts: DraftComment[]): string | null {
   if (drafts.length === 0) return null
   const fileCount = new Set(drafts.map((d) => d.path)).size
   const fromFindingCount = drafts.filter((d) => d.fromFindingId).length
   const fromFinding = fromFindingCount > 0 ? ` · ${fromFindingCount} from an agent finding` : ''
-  return `${plural(drafts.length, 'draft')} on ${plural(fileCount, 'file')}${fromFinding}`
+  return `${drafts.length} ${plural(drafts.length, 'draft')} on ${fileCount} ${plural(fileCount, 'file')}${fromFinding}`
 }
 
 function SubmitButton({ onClick }: { onClick: () => void }) {

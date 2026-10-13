@@ -57,7 +57,7 @@ function useRowDrag(target: DragTarget) {
     dragIndexRef.current = null
     setDragOverIndex(null)
   }
-  const handlersFor = (index: number) => ({
+  const fileDragHandlers = (index: number) => ({
     onDragStart: () => {
       dragIndexRef.current = index
     },
@@ -72,7 +72,7 @@ function useRowDrag(target: DragTarget) {
     },
     onDragEnd: endDrag,
   })
-  return { dragOverIndex, handlersFor }
+  return { dragOverIndex, handlersFor: fileDragHandlers }
 }
 
 type RowDrag = ReturnType<typeof useRowDrag>

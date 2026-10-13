@@ -6,14 +6,14 @@ import { notificationsAPI } from '../api/notifications'
 function useCreatedPullRequest(): PullRequest | null {
   const [created, setCreated] = useState<PullRequest | null>(null)
   useEffect(() => {
-    const onCreated = (event: Event) => {
+    const adoptCreatedPr = (event: Event) => {
       const { pr } = (event as CustomEvent<{ pr: PullRequest }>).detail
       setCreated(pr)
       const title = `Opened #${pr.number} ${pr.title}`
       void notificationsAPI.notify({ type: 'success', title, key: 'prCreated', message: pr.url })
     }
-    window.addEventListener('git:pr-created', onCreated)
-    return () => window.removeEventListener('git:pr-created', onCreated)
+    window.addEventListener('git:pr-created', adoptCreatedPr)
+    return () => window.removeEventListener('git:pr-created', adoptCreatedPr)
   }, [])
   return created
 }

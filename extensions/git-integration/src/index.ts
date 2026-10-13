@@ -161,7 +161,7 @@ function bindRoots(api: ExtensionAPI, projectRoots: () => string[]): void {
 }
 
 /** Opens an agent terminal in the project the repo belongs to and types the command into it. */
-async function openAgentTerminal(api: ExtensionAPI, input: OpenTerminalInput): Promise<void> {
+async function openReviewAgentTerminal(api: ExtensionAPI, input: OpenTerminalInput): Promise<void> {
   const projectId = projectForCheckout(api.workspace, input.repoRoot)
   if (!projectId) return
   const sessionId = await api.pty.openTerminal({
@@ -212,7 +212,7 @@ function registerChannels(api: ExtensionAPI, roots: ChannelRoots): void {
   const reviewAgent = registerReviewAgentHandlers(registerFn, {
     getSetting: (key) => api.settings.get(key),
     broadcast: (channel, data) => api.window.broadcast(channel, data),
-    openTerminal: (input) => openAgentTerminal(api, input),
+    openTerminal: (input) => openReviewAgentTerminal(api, input),
   })
   disposables.push(reviewAgent)
 }

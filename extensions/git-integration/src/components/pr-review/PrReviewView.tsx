@@ -189,7 +189,7 @@ function inspectorFile(pr: PrReviewDetail, repoRoot: string, file: PrChangedFile
   }
 }
 
-function isStale(lastAccessedAt: string | null | undefined): boolean {
+function isStaleSession(lastAccessedAt: string | null | undefined): boolean {
   if (!lastAccessedAt) return false
   return Date.now() - new Date(lastAccessedAt).getTime() > RESUME_CARD_STALE_MS
 }
@@ -210,7 +210,7 @@ function useUiState() {
 
 /** The view's own toggles and panels. */
 function useViewState(store: ReviewStore) {
-  const [showResume, setShowResume] = useState(() => isStale(store.lastAccessedAt))
+  const [showResume, setShowResume] = useState(() => isStaleSession(store.lastAccessedAt))
   const [showSubmit, setShowSubmit] = useState(false)
   const [showRiskFor, setShowRiskFor] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'guided' | 'full'>('full')
@@ -297,12 +297,12 @@ function headOf(r: ReviewState) {
 }
 
 /** Moves to `target`, switching chapter when it lies in another. */
-function goTo(r: ReviewState, target: FileEntry): void {
+function goToFile(r: ReviewState, target: FileEntry): void {
   if (target.chapterId !== r.position.activeChapterId) r.store.setCurrentChapter(target.chapterId)
   r.store.setCurrentFile(target.path)
 }
 
-function selectChapter(r: ReviewState, id: string): void {
+function selectChapterIn(r: ReviewState, id: string): void {
   r.store.setCurrentChapter(id)
   const chapter = r.displayPr.chapters.find((c) => c.id === id)
   if (chapter) {
@@ -314,7 +314,7 @@ function selectChapter(r: ReviewState, id: string): void {
 
 function stepChapter(r: ReviewState, delta: 1 | -1): void {
   const target = r.displayPr.chapters[r.position.activeChapterIndex + delta]
-  if (target) selectChapter(r, target.id)
+  if (target) selectChapterIn(r, target.id)
 }
 
 function stepFile(r: ReviewState, delta: 1 | -1): void {
@@ -323,10 +323,10 @@ function stepFile(r: ReviewState, delta: 1 | -1): void {
   const at = all.findIndex((e) => e.chapterId === activeChapterId && e.path === activeFile?.path)
   const target = all[at + delta]
   if (at < 0 || !target) return
-  goTo(r, target)
+  goToFile(r, target)
 }
 
-function markViewed(r: ReviewState): void {
+function markOpenFileViewed(r: ReviewState): void {
   const { activeFile } = r.position
   if (!activeFile) return
   r.store.markFileViewed(headOf(r), activeFile.path)
@@ -341,7 +341,7 @@ function finishChapter(r: ReviewState): void {
   r.store.markFilesViewed(headOf(r), unviewed)
   const chapterIndex = r.displayPr.chapters.findIndex((c) => c.id === activeChapterId)
   const nextChapter = r.displayPr.chapters[chapterIndex + 1]
-  if (nextChapter) selectChapter(r, nextChapter.id)
+  if (nextChapter) selectChapterIn(r, nextChapter.id)
   else r.view.setShowSubmit(true)
 }
 
@@ -349,7 +349,7 @@ function finishChapter(r: ReviewState): void {
 function navHandlers(r: ReviewState) {
   const { store, view } = r
   return {
-    selectChapter: (id: string) => selectChapter(r, id),
+    selectChapter: (id: string) => selectChapterIn(r, id),
     prevFile: () => stepFile(r, -1),
     nextFile: () => stepFile(r, 1),
     selectFile: (path: string) => {
@@ -357,12 +357,12 @@ function navHandlers(r: ReviewState) {
       view.setShowRiskFor(null)
     },
     selectFileFromFull: (path: string, chapterId: string) => {
-      goTo(r, { chapterId, path })
+      goToFile(r, { chapterId, path })
       view.setShowRiskFor(null)
     },
     nextUnviewedFile: () => {
       const next = nextUnviewed(r.displayPr, store.currentFilePath, store.viewedFiles)
-      if (next) goTo(r, next)
+      if (next) goToFile(r, next)
     },
   }
 }
@@ -371,7 +371,7 @@ function navHandlers(r: ReviewState) {
 function actionHandlers(r: ReviewState) {
   const { store, view, props } = r
   return {
-    markViewed: () => markViewed(r),
+    markViewed: () => markOpenFileViewed(r),
     finishChapter: () => finishChapter(r),
     pause: () => {
       store.setPaused(headOf(r), new Date().toISOString())
@@ -585,7 +585,7 @@ function InspectorPane({ r }: { r: ReviewState }) {
   const { repoRoot, pr } = r.props
   const { ui } = r
   const run = finishedRunFor(ui.agentRuns, pr.number, ui.agentPanelScope)
-  const close = () => {
+  const closeAgentPanel = () => {
     ui.openAgentPanel(null)
     r.view.setShowRiskFor(null)
   }
@@ -599,7 +599,7 @@ function InspectorPane({ r }: { r: ReviewState }) {
         <ReviewInspector
           tab={r.inspector.inspectorTab}
           onTabChange={r.inspector.setInspectorTab}
-          onClose={close}
+          onClose={closeAgentPanel}
           agentAvailable={!!ui.agentPanelScope}
           agentFindingCount={openFindingCount(run)}
           agent={<AgentPanel repoRoot={repoRoot} pr={pr} />}
@@ -633,15 +633,15 @@ function Panels({ r, h }: { r: ReviewState; h: Handlers }) {
 function SubmitDialog({ r }: { r: ReviewState }) {
   const { repoRoot, pr, onApproved } = r.props
   const { currentUserLogin } = r.store
-  const close = () => r.view.setShowSubmit(false)
+  const closeSubmit = () => r.view.setShowSubmit(false)
   return (
-    <Dialog title="Submit review" onDismiss={close} actions={[]}>
+    <Dialog title="Submit review" onDismiss={closeSubmit} actions={[]}>
       <ReviewSubmitPanel
         repoRoot={repoRoot}
         prNumber={pr.number}
         headSHA={pr.headSHA}
         isOwnPr={!!currentUserLogin && currentUserLogin === pr.author}
-        onClose={close}
+        onClose={closeSubmit}
         onApproved={onApproved}
       />
     </Dialog>

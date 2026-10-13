@@ -155,13 +155,13 @@ function FileCard(props: FileCardProps) {
   )
 }
 
-function branchNames(session: ConflictSession): { ours: string; theirs: string } {
+function sessionBranchNames(session: ConflictSession): { ours: string; theirs: string } {
   const fallback = choose(session.isRebase, 'upstream', 'incoming')
   return { ours: session.oursBranch ?? 'HEAD', theirs: session.theirsBranch ?? fallback }
 }
 
 function HubTopBar({ session, hub }: { session: ConflictSession; hub: Props }) {
-  const branches = branchNames(session)
+  const branches = sessionBranchNames(session)
   return (
     <div className="conflict-hub__topbar">
       <div className="conflict-hub__brand">
@@ -199,7 +199,7 @@ function Stat(props: { value: React.ReactNode; label: string; tone?: string }) {
   )
 }
 
-function progressPercent(session: ConflictSession): number {
+function resolvedPercent(session: ConflictSession): number {
   if (session.totalConflicts <= 0) return 0
   return Math.round((session.totalResolved / session.totalConflicts) * 100)
 }
@@ -211,7 +211,7 @@ function Progress({ session }: { session: ConflictSession }) {
       <div className="conflict-hub__progress-bar">
         <div
           className="conflict-hub__progress-fill"
-          style={{ width: `${progressPercent(session)}%` }}
+          style={{ width: `${resolvedPercent(session)}%` }}
         />
       </div>
       <span className="conflict-hub__progress-count">
@@ -222,7 +222,7 @@ function Progress({ session }: { session: ConflictSession }) {
 }
 
 function Hero({ session }: { session: ConflictSession }) {
-  const branches = branchNames(session)
+  const branches = sessionBranchNames(session)
   const estimatedMin = Math.max(1, Math.ceil(session.totalConflicts * 0.75))
   return (
     <div className="conflict-hub__hero">

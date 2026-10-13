@@ -25,7 +25,7 @@ export function mergeReadiness(pr: SortablePr): number {
   return 0
 }
 
-const hasSession = (pr: SortablePr) =>
+const isResumable = (pr: SortablePr) =>
   pr.sessionStatus === 'in-progress' || pr.sessionStatus === 'paused'
 
 const viewedFraction = (pr: SortablePr) =>
@@ -45,7 +45,7 @@ export function sortPrs<T>(prs: T[], mode: SortMode, toSortable: (pr: T) => Sort
     if (mode === 'closest') return mergeReadiness(a) - mergeReadiness(b) || byAge(a, b)
     if (mode === 'started') {
       return (
-        Number(hasSession(b)) - Number(hasSession(a)) ||
+        Number(isResumable(b)) - Number(isResumable(a)) ||
         viewedFraction(b) - viewedFraction(a) ||
         byAge(a, b)
       )

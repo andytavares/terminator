@@ -155,13 +155,13 @@ function file(path: string, tier: 1 | 2 | 3 = 1): PrChangedFile {
 }
 
 /** A chapter holding `files`. */
-function chapter(id: string, files: ChangedFile[]) {
+function chapterWithFiles(id: string, files: ChangedFile[]) {
   return { id, name: id, estimatedMinutes: 1, status: 'not-started' as const, files }
 }
 
 /** The active PR with one chapter of `files`. */
 function prWithFiles(files: ChangedFile[], overrides: Record<string, unknown> = {}) {
-  return { ...validActivePr, ...overrides, chapters: [chapter('ch-1', files)] }
+  return { ...validActivePr, ...overrides, chapters: [chapterWithFiles('ch-1', files)] }
 }
 
 /** A PR whose one file, src/foo.ts, has no score yet, with CI in `ciStatus`. */
@@ -201,7 +201,7 @@ async function load<A extends unknown[]>(loader: (...args: A) => Promise<unknown
 }
 
 /** Loads the queue of /repo once. */
-async function loadQueue(options?: Parameters<ReturnType<typeof useLoadPrQueue>>[0]) {
+async function loadQueueVia(options?: Parameters<ReturnType<typeof useLoadPrQueue>>[0]) {
   const { result } = renderHook(() => useLoadPrQueue('/repo'))
   await load(result.current, options)
 }
@@ -221,7 +221,7 @@ async function loadWithOrphan(orphan: unknown, prune: () => unknown) {
   mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
   mockActiveReviewsForRepoAPI.mockResolvedValue({ prs: [orphan] })
   mockPruneActiveReviewsAPI.mockImplementation(async () => prune())
-  await loadQueue()
+  await loadQueueVia()
 }
 
 /** A stored session of PR 42 that viewed src/foo.ts, paused at `pausedAt`. */
@@ -397,7 +397,7 @@ describe('useLoadPrQueue — includes orphan PRs when pruneActiveReviews confirm
     mockActiveReviewsForRepoAPI.mockResolvedValue({ prs: [orphanPr(99, { viewedFileCount: 1 })] })
     // pruneActiveReviews returns 99 → PR is still open (just on a later page)
     mockPruneActiveReviewsAPI.mockResolvedValue({ openNumbers: [99] })
-    await loadQueue()
+    await loadQueueVia()
     expect(queuedPrs().find((p) => p.number === 99)).toBeDefined()
   })
 })
@@ -729,7 +729,7 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch — mergeSessionStatuses: 
     // in-progress (not paused)
     mockSessionsForRepoAPI.mockResolvedValue({ sessions: [storedSession(null)] })
     mockListOpenPrs.mockResolvedValue({ prs: [ghPr42], hasMore: false })
-    await loadQueue()
+    await loadQueueVia()
     // Should call sessionsForRepo to merge statuses
     expect(mockSessionsForRepoAPI).toHaveBeenCalledWith('/repo')
     // Queue should be set (with merged session status)
@@ -742,7 +742,7 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch — mergeSessionStatuses: 
     mockSessionsForRepoAPI.mockResolvedValue({ sessions: [storedSession('2026-01-01T00:00:00Z')] })
     const pr42 = { ...reviewQueuePr(42), title: 'Test', sessionStatus: 'not-started' }
     mockListOpenPrs.mockResolvedValue({ prs: [pr42], hasMore: false })
-    await loadQueue()
+    await loadQueueVia()
     expect(queuedPrs().find((p) => p.number === 42)?.sessionStatus).toBe('paused')
   })
 })
@@ -1131,8 +1131,15 @@ describe('useLoadIssueComments — handles thrown exceptions gracefully without 
 
 describe('useFetchFileMetrics — one batched request', () => {
   it('asks for every non-generated file in one call and applies the scores in one update', async () => {
-    const one = chapter('ch-1', [file('src/a.ts'), file('src/b.ts'), file('package-lock.json', 3)])
-    withActivePr({ ...validActivePr, chapters: [one, chapter('ch-2', [file('src/c.ts')])] })
+    const one = chapterWithFiles('ch-1', [
+      file('src/a.ts'),
+      file('src/b.ts'),
+      file('package-lock.json', 3),
+    ])
+    withActivePr({
+      ...validActivePr,
+      chapters: [one, chapterWithFiles('ch-2', [file('src/c.ts')])],
+    })
     metricsAnswer({ churn90d: 1, blastRadius: 1 })
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
     await load(result.current)

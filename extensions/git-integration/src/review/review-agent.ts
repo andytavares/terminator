@@ -62,8 +62,8 @@ function defaultSpawn(
   opts: { cwd: string; env: Record<string, string> }
 ): SpawnedProcess {
   const child = spawnCb(cmd, args, { cwd: opts.cwd, env: opts.env, detached: OWN_PROCESS_GROUP })
-  const kill = (signal?: NodeJS.Signals): void => killGroup(child, signal)
-  return Object.assign(child, { kill })
+  const killChild = (signal?: NodeJS.Signals): void => killGroup(child, signal)
+  return Object.assign(child, { kill: killChild })
 }
 
 /** The last absolute path in a shell's `command -v` output; rc files may print before it.
@@ -505,7 +505,7 @@ function sendPrompt(child: SpawnedProcess, prompt: string): void {
   }
 }
 
-function collectOutput(child: SpawnedProcess): { stdout: string; stderr: string } {
+function collectChildOutput(child: SpawnedProcess): { stdout: string; stderr: string } {
   const output = { stdout: '', stderr: '' }
   child.stdout.on('data', (d) => {
     output.stdout += d.toString()
@@ -526,7 +526,7 @@ function runClaude(run: RunContext, launch: ClaudeLaunch, control: RunControl): 
       resolve(failedRun(run, 'Timed out after 5 min'))
     }, run.input.timeoutMs ?? DEFAULT_TIMEOUT_MS)
     sendPrompt(child, launch.prompt)
-    const output = collectOutput(child)
+    const output = collectChildOutput(child)
     child.on('error', (e) => {
       clearTimeout(timer)
       resolve(failedRun(run, `Failed to start claude: ${String(e)}`))

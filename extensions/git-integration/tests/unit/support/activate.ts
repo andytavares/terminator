@@ -24,7 +24,7 @@ export interface FakeWorkspace {
 }
 
 /** A `paths.globalStorage` in a fresh userData, `<userData>/extensions/<id>`, not created yet. */
-export function freshGlobalStorage(): string {
+export function freshExtensionStorage(): string {
   const userData = makeTempDir('git-integration-user-data-')
   return join(userData, 'extensions', 'terminator.git-integration')
 }
@@ -59,7 +59,7 @@ function capturingIpc(channels: RegisteredChannel[]) {
   })
 }
 
-const isWithin = (path: string, folder: string) => {
+const isWithinFolder = (path: string, folder: string) => {
   const rel = relative(folder, path)
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
 }
@@ -69,7 +69,7 @@ function settingsOver(places: ApiPlaces) {
   const ownValues = (repoPath?: string) =>
     repoPath === undefined
       ? undefined
-      : places.workspaces.find((w) => isWithin(repoPath, w.folderPath))?.settings
+      : places.workspaces.find((w) => isWithinFolder(repoPath, w.folderPath))?.settings
   return partialFake<ExtensionAPI['settings']>({
     get: <T>(key: string, scope?: SettingScope) =>
       (ownValues(scope?.repoPath)?.[key] ?? places.settings?.[key]) as T | undefined,
@@ -130,7 +130,7 @@ function fakeWorkspaceApi(workspaces: FakeWorkspace[]) {
 export function activateInWorkspaces(
   workspaces: FakeWorkspace[],
   settings?: Record<string, unknown>,
-  globalStorage = freshGlobalStorage()
+  globalStorage = freshExtensionStorage()
 ) {
   const channels: RegisteredChannel[] = []
   const spies: ApiSpies = {
@@ -146,7 +146,7 @@ export function activateInWorkspaces(
 /** Activates git-integration on a stand-in API; returns its channels and the shell, gh and log warn spies. */
 export function activateCapturingChannels(
   workspace?: FakeWorkspace,
-  globalStorage = freshGlobalStorage(),
+  globalStorage = freshExtensionStorage(),
   settings?: Record<string, unknown>
 ) {
   return activateInWorkspaces(workspace ? [workspace] : [], settings, globalStorage)

@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { execFileSync } from 'child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -7,27 +6,21 @@ import { registerGitExtensionHandlers, type GitSettings } from '../../src/ipc/gi
 import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
 import { channelRegistry } from './support/channels'
 import { bindRealShell } from './support/shell'
+import { GIT_FREE_ENV, runGitIn } from './support/git-repo'
 
 // The Git view's settings, read by the channels it calls, against real git.
 // `--signoff` adds a Signed-off-by trailer naming the committer
 // (https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff).
 
-const env = Object.fromEntries(
-  Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_'))
-) as NodeJS.ProcessEnv
-
-const gitIn = (repo: string, args: string[]) =>
-  execFileSync('git', args, { cwd: repo, env, encoding: 'utf-8' }).trim()
-
 /** A new repository with `count` untracked files and a.txt staged. */
 function repoWithFiles(count: number): string {
   const repo = mkdtempSync(join(tmpdir(), 'git-settings-'))
-  gitIn(repo, ['init', '-q', '-b', 'main'])
-  gitIn(repo, ['config', 'user.email', 'e@x.dev'])
-  gitIn(repo, ['config', 'user.name', 'E'])
+  runGitIn(repo, ['init', '-q', '-b', 'main'])
+  runGitIn(repo, ['config', 'user.email', 'e@x.dev'])
+  runGitIn(repo, ['config', 'user.name', 'E'])
   for (let i = 0; i < count; i++) writeFileSync(join(repo, `f${i}.txt`), `${i}\n`)
   writeFileSync(join(repo, 'a.txt'), 'a\n')
-  gitIn(repo, ['add', 'a.txt'])
+  runGitIn(repo, ['add', 'a.txt'])
   return repo
 }
 
@@ -40,10 +33,10 @@ function channelsWith(settings: GitSettings) {
 const DEFAULTS: GitSettings = { signOff: () => false, maxDisplayedFiles: () => 500 }
 
 /** A fresh repository with 12 untracked files and a.txt staged, bound as a workspace root. */
-function useRepo(): { path: string } {
+function useTempRepo(): { path: string } {
   const repo = { path: '' }
   beforeEach(() => {
-    bindRealShell(env)
+    bindRealShell(GIT_FREE_ENV)
     repo.path = repoWithFiles(12)
     bindWorkspaceRoots(() => [repo.path])
   })
@@ -52,14 +45,14 @@ function useRepo(): { path: string } {
 }
 
 describe('"Add sign-off to commits", through git:commit', () => {
-  const repo = useRepo()
+  const repo = useTempRepo()
 
   it('signs a commit off when the setting is on', async () => {
     const invoke = channelsWith({ ...DEFAULTS, signOff: () => true })
 
     await invoke('git:commit', { repoRoot: repo.path, message: 'add a' })
 
-    expect(gitIn(repo.path, ['log', '-1', '--format=%B'])).toBe(
+    expect(runGitIn(repo.path, ['log', '-1', '--format=%B'])).toBe(
       'add a\n\nSigned-off-by: E <e@x.dev>'
     )
   })
@@ -69,14 +62,14 @@ describe('"Add sign-off to commits", through git:commit', () => {
 
     await invoke('git:commit', { repoRoot: repo.path, message: 'add a' })
 
-    expect(gitIn(repo.path, ['log', '-1', '--format=%B'])).toBe('add a')
+    expect(runGitIn(repo.path, ['log', '-1', '--format=%B'])).toBe('add a')
   })
 })
 
 type Status = { files: unknown[]; truncated: boolean }
 
 describe('"Max displayed changed files", through git:status', () => {
-  const repo = useRepo()
+  const repo = useTempRepo()
 
   it('lists no more changed files than the setting allows, and says there are more', async () => {
     const invoke = channelsWith({ ...DEFAULTS, maxDisplayedFiles: () => 10 })

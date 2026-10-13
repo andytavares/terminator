@@ -73,7 +73,7 @@ function quoteForReply(body: string): string {
 /** A flag that is set while `action` runs. */
 function useBusyFlag() {
   const [busy, setBusy] = useState(false)
-  const run = async (action: () => Promise<unknown>) => {
+  const runWhileBusy = async (action: () => Promise<unknown>) => {
     setBusy(true)
     try {
       await action()
@@ -81,14 +81,14 @@ function useBusyFlag() {
       setBusy(false)
     }
   }
-  return { busy, run }
+  return { busy, run: runWhileBusy }
 }
 
 /** Like useBusyFlag, and keeps the problem `action` reports, or the error it throws. */
 function useBusyAction() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const run = async (action: () => Promise<string | null>) => {
+  const runReportingError = async (action: () => Promise<string | null>) => {
     setBusy(true)
     setError(null)
     try {
@@ -99,12 +99,12 @@ function useBusyAction() {
       setBusy(false)
     }
   }
-  return { busy, error, run }
+  return { busy, error, run: runReportingError }
 }
 
 type BusyFlag = ReturnType<typeof useBusyFlag>
 
-async function updateBranch(props: Props): Promise<string | null> {
+async function updateBranchFromBase(props: Props): Promise<string | null> {
   const result = await githubAPI.prUpdateBranch(props.repoRoot, props.pr.number)
   if (result && typeof result === 'object' && 'error' in result) {
     return String((result as { error: string }).error)
@@ -150,7 +150,7 @@ function useOverviewActions(props: Props, loadIssueComments: (prNumber: number) 
         await githubAPI.prMarkReady(repoRoot, pr.number)
         await onRefresh?.()
       }),
-    handleUpdateBranch: () => update.run(() => updateBranch(props)),
+    handleUpdateBranch: () => update.run(() => updateBranchFromBase(props)),
     handleResolveConflicts: () => merge.run(() => resolveConflicts(props)),
   }
 }
@@ -411,7 +411,13 @@ function WriteBox({ box, composerRef }: { box: IssueCommentBox; composerRef: Com
   )
 }
 
-function ComposerTabs({ box, composerRef }: { box: IssueCommentBox; composerRef: ComposerRef }) {
+function IssueComposerTabs({
+  box,
+  composerRef,
+}: {
+  box: IssueCommentBox
+  composerRef: ComposerRef
+}) {
   const { commentBody } = box
   return (
     <TabsRoot selectedId={box.commentTab} onSelect={box.setCommentTab}>
@@ -441,7 +447,7 @@ function DiscussionComposer({
 }) {
   return (
     <div className="comment-composer pr-issue-composer">
-      <ComposerTabs box={box} composerRef={composerRef} />
+      <IssueComposerTabs box={box} composerRef={composerRef} />
       {box.commentError && <p className="comment-composer-error">{box.commentError}</p>}
       <div className="comment-composer-actions">
         <span className="pr-issue-composer-hint">⌘↵ to submit</span>

@@ -24,7 +24,7 @@ function chapterName(chapter: Chapter, status: ChapterStatus): string {
   return name
 }
 
-function statusOf(chapter: Chapter, viewedFiles: Set<string>): ChapterStatus {
+function chapterStatusOf(chapter: Chapter, viewedFiles: Set<string>): ChapterStatus {
   const viewed = chapter.files.filter((f) => viewedFiles.has(f.path)).length
   if (viewed === 0) return 'not-started'
   if (viewed === chapter.files.length) return 'complete'
@@ -66,7 +66,7 @@ export function ChapterNav({ chapters, onSelectChapter }: Props) {
   return (
     <TabsRoot selectedId={activeId} onSelect={selectChapter}>
       <TabList label="PR chapters" orientation="vertical" className="chapter-nav">
-        {chapters.map((ch) => chapterTab(ch, statusOf(ch, viewedFiles)))}
+        {chapters.map((ch) => chapterTab(ch, chapterStatusOf(ch, viewedFiles)))}
       </TabList>
     </TabsRoot>
   )

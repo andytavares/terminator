@@ -77,16 +77,22 @@ function pullCommand(api: ExtensionAPI) {
 const GIT_COMMAND = { requires: 'repo', category: 'Git' } as const
 
 export function registerQuickActionCommands(api: ExtensionAPI): Disposable[] {
-  const register: ExtensionAPI['commands']['register'] = (spec, handler) =>
+  const registerGitCommand: ExtensionAPI['commands']['register'] = (spec, handler) =>
     api.commands.register(spec, handler)
   return [
-    register(
+    registerGitCommand(
       { id: 'commit', label: 'Commit…', mnemonic: 'c', ...GIT_COMMAND },
       viewCommand(api, 'commit')
     ),
-    register({ id: 'push', label: 'Push', mnemonic: 'p', ...GIT_COMMAND }, pushCommand(api)),
-    register({ id: 'pull', label: 'Pull', mnemonic: 'l', ...GIT_COMMAND }, pullCommand(api)),
-    register(
+    registerGitCommand(
+      { id: 'push', label: 'Push', mnemonic: 'p', ...GIT_COMMAND },
+      pushCommand(api)
+    ),
+    registerGitCommand(
+      { id: 'pull', label: 'Pull', mnemonic: 'l', ...GIT_COMMAND },
+      pullCommand(api)
+    ),
+    registerGitCommand(
       { id: 'create-pr', label: 'Create PR…', mnemonic: 'r', ...GIT_COMMAND },
       viewCommand(api, 'pull-request')
     ),

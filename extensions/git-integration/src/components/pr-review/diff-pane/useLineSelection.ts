@@ -38,7 +38,7 @@ function useDragEnd(
   const { path, setSelection } = target
   const { drag: dragRef, justEnded } = refs
   useEffect(() => {
-    const onMouseUp = () => {
+    const endGutterDrag = () => {
       const drag = dragRef.current
       if (!drag.active || drag.side == null) return
       drag.active = false
@@ -57,8 +57,8 @@ function useDragEnd(
         endLine: Math.max(drag.startLine, drag.endLine),
       })
     }
-    window.addEventListener('mouseup', onMouseUp)
-    return () => window.removeEventListener('mouseup', onMouseUp)
+    window.addEventListener('mouseup', endGutterDrag)
+    return () => window.removeEventListener('mouseup', endGutterDrag)
   }, [path, setSelection, dragRef, justEnded, setPreview])
 }
 

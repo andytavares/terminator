@@ -20,6 +20,7 @@ import { applyReadingOrder } from '../../review/apply-reading-order.js'
 import { findTestReferencesInRepo } from '../../review/test-references.js'
 import { VALIDATION_ERROR } from '../register.js'
 import { catchError, PullRequestPayload, type GithubContext } from './context.js'
+import { assigneeLoginsOf, textOf } from '../../github/pr-review-service.js'
 
 type RawRecord = Record<string, unknown>
 
@@ -88,11 +89,6 @@ function requestedReviewersOf(reviewers: PrSources['reviewers']): string[] {
   return [...users, ...teams].filter(Boolean)
 }
 
-function assigneeLoginsOf(meta: RawRecord): string[] {
-  const assignees = (meta.assignees as RawRecord[] | undefined) ?? []
-  return assignees.map((a) => String(a.login ?? '')).filter(Boolean)
-}
-
 /** The PR's check rollup; when empty (checks queued, not yet reported), its head's check suites, so
  *  "Expected" checks show. Best-effort: a failed lookup keeps the rollup. */
 async function checkRollup(ctx: GithubContext, meta: RawRecord, where: RepoAt) {
@@ -114,10 +110,6 @@ async function checkRollup(ctx: GithubContext, meta: RawRecord, where: RepoAt) {
   } catch {
     return rollup
   }
-}
-
-function textOf(value: unknown): string {
-  return String(value ?? '')
 }
 
 /** Who opened the PR, when, from which branch, and where it stands. */

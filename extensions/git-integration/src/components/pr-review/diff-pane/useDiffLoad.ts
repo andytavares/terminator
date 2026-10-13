@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { githubAPI } from '../../../api/github'
-import { parseDiff } from '../../../github/pr-review-service'
+import { parsePrFileDiff } from '../../../github/pr-review-service'
 import { FileDiffSchema, type FileDiff } from '../../../schemas/git.schema'
 
 interface CachedDiff {
@@ -86,7 +86,7 @@ function showComparison(cmp: CompareAnswer, req: DiffRequest, cb: LoadCallbacks)
   }
   const entry = cmp.files.find((f) => f.path === req.path)
   if (!entry) return { fallbackNote: null }
-  cb.show(parseDiff(entry.patch, req.path), `Showing ${req.sinceSha!.slice(0, 8)} … head`)
+  cb.show(parsePrFileDiff(entry.patch, req.path), `Showing ${req.sinceSha!.slice(0, 8)} … head`)
   return null
 }
 

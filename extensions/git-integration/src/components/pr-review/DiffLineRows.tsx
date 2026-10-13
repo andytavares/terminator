@@ -2,6 +2,7 @@ import React, { memo } from 'react'
 import type { DiffLine } from '../../schemas/git.schema'
 import { highlight, type detectLanguage } from '../FileDiffView'
 import { choose } from '../text'
+import { unifiedSide } from './diff-pane/lines'
 
 export type Side = 'LEFT' | 'RIGHT'
 type Language = ReturnType<typeof detectLanguage>
@@ -15,7 +16,7 @@ const HIGHLIGHT_CACHE_CAP = 20_000
 const highlightCache = new Map<string, string>()
 
 /** Highlighting is pure in (language, line); a row re-renders on every selection change. */
-function highlightLine(content: string, language: Language): string {
+function cachedHighlight(content: string, language: Language): string {
   const key = `${language}\u0000${content}`
   let html = highlightCache.get(key)
   if (html === undefined) {
@@ -126,19 +127,13 @@ function CodeCells({ line, language, prefix }: CodeCellsProps) {
     <>
       <td className="diff-line__prefix">{prefix}</td>
       <td className="diff-line__content">
-        <pre dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }} />
+        <pre dangerouslySetInnerHTML={{ __html: cachedHighlight(line.content, language) }} />
       </td>
     </>
   )
 }
 
 const PREFIX: Record<DiffLine['type'], string> = { add: '+', remove: '-', context: ' ' }
-
-/** The side a unified row's comment lands on: removed lines are on the left. */
-function unifiedSide(line: DiffLine): Side {
-  if (line.type === 'remove') return 'LEFT'
-  return 'RIGHT'
-}
 
 function expandedAttr(expanded: boolean): 'true' | undefined {
   return choose(expanded, 'true' as const, undefined)

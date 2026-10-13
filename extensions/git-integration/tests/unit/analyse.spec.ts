@@ -62,7 +62,7 @@ describe('analysePr()', () => {
   })
 
   it("parses each file's patch once across the reading-order, moved-blocks and insights passes", async () => {
-    const parseSpy = vi.spyOn(prReviewService, 'parseDiff')
+    const parseSpy = vi.spyOn(prReviewService, 'parsePrFileDiff')
     await analysePr(SOURCE_SPEC_AND_MANIFEST, baseOpts)
 
     expect(parseSpy.mock.calls.map(([, path]) => path).sort()).toEqual([

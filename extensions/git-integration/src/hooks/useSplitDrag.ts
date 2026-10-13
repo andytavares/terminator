@@ -49,19 +49,19 @@ function followPointer(
   drag: MutableRefObject<DragState>,
   setSplitLeftPct: (pct: number) => void
 ): () => void {
-  const onMove = (e: MouseEvent) => {
+  const moveSplitDivider = (e: MouseEvent) => {
     const s = drag.current
     if (!s.active || s.containerWidth === 0) return
     const deltaPct = ((e.clientX - s.startX) / s.containerWidth) * 100
     setSplitLeftPct(Math.max(20, Math.min(80, s.startPct + deltaPct)))
   }
-  const onUp = () => {
+  const endSplitDrag = () => {
     drag.current.active = false
   }
-  window.addEventListener('mousemove', onMove)
-  window.addEventListener('mouseup', onUp)
+  window.addEventListener('mousemove', moveSplitDivider)
+  window.addEventListener('mouseup', endSplitDrag)
   return () => {
-    window.removeEventListener('mousemove', onMove)
-    window.removeEventListener('mouseup', onUp)
+    window.removeEventListener('mousemove', moveSplitDivider)
+    window.removeEventListener('mouseup', endSplitDrag)
   }
 }

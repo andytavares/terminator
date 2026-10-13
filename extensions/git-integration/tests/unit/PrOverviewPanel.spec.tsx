@@ -56,7 +56,7 @@ vi.mock('../../src/components/pr-review/RichContent', () => ({
   ),
 }))
 
-const riskScoreOf = (level: 'low' | 'medium' | 'high', composite: number) => ({
+const overviewRiskScore = (level: 'low' | 'medium' | 'high', composite: number) => ({
   level,
   composite,
   metrics: {
@@ -84,7 +84,7 @@ const makeFile = (
   isBinary: false,
   tier: 1 as const,
   whyHere: 'test',
-  riskScore: riskScoreOf(risk.level, risk.composite),
+  riskScore: overviewRiskScore(risk.level, risk.composite),
   estimatedMinutes: 5,
 })
 

@@ -27,7 +27,7 @@ async function latestSessionsByPr(repoRoot: string): Promise<Map<number, ReviewS
 }
 
 /** The PR as its session left it: paused or in progress, and how many files were viewed. */
-function withSession(pr: ReviewQueuePR, session: ReviewSession | undefined): ReviewQueuePR {
+function withStoredSession(pr: ReviewQueuePR, session: ReviewSession | undefined): ReviewQueuePR {
   const sessionStatus = session?.pausedAt ? ('paused' as const) : ('in-progress' as const)
   return { ...pr, sessionStatus, viewedFileCount: session?.viewedFiles.length ?? 0 }
 }
@@ -63,7 +63,7 @@ async function openOrphans(
   )
   return candidates
     .filter((pr) => open.has(pr.number))
-    .map((pr) => withSession(pr, latestByPr.get(pr.number)))
+    .map((pr) => withStoredSession(pr, latestByPr.get(pr.number)))
 }
 
 /** Each PR with its stored session's progress, after any open orphans (an appended page skips them:
@@ -77,7 +77,7 @@ export async function mergeSessionStatuses(
     const latestByPr = await latestSessionsByPr(repoRoot)
     const merged = prs.map((pr) => {
       const session = pr ? latestByPr.get(pr.number) : undefined
-      return session ? withSession(pr, session) : pr
+      return session ? withStoredSession(pr, session) : pr
     })
     if (isAppend) return merged
     return [...(await openOrphans(repoRoot, prs, latestByPr)), ...merged]

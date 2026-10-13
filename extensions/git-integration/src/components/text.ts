@@ -16,3 +16,9 @@ export function splitPath(filePath: string): { dir: string; name: string } {
   if (slash === -1) return { dir: '', name: filePath }
   return { dir: filePath.slice(0, slash + 1), name: filePath.slice(slash + 1) }
 }
+
+/** An error's message, or the thrown value as text. */
+export function errorText(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return String(err)
+}

@@ -47,7 +47,7 @@ export async function getStatus(repoRoot: string, maxFiles: number = 500): Promi
   return { ...partial, branch: branch || 'HEAD' }
 }
 
-function diff(args: string[], repoRoot: string): Promise<string> {
+function runDiff(args: string[], repoRoot: string): Promise<string> {
   return runGit(repoRoot, args, {
     timeoutMs: GIT_TIMEOUT,
     maxBuffer: DIFF_MAX_BYTES + 1024,
@@ -58,7 +58,10 @@ function diff(args: string[], repoRoot: string): Promise<string> {
 /** An untracked file against /dev/null; git exits 1 when they differ, with the diff on stdout. */
 async function untrackedFileDiff(repoRoot: string, filePath: string): Promise<string | null> {
   try {
-    return await diff(['diff', '--no-index', '--unified=3', '--', '/dev/null', filePath], repoRoot)
+    return await runDiff(
+      ['diff', '--no-index', '--unified=3', '--', '/dev/null', filePath],
+      repoRoot
+    )
   } catch (e: unknown) {
     if (e instanceof GitCommandError && e.stdout) return e.stdout
     return null
@@ -73,7 +76,7 @@ export async function getDiff(
   const args = side.staged
     ? ['diff', '--cached', '--unified=3', '--', filePath]
     : ['diff', '--unified=3', '--', filePath]
-  const stdout = await diff(args, repoRoot)
+  const stdout = await runDiff(args, repoRoot)
   // `git diff` prints nothing for an untracked file: git has no index entry to compare.
   const untracked = !side.staged && side.isUntracked && !stdout.trim()
   const output = (untracked ? await untrackedFileDiff(repoRoot, filePath) : null) ?? stdout

@@ -72,7 +72,7 @@ function useComposer(props: Props) {
   const [error, setError] = useState<string | null>(null)
   const addDraft = usePrReviewStore((s) => s.addDraft)
 
-  const reply = async (replyProps: ReplyProps) => {
+  const sendComposedReply = async (replyProps: ReplyProps) => {
     setSubmitting(true)
     setError(null)
     try {
@@ -86,7 +86,7 @@ function useComposer(props: Props) {
   }
   const handleSubmit = async () => {
     if (!body.trim()) return
-    if (isReply(props)) return reply(props)
+    if (isReply(props)) return sendComposedReply(props)
     addCommentDraft(props, body, addDraft)
     props.onSubmitted()
   }

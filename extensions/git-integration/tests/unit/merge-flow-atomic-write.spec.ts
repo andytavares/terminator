@@ -46,13 +46,13 @@ describe('merge flow writes resolved files whole', () => {
 
   afterEach(() => rmSync(repo, { recursive: true, force: true }))
 
-  const invoke = (channel: string, payload: Record<string, unknown>) =>
+  const invokeMergeFlow = (channel: string, payload: Record<string, unknown>) =>
     invokeOnBlock(repo, channel, payload)
 
   it('replaces the file instead of truncating it, keeping its mode and leaving nothing behind', async () => {
     const before = statSync(file()).ino
 
-    const result = await invoke('git:resolve-conflict', {
+    const result = await invokeMergeFlow('git:resolve-conflict', {
       resolvedText: 'ours',
       strategy: 'ours',
       originalConflictText: CONFLICT,
@@ -78,14 +78,17 @@ describe('merge flow writes resolved files whole — on undo', () => {
 
   afterEach(() => rmSync(repo, { recursive: true, force: true }))
 
-  const invoke = (channel: string, payload: Record<string, unknown>) =>
+  const invokeMergeFlow = (channel: string, payload: Record<string, unknown>) =>
     invokeOnBlock(repo, channel, payload)
 
   it('undoing a decision replaces the file the same way', async () => {
     writeFileSync(file(), '#!/bin/sh\nours\n')
     const before = statSync(file()).ino
 
-    await invoke('git:undo-resolve', { resolvedText: 'ours', originalConflictText: CONFLICT })
+    await invokeMergeFlow('git:undo-resolve', {
+      resolvedText: 'ours',
+      originalConflictText: CONFLICT,
+    })
 
     expect(readFileSync(file(), 'utf8')).toBe(`#!/bin/sh\n${CONFLICT}\n`)
     expectReplacedWhole(repo, before)

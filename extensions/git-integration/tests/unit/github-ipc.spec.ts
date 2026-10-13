@@ -303,7 +303,11 @@ function handlersWithProjectRoots(projectRoots: string[]): Record<string, Handle
 }
 
 /** A dashboard search node: alice's PR `number` of `repo`, with nothing to note, and `overrides`. */
-function dashboardNode(repo: string, number: number, overrides: Record<string, unknown> = {}) {
+function dashboardSearchNode(
+  repo: string,
+  number: number,
+  overrides: Record<string, unknown> = {}
+) {
   return {
     number,
     title: `PR ${number}`,
@@ -1899,11 +1903,11 @@ describe('github:pr-issue-comments — includes PR review body comments merged w
   const handlers = freshHandlers()
 
   it('includes PR review body comments merged with issue comments', async () => {
-    const author = (login: string) => ({ login, avatar_url: '' })
-    const issueComment = { id: 1, user: author('alice'), body: 'Issue comment' }
+    const authorNamed = (login: string) => ({ login, avatar_url: '' })
+    const issueComment = { id: 1, user: authorNamed('alice'), body: 'Issue comment' }
     const at = { created_at: '2025-01-02T00:00:00Z', updated_at: '2025-01-02T00:00:00Z' }
     mockGitSuccess(JSON.stringify([{ ...issueComment, ...at }]))
-    const reviewBody = { id: 2, user: author('bob'), body: 'Review body comment' }
+    const reviewBody = { id: 2, user: authorNamed('bob'), body: 'Review body comment' }
     mockGitSuccess(JSON.stringify([{ ...reviewBody, submitted_at: '2025-01-01T00:00:00Z' }]))
 
     const result = (await handlers['github:pr-issue-comments']({
@@ -2553,7 +2557,7 @@ describe('review revamp — edge branches — maps ssh remotes, and ignores non-
   it('maps ssh remotes, and ignores non-GitHub and unreadable ones', async () => {
     const hs = handlersWithProjectRoots(['/src/widgets', '/src/gadgets', '/src/broken'])
     mockDashboardExec(
-      { mine: [dashboardNode('acme/widgets', 1), dashboardNode('acme/gadgets', 2)] },
+      { mine: [dashboardSearchNode('acme/widgets', 1), dashboardSearchNode('acme/gadgets', 2)] },
       {
         '/src/widgets': 'git@github.com:acme/widgets.git',
         '/src/gadgets': 'https://gitlab.com/acme/gadgets.git',
@@ -2571,7 +2575,7 @@ describe('review revamp — edge branches — maps ssh remotes, and ignores non-
 const WIDGETS_REMOTE = 'https://github.com/acme/widgets.git'
 
 /** alice's acme/widgets PR 1, "Fix bug", waiting on review with CI passing. */
-const FIX_BUG_NODE = dashboardNode('acme/widgets', 1, {
+const FIX_BUG_NODE = dashboardSearchNode('acme/widgets', 1, {
   title: 'Fix bug',
   additions: 10,
   deletions: 5,
@@ -2675,7 +2679,7 @@ describe('github:dashboard-search — keeps the other sections when one fails, n
 
   it('keeps the other sections when one fails, naming the failure briefly', async () => {
     const handlers = captureHandlers()
-    const node = dashboardNode('acme/widgets', 7, {
+    const node = dashboardSearchNode('acme/widgets', 7, {
       title: 'Mine',
       createdAt: '2026-01-01T00:00:00Z',
     })
@@ -3289,7 +3293,7 @@ describe('stateForSearch', () => {
   })
 })
 
-const widgetsNode = dashboardNode('acme/widgets', 5, {
+const widgetsNode = dashboardSearchNode('acme/widgets', 5, {
   title: 'Mine',
   changedFiles: 4,
   createdAt: '2026-01-01T00:00:00Z',

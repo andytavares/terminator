@@ -12,11 +12,11 @@ import type {
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
 import { partialFake } from '../../../../tests/support/fakes'
 
-const chapter = (id: string, name: string) => partialFake<Chapter>({ id, name })
+const chapterNamed = (id: string, name: string) => partialFake<Chapter>({ id, name })
 
 const mockPr = partialFake<PrReviewDetail>({
   number: 209,
-  chapters: [chapter('ch-1', 'Chapter 1'), chapter('ch-2', 'Chapter 2')],
+  chapters: [chapterNamed('ch-1', 'Chapter 1'), chapterNamed('ch-2', 'Chapter 2')],
 })
 
 type CardProps = React.ComponentProps<typeof ResumeCard>

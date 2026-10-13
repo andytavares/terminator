@@ -3,7 +3,7 @@ import { buildDiffItems, type DiffItemSource, type MovedMark } from '../../src/r
 import { buildSplitRows } from '../../src/components/FileDiffView'
 import type { DiffHunk, DiffLine } from '../../src/schemas/git.schema'
 
-const context = (n: number): DiffLine => ({
+const contextLine = (n: number): DiffLine => ({
   type: 'context',
   content: `line ${n}`,
   oldLineNumber: n,
@@ -11,7 +11,10 @@ const context = (n: number): DiffLine => ({
 })
 const hunkOf = (header: string, lines: DiffLine[]): DiffHunk => ({ header, lines })
 
-function sourceOf(hunks: DiffHunk[], overrides: Partial<DiffItemSource> = {}): DiffItemSource {
+function diffItemSource(
+  hunks: DiffHunk[],
+  overrides: Partial<DiffItemSource> = {}
+): DiffItemSource {
   return {
     mode: 'unified',
     hunkCount: hunks.length,
@@ -53,13 +56,13 @@ const addedAt8: DiffLine = { type: 'add', content: 'y', oldLineNumber: null, new
 
 describe('buildDiffItems()', () => {
   it('orders the top gap, each hunk header and rows, its hotspot, and the gaps after it', () => {
-    const hunks = [hunkOf('@@ a', [context(5)]), hunkOf('@@ b', [context(9)])]
+    const hunks = [hunkOf('@@ a', [contextLine(5)]), hunkOf('@@ b', [contextLine(9)])]
     const gapViews = new Map([
       ['top', { above: [], hidden: 4, below: [] }],
-      ['after-0', { above: [context(6)], hidden: 2, below: [] }],
+      ['after-0', { above: [contextLine(6)], hidden: 2, below: [] }],
       ['bottom', { above: [], hidden: null, below: [] }],
     ])
-    const source = sourceOf(hunks, { gapViews, hotspots: [{ hunkIndex: 0, message: 'hot' }] })
+    const source = diffItemSource(hunks, { gapViews, hotspots: [{ hunkIndex: 0, message: 'hot' }] })
 
     expect(keysOf(source)).toEqual([
       'top-expander',
@@ -75,8 +78,10 @@ describe('buildDiffItems()', () => {
   })
 
   it('leads with a notice counting the formatting hunks it hides', () => {
-    const hunks = [hunkOf('@@ a', [context(1)]), hunkOf('@@ b', [context(9)])]
-    const items = buildDiffItems(sourceOf(hunks, { visibleHunks: [{ hunk: hunks[1], index: 1 }] }))
+    const hunks = [hunkOf('@@ a', [contextLine(1)]), hunkOf('@@ b', [contextLine(9)])]
+    const items = buildDiffItems(
+      diffItemSource(hunks, { visibleHunks: [{ hunk: hunks[1], index: 1 }] })
+    )
     expect(items[0]).toEqual({ kind: 'notice', key: 'notice', hiddenCount: 1 })
     expect(items.map((i) => i.key)).toEqual(['notice', '1-header', '1-0'])
   })
@@ -85,23 +90,25 @@ describe('buildDiffItems()', () => {
 describe('buildDiffItems() — moved blocks', () => {
   it('drops the lines of a collapsed moved block but keeps the line that opens it', () => {
     const lines = [1, 2, 3].map(
-      (n): DiffLine => ({ ...context(n), type: 'add', oldLineNumber: null })
+      (n): DiffLine => ({ ...contextLine(n), type: 'add', oldLineNumber: null })
     )
-    const source = sourceOf([hunkOf('@@ a', lines)], { movedMark: (n) => collapsedMark(n === 1) })
+    const source = diffItemSource([hunkOf('@@ a', lines)], {
+      movedMark: (n) => collapsedMark(n === 1),
+    })
     expect(keysOf(source)).toEqual(['0-header', '0-0'])
     expect(keysOf({ ...source, mode: 'split' })).toEqual(['0-header', '0-row-0'])
   })
 
   it('reads a removed unified line on the left, by its old line number', () => {
-    const hunks = [hunkOf('@@ a', [context(5), removedAt7, addedAt8])]
-    const source = sourceOf(hunks, { movedMark: hidingOnly('LEFT', 7) })
+    const hunks = [hunkOf('@@ a', [contextLine(5), removedAt7, addedAt8])]
+    const source = diffItemSource(hunks, { movedMark: hidingOnly('LEFT', 7) })
     expect(keysOf(source)).toEqual(['0-header', '0-0', '0-2'])
   })
 
   it('hides a split row by either side, each read by its own line number', () => {
-    const hunks = [hunkOf('@@ a', [context(5), removedAt7, addedAt8])]
+    const hunks = [hunkOf('@@ a', [contextLine(5), removedAt7, addedAt8])]
     const visibleSplitKeys = (movedMark: DiffItemSource['movedMark']) =>
-      keysOf(sourceOf(hunks, { mode: 'split', movedMark }))
+      keysOf(diffItemSource(hunks, { mode: 'split', movedMark }))
     expect(visibleSplitKeys(hidingOnly('LEFT', 7))).toEqual(['0-header', '0-row-0'])
     expect(visibleSplitKeys(hidingOnly('RIGHT', 8))).toEqual(['0-header', '0-row-0'])
     expect(visibleSplitKeys(hidingOnly('LEFT', 5))).toEqual(['0-header', '0-row-1'])

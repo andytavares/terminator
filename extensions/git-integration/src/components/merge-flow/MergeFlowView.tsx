@@ -28,7 +28,7 @@ function notifyError(title: string, key: string, message: string): void {
 }
 
 /** Restores a stored session that still has conflicts; true when one was restored. */
-async function restoreSession(ctx: FlowContext): Promise<boolean> {
+async function restoreFlowSession(ctx: FlowContext): Promise<boolean> {
   const { session } = await mergeFlowAPI.restoreSession(ctx.repoRoot)
   // A stored session with no conflicts is stale.
   if (!session || !(session.totalConflicts > 0)) return false
@@ -74,7 +74,7 @@ async function startFreshSession(ctx: FlowContext): Promise<void> {
 async function openSession(ctx: FlowContext): Promise<void> {
   ctx.store.setLoading(true)
   try {
-    if (await restoreSession(ctx)) return
+    if (await restoreFlowSession(ctx)) return
     await startFreshSession(ctx)
   } catch (e) {
     ctx.store.setError(String(e))

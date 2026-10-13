@@ -254,7 +254,7 @@ interface ResolverView {
   block: ConflictBlock
 }
 
-function pick(view: ResolverView, strategy: 'ours' | 'theirs'): void {
+function pickStrategy(view: ResolverView, strategy: 'ours' | 'theirs'): void {
   const text = choiceText(view.block, strategy)
   view.state.setPendingResolution({ text, strategy })
 }
@@ -266,7 +266,7 @@ function choiceText(block: ConflictBlock, strategy: 'ours' | 'theirs'): string {
 
 /** "Keep mine" or "Keep theirs": in the editor it replaces the text, otherwise it is the pending choice. */
 function keepSide(view: ResolverView, strategy: 'ours' | 'theirs'): void {
-  if (!view.state.manualMode) return pick(view, strategy)
+  if (!view.state.manualMode) return pickStrategy(view, strategy)
   view.state.setManualSuggestedText(stripConflictMarkers(choiceText(view.block, strategy)))
 }
 
@@ -297,8 +297,8 @@ function ResolverBody({ view }: { view: ResolverView }) {
       pendingStrategy={state.pendingResolution?.strategy ?? null}
       oursAuthor={file.oursAuthor}
       theirsAuthor={file.theirsAuthor}
-      onSelectMine={() => pick(view, 'ours')}
-      onSelectTheirs={() => pick(view, 'theirs')}
+      onSelectMine={() => pickStrategy(view, 'ours')}
+      onSelectTheirs={() => pickStrategy(view, 'theirs')}
     />
   )
 }

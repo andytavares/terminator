@@ -60,7 +60,7 @@ function compareError(e: unknown) {
 }
 
 /** Clones a repository into `folder` for diff-only review of an uncloned PR. */
-async function cloneRepo(ctx: GithubContext, repo: string, folder: string) {
+async function cloneRepoInto(ctx: GithubContext, repo: string, folder: string) {
   if (!existsSync(folder)) return { error: 'FOLDER_NOT_FOUND' }
   const name = repo.split('/')[1] ?? repo
   await ctx.github.repositories.clone(ctx.target(folder), repo, name)
@@ -134,7 +134,7 @@ function updateBranchChannel(ctx: GithubContext): ChannelSpec {
   })
 }
 
-function pullRequestVerbs(ctx: GithubContext): ChannelSpec[] {
+function pullRequestVerbChannels(ctx: GithubContext): ChannelSpec[] {
   return [
     prStatusChannel(ctx),
     prCreateChannel(ctx),
@@ -182,7 +182,7 @@ function cloneRepoChannel(ctx: GithubContext): ChannelSpec {
     channel: 'github:clone-repo',
     schema: z.object({ repo: z.string().min(1), folder: z.string().min(1) }),
     invalid: VALIDATION_ERROR,
-    run: ({ repo, folder }) => cloneRepo(ctx, repo, folder),
+    run: ({ repo, folder }) => cloneRepoInto(ctx, repo, folder),
     onError: catchError,
   })
 }
@@ -197,5 +197,5 @@ function lookupChannels(ctx: GithubContext): ChannelSpec[] {
 }
 
 export function prActionChannels(ctx: GithubContext): ChannelSpec[] {
-  return [...pullRequestVerbs(ctx), ...lookupChannels(ctx)]
+  return [...pullRequestVerbChannels(ctx), ...lookupChannels(ctx)]
 }

@@ -814,7 +814,7 @@ function approversOf(obj: RawRecord): string[] {
 }
 
 /** Assignees as normalizeGraphQLNode flattens them, or from the REST `assignees` field. */
-function assigneeLoginsOf(obj: RawRecord): string[] {
+export function assigneeLoginsOf(obj: RawRecord): string[] {
   if (Array.isArray(obj.assigneeLogins)) return obj.assigneeLogins as string[]
   if (!Array.isArray(obj.assignees)) return []
   return (obj.assignees as RawRecord[]).map((a) => String(a.login ?? '')).filter(Boolean)
@@ -833,7 +833,7 @@ function upper(value: unknown): string {
   return String(value ?? '').toUpperCase()
 }
 
-function textOf(value: unknown): string {
+export function textOf(value: unknown): string {
   return String(value ?? '')
 }
 
@@ -1199,7 +1199,7 @@ function numberHunkLines(hunk: FileDiff['hunks'][0]): void {
   }
 }
 
-export function parseDiff(raw: string, filePath: string): FileDiff {
+export function parsePrFileDiff(raw: string, filePath: string): FileDiff {
   if (!raw.trim()) return { path: filePath, hunks: [], isBinary: false, truncated: false }
   if (raw.includes('Binary files')) {
     return { path: filePath, hunks: [], isBinary: true, truncated: false }

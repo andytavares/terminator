@@ -18,11 +18,11 @@ const baseOpts: ComputeInsightsOptions = {
 /** A changed file as GitHub lists it, with its patch given line by line. */
 const ONE_ADDITION = { additions: 1, deletions: 0 }
 
-function changedFile(path: string, patchLines: string[], counts = ONE_ADDITION) {
+function changedFileWithPatch(path: string, patchLines: string[], counts = ONE_ADDITION) {
   return { path, ...counts, patch: patchLines.join('\n') }
 }
 
-const RISKY_FILE = changedFile(
+const RISKY_FILE = changedFileWithPatch(
   'src/risky.ts',
   [
     '@@ -1,3 +1,6 @@ export function risky',
@@ -60,7 +60,7 @@ const RISK_SCORE_FILE = {
   ].join('\n'),
 }
 
-const SHRINK_FILE = changedFile(
+const SHRINK_FILE = changedFileWithPatch(
   'src/shrink.ts',
   [
     '@@ -1,5 +1,0 @@ export function shrink',
@@ -73,7 +73,7 @@ const SHRINK_FILE = changedFile(
   { additions: 0, deletions: 5 }
 )
 
-const TWO_FUNCTIONS_FILE = changedFile('src/two.ts', [
+const TWO_FUNCTIONS_FILE = changedFileWithPatch('src/two.ts', [
   '@@ -0,0 +1,9 @@ export function small',
   '+export function small(a: number) {',
   '+  if (a) return 1',
@@ -115,13 +115,13 @@ describe('computeInsights() — complexity of parsed code', () => {
   })
 })
 
-const STEADY_TF_FILE = changedFile(
+const STEADY_TF_FILE = changedFileWithPatch(
   'infra/steady.tf',
   ['@@ -1,1 +1,1 @@', '-name = "a"', '+name = "b"'],
   { additions: 1, deletions: 1 }
 )
 
-const DEPLOY_TF_FILE = changedFile(
+const DEPLOY_TF_FILE = changedFileWithPatch(
   'infra/deploy.tf',
   ['@@ -1,0 +2,2 @@ resource', '+  if (a && b) {}', '+  if (c || d) {}'],
   { additions: 2, deletions: 0 }
@@ -151,7 +151,7 @@ describe('computeInsights() — complexity of skipped, removed and unparsed code
   })
 })
 
-const ADD_ONE_FILE = changedFile(
+const ADD_ONE_FILE = changedFileWithPatch(
   'src/util.ts',
   [
     '@@ -0,0 +1,3 @@ export function addOne',
@@ -162,13 +162,13 @@ const ADD_ONE_FILE = changedFile(
   { additions: 3, deletions: 0 }
 )
 
-const ADD_ONE_SPEC_FILE = changedFile(
+const ADD_ONE_SPEC_FILE = changedFileWithPatch(
   'tests/unit/util.spec.ts',
   ['@@ -0,0 +1,2 @@ describe', '+const result = addOne(1)', '+expect(result).toBe(2)'],
   { additions: 2, deletions: 0 }
 )
 
-const SUBTRACT_ONE_FILE = changedFile(
+const SUBTRACT_ONE_FILE = changedFileWithPatch(
   'src/util.ts',
   [
     '@@ -0,0 +1,3 @@ export function subtractOne',
@@ -179,7 +179,10 @@ const SUBTRACT_ONE_FILE = changedFile(
   { additions: 3, deletions: 0 }
 )
 
-const ONE_CONSTANT_FILE = changedFile('src/util.ts', ['@@ -0,0 +1,1 @@', '+export const x = 1'])
+const ONE_CONSTANT_FILE = changedFileWithPatch('src/util.ts', [
+  '@@ -0,0 +1,1 @@',
+  '+export const x = 1',
+])
 
 describe('computeInsights() — coverage of changed functions', () => {
   it('marks a changed function tested when a PR test file references it', async () => {
@@ -221,7 +224,7 @@ describe('computeInsights() — patch coverage percentage', () => {
   })
 })
 
-const FREED_FILE = changedFile(
+const FREED_FILE = changedFileWithPatch(
   'src/freed.ts',
   [
     '@@ -1,2 +1,4 @@ export function freed',
@@ -234,7 +237,7 @@ const FREED_FILE = changedFile(
   { additions: 3, deletions: 1 }
 )
 
-const FREED_SPEC_FILE = changedFile('src/freed.spec.ts', [
+const FREED_SPEC_FILE = changedFileWithPatch('src/freed.spec.ts', [
   '@@ -0,0 +1,1 @@',
   "+it('frees', () => freed(2))",
 ])
@@ -255,7 +258,7 @@ describe('computeInsights() — syntax tree memory', () => {
   })
 })
 
-const MARKERS_FILE = changedFile(
+const MARKERS_FILE = changedFileWithPatch(
   'src/health.ts',
   [
     '@@ -0,0 +1,4 @@',
@@ -292,12 +295,15 @@ function oversizedFunctionFiles() {
     '+}',
   ]
   return [
-    changedFile('src/long.ts', ['@@ -0,0 +1,84 @@', ...longFn], { additions: 84, deletions: 0 }),
-    changedFile('src/deep.ts', ['@@ -0,0 +1,12 @@', ...DEEPLY_NESTED_LINES], {
+    changedFileWithPatch('src/long.ts', ['@@ -0,0 +1,84 @@', ...longFn], {
+      additions: 84,
+      deletions: 0,
+    }),
+    changedFileWithPatch('src/deep.ts', ['@@ -0,0 +1,12 @@', ...DEEPLY_NESTED_LINES], {
       additions: 12,
       deletions: 0,
     }),
-    changedFile('src/params.ts', ['@@ -0,0 +1,3 @@', ...manyParams], {
+    changedFileWithPatch('src/params.ts', ['@@ -0,0 +1,3 @@', ...manyParams], {
       additions: 3,
       deletions: 0,
     }),
@@ -330,16 +336,20 @@ describe('computeInsights() — health flags', () => {
   })
 })
 
-const FEATURE_FILE = changedFile(
+const FEATURE_FILE = changedFileWithPatch(
   'src/feature.ts',
   ['@@ -0,0 +1,3 @@ export function feature', '+export function feature() {', '+  return 1', '+}'],
   { additions: 3, deletions: 0 }
 )
 
-const LOCK_FILE = changedFile('package-lock.json', ['@@ -0,0 +1,1 @@', '-"a": "1"', '+"a": "2"'], {
-  additions: 500,
-  deletions: 500,
-})
+const LOCK_FILE = changedFileWithPatch(
+  'package-lock.json',
+  ['@@ -0,0 +1,1 @@', '-"a": "1"', '+"a": "2"'],
+  {
+    additions: 500,
+    deletions: 500,
+  }
+)
 
 /** A reading order where each step uses the symbol the step before it defines. */
 function chainedReadingOrder(paths: string[]): ReadingStep[] {
@@ -352,7 +362,7 @@ function chainedReadingOrder(paths: string[]): ReadingStep[] {
   }))
 }
 
-function chapterWith(id: string, paths: string[]): Chapter {
+function chapterOfPaths(id: string, paths: string[]): Chapter {
   return {
     id,
     name: `Chapter ${id}`,
@@ -374,7 +384,7 @@ describe('computeInsights() — understandability', () => {
 
   it('derives the longest dependency chain and cross-chapter refs from the reading order', async () => {
     const readingOrder = chainedReadingOrder(['a.ts', 'b.ts', 'c.ts'])
-    const chapters = [chapterWith('ch1', ['a.ts']), chapterWith('ch2', ['b.ts', 'c.ts'])]
+    const chapters = [chapterOfPaths('ch1', ['a.ts']), chapterOfPaths('ch2', ['b.ts', 'c.ts'])]
     const insights = await insightsOf([], { ...baseOpts, readingOrder, chapters })
     expect(insights.understandability.longestChain).toBe(3)
     // b.ts (chapter 2) uses a.ts (chapter 1) — one cross-chapter ref.

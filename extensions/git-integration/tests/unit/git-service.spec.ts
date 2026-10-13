@@ -202,14 +202,14 @@ let calls: ExecOptions[]
 /** The core's shell.exec stand-in: streams `chunks` to onOutput, then resolves `result`. */
 function commitRuns(chunks: string[], result: Partial<ShellExecResult> = {}): void {
   calls = []
-  const exec = async (options: ExecOptions): Promise<ShellExecResult> => {
+  const execRecording = async (options: ExecOptions): Promise<ShellExecResult> => {
     calls.push(options)
     for (const chunk of chunks) options.onOutput?.(chunk)
     const exitCode = result.exitCode ?? 0
     const stdout = exitCode === 0 ? chunks.join('') : ''
     return { exitCode, stdout, stderr: '', timedOut: false, exceededMaxBuffer: false, ...result }
   }
-  bindShell({ exec: exec as ExtensionAPI['shell']['exec'] })
+  bindShell({ exec: execRecording as ExtensionAPI['shell']['exec'] })
 }
 
 afterEach(() => {
