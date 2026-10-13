@@ -152,18 +152,18 @@ function sidesOf(t: Tile, horizontal: boolean): readonly [Tile, Tile] {
       ]
 }
 
+// On a tie the right-hand column wins; with no clear column, the preferred one.
 function nearestClearColumn(solid: boolean[][], row: number, preferred: number): number {
   const width = solid[row].length
   const clamped = Math.min(Math.max(preferred, 1), width - 2)
-  if (!solid[row][clamped]) return clamped
-  for (let offset = 1; offset < width; offset++) {
-    const right = clamped + offset
-    if (right <= width - 2 && !solid[row][right]) return right
-    const left = clamped - offset
-    if (left >= 1 && !solid[row][left]) return left
-  }
-  /* v8 ignore next -- a hall always has floor the perimeter fill leaves clear */
-  return clamped
+  const distance = (x: number): number => Math.abs(x - clamped)
+  return [...Array(width - 2).keys()]
+    .map((i) => i + 1)
+    .reduce(
+      (best, x) =>
+        !solid[row][x] && (solid[row][best] || distance(x) <= distance(best)) ? x : best,
+      clamped
+    )
 }
 
 /** @internal */

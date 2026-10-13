@@ -319,6 +319,11 @@ describe('stateWord', () => {
     expect(stateWord('running')).toBe('Working')
     expect(stateWord('waiting')).toBe('Queued')
   })
+
+  it('throws on a state a corrupted run graph file holds', () => {
+    const corrupted: NodeState = JSON.parse('"rebuilding"')
+    expect(() => stateWord(corrupted)).toThrow('unhandled node state: rebuilding')
+  })
 })
 
 // A callout 100 wide and 20 tall, whose level-0 bottom edge sits at y.

@@ -85,7 +85,6 @@ function sendToRest(world: World, nodeId: string): World {
       .map((c) => c.restSeat as number)
   )
   const seat = nearestRestSeat(world.map, tileOf(crew.x, crew.y), taken)
-  /* v8 ignore next -- a hall always has at least (crewed + 2) rest seats */
   if (seat === null) return world
   return withCrew(world, nodeId, (c) => ({
     ...c,
@@ -210,7 +209,6 @@ function applyNodeState(world: World, event: Extract<FactoryEvent, { kind: 'node
     case 'skipped':
     case 'blocked':
       return sendToRest(fed, event.nodeId)
-    /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = event.to
       throw new Error(`unhandled node state: ${String(never)}`)

@@ -180,7 +180,7 @@ async function attempt(
   work: () => Promise<void>,
   deps: WriteBackDeps
 ): Promise<WriteBackResult> {
-  for (let n = 1; n <= MAX_ATTEMPTS; n++) {
+  for (let n = 1; ; n++) {
     try {
       await work()
       await deps.record('writeback.ok', subject, done)
@@ -198,8 +198,6 @@ async function attempt(
       }
     }
   }
-  /* c8 ignore next */
-  return { write, ok: false, unsupported: false, reason: 'unreachable' }
 }
 
 function linkComment(order: WorkOrder, pulls: readonly { repo: string; url: string }[]): string {

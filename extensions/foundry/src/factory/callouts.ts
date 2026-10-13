@@ -346,7 +346,6 @@ export function stateWord(state: NodeState): string {
       return 'Blocked'
     case 'skipped':
       return 'Skipped'
-    /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = state
       throw new Error(`unhandled node state: ${String(never)}`)

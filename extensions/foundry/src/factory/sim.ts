@@ -237,7 +237,6 @@ function placementFor(map: HallMap, node: RunNode, taken: Set<number>): Placemen
     case 'skipped':
     case 'blocked': {
       const rest = nearestRestSeat(map, seat, taken)
-      /* v8 ignore next -- a hall always has at least (crewed + 2) rest seats */
       if (rest === null) return { tile: seat, anim: 'idle', ...WORKING }
       taken.add(rest.id)
       return {
@@ -248,7 +247,6 @@ function placementFor(map: HallMap, node: RunNode, taken: Set<number>): Placemen
         settle: rest.facing,
       }
     }
-    /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = node.state
       throw new Error(`unhandled node state: ${String(never)}`)
