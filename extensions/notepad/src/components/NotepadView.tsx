@@ -262,10 +262,7 @@ function useOpenNote(noteId: string | null, autosaveTimerRef: TimerRef, activeId
   }, [noteId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    return () => {
-      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
-      if (anchorTimerRef.current) clearTimeout(anchorTimerRef.current)
-    }
+    return () => clearTimers([autosaveTimerRef, anchorTimerRef])
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return loadedNoteId
@@ -326,6 +323,11 @@ async function readNoteBody(noteId: string, cachedBody: string | undefined) {
  * cached optimistically so navigating back never reads stale DB data, even if
  * this fire-and-forget flush races the next notes.get.
  */
+/** Stops the pending timers, as the view goes away. */
+function clearTimers(timers: TimerRef[]): void {
+  for (const timer of timers) if (timer.current) clearTimeout(timer.current)
+}
+
 function flushUnsavedNote(noteId: string, autosaveTimerRef: TimerRef): void {
   const { bodyDraft, isDirty } = useEditorStore.getState()
   if (autosaveTimerRef.current) {
