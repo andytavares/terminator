@@ -60,7 +60,7 @@ export function HomeScreen({ onOpenQuickActions }: HomeScreenProps = {}): JSX.El
   const [linking, setLinking] = useState<SessionFacts | null>(null)
 
   const groups = useMemo(
-    () => buildLedger(facts, prefs, { needsYou, text }, titles),
+    () => buildLedger(facts, prefs, { needsYou, text, titles }),
     [facts, prefs, needsYou, text, titles]
   )
   const logbook = useMemo(

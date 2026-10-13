@@ -442,13 +442,9 @@ export function UnifiedSidebar({
   const { groups, scratch, shown, total } = useMemo(
     () =>
       buildBranchRows(
-        sessionList,
-        allProjects,
-        workspaces,
+        { sessions: sessionList, projects: allProjects, workspaces, workItems: workItemsBySession },
         view,
-        rowsClock,
-        staleAfterMs,
-        workItemsBySession
+        { now: rowsClock, staleAfterMs }
       ),
     [sessionList, allProjects, workspaces, view, rowsClock, staleAfterMs, workItemsBySession]
   )
@@ -458,14 +454,10 @@ export function UnifiedSidebar({
   const viewCounts = useMemo(() => {
     const out: Record<string, number> = {}
     for (const v of views) {
-      out[v.id] = buildBranchRows(
-        sessionList,
-        allProjects,
-        workspaces,
-        v,
-        rowsClock,
-        staleAfterMs
-      ).shown
+      out[v.id] = buildBranchRows({ sessions: sessionList, projects: allProjects, workspaces }, v, {
+        now: rowsClock,
+        staleAfterMs,
+      }).shown
     }
     return out
   }, [views, sessionList, allProjects, workspaces, rowsClock, staleAfterMs])

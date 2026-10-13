@@ -68,15 +68,14 @@ export function headlineOf(
 export function suggestWorkItems(
   facts: SessionFacts,
   projectIssue: IssueSummary | null,
-  mine: readonly IssueSummary[],
-  limit = SUGGESTIONS
+  mine: readonly IssueSummary[]
 ): IssueSummary[] {
   const current = facts.workItem?.ref
   const id = (i: { tracker: string; key: string }) => `${i.tracker}:${i.key}`
   const seen = new Set(current ? [id(current)] : [])
   const out: IssueSummary[] = []
   for (const candidate of [...(projectIssue ? [projectIssue] : []), ...mine]) {
-    if (out.length === limit) break
+    if (out.length === SUGGESTIONS) break
     if (seen.has(id(candidate))) continue
     seen.add(id(candidate))
     out.push(candidate)

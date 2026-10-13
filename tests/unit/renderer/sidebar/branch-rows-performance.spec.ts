@@ -45,7 +45,10 @@ describe('rebuilding the branch list stays well inside budget', () => {
     (_name, view) => {
       const started = performance.now()
       for (let i = 0; i < 20; i++) {
-        buildBranchRows(sessions, projects, workspaces, view, NOW, STALE_AFTER)
+        buildBranchRows({ sessions, projects, workspaces }, view, {
+          now: NOW,
+          staleAfterMs: STALE_AFTER,
+        })
       }
       expect(performance.now() - started).toBeLessThan(100)
     }
@@ -60,7 +63,10 @@ describe('rebuilding the branch list stays well inside budget', () => {
       id: `big-${i}`,
     }))
     const started = performance.now()
-    buildBranchRows(many, projects, workspaces, BUILT_IN_VIEWS[0], NOW, STALE_AFTER)
+    buildBranchRows({ sessions: many, projects, workspaces }, BUILT_IN_VIEWS[0], {
+      now: NOW,
+      staleAfterMs: STALE_AFTER,
+    })
     expect(performance.now() - started).toBeLessThan(100)
   })
 })

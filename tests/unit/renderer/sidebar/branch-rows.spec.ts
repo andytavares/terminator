@@ -83,7 +83,10 @@ const view = (patch: Partial<SessionView> = {}): SessionView => ({
 })
 
 const build = (sessions: TerminalSession[], v: SessionView = view()) =>
-  buildBranchRows(sessions, PROJECTS, REPOS, v, NOW, STALE_AFTER)
+  buildBranchRows({ sessions, projects: PROJECTS, workspaces: REPOS }, v, {
+    now: NOW,
+    staleAfterMs: STALE_AFTER,
+  })
 
 const rowFor = (result: ReturnType<typeof build>, projectId: string) =>
   result.groups.flatMap((g) => g.branches).find((b) => b.projectId === projectId)
@@ -402,12 +405,9 @@ describe('buildBranchRows — order — sorts repos by their most severe branch 
 describe('buildBranchRows — order — orders repos by the workspace list, not by the order branches arrive in', () => {
   it('orders repos by the workspace list, not by the order branches arrive in', () => {
     const result = buildBranchRows(
-      [],
-      [branchless, feature, main],
-      [repoA, repoB],
+      { sessions: [], projects: [branchless, feature, main], workspaces: [repoA, repoB] },
       view({ sortBy: 'manual' }),
-      NOW,
-      STALE_AFTER
+      { now: NOW, staleAfterMs: STALE_AFTER }
     )
     expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
   })
@@ -425,7 +425,10 @@ describe('buildBranchRows — order — orders repos by the workspace list, not 
 const emptyRepo: Workspace = { ...repoA, id: 'ws-3', name: 'aardvark', folderPath: '/repos/aa' }
 
 const withEmpty = (v: SessionView = view()) =>
-  buildBranchRows([], PROJECTS, [repoA, repoB, emptyRepo], v, NOW, STALE_AFTER)
+  buildBranchRows({ sessions: [], projects: PROJECTS, workspaces: [repoA, repoB, emptyRepo] }, v, {
+    now: NOW,
+    staleAfterMs: STALE_AFTER,
+  })
 
 describe('buildBranchRows — repos with no branches', () => {
   it('lists an empty repo as a group of its own', () => {
@@ -465,15 +468,16 @@ describe('buildBranchRows — repos with no branches — does not invent a repo 
 
   it('ranks an empty repo as idle under a status sort', () => {
     const result = buildBranchRows(
-      [
-        session('a', 'p1', { agentState: 'awaiting-input' }),
-        session('b', 'p3', { agentState: 'exited' }),
-      ],
-      PROJECTS,
-      [repoA, repoB, emptyRepo],
+      {
+        sessions: [
+          session('a', 'p1', { agentState: 'awaiting-input' }),
+          session('b', 'p3', { agentState: 'exited' }),
+        ],
+        projects: PROJECTS,
+        workspaces: [repoA, repoB, emptyRepo],
+      },
       view({ sortBy: 'status' }),
-      NOW,
-      STALE_AFTER
+      { now: NOW, staleAfterMs: STALE_AFTER }
     )
     expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'aardvark', 'kalli'])
   })
@@ -507,7 +511,11 @@ describe('buildBranchRows — carries no change statistics — they belong to th
 
   it('drops a branch whose repo has gone', () => {
     const orphan: Project = { ...feature, id: 'p9', workspaceId: 'ws-gone' }
-    const result = buildBranchRows([], [...PROJECTS, orphan], REPOS, view(), NOW, STALE_AFTER)
+    const result = buildBranchRows(
+      { sessions: [], projects: [...PROJECTS, orphan], workspaces: REPOS },
+      view(),
+      { now: NOW, staleAfterMs: STALE_AFTER }
+    )
     const shown = result.groups.flatMap((g) => g.branches).map((b) => b.projectId)
     expect(shown.sort()).toEqual(['p1', 'p2', 'p3'])
   })
@@ -549,20 +557,25 @@ const item: WorkItem = { source: 'session', ref: { tracker: 'linear', key: 'ENG-
 describe('buildBranchRows — workItem', () => {
   it('threads a terminal work item from the map, keyed by session id', () => {
     const result = buildBranchRows(
-      [session('a', 'p1')],
-      PROJECTS,
-      REPOS,
+      {
+        sessions: [session('a', 'p1')],
+        projects: PROJECTS,
+        workspaces: REPOS,
+        workItems: new Map([['a', item]]),
+      },
       view(),
-      NOW,
-      STALE_AFTER,
-      new Map([['a', item]])
+      { now: NOW, staleAfterMs: STALE_AFTER }
     )
     const terminal = rowFor(result, 'p1')!.terminals[0]
     expect(terminal.workItem).toEqual(item)
   })
 
   it('is null for a session absent from the map', () => {
-    const result = buildBranchRows([session('a', 'p1')], PROJECTS, REPOS, view(), NOW, STALE_AFTER)
+    const result = buildBranchRows(
+      { sessions: [session('a', 'p1')], projects: PROJECTS, workspaces: REPOS },
+      view(),
+      { now: NOW, staleAfterMs: STALE_AFTER }
+    )
     expect(rowFor(result, 'p1')!.terminals[0].workItem).toBeNull()
   })
 })
@@ -571,16 +584,17 @@ describe('buildBranchRows — workItem — threads a pane work item independentl
   it('threads a pane work item independently of its root', () => {
     const rootItem: WorkItem = { source: 'project', ref: { tracker: 'linear', key: 'ENG-2' } }
     const result = buildBranchRows(
-      [session('a', 'p1'), session('b', 'p1', { parentSessionId: 'a' })],
-      PROJECTS,
-      REPOS,
+      {
+        sessions: [session('a', 'p1'), session('b', 'p1', { parentSessionId: 'a' })],
+        projects: PROJECTS,
+        workspaces: REPOS,
+        workItems: new Map([
+          ['a', rootItem],
+          ['b', item],
+        ]),
+      },
       view(),
-      NOW,
-      STALE_AFTER,
-      new Map([
-        ['a', rootItem],
-        ['b', item],
-      ])
+      { now: NOW, staleAfterMs: STALE_AFTER }
     )
     const root = rowFor(result, 'p1')!.terminals[0]
     expect(root.workItem).toEqual(rootItem)

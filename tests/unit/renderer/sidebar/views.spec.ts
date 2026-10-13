@@ -86,7 +86,10 @@ const projects = ['working', 'waiting', 'idle', 'quiet'].map(branch)
 
 const shownBy = (id: string): string[] => {
   const view = BUILT_IN_VIEWS.find((v) => v.id === id)!
-  const { groups } = buildBranchRows(sessions, projects, [repo], view, NOW, STALE_AFTER)
+  const { groups } = buildBranchRows({ sessions, projects, workspaces: [repo] }, view, {
+    now: NOW,
+    staleAfterMs: STALE_AFTER,
+  })
   return groups.flatMap((g) => g.branches.map((b) => b.projectId)).sort()
 }
 
