@@ -25,6 +25,10 @@ describe('parseHookReport', () => {
     expect(parseHookReport(payload)).toBeNull()
   })
 
+  it('refuses a report that does not name its agent', () => {
+    expect(parseHookReport({ ...FULL, provider: undefined })).toBeNull()
+  })
+
   it('refuses an agent whose conversations this cannot resume', () => {
     expect(parseHookReport({ ...FULL, provider: 'some-other-agent' })).toBeNull()
   })
@@ -39,6 +43,10 @@ describe('parseHookReport', () => {
 
   it('records a source it does not recognise rather than refusing the report', () => {
     expect(parseHookReport({ ...FULL, source: 'clear' })?.source).toBe('clear')
+  })
+
+  it('calls a source the hook left out unknown', () => {
+    expect(parseHookReport({ ...FULL, source: undefined })?.source).toBe('unknown')
   })
 
   it('stamps a report that arrived without a time', () => {

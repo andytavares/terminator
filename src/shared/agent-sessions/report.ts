@@ -28,23 +28,27 @@ const text = (value: unknown): string | null =>
 export function parseHookReport(value: unknown): HookReport | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
   const raw = value as Record<string, unknown>
+  const where = conversationLocation(raw)
+  const provider = text(raw.provider)
+  if (where === null || provider === null || !PROVIDERS.includes(provider)) return null
 
+  return {
+    ...where,
+    provider: provider as AgentProvider,
+    source: text(raw.source) ?? 'unknown',
+    at: text(raw.at) ?? new Date().toISOString(),
+  }
+}
+
+type ConversationLocation = Pick<HookReport, 'terminal' | 'sessionId' | 'transcriptPath' | 'cwd'>
+
+/** The four fields that place a conversation, or null when any is missing. */
+function conversationLocation(raw: Record<string, unknown>): ConversationLocation | null {
   const terminal = text(raw.terminal)
   const sessionId = text(raw.sessionId)
   const transcriptPath = text(raw.transcriptPath)
   const cwd = text(raw.cwd)
-  const provider = text(raw.provider)
   if (terminal === null || sessionId === null || transcriptPath === null || cwd === null)
     return null
-  if (provider === null || !PROVIDERS.includes(provider)) return null
-
-  return {
-    terminal,
-    provider: provider as AgentProvider,
-    sessionId,
-    transcriptPath,
-    cwd,
-    source: text(raw.source) ?? 'unknown',
-    at: text(raw.at) ?? new Date().toISOString(),
-  }
+  return { terminal, sessionId, transcriptPath, cwd }
 }
