@@ -350,415 +350,507 @@ function recordFailureOf(deps: RunDeps, order: WorkOrder, run: Promise<void>): v
 }
 
 export function createRunChannels(deps: RunDeps): RunChannels {
-  const isLive: SessionLiveness = deps.isLive
-
-  /**
-   * The nodes nothing is running, for one order.
-   *
-   * Empty while an executor in this process is driving the order, because a
-   * node marked `running` before its agent has reported a session is
-   * indistinguishable from one whose agent is gone — and only one of those is
-   * safe to restart.
-   */
-  function orphansOf(orderId: string, graph: RunGraph): string[] {
-    if (deps.executing(orderId)) return []
-    return orphanedNodes(graph, isLive).map((node) => node.id)
+  return {
+    start: (payload) => start(deps, payload),
+    resume: (payload) => resume(deps, payload),
+    observe: (payload) => observe(deps, payload),
+    recipes: (payload) => recipes(deps, payload),
+    attach: (payload) => attach(deps, payload),
+    activity: (payload) => activity(deps, payload),
+    timeline: (payload) => timeline(deps, payload),
   }
+}
 
-  async function saveGraph(graph: RunGraph): Promise<void> {
-    await writeRunGraph(deps.dataRoot(), graph, deps.index?.(deps.dataRoot()))
-  }
+/**
+ * The nodes nothing is running, for one order.
+ *
+ * Empty while an executor in this process is driving the order, because a
+ * node marked `running` before its agent has reported a session is
+ * indistinguishable from one whose agent is gone — and only one of those is
+ * safe to restart.
+ */
+function orphansOf(deps: RunDeps, orderId: string, graph: RunGraph): string[] {
+  if (deps.executing(orderId)) return []
+  return orphanedNodes(graph, deps.isLive).map((node) => node.id)
+}
 
-  async function loadGraph(orderId: string): Promise<RunGraph | null> {
-    return readRunGraph(deps.dataRoot(), orderId, deps.index?.(deps.dataRoot()))
-  }
+async function saveGraph(deps: RunDeps, graph: RunGraph): Promise<void> {
+  await writeRunGraph(deps.dataRoot(), graph, deps.index?.(deps.dataRoot()))
+}
 
-  async function start(payload: z.infer<typeof StartPayload>): Promise<unknown> {
-    const order = await deps.store.load(payload.id)
-    if (order === null) return { error: `No order ${payload.id}.` }
-    if (order.status !== 'agreed') {
-      return {
-        error: `Only an agreed order can be started; this one is ${order.status}.`,
-      }
+async function loadGraph(deps: RunDeps, orderId: string): Promise<RunGraph | null> {
+  return readRunGraph(deps.dataRoot(), orderId, deps.index?.(deps.dataRoot()))
+}
+
+async function start(deps: RunDeps, payload: z.infer<typeof StartPayload>): Promise<unknown> {
+  const order = await deps.store.load(payload.id)
+  if (order === null) return { error: `No order ${payload.id}.` }
+  if (order.status !== 'agreed') {
+    return {
+      error: `Only an agreed order can be started; this one is ${order.status}.`,
     }
+  }
 
-    const writable = await ensureWritable(deps.dataRoot())
-    if (!writable.ok) return { error: writable.reason }
+  const writable = await ensureWritable(deps.dataRoot())
+  if (!writable.ok) return { error: writable.reason }
 
-    const chosenByOperator = payload.recipe !== undefined
-    // An operator's choice is honoured or refused, never quietly swapped. A
-    // *proposal* walks its own ladder instead: proposing a shape this
-    // repository cannot run would refuse the run over a decision nobody made.
-    const ladder = chosenByOperator
-      ? [{ name: payload.recipe as string, why: 'chosen by the operator' }]
+  const chosenByOperator = payload.recipe !== undefined
+  // An operator's choice is honoured or refused, never quietly swapped. A
+  // *proposal* walks its own ladder instead: proposing a shape this
+  // repository cannot run would refuse the run over a decision nobody made.
+  const ladder =
+    payload.recipe !== undefined
+      ? [{ name: payload.recipe, why: 'chosen by the operator' }]
       : recipeLadder(order)
 
-    const fitted = fitRecipe(ladder, order, deps.sources())
-    if ('error' in fitted) return { error: fitted.error }
-    const { proposal, fitted: recipe } = fitted
-    const name = proposal.name
+  const fitted = fitRecipe(ladder, order, deps.sources())
+  if ('error' in fitted) return { error: fitted.error }
+  const recipe = fitted.fitted.value
+  const graph = buildRunGraph(order, recipe)
 
-    const graph = buildRunGraph(order, recipe.value)
+  const unknownSkill = unknownSkillIn(deps, recipe, graph)
+  if (unknownSkill !== null) return { error: unknownSkill }
 
-    // Every node's skills, resolved before anything is cut. An unknown one
-    // discovered mid-run has already spent agent time on a node that was
-    // going to fail the moment its agent tried to read a directory nobody
-    // mounted; refusing here costs nothing.
-    const roleRegistry = createRoleRegistry(deps.sources())
-    for (const node of graph.nodes) {
-      const ids = skillsFor(recipe.value, node, roleRegistry)
-      if (ids.length === 0) continue
-      const { unknown } = resolveSkills(ids, deps.sources())
-      if (unknown.length === 0) continue
-      const missing = unknown[0]
-      const role = node.role === null ? null : roleRegistry.get(node.role)
-      const declaredBy = role !== null && role.skills.includes(missing) ? node.role : node.stepId
-      return {
-        error: `Unknown skill "${missing}" (declared by ${declaredBy}). Add it under ${deps.dataRoot()}/skills/${missing}/SKILL.md or remove it.`,
-      }
-    }
+  await saveGraph(deps, graph)
+  const running = await markRunning(deps, order, { ...fitted, chosenByOperator })
 
-    await saveGraph(graph)
+  // Not awaited: a run outlives the call that started it, and a channel that
+  // blocked until the last agent finished would hold the bridge for the
+  // length of the work. Failures reach the ledger and the graph, which is
+  // where a surface reads them.
+  recordFailureOf(deps, running, deps.execute(running, recipe, graph))
 
-    const running: WorkOrder = {
-      ...order,
-      status: 'running',
-      recipe: name,
-      recipeOverriddenBy: chosenByOperator ? 'operator' : null,
-    }
-    await deps.store.save(running)
-    await deps.store.record({
-      at: deps.now(),
-      orderId: order.id,
-      actor: chosenByOperator ? 'operator' : 'role:architect',
-      action: 'run.started',
-      subject: name,
-      // Both halves of "why this shape": the grounds for choosing it, and
-      // which rung it was read from. Either alone leaves a surprising run
-      // unexplained — the first says why this shape, the second says why this
-      // version of it.
-      reason: `${
-        chosenByOperator ? 'chosen by the operator' : proposal.why
-      }; recipe resolved from ${recipe.rung}`,
-      evidence: [],
+  return { graph, order: running, started: true }
+}
+
+/**
+ * The first skill a node declares that resolves nowhere, said as the refusal.
+ *
+ * Every node's skills, resolved before anything is cut. An unknown one
+ * discovered mid-run has already spent agent time on a node that was
+ * going to fail the moment its agent tried to read a directory nobody
+ * mounted; refusing here costs nothing.
+ */
+function unknownSkillIn(deps: RunDeps, recipe: Recipe, graph: RunGraph): string | null {
+  const roleRegistry = createRoleRegistry(deps.sources())
+  for (const node of graph.nodes) {
+    const ids = skillsFor(recipe, node, roleRegistry)
+    if (ids.length === 0) continue
+    const { unknown } = resolveSkills(ids, deps.sources())
+    if (unknown.length === 0) continue
+    const missing = unknown[0]
+    const role = node.role === null ? null : roleRegistry.get(node.role)
+    const declaredBy = role !== null && role.skills.includes(missing) ? node.role : node.stepId
+    return `Unknown skill "${missing}" (declared by ${declaredBy}). Add it under ${deps.dataRoot()}/skills/${missing}/SKILL.md or remove it.`
+  }
+  return null
+}
+
+/** The shape a run starts on, and whether the operator chose it. */
+interface StartedShape {
+  readonly proposal: ProposedRecipe
+  readonly fitted: Resolved<Recipe>
+  readonly chosenByOperator: boolean
+}
+
+/** The order marked running on the shape it starts on, with the ledger line that says why. */
+async function markRunning(
+  deps: RunDeps,
+  order: WorkOrder,
+  { proposal, fitted, chosenByOperator }: StartedShape
+): Promise<WorkOrder> {
+  const running: WorkOrder = {
+    ...order,
+    status: 'running',
+    recipe: proposal.name,
+    recipeOverriddenBy: chosenByOperator ? 'operator' : null,
+  }
+  await deps.store.save(running)
+  await deps.store.record({
+    at: deps.now(),
+    orderId: order.id,
+    actor: chosenByOperator ? 'operator' : 'role:architect',
+    action: 'run.started',
+    subject: proposal.name,
+    // Both halves of "why this shape": the grounds for choosing it, and
+    // which rung it was read from. Either alone leaves a surprising run
+    // unexplained — the first says why this shape, the second says why this
+    // version of it.
+    reason: `${
+      chosenByOperator ? 'chosen by the operator' : proposal.why
+    }; recipe resolved from ${fitted.rung}`,
+    evidence: [],
+  })
+  return running
+}
+
+async function observe(deps: RunDeps, payload: z.infer<typeof ObservePayload>): Promise<unknown> {
+  const { id } = payload
+  const graph = await loadGraph(deps, id)
+  if (graph === null) return { error: `No run for ${id}.` }
+
+  const order = await deps.store.load(id)
+  const budgets = order?.budgets ?? { agents: 3, wallClockMinutes: 45, tokens: null }
+
+  // What each node is called, worked out where the order is in hand rather
+  // than in the surface, so the chips and the blocked sentences agree.
+  const labels = nodeLabels(order, graph)
+  const orphaned = orphansOf(deps, id, graph)
+  const gates = await deps.gatesFor(id)
+
+  return {
+    graph,
+    labels,
+    skills: nodeSkills(deps, order, graph),
+    // The draft's CI, read from the ship tail's own file rather than
+    // re-derived here — a surface that only wants "where does CI stand"
+    // reads one small file instead of walking nodes and feedback.
+    ci: await readCiState(deps.dataRoot(), id),
+    pulls: await observedPulls(deps, id),
+    source: ticketOf(order),
+    // What the operator called it. The surface's heading was the order id
+    // and the recipe name — two identifiers nobody chose — so the screen
+    // showing a run never said which piece of work it was.
+    title: order?.title ?? null,
+    standing: await observedStanding(deps, { id, order, graph, gates, orphaned }),
+    // The agents waiting at a terminal prompt, so the band can offer the one
+    // move that answers a handed-back call: going to that terminal.
+    stranded: deps.strandedSessions(id),
+    // The gates holding it, in full. A band that says "halted at a gate" and
+    // cannot offer the gate's own options is the wall this replaces.
+    waiting: gates.filter((gate) => gate.decision === null),
+    // What the graph calls running and nothing is actually running. A
+    // surface that cannot tell those apart shows a dead run as a busy one,
+    // which is how an interrupted run went unnoticed for hours.
+    orphaned,
+    ready: readyNodes(graph, budgets).map((n) => n.id),
+    blocked: blockedNodes(graph, labels),
+    lanes: order === null ? [] : laneRows(order),
+    // Where this order stands in the refinery's file-overlap queue. Null
+    // when it is not in one — nothing else agreed against the same repo and
+    // base touches the same files.
+    queue: await queuePositionFor(deps, id),
+  }
+}
+
+/**
+ * Every node's skills, resolved the way `start` resolves them.
+ *
+ * An order whose recipe no longer resolves — removed from disk after the run
+ * began — has nothing to report rather than a thrown surface.
+ */
+function nodeSkills(
+  deps: RunDeps,
+  order: WorkOrder | null,
+  graph: RunGraph
+): Record<string, string[]> {
+  const skills: Record<string, string[]> = {}
+  if (order?.recipe === null || order?.recipe === undefined) return skills
+  const resolved = resolveRecipe(order.recipe, deps.sources())
+  if (!resolved.ok) return skills
+  const roleRegistry = createRoleRegistry(deps.sources())
+  for (const node of graph.nodes) {
+    const ids = skillsFor(resolved.resolved.value, node, roleRegistry)
+    if (ids.length > 0) skills[node.id] = ids
+  }
+  return skills
+}
+
+/**
+ * Where the pull requests are, so the Floor can link them. `cwd` is the
+ * checkout a review opens against.
+ */
+async function observedPulls(deps: RunDeps, orderId: string) {
+  const pulls = await readPulls(deps.dataRoot(), orderId)
+  return pulls.map((pull) => ({
+    repo: pull.repo,
+    url: pull.url,
+    number: pullNumber(pull.url),
+    cwd: pull.cwd,
+  }))
+}
+
+/** The ticket the order came from, so the Floor can link it. */
+function ticketOf(order: WorkOrder | null): { key: string; url: string } | null {
+  return order?.source.key != null && order.source.url != null
+    ? { key: order.source.key, url: order.source.url }
+    : null
+}
+
+/** What `observe` already holds about a run, handed to `readStanding` as it is. */
+interface ObservedRun {
+  readonly id: string
+  readonly order: WorkOrder | null
+  readonly graph: RunGraph
+  readonly gates: readonly Gate[]
+  readonly orphaned: string[]
+}
+
+/**
+ * Where this order stands, and whose move it is, decided once here rather
+ * than five times over in five surfaces from whatever each of them happened
+ * to hold.
+ *
+ * Through `readStanding` with what is already in hand rather than a second
+ * assembly of the same inputs: two callers assembling them separately is how
+ * the order list and this surface came to describe one halted run as "ready
+ * to hand off" and "building" at once.
+ */
+function observedStanding(deps: RunDeps, { id, order, graph, gates, orphaned }: ObservedRun) {
+  return readStanding(order ?? ({ id, status: 'running' } as WorkOrder), {
+    graphFor: async () => graph,
+    gatesFor: async () => gates,
+    asksFor: deps.asksFor,
+    stallsFor: deps.stallsFor,
+    strandedFor: deps.strandedFor,
+    orphansFor: () => orphaned,
+    runFailureFor: async (orderId) => runFailure(await deps.store.entries(orderId)),
+    documentReadyFor: async (orderId) => runDocumentReady(await deps.store.entries(orderId)),
+  })
+}
+
+/** Each node that cannot start, with the sentence that says why. */
+function blockedNodes(
+  graph: RunGraph,
+  labels: Record<string, string>
+): { id: string; reason: string | null }[] {
+  const name = (id: string): string => labels[id] ?? id
+  return graph.nodes
+    .map((n) => ({ id: n.id, reason: blockedReason(graph, n.id, name) }))
+    .filter((b) => b.reason !== null)
+}
+
+/**
+ * What each lane is, what it shares, and what it is waiting for. One
+ * unremarkable row for a single-repository order — the surface decides not
+ * to draw it.
+ */
+function laneRows(order: WorkOrder) {
+  return laneViews(order).map((view) => ({
+    ord: view.lane.ord,
+    repo: view.lane.repo,
+    role: view.lane.role,
+    collisions: view.collisions,
+    blockedBy: view.blockedBy,
+    // Said as a sentence here rather than reassembled in the view,
+    // so the reason the operator reads is the reason the rule gave.
+    hold: mayMergeLane(order, view.lane.ord, []).reason,
+  }))
+}
+
+/**
+ * Pick a halted run back up.
+ *
+ * The graph on disk is the run's state, so resuming is re-entering the
+ * executor over it — there is no second notion of "where it got to" that
+ * could disagree. A node the operator sent back is retried; everything else
+ * carries on from where the wave stopped.
+ *
+ * Idempotent against a run that is already going: `execute` starts only what
+ * the scheduler offers, and a running node is not offered.
+ */
+async function resume(deps: RunDeps, payload: z.infer<typeof ObservePayload>): Promise<unknown> {
+  const order = await deps.store.load(payload.id)
+  if (order === null) return { error: `No order ${payload.id}.` }
+  if (order.status !== 'running') {
+    return { error: `Only a running order can be resumed; this one is ${order.status}.` }
+  }
+  // An executor already going for this order needs no second one — the
+  // scheduler it is already inside offers the same nodes this call would.
+  // Starting another produced `run.halted: waiting on a gate` three times
+  // in 23 seconds on WO-0927-4fd.
+  if (deps.executing(order.id)) {
+    return { error: 'This run is already going; nothing to resume.' }
+  }
+
+  const graph = await loadGraph(deps, payload.id)
+  if (graph === null) return { error: `No run for ${payload.id}.` }
+  if (order.recipe === null) return { error: `${order.id} has no recipe to resume.` }
+
+  const resolved = resolveRecipe(order.recipe, deps.sources())
+  if (!resolved.ok) return { error: resolved.reason }
+
+  const taken = await reclaimOrphans(deps, order.id, graph)
+
+  // Anything the operator sent back is offered again. Without this a failed
+  // node stays failed and the resumed run has nothing to do — which reads
+  // as "it finished" rather than "it never restarted".
+  const retried = (payload.retry ?? []).reduce((g, id) => retryNode(g, id), taken.graph)
+  await saveGraph(deps, retried)
+
+  // Clears any failure the previous attempt left in the ledger: without
+  // this, a resumed run that goes on to succeed still reads `stopped` from
+  // the attempt before it, because `runFailure` has nothing newer to stop
+  // its backward scan on.
+  await recordLine(deps, order.id, { action: 'run.resumed', reason: 'picked up by the operator' })
+  recordFailureOf(deps, order, deps.execute(order, resolved.resolved.value, retried))
+  return { graph: retried, reclaimed: taken.reclaimed, started: true }
+}
+
+/**
+ * Whatever was left mid-flight by an application that closed, back in the queue.
+ *
+ * Without this the scheduler has nothing to offer — it offers only `waiting`
+ * and `ready` — so a resumed run started nothing and said nothing, which
+ * reads exactly like a run that had finished.
+ */
+async function reclaimOrphans(
+  deps: RunDeps,
+  orderId: string,
+  graph: RunGraph
+): Promise<ReturnType<typeof reclaim>> {
+  const taken = reclaim(graph, deps.isLive)
+  if (taken.reclaimed.length > 0) {
+    await recordLine(deps, orderId, {
+      action: 'run.reclaimed',
+      reason: `${taken.reclaimed.join(', ')} had no agent left and were put back in the queue`,
     })
-
-    // Not awaited: a run outlives the call that started it, and a channel that
-    // blocked until the last agent finished would hold the bridge for the
-    // length of the work. Failures reach the ledger and the graph, which is
-    // where a surface reads them.
-    recordFailureOf(deps, running, deps.execute(running, recipe.value, graph))
-
-    return { graph, order: running, started: true }
   }
+  return taken
+}
 
-  async function observe(payload: z.infer<typeof ObservePayload>): Promise<unknown> {
-    const graph = await loadGraph(payload.id)
-    if (graph === null) return { error: `No run for ${payload.id}.` }
+/** A line the Line itself writes about an order's run. */
+function recordLine(
+  deps: RunDeps,
+  orderId: string,
+  { action, reason }: { action: string; reason: string }
+): Promise<void> {
+  return deps.store.record({
+    at: deps.now(),
+    orderId,
+    actor: 'rule:line',
+    action,
+    subject: orderId,
+    reason,
+    evidence: [],
+  })
+}
 
-    const order = await deps.store.load(payload.id)
-    const budgets = order?.budgets ?? {
-      agents: 3,
-      wallClockMinutes: 45,
-      tokens: null,
-    }
+async function recipes(deps: RunDeps, payload: z.infer<typeof ObservePayload>): Promise<unknown> {
+  const order = await deps.store.load(payload.id)
+  if (order === null) return { error: `No order ${payload.id}.` }
 
-    // What each node is called, worked out where the order is in hand rather
-    // than in the surface, so the chips and the blocked sentences agree.
-    const labels = nodeLabels(order, graph)
-    const name = (id: string): string => labels[id] ?? id
-
-    const orphaned = orphansOf(payload.id, graph)
-    const gates = await deps.gatesFor(payload.id)
-    const waiting = gates.filter((gate) => gate.decision === null)
-
-    // Every node's skills, resolved the way `start` resolves them. An order
-    // whose recipe no longer resolves — removed from disk after the run
-    // began — has nothing to report rather than a thrown surface.
-    const skills: Record<string, string[]> = {}
-    if (order?.recipe !== null && order?.recipe !== undefined) {
-      const resolved = resolveRecipe(order.recipe, deps.sources())
-      if (resolved.ok) {
-        const roleRegistry = createRoleRegistry(deps.sources())
-        for (const node of graph.nodes) {
-          const ids = skillsFor(resolved.resolved.value, node, roleRegistry)
-          if (ids.length > 0) skills[node.id] = ids
-        }
-      }
-    }
-
+  const offered = availableNames('recipes', deps.sources()).map((name) => {
+    const resolved = resolveRecipe(name, deps.sources())
+    if (!resolved.ok) return { name, available: false, unmet: [resolved.reason], rung: null }
+    const availability = checkRequirements(resolved.resolved.value.requires, order)
     return {
-      graph,
-      labels,
-      skills,
-      // The draft's CI, read from the ship tail's own file rather than
-      // re-derived here — a surface that only wants "where does CI stand"
-      // reads one small file instead of walking nodes and feedback.
-      ci: await readCiState(deps.dataRoot(), payload.id),
-      // Where the pull requests are, and the ticket the order came from, so the
-      // Floor can link both. `cwd` is the checkout a review opens against.
-      pulls: (await readPulls(deps.dataRoot(), payload.id)).map((pull) => ({
-        repo: pull.repo,
-        url: pull.url,
-        number: pullNumber(pull.url),
-        cwd: pull.cwd,
-      })),
-      source:
-        order?.source.key != null && order.source.url != null
-          ? { key: order.source.key, url: order.source.url }
-          : null,
-      // What the operator called it. The surface's heading was the order id
-      // and the recipe name — two identifiers nobody chose — so the screen
-      // showing a run never said which piece of work it was.
-      title: order?.title ?? null,
-      // Where this order stands, and whose move it is, decided once here
-      // rather than five times over in five surfaces from whatever each of
-      // them happened to hold.
-      // Through `readStanding` with what is already in hand rather than a
-      // second assembly of the same inputs: two callers assembling them
-      // separately is how the order list and this surface came to describe
-      // one halted run as "ready to hand off" and "building" at once.
-      standing: await readStanding(order ?? ({ id: payload.id, status: 'running' } as WorkOrder), {
-        graphFor: async () => graph,
-        gatesFor: async () => gates,
-        asksFor: deps.asksFor,
-        stallsFor: deps.stallsFor,
-        strandedFor: deps.strandedFor,
-        orphansFor: () => orphaned,
-        runFailureFor: async (id) => runFailure(await deps.store.entries(id)),
-        documentReadyFor: async (id) => runDocumentReady(await deps.store.entries(id)),
-      }),
-      // The agents waiting at a terminal prompt, so the band can offer the one
-      // move that answers a handed-back call: going to that terminal.
-      stranded: deps.strandedSessions(payload.id),
-      // The gates holding it, in full. A band that says "halted at a gate" and
-      // cannot offer the gate's own options is the wall this replaces.
-      waiting,
-      // What the graph calls running and nothing is actually running. A
-      // surface that cannot tell those apart shows a dead run as a busy one,
-      // which is how an interrupted run went unnoticed for hours.
-      orphaned,
-      ready: readyNodes(graph, budgets).map((n) => n.id),
-      blocked: graph.nodes
-        .map((n) => ({ id: n.id, reason: blockedReason(graph, n.id, name) }))
-        .filter((b) => b.reason !== null),
-      // What each lane is, what it shares, and what it is waiting for. Empty
-      // for an order with nothing agreed yet, and one unremarkable row for a
-      // single-repository order — the surface decides not to draw it.
-      lanes:
-        order === null
-          ? []
-          : laneViews(order).map((view) => ({
-              ord: view.lane.ord,
-              repo: view.lane.repo,
-              role: view.lane.role,
-              collisions: view.collisions,
-              blockedBy: view.blockedBy,
-              // Said as a sentence here rather than reassembled in the view,
-              // so the reason the operator reads is the reason the rule gave.
-              hold: mayMergeLane(order, view.lane.ord, []).reason,
-            })),
-      // Where this order stands in the refinery's file-overlap queue. Null
-      // when it is not in one — nothing else agreed against the same repo and
-      // base touches the same files.
-      queue: await queuePositionFor(deps, payload.id),
+      name,
+      available: availability.available,
+      unmet: availability.unmet,
+      rung: resolved.resolved.rung,
+      description: resolved.resolved.value.description,
     }
+  })
+
+  // The same walk `start` does, so the shape the surface shows is the shape
+  // that would run — but over the order's own statement of itself, with the
+  // operator's pick set aside: `proposed` is "what the ladder would choose",
+  // not "what is already chosen", or overriding one recipe with another
+  // would say it was the ladder's idea.
+  const forProposal: WorkOrder = { ...order, recipe: null }
+  const fitted = fitRecipe(recipeLadder(forProposal), forProposal, deps.sources())
+  const proposal = 'error' in fitted ? proposeRecipe(forProposal) : fitted.proposal
+
+  // When the operator actually chose one, and when — `null` for both while
+  // they have not, or while their only "choice" was clearing it back to the
+  // proposal (`recipe.chosen` records that too, with reason "the proposal").
+  const entries = await deps.store.entries(order.id)
+  const chosenEntry = [...entries]
+    .reverse()
+    .find((entry) => entry.action === 'recipe.chosen' && entry.reason !== 'the proposal')
+
+  return {
+    recipes: offered,
+    proposed: proposal.name,
+    proposedWhy: proposal.why,
+    chosen: order.recipe,
+    chosenAt: chosenEntry?.at ?? null,
   }
+}
 
-  /**
-   * Pick a halted run back up.
-   *
-   * The graph on disk is the run's state, so resuming is re-entering the
-   * executor over it — there is no second notion of "where it got to" that
-   * could disagree. A node the operator sent back is retried; everything else
-   * carries on from where the wave stopped.
-   *
-   * Idempotent against a run that is already going: `execute` starts only what
-   * the scheduler offers, and a running node is not offered.
-   */
-  async function resume(payload: z.infer<typeof ObservePayload>): Promise<unknown> {
-    const order = await deps.store.load(payload.id)
-    if (order === null) return { error: `No order ${payload.id}.` }
-    if (order.status !== 'running') {
-      return { error: `Only a running order can be resumed; this one is ${order.status}.` }
-    }
-    // An executor already going for this order needs no second one — the
-    // scheduler it is already inside offers the same nodes this call would.
-    // Starting another produced `run.halted: waiting on a gate` three times
-    // in 23 seconds on WO-0927-4fd.
-    if (deps.executing(order.id)) {
-      return { error: 'This run is already going; nothing to resume.' }
-    }
+/**
+ * Where the agent actually is.
+ *
+ * The backstop: however good the structured view gets, there are moments
+ * when the only useful thing is to be in the session typing at it. One
+ * action, from any surface.
+ */
+async function attach(deps: RunDeps, payload: z.infer<typeof AttachPayload>): Promise<unknown> {
+  const graph = await loadGraph(deps, payload.orderId)
+  if (graph === null) return { error: `No run for ${payload.orderId}.` }
 
-    const graph = await loadGraph(payload.id)
-    if (graph === null) return { error: `No run for ${payload.id}.` }
-    if (order.recipe === null) return { error: `${order.id} has no recipe to resume.` }
-
-    const resolved = resolveRecipe(order.recipe, deps.sources())
-    if (!resolved.ok) return { error: resolved.reason }
-
-    // Whatever was left mid-flight by an application that closed comes back
-    // first. Without this the scheduler has nothing to offer — it offers only
-    // `waiting` and `ready` — so a resumed run started nothing and said
-    // nothing, which reads exactly like a run that had finished.
-    const taken = reclaim(graph, isLive)
-    if (taken.reclaimed.length > 0) {
-      await deps.store.record({
-        at: deps.now(),
-        orderId: order.id,
-        actor: 'rule:line',
-        action: 'run.reclaimed',
-        subject: order.id,
-        reason: `${taken.reclaimed.join(', ')} had no agent left and were put back in the queue`,
-        evidence: [],
-      })
-    }
-
-    // Anything the operator sent back is offered again. Without this a failed
-    // node stays failed and the resumed run has nothing to do — which reads
-    // as "it finished" rather than "it never restarted".
-    const retried = (payload.retry ?? []).reduce((g, id) => retryNode(g, id), taken.graph)
-    await saveGraph(retried)
-
-    // Clears any failure the previous attempt left in the ledger: without
-    // this, a resumed run that goes on to succeed still reads `stopped` from
-    // the attempt before it, because `runFailure` has nothing newer to stop
-    // its backward scan on.
-    await deps.store.record({
-      at: deps.now(),
-      orderId: order.id,
-      actor: 'rule:line',
-      action: 'run.resumed',
-      subject: order.id,
-      reason: 'picked up by the operator',
-      evidence: [],
-    })
-    recordFailureOf(deps, order, deps.execute(order, resolved.resolved.value, retried))
-    return { graph: retried, reclaimed: taken.reclaimed, started: true }
+  const node = graph.nodes.find((n) => n.id === payload.nodeId)
+  if (node === undefined) return { error: `No step ${payload.nodeId}.` }
+  const step = nodeLabel(await deps.store.load(payload.orderId), node)
+  // A step that never has an agent, said as such rather than as "no session
+  // yet", which promises one is coming.
+  if (AUTOMATIC_KINDS.includes(node.kind)) {
+    return { error: `${step} is an automatic step with no agent.` }
   }
-
-  async function recipes(payload: z.infer<typeof ObservePayload>): Promise<unknown> {
-    const order = await deps.store.load(payload.id)
-    if (order === null) return { error: `No order ${payload.id}.` }
-
-    const offered = availableNames('recipes', deps.sources()).map((name) => {
-      const resolved = resolveRecipe(name, deps.sources())
-      if (!resolved.ok) return { name, available: false, unmet: [resolved.reason], rung: null }
-      const availability = checkRequirements(resolved.resolved.value.requires, order)
-      return {
-        name,
-        available: availability.available,
-        unmet: availability.unmet,
-        rung: resolved.resolved.rung,
-        description: resolved.resolved.value.description,
-      }
-    })
-
-    // The same walk `start` does, so the shape the surface shows is the shape
-    // that would run — but over the order's own statement of itself, with the
-    // operator's pick set aside: `proposed` is "what the ladder would choose",
-    // not "what is already chosen", or overriding one recipe with another
-    // would say it was the ladder's idea.
-    const forProposal: WorkOrder = { ...order, recipe: null }
-    const fitted = fitRecipe(recipeLadder(forProposal), forProposal, deps.sources())
-    const proposal = 'error' in fitted ? proposeRecipe(forProposal) : fitted.proposal
-
-    // When the operator actually chose one, and when — `null` for both while
-    // they have not, or while their only "choice" was clearing it back to the
-    // proposal (`recipe.chosen` records that too, with reason "the proposal").
-    const entries = await deps.store.entries(order.id)
-    const chosenEntry = [...entries]
-      .reverse()
-      .find((entry) => entry.action === 'recipe.chosen' && entry.reason !== 'the proposal')
-
+  const finished = finishedAgent(step, node)
+  if (finished !== null) return { error: finished }
+  if (node.sessionId === null) {
+    return { error: `${node.id} has no session yet — it is ${node.state}.` }
+  }
+  // A session id outlives the process that ran it, so handing one back
+  // unchecked sent the operator to a terminal that no longer exists.
+  if (!deps.isLive(node.sessionId) && !deps.executing(payload.orderId)) {
     return {
-      recipes: offered,
-      proposed: proposal.name,
-      proposedWhy: proposal.why,
-      chosen: order.recipe,
-      chosenAt: chosenEntry?.at ?? null,
+      error: `${node.id} has no live agent — its session ended when the application last closed. Resume the run to start it again.`,
     }
   }
+  return { terminalSessionId: node.sessionId, nodeId: node.id }
+}
 
-  /**
-   * Where the agent actually is.
-   *
-   * The backstop: however good the structured view gets, there are moments
-   * when the only useful thing is to be in the session typing at it. One
-   * action, from any surface.
-   */
-  async function attach(payload: z.infer<typeof AttachPayload>): Promise<unknown> {
-    const graph = await loadGraph(payload.orderId)
-    if (graph === null) return { error: `No run for ${payload.orderId}.` }
+/**
+ * Why a finished step has no agent to go to, or null while it has not finished.
+ *
+ * A finished step's session is closed (ADR 076); the resume advice `attach`
+ * gives is for a run that died, and sent people to resume a step that had
+ * succeeded.
+ */
+function finishedAgent(step: string, node: RunNode): string | null {
+  if (node.state !== 'passed' && node.state !== 'failed' && node.state !== 'skipped') return null
+  return node.endedAt === null
+    ? `${step} has finished; its agent has closed.`
+    : `${step} finished at ${clockTime(node.endedAt)}; its agent has closed.`
+}
 
-    const node = graph.nodes.find((n) => n.id === payload.nodeId)
-    if (node === undefined) return { error: `No step ${payload.nodeId}.` }
-    const step = nodeLabel(await deps.store.load(payload.orderId), node)
-    // A step that never has an agent, said as such rather than as "no session
-    // yet", which promises one is coming.
-    if (AUTOMATIC_KINDS.includes(node.kind)) {
-      return { error: `${step} is an automatic step with no agent.` }
-    }
-    // A finished step's session is closed (ADR 076); the resume advice below is
-    // for a run that died, and sent people to resume a step that had succeeded.
-    if (node.state === 'passed' || node.state === 'failed' || node.state === 'skipped') {
-      return {
-        error:
-          node.endedAt === null
-            ? `${step} has finished; its agent has closed.`
-            : `${step} finished at ${clockTime(node.endedAt)}; its agent has closed.`,
-      }
-    }
-    if (node.sessionId === null) {
-      return { error: `${node.id} has no session yet — it is ${node.state}.` }
-    }
-    // A session id outlives the process that ran it, so handing one back
-    // unchecked sent the operator to a terminal that no longer exists.
-    if (!isLive(node.sessionId) && !deps.executing(payload.orderId)) {
-      return {
-        error: `${node.id} has no live agent — its session ended when the application last closed. Resume the run to start it again.`,
-      }
-    }
-    return { terminalSessionId: node.sessionId, nodeId: node.id }
+/**
+ * What each node's agent has been doing lately.
+ *
+ * The Factory view draws a station's activity, not its whole transcript —
+ * the last 20 entries are plenty to say "reading" or "running a shell
+ * command" and drop off as soon as the agent moves on.
+ */
+async function activity(deps: RunDeps, payload: z.infer<typeof ActivityPayload>): Promise<unknown> {
+  const graph = await loadGraph(deps, payload.id)
+  if (graph === null) return { error: `No run for ${payload.id}.` }
+
+  const activity: Record<string, ToolActivity[]> = {}
+  for (const node of graph.nodes) {
+    if (node.sessionId === null) continue
+    const events = deps.activityFor(node.sessionId)
+    activity[node.id] = events.slice(-20)
   }
+  return { activity }
+}
 
-  /**
-   * What each node's agent has been doing lately.
-   *
-   * The Factory view draws a station's activity, not its whole transcript —
-   * the last 20 entries are plenty to say "reading" or "running a shell
-   * command" and drop off as soon as the agent moves on.
-   */
-  async function activity(payload: z.infer<typeof ActivityPayload>): Promise<unknown> {
-    const graph = await loadGraph(payload.id)
-    if (graph === null) return { error: `No run for ${payload.id}.` }
+/**
+ * What the run did, as recorded while it did it: the graph for its shape,
+ * each frame of node states and each tool call, and every gate the order
+ * raised — decided ones included, since a replay shows the waits too.
+ */
+async function timeline(deps: RunDeps, payload: z.infer<typeof ActivityPayload>): Promise<unknown> {
+  const graph = await loadGraph(deps, payload.id)
+  if (graph === null) return { error: `No run for ${payload.id}.` }
 
-    const activity: Record<string, ToolActivity[]> = {}
-    for (const node of graph.nodes) {
-      if (node.sessionId === null) continue
-      const events = deps.activityFor(node.sessionId)
-      activity[node.id] = events.slice(-20)
-    }
-    return { activity }
+  return {
+    graph,
+    timeline: await readTimeline(orderDir(deps.dataRoot(), payload.id)),
+    gates: await deps.gatesFor(payload.id),
   }
-
-  /**
-   * What the run did, as recorded while it did it: the graph for its shape,
-   * each frame of node states and each tool call, and every gate the order
-   * raised — decided ones included, since a replay shows the waits too.
-   */
-  async function timeline(payload: z.infer<typeof ActivityPayload>): Promise<unknown> {
-    const graph = await loadGraph(payload.id)
-    if (graph === null) return { error: `No run for ${payload.id}.` }
-
-    return {
-      graph,
-      timeline: await readTimeline(orderDir(deps.dataRoot(), payload.id)),
-      gates: await deps.gatesFor(payload.id),
-    }
-  }
-
-  return { start, resume, observe, recipes, attach, activity, timeline }
 }
 
 /** The Line's channels, each with the schema its payload is parsed with (ADR 096). */
