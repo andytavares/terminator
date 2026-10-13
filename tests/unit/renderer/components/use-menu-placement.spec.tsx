@@ -98,7 +98,9 @@ describe('useMenuPlacement', () => {
     )
     expect(placed.left).toBe(8)
   })
+})
 
+describe('useMenuPlacement — opens upwards when there is no room below', () => {
   it('opens upwards when there is no room below', () => {
     const placed = placeOf(
       { left: 100, top: 700, width: 90, height: 26 },

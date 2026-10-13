@@ -78,7 +78,9 @@ describe('CreateWorkspaceDialog', () => {
     fireEvent.blur(nameInput)
     expect(screen.getByText('A workspace with this name already exists')).toBeTruthy()
   })
+})
 
+describe('CreateWorkspaceDialog — adds the workspace it creates to the list', () => {
   it('adds the workspace it creates to the list', async () => {
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
     fireEvent.change(screen.getByPlaceholderText('My Workspace'), { target: { value: 'My WS' } })
@@ -107,7 +109,9 @@ describe('CreateWorkspaceDialog', () => {
     await vi.waitFor(() => expect(screen.getByDisplayValue('/selected/path')).toBeTruthy())
     expect(mockOpenDirectory).toHaveBeenCalled()
   })
+})
 
+describe('CreateWorkspaceDialog — does not update folder path when Browse is cancelled', () => {
   it('does not update folder path when Browse is cancelled', async () => {
     mockOpenDirectory.mockResolvedValue({ cancelled: true })
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
@@ -139,7 +143,9 @@ describe('CreateWorkspaceDialog', () => {
     fireEvent.change(tagsInput, { target: { value: 'a, b' } })
     expect(screen.getByDisplayValue('a, b')).toBeTruthy()
   })
+})
 
+describe('CreateWorkspaceDialog — clears nameError when name input changes', () => {
   it('clears nameError when name input changes', () => {
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
     const nameInput = screen.getByPlaceholderText('My Workspace')
@@ -167,7 +173,9 @@ describe('CreateWorkspaceDialog', () => {
     fireEvent.click(screen.getByText('Create Workspace').closest('.tmui-dialog__scrim')!)
     expect(onClose).toHaveBeenCalled()
   })
+})
 
+describe('CreateWorkspaceDialog — surfaces a name error when createWorkspace reports DUPLICATE_NAME', () => {
   it('surfaces a name error when createWorkspace reports DUPLICATE_NAME', async () => {
     mockCreateWorkspace.mockResolvedValueOnce({ error: 'DUPLICATE_NAME' })
     const onClose = vi.fn()
@@ -191,7 +199,9 @@ describe('CreateWorkspaceDialog', () => {
     fireEvent.click(screen.getByText('Create'))
     await screen.findByText('Failed to create workspace')
   })
+})
 
+describe('CreateWorkspaceDialog — auto-creates a branch project when the chosen folder is a git repo', () => {
   it('auto-creates a branch project when the chosen folder is a git repo', async () => {
     nextWorkspaceId = REPO_WORKSPACE
     withApi({

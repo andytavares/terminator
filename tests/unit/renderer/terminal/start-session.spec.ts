@@ -142,7 +142,9 @@ describe('startScratchSession', () => {
       GLOBAL_SCROLLBACK
     )
   })
+})
 
+describe('startScratchSession — stays on Home when the scratch terminal cannot start', () => {
   it('stays on Home when the scratch terminal cannot start', async () => {
     create.mockRejectedValueOnce(new Error('nope'))
     await startScratchSession()
@@ -151,30 +153,36 @@ describe('startScratchSession', () => {
   })
 })
 
-describe('resumeSession', () => {
-  const conversation = {
-    provider: 'claude' as const,
-    sessionId: 'conv-1',
-    transcriptPath: '/t/conv-1.jsonl',
-    cwd: '/code/repo-wt',
-    capturedAt: '2026-09-15T18:00:00.000Z',
-  }
-  const stopped = (patch = {}) =>
-    fact({
-      sessionId: 'old',
-      name: 'claude',
-      state: 'exited',
-      agent: conversation,
-      resumable: true,
-      snapshot: { ...fact().snapshot, sessionId: 'old', projectId: 'p1' },
-      ...patch,
-    })
+const conversation = {
+  provider: 'claude' as const,
+  sessionId: 'conv-1',
+  transcriptPath: '/t/conv-1.jsonl',
+  cwd: '/code/repo-wt',
+  capturedAt: '2026-09-15T18:00:00.000Z',
+}
 
+const stopped = (patch = {}) =>
+  fact({
+    sessionId: 'old',
+    name: 'claude',
+    state: 'exited',
+    agent: conversation,
+    resumable: true,
+    snapshot: { ...fact().snapshot, sessionId: 'old', projectId: 'p1' },
+    ...patch,
+  })
+
+/** The hooks every "resumeSession" describe registers. */
+function setUpResumeSession(): void {
   beforeEach(() => {
     useSessionStore.setState({
       sessions: new Map([['old', terminalSessionOf({ id: 'old', projectId: 'p1' })]]),
     })
   })
+}
+
+describe('resumeSession', () => {
+  setUpResumeSession()
 
   it('opens a terminal that carries the conversation on, where it ran', async () => {
     await resumeSession(stopped())
@@ -201,6 +209,10 @@ describe('resumeSession', () => {
       closeSession.mock.invocationCallOrder[0]
     )
   })
+})
+
+describe('resumeSession — closes nothing for a session whose terminal has already gone', () => {
+  setUpResumeSession()
 
   it('closes nothing for a session whose terminal has already gone', async () => {
     useSessionStore.setState({ sessions: new Map() })

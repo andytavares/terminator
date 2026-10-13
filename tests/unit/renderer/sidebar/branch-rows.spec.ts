@@ -119,7 +119,9 @@ describe('buildBranchRows', () => {
     expect(rowFor(result, 'p1')!.isWorktree).toBe(true)
     expect(rowFor(result, 'p2')!.isWorktree).toBe(false)
   })
+})
 
+describe('buildBranchRows — carries the repo colour and folder path on the group, not the row', () => {
   it('carries the repo colour and folder path on the group, not the row', () => {
     const group = build([]).groups.find((g) => g.label === 'terminator')!
     expect(group.color).toBe('#5c6bc0')
@@ -132,341 +134,357 @@ describe('buildBranchRows', () => {
       expect(group.branchCount).toBe(group.branches.length)
     }
   })
+})
 
-  describe('the row state', () => {
-    it('folds its terminals to one state', () => {
-      const result = build([
+describe('buildBranchRows — the row state', () => {
+  it('folds its terminals to one state', () => {
+    const result = build([
+      session('a', 'p1', { agentState: 'idle' }),
+      session('b', 'p1', { agentState: 'awaiting-input' }),
+    ])
+    expect(rowFor(result, 'p1')!.state).toBe('awaiting-input')
+  })
+
+  it('reads idle when the branch has no terminals', () => {
+    expect(rowFor(build([]), 'p1')!.state).toBe('idle')
+  })
+
+  // The count agrees with the glyph rather than totalling the branch.
+  it('counts the terminals in the row own state', () => {
+    const result = build([
+      session('a', 'p1', { agentState: 'awaiting-input' }),
+      session('b', 'p1', { agentState: 'awaiting-input' }),
+      session('c', 'p1', { agentState: 'idle' }),
+    ])
+    const row = rowFor(result, 'p1')!
+    expect(row.state).toBe('awaiting-input')
+    expect(row.stateCount).toBe(2)
+    expect(row.sessionCount).toBe(3)
+  })
+})
+
+describe('buildBranchRows — the row state — reports the newest activity across its terminals', () => {
+  it('reports the newest activity across its terminals', () => {
+    const result = build([
+      session('a', 'p1', { lastActivityAt: 10 }),
+      session('b', 'p1', { lastActivityAt: 99 }),
+    ])
+    expect(rowFor(result, 'p1')!.lastActivityAt).toBe(99)
+  })
+
+  it('has no activity stamp at all when it has no terminals', () => {
+    expect(rowFor(build([]), 'p1')!.lastActivityAt).toBeNull()
+  })
+})
+
+// BR-5. A collapsed repo must still be able to say something inside it is
+// waiting; the pure layer reports the fact, the component decides when to
+// draw it.
+describe('buildBranchRows — needsYou on the repo', () => {
+  it('is true when any branch in it is waiting', () => {
+    const { groups } = build([session('a', 'p1', { agentState: 'awaiting-input' })])
+    expect(groups.find((g) => g.label === 'terminator')!.needsYou).toBe(true)
+  })
+
+  it('is false when nothing in it is waiting', () => {
+    const { groups } = build([session('a', 'p1', { agentState: 'working' })])
+    expect(groups.find((g) => g.label === 'terminator')!.needsYou).toBe(false)
+  })
+})
+
+// BR-6. A scratch terminal has no branch to be represented by, so it is the
+// one place a terminal is still a row.
+describe('buildBranchRows — scratch', () => {
+  it('comes back separately rather than as a branch', () => {
+    const result = build([session('s', SCRATCH_PROJECT_ID)])
+    expect(result.scratch.map((s) => s.id)).toEqual(['s'])
+    expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).not.toContain(
+      SCRATCH_PROJECT_ID
+    )
+  })
+
+  it('is empty when there are none', () => {
+    expect(build([]).scratch).toEqual([])
+  })
+})
+
+// BR-3. Counts are of branches, since branches are what is drawn.
+describe('buildBranchRows — filtering', () => {
+  it('counts branches, not terminals', () => {
+    const result = build([session('a', 'p1'), session('b', 'p1'), session('c', 'p2')])
+    expect(result.total).toBe(3)
+    expect(result.shown).toBe(3)
+  })
+
+  // BR-4.
+  it('keeps a branch when any of its terminals matches the state filter', () => {
+    const result = build(
+      [
         session('a', 'p1', { agentState: 'idle' }),
-        session('b', 'p1', { agentState: 'awaiting-input' }),
-      ])
-      expect(rowFor(result, 'p1')!.state).toBe('awaiting-input')
-    })
+        session('b', 'p1', { agentState: 'working' }),
+        session('c', 'p2', { agentState: 'idle' }),
+      ],
+      view({ filters: { states: ['working'] } })
+    )
+    expect(rowFor(result, 'p1')).toBeTruthy()
+    expect(rowFor(result, 'p2')).toBeUndefined()
+    expect(result.shown).toBe(1)
+    expect(result.total).toBe(3)
+  })
 
-    it('reads idle when the branch has no terminals', () => {
-      expect(rowFor(build([]), 'p1')!.state).toBe('idle')
+  it('hides a branch with no terminals under a state filter', () => {
+    const result = build([session('a', 'p1', { agentState: 'working' })], {
+      ...view(),
+      filters: { states: ['working'] },
     })
+    expect(rowFor(result, 'p3')).toBeUndefined()
+  })
+})
 
-    // The count agrees with the glyph rather than totalling the branch.
-    it('counts the terminals in the row own state', () => {
-      const result = build([
+describe('buildBranchRows — filtering — matches a search against the branch name', () => {
+  it('matches a search against the branch name', () => {
+    const result = build([], view({ filters: { query: 'declutter' } }))
+    expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).toEqual(['p1'])
+  })
+
+  it('matches a search against the repo name', () => {
+    const result = build([], view({ filters: { query: 'kalli' } }))
+    expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).toEqual(['p3'])
+  })
+
+  it('matches a search against a terminal title', () => {
+    const result = build([session('deploy-script', 'p2')], view({ filters: { query: 'deploy' } }))
+    expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).toEqual(['p2'])
+  })
+
+  it('narrows to the given branches', () => {
+    const result = build([], view({ filters: { projectIds: ['p2'] } }))
+    expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).toEqual(['p2'])
+  })
+
+  it('drops a repo left with no branches', () => {
+    const result = build([], view({ filters: { projectIds: ['p3'] } }))
+    expect(result.groups.map((g) => g.label)).toEqual(['kalli'])
+  })
+})
+
+describe('buildBranchRows — filtering — hides a branch whose every terminal has gone stale', () => {
+  it('hides a branch whose every terminal has gone stale', () => {
+    const old = NOW - STALE_AFTER - 1
+    const result = build(
+      [session('a', 'p1', { lastActivityAt: old })],
+      view({ filters: { hideStale: true } })
+    )
+    expect(rowFor(result, 'p1')).toBeUndefined()
+  })
+
+  it('keeps a stale branch when one of its terminals is still live', () => {
+    const old = NOW - STALE_AFTER - 1
+    const result = build(
+      [session('a', 'p1', { lastActivityAt: old }), session('b', 'p1')],
+      view({ filters: { hideStale: true } })
+    )
+    expect(rowFor(result, 'p1')).toBeTruthy()
+  })
+
+  it('never hides a branch with no terminals for being stale', () => {
+    // Nothing has gone quiet on it — there is nothing on it at all, and a
+    // branch you have not started work on is not abandoned work.
+    const result = build([], view({ filters: { hideStale: true } }))
+    expect(rowFor(result, 'p1')).toBeTruthy()
+  })
+})
+
+describe('buildBranchRows — filtering — shows only stale branches under staleOnly', () => {
+  it('shows only stale branches under staleOnly', () => {
+    const old = NOW - STALE_AFTER - 1
+    const result = build(
+      [session('a', 'p1', { lastActivityAt: old }), session('b', 'p2')],
+      view({ filters: { staleOnly: true } })
+    )
+    expect(rowFor(result, 'p1')).toBeTruthy()
+    expect(rowFor(result, 'p2')).toBeUndefined()
+  })
+})
+
+// BR-7. Fixed, observable order.
+describe('buildBranchRows — order', () => {
+  it('sorts branches by recency within a repo', () => {
+    const result = build([
+      session('a', 'p1', { lastActivityAt: 10 }),
+      session('b', 'p2', { lastActivityAt: 99 }),
+    ])
+    const group = result.groups.find((g) => g.label === 'terminator')!
+    expect(group.branches.map((b) => b.projectId)).toEqual(['p2', 'p1'])
+  })
+
+  it('sorts branches by name when asked', () => {
+    const group = build([], view({ sortBy: 'name' })).groups.find((g) => g.label === 'terminator')!
+    expect(group.branches.map((b) => b.label)).toEqual(['034-declutter', 'main'])
+  })
+
+  it('sorts branches by state severity when asked', () => {
+    const result = build(
+      [
+        session('a', 'p1', { agentState: 'idle' }),
+        session('b', 'p2', { agentState: 'awaiting-input' }),
+      ],
+      view({ sortBy: 'status' })
+    )
+    const group = result.groups.find((g) => g.label === 'terminator')!
+    expect(group.branches.map((b) => b.projectId)).toEqual(['p2', 'p1'])
+  })
+})
+
+describe('buildBranchRows — order — sorts repos by name when asked', () => {
+  // The repo headers are half the list. A sort that only reaches inside them
+  // reads as a sort that does nothing, which is what shipped: the group order
+  // was hard-coded alphabetical and neither the sort key nor a drag could
+  // move it.
+  it('sorts repos by name when asked', () => {
+    expect(build([], view({ sortBy: 'name' })).groups.map((g) => g.label)).toEqual([
+      'kalli',
+      'terminator',
+    ])
+  })
+
+  it('falls back to name when two repos are equally recent', () => {
+    expect(build([]).groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
+  })
+
+  it('sorts repos by their most recent branch', () => {
+    const result = build([
+      session('a', 'p1', { lastActivityAt: 10 }),
+      session('b', 'p3', { lastActivityAt: 99 }),
+    ])
+    expect(result.groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
+  })
+
+  it('sorts repos by their oldest branch when asked', () => {
+    const result = build(
+      [session('a', 'p1', { lastActivityAt: 10 }), session('b', 'p3', { lastActivityAt: 99 })],
+      view({ sortBy: 'oldest' })
+    )
+    expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
+  })
+})
+
+describe('buildBranchRows — order — sorts repos by their most severe branch when asked', () => {
+  it('sorts repos by their most severe branch when asked', () => {
+    const result = build(
+      [
+        session('a', 'p1', { agentState: 'idle' }),
+        session('b', 'p3', { agentState: 'awaiting-input' }),
+      ],
+      view({ sortBy: 'status' })
+    )
+    expect(result.groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
+  })
+
+  // Manual is the user's own order, and the only place it is written down is
+  // the order the stores hand over — workspaces for repos, projects within a
+  // repo. Alphabetising either one silently discards a drag.
+  it('keeps repos in the stored order under a manual sort', () => {
+    const result = build([], view({ sortBy: 'manual' }))
+    expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
+  })
+
+  it('keeps branches in the stored order under a manual sort', () => {
+    const result = build(
+      [session('a', 'p1', { lastActivityAt: 10 }), session('b', 'p2', { lastActivityAt: 99 })],
+      view({ sortBy: 'manual' })
+    )
+    const group = result.groups.find((g) => g.label === 'terminator')!
+    expect(group.branches.map((b) => b.projectId)).toEqual(['p1', 'p2'])
+  })
+})
+
+describe('buildBranchRows — order — orders repos by the workspace list, not by the order branches arrive in', () => {
+  it('orders repos by the workspace list, not by the order branches arrive in', () => {
+    const result = buildBranchRows(
+      [],
+      [branchless, feature, main],
+      [repoA, repoB],
+      view({ sortBy: 'manual' }),
+      NOW,
+      STALE_AFTER
+    )
+    expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
+  })
+
+  it('puts everything in one group when grouping is off', () => {
+    const { groups } = build([], view({ groupBy: 'none' }))
+    expect(groups).toHaveLength(1)
+    expect(groups[0].branches).toHaveLength(3)
+  })
+})
+
+// A repo with no branches yet was drawn in a block of its own after every
+// group, so any order it was given — dragged or sorted — could not move it
+// out of the bottom of the list. It is a group like the others.
+const emptyRepo: Workspace = { ...repoA, id: 'ws-3', name: 'aardvark', folderPath: '/repos/aa' }
+
+const withEmpty = (v: SessionView = view()) =>
+  buildBranchRows([], PROJECTS, [repoA, repoB, emptyRepo], v, NOW, STALE_AFTER)
+
+describe('buildBranchRows — repos with no branches', () => {
+  it('lists an empty repo as a group of its own', () => {
+    const group = withEmpty().groups.find((g) => g.label === 'aardvark')
+    expect(group).toBeTruthy()
+    expect(group!.branches).toHaveLength(0)
+    expect(group!.branchCount).toBe(0)
+  })
+
+  it('sorts an empty repo among the rest rather than after them', () => {
+    expect(withEmpty(view({ sortBy: 'name' })).groups.map((g) => g.label)).toEqual([
+      'aardvark',
+      'kalli',
+      'terminator',
+    ])
+  })
+
+  it('keeps an empty repo in its stored place under a manual sort', () => {
+    expect(withEmpty(view({ sortBy: 'manual' })).groups.map((g) => g.label)).toEqual([
+      'terminator',
+      'kalli',
+      'aardvark',
+    ])
+  })
+
+  it('drops an empty repo from a narrowed view, which has nothing to say about it', () => {
+    const labels = withEmpty(view({ filters: { query: 'main' } })).groups.map((g) => g.label)
+    expect(labels).toEqual(['terminator'])
+  })
+})
+
+describe('buildBranchRows — repos with no branches — does not invent a repo header when grouping is off', () => {
+  it('does not invent a repo header when grouping is off', () => {
+    const { groups } = withEmpty(view({ groupBy: 'none' }))
+    expect(groups).toHaveLength(1)
+  })
+
+  it('ranks an empty repo as idle under a status sort', () => {
+    const result = buildBranchRows(
+      [
         session('a', 'p1', { agentState: 'awaiting-input' }),
-        session('b', 'p1', { agentState: 'awaiting-input' }),
-        session('c', 'p1', { agentState: 'idle' }),
-      ])
-      const row = rowFor(result, 'p1')!
-      expect(row.state).toBe('awaiting-input')
-      expect(row.stateCount).toBe(2)
-      expect(row.sessionCount).toBe(3)
-    })
-
-    it('reports the newest activity across its terminals', () => {
-      const result = build([
-        session('a', 'p1', { lastActivityAt: 10 }),
-        session('b', 'p1', { lastActivityAt: 99 }),
-      ])
-      expect(rowFor(result, 'p1')!.lastActivityAt).toBe(99)
-    })
-
-    it('has no activity stamp at all when it has no terminals', () => {
-      expect(rowFor(build([]), 'p1')!.lastActivityAt).toBeNull()
-    })
+        session('b', 'p3', { agentState: 'exited' }),
+      ],
+      PROJECTS,
+      [repoA, repoB, emptyRepo],
+      view({ sortBy: 'status' }),
+      NOW,
+      STALE_AFTER
+    )
+    expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'aardvark', 'kalli'])
   })
 
-  // BR-5. A collapsed repo must still be able to say something inside it is
-  // waiting; the pure layer reports the fact, the component decides when to
-  // draw it.
-  describe('needsYou on the repo', () => {
-    it('is true when any branch in it is waiting', () => {
-      const { groups } = build([session('a', 'p1', { agentState: 'awaiting-input' })])
-      expect(groups.find((g) => g.label === 'terminator')!.needsYou).toBe(true)
-    })
-
-    it('is false when nothing in it is waiting', () => {
-      const { groups } = build([session('a', 'p1', { agentState: 'working' })])
-      expect(groups.find((g) => g.label === 'terminator')!.needsYou).toBe(false)
-    })
+  it('counts only branches, so an empty repo changes no total', () => {
+    expect(withEmpty().total).toBe(3)
+    expect(withEmpty().shown).toBe(3)
   })
+})
 
-  // BR-6. A scratch terminal has no branch to be represented by, so it is the
-  // one place a terminal is still a row.
-  describe('scratch', () => {
-    it('comes back separately rather than as a branch', () => {
-      const result = build([session('s', SCRATCH_PROJECT_ID)])
-      expect(result.scratch.map((s) => s.id)).toEqual(['s'])
-      expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).not.toContain(
-        SCRATCH_PROJECT_ID
-      )
-    })
-
-    it('is empty when there are none', () => {
-      expect(build([]).scratch).toEqual([])
-    })
-  })
-
-  // BR-3. Counts are of branches, since branches are what is drawn.
-  describe('filtering', () => {
-    it('counts branches, not terminals', () => {
-      const result = build([session('a', 'p1'), session('b', 'p1'), session('c', 'p2')])
-      expect(result.total).toBe(3)
-      expect(result.shown).toBe(3)
-    })
-
-    // BR-4.
-    it('keeps a branch when any of its terminals matches the state filter', () => {
-      const result = build(
-        [
-          session('a', 'p1', { agentState: 'idle' }),
-          session('b', 'p1', { agentState: 'working' }),
-          session('c', 'p2', { agentState: 'idle' }),
-        ],
-        view({ filters: { states: ['working'] } })
-      )
-      expect(rowFor(result, 'p1')).toBeTruthy()
-      expect(rowFor(result, 'p2')).toBeUndefined()
-      expect(result.shown).toBe(1)
-      expect(result.total).toBe(3)
-    })
-
-    it('hides a branch with no terminals under a state filter', () => {
-      const result = build([session('a', 'p1', { agentState: 'working' })], {
-        ...view(),
-        filters: { states: ['working'] },
-      })
-      expect(rowFor(result, 'p3')).toBeUndefined()
-    })
-
-    it('matches a search against the branch name', () => {
-      const result = build([], view({ filters: { query: 'declutter' } }))
-      expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).toEqual(['p1'])
-    })
-
-    it('matches a search against the repo name', () => {
-      const result = build([], view({ filters: { query: 'kalli' } }))
-      expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).toEqual(['p3'])
-    })
-
-    it('matches a search against a terminal title', () => {
-      const result = build([session('deploy-script', 'p2')], view({ filters: { query: 'deploy' } }))
-      expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).toEqual(['p2'])
-    })
-
-    it('narrows to the given branches', () => {
-      const result = build([], view({ filters: { projectIds: ['p2'] } }))
-      expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).toEqual(['p2'])
-    })
-
-    it('drops a repo left with no branches', () => {
-      const result = build([], view({ filters: { projectIds: ['p3'] } }))
-      expect(result.groups.map((g) => g.label)).toEqual(['kalli'])
-    })
-
-    it('hides a branch whose every terminal has gone stale', () => {
-      const old = NOW - STALE_AFTER - 1
-      const result = build(
-        [session('a', 'p1', { lastActivityAt: old })],
-        view({ filters: { hideStale: true } })
-      )
-      expect(rowFor(result, 'p1')).toBeUndefined()
-    })
-
-    it('keeps a stale branch when one of its terminals is still live', () => {
-      const old = NOW - STALE_AFTER - 1
-      const result = build(
-        [session('a', 'p1', { lastActivityAt: old }), session('b', 'p1')],
-        view({ filters: { hideStale: true } })
-      )
-      expect(rowFor(result, 'p1')).toBeTruthy()
-    })
-
-    it('never hides a branch with no terminals for being stale', () => {
-      // Nothing has gone quiet on it — there is nothing on it at all, and a
-      // branch you have not started work on is not abandoned work.
-      const result = build([], view({ filters: { hideStale: true } }))
-      expect(rowFor(result, 'p1')).toBeTruthy()
-    })
-
-    it('shows only stale branches under staleOnly', () => {
-      const old = NOW - STALE_AFTER - 1
-      const result = build(
-        [session('a', 'p1', { lastActivityAt: old }), session('b', 'p2')],
-        view({ filters: { staleOnly: true } })
-      )
-      expect(rowFor(result, 'p1')).toBeTruthy()
-      expect(rowFor(result, 'p2')).toBeUndefined()
-    })
-  })
-
-  // BR-7. Fixed, observable order.
-  describe('order', () => {
-    it('sorts branches by recency within a repo', () => {
-      const result = build([
-        session('a', 'p1', { lastActivityAt: 10 }),
-        session('b', 'p2', { lastActivityAt: 99 }),
-      ])
-      const group = result.groups.find((g) => g.label === 'terminator')!
-      expect(group.branches.map((b) => b.projectId)).toEqual(['p2', 'p1'])
-    })
-
-    it('sorts branches by name when asked', () => {
-      const group = build([], view({ sortBy: 'name' })).groups.find(
-        (g) => g.label === 'terminator'
-      )!
-      expect(group.branches.map((b) => b.label)).toEqual(['034-declutter', 'main'])
-    })
-
-    it('sorts branches by state severity when asked', () => {
-      const result = build(
-        [
-          session('a', 'p1', { agentState: 'idle' }),
-          session('b', 'p2', { agentState: 'awaiting-input' }),
-        ],
-        view({ sortBy: 'status' })
-      )
-      const group = result.groups.find((g) => g.label === 'terminator')!
-      expect(group.branches.map((b) => b.projectId)).toEqual(['p2', 'p1'])
-    })
-
-    // The repo headers are half the list. A sort that only reaches inside them
-    // reads as a sort that does nothing, which is what shipped: the group order
-    // was hard-coded alphabetical and neither the sort key nor a drag could
-    // move it.
-    it('sorts repos by name when asked', () => {
-      expect(build([], view({ sortBy: 'name' })).groups.map((g) => g.label)).toEqual([
-        'kalli',
-        'terminator',
-      ])
-    })
-
-    it('falls back to name when two repos are equally recent', () => {
-      expect(build([]).groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
-    })
-
-    it('sorts repos by their most recent branch', () => {
-      const result = build([
-        session('a', 'p1', { lastActivityAt: 10 }),
-        session('b', 'p3', { lastActivityAt: 99 }),
-      ])
-      expect(result.groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
-    })
-
-    it('sorts repos by their oldest branch when asked', () => {
-      const result = build(
-        [session('a', 'p1', { lastActivityAt: 10 }), session('b', 'p3', { lastActivityAt: 99 })],
-        view({ sortBy: 'oldest' })
-      )
-      expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
-    })
-
-    it('sorts repos by their most severe branch when asked', () => {
-      const result = build(
-        [
-          session('a', 'p1', { agentState: 'idle' }),
-          session('b', 'p3', { agentState: 'awaiting-input' }),
-        ],
-        view({ sortBy: 'status' })
-      )
-      expect(result.groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
-    })
-
-    // Manual is the user's own order, and the only place it is written down is
-    // the order the stores hand over — workspaces for repos, projects within a
-    // repo. Alphabetising either one silently discards a drag.
-    it('keeps repos in the stored order under a manual sort', () => {
-      const result = build([], view({ sortBy: 'manual' }))
-      expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
-    })
-
-    it('keeps branches in the stored order under a manual sort', () => {
-      const result = build(
-        [session('a', 'p1', { lastActivityAt: 10 }), session('b', 'p2', { lastActivityAt: 99 })],
-        view({ sortBy: 'manual' })
-      )
-      const group = result.groups.find((g) => g.label === 'terminator')!
-      expect(group.branches.map((b) => b.projectId)).toEqual(['p1', 'p2'])
-    })
-
-    it('orders repos by the workspace list, not by the order branches arrive in', () => {
-      const result = buildBranchRows(
-        [],
-        [branchless, feature, main],
-        [repoA, repoB],
-        view({ sortBy: 'manual' }),
-        NOW,
-        STALE_AFTER
-      )
-      expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
-    })
-
-    it('puts everything in one group when grouping is off', () => {
-      const { groups } = build([], view({ groupBy: 'none' }))
-      expect(groups).toHaveLength(1)
-      expect(groups[0].branches).toHaveLength(3)
-    })
-  })
-
-  // A repo with no branches yet was drawn in a block of its own after every
-  // group, so any order it was given — dragged or sorted — could not move it
-  // out of the bottom of the list. It is a group like the others.
-  describe('repos with no branches', () => {
-    const emptyRepo: Workspace = { ...repoA, id: 'ws-3', name: 'aardvark', folderPath: '/repos/aa' }
-
-    const withEmpty = (v: SessionView = view()) =>
-      buildBranchRows([], PROJECTS, [repoA, repoB, emptyRepo], v, NOW, STALE_AFTER)
-
-    it('lists an empty repo as a group of its own', () => {
-      const group = withEmpty().groups.find((g) => g.label === 'aardvark')
-      expect(group).toBeTruthy()
-      expect(group!.branches).toHaveLength(0)
-      expect(group!.branchCount).toBe(0)
-    })
-
-    it('sorts an empty repo among the rest rather than after them', () => {
-      expect(withEmpty(view({ sortBy: 'name' })).groups.map((g) => g.label)).toEqual([
-        'aardvark',
-        'kalli',
-        'terminator',
-      ])
-    })
-
-    it('keeps an empty repo in its stored place under a manual sort', () => {
-      expect(withEmpty(view({ sortBy: 'manual' })).groups.map((g) => g.label)).toEqual([
-        'terminator',
-        'kalli',
-        'aardvark',
-      ])
-    })
-
-    it('drops an empty repo from a narrowed view, which has nothing to say about it', () => {
-      const labels = withEmpty(view({ filters: { query: 'main' } })).groups.map((g) => g.label)
-      expect(labels).toEqual(['terminator'])
-    })
-
-    it('does not invent a repo header when grouping is off', () => {
-      const { groups } = withEmpty(view({ groupBy: 'none' }))
-      expect(groups).toHaveLength(1)
-    })
-
-    it('ranks an empty repo as idle under a status sort', () => {
-      const result = buildBranchRows(
-        [
-          session('a', 'p1', { agentState: 'awaiting-input' }),
-          session('b', 'p3', { agentState: 'exited' }),
-        ],
-        PROJECTS,
-        [repoA, repoB, emptyRepo],
-        view({ sortBy: 'status' }),
-        NOW,
-        STALE_AFTER
-      )
-      expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'aardvark', 'kalli'])
-    })
-
-    it('counts only branches, so an empty repo changes no total', () => {
-      expect(withEmpty().total).toBe(3)
-      expect(withEmpty().shown).toBe(3)
-    })
-  })
-
+describe('buildBranchRows — carries no change statistics — they belong to the store, behind its TTL', () => {
   // BR-8 / BR-9.
   it('carries no change statistics — they belong to the store, behind its TTL', () => {
     const row = rowFor(build([]), 'p1')!
@@ -493,84 +511,79 @@ describe('buildBranchRows', () => {
     const shown = result.groups.flatMap((g) => g.branches).map((b) => b.projectId)
     expect(shown.sort()).toEqual(['p1', 'p2', 'p3'])
   })
+})
 
-  describe('sessionIssueKeys', () => {
-    const own = (key: string): WorkItem => ({ source: 'session', ref: { tracker: 'linear', key } })
-    const inherited: WorkItem = { source: 'project', ref: { tracker: 'linear', key: 'ENG-9' } }
-    const terminal = (
-      sessionId: string,
-      workItem: WorkItem | null,
-      panes: BranchTerminal[] = []
-    ): BranchTerminal => ({
-      sessionId,
-      title: sessionId,
-      state: 'idle',
-      bellCount: 0,
-      panes,
-      workItem,
-    })
-
-    it('lists each own session key once, roots then panes, and skips inherited ones', () => {
-      const keys = sessionIssueKeys([
-        terminal('a', own('ENG-1'), [terminal('a1', own('ENG-2'))]),
-        terminal('b', inherited),
-        terminal('c', own('ENG-1')),
-        terminal('d', null),
-      ])
-      expect(keys).toEqual(['ENG-1', 'ENG-2'])
-    })
-
-    it('is empty for a branch with no terminals', () => {
-      expect(sessionIssueKeys([])).toEqual([])
-    })
+describe('buildBranchRows — sessionIssueKeys', () => {
+  const own = (key: string): WorkItem => ({ source: 'session', ref: { tracker: 'linear', key } })
+  const inherited: WorkItem = { source: 'project', ref: { tracker: 'linear', key: 'ENG-9' } }
+  const terminal = (
+    sessionId: string,
+    workItem: WorkItem | null,
+    panes: BranchTerminal[] = []
+  ): BranchTerminal => ({
+    sessionId,
+    title: sessionId,
+    state: 'idle',
+    bellCount: 0,
+    panes,
+    workItem,
   })
 
-  describe('workItem', () => {
-    const item: WorkItem = { source: 'session', ref: { tracker: 'linear', key: 'ENG-1' } }
+  it('lists each own session key once, roots then panes, and skips inherited ones', () => {
+    const keys = sessionIssueKeys([
+      terminal('a', own('ENG-1'), [terminal('a1', own('ENG-2'))]),
+      terminal('b', inherited),
+      terminal('c', own('ENG-1')),
+      terminal('d', null),
+    ])
+    expect(keys).toEqual(['ENG-1', 'ENG-2'])
+  })
 
-    it('threads a terminal work item from the map, keyed by session id', () => {
-      const result = buildBranchRows(
-        [session('a', 'p1')],
-        PROJECTS,
-        REPOS,
-        view(),
-        NOW,
-        STALE_AFTER,
-        new Map([['a', item]])
-      )
-      const terminal = rowFor(result, 'p1')!.terminals[0]
-      expect(terminal.workItem).toEqual(item)
-    })
+  it('is empty for a branch with no terminals', () => {
+    expect(sessionIssueKeys([])).toEqual([])
+  })
+})
 
-    it('is null for a session absent from the map', () => {
-      const result = buildBranchRows(
-        [session('a', 'p1')],
-        PROJECTS,
-        REPOS,
-        view(),
-        NOW,
-        STALE_AFTER
-      )
-      expect(rowFor(result, 'p1')!.terminals[0].workItem).toBeNull()
-    })
+const item: WorkItem = { source: 'session', ref: { tracker: 'linear', key: 'ENG-1' } }
 
-    it('threads a pane work item independently of its root', () => {
-      const rootItem: WorkItem = { source: 'project', ref: { tracker: 'linear', key: 'ENG-2' } }
-      const result = buildBranchRows(
-        [session('a', 'p1'), session('b', 'p1', { parentSessionId: 'a' })],
-        PROJECTS,
-        REPOS,
-        view(),
-        NOW,
-        STALE_AFTER,
-        new Map([
-          ['a', rootItem],
-          ['b', item],
-        ])
-      )
-      const root = rowFor(result, 'p1')!.terminals[0]
-      expect(root.workItem).toEqual(rootItem)
-      expect(root.panes[0].workItem).toEqual(item)
-    })
+describe('buildBranchRows — workItem', () => {
+  it('threads a terminal work item from the map, keyed by session id', () => {
+    const result = buildBranchRows(
+      [session('a', 'p1')],
+      PROJECTS,
+      REPOS,
+      view(),
+      NOW,
+      STALE_AFTER,
+      new Map([['a', item]])
+    )
+    const terminal = rowFor(result, 'p1')!.terminals[0]
+    expect(terminal.workItem).toEqual(item)
+  })
+
+  it('is null for a session absent from the map', () => {
+    const result = buildBranchRows([session('a', 'p1')], PROJECTS, REPOS, view(), NOW, STALE_AFTER)
+    expect(rowFor(result, 'p1')!.terminals[0].workItem).toBeNull()
+  })
+})
+
+describe('buildBranchRows — workItem — threads a pane work item independently of its root', () => {
+  it('threads a pane work item independently of its root', () => {
+    const rootItem: WorkItem = { source: 'project', ref: { tracker: 'linear', key: 'ENG-2' } }
+    const result = buildBranchRows(
+      [session('a', 'p1'), session('b', 'p1', { parentSessionId: 'a' })],
+      PROJECTS,
+      REPOS,
+      view(),
+      NOW,
+      STALE_AFTER,
+      new Map([
+        ['a', rootItem],
+        ['b', item],
+      ])
+    )
+    const root = rowFor(result, 'p1')!.terminals[0]
+    expect(root.workItem).toEqual(rootItem)
+    expect(root.panes[0].workItem).toEqual(item)
   })
 })

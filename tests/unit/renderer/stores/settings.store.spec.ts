@@ -41,12 +41,12 @@ function resetStore() {
   })
 }
 
-describe('useSettingsStore', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    resetStore()
-  })
+beforeEach(() => {
+  vi.clearAllMocks()
+  resetStore()
+})
 
+describe('useSettingsStore', () => {
   describe('loadSettings', () => {
     it('loads and stores global settings', async () => {
       const globalSettings = { ...DEFAULT_SETTINGS, appearance: { theme: 'light' as const } }
@@ -83,7 +83,9 @@ describe('useSettingsStore', () => {
       expect(useSettingsStore.getState().resolvedTheme).toBe('light')
     })
   })
+})
 
+describe('useSettingsStore — updateGlobalTheme', () => {
   describe('updateGlobalTheme', () => {
     it('calls updateGlobal and updates store', async () => {
       const updated = { ...DEFAULT_SETTINGS, appearance: { theme: 'light' as const } }
@@ -112,7 +114,9 @@ describe('useSettingsStore', () => {
       expect(useSettingsStore.getState().resolvedTheme).toBe('light')
     })
   })
+})
 
+describe('useSettingsStore — updateScrollbackLimit', () => {
   describe('updateScrollbackLimit', () => {
     it('calls updateGlobal with scrollbackLimit and updates store', async () => {
       const updated = {
@@ -141,7 +145,9 @@ describe('useSettingsStore', () => {
       expect(useSettingsStore.getState().globalSettings).toEqual(updated)
     })
   })
+})
 
+describe('useSettingsStore — updateWorkspaceWorktreeBaseDir', () => {
   describe('updateWorkspaceWorktreeBaseDir', () => {
     it('calls updateWorkspace with git override when dir is provided', async () => {
       const wsSettings = { overrides: { git: { worktreeBaseDir: '/ws/worktrees' } } }
@@ -164,49 +170,53 @@ describe('useSettingsStore', () => {
       })
     })
   })
+})
 
-  describe('resolveSettings', () => {
-    it('returns defaults merged with global settings when no workspace', () => {
-      useSettingsStore.setState({ globalSettings: DEFAULT_SETTINGS })
-      const resolved = useSettingsStore.getState().resolveSettings()
-      expect(resolved.appearance.theme).toBe('dark')
-    })
-
-    it('merges workspace overrides over global settings', () => {
-      useSettingsStore.setState({
-        globalSettings: DEFAULT_SETTINGS,
-        workspaceSettings: new Map([
-          [
-            'ws-1',
-            { workspaceId: 'ws-1', extensions: {}, overrides: { appearance: { theme: 'light' } } },
-          ],
-        ]),
-      })
-      const resolved = useSettingsStore.getState().resolveSettings('ws-1')
-      expect(resolved.appearance.theme).toBe('light')
-    })
-
-    it('uses defaults when globalSettings is null', () => {
-      useSettingsStore.setState({ globalSettings: null })
-      const resolved = useSettingsStore.getState().resolveSettings()
-      expect(resolved.terminal.scrollbackLimit).toBe(10000)
-    })
-
-    it('ignores workspace overrides when no workspace id provided', () => {
-      useSettingsStore.setState({
-        globalSettings: { ...DEFAULT_SETTINGS, appearance: { theme: 'dark' as const } },
-        workspaceSettings: new Map([
-          [
-            'ws-1',
-            { workspaceId: 'ws-1', extensions: {}, overrides: { appearance: { theme: 'light' } } },
-          ],
-        ]),
-      })
-      const resolved = useSettingsStore.getState().resolveSettings(null)
-      expect(resolved.appearance.theme).toBe('dark')
-    })
+describe('useSettingsStore — resolveSettings', () => {
+  it('returns defaults merged with global settings when no workspace', () => {
+    useSettingsStore.setState({ globalSettings: DEFAULT_SETTINGS })
+    const resolved = useSettingsStore.getState().resolveSettings()
+    expect(resolved.appearance.theme).toBe('dark')
   })
 
+  it('merges workspace overrides over global settings', () => {
+    useSettingsStore.setState({
+      globalSettings: DEFAULT_SETTINGS,
+      workspaceSettings: new Map([
+        [
+          'ws-1',
+          { workspaceId: 'ws-1', extensions: {}, overrides: { appearance: { theme: 'light' } } },
+        ],
+      ]),
+    })
+    const resolved = useSettingsStore.getState().resolveSettings('ws-1')
+    expect(resolved.appearance.theme).toBe('light')
+  })
+
+  it('uses defaults when globalSettings is null', () => {
+    useSettingsStore.setState({ globalSettings: null })
+    const resolved = useSettingsStore.getState().resolveSettings()
+    expect(resolved.terminal.scrollbackLimit).toBe(10000)
+  })
+})
+
+describe('useSettingsStore — resolveSettings — ignores workspace overrides when no workspace id provided', () => {
+  it('ignores workspace overrides when no workspace id provided', () => {
+    useSettingsStore.setState({
+      globalSettings: { ...DEFAULT_SETTINGS, appearance: { theme: 'dark' as const } },
+      workspaceSettings: new Map([
+        [
+          'ws-1',
+          { workspaceId: 'ws-1', extensions: {}, overrides: { appearance: { theme: 'light' } } },
+        ],
+      ]),
+    })
+    const resolved = useSettingsStore.getState().resolveSettings(null)
+    expect(resolved.appearance.theme).toBe('dark')
+  })
+})
+
+describe('useSettingsStore — markWelcomeSeen', () => {
   describe('markWelcomeSeen', () => {
     it('calls updateGlobal with hasSeenWelcome true', async () => {
       const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: true } }
@@ -233,7 +243,9 @@ describe('useSettingsStore', () => {
       expect(stored).toEqual(wsSettings)
     })
   })
+})
 
+describe('useSettingsStore — updateShowMetricsBar', () => {
   describe('updateShowMetricsBar', () => {
     it('calls updateGlobal with showMetricsBar true and updates store', async () => {
       const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: false, showMetricsBar: true } }
@@ -256,7 +268,9 @@ describe('useSettingsStore', () => {
       })
     })
   })
+})
 
+describe('useSettingsStore — updatePromptForName', () => {
   describe('updatePromptForName', () => {
     it('calls updateGlobal with promptForName true and updates store', async () => {
       const updated = {
@@ -285,7 +299,9 @@ describe('useSettingsStore', () => {
       })
     })
   })
+})
 
+describe('useSettingsStore — updateNotificationDefaultTargets', () => {
   describe('updateNotificationDefaultTargets', () => {
     it('calls updateGlobal with the new default targets and updates store', async () => {
       const updated = {
@@ -301,7 +317,9 @@ describe('useSettingsStore', () => {
       expect(useSettingsStore.getState().globalSettings).toEqual(updated)
     })
   })
+})
 
+describe('useSettingsStore — updateNotificationOverride', () => {
   describe('updateNotificationOverride', () => {
     it('calls updateGlobal with a single-key override patch and updates store', async () => {
       const updated = {
@@ -333,7 +351,9 @@ describe('useSettingsStore', () => {
       })
     })
   })
+})
 
+describe('useSettingsStore — updateQuickActions', () => {
   describe('updateQuickActions', () => {
     it('calls updateGlobal with the quickActions patch and updates store', async () => {
       const updated = {
@@ -349,7 +369,9 @@ describe('useSettingsStore', () => {
       expect(useSettingsStore.getState().globalSettings).toEqual(updated)
     })
   })
+})
 
+describe('useSettingsStore — updateWorkspaceQuickActions', () => {
   describe('updateWorkspaceQuickActions', () => {
     it('calls updateWorkspace with the custom action list and updates workspace settings', async () => {
       const custom = [

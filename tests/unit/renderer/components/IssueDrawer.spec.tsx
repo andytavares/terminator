@@ -108,7 +108,9 @@ describe('IssueDrawer — the issue', () => {
     })
     expect(document.querySelector('.issue-drawer__comment code')?.textContent).toBe('npm test')
   })
+})
 
+describe('IssueDrawer — the issue — fetches nothing a description names, and opens its links in the browser', () => {
   // Anyone who can comment on a ticket writes this text: a remote image in it
   // is a tracking pixel aimed at whoever opens the drawer.
   it('fetches nothing a description names, and opens its links in the browser', async () => {
@@ -139,7 +141,9 @@ describe('IssueDrawer — the issue', () => {
     expect(screen.getByText(/could not be read/)).toBeTruthy()
     expect(screen.getByText(/still\s+attached/)).toBeTruthy()
   })
+})
 
+describe('IssueDrawer — the issue — renders nothing for a project with no link', () => {
   it('renders nothing for a project with no link', async () => {
     const { container } = await setupSettled({ link: null })
     expect(container.querySelector('.issue-drawer')).toBeNull()
@@ -165,7 +169,9 @@ describe('IssueDrawer — actions', () => {
     )
     await waitFor(() => expect(loadLink).toHaveBeenCalledWith(P))
   })
+})
 
+describe('IssueDrawer — actions — posts a comment and clears the box', () => {
   it('posts a comment and clears the box', async () => {
     await setupSettled()
     const box = screen.getByPlaceholderText(/Add a comment/)
@@ -199,7 +205,9 @@ describe('IssueDrawer — actions', () => {
     // possible response to a failed write.
     expect((box as HTMLTextAreaElement).value).toBe('important note')
   })
+})
 
+describe('IssueDrawer — actions — unlinks and closes', () => {
   it('unlinks and closes', async () => {
     const onClose = vi.fn()
     useIntegrationsStore.setState({
@@ -249,7 +257,9 @@ describe('IssueDrawer — agent context (FR-023)', () => {
     setup()
     expect(await screen.findByText(/Shortened to fit/)).toBeTruthy()
   })
+})
 
+describe('IssueDrawer — agent context (FR-023) — says plainly when nothing is fed', () => {
   it('says plainly when nothing is fed', async () => {
     api.contextPreview.mockResolvedValue({ context: null })
     setup()

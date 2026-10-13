@@ -25,10 +25,15 @@ function resetStore() {
   })
 }
 
-describe('useExtensionRegistry', () => {
+/** The hooks every "useExtensionRegistry" describe registers. */
+function setUpUseExtensionRegistry(): void {
   beforeEach(() => {
     resetStore()
   })
+}
+
+describe('useExtensionRegistry', () => {
+  setUpUseExtensionRegistry()
 
   describe('registerSidebarPanel', () => {
     it('adds panel to sidebarPanels map', () => {
@@ -63,6 +68,10 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().openPanels.has('git')).toBe(false)
     })
   })
+})
+
+describe('useExtensionRegistry — registerProjectTab', () => {
+  setUpUseExtensionRegistry()
 
   describe('registerProjectTab', () => {
     it('adds tab to projectTabs map', () => {
@@ -94,6 +103,10 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().activeProjectTabId).toBe('other-tab')
     })
   })
+})
+
+describe('useExtensionRegistry — registerKeyboardShortcut', () => {
+  setUpUseExtensionRegistry()
 
   describe('registerKeyboardShortcut', () => {
     it('adds shortcut to keyboardShortcuts array', () => {
@@ -123,6 +136,10 @@ describe('useExtensionRegistry', () => {
       expect(remaining[0].accelerator).toBe('CmdOrCtrl+H')
     })
   })
+})
+
+describe('useExtensionRegistry — togglePanel', () => {
+  setUpUseExtensionRegistry()
 
   describe('togglePanel', () => {
     it('opens closed panel', () => {
@@ -149,6 +166,10 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
     })
   })
+})
+
+describe('useExtensionRegistry — registerWindowView', () => {
+  setUpUseExtensionRegistry()
 
   describe('registerWindowView', () => {
     it('adds view to windowViews map', () => {
@@ -163,6 +184,10 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().windowViews.get('pr-review')).toBe(comp2)
     })
   })
+})
+
+describe('useExtensionRegistry — registerGlobalTab', () => {
+  setUpUseExtensionRegistry()
 
   describe('registerGlobalTab', () => {
     it('adds tab to globalTabs map', () => {
@@ -186,6 +211,10 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
     })
   })
+})
+
+describe('useExtensionRegistry — registerCommand', () => {
+  setUpUseExtensionRegistry()
 
   describe('registerCommand', () => {
     it('adds command to commands array', () => {
@@ -201,6 +230,10 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().commands.some((c) => c.id === 'test2')).toBe(false)
     })
   })
+})
+
+describe('useExtensionRegistry — updateCommand', () => {
+  setUpUseExtensionRegistry()
 
   describe('updateCommand', () => {
     it('updates label and shortcut of an existing command', () => {
@@ -231,6 +264,10 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().globalTabs.size).toBe(0)
     })
   })
+})
+
+describe('useExtensionRegistry — registerOverlay', () => {
+  setUpUseExtensionRegistry()
 
   describe('registerOverlay', () => {
     it('adds component to overlays array', () => {
@@ -244,6 +281,10 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().overlays).toHaveLength(0)
     })
   })
+})
+
+describe('useExtensionRegistry — registerWorkspaceTab', () => {
+  setUpUseExtensionRegistry()
 
   describe('registerWorkspaceTab', () => {
     it('adds tab to workspaceTabs map', () => {
@@ -275,6 +316,10 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBe('other-tab')
     })
   })
+})
+
+describe('useExtensionRegistry — setActiveGlobalTab', () => {
+  setUpUseExtensionRegistry()
 
   describe('setActiveGlobalTab', () => {
     it('sets activeGlobalTabId', () => {
@@ -300,6 +345,10 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().activeProjectTabId).toBe('git')
     })
   })
+})
+
+describe('useExtensionRegistry — setActiveWorkspaceTab', () => {
+  setUpUseExtensionRegistry()
 
   describe('setActiveWorkspaceTab', () => {
     it('sets activeWorkspaceTabId', () => {
@@ -325,6 +374,10 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().activeProjectTabId).toBe('git')
     })
   })
+})
+
+describe('useExtensionRegistry — setActiveGlobalTabWithNavigation', () => {
+  setUpUseExtensionRegistry()
 
   describe('setActiveGlobalTabWithNavigation', () => {
     it('sets activeGlobalTabId and stores navigation data', () => {
@@ -352,6 +405,10 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().pendingNavigations.size).toBe(0)
     })
   })
+})
+
+describe('useExtensionRegistry — dismissSurfaces', () => {
+  setUpUseExtensionRegistry()
 
   describe('dismissSurfaces', () => {
     it('clears a core global tab such as Home, which the Escape exit leaves alone', () => {
@@ -377,95 +434,105 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().openPanels.has('git-panel')).toBe(true)
     })
   })
+})
 
-  describe('exitExtensionToTerminal', () => {
-    it('clears an active global tab and reports that it exited', () => {
-      useExtensionRegistry.getState().setActiveGlobalTab('notepad')
-      expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
-      expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
-    })
+describe('useExtensionRegistry — exitExtensionToTerminal', () => {
+  setUpUseExtensionRegistry()
 
-    it('clears an active workspace tab', () => {
-      useExtensionRegistry.getState().setActiveWorkspaceTab('foundry')
-      expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
-      expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBeNull()
-    })
+  it('clears an active global tab and reports that it exited', () => {
+    useExtensionRegistry.getState().setActiveGlobalTab('notepad')
+    expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+  })
 
-    it('clears an active project tab', () => {
-      useExtensionRegistry.getState().setActiveProjectTab('git-integration')
-      expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
-      expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
-    })
+  it('clears an active workspace tab', () => {
+    useExtensionRegistry.getState().setActiveWorkspaceTab('foundry')
+    expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
+    expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBeNull()
+  })
 
-    it('clears every full-screen surface in a single call', () => {
-      useExtensionRegistry.setState({
-        activeGlobalTabId: 'notepad',
-        activeWorkspaceTabId: 'foundry',
-        activeProjectTabId: 'git-integration',
-      })
-      expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
-      const state = useExtensionRegistry.getState()
-      expect(state.activeGlobalTabId).toBeNull()
-      expect(state.activeWorkspaceTabId).toBeNull()
-      expect(state.activeProjectTabId).toBeNull()
-    })
+  it('clears an active project tab', () => {
+    useExtensionRegistry.getState().setActiveProjectTab('git-integration')
+    expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
+    expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
+  })
+})
 
-    it('never exits the core Overview tab', () => {
-      useExtensionRegistry.getState().setActiveGlobalTab('core.overview')
-      expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(false)
-      expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.overview')
-    })
+describe('useExtensionRegistry — exitExtensionToTerminal — clears every full-screen surface in a single call', () => {
+  setUpUseExtensionRegistry()
 
-    it('closes the named sidebar panel when it is the surface being exited', () => {
-      useExtensionRegistry
-        .getState()
-        .registerSidebarPanel({ id: 'git-integration', label: 'Git', component: NullComponent })
-      useExtensionRegistry.getState().togglePanel('git-integration')
-      expect(useExtensionRegistry.getState().exitExtensionToTerminal('git-integration')).toBe(true)
-      expect(useExtensionRegistry.getState().openPanels.has('git-integration')).toBe(false)
+  it('clears every full-screen surface in a single call', () => {
+    useExtensionRegistry.setState({
+      activeGlobalTabId: 'notepad',
+      activeWorkspaceTabId: 'foundry',
+      activeProjectTabId: 'git-integration',
     })
+    expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
+    const state = useExtensionRegistry.getState()
+    expect(state.activeGlobalTabId).toBeNull()
+    expect(state.activeWorkspaceTabId).toBeNull()
+    expect(state.activeProjectTabId).toBeNull()
+  })
 
-    it('leaves other open sidebar panels alone', () => {
-      const registry = useExtensionRegistry.getState()
-      registry.registerSidebarPanel({
-        id: 'git-integration',
-        label: 'Git',
-        component: NullComponent,
-      })
-      registry.registerSidebarPanel({ id: 'task-vault', label: 'Vault', component: NullComponent })
-      registry.togglePanel('git-integration')
-      registry.togglePanel('task-vault')
-      useExtensionRegistry.getState().exitExtensionToTerminal('git-integration')
-      expect(useExtensionRegistry.getState().openPanels.has('task-vault')).toBe(true)
-    })
+  it('never exits the core Overview tab', () => {
+    useExtensionRegistry.getState().setActiveGlobalTab('core.overview')
+    expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(false)
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.overview')
+  })
 
-    it('reports false when nothing is open to exit', () => {
-      expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(false)
-    })
+  it('closes the named sidebar panel when it is the surface being exited', () => {
+    useExtensionRegistry
+      .getState()
+      .registerSidebarPanel({ id: 'git-integration', label: 'Git', component: NullComponent })
+    useExtensionRegistry.getState().togglePanel('git-integration')
+    expect(useExtensionRegistry.getState().exitExtensionToTerminal('git-integration')).toBe(true)
+    expect(useExtensionRegistry.getState().openPanels.has('git-integration')).toBe(false)
+  })
+})
 
-    it('ignores a sidebar panel id that is not open', () => {
-      useExtensionRegistry
-        .getState()
-        .registerSidebarPanel({ id: 'git-integration', label: 'Git', component: NullComponent })
-      expect(useExtensionRegistry.getState().exitExtensionToTerminal('git-integration')).toBe(false)
+describe('useExtensionRegistry — exitExtensionToTerminal — leaves other open sidebar panels alone', () => {
+  setUpUseExtensionRegistry()
+
+  it('leaves other open sidebar panels alone', () => {
+    const registry = useExtensionRegistry.getState()
+    registry.registerSidebarPanel({
+      id: 'git-integration',
+      label: 'Git',
+      component: NullComponent,
     })
+    registry.registerSidebarPanel({ id: 'task-vault', label: 'Vault', component: NullComponent })
+    registry.togglePanel('git-integration')
+    registry.togglePanel('task-vault')
+    useExtensionRegistry.getState().exitExtensionToTerminal('git-integration')
+    expect(useExtensionRegistry.getState().openPanels.has('task-vault')).toBe(true)
+  })
+
+  it('reports false when nothing is open to exit', () => {
+    expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(false)
+  })
+
+  it('ignores a sidebar panel id that is not open', () => {
+    useExtensionRegistry
+      .getState()
+      .registerSidebarPanel({ id: 'git-integration', label: 'Git', component: NullComponent })
+    expect(useExtensionRegistry.getState().exitExtensionToTerminal('git-integration')).toBe(false)
   })
 })
 
 // ─── matchesAccelerator ────────────────────────────────────────────────────────
 
-describe('matchesAccelerator', () => {
-  function makeEvent(overrides: Partial<KeyboardEvent>): KeyboardEvent {
-    return {
-      key: '',
-      metaKey: false,
-      ctrlKey: false,
-      shiftKey: false,
-      altKey: false,
-      ...overrides,
-    } as KeyboardEvent
-  }
+function makeEvent(overrides: Partial<KeyboardEvent>): KeyboardEvent {
+  return {
+    key: '',
+    metaKey: false,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    ...overrides,
+  } as KeyboardEvent
+}
 
+describe('matchesAccelerator', () => {
   it('matches CmdOrCtrl+Shift+G with Ctrl held on non-Mac', () => {
     const event = makeEvent({ key: 'g', ctrlKey: true, shiftKey: true })
     expect(matchesAccelerator(event, 'CmdOrCtrl+Shift+G')).toBe(true)
@@ -495,7 +562,9 @@ describe('matchesAccelerator', () => {
     const event = makeEvent({ key: 'k', ctrlKey: true })
     expect(matchesAccelerator(event, 'CmdOrCtrl+K')).toBe(true)
   })
+})
 
+describe('matchesAccelerator — matches Alt+F4 style shortcut', () => {
   it('matches Alt+F4 style shortcut', () => {
     const event = makeEvent({ key: 'f4', altKey: true })
     expect(matchesAccelerator(event, 'Alt+F4')).toBe(true)

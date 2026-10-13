@@ -71,7 +71,9 @@ describe('RepoHeader', () => {
     const { container } = renderHeader({}, { pathLabel: '~/repos/terminator' })
     expect(container.querySelector('.repo-header')!.getAttribute('title')).toBeNull()
   })
+})
 
+describe('RepoHeader — carries the repo colour as a swatch, not as the name colour', () => {
   // FR-043. The colour is a swatch; the name is ordinary text.
   it('carries the repo colour as a swatch, not as the name colour', () => {
     const { container } = renderHeader()
@@ -104,7 +106,9 @@ describe('RepoHeader', () => {
     const { container: shut } = renderHeader({ needsYou: true }, { collapsed: true })
     expect(shut.querySelector('.repo-header__needs-you')).toBeTruthy()
   })
+})
 
+describe('RepoHeader — stays quiet when collapsed with nothing waiting', () => {
   it('stays quiet when collapsed with nothing waiting', () => {
     const { container } = renderHeader({ needsYou: false }, { collapsed: true })
     expect(container.querySelector('.repo-header__needs-you')).toBeNull()
@@ -116,78 +120,82 @@ describe('RepoHeader', () => {
       /waiting/i
     )
   })
+})
 
-  describe('interaction', () => {
-    it('collapses on click', () => {
-      const onToggleCollapse = vi.fn()
-      const { container } = renderHeader({}, { onToggleCollapse })
-      fireEvent.click(container.querySelector('.repo-header')!)
-      expect(onToggleCollapse).toHaveBeenCalled()
-    })
+describe('RepoHeader — interaction', () => {
+  it('collapses on click', () => {
+    const onToggleCollapse = vi.fn()
+    const { container } = renderHeader({}, { onToggleCollapse })
+    fireEvent.click(container.querySelector('.repo-header')!)
+    expect(onToggleCollapse).toHaveBeenCalled()
+  })
 
-    it.each(['Enter', ' '])('collapses on %s', (key) => {
-      const onToggleCollapse = vi.fn()
-      const { container } = renderHeader({}, { onToggleCollapse })
-      fireEvent.keyDown(container.querySelector('.repo-header')!, { key })
-      expect(onToggleCollapse).toHaveBeenCalled()
-    })
+  it.each(['Enter', ' '])('collapses on %s', (key) => {
+    const onToggleCollapse = vi.fn()
+    const { container } = renderHeader({}, { onToggleCollapse })
+    fireEvent.keyDown(container.querySelector('.repo-header')!, { key })
+    expect(onToggleCollapse).toHaveBeenCalled()
+  })
 
-    it('reports its expanded state', () => {
-      const { container } = renderHeader({}, { collapsed: true })
-      expect(container.querySelector('.repo-header')!.getAttribute('aria-expanded')).toBe('false')
-    })
+  it('reports its expanded state', () => {
+    const { container } = renderHeader({}, { collapsed: true })
+    expect(container.querySelector('.repo-header')!.getAttribute('aria-expanded')).toBe('false')
+  })
 
-    // FR-005. Creating a branch moved here from an always-visible row.
-    it('offers a new branch without also collapsing the repo', () => {
-      const onAddBranch = vi.fn()
-      const onToggleCollapse = vi.fn()
-      renderHeader({}, { onAddBranch, onToggleCollapse })
-      fireEvent.click(screen.getByRole('button', { name: 'New branch in terminator' }))
-      expect(onAddBranch).toHaveBeenCalled()
-      expect(onToggleCollapse).not.toHaveBeenCalled()
-    })
+  // FR-005. Creating a branch moved here from an always-visible row.
+  it('offers a new branch without also collapsing the repo', () => {
+    const onAddBranch = vi.fn()
+    const onToggleCollapse = vi.fn()
+    renderHeader({}, { onAddBranch, onToggleCollapse })
+    fireEvent.click(screen.getByRole('button', { name: 'New branch in terminator' }))
+    expect(onAddBranch).toHaveBeenCalled()
+    expect(onToggleCollapse).not.toHaveBeenCalled()
+  })
+})
 
-    it('hosts registered repo actions', () => {
-      const onSelectWorkspaceTab = vi.fn()
-      renderHeader(
-        {},
-        {
-          workspaceTabs: [{ id: 'git', label: 'Git', component: () => null }],
-          onSelectWorkspaceTab,
-        }
-      )
-      fireEvent.click(screen.getByRole('button', { name: 'Git' }))
-      expect(onSelectWorkspaceTab).toHaveBeenCalledWith('git')
-    })
+describe('RepoHeader — interaction — hosts registered repo actions', () => {
+  it('hosts registered repo actions', () => {
+    const onSelectWorkspaceTab = vi.fn()
+    renderHeader(
+      {},
+      {
+        workspaceTabs: [{ id: 'git', label: 'Git', component: () => null }],
+        onSelectWorkspaceTab,
+      }
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Git' }))
+    expect(onSelectWorkspaceTab).toHaveBeenCalledWith('git')
+  })
 
-    it('marks the active repo action', () => {
-      const { container } = renderHeader(
-        {},
-        {
-          workspaceTabs: [{ id: 'git', label: 'Git', component: () => null }],
-          activeWorkspaceTabId: 'git',
-        }
-      )
-      expect(container.querySelector('.repo-header__action--on')).toBeTruthy()
-    })
+  it('marks the active repo action', () => {
+    const { container } = renderHeader(
+      {},
+      {
+        workspaceTabs: [{ id: 'git', label: 'Git', component: () => null }],
+        activeWorkspaceTabId: 'git',
+      }
+    )
+    expect(container.querySelector('.repo-header__action--on')).toBeTruthy()
+  })
+})
 
-    it('edits and removes from the context menu', () => {
-      const onEdit = vi.fn()
-      const onRemove = vi.fn()
-      const { container } = renderHeader({}, { onEdit, onRemove })
-      fireEvent.contextMenu(container.querySelector('.repo-header')!)
-      fireEvent.click(screen.getByText('Edit workspace'))
-      expect(onEdit).toHaveBeenCalled()
-      fireEvent.contextMenu(container.querySelector('.repo-header')!)
-      fireEvent.click(screen.getByText('Remove workspace'))
-      expect(onRemove).toHaveBeenCalled()
-    })
+describe('RepoHeader — interaction — edits and removes from the context menu', () => {
+  it('edits and removes from the context menu', () => {
+    const onEdit = vi.fn()
+    const onRemove = vi.fn()
+    const { container } = renderHeader({}, { onEdit, onRemove })
+    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    fireEvent.click(screen.getByText('Edit workspace'))
+    expect(onEdit).toHaveBeenCalled()
+    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    fireEvent.click(screen.getByText('Remove workspace'))
+    expect(onRemove).toHaveBeenCalled()
+  })
 
-    it('opens no menu when there is nothing to put in it', () => {
-      const { container } = renderHeader()
-      fireEvent.contextMenu(container.querySelector('.repo-header')!)
-      expect(document.querySelector('.ctx-menu')).toBeNull()
-    })
+  it('opens no menu when there is nothing to put in it', () => {
+    const { container } = renderHeader()
+    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    expect(document.querySelector('.ctx-menu')).toBeNull()
   })
 })
 

@@ -218,7 +218,9 @@ describe('the extension API surface is unchanged', () => {
       'workspaceTab',
     ])
   })
+})
 
+describe('the extension API surface is unchanged — the renderer-facing extension API still exposes exactly its known members', () => {
   it('the renderer-facing extension API still exposes exactly its known members', async () => {
     const state: Record<string, unknown> = { ...useExtensionRegistry.getState() }
     const rendererApi = [

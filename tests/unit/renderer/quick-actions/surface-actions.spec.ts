@@ -32,7 +32,9 @@ describe('buildSurfaceActions', () => {
     expect(actions[0].group).toBe('top')
     expect(actions[0].mnemonic).toBeUndefined()
   })
+})
 
+describe('buildSurfaceActions — never takes a letter another action in its group already uses', () => {
   it('never takes a letter another action in its group already uses', () => {
     const taken = [
       {
@@ -55,7 +57,9 @@ describe('buildSurfaceActions', () => {
     actions[0].run()
     expect(activate).toHaveBeenCalledWith(s)
   })
+})
 
+describe('buildSurfaceActions — assigns no mnemonic once both "o" and every label letter are taken', () => {
   it('assigns no mnemonic once both "o" and every label letter are taken', () => {
     const surfaces = [
       surface({ view: 'a', label: 'Aa' }),

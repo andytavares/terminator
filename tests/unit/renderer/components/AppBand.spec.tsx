@@ -52,7 +52,9 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
       expect(icon.getAttribute('aria-hidden')).toBe('true')
     }
   })
+})
 
+describe('AppBand — one labelled home for app-level surfaces (US4) — falls back to a neutral glyph when a contribution supplies no icon', () => {
   it('falls back to a neutral glyph when a contribution supplies no icon', () => {
     const { container } = renderBand()
     const vault = [...container.querySelectorAll('.app-band__entry')].find(
@@ -83,7 +85,9 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
     )!
     expect(notes.getAttribute('aria-current')).toBe('page')
   })
+})
 
+describe('AppBand — one labelled home for app-level surfaces (US4) — keeps every entry keyboard reachable in reading order', () => {
   it('keeps every entry keyboard reachable in reading order', () => {
     const { container } = renderBand()
     for (const el of container.querySelectorAll('.app-band__entry')) {

@@ -113,7 +113,9 @@ describe('HomeScreen', () => {
     fireEvent.keyDown(screen.getByRole('row', { name: 'claude' }), { key: 'Enter' })
     expect(navigate).toHaveBeenCalledWith('a')
   })
+})
 
+describe('HomeScreen — writes a description to the session record', () => {
   it('writes a description to the session record', async () => {
     render(<HomeScreen />)
     const box = within(screen.getByRole('row', { name: 'claude' })).getByRole('textbox', {
@@ -137,7 +139,9 @@ describe('HomeScreen', () => {
     expect(screen.queryByRole('row', { name: 'claude' })).toBeNull()
     expect(screen.getByRole('row', { name: 'zsh' })).toBeTruthy()
   })
+})
 
+describe('HomeScreen — says when nothing matches and clears the filter on request', () => {
   it('says when nothing matches and clears the filter on request', () => {
     render(<HomeScreen />)
     const search = screen.getByRole('searchbox', { name: 'Filter sessions' }) as HTMLInputElement
@@ -163,7 +167,9 @@ describe('HomeScreen', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /^Close / })[0])
     expect(closeSession).toHaveBeenCalled()
   })
+})
 
+describe('HomeScreen — removes a closed session from the list', () => {
   it('removes a closed session from the list', () => {
     state.facts = [
       fact({
@@ -178,7 +184,9 @@ describe('HomeScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove old from the list' }))
     expect(records.forget).toHaveBeenCalledWith('c')
   })
+})
 
+describe('HomeScreen — still shows closed history when no terminal is open', () => {
   it('still shows closed history when no terminal is open', () => {
     state.facts = [
       fact({
@@ -206,7 +214,9 @@ describe('HomeScreen', () => {
     render(<HomeScreen />)
     expect(screen.getByRole('listbox', { name: 'Sessions' })).toBeTruthy()
   })
+})
 
+describe('HomeScreen — keeps the selection when switching layout', () => {
   it('keeps the selection when switching layout', () => {
     render(<HomeScreen />)
     fireEvent.click(screen.getByRole('row', { name: 'zsh' }))
@@ -228,7 +238,9 @@ describe('HomeScreen', () => {
       key: 'NW-84',
     })
   })
+})
 
+describe('HomeScreen — says when nothing matches in the Logbook too', () => {
   it('says when nothing matches in the Logbook too', () => {
     localStorage.setItem('terminator.home.prefs', JSON.stringify({ layout: 'logbook' }))
     render(<HomeScreen />)
@@ -258,7 +270,9 @@ describe('HomeScreen', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Logbook' }))
     expect(screen.queryByRole('option', { name: /Checking bundle size/ })).toBeNull()
   })
+})
 
+describe('HomeScreen — does not remember the Needs you filter', () => {
   it('does not remember the Needs you filter', () => {
     const { unmount } = render(<HomeScreen />)
     fireEvent.click(screen.getByRole('button', { name: /Needs you/ }))
@@ -276,7 +290,9 @@ describe('HomeScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
     expect(screen.getByRole('row', { name: 'zsh' })).toBeTruthy()
   })
+})
 
+describe('HomeScreen — arranges the Ledger from the Display menu, and remembers it', () => {
   it('arranges the Ledger from the Display menu, and remembers it', () => {
     const { unmount } = render(<HomeScreen />)
     fireEvent.click(screen.getByRole('button', { name: 'Display' }))
@@ -303,7 +319,9 @@ describe('HomeScreen', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'New terminal in terminator / main' }))
     expect(started.inBranch).toHaveBeenCalledWith('p1')
   })
+})
 
+describe('HomeScreen — starts a scratch terminal from Home', () => {
   it('starts a scratch terminal from Home', () => {
     render(<HomeScreen />)
     fireEvent.click(screen.getByRole('button', { name: 'New terminal' }))

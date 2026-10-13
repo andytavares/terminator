@@ -66,7 +66,9 @@ describe('useBranchSync — the name on the card is the branch in the tree', () 
     await settle()
     expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-1', 'feature/new')
   })
+})
 
+describe('useBranchSync — the name on the card is the branch in the tree — moves every card that shares the folder, without one telling the other', () => {
   it('moves every card that shares the folder, without one telling the other', async () => {
     // Two plain cards on one repo: each is checked against its own tree, so
     // both land on the branch that tree is on.
@@ -91,7 +93,9 @@ describe('useBranchSync — the name on the card is the branch in the tree', () 
     expect(mockCurrentBranch).toHaveBeenCalledWith('/workspace')
     expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-1', 'develop')
   })
+})
 
+describe('useBranchSync — the name on the card is the branch in the tree — does not ask while the window is hidden', () => {
   it('does not ask while the window is hidden', async () => {
     const spy = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     renderHook(() => useBranchSync([target()]))
@@ -119,7 +123,9 @@ describe('useBranchSync — the name on the card is the branch in the tree', () 
     await settle()
     expect(mockCurrentBranch.mock.calls.length).toBe(callsAfterMount)
   })
+})
 
+describe('useBranchSync — the name on the card is the branch in the tree — ignores a folder that is not a repository', () => {
   it('ignores a folder that is not a repository', async () => {
     mockCurrentBranch.mockRejectedValue(new Error('not a git repo'))
     renderHook(() => useBranchSync([target()]))

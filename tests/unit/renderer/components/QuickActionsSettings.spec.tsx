@@ -59,7 +59,9 @@ describe('QuickActionsSettings — global scope', () => {
     expect(screen.getByText('shell')).toBeTruthy()
     expect(screen.getByText('New tab on branch')).toBeTruthy()
   })
+})
 
+describe('QuickActionsSettings — global scope — adds a new action and saves it via updateQuickActions', () => {
   it('adds a new action and saves it via updateQuickActions', () => {
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
@@ -83,7 +85,9 @@ describe('QuickActionsSettings — global scope', () => {
       ],
     })
   })
+})
 
+describe('QuickActionsSettings — global scope — edits an existing action in place', () => {
   it('edits an existing action in place', () => {
     mockStore([
       {
@@ -113,7 +117,9 @@ describe('QuickActionsSettings — global scope', () => {
       ],
     })
   })
+})
 
+describe('QuickActionsSettings — global scope — deletes an action', () => {
   it('deletes an action', () => {
     mockStore([
       {
@@ -139,7 +145,9 @@ describe('QuickActionsSettings — global scope', () => {
     expect(screen.getByText('Label is required')).toBeTruthy()
     expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
+})
 
+describe('QuickActionsSettings — global scope — requires a body', () => {
   it('requires a body', () => {
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
@@ -158,7 +166,9 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(keyInput, { target: { value: 'ab' } })
     expect(keyInput.value).toBe('a')
   })
+})
 
+describe('QuickActionsSettings — global scope — rejects a key already used by another action', () => {
   it('rejects a key already used by another action', () => {
     mockStore([
       {
@@ -179,7 +189,9 @@ describe('QuickActionsSettings — global scope', () => {
     expect(screen.getByText('Key already used by Existing')).toBeTruthy()
     expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
+})
 
+describe('QuickActionsSettings — global scope — resets target to the first valid option when kind changes', () => {
   it('resets target to the first valid option when kind changes', () => {
     mockStore([])
     render(<QuickActionsSettings scope="global" />)

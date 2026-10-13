@@ -55,7 +55,9 @@ describe('checkbox styling', () => {
       expect(CONTROLS).not.toContain(glyph)
     }
   })
+})
 
+describe('checkbox styling — has a visible keyboard focus ring', () => {
   it('has a visible keyboard focus ring', () => {
     expect(
       ruleBody(CONTROLS, "input[type='checkbox']:focus-visible,\ninput[type='radio']:focus-visible")
@@ -136,7 +138,9 @@ describe('radio styling', () => {
     expect(dot).toMatch(/border-radius:\s*50%/)
     expect(dot).toMatch(/background:\s*var\(--tm-on-accent\)/)
   })
+})
 
+describe('radio styling — centres the dot — asserted arithmetically, so resizing the box cannot break it silently', () => {
   it('centres the dot — asserted arithmetically, so resizing the box cannot break it silently', () => {
     const base = ruleBody(CONTROLS, BOX)
     const dot = ruleBody(CONTROLS, "input[type='radio']:checked::after")
@@ -236,10 +240,11 @@ function rules(css: string): Array<[string, string]> {
   return out
 }
 
-describe('no form control may drift back to a native or half-styled widget', () => {
-  const cssFiles = filesUnder(sourceRoots(), ['.css'])
-  const tsFiles = filesUnder(sourceRoots(), ['.ts', '.tsx'])
+const cssFiles = filesUnder(sourceRoots(), ['.css'])
 
+const tsFiles = filesUnder(sourceRoots(), ['.ts', '.tsx'])
+
+describe('no form control may drift back to a native or half-styled widget', () => {
   it('finds stylesheets to check, so a broken glob cannot make these vacuous', () => {
     expect(cssFiles.length).toBeGreaterThan(10)
     expect(tsFiles.length).toBeGreaterThan(50)
@@ -260,7 +265,9 @@ describe('no form control may drift back to a native or half-styled widget', () 
     }
     expect(bad).toEqual([])
   })
+})
 
+describe('no form control may drift back to a native or half-styled widget — declares no box property on a control rule too weak to win', () => {
   it('declares no box property on a control rule too weak to win', () => {
     // A bare `.thing-checkbox { width: … }` loses to the (0,1,1) base rule, so
     // it is a lie in the source. Raise the selector or drop the declaration.

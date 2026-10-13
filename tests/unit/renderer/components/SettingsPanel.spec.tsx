@@ -81,7 +81,9 @@ describe('SettingsPanel', () => {
     render(<SettingsPanel onClose={vi.fn()} />)
     expect(screen.queryByText('Workspace Settings')).toBeNull()
   })
+})
 
+describe('SettingsPanel — shows Workspace Settings nav when a workspace is active', () => {
   it('shows Workspace Settings nav when a workspace is active', () => {
     seedStore(useWorkspaceStore, {
       activeWorkspaceId: 'ws-1',
@@ -112,7 +114,9 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByText('Settings').closest('.settings-overlay')!)
     expect(onClose).toHaveBeenCalled()
   })
+})
 
+describe('SettingsPanel — calls onClose on Escape key', () => {
   it('calls onClose on Escape key', () => {
     const onClose = vi.fn()
     render(<SettingsPanel onClose={onClose} />)
@@ -128,10 +132,15 @@ describe('SettingsPanel', () => {
   })
 })
 
-describe('ExtensionsSection', () => {
+/** The hooks every "ExtensionsSection" describe registers. */
+function setUpExtensionsSection(): void {
   beforeEach(() => {
     api.extension.list.mockResolvedValue({ extensions: [] })
   })
+}
+
+describe('ExtensionsSection', () => {
+  setUpExtensionsSection()
 
   it('shows empty message when no extensions', async () => {
     render(<SettingsPanel onClose={vi.fn()} />)
@@ -153,6 +162,10 @@ describe('ExtensionsSection', () => {
     expect(screen.getByText('v1.0.0')).toBeTruthy()
     expect(screen.getByText('enabled')).toBeTruthy()
   })
+})
+
+describe('ExtensionsSection — shows a failed extension as error, with why on its status', () => {
+  setUpExtensionsSection()
 
   it('shows a failed extension as error, with why on its status', async () => {
     const ext = extensionOf({
@@ -169,6 +182,10 @@ describe('ExtensionsSection', () => {
     expect(status.getAttribute('title')).toBe('Extension host exited with code 134')
     expect(screen.getByText('Enable')).toBeTruthy()
   })
+})
+
+describe('ExtensionsSection — reads the list again when main says it changed', () => {
+  setUpExtensionsSection()
 
   // The host can fail, or a backend come back, while this panel is open.
   it('reads the list again when main says it changed', async () => {
@@ -196,6 +213,10 @@ describe('ExtensionsSection', () => {
     const status = await screen.findByText('error')
     expect(status.getAttribute('title')).toBe('Extension host exited')
   })
+})
+
+describe('ExtensionsSection — stops listening for list changes when it closes', () => {
+  setUpExtensionsSection()
 
   it('stops listening for list changes when it closes', async () => {
     const unsubscribe = vi.fn()
@@ -222,6 +243,10 @@ describe('ExtensionsSection', () => {
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => expect(screen.getByText('Disable')).toBeTruthy())
   })
+})
+
+describe('ExtensionsSection — shows Enable button for disabled extensions', () => {
+  setUpExtensionsSection()
 
   it('shows Enable button for disabled extensions', async () => {
     const ext = extensionOf({
@@ -250,6 +275,10 @@ describe('ExtensionsSection', () => {
     fireEvent.click(screen.getByText('Install from Directory'))
     await waitFor(() => expect(api.dialog.openDirectory).toHaveBeenCalled())
   })
+})
+
+describe('ExtensionsSection — installs extension and shows it in list', () => {
+  setUpExtensionsSection()
 
   it('installs extension and shows it in list', async () => {
     const newExt = extensionOf({
@@ -268,6 +297,10 @@ describe('ExtensionsSection', () => {
     fireEvent.click(screen.getByText('Install from Directory'))
     await waitFor(() => expect(screen.getByText('New Ext')).toBeTruthy())
   })
+})
+
+describe('ExtensionsSection — lists an installed extension once when the list was re-read first', () => {
+  setUpExtensionsSection()
 
   // Main announces the changed list while the install is answering, so the
   // re-read can already hold the new extension: it must be listed once.
@@ -287,6 +320,10 @@ describe('ExtensionsSection', () => {
     await waitFor(() => expect(mockDispatchNotification).toHaveBeenCalled())
     expect(screen.getAllByText('New Ext')).toHaveLength(1)
   })
+})
+
+describe('ExtensionsSection — shows toast on install error', () => {
+  setUpExtensionsSection()
 
   it('shows toast on install error', async () => {
     api.dialog.openDirectory.mockResolvedValue({ filePath: '/path' })
@@ -303,6 +340,10 @@ describe('ExtensionsSection', () => {
       )
     )
   })
+})
+
+describe('ExtensionsSection — toggles extension enable/disable', () => {
+  setUpExtensionsSection()
 
   it('toggles extension enable/disable', async () => {
     const ext = extensionOf({
@@ -321,6 +362,10 @@ describe('ExtensionsSection', () => {
     fireEvent.click(screen.getByText('Disable'))
     await waitFor(() => expect(api.extension.toggle).toHaveBeenCalledWith('com.test', false))
   })
+})
+
+describe('ExtensionsSection — reloads extension and shows toast', () => {
+  setUpExtensionsSection()
 
   it('reloads extension and shows toast', async () => {
     const ext = extensionOf({
@@ -341,6 +386,10 @@ describe('ExtensionsSection', () => {
       )
     )
   })
+})
+
+describe('ExtensionsSection — shows toast when reload fails', () => {
+  setUpExtensionsSection()
 
   it('shows toast when reload fails', async () => {
     const ext = extensionOf({
@@ -361,6 +410,10 @@ describe('ExtensionsSection', () => {
       )
     )
   })
+})
+
+describe('ExtensionsSection — uninstalls extension when confirm is accepted', () => {
+  setUpExtensionsSection()
 
   it('uninstalls extension when confirm is accepted', async () => {
     const ext = extensionOf({
@@ -378,6 +431,10 @@ describe('ExtensionsSection', () => {
     await waitFor(() => expect(api.extension.uninstall).toHaveBeenCalledWith('com.test'))
     vi.unstubAllGlobals()
   })
+})
+
+describe('ExtensionsSection — does not uninstall when confirm is declined', () => {
+  setUpExtensionsSection()
 
   it('does not uninstall when confirm is declined', async () => {
     const ext = extensionOf({
@@ -396,6 +453,10 @@ describe('ExtensionsSection', () => {
     expect(api.extension.uninstall).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })
+})
+
+describe('ExtensionsSection — upgrades extension via Browse + install', () => {
+  setUpExtensionsSection()
 
   it('upgrades extension via Browse + install', async () => {
     const ext = extensionOf({
@@ -419,6 +480,10 @@ describe('ExtensionsSection', () => {
       )
     )
   })
+})
+
+describe('ExtensionsSection — shows error toast when upgrade install step fails', () => {
+  setUpExtensionsSection()
 
   it('shows error toast when upgrade install step fails', async () => {
     const ext = extensionOf({
@@ -441,6 +506,10 @@ describe('ExtensionsSection', () => {
       )
     )
   })
+})
+
+describe('ExtensionsSection — shows error toast when upgrade uninstall step fails', () => {
+  setUpExtensionsSection()
 
   it('shows error toast when upgrade uninstall step fails', async () => {
     const ext = extensionOf({
@@ -462,6 +531,10 @@ describe('ExtensionsSection', () => {
       )
     )
   })
+})
+
+describe('ExtensionsSection — skips upgrade when directory dialog is cancelled', () => {
+  setUpExtensionsSection()
 
   it('skips upgrade when directory dialog is cancelled', async () => {
     const ext = extensionOf({
@@ -479,6 +552,10 @@ describe('ExtensionsSection', () => {
     await new Promise((r) => setTimeout(r, 50))
     expect(api.extension.uninstall).not.toHaveBeenCalled()
   })
+})
+
+describe('ExtensionsSection — renders ExtensionSettingRow for extension with schema', () => {
+  setUpExtensionsSection()
 
   it('renders ExtensionSettingRow for extension with schema', async () => {
     const ext = extensionOf({
@@ -510,6 +587,10 @@ describe('ExtensionsSection', () => {
     fireEvent.click(screen.getByTitle('Configure'))
     await waitFor(() => expect(screen.getByText('My Setting')).toBeTruthy())
   })
+})
+
+describe('ExtensionsSection — ExtensionSettingRow calls updateSetting after debounce', () => {
+  setUpExtensionsSection()
 
   it('ExtensionSettingRow calls updateSetting after debounce', async () => {
     const ext = extensionOf({
@@ -546,6 +627,10 @@ describe('ExtensionsSection', () => {
       { timeout: 2000 }
     )
   })
+})
+
+describe('ExtensionsSection — ExtensionSettingRow renders boolean select', () => {
+  setUpExtensionsSection()
 
   it('ExtensionSettingRow renders boolean select', async () => {
     const ext = extensionOf({
@@ -578,6 +663,10 @@ describe('ExtensionsSection', () => {
     // The boolean setting renders as a toggle switch (role="switch")
     expect(screen.getByRole('switch', { name: 'Enable Feature' })).toBeTruthy()
   })
+})
+
+describe('ExtensionsSection — groups per-notification-kind boolean settings into a 4-column table instead of individual switches', () => {
+  setUpExtensionsSection()
 
   it('groups per-notification-kind boolean settings into a 4-column table instead of individual switches', async () => {
     const ext = extensionOf({
@@ -631,6 +720,10 @@ describe('ExtensionsSection', () => {
       )
     )
   })
+})
+
+describe('ExtensionsSection — ExtensionSettingRow renders enum select', () => {
+  setUpExtensionsSection()
 
   it('ExtensionSettingRow renders enum select', async () => {
     const ext = extensionOf({
@@ -666,6 +759,10 @@ describe('ExtensionsSection', () => {
     expect(screen.getByText('Slow')).toBeTruthy()
     expect(screen.getByText('Auto')).toBeTruthy()
   })
+})
+
+describe('ExtensionsSection — toggleSettingsExpand collapses panel when clicked again', () => {
+  setUpExtensionsSection()
 
   it('toggleSettingsExpand collapses panel when clicked again', async () => {
     const ext = extensionOf({
@@ -695,6 +792,10 @@ describe('ExtensionsSection', () => {
     fireEvent.click(gearBtn)
     await waitFor(() => expect(screen.queryByText('Key')).toBeNull())
   })
+})
+
+describe('ExtensionsSection — switches to global section when Appearance & Terminal is clicked', () => {
+  setUpExtensionsSection()
 
   it('switches to global section when Appearance & Terminal is clicked', () => {
     seedStore(useWorkspaceStore, {
@@ -705,6 +806,10 @@ describe('ExtensionsSection', () => {
     fireEvent.click(screen.getByText('Appearance & Terminal'))
     expect(screen.getByTestId('global-settings')).toBeTruthy()
   })
+})
+
+describe('ExtensionsSection — ActionSettingRow', () => {
+  setUpExtensionsSection()
 
   describe('ActionSettingRow', () => {
     function setupExtWithAction(
@@ -865,6 +970,10 @@ describe('ExtensionsSection', () => {
       vi.restoreAllMocks()
     })
   })
+})
+
+describe('ExtensionsSection — shows schema description when present', () => {
+  setUpExtensionsSection()
 
   it('shows schema description when present', async () => {
     const ext = extensionOf({
@@ -892,6 +1001,10 @@ describe('ExtensionsSection', () => {
     fireEvent.click(screen.getByTitle('Configure'))
     await waitFor(() => expect(screen.getByText('This extension does stuff')).toBeTruthy())
   })
+})
+
+describe('ExtensionsSection — renders folder-type setting with Choose button and updates value when folder picked', () => {
+  setUpExtensionsSection()
 
   it('renders folder-type setting with Choose button and updates value when folder picked', async () => {
     const ext = extensionOf({
@@ -925,6 +1038,10 @@ describe('ExtensionsSection', () => {
       { timeout: 2000 }
     )
   })
+})
+
+describe('ExtensionsSection — renders number-type setting as number input', () => {
+  setUpExtensionsSection()
 
   it('renders number-type setting as number input', async () => {
     const ext = extensionOf({
@@ -953,6 +1070,10 @@ describe('ExtensionsSection', () => {
     const input = screen.getByDisplayValue('5') as HTMLInputElement
     expect(input.type).toBe('number')
   })
+})
+
+describe('ExtensionsSection — toggle with error response calls toggle API', () => {
+  setUpExtensionsSection()
 
   it('toggle with error response calls toggle API', async () => {
     const ext = extensionOf({
@@ -969,6 +1090,10 @@ describe('ExtensionsSection', () => {
     fireEvent.click(screen.getByText('Disable'))
     await waitFor(() => expect(api.extension.toggle).toHaveBeenCalledWith('com.test', false))
   })
+})
+
+describe('ExtensionsSection — uninstall with error response shows error toast', () => {
+  setUpExtensionsSection()
 
   it('uninstall with error response shows error toast', async () => {
     const ext = extensionOf({
@@ -991,6 +1116,10 @@ describe('ExtensionsSection', () => {
     )
     vi.unstubAllGlobals()
   })
+})
+
+describe('ExtensionsSection — folder-type setting shows Not set placeholder when value is empty', () => {
+  setUpExtensionsSection()
 
   it('folder-type setting shows Not set placeholder when value is empty', async () => {
     const ext = extensionOf({

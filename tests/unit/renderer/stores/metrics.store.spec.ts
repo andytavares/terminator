@@ -36,20 +36,20 @@ function resetStore(): void {
   })
 }
 
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.useFakeTimers()
+  resetStore()
+})
+
+afterEach(() => {
+  // disableGlobalMetrics clears the interval whatever the case left enabled;
+  // stopPolling restarts it when global metrics are on.
+  useMetricsStore.getState().disableGlobalMetrics()
+  vi.useRealTimers()
+})
+
 describe('useMetricsStore', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    vi.useFakeTimers()
-    resetStore()
-  })
-
-  afterEach(() => {
-    // disableGlobalMetrics clears the interval whatever the case left enabled;
-    // stopPolling restarts it when global metrics are on.
-    useMetricsStore.getState().disableGlobalMetrics()
-    vi.useRealTimers()
-  })
-
   it('setSystem updates system metrics', () => {
     useMetricsStore.getState().setSystem(sysData)
     expect(useMetricsStore.getState().system).toMatchObject({ cpuPercent: 42 })
@@ -74,7 +74,9 @@ describe('useMetricsStore', () => {
 
     expect(useMetricsStore.getState().system).toEqual(sysData)
   })
+})
 
+describe('useMetricsStore — startPolling polls getProcesses with resolved pids', () => {
   it('startPolling polls getProcesses with resolved pids', async () => {
     mockGetSystem.mockResolvedValue({ data: sysData })
     mockGetProcesses.mockResolvedValue({
@@ -105,7 +107,9 @@ describe('useMetricsStore', () => {
     expect(useMetricsStore.getState().processesBySessionId.size).toBe(0)
     expect(useMetricsStore.getState().pollingActive).toBe(false)
   })
+})
 
+describe('useMetricsStore — stopPolling keeps polling when globalMetricsEnabled is true', () => {
   it('stopPolling keeps polling when globalMetricsEnabled is true', async () => {
     mockGetSystem.mockResolvedValue({ data: sysData })
     mockGetProcesses.mockResolvedValue({ data: [] })
@@ -131,7 +135,9 @@ describe('useMetricsStore', () => {
     expect(useMetricsStore.getState().globalMetricsEnabled).toBe(true)
     expect(useMetricsStore.getState().pollingActive).toBe(true)
   })
+})
 
+describe('useMetricsStore — disableGlobalMetrics stops polling and clears state', () => {
   it('disableGlobalMetrics stops polling and clears state', async () => {
     mockGetSystem.mockResolvedValue({ data: sysData })
     mockGetProcesses.mockResolvedValue({ data: [] })
@@ -156,7 +162,9 @@ describe('useMetricsStore', () => {
     // system stays null — no crash
     expect(useMetricsStore.getState().system).toBeNull()
   })
+})
 
+describe('useMetricsStore — stopPolling keeps system polling when globalMetricsEnabled and clears per-process metrics', () => {
   it('stopPolling keeps system polling when globalMetricsEnabled and clears per-process metrics', async () => {
     mockGetSystem.mockResolvedValue({ data: sysData })
     mockGetProcesses.mockResolvedValue({ data: [] })

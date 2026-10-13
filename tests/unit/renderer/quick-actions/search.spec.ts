@@ -11,14 +11,14 @@ function action(id: string, label: string, group: string, description?: string):
   return { id, label, group, description, run: () => {} }
 }
 
-describe('searchActions', () => {
-  const actions: QuickAction[] = [
-    action('git.push', 'Push', 'git', 'Push the current branch'),
-    action('git.pull', 'Pull', 'git'),
-    action('terminal.new-tab', 'New tab', 'terminal'),
-    action('terminal.split', 'Split right', 'terminal', 'Push output to a new pane'),
-  ]
+const actions: QuickAction[] = [
+  action('git.push', 'Push', 'git', 'Push the current branch'),
+  action('git.pull', 'Pull', 'git'),
+  action('terminal.new-tab', 'New tab', 'terminal'),
+  action('terminal.split', 'Split right', 'terminal', 'Push output to a new pane'),
+]
 
+describe('searchActions', () => {
   it('returns nothing for an empty query', () => {
     expect(searchActions(actions, groups, '', 50)).toEqual([])
   })
@@ -53,7 +53,9 @@ describe('searchActions', () => {
     const results = searchActions(actions, groups, 'ntab', 50)
     expect(results.map((a) => a.id)).toContain('terminal.new-tab')
   })
+})
 
+describe('searchActions — excludes actions that do not match at all', () => {
   it('excludes actions that do not match at all', () => {
     const results = searchActions(actions, groups, 'zzzzz', 50)
     expect(results).toEqual([])

@@ -111,7 +111,9 @@ describe('useKeyboardShortcuts', () => {
     pressKey('9', { metaKey: true })
     expect(workspaces().activeWorkspaceId).toBe('ws-1')
   })
+})
 
+describe('useKeyboardShortcuts — cycles to next workspace on Cmd+=, expanding only it', () => {
   it('cycles to next workspace on Cmd+=, expanding only it', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('=', { metaKey: true })
@@ -138,7 +140,9 @@ describe('useKeyboardShortcuts', () => {
     pressKey('t', { metaKey: true })
     expect(createSession).toHaveBeenCalledWith('proj-1', 'human', 'Terminal', '/ws1', 5000)
   })
+})
 
+describe('useKeyboardShortcuts — does not create session on Cmd+T when no active project', () => {
   it('does not create session on Cmd+T when no active project', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('t', { metaKey: true })
@@ -166,7 +170,9 @@ describe('useKeyboardShortcuts', () => {
     pressKey('k', { metaKey: true })
     expect(input).not.toHaveBeenCalled()
   })
+})
 
+describe('useKeyboardShortcuts — cycles tabs on Cmd+ArrowRight when sessions exist', () => {
   it('cycles tabs on Cmd+ArrowRight when sessions exist', () => {
     setup({ activeProjectId: 'proj-1' })
     withTabs('proj-1', ['s1', 's2'], 's1')
@@ -198,7 +204,9 @@ describe('useKeyboardShortcuts', () => {
     pressKey('i', { metaKey: true, shiftKey: true })
     expect(onToggleOverview).not.toHaveBeenCalled()
   })
+})
 
+describe('useKeyboardShortcuts — calls onNewScratch when Cmd+Shift+T is pressed', () => {
   it('calls onNewScratch when Cmd+Shift+T is pressed', () => {
     const onNewScratch = vi.fn()
     renderHook(() => useKeyboardShortcuts({ onNewScratch }))
@@ -225,49 +233,51 @@ describe('useKeyboardShortcuts', () => {
     pressKey(',', { metaKey: true })
     expect(onOpenSettings).not.toHaveBeenCalled()
   })
+})
 
-  describe('extension shortcuts', () => {
-    function registered(accelerator: string) {
-      const action = vi.fn()
-      useExtensionRegistry.getState().registerKeyboardShortcut({ accelerator, action })
-      return action
-    }
+function registered(accelerator: string) {
+  const action = vi.fn()
+  useExtensionRegistry.getState().registerKeyboardShortcut({ accelerator, action })
+  return action
+}
 
-    function pressIn(field: HTMLElement, key: string, metaKey = false): void {
-      document.body.appendChild(field)
-      field.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, metaKey }))
-      field.remove()
-    }
+function pressIn(field: HTMLElement, key: string, metaKey = false): void {
+  document.body.appendChild(field)
+  field.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, metaKey }))
+  field.remove()
+}
 
-    it('calls extension shortcut action when accelerator matches', () => {
-      const action = registered('CmdOrCtrl+Shift+K')
-      renderHook(() => useKeyboardShortcuts())
-      pressKey('k', { metaKey: true, shiftKey: true })
-      expect(action).toHaveBeenCalled()
-    })
-
-    it('suppresses bare-key extension shortcut when pressed inside an input', () => {
-      const action = registered('1')
-      renderHook(() => useKeyboardShortcuts())
-      pressIn(document.createElement('input'), '1')
-      expect(action).not.toHaveBeenCalled()
-    })
-
-    it('fires bare-key extension shortcut when pressed outside an input', () => {
-      const action = registered('1')
-      renderHook(() => useKeyboardShortcuts())
-      pressKey('1')
-      expect(action).toHaveBeenCalled()
-    })
-
-    it('fires modifier+key extension shortcut even when pressed inside an input', () => {
-      const action = registered('CmdOrCtrl+1')
-      renderHook(() => useKeyboardShortcuts())
-      pressIn(document.createElement('input'), '1', true)
-      expect(action).toHaveBeenCalled()
-    })
+describe('useKeyboardShortcuts — extension shortcuts', () => {
+  it('calls extension shortcut action when accelerator matches', () => {
+    const action = registered('CmdOrCtrl+Shift+K')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('k', { metaKey: true, shiftKey: true })
+    expect(action).toHaveBeenCalled()
   })
 
+  it('suppresses bare-key extension shortcut when pressed inside an input', () => {
+    const action = registered('1')
+    renderHook(() => useKeyboardShortcuts())
+    pressIn(document.createElement('input'), '1')
+    expect(action).not.toHaveBeenCalled()
+  })
+
+  it('fires bare-key extension shortcut when pressed outside an input', () => {
+    const action = registered('1')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('1')
+    expect(action).toHaveBeenCalled()
+  })
+
+  it('fires modifier+key extension shortcut even when pressed inside an input', () => {
+    const action = registered('CmdOrCtrl+1')
+    renderHook(() => useKeyboardShortcuts())
+    pressIn(document.createElement('input'), '1', true)
+    expect(action).toHaveBeenCalled()
+  })
+})
+
+describe('useKeyboardShortcuts — Cmd+D splits vertically when activeProjectId is set', () => {
   it('Cmd+D splits vertically when activeProjectId is set', () => {
     setup({ activeProjectId: 'proj-1' })
     renderHook(() => useKeyboardShortcuts())
@@ -287,7 +297,9 @@ describe('useKeyboardShortcuts', () => {
     pressKey('d', { metaKey: true, shiftKey: true })
     expect(splitSession).toHaveBeenCalledWith('proj-1', 'horizontal', '/ws1', 5000)
   })
+})
 
+describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split mode', () => {
   it('Cmd+W closes focused split pane when in split mode', async () => {
     setup({ activeProjectId: 'proj-1' })
     withTabs('proj-1', ['ses-root', 'ses-focused'], 'ses-root')
@@ -316,88 +328,91 @@ describe('useKeyboardShortcuts', () => {
     await Promise.resolve()
     expect(sessions().sessions.has('ses-active')).toBe(true)
   })
+})
 
-  describe('scratch mode — scratchProjectId overrides activeProjectId', () => {
-    const scratch = { scratchProjectId: SCRATCH_PROJECT_ID }
+const scratch = { scratchProjectId: SCRATCH_PROJECT_ID }
 
-    it('Cmd+K clears scratch session when scratchProjectId is set and activeProjectId is null', () => {
-      withTabs(SCRATCH_PROJECT_ID, ['scratch-ses-1'], 'scratch-ses-1')
-      renderHook(() => useKeyboardShortcuts(scratch))
-      pressKey('k', { metaKey: true })
-      expect(input).toHaveBeenCalledWith('scratch-ses-1', '\x0c')
-    })
+describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides activeProjectId', () => {
+  it('Cmd+K clears scratch session when scratchProjectId is set and activeProjectId is null', () => {
+    withTabs(SCRATCH_PROJECT_ID, ['scratch-ses-1'], 'scratch-ses-1')
+    renderHook(() => useKeyboardShortcuts(scratch))
+    pressKey('k', { metaKey: true })
+    expect(input).toHaveBeenCalledWith('scratch-ses-1', '\x0c')
+  })
 
-    it('Cmd+T creates scratch session when scratchProjectId is set and activeProjectId is null', () => {
-      renderHook(() => useKeyboardShortcuts(scratch))
-      pressKey('t', { metaKey: true })
-      expect(createSession).toHaveBeenCalledWith(
-        SCRATCH_PROJECT_ID,
-        'human',
-        'Terminal',
-        '/ws1',
-        5000
-      )
-    })
+  it('Cmd+T creates scratch session when scratchProjectId is set and activeProjectId is null', () => {
+    renderHook(() => useKeyboardShortcuts(scratch))
+    pressKey('t', { metaKey: true })
+    expect(createSession).toHaveBeenCalledWith(
+      SCRATCH_PROJECT_ID,
+      'human',
+      'Terminal',
+      '/ws1',
+      5000
+    )
+  })
 
-    it('Cmd+D splits the scratch terminal when that is what is on screen', () => {
-      // This used to be gated on `activeProjectId` alone and do nothing at
-      // all here — silently, with the palette entries absent too, which reads
-      // as the feature having been removed rather than as not applying. Cmd+T
-      // and Cmd+W already treat scratch as an ordinary project; this now does
-      // the same.
-      renderHook(() => useKeyboardShortcuts(scratch))
-      pressKey('d', { metaKey: true })
-      expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'vertical', '/ws1', 5000)
-    })
+  it('Cmd+D splits the scratch terminal when that is what is on screen', () => {
+    // This used to be gated on `activeProjectId` alone and do nothing at
+    // all here — silently, with the palette entries absent too, which reads
+    // as the feature having been removed rather than as not applying. Cmd+T
+    // and Cmd+W already treat scratch as an ordinary project; this now does
+    // the same.
+    renderHook(() => useKeyboardShortcuts(scratch))
+    pressKey('d', { metaKey: true })
+    expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'vertical', '/ws1', 5000)
+  })
 
-    it('Cmd+Shift+D splits the scratch terminal horizontally', () => {
-      renderHook(() => useKeyboardShortcuts(scratch))
-      pressKey('d', { metaKey: true, shiftKey: true })
-      expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'horizontal', '/ws1', 5000)
-    })
-
-    it('Cmd+W closes scratch tab when scratchProjectId is set', async () => {
-      withTabs(SCRATCH_PROJECT_ID, ['scratch-ses-1'], 'scratch-ses-1')
-      renderHook(() => useKeyboardShortcuts(scratch))
-      pressKey('w', { metaKey: true })
-      await waitFor(() => expect(sessions().sessions.has('scratch-ses-1')).toBe(false))
-    })
-
-    it('Cmd+ArrowRight cycles scratch tabs when scratchProjectId is set', () => {
-      withTabs(SCRATCH_PROJECT_ID, ['ss1', 'ss2'], 'ss1')
-      renderHook(() => useKeyboardShortcuts(scratch))
-      pressKey('ArrowRight', { metaKey: true })
-      expect(sessions().getActiveSessionForProject(SCRATCH_PROJECT_ID)).toBe('ss2')
-    })
-
-    it('regular project shortcuts still work when both activeProjectId and scratchProjectId are null', () => {
-      renderHook(() => useKeyboardShortcuts({ scratchProjectId: null }))
-      pressKey('t', { metaKey: true })
-      expect(createSession).not.toHaveBeenCalled()
-    })
-
-    it('Cmd+T calls onNewTab when provided instead of creating a session directly', () => {
-      const onNewTab = vi.fn()
-      setup({ activeProjectId: 'proj-1' })
-      renderHook(() => useKeyboardShortcuts({ scratchProjectId: null, onNewTab }))
-      pressKey('t', { metaKey: true })
-      expect(onNewTab).toHaveBeenCalled()
-      expect(createSession).not.toHaveBeenCalled()
-    })
+  it('Cmd+Shift+D splits the scratch terminal horizontally', () => {
+    renderHook(() => useKeyboardShortcuts(scratch))
+    pressKey('d', { metaKey: true, shiftKey: true })
+    expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'horizontal', '/ws1', 5000)
   })
 })
 
-describe('session navigation shortcuts (FR-032)', () => {
-  const mkSession = (id: string, projectId: string, patch: Partial<TerminalSession> = {}) =>
-    terminalSessionOf({ id, projectId, type: 'agent', ...patch })
+describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides activeProjectId — Cmd+W closes scratch tab when scratchProjectId is set', () => {
+  it('Cmd+W closes scratch tab when scratchProjectId is set', async () => {
+    withTabs(SCRATCH_PROJECT_ID, ['scratch-ses-1'], 'scratch-ses-1')
+    renderHook(() => useKeyboardShortcuts(scratch))
+    pressKey('w', { metaKey: true })
+    await waitFor(() => expect(sessions().sessions.has('scratch-ses-1')).toBe(false))
+  })
 
-  function withSessions(...list: TerminalSession[]): void {
-    useSessionStore.setState({ sessions: new Map(list.map((s) => [s.id, s])) })
-    useSessionStore.setState({
-      projectViews: new Map([['p1', { terminalCounter: 0, activeSessionId: 'a' }]]),
-    })
-  }
+  it('Cmd+ArrowRight cycles scratch tabs when scratchProjectId is set', () => {
+    withTabs(SCRATCH_PROJECT_ID, ['ss1', 'ss2'], 'ss1')
+    renderHook(() => useKeyboardShortcuts(scratch))
+    pressKey('ArrowRight', { metaKey: true })
+    expect(sessions().getActiveSessionForProject(SCRATCH_PROJECT_ID)).toBe('ss2')
+  })
 
+  it('regular project shortcuts still work when both activeProjectId and scratchProjectId are null', () => {
+    renderHook(() => useKeyboardShortcuts({ scratchProjectId: null }))
+    pressKey('t', { metaKey: true })
+    expect(createSession).not.toHaveBeenCalled()
+  })
+
+  it('Cmd+T calls onNewTab when provided instead of creating a session directly', () => {
+    const onNewTab = vi.fn()
+    setup({ activeProjectId: 'proj-1' })
+    renderHook(() => useKeyboardShortcuts({ scratchProjectId: null, onNewTab }))
+    pressKey('t', { metaKey: true })
+    expect(onNewTab).toHaveBeenCalled()
+    expect(createSession).not.toHaveBeenCalled()
+  })
+})
+
+const mkSession = (id: string, projectId: string, patch: Partial<TerminalSession> = {}) =>
+  terminalSessionOf({ id, projectId, type: 'agent', ...patch })
+
+function withSessions(...list: TerminalSession[]): void {
+  useSessionStore.setState({ sessions: new Map(list.map((s) => [s.id, s])) })
+  useSessionStore.setState({
+    projectViews: new Map([['p1', { terminalCounter: 0, activeSessionId: 'a' }]]),
+  })
+}
+
+/** The hooks every "session navigation shortcuts (FR-032)" describe registers. */
+function setUpSessionNavigationShortcutsFR(): void {
   beforeEach(() => {
     setup({ activeProjectId: 'p1' })
     withSessions(
@@ -406,6 +421,10 @@ describe('session navigation shortcuts (FR-032)', () => {
       mkSession('c', 'p3', { lastAttendedAt: 100, bellCount: 1 })
     )
   })
+}
+
+describe('session navigation shortcuts (FR-032)', () => {
+  setUpSessionNavigationShortcutsFR()
 
   it('Cmd+] moves to the next most-recently-attended session, across projects', () => {
     renderHook(() => useKeyboardShortcuts({}))
@@ -432,6 +451,10 @@ describe('session navigation shortcuts (FR-032)', () => {
     expect(workspaces().activeProjectId).toBe('p1')
     expect(sessions().focusRequest).toBeNull()
   })
+})
+
+describe('session navigation shortcuts (FR-032) — Cmd+Shift+A jumps to a session waiting on you', () => {
+  setUpSessionNavigationShortcutsFR()
 
   it('Cmd+Shift+A jumps to a session waiting on you', () => {
     renderHook(() => useKeyboardShortcuts({}))
@@ -460,6 +483,10 @@ describe('session navigation shortcuts (FR-032)', () => {
     const event = pressKey('Escape', { metaKey: true })
     expect(event.defaultPrevented).toBe(false)
   })
+})
+
+describe('session navigation shortcuts (FR-032) — leaves the new bindings alone while typing in a text field', () => {
+  setUpSessionNavigationShortcutsFR()
 
   it('leaves the new bindings alone while typing in a text field', () => {
     renderHook(() => useKeyboardShortcuts({}))

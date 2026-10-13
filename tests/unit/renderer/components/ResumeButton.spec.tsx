@@ -43,7 +43,9 @@ describe('ResumeButton', () => {
     )
     expect(container.innerHTML).toBe('')
   })
+})
 
+describe('ResumeButton — does not open the row or tile it sits on', () => {
   it('does not open the row or tile it sits on', () => {
     const behind = vi.fn()
     render(

@@ -132,7 +132,9 @@ describe('LogbookView — the detail of an open session', () => {
       'Reproducing the staging 429s'
     )
   })
+})
 
+describe('LogbookView — the detail of an open session — saves with Cmd+Enter, and clears with an empty box', () => {
   it('saves with Cmd+Enter, and clears with an empty box', () => {
     render(<LogbookView {...props} selected={{ ...undescribed, description: 'old' }} />)
     const box = screen.getByRole('textbox', { name: 'What is this session doing?' })
@@ -151,7 +153,9 @@ describe('LogbookView — the detail of an open session', () => {
     expect(within(detail).getByText('NW-88')).toBeTruthy()
     expect(within(detail).getByText("From the branch's link")).toBeTruthy()
   })
+})
 
+describe('LogbookView — the detail of an open session — suggests tickets and links one in a click', () => {
   it('suggests tickets and links one in a click', async () => {
     render(<LogbookView {...props} selected={undescribed} />)
     const suggestions = await screen.findByRole('list', { name: 'Suggested work items' })
@@ -179,7 +183,9 @@ describe('LogbookView — the detail of an open session', () => {
       'P-1 Project ticket'
     )
   })
+})
 
+describe('LogbookView — the detail of an open session — suggests nothing when no tracker is connected', () => {
   it('suggests nothing when no tracker is connected', async () => {
     useIntegrationsStore.setState({ connections: [trackerConnectionOf({ connected: false })] })
     render(<LogbookView {...props} selected={undescribed} />)
@@ -235,7 +241,9 @@ describe('LogbookView — the detail of a closed session', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Resume zsh' }))
     expect(onResume).toHaveBeenCalledWith(stopped)
   })
+})
 
+describe('LogbookView — the detail of a closed session — ends the selected session', () => {
   it('ends the selected session', () => {
     const onCloseSession = vi.fn()
     render(<LogbookView {...props} selected={undescribed} onCloseSession={onCloseSession} />)

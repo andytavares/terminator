@@ -81,7 +81,9 @@ describe('IntegrationsSettings — rendering', () => {
     ])
     await waitFor(() => expect(screen.getByText(/tav.atlassian.net/)).toBeTruthy())
   })
+})
 
+describe('IntegrationsSettings — rendering — says a working credential has started failing rather than showing an empty list', () => {
   it('says a working credential has started failing rather than showing an empty list', async () => {
     await renderWith([
       connection({
@@ -142,7 +144,9 @@ describe('IntegrationsSettings — connecting', () => {
     // Nothing was sent anywhere just by typing.
     expect(api.connect).not.toHaveBeenCalled()
   })
+})
 
+describe('IntegrationsSettings — connecting — masks the Jira token too', () => {
   it('masks the Jira token too', async () => {
     await renderWith([connection(), JIRA_DISCONNECTED])
     const token = screen.getByLabelText('API token') as HTMLInputElement
@@ -167,7 +171,9 @@ describe('IntegrationsSettings — connecting', () => {
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Authentication'))
   })
+})
 
+describe('IntegrationsSettings — connecting — clears the rejection as soon as the operator types again', () => {
   it('clears the rejection as soon as the operator types again', async () => {
     api.connect.mockResolvedValue({ error: 'auth-failed', message: 'Authentication required' })
     await renderWith([connection(), JIRA_DISCONNECTED])
@@ -192,7 +198,9 @@ describe('IntegrationsSettings — connecting', () => {
     fireEvent.change(screen.getByLabelText('API token'), { target: { value: 'tok' } })
     expect((screen.getByText('Connect Jira') as HTMLButtonElement).disabled).toBe(false)
   })
+})
 
+describe('IntegrationsSettings — connecting — sends the Jira query along with the credential', () => {
   it('sends the Jira query along with the credential', async () => {
     api.connect.mockResolvedValue({ connection: JIRA_DISCONNECTED })
     await renderWith([connection(), JIRA_DISCONNECTED])
@@ -245,7 +253,9 @@ describe('IntegrationsSettings — connected actions', () => {
       })
     )
   })
+})
 
+describe('IntegrationsSettings — connected actions — stores an edited JQL on blur', () => {
   it('stores an edited JQL on blur', async () => {
     api.setMine.mockResolvedValue({ ok: true })
     await renderWith([
@@ -270,7 +280,9 @@ describe('IntegrationsSettings — connected actions', () => {
       })
     )
   })
+})
 
+describe('IntegrationsSettings — connected actions — re-checks the connection when Test is pressed', () => {
   it('re-checks the connection when Test is pressed', async () => {
     await renderWith([
       connection({ connected: true, account: { name: 'A', email: 'a@b.co' } }),

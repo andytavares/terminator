@@ -194,11 +194,12 @@ beforeEach(() => {
 
 const renderSidebar = (props = {}) => render(<UnifiedSidebar {...defaultProps} {...props} />)
 
-describe('UnifiedSidebar — the list is branches, not terminals (US1)', () => {
-  const branchRows = (c: HTMLElement) => Array.from(c.querySelectorAll('.branch-row'))
-  const branchNames = (c: HTMLElement) =>
-    branchRows(c).map((r) => r.querySelector('.branch-row__name')!.textContent)
+const branchRows = (c: HTMLElement) => Array.from(c.querySelectorAll('.branch-row'))
 
+const branchNames = (c: HTMLElement) =>
+  branchRows(c).map((r) => r.querySelector('.branch-row__name')!.textContent)
+
+describe('UnifiedSidebar — the list is branches, not terminals (US1)', () => {
   it('lists one row per branch and no terminals at all', () => {
     const { container } = renderSidebar()
     expect(branchNames(container)).toEqual(['main', 'Jobs', 'Web'])
@@ -228,7 +229,9 @@ describe('UnifiedSidebar — the list is branches, not terminals (US1)', () => {
     const { container } = renderSidebar()
     expect(branchNames(container)).toEqual(['main', 'Jobs', 'Web'])
   })
+})
 
+describe('UnifiedSidebar — the list is branches, not terminals (US1) — shows a branch state folded from its terminals', () => {
   it('shows a branch state folded from its terminals', () => {
     setSessions(new Map([['s1', session('s1', 'p1', { bellCount: 1 })]]))
     const { container } = renderSidebar()
@@ -260,10 +263,10 @@ describe('UnifiedSidebar — the list is branches, not terminals (US1)', () => {
   })
 })
 
-describe('UnifiedSidebar — selecting a branch (FR-047)', () => {
-  const clickBranch = (container: HTMLElement, index = 0) =>
-    fireEvent.click(container.querySelectorAll('.branch-row')[index])
+const clickBranch = (container: HTMLElement, index = 0) =>
+  fireEvent.click(container.querySelectorAll('.branch-row')[index])
 
+describe('UnifiedSidebar — selecting a branch (FR-047)', () => {
   it('activates the branch and its repo', () => {
     const { container } = renderSidebar()
     clickBranch(container, 2)
@@ -281,7 +284,9 @@ describe('UnifiedSidebar — selecting a branch (FR-047)', () => {
     clickBranch(container)
     expect(useSessionStore.getState().getActiveSessionForProject('p1')).toBe('s2')
   })
+})
 
+describe('UnifiedSidebar — selecting a branch (FR-047) — falls back to the one you last had open on that branch', () => {
   it('falls back to the one you last had open on that branch', () => {
     sessions = new Map([
       ['s1', session('s1', 'p1', { lastActivityAt: NOW - 900_000 })],
@@ -306,7 +311,9 @@ describe('UnifiedSidebar — selecting a branch (FR-047)', () => {
     clickBranch(container)
     expect(useSessionStore.getState().getActiveSessionForProject('p1')).toBe('s2')
   })
+})
 
+describe('UnifiedSidebar — selecting a branch (FR-047) — selects a branch with no terminals and lets the app open its first', () => {
   it('selects a branch with no terminals and lets the app open its first', () => {
     // App's auto-open effect gives a newly selected branch its first terminal.
     // Starting one here as well opened two, which the e2e caught.
@@ -392,7 +399,9 @@ describe('UnifiedSidebar — branch actions', () => {
     await waitFor(() => expect(screen.queryByText('main')).toBeNull())
     expect(projectApi.delete).toHaveBeenCalledWith('p1')
   })
+})
 
+describe('UnifiedSidebar — branch actions — renames a branch that has no branch to be named by', () => {
   it('renames a branch that has no branch to be named by', async () => {
     const { container } = renderSidebar()
     // `web` sits in a folder that is not a repo, so its stored name is its only name.
@@ -472,13 +481,18 @@ describe('UnifiedSidebar — search', () => {
   })
 })
 
-describe('UnifiedSidebar — scratch is the one place a terminal is still a row', () => {
+/** The hooks every "UnifiedSidebar — scratch is the one place a terminal is still a row" describe registers. */
+function setUpUnifiedSidebarScratchIsThe(): void {
   beforeEach(() => {
     sessions = new Map([
       ['sc1', session('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' })],
     ])
     setSessions(sessions)
   })
+}
+
+describe('UnifiedSidebar — scratch is the one place a terminal is still a row', () => {
+  setUpUnifiedSidebarScratchIsThe()
 
   it('lists a scratch terminal in its own section', () => {
     const { container } = renderSidebar()
@@ -498,6 +512,10 @@ describe('UnifiedSidebar — scratch is the one place a terminal is still a row'
     const { container } = renderSidebar()
     expect(container.querySelector('.unified-sidebar__scratch-count')!.textContent).toBe('1')
   })
+})
+
+describe("UnifiedSidebar — scratch is the one place a terminal is still a row — shows a scratch terminal's own ticket, and one its split pane carries, on its row", () => {
+  setUpUnifiedSidebarScratchIsThe()
 
   it("shows a scratch terminal's own ticket, and one its split pane carries, on its row", () => {
     sessions.set(
@@ -521,6 +539,10 @@ describe('UnifiedSidebar — scratch is the one place a terminal is still a row'
     const key = container.querySelector('.unified-sidebar__scratch .branch-row__issue')!
     expect(key.textContent).toBe('ENG-3 +1')
   })
+})
+
+describe('UnifiedSidebar — scratch is the one place a terminal is still a row — selects a scratch terminal when its row is clicked', () => {
+  setUpUnifiedSidebarScratchIsThe()
 
   it('selects a scratch terminal when its row is clicked', () => {
     const onSelectScratchSession = vi.fn()
@@ -576,7 +598,9 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     await waitFor(() => expect(screen.queryByText('Backend')).toBeNull())
     expect(workspaceApi.delete).toHaveBeenCalledWith('ws-1')
   })
+})
 
+describe('UnifiedSidebar — shell behaviour preserved — opens the workspace editor', () => {
   it('opens the workspace editor', () => {
     const { container } = renderSidebar()
     fireEvent.contextMenu(container.querySelectorAll('.repo-header')[0])
@@ -603,7 +627,9 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     expect(await screen.findByText('Web')).toBeTruthy()
     expect(projectApi.list).toHaveBeenCalledWith('ws-2')
   })
+})
 
+describe('UnifiedSidebar — shell behaviour preserved — restores a previously stored width', () => {
   it('restores a previously stored width', () => {
     localStorage.setItem('terminator.sidebar.width', '333')
     const { container } = renderSidebar()
@@ -632,7 +658,9 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     const { container } = renderSidebar()
     expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('264px')
   })
+})
 
+describe('UnifiedSidebar — shell behaviour preserved — persists a new width after a resize drag', () => {
   it('persists a new width after a resize drag', () => {
     const { container } = renderSidebar()
     const handle = container.querySelector('.unified-sidebar__resize-handle')!
@@ -661,7 +689,9 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     fireEvent.click(container.querySelector('.sidebar-search__clear')!)
     expect(screen.getByText('main')).toBeTruthy()
   })
+})
 
+describe('UnifiedSidebar — shell behaviour preserved — closes the create-workspace dialog when it asks to close', () => {
   it('closes the create-workspace dialog when it asks to close', () => {
     const { container } = renderSidebar()
     fireEvent.click(container.querySelector('.sidebar-header__add')!)
@@ -670,10 +700,11 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
   })
 })
 
-describe('UnifiedSidebar — two menus replace four bands of chrome (US5)', () => {
-  const openDisplay = () => fireEvent.click(screen.getByRole('button', { name: 'Display' }))
-  const openFilter = () => fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
+const openDisplay = () => fireEvent.click(screen.getByRole('button', { name: 'Display' }))
 
+const openFilter = () => fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
+
+describe('UnifiedSidebar — two menus replace four bands of chrome (US5)', () => {
   it('switches grouping from the Display menu', () => {
     const { container } = renderSidebar()
     openDisplay()
@@ -695,7 +726,9 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5)', () =
     )
     expect(labels).toEqual(['All branches'])
   })
+})
 
+describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — switches sort from the Display menu', () => {
   it('switches sort from the Display menu', () => {
     renderSidebar()
     openDisplay()
@@ -722,7 +755,9 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5)', () =
     }
     expect(screen.getByRole('menuitemcheckbox', { name: /Hide stale/ })).toBeTruthy()
   })
+})
 
+describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — restores the unfiltered Everything view on mount, never a filtered one (FR-015)', () => {
   it('restores the unfiltered Everything view on mount, never a filtered one (FR-015)', () => {
     const { unmount } = renderSidebar()
     openFilter()
@@ -749,7 +784,9 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5)', () =
     })
     expect(container.querySelector('.sidebar-menu__badge')!.textContent).toBe('2')
   })
+})
 
+describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — draws no notice band at all', () => {
   it('draws no notice band at all', () => {
     const { container } = renderSidebar()
     openFilter()
@@ -772,7 +809,9 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5)', () =
     expect(screen.getByText('main')).toBeTruthy()
     expect(container.querySelector('.sidebar-menu__badge')).toBeNull()
   })
+})
 
+describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — disables the hide-stale toggle on the Stale view (FR-021)', () => {
   it('disables the hide-stale toggle on the Stale view (FR-021)', () => {
     renderSidebar()
     openFilter()
@@ -822,7 +861,9 @@ describe('UnifiedSidebar — agent state is derived, not read from a field nobod
     const active = renderSidebar({ initialViewId: 'active' })
     expect(active.container.textContent).not.toContain('quiet')
   })
+})
 
+describe('UnifiedSidebar — agent state is derived, not read from a field nobody writes — treats a closed session as exited', () => {
   it('treats a closed session as exited', () => {
     sessions.clear()
     sessions.set('s9', session('s9', 'p1', { tabTitle: 'gone', status: 'closed' }))
@@ -852,26 +893,27 @@ describe('UnifiedSidebar — app surfaces have one home, scratch has a group (US
   })
 })
 
-describe('UnifiedSidebar — issue actions on a branch header', () => {
-  // These reach openLinkedIssue and copyIssueKey, which the header context menu
-  // and ScopeMenu both call through issueActionsFor. Nothing exercised them
-  // before, which is what held the file's function coverage under the 80% gate.
-  const link = {
-    projectId: 'p1',
-    tracker: 'linear' as const,
-    key: 'TAV-14',
-    injectContext: false,
-    linkedAt: '',
-  }
+// These reach openLinkedIssue and copyIssueKey, which the header context menu
+// and ScopeMenu both call through issueActionsFor. Nothing exercised them
+// before, which is what held the file's function coverage under the 80% gate.
+const link = {
+  projectId: 'p1',
+  tracker: 'linear' as const,
+  key: 'TAV-14',
+  injectContext: false,
+  linkedAt: '',
+}
 
-  function openBranchMenu(): void {
-    const { container } = renderSidebar()
-    const rows = Array.from(container.querySelectorAll('.branch-row'))
-    fireEvent.contextMenu(
-      rows.find((r) => r.querySelector('.branch-row__name')?.textContent === 'main')!
-    )
-  }
+function openBranchMenu(): void {
+  const { container } = renderSidebar()
+  const rows = Array.from(container.querySelectorAll('.branch-row'))
+  fireEvent.contextMenu(
+    rows.find((r) => r.querySelector('.branch-row__name')?.textContent === 'main')!
+  )
+}
 
+/** The hooks every "UnifiedSidebar — issue actions on a branch header" describe registers. */
+function setUpUnifiedSidebarIssueActionsOn(): void {
   beforeEach(() => {
     useIntegrationsStore.setState({ links: new Map([['p1', link]]) })
     Object.defineProperty(window, 'electronAPI', {
@@ -883,6 +925,10 @@ describe('UnifiedSidebar — issue actions on a branch header', () => {
       value: { writeText: vi.fn() },
     })
   })
+}
+
+describe('UnifiedSidebar — issue actions on a branch header', () => {
+  setUpUnifiedSidebarIssueActionsOn()
 
   it('opens the linked issue in the tracker', () => {
     useIntegrationsStore.setState({
@@ -909,6 +955,10 @@ describe('UnifiedSidebar — issue actions on a branch header', () => {
     fireEvent.click(screen.getByText('Copy issue key'))
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('TAV-14')
   })
+})
+
+describe('UnifiedSidebar — issue actions on a branch header — copies nothing when the branch has no link', () => {
+  setUpUnifiedSidebarIssueActionsOn()
 
   it('copies nothing when the branch has no link', () => {
     useIntegrationsStore.setState({ links: new Map() })
@@ -933,9 +983,17 @@ describe('UnifiedSidebar — issue actions on a branch header', () => {
   })
 })
 
-describe('UnifiedSidebar — opening a branch in the editor', () => {
-  const openEditor = vi.fn()
+const openEditor = vi.fn()
 
+const openRowMenu = (container: HTMLElement, name: string) => {
+  const row = Array.from(container.querySelectorAll('.branch-row')).find(
+    (r) => r.querySelector('.branch-row__name')?.textContent === name
+  )!
+  fireEvent.contextMenu(row)
+}
+
+/** The hooks every "UnifiedSidebar — opening a branch in the editor" describe registers. */
+function setUpUnifiedSidebarOpeningABranch(): void {
   beforeEach(() => {
     openEditor.mockClear()
     // The real channel always answers with a promise. A bare `vi.fn()` returns
@@ -954,13 +1012,10 @@ describe('UnifiedSidebar — opening a branch in the editor', () => {
       },
     })
   })
+}
 
-  const openRowMenu = (container: HTMLElement, name: string) => {
-    const row = Array.from(container.querySelectorAll('.branch-row')).find(
-      (r) => r.querySelector('.branch-row__name')?.textContent === name
-    )!
-    fireEvent.contextMenu(row)
-  }
+describe('UnifiedSidebar — opening a branch in the editor', () => {
+  setUpUnifiedSidebarOpeningABranch()
 
   it("opens a branch's own working copy when it has one", async () => {
     // `jobs` is a worktree, so its own directory is the one to open.
@@ -986,6 +1041,10 @@ describe('UnifiedSidebar — opening a branch in the editor', () => {
     fireEvent.click(screen.getByText(/Open in/))
     expect(openEditor).toHaveBeenCalledWith('/b')
   })
+})
+
+describe('UnifiedSidebar — opening a branch in the editor — names the detected editor in the menu', () => {
+  setUpUnifiedSidebarOpeningABranch()
 
   it('names the detected editor in the menu', async () => {
     const { container } = renderSidebar()
@@ -995,11 +1054,19 @@ describe('UnifiedSidebar — opening a branch in the editor', () => {
   })
 })
 
+const toasts = () => useToastStore.getState().toasts
+
+const openMenuAndClick = async (container: HTMLElement) => {
+  await act(async () => {})
+  fireEvent.contextMenu(container.querySelector('.branch-row')!)
+  fireEvent.click(screen.getByText(/Open in/))
+  await act(async () => {})
+}
+
 describe('UnifiedSidebar — opening in the editor reports back', () => {
   // The first version discarded the result, so a failure looked exactly like
   // the action not being wired up: nothing at all on screen.
   const openEditor = vi.fn()
-  const toasts = () => useToastStore.getState().toasts
 
   beforeEach(() => {
     openEditor.mockClear()
@@ -1013,18 +1080,29 @@ describe('UnifiedSidebar — opening in the editor reports back', () => {
     })
   })
 
-  const openMenuAndClick = async (container: HTMLElement) => {
-    await act(async () => {})
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(screen.getByText(/Open in/))
-    await act(async () => {})
-  }
-
   it('says nothing when it worked', async () => {
     openEditor.mockResolvedValue({ ok: true, editor: 'Cursor' })
     const { container } = renderSidebar()
     await openMenuAndClick(container)
     expect(toasts()).toEqual([])
+  })
+})
+
+describe('UnifiedSidebar — opening in the editor reports back — explains in the user own terms', () => {
+  // The first version discarded the result, so a failure looked exactly like
+  // the action not being wired up: nothing at all on screen.
+  const openEditor = vi.fn()
+
+  beforeEach(() => {
+    openEditor.mockClear()
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+        editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
+        shell: { openExternal: vi.fn() },
+      },
+    })
   })
 
   it.each([
@@ -1039,6 +1117,24 @@ describe('UnifiedSidebar — opening in the editor reports back', () => {
       expect.objectContaining({ type: 'error', message: expect.stringMatching(expected) }),
     ])
   })
+})
+
+describe('UnifiedSidebar — opening in the editor reports back — passes an unrecognised failure through rather than swallowing it', () => {
+  // The first version discarded the result, so a failure looked exactly like
+  // the action not being wired up: nothing at all on screen.
+  const openEditor = vi.fn()
+
+  beforeEach(() => {
+    openEditor.mockClear()
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+        editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
+        shell: { openExternal: vi.fn() },
+      },
+    })
+  })
 
   it('passes an unrecognised failure through rather than swallowing it', async () => {
     openEditor.mockResolvedValue({ error: 'EACCES' })
@@ -1047,6 +1143,24 @@ describe('UnifiedSidebar — opening in the editor reports back', () => {
     expect(toasts()).toEqual([
       expect.objectContaining({ message: expect.stringContaining('EACCES') }),
     ])
+  })
+})
+
+describe('UnifiedSidebar — opening in the editor reports back — survives the call rejecting outright', () => {
+  // The first version discarded the result, so a failure looked exactly like
+  // the action not being wired up: nothing at all on screen.
+  const openEditor = vi.fn()
+
+  beforeEach(() => {
+    openEditor.mockClear()
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+        editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
+        shell: { openExternal: vi.fn() },
+      },
+    })
   })
 
   it('survives the call rejecting outright', async () => {
@@ -1087,27 +1201,29 @@ describe('UnifiedSidebar — where there is no editor API at all', () => {
   })
 })
 
-describe('UnifiedSidebar — a drag is the manual order (Display → Manual)', () => {
-  const openDisplay = () => fireEvent.click(screen.getByRole('button', { name: 'Display' }))
-  const pickSort = (label: string) => {
-    openDisplay()
-    fireEvent.click(screen.getByRole('menuitemradio', { name: label }))
-  }
-  const checkedSort = () => {
-    openDisplay()
-    return ['Recent', 'Oldest', 'Name', 'Status', 'Manual'].find(
-      (label) =>
-        screen.getByRole('menuitemradio', { name: label }).getAttribute('aria-checked') === 'true'
-    )
-  }
-  const branchIdsOf = (workspaceId: string) =>
-    useWorkspaceStore
-      .getState()
-      .projectsByWorkspaceId.get(workspaceId)!
-      .map((p) => p.id)
-  const repoNames = (c: HTMLElement) =>
-    Array.from(c.querySelectorAll('.repo-header__name')).map((el) => el.textContent)
+const pickSort = (label: string) => {
+  openDisplay()
+  fireEvent.click(screen.getByRole('menuitemradio', { name: label }))
+}
 
+const checkedSort = () => {
+  openDisplay()
+  return ['Recent', 'Oldest', 'Name', 'Status', 'Manual'].find(
+    (label) =>
+      screen.getByRole('menuitemradio', { name: label }).getAttribute('aria-checked') === 'true'
+  )
+}
+
+const branchIdsOf = (workspaceId: string) =>
+  useWorkspaceStore
+    .getState()
+    .projectsByWorkspaceId.get(workspaceId)!
+    .map((p) => p.id)
+
+const repoNames = (c: HTMLElement) =>
+  Array.from(c.querySelectorAll('.repo-header__name')).map((el) => el.textContent)
+
+describe('UnifiedSidebar — a drag is the manual order (Display → Manual)', () => {
   // The store's order and the drawn order are two different things the moment a
   // computed sort is on. A drop has to move the row the user actually dragged,
   // so the indices it works in are the drawn ones.
@@ -1142,6 +1258,10 @@ describe('UnifiedSidebar — a drag is the manual order (Display → Manual)', (
     fireEvent.drop(rows[1])
     expect(branchIdsOf('ws-1')).toEqual(['p2', 'p1'])
   })
+})
+
+describe('UnifiedSidebar — a drag is the manual order (Display → Manual) — switches the view to Manual when a branch is dropped', () => {
+  const openDisplay = () => fireEvent.click(screen.getByRole('button', { name: 'Display' }))
 
   it('switches the view to Manual when a branch is dropped', () => {
     const { container } = renderSidebar()
@@ -1186,7 +1306,9 @@ describe('a session-level ticket link', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show terminals in main' }))
     expect(container.querySelector('.terminal-row__key')!.textContent).toBe('ENG-9')
   })
+})
 
+describe('a session-level ticket link — removes the link from the terminal menu', () => {
   it('removes the link from the terminal menu', async () => {
     const linked = fact({
       sessionId: 's1',
@@ -1210,9 +1332,25 @@ describe('a session-level ticket link', () => {
   })
 })
 
-describe('a busy terminal and the sidebar', () => {
-  const changeStats = vi.fn()
+const changeStats = vi.fn()
 
+const diffsOfMain = (): number => changeStats.mock.calls.filter(([cwd]) => cwd === '/b').length
+
+/** One activity stamp a second while s1 prints, as the session controller sends them. */
+async function printFor(
+  seconds: number,
+  rerender: (ui: React.ReactElement) => void
+): Promise<void> {
+  for (let second = 1; second <= seconds; second++) {
+    const at = NOW + second * 1000
+    sessions.set('s1', { ...sessions.get('s1')!, busy: true, lastActivityAt: at })
+    setSessions(new Map(sessions))
+    await act(async () => rerender(<UnifiedSidebar {...defaultProps} now={at} />))
+  }
+}
+
+/** The hooks every "a busy terminal and the sidebar" describe registers. */
+function setUpABusyTerminalAnd(): void {
   beforeEach(() => {
     useChangeStatsStore.getState().invalidateAll()
     changeStats.mockReset()
@@ -1223,21 +1361,10 @@ describe('a busy terminal and the sidebar', () => {
     })
     vi.mocked(buildBranchRows).mockClear()
   })
+}
 
-  const diffsOfMain = (): number => changeStats.mock.calls.filter(([cwd]) => cwd === '/b').length
-
-  /** One activity stamp a second while s1 prints, as the session controller sends them. */
-  async function printFor(
-    seconds: number,
-    rerender: (ui: React.ReactElement) => void
-  ): Promise<void> {
-    for (let second = 1; second <= seconds; second++) {
-      const at = NOW + second * 1000
-      sessions.set('s1', { ...sessions.get('s1')!, busy: true, lastActivityAt: at })
-      setSessions(new Map(sessions))
-      await act(async () => rerender(<UnifiedSidebar {...defaultProps} now={at} />))
-    }
-  }
+describe('a busy terminal and the sidebar', () => {
+  setUpABusyTerminalAnd()
 
   it('asks git for its branch once while it prints, and again once it settles', async () => {
     const { rerender } = renderSidebar()
@@ -1263,6 +1390,10 @@ describe('a busy terminal and the sidebar', () => {
     }
     expect(vi.mocked(buildBranchRows).mock.calls.length).toBe(builds)
   })
+})
+
+describe('a busy terminal and the sidebar — still lists a branch as stale once its terminals pass the threshold', () => {
+  setUpABusyTerminalAnd()
 
   it('still lists a branch as stale once its terminals pass the threshold', async () => {
     const { container, rerender } = renderSidebar()

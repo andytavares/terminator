@@ -30,52 +30,53 @@ vi.mock('../../../../src/renderer/lib/focus-terminal', () => ({
   focusActiveTerminal: vi.fn(),
 }))
 
+let panelLoadedHandler: ((id: string) => void) | null = null
+
+const originalElectronAPI = window.electronAPI
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  capturedResizeCallback = null
+  panelLoadedHandler = null
+  mockOnExtensionPanelLoaded.mockImplementation((handler: (id: string) => void) => {
+    panelLoadedHandler = handler
+    return () => {
+      panelLoadedHandler = null
+    }
+  })
+  // Mock getBoundingClientRect to return a controlled rect
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 10,
+    top: 20,
+    width: 400,
+    height: 300,
+    right: 410,
+    bottom: 320,
+    x: 10,
+    y: 20,
+    toJSON: () => ({}),
+  } as DOMRect)
+  Object.defineProperty(window, 'electronAPI', {
+    value: {
+      extension: { updatePanelBounds: mockUpdatePanelBounds },
+      extensionEvents: { onExtensionPanelLoaded: mockOnExtensionPanelLoaded },
+    },
+    configurable: true,
+    writable: true,
+  })
+})
+
+afterEach(() => {
+  capturedResizeCallback = null
+  vi.restoreAllMocks()
+  Object.defineProperty(window, 'electronAPI', {
+    value: originalElectronAPI,
+    configurable: true,
+    writable: true,
+  })
+})
+
 describe('ExtensionPanelPortal', () => {
-  let panelLoadedHandler: ((id: string) => void) | null = null
-  const originalElectronAPI = window.electronAPI
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    capturedResizeCallback = null
-    panelLoadedHandler = null
-    mockOnExtensionPanelLoaded.mockImplementation((handler: (id: string) => void) => {
-      panelLoadedHandler = handler
-      return () => {
-        panelLoadedHandler = null
-      }
-    })
-    // Mock getBoundingClientRect to return a controlled rect
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-      left: 10,
-      top: 20,
-      width: 400,
-      height: 300,
-      right: 410,
-      bottom: 320,
-      x: 10,
-      y: 20,
-      toJSON: () => ({}),
-    } as DOMRect)
-    Object.defineProperty(window, 'electronAPI', {
-      value: {
-        extension: { updatePanelBounds: mockUpdatePanelBounds },
-        extensionEvents: { onExtensionPanelLoaded: mockOnExtensionPanelLoaded },
-      },
-      configurable: true,
-      writable: true,
-    })
-  })
-
-  afterEach(() => {
-    capturedResizeCallback = null
-    vi.restoreAllMocks()
-    Object.defineProperty(window, 'electronAPI', {
-      value: originalElectronAPI,
-      configurable: true,
-      writable: true,
-    })
-  })
-
   it('fires updatePanelBounds using element rect dimensions when ResizeObserver fires', () => {
     render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
     act(() => {
@@ -105,7 +106,9 @@ describe('ExtensionPanelPortal', () => {
     )
     expect(container.querySelector('[data-testid="extension-loading"]')).toBeTruthy()
   })
+})
 
+describe('ExtensionPanelPortal — shows no spinner when the host cannot report that the panel loaded', () => {
   it('shows no spinner when the host cannot report that the panel loaded', () => {
     Object.defineProperty(window, 'electronAPI', {
       value: { extension: { updatePanelBounds: mockUpdatePanelBounds }, extensionEvents: {} },
@@ -127,7 +130,9 @@ describe('ExtensionPanelPortal', () => {
     })
     expect(container.querySelector('[data-testid="extension-loading"]')).toBeNull()
   })
+})
 
+describe('ExtensionPanelPortal — does not dismiss spinner when onExtensionPanelLoaded fires with a different id', () => {
   it('does not dismiss spinner when onExtensionPanelLoaded fires with a different id', () => {
     const { container } = render(
       <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
@@ -156,7 +161,9 @@ describe('ExtensionPanelPortal', () => {
       expect.objectContaining({ visible: false, extensionId: 'com.test.ext', viewParam: 'main' })
     )
   })
+})
 
+describe('ExtensionPanelPortal — remote/browser mode (onExtensionPanelLoaded absent)', () => {
   describe('remote/browser mode (onExtensionPanelLoaded absent)', () => {
     beforeEach(() => {
       Object.defineProperty(window, 'electronAPI', {

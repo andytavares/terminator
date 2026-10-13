@@ -89,7 +89,9 @@ describe('LedgerView', () => {
     expect(within(row).getByText('2m')).toBeTruthy()
     expect(within(row).getByRole('textbox', { name: 'What is this session doing?' })).toBeTruthy()
   })
+})
 
+describe('LedgerView — draws a header for each visible column', () => {
   it('draws a header for each visible column', () => {
     render(<LedgerView {...props} />)
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent)
@@ -117,7 +119,9 @@ describe('LedgerView', () => {
     fireEvent.keyDown(screen.getByRole('row', { name: 'zsh' }), { key: 'Enter' })
     expect(props.onOpen).toHaveBeenCalledWith('b')
   })
+})
 
+describe('LedgerView — expands the selected row into a live preview with a way into the terminal', () => {
   it('expands the selected row into a live preview with a way into the terminal', () => {
     render(<LedgerView {...props} selectedId="a" />)
     expect(screen.getByRole('row', { name: 'claude' }).getAttribute('aria-selected')).toBe('true')
@@ -138,7 +142,9 @@ describe('LedgerView', () => {
     expect(within(row).getByText('Bundle size check')).toBeTruthy()
     expect(within(row).queryByRole('button', { name: 'Edit description' })).toBeNull()
   })
+})
 
+describe('LedgerView — saves a description against the session it was typed on', () => {
   it('saves a description against the session it was typed on', () => {
     render(<LedgerView {...props} />)
     const box = within(screen.getByRole('row', { name: 'claude' })).getByRole('textbox', {
@@ -169,7 +175,9 @@ describe('LedgerView', () => {
     expect(within(screen.getByRole('row', { name: 'claude' })).getByText('client')).toBeTruthy()
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toContain('Tags')
   })
+})
 
+describe('LedgerView — leaves out a hidden column, header and cells alike', () => {
   it('leaves out a hidden column, header and cells alike', () => {
     render(
       <LedgerView
@@ -192,7 +200,9 @@ describe('LedgerView', () => {
     render(<LedgerView {...props} selectedId="a" previewSelected={false} />)
     expect(screen.queryByRole('region', { name: 'Preview of claude' })).toBeNull()
   })
+})
 
+describe('LedgerView — offers a link on open sessions only, when linking is possible', () => {
   it('offers a link on open sessions only, when linking is possible', () => {
     const onLink = vi.fn()
     render(<LedgerView {...props} onLink={onLink} />)
@@ -212,7 +222,9 @@ describe('LedgerView', () => {
     render(<LedgerView {...props} groups={[waiting]} />)
     expect(screen.getByText('Which runner?')).toBeTruthy()
   })
+})
 
+describe('LedgerView — draws answers beside Open in the preview', () => {
   it('draws answers beside Open in the preview', () => {
     render(
       <LedgerView
@@ -233,7 +245,9 @@ describe('LedgerView', () => {
     const { container } = render(<LedgerView {...props} groups={[bare]} />)
     expect(container.querySelector('.ledger__branch svg')).toBeNull()
   })
+})
 
+describe('LedgerView — offers Resume on a stopped session whose conversation is still there', () => {
   it('offers Resume on a stopped session whose conversation is still there', () => {
     const onResume = vi.fn()
     const stopped = {
@@ -258,7 +272,9 @@ describe('LedgerView', () => {
     expect(onResume).toHaveBeenCalledWith(stopped.facts[0])
     expect(props.onSelect).not.toHaveBeenCalled()
   })
+})
 
+describe('LedgerView — offers Resume on a closed session, whose description stays readable', () => {
   // The case a restart leaves behind: the tab has gone and the session lives
   // only as a record under Closed, which is exactly where its conversation is
   // most worth picking up.
@@ -289,7 +305,9 @@ describe('LedgerView', () => {
     expect(onResume).toHaveBeenCalledWith(closed.facts[0])
     expect(screen.getByText('chasing the flaky test')).toBeTruthy()
   })
+})
 
+describe('LedgerView — says when a stopped session’s conversation has gone', () => {
   it('says when a stopped session’s conversation has gone', () => {
     const gone = {
       ...groups[0],
@@ -312,7 +330,9 @@ describe('LedgerView', () => {
     expect(screen.getByText('Conversation no longer available')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
   })
+})
 
+describe('LedgerView — ends a session from its row', () => {
   it('ends a session from its row', () => {
     const onCloseSession = vi.fn()
     render(<LedgerView {...props} onCloseSession={onCloseSession} />)
@@ -342,7 +362,9 @@ describe('LedgerView', () => {
     render(<LedgerView {...props} onResume={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
   })
+})
 
+describe('LedgerView — marks a needs-you row so it reads as a band, not just an icon', () => {
   it('marks a needs-you row so it reads as a band, not just an icon', () => {
     render(<LedgerView {...props} />)
     const row = screen.getByRole('row', { name: 'claude' })
@@ -365,7 +387,9 @@ describe('LedgerView', () => {
       'ledger__group-label--needs'
     )
   })
+})
 
+describe('LedgerView — draws a workspace swatch on a workspace group heading, not on Needs you', () => {
   it('draws a workspace swatch on a workspace group heading, not on Needs you', () => {
     const { container } = render(<LedgerView {...props} />)
     const workspaceGroup = container.querySelector(

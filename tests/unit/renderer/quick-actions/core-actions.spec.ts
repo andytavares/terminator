@@ -68,7 +68,9 @@ describe('buildCoreActions', () => {
     const clear = actions.find((a) => a.id === 'core.clear')!
     expect(clear.disabledReason).toBe('No terminal focused')
   })
+})
 
+describe('buildCoreActions — disables New tab with "No project focused" when no project is focused', () => {
   it('disables New tab with "No project focused" when no project is focused', () => {
     const actions = buildCoreActions(makeDeps({ hasProjectFocused: false }))
     const newTab = actions.find((a) => a.id === 'core.new-tab')!
@@ -91,42 +93,46 @@ describe('buildCoreActions', () => {
     expect(actions.find((a) => a.id === 'core.close-tab')).toBeDefined()
     expect(actions.find((a) => a.id === 'core.link-issue')).toBeDefined()
   })
+})
 
-  describe('linking issues to a session vs a branch', () => {
-    it('targets the focused terminal, disabled by "No terminal focused" rather than project', () => {
-      const actions = buildCoreActions(
-        makeDeps({ hasTerminalFocused: false, hasProjectFocused: true })
-      )
-      expect(actions.find((a) => a.id === 'core.link-issue')!.disabledReason).toBe(
-        'No terminal focused'
-      )
-    })
-
-    it('runs onLinkIssue, not onLinkIssueBranch', () => {
-      const deps = makeDeps()
-      buildCoreActions(deps)
-        .find((a) => a.id === 'core.link-issue')!
-        .run()
-      expect(deps.onLinkIssue).toHaveBeenCalledOnce()
-      expect(deps.onLinkIssueBranch).not.toHaveBeenCalled()
-    })
-
-    it('offers a separate "Link issue to branch" action, disabled by "No project focused"', () => {
-      const actions = buildCoreActions(makeDeps({ hasProjectFocused: false }))
-      const branch = actions.find((a) => a.id === 'core.link-issue-branch')!
-      expect(branch.label).toBe('Link issue to branch')
-      expect(branch.disabledReason).toBe('No project focused')
-    })
-
-    it('runs onLinkIssueBranch for the branch action', () => {
-      const deps = makeDeps()
-      buildCoreActions(deps)
-        .find((a) => a.id === 'core.link-issue-branch')!
-        .run()
-      expect(deps.onLinkIssueBranch).toHaveBeenCalledOnce()
-    })
+describe('buildCoreActions — linking issues to a session vs a branch', () => {
+  it('targets the focused terminal, disabled by "No terminal focused" rather than project', () => {
+    const actions = buildCoreActions(
+      makeDeps({ hasTerminalFocused: false, hasProjectFocused: true })
+    )
+    expect(actions.find((a) => a.id === 'core.link-issue')!.disabledReason).toBe(
+      'No terminal focused'
+    )
   })
 
+  it('runs onLinkIssue, not onLinkIssueBranch', () => {
+    const deps = makeDeps()
+    buildCoreActions(deps)
+      .find((a) => a.id === 'core.link-issue')!
+      .run()
+    expect(deps.onLinkIssue).toHaveBeenCalledOnce()
+    expect(deps.onLinkIssueBranch).not.toHaveBeenCalled()
+  })
+
+  it('offers a separate "Link issue to branch" action, disabled by "No project focused"', () => {
+    const actions = buildCoreActions(makeDeps({ hasProjectFocused: false }))
+    const branch = actions.find((a) => a.id === 'core.link-issue-branch')!
+    expect(branch.label).toBe('Link issue to branch')
+    expect(branch.disabledReason).toBe('No project focused')
+  })
+})
+
+describe('buildCoreActions — linking issues to a session vs a branch — runs onLinkIssueBranch for the branch action', () => {
+  it('runs onLinkIssueBranch for the branch action', () => {
+    const deps = makeDeps()
+    buildCoreActions(deps)
+      .find((a) => a.id === 'core.link-issue-branch')!
+      .run()
+    expect(deps.onLinkIssueBranch).toHaveBeenCalledOnce()
+  })
+})
+
+describe('buildCoreActions — runs the matching dep callback', () => {
   it('runs the matching dep callback', () => {
     const deps = makeDeps()
     const actions = buildCoreActions(deps)

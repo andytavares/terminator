@@ -33,7 +33,9 @@ describe('BranchSelect', () => {
     expect(screen.getByText('feature/a')).toBeTruthy()
     expect(screen.getByText('feature/b')).toBeTruthy()
   })
+})
 
+describe('BranchSelect — filters branches by search input', () => {
   it('filters branches by search input', () => {
     render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /main/i }))
@@ -56,7 +58,9 @@ describe('BranchSelect', () => {
     expect((screen.getByPlaceholderText('Search branches…') as HTMLInputElement).value).toBe('')
     expect(screen.getByText('feature/b')).toBeTruthy()
   })
+})
 
+describe('BranchSelect — shows no matching branches message when filter has no results', () => {
   it('shows no matching branches message when filter has no results', () => {
     render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /main/i }))
@@ -82,7 +86,9 @@ describe('BranchSelect', () => {
     fireEvent.keyDown(screen.getByPlaceholderText('Search branches…'), { key: 'Escape' })
     expect(screen.queryByPlaceholderText('Search branches…')).toBeNull()
   })
+})
 
+describe('BranchSelect — shows current branch check mark', () => {
   it('shows current branch check mark', () => {
     render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /main/i }))
@@ -102,7 +108,9 @@ describe('BranchSelect', () => {
     fireEvent.click(screen.getByRole('button', { name: /main/i }))
     expect(screen.getByText('+ New branch…')).toBeTruthy()
   })
+})
 
+describe('BranchSelect — calls onNewBranch and closes when new branch option is clicked', () => {
   it('calls onNewBranch and closes when new branch option is clicked', () => {
     const onNewBranch = vi.fn()
     render(
@@ -119,7 +127,9 @@ describe('BranchSelect', () => {
     expect(onNewBranch).toHaveBeenCalled()
     expect(screen.queryByPlaceholderText('Search branches…')).toBeNull()
   })
+})
 
+describe('BranchSelect — shows isNewSelected label in trigger when isNewSelected is true', () => {
   it('shows isNewSelected label in trigger when isNewSelected is true', () => {
     render(
       <BranchSelect

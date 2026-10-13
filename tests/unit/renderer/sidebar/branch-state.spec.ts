@@ -52,7 +52,9 @@ describe('aggregateBranchState', () => {
     aggregateBranchState(sessions)
     expect(sessions.map((s) => s.id)).toEqual(before)
   })
+})
 
+describe('aggregateBranchState — follows STATUS_ORDER exactly', () => {
   // The precedence is the sidebar's, the tab bar's and the board's at once, so
   // it must be the one constant, not a second copy that can drift from it.
   it('follows STATUS_ORDER exactly', () => {

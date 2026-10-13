@@ -64,7 +64,9 @@ describe('revealSession', () => {
     expect(workspaces()).toMatchObject({ scratchActive: true, activeProjectId: null })
     expect(sessions().focusRequest?.sessionId).toBe('s3')
   })
+})
 
+describe('revealSession — does nothing for a session that has gone', () => {
   it('does nothing for a session that has gone', () => {
     revealSession('nobody')
     expect(registry().activeGlobalTabId).toBe('core.home')

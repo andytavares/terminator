@@ -55,13 +55,17 @@ describe('SplitContainer', () => {
     const children = container.querySelectorAll('.split-container__child')
     expect(parseFloat((children[0] as HTMLElement).style.flex)).toBeCloseTo(0.3)
   })
+})
 
+describe('SplitContainer — applies complementary ratio to second child', () => {
   it('applies complementary ratio to second child', () => {
     const { container } = renderSplit('vertical', 0.3)
     const children = container.querySelectorAll('.split-container__child')
     expect(parseFloat((children[1] as HTMLElement).style.flex)).toBeCloseTo(0.7)
   })
+})
 
+describe('SplitContainer — calls onRatioChange on mouse drag', () => {
   it('calls onRatioChange on mouse drag', () => {
     const onRatioChange = vi.fn()
     const { container } = render(
@@ -100,7 +104,9 @@ describe('SplitContainer', () => {
     expect(splitId).toBe('split-1')
     expect(ratio).toBeCloseTo(0.75)
   })
+})
 
+describe('SplitContainer — clamps ratio to minimum 0.1', () => {
   it('clamps ratio to minimum 0.1', () => {
     const onRatioChange = vi.fn()
     const { container } = render(
@@ -135,7 +141,9 @@ describe('SplitContainer', () => {
     const [, ratio] = onRatioChange.mock.calls[0]
     expect(ratio).toBe(0.1)
   })
+})
 
+describe('SplitContainer — clamps ratio to maximum 0.9', () => {
   it('clamps ratio to maximum 0.9', () => {
     const onRatioChange = vi.fn()
     const { container } = render(
@@ -170,7 +178,9 @@ describe('SplitContainer', () => {
     const [, ratio] = onRatioChange.mock.calls[0]
     expect(ratio).toBe(0.9)
   })
+})
 
+describe('SplitContainer — calls onRatioChange using clientY for horizontal splits', () => {
   it('calls onRatioChange using clientY for horizontal splits', () => {
     const onRatioChange = vi.fn()
     const { container } = render(
@@ -207,7 +217,9 @@ describe('SplitContainer', () => {
     expect(splitId).toBe('split-h')
     expect(ratio).toBeCloseTo(0.5)
   })
+})
 
+describe('SplitContainer — does not call onRatioChange after mouseup', () => {
   it('does not call onRatioChange after mouseup', () => {
     const onRatioChange = vi.fn()
     const { container } = render(

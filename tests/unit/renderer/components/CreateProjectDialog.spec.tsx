@@ -80,7 +80,9 @@ describe('CreateProjectDialog', () => {
     fireEvent.click(screen.getByText('Create'))
     expect(screen.getByText('Name is required')).toBeTruthy()
   })
+})
 
+describe('CreateProjectDialog — submits with valid name for simple project', () => {
   it('submits with valid name for simple project', async () => {
     const onClose = vi.fn()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={onClose} />)
@@ -110,7 +112,9 @@ describe('CreateProjectDialog', () => {
     fireEvent.change(nameInput, { target: { value: 'Something' } })
     expect(screen.queryByText('Name is required')).toBeNull()
   })
+})
 
+describe('CreateProjectDialog — shows duplicate project name error on blur', () => {
   it('shows duplicate project name error on blur', () => {
     seedStore(useWorkspaceStore, {
       createProject: mockCreateProject,
@@ -139,7 +143,9 @@ describe('CreateProjectDialog', () => {
     await vi.waitFor(() => screen.getByRole('button', { name: 'Branch' }))
     expect(screen.queryByText('Name *')).toBeNull()
   })
+})
 
+describe('CreateProjectDialog — still asks for a name where there is no branch to take one from', () => {
   it('still asks for a name where there is no branch to take one from', () => {
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     expect(screen.getByText('Name *')).toBeTruthy()
@@ -166,7 +172,9 @@ describe('CreateProjectDialog', () => {
     await vi.waitFor(() => expect(screen.getByText('Select or enter a branch name')).toBeTruthy())
     expect(mockCreateProject).not.toHaveBeenCalled()
   })
+})
 
+describe('CreateProjectDialog — shows branch segmented control for git repos', () => {
   it('shows branch segmented control for git repos', async () => {
     setupGitWorkspace()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
@@ -198,7 +206,9 @@ describe('CreateProjectDialog', () => {
     fireEvent.click(screen.getByText('+ New branch…'))
     expect(screen.getByPlaceholderText('feature/my-feature')).toBeTruthy()
   })
+})
 
+describe('CreateProjectDialog — new branch mode creates branch and project on submit', () => {
   it('new branch mode creates branch and project on submit', async () => {
     setupGitWorkspace()
     const onClose = vi.fn()
@@ -221,7 +231,9 @@ describe('CreateProjectDialog', () => {
       )
     )
   })
+})
 
+describe('CreateProjectDialog — new branch mode shows error when branch name is empty', () => {
   it('new branch mode shows error when branch name is empty', async () => {
     setupGitWorkspace()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
@@ -250,7 +262,9 @@ describe('CreateProjectDialog', () => {
     const worktreeBtn = screen.getByRole('button', { name: 'Worktree' })
     expect(worktreeBtn.className).toContain('dialog__segment-btn--active')
   })
+})
 
+describe('CreateProjectDialog — submit guard shows error when branchMode is existing and hasNonWorktreeProject is true', () => {
   it('submit guard shows error when branchMode is existing and hasNonWorktreeProject is true', async () => {
     // Initial render: no non-worktree projects → branchMode initializes to 'existing'
     const { rerender } = render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
@@ -273,7 +287,9 @@ describe('CreateProjectDialog', () => {
       expect(screen.getByText('A branch-based entry already exists in this repo')).toBeTruthy()
     )
   })
+})
 
+describe('CreateProjectDialog — worktree mode pre-fills path with .worktrees base when no branch typed', () => {
   it('worktree mode pre-fills path with .worktrees base when no branch typed', async () => {
     setupGitWorkspace()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
@@ -305,7 +321,9 @@ describe('CreateProjectDialog', () => {
     fireEvent.click(screen.getByText('Worktree'))
     await vi.waitFor(() => expect(screen.getByText('Worktree path')).toBeTruthy())
   })
+})
 
+describe('CreateProjectDialog — worktree mode new branch name input sanitizes input', () => {
   it('worktree mode new branch name input sanitizes input', async () => {
     setupGitWorkspace()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
@@ -329,7 +347,9 @@ describe('CreateProjectDialog', () => {
     fireEvent.change(worktreeInput, { target: { value: '/custom/wt/path' } })
     expect((worktreeInput as HTMLInputElement).value).toBe('/custom/wt/path')
   })
+})
 
+describe('CreateProjectDialog — clicking Branch tab switches back from worktree mode', () => {
   it('clicking Branch tab switches back from worktree mode', async () => {
     setupGitWorkspace()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
@@ -339,7 +359,9 @@ describe('CreateProjectDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Branch' }))
     await vi.waitFor(() => expect(screen.queryByText('Worktree path')).toBeNull())
   })
+})
 
+describe('CreateProjectDialog — branch mode selecting a branch via dropdown fires onChange', () => {
   it('branch mode selecting a branch via dropdown fires onChange', async () => {
     gitApi.isRepo.mockResolvedValue({ isRepo: true, root: '/repo' })
     gitApi.listBranches.mockResolvedValue({
@@ -364,7 +386,9 @@ describe('CreateProjectDialog', () => {
       )
     )
   })
+})
 
+describe('CreateProjectDialog — worktree mode selecting existing branch then new branch fires onNewBranch', () => {
   it('worktree mode selecting existing branch then new branch fires onNewBranch', async () => {
     gitApi.isRepo.mockResolvedValue({ isRepo: true, root: '/repo' })
     gitApi.listBranches.mockResolvedValue({
@@ -393,7 +417,9 @@ describe('CreateProjectDialog', () => {
     fireEvent.click(screen.getAllByText('+ New branch…')[0])
     await vi.waitFor(() => screen.getByPlaceholderText('feature/my-feature'))
   })
+})
 
+describe('CreateProjectDialog — existing mode submits with selected branch', () => {
   it('existing mode submits with selected branch', async () => {
     setupGitWorkspace()
     const onClose = vi.fn()
@@ -420,7 +446,9 @@ describe('CreateProjectDialog', () => {
       expect(screen.getByText('Could not create branch: already exists')).toBeTruthy()
     )
   })
+})
 
+describe('CreateProjectDialog — shows name error when createProject returns DUPLICATE_NAME', () => {
   it('shows name error when createProject returns DUPLICATE_NAME', async () => {
     mockCreateProject.mockResolvedValue({ error: 'DUPLICATE_NAME' })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
@@ -438,7 +466,9 @@ describe('CreateProjectDialog', () => {
     fireEvent.click(screen.getByText('Create'))
     await vi.waitFor(() => expect(screen.getByText('Could not create the branch')).toBeTruthy())
   })
+})
 
+describe('CreateProjectDialog — shows error when createWorktree fails', () => {
   it('shows error when createWorktree fails', async () => {
     setupGitWorkspace()
     gitApi.createWorktree.mockResolvedValue({ error: 'no space' })
@@ -451,7 +481,9 @@ describe('CreateProjectDialog', () => {
     fireEvent.click(screen.getByText('Create'))
     await vi.waitFor(() => expect(screen.getByText('Worktree error: no space')).toBeTruthy())
   })
+})
 
+describe('CreateProjectDialog — shows empty branch name error in worktree mode', () => {
   it('shows empty branch name error in worktree mode', async () => {
     setupGitWorkspace()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
@@ -477,61 +509,68 @@ describe('CreateProjectDialog', () => {
 
 // ── Starting from an issue (US5) ────────────────────────────────────────────
 
-describe('CreateProjectDialog — from an issue', () => {
-  const ISSUE = issueSummaryOf({
-    key: 'TAV-42',
-    title: 'Unify Linear connections behind one core service',
-    branchName: 'andrew/tav-42-unify-linear',
+const ISSUE = issueSummaryOf({
+  key: 'TAV-42',
+  title: 'Unify Linear connections behind one core service',
+  branchName: 'andrew/tav-42-unify-linear',
+})
+
+const JIRA_ISSUE = issueSummaryOf({ ...ISSUE, tracker: 'jira', key: 'TAV-7', branchName: null })
+
+const listMine = vi.fn()
+
+const linkIssue = vi.fn()
+
+async function openWithIssues(connected = true, issues: IssueSummary[] = [ISSUE]) {
+  const { useIntegrationsStore } = await import(
+    '../../../../src/renderer/stores/integrations.store'
+  )
+  listMine.mockResolvedValue({ issues, failures: [] })
+  linkIssue.mockResolvedValue(true)
+  useIntegrationsStore.setState({
+    connections: connected
+      ? [
+          {
+            tracker: 'linear',
+            connected: true,
+            account: null,
+            site: null,
+            mine: { kind: 'assignee', email: null },
+            lastError: null,
+          },
+        ]
+      : [],
+    listMine,
+    searchIssues: vi.fn().mockResolvedValue({ issues: [], failures: [] }),
+    linkIssue,
   })
-  const JIRA_ISSUE = issueSummaryOf({ ...ISSUE, tracker: 'jira', key: 'TAV-7', branchName: null })
 
-  const listMine = vi.fn()
-  const linkIssue = vi.fn()
+  setupGitAPI({
+    isRepo: vi.fn().mockResolvedValue({ isRepo: true, root: '/repo' }),
+    listBranches: vi
+      .fn()
+      .mockResolvedValue({ branches: [{ name: 'main', isCurrent: true, isRemote: false }] }),
+  })
+  seedStore(useWorkspaceStore, {
+    createProject: mockCreateProject,
+    projectsByWorkspaceId: new Map(),
+    workspaces: [workspaceOf({ id: 'w1', name: 'ws', folderPath: '/repo' })],
+  })
+  seedStore(useSettingsStore, { resolveSettings: () => DEFAULT_GLOBAL_SETTINGS })
 
-  async function openWithIssues(connected = true, issues: IssueSummary[] = [ISSUE]) {
-    const { useIntegrationsStore } = await import(
-      '../../../../src/renderer/stores/integrations.store'
-    )
-    listMine.mockResolvedValue({ issues, failures: [] })
-    linkIssue.mockResolvedValue(true)
-    useIntegrationsStore.setState({
-      connections: connected
-        ? [
-            {
-              tracker: 'linear',
-              connected: true,
-              account: null,
-              site: null,
-              mine: { kind: 'assignee', email: null },
-              lastError: null,
-            },
-          ]
-        : [],
-      listMine,
-      searchIssues: vi.fn().mockResolvedValue({ issues: [], failures: [] }),
-      linkIssue,
-    })
+  render(<CreateProjectDialog workspaceId="w1" onClose={vi.fn()} />)
+}
 
-    setupGitAPI({
-      isRepo: vi.fn().mockResolvedValue({ isRepo: true, root: '/repo' }),
-      listBranches: vi
-        .fn()
-        .mockResolvedValue({ branches: [{ name: 'main', isCurrent: true, isRemote: false }] }),
-    })
-    seedStore(useWorkspaceStore, {
-      createProject: mockCreateProject,
-      projectsByWorkspaceId: new Map(),
-      workspaces: [workspaceOf({ id: 'w1', name: 'ws', folderPath: '/repo' })],
-    })
-    seedStore(useSettingsStore, { resolveSettings: () => DEFAULT_GLOBAL_SETTINGS })
-
-    render(<CreateProjectDialog workspaceId="w1" onClose={vi.fn()} />)
-  }
-
+/** The hooks every "CreateProjectDialog — from an issue" describe registers. */
+function setUpCreateProjectDialogFromAnIssue(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     mockCreateProject.mockResolvedValue({ project: { id: 'p-new' } })
   })
+}
+
+describe('CreateProjectDialog — from an issue', () => {
+  setUpCreateProjectDialogFromAnIssue()
 
   it('does not offer the picker when no tracker is connected', async () => {
     await openWithIssues(false)
@@ -560,6 +599,10 @@ describe('CreateProjectDialog — from an issue', () => {
 
     expect(screen.getByDisplayValue(/tav-7-unify-linear/)).toBeTruthy()
   })
+})
+
+describe('CreateProjectDialog — from an issue — honours an edit made after prefilling', () => {
+  setUpCreateProjectDialogFromAnIssue()
 
   it('honours an edit made after prefilling', async () => {
     await openWithIssues()
@@ -589,6 +632,10 @@ describe('CreateProjectDialog — from an issue', () => {
     await vi.waitFor(() => expect(mockCreateProject).toHaveBeenCalled())
     await vi.waitFor(() => expect(linkIssue).toHaveBeenCalledWith('p-new', 'linear', 'TAV-42'))
   })
+})
+
+describe('CreateProjectDialog — from an issue — attaches nothing when no issue was picked', () => {
+  setUpCreateProjectDialogFromAnIssue()
 
   it('attaches nothing when no issue was picked', async () => {
     await openWithIssues()
@@ -598,6 +645,10 @@ describe('CreateProjectDialog — from an issue', () => {
     await vi.waitFor(() => expect(mockCreateProject).toHaveBeenCalled())
     expect(linkIssue).not.toHaveBeenCalled()
   })
+})
+
+describe('CreateProjectDialog — from an issue — while it is working', () => {
+  setUpCreateProjectDialogFromAnIssue()
 
   // Creating a worktree takes seconds of git work. Without a busy state the
   // dialog just sits there, and a second press starts the whole thing again.
@@ -673,18 +724,18 @@ describe('CreateProjectDialog — from an issue', () => {
   })
 })
 
+function git(): ReturnType<typeof gitFake> {
+  return gitApi
+}
+
+async function openWorktreeMode(): Promise<void> {
+  render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
+  await vi.waitFor(() => screen.getByText('Worktree'))
+  fireEvent.click(screen.getByText('Worktree'))
+  await vi.waitFor(() => screen.getByText('Worktree path'))
+}
+
 describe('CreateProjectDialog branch names and fetching', () => {
-  function git(): ReturnType<typeof gitFake> {
-    return gitApi
-  }
-
-  async function openWorktreeMode(): Promise<void> {
-    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    await vi.waitFor(() => screen.getByText('Worktree'))
-    fireEvent.click(screen.getByText('Worktree'))
-    await vi.waitFor(() => screen.getByText('Worktree path'))
-  }
-
   it('keeps a slash while the new branch name is being typed', async () => {
     setupGitWorkspace()
     await openWorktreeMode()
@@ -713,7 +764,9 @@ describe('CreateProjectDialog branch names and fetching', () => {
       )
     )
   })
+})
 
+describe('CreateProjectDialog branch names and fetching — offers a branch that exists only on the remote, by its bare name', () => {
   it('offers a branch that exists only on the remote, by its bare name', async () => {
     setupGitWorkspace()
     git().listBranches.mockResolvedValue({
@@ -732,7 +785,9 @@ describe('CreateProjectDialog branch names and fetching', () => {
       )
     )
   })
+})
 
+describe('CreateProjectDialog branch names and fetching — fetches and relists the branches when refresh is pressed', () => {
   it('fetches and relists the branches when refresh is pressed', async () => {
     setupGitWorkspace()
     git().fetch.mockResolvedValue({ success: true })

@@ -114,7 +114,9 @@ describe('QuickActions — top level', () => {
     const splitRow = screen.getByText('Split right').closest('.qa-row')!
     expect(splitRow.querySelector('.qa-pin-indicator')).toBeNull()
   })
+})
 
+describe('QuickActions — top level — omits the context section when there is no context group', () => {
   it('omits the context section when there is no context group', () => {
     renderPanel({ contextGroupId: null })
     expect(screen.queryByText(/· here/)).toBeNull()
@@ -178,7 +180,9 @@ describe('QuickActions — search mode', () => {
     expect(screen.getByText('Push')).toBeTruthy()
     expect(screen.queryByText('Split right')).toBeNull()
   })
+})
 
+describe('QuickActions — search mode — switches to search when searchSignal increments', () => {
   it('switches to search when searchSignal increments', () => {
     const { rerender } = renderPanel({ searchSignal: 1 })
     expect(screen.queryByRole('combobox')).toBeNull()
@@ -207,7 +211,9 @@ describe('QuickActions — search mode', () => {
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'git.push' }))
   })
+})
 
+describe('QuickActions — search mode — puts the highlight back on the first match when the query changes', () => {
   it('puts the highlight back on the first match when the query changes', () => {
     renderPanel()
     fireEvent.keyDown(window, { key: '/' })

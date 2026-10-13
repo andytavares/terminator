@@ -75,7 +75,9 @@ describe('BranchRow', () => {
     expect(chip.className).toContain('state-chip--compact')
     expect(chip.getAttribute('aria-label')).toBe('Waiting on you')
   })
+})
 
+describe('BranchRow — distinguishes the four states by shape', () => {
   it('distinguishes the four states by shape', () => {
     const shapes = (['awaiting-input', 'working', 'idle', 'exited'] as const).map((state) => {
       const { container, unmount } = renderRow({ state })
@@ -105,7 +107,9 @@ describe('BranchRow', () => {
     const { container } = renderRow({ isWorktree: true })
     expect(container.textContent).not.toMatch(/worktree/i)
   })
+})
 
+describe('BranchRow — draws a linked issue key as plain text', () => {
   // FR-029.
   it('draws a linked issue key as plain text', () => {
     const { container } = renderRow({}, { issueKey: 'TAV-14' })
@@ -137,7 +141,9 @@ describe('BranchRow', () => {
     const { container } = renderRow({}, { changeStats })
     expect(container.querySelector('.branch-row__stats')).toBeNull()
   })
+})
 
+describe('BranchRow — counts what shares the row state, once there is more than one', () => {
   // The count agrees with the glyph rather than totalling the branch.
   it('counts what shares the row state, once there is more than one', () => {
     const { container } = renderRow({ state: 'awaiting-input', stateCount: 2, sessionCount: 5 })
@@ -168,7 +174,9 @@ describe('BranchRow', () => {
     )
     expect(restingElements(container)).toBeLessThanOrEqual(6)
   })
+})
 
+describe('BranchRow — carries the repo colour as one rail variable, not as a background', () => {
   it('carries the repo colour as one rail variable, not as a background', () => {
     const { container } = renderRow()
     const el = container.querySelector<HTMLElement>('.branch-row')!
@@ -182,102 +190,108 @@ describe('BranchRow', () => {
       container.querySelector<HTMLElement>('.branch-row')!.style.getPropertyValue('--ws-color')
     ).toBe('')
   })
+})
 
-  describe('interaction', () => {
-    it('selects on click', () => {
-      const onSelect = vi.fn()
-      const { container } = renderRow({}, { onSelect })
-      fireEvent.click(container.querySelector('.branch-row')!)
-      expect(onSelect).toHaveBeenCalled()
-    })
-
-    it.each(['Enter', ' '])('selects on %s', (key) => {
-      const onSelect = vi.fn()
-      const { container } = renderRow({}, { onSelect })
-      fireEvent.keyDown(container.querySelector('.branch-row')!, { key })
-      expect(onSelect).toHaveBeenCalled()
-    })
-
-    it('marks the selected row without using the repo colour', () => {
-      const { container } = renderRow({}, { selected: true })
-      const el = container.querySelector('.branch-row')!
-      expect(el.classList.contains('branch-row--selected')).toBe(true)
-      expect(el.getAttribute('aria-current')).toBe('true')
-    })
-
-    it('offers a new terminal on hover without shifting the row', () => {
-      const onAddTerminal = vi.fn()
-      renderRow({}, { onAddTerminal })
-      fireEvent.click(screen.getByRole('button', { name: /new terminal in 034-declutter/i }))
-      expect(onAddTerminal).toHaveBeenCalled()
-    })
-
-    it('does not select the branch when the add button is used', () => {
-      const onSelect = vi.fn()
-      const onAddTerminal = vi.fn()
-      renderRow({}, { onSelect, onAddTerminal })
-      fireEvent.click(screen.getByRole('button', { name: /new terminal/i }))
-      expect(onSelect).not.toHaveBeenCalled()
-    })
+describe('BranchRow — interaction', () => {
+  it('selects on click', () => {
+    const onSelect = vi.fn()
+    const { container } = renderRow({}, { onSelect })
+    fireEvent.click(container.querySelector('.branch-row')!)
+    expect(onSelect).toHaveBeenCalled()
   })
 
-  describe('the context menu', () => {
-    it('offers rename only where the branch has no branch to be named by', () => {
-      const { container } = renderRow({}, { onRename: vi.fn() })
-      fireEvent.contextMenu(container.querySelector('.branch-row')!)
-      expect(screen.getByText('Rename')).toBeTruthy()
-    })
+  it.each(['Enter', ' '])('selects on %s', (key) => {
+    const onSelect = vi.fn()
+    const { container } = renderRow({}, { onSelect })
+    fireEvent.keyDown(container.querySelector('.branch-row')!, { key })
+    expect(onSelect).toHaveBeenCalled()
+  })
 
-    it('offers no rename for a branch named by its branch', () => {
-      const { container } = renderRow({}, { onRemove: vi.fn() })
-      fireEvent.contextMenu(container.querySelector('.branch-row')!)
-      expect(screen.queryByText('Rename')).toBeNull()
-    })
+  it('marks the selected row without using the repo colour', () => {
+    const { container } = renderRow({}, { selected: true })
+    const el = container.querySelector('.branch-row')!
+    expect(el.classList.contains('branch-row--selected')).toBe(true)
+    expect(el.getAttribute('aria-current')).toBe('true')
+  })
 
-    it('renames through the callback', () => {
-      const onRename = vi.fn()
-      const { container } = renderRow({}, { onRename })
-      fireEvent.contextMenu(container.querySelector('.branch-row')!)
-      fireEvent.click(screen.getByText('Rename'))
-      const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
-      fireEvent.change(input, { target: { value: 'renamed' } })
-      fireEvent.keyDown(input, { key: 'Enter' })
-      expect(onRename).toHaveBeenCalledWith('renamed')
-    })
+  it('offers a new terminal on hover without shifting the row', () => {
+    const onAddTerminal = vi.fn()
+    renderRow({}, { onAddTerminal })
+    fireEvent.click(screen.getByRole('button', { name: /new terminal in 034-declutter/i }))
+    expect(onAddTerminal).toHaveBeenCalled()
+  })
+})
 
-    it('abandons a rename on Escape', () => {
-      const onRename = vi.fn()
-      const { container } = renderRow({}, { onRename })
-      fireEvent.contextMenu(container.querySelector('.branch-row')!)
-      fireEvent.click(screen.getByText('Rename'))
-      const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
-      fireEvent.change(input, { target: { value: 'nope' } })
-      fireEvent.keyDown(input, { key: 'Escape' })
-      expect(onRename).not.toHaveBeenCalled()
-    })
+describe('BranchRow — interaction — does not select the branch when the add button is used', () => {
+  it('does not select the branch when the add button is used', () => {
+    const onSelect = vi.fn()
+    const onAddTerminal = vi.fn()
+    renderRow({}, { onSelect, onAddTerminal })
+    fireEvent.click(screen.getByRole('button', { name: /new terminal/i }))
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+})
 
-    it('carries the issue actions', () => {
-      const { container } = renderRow(
-        {},
-        { issueActions: { issueKey: 'TAV-14', onLinkIssue: vi.fn(), onOpenIssue: vi.fn() } }
-      )
-      fireEvent.contextMenu(container.querySelector('.branch-row')!)
-      expect(screen.getByText('Open TAV-14 in tracker')).toBeTruthy()
-    })
+describe('BranchRow — the context menu', () => {
+  it('offers rename only where the branch has no branch to be named by', () => {
+    const { container } = renderRow({}, { onRename: vi.fn() })
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    expect(screen.getByText('Rename')).toBeTruthy()
+  })
 
-    it('removes through the callback', () => {
-      const onRemove = vi.fn()
-      const { container } = renderRow({}, { onRemove })
-      fireEvent.contextMenu(container.querySelector('.branch-row')!)
-      fireEvent.click(screen.getByText('Remove branch'))
-      expect(onRemove).toHaveBeenCalled()
-    })
+  it('offers no rename for a branch named by its branch', () => {
+    const { container } = renderRow({}, { onRemove: vi.fn() })
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    expect(screen.queryByText('Rename')).toBeNull()
+  })
 
-    it('opens no menu when there is nothing to put in it', () => {
-      const { container } = renderRow()
-      fireEvent.contextMenu(container.querySelector('.branch-row')!)
-      expect(document.querySelector('.ctx-menu')).toBeNull()
-    })
+  it('renames through the callback', () => {
+    const onRename = vi.fn()
+    const { container } = renderRow({}, { onRename })
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    fireEvent.click(screen.getByText('Rename'))
+    const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
+    fireEvent.change(input, { target: { value: 'renamed' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onRename).toHaveBeenCalledWith('renamed')
+  })
+})
+
+describe('BranchRow — the context menu — abandons a rename on Escape', () => {
+  it('abandons a rename on Escape', () => {
+    const onRename = vi.fn()
+    const { container } = renderRow({}, { onRename })
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    fireEvent.click(screen.getByText('Rename'))
+    const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
+    fireEvent.change(input, { target: { value: 'nope' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(onRename).not.toHaveBeenCalled()
+  })
+
+  it('carries the issue actions', () => {
+    const { container } = renderRow(
+      {},
+      { issueActions: { issueKey: 'TAV-14', onLinkIssue: vi.fn(), onOpenIssue: vi.fn() } }
+    )
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    expect(screen.getByText('Open TAV-14 in tracker')).toBeTruthy()
+  })
+
+  it('removes through the callback', () => {
+    const onRemove = vi.fn()
+    const { container } = renderRow({}, { onRemove })
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    fireEvent.click(screen.getByText('Remove branch'))
+    expect(onRemove).toHaveBeenCalled()
+  })
+})
+
+describe('BranchRow — the context menu — opens no menu when there is nothing to put in it', () => {
+  it('opens no menu when there is nothing to put in it', () => {
+    const { container } = renderRow()
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    expect(document.querySelector('.ctx-menu')).toBeNull()
   })
 })
 
@@ -350,7 +364,9 @@ describe('BranchRow — renaming', () => {
     fireEvent.blur(input)
     expect(onRename).not.toHaveBeenCalled()
   })
+})
 
+describe('BranchRow — renaming — ignores a name that did not change', () => {
   it('ignores a name that did not change', () => {
     const onRename = vi.fn()
     const { container } = renderRow({}, { onRename })
@@ -399,7 +415,9 @@ describe('BranchRow — open in editor', () => {
     fireEvent.contextMenu(container.querySelector('.branch-row')!)
     expect(screen.queryByText(/Open in/)).toBeNull()
   })
+})
 
+describe('BranchRow — open in editor — does not also select the branch', () => {
   it('does not also select the branch', () => {
     const onSelect = vi.fn()
     const { container } = renderRow({}, { onOpenInEditor: vi.fn(), onSelect })
@@ -407,33 +425,33 @@ describe('BranchRow — open in editor', () => {
     fireEvent.click(screen.getByText('Open in editor'))
     expect(onSelect).not.toHaveBeenCalled()
   })
+})
 
-  describe('session issue keys', () => {
-    it('shows a session key when the branch has no link of its own', () => {
-      const { container } = renderRow({}, { sessionIssueKeys: ['ENG-7'] })
-      const key = container.querySelector('.branch-row__issue')!
-      expect(key.textContent).toBe('ENG-7')
-      expect(key.tagName).toBe('SPAN')
-    })
+describe('BranchRow — open in editor — session issue keys', () => {
+  it('shows a session key when the branch has no link of its own', () => {
+    const { container } = renderRow({}, { sessionIssueKeys: ['ENG-7'] })
+    const key = container.querySelector('.branch-row__issue')!
+    expect(key.textContent).toBe('ENG-7')
+    expect(key.tagName).toBe('SPAN')
+  })
 
-    it('keeps the branch key first and counts the other keys its terminals carry', () => {
-      const { container } = renderRow(
-        {},
-        {
-          issueKey: 'TAV-14',
-          onIssueClick: vi.fn(),
-          sessionIssueKeys: ['ENG-7', 'TAV-14', 'ENG-8'],
-        }
-      )
-      const key = container.querySelector('.branch-row__issue')!
-      expect(key.textContent).toBe('TAV-14 +2')
-      expect(key.getAttribute('title')).toBe('TAV-14, ENG-7, ENG-8')
-      expect(container.querySelectorAll('.branch-row__issue')).toHaveLength(1)
-    })
+  it('keeps the branch key first and counts the other keys its terminals carry', () => {
+    const { container } = renderRow(
+      {},
+      {
+        issueKey: 'TAV-14',
+        onIssueClick: vi.fn(),
+        sessionIssueKeys: ['ENG-7', 'TAV-14', 'ENG-8'],
+      }
+    )
+    const key = container.querySelector('.branch-row__issue')!
+    expect(key.textContent).toBe('TAV-14 +2')
+    expect(key.getAttribute('title')).toBe('TAV-14, ENG-7, ENG-8')
+    expect(container.querySelectorAll('.branch-row__issue')).toHaveLength(1)
+  })
 
-    it('draws no key when neither the branch nor a terminal is linked', () => {
-      const { container } = renderRow({}, { sessionIssueKeys: [] })
-      expect(container.querySelector('.branch-row__issue')).toBeNull()
-    })
+  it('draws no key when neither the branch nor a terminal is linked', () => {
+    const { container } = renderRow({}, { sessionIssueKeys: [] })
+    expect(container.querySelector('.branch-row__issue')).toBeNull()
   })
 })

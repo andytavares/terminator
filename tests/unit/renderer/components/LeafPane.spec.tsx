@@ -94,7 +94,9 @@ describe('LeafPane', () => {
     expect(container.querySelector('.leaf-pane--focused')).toBeTruthy()
     expect(instance.terminal.focus).toHaveBeenCalled()
   })
+})
 
+describe('LeafPane — clears the unseen bells on mousedown', () => {
   it('clears the unseen bells on mousedown', () => {
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
@@ -118,7 +120,9 @@ describe('LeafPane', () => {
     })
     expect(instance.terminal.paste).toHaveBeenCalledWith('/Users/me/report.pdf')
   })
+})
 
+describe('LeafPane — quotes paths with spaces on drop', () => {
   it('quotes paths with spaces on drop', () => {
     const instance = makeInstance()
     withInstance(instance)
@@ -146,7 +150,9 @@ describe('LeafPane', () => {
     unmount()
     expect(instance.unmount).toHaveBeenCalled()
   })
+})
 
+describe('LeafPane — calls mount with just the container element', () => {
   it('calls mount with just the container element', () => {
     const instance = makeInstance()
     withInstance(instance)

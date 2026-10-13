@@ -44,7 +44,9 @@ describe('buildExtensionActions', () => {
     )
     expect(actions[0].group).toBe('top')
   })
+})
 
+describe('buildExtensionActions — disables a repo-required command with "No repository focused" when repoRoot is null', () => {
   it('disables a repo-required command with "No repository focused" when repoRoot is null', () => {
     const actions = buildExtensionActions(
       [registered({ requires: 'repo' })],
@@ -74,7 +76,9 @@ describe('buildExtensionActions', () => {
     actions[0].run()
     expect(execute).toHaveBeenCalledWith('git.push', c)
   })
+})
 
+describe('buildExtensionActions — shows a dimmed action for a declared command the extension never registered', () => {
   it('shows a dimmed action for a declared command the extension never registered', () => {
     const declared: DeclaredCommand[] = [{ extensionId: 'git', id: 'pull', label: 'Pull' }]
     const actions = buildExtensionActions([], declared, [gitGroup], ctx(), vi.fn())

@@ -385,7 +385,9 @@ describe('App', () => {
     render(<App />)
     expect(screen.getByTestId('toast-container')).toBeTruthy()
   })
+})
 
+describe('App — loads the workspaces and settings from main on mount', () => {
   it('loads the workspaces and settings from main on mount', async () => {
     setupApp({ workspaces: [WS1, WS2] })
     useWorkspaceStore.setState({ workspaces: [] })
@@ -412,7 +414,9 @@ describe('App', () => {
     leaveHome()
     expect(screen.getByRole('heading', { name: 'Select or create a project' })).toBeTruthy()
   })
+})
 
+describe('App — shows Welcome to Terminator EmptyState when no welcome seen', () => {
   it('shows Welcome to Terminator EmptyState when no welcome seen', () => {
     setupApp({ globalSettings: settingsWith({ ui: { hasSeenWelcome: false } }) })
     render(<App />)
@@ -437,7 +441,9 @@ describe('App', () => {
     act(() => main.events.openSettings.emit())
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
+})
 
+describe('App — closes SettingsPanel when onClose is called', () => {
   it('closes SettingsPanel when onClose is called', async () => {
     render(<App />)
     act(() => main.events.openSettings.emit())
@@ -465,7 +471,9 @@ describe('App', () => {
       )
     )
   })
+})
 
+describe('App — records the welcome as seen once a project is opened', () => {
   it('records the welcome as seen once a project is opened', async () => {
     setupApp({
       activeProjectId: 'proj-1',
@@ -489,7 +497,9 @@ describe('App', () => {
     act(() => shortcuts.callbacks.onToggleLog?.())
     await waitFor(() => expect(screen.getByTestId('log-window')).toBeTruthy())
   })
+})
 
+describe('App — closes LogWindow when its onClose is called', () => {
   it('closes LogWindow when its onClose is called', async () => {
     render(<App />)
     act(() => shortcuts.callbacks.onToggleLog?.())
@@ -520,7 +530,9 @@ describe('App', () => {
     act(() => shortcuts.callbacks.onToggleOverview?.())
     expect(registry().activeGlobalTabId).toBeNull()
   })
+})
 
+describe('App — activates core.home when the menu:open-home event fires', () => {
   it('activates core.home when the menu:open-home event fires', () => {
     render(<App />)
     leaveHome()
@@ -533,7 +545,9 @@ describe('App', () => {
     render(<App />)
     expect(screen.getByTestId('mock-overlay')).toBeTruthy()
   })
+})
 
+describe('App — renders an open extension sidebar panel, and closes it from the panel', () => {
   it('renders an open extension sidebar panel, and closes it from the panel', () => {
     registry().registerSidebarPanel({
       id: 'git-changes',
@@ -557,7 +571,9 @@ describe('App', () => {
     act(() => main.events.togglePanel.emit('git-changes'))
     expect(registry().openPanels.has('git-changes')).toBe(true)
   })
+})
 
+describe("App — shows an extension's project tab in place of the terminal once it is selected", () => {
   it("shows an extension's project tab in place of the terminal once it is selected", () => {
     setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
     registry().registerProjectTab({
@@ -584,7 +600,9 @@ describe('App', () => {
     act(() => registry().setActiveGlobalTab('task-vault'))
     expect(screen.getByTestId('global-tab-content')).toBeTruthy()
   })
+})
 
+describe('App — does not close open panels when workspace changes', () => {
   it('does not close open panels when workspace changes', () => {
     setupApp({ activeWorkspaceId: 'ws-1', workspaces: [WS1, WS2] })
     registry().togglePanel('panel-a')
@@ -615,7 +633,9 @@ describe('App', () => {
       expect(screen.getByTestId('unified-sidebar').className).toContain('unified-sidebar--hidden')
     )
   })
+})
 
+describe('App — command core.toggle-log action opens LogWindow', () => {
   it('command core.toggle-log action opens LogWindow', async () => {
     render(<App />)
     openPalette()
@@ -646,7 +666,9 @@ describe('App', () => {
     runAction('core.split-horizontal')
     expect(splitSession).toHaveBeenCalledWith('proj-1', 'horizontal', '/a', 10000)
   })
+})
 
+describe('App — onSelectGlobalTab toggles activeGlobalTab off when same id clicked', () => {
   it('onSelectGlobalTab toggles activeGlobalTab off when same id clicked', () => {
     registry().registerGlobalTab({ id: 'task-vault', label: 'Tasks', component: () => null })
     render(<App />)
@@ -663,56 +685,61 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /Open Settings/ }))
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
+})
 
-  describe('menu:close-tab (onMenuCloseTab)', () => {
-    const tab = (id: string, projectId: string) => terminalSessionOf({ id, projectId })
-    const has = (id: string) => useSessionStore.getState().sessions.has(id)
+const tab = (id: string, projectId: string) => terminalSessionOf({ id, projectId })
 
-    it('closes the active session of the active project', async () => {
-      setupApp({
-        activeProjectId: 'proj-1',
-        activeWorkspaceId: 'ws-1',
-        sessions: [tab('ses-active', 'proj-1'), tab('ses-other', 'proj-1')],
-      })
-      showTab('proj-1', 'ses-active')
-      render(<App />)
-      act(() => main.events.closeTab.emit())
-      await waitFor(() => expect(has('ses-active')).toBe(false))
-      expect(has('ses-other')).toBe(true)
+const has = (id: string) => useSessionStore.getState().sessions.has(id)
+
+describe('App — menu:close-tab (onMenuCloseTab)', () => {
+  it('closes the active session of the active project', async () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      sessions: [tab('ses-active', 'proj-1'), tab('ses-other', 'proj-1')],
     })
-
-    it('closes nothing when there is no active project', async () => {
-      setupApp({ sessions: [tab('ses-active', 'proj-1')] })
-      showTab('proj-1', 'ses-active')
-      render(<App />)
-      act(() => main.events.closeTab.emit())
-      await act(async () => {})
-      expect(has('ses-active')).toBe(true)
-    })
-
-    it('closes the scratch session once a new scratch terminal has made scratch active', async () => {
-      setupApp({ activeWorkspaceId: 'ws-1', sessions: [tab('ses-scratch', SCRATCH_PROJECT_ID)] })
-      showTab(SCRATCH_PROJECT_ID, 'ses-scratch')
-      render(<App />)
-      act(() => shortcuts.callbacks.onNewScratch?.())
-      await waitFor(() => expect(useWorkspaceStore.getState().scratchActive).toBe(true))
-      act(() => main.events.closeTab.emit())
-      await waitFor(() => expect(has('ses-scratch')).toBe(false))
-    })
-
-    it('closes nothing when the active project has no active session', async () => {
-      setupApp({
-        activeProjectId: 'proj-1',
-        activeWorkspaceId: 'ws-1',
-        sessions: [tab('ses-1', 'proj-1')],
-      })
-      render(<App />)
-      act(() => main.events.closeTab.emit())
-      await act(async () => {})
-      expect(has('ses-1')).toBe(true)
-    })
+    showTab('proj-1', 'ses-active')
+    render(<App />)
+    act(() => main.events.closeTab.emit())
+    await waitFor(() => expect(has('ses-active')).toBe(false))
+    expect(has('ses-other')).toBe(true)
   })
 
+  it('closes nothing when there is no active project', async () => {
+    setupApp({ sessions: [tab('ses-active', 'proj-1')] })
+    showTab('proj-1', 'ses-active')
+    render(<App />)
+    act(() => main.events.closeTab.emit())
+    await act(async () => {})
+    expect(has('ses-active')).toBe(true)
+  })
+})
+
+describe('App — menu:close-tab (onMenuCloseTab) — closes the scratch session once a new scratch terminal has made scratch active', () => {
+  it('closes the scratch session once a new scratch terminal has made scratch active', async () => {
+    setupApp({ activeWorkspaceId: 'ws-1', sessions: [tab('ses-scratch', SCRATCH_PROJECT_ID)] })
+    showTab(SCRATCH_PROJECT_ID, 'ses-scratch')
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewScratch?.())
+    await waitFor(() => expect(useWorkspaceStore.getState().scratchActive).toBe(true))
+    act(() => main.events.closeTab.emit())
+    await waitFor(() => expect(has('ses-scratch')).toBe(false))
+  })
+
+  it('closes nothing when the active project has no active session', async () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      sessions: [tab('ses-1', 'proj-1')],
+    })
+    render(<App />)
+    act(() => main.events.closeTab.emit())
+    await act(async () => {})
+    expect(has('ses-1')).toBe(true)
+  })
+})
+
+describe('App — command core.toggle-overview action opens Overview', () => {
   it('command core.toggle-overview action opens Overview', () => {
     render(<App />)
     openPalette()
@@ -736,7 +763,9 @@ describe('App', () => {
     expect(createSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'human', 'Scratch', '/a', 10000)
     await waitFor(() => expect(useWorkspaceStore.getState().scratchActive).toBe(true))
   })
+})
 
+describe('App — renders MetricsBar when showMetricsBar is true', () => {
   it('renders MetricsBar when showMetricsBar is true', () => {
     setupApp({
       globalSettings: settingsWith({ ui: { hasSeenWelcome: true, showMetricsBar: true } }),
@@ -758,7 +787,9 @@ describe('App', () => {
     )
     expect(registry().activeGlobalTabId).toBeNull()
   })
+})
 
+describe('App — toggles sidebar when onMenuToggleSidebar event fires', () => {
   it('toggles sidebar when onMenuToggleSidebar event fires', async () => {
     setupApp({ activeWorkspaceId: 'ws-1' })
     render(<App />)
@@ -781,7 +812,9 @@ describe('App', () => {
     expect(screen.getByTestId('workspace-tab-content')).toBeTruthy()
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-1')
   })
+})
 
+describe('App — onSelectProject clears active global, workspace, and project tabs', () => {
   it('onSelectProject clears active global, workspace, and project tabs', () => {
     render(<App />)
     act(() => {
@@ -795,7 +828,9 @@ describe('App', () => {
       activeProjectTabId: null,
     })
   })
+})
 
+describe('App — tells main whether each registered panel is open, whenever that changes', () => {
   it('tells main whether each registered panel is open, whenever that changes', async () => {
     registry().registerSidebarPanel({
       id: 'git-changes',
@@ -819,7 +854,9 @@ describe('App', () => {
     render(<App />)
     expect(registry().openPanels.has('saved-panel')).toBe(true)
   })
+})
 
+describe('App — shows an open panel when the bridge has no extensionEvents (the remote window)', () => {
   it('shows an open panel when the bridge has no extensionEvents (the remote window)', () => {
     const { extensionEvents: _left, ...remote } = main.parts
     installElectronApi(remote)
@@ -833,140 +870,148 @@ describe('App', () => {
     leaveHome()
     expect(screen.getByTestId('mock-panel')).toBeTruthy()
   })
+})
 
-  describe('Home', () => {
-    it('registers Home as a permanent core tab, ahead of Overview', () => {
-      render(<App />)
-      const tabs = [...registry().globalTabs.values()]
-      expect(tabs.map((t) => [t.id, t.permanent])).toEqual([
-        ['core.home', true],
-        ['core.overview', true],
-      ])
-    })
-
-    it('opens on Home at launch', () => {
-      render(<App />)
-      expect(registry().activeGlobalTabId).toBe('core.home')
-      expect(screen.getByTestId('home-screen')).toBeTruthy()
-    })
-
-    it('badges Home with the number of sessions waiting on the operator', () => {
-      // State is derived, never read from the store: a bell or a visible choice
-      // makes a session wait on the operator; a closed one never does.
-      const session = (id: string, patch: Partial<TerminalSession>) =>
-        terminalSessionOf({ id, projectId: 'p', ...patch })
-      setupApp({
-        sessions: [
-          session('a', { bellCount: 1 }),
-          session('b', { choicePrompt: { question: 'Proceed?', options: [] } }),
-          session('c', { busy: true }),
-          session('d', { bellCount: 2, status: 'closed' }),
-        ],
-      })
-      render(<App />)
-      expect(registry().globalTabs.get('core.home')).toMatchObject({
-        badge: 2,
-        badgeLabel: '2 need you',
-      })
-      expect(screen.getByRole('button', { name: 'Home, 2 need you' })).toBeTruthy()
-    })
+describe('App — Home', () => {
+  it('registers Home as a permanent core tab, ahead of Overview', () => {
+    render(<App />)
+    const tabs = [...registry().globalTabs.values()]
+    expect(tabs.map((t) => [t.id, t.permanent])).toEqual([
+      ['core.home', true],
+      ['core.overview', true],
+    ])
   })
 
-  describe('auto-open terminal failure', () => {
-    it("keeps the reason a branch's first terminal failed to open", async () => {
-      createSession.mockRejectedValue(new Error('spawn EBADF'))
-      setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-      render(<App />)
-      await waitFor(() =>
-        expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBe('spawn EBADF')
-      )
-      expect(createSession).toHaveBeenCalledTimes(1)
-    })
+  it('opens on Home at launch', () => {
+    render(<App />)
+    expect(registry().activeGlobalTabId).toBe('core.home')
+    expect(screen.getByTestId('home-screen')).toBeTruthy()
+  })
+})
 
-    it('opens again when Try again bumps the retry, and clears the error on success', async () => {
-      createSession.mockRejectedValueOnce(new Error('spawn EBADF')).mockResolvedValue('ses-1')
-      setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-      render(<App />)
-      await waitFor(() =>
-        expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBeTruthy()
-      )
-      act(() => useTerminalOpenErrorStore.getState().retry('proj-1'))
-      await waitFor(() => expect(createSession).toHaveBeenCalledTimes(2))
-      await waitFor(() =>
-        expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBeUndefined()
-      )
+describe('App — Home — badges Home with the number of sessions waiting on the operator', () => {
+  it('badges Home with the number of sessions waiting on the operator', () => {
+    // State is derived, never read from the store: a bell or a visible choice
+    // makes a session wait on the operator; a closed one never does.
+    const session = (id: string, patch: Partial<TerminalSession>) =>
+      terminalSessionOf({ id, projectId: 'p', ...patch })
+    setupApp({
+      sessions: [
+        session('a', { bellCount: 1 }),
+        session('b', { choicePrompt: { question: 'Proceed?', options: [] } }),
+        session('c', { busy: true }),
+        session('d', { bellCount: 2, status: 'closed' }),
+      ],
     })
+    render(<App />)
+    expect(registry().globalTabs.get('core.home')).toMatchObject({
+      badge: 2,
+      badgeLabel: '2 need you',
+    })
+    expect(screen.getByRole('button', { name: 'Home, 2 need you' })).toBeTruthy()
+  })
+})
+
+describe('App — auto-open terminal failure', () => {
+  it("keeps the reason a branch's first terminal failed to open", async () => {
+    createSession.mockRejectedValue(new Error('spawn EBADF'))
+    setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+    render(<App />)
+    await waitFor(() =>
+      expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBe('spawn EBADF')
+    )
+    expect(createSession).toHaveBeenCalledTimes(1)
   })
 
-  describe('handleNewTab', () => {
-    const promptForName = () => settingsWith({ terminal: { promptForName: true } })
+  it('opens again when Try again bumps the retry, and clears the error on success', async () => {
+    createSession.mockRejectedValueOnce(new Error('spawn EBADF')).mockResolvedValue('ses-1')
+    setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+    render(<App />)
+    await waitFor(() => expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBeTruthy())
+    act(() => useTerminalOpenErrorStore.getState().retry('proj-1'))
+    await waitFor(() => expect(createSession).toHaveBeenCalledTimes(2))
+    await waitFor(() =>
+      expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBeUndefined()
+    )
+  })
+})
 
-    it('does nothing when there is no active project and scratchActive is false', () => {
-      render(<App />)
-      act(() => shortcuts.callbacks.onNewTab?.())
-      expect(createSession).not.toHaveBeenCalled()
-    })
+const promptForName = () => settingsWith({ terminal: { promptForName: true } })
 
-    it('opens a terminal straight away when promptForName is off', () => {
-      setupApp({
-        activeProjectId: 'proj-1',
-        activeWorkspaceId: 'ws-1',
-        workspaces: [WS1],
-        sessions: [terminalSessionOf({ id: 'existing', projectId: 'proj-1' })],
-      })
-      render(<App />)
-      act(() => shortcuts.callbacks.onNewTab?.())
-      expect(createSession).toHaveBeenCalledWith('proj-1', 'human', '', '/a', 10000)
-    })
-
-    it('shows NameTerminalDialog when promptForName is true', async () => {
-      setupApp({
-        activeProjectId: 'proj-1',
-        activeWorkspaceId: 'ws-1',
-        globalSettings: promptForName(),
-        sessions: [terminalSessionOf({ id: 'existing', projectId: 'proj-1' })],
-      })
-      useSessionStore.setState({
-        projectViews: new Map([['proj-1', { terminalCounter: 2, activeSessionId: 'existing' }]]),
-      })
-      render(<App />)
-      leaveHome()
-      act(() => shortcuts.callbacks.onNewTab?.())
-      await waitFor(() => expect(screen.getByTestId('name-terminal-dialog')).toBeTruthy())
-      expect(screen.getByTestId('name-terminal-default').textContent).toBe('Terminal 3')
-    })
-
-    it('NameTerminalDialog onConfirm opens the named terminal and closes the dialog', async () => {
-      setupApp({
-        activeProjectId: 'proj-1',
-        activeWorkspaceId: 'ws-1',
-        globalSettings: promptForName(),
-        sessions: [terminalSessionOf({ id: 'existing', projectId: 'proj-1' })],
-      })
-      render(<App />)
-      act(() => shortcuts.callbacks.onNewTab?.())
-      await waitFor(() => screen.getByTestId('name-terminal-dialog'))
-      fireEvent.click(screen.getByText('Confirm'))
-      await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
-      expect(createSession).toHaveBeenCalledWith('proj-1', 'human', 'My Terminal', '~', 10000)
-    })
-
-    it('NameTerminalDialog onCancel closes dialog without creating a named session', async () => {
-      setupApp({
-        activeProjectId: 'proj-1',
-        activeWorkspaceId: 'ws-1',
-        globalSettings: promptForName(),
-        sessions: [terminalSessionOf({ id: 'existing', projectId: 'proj-1' })],
-      })
-      render(<App />)
-      act(() => shortcuts.callbacks.onNewTab?.())
-      await waitFor(() => screen.getByTestId('name-terminal-dialog'))
-      fireEvent.click(screen.getByText('Cancel Dialog'))
-      await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
-      expect(createSession).not.toHaveBeenCalled()
-    })
+describe('App — handleNewTab', () => {
+  it('does nothing when there is no active project and scratchActive is false', () => {
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewTab?.())
+    expect(createSession).not.toHaveBeenCalled()
   })
 
+  it('opens a terminal straight away when promptForName is off', () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      workspaces: [WS1],
+      sessions: [terminalSessionOf({ id: 'existing', projectId: 'proj-1' })],
+    })
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewTab?.())
+    expect(createSession).toHaveBeenCalledWith('proj-1', 'human', '', '/a', 10000)
+  })
+})
+
+describe('App — handleNewTab — shows NameTerminalDialog when promptForName is true', () => {
+  it('shows NameTerminalDialog when promptForName is true', async () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      globalSettings: promptForName(),
+      sessions: [terminalSessionOf({ id: 'existing', projectId: 'proj-1' })],
+    })
+    useSessionStore.setState({
+      projectViews: new Map([['proj-1', { terminalCounter: 2, activeSessionId: 'existing' }]]),
+    })
+    render(<App />)
+    leaveHome()
+    act(() => shortcuts.callbacks.onNewTab?.())
+    await waitFor(() => expect(screen.getByTestId('name-terminal-dialog')).toBeTruthy())
+    expect(screen.getByTestId('name-terminal-default').textContent).toBe('Terminal 3')
+  })
+})
+
+describe('App — handleNewTab — NameTerminalDialog onConfirm opens the named terminal and closes the dialog', () => {
+  it('NameTerminalDialog onConfirm opens the named terminal and closes the dialog', async () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      globalSettings: promptForName(),
+      sessions: [terminalSessionOf({ id: 'existing', projectId: 'proj-1' })],
+    })
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewTab?.())
+    await waitFor(() => screen.getByTestId('name-terminal-dialog'))
+    fireEvent.click(screen.getByText('Confirm'))
+    await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
+    expect(createSession).toHaveBeenCalledWith('proj-1', 'human', 'My Terminal', '~', 10000)
+  })
+})
+
+describe('App — handleNewTab — NameTerminalDialog onCancel closes dialog without creating a named session', () => {
+  it('NameTerminalDialog onCancel closes dialog without creating a named session', async () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      globalSettings: promptForName(),
+      sessions: [terminalSessionOf({ id: 'existing', projectId: 'proj-1' })],
+    })
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewTab?.())
+    await waitFor(() => screen.getByTestId('name-terminal-dialog'))
+    fireEvent.click(screen.getByText('Cancel Dialog'))
+    await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
+    expect(createSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('App — reopens saved panels when switching back to Terminal tab', () => {
   it('reopens saved panels when switching back to Terminal tab', () => {
     setupApp({ activeProjectId: 'proj-1' })
     registry().togglePanel('panel-a')
@@ -978,15 +1023,16 @@ describe('App', () => {
   })
 })
 
-describe('App — command palette sessions and note editing (US6)', () => {
-  const paletteSession = terminalSessionOf({
-    id: 's1',
-    projectId: 'proj-1',
-    tabTitle: 'api-shell',
-    type: 'agent',
-  })
-  const projects = new Map([['ws-1', [PROJ1]]])
+const paletteSession = terminalSessionOf({
+  id: 's1',
+  projectId: 'proj-1',
+  tabTitle: 'api-shell',
+  type: 'agent',
+})
 
+const projects = new Map([['ws-1', [PROJ1]]])
+
+describe('App — command palette sessions and note editing (US6)', () => {
   it('offers open sessions to the panel, one action per session named by project', () => {
     setupApp({ sessions: [paletteSession], projectsByWorkspaceId: projects })
     render(<App />)
@@ -1010,7 +1056,9 @@ describe('App — command palette sessions and note editing (US6)', () => {
     openPalette()
     expect(paletteAction('session:s1')?.description).toBe('')
   })
+})
 
+describe('App — command palette sessions and note editing (US6) — activates both the project and the session when one is chosen', () => {
   it('activates both the project and the session when one is chosen', () => {
     setupApp({ sessions: [paletteSession], projectsByWorkspaceId: projects })
     render(<App />)
@@ -1061,7 +1109,9 @@ describe('App — Quick Actions integration (feature 057)', () => {
       expect(settings()?.quickActions.usage.some((u) => u.id === 'core.clear')).toBe(true)
     )
   })
+})
 
+describe('App — Quick Actions integration (feature 057) — shows a "Next time" hint toast when a shortcut action with a fresh direct-use count runs', () => {
   it('shows a "Next time" hint toast when a shortcut action with a fresh direct-use count runs', () => {
     render(<App />)
     openPalette()
@@ -1077,7 +1127,9 @@ describe('App — Quick Actions integration (feature 057)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Quick actions (⌘P)' }))
     await waitFor(() => expect(screen.getByTestId('quick-actions')).toBeTruthy())
   })
+})
 
+describe('App — Quick Actions integration (feature 057) — runs the terminal, session and workspace core actions against the stores', () => {
   it('runs the terminal, session and workspace core actions against the stores', async () => {
     const s1 = terminalSessionOf({ id: 's1', projectId: 'proj-1' })
     const s2 = terminalSessionOf({
@@ -1123,7 +1175,9 @@ describe('App — Quick Actions integration (feature 057)', () => {
     runAction('core.cycle-workspace-next')
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-2')
   })
+})
 
+describe('App — Quick Actions integration (feature 057) — "Link issue" opens the dialog for the focused terminal\'s own session', () => {
   it('"Link issue" opens the dialog for the focused terminal\'s own session', async () => {
     facts.sessionFacts = [{ sessionId: 's1', workItem: null }]
     setupApp({
@@ -1152,7 +1206,9 @@ describe('App — Quick Actions integration (feature 057)', () => {
     expect(useIntegrationsStore.getState().linkDialogProjectId).toBe('proj-1')
     expect(screen.queryByTestId('session-link-dialog')).toBeNull()
   })
+})
 
+describe('App — Quick Actions integration (feature 057) — pinning an action saves it in the pins', () => {
   it('pinning an action saves it in the pins', async () => {
     render(<App />)
     openPalette()
@@ -1169,14 +1225,15 @@ describe('App — Quick Actions integration (feature 057)', () => {
   })
 })
 
-describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors)', () => {
-  const customAction = (id: string, body: string, target: 'new-tab' | 'focused') =>
-    settingsWith({
-      ui: { hasSeenWelcome: true },
-      quickActions: { custom: [{ id, label: id, kind: 'shell', target, body }] },
-    })
-  const shell = terminalSessionOf({ id: 's1', projectId: 'proj-1', tabTitle: 'shell' })
+const customAction = (id: string, body: string, target: 'new-tab' | 'focused') =>
+  settingsWith({
+    ui: { hasSeenWelcome: true },
+    quickActions: { custom: [{ id, label: id, kind: 'shell', target, body }] },
+  })
 
+const shell = terminalSessionOf({ id: 's1', projectId: 'proj-1', tabTitle: 'shell' })
+
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors)', () => {
   it('labels the context "in <group label>" when an extension surface is active', () => {
     registry().setQuickActionGroups([
       { id: 'ext:git-integration', mnemonic: 'g', label: 'Git', owner: 'git-integration' },
@@ -1203,7 +1260,9 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
     expect(palette.props?.contextGroupId).toBeNull()
     expect(palette.props?.contextLabel).toBeUndefined()
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — extension:show-surface activates the registered surface matching the extension id and view', () => {
   it('extension:show-surface activates the registered surface matching the extension id and view', () => {
     registry().registerGlobalTab({
       id: 'git-integration',
@@ -1220,7 +1279,9 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
     )
     expect(registry().activeGlobalTabId).toBe('git-integration')
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — extension:show-surface does nothing when no registered surface matches', () => {
   it('extension:show-surface does nothing when no registered surface matches', () => {
     registry().registerGlobalTab({
       id: 'git-integration',
@@ -1248,7 +1309,9 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
     openPalette()
     expect(paletteAction('custom:c1')?.disabledReason).toBe('No linked issue')
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — enables a custom action referencing {issue} once the project has a linked issue', () => {
   it('enables a custom action referencing {issue} once the project has a linked issue', () => {
     setupApp({
       activeProjectId: 'proj-1',
@@ -1273,7 +1336,9 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
     openPalette()
     expect(paletteAction('custom:c1')?.disabledReason).toBeUndefined()
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — disables a custom action referencing {selection} with "No text selected" when nothing is selected', () => {
   it('disables a custom action referencing {selection} with "No text selected" when nothing is selected', () => {
     setupApp({
       activeProjectId: 'proj-1',
@@ -1285,7 +1350,9 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
     openPalette()
     expect(paletteAction('custom:c2')?.disabledReason).toBe('No text selected')
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — enables and runs a custom action referencing {selection} once there is a selection', () => {
   it('enables and runs a custom action referencing {selection} once there is a selection', () => {
     setupApp({
       activeProjectId: 'proj-1',
@@ -1306,7 +1373,9 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
     act(() => palette.props?.onRun(action))
     expect(main.sent.input).toHaveBeenCalledWith('s1', expect.stringContaining('picked-text'))
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — shows an error toast with the thrown message when an action fails synchronously', () => {
   it('shows an error toast with the thrown message when an action fails synchronously', async () => {
     render(<App />)
     openPalette()
@@ -1324,7 +1393,9 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
       expect(toasts()).toContainEqual(expect.objectContaining({ type: 'error', message: 'boom' }))
     )
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — shows a generic "Action failed" error toast when a non-Error value is rejected', () => {
   it('shows a generic "Action failed" error toast when a non-Error value is rejected', async () => {
     render(<App />)
     openPalette()
@@ -1342,7 +1413,9 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
       )
     )
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — suppresses the "Next time" hint once the shortcut has been used directly three times', () => {
   it('suppresses the "Next time" hint once the shortcut has been used directly three times', () => {
     setupApp({
       globalSettings: settingsWith({
@@ -1372,7 +1445,9 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
     act(() => main.events.closeTab.emit())
     await waitFor(() => expect(directUse()).toContain('core.close-tab'))
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — writes no settings for a shortcut whose hint has already stopped showing', () => {
   it('writes no settings for a shortcut whose hint has already stopped showing', () => {
     setupApp({
       globalSettings: settingsWith({
@@ -1385,7 +1460,9 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
     }
     expect(main.sent.updateGlobal).not.toHaveBeenCalled()
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — leaves everything as it was for core actions with no project, no sessions and no workspaces', () => {
   it('leaves everything as it was for core actions with no project, no sessions and no workspaces', () => {
     render(<App />)
     openPalette()

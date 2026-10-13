@@ -114,7 +114,9 @@ describe('createTerminalSession', () => {
       expect.objectContaining({ initialCommand: 'claude --resume abc' })
     )
   })
+})
 
+describe('createTerminalSession — reports a terminal that could not start, and opens no tab', () => {
   // A branch whose worktree was removed outside the app: the main process
   // refuses the spawn, and the operator gets the folder's name rather than a
   // tab that opens and instantly dies with nothing in it.
@@ -138,7 +140,9 @@ describe('createTerminalSession', () => {
     expect(useSessionStore.getState().terminalInstances.size).toBe(0)
     expect(activeIn('proj-1')).toBeNull()
   })
+})
 
+describe('createTerminalSession — stores the instance before activating the session', () => {
   it('stores the instance before activating the session', async () => {
     const seen: string[] = []
     const stop = useSessionStore.subscribe((state) => {
@@ -163,7 +167,9 @@ describe('createTerminalSession', () => {
     expect(scrollbackLimit).toBe(7777)
     expect(Object.keys(hooks ?? {}).sort()).toEqual(['onBell', 'onBusy', 'onDispose', 'onIdle'])
   })
+})
 
+describe('createTerminalSession — marks the session busy on output, and idle after the working hold', () => {
   it('marks the session busy on output, and idle after the working hold', async () => {
     vi.useFakeTimers()
     try {
@@ -193,12 +199,12 @@ describe('createTerminalSession', () => {
   })
 })
 
-describe('bell handling', () => {
-  async function createAndGetBell(): Promise<() => void> {
-    await createTerminalSession('proj-1', 'human', 'My Tab', '/repo', 5000)
-    return capturedCtorArgs[0].hooks!.onBell!
-  }
+async function createAndGetBell(): Promise<() => void> {
+  await createTerminalSession('proj-1', 'human', 'My Tab', '/repo', 5000)
+  return capturedCtorArgs[0].hooks!.onBell!
+}
 
+describe('bell handling', () => {
   it('counts and notifies when the session is not the active session', async () => {
     const bell = await createAndGetBell()
     useSessionStore.getState().setActiveSessionForProject('proj-1', 'some-other-session')
@@ -228,7 +234,9 @@ describe('bell handling', () => {
     expect(sessionOf('session-123')!.bellCount).toBeUndefined()
     expect(mockDispatchNotification).not.toHaveBeenCalled()
   })
+})
 
+describe('bell handling — does not crash when the session is missing from the store', () => {
   it('does not crash when the session is missing from the store', async () => {
     const bell = await createAndGetBell()
     useSessionStore.setState({ sessions: new Map() })
@@ -238,9 +246,9 @@ describe('bell handling', () => {
   })
 })
 
-describe('splitTerminalSession', () => {
-  const layoutOf = (projectId: string) => useSessionStore.getState().getPaneLayout(projectId)
+const layoutOf = (projectId: string) => useSessionStore.getState().getPaneLayout(projectId)
 
+describe('splitTerminalSession', () => {
   it('does nothing when there is no focused or active session', async () => {
     await splitTerminalSession('proj-1', 'horizontal', '/repo', 5000)
     expect(terminalApi.create).not.toHaveBeenCalled()
@@ -270,7 +278,9 @@ describe('splitTerminalSession', () => {
     expect(sessionOf('session-123')!.parentSessionId).toBe('root-1')
     expect(leafIds(layoutOf('proj-1')!)).toEqual(['root-1', 'pane-1', 'session-123'])
   })
+})
 
+describe('splitTerminalSession — pins to the focused session root when the focused session is itself a split child', () => {
   it('pins to the focused session root when the focused session is itself a split child', async () => {
     addSession('child-1', { parentSessionId: 'root-1' })
     useSessionStore.getState().setActiveSessionForProject('proj-1', 'child-1')
@@ -300,18 +310,18 @@ describe('splitTerminalSession', () => {
   })
 })
 
-describe('adoptTerminalSession', () => {
-  // A supervised agent's terminal is spawned in the main process. The store
-  // record alone is not a tab you can see: without an xterm instance nothing
-  // ever mounts and the project opens empty, which is the invisible agent this
-  // runtime exists to have got rid of.
-  const adopted = {
-    sessionId: 'terminal-1',
-    projectId: 'proj-1',
-    tabTitle: 'feat/x',
-    scrollbackLimit: 5000,
-  }
+// A supervised agent's terminal is spawned in the main process. The store
+// record alone is not a tab you can see: without an xterm instance nothing
+// ever mounts and the project opens empty, which is the invisible agent this
+// runtime exists to have got rid of.
+const adopted = {
+  sessionId: 'terminal-1',
+  projectId: 'proj-1',
+  tabTitle: 'feat/x',
+  scrollbackLimit: 5000,
+}
 
+describe('adoptTerminalSession', () => {
   it('records the session', () => {
     adoptTerminalSession(adopted)
     expect(sessionOf('terminal-1')).toMatchObject({
@@ -343,7 +353,9 @@ describe('adoptTerminalSession', () => {
     adoptTerminalSession(adopted)
     expect(activeIn('proj-1')).toBe('the-one-being-read')
   })
+})
 
+describe('adoptTerminalSession — does nothing for a session it already has, so a repeat is not a second tab', () => {
   it('does nothing for a session it already has, so a repeat is not a second tab', () => {
     addSession('terminal-1', { tabTitle: 'feat/x', type: 'human' })
     adoptTerminalSession(adopted)
@@ -366,29 +378,29 @@ describe('adoptTerminalSession', () => {
   })
 })
 
+// onBusy fires on every PTY output chunk. Without a throttle a chatty agent
+// would write to the store — and re-render the sidebar — per chunk.
+async function busyHookFor(sessionId: string) {
+  terminalApi.create.mockResolvedValue({ sessionId })
+  await createTerminalSession('proj-1', 'agent', 'A', '/repo', 5000)
+  const hooks = capturedCtorArgs.at(-1)!.hooks!
+  return hooks.onBusy!
+}
+
+/** Counts the store writes that move a session's activity stamp. */
+function countStamps(): { of: (id: string) => number[] } {
+  const stamps = new Map<string, number[]>()
+  useSessionStore.subscribe((state, previous) => {
+    for (const [id, session] of state.sessions) {
+      const before = previous.sessions.get(id)?.lastActivityAt
+      if (before !== session.lastActivityAt)
+        stamps.set(id, [...(stamps.get(id) ?? []), session.lastActivityAt])
+    }
+  })
+  return { of: (id) => stamps.get(id) ?? [] }
+}
+
 describe('activity stamping throttle (FR-002)', () => {
-  // onBusy fires on every PTY output chunk. Without a throttle a chatty agent
-  // would write to the store — and re-render the sidebar — per chunk.
-  async function busyHookFor(sessionId: string) {
-    terminalApi.create.mockResolvedValue({ sessionId })
-    await createTerminalSession('proj-1', 'agent', 'A', '/repo', 5000)
-    const hooks = capturedCtorArgs.at(-1)!.hooks!
-    return hooks.onBusy!
-  }
-
-  /** Counts the store writes that move a session's activity stamp. */
-  function countStamps(): { of: (id: string) => number[] } {
-    const stamps = new Map<string, number[]>()
-    useSessionStore.subscribe((state, previous) => {
-      for (const [id, session] of state.sessions) {
-        const before = previous.sessions.get(id)?.lastActivityAt
-        if (before !== session.lastActivityAt)
-          stamps.set(id, [...(stamps.get(id) ?? []), session.lastActivityAt])
-      }
-    })
-    return { of: (id) => stamps.get(id) ?? [] }
-  }
-
   it('writes once for a burst of output inside one second', async () => {
     setActivityClock(() => 1_000)
     const onBusy = await busyHookFor('s1')
@@ -418,7 +430,9 @@ describe('activity stamping throttle (FR-002)', () => {
     onBusy()
     expect(stamps.of('s1')).toEqual([1_000, 2_000])
   })
+})
 
+describe('activity stamping throttle (FR-002) — suppresses a write one millisecond short of the boundary', () => {
   it('suppresses a write one millisecond short of the boundary', async () => {
     let now = 1_000
     setActivityClock(() => now)
@@ -440,7 +454,9 @@ describe('activity stamping throttle (FR-002)', () => {
     expect(stamps.of('s1')).toEqual([5_000])
     expect(stamps.of('s2')).toEqual([5_000])
   })
+})
 
+describe('activity stamping throttle (FR-002) — still marks the session busy on every chunk — only the stamp is throttled', () => {
   it('still marks the session busy on every chunk — only the stamp is throttled', async () => {
     setActivityClock(() => 1_000)
     const onBusy = await busyHookFor('s1')
@@ -496,7 +512,9 @@ describe('reading a choice prompt off the screen (054)', () => {
     expect(sessionOf('session-123')!.latestLine).toBe('⏺ Wrote 1 line to a.txt')
     expect(sessionOf('session-123')!.choicePrompt).toBeUndefined()
   })
+})
 
+describe('reading a choice prompt off the screen (054) — refreshes the latest line of a session that never settles, once a second', () => {
   it('refreshes the latest line of a session that never settles, once a second', async () => {
     await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
     screenRows = ['17:02:21 14 passed', '']
@@ -519,7 +537,15 @@ describe('reading a choice prompt off the screen (054)', () => {
   })
 })
 
-describe('working hold before idle (058)', () => {
+async function busySession(): Promise<NonNullable<(typeof capturedCtorArgs)[0]['hooks']>> {
+  await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+  const hooks = capturedCtorArgs[0].hooks!
+  hooks.onBusy!()
+  return hooks
+}
+
+/** The hooks every "working hold before idle (058)" describe registers. */
+function setUpWorkingHoldBeforeIdle(): void {
   beforeEach(() => {
     vi.useFakeTimers()
   })
@@ -527,13 +553,10 @@ describe('working hold before idle (058)', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
+}
 
-  async function busySession(): Promise<NonNullable<(typeof capturedCtorArgs)[0]['hooks']>> {
-    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
-    const hooks = capturedCtorArgs[0].hooks!
-    hooks.onBusy!()
-    return hooks
-  }
+describe('working hold before idle (058)', () => {
+  setUpWorkingHoldBeforeIdle()
 
   it('reads the screen at settle but stays busy until the hold elapses', async () => {
     const hooks = await busySession()
@@ -557,6 +580,10 @@ describe('working hold before idle (058)', () => {
       busy: true,
     })
   })
+})
+
+describe('working hold before idle (058) — a busy event inside the hold cancels the pending idle', () => {
+  setUpWorkingHoldBeforeIdle()
 
   it('a busy event inside the hold cancels the pending idle', async () => {
     const hooks = await busySession()
@@ -576,13 +603,18 @@ describe('working hold before idle (058)', () => {
   })
 })
 
-describe('answerChoice (054)', () => {
+/** The hooks every "answerChoice (054)" describe registers. */
+function setUpAnswerChoice054(): void {
   beforeEach(async () => {
     terminalApi.create.mockResolvedValue({ sessionId: 's1' })
     await createTerminalSession('p', 'human', 'claude', '/repo', 5000)
     screenRows = PROMPT_ROWS
     capturedCtorArgs[0].hooks!.onIdle!()
   })
+}
+
+describe('answerChoice (054)', () => {
+  setUpAnswerChoice054()
 
   it('types the option number when the prompt is still on screen', () => {
     expect(answerChoice('s1', 2)).toBe(true)

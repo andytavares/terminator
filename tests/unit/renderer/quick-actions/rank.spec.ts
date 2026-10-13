@@ -39,10 +39,11 @@ describe('frecencyScore', () => {
   })
 })
 
-describe('rankFirstScreen', () => {
-  const now = 1_000_000_000_000
-  const actions = [action('a'), action('b'), action('c'), action('d'), action('e')]
+const now = 1_000_000_000_000
 
+const actions = [action('a'), action('b'), action('c'), action('d'), action('e')]
+
+describe('rankFirstScreen', () => {
   it('follows pin order regardless of usage', () => {
     const { pinned } = rankFirstScreen(actions, { pins: ['c', 'a'], usage: [], now })
     expect(pinned.map((a) => a.id)).toEqual(['c', 'a'])
@@ -68,7 +69,9 @@ describe('rankFirstScreen', () => {
     const { recent } = rankFirstScreen(actions, { pins: [], usage, now })
     expect(recent).toEqual([])
   })
+})
 
+describe('rankFirstScreen — limits the recent row to the given limit, defaulting to 4', () => {
   it('limits the recent row to the given limit, defaulting to 4', () => {
     const usage: ActionUsage[] = actions.map((a) => ({ id: a.id, count: 1, lastUsedAt: now }))
     const { recent } = rankFirstScreen(actions, { pins: [], usage, now })

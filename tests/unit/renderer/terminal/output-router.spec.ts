@@ -54,7 +54,9 @@ describe('subscribeToSessionOutput', () => {
     expect(first).not.toHaveBeenCalled()
     expect(second).toHaveBeenCalledWith('still here', expect.any(Function))
   })
+})
 
+describe('subscribeToSessionOutput — does not let a stale unsubscribe remove a newer subscriber for the same session', () => {
   it('does not let a stale unsubscribe remove a newer subscriber for the same session', async () => {
     const { subscribeToSessionOutput } = await freshRouter()
     const old = subscribeToSessionOutput('a', vi.fn())
@@ -85,7 +87,9 @@ describe('subscribeToSessionOutput', () => {
     deliver('a', 'pending')
     expect(acknowledge).not.toHaveBeenCalled()
   })
+})
 
+describe('subscribeToSessionOutput — acknowledges output nobody will write at once, so the process is not held up for it', () => {
   it('acknowledges output nobody will write at once, so the process is not held up for it', async () => {
     const { subscribeToSessionOutput } = await freshRouter()
     const stop = subscribeToSessionOutput('a', vi.fn())

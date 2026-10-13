@@ -5,11 +5,11 @@ function resetStore() {
   useLogStore.setState({ entries: [] })
 }
 
-describe('useLogStore', () => {
-  beforeEach(() => {
-    resetStore()
-  })
+beforeEach(() => {
+  resetStore()
+})
 
+describe('useLogStore', () => {
   describe('addEntry', () => {
     it('adds an entry with sequential id, level, and message', () => {
       useLogStore.getState().addEntry('info', 'test message')
@@ -44,7 +44,9 @@ describe('useLogStore', () => {
       expect(entries[0].message).toBe('msg 5')
     })
   })
+})
 
+describe('useLogStore — clear', () => {
   describe('clear', () => {
     it('removes all entries', () => {
       useLogStore.getState().addEntry('log', 'a')

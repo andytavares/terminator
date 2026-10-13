@@ -33,7 +33,9 @@ describe('expandVariables', () => {
       reason: 'No worktree focused',
     })
   })
+})
 
+describe('expandVariables — fails with a named reason when repo is missing', () => {
   it('fails with a named reason when repo is missing', () => {
     expect(expandVariables('{repo}', {})).toEqual({ ok: false, reason: 'No repository focused' })
   })

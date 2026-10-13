@@ -117,7 +117,9 @@ describe('LinkIssueDialog — searching', () => {
     })
     expect(screen.getByText('Results')).toBeTruthy()
   })
+})
 
+describe('LinkIssueDialog — searching — goes back to assigned issues when the search is cleared', () => {
   it('goes back to assigned issues when the search is cleared', async () => {
     vi.useFakeTimers()
     open()
@@ -157,7 +159,9 @@ describe('LinkIssueDialog — linking', () => {
     await waitFor(() => expect(linkIssue).toHaveBeenCalledWith(P, 'linear', 'TAV-42'))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
+})
 
+describe('LinkIssueDialog — linking — reports a failure and stays open rather than pretending', () => {
   it('reports a failure and stays open rather than pretending', async () => {
     const onClose = vi.fn()
     linkIssue.mockResolvedValue(false)
@@ -185,7 +189,9 @@ describe('LinkIssueDialog — linking', () => {
     fireEvent.click(await screen.findByText('TAV-42'))
     expect(screen.queryByRole('alert')).toBeNull()
   })
+})
 
+describe('LinkIssueDialog — linking — does not warn for a project that has no issue yet', () => {
   it('does not warn for a project that has no issue yet', async () => {
     open()
     fireEvent.click(await screen.findByText('TAV-42'))

@@ -31,12 +31,12 @@ function resetStore() {
   useNotificationStore.setState({ notifications: [], panelOpen: false, unreadCount: 0 })
 }
 
-describe('useNotificationStore', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    resetStore()
-  })
+beforeEach(() => {
+  vi.clearAllMocks()
+  resetStore()
+})
 
+describe('useNotificationStore', () => {
   describe('addNotification', () => {
     it('adds notification with read=false and increments unreadCount', () => {
       const n = makeNotif()
@@ -64,7 +64,9 @@ describe('useNotificationStore', () => {
       expect(notifications[1].title).toBe('A')
     })
   })
+})
 
+describe('useNotificationStore — markRead', () => {
   describe('markRead', () => {
     it('marks notification as read and decrements unreadCount', () => {
       const n = makeNotif()
@@ -86,7 +88,9 @@ describe('useNotificationStore', () => {
       expect(bNotif?.read).toBe(false)
     })
   })
+})
 
+describe('useNotificationStore — markAllRead', () => {
   describe('markAllRead', () => {
     it('marks all notifications as read and zeroes unreadCount', () => {
       useNotificationStore.getState().addNotification(makeNotif({ id: 'x' }))
@@ -97,7 +101,9 @@ describe('useNotificationStore', () => {
       expect(unreadCount).toBe(0)
     })
   })
+})
 
+describe('useNotificationStore — dismiss', () => {
   describe('dismiss', () => {
     it('removes notification from list', () => {
       const n = makeNotif()
@@ -120,7 +126,9 @@ describe('useNotificationStore', () => {
       expect(useNotificationStore.getState().unreadCount).toBe(0)
     })
   })
+})
 
+describe('useNotificationStore — clearAll', () => {
   describe('clearAll', () => {
     it('empties notifications list and zeroes unreadCount', () => {
       useNotificationStore.getState().addNotification(makeNotif({ id: 'c1' }))
@@ -137,7 +145,9 @@ describe('useNotificationStore', () => {
       expect(mockDismiss.mock.calls).toEqual([['d2'], ['d1']])
     })
   })
+})
 
+describe('useNotificationStore — panel state', () => {
   describe('panel state', () => {
     it('togglePanel flips panelOpen', () => {
       expect(useNotificationStore.getState().panelOpen).toBe(false)

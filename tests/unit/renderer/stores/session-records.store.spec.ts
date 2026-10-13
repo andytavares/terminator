@@ -83,7 +83,9 @@ describe('session records store', () => {
     expect(ok).toBe(true)
     expect(useSessionRecordsStore.getState().records.get('s1')?.description).toBe('new')
   })
+})
 
+describe('session records store — drops the record when a write removed it', () => {
   it('drops the record when a write removed it', async () => {
     useSessionRecordsStore.setState({ records: new Map([['s1', record()]]) })
     api.setDescription.mockResolvedValue({ data: null })
@@ -106,7 +108,9 @@ describe('session records store', () => {
     expect(api.setLink).toHaveBeenCalledWith({ session: SNAP, link })
     expect(useSessionRecordsStore.getState().records.get('s1')?.link).toEqual(link)
   })
+})
 
+describe('session records store — moves a record onto the session that resumed it', () => {
   it('moves a record onto the session that resumed it', async () => {
     useSessionRecordsStore.setState({ records: new Map([['s1', record()]]) })
     const resumed = { ...SNAP, sessionId: 's2' }
@@ -132,7 +136,9 @@ describe('session records store', () => {
     ).toBe(false)
     expect([...useSessionRecordsStore.getState().records.keys()]).toEqual(['s1'])
   })
+})
 
+describe('session records store — forgets a closed record and takes it out of the list', () => {
   it('forgets a closed record and takes it out of the list', async () => {
     useSessionRecordsStore.setState({ records: new Map([['s1', record()]]) })
     api.forget.mockResolvedValue({ data: true })

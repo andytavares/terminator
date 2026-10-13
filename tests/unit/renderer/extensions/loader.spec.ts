@@ -80,7 +80,9 @@ describe('initExtensions — manifest-driven (contributes) registration', () => 
     ])
     expect(registry().projectTabs.get('com.test.ext')).toMatchObject({ label: 'Proj Tab' })
   })
+})
 
+describe('initExtensions — manifest-driven (contributes) registration — registers sidebarPanel via registerSidebarPanel when contributes.sidebarPanel is set', () => {
   it('registers sidebarPanel via registerSidebarPanel when contributes.sidebarPanel is set', async () => {
     await callInit([
       {
@@ -109,7 +111,9 @@ describe('initExtensions — manifest-driven (contributes) registration', () => 
       'com.test.ext:preview'
     )
   })
+})
 
+describe('initExtensions — manifest-driven (contributes) registration — does not call any registry method when extension has no contributes', () => {
   it('does not call any registry method when extension has no contributes', async () => {
     await callInit([{ id: 'com.test.ext' }])
     const { globalTabs, workspaceTabs, projectTabs, sidebarPanels, windowViews } = registry()
@@ -190,7 +194,9 @@ describe('registerWebviewExtension — commands / keyboard shortcuts', () => {
     )
     expect(registry().keyboardShortcuts).toEqual([])
   })
+})
 
+describe('registerWebviewExtension — commands / keyboard shortcuts — does not register a keyboard shortcut when there is no sidebarPanel', () => {
   it('does not register a keyboard shortcut when there is no sidebarPanel', () => {
     registerWebviewExtension(
       makeExt({
@@ -237,7 +243,9 @@ describe('Quick Actions group allocation at init', () => {
     await callInit([{ id: 'com.test.ext' }])
     expect(registry().quickActionGroups).toEqual([])
   })
+})
 
+describe('Quick Actions group allocation at init — reassigns a colliding mnemonic rather than dropping the group', () => {
   it('reassigns a colliding mnemonic rather than dropping the group', async () => {
     await callInit([
       { id: 'one', contributes: { quickActions: { group: { mnemonic: 'g', label: 'One' } } } },

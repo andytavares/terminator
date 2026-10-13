@@ -30,7 +30,9 @@ describe('WorkItemCell — a linked ticket', () => {
     expect(screen.getByText('NW-88')).toBeTruthy()
     expect(screen.getByText('Details unavailable')).toBeTruthy()
   })
+})
 
+describe('WorkItemCell — a linked ticket — shows only the key while the details load', () => {
   it('shows only the key while the details load', () => {
     render(
       <WorkItemCell
@@ -72,7 +74,9 @@ describe('WorkItemCell — a description', () => {
     fireEvent.keyDown(box, { key: 'Enter' })
     expect(save).toHaveBeenCalledWith('new')
   })
+})
 
+describe('WorkItemCell — a description — saves a cleared description as null', () => {
   it('saves a cleared description as null', () => {
     const save = vi.fn()
     render(
@@ -129,7 +133,9 @@ describe('WorkItemCell — nothing yet', () => {
     })
     expect(save).not.toHaveBeenCalled()
   })
+})
 
+describe('WorkItemCell — nothing yet — reverts on Escape without saving', () => {
   it('reverts on Escape without saving', () => {
     const save = vi.fn()
     render(
@@ -143,7 +149,9 @@ describe('WorkItemCell — nothing yet', () => {
     expect(box.value).toBe('')
     expect(save).not.toHaveBeenCalled()
   })
+})
 
+describe('WorkItemCell — nothing yet — does not bubble its keys to a surrounding row', () => {
   it('does not bubble its keys to a surrounding row', () => {
     const rowKey = vi.fn()
     render(
@@ -161,7 +169,9 @@ describe('WorkItemCell — nothing yet', () => {
     })
     expect(rowKey).not.toHaveBeenCalled()
   })
+})
 
+describe('WorkItemCell — nothing yet — offers a link only when linking is possible here', () => {
   it('offers a link only when linking is possible here', () => {
     const { rerender } = render(
       <WorkItemCell workItem={null} issue={undefined} description={null} onSaveDescription={noop} />

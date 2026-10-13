@@ -41,11 +41,16 @@ function resetStore() {
   })
 }
 
-describe('useSessionStore', () => {
+/** The hooks every "useSessionStore" describe registers. */
+function setUpUseSessionStore(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     resetStore()
   })
+}
+
+describe('useSessionStore', () => {
+  setUpUseSessionStore()
 
   // The main process already ended these; the tabs must not outlive them.
   describe('dropProjectSessions', () => {
@@ -65,76 +70,90 @@ describe('useSessionStore', () => {
       expect(mockElectronAPI.terminal.close).not.toHaveBeenCalled()
     })
   })
+})
 
-  describe('createSession', () => {
-    it('keeps the shell the main process spawned', async () => {
-      mockElectronAPI.terminal.create.mockResolvedValue({
-        sessionId: 'sess-sh',
-        shell: '/bin/fish',
-      })
-      await useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/home', 10000)
-      expect(useSessionStore.getState().sessions.get('sess-sh')?.shell).toBe('/bin/fish')
+describe('useSessionStore — createSession', () => {
+  setUpUseSessionStore()
+
+  it('keeps the shell the main process spawned', async () => {
+    mockElectronAPI.terminal.create.mockResolvedValue({
+      sessionId: 'sess-sh',
+      shell: '/bin/fish',
     })
+    await useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/home', 10000)
+    expect(useSessionStore.getState().sessions.get('sess-sh')?.shell).toBe('/bin/fish')
+  })
 
-    it('creates a session and stores it', async () => {
-      mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
-      const id = await useSessionStore
-        .getState()
-        .createSession('proj-1', 'human', 'Shell', '/home', 10000)
-      expect(id).toBe('sess-1')
-      const session = useSessionStore.getState().sessions.get('sess-1')
-      expect(session).toMatchObject({
-        id: 'sess-1',
-        projectId: 'proj-1',
-        tabTitle: 'Shell',
-        status: 'active',
-        type: 'human',
-        scrollbackLimit: 10000,
-      })
-    })
-
-    it('throws when terminal.create returns an error', async () => {
-      mockElectronAPI.terminal.create.mockResolvedValue({ error: 'FAILED' })
-      await expect(
-        useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/home', 10000)
-      ).rejects.toThrow('FAILED')
-    })
-
-    // The code names the failure; only the message names the folder, and the
-    // folder is the entire answer to "why did my terminal not open".
-    it('throws the message when the error carries one', async () => {
-      mockElectronAPI.terminal.create.mockResolvedValue({
-        error: 'CWD_MISSING',
-        message: 'That folder no longer exists: /repo/.worktrees/removed',
-      })
-      await expect(
-        useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/gone', 10000)
-      ).rejects.toThrow('That folder no longer exists: /repo/.worktrees/removed')
-    })
-
-    it('auto-numbers title as "Terminal 1" when empty title given', async () => {
-      mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
-      await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)
-      const session = useSessionStore.getState().sessions.get('sess-1')
-      expect(session?.tabTitle).toBe('Terminal 1')
-    })
-
-    it('increments counter per project for subsequent empty-title sessions', async () => {
-      mockElectronAPI.terminal.create
-        .mockResolvedValueOnce({ sessionId: 'sess-1' })
-        .mockResolvedValueOnce({ sessionId: 'sess-2' })
-      await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)
-      await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)
-      expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('Terminal 1')
-      expect(useSessionStore.getState().sessions.get('sess-2')?.tabTitle).toBe('Terminal 2')
-    })
-
-    it('uses explicit title when provided (no auto-numbering)', async () => {
-      mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
-      await useSessionStore.getState().createSession('proj-1', 'human', 'My Tab', '/home', 10000)
-      expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('My Tab')
+  it('creates a session and stores it', async () => {
+    mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
+    const id = await useSessionStore
+      .getState()
+      .createSession('proj-1', 'human', 'Shell', '/home', 10000)
+    expect(id).toBe('sess-1')
+    const session = useSessionStore.getState().sessions.get('sess-1')
+    expect(session).toMatchObject({
+      id: 'sess-1',
+      projectId: 'proj-1',
+      tabTitle: 'Shell',
+      status: 'active',
+      type: 'human',
+      scrollbackLimit: 10000,
     })
   })
+})
+
+describe('useSessionStore — createSession — throws when terminal.create returns an error', () => {
+  setUpUseSessionStore()
+
+  it('throws when terminal.create returns an error', async () => {
+    mockElectronAPI.terminal.create.mockResolvedValue({ error: 'FAILED' })
+    await expect(
+      useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/home', 10000)
+    ).rejects.toThrow('FAILED')
+  })
+
+  // The code names the failure; only the message names the folder, and the
+  // folder is the entire answer to "why did my terminal not open".
+  it('throws the message when the error carries one', async () => {
+    mockElectronAPI.terminal.create.mockResolvedValue({
+      error: 'CWD_MISSING',
+      message: 'That folder no longer exists: /repo/.worktrees/removed',
+    })
+    await expect(
+      useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/gone', 10000)
+    ).rejects.toThrow('That folder no longer exists: /repo/.worktrees/removed')
+  })
+
+  it('auto-numbers title as "Terminal 1" when empty title given', async () => {
+    mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
+    await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)
+    const session = useSessionStore.getState().sessions.get('sess-1')
+    expect(session?.tabTitle).toBe('Terminal 1')
+  })
+})
+
+describe('useSessionStore — createSession — increments counter per project for subsequent empty-title sessions', () => {
+  setUpUseSessionStore()
+
+  it('increments counter per project for subsequent empty-title sessions', async () => {
+    mockElectronAPI.terminal.create
+      .mockResolvedValueOnce({ sessionId: 'sess-1' })
+      .mockResolvedValueOnce({ sessionId: 'sess-2' })
+    await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)
+    await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)
+    expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('Terminal 1')
+    expect(useSessionStore.getState().sessions.get('sess-2')?.tabTitle).toBe('Terminal 2')
+  })
+
+  it('uses explicit title when provided (no auto-numbering)', async () => {
+    mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
+    await useSessionStore.getState().createSession('proj-1', 'human', 'My Tab', '/home', 10000)
+    expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('My Tab')
+  })
+})
+
+describe('useSessionStore — renameSession', () => {
+  setUpUseSessionStore()
 
   describe('renameSession', () => {
     it('updates tabTitle of existing session', () => {
@@ -150,81 +169,95 @@ describe('useSessionStore', () => {
       expect(useSessionStore.getState().sessions).toBe(before)
     })
   })
+})
 
-  describe('closeSession', () => {
-    it('removes session from store', async () => {
-      const session = makeSession()
-      useSessionStore.setState({ sessions: new Map([['sess-1', session]]) })
-      mockElectronAPI.terminal.close.mockResolvedValue({})
-      await useSessionStore.getState().closeSession('sess-1')
-      expect(useSessionStore.getState().sessions.has('sess-1')).toBe(false)
-    })
+describe('useSessionStore — closeSession', () => {
+  setUpUseSessionStore()
 
-    it('disposes xterm instance if present', async () => {
-      const session = makeSession()
-      const dispose = vi.fn()
-      useSessionStore.setState({
-        sessions: new Map([['sess-1', session]]),
-        terminalInstances: new Map([['sess-1', partialFake<TerminalInstance>({ dispose })]]),
-      })
-      mockElectronAPI.terminal.close.mockResolvedValue({})
-      await useSessionStore.getState().closeSession('sess-1')
-      expect(dispose).toHaveBeenCalled()
-    })
-
-    it('clears bell count for closed session', async () => {
-      useSessionStore.setState({
-        sessions: new Map([['sess-1', makeSession({ bellCount: 2 })]]),
-      })
-      mockElectronAPI.terminal.close.mockResolvedValue({})
-      await useSessionStore.getState().closeSession('sess-1')
-      expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
-    })
-
-    it('updates activeSessionIdByProject when closed session was active', async () => {
-      const session1 = makeSession({ id: 'sess-1' })
-      const session2 = makeSession({ id: 'sess-2' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['sess-1', session1],
-          ['sess-2', session2],
-        ]),
-        projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'sess-1' }]]),
-      })
-      mockElectronAPI.terminal.close.mockResolvedValue({})
-      await useSessionStore.getState().closeSession('sess-1')
-      // sess-2 remains, should become active
-      expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-2')
-    })
-
-    it('removes project from activeSessionIdByProject when last session closed', async () => {
-      const session = makeSession()
-      useSessionStore.setState({
-        sessions: new Map([['sess-1', session]]),
-        projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'sess-1' }]]),
-      })
-      mockElectronAPI.terminal.close.mockResolvedValue({})
-      await useSessionStore.getState().closeSession('sess-1')
-      expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBeNull()
-    })
-
-    it('cascades close to child sessions with matching parentSessionId', async () => {
-      const parent = makeSession({ id: 'parent', projectId: 'proj-1' })
-      const child = makeSession({ id: 'child', projectId: 'proj-1', parentSessionId: 'parent' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['parent', parent],
-          ['child', child],
-        ]),
-      })
-      mockElectronAPI.terminal.close.mockResolvedValue({})
-      await useSessionStore.getState().closeSession('parent')
-      expect(useSessionStore.getState().sessions.has('parent')).toBe(false)
-      expect(useSessionStore.getState().sessions.has('child')).toBe(false)
-      expect(mockElectronAPI.terminal.close).toHaveBeenCalledWith('child')
-      expect(mockElectronAPI.terminal.close).toHaveBeenCalledWith('parent')
-    })
+  it('removes session from store', async () => {
+    const session = makeSession()
+    useSessionStore.setState({ sessions: new Map([['sess-1', session]]) })
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    await useSessionStore.getState().closeSession('sess-1')
+    expect(useSessionStore.getState().sessions.has('sess-1')).toBe(false)
   })
+
+  it('disposes xterm instance if present', async () => {
+    const session = makeSession()
+    const dispose = vi.fn()
+    useSessionStore.setState({
+      sessions: new Map([['sess-1', session]]),
+      terminalInstances: new Map([['sess-1', partialFake<TerminalInstance>({ dispose })]]),
+    })
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    await useSessionStore.getState().closeSession('sess-1')
+    expect(dispose).toHaveBeenCalled()
+  })
+
+  it('clears bell count for closed session', async () => {
+    useSessionStore.setState({
+      sessions: new Map([['sess-1', makeSession({ bellCount: 2 })]]),
+    })
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    await useSessionStore.getState().closeSession('sess-1')
+    expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
+  })
+})
+
+describe('useSessionStore — closeSession — updates activeSessionIdByProject when closed session was active', () => {
+  setUpUseSessionStore()
+
+  it('updates activeSessionIdByProject when closed session was active', async () => {
+    const session1 = makeSession({ id: 'sess-1' })
+    const session2 = makeSession({ id: 'sess-2' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', session1],
+        ['sess-2', session2],
+      ]),
+      projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'sess-1' }]]),
+    })
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    await useSessionStore.getState().closeSession('sess-1')
+    // sess-2 remains, should become active
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-2')
+  })
+
+  it('removes project from activeSessionIdByProject when last session closed', async () => {
+    const session = makeSession()
+    useSessionStore.setState({
+      sessions: new Map([['sess-1', session]]),
+      projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'sess-1' }]]),
+    })
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    await useSessionStore.getState().closeSession('sess-1')
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBeNull()
+  })
+})
+
+describe('useSessionStore — closeSession — cascades close to child sessions with matching parentSessionId', () => {
+  setUpUseSessionStore()
+
+  it('cascades close to child sessions with matching parentSessionId', async () => {
+    const parent = makeSession({ id: 'parent', projectId: 'proj-1' })
+    const child = makeSession({ id: 'child', projectId: 'proj-1', parentSessionId: 'parent' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['parent', parent],
+        ['child', child],
+      ]),
+    })
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    await useSessionStore.getState().closeSession('parent')
+    expect(useSessionStore.getState().sessions.has('parent')).toBe(false)
+    expect(useSessionStore.getState().sessions.has('child')).toBe(false)
+    expect(mockElectronAPI.terminal.close).toHaveBeenCalledWith('child')
+    expect(mockElectronAPI.terminal.close).toHaveBeenCalledWith('parent')
+  })
+})
+
+describe('useSessionStore — getSessionsForProject', () => {
+  setUpUseSessionStore()
 
   describe('getSessionsForProject', () => {
     it('returns only sessions belonging to the given project', () => {
@@ -248,75 +281,89 @@ describe('useSessionStore', () => {
       expect(useSessionStore.getState().getSessionsForProject('nonexistent')).toHaveLength(0)
     })
   })
+})
 
-  describe('setActiveSessionForProject', () => {
-    it('marks the given session as active and others as backgrounded', () => {
-      const s1 = makeSession({ id: 'sess-1', status: 'active' })
-      const s2 = makeSession({ id: 'sess-2', status: 'active' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['sess-1', s1],
-          ['sess-2', s2],
-        ]),
-      })
-      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-2')
-      expect(useSessionStore.getState().sessions.get('sess-2')?.status).toBe('active')
-      expect(useSessionStore.getState().sessions.get('sess-1')?.status).toBe('backgrounded')
+describe('useSessionStore — setActiveSessionForProject', () => {
+  setUpUseSessionStore()
+
+  it('marks the given session as active and others as backgrounded', () => {
+    const s1 = makeSession({ id: 'sess-1', status: 'active' })
+    const s2 = makeSession({ id: 'sess-2', status: 'active' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', s1],
+        ['sess-2', s2],
+      ]),
     })
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-2')
+    expect(useSessionStore.getState().sessions.get('sess-2')?.status).toBe('active')
+    expect(useSessionStore.getState().sessions.get('sess-1')?.status).toBe('backgrounded')
+  })
 
-    it('clears bell count for the newly active session', () => {
-      useSessionStore.setState({ sessions: new Map([['sess-1', makeSession({ bellCount: 3 })]]) })
-      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
-      expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
+  it('clears bell count for the newly active session', () => {
+    useSessionStore.setState({ sessions: new Map([['sess-1', makeSession({ bellCount: 3 })]]) })
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
+    expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
+  })
+})
+
+describe('useSessionStore — setActiveSessionForProject — keeps an exited tab closed when another tab of its project is shown', () => {
+  setUpUseSessionStore()
+
+  // An exited terminal stays exited: the sidebar, Quick Actions and tab
+  // cycling all leave out a closed session, whichever tab is shown.
+  it('keeps an exited tab closed when another tab of its project is shown', () => {
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', makeSession({ id: 'sess-1' })],
+        ['sess-2', makeSession({ id: 'sess-2', status: 'closed' })],
+      ]),
     })
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
+    expect(useSessionStore.getState().sessions.get('sess-2')?.status).toBe('closed')
+  })
 
-    // An exited terminal stays exited: the sidebar, Quick Actions and tab
-    // cycling all leave out a closed session, whichever tab is shown.
-    it('keeps an exited tab closed when another tab of its project is shown', () => {
-      useSessionStore.setState({
-        sessions: new Map([
-          ['sess-1', makeSession({ id: 'sess-1' })],
-          ['sess-2', makeSession({ id: 'sess-2', status: 'closed' })],
-        ]),
-      })
-      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
-      expect(useSessionStore.getState().sessions.get('sess-2')?.status).toBe('closed')
+  it('keeps an exited tab closed when it is the one shown', () => {
+    useSessionStore.setState({
+      sessions: new Map([['sess-1', makeSession({ status: 'closed', bellCount: 1 })]]),
     })
-
-    it('keeps an exited tab closed when it is the one shown', () => {
-      useSessionStore.setState({
-        sessions: new Map([['sess-1', makeSession({ status: 'closed', bellCount: 1 })]]),
-      })
-      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1', 42)
-      expect(useSessionStore.getState().sessions.get('sess-1')).toMatchObject({
-        status: 'closed',
-        bellCount: undefined,
-        lastAttendedAt: 42,
-      })
-    })
-
-    // A session whose process ended stays ended, whichever tab is selected.
-    it('leaves a closed session closed, selected or not', () => {
-      const ended = makeSession({ id: 'sess-1', status: 'closed' })
-      const other = makeSession({ id: 'sess-2', status: 'closed' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['sess-1', ended],
-          ['sess-2', other],
-        ]),
-      })
-      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-2')
-      expect(useSessionStore.getState().sessions.get('sess-1')?.status).toBe('closed')
-      expect(useSessionStore.getState().sessions.get('sess-2')?.status).toBe('closed')
-    })
-
-    it('sets activeSessionIdByProject for the project', () => {
-      const session = makeSession()
-      useSessionStore.setState({ sessions: new Map([['sess-1', session]]) })
-      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
-      expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-1')
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1', 42)
+    expect(useSessionStore.getState().sessions.get('sess-1')).toMatchObject({
+      status: 'closed',
+      bellCount: undefined,
+      lastAttendedAt: 42,
     })
   })
+})
+
+describe('useSessionStore — setActiveSessionForProject — leaves a closed session closed, selected or not', () => {
+  setUpUseSessionStore()
+
+  // A session whose process ended stays ended, whichever tab is selected.
+  it('leaves a closed session closed, selected or not', () => {
+    const ended = makeSession({ id: 'sess-1', status: 'closed' })
+    const other = makeSession({ id: 'sess-2', status: 'closed' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', ended],
+        ['sess-2', other],
+      ]),
+    })
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-2')
+    expect(useSessionStore.getState().sessions.get('sess-1')?.status).toBe('closed')
+    expect(useSessionStore.getState().sessions.get('sess-2')?.status).toBe('closed')
+  })
+
+  it('sets activeSessionIdByProject for the project', () => {
+    const session = makeSession()
+    useSessionStore.setState({ sessions: new Map([['sess-1', session]]) })
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-1')
+  })
+})
+
+describe('useSessionStore — getActiveSessionForProject', () => {
+  setUpUseSessionStore()
 
   describe('getActiveSessionForProject', () => {
     it('returns the active session id', () => {
@@ -330,6 +377,10 @@ describe('useSessionStore', () => {
       expect(useSessionStore.getState().getActiveSessionForProject('unknown')).toBeNull()
     })
   })
+})
+
+describe('useSessionStore — handleProcessExit', () => {
+  setUpUseSessionStore()
 
   describe('handleProcessExit', () => {
     it('marks session status as closed and appends [exited] to title', () => {
@@ -348,116 +399,136 @@ describe('useSessionStore', () => {
       expect(useSessionStore.getState().sessions).toBe(before)
     })
   })
+})
 
-  describe('bell counts', () => {
-    it('incrementBellCount increases count', () => {
-      useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
-      useSessionStore.getState().incrementBellCount('sess-1')
-      useSessionStore.getState().incrementBellCount('sess-1')
-      expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(2)
-    })
+describe('useSessionStore — bell counts', () => {
+  setUpUseSessionStore()
 
-    it('clearBellCount removes entry', () => {
-      useSessionStore.setState({ sessions: new Map([['sess-1', makeSession({ bellCount: 3 })]]) })
-      useSessionStore.getState().clearBellCount('sess-1')
-      expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
-    })
-
-    it('clearBellCount is a no-op when count is already 0', () => {
-      useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
-      const before = useSessionStore.getState().sessions
-      useSessionStore.getState().clearBellCount('sess-1')
-      expect(useSessionStore.getState().sessions).toBe(before)
-    })
-
-    it('getBellCountForSession returns 0 for unknown session', () => {
-      expect(useSessionStore.getState().getBellCountForSession('unknown')).toBe(0)
-    })
-
-    it('getBellCountForProject sums bell counts across all project sessions', () => {
-      const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
-      const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
-      const s3 = makeSession({ id: 'sess-3', projectId: 'proj-2' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['sess-1', { ...s1, bellCount: 2 }],
-          ['sess-2', { ...s2, bellCount: 3 }],
-          ['sess-3', { ...s3, bellCount: 10 }],
-        ]),
-      })
-      expect(useSessionStore.getState().getBellCountForProject('proj-1')).toBe(5)
-      expect(useSessionStore.getState().getBellCountForProject('proj-2')).toBe(10)
-    })
+  it('incrementBellCount increases count', () => {
+    useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
+    useSessionStore.getState().incrementBellCount('sess-1')
+    useSessionStore.getState().incrementBellCount('sess-1')
+    expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(2)
   })
 
-  describe('busy state', () => {
-    it('setSessionBusy marks session as busy', () => {
-      useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
-      useSessionStore.getState().setSessionBusy('sess-1')
-      expect(useSessionStore.getState().isSessionBusy('sess-1')).toBe(true)
-    })
-
-    it('setSessionBusy is idempotent (no extra re-renders)', () => {
-      useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
-      useSessionStore.getState().setSessionBusy('sess-1')
-      const before = useSessionStore.getState().sessions
-      useSessionStore.getState().setSessionBusy('sess-1')
-      expect(useSessionStore.getState().sessions).toBe(before)
-    })
-
-    it('setSessionIdle removes busy mark', () => {
-      useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
-      useSessionStore.getState().setSessionBusy('sess-1')
-      useSessionStore.getState().setSessionIdle('sess-1')
-      expect(useSessionStore.getState().isSessionBusy('sess-1')).toBe(false)
-    })
-
-    it('setSessionIdle is a no-op when session is not busy', () => {
-      const before = useSessionStore.getState().sessions
-      useSessionStore.getState().setSessionIdle('not-busy')
-      expect(useSessionStore.getState().sessions).toBe(before)
-    })
-
-    it('isSessionBusy returns false for unknown session', () => {
-      expect(useSessionStore.getState().isSessionBusy('unknown')).toBe(false)
-    })
-
-    it('isProjectBusy returns true when any session in project is busy', () => {
-      const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
-      const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['sess-1', s1],
-          ['sess-2', { ...s2, busy: true }],
-        ]),
-      })
-      expect(useSessionStore.getState().isProjectBusy('proj-1')).toBe(true)
-    })
-
-    it('isProjectBusy returns false when no session in project is busy', () => {
-      const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['sess-1', s1],
-          [
-            'sess-other',
-            { ...makeSession({ id: 'sess-other', projectId: 'proj-other' }), busy: true },
-          ],
-        ]),
-      })
-      expect(useSessionStore.getState().isProjectBusy('proj-1')).toBe(false)
-    })
-
-    it('closeSession clears busy state for the closed session', async () => {
-      const session = makeSession()
-      useSessionStore.setState({
-        sessions: new Map([['sess-1', { ...session, busy: true }]]),
-      })
-      mockElectronAPI.terminal.close.mockResolvedValue({})
-      await useSessionStore.getState().closeSession('sess-1')
-      expect(useSessionStore.getState().isSessionBusy('sess-1')).toBe(false)
-    })
+  it('clearBellCount removes entry', () => {
+    useSessionStore.setState({ sessions: new Map([['sess-1', makeSession({ bellCount: 3 })]]) })
+    useSessionStore.getState().clearBellCount('sess-1')
+    expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
   })
+
+  it('clearBellCount is a no-op when count is already 0', () => {
+    useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
+    const before = useSessionStore.getState().sessions
+    useSessionStore.getState().clearBellCount('sess-1')
+    expect(useSessionStore.getState().sessions).toBe(before)
+  })
+
+  it('getBellCountForSession returns 0 for unknown session', () => {
+    expect(useSessionStore.getState().getBellCountForSession('unknown')).toBe(0)
+  })
+})
+
+describe('useSessionStore — bell counts — getBellCountForProject sums bell counts across all project sessions', () => {
+  setUpUseSessionStore()
+
+  it('getBellCountForProject sums bell counts across all project sessions', () => {
+    const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+    const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
+    const s3 = makeSession({ id: 'sess-3', projectId: 'proj-2' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', { ...s1, bellCount: 2 }],
+        ['sess-2', { ...s2, bellCount: 3 }],
+        ['sess-3', { ...s3, bellCount: 10 }],
+      ]),
+    })
+    expect(useSessionStore.getState().getBellCountForProject('proj-1')).toBe(5)
+    expect(useSessionStore.getState().getBellCountForProject('proj-2')).toBe(10)
+  })
+})
+
+describe('useSessionStore — busy state', () => {
+  setUpUseSessionStore()
+
+  it('setSessionBusy marks session as busy', () => {
+    useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
+    useSessionStore.getState().setSessionBusy('sess-1')
+    expect(useSessionStore.getState().isSessionBusy('sess-1')).toBe(true)
+  })
+
+  it('setSessionBusy is idempotent (no extra re-renders)', () => {
+    useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
+    useSessionStore.getState().setSessionBusy('sess-1')
+    const before = useSessionStore.getState().sessions
+    useSessionStore.getState().setSessionBusy('sess-1')
+    expect(useSessionStore.getState().sessions).toBe(before)
+  })
+
+  it('setSessionIdle removes busy mark', () => {
+    useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
+    useSessionStore.getState().setSessionBusy('sess-1')
+    useSessionStore.getState().setSessionIdle('sess-1')
+    expect(useSessionStore.getState().isSessionBusy('sess-1')).toBe(false)
+  })
+
+  it('setSessionIdle is a no-op when session is not busy', () => {
+    const before = useSessionStore.getState().sessions
+    useSessionStore.getState().setSessionIdle('not-busy')
+    expect(useSessionStore.getState().sessions).toBe(before)
+  })
+
+  it('isSessionBusy returns false for unknown session', () => {
+    expect(useSessionStore.getState().isSessionBusy('unknown')).toBe(false)
+  })
+})
+
+describe('useSessionStore — busy state — isProjectBusy returns true when any session in project is busy', () => {
+  setUpUseSessionStore()
+
+  it('isProjectBusy returns true when any session in project is busy', () => {
+    const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+    const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', s1],
+        ['sess-2', { ...s2, busy: true }],
+      ]),
+    })
+    expect(useSessionStore.getState().isProjectBusy('proj-1')).toBe(true)
+  })
+
+  it('isProjectBusy returns false when no session in project is busy', () => {
+    const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', s1],
+        [
+          'sess-other',
+          { ...makeSession({ id: 'sess-other', projectId: 'proj-other' }), busy: true },
+        ],
+      ]),
+    })
+    expect(useSessionStore.getState().isProjectBusy('proj-1')).toBe(false)
+  })
+})
+
+describe('useSessionStore — busy state — closeSession clears busy state for the closed session', () => {
+  setUpUseSessionStore()
+
+  it('closeSession clears busy state for the closed session', async () => {
+    const session = makeSession()
+    useSessionStore.setState({
+      sessions: new Map([['sess-1', { ...session, busy: true }]]),
+    })
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    await useSessionStore.getState().closeSession('sess-1')
+    expect(useSessionStore.getState().isSessionBusy('sess-1')).toBe(false)
+  })
+})
+
+describe('useSessionStore — setTerminalInstance / getTerminalInstance', () => {
+  setUpUseSessionStore()
 
   describe('setTerminalInstance / getTerminalInstance', () => {
     it('stores and retrieves terminal instance by sessionId', () => {
@@ -470,6 +541,10 @@ describe('useSessionStore', () => {
       expect(useSessionStore.getState().getTerminalInstance('unknown')).toBeUndefined()
     })
   })
+})
+
+describe('useSessionStore — split pane actions', () => {
+  setUpUseSessionStore()
 
   describe('split pane actions', () => {
     // Every split is made from the tab on screen.
@@ -614,6 +689,10 @@ describe('useSessionStore', () => {
       expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-a')
     })
   })
+})
+
+describe('useSessionStore — a split belongs to the tab it was made in', () => {
+  setUpUseSessionStore()
 
   describe('a split belongs to the tab it was made in', () => {
     const store = () => useSessionStore.getState()
@@ -660,6 +739,10 @@ describe('useSessionStore', () => {
       expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
     })
   })
+})
+
+describe('useSessionStore — getScratchSessions', () => {
+  setUpUseSessionStore()
 
   describe('getScratchSessions', () => {
     it('returns sessions with SCRATCH_PROJECT_ID', () => {
@@ -682,122 +765,143 @@ describe('useSessionStore', () => {
       expect(useSessionStore.getState().getScratchSessions()).toHaveLength(0)
     })
   })
+})
 
-  describe('reorderSessions', () => {
-    it('stores the given order for a project', () => {
-      useSessionStore.getState().reorderSessions('proj-1', ['sess-2', 'sess-1'])
-      expect(useSessionStore.getState().projectViews.get('proj-1')?.order).toEqual([
-        'sess-2',
-        'sess-1',
-      ])
-    })
+describe('useSessionStore — reorderSessions', () => {
+  setUpUseSessionStore()
 
-    it('getSessionsForProject respects the order', () => {
-      const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
-      const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['sess-1', s1],
-          ['sess-2', s2],
-        ]),
-      })
-      useSessionStore.getState().reorderSessions('proj-1', ['sess-2', 'sess-1'])
-      const ordered = useSessionStore.getState().getSessionsForProject('proj-1')
-      expect(ordered.map((s) => s.id)).toEqual(['sess-2', 'sess-1'])
-    })
-
-    it('untracked sessions appear after ordered ones', () => {
-      const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
-      const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
-      const s3 = makeSession({ id: 'sess-3', projectId: 'proj-1' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['sess-1', s1],
-          ['sess-2', s2],
-          ['sess-3', s3],
-        ]),
-      })
-      useSessionStore.getState().reorderSessions('proj-1', ['sess-2', 'sess-1'])
-      const ordered = useSessionStore.getState().getSessionsForProject('proj-1')
-      expect(ordered[0].id).toBe('sess-2')
-      expect(ordered[1].id).toBe('sess-1')
-      expect(ordered[2].id).toBe('sess-3')
-    })
+  it('stores the given order for a project', () => {
+    useSessionStore.getState().reorderSessions('proj-1', ['sess-2', 'sess-1'])
+    expect(useSessionStore.getState().projectViews.get('proj-1')?.order).toEqual([
+      'sess-2',
+      'sess-1',
+    ])
   })
 
-  describe('moveSession', () => {
-    it('updates session projectId to target', () => {
-      const s = makeSession({ id: 'sess-1', projectId: 'proj-1' })
-      useSessionStore.setState({ sessions: new Map([['sess-1', s]]) })
-      useSessionStore.getState().moveSession('sess-1', 'proj-2')
-      expect(useSessionStore.getState().sessions.get('sess-1')?.projectId).toBe('proj-2')
+  it('getSessionsForProject respects the order', () => {
+    const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+    const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', s1],
+        ['sess-2', s2],
+      ]),
     })
-
-    it('updates activeSessionIdByProject — removes from old, sets in target', () => {
-      const s = makeSession({ id: 'sess-1', projectId: 'proj-1' })
-      useSessionStore.setState({
-        sessions: new Map([['sess-1', s]]),
-        projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'sess-1' }]]),
-      })
-      useSessionStore.getState().moveSession('sess-1', 'proj-2')
-      const active = new Map(
-        [...useSessionStore.getState().projectViews].map(([pid, v]) => [pid, v.activeSessionId])
-      )
-      expect(active.has('proj-1')).toBe(false)
-      expect(active.get('proj-2')).toBe('sess-1')
-    })
-
-    it('removes sessionId from old project order, appends to target order', () => {
-      const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
-      const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['sess-1', s1],
-          ['sess-2', s2],
-        ]),
-        projectViews: new Map([
-          ['proj-1', { terminalCounter: 0, order: ['sess-1', 'sess-2'] }],
-          ['proj-2', { terminalCounter: 0, order: ['sess-3'] }],
-        ]),
-      })
-      useSessionStore.getState().moveSession('sess-1', 'proj-2')
-      expect(useSessionStore.getState().projectViews.get('proj-1')?.order).toEqual(['sess-2'])
-      expect(useSessionStore.getState().projectViews.get('proj-2')?.order).toEqual([
-        'sess-3',
-        'sess-1',
-      ])
-    })
-
-    it('is a no-op for unknown session', () => {
-      const before = useSessionStore.getState()
-      useSessionStore.getState().moveSession('nonexistent', 'proj-2')
-      expect(useSessionStore.getState().sessions).toBe(before.sessions)
-      expect(useSessionStore.getState().projectViews).toBe(before.projectViews)
-    })
-
-    it('clears focusedSession for old project when moved session was focused', () => {
-      const s = makeSession({ id: 'sess-1', projectId: 'proj-1' })
-      useSessionStore.setState({
-        sessions: new Map([['sess-1', s]]),
-        projectViews: new Map([['proj-1', { terminalCounter: 0, focusedSessionId: 'sess-1' }]]),
-      })
-      useSessionStore.getState().moveSession('sess-1', 'proj-2')
-      expect(useSessionStore.getState().getFocusedSession('proj-1')).toBeNull()
-    })
+    useSessionStore.getState().reorderSessions('proj-1', ['sess-2', 'sess-1'])
+    const ordered = useSessionStore.getState().getSessionsForProject('proj-1')
+    expect(ordered.map((s) => s.id)).toEqual(['sess-2', 'sess-1'])
   })
 })
 
-describe('adoptSession', () => {
-  // A supervised agent's terminal is spawned in the main process; this takes
-  // ownership of it so it becomes an ordinary tab.
-  const adopted = {
-    sessionId: 'terminal-1',
-    projectId: 'proj-1',
-    tabTitle: 'feat/x',
-    scrollbackLimit: 5000,
-  }
+describe('useSessionStore — reorderSessions — untracked sessions appear after ordered ones', () => {
+  setUpUseSessionStore()
 
+  it('untracked sessions appear after ordered ones', () => {
+    const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+    const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
+    const s3 = makeSession({ id: 'sess-3', projectId: 'proj-1' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', s1],
+        ['sess-2', s2],
+        ['sess-3', s3],
+      ]),
+    })
+    useSessionStore.getState().reorderSessions('proj-1', ['sess-2', 'sess-1'])
+    const ordered = useSessionStore.getState().getSessionsForProject('proj-1')
+    expect(ordered[0].id).toBe('sess-2')
+    expect(ordered[1].id).toBe('sess-1')
+    expect(ordered[2].id).toBe('sess-3')
+  })
+})
+
+describe('useSessionStore — moveSession', () => {
+  setUpUseSessionStore()
+
+  it('updates session projectId to target', () => {
+    const s = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+    useSessionStore.setState({ sessions: new Map([['sess-1', s]]) })
+    useSessionStore.getState().moveSession('sess-1', 'proj-2')
+    expect(useSessionStore.getState().sessions.get('sess-1')?.projectId).toBe('proj-2')
+  })
+
+  it('updates activeSessionIdByProject — removes from old, sets in target', () => {
+    const s = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+    useSessionStore.setState({
+      sessions: new Map([['sess-1', s]]),
+      projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'sess-1' }]]),
+    })
+    useSessionStore.getState().moveSession('sess-1', 'proj-2')
+    const active = new Map(
+      [...useSessionStore.getState().projectViews].map(([pid, v]) => [pid, v.activeSessionId])
+    )
+    expect(active.has('proj-1')).toBe(false)
+    expect(active.get('proj-2')).toBe('sess-1')
+  })
+})
+
+describe('useSessionStore — moveSession — removes sessionId from old project order, appends to target order', () => {
+  setUpUseSessionStore()
+
+  it('removes sessionId from old project order, appends to target order', () => {
+    const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+    const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', s1],
+        ['sess-2', s2],
+      ]),
+      projectViews: new Map([
+        ['proj-1', { terminalCounter: 0, order: ['sess-1', 'sess-2'] }],
+        ['proj-2', { terminalCounter: 0, order: ['sess-3'] }],
+      ]),
+    })
+    useSessionStore.getState().moveSession('sess-1', 'proj-2')
+    expect(useSessionStore.getState().projectViews.get('proj-1')?.order).toEqual(['sess-2'])
+    expect(useSessionStore.getState().projectViews.get('proj-2')?.order).toEqual([
+      'sess-3',
+      'sess-1',
+    ])
+  })
+
+  it('is a no-op for unknown session', () => {
+    const before = useSessionStore.getState()
+    useSessionStore.getState().moveSession('nonexistent', 'proj-2')
+    expect(useSessionStore.getState().sessions).toBe(before.sessions)
+    expect(useSessionStore.getState().projectViews).toBe(before.projectViews)
+  })
+})
+
+describe('useSessionStore — moveSession — clears focusedSession for old project when moved session was focused', () => {
+  setUpUseSessionStore()
+
+  it('clears focusedSession for old project when moved session was focused', () => {
+    const s = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+    useSessionStore.setState({
+      sessions: new Map([['sess-1', s]]),
+      projectViews: new Map([['proj-1', { terminalCounter: 0, focusedSessionId: 'sess-1' }]]),
+    })
+    useSessionStore.getState().moveSession('sess-1', 'proj-2')
+    expect(useSessionStore.getState().getFocusedSession('proj-1')).toBeNull()
+  })
+})
+
+// A supervised agent's terminal is spawned in the main process; this takes
+// ownership of it so it becomes an ordinary tab.
+const adopted = {
+  sessionId: 'terminal-1',
+  projectId: 'proj-1',
+  tabTitle: 'feat/x',
+  scrollbackLimit: 5000,
+}
+
+/** The hooks every "adoptSession" describe registers. */
+function setUpAdoptSession(): void {
   beforeEach(() => resetStore())
+}
+
+describe('adoptSession', () => {
+  setUpAdoptSession()
 
   it('records it as an agent’s terminal', () => {
     useSessionStore.getState().adoptSession(adopted)
@@ -822,6 +926,10 @@ describe('adoptSession', () => {
     useSessionStore.getState().adoptSession(adopted)
     expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('existing')
   })
+})
+
+describe('adoptSession — appends to an explicit tab order when the project has one', () => {
+  setUpAdoptSession()
 
   it('appends to an explicit tab order when the project has one', () => {
     useSessionStore.setState({
@@ -847,17 +955,22 @@ describe('adoptSession', () => {
   })
 })
 
-describe('activity, attention and notes (feature 030)', () => {
+function seed(overrides: Partial<TerminalSession> = {}) {
+  const session = makeSession(overrides)
+  useSessionStore.setState({ sessions: new Map([[session.id, session]]) })
+  return session
+}
+
+/** The hooks every "activity, attention and notes (feature 030)" describe registers. */
+function setUpActivityAttentionAndNotes(): void {
   beforeEach(() => {
     resetStore()
     vi.clearAllMocks()
   })
+}
 
-  function seed(overrides: Partial<TerminalSession> = {}) {
-    const session = makeSession(overrides)
-    useSessionStore.setState({ sessions: new Map([[session.id, session]]) })
-    return session
-  }
+describe('activity, attention and notes (feature 030)', () => {
+  setUpActivityAttentionAndNotes()
 
   describe('stampActivity', () => {
     it('records the supplied time without reading the clock itself', () => {
@@ -879,6 +992,10 @@ describe('activity, attention and notes (feature 030)', () => {
       expect(useSessionStore.getState().sessions).toBe(before)
     })
   })
+})
+
+describe('activity, attention and notes (feature 030) — lastActivityAt backfill (FR-007)', () => {
+  setUpActivityAttentionAndNotes()
 
   describe('lastActivityAt backfill (FR-007)', () => {
     it('createSession stamps lastActivityAt from createdAt', async () => {
@@ -905,6 +1022,10 @@ describe('activity, attention and notes (feature 030)', () => {
       expect(useSessionStore.getState().sessions.get('new-2')!.agentState).toBe('idle')
     })
   })
+})
+
+describe('activity, attention and notes (feature 030) — lastAttendedAt', () => {
+  setUpActivityAttentionAndNotes()
 
   describe('lastAttendedAt', () => {
     it('is stamped when the session becomes the visible one', () => {

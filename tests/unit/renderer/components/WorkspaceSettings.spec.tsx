@@ -75,7 +75,9 @@ describe('WorkspaceSettings', () => {
     render(<WorkspaceSettings workspaceId="ws-1" />)
     expect(mockLoadSettings).toHaveBeenCalledWith('ws-1')
   })
+})
 
+describe('WorkspaceSettings — renders theme radio options', () => {
   it('renders theme radio options', () => {
     render(<WorkspaceSettings workspaceId="ws-1" />)
     expect(screen.getByText('Dark')).toBeTruthy()
@@ -103,7 +105,9 @@ describe('WorkspaceSettings', () => {
     fireEvent.change(input, { target: { value: '100' } })
     expect(mockUpdateScrollback).not.toHaveBeenCalled()
   })
+})
 
+describe('WorkspaceSettings — calls updateWorkspace to clear theme override when "Use global default" radio is changed', () => {
   it('calls updateWorkspace to clear theme override when "Use global default" radio is changed', () => {
     // Set a theme override so the "Use global default" radio is not already checked
     seedStore(useSettingsStore, {
@@ -131,7 +135,9 @@ describe('WorkspaceSettings', () => {
     fireEvent.click(radios[2])
     expect(mockUpdateWorkspace).toHaveBeenCalledWith('ws-1', { appearance: undefined })
   })
+})
 
+describe('WorkspaceSettings — calls updateWorkspace to clear scrollback override when "Use global default" link is clicked', () => {
   it('calls updateWorkspace to clear scrollback override when "Use global default" link is clicked', () => {
     render(<WorkspaceSettings workspaceId="ws-1" />)
     // The button-link for scrollback reset — filter by role=button
@@ -158,7 +164,9 @@ describe('WorkspaceSettings', () => {
     fireEvent.blur(input)
     expect(mockUpdateWorktreeDir).toHaveBeenCalledWith('ws-1', '/custom/dir')
   })
+})
 
+describe('WorkspaceSettings — shows "Use global default" button for worktree override when override is set', () => {
   it('shows "Use global default" button for worktree override when override is set', () => {
     seedStore(useSettingsStore, {
       globalSettings,
@@ -186,7 +194,9 @@ describe('WorkspaceSettings', () => {
     fireEvent.click(globalDefaults[globalDefaults.length - 1])
     expect(mockUpdateWorktreeDir).toHaveBeenCalledWith('ws-1', undefined)
   })
+})
 
+describe('WorkspaceSettings — calls updateWorkspaceBranchExcludePatterns on blur of branch exclude textarea', () => {
   it('calls updateWorkspaceBranchExcludePatterns on blur of branch exclude textarea', () => {
     render(<WorkspaceSettings workspaceId="ws-1" />)
     const textarea = screen.getByPlaceholderText(/gh-readonly-queue/)
@@ -208,7 +218,9 @@ describe('WorkspaceSettings', () => {
     fireEvent.blur(textarea)
     expect(mockUpdateBranchExcludePatterns).toHaveBeenCalledWith('ws-1', undefined)
   })
+})
 
+describe('WorkspaceSettings — shows Use global default button for branch exclude when override is set and clicking it calls update with undefined', () => {
   it('shows Use global default button for branch exclude when override is set and clicking it calls update with undefined', () => {
     seedStore(useSettingsStore, {
       globalSettings,
@@ -235,7 +247,9 @@ describe('WorkspaceSettings', () => {
     fireEvent.click(globalDefaults[globalDefaults.length - 1])
     expect(mockUpdateBranchExcludePatterns).toHaveBeenCalledWith('ws-1', undefined)
   })
+})
 
+describe('WorkspaceSettings — mounts the Quick actions section scoped to the workspace', () => {
   it('mounts the Quick actions section scoped to the workspace', () => {
     render(<WorkspaceSettings workspaceId="ws-1" />)
     expect(screen.getByText('Quick actions')).toBeTruthy()

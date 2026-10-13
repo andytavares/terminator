@@ -79,12 +79,12 @@ function setupMocks(sessionProjectId = SCRATCH) {
   })
 }
 
-describe('MoveSessionDialog', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    setupMocks()
-  })
+beforeEach(() => {
+  vi.clearAllMocks()
+  setupMocks()
+})
 
+describe('MoveSessionDialog', () => {
   it('renders workspace and project options', () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     expect(screen.getByText('Alpha')).toBeTruthy()
@@ -109,7 +109,9 @@ describe('MoveSessionDialog', () => {
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
     expect(screen.getByPlaceholderText('My branch')).toBeTruthy()
   })
+})
 
+describe('MoveSessionDialog — moves the session to the chosen branch and shows it there', () => {
   it('moves the session to the chosen branch and shows it there', async () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} onMoved={mockOnMoved} />)
     fireEvent.click(screen.getByText('Proj One'))
@@ -137,7 +139,9 @@ describe('MoveSessionDialog', () => {
       expect(screen.getByText('Name is required')).toBeTruthy()
     })
   })
+})
 
+describe('MoveSessionDialog — creates the branch and moves the session into it', () => {
   it('creates the branch and moves the session into it', async () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
@@ -160,7 +164,9 @@ describe('MoveSessionDialog', () => {
       expect(screen.getByText('Name already in use')).toBeTruthy()
     })
   })
+})
 
+describe('MoveSessionDialog — shows generic error when createProject returns a non-duplicate error', () => {
   it('shows generic error when createProject returns a non-duplicate error', async () => {
     mockCreateProject.mockResolvedValueOnce({ error: 'UNKNOWN' })
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
@@ -188,7 +194,9 @@ describe('MoveSessionDialog', () => {
     await waitFor(() => expect(projectIds()).toEqual(['proj-2']))
     expect(projectOfSession()).toBe('proj-2')
   })
+})
 
+describe('MoveSessionDialog — submits new project form on Enter key', () => {
   it('submits new project form on Enter key', async () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('+ New branch in Alpha'))

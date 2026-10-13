@@ -41,7 +41,9 @@ describe('buildLedger — default grouping and order (US1)', () => {
       ['No branch', ['scratch']],
     ])
   })
+})
 
+describe('buildLedger — default grouping and order (US1) — lifts awaiting-input sessions into a Needs you group, and orders the rest by standing then startedAt', () => {
   it('lifts awaiting-input sessions into a Needs you group, and orders the rest by standing then startedAt', () => {
     const T1 = '2026-09-15T10:00:00.000Z'
     const T2 = '2026-09-15T10:01:00.000Z'
@@ -68,7 +70,9 @@ describe('buildLedger — default grouping and order (US1)', () => {
   it('draws no group at all when there are no sessions', () => {
     expect(buildLedger([], DEFAULT_HOME_PREFS, NO_FILTERS, titles)).toEqual([])
   })
+})
 
+describe('buildLedger — default grouping and order (US1) — does not move a running session when its lastActivityAt changes', () => {
   it('does not move a running session when its lastActivityAt changes', () => {
     const T1 = '2026-09-15T10:00:00.000Z'
     const T2 = '2026-09-15T10:01:00.000Z'
@@ -94,7 +98,9 @@ describe('buildLedger — default grouping and order (US1)', () => {
     const afterOrder = shape(buildLedger(flipped, DEFAULT_HOME_PREFS, NO_FILTERS, titles))[0][1]
     expect(afterOrder).toEqual(beforeOrder)
   })
+})
 
+describe('buildLedger — default grouping and order (US1) — moves a session into the Needs you group when it becomes awaiting-input', () => {
   it('moves a session into the Needs you group when it becomes awaiting-input', () => {
     const T1 = '2026-09-15T10:00:00.000Z'
     const T2 = '2026-09-15T10:01:00.000Z'
@@ -113,10 +119,10 @@ describe('buildLedger — default grouping and order (US1)', () => {
   })
 })
 
-describe('buildLedger — closed sessions and the text filter (US2)', () => {
-  const closed = (id: string, closedAt: string, patch = {}) =>
-    personal(id, { isClosed: true, state: 'exited', closedAt, ...patch })
+const closed = (id: string, closedAt: string, patch = {}) =>
+  personal(id, { isClosed: true, state: 'exited', closedAt, ...patch })
 
+describe('buildLedger — closed sessions and the text filter (US2)', () => {
   it('files closed sessions in a final Closed group, most recently closed first', () => {
     const groups = buildLedger(
       [
@@ -133,7 +139,9 @@ describe('buildLedger — closed sessions and the text filter (US2)', () => {
       ['Closed', ['newer', 'older']],
     ])
   })
+})
 
+describe('buildLedger — closed sessions and the text filter (US2) — filters open and closed sessions alike', () => {
   it('filters open and closed sessions alike', () => {
     const groups = buildLedger(
       [
@@ -148,20 +156,20 @@ describe('buildLedger — closed sessions and the text filter (US2)', () => {
   })
 })
 
-describe('buildLedger — display options (US7)', () => {
-  const facts = [
-    personal('p-idle', { state: 'idle', lastActivityAt: 3, lastAttendedAt: 300 }),
-    northwind('n-needs', { state: 'awaiting-input', lastActivityAt: 1, lastAttendedAt: 100 }),
-    personal('p-exited', { state: 'exited', lastActivityAt: 7, lastAttendedAt: 700 }),
-    northwind('n-work', {
-      state: 'working',
-      lastActivityAt: 5,
-      lastAttendedAt: 500,
-      projectName: 'northwind-web',
-    }),
-    personal('p-closed', { isClosed: true, state: 'exited', closedAt: '2026-09-15T00:00:00.000Z' }),
-  ]
+const facts = [
+  personal('p-idle', { state: 'idle', lastActivityAt: 3, lastAttendedAt: 300 }),
+  northwind('n-needs', { state: 'awaiting-input', lastActivityAt: 1, lastAttendedAt: 100 }),
+  personal('p-exited', { state: 'exited', lastActivityAt: 7, lastAttendedAt: 700 }),
+  northwind('n-work', {
+    state: 'working',
+    lastActivityAt: 5,
+    lastAttendedAt: 500,
+    projectName: 'northwind-web',
+  }),
+  personal('p-closed', { isClosed: true, state: 'exited', closedAt: '2026-09-15T00:00:00.000Z' }),
+]
 
+describe('buildLedger — display options (US7)', () => {
   it('groups by project alone, lifting the needs-you session out first', () => {
     const groups = buildLedger(
       facts,
@@ -190,7 +198,9 @@ describe('buildLedger — display options (US7)', () => {
       ['Closed', ['p-closed']],
     ])
   })
+})
 
+describe('buildLedger — display options (US7) — sorts by when each session was last opened, null last, when asked', () => {
   it('sorts by when each session was last opened, null last, when asked', () => {
     const groups = buildLedger(
       facts,
@@ -200,7 +210,9 @@ describe('buildLedger — display options (US7)', () => {
     )
     expect(shape(groups)[0][1]).toEqual(['p-exited', 'n-work', 'p-idle', 'n-needs'])
   })
+})
 
+describe('buildLedger — display options (US7) — orders never-opened sessions by start, and equal open times by start', () => {
   it('orders never-opened sessions by start, and equal open times by start', () => {
     const at = (id: string, lastAttendedAt: number | null, startedAt: string) =>
       personal(id, { lastAttendedAt, startedAt })
@@ -224,7 +236,9 @@ describe('buildLedger — display options (US7)', () => {
       'never-late',
     ])
   })
+})
 
+describe('buildLedger — display options (US7) — labels a project with no workspace under "No branch / <project>", sorted by name', () => {
   it('labels a project with no workspace under "No branch / <project>", sorted by name', () => {
     const groups = buildLedger(
       [fact({ sessionId: 'orphan', workspaceName: null, projectName: 'loose' }), personal('a')],
@@ -253,7 +267,9 @@ describe('buildLedger — display options (US7)', () => {
       'No branch',
     ])
   })
+})
 
+describe('buildLedger — display options (US7) — hides sessions whose process exited, but keeps closed history', () => {
   it('hides sessions whose process exited, but keeps closed history', () => {
     const groups = buildLedger(
       facts,
