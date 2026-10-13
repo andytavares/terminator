@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { queued } from '../helpers/queue-entries.js'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { dispatchChannel } from '@terminator/extension-sdk'
@@ -346,24 +348,11 @@ function theQueuePositionTests() {
     const c = createForgeChannels(
       forgeDeps({
         queueEntries: async () => [
-          {
-            orderId: seeded.order.id,
+          queued(seeded.order.id, {
             title: seeded.order.title,
-            repo: 'repo',
-            base: 'main',
             agreedAt: '2026-09-02T00:00:00.000Z',
-            files: ['src/a.ts'],
-            merged: false,
-          },
-          {
-            orderId: 'WO-earlier',
-            title: 'Earlier work',
-            repo: 'repo',
-            base: 'main',
-            agreedAt: '2026-09-01T00:00:00.000Z',
-            files: ['src/a.ts'],
-            merged: false,
-          },
+          }),
+          queued('WO-earlier', { title: 'Earlier work' }),
         ],
       })
     )
@@ -477,6 +466,33 @@ function whenItWasMadeTests() {
   })
 }
 
+/** CI watching one pull request: one check passed, one pending, one failed. */
+function watchingThreeChecks(url: string) {
+  const checks = [
+    { name: 'lint', bucket: 'pass', link: '', workflow: 'ci' },
+    { name: 'test', bucket: 'pending', link: '', workflow: 'ci' },
+    { name: 'build', bucket: 'fail', link: '', workflow: 'ci' },
+  ] as const
+  return {
+    round: 0,
+    max: 2,
+    status: 'watching' as const,
+    pulls: [{ url, checks: [...checks] }],
+    reason: '',
+    at: NOW,
+  }
+}
+
+/** Puts the order in a run that opened the pull request at `url`. */
+async function runningWithPull(orderId: string, url: string): Promise<void> {
+  const loaded = await store.load(orderId)
+  if (loaded === null) throw new Error('the order this test needs was not saved')
+  await store.save({ ...loaded, status: 'running' })
+  const dir = path.join(root, 'orders', orderId)
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, 'pulls.json'), JSON.stringify([{ url, repo: 'r', cwd: '/c' }]))
+}
+
 function finishedChecksAndPullsTests() {
   it('counts the checks that have finished, and links the pull requests', async () => {
     const c = createForgeChannels(forgeDeps({ dataRoot: () => root }))
@@ -485,29 +501,8 @@ function finishedChecksAndPullsTests() {
       repoPaths: [repo],
     })) as OrderView
     const url = 'https://github.com/andytavares/terminator/pull/233'
-    await writeCiState(root, seeded.order.id, {
-      round: 0,
-      max: 2,
-      status: 'watching',
-      pulls: [
-        {
-          url,
-          checks: [
-            { name: 'lint', bucket: 'pass', link: '', workflow: 'ci' },
-            { name: 'test', bucket: 'pending', link: '', workflow: 'ci' },
-            { name: 'build', bucket: 'fail', link: '', workflow: 'ci' },
-          ],
-        },
-      ],
-      reason: '',
-      at: NOW,
-    })
-    const loaded = await store.load(seeded.order.id)
-    if (loaded === null) throw new Error('the order this test needs was not saved')
-    await store.save({ ...loaded, status: 'running' })
-    const dir = path.join(root, 'orders', seeded.order.id)
-    fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(path.join(dir, 'pulls.json'), JSON.stringify([{ url, repo: 'r', cwd: '/c' }]))
+    await writeCiState(root, seeded.order.id, watchingThreeChecks(url))
+    await runningWithPull(seeded.order.id, url)
 
     const r = (await c.list()) as {
       orders: {
@@ -697,29 +692,10 @@ async function agreeable(): Promise<WorkOrder> {
     },
     intent: { problem: 'p', outcome: 'rows render fully', nonGoals: ['scrollbars'] },
     risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a full-width row renders its final glyph',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a full-width row renders its final glyph' })],
     plan: {
       ...seed.order.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'widen',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a.ts'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'widen', satisfies: ['AC-1'], touches: ['src/a.ts'] })],
     },
     redTeam: seed.order.redTeam.map((f) => ({ ...f, status: 'resolved' as const })),
   }
@@ -903,54 +879,56 @@ describe('foundry:order.converge — the half that was missing', () => {
   describe('non-drafts and unknown orders', nonDraftsAndUnknownOrdersTests)
 })
 
+/** Two open questions and two blocking findings: everything one settle can decide. */
+const UNSETTLED: Pick<WorkOrder, 'openQuestions' | 'redTeam'> = {
+  openQuestions: [
+    {
+      id: 'Q-1',
+      text: 'which token?',
+      why: '',
+      options: ['a', 'b'],
+      recommended: 0,
+      answer: null,
+      rank: 1,
+    },
+    {
+      id: 'Q-2',
+      text: 'which clock?',
+      why: '',
+      options: ['server', 'client'],
+      recommended: 0,
+      answer: null,
+      rank: 1,
+    },
+  ],
+  redTeam: [
+    {
+      id: 'RT-1',
+      severity: 'high',
+      category: 'wrong-outcome',
+      text: 'finding one is wrong',
+      status: 'open',
+      reason: '',
+      round: 0,
+    },
+    {
+      id: 'RT-2',
+      severity: 'high',
+      category: 'regression',
+      text: 'finding two breaks something',
+      status: 'open',
+      reason: '',
+      round: 0,
+    },
+  ],
+}
+
 async function withQuestionsAndFindings(): Promise<WorkOrder> {
   const seed = (await channels().create({
     source: { kind: 'typed', text: 'x' },
     repoPaths: [repo],
   })) as OrderView
-  const withExtras: WorkOrder = {
-    ...seed.order,
-    openQuestions: [
-      {
-        id: 'Q-1',
-        text: 'which token?',
-        why: '',
-        options: ['a', 'b'],
-        recommended: 0,
-        answer: null,
-        rank: 1,
-      },
-      {
-        id: 'Q-2',
-        text: 'which clock?',
-        why: '',
-        options: ['server', 'client'],
-        recommended: 0,
-        answer: null,
-        rank: 1,
-      },
-    ],
-    redTeam: [
-      {
-        id: 'RT-1',
-        severity: 'high',
-        category: 'wrong-outcome',
-        text: 'finding one is wrong',
-        status: 'open',
-        reason: '',
-        round: 0,
-      },
-      {
-        id: 'RT-2',
-        severity: 'high',
-        category: 'regression',
-        text: 'finding two breaks something',
-        status: 'open',
-        reason: '',
-        round: 0,
-      },
-    ],
-  }
+  const withExtras: WorkOrder = { ...seed.order, ...UNSETTLED }
   await store.save(withExtras)
   return withExtras
 }
@@ -1422,35 +1400,30 @@ function whoAcceptedTests() {
   })
 }
 
+/**
+ * The failure an operator actually meets: a unit changes a file a person
+ * looks at, and no criterion asks for a picture of it. The other half of
+ * this check — a criterion with no proof at all — cannot survive the
+ * schema, so this is the one the escape has to answer.
+ */
+function blockedOnAPicture(o: WorkOrder): WorkOrder {
+  const proof = { kind: 'command' as const, command: 'npm test', assert: 'ok' }
+  const unit = builderUnit('U-1', {
+    title: 'redraw the row',
+    satisfies: ['AC-1'],
+    touches: ['src/components/Row.tsx'],
+  })
+  return {
+    ...o,
+    acceptance: [{ ...o.acceptance[0], verify: proof }],
+    plan: { ...o.plan, units: [unit] },
+  }
+}
+
 function theFalsifiableCheckTests() {
   it('clears the falsifiable check, which is the whole point of the escape', async () => {
     const o = await withCriterion()
-    // The failure an operator actually meets: a unit changes a file a person
-    // looks at, and no criterion asks for a picture of it. The other half of
-    // this check — a criterion with no proof at all — cannot survive the
-    // schema, so this is the one the escape has to answer.
-    const blocked: WorkOrder = {
-      ...o,
-      acceptance: [
-        { ...o.acceptance[0], verify: { kind: 'command', command: 'npm test', assert: 'ok' } },
-      ],
-      plan: {
-        ...o.plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'redraw the row',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: ['src/components/Row.tsx'],
-            verify: [],
-          },
-        ],
-      },
-    }
-    await store.save(blocked)
+    await store.save(blockedOnAPicture(o))
 
     const before = (await channels().compile({ id: o.id, commit: false })) as {
       compile: { failures: { check: string }[] }
@@ -1779,29 +1752,10 @@ async function completeOrder(): Promise<WorkOrder> {
     ...r.order,
     intent: { problem: 'p', outcome: 'rows render fully', nonGoals: ['scrollbars'] },
     risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a full-width row renders its final glyph',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a full-width row renders its final glyph' })],
     plan: {
       ...r.order.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'widen',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a.ts'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'widen', satisfies: ['AC-1'], touches: ['src/a.ts'] })],
     },
     redTeam: r.order.redTeam.map((f) => ({ ...f, status: 'resolved' as const })),
   }

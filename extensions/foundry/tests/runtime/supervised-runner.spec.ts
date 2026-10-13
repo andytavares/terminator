@@ -7,6 +7,8 @@ import { createSupervisedRunner } from '../../src/runtime/supervised-runner.js'
 import { createControlServer, type ControlServer } from '../../src/runtime/control-server.js'
 import type { PendingPermission } from '../../src/runtime/permission-bridge.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { partialFake } from '../../../../tests/support/fakes'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 // This replaces spawning `claude --print --permission-mode bypassPermissions`
 // as a hidden child process — a run nobody could see, approving every tool call
@@ -1005,11 +1007,25 @@ function exitStatusesTests() {
 // A command step's output used to vanish the moment the tab scrolled past it.
 // logPath tees stdout+stderr to a file while keeping the script's own exit
 // status as the verdict — the command's status, never tee's.
+const LOG_SHELLS = ['/bin/sh', ...(existsSync('/bin/zsh') ? ['/bin/zsh'] : [])]
+
+let logDir: string
+
+/** The script the runner hands the terminal for `commandLine`, teeing to `logPath` if given. */
+async function scriptFor(commandLine: string, logPath?: string): Promise<string> {
+  void runner().runCommand({
+    worktreePath: '/wt/feat-thing',
+    workspaceId: 'ws-1',
+    branch: 'feat/thing',
+    title: 'Check',
+    command: commandLine,
+    logPath,
+  })
+  await settled()
+  return scriptOf(ran[ran.length - 1])
+}
+
 describe('running a command with a log file', () => {
-  const shells = ['/bin/sh', ...(existsSync('/bin/zsh') ? ['/bin/zsh'] : [])]
-
-  let logDir: string
-
   beforeEach(() => {
     logDir = makeTempDir('supervised-runner-log-')
   })
@@ -1018,133 +1034,141 @@ describe('running a command with a log file', () => {
     rmSync(logDir, { recursive: true, force: true, maxRetries: 5 })
   })
 
-  async function scriptFor(commandLine: string, logPath?: string): Promise<string> {
-    void runner().runCommand({
-      worktreePath: '/wt/feat-thing',
-      workspaceId: 'ws-1',
-      branch: 'feat/thing',
-      title: 'Check',
-      command: commandLine,
-      logPath,
-    })
-    await settled()
-    return scriptOf(ran[ran.length - 1])
-  }
-
-  for (const shell of shells) {
-    it(`(${shell}) exits with the command's status, not tee's, and writes the log`, async () => {
-      const logPath = join(logDir, 'false.log')
-      const result = spawnSync(shell, [await scriptFor('false', logPath)])
-      expect(result.status).toBe(1)
-      expect(existsSync(logPath)).toBe(true)
-    })
-
-    it(`(${shell}) captures the command's exit code and its combined output in the log`, async () => {
-      const logPath = join(logDir, 'echo.log')
-      const result = spawnSync(shell, [await scriptFor('echo hello; exit 3', logPath)])
-      expect(result.status).toBe(3)
-      expect(readFileSync(logPath, 'utf8')).toContain('hello')
-    })
-  }
+  for (const shell of LOG_SHELLS) loggedCommandTests(shell)
 
   it('has no tee when logPath is absent', async () => {
     expect(readFileSync(await scriptFor('npm run lint'), 'utf8')).not.toContain('tee')
   })
 })
 
+function loggedCommandTests(shell: string) {
+  it(`(${shell}) exits with the command's status, not tee's, and writes the log`, async () => {
+    const logPath = join(logDir, 'false.log')
+    const result = spawnSync(shell, [await scriptFor('false', logPath)])
+    expect(result.status).toBe(1)
+    expect(existsSync(logPath)).toBe(true)
+  })
+
+  it(`(${shell}) captures the command's exit code and its combined output in the log`, async () => {
+    const logPath = join(logDir, 'echo.log')
+    const result = spawnSync(shell, [await scriptFor('echo hello; exit 3', logPath)])
+    expect(result.status).toBe(3)
+    expect(readFileSync(logPath, 'utf8')).toContain('hello')
+  })
+}
+
 // A check used to be typed into the tab's interactive login shell, so whatever
 // the user's startup files export (JAVA_HOME, GOPATH, nvm's PATH) reached it.
 // The app adopts only PATH from the login shell, so a check run as a bare
 // `$SHELL script` lost the rest. A real PTY, a temporary HOME whose startup
 // file is the only place a variable is set, and the check must see it.
+interface StartupShell {
+  shell: string
+  files: Record<string, string>
+}
+
+/** Each shell there is, and the startup files where it reads the one variable a check needs. */
+const EVERY_STARTUP_SHELL: StartupShell[] = [
+  // An interactive login bash reads ~/.bash_profile, which is where the
+  // usual setup sources ~/.bashrc from.
+  {
+    shell: '/bin/bash',
+    files: {
+      '.bash_profile': '[ -f ~/.bashrc ] && . ~/.bashrc\n',
+      '.bashrc': 'export FOUNDRY_RC_ONLY=from-rc\n',
+    },
+  },
+  {
+    shell: '/bin/zsh',
+    files: {
+      // Debian and Ubuntu's /etc/zsh/zshrc runs compinit, which stops to ask
+      // about group-writable system directories on CI's runner; that file's
+      // own documented opt-out is this line in ~/.zshenv.
+      '.zshenv': 'skip_global_compinit=1\n',
+      '.zshrc': 'export FOUNDRY_RC_ONLY=from-rc\n',
+    },
+  },
+]
+
+const STARTUP_SHELLS = EVERY_STARTUP_SHELL.filter(({ shell }) => existsSync(shell))
+
+let home: string
+const savedEnv = { HOME: process.env.HOME, SHELL: process.env.SHELL }
+/** What the tab printed, so a check that never ends says what the shell is waiting on. */
+let printed = ''
+
+/** Runs `input` in a real node-pty, ending it the way the core does when its tab closes. */
+function runInRealPty(input: { file: string; args: string[]; cwd: string }) {
+  return new Promise((resolve) => {
+    const proc = ptySpawn(input.file, input.args, {
+      cwd: input.cwd,
+      env: process.env as Record<string, string>,
+    })
+    proc.onData((data) => {
+      printed += data
+      // Closing the tab: the core sends the process SIGHUP.
+      if (data.includes('hang-up-now')) proc.kill('SIGHUP')
+    })
+    // As PtyManager reports it: null when a signal ended the process.
+    proc.onExit(({ exitCode, signal }) =>
+      resolve({ sessionId: 'terminal-1', exitCode: signal ? null : exitCode })
+    )
+  })
+}
+
+/** The core's runInTerminal, over a real node-pty and nothing else. */
+function realPtyApi(): ExtensionAPI {
+  const project = { id: 'project-1', workspaceId: 'ws-1', name: 'p' }
+  return partialFake<ExtensionAPI>({
+    workspace: partialFake<ExtensionAPI['workspace']>({ addProject: async () => project }),
+    pty: partialFake<ExtensionAPI['pty']>({
+      write: () => {},
+      closeTerminalTab: () => {},
+      runInTerminal: runInRealPty as ExtensionAPI['pty']['runInTerminal'],
+    }),
+  })
+}
+
+function runCheck(commandLine: string, logPath?: string): Promise<number | null> {
+  return createSupervisedRunner({
+    api: realPtyApi(),
+    control,
+    stateDir: join(dir, 'state'),
+    now: () => 1_000,
+  }).runCommand({
+    worktreePath: dir,
+    workspaceId: 'ws-1',
+    branch: 'feat/thing',
+    title: 'Check',
+    command: commandLine,
+    logPath,
+  })
+}
+
+async function check(commandLine: string, logPath?: string): Promise<number | null> {
+  const ended = runCheck(commandLine, logPath)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const stuck = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`the check never ended; it printed:\n${printed}`)),
+      4_000
+    )
+  })
+  try {
+    return await Promise.race([ended, stuck])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** Makes `startup.shell` the user's shell, in a HOME holding only its startup files. */
+function useShell(startup: StartupShell): void {
+  for (const [name, body] of Object.entries(startup.files)) writeFileSync(join(home, name), body)
+  process.env.HOME = home
+  process.env.SHELL = startup.shell
+}
+
 describe('a check sees what the user’s shell startup files export', () => {
-  const shells = [
-    // An interactive login bash reads ~/.bash_profile, which is where the
-    // usual setup sources ~/.bashrc from.
-    {
-      shell: '/bin/bash',
-      files: {
-        '.bash_profile': '[ -f ~/.bashrc ] && . ~/.bashrc\n',
-        '.bashrc': 'export FOUNDRY_RC_ONLY=from-rc\n',
-      },
-    },
-    {
-      shell: '/bin/zsh',
-      files: {
-        // Debian and Ubuntu's /etc/zsh/zshrc runs compinit, which stops to ask
-        // about group-writable system directories on CI's runner; that file's
-        // own documented opt-out is this line in ~/.zshenv.
-        '.zshenv': 'skip_global_compinit=1\n',
-        '.zshrc': 'export FOUNDRY_RC_ONLY=from-rc\n',
-      },
-    },
-  ].filter(({ shell }) => existsSync(shell))
-
-  let home: string
-  const savedEnv = { HOME: process.env.HOME, SHELL: process.env.SHELL }
-
-  /** The core's runInTerminal, over a real node-pty and nothing else. */
-  function realPtyApi() {
-    return {
-      workspace: { addProject: async () => ({ id: 'project-1', workspaceId: 'ws-1', name: 'p' }) },
-      pty: {
-        write: () => {},
-        closeTerminalTab: () => {},
-        runInTerminal: (input: { file: string; args: string[]; cwd: string }) =>
-          new Promise((resolve) => {
-            const proc = ptySpawn(input.file, input.args, {
-              cwd: input.cwd,
-              env: process.env as Record<string, string>,
-            })
-            proc.onData((data) => {
-              printed += data
-              // Closing the tab: the core sends the process SIGHUP.
-              if (data.includes('hang-up-now')) proc.kill('SIGHUP')
-            })
-            // As PtyManager reports it: null when a signal ended the process.
-            proc.onExit(({ exitCode, signal }) =>
-              resolve({ sessionId: 'terminal-1', exitCode: signal ? null : exitCode })
-            )
-          }),
-      },
-    } as never
-  }
-
-  /** What the tab printed, so a check that never ends says what the shell is waiting on. */
-  let printed = ''
-
-  async function check(commandLine: string, logPath?: string): Promise<number | null> {
-    const ended = runCheck(commandLine, logPath)
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const stuck = new Promise<never>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error(`the check never ended; it printed:\n${printed}`)),
-        4_000
-      )
-    })
-    try {
-      return await Promise.race([ended, stuck])
-    } finally {
-      clearTimeout(timer)
-    }
-  }
-
-  function runCheck(commandLine: string, logPath?: string): Promise<number | null> {
-    return createSupervisedRunner({
-      api: realPtyApi(),
-      control,
-      stateDir: join(dir, 'state'),
-      now: () => 1_000,
-    }).runCommand({
-      worktreePath: dir,
-      workspaceId: 'ws-1',
-      branch: 'feat/thing',
-      title: 'Check',
-      command: commandLine,
-      logPath,
-    })
-  }
-
   beforeEach(() => {
     printed = ''
     home = makeTempDir('supervised-runner-home-')
@@ -1157,35 +1181,33 @@ describe('a check sees what the user’s shell startup files export', () => {
     rmSync(home, { recursive: true, force: true, maxRetries: 5 })
   })
 
-  for (const { shell, files } of shells) {
-    function useShell(): void {
-      for (const [name, body] of Object.entries(files)) writeFileSync(join(home, name), body)
-      process.env.HOME = home
-      process.env.SHELL = shell
-    }
-
-    it(`(${shell}) passes a check that needs a variable only a startup file exports`, async () => {
-      useShell()
-      await expect(check('test "$FOUNDRY_RC_ONLY" = from-rc')).resolves.toBe(0)
-    })
-
-    it(`(${shell}) still resolves the command's own exit code, not the shell's`, async () => {
-      useShell()
-      await expect(check('echo "$FOUNDRY_RC_ONLY"; exit 3')).resolves.toBe(3)
-    })
-
-    // bash ends by the signal (null, "not measured"); zsh catches SIGHUP and
-    // exits 1. Either way a check nobody let finish is never a pass.
-    it(`(${shell}) never passes a check whose tab was closed while it ran`, async () => {
-      useShell()
-      await expect(check('echo hang-up-"now"; sleep 30')).resolves.not.toBe(0)
-    })
-
-    it(`(${shell}) keeps both through the log file`, async () => {
-      useShell()
-      const logPath = join(home, 'logs', 'check.log')
-      await expect(check('echo "$FOUNDRY_RC_ONLY"; exit 3', logPath)).resolves.toBe(3)
-      expect(readFileSync(logPath, 'utf8')).toContain('from-rc')
-    })
-  }
+  for (const startup of STARTUP_SHELLS) startupFileTests(startup)
 })
+
+function startupFileTests(startup: StartupShell) {
+  const { shell } = startup
+
+  it(`(${shell}) passes a check that needs a variable only a startup file exports`, async () => {
+    useShell(startup)
+    await expect(check('test "$FOUNDRY_RC_ONLY" = from-rc')).resolves.toBe(0)
+  })
+
+  it(`(${shell}) still resolves the command's own exit code, not the shell's`, async () => {
+    useShell(startup)
+    await expect(check('echo "$FOUNDRY_RC_ONLY"; exit 3')).resolves.toBe(3)
+  })
+
+  // bash ends by the signal (null, "not measured"); zsh catches SIGHUP and
+  // exits 1. Either way a check nobody let finish is never a pass.
+  it(`(${shell}) never passes a check whose tab was closed while it ran`, async () => {
+    useShell(startup)
+    await expect(check('echo hang-up-"now"; sleep 30')).resolves.not.toBe(0)
+  })
+
+  it(`(${shell}) keeps both through the log file`, async () => {
+    useShell(startup)
+    const logPath = join(home, 'logs', 'check.log')
+    await expect(check('echo "$FOUNDRY_RC_ONLY"; exit 3', logPath)).resolves.toBe(3)
+    expect(readFileSync(logPath, 'utf8')).toContain('from-rc')
+  })
+}

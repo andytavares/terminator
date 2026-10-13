@@ -12,6 +12,7 @@ import { freshGlobalStorage } from '../helpers/foundry-host.js'
 const GLOBAL_STORAGE = freshGlobalStorage()
 
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
+import { partialFake } from '../../../../tests/support/fakes'
 import { activate } from '../../src/index.ts'
 import type { ExtensionAPI, CommandContribution } from '@terminator/extension-sdk'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
@@ -96,68 +97,49 @@ async function addRunAndWaitForPalette(
   await vi.advanceTimersByTimeAsync(5100)
 }
 
-beforeAll(async () => {
-  vi.useFakeTimers()
-  api = {
-    ipc: {
-      registerHandler: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      invokeChannel: vi.fn(),
-      sendChannel: vi.fn(),
-      onWindowEvent: vi.fn().mockReturnValue(() => {}),
-      isRemoteAccessible: vi.fn().mockReturnValue(false),
-    },
-    window: {
+/** Commands kept in `registered` with what they were registered with. */
+function registeringCommands(): ExtensionAPI['commands'] {
+  return partialFake<ExtensionAPI['commands']>({
+    register: vi.fn((command: CommandContribution, handler: () => void) => {
+      registered.set(command.id, { command, handler })
+      return { dispose: vi.fn(() => registered.delete(command.id)) }
+    }),
+  })
+}
+
+/** A host that keeps every command registered, so a spec can read it and run it. */
+function paletteApi(): ExtensionAPI {
+  const disposable = () => ({ dispose: vi.fn() })
+  return partialFake<ExtensionAPI>({
+    ipc: partialFake<ExtensionAPI['ipc']>({ registerHandler: vi.fn(disposable) }),
+    window: partialFake<ExtensionAPI['window']>({
       broadcast: vi.fn(),
       openAuxiliary: vi.fn(),
       focusSelf: vi.fn(),
       showSelf: vi.fn(),
-    },
-    commands: {
-      register: vi.fn((command: CommandContribution, handler: () => void) => {
-        registered.set(command.id, { command, handler })
-        return { dispose: vi.fn(() => registered.delete(command.id)) }
-      }),
-      setEnabled: vi.fn(),
-    },
-    shell: {
-      exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false }),
-    },
-    notifications: {
+    }),
+    commands: registeringCommands(),
+    notifications: partialFake<ExtensionAPI['notifications']>({
       showToast: vi.fn(),
-      createNotification: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
+      createNotification: vi.fn(disposable),
+    }),
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     paths: { app: '', globalStorage: GLOBAL_STORAGE },
-    settings: {
-      register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+    settings: partialFake<ExtensionAPI['settings']>({
+      register: vi.fn(disposable),
       get: vi.fn(),
       set: vi.fn(),
-      resolveWorktreeBaseDir: vi.fn().mockReturnValue('/tmp/speckit-quick-actions'),
-    },
-    terminal: {
-      onSessionCreate: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onSessionClose: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    workspace: {
-      list: vi.fn().mockReturnValue([]),
-      listProjects: vi.fn().mockReturnValue([]),
-      createProject: vi.fn(),
-      deleteProject: vi.fn(),
-      onDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onProjectDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    pty: {
-      spawn: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      listSessions: vi.fn().mockReturnValue([]),
-      attachOnData: vi.fn().mockReturnValue(null),
-      attachOnExit: vi.fn().mockReturnValue(null),
-      openTerminalTab: vi.fn(),
-    },
-    app: { version: '0.0.0-test' },
-  } as unknown as ExtensionAPI
+    }),
+    shell: partialFake<ExtensionAPI['shell']>({
+      exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false }),
+    }),
+    workspace: partialFake<ExtensionAPI['workspace']>({ list: () => [], listProjects: () => [] }),
+  })
+}
+
+beforeAll(async () => {
+  vi.useFakeTimers()
+  api = paletteApi()
   const { startSupervisionRuntime } = await import('../../src/runtime/supervision-runtime.ts')
   activate(api)
   const started = await startSupervisionRuntime(api)

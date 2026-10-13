@@ -32,16 +32,12 @@ const HOOK_INPUT = JSON.stringify({
   tool_input: { command: 'rm -rf /' },
 })
 
-function run(
-  script: string,
-  args: string[],
-  stdin: string,
-  env: Record<string, string> = {}
-): Promise<string> {
+/** Runs `argv` (the script, then its arguments) under Node, feeding it `stdin`. */
+function run(argv: string[], stdin: string, env: Record<string, string> = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = execFile(
       process.execPath,
-      [script, ...args],
+      argv,
       { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', ...env } },
       (error, stdout) => (error ? reject(error) : resolve(stdout))
     )
@@ -92,8 +88,7 @@ function allowAndDeferTests() {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
     const stdout = await run(
-      installHookScript(directory),
-      [server.url, server.token, 's1'],
+      [installHookScript(directory), server.url, server.token, 's1'],
       HOOK_INPUT
     )
     expect(JSON.parse(stdout)).toEqual({
@@ -107,8 +102,7 @@ function allowAndDeferTests() {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'defer' }) })
     const stdout = await run(
-      installHookScript(directory),
-      [server.url, server.token, 's1'],
+      [installHookScript(directory), server.url, server.token, 's1'],
       HOOK_INPUT
     )
     expect(stdout).toBe('')
@@ -125,7 +119,7 @@ function theToolAndInputTests() {
         return { permissionDecision: 'allow' }
       },
     })
-    await run(installHookScript(directory), [server.url, server.token, 's1'], HOOK_INPUT)
+    await run([installHookScript(directory), server.url, server.token, 's1'], HOOK_INPUT)
     expect(seen).toEqual({
       sessionId: 's1',
       toolName: 'Bash',
@@ -144,8 +138,7 @@ function theReasonTests() {
       }),
     })
     const stdout = await run(
-      installHookScript(directory),
-      [server.url, server.token, 's1'],
+      [installHookScript(directory), server.url, server.token, 's1'],
       HOOK_INPUT
     )
     // permissionDecisionReason, inside hookSpecificOutput: verified against the
@@ -170,8 +163,7 @@ function editedInputTests() {
       }),
     })
     const stdout = await run(
-      installHookScript(directory),
-      [server.url, server.token, 's1'],
+      [installHookScript(directory), server.url, server.token, 's1'],
       HOOK_INPUT
     )
     expect(JSON.parse(stdout).hookSpecificOutput).toEqual({
@@ -186,8 +178,7 @@ function anUnreachableOrRefusingConsoleTests() {
   it('asks in the terminal when the console cannot be reached', async () => {
     // Nothing is listening on this port: the console is closed, or crashed.
     const stdout = await run(
-      installHookScript(directory),
-      ['http://127.0.0.1:1/pretooluse', 'token', 's1'],
+      [installHookScript(directory), 'http://127.0.0.1:1/pretooluse', 'token', 's1'],
       HOOK_INPUT
     )
     expect(JSON.parse(stdout)).toEqual({
@@ -198,7 +189,7 @@ function anUnreachableOrRefusingConsoleTests() {
   it('asks in the terminal when the console refuses the token', async () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
-    const stdout = await run(installHookScript(directory), [server.url, 'wrong', 's1'], HOOK_INPUT)
+    const stdout = await run([installHookScript(directory), server.url, 'wrong', 's1'], HOOK_INPUT)
     expect(JSON.parse(stdout)).toEqual({
       hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask' },
     })
@@ -210,8 +201,7 @@ function unrecognisableAnswersAndInputTests() {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'maybe' }) as never })
     const stdout = await run(
-      installHookScript(directory),
-      [server.url, server.token, 's1'],
+      [installHookScript(directory), server.url, server.token, 's1'],
       HOOK_INPUT
     )
     expect(JSON.parse(stdout)).toEqual({
@@ -223,8 +213,7 @@ function unrecognisableAnswersAndInputTests() {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
     const stdout = await run(
-      installHookScript(directory),
-      [server.url, server.token, 's1'],
+      [installHookScript(directory), server.url, server.token, 's1'],
       'not json'
     )
     expect(JSON.parse(stdout)).toEqual({
@@ -238,7 +227,7 @@ function exitStatusTests() {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'deny' }) })
     await expect(
-      run(installHookScript(directory), [server.url, server.token, 's1'], HOOK_INPUT)
+      run([installHookScript(directory), server.url, server.token, 's1'], HOOK_INPUT)
     ).resolves.toBeTruthy()
   })
 }
@@ -257,8 +246,7 @@ function reportingTheEndTests() {
       onEvent: (kind) => seen.push(kind),
     })
     await run(
-      installHookScript(directory),
-      [server.eventUrl, server.token, 's1', 'stop'],
+      [installHookScript(directory), server.eventUrl, server.token, 's1', 'stop'],
       STOP_INPUT
     )
     expect(seen).toEqual(['stop'])
@@ -272,8 +260,7 @@ function reportingTheEndTests() {
       onEvent: (kind) => seen.push(kind),
     })
     await run(
-      installHookScript(directory),
-      [server.eventUrl, server.token, 's1', 'session_end'],
+      [installHookScript(directory), server.eventUrl, server.token, 's1', 'session_end'],
       STOP_INPUT
     )
     expect(seen).toEqual(['session_end'])
@@ -285,8 +272,7 @@ function stayingOutOfTheWayTests() {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
     const stdout = await run(
-      installHookScript(directory),
-      [server.eventUrl, server.token, 's1', 'stop'],
+      [installHookScript(directory), server.eventUrl, server.token, 's1', 'stop'],
       STOP_INPUT
     )
     expect(stdout).toBe('')
@@ -295,8 +281,7 @@ function stayingOutOfTheWayTests() {
   it('gets out of the way when the console is not listening', async () => {
     await expect(
       run(
-        installHookScript(directory),
-        ['http://127.0.0.1:1/event', 'token', 's1', 'stop'],
+        [installHookScript(directory), 'http://127.0.0.1:1/event', 'token', 's1', 'stop'],
         STOP_INPUT
       )
     ).resolves.toBe('')
@@ -321,8 +306,7 @@ describe('a console that accepts and never answers', () => {
       const script = installHookScript(directory)
       const started = Date.now()
       const out = await run(
-        script,
-        [`http://127.0.0.1:${port}/pretooluse`, 'token', 'session-1'],
+        [script, `http://127.0.0.1:${port}/pretooluse`, 'token', 'session-1'],
         HOOK_INPUT,
         { TERMINATOR_HOOK_ANSWER_MS: '1200' }
       )

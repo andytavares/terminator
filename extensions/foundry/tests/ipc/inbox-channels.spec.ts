@@ -119,19 +119,17 @@ function raisedGatesTests() {
   })
 }
 
+const TAV_15 = {
+  kind: 'tracker' as const,
+  tracker: 'linear',
+  key: 'TAV-15',
+  url: 'https://linear.app/team/issue/TAV-15',
+}
+
 function linksTests() {
   it('carries the order\u2019s pull requests and ticket on each gate, so the row can link them', async () => {
     const orders = createOrderStore(root)
-    await orders.save(
-      order({
-        source: {
-          kind: 'tracker',
-          tracker: 'linear',
-          key: 'TAV-15',
-          url: 'https://linear.app/team/issue/TAV-15',
-        },
-      })
-    )
+    await orders.save(order({ source: TAV_15 }))
     await createGateStore(root).save(gate())
     const url = 'https://github.com/andytavares/terminator/pull/233'
     const c = createInboxChannels(
@@ -147,10 +145,7 @@ function linksTests() {
       }[]
     }
     expect(r.gates[0].pulls).toEqual([{ number: 233, url }])
-    expect(r.gates[0].source).toEqual({
-      key: 'TAV-15',
-      url: 'https://linear.app/team/issue/TAV-15',
-    })
+    expect(r.gates[0].source).toEqual({ key: TAV_15.key, url: TAV_15.url })
   })
 }
 

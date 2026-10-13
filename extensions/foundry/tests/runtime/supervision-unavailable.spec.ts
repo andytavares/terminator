@@ -3,6 +3,7 @@
  * told, and nothing that needs an agent pretends to have started one.
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import { activate, deactivate } from '../../src/index.ts'
 import * as path from 'node:path'
 
@@ -65,16 +66,7 @@ function readyDraft() {
     plan: {
       ...base.plan,
       units: [
-        {
-          id: 'U-1',
-          title: 'red text',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/theme.ts'],
-          verify: [],
-        },
+        builderUnit('U-1', { title: 'red text', satisfies: ['AC-1'], touches: ['src/theme.ts'] }),
       ],
     },
   }

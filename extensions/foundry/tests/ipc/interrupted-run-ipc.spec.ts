@@ -8,17 +8,14 @@
  * existed and none of it was joined up: `run.resume` was registered and called
  * by nothing, and every gate offering "Stop here" did nothing at all.
  */
-import { tmpdir } from 'node:os'
-import { freshGlobalStorage } from '../helpers/foundry-host.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
-
-const GLOBAL_STORAGE = freshGlobalStorage()
-
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
-import { activate } from '../../src/index.ts'
-import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
+
+import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
+import { activateFoundry } from '../helpers/foundry-activation.js'
+import { builderUnit } from '../helpers/order-parts.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -64,19 +61,10 @@ vi.mock('../../src/runtime/control-server.js', () => ({
   }),
 }))
 
-let getHandler: (channel: string) => ((payload: unknown) => Promise<unknown>) | undefined
-let api: ExtensionAPI
 /** Read by the extension through `settings.get`; a fresh one per test. */
 let dataDir = ''
-const settingsGet = vi.fn((key: string) =>
-  key === 'terminator.foundry.dataDir' ? dataDir : undefined
-)
-
-function call(channel: string, payload: unknown = {}): Promise<unknown> {
-  const handler = getHandler(channel)
-  if (handler === undefined) throw new Error(`${channel} is not registered`)
-  return handler(payload)
-}
+let host: FoundryHost
+const call = (channel: string, payload: unknown = {}) => host.call(channel, payload)
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -92,18 +80,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
     recipe: 'direct',
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'the first bit',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'the first bit', satisfies: ['AC-1'] })],
     },
     ...over,
   }
@@ -160,60 +137,9 @@ function ledger(): string {
 }
 
 beforeAll(async () => {
-  const handlers = new Map<string, (payload: unknown) => Promise<unknown>>()
-  api = {
-    ipc: {
-      registerHandler: vi.fn((spec: ChannelSpec) => {
-        handlers.set(spec.channel, (payload) => dispatchChannel(spec, payload))
-        return { dispose: vi.fn() }
-      }),
-      invokeChannel: vi.fn(),
-      sendChannel: vi.fn(),
-      onWindowEvent: vi.fn().mockReturnValue(() => {}),
-      isRemoteAccessible: vi.fn().mockReturnValue(false),
-    },
-    window: { broadcast: vi.fn(), openAuxiliary: vi.fn(), focusSelf: vi.fn(), showSelf: vi.fn() },
-    commands: { register: vi.fn().mockReturnValue({ dispose: vi.fn() }), setEnabled: vi.fn() },
-    shell: { exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }) },
-    notifications: { showToast: vi.fn(), createNotification: vi.fn() },
-    log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    paths: { app: '', globalStorage: GLOBAL_STORAGE },
-    settings: {
-      register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      get: settingsGet,
-      set: vi.fn(),
-      resolveWorktreeBaseDir: vi.fn().mockReturnValue(path.join(tmpdir(), 'fdry-worktrees')),
-    },
-    terminal: {
-      onSessionCreate: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onSessionClose: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    workspace: {
-      list: vi.fn().mockReturnValue([]),
-      listProjects: vi.fn().mockReturnValue([]),
-      createProject: vi.fn(),
-      deleteProject: vi.fn(),
-      onDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onProjectDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    pty: {
-      spawn: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      listSessions: vi.fn().mockReturnValue([]),
-      attachOnData: vi.fn().mockReturnValue(null),
-      attachOnExit: vi.fn().mockReturnValue(null),
-      openTerminalTab: vi.fn(),
-    },
-    app: { version: '0.0.0-test' },
-  } as unknown as ExtensionAPI
-  const { startSupervisionRuntime } = await import('../../src/runtime/supervision-runtime.ts')
-  activate(api)
-  getHandler = (channel) => handlers.get(channel)
-  if ((await startSupervisionRuntime(api)) === null) {
-    throw new Error('the supervision runtime did not start')
-  }
+  host = fakeHost(() => dataDir)
+  host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+  await activateFoundry(host)
 })
 
 /**
@@ -353,45 +279,48 @@ function stoppingAndHoldingTests() {
   })
 }
 
+/** A budget gate whose options include stopping the order. */
+const BUDGET_GATE = {
+  id: 'WO-1-budget',
+  rule: 'budget.exceeded',
+  orderId: 'WO-1',
+  nodeId: null,
+  summary: 's',
+  why: 'w',
+  evidence: [],
+  options: [
+    { id: 'raise', label: 'Raise the budget', consequence: 'c' },
+    { id: 'stop', label: 'Stop here', consequence: 'c' },
+    { id: 'hold', label: 'Hold', consequence: 'c' },
+  ],
+  defaultIfIgnored: 'hold',
+  deadline: null,
+  blockedUnits: 0,
+  riskGrade: 'P3',
+  raisedAt: '2026-09-06T10:00:00.000Z',
+  decision: null,
+}
+
+const RAISED = {
+  at: '2026-09-06T10:00:00.000Z',
+  orderId: 'WO-1',
+  actor: 'rule:line',
+  action: 'gate.raised',
+  subject: 'x',
+  reason: 'x',
+  evidence: [],
+}
+
 describe('stopping a run whose agents are still alive', () => {
   it('ends each one, saying why, before the order is cancelled', async () => {
     runner.terminalFor.mockReturnValue({ terminalSessionId: 't1', projectId: 'p1' })
     await seedInterruptedRun()
     // Raised by hand: with live agents nothing adopts it, which is the point.
     const store = createOrderStore(dataDir)
-    await store.record({
-      at: '2026-09-06T10:00:00.000Z',
-      orderId: 'WO-1',
-      actor: 'rule:line',
-      action: 'gate.raised',
-      subject: 'x',
-      reason: 'x',
-      evidence: [],
-    })
+    await store.record(RAISED)
     fs.writeFileSync(
       path.join(dataDir, 'orders', 'WO-1', 'gates.json'),
-      JSON.stringify([
-        {
-          id: 'WO-1-budget',
-          rule: 'budget.exceeded',
-          orderId: 'WO-1',
-          nodeId: null,
-          summary: 's',
-          why: 'w',
-          evidence: [],
-          options: [
-            { id: 'raise', label: 'Raise the budget', consequence: 'c' },
-            { id: 'stop', label: 'Stop here', consequence: 'c' },
-            { id: 'hold', label: 'Hold', consequence: 'c' },
-          ],
-          defaultIfIgnored: 'hold',
-          deadline: null,
-          blockedUnits: 0,
-          riskGrade: 'P3',
-          raisedAt: '2026-09-06T10:00:00.000Z',
-          decision: null,
-        },
-      ])
+      JSON.stringify([BUDGET_GATE])
     )
 
     await call('foundry:inbox.decide', { gateId: 'WO-1-budget', option: 'stop' })
@@ -405,7 +334,7 @@ describe('stopping a run whose agents are still alive', () => {
 
 describe('stopping the whole order rather than one agent', () => {
   it('is reachable as its own channel, because a gate was the only way out', async () => {
-    expect(getHandler('foundry:run.stop')).toBeDefined()
+    await expect(call('foundry:run.stop', { id: 'WO-none' })).resolves.toBeDefined()
   })
 
   it('cancels the order and writes down that a person did it', async () => {

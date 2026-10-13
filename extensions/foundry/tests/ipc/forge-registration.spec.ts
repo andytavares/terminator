@@ -167,6 +167,14 @@ function capabilitiesAndUnknownTrackersTests() {
   })
 }
 
+/** A finding the operator accepted on WO-1; each use says when, about what and why. */
+const ACCEPTED = {
+  orderId: 'WO-1',
+  actor: 'operator',
+  action: 'finding.accepted',
+  evidence: [],
+}
+
 describe('the record of earlier decisions', () => {
   it('names the newest decisions about the files a plan touches, and nothing else', async () => {
     const store = createOrderStore(dataDir)
@@ -180,15 +188,7 @@ describe('the record of earlier decisions', () => {
       })
     )
     const decided = (at: string, subject: string, reason: string) =>
-      store.record({
-        at,
-        orderId: 'WO-1',
-        actor: 'operator',
-        action: 'finding.accepted',
-        subject,
-        reason,
-        evidence: [],
-      })
+      store.record({ ...ACCEPTED, at, subject, reason })
     await decided('2026-10-01T10:00:00.000Z', 'src/theme.ts', 'keep tokens')
     await decided('2026-10-05T10:00:00.000Z', 'RT-1', 'src/theme.ts stays the source of colour')
     await decided('2026-10-06T10:00:00.000Z', 'src/other.ts', 'unrelated')

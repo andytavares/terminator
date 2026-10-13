@@ -29,6 +29,9 @@ const theRunner = fakeRunner()
 runner.current = theRunner
 
 const { runtime, stallFirings } = await import('../../src/runtime/runtime-state.ts')
+const { startPaletteRefresh, stopPaletteRefresh } = await import(
+  '../../src/runtime/palette-commands.ts'
+)
 const { notePending, noteResolved } = await import('../../src/runtime/held-calls.ts')
 
 let dataDir = ''
@@ -375,25 +378,27 @@ function outsideAnOrderTests() {
   })
 }
 
+/** A builder run on WO-1 that is waiting on the operator. */
+function addWaitingRun(sessionId: string): void {
+  runtime.supervision?.runs.add({
+    sessionId,
+    featureDir: orderDir(dataDir, 'WO-1'),
+    phase: 'builder',
+    worktreePath: '/repos/app',
+    branch: 'foundry/WO-1',
+    baseBranch: 'main',
+    terminalSessionId: 'term-w',
+    transcriptPath: '/nowhere.jsonl',
+    startedAt: Date.now(),
+  })
+  runtime.supervision?.runs.setState(sessionId, 'waiting', Date.now())
+}
+
 describe('the palette', () => {
   it('lists a run waiting on the operator first, and going to it opens the run when it has no terminal', async () => {
-    runtime.supervision?.runs.add({
-      sessionId: 'waiting-1',
-      featureDir: orderDir(dataDir, 'WO-1'),
-      phase: 'builder',
-      worktreePath: '/repos/app',
-      branch: 'foundry/WO-1',
-      baseBranch: 'main',
-      terminalSessionId: 'term-w',
-      transcriptPath: '/nowhere.jsonl',
-      startedAt: Date.now(),
-    })
-    runtime.supervision?.runs.setState('waiting-1', 'waiting', Date.now())
+    addWaitingRun('waiting-1')
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     try {
-      const { startPaletteRefresh, stopPaletteRefresh } = await import(
-        '../../src/runtime/palette-commands.ts'
-      )
       stopPaletteRefresh()
       startPaletteRefresh(host.api)
       const go = host.commands.get('run.waiting-1')

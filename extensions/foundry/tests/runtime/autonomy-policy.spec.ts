@@ -20,13 +20,8 @@ import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 const WORKTREE = '/data/orders/WO-1/worktrees/app'
 
-function decide(
-  toolName: string,
-  input: unknown,
-  autonomy: Autonomy = 'standard',
-  worktreePath = WORKTREE
-) {
-  return decideByAutonomy({ toolName, input, autonomy, worktreePath })
+function decide(toolName: string, input: unknown, autonomy: Autonomy = 'standard') {
+  return decideByAutonomy({ toolName, input, autonomy, worktreePath: WORKTREE })
 }
 
 const bash = (command: string) => ({ command })
@@ -309,13 +304,21 @@ describe('a discard, wherever the shell puts its punctuation', () => {
       'ls node_modules 2>/dev/null | head -3 ; echo "present: $?"; ' +
       'ls -d node_modules/.bin 2>/dev/null; echo "---"; ls -la | head -20'
     expect(writesOutside('Bash', bash(real), WT)).toBe(false)
-    expect(decide('Bash', bash(real), 'standard', WT)?.allow).toBe(true)
+    const decision = decideByAutonomy({
+      toolName: 'Bash',
+      input: bash(real),
+      autonomy: 'standard',
+      worktreePath: WT,
+    })
+    expect(decision?.allow).toBe(true)
   })
 
   it('still reads a real file next to a discard', () => {
     expect(writesOutside('Bash', bash('ls 2>/dev/null > /work/other/out.log'), WT)).toBe(true)
   })
 })
+
+const WT = '/work/checkout'
 
 // The harness an agent runs inside gives it a scratchpad under the OS temp
 // directory and tells it, in its own system prompt, to put intermediate files
@@ -329,8 +332,11 @@ describe('a discard, wherever the shell puts its punctuation', () => {
 // OS temp directory gives up cross-checkout protection with it. The default is
 // `<workdir>/.foundry`, and a data root in temp does not survive a reboot.
 describe('a scratch file, where the harness tells the agent to put one', () => {
-  const WT = '/work/checkout'
+  describe('temp roots and the scratchpad', tempRootsAndTheScratchpadTests)
+  describe('everywhere else', everywhereElseTests)
+})
 
+function tempRootsAndTheScratchpadTests() {
   it('is taken without asking, under any of the temp roots', () => {
     for (const root of [os.tmpdir(), '/tmp', '/private/tmp']) {
       expect(writesOutside('Write', { file_path: path.join(root, 'probe.mjs') }, WT)).toBe(false)
@@ -344,10 +350,17 @@ describe('a scratch file, where the harness tells the agent to put one', () => {
     const scratch = path.join(os.tmpdir(), 'claude-501', 'a-project', 'a-session', 'scratchpad')
     expect(writesOutside('Write', { file_path: path.join(scratch, 'nontext.mjs') }, WT)).toBe(false)
     expect(
-      decide('Bash', bash(`cat > ${scratch}/ramp.mjs <<'EOF'\nx\nEOF`), 'standard', WT)?.allow
+      decideByAutonomy({
+        toolName: 'Bash',
+        input: bash(`cat > ${scratch}/ramp.mjs <<'EOF'\nx\nEOF`),
+        autonomy: 'standard',
+        worktreePath: WT,
+      })?.allow
     ).toBe(true)
   })
+}
 
+function everywhereElseTests() {
   it('still asks about everywhere else outside the checkout', () => {
     expect(writesOutside('Write', { file_path: '/etc/hosts' }, WT)).toBe(true)
     expect(writesOutside('Write', { file_path: '/work/other/src/a.ts' }, WT)).toBe(true)
@@ -355,6 +368,9 @@ describe('a scratch file, where the harness tells the agent to put one', () => {
   })
 
   it('does not make a destructive command ordinary just because it is in temp', () => {
-    expect(decide('Bash', bash(`rm -rf ${os.tmpdir()}/x`), 'lights-out', WT)).toBeNull()
+    const input = bash(`rm -rf ${os.tmpdir()}/x`)
+    expect(
+      decideByAutonomy({ toolName: 'Bash', input, autonomy: 'lights-out', worktreePath: WT })
+    ).toBeNull()
   })
-})
+}

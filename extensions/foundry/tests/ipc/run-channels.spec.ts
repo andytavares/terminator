@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { queued } from '../helpers/queue-entries.js'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -55,29 +57,10 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
   return {
     ...base,
     status: 'agreed',
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a' })],
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'a',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'a', satisfies: ['AC-1'], touches: ['src/a'] })],
     },
     ...over,
   }
@@ -361,24 +344,8 @@ function theQueuePositionTests() {
     const withQueue = createRunChannels(
       runDeps({
         queueEntries: async () => [
-          {
-            orderId: 'WO-1',
-            title: 'x',
-            repo: 'repo',
-            base: 'main',
-            agreedAt: '2026-09-02T00:00:00.000Z',
-            files: ['src/a'],
-            merged: false,
-          },
-          {
-            orderId: 'WO-earlier',
-            title: 'Earlier work',
-            repo: 'repo',
-            base: 'main',
-            agreedAt: '2026-09-01T00:00:00.000Z',
-            files: ['src/a'],
-            merged: false,
-          },
+          queued('WO-1', { title: 'x', agreedAt: '2026-09-02T00:00:00.000Z', files: ['src/a'] }),
+          queued('WO-earlier', { title: 'Earlier work', files: ['src/a'] }),
         ],
       })
     )
@@ -619,115 +586,74 @@ function directAndRefusedChoicesTests() {
 // carry a whole lane have `unitId`, a single value, and nothing validates the
 // file on the way in — so the boundary that reads it is the one place worth
 // converting.
+/** What every node in an old graph carries besides what each test names. */
+const LEGACY_NODE = {
+  lane: null,
+  role: null,
+  dependsOn: [],
+  attempts: 0,
+  sessionId: null,
+  worktreePath: null,
+  startedAt: null,
+  endedAt: null,
+}
+
+/** Writes WO-1's graph the way an earlier build did, with this one node. */
+function writeLegacyGraph(node: Record<string, unknown>): void {
+  const dir = path.join(dataRoot, 'orders', 'WO-1')
+  fs.mkdirSync(dir, { recursive: true })
+  const graph = { orderId: 'WO-1', recipe: 'direct', nodes: [{ ...LEGACY_NODE, ...node }] }
+  fs.writeFileSync(path.join(dir, 'run-graph.json'), JSON.stringify(graph))
+}
+
 describe('a graph written before a node could carry a lane', () => {
   it('reads a legacy unitId as the one unit it names', async () => {
-    const dir = path.join(dataRoot, 'orders', 'WO-1')
-    fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(
-      path.join(dir, 'run-graph.json'),
-      JSON.stringify({
-        orderId: 'WO-1',
-        recipe: 'direct',
-        nodes: [
-          {
-            id: 'build:U-1',
-            stepId: 'build',
-            kind: 'fanout',
-            state: 'running',
-            unitId: 'U-1',
-            lane: 1,
-            role: 'builder',
-            dependsOn: [],
-            attempts: 1,
-            sessionId: 's-1',
-            worktreePath: null,
-            startedAt: null,
-            endedAt: null,
-          },
-        ],
-      })
-    )
+    writeLegacyGraph({
+      id: 'build:U-1',
+      stepId: 'build',
+      kind: 'fanout',
+      state: 'running',
+      unitId: 'U-1',
+      lane: 1,
+      role: 'builder',
+      attempts: 1,
+      sessionId: 's-1',
+    })
     const graph = await readRunGraph(dataRoot, 'WO-1')
     expect(graph?.nodes[0].unitIds).toEqual(['U-1'])
   })
 
   it('reads a legacy node with no unit as covering none', async () => {
-    const dir = path.join(dataRoot, 'orders', 'WO-1')
-    fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(
-      path.join(dir, 'run-graph.json'),
-      JSON.stringify({
-        orderId: 'WO-1',
-        recipe: 'direct',
-        nodes: [
-          {
-            id: 'ship',
-            stepId: 'ship',
-            kind: 'gate',
-            state: 'waiting',
-            unitId: null,
-            lane: null,
-            role: null,
-            dependsOn: [],
-            attempts: 0,
-            sessionId: null,
-            worktreePath: null,
-            startedAt: null,
-            endedAt: null,
-          },
-        ],
-      })
-    )
+    writeLegacyGraph({ id: 'ship', stepId: 'ship', kind: 'gate', state: 'waiting', unitId: null })
     const graph = await readRunGraph(dataRoot, 'WO-1')
     expect(graph?.nodes[0].unitIds).toEqual([])
   })
 
   it('reads a graph written before reworks and feedback existed as having neither', async () => {
-    const dir = path.join(dataRoot, 'orders', 'WO-1')
-    fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(
-      path.join(dir, 'run-graph.json'),
-      JSON.stringify({
-        orderId: 'WO-1',
-        recipe: 'direct',
-        nodes: [
-          {
-            id: 'lint',
-            stepId: 'lint',
-            kind: 'agent',
-            state: 'waiting',
-            unitIds: [],
-            lane: null,
-            role: null,
-            dependsOn: [],
-            attempts: 0,
-            sessionId: null,
-            worktreePath: null,
-            startedAt: null,
-            endedAt: null,
-          },
-        ],
-      })
-    )
+    writeLegacyGraph({ id: 'lint', stepId: 'lint', kind: 'agent', state: 'waiting', unitIds: [] })
     const graph = await readRunGraph(dataRoot, 'WO-1')
     expect(graph?.nodes[0].reworks).toBe(0)
     expect(graph?.nodes[0].feedback).toEqual([])
   })
 })
 
+/** Starts WO-1 with its records in a directory nobody may write to, then cleans up. */
+async function startWhereNothingCanBeWritten(): Promise<{ error: string }> {
+  const wall = makeTempDir('fdry-wall-')
+  fs.chmodSync(wall, 0o500)
+  try {
+    const blocked = createRunChannels(runDeps({ dataRoot: () => path.join(wall, 'foundry') }))
+    return (await blocked.start({ id: 'WO-1' })) as { error: string }
+  } finally {
+    fs.chmodSync(wall, 0o700)
+    fs.rmSync(wall, { recursive: true, force: true })
+  }
+}
+
 describe('the records location', () => {
   it('refuses to start when the records location cannot be written to, before any work begins', async () => {
     await store.save(order())
-    const wall = makeTempDir('fdry-wall-')
-    fs.chmodSync(wall, 0o500)
-    const blocked = createRunChannels(
-      runDeps({
-        dataRoot: () => path.join(wall, 'foundry'),
-      })
-    )
-    const r = (await blocked.start({ id: 'WO-1' })) as { error: string }
-    fs.chmodSync(wall, 0o700)
-    fs.rmSync(wall, { recursive: true, force: true })
+    const r = await startWhereNothingCanBeWritten()
 
     expect(r.error).toContain('foundry')
     // And the order is untouched — no half-started run.
@@ -750,6 +676,28 @@ async function startedRun(): Promise<void> {
 }
 
 describe('attaching to a running agent', () => {
+  describe('the live session', theLiveSessionTests)
+  describe('no session yet', noSessionYetTests)
+
+  describe('what it says about a step that has no agent to go to', () => {
+    describe('finished and automatic steps', finishedAndAutomaticStepsTests)
+    describe('the resume wording', theResumeWordingTests)
+  })
+
+  it('reports a node that is not in the run', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().attach({ orderId: 'WO-1', nodeId: 'nope' })) as { error: string }
+    expect(r.error).toBe('No step nope.')
+  })
+
+  it('reports an order with no run', async () => {
+    const r = (await channels().attach({ orderId: 'WO-nope', nodeId: 'x' })) as { error: string }
+    expect(r.error).toBe('No run for WO-nope.')
+  })
+})
+
+function theLiveSessionTests() {
   it('returns the live session behind a node', async () => {
     await store.save(order())
     await channels().start({ id: 'WO-1' })
@@ -774,7 +722,9 @@ describe('attaching to a running agent', () => {
     }
     expect(r.terminalSessionId).toBe('sess-42')
   })
+}
 
+function noSessionYetTests() {
   it('says why rather than pretending, when a node has no session yet', async () => {
     await store.save(order())
     const started = (await channels().start({ id: 'WO-1' })) as {
@@ -786,24 +736,7 @@ describe('attaching to a running agent', () => {
     })) as { error: string }
     expect(r.error).toMatch(/no session yet/)
   })
-
-  describe('what it says about a step that has no agent to go to', () => {
-    describe('finished and automatic steps', finishedAndAutomaticStepsTests)
-    describe('the resume wording', theResumeWordingTests)
-  })
-
-  it('reports a node that is not in the run', async () => {
-    await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const r = (await channels().attach({ orderId: 'WO-1', nodeId: 'nope' })) as { error: string }
-    expect(r.error).toBe('No step nope.')
-  })
-
-  it('reports an order with no run', async () => {
-    const r = (await channels().attach({ orderId: 'WO-nope', nodeId: 'x' })) as { error: string }
-    expect(r.error).toBe('No run for WO-nope.')
-  })
-})
+}
 
 function channelsWithActivity(activityFor: (sessionId: string) => ToolActivity[]) {
   return createRunChannels(
@@ -926,26 +859,17 @@ function twoLanes(): WorkOrder {
         { ord: 2, repo: 'cli', branch: '', role: 'consumer', blocks: [], blockedBy: [1] },
       ],
       units: [
-        {
-          id: 'U-1',
+        builderUnit('U-1', {
           title: 'the contract',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
           satisfies: ['AC-1'],
           touches: ['proto/session.proto'],
-          verify: [],
-        },
-        {
-          id: 'U-2',
+        }),
+        builderUnit('U-2', {
           title: 'adopt it',
-          role: 'builder',
           lane: 2,
-          dependsOn: [],
           satisfies: ['AC-1'],
           touches: ['proto/session.proto'],
-          verify: [],
-        },
+        }),
       ],
     },
   }

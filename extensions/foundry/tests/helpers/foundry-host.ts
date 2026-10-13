@@ -92,6 +92,8 @@ export interface FoundryHost {
   readonly exec: ReturnType<typeof vi.fn>
   readonly issues: ExtensionAPI['issues']
   readonly workspaces: Array<{ id: string; folderPath: string }>
+  /** The channels registered as reachable from the remote browser client. */
+  readonly remoteChannels: string[]
   /** `api.paths.globalStorage`, `<userData>/extensions/terminator.foundry`, not created yet. */
   readonly globalStorage: string
 }
@@ -138,6 +140,7 @@ function hostParts() {
     showToast: vi.fn(),
     createNotification: vi.fn(() => ({ dispose: vi.fn() })),
     issues: noIssues(),
+    remoteChannels: [] as string[],
   }
 }
 
@@ -172,8 +175,9 @@ interface HostApiInput {
 }
 
 function hostApi({ dataDir, globalStorage, handlers, parts }: HostApiInput): ExtensionAPI {
-  const registerHandler = vi.fn((spec: ChannelSpec) => {
+  const registerHandler = vi.fn((spec: ChannelSpec, options?: { remoteAccessible?: boolean }) => {
     handlers.set(spec.channel, spec)
+    if (options?.remoteAccessible === true) parts.remoteChannels.push(spec.channel)
     return disposable()
   })
   return partialFake<ExtensionAPI>({
