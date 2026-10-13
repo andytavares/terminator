@@ -329,21 +329,27 @@ describe('calloutLevels', () => {
 
 function liftingTests() {
   it('leaves a callout nothing crowds on the ground level', () => {
-    expect(calloutLevels([bubble('a', 100), bubble('b', 400)], [], {}, 26)).toEqual({
+    expect(
+      calloutLevels([bubble('a', 100), bubble('b', 400)], { obstacles: [], kept: {} }, 26)
+    ).toEqual({
       a: 0,
       b: 0,
     })
   })
 
   it('lifts a callout that would cover a neighbour raised before it', () => {
-    expect(calloutLevels([bubble('a', 100), bubble('b', 160)], [], {}, 26)).toEqual({
+    expect(
+      calloutLevels([bubble('a', 100), bubble('b', 160)], { obstacles: [], kept: {} }, 26)
+    ).toEqual({
       a: 0,
       b: 1,
     })
   })
 
   it('keeps the level a callout was given, so it never jumps when an older one leaves', () => {
-    expect(calloutLevels([bubble('b', 160)], [], { b: 1 }, 26)).toEqual({ b: 1 })
+    expect(calloutLevels([bubble('b', 160)], { obstacles: [], kept: { b: 1 } }, 26)).toEqual({
+      b: 1,
+    })
   })
 }
 
@@ -351,8 +357,7 @@ function freeLevelsAndTouchingTests() {
   it('takes the lowest free level, under a kept callout that sits higher', () => {
     const levels = calloutLevels(
       [bubble('a', 100), bubble('b', 160), bubble('c', 160)],
-      [],
-      { a: 0, b: 2 },
+      { obstacles: [], kept: { a: 0, b: 2 } },
       26
     )
     expect(levels.c).toBe(1)
@@ -360,11 +365,15 @@ function freeLevelsAndTouchingTests() {
 
   it('rises clear of a nameplate from another row in its way', () => {
     const plate = { left: 60, top: 178, right: 140, bottom: 195 }
-    expect(calloutLevels([bubble('a', 100)], [plate], {}, 26)).toEqual({ a: 1 })
+    expect(calloutLevels([bubble('a', 100)], { obstacles: [plate], kept: {} }, 26)).toEqual({
+      a: 1,
+    })
   })
 
   it('treats a callout that only touches a neighbour edge to edge as clear of it', () => {
-    expect(calloutLevels([bubble('a', 100), bubble('b', 200)], [], {}, 26)).toEqual({
+    expect(
+      calloutLevels([bubble('a', 100), bubble('b', 200)], { obstacles: [], kept: {} }, 26)
+    ).toEqual({
       a: 0,
       b: 0,
     })

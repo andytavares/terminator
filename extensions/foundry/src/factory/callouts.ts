@@ -1,5 +1,5 @@
 import { gateNodeId } from './events.js'
-import type { FactoryEvent } from './events.js'
+import type { FactoryEvent, ToolProp } from './events.js'
 import { ordinal } from './format.js'
 import type { Gate } from '../gates/rules.js'
 import type { NodeState, RunGraph } from '../line/run-graph.js'
@@ -46,8 +46,85 @@ function name(labels: Readonly<Record<string, string>>, nodeId: string): string 
   return labels[nodeId] ?? nodeId
 }
 
-function callout(nodeId: string, tone: CalloutTone, text: string, at: number): Callout {
+function callout(nodeId: string, { tone, text }: Said, at: number): Callout {
   return { id: `${nodeId}@${at}`, nodeId, tone, text, at }
+}
+
+/** What a callout says, and in what tone. */
+interface Said {
+  readonly tone: CalloutTone
+  readonly text: string
+}
+
+/** A callout to raise, before it has a moment: which station, and what it says. */
+type Raised = (Said & { readonly nodeId: string }) | null
+
+const STATE_SAYS: Readonly<Record<NodeState, Said | null>> = {
+  running: { tone: 'start', text: 'Started' },
+  passed: { tone: 'done', text: 'Done' },
+  failed: { tone: 'fail', text: 'Failed' },
+  blocked: { tone: 'fail', text: 'Blocked' },
+  skipped: { tone: 'done', text: 'Skipped' },
+  waiting: null,
+}
+
+/** Edits happen at the desk all the time; the lit screen already says so. */
+const TOOL_SAYS: Readonly<Record<ToolProp, Said | null>> = {
+  archive: { tone: 'tool', text: 'Reading files' },
+  rack: { tone: 'tool', text: 'Running a command' },
+  desk: null,
+}
+
+const CHECK_SAYS: Readonly<Record<Check['bucket'], Said | null>> = {
+  fail: { tone: 'fail', text: 'failed' },
+  cancel: { tone: 'fail', text: 'failed' },
+  pass: { tone: 'done', text: 'passed' },
+  pending: null,
+  skipping: null,
+}
+
+function onStation(nodeId: string, said: Said | null): Raised {
+  return said === null ? null : { nodeId, ...said }
+}
+
+/** The callout one kind of event raises, given how to name a node. */
+type Raiser<K extends FactoryEvent['kind']> = (
+  event: Extract<FactoryEvent, { kind: K }>,
+  named: (nodeId: string) => string
+) => Raised
+
+const RAISE: { readonly [K in FactoryEvent['kind']]: Raiser<K> } = {
+  'node-state': (event) => onStation(event.nodeId, STATE_SAYS[event.to]),
+  orphaned: (event) => onStation(event.nodeId, { tone: 'fail', text: 'Agent gone' }),
+  // Going quiet at a terminal is an interruption, pinned rather than raised.
+  stranded: (event) =>
+    event.on ? null : onStation(event.nodeId, { tone: 'start', text: 'Back to work' }),
+  tool: (event) => (event.open ? onStation(event.nodeId, TOOL_SAYS[event.prop]) : null),
+  handoff: (event, named) =>
+    onStation(event.toNodeId, { tone: 'handoff', text: `Work in from ${named(event.fromNodeId)}` }),
+  gate: (event) =>
+    event.waiting ? null : onStation(event.nodeId, { tone: 'done', text: 'Gate cleared' }),
+  rework: (event, named) =>
+    onStation(event.toNodeId, {
+      tone: 'fail',
+      text: `Sent back: ${named(event.fromNodeId)} failed`,
+    }),
+  'ci-round': (event) =>
+    onStation(DISPATCH_NODE_ID, { tone: 'start', text: `Round ${event.round} of ${event.max}` }),
+  'ci-check': (event) => {
+    const said = CHECK_SAYS[event.bucket]
+    return said === null
+      ? null
+      : onStation(DISPATCH_NODE_ID, { ...said, text: `${event.name} ${said.text}` })
+  },
+  queued: (event) =>
+    onStation(DISPATCH_NODE_ID, {
+      tone: 'start',
+      text:
+        event.behind.length === 0
+          ? `Queued ${ordinal(event.position)}`
+          : `Queued ${ordinal(event.position)} behind ${event.behind[event.behind.length - 1]}`,
+    }),
 }
 
 /**
@@ -61,97 +138,9 @@ export function calloutFor(
   labels: Readonly<Record<string, string>>,
   at: number
 ): Callout | null {
-  switch (event.kind) {
-    case 'node-state':
-      switch (event.to) {
-        case 'running':
-          return callout(event.nodeId, 'start', 'Started', at)
-        case 'passed':
-          return callout(event.nodeId, 'done', 'Done', at)
-        case 'failed':
-          return callout(event.nodeId, 'fail', 'Failed', at)
-        case 'blocked':
-          return callout(event.nodeId, 'fail', 'Blocked', at)
-        case 'skipped':
-          return callout(event.nodeId, 'done', 'Skipped', at)
-        case 'waiting':
-          return null
-        /* v8 ignore next 3 -- exhaustive union, unreachable */
-        default: {
-          const never: never = event.to
-          throw new Error(`unhandled node state: ${String(never)}`)
-        }
-      }
-    case 'orphaned':
-      return callout(event.nodeId, 'fail', 'Agent gone', at)
-    case 'stranded':
-      // Going quiet at a terminal is an interruption, pinned rather than raised.
-      return event.on ? null : callout(event.nodeId, 'start', 'Back to work', at)
-    case 'tool':
-      if (!event.open) return null
-      switch (event.prop) {
-        case 'archive':
-          return callout(event.nodeId, 'tool', 'Reading files', at)
-        case 'rack':
-          return callout(event.nodeId, 'tool', 'Running a command', at)
-        case 'desk':
-          // Edits happen at the desk all the time; the lit screen already says so.
-          return null
-        /* v8 ignore next 3 -- exhaustive union, unreachable */
-        default: {
-          const never: never = event.prop
-          throw new Error(`unhandled tool prop: ${String(never)}`)
-        }
-      }
-    case 'handoff':
-      return callout(
-        event.toNodeId,
-        'handoff',
-        `Work in from ${name(labels, event.fromNodeId)}`,
-        at
-      )
-    case 'gate':
-      return event.waiting ? null : callout(event.nodeId, 'done', 'Gate cleared', at)
-    case 'rework':
-      return callout(
-        event.toNodeId,
-        'fail',
-        `Sent back: ${name(labels, event.fromNodeId)} failed`,
-        at
-      )
-    case 'ci-round':
-      return callout(DISPATCH_NODE_ID, 'start', `Round ${event.round} of ${event.max}`, at)
-    case 'ci-check':
-      switch (event.bucket) {
-        case 'fail':
-        case 'cancel':
-          return callout(DISPATCH_NODE_ID, 'fail', `${event.name} failed`, at)
-        case 'pass':
-          return callout(DISPATCH_NODE_ID, 'done', `${event.name} passed`, at)
-        case 'pending':
-        case 'skipping':
-          return null
-        /* v8 ignore next 3 -- exhaustive union, unreachable */
-        default: {
-          const never: never = event.bucket
-          throw new Error(`unhandled check bucket: ${String(never)}`)
-        }
-      }
-    case 'queued':
-      return callout(
-        DISPATCH_NODE_ID,
-        'start',
-        event.behind.length === 0
-          ? `Queued ${ordinal(event.position)}`
-          : `Queued ${ordinal(event.position)} behind ${event.behind[event.behind.length - 1]}`,
-        at
-      )
-    /* v8 ignore next 3 -- exhaustive union, unreachable */
-    default: {
-      const never: never = event
-      throw new Error(`unhandled factory event: ${String(never)}`)
-    }
-  }
+  const raise = RAISE[event.kind] as Raiser<FactoryEvent['kind']>
+  const raised = raise(event, (nodeId) => name(labels, nodeId))
+  return raised === null ? null : callout(raised.nodeId, raised, at)
 }
 
 /** A held tool call, as the permissions list reports it. */
@@ -198,19 +187,29 @@ export interface InterruptionInput {
 
 /** Everything in this hall waiting on the operator, each pinned to a station where one owns it. */
 export function interruptionsFor(input: InterruptionInput): Interruption[] {
-  const nodeOfSession = (sessionId: string): string | null =>
-    input.graph.nodes.find((n) => n.sessionId === sessionId)?.id ?? null
+  return [...asksOf(input), ...gatesOf(input), ...parkedOf(input)]
+}
 
-  const asks: Interruption[] = input.pending.map((call) => ({
+/** The node whose agent runs in `sessionId`, when one does. */
+function nodeOfSession(graph: RunGraph, sessionId: string): string | null {
+  return graph.nodes.find((n) => n.sessionId === sessionId)?.id ?? null
+}
+
+/** The held tool calls, each over its agent's station. */
+function asksOf(input: InterruptionInput): Interruption[] {
+  return input.pending.map((call) => ({
     kind: 'ask',
     id: call.requestId,
-    nodeId: nodeOfSession(call.sessionId),
+    nodeId: nodeOfSession(input.graph, call.sessionId),
     title: `Wants to run ${call.toolName}`,
     detail: call.summary,
     prose: call.toolName === 'AskUserQuestion',
   }))
+}
 
-  const gates: Interruption[] = input.waiting.map((gate) => ({
+/** The gates waiting on the operator, each over the station it holds. */
+function gatesOf(input: InterruptionInput): Interruption[] {
+  return input.waiting.map((gate) => ({
     kind: 'gate',
     id: gate.id,
     nodeId: gateNodeId(gate, input.graph),
@@ -218,20 +217,21 @@ export function interruptionsFor(input: InterruptionInput): Interruption[] {
     detail: gate.why,
     gate,
   }))
+}
 
+/** The agents parked at their terminal's own prompt, unless a held call already says so. */
+function parkedOf(input: InterruptionInput): Interruption[] {
   // A held call already says its agent is stopped; saying it twice is noise.
   const asking = new Set(input.pending.map((call) => call.sessionId))
-  const parked: Interruption[] = input.stranded
+  return input.stranded
     .filter((sessionId) => !asking.has(sessionId))
     .map((sessionId) => ({
       kind: 'stranded',
       id: sessionId,
-      nodeId: nodeOfSession(sessionId),
+      nodeId: nodeOfSession(input.graph, sessionId),
       title: 'Waiting at its terminal',
       detail: 'A question went unanswered in time. Answer it in the terminal.',
     }))
-
-  return [...asks, ...gates, ...parked]
 }
 
 /** How loudly a callout's tone speaks when one station has several things to say. */
@@ -298,8 +298,10 @@ function overlaps(a: Obstacle, b: Obstacle): boolean {
  */
 export function calloutLevels(
   boxes: readonly CalloutBox[],
-  obstacles: readonly Obstacle[],
-  kept: Readonly<Record<string, number>>,
+  {
+    obstacles,
+    kept,
+  }: { readonly obstacles: readonly Obstacle[]; readonly kept: Readonly<Record<string, number>> },
   pitch: number
 ): Record<string, number> {
   const at = (box: CalloutBox, level: number): Obstacle => {

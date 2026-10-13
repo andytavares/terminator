@@ -85,16 +85,37 @@ function ciAt(timeline: Timeline, at: number): CiState | null {
   }
 }
 
+/** What a replay plays back: the recorded timeline, the order's gates, and its graph's shape. */
+export interface Recording {
+  readonly timeline: Timeline
+  readonly gates: readonly Gate[]
+  readonly base: RunGraph
+}
+
 /** What the hall would have observed at `at`, from what was recorded. */
-export function observationAt(
-  timeline: Timeline,
-  gates: readonly Gate[],
-  base: RunGraph,
-  at: number
-): Observation {
+export function observationAt({ timeline, gates, base }: Recording, at: number): Observation {
+  // CI is recorded when it changes, so a replay shows the tower and the wait
+  // as they were. The refinery's queue is not recorded, so a replay shows no
+  // queue plate at any point in a run (ADR-060: only what was recorded plays back).
+  return {
+    graph: graphAt(timeline, base, at),
+    orphaned: [],
+    stranded: [],
+    waiting: gates.filter((gate) => {
+      const decided = decidedAt(gate)
+      return Date.parse(gate.raisedAt) <= at && (decided === null || decided > at)
+    }),
+    activity: activityAt(timeline, at),
+    ci: ciAt(timeline, at),
+    queue: null,
+  }
+}
+
+/** The graph with each node as the frame at `at` recorded it, and waiting before it was. */
+function graphAt(timeline: Timeline, base: RunGraph, at: number): RunGraph {
   const frame = frameAt(timeline, at)
   const recorded = new Map((frame?.nodes ?? []).map((n) => [n.id, n]))
-  const graph: RunGraph = {
+  return {
     ...base,
     nodes: base.nodes.map((node) => {
       const then = recorded.get(node.id)
@@ -103,7 +124,10 @@ export function observationAt(
         : { ...node, state: then.state, attempts: then.attempts, sessionId: then.sessionId }
     }),
   }
+}
 
+/** Each node's tool calls up to `at`, as many as the live activity channel hands back. */
+function activityAt(timeline: Timeline, at: number): Record<string, ToolActivity[]> {
   const activity: Record<string, ToolActivity[]> = {}
   for (const entry of timeline.tools) {
     if (entry.at > at) continue
@@ -116,24 +140,7 @@ export function observationAt(
   for (const nodeId of Object.keys(activity)) {
     activity[nodeId] = activity[nodeId].slice(-ACTIVITY_WINDOW)
   }
-
-  const waiting = gates.filter((gate) => {
-    const decided = decidedAt(gate)
-    return Date.parse(gate.raisedAt) <= at && (decided === null || decided > at)
-  })
-
-  // CI is recorded when it changes, so a replay shows the tower and the wait
-  // as they were. The refinery's queue is not recorded, so a replay shows no
-  // queue plate at any point in a run (ADR-060: only what was recorded plays back).
-  return {
-    graph,
-    orphaned: [],
-    stranded: [],
-    waiting,
-    activity,
-    ci: ciAt(timeline, at),
-    queue: null,
-  }
+  return activity
 }
 
 /** How long before the first thing happens a replay begins. */
@@ -154,10 +161,26 @@ function firstMovementAt(timeline: Timeline): number | null {
  * hall with nobody working in it.
  */
 export function momentsOf(timeline: Timeline, gates: readonly Gate[]): number[] {
+  const all = recordedMoments(timeline, gates)
+  const moved = firstMovementAt(timeline)
+  const start = moved === null ? -Infinity : moved - LEAD_IN_MS
+  const kept = [...all].filter((at) => at >= start)
+  if (moved !== null) kept.push(start)
+  return [...new Set(kept)].sort((a, b) => a - b)
+}
+
+/** Every session some step carried at some point. */
+function carriedSessions(timeline: Timeline): Set<string> {
   const carried = new Set<string>()
   for (const frame of timeline.frames) {
     for (const n of frame.nodes) if (n.sessionId !== null) carried.add(n.sessionId)
   }
+  return carried
+}
+
+/** Every moment anything was recorded: frames, carried tool calls, CI, and each gate raised and decided. */
+function recordedMoments(timeline: Timeline, gates: readonly Gate[]): Set<number> {
+  const carried = carriedSessions(timeline)
   const all = new Set<number>()
   for (const frame of timeline.frames) all.add(frame.at)
   for (const entry of timeline.tools) if (carried.has(entry.sessionId)) all.add(entry.at)
@@ -167,11 +190,7 @@ export function momentsOf(timeline: Timeline, gates: readonly Gate[]): number[] 
     const decided = decidedAt(gate)
     if (decided !== null) all.add(decided)
   }
-  const moved = firstMovementAt(timeline)
-  const start = moved === null ? -Infinity : moved - LEAD_IN_MS
-  const kept = [...all].filter((at) => at >= start)
-  if (moved !== null) kept.push(start)
-  return [...new Set(kept)].sort((a, b) => a - b)
+  return all
 }
 
 export interface ReplayClock {

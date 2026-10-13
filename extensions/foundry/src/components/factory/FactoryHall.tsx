@@ -276,7 +276,10 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
     }
     const gates = r.gates ?? []
     const clock = replayClock(momentsOf(r.timeline, gates), REPLAY_MAX_GAP_MS)
-    const observation = observationAt(r.timeline, gates, r.graph, clock.toReal(0))
+    const observation = observationAt(
+      { timeline: r.timeline, gates, base: r.graph },
+      clock.toReal(0)
+    )
     // A recording that wrote CI down has a tower to wait at.
     const replayMap = layoutHall(r.graph, labelsNow ?? {}, (r.timeline.ci?.length ?? 0) > 0)
     const replayWorld = createWorld(replayMap, observation)
@@ -310,14 +313,21 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
       if (r === null) return
       const at = Math.min(Math.max(pos, 0), r.clock.duration)
       const real = r.clock.toReal(at)
-      const observation = observationAt(r.timeline, r.gates, r.graph, real)
+      const observation = observationAt(
+        { timeline: r.timeline, gates: r.gates, base: r.graph },
+        real
+      )
       if (seek) {
         replayWorldRef.current = createWorld(r.map, observation)
         replayBeatsRef.current = createBeats(statesOf(observation.graph))
         setCallouts([])
       } else {
         const seen = diffObservation(replayPrevRef.current, observation)
-        const held = schedule(replayBeatsRef.current as Beats, seen, r.graph.nodes, real)
+        const held = schedule(
+          replayBeatsRef.current as Beats,
+          { events: seen, nodes: r.graph.nodes },
+          real
+        )
         // The recording's end shows everything still held rather than cutting it off.
         const { beats, events } = release(held, at >= r.clock.duration ? Infinity : real)
         replayBeatsRef.current = beats
@@ -400,7 +410,7 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
       }
     })
     setCalloutLift((kept) => {
-      const next = calloutLevels(boxes, [], kept, CALLOUT_PITCH_PX)
+      const next = calloutLevels(boxes, { obstacles: [], kept }, CALLOUT_PITCH_PX)
       const same =
         Object.keys(next).length === Object.keys(kept).length &&
         Object.entries(next).every(([id, level]) => kept[id] === level)
