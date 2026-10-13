@@ -12,6 +12,7 @@ import { useIntegrationsStore } from '../../../src/renderer/stores/integrations.
 import { App } from '../../../src/renderer/App'
 import { installLogInterceptor } from '../../../src/renderer/logger'
 import { useLogStore } from '../../../src/renderer/stores/log.store'
+import { useNotificationStore } from '../../../src/renderer/stores/notification.store'
 import type { QuickAction } from '../../../src/renderer/quick-actions/types'
 import type { QuickActionsProps } from '../../../src/renderer/components/QuickActions'
 import type { useTerminalSession } from '../../../src/renderer/hooks/useTerminalSession'
@@ -136,13 +137,23 @@ vi.mock('../../../src/renderer/components/terminal/TerminalPane', () => ({
     <div data-testid="terminal-pane">{projectId}</div>
   ),
 }))
-const tabBar = vi.hoisted(() => ({ editNoteSessionId: null as string | null }))
+const tabBar = vi.hoisted(() => ({
+  editNoteSessionId: null as string | null,
+  onScratchDeactivate: undefined as (() => void) | undefined,
+}))
 vi.mock('../../../src/renderer/components/terminal/TabBar', () => ({
-  TabBar: ({ editNoteSessionId }: { editNoteSessionId?: string | null }) => {
+  TabBar: ({
+    editNoteSessionId,
+    onScratchDeactivate,
+  }: {
+    editNoteSessionId?: string | null
+    onScratchDeactivate?: () => void
+  }) => {
     // App sets the id then clears it on a microtask, so pressing the shortcut
     // twice reopens the editor. The last render therefore always sees null —
     // what the test is asking is whether the tab bar was ever handed the id.
     if (editNoteSessionId) tabBar.editNoteSessionId = editNoteSessionId
+    tabBar.onScratchDeactivate = onScratchDeactivate
     return <div data-testid="tab-bar" />
   },
 }))
@@ -183,9 +194,9 @@ function settingsWith(patch: Record<string, unknown>): GlobalSettings {
   return mainSettings.updateGlobalSettings(patch)
 }
 
-/** What main pushes to the window, and what the window sends back to it. */
-function mainProcess(data: { workspaces: Workspace[]; projects: Map<string, Project[]> }) {
-  const events = {
+/** What main pushes to the window. */
+function mainEvents() {
+  return {
     processExit: pushedEvent<[string, number | null]>(),
     commandsChanged: pushedEvent<[]>(),
     quickActionsOpen: pushedEvent<[]>(),
@@ -198,7 +209,13 @@ function mainProcess(data: { workspaces: Workspace[]; projects: Map<string, Proj
     selectProjectTab: pushedEvent<[string]>(),
     bridge: bridgeEvents(),
   }
-  const sent = {
+}
+
+type MainEvents = ReturnType<typeof mainEvents>
+
+/** What the window sends back to main, recorded. */
+function mainSent() {
+  return {
     input: vi.fn<ElectronAPI['terminal']['input']>(),
     notifyPanelState: vi.fn<ElectronAPI['extensionEvents']['notifyPanelState']>(),
     getCommands: vi.fn<ElectronAPI['extension']['getCommands']>(async () => ({ commands: [] })),
@@ -206,8 +223,14 @@ function mainProcess(data: { workspaces: Workspace[]; projects: Map<string, Proj
       settings: mainSettings.updateGlobalSettings(patch),
     })),
   }
-  const unsubscribe = () => {}
-  const parts = {
+}
+
+type MainSent = ReturnType<typeof mainSent>
+type MainData = { workspaces: Workspace[]; projects: Map<string, Project[]> }
+
+/** Terminals, the workspace and project lists, and settings. */
+function coreParts(data: MainData, events: MainEvents, sent: MainSent) {
+  return {
     terminal: {
       onProcessExit: events.processExit.subscribe,
       input: sent.input,
@@ -220,6 +243,12 @@ function mainProcess(data: { workspaces: Workspace[]; projects: Map<string, Proj
       getWorkspace: async (id: string) => ({ settings: mainSettings.getWorkspaceSettings(id) }),
       updateGlobal: sent.updateGlobal,
     },
+  }
+}
+
+/** Menu accelerators, the extension bridge and extension commands. */
+function extensionParts(events: MainEvents, sent: MainSent) {
+  return {
     extensionEvents: {
       onMenuOpenSettings: events.openSettings.subscribe,
       onMenuOpenAbout: events.openAbout.subscribe,
@@ -230,11 +259,6 @@ function mainProcess(data: { workspaces: Workspace[]; projects: Map<string, Proj
       onSelectProjectTab: events.selectProjectTab.subscribe,
       notifyPanelState: sent.notifyPanelState,
     },
-    notifications: {
-      list: async () => [],
-      onPush: () => unsubscribe,
-      create: async () => ({ id: 'n1' }),
-    },
     extensionBridge: { on: events.bridge.on, invoke: async () => ({}) },
     extension: {
       setBottomInset: () => {},
@@ -244,20 +268,42 @@ function mainProcess(data: { workspaces: Workspace[]; projects: Map<string, Proj
       executeCommand: () => {},
     },
     quickActions: { onOpen: events.quickActionsOpen.subscribe },
+  }
+}
+
+/** What the window only reads: notifications, session records, metrics and the branch. */
+function quietParts() {
+  const unsubscribe = () => {}
+  const system = {
+    cpuPercent: 0,
+    memUsedBytes: 0,
+    memTotalBytes: 1,
+    netInBytesPerSec: 0,
+    netOutBytesPerSec: 0,
+  }
+  return {
+    notifications: {
+      list: async () => [],
+      onPush: () => unsubscribe,
+      create: async () => ({ id: 'n1' }),
+    },
     sessionRecords: { list: async () => ({ data: [] }), onChanged: () => unsubscribe },
     metrics: {
-      getSystem: async () => ({
-        data: {
-          cpuPercent: 0,
-          memUsedBytes: 0,
-          memTotalBytes: 1,
-          netInBytesPerSec: 0,
-          netOutBytesPerSec: 0,
-        },
-      }),
+      getSystem: async () => ({ data: system }),
       getProcesses: async () => ({ data: [] }),
     },
     git: { currentBranch: async () => ({ branch: 'main' }) },
+  }
+}
+
+/** What main pushes to the window, and what the window sends back to it. */
+function mainProcess(data: MainData) {
+  const events = mainEvents()
+  const sent = mainSent()
+  const parts = {
+    ...coreParts(data, events, sent),
+    ...extensionParts(events, sent),
+    ...quietParts(),
   }
   return { events, sent, parts }
 }
@@ -661,7 +707,9 @@ describe('App — command core.toggle-log action opens LogWindow', () => {
       scrollbackLimit: 10000,
     })
   })
+})
 
+describe('App — command core.toggle-log action opens LogWindow — command core.split-horizontal action splits the active project', () => {
   it('command core.split-horizontal action splits the active project', () => {
     setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1', workspaces: [WS1] })
     render(<App />)
@@ -1153,27 +1201,35 @@ describe('App — Quick Actions integration (feature 057) — shows a "Next time
   })
 })
 
-describe('App — Quick Actions integration (feature 057) — runs the terminal, session and workspace core actions against the stores', () => {
+/**
+ * Two workspaces: s1 and s3 in the active branch with s1 showing, and s2,
+ * waiting for input, in the other workspace's branch.
+ */
+function setupTwoWorkspaces(): void {
+  const s1 = terminalSessionOf({ id: 's1', projectId: 'proj-1' })
+  const s2 = terminalSessionOf({
+    id: 's2',
+    projectId: 'proj-2',
+    agentState: 'awaiting-input',
+    lastAttendedAt: 5,
+  })
+  const s3 = terminalSessionOf({ id: 's3', projectId: 'proj-1' })
+  setupApp({
+    activeWorkspaceId: 'ws-1',
+    activeProjectId: 'proj-1',
+    workspaces: [WS1, WS2],
+    projectsByWorkspaceId: new Map([
+      ['ws-1', [PROJ1]],
+      ['ws-2', [projectOf({ id: 'proj-2', workspaceId: 'ws-2' })]],
+    ]),
+    sessions: [s1, s2, s3],
+  })
+  showTab('proj-1', 's1')
+}
+
+describe('App — Quick Actions integration (feature 057) — core actions', () => {
   it('runs the terminal, session and workspace core actions against the stores', async () => {
-    const s1 = terminalSessionOf({ id: 's1', projectId: 'proj-1' })
-    const s2 = terminalSessionOf({
-      id: 's2',
-      projectId: 'proj-2',
-      agentState: 'awaiting-input',
-      lastAttendedAt: 5,
-    })
-    const s3 = terminalSessionOf({ id: 's3', projectId: 'proj-1' })
-    setupApp({
-      activeWorkspaceId: 'ws-1',
-      activeProjectId: 'proj-1',
-      workspaces: [WS1, WS2],
-      projectsByWorkspaceId: new Map([
-        ['ws-1', [PROJ1]],
-        ['ws-2', [projectOf({ id: 'proj-2', workspaceId: 'ws-2' })]],
-      ]),
-      sessions: [s1, s2, s3],
-    })
-    showTab('proj-1', 's1')
+    setupTwoWorkspaces()
     render(<App />)
     openPalette()
     const shown = (projectId: string) =>
@@ -1525,5 +1581,225 @@ describe('App — console capture', () => {
     } finally {
       Object.assign(console, saved)
     }
+  })
+})
+
+const showSurface = (extensionId: string, view: string): void =>
+  act(() => main.events.bridge.emit('extension:show-surface', { extensionId, view }))
+
+describe('App — surfaces an extension asks to show', () => {
+  it('shows a workspace tab and a project tab', () => {
+    registry().registerWorkspaceTab({ id: 'reviews', label: 'Reviews', component: () => null })
+    registry().registerProjectTab({ id: 'notes', label: 'Notes', component: () => null })
+    render(<App />)
+    showSurface('reviews', 'workspace')
+    showSurface('notes', 'project')
+    expect(registry()).toMatchObject({
+      activeWorkspaceTabId: 'reviews',
+      activeProjectTabId: 'notes',
+    })
+  })
+
+  it('opens a sidebar panel, and leaves it open when asked again', () => {
+    registry().registerSidebarPanel({ id: 'tasks', label: 'Tasks', component: () => null })
+    render(<App />)
+    showSurface('tasks', 'sidebar')
+    showSurface('tasks', 'sidebar')
+    expect(registry().openPanels.has('tasks')).toBe(true)
+  })
+
+  it('switches to the global tab an extension names, and ignores anything else', () => {
+    registry().registerGlobalTab({ id: 'git', label: 'Git', component: () => null })
+    render(<App />)
+    act(() => main.events.bridge.emit('extension:activate-global-tab', 42))
+    expect(registry().activeGlobalTabId).toBe('core.home')
+    act(() => main.events.bridge.emit('extension:activate-global-tab', 'git'))
+    expect(registry().activeGlobalTabId).toBe('git')
+  })
+})
+
+describe('App — terminals an extension opens, closes or reveals', () => {
+  it('adopts a terminal an extension opened, as a tab in its project', () => {
+    setupApp({ workspaces: [WS1], projectsByWorkspaceId: new Map([['ws-1', [PROJ1]]]) })
+    installElectronApi({
+      ...main.parts,
+      terminal: {
+        ...main.parts.terminal,
+        onOutput: () => () => {},
+        attach: async () => ({ released: true }),
+      },
+    })
+    render(<App />)
+    act(() =>
+      main.events.bridge.emit('terminal:adopt', {
+        sessionId: 'ext-1',
+        projectId: 'proj-1',
+        tabTitle: 'Review run',
+        scrollbackLimit: 1000,
+      })
+    )
+    expect(useSessionStore.getState().sessions.get('ext-1')).toMatchObject({
+      projectId: 'proj-1',
+      tabTitle: 'Review run',
+    })
+  })
+})
+
+describe('App — terminals an extension opens, closes or reveals — closes the tab an extension asks to close', () => {
+  it('closes the tab an extension asks to close', () => {
+    const closeSession = vi.fn(async () => {})
+    render(<App />)
+    useSessionStore.setState({ closeSession })
+    act(() => main.events.bridge.emit('terminal:close-tab', { sessionId: 's1' }))
+    expect(closeSession).toHaveBeenCalledWith('s1')
+  })
+
+  it('reveals the session an extension navigates to', () => {
+    setupApp({
+      workspaces: [WS1],
+      projectsByWorkspaceId: new Map([['ws-1', [PROJ1]]]),
+      sessions: [terminalSessionOf({ id: 's1', projectId: 'proj-1' })],
+    })
+    render(<App />)
+    act(() => main.events.bridge.emit('terminal:navigate-to-session', { sessionId: 's1' }))
+    expect(useWorkspaceStore.getState().activeProjectId).toBe('proj-1')
+    expect(useSessionStore.getState().projectViews.get('proj-1')?.activeSessionId).toBe('s1')
+  })
+})
+
+type Pushed = Parameters<Parameters<ElectronAPI['notifications']['onPush']>[0]>[0]
+
+const notice = (patch: Partial<Pushed>): Pushed => ({
+  id: crypto.randomUUID(),
+  type: 'info',
+  title: 'Built',
+  timestamp: 0,
+  targets: ['center'],
+  ...patch,
+})
+
+describe('App — notifications and log lines from main', () => {
+  it('fills the notification centre with only what was meant for it', async () => {
+    resetStore(useNotificationStore)
+    const list = async () => [
+      notice({ title: 'In the centre' }),
+      notice({ title: 'Toast only', targets: ['toast'] }),
+    ]
+    installElectronApi({ ...main.parts, notifications: { ...main.parts.notifications, list } })
+    render(<App />)
+    await waitFor(() =>
+      expect(useNotificationStore.getState().notifications.map((n) => n.title)).toEqual([
+        'In the centre',
+      ])
+    )
+  })
+
+  it('puts a pushed notification in the centre, as a toast, or both', () => {
+    resetStore(useNotificationStore)
+    const push = pushedEvent<[Pushed]>()
+    installElectronApi({
+      ...main.parts,
+      notifications: { ...main.parts.notifications, onPush: push.subscribe },
+    })
+    render(<App />)
+    act(() => push.emit(notice({ title: 'Saved', message: 'all of it', targets: ['toast'] })))
+    act(() => push.emit(notice({ title: 'Done', targets: ['center', 'toast'] })))
+    expect(toasts().map((t) => t.message)).toEqual(['Saved: all of it', 'Done'])
+    expect(useNotificationStore.getState().notifications.map((n) => n.title)).toEqual(['Done'])
+  })
+})
+
+describe('App — notifications and log lines from main — records a log line an extension pushed, and reports a dropped tunnel', () => {
+  it('records a log line an extension pushed, and reports a dropped tunnel', () => {
+    const create = vi.fn(async () => ({ id: 'n1' }))
+    installElectronApi({ ...main.parts, notifications: { ...main.parts.notifications, create } })
+    render(<App />)
+    act(() => main.events.bridge.emit('log:push', { level: 'warn', message: 'slow disk' }))
+    act(() => main.events.bridge.emit('remote:tunnel-disconnected'))
+    expect(useLogStore.getState().entries.at(-1)).toMatchObject({
+      level: 'warn',
+      message: 'slow disk',
+    })
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'remoteTunnelDisconnected' })
+    )
+  })
+})
+
+describe('App — the shell around the main area', () => {
+  it('opens Home from its shortcut, and runs without a Quick Actions bridge', () => {
+    const { quickActions: _quickActions, ...withoutQuickActions } = main.parts
+    installElectronApi(withoutQuickActions)
+    render(<App />)
+    act(() => registry().setActiveGlobalTab(null))
+    act(() => shortcuts.callbacks.onOpenHome?.())
+    expect(registry().activeGlobalTabId).toBe('core.home')
+  })
+
+  it('puts a tab that asked for a place ahead of core', () => {
+    registry().registerGlobalTab({
+      id: 'first',
+      label: 'First',
+      sortOrder: -1,
+      component: () => null,
+    })
+    render(<App />)
+    const band = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))
+    expect(band.indexOf('First')).toBeLessThan(band.indexOf('Home'))
+  })
+})
+
+describe('App — the shell around the main area — closes a workspace tab chosen again, and clears no tab when none is open', () => {
+  it('closes a workspace tab chosen again, and clears no tab when none is open', () => {
+    setupApp({ workspaces: [WS1] })
+    registry().registerWorkspaceTab({ id: 'reviews', label: 'Reviews', component: () => null })
+    render(<App />)
+    act(() => registry().setActiveGlobalTab(null))
+    act(() => sidebar.props?.onSelectWorkspaceTab('ws-1', 'reviews'))
+    act(() => sidebar.props?.onSelectWorkspaceTab('ws-1', 'reviews'))
+    expect(registry().activeWorkspaceTabId).toBeNull()
+    act(() => sidebar.props?.onSelectProject?.())
+    expect(registry()).toMatchObject({ activeGlobalTabId: null, activeProjectTabId: null })
+  })
+
+  it('leaves scratch when its tab bar asks to', () => {
+    setupApp({ scratchActive: true })
+    render(<App />)
+    leaveHome()
+    act(() => tabBar.onScratchDeactivate?.())
+    expect(useWorkspaceStore.getState().scratchActive).toBe(false)
+  })
+})
+
+describe('App — terminals that fail to start', () => {
+  it('opens a new tab in scratch while scratch is showing', () => {
+    setupApp({ scratchActive: true })
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewTab?.())
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: SCRATCH_PROJECT_ID })
+    )
+  })
+
+  it('stays out of scratch when its first terminal fails to start', async () => {
+    createSession.mockRejectedValue(new Error('pty'))
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewScratch?.())
+    await waitFor(() => expect(createSession).toHaveBeenCalled())
+    expect(useWorkspaceStore.getState().scratchActive).toBe(false)
+  })
+
+  it('keeps a non-Error refusal of a branch’s first terminal as its text', async () => {
+    createSession.mockRejectedValue('no shell')
+    setupApp({
+      workspaces: [WS1],
+      projectsByWorkspaceId: new Map([['ws-1', [PROJ1]]]),
+      activeWorkspaceId: 'ws-1',
+      activeProjectId: 'proj-1',
+    })
+    render(<App />)
+    await waitFor(() =>
+      expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBe('no shell')
+    )
   })
 })
