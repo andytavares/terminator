@@ -1,5 +1,5 @@
-import { execFile as execFileCb, spawn as spawnCb } from 'child_process'
-import { promisify } from 'util'
+// child_process only for finding and running `claude`, which is not a command shell.exec runs.
+import { spawn as spawnCb, type ChildProcess } from 'child_process'
 import { randomUUID } from 'crypto'
 import {
   AgentOutputSchema,
@@ -10,9 +10,6 @@ import {
   type AgentScope,
 } from '../schemas/review-agent.schema.js'
 import { runGit } from '../shell/run-git.js'
-
-// Only for finding and running `claude`, which is not a command shell.exec runs.
-const execFileAsync = promisify(execFileCb)
 
 const DIFF_CAP_BYTES = 200 * 1024
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
@@ -47,12 +44,32 @@ type SpawnFn = (
   opts: { cwd: string; env: Record<string, string> }
 ) => SpawnedProcess
 
+/**
+ * claude leads a process group of its own, and kill() signals the whole group,
+ * so cancelling a run also ends what claude started (its tools' shells, MCP
+ * servers): https://nodejs.org/api/child_process.html#optionsdetached. Not on
+ * Windows, where `detached` gives the child a console of its own instead.
+ */
+const OWN_PROCESS_GROUP = process.platform !== 'win32'
+
+/** Signals `child` and, on POSIX, every process in its group. */
+function killGroup(child: ChildProcess, signal?: NodeJS.Signals): void {
+  if (!OWN_PROCESS_GROUP || child.pid === undefined) return void child.kill(signal)
+  try {
+    process.kill(-child.pid, signal)
+  } catch {
+    // Already gone.
+  }
+}
+
 function defaultSpawn(
   cmd: string,
   args: string[],
   opts: { cwd: string; env: Record<string, string> }
 ): SpawnedProcess {
-  return spawnCb(cmd, args, { cwd: opts.cwd, env: opts.env }) as unknown as SpawnedProcess
+  const child = spawnCb(cmd, args, { cwd: opts.cwd, env: opts.env, detached: OWN_PROCESS_GROUP })
+  const kill = (signal?: NodeJS.Signals): void => killGroup(child, signal)
+  return Object.assign(child, { kill }) as unknown as SpawnedProcess
 }
 
 /**
@@ -75,20 +92,37 @@ let resolvedClaude: string | undefined
  * terminal runs, where it is. Only a hit is cached, so installing claude later
  * needs no restart.
  */
-async function defaultResolveClaude(): Promise<string> {
+async function defaultResolveClaude(control: RunControl): Promise<string> {
   if (resolvedClaude) return resolvedClaude
-  try {
-    const { stdout } = await execFileAsync(
-      process.env.SHELL || '/bin/zsh',
-      ['-ilc', 'command -v claude'],
-      { timeout: 10_000 }
-    )
-    const found = claudeFromShellOutput(stdout)
-    if (found) resolvedClaude = found
-    return found ?? 'claude'
-  } catch {
-    return 'claude'
-  }
+  const found = claudeFromShellOutput(await askLoginShell(control))
+  if (found) resolvedClaude = found
+  return found ?? 'claude'
+}
+
+const LOGIN_SHELL_TIMEOUT_MS = 10_000
+
+/**
+ * The output of `command -v claude` in the login shell, or '' when it fails.
+ * The shell leads a process group of its own, which its timeout and a cancel
+ * of the run stop whole: the person's rc files can start processes of their own.
+ */
+function askLoginShell(control: RunControl): Promise<string> {
+  return new Promise((resolve) => {
+    const shell = spawnCb(process.env.SHELL || '/bin/zsh', ['-ilc', 'command -v claude'], {
+      detached: OWN_PROCESS_GROUP,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    control.stopProbe = () => killGroup(shell, 'SIGKILL')
+    const timer = setTimeout(control.stopProbe, LOGIN_SHELL_TIMEOUT_MS)
+    let stdout = ''
+    shell.stdout?.on('data', (chunk: Buffer) => (stdout += chunk.toString()))
+    shell.once('error', () => resolve(''))
+    shell.once('close', (code) => {
+      clearTimeout(timer)
+      control.stopProbe = undefined
+      resolve(code === 0 ? stdout : '')
+    })
+  })
 }
 
 // ─── Prompt ────────────────────────────────────────────────────────────────
@@ -364,6 +398,8 @@ interface RunContext {
 interface RunControl {
   cancelled: boolean
   proc?: SpawnedProcess
+  /** Stops the login shell asked where claude is, while it runs. */
+  stopProbe?: () => void
 }
 
 /** A started `claude` invocation: what to run and what to send it. */
@@ -547,7 +583,7 @@ async function executeAgentRun(
   const { sessionId, model, effort } = input
   const args = buildClaudeArgs({ sessionId, model, effort, schemaJson })
   const env = scrubbedEnv()
-  const claudePath = await (deps.resolveClaude ?? defaultResolveClaude)()
+  const claudePath = await (deps.resolveClaude ?? (() => defaultResolveClaude(control)))()
   if (control.cancelled) return cancelledRun(run)
   const spawn = deps.spawn ?? defaultSpawn
   return runClaude(run, { spawn, claudePath, args, prompt, env }, control)
@@ -565,6 +601,7 @@ export function runAgentReview(
     done: executeAgentRun(run, deps, control),
     cancel: () => {
       control.cancelled = true
+      control.stopProbe?.()
       control.proc?.kill('SIGKILL')
     },
   }

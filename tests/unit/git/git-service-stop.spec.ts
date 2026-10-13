@@ -34,7 +34,7 @@ describe('git-service on quit', () => {
     // git-service takes its environment, PATH included, when it is loaded.
     process.env.PATH = `${scratch}:${originalPath}`
     const { fetchRemotes } = await import('../../../src/main/git/git-service')
-    const { stopRunningCommands } = await import('../../../src/main/shell/shell-executor')
+    const { stopRunningCommands } = await import('../../../src/main/shell/command-runner')
 
     const fetch = fetchRemotes(scratch).then(
       () => 'resolved',

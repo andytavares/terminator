@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { ShellExecInput } from '../../../src/main/shell/shell-executor'
+import type { ShellExecInput } from '../../../src/main/shell/command-runner'
 
-// git-service.ts runs git through runCommand (src/main/shell/shell-executor.ts).
+// git-service.ts runs git through runCommand (src/main/shell/command-runner.ts).
 // Every case drives this fake, which gets the command, its arguments and its
 // options, and resolves with git's output or rejects with its error.
 type GitRun = (
@@ -12,7 +12,7 @@ type GitRun = (
 const execFileCustom = vi.hoisted(() => vi.fn<GitRun>())
 const customMock = () => execFileCustom
 
-vi.mock('../../../src/main/shell/shell-executor.js', () => ({
+vi.mock('../../../src/main/shell/command-runner.js', () => ({
   runCommand: (input: ShellExecInput, env: NodeJS.ProcessEnv) =>
     execFileCustom(input.command, input.args, { cwd: input.cwd, env }).then(
       ({ stdout, stderr }) => ({ exitCode: 0, stdout, stderr, timedOut: false }),
