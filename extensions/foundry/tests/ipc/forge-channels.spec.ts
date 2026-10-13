@@ -1891,3 +1891,67 @@ describe('foundry:order.hold', () => {
     expect(r.error).toBe('No order WO-nope.')
   })
 })
+
+// An order made by mistake used to stay on the list for good. Discarding marks
+// it rather than deleting it, and refuses one whose agents are still working.
+describe('foundry:order.cancel', () => {
+  describe('discarding a draft', discardingADraftTests)
+  describe('an order already cancelled', alreadyCancelledTests)
+  describe('what it refuses', whatCancelRefusesTests)
+})
+
+function discardingADraftTests() {
+  it('marks the order cancelled, records why, and takes it off the list', async () => {
+    const seed = await drafted()
+    const r = (await send('foundry:order.cancel', {
+      id: seed.order.id,
+      reason: 'made by mistake',
+    })) as OrderView
+    expect(r.order.status).toBe('cancelled')
+    expect((await store.load(seed.order.id))?.status).toBe('cancelled')
+    const last = (await store.entries(seed.order.id)).at(-1)
+    expect(last).toMatchObject({
+      actor: 'operator',
+      action: 'order.cancelled',
+      reason: 'made by mistake',
+    })
+    const listed = (await channels().list()) as { orders: { id: string }[] }
+    expect(listed.orders.map((row) => row.id)).not.toContain(seed.order.id)
+  })
+
+  it('says the operator discarded it when no reason is given', async () => {
+    const seed = await drafted()
+    await send('foundry:order.cancel', { id: seed.order.id })
+    const last = (await store.entries(seed.order.id)).at(-1)
+    expect(last?.reason).toBe('Discarded by the operator.')
+  })
+}
+
+function alreadyCancelledTests() {
+  it('leaves an order already cancelled as it is, recording nothing more', async () => {
+    const seed = await drafted()
+    await send('foundry:order.cancel', { id: seed.order.id })
+    const before = (await store.entries(seed.order.id)).length
+    const r = (await send('foundry:order.cancel', { id: seed.order.id })) as OrderView
+    expect(r.order.status).toBe('cancelled')
+    expect(await store.entries(seed.order.id)).toHaveLength(before)
+  })
+}
+
+function whatCancelRefusesTests() {
+  it('refuses a running order, sending the operator to its gate', async () => {
+    const seed = await drafted()
+    await store.save({ ...seed.order, status: 'running' })
+    const r = (await send('foundry:order.cancel', { id: seed.order.id })) as { error: string }
+    expect(r.error).toBe(
+      `${seed.order.id} is running. Stop it at its gate before discarding it — its agents still have work in their worktrees.`
+    )
+    expect((await store.load(seed.order.id))?.status).toBe('running')
+  })
+
+  it('reports an order it cannot find', async () => {
+    expect(await send('foundry:order.cancel', { id: 'WO-nope' })).toEqual({
+      error: 'No order WO-nope.',
+    })
+  })
+}
