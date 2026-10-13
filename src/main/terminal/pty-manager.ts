@@ -88,6 +88,57 @@ function assertUsableCwd(cwd: string): void {
   if (!isDirectory) throw new MissingCwdError(cwd)
 }
 
+function startSession(opts: SpawnSessionOptions): ActiveSession {
+  const ptyProcess = pty.spawn(opts.shell, opts.args ?? ['-l'], {
+    name: 'xterm-256color',
+    cols: 80,
+    rows: 24,
+    cwd: opts.cwd,
+    env: { ...(process.env as { [key: string]: string }), ...(opts.env ?? {}) },
+  })
+  return {
+    pty: ptyProcess,
+    info: {
+      sessionId: opts.sessionId,
+      cwd: opts.cwd,
+      type: opts.type,
+      origin: opts.origin,
+      createdAt: new Date().toISOString(),
+      pid: ptyProcess.pid,
+      projectId: opts.projectId,
+      tabTitle: opts.tabTitle,
+    },
+    dataListeners: new Set(),
+    exitListeners: new Set(),
+    held: opts.holdOutput === true ? [] : null,
+    heldChars: 0,
+  }
+}
+
+/** Hands output to the listeners, or holds it while the session is holding. */
+function deliverOrHold(session: ActiveSession, data: string): void {
+  if (session.held === null) {
+    for (const listener of session.dataListeners) listener(data)
+    return
+  }
+  session.held.push(data)
+  session.heldChars += data.length
+  // Oldest first: what matters most on a long-running agent is the recent
+  // output, and the alternative is an unbounded buffer.
+  while (session.heldChars > MAX_HELD_CHARS && session.held.length > 1) {
+    session.heldChars -= session.held.shift()?.length ?? 0
+  }
+}
+
+/** Everything held, joined, and stops holding; null when nothing was held. */
+function takeHeld(session: ActiveSession): string | null {
+  if (session.held === null || session.held.length === 0) return null
+  const buffered = session.held.join('')
+  session.held = null
+  session.heldChars = 0
+  return buffered
+}
+
 export class PtyManager {
   private sessions = new Map<string, ActiveSession>()
 
@@ -109,76 +160,40 @@ export class PtyManager {
     // the operator exited.
     assertUsableCwd(opts.cwd)
 
-    const ptyProcess = pty.spawn(opts.shell, opts.args ?? ['-l'], {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
-      cwd: opts.cwd,
-      env: { ...(process.env as { [key: string]: string }), ...(opts.env ?? {}) },
-    })
-
-    const session: ActiveSession = {
-      pty: ptyProcess,
-      info: {
-        sessionId: opts.sessionId,
-        cwd: opts.cwd,
-        type: opts.type,
-        origin: opts.origin,
-        createdAt: new Date().toISOString(),
-        pid: ptyProcess.pid,
-        projectId: opts.projectId,
-        tabTitle: opts.tabTitle,
-      },
-      dataListeners: new Set(),
-      exitListeners: new Set(),
-      held: opts.holdOutput === true ? [] : null,
-      heldChars: 0,
-    }
-
-    ptyProcess.onData((data) => {
-      if (session.held !== null) {
-        session.held.push(data)
-        session.heldChars += data.length
-        // Oldest first: what matters most on a long-running agent is the recent
-        // output, and the alternative is an unbounded buffer.
-        while (session.heldChars > MAX_HELD_CHARS && session.held.length > 1) {
-          session.heldChars -= session.held.shift()?.length ?? 0
-        }
-        return
-      }
-      for (const listener of session.dataListeners) listener(data)
-    })
-    ptyProcess.onExit((exit) => {
-      // Everything held goes out first. A process that dies before any tab
-      // mounted — a bad flag, a missing binary, the wrong cwd — otherwise took
-      // its output to the grave and left exactly the blank terminal this hold
-      // exists to prevent. Delivered to whoever is listening; kept on the
-      // session for whoever attaches next.
-      if (session.held !== null && session.held.length > 0) {
-        const buffered = session.held.join('')
-        session.held = null
-        session.heldChars = 0
-        if (session.dataListeners.size > 0) {
-          for (const listener of session.dataListeners) listener(buffered)
-        } else {
-          // Nothing has mounted yet. Kept for a tab that is still on its way,
-          // because the alternative is the blank terminal this hold exists to
-          // prevent — and a run that dies at launch is exactly when its output
-          // matters most.
-          this.rememberForLateAttach(opts.sessionId, buffered)
-        }
-      }
-      this.sessions.delete(opts.sessionId)
-      this.persistRegistry()
-      const exitCode = exitStatusOf(exit)
-      for (const listener of session.exitListeners) listener(exitCode)
-      session.dataListeners.clear()
-      session.exitListeners.clear()
-    })
+    const session = startSession(opts)
+    session.pty.onData((data) => deliverOrHold(session, data))
+    session.pty.onExit((exit) => this.endSession(session, exit))
 
     this.sessions.set(opts.sessionId, session)
     this.persistRegistry()
     return { ...session.info }
+  }
+
+  private endSession(session: ActiveSession, exit: { exitCode: number; signal?: number }): void {
+    const { sessionId } = session.info
+    // Everything held goes out first. A process that dies before any tab
+    // mounted — a bad flag, a missing binary, the wrong cwd — otherwise took
+    // its output to the grave and left exactly the blank terminal this hold
+    // exists to prevent. Delivered to whoever is listening; kept on the
+    // session for whoever attaches next.
+    const buffered = takeHeld(session)
+    if (buffered !== null) {
+      if (session.dataListeners.size > 0) {
+        for (const listener of session.dataListeners) listener(buffered)
+      } else {
+        // Nothing has mounted yet. Kept for a tab that is still on its way,
+        // because the alternative is the blank terminal this hold exists to
+        // prevent — and a run that dies at launch is exactly when its output
+        // matters most.
+        this.rememberForLateAttach(sessionId, buffered)
+      }
+    }
+    this.sessions.delete(sessionId)
+    this.persistRegistry()
+    const exitCode = exitStatusOf(exit)
+    for (const listener of session.exitListeners) listener(exitCode)
+    session.dataListeners.clear()
+    session.exitListeners.clear()
   }
 
   /**

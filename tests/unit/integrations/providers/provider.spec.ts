@@ -70,7 +70,9 @@ describe('TrackerProvider surface', () => {
       expect(methodsOf(linear)).toContain(operation)
     }
   })
+})
 
+describe('TrackerProvider optional operations and writes', () => {
   // Asked about one, the issue service answers "unsupported" (issue-service-transition.spec).
   it('jira omits every optional operation', () => {
     const [, jira] = providers[1]

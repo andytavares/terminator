@@ -94,7 +94,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
       expect.objectContaining({ targets: ['toast'] })
     )
   })
+})
 
+describe('NotificationManager.create — extension targets', () => {
   it('resolves an extension notification via the injected reader, keyed by source+key', () => {
     const reader = vi.fn().mockReturnValue(['system'])
     setExtensionNotificationSettingReader(reader)
@@ -123,7 +125,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
       expect.objectContaining({ targets: ['toast'] })
     )
   })
+})
 
+describe('NotificationManager.create — errors always toast', () => {
   it('force-includes toast for an error even when settings omit it', () => {
     withDefaultTargets('system')
     notificationManager.create({ type: 'error', title: 'Uh oh', key: 'errKey' })
@@ -146,7 +150,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
       expect.objectContaining({ targets: ['system', 'toast'] })
     )
   })
+})
 
+describe('NotificationManager.create — system notifications', () => {
   it('fires system notification when resolved targets include system', () => {
     withDefaultTargets('system')
     notificationManager.create({ type: 'info', title: 'Sys', key: 'sysKey' })
@@ -165,7 +171,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
     notificationManager.create({ type: 'info', title: 'Only sys', key: 'onlySysKey' })
     expect(mockSend).not.toHaveBeenCalled()
   })
+})
 
+describe('NotificationManager.create — persistent targets', () => {
   it('broadcasts when resolved targets includes center', () => {
     withDefaultTargets('center')
     notificationManager.create({ type: 'info', title: 'Center only', key: 'centerKey' })
@@ -183,7 +191,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
       expect.objectContaining({ targets: ['toast'] })
     )
   })
+})
 
+describe('NotificationManager.create — system support and dock', () => {
   it('skips system notification when not supported', () => {
     withDefaultTargets('system')
     MockNotification.isSupported.mockReturnValue(false)
@@ -199,7 +209,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
     expect(mockDockBounce).toHaveBeenCalledWith('critical')
     Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
   })
+})
 
+describe('NotificationManager.create — system notification failures and clicks', () => {
   it('logs a system notification the operating system failed to show', () => {
     withDefaultTargets('system')
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -212,7 +224,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
     )
     warn.mockRestore()
   })
+})
 
+describe('NotificationManager.create — system notification clicks', () => {
   it('wires the first action handler to the system notification click event', () => {
     withDefaultTargets('system')
     const handler = vi.fn()
@@ -242,7 +256,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
     clickHandler()
     expect(onClick).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('NotificationManager.create — system notification click priority', () => {
   it('prefers onClick over the first action when both are present', () => {
     withDefaultTargets('system')
     const onClick = vi.fn()
@@ -282,7 +298,9 @@ describe('NotificationManager.create — broadcast', () => {
     notificationManager.create({ type: 'info', title: 'Skip me', key: 'skipKey' })
     expect(mockSend).not.toHaveBeenCalled()
   })
+})
 
+describe('NotificationManager.create — serialized fields', () => {
   it('includes actions in serialized notification', () => {
     notificationManager.create({
       type: 'warning',
@@ -301,7 +319,9 @@ describe('NotificationManager.create — broadcast', () => {
     const payload = mockSend.mock.calls[0][1] as { actions?: unknown }
     expect(payload.actions).toBeUndefined()
   })
+})
 
+describe('NotificationManager.create — optional fields', () => {
   it('includes optional message and source', () => {
     notificationManager.create({
       type: 'error',
@@ -404,7 +424,9 @@ describe('taking you to the thing a notification is about', () => {
     notificationManager.create({ type: 'info', title: 'Area archived', key: 'k' })
     expect(notificationManager.list()[0].clickable).toBe(false)
   })
+})
 
+describe('taking you to the thing — the destination action', () => {
   it('does not render the destination as a button beside the real answers', () => {
     // Otherwise "Open" sits next to "Approve" and "Deny" as if it were a third
     // way of answering the question.
@@ -451,7 +473,9 @@ describe('acting on a notification settles it', () => {
     expect(approve).toHaveBeenCalled()
     expect(notificationManager.list().map((n) => n.id)).not.toContain(id)
   })
+})
 
+describe('acting on a notification settles it — repeat and unknown answers', () => {
   it('refuses a second answer to a question already answered', () => {
     const approve = vi.fn()
     notificationManager.create({

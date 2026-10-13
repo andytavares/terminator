@@ -46,7 +46,9 @@ describe('execShell per-call options', () => {
 
     expect(result.stdout).toBe('  indented\n\n')
   })
+})
 
+describe('execShell per-call options — input and streamed output', () => {
   it('writes the input to the command and closes its stdin', async () => {
     fakeGh('cat')
 
@@ -68,13 +70,23 @@ describe('execShell per-call options', () => {
 
     expect(chunks.join('').split('\n').sort()).toEqual(['', 'one', 'two'])
   })
+})
 
+describe('execShell per-call options — output encoding and limits', () => {
   it('returns bytes when asked for a buffer', async () => {
     fakeGh(`printf '\\377\\000A'`)
 
     const result = await execShell({ command: 'gh', args: [], cwd: scratch, encoding: 'buffer' })
 
     expect([...result.stdout]).toEqual([0xff, 0x00, 0x41])
+  })
+
+  it('says why a command could not start, as bytes when asked for a buffer', async () => {
+    const command = 'terminator-no-such-command'
+    const result = await execShell({ command, args: [], cwd: scratch, encoding: 'buffer' })
+
+    expect(Buffer.isBuffer(result.stderr)).toBe(true)
+    expect(result.stderr.toString()).toContain('ENOENT')
   })
 
   it('stops a command whose output passes maxBuffer and reports it as a failure', async () => {
@@ -85,7 +97,9 @@ describe('execShell per-call options', () => {
     expect(result.exceededMaxBuffer).toBe(true)
     expect(result.exitCode).not.toBe(0)
   })
+})
 
+describe('execShell per-call options — limits and timeouts', () => {
   it('keeps output that fits in maxBuffer', async () => {
     fakeGh(`printf '%0100d' 0`)
 

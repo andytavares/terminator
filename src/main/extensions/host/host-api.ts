@@ -8,6 +8,7 @@ import type {
   ExtensionSettingsSchema,
 } from '@terminator/extension-sdk'
 import type { RpcEndpoint } from './rpc-endpoint.js'
+import type { ApiCall, HeldRegistration } from './messages.js'
 import { CallbackRegistry } from './callbacks.js'
 import type { HostSnapshot } from './snapshot.js'
 import { extensionPaths } from '../extension-paths.js'
@@ -46,14 +47,16 @@ class MainCalls {
     const { endpoint, callbacks, extensionId } = this.context
     const marshalled = callbacks.marshal(params)
     try {
-      return (await endpoint.request('api', extensionId, path, marshalled.params)) as never
+      const call: ApiCall = { extensionId, path, params: marshalled.params }
+      return (await endpoint.request('api', call)) as never
     } finally {
       callbacks.release(marshalled.ids)
     }
   }
 
   fire(path: string, ...params: unknown[]): void {
-    this.context.endpoint.notify('api', this.context.extensionId, path, params)
+    const call: ApiCall = { extensionId: this.context.extensionId, path, params }
+    this.context.endpoint.notify('api', call)
   }
 
   register(method: string, ...params: unknown[]): Registration {
@@ -62,8 +65,17 @@ class MainCalls {
     const marshalled = callbacks.marshal(params)
     const ready =
       method === 'api'
-        ? endpoint.request('api', extensionId, params[0], marshalled.params.slice(1), handleId)
-        : endpoint.request(method, extensionId, ...marshalled.params, handleId)
+        ? endpoint.request('api', {
+            extensionId,
+            path: params[0] as string,
+            params: marshalled.params.slice(1),
+            handleId,
+          } satisfies ApiCall)
+        : endpoint.request(method, {
+            extensionId,
+            handleId,
+            params: marshalled.params,
+          } satisfies HeldRegistration<unknown[]>)
     ready.catch(() => callbacks.release(marshalled.ids))
     let disposed = false
     const dispose = () => {
@@ -185,8 +197,8 @@ function issuesFor(context: HostContext, main: MainCalls): ExtensionAPI['issues'
     get: (tracker, key, options) => main.call('issues.get', tracker, key, options),
     comment: (tracker, key, body) => main.call('issues.comment', tracker, key, body),
     states: (tracker, key) => main.call('issues.states', tracker, key),
-    transition: (tracker, key, intent, optionId) =>
-      main.call('issues.transition', tracker, key, intent, optionId),
+    // Forwarded as the SDK declares it: tracker, key, intent and the operator's option.
+    transition: (...move) => main.call('issues.transition', ...move),
     supportsTransitions: (tracker) => context.snapshot.trackers[tracker]?.transitions ?? false,
     teams: (tracker) => main.call('issues.teams', tracker),
     create: (tracker, input) => main.call('issues.create', tracker, input),

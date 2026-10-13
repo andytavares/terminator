@@ -32,7 +32,7 @@ vi.mock('electron', () => ({
   },
 }))
 
-describe('logger (src/main/logger.ts)', () => {
+function useFreshLogger(): void {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
@@ -44,9 +44,12 @@ describe('logger (src/main/logger.ts)', () => {
     // restore NODE_ENV
     delete process.env.NODE_ENV
   })
+}
+
+describe('logger (src/main/logger.ts)', () => {
+  useFreshLogger()
 
   // ── makeLogger ─────────────────────────────────────────────────────────
-
   it('debug writes a DEBUG line to the stream', async () => {
     const { makeLogger } = await import('../../src/main/logger')
     const log = makeLogger('myns')
@@ -75,6 +78,10 @@ describe('logger (src/main/logger.ts)', () => {
     expect(written).toMatch(/WARN/)
     expect(written).toMatch(/hello warn/)
   })
+})
+
+describe('logger — errors and meta formatting', () => {
+  useFreshLogger()
 
   it('error writes an ERROR line to the stream', async () => {
     const { makeLogger } = await import('../../src/main/logger')
@@ -101,8 +108,10 @@ describe('logger (src/main/logger.ts)', () => {
     const written = mockStream.write.mock.calls[0][0] as string
     expect(written).toMatch(/extra-string/)
   })
+})
 
-  // ── writeFromRenderer ──────────────────────────────────────────────────
+describe('logger — renderer lines and the log path', () => {
+  useFreshLogger()
 
   it('writeFromRenderer writes the correct level to stream', async () => {
     const { writeFromRenderer } = await import('../../src/main/logger')
@@ -129,6 +138,10 @@ describe('logger (src/main/logger.ts)', () => {
       flags: 'a',
     })
   })
+})
+
+describe('logger — rotation', () => {
+  useFreshLogger()
 
   it('rotates log file when it exceeds 5 MB', async () => {
     mockExistsSync = vi.fn(() => true)
@@ -151,6 +164,10 @@ describe('logger (src/main/logger.ts)', () => {
 
     expect(mockRenameSync).not.toHaveBeenCalled()
   })
+})
+
+describe('logger — rotation fallbacks', () => {
+  useFreshLogger()
 
   it('does not rotate when log file is under 5 MB', async () => {
     mockExistsSync = vi.fn(() => true)
@@ -173,6 +190,10 @@ describe('logger (src/main/logger.ts)', () => {
     expect(mockRenameSync).not.toHaveBeenCalled()
     expect(mockStream.write).toHaveBeenCalledWith(expect.stringContaining('[stat-err] ping'))
   })
+})
+
+describe('logger — write failures and development mirroring', () => {
+  useFreshLogger()
 
   it('swallows stream.write errors without crashing', async () => {
     mockStream.write.mockImplementationOnce(() => {
@@ -206,6 +227,10 @@ describe('logger (src/main/logger.ts)', () => {
     expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining('dev error'))
     writeSpy.mockRestore()
   })
+})
+
+describe('logger — no mirroring outside development', () => {
+  useFreshLogger()
 
   it('does NOT mirror to stdout/stderr outside development mode', async () => {
     process.env.NODE_ENV = 'production'
@@ -220,8 +245,10 @@ describe('logger (src/main/logger.ts)', () => {
     stdoutSpy.mockRestore()
     stderrSpy.mockRestore()
   })
+})
 
-  // ── top-level logger export ────────────────────────────────────────────
+describe('logger — the top-level export', () => {
+  useFreshLogger()
 
   it('top-level logger.debug writes with "main" namespace', async () => {
     const { logger } = await import('../../src/main/logger')

@@ -46,7 +46,9 @@ describe('workspace-store', () => {
       error: 'DUPLICATE_NAME',
     })
   })
+})
 
+describe('workspace-store — listing and deleting workspaces', () => {
   it('lists all workspaces, in creation order', () => {
     const a = workspace('A')
     const b = workspace('B')
@@ -63,7 +65,9 @@ describe('workspace-store', () => {
     expect(store.listProjects(doomed.id)).toEqual([])
     expect(store.listProjects(kept.id)).toHaveLength(1)
   })
+})
 
+describe('workspace-store — creating projects', () => {
   it('creates a project within a workspace', () => {
     const ws = workspace('ForProject')
     const created = project(ws.id, 'MyProject')
@@ -94,7 +98,9 @@ describe('workspace-store', () => {
     }
     expect(store.createProject(input)).toEqual({ error: 'WORKSPACE_NOT_FOUND' })
   })
+})
 
+describe('workspace-store — branches and deleting projects', () => {
   it('updateProjectBranch updates the branch on a project', () => {
     const p = project(workspace('BranchWS').id, 'BranchProj')
     expect(store.updateProjectBranch({ id: p.id, gitBranch: 'feature/test' })).toMatchObject({
@@ -114,7 +120,9 @@ describe('workspace-store', () => {
     store.deleteProject(p.id)
     expect(store.listProjects(ws.id)).toEqual([])
   })
+})
 
+describe('workspace-store — renaming projects', () => {
   it('renameProject renames an existing project', () => {
     const p = project(workspace('RenameWS').id, 'OldName')
     expect(store.renameProject({ id: p.id, name: 'NewName' })).toMatchObject({
@@ -136,7 +144,9 @@ describe('workspace-store', () => {
       error: 'DUPLICATE_NAME',
     })
   })
+})
 
+describe('workspace-store — ordering and updating', () => {
   it('reorderWorkspaces reorders workspaces by id list', () => {
     const first = workspace('First')
     const second = workspace('Second')

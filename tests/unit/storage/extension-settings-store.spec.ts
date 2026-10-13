@@ -41,7 +41,9 @@ describe('extension-settings-store', () => {
     setExtensionSetting('com.test.token', 'abc123')
     expect(getExtensionSetting('com.test.token')).toBe('abc123')
   })
+})
 
+describe('extension-settings-store — listing and overwriting', () => {
   it('getAllExtensionSettings returns all stored key-value pairs', async () => {
     const { setExtensionSetting, getAllExtensionSettings } = await import(
       '../../../src/main/storage/extension-settings-store'

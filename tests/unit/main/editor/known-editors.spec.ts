@@ -12,14 +12,14 @@ describe('KNOWN_EDITORS', () => {
   })
 })
 
-describe('pickEditor', () => {
-  // `available` answers "is this on the machine" — the caller probes the file
-  // system, so the choosing itself stays pure and testable.
-  const availableOnly =
-    (...ids: string[]) =>
-    (id: string) =>
-      ids.includes(id)
+// `available` answers "is this on the machine" — the caller probes the file
+// system, so the choosing itself stays pure and testable.
+const availableOnly =
+  (...ids: string[]) =>
+  (id: string) =>
+    ids.includes(id)
 
+describe('pickEditor', () => {
   it('returns nothing when no editor is installed', () => {
     expect(pickEditor(availableOnly(), undefined)).toBeNull()
   })
@@ -33,7 +33,9 @@ describe('pickEditor', () => {
     const second = KNOWN_EDITORS[1].id
     expect(pickEditor(availableOnly(second, first), undefined)?.id).toBe(first)
   })
+})
 
+describe('pickEditor — a configured editor', () => {
   // A configured editor is the user's answer to "my default editor" and beats
   // whatever happens to be installed first.
   it('honours a configured editor over the detected one', () => {
@@ -57,9 +59,9 @@ describe('pickEditor', () => {
   })
 })
 
-describe('launchArgvFor', () => {
-  const cursor = KNOWN_EDITORS.find((e) => e.id === 'cursor')!
+const cursor = KNOWN_EDITORS.find((e) => e.id === 'cursor')!
 
+describe('launchArgvFor', () => {
   /**
    * On macOS `open -a` is preferred over the editor's own CLI, even when the
    * CLI is installed. VS Code-family launchers (`code`, `cursor`, `windsurf`)
@@ -88,7 +90,9 @@ describe('launchArgvFor', () => {
       args: ['/repos/app'],
     })
   })
+})
 
+describe('launchArgvFor — no CLI, spaces and shell strings', () => {
   it('falls back to the application when there is no CLI', () => {
     expect(launchArgvFor({ ...cursor, cli: undefined }, '/repos/app', 'darwin')).toEqual({
       command: 'open',

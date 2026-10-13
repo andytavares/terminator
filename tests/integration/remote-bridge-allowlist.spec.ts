@@ -32,15 +32,15 @@ function waitForMessage(ws: WebSocket): Promise<Record<string, unknown>> {
   })
 }
 
-describe('remote bridge allowlist (integration: real route + real allowlist)', () => {
-  let app: FastifyInstance
-  let ticketStore: WsTicketStore
-  let baseUrl: string
-  let dialogHandler: ReturnType<typeof vi.fn>
+let app: FastifyInstance
+let ticketStore: WsTicketStore
+let baseUrl: string
+let dialogHandler: ReturnType<typeof vi.fn>
 
-  // A real registry of IPC handlers, keyed by channel — the same shape index.ts builds.
-  const registry = new Map<string, (event: never, payload: unknown) => unknown>()
+// A real registry of IPC handlers, keyed by channel — the same shape index.ts builds.
+const registry = new Map<string, (event: never, payload: unknown) => unknown>()
 
+function useBridgeServer(): void {
   beforeEach(async () => {
     registry.clear()
     registry.set('workspace:list', () => [{ id: 'ws-1', name: 'Alpha' }])
@@ -67,6 +67,10 @@ describe('remote bridge allowlist (integration: real route + real allowlist)', (
   afterEach(async () => {
     await app.close()
   })
+}
+
+describe('remote bridge allowlist (integration: real route + real allowlist)', () => {
+  useBridgeServer()
 
   it('invokes an allowlisted channel end-to-end and returns its handler result', async () => {
     const ticket = ticketStore.createTicket('__bridge__', 'bridge')

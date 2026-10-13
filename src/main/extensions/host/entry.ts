@@ -31,11 +31,10 @@ process.parentPort.once('message', (event) => {
   const endpoint = new RpcEndpoint(portLink(port), (method, error) =>
     console.error(`[extension-host] ${method} failed:`, error)
   )
-  new HostRuntime(
-    endpoint,
+  new HostRuntime(endpoint, {
     snapshot,
-    openDatabase(snapshot.databasePath),
-    requireLoader(loadCommonJs)
-  )
+    db: openDatabase(snapshot.databasePath),
+    loader: requireLoader(loadCommonJs),
+  })
   port.start()
 })

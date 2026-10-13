@@ -68,7 +68,9 @@ describe('PrDialog', () => {
     fireEvent.click(screen.getByLabelText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
+})
 
+describe('PrDialog — notices', () => {
   it('shows existing PR notice when existingPr is set', async () => {
     const existingPr: PullRequest = {
       number: 42,
@@ -91,7 +93,9 @@ describe('PrDialog', () => {
     await waitFor(() => screen.getByRole('dialog'))
     expect(screen.getByText(/creating a PR from the default branch/)).toBeTruthy()
   })
+})
 
+describe('PrDialog — title, modes and draft', () => {
   it('disables Create PR button when title is empty', async () => {
     render(<PrDialog {...defaultProps} />)
     await waitFor(() => screen.getByRole('dialog'))
@@ -120,7 +124,9 @@ describe('PrDialog', () => {
     expect(checkbox.checked).toBe(true)
     expect(screen.getByText('Create Draft PR')).toBeTruthy()
   })
+})
 
+describe('PrDialog — branches and template', () => {
   it('loads branches and sets base branch', async () => {
     mockListBranches.mockResolvedValue({
       branches: [
@@ -146,7 +152,9 @@ describe('PrDialog', () => {
       expect(textarea.value).toBe('## Summary\n')
     })
   })
+})
 
+describe('PrDialog — creating', () => {
   it('creates PR and calls onCreated on success', async () => {
     const onCreated = vi.fn()
     mockShellExec
@@ -170,7 +178,9 @@ describe('PrDialog', () => {
       draft: false,
     })
   })
+})
 
+describe('PrDialog — creation errors', () => {
   it('shows error when PR creation fails', async () => {
     mockShellExec.mockResolvedValueOnce(ran(0, '3', '')).mockResolvedValueOnce(ran(0, '', ''))
     mockInvoke.mockResolvedValueOnce({ error: 'gh error' })

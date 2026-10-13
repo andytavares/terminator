@@ -22,39 +22,41 @@ const ShellExecPayloadSchema = z.object({
 
 const invalid = { error: 'VALIDATION_ERROR' }
 
+const openPathChannel = defineChannel({
+  channel: 'shell:open-path',
+  schema: z.object({ filePath: z.string().min(1) }),
+  invalid,
+  run: async ({ filePath }) => {
+    const errorMsg = await shell.openPath(filePath.replace(/^~(?=\/|$)/, homedir()))
+    return errorMsg ? { error: errorMsg } : { ok: true as const }
+  },
+})
+
+const openExternalChannel = defineChannel({
+  channel: 'shell:open-external',
+  schema: z.object({ url: z.string().url() }),
+  invalid,
+  run: async ({ url }) => {
+    await shell.openExternal(url)
+    return { ok: true as const }
+  },
+  onError: (err) => ({ error: String(err) }),
+})
+
+const execChannel = defineChannel({
+  channel: 'shell:exec',
+  schema: ShellExecPayloadSchema,
+  invalid: (error: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: error.message }),
+  run: async ({ command, args, cwd, timeoutMs = 10000, workspaceRoot }) => {
+    if (workspaceRoot) await assertCwdInScope(cwd, [workspaceRoot])
+    return await execShell({ command, args, cwd, timeoutMs })
+  },
+  onError: (err) => {
+    if (err instanceof CwdOutOfScopeError) return { error: 'CWD_OUT_OF_SCOPE' }
+    return { error: String(err) }
+  },
+})
+
 export function registerShellHandlers(): void {
-  registerInvokeTable([
-    defineChannel({
-      channel: 'shell:open-path',
-      schema: z.object({ filePath: z.string().min(1) }),
-      invalid,
-      run: async ({ filePath }) => {
-        const errorMsg = await shell.openPath(filePath.replace(/^~(?=\/|$)/, homedir()))
-        return errorMsg ? { error: errorMsg } : { ok: true as const }
-      },
-    }),
-    defineChannel({
-      channel: 'shell:open-external',
-      schema: z.object({ url: z.string().url() }),
-      invalid,
-      run: async ({ url }) => {
-        await shell.openExternal(url)
-        return { ok: true as const }
-      },
-      onError: (err) => ({ error: String(err) }),
-    }),
-    defineChannel({
-      channel: 'shell:exec',
-      schema: ShellExecPayloadSchema,
-      invalid: (error: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: error.message }),
-      run: async ({ command, args, cwd, timeoutMs = 10000, workspaceRoot }) => {
-        if (workspaceRoot) await assertCwdInScope(cwd, [workspaceRoot])
-        return await execShell({ command, args, cwd, timeoutMs })
-      },
-      onError: (err) => {
-        if (err instanceof CwdOutOfScopeError) return { error: 'CWD_OUT_OF_SCOPE' }
-        return { error: String(err) }
-      },
-    }),
-  ])
+  registerInvokeTable([openPathChannel, openExternalChannel, execChannel])
 }

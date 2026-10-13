@@ -41,6 +41,12 @@ describe('registerLogHandlers()', () => {
     handler({}, { level: 'info', message: 'hello' })
     expect(mockWriteFromRenderer).not.toHaveBeenCalled()
   })
+})
+
+describe('registerLogHandlers() — malformed payloads', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('ignores payload with non-string message', () => {
     registerLogHandlers()

@@ -44,6 +44,76 @@ interface NotificationRecord extends SerializedNotification {
   callbacks: Map<string, () => void>
 }
 
+interface CreateNotificationOptions {
+  type: NotificationType
+  title: string
+  message?: string
+  source?: string
+  key: string
+  actions?: Array<{ id: string; label: string; handler: () => void }>
+  /**
+   * Take me to the thing this is about.
+   *
+   * A handler rather than a route, because only the notification's author
+   * knows what "the thing" is — a card, a task, a review — and a route
+   * shape general enough to name all of them would be a second navigation
+   * system. It is stored as a reserved action so the existing trigger path
+   * carries it: a function cannot cross IPC, and inventing a channel for
+   * one that could would be the same mechanism twice.
+   */
+  onClick?: () => void
+}
+
+/** The buttons the renderer may show, and the handler behind each id. */
+function collectActions(opts: CreateNotificationOptions): {
+  callbacks: Map<string, () => void>
+  actions: NotificationAction[]
+} {
+  const callbacks = new Map<string, () => void>()
+  const actions: NotificationAction[] = []
+  for (const action of opts.actions ?? []) {
+    callbacks.set(action.id, action.handler)
+    actions.push({ id: action.id, label: action.label })
+  }
+  // Not pushed onto `actions`: it is what clicking the row does, not a
+  // button, and rendering it as one would put "Open" beside "Approve".
+  if (opts.onClick) callbacks.set(OPEN_ACTION_ID, opts.onClick)
+  return { callbacks, actions }
+}
+
+/** Where the user's settings send this notification; an error always reaches a toast. */
+function resolveTargets(opts: CreateNotificationOptions): NotificationTarget[] {
+  const globalSettings = getGlobalSettings()
+  const base = opts.source
+    ? (readExtensionNotificationTargets(opts.source, opts.key) ??
+      globalSettings.notifications.defaultTargets)
+    : resolveCoreNotificationTargets(globalSettings.notifications, {
+        key: opts.key,
+        type: opts.type,
+      })
+  return opts.type === 'error' && !base.includes('toast') ? [...base, 'toast'] : base
+}
+
+/** Clicking the OS notification opens the thing, or else runs the first action. */
+function clickHandler(opts: CreateNotificationOptions): (() => void) | undefined {
+  if (opts.onClick) return opts.onClick
+  const first = opts.actions?.[0]
+  return first === undefined ? undefined : () => first.handler()
+}
+
+function showSystemNotification(opts: CreateNotificationOptions): void {
+  const notif = new Notification({ title: opts.title, body: opts.message ?? '' })
+  notif.on('failed', (_e, error) => {
+    console.warn('[notifications] system notification failed:', error)
+  })
+  const onClick = clickHandler(opts)
+  if (onClick) notif.on('click', onClick)
+  notif.show()
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.bounce('critical')
+  }
+}
+
 class NotificationManager {
   private records = new Map<string, NotificationRecord>()
 
@@ -55,69 +125,12 @@ class NotificationManager {
    * default → per-key override, with the extension itself owning its own
    * per-key settings (core never enumerates or hardcodes extension keys).
    */
-  create(opts: {
-    type: NotificationType
-    title: string
-    message?: string
-    source?: string
-    key: string
-    actions?: Array<{ id: string; label: string; handler: () => void }>
-    /**
-     * Take me to the thing this is about.
-     *
-     * A handler rather than a route, because only the notification's author
-     * knows what "the thing" is — a card, a task, a review — and a route
-     * shape general enough to name all of them would be a second navigation
-     * system. It is stored as a reserved action so the existing trigger path
-     * carries it: a function cannot cross IPC, and inventing a channel for
-     * one that could would be the same mechanism twice.
-     */
-    onClick?: () => void
-  }): string {
+  create(opts: CreateNotificationOptions): string {
     const id = randomUUID()
-    const callbacks = new Map<string, () => void>()
-    const actions: NotificationAction[] = []
-
-    for (const action of opts.actions ?? []) {
-      callbacks.set(action.id, action.handler)
-      actions.push({ id: action.id, label: action.label })
-    }
-    // Not pushed onto `actions`: it is what clicking the row does, not a
-    // button, and rendering it as one would put "Open" beside "Approve".
-    if (opts.onClick) callbacks.set(OPEN_ACTION_ID, opts.onClick)
-
-    const globalSettings = getGlobalSettings()
-    const base = opts.source
-      ? (readExtensionNotificationTargets(opts.source, opts.key) ??
-        globalSettings.notifications.defaultTargets)
-      : resolveCoreNotificationTargets(globalSettings.notifications, {
-          key: opts.key,
-          type: opts.type,
-        })
-    const targets: NotificationTarget[] =
-      opts.type === 'error' && !base.includes('toast') ? [...base, 'toast'] : base
+    const { callbacks, actions } = collectActions(opts)
+    const targets = resolveTargets(opts)
+    if (targets.includes('system') && Notification.isSupported()) showSystemNotification(opts)
     const persistent = targets.includes('center') || targets.includes('toast')
-
-    if (targets.includes('system') && Notification.isSupported()) {
-      const notif = new Notification({ title: opts.title, body: opts.message ?? '' })
-      notif.on('failed', (_e, error) => {
-        console.warn('[notifications] system notification failed:', error)
-      })
-      if (opts.onClick || actions.length > 0) {
-        notif.on('click', () => {
-          if (opts.onClick) {
-            opts.onClick()
-            return
-          }
-          opts.actions![0].handler()
-        })
-      }
-      notif.show()
-      if (process.platform === 'darwin' && app.dock) {
-        app.dock.bounce('critical')
-      }
-    }
-
     if (!persistent) return id
 
     const record: NotificationRecord = {
@@ -132,10 +145,8 @@ class NotificationManager {
       targets,
       callbacks,
     }
-
     this.records.set(id, record)
     this.broadcast(this.serialize(record))
-
     return id
   }
 

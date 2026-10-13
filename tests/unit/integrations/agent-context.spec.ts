@@ -70,7 +70,9 @@ describe('buildAgentContext — composition', () => {
     expect(markdown).toContain('andrew')
     expect(markdown).toContain('Fold the migration into P0.')
   })
+})
 
+describe('buildAgentContext — provenance and size', () => {
   it('says which tracker it came from — two trackers can share a key', () => {
     expect(contextOf(issue({ tracker: 'jira' })).markdown).toContain('Jira')
     expect(contextOf(issue()).markdown).toContain('Linear')
@@ -140,7 +142,9 @@ describe('buildAgentContext — budget (FR-022)', () => {
     expect(context.markdown).toContain('truncated')
     expect(context.markdown).toContain('https://linear.app/tav/issue/TAV-42')
   })
+})
 
+describe('buildAgentContext — what the budget keeps', () => {
   it('keeps the identity even when the description swamps everything', () => {
     const { markdown } = contextOf(issue({ description: 'x'.repeat(50_000) }))
     expect(markdown).toContain('# Linked issue: TAV-42')
@@ -161,7 +165,9 @@ describe('buildAgentContext — budget (FR-022)', () => {
     expect(markdown).toContain('comment 8')
     expect(markdown).not.toContain('comment 0')
   })
+})
 
+describe('buildAgentContext — where the budget cuts', () => {
   it('never cuts a fenced code block open', () => {
     const description = ['prose', '```ts', 'const a = 1', '```', 'x'.repeat(20_000)].join('\n')
     const { markdown } = contextOf(issue({ description }))
@@ -186,11 +192,11 @@ describe('buildAgentContext — no issue', () => {
   })
 })
 
-describe('the context file', () => {
-  async function mod() {
-    return import('../../../src/main/integrations/agent-context')
-  }
+async function mod() {
+  return import('../../../src/main/integrations/agent-context')
+}
 
+describe('the context file', () => {
   it('writes, reads back, and deletes', async () => {
     const { writeContextFile, readContextFile, deleteContextFile } = await mod()
     const context = buildAgentContext('p1', issue())!
@@ -213,7 +219,9 @@ describe('the context file', () => {
     fs.writeFileSync(contextFilePath('p1'), '{{{ not json', 'utf8')
     await expect(readContextFile('p1')).resolves.toBeNull()
   })
+})
 
+describe('the context file — edge cases', () => {
   it('reads null for JSON that is not an object', async () => {
     const { writeContextFile, readContextFile, contextFilePath } = await mod()
     await writeContextFile(buildAgentContext('p1', issue())!)

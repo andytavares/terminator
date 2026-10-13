@@ -53,7 +53,9 @@ describe('detectEditor', () => {
     present()
     expect(await detectEditor()).toBeNull()
   })
+})
 
+describe('detectEditor — a configured editor and PATH', () => {
   it('honours a configured editor over the one it would have picked', async () => {
     present('/usr/local/bin/cursor', '/usr/local/bin/subl')
     expect((await detectEditor('sublime'))?.id).toBe('sublime')
@@ -100,7 +102,9 @@ describe('openInEditor', () => {
       expect.any(Function)
     )
   })
+})
 
+describe('openInEditor — paths', () => {
   // The path is an argument, never part of a shell string, so a directory name
   // cannot become a second command.
   it('passes a hostile path through as one argument', async () => {
@@ -122,7 +126,9 @@ describe('openInEditor', () => {
     expect(await openInEditor('/gone')).toEqual({ error: 'FOLDER_NOT_FOUND' })
     expect(execFile).not.toHaveBeenCalled()
   })
+})
 
+describe('openInEditor — failures and a configured editor', () => {
   it('says so when the machine has no editor it recognises', async () => {
     present('/repos/app')
     expect(await openInEditor('/repos/app')).toEqual({ error: 'NO_EDITOR_FOUND' })

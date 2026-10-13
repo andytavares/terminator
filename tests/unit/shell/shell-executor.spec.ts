@@ -50,12 +50,12 @@ describe('assertCommandAllowed', () => {
 // ─── assertCwdInScope ─────────────────────────────────────────────────────────
 
 // Real directories: the check resolves symlinks, so it is only meaningful on a real disk.
-describe('assertCwdInScope', () => {
-  let scratch: string
-  let root: string
-  let otherRoot: string
-  let outside: string
+let scratch: string
+let root: string
+let otherRoot: string
+let outside: string
 
+function useScopeDirectories(): void {
   beforeEach(() => {
     scratch = realpathSync(makeTempDir('cwd-scope-'))
     root = join(scratch, 'root')
@@ -67,6 +67,10 @@ describe('assertCwdInScope', () => {
   })
 
   afterEach(() => rmSync(scratch, { recursive: true, force: true }))
+}
+
+describe('assertCwdInScope', () => {
+  useScopeDirectories()
 
   it('allows the root itself and any directory below it', async () => {
     await expect(assertCwdInScope(root, [root])).resolves.toBeUndefined()
@@ -81,6 +85,10 @@ describe('assertCwdInScope', () => {
     const clone = join(root, 'not-cloned-yet')
     await expect(assertCwdInScope(clone, [root])).resolves.toBeUndefined()
   })
+})
+
+describe('assertCwdInScope — escapes', () => {
+  useScopeDirectories()
 
   it('refuses a directory outside every root', async () => {
     await expect(assertCwdInScope(outside, [root, otherRoot])).rejects.toThrow(CwdOutOfScopeError)
@@ -106,6 +114,10 @@ describe('assertCwdInScope', () => {
       CwdOutOfScopeError
     )
   })
+})
+
+describe('assertCwdInScope — look-alikes, symlinked roots and errors', () => {
+  useScopeDirectories()
 
   it('refuses a sibling whose name only starts with the root', async () => {
     const sibling = `${root}-sibling`
@@ -141,10 +153,26 @@ vi.mock('child_process', async () => {
 })
 
 import { execFile } from 'child_process'
-import type { ExecFileOptions, ChildProcess } from 'child_process'
+import type { ExecFileException, ExecFileOptions, ChildProcess } from 'child_process'
 import { partialFake } from '../../support/fakes'
 
 const mockExecFile = vi.mocked(execFile)
+
+type ExecFileAnswer = (error: ExecFileException | null, stdout: string, stderr: string) => void
+
+/**
+ * Has execFile answer through its callback, its fourth argument, the way
+ * `answer` does; returns the options each call was given.
+ */
+function execFileAnswers(answer: (callback: ExecFileAnswer) => void): ExecFileOptions[] {
+  const seen: ExecFileOptions[] = []
+  mockExecFile.mockImplementation((...call: unknown[]) => {
+    seen.push(call[2] as ExecFileOptions)
+    answer(call[3] as ExecFileAnswer)
+    return partialFake<ChildProcess>({ on: vi.fn() })
+  })
+  return seen
+}
 
 describe('execShell', () => {
   beforeEach(() => {
@@ -152,10 +180,7 @@ describe('execShell', () => {
   })
 
   it('resolves with exitCode 0 and stdout on success', async () => {
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      callback?.(null, 'hello\n', '')
-      return partialFake<ChildProcess>({ on: vi.fn() })
-    })
+    execFileAnswers((callback) => callback(null, 'hello\n', ''))
 
     const result = await execShell({ command: 'git', args: ['--version'], cwd: '/tmp' })
     expect(result.exitCode).toBe(0)
@@ -166,10 +191,7 @@ describe('execShell', () => {
 
   it('resolves with non-zero exitCode when process fails', async () => {
     const err = Object.assign(new Error('exit 1'), { code: 1 })
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      callback?.(err, '', 'error output')
-      return partialFake<ChildProcess>({ on: vi.fn() })
-    })
+    execFileAnswers((callback) => callback(err, '', 'error output'))
 
     const result = await execShell({ command: 'git', args: ['fail'], cwd: '/tmp' })
     expect(result.exitCode).toBe(1)
@@ -179,23 +201,23 @@ describe('execShell', () => {
 
   it('resolves with exitCode 1 when error code is non-numeric', async () => {
     const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      callback?.(err, '', '')
-      return partialFake<ChildProcess>({ on: vi.fn() })
-    })
+    execFileAnswers((callback) => callback(err, '', ''))
 
     const result = await execShell({ command: 'git', args: ['status'], cwd: '/tmp' })
     expect(result.exitCode).toBe(1)
+  })
+})
+
+describe('execShell — failures', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
   })
 
   // A command that never started (not on PATH) has no stderr of its own; without
   // the spawn error a caller could only report "exit code 1".
   it('reports the spawn error as stderr when the command could not be started', async () => {
     const err = Object.assign(new Error('spawn gh ENOENT'), { code: 'ENOENT' })
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      callback?.(err, '', '')
-      return partialFake<ChildProcess>({ on: vi.fn() })
-    })
+    execFileAnswers((callback) => callback(err, '', ''))
 
     const result = await execShell({ command: 'gh', args: ['pr', 'create'], cwd: '/tmp' })
     expect(result.exitCode).toBe(1)
@@ -208,15 +230,21 @@ describe('execShell', () => {
       code: null,
       signal: 'SIGTERM' as const,
     })
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      setTimeout(() => callback?.(killed, '', ''), 0)
-      return partialFake<ChildProcess>({ on: vi.fn() })
-    })
+    execFileAnswers((callback) => setTimeout(() => callback(killed, '', ''), 0))
 
     const result = await execShell({ command: 'git', args: ['status'], cwd: '/tmp', timeoutMs: 1 })
     expect(result.timedOut).toBe(true)
     expect(result.exitCode).not.toBe(0)
   })
+})
+
+describe('execShell — signals and environment', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  // A command that never started (not on PATH) has no stderr of its own; without
+  // the spawn error a caller could only report "exit code 1".
 
   it('reports a command ended by another signal as failed, not timed out', async () => {
     const crashed = Object.assign(new Error('Command failed'), {
@@ -224,10 +252,7 @@ describe('execShell', () => {
       code: null,
       signal: 'SIGSEGV' as const,
     })
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      callback?.(crashed, '', '')
-      return partialFake<ChildProcess>({ on: vi.fn() })
-    })
+    execFileAnswers((callback) => callback(crashed, '', ''))
 
     const result = await execShell({ command: 'git', args: ['status'], cwd: '/tmp' })
     expect(result.exitCode).not.toBe(0)
@@ -248,17 +273,22 @@ describe('execShell', () => {
     expect(result.timedOut).toBe(true)
     expect(result.exitCode).not.toBe(0)
   })
+})
+
+describe('execShell — environment', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  // A command that never started (not on PATH) has no stderr of its own; without
+  // the spawn error a caller could only report "exit code 1".
 
   it('passes sanitized env variables to child process', async () => {
     vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'in-the-app-environment')
-    let capturedOpts: ExecFileOptions | null | undefined
-    mockExecFile.mockImplementation((_cmd, _args, opts, callback) => {
-      capturedOpts = opts
-      callback?.(null, '', '')
-      return partialFake<ChildProcess>({ on: vi.fn() })
-    })
+    const seen = execFileAnswers((callback) => callback(null, '', ''))
 
     await execShell({ command: 'git', args: ['status'], cwd: '/tmp' })
+    const capturedOpts = seen[0]
     expect(capturedOpts?.env).toHaveProperty('GIT_TERMINAL_PROMPT', '0')
     // Should not pass arbitrary env vars (not in allowlist)
     expect(capturedOpts?.env).not.toHaveProperty('AWS_SECRET_ACCESS_KEY')

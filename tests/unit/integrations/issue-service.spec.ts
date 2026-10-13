@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createIssueService } from '../../../src/main/integrations/issue-service'
 import { TrackerError } from '../../../src/main/integrations/tracker-error'
 import type { TrackerProvider } from '../../../src/main/integrations/providers/provider'
@@ -96,7 +96,9 @@ describe('issue-service — cache', () => {
     await service.get('linear', 'TAV-42', { refresh: true })
     expect(linear.get).toHaveBeenCalledTimes(2)
   })
+})
 
+describe('issue-service — cache keys and invalidation on comment', () => {
   it('caches per tracker, so the same key in both is two entries', async () => {
     const { service, linear, jira } = build()
     await service.get('linear', 'TAV-42')
@@ -139,7 +141,9 @@ describe('issue-service — single flight (SC-008)', () => {
     expect(linear.get).toHaveBeenCalledTimes(1)
     expect(results.every((r) => r?.key === 'TAV-42')).toBe(true)
   })
+})
 
+describe('issue-service — single flight after a failure', () => {
   it('does not leave a failed request cached as in-flight', async () => {
     const linear = fakeProvider('linear', {
       get: vi
@@ -173,7 +177,9 @@ describe('issue-service — listMine across trackers', () => {
     expect(result.issues.map((i) => i.tracker)).toEqual(['linear'])
     expect(result.failures).toEqual([{ tracker: 'jira', error: 'auth-failed' }])
   })
+})
 
+describe('issue-service — listMine when trackers are missing', () => {
   it('does not call a tracker that is not connected, and says so', async () => {
     const { service, jira } = build({ connected: new Set<TrackerId>(['linear']) })
     const result = await service.listMine()
@@ -225,7 +231,9 @@ describe('issue-service — search', () => {
       1
     )
   })
+})
 
+describe('issue-service — search across trackers', () => {
   it('keeps the same key from both trackers as two results', async () => {
     // TAV-42 can exist in Linear and in Jira. They are different issues.
     const { service } = build()
@@ -238,6 +246,49 @@ describe('issue-service — search', () => {
     await service.search('sidebar')
     expect(linear.search).toHaveBeenCalledWith(expect.anything(), 'sidebar', expect.any(Number))
     expect(linear.get).not.toHaveBeenCalled()
+  })
+})
+
+describe('issue-service — search edge cases', () => {
+  it('asks only the named tracker when narrowed to one', async () => {
+    const { service, linear, jira } = build()
+    await service.search('sidebar', { tracker: 'jira' })
+    expect(linear.search).not.toHaveBeenCalled()
+    expect(jira.search).toHaveBeenCalledWith(expect.anything(), 'sidebar', expect.any(Number))
+  })
+
+  it('returns the text results unchanged when no tracker has the exact key', async () => {
+    const linear = fakeProvider('linear', {
+      search: vi.fn().mockResolvedValue([summary('linear', 'TAV-9')]),
+      get: vi.fn().mockResolvedValue(null),
+    })
+    const jira = fakeProvider('jira', { get: vi.fn().mockResolvedValue(null) })
+    const { service } = build({ linear, jira })
+    const result = await service.search('TAV-42')
+    expect(result.issues.map((i) => i.key)).toEqual(['TAV-9'])
+  })
+})
+
+describe('issue-service — waiting without an injected sleep', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('waits the stated period on a real timer before retrying', async () => {
+    vi.useFakeTimers()
+    const get = vi
+      .fn()
+      .mockRejectedValueOnce(new TrackerError('rate-limited', 'slow down', { retryAfterMs: 2000 }))
+      .mockResolvedValue(issue('linear', 'TAV-42'))
+    const service = createIssueService({
+      providers: { linear: fakeProvider('linear', { get }), jira: fakeProvider('jira') },
+      getCredential: async () => ({ tracker: 'linear', apiKey: 'k' }),
+      getMine: async () => ({ kind: 'assignee', email: null }),
+      onTrackerError: () => {},
+    })
+    const pending = service.get('linear', 'TAV-42')
+    await vi.advanceTimersByTimeAsync(1999)
+    expect(get).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(pending).resolves.toMatchObject({ key: 'TAV-42' })
   })
 })
 
@@ -271,7 +322,9 @@ describe('issue-service — rate limits (FR-031)', () => {
     expect(sleep).toHaveBeenCalledTimes(1)
     expect(linear.get).toHaveBeenCalledTimes(2)
   })
+})
 
+describe('issue-service — rate limits that are not retried', () => {
   it('does not retry an auth failure — a bad credential will not fix itself', async () => {
     const linear = fakeProvider('linear', {
       get: vi.fn().mockRejectedValue(new TrackerError('auth-failed', 'revoked')),
@@ -352,7 +405,9 @@ describe('issue-service — error reporting to settings', () => {
     await service.get('linear', 'TAV-42')
     expect(onTrackerError).toHaveBeenCalledWith('linear', null)
   })
+})
 
+describe('issue-service — errors and default waits', () => {
   it('wraps a non-TrackerError into the taxonomy rather than letting it escape', async () => {
     const linear = fakeProvider('linear', { get: vi.fn().mockRejectedValue('a bare string') })
     const { service } = build({ linear })

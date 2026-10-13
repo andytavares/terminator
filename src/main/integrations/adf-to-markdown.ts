@@ -40,35 +40,26 @@ function attr(node: AdfNode, name: string): unknown {
   return node.attrs === undefined ? undefined : node.attrs[name]
 }
 
+function renderLink(value: string, mark: AdfMark): string {
+  const href = mark.attrs?.href
+  return typeof href === 'string' ? `[${value}](${href})` : value
+}
+
+const MARK_RENDERERS = new Map<string, (value: string, mark: AdfMark) => string>([
+  ['strong', (value) => `**${value}**`],
+  ['em', (value) => `_${value}_`],
+  ['code', (value) => `\`${value}\``],
+  ['strike', (value) => `~~${value}~~`],
+  ['link', renderLink],
+])
+
 /** Marks applied innermost-first so `[`fn`](href)` comes out in that order. */
 function applyMarks(value: string, marks: AdfMark[] | undefined): string {
   if (!Array.isArray(marks)) return value
-  let out = value
-  for (const mark of marks) {
-    if (!isNode(mark)) continue
-    switch (mark.type) {
-      case 'strong':
-        out = `**${out}**`
-        break
-      case 'em':
-        out = `_${out}_`
-        break
-      case 'code':
-        out = `\`${out}\``
-        break
-      case 'strike':
-        out = `~~${out}~~`
-        break
-      case 'link': {
-        const href = mark.attrs?.href
-        out = typeof href === 'string' ? `[${out}](${href})` : out
-        break
-      }
-      default:
-        break
-    }
-  }
-  return out
+  return marks.reduce((out, mark) => {
+    const render = isNode(mark) ? MARK_RENDERERS.get(mark.type ?? '') : undefined
+    return render === undefined ? out : render(out, mark)
+  }, value)
 }
 
 /** Everything that can appear inside a paragraph, cell, heading or task item. */
@@ -161,47 +152,49 @@ function renderTable(node: AdfNode): string {
   return lines.join('\n')
 }
 
+function renderHeading(node: AdfNode): string {
+  const rawLevel = attr(node, 'level')
+  const level = typeof rawLevel === 'number' ? Math.min(Math.max(rawLevel, 1), 6) : 1
+  return `${'#'.repeat(level)} ${renderInline(childrenOf(node))}`
+}
+
+function renderBlockquote(node: AdfNode, depth: number): string {
+  return renderBlocks(childrenOf(node), depth)
+    .split('\n')
+    .map((line) => (line.length === 0 ? '>' : `> ${line}`))
+    .join('\n')
+}
+
+function renderCodeBlock(node: AdfNode): string {
+  const language = attr(node, 'language')
+  const fence = typeof language === 'string' && language.length > 0 ? `\`\`\`${language}` : '```'
+  return `${fence}\n${renderInline(childrenOf(node))}\n\`\`\``
+}
+
+const renderAsInline = (node: AdfNode): string => renderInline([node])
+
+const BLOCK_RENDERERS = new Map<string, (node: AdfNode, depth: number) => string>([
+  ['paragraph', (node) => renderInline(childrenOf(node))],
+  ['heading', renderHeading],
+  ['bulletList', (node, depth) => renderListItems(node, depth, false)],
+  ['orderedList', (node, depth) => renderListItems(node, depth, true)],
+  ['taskList', renderTaskItems],
+  ['table', renderTable],
+  ['blockquote', renderBlockquote],
+  ['codeBlock', renderCodeBlock],
+  ['rule', () => '---'],
+  ['text', renderAsInline],
+  ['mention', renderAsInline],
+  ['emoji', renderAsInline],
+  ['inlineCard', renderAsInline],
+  ['hardBreak', renderAsInline],
+])
+
 function renderBlock(node: AdfNode, depth: number): string {
-  switch (node.type) {
-    case 'paragraph':
-      return renderInline(childrenOf(node))
-    case 'heading': {
-      const rawLevel = attr(node, 'level')
-      const level = typeof rawLevel === 'number' ? Math.min(Math.max(rawLevel, 1), 6) : 1
-      return `${'#'.repeat(level)} ${renderInline(childrenOf(node))}`
-    }
-    case 'bulletList':
-      return renderListItems(node, depth, false)
-    case 'orderedList':
-      return renderListItems(node, depth, true)
-    case 'taskList':
-      return renderTaskItems(node, depth)
-    case 'table':
-      return renderTable(node)
-    case 'blockquote':
-      return renderBlocks(childrenOf(node), depth)
-        .split('\n')
-        .map((line) => (line.length === 0 ? '>' : `> ${line}`))
-        .join('\n')
-    case 'codeBlock': {
-      const language = attr(node, 'language')
-      const fence =
-        typeof language === 'string' && language.length > 0 ? `\`\`\`${language}` : '```'
-      return `${fence}\n${renderInline(childrenOf(node))}\n\`\`\``
-    }
-    case 'rule':
-      return '---'
-    case 'text':
-    case 'mention':
-    case 'emoji':
-    case 'inlineCard':
-    case 'hardBreak':
-      return renderInline([node])
-    default:
-      // Unmapped: render what it contains. A panel keeps its notice, a media
-      // node with nothing readable in it contributes nothing.
-      return renderBlocks(childrenOf(node), depth)
-  }
+  const render = BLOCK_RENDERERS.get(node.type ?? '')
+  // Unmapped: render what it contains. A panel keeps its notice, a media
+  // node with nothing readable in it contributes nothing.
+  return render === undefined ? renderBlocks(childrenOf(node), depth) : render(node, depth)
 }
 
 function renderBlocks(nodes: AdfNode[], depth: number): string {

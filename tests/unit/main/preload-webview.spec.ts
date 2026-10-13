@@ -23,13 +23,17 @@ vi.mock('electron', () => ({
   },
 }))
 
-describe('preload-webview', () => {
+function usePreloadWebview(): void {
   beforeEach(async () => {
     Object.keys(exposed).forEach((k) => delete exposed[k])
     mockSend.mockClear()
     vi.resetModules()
     await import('../../../src/main/preload-webview.js')
   })
+}
+
+describe('preload-webview', () => {
+  usePreloadWebview()
 
   it('exposes electronAPI via contextBridge', () => {
     expect(exposed).toHaveProperty('electronAPI')
@@ -59,6 +63,10 @@ describe('preload-webview', () => {
       expect(api, `namespace '${ns}' is missing`).toHaveProperty(ns)
     }
   })
+})
+
+describe('preload-webview — the declared surface', () => {
+  usePreloadWebview()
 
   it('exposes exactly the methods the manifest declares for extension views', () => {
     const methodPaths = (api: Record<string, unknown>, prefix = ''): string[] =>
@@ -73,6 +81,10 @@ describe('preload-webview', () => {
     const exposedPaths = methodPaths(exposed['electronAPI'] as Record<string, unknown>)
     expect(exposedPaths.sort()).toEqual(declared.sort())
   })
+})
+
+describe('preload-webview — what each method sends', () => {
+  usePreloadWebview()
 
   // This preload is still written by hand (see the bundling note in
   // src/main/preload.ts), so each method must put on the wire what its spec says.
@@ -96,6 +108,10 @@ describe('preload-webview', () => {
     const sent = vi.mocked(wire).mock.calls[0] as unknown[]
     expect([sent[0], sent[1]]).toEqual([spec.channel, payload])
   })
+})
+
+describe('preload-webview — what each event hands its handler', () => {
+  usePreloadWebview()
 
   it.each(
     ELECTRON_API_MANIFEST.filter(
@@ -118,6 +134,10 @@ describe('preload-webview', () => {
       ...(spec.toHandlerArgs ? spec.toHandlerArgs([pushed]) : [pushed])
     )
   })
+})
+
+describe('preload-webview — commands', () => {
+  usePreloadWebview()
 
   it('runCommand and hasCommand invoke the extension channels with key and args', async () => {
     const { ipcRenderer } = await import('electron')
@@ -135,36 +155,38 @@ describe('preload-webview', () => {
       key: 'ext.command.open',
     })
   })
+})
 
-  describe('double-Escape exit gesture', () => {
-    function pressEscape(times: number): void {
-      for (let i = 0; i < times; i++) {
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-      }
+describe('preload-webview — double-Escape exit gesture', () => {
+  usePreloadWebview()
+
+  function pressEscape(times: number): void {
+    for (let i = 0; i < times; i++) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     }
+  }
 
-    it('stays silent on a single Escape so the extension keeps its own', () => {
-      pressEscape(1)
-      expect(mockSend).not.toHaveBeenCalled()
-    })
+  it('stays silent on a single Escape so the extension keeps its own', () => {
+    pressEscape(1)
+    expect(mockSend).not.toHaveBeenCalled()
+  })
 
-    it('requests an exit on a second Escape', () => {
-      pressEscape(2)
-      expect(mockSend).toHaveBeenCalledWith('extension:request-exit')
-    })
+  it('requests an exit on a second Escape', () => {
+    pressEscape(2)
+    expect(mockSend).toHaveBeenCalledWith('extension:request-exit')
+  })
 
-    it('does not let the extension cancel the gesture with preventDefault', () => {
-      // The first press is genuinely the extension's; the exit is about what the
-      // user does next, so a handled first Escape must not disarm the second.
-      window.addEventListener('keydown', (e) => e.preventDefault())
-      pressEscape(2)
-      expect(mockSend).toHaveBeenCalledWith('extension:request-exit')
-    })
+  it('does not let the extension cancel the gesture with preventDefault', () => {
+    // The first press is genuinely the extension's; the exit is about what the
+    // user does next, so a handled first Escape must not disarm the second.
+    window.addEventListener('keydown', (e) => e.preventDefault())
+    pressEscape(2)
+    expect(mockSend).toHaveBeenCalledWith('extension:request-exit')
+  })
 
-    it('ignores other keys', () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
-      expect(mockSend).not.toHaveBeenCalled()
-    })
+  it('ignores other keys', () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+    expect(mockSend).not.toHaveBeenCalled()
   })
 })

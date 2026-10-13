@@ -116,7 +116,9 @@ describe('syncProjectContext — linked and injecting', () => {
     expect(JSON.stringify(settings)).toContain('ELECTRON_RUN_AS_NODE=1')
     expect(JSON.stringify(settings)).toContain(P)
   })
+})
 
+describe('syncProjectContext — repeated and failed syncs', () => {
   it('returns the context so a caller can report its size', async () => {
     const mod = await load()
     const context = await mod.syncProjectContext(P, service())

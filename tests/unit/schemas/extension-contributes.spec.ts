@@ -26,7 +26,9 @@ describe('ExtensionContributesSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+})
 
+describe('ExtensionContributesSchema — workspace, project and sidebar tabs', () => {
   it('accepts a valid workspaceTab contribution', () => {
     const result = ExtensionContributesSchema.safeParse({
       workspaceTab: { label: 'Reviews', icon: 'git-pull-request', view: 'reviews' },
@@ -57,7 +59,9 @@ describe('ExtensionContributesSchema', () => {
       expect(result.data.sidebarPanel?.defaultOpen).toBeUndefined()
     }
   })
+})
 
+describe('ExtensionContributesSchema — window views and commands', () => {
   it('accepts windowViews array', () => {
     const result = ExtensionContributesSchema.safeParse({
       windowViews: [{ id: 'my-view', view: 'detail' }],
@@ -85,7 +89,9 @@ describe('ExtensionContributesSchema', () => {
     })
     expect(result.success).toBe(true)
   })
+})
 
+describe('ExtensionContributesSchema — unknown keys and combined contributions', () => {
   it('silently ignores unknown keys', () => {
     const result = ExtensionContributesSchema.safeParse({
       unknownFutureContribution: { label: 'something' },
