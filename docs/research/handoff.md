@@ -124,6 +124,11 @@ Each entry: what was decided, why, and how to undo it.
     and both settings schemas already hold an unused `extensions` record for these values. The
     change to `api.settings.get` is additive (an optional workspace), so no extension breaks. Undo:
     remove `workspaceScoped` and the `extensions` records, and the docs' per-workspace wording.
+    The global settings' `extensions` record stayed unused (global values live in the
+    extension-settings store) and is removed. A stored file that still has it loads, since
+    reads merge over the defaults, and the next global write drops it: the zod object strips
+    keys it does not declare (`tests/unit/storage/settings-store.spec.ts`). Undo: revert that
+    commit.
 
 ## Known advisories
 

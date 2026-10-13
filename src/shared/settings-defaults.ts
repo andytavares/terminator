@@ -10,7 +10,6 @@ export function defaultGlobalSettings(defaultShell: string): GlobalSettings {
     appearance: { theme: 'dark' },
     terminal: { scrollbackLimit: 10000, defaultShell, promptForName: false },
     git: { worktreeBaseDir: '', branchExcludePatterns: [] },
-    extensions: {},
     ui: { hasSeenWelcome: false, editor: '' },
     sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
     notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
