@@ -114,27 +114,23 @@ describe('a project worktree under git.worktreeBaseDir, outside the workspace fo
   })
 })
 
+async function foundry(): Promise<ExtensionAPI> {
+  const api = await builtIn('foundry', 'terminator.foundry')
+  const { registerSettings } = await import('../../../extensions/foundry/src/state/settings-schema')
+  registerSettings(api)
+  return api
+}
+
+async function lanePath(api: ExtensionAPI): Promise<{ root: string; lane: string }> {
+  const { resolveFoundryDataRoot } = await import('../../../extensions/foundry/src/workspace-root')
+  const { checkoutPath } = await import('../../../extensions/foundry/src/line/worktree')
+  const root = resolveFoundryDataRoot(api)
+  const lane = checkoutPath(root, { id: 'WO-1' } as Parameters<typeof checkoutPath>[1], 'widgets')
+  mkdirSync(lane, { recursive: true })
+  return { root, lane }
+}
+
 describe('Foundry', () => {
-  async function foundry(): Promise<ExtensionAPI> {
-    const api = await builtIn('foundry', 'terminator.foundry')
-    const { registerSettings } = await import(
-      '../../../extensions/foundry/src/state/settings-schema'
-    )
-    registerSettings(api)
-    return api
-  }
-
-  async function lanePath(api: ExtensionAPI): Promise<{ root: string; lane: string }> {
-    const { resolveFoundryDataRoot } = await import(
-      '../../../extensions/foundry/src/workspace-root'
-    )
-    const { checkoutPath } = await import('../../../extensions/foundry/src/line/worktree')
-    const root = resolveFoundryDataRoot(api)
-    const lane = checkoutPath(root, { id: 'WO-1' } as Parameters<typeof checkoutPath>[1], 'widgets')
-    mkdirSync(lane, { recursive: true })
-    return { root, lane }
-  }
-
   it('runs git in its records root in api.paths.globalStorage, and in a lane there, with no workspace open', async () => {
     const api = await foundry()
     const { root, lane } = await lanePath(api)
@@ -158,32 +154,32 @@ describe('Foundry', () => {
   })
 })
 
-describe('git-integration', () => {
-  const CLONE_FOLDER = 'terminator.git-integration.review.cloneFolder'
+const CLONE_FOLDER = 'terminator.git-integration.review.cloneFolder'
 
-  async function githubChannels(): Promise<Record<string, (payload: unknown) => Promise<unknown>>> {
-    const api = await builtIn('git-integration', 'terminator.git-integration')
-    // The one property of the extension's settings page this caller depends on.
-    api.settings.register({
-      label: 'Git',
-      properties: { [CLONE_FOLDER]: { type: 'folder', label: 'Clone folder', default: '' } },
-    })
-    const { registerGithubHandlers } = await import(
-      '../../../extensions/git-integration/src/ipc/github.ipc'
-    )
-    const channels: Record<string, (payload: unknown) => Promise<unknown>> = {}
-    mkdirSync(api.paths.globalStorage, { recursive: true })
-    const access = {
-      github: api.github,
-      getToken: () => '',
-      noCheckoutCwd: api.paths.globalStorage,
-    }
-    registerGithubHandlers((spec: ChannelSpec) => {
-      channels[spec.channel] = (payload) => dispatchChannel(spec, payload)
-    }, access)
-    return channels
+async function githubChannels(): Promise<Record<string, (payload: unknown) => Promise<unknown>>> {
+  const api = await builtIn('git-integration', 'terminator.git-integration')
+  // The one property of the extension's settings page this caller depends on.
+  api.settings.register({
+    label: 'Git',
+    properties: { [CLONE_FOLDER]: { type: 'folder', label: 'Clone folder', default: '' } },
+  })
+  const { registerGithubHandlers } = await import(
+    '../../../extensions/git-integration/src/ipc/github.ipc'
+  )
+  const channels: Record<string, (payload: unknown) => Promise<unknown>> = {}
+  mkdirSync(api.paths.globalStorage, { recursive: true })
+  const access = {
+    github: api.github,
+    getToken: () => '',
+    noCheckoutCwd: api.paths.globalStorage,
   }
+  registerGithubHandlers((spec: ChannelSpec) => {
+    channels[spec.channel] = (payload) => dispatchChannel(spec, payload)
+  }, access)
+  return channels
+}
 
+describe('git-integration', () => {
   it('clones into the review clone folder it declares', async () => {
     const clones = directory('reviews')
     settings[CLONE_FOLDER] = clones

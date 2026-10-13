@@ -135,7 +135,9 @@ describe('api.shell.exec runs only inside a root', () => {
     const records = directory('user-data', 'extensions', ID, 'records')
     expect((await gitIn(api, records)).stdout).toBe(`${records}\n`)
   })
+})
 
+describe('api.shell.exec runs only inside a root — other folders and settings', () => {
   it("refuses another extension's folder, and userData outside its own folder", async () => {
     const api = await hostedApi()
     const other = directory('user-data', 'extensions', 'com.example.other', 'records')
@@ -156,7 +158,9 @@ describe('api.shell.exec runs only inside a root', () => {
     settings[FOLDER_KEY] = directory('elsewhere')
     await expect(gitIn(api, clones)).rejects.toMatchObject({ name: 'CwdOutOfScopeError' })
   })
+})
 
+describe('api.shell.exec runs only inside a root — escapes', () => {
   it('refuses a directory outside every root, and runs nothing', async () => {
     workspaces.push({ id: 'w1', name: 'Repo', folderPath: directory('repo') })
     const api = await hostedApi()
@@ -180,7 +184,9 @@ describe('api.shell.exec runs only inside a root', () => {
     }
     expect(existsSync(ran)).toBe(false)
   })
+})
 
+describe('api.shell.exec runs only inside a root — undeclared folders', () => {
   it('ignores a declared key the extension never registered as a folder', async () => {
     const api = await hostedApi({ shellRoots: [FOLDER_KEY] })
     const clones = directory('clones')

@@ -108,7 +108,9 @@ describe('ExtensionHost.load', () => {
     expect(host.listExtensions()[0]).toMatchObject({ status: 'error' })
     expect(host.hostedApi('com.crash')).toBeUndefined()
   })
+})
 
+describe('ExtensionHost.load — invalid manifests', () => {
   it('returns INVALID_MANIFEST for a directory without a manifest', async () => {
     const { host, backendHost } = await newHost()
 
@@ -140,7 +142,9 @@ describe('ExtensionHost.load', () => {
     expect(host.listExtensions()).toHaveLength(0)
     expect(backendHost.activated).toHaveLength(0)
   })
+})
 
+describe('ExtensionHost.load — shell roots and duplicates', () => {
   it('loads a manifest that declares a shell root setting of its own', async () => {
     const { host } = await newHost()
     const manifest = { contributes: { shellRoots: ['com.owner.cloneFolder'] } }
@@ -227,7 +231,9 @@ describe('ExtensionHost lifecycle', () => {
     const { host } = await newHost()
     await expect(host.uninstall('com.unknown')).resolves.toBe(false)
   })
+})
 
+describe('ExtensionHost lifecycle — reload', () => {
   it('reload deactivates the backend and activates it again', async () => {
     const { host, backendHost } = await newHost()
     await host.load(writeExtension('com.reload'))
@@ -255,7 +261,9 @@ describe('ExtensionHost lifecycle', () => {
     const { host } = await newHost()
     await expect(host.reload('com.unknown')).resolves.toEqual({ error: 'NOT_FOUND' })
   })
+})
 
+describe('ExtensionHost lifecycle — toggle', () => {
   it('toggle off deactivates the backend; toggle on activates it again', async () => {
     const { host, backendHost } = await newHost()
     await host.load(writeExtension('com.toggle'))
@@ -295,16 +303,16 @@ describe('ExtensionHost when the extension host loses its backends', () => {
 
 // Settings -> Extensions stays open while a backend fails or comes back, so it
 // re-reads the list on this event rather than only when it opens.
-describe('ExtensionHost tells the windows when the extension list changes', () => {
-  async function watchedHost(backends: Record<string, FakeBackend> = {}) {
-    const created = await newHost(backends)
-    const broadcastToWindows = vi.fn()
-    created.host.setDeps({ broadcastToWindows })
-    const listChanges = () =>
-      broadcastToWindows.mock.calls.filter(([channel]) => channel === 'extension:list-changed')
-    return { ...created, broadcastToWindows, listChanges }
-  }
+async function watchedHost(backends: Record<string, FakeBackend> = {}) {
+  const created = await newHost(backends)
+  const broadcastToWindows = vi.fn()
+  created.host.setDeps({ broadcastToWindows })
+  const listChanges = () =>
+    broadcastToWindows.mock.calls.filter(([channel]) => channel === 'extension:list-changed')
+  return { ...created, broadcastToWindows, listChanges }
+}
 
+describe('ExtensionHost tells the windows when the extension list changes', () => {
   it('when the extension host loses its backends for good', async () => {
     const { host, listChanges } = await watchedHost()
     await host.load(writeExtension('com.lost'))
@@ -326,7 +334,9 @@ describe('ExtensionHost tells the windows when the extension list changes', () =
 
     expect(listChanges().length).toBeGreaterThan(before)
   })
+})
 
+describe('ExtensionHost tells the windows — not for unchanged statuses', () => {
   it('not when a running backend is reloaded and its status stays the same', async () => {
     const { host, listChanges } = await watchedHost()
     await host.load(writeExtension('com.steady'))
@@ -344,7 +354,9 @@ describe('ExtensionHost tells the windows when the extension list changes', () =
 
     expect(broadcastToWindows).not.toHaveBeenCalled()
   })
+})
 
+describe('ExtensionHost tells the windows — install, failure, toggle and uninstall', () => {
   it('when an extension is installed, fails to activate, is toggled or uninstalled', async () => {
     const { host, listChanges } = await watchedHost({ 'com.crash': failing('boom') })
     const counts: number[] = []
@@ -413,12 +425,12 @@ describe('ExtensionHost.start with an unusual bundled directory', () => {
   })
 })
 
-describe('isVersionCompatible', () => {
-  async function isCompatible(minVersion: string, appVersion: string): Promise<boolean> {
-    const { isVersionCompatible } = await import('../../../src/main/extensions/extension-host')
-    return isVersionCompatible(minVersion, appVersion)
-  }
+async function isCompatible(minVersion: string, appVersion: string): Promise<boolean> {
+  const { isVersionCompatible } = await import('../../../src/main/extensions/extension-host')
+  return isVersionCompatible(minVersion, appVersion)
+}
 
+describe('isVersionCompatible', () => {
   it.each([
     ['0.1.0', '1.0.0', true],
     ['0.0.9', '0.1.0', true],
