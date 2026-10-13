@@ -14,10 +14,8 @@ let notepad: Page
 
 const RECTANGLE = { id: 'r1', type: 'rectangle', x: 10, y: 20, width: 160, height: 100 }
 
-test.beforeAll(async () => {
-  handle = await launchApp()
-  notepad = await openNotepad(handle)
-  // What the export finds: a commented note and a drawn diagram, made in the other specs' way.
+/** What the export finds: a commented note and a drawn diagram, made in the other specs' way. */
+async function seedNoteAndDiagram(notepad: Page): Promise<void> {
   const note = await invokeChannel<{ data: { id: string } }>(
     notepad,
     'terminator.notepad:notes.create',
@@ -44,6 +42,12 @@ test.beforeAll(async () => {
     title: 'Route map',
     sceneJson: JSON.stringify({ elements: [RECTANGLE], appState: {} }),
   })
+}
+
+test.beforeAll(async () => {
+  handle = await launchApp()
+  notepad = await openNotepad(handle)
+  await seedNoteAndDiagram(notepad)
   await notepad.reload()
   await expect(noteRow(notepad, 'Trip plan')).toBeVisible()
 })

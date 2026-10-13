@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
 import { goTo, openVault, storedTask, type StoredTask } from './task-vault-harness'
@@ -76,13 +76,8 @@ test('deleting an inbox item asks first, then removes it for good', async () => 
   expect(await storedTask(vault, 'Junk mail')).toBeUndefined()
 })
 
-test('clarifying the inbox trashes, incubates, does now and files each item', async () => {
-  for (const text of ['Old flyer', 'Write a novel', 'Reply to Sam', 'Draft the budget']) {
-    await captureFromInbox(text)
-  }
-  await vault.getByRole('button', { name: 'Process inbox (GTD clarify)' }).click()
-  const processor = vault.locator('.inbox-processor')
-
+/** Answers the clarify questions for each of the five inbox items, in the order they come. */
+async function clarifyEachItem(processor: Locator): Promise<void> {
   // The edited item from earlier comes first: file it under a new area.
   await expect(processor.locator('.inbox-processor__text')).toHaveText(
     'Call the plumber about the leak'
@@ -107,6 +102,16 @@ test('clarifying the inbox trashes, incubates, does now and files each item', as
   await processor.getByRole('button', { name: 'No — File it' }).click()
   await processor.getByPlaceholder('Search or create project / area…').fill('Finances')
   await processor.getByText('Create project "Finances"').click()
+}
+
+test('clarifying the inbox trashes, incubates, does now and files each item', async () => {
+  for (const text of ['Old flyer', 'Write a novel', 'Reply to Sam', 'Draft the budget']) {
+    await captureFromInbox(text)
+  }
+  await vault.getByRole('button', { name: 'Process inbox (GTD clarify)' }).click()
+  const processor = vault.locator('.inbox-processor')
+
+  await clarifyEachItem(processor)
 
   // Done with the last item, the view goes back to today's log.
   await expect(vault.locator('.daily-log')).toBeVisible()
