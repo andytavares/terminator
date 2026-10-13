@@ -114,6 +114,16 @@ beforeEach(() => {
   root = makeTempDir('fdry-early-')
 })
 
+describe('without a CI watch', () => {
+  it('opens the draft with nothing to watch when CI is not watched, and asks once it ends', async () => {
+    const { early, raised } = setup({ watchCi: undefined })
+    expect(await early.beforeFinalCheck({ risk: risk('P3'), verdicts: [] })).toBe(true)
+    const shipped = await early.finish(outcome())
+    expect(shipped?.held).toBe(false)
+    expect(raised).toEqual(['ready-for-review'])
+  })
+})
+
 describe('opening before the final check', () => {
   it('opens the draft and starts the CI watch for a P3 change, before the check climbs', async () => {
     const { early, calls, deps } = setup()

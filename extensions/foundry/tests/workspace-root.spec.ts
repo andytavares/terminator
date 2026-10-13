@@ -21,6 +21,11 @@ function host({ dataDir, workspace }: HostShape): ExtensionAPI {
 }
 
 describe('resolveFoundryDataRoot', () => {
+  describe('with a workspace', withAWorkspaceTests)
+  describe('when the workspace cannot be listed', unlistedWorkspaceTests)
+})
+
+function withAWorkspaceTests() {
   it('keeps the records beside the first workspace folder by default', () => {
     const api = host({ dataDir: '', workspace: () => [{ folderPath: '/work/default' }] })
     expect(resolveFoundryDataRoot(api)).toBe(path.join('/work/default', '.foundry'))
@@ -38,7 +43,9 @@ describe('resolveFoundryDataRoot', () => {
     })
     expect(resolveFoundryDataRoot(api)).toBe(path.join('/work/rel', '.foundry'))
   })
+}
 
+function unlistedWorkspaceTests() {
   it('keeps the configured directory when the workspace cannot be listed', () => {
     const api = host({
       dataDir: '/records/no-workspace',
@@ -58,4 +65,4 @@ describe('resolveFoundryDataRoot', () => {
     })
     expect(resolveFoundryDataRoot(api)).toBe(path.join('/storage/foundry', 'records', '.foundry'))
   })
-})
+}

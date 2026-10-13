@@ -357,6 +357,7 @@ describe('provisioning dependencies', () => {
   describe('check-ignore', checkIgnoreTests)
   describe('reused checkouts', reusedCheckoutsTests)
   describe('git unable to list', gitUnableToListTests)
+  describe('odd checkouts', oddCheckoutsTests)
 })
 
 /** git refusing every command, as in a directory that is no longer a repository. */
@@ -395,7 +396,9 @@ function gitUnableToListTests() {
     expect(unlinked).toEqual([])
     expect(fs.lstatSync(path.join(wt, 'node_modules')).isSymbolicLink()).toBe(true)
   })
+}
 
+function oddCheckoutsTests() {
   it('lends nothing into a package directory the checkout does not have', async () => {
     const origin = tmpDir('foundry-origin-')
     const wt = tmpDir('foundry-wt-')

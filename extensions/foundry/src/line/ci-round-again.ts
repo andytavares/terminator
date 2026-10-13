@@ -55,10 +55,11 @@ export async function ciRoundAgain(request: CiRoundAgain): Promise<void> {
   })
   const finished = await finishShipping(
     order,
-    { verdicts: [], findings: [] },
-    pulls,
-    pulls.map((pull) => pull.bodyPath),
-    outcome,
+    {
+      shipment: { verdicts: [], findings: [] },
+      drafts: { pulls, bodyPaths: pulls.map((pull) => pull.bodyPath) },
+      ci: outcome,
+    },
     {
       ...integrateDeps,
       raiseGate: async (gate) => {

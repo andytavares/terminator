@@ -48,6 +48,7 @@ describe('watchChecks', () => {
   describe('cancel and unreadable output', cancelAndUnreadableOutputTests)
   describe('timing out and polling', timingOutAndPollingTests)
   describe('odd output', oddOutputTests)
+  describe('runs it cannot place', runsItCannotPlaceTests)
 })
 
 function passingAndFailingTests() {
@@ -168,12 +169,24 @@ function oddOutputTests() {
     })
   })
 
+  it('is not measured when what gh printed is not JSON at all', async () => {
+    const exec = queuedExec([{ exitCode: 0, stdout: 'not json', stderr: '', timedOut: false }])
+    const verdict = await watchChecks(pull, exec, { sleep: noopSleep() })
+    expect(verdict).toEqual({
+      kind: 'not_measured',
+      checks: [],
+      reason: 'unparseable checks output',
+    })
+  })
+
   it('gives what gh printed as the reason when it failed saying nothing on stderr', async () => {
     const exec = queuedExec([{ exitCode: 4, stdout: 'HTTP 502', stderr: '', timedOut: false }])
     const verdict = await watchChecks(pull, exec, { sleep: noopSleep() })
     expect(verdict).toEqual({ kind: 'not_measured', checks: [], reason: 'HTTP 502' })
   })
+}
 
+function runsItCannotPlaceTests() {
   it('reads a check with no run in its link as a fresh one', async () => {
     const exec = queuedExec([ok([check({ bucket: 'pass', link: 'https://example.com/status' })])])
     const verdict = await watchChecks(pull, exec, {
@@ -209,6 +222,7 @@ function timingOutAndPollingTests() {
 describe('failedLogs', () => {
   describe('run logs', runLogsTests)
   describe('checks without a run, and failures', checksWithoutARunAndFailuresTests)
+  describe('non-Error throws', nonErrorThrowsTests)
 })
 
 function runLogsTests() {
@@ -261,7 +275,9 @@ function checksWithoutARunAndFailuresTests() {
     const out = await failedLogs(checks, '/repos/app', exec)
     expect(out).toContain('could not be read')
   })
+}
 
+function nonErrorThrowsTests() {
   it('says what was thrown when it was not an Error', async () => {
     const checks: Check[] = [
       check({ bucket: 'fail', link: 'https://github.com/o/r/actions/runs/1/job/2' }),

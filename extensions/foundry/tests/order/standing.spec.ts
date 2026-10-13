@@ -73,6 +73,7 @@ function input(over: Partial<StandingInput> = {}): StandingInput {
 describe('standingOf', () => {
   describe('working', workingTests)
   describe('sent back', sentBackTests)
+  describe('checks no longer there', checksNoLongerThereTests)
   describe('ordinary work', ordinaryWorkTests)
   describe('halted', haltedTests)
   describe('adrift and asking', adriftAndAskingTests)
@@ -83,6 +84,7 @@ describe('standingOf', () => {
   describe('draft questions', draftQuestionsTests)
   describe('refused intake', refusedIntakeTests)
   describe('draft checks', draftChecksTests)
+  describe('unnamed blockers', unnamedBlockersTests)
   describe('draft wording', draftWordingTests)
   describe('agreed orders', agreedOrdersTests)
   describe('shipped', shippedTests)
@@ -143,7 +145,9 @@ function sentBackTests() {
     expect(standing.kind).toBe('working')
     expect(standing.detail).toBe('Reworking after lint failed.')
   })
+}
 
+function checksNoLongerThereTests() {
   it('names the check by its id when that check is no longer on the graph', () => {
     const feedback = [{ ...CHECK_FAILED, from: 'lint-gone' }]
     const standing = standingOf(
@@ -413,7 +417,9 @@ function draftChecksTests() {
     expect(standing.detail).toContain('RT-6 is open and blocks hand-off')
     expect(standing.detail).toContain('2 checks')
   })
+}
 
+function unnamedBlockersTests() {
   it('points to the Forge for which check when it cannot name the one a draft is stuck on', () => {
     const standing = standingOf(
       input({ status: 'draft', graph: null, shaping: false, failures: 1, blocker: null })

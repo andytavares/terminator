@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { builderUnit } from '../helpers/order-parts.js'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import {
@@ -16,7 +16,7 @@ import {
   watchAndFinish,
   commitAndPushLanes,
 } from '../../src/line/integrate.js'
-import type { IntegrateDeps } from '../../src/line/integrate.js'
+import type { IntegrateDeps, ShippedDrafts } from '../../src/line/integrate.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -541,6 +541,12 @@ describe('remembering what was opened', () => {
   it('reads no drafts for an order that never opened any', async () => {
     const { readPulls } = await import('../../src/line/integrate.js')
     expect(await readPulls(root, 'WO-nothing')).toEqual([])
+  })
+
+  it('reads a record that is not a list of drafts as none', async () => {
+    fs.mkdirSync(path.join(root, 'orders', 'WO-odd'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'orders', 'WO-odd', 'pulls.json'), '{"url":"x"}')
+    expect(await readPulls(root, 'WO-odd')).toEqual([])
   })
 
   it('reads an unreadable record as none rather than guessing at a URL', async () => {
@@ -1282,6 +1288,15 @@ function haltedWatchesAndNoneTests() {
   })
 }
 
+/** One draft, shipped with one verdict, and what CI said of it. */
+function shippedWith(ci: CiOutcome): ShippedDrafts {
+  return {
+    shipment: { verdicts: [verdict()], findings: [] },
+    drafts: { pulls: [pull], bodyPaths: [pull.bodyPath] },
+    ci,
+  }
+}
+
 describe('finishShipping', () => {
   describe('CI stayed red', ciStayedRedTests)
   describe('CI green', ciGreenTests)
@@ -1319,14 +1334,7 @@ function ciStayedRedTests() {
       excerpt: 'boom',
       rounds: 2,
     }
-    const result = await finishShipping(
-      order(),
-      { verdicts: [verdict()], findings: [] },
-      [pull],
-      [pull.bodyPath],
-      ci,
-      deps({ raiseGate })
-    )
+    const result = await finishShipping(order(), shippedWith(ci), deps({ raiseGate }))
     expect(raiseGate).toHaveBeenCalledWith(expect.objectContaining({ rule: 'ci.red' }))
     expect(result.gate?.rule).toBe('ci.red')
     expect(result.held).toBe(true)
@@ -1337,14 +1345,7 @@ function ciGreenTests() {
   it('raises a ready-for-review gate carrying the CI note when CI is green', async () => {
     const raiseGate = vi.fn(async () => undefined)
     const ci: CiOutcome = { kind: 'green', checks: [check()] }
-    const result = await finishShipping(
-      order(),
-      { verdicts: [verdict()], findings: [] },
-      [pull],
-      [pull.bodyPath],
-      ci,
-      deps({ raiseGate })
-    )
+    const result = await finishShipping(order(), shippedWith(ci), deps({ raiseGate }))
     expect(raiseGate).toHaveBeenCalledWith(expect.objectContaining({ rule: 'ready-for-review' }))
     expect(result.gate?.rule).toBe('ready-for-review')
     expect(result.gate?.why).toContain('CI passed: 1 checks.')
@@ -1453,7 +1454,11 @@ function watchingTests() {
   it('watchAndFinish raises the ready question for drafts that are already open', async () => {
     const raise = vi.fn(async () => undefined)
     const d = deps({ raiseGate: raise })
-    const result = await watchAndFinish(order(), { verdicts: [verdict()], findings: [] }, [], [], d)
+    const result = await watchAndFinish(
+      order(),
+      { shipment: { verdicts: [verdict()], findings: [] }, drafts: { pulls: [], bodyPaths: [] } },
+      d
+    )
     expect(result.gate?.rule).toBe('ready-for-review')
     expect(raise).toHaveBeenCalledTimes(1)
   })
@@ -1524,6 +1529,13 @@ function failedEditsTests() {
 }
 
 function creatingOneTests() {
+  it('creates one when the listing is not a list', async () => {
+    const d = withOpenPull({ exitCode: 0, stdout: JSON.stringify({ url: OPEN }) })
+    const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+    expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(1)
+    expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
+  })
+
   it('creates one when nothing is open', async () => {
     const d = withOpenPull({ exitCode: 0, stdout: '[]' })
     const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
@@ -1536,5 +1548,96 @@ function creatingOneTests() {
     const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
     expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(1)
     expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
+  })
+}
+
+describe('what the ready question and the bodies say', () => {
+  describe('every criterion', everyCriterionTests)
+  describe('one house rule', oneHouseRuleTests)
+  describe('cross-links that fail', crossLinksThatFailTests)
+  describe('cancelled checks', cancelledChecksTests)
+})
+
+/** Four criteria: one passed, one failed, one nothing judged, one not measured. */
+function fourCriteria(): WorkOrder {
+  return order({
+    acceptance: ['AC-1', 'AC-2', 'AC-3', 'AC-4'].map((id) =>
+      testCriterion(id, { statement: `statement ${id}` })
+    ),
+  })
+}
+
+function everyCriterionTests() {
+  it('names each criterion with how it came out, including the ones nothing judged', async () => {
+    const shipment = {
+      verdicts: [
+        verdict({ criterionId: 'AC-1' }),
+        verdict({ criterionId: 'AC-2', result: 'fail', reason: 'the token was accepted' }),
+        verdict({ criterionId: 'AC-4', result: 'not_measured', reason: 'no runner' }),
+      ],
+      findings: [],
+    }
+    const result = await finishShipping(
+      fourCriteria(),
+      { shipment, drafts: { pulls: [pull], bodyPaths: [pull.bodyPath] }, ci: { kind: 'none' } },
+      deps()
+    )
+    expect(result.gate?.why).toContain(
+      [
+        '- AC-1: statement AC-1 — passed',
+        '- AC-2: statement AC-2 — failed: the token was accepted',
+        '- AC-3: statement AC-3 — not measured: nothing ran',
+        '- AC-4: statement AC-4 — not measured: no runner',
+      ].join('\n')
+    )
+  })
+}
+
+function oneHouseRuleTests() {
+  it('says rule, not rules, when one house rule was in force', () => {
+    const body = prBody(order(), {
+      verdicts: [verdict()],
+      findings: [],
+      rulesInForce: ['exit-code-not-count (L2)'],
+    })
+    expect(body).toContain('Judged against 1 house rule: exit-code-not-count (L2).')
+  })
+}
+
+function crossLinksThatFailTests() {
+  it('records a cross-link it could not write back, and keeps the drafts', async () => {
+    const d = multiDeps()
+    const opened = d.exec.getMockImplementation()
+    d.exec.mockImplementation(async (options: { command: string; args: string[] }) =>
+      options.command === 'gh' && options.args[1] === 'edit'
+        ? { exitCode: 1, stdout: '', stderr: 'rate limited', timedOut: false }
+        : opened?.(options)
+    )
+    const result = await openDrafts(twoLanes(), { verdicts: [], findings: [] }, d)
+    expect(result.pulls).toHaveLength(2)
+    expect(d.record).toHaveBeenCalledWith(
+      'ship.crosslink_failed',
+      'https://github.com/tav/r/pull/1',
+      'The cross-links could not be written back: rate limited'
+    )
+  })
+}
+
+function cancelledChecksTests() {
+  it('names a cancelled check among the red ones', async () => {
+    const ci: CiOutcome = {
+      kind: 'red',
+      checks: [
+        check({ bucket: 'cancel', name: 'e2e' }),
+        check({ bucket: 'pass', name: 'lint' }),
+        check({ bucket: 'fail', name: 'unit-tests' }),
+      ],
+      excerpt: 'boom',
+      rounds: 2,
+    }
+    const result = await finishShipping(order(), shippedWith(ci), deps())
+    expect(result.gate?.summary).toBe(
+      'CI is still red on e2e, unit-tests for Refuse an expired refresh token'
+    )
   })
 }

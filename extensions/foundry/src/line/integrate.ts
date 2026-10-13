@@ -223,38 +223,51 @@ function verdictLine(order: WorkOrder, criterionId: string, verdicts: readonly V
   return `| ${criterionId} | ${statement} | ${result} | ${worst.reason} |`
 }
 
+/** Which lane a body is for, and the drafts already open beside it. */
+export interface BodyPlace {
+  readonly lane: number
+  readonly opened: readonly LanePullRequest[]
+}
+
+const FIRST_LANE: BodyPlace = { lane: 1, opened: [] }
+
 /**
  * The lane section of a body: what else this change is part of.
  *
  * Only for an order that spans repositories. One lane produces no section at
  * all, because "1 of 1" on a pull request is noise (FR-068).
  */
-function laneSection(order: WorkOrder, lane: number, opened: readonly LanePullRequest[]): string[] {
+function laneSection(order: WorkOrder, { lane, opened }: BodyPlace): string[] {
   if (order.plan.lanes.length < 2) return []
 
   const views = laneViews(order)
-  const mine = views.find((view) => view.lane.ord === lane)
   const lines = ['', `### Part of a ${views.length}-repository change`, '']
-
   for (const view of views) {
-    const url = opened.find((pull) => pull.lane === view.lane.ord)?.url
-    const position =
-      view.lane.ord === lane
-        ? '**this one**'
-        : (url ?? (view.lane.ord < lane ? 'merges before this' : 'merges after this'))
-    lines.push(`${view.lane.ord}. \`${view.lane.repo}\` — ${position}`)
+    lines.push(
+      `${view.lane.ord}. \`${view.lane.repo}\` — ${lanePosition(view.lane.ord, { lane, opened })}`
+    )
   }
+  return [...lines, ...laneWarnings(views.find((view) => view.lane.ord === lane))]
+}
 
-  if (mine !== undefined && mine.collisions.length > 0) {
+/** Where another lane stands from this one: this one, its draft, or before or after it. */
+function lanePosition(ord: number, { lane, opened }: BodyPlace): string {
+  if (ord === lane) return '**this one**'
+  const url = opened.find((pull) => pull.lane === ord)?.url
+  return url ?? (ord < lane ? 'merges before this' : 'merges after this')
+}
+
+function laneWarnings(mine: ReturnType<typeof laneViews>[number] | undefined): string[] {
+  if (mine === undefined) return []
+  const lines: string[] = []
+  if (mine.collisions.length > 0) {
     lines.push(
       '',
       `Shared with the other lanes: ${mine.collisions.map((path) => `\`${path}\``).join(', ')}.`
     )
   }
-  if (mine !== undefined && mine.blockedBy.length > 0) {
-    const first = mine.blockedBy.join(', ')
-    lines.push(`Do not merge this before lane ${first}.`)
-  }
+  if (mine.blockedBy.length > 0)
+    lines.push(`Do not merge this before lane ${mine.blockedBy.join(', ')}.`)
   return lines
 }
 
@@ -267,10 +280,29 @@ function laneSection(order: WorkOrder, lane: number, opened: readonly LanePullRe
 export function prBody(
   order: WorkOrder,
   shipment: Shipment,
-  lane = 1,
-  opened: readonly LanePullRequest[] = []
+  place: BodyPlace = FIRST_LANE
 ): string {
-  const lines: string[] = [
+  return [
+    ...introLines(order),
+    ...verdictTable(order, shipment),
+    ...verificationLines(shipment.ladder ?? null),
+    ...rulesLines(shipment.rulesInForce ?? []),
+    '',
+    '### Inspection',
+    '',
+    ...inspectionLines(shipment),
+    ...laneSection(order, place),
+    '',
+    '---',
+    '',
+    `Opened as a draft by Foundry from work order \`${order.id}\`. Risk ${order.risk.grade}.`,
+    'Nothing here was merged by a machine — marking it ready and merging are both yours.',
+  ].join('\n')
+}
+
+function introLines(order: WorkOrder): string[] {
+  const units = order.plan.units.map((unit) => `- **${unit.id}** ${unit.title} — ${unit.role}`)
+  return [
     `## ${order.title}`,
     '',
     order.intent.problem === '' ? '_No problem statement._' : order.intent.problem,
@@ -279,62 +311,56 @@ export function prBody(
     '',
     '### What was done',
     '',
+    ...(units.length === 0 ? ['_No units._'] : units),
   ]
+}
 
-  for (const unit of order.plan.units) {
-    lines.push(`- **${unit.id}** ${unit.title} — ${unit.role}`)
-  }
-  if (order.plan.units.length === 0) lines.push('_No units._')
-
-  lines.push(
+function verdictTable(order: WorkOrder, shipment: Shipment): string[] {
+  const rows = order.acceptance.map((criterion) =>
+    verdictLine(order, criterion.id, shipment.verdicts)
+  )
+  return [
     '',
     '### Verdicts',
     '',
     '| | Criterion | Result | Notes |',
-    '| --- | --- | --- | --- |'
-  )
-  for (const criterion of order.acceptance) {
-    lines.push(verdictLine(order, criterion.id, shipment.verdicts))
-  }
-  if (order.acceptance.length === 0) lines.push('| — | _No criteria._ | not measured | |')
+    '| --- | --- | --- | --- |',
+    ...(rows.length === 0 ? ['| — | _No criteria._ | not measured | |'] : rows),
+  ]
+}
 
-  const ladder = shipment.ladder ?? null
-  if (ladder !== null) {
-    lines.push('', '### Verification', '', '| Step | Rung | Result |', '| --- | --- | --- |')
-    for (const step of ladder.steps) {
-      const result =
-        step.result === 'not_measured' || step.result === 'elsewhere'
-          ? `${step.result === 'elsewhere' ? 'decided' : 'not measured'} — ${step.reason}`
-          : step.result
-      lines.push(`| ${step.name} | ${step.rung} | ${result} |`)
-    }
-    if (ladder.unmeasured.length > 0) {
-      lines.push(
-        '',
-        `**${ladder.unmeasured.length} ${ladder.unmeasured.length === 1 ? 'check was' : 'checks were'} not measured here**: ${ladder.unmeasured.join(', ')}. This repository has no command for them, so they are reported as unmeasured rather than as passing.`
-      )
-    }
-  }
-
-  if ((shipment.rulesInForce?.length ?? 0) > 0) {
-    lines.push(
-      '',
-      `Judged against ${shipment.rulesInForce?.length} house ${shipment.rulesInForce?.length === 1 ? 'rule' : 'rules'}: ${shipment.rulesInForce?.join(', ')}.`
-    )
-  }
-
-  lines.push('', '### Inspection', '', ...inspectionLines(shipment))
-
-  lines.push(...laneSection(order, lane, opened))
-
-  lines.push(
+function verificationLines(ladder: LadderOutcome | null): string[] {
+  if (ladder === null) return []
+  const rows = ladder.steps.map((step) => {
+    const result =
+      step.result === 'not_measured' || step.result === 'elsewhere'
+        ? `${step.result === 'elsewhere' ? 'decided' : 'not measured'} — ${step.reason}`
+        : step.result
+    return `| ${step.name} | ${step.rung} | ${result} |`
+  })
+  const lines = [
     '',
-    '---',
+    '### Verification',
     '',
-    `Opened as a draft by Foundry from work order \`${order.id}\`. Risk ${order.risk.grade}.`,
-    'Nothing here was merged by a machine — marking it ready and merging are both yours.'
-  )
-  return lines.join('\n')
+    '| Step | Rung | Result |',
+    '| --- | --- | --- |',
+    ...rows,
+  ]
+  const count = ladder.unmeasured.length
+  if (count === 0) return lines
+  return [
+    ...lines,
+    '',
+    `**${count} ${count === 1 ? 'check was' : 'checks were'} not measured here**: ${ladder.unmeasured.join(', ')}. This repository has no command for them, so they are reported as unmeasured rather than as passing.`,
+  ]
+}
+
+function rulesLines(rules: readonly string[]): string[] {
+  if (rules.length === 0) return []
+  return [
+    '',
+    `Judged against ${rules.length} house ${rules.length === 1 ? 'rule' : 'rules'}: ${rules.join(', ')}.`,
+  ]
 }
 
 function bodyPathFor(root: string, order: WorkOrder, lane: number): string {
@@ -482,29 +508,40 @@ async function pushLane(
   if (result.exitCode !== 0 || result.timedOut) throw new PushRefusedError(repo.name, result)
 }
 
+type ResolvedRepo = ReturnType<typeof resolvedRepos>[number]
+
+/** One lane's draft to open: the repository it is for and the body file it carries. */
+interface DraftTarget {
+  readonly repo: Pick<ResolvedRepo, 'name' | 'path' | 'baseBranch' | 'headBranch' | 'lane'>
+  readonly bodyPath: string
+}
+
+function laneDraft({ repo, bodyPath }: DraftTarget, url: string): LanePullRequest {
+  return {
+    lane: repo.lane,
+    repo: repo.name,
+    cwd: repo.path,
+    branch: repo.headBranch,
+    url,
+    bodyPath,
+  }
+}
+
 async function openDraft(
   order: WorkOrder,
-  repo: { name: string; path: string; baseBranch: string; headBranch: string; lane: number },
-  bodyPath: string,
+  target: DraftTarget,
   deps: IntegrateDeps
 ): Promise<LanePullRequest> {
+  const { repo, bodyPath } = target
   const result = await deps.exec({
     command: 'gh',
     args: [
-      'pr',
-      'create',
-      '--draft',
-      '--head',
-      repo.headBranch,
-      '--base',
-      repo.baseBranch,
-      '--title',
-      order.title,
+      ...['pr', 'create', '--draft', '--head', repo.headBranch, '--base', repo.baseBranch],
+      ...['--title', order.title],
       // Never `--body`: a pull request body is long, multi-line, full of
       // backticks and written by an agent. Through argv that is a quoting bug
       // waiting for the one description that contains a quote.
-      '--body-file',
-      bodyPath,
+      ...['--body-file', bodyPath],
     ],
     cwd: repo.path,
     timeoutMs: 120_000,
@@ -512,14 +549,7 @@ async function openDraft(
   if (result.exitCode !== 0) {
     throw new PullRequestFailedError(`Opening the pull request for ${repo.name} failed`, result)
   }
-  return {
-    lane: repo.lane,
-    repo: repo.name,
-    cwd: repo.path,
-    branch: repo.headBranch,
-    url: result.stdout.trim().split('\n').pop()?.trim() ?? '',
-    bodyPath,
-  }
+  return laneDraft(target, result.stdout.trim().split('\n').pop()?.trim() ?? '')
 }
 
 /**
@@ -532,27 +562,27 @@ async function openDraft(
 async function findOpenPull(
   repo: { path: string; baseBranch: string; headBranch: string },
   deps: IntegrateDeps
-): Promise<{ url: string; isDraft: boolean } | null> {
+): Promise<OpenPull | null> {
   const result = await deps.exec({
     command: 'gh',
     args: [
-      'pr',
-      'list',
-      '--head',
-      repo.headBranch,
-      '--base',
-      repo.baseBranch,
-      '--state',
-      'open',
-      '--json',
-      'url,number,isDraft',
+      ...['pr', 'list', '--head', repo.headBranch, '--base', repo.baseBranch],
+      ...['--state', 'open', '--json', 'url,number,isDraft'],
     ],
     cwd: repo.path,
     timeoutMs: 60_000,
   })
-  if (result.exitCode !== 0) return null
+  return result.exitCode === 0 ? firstOpenPull(result.stdout) : null
+}
+
+interface OpenPull {
+  readonly url: string
+  readonly isDraft: boolean
+}
+
+function firstOpenPull(stdout: string): OpenPull | null {
   try {
-    const listed: unknown = JSON.parse(result.stdout)
+    const listed: unknown = JSON.parse(stdout)
     if (!Array.isArray(listed)) return null
     const first = listed[0] as { url?: unknown; isDraft?: unknown } | undefined
     if (typeof first?.url !== 'string' || first.url === '') return null
@@ -570,39 +600,32 @@ async function findOpenPull(
  */
 async function adoptPull(
   order: WorkOrder,
-  repo: { name: string; path: string; headBranch: string; lane: number },
-  open: { url: string; isDraft: boolean },
-  bodyPath: string,
+  target: DraftTarget & { open: OpenPull },
   deps: IntegrateDeps
 ): Promise<LanePullRequest> {
-  const edited = await deps.exec({
+  const { repo, bodyPath, open } = target
+  const edit = ['pr', 'edit', open.url, '--title', order.title, '--body-file', bodyPath]
+  await ghOrRecord(deps, { cwd: repo.path, args: edit, failed: 'ship.adopt_edit_failed' }, open.url)
+  if (!open.isDraft) {
+    const undo = ['pr', 'ready', '--undo', open.url]
+    await ghOrRecord(deps, { cwd: repo.path, args: undo, failed: 'ship.undraft_failed' }, open.url)
+  }
+  return laneDraft(target, open.url)
+}
+
+/** Runs one `gh` call that must not stop shipping, recording why when it fails. */
+async function ghOrRecord(
+  deps: IntegrateDeps,
+  call: { cwd: string; args: string[]; failed: string },
+  subject: string
+): Promise<void> {
+  const result = await deps.exec({
     command: 'gh',
-    args: ['pr', 'edit', open.url, '--title', order.title, '--body-file', bodyPath],
-    cwd: repo.path,
+    args: call.args,
+    cwd: call.cwd,
     timeoutMs: 60_000,
   })
-  if (edited.exitCode !== 0) {
-    await deps.record('ship.adopt_edit_failed', open.url, detailFor(edited))
-  }
-  if (!open.isDraft) {
-    const undone = await deps.exec({
-      command: 'gh',
-      args: ['pr', 'ready', '--undo', open.url],
-      cwd: repo.path,
-      timeoutMs: 60_000,
-    })
-    if (undone.exitCode !== 0) {
-      await deps.record('ship.undraft_failed', open.url, detailFor(undone))
-    }
-  }
-  return {
-    lane: repo.lane,
-    repo: repo.name,
-    cwd: repo.path,
-    branch: repo.headBranch,
-    url: open.url,
-    bodyPath,
-  }
+  if (result.exitCode !== 0) await deps.record(call.failed, subject, detailFor(result))
 }
 
 /** Turn a draft into a review request. The operator's decision, never ours. */
@@ -619,6 +642,19 @@ export async function markReady(
   if (result.exitCode !== 0) {
     throw new PullRequestFailedError(`Marking ${pull.url} ready failed`, result)
   }
+}
+
+/** The drafts an order has open, and the body file each was given. */
+export interface OpenDrafts {
+  readonly pulls: readonly LanePullRequest[]
+  readonly bodyPaths: readonly string[]
+}
+
+/** One order's shipping: what it is, what it shipped with, and the seams it ships through. */
+interface Shipping {
+  readonly order: WorkOrder
+  readonly shipment: Shipment
+  readonly deps: IntegrateDeps
 }
 
 /**
@@ -648,122 +684,22 @@ export async function openDrafts(
   shipment: Shipment,
   deps: IntegrateDeps
 ): Promise<ShipOutcome> {
+  const ship: Shipping = { order, shipment, deps }
   const repos = resolvedRepos(order, deps)
-  const bodyPaths: string[] = []
-
-  for (const repo of repos) {
-    const file = bodyPathFor(deps.root, order, repo.lane)
-    // Written before anything is pushed, so the operator can read what would
-    // have shipped even when nothing does. Rewritten per lane afterwards once
-    // the sibling URLs exist.
-    await writeBody(file, prBody(order, shipment, repo.lane, []))
-    bodyPaths.push(file)
-  }
-
-  if (!deps.autoOpen) {
-    const reason =
-      'Opening a draft pull request is turned off, so nothing was pushed. The body is written and waiting.'
+  const bodyPaths = await writeFirstBodies(ship, repos)
+  const reason = await heldBeforePush(order, deps)
+  if (reason !== null) {
     await deps.record('ship.held', order.id, reason)
     return { pulls: [], bodyPaths, held: true, reason }
   }
 
-  if (shipModeFor(order) === 'gate_then_push') {
-    const gate = raiseGate({
-      id: `${order.id}-ship`,
-      rule: 'risk.p0',
-      orderId: order.id,
-      // The rule is named for the grade that made it unconditional; the grade
-      // that actually fired is carried here, because at P1 the id alone would
-      // read as wrong.
-      summary: `Push and open a draft pull request for ${order.title}?`,
-      why: `This order is graded ${gradeInWords(order.risk.grade)}, so the decision is taken before anything reaches the remote${order.risk.triggers.length === 0 ? '' : ` (${order.risk.triggers.join(', ')})`}.`,
-      riskGrade: order.risk.grade,
-      blockedUnits: order.plan.units.length,
-      at: deps.now(),
-    })
-    const chosen = await deps.decide(gate)
-    if (chosen !== 'approve') {
-      const reason = `The ${gradeInWords(order.risk.grade)} shipping decision is waiting on you, so nothing was pushed yet.`
-      await deps.record('ship.held', order.id, reason)
-      return { pulls: [], bodyPaths, held: true, reason }
-    }
-  }
-
-  const existing = await readPulls(deps.root, order.id)
-  const pulls: LanePullRequest[] = []
-  let created = 0
-  for (const repo of repos) {
-    const already = existing.find((pull) => pull.lane === repo.lane)
-    if (already !== undefined) {
-      await pushLane(repo, deps)
-      pulls.push(already)
-      continue
-    }
-
-    // The lanes this one waits on are open by now — this loop runs in merge
-    // order — so the cross-links in its body are real URLs rather than
-    // "merges before this".
-    const held = mayMergeLane(
-      order,
-      repo.lane,
-      pulls.map((pull) => pull.lane)
-    )
-    const file = bodyPathFor(deps.root, order, repo.lane)
-    await writeBody(file, prBody(order, shipment, repo.lane, pulls))
-
-    await pushLane(repo, deps)
-    const open = await findOpenPull(repo, deps)
-    if (open !== null) {
-      const adopted = await adoptPull(order, repo, open, file, deps)
-      pulls.push(adopted)
-      created += 1
-      await deps.record(
-        'ship.draft_adopted',
-        adopted.url,
-        `A pull request was already open on ${repo.headBranch}; Foundry adopted it instead of opening another.`
-      )
-      continue
-    }
-    const pull = await openDraft(order, repo, file, deps)
-    pulls.push(pull)
-    created += 1
-    await deps.record(
-      'ship.draft_opened',
-      pull.url,
-      held.allowed
-        ? `Draft pull request for lane ${repo.lane}.`
-        : `Draft pull request for lane ${repo.lane}, held from merging: ${held.reason ?? ''}`
-    )
-  }
-
-  // Now every sibling URL exists, so the earlier lanes can name the later
-  // ones. This has to go back to GitHub — `gh pr create` read the file once
-  // and rewriting it afterwards changes a local file and nothing else, which
-  // would leave lane 1 permanently saying "merges after this".
-  //
-  // Only where there is a sibling to link to, and never for the last lane,
-  // whose body already had every URL when it was created.
-  if (created > 0 && pulls.length > 1) {
-    for (const pull of pulls.slice(0, -1)) {
-      const edited = await rewriteBody(pull, prBody(order, shipment, pull.lane, pulls), deps)
-      // A failed cross-link is cosmetic. The drafts are open and the work is
-      // pushed; losing that over a description would be the worse failure.
-      if (edited.exitCode !== 0) {
-        await deps.record(
-          'ship.crosslink_failed',
-          pull.url,
-          `The cross-links could not be written back: ${edited.stderr.trim()}`
-        )
-      }
-    }
-  }
-
+  const { pulls, created } = await openLanes(ship, repos)
+  if (created > 0 && pulls.length > 1) await crossLink(ship, pulls)
   await fs.promises.writeFile(
     pullsPath(deps.root, order.id),
     JSON.stringify(pulls, null, 2),
     'utf8'
   )
-
   if (created > 0) {
     try {
       await deps.onDraftOpened?.(pulls)
@@ -771,8 +707,140 @@ export async function openDrafts(
       // Telling a tracker is never worth the drafts that are already open.
     }
   }
-
   return { pulls, bodyPaths, held: false, reason: '' }
+}
+
+/**
+ * Written before anything is pushed, so the operator can read what would have
+ * shipped even when nothing does. Rewritten per lane afterwards once the
+ * sibling URLs exist.
+ */
+async function writeFirstBodies(
+  { order, shipment, deps }: Shipping,
+  repos: readonly ResolvedRepo[]
+): Promise<string[]> {
+  const bodyPaths: string[] = []
+  for (const repo of repos) {
+    const file = bodyPathFor(deps.root, order, repo.lane)
+    await writeBody(file, prBody(order, shipment, { lane: repo.lane, opened: [] }))
+    bodyPaths.push(file)
+  }
+  return bodyPaths
+}
+
+/** Why nothing may be pushed yet, or null when the drafts can open now. */
+async function heldBeforePush(order: WorkOrder, deps: IntegrateDeps): Promise<string | null> {
+  if (!deps.autoOpen) {
+    return 'Opening a draft pull request is turned off, so nothing was pushed. The body is written and waiting.'
+  }
+  if (shipModeFor(order) === 'push_then_gate') return null
+  const chosen = await deps.decide(pushGate(order, deps.now()))
+  if (chosen === 'approve') return null
+  return `The ${gradeInWords(order.risk.grade)} shipping decision is waiting on you, so nothing was pushed yet.`
+}
+
+function pushGate(order: WorkOrder, at: string): Gate {
+  const triggers = order.risk.triggers.length === 0 ? '' : ` (${order.risk.triggers.join(', ')})`
+  return raiseGate({
+    id: `${order.id}-ship`,
+    rule: 'risk.p0',
+    orderId: order.id,
+    // The rule is named for the grade that made it unconditional; the grade
+    // that actually fired is carried here, because at P1 the id alone would
+    // read as wrong.
+    summary: `Push and open a draft pull request for ${order.title}?`,
+    why: `This order is graded ${gradeInWords(order.risk.grade)}, so the decision is taken before anything reaches the remote${triggers}.`,
+    riskGrade: order.risk.grade,
+    blockedUnits: order.plan.units.length,
+    at,
+  })
+}
+
+/** Every lane's draft, in merge order: kept, adopted or opened. */
+async function openLanes(
+  ship: Shipping,
+  repos: readonly ResolvedRepo[]
+): Promise<{ pulls: LanePullRequest[]; created: number }> {
+  const existing = await readPulls(ship.deps.root, ship.order.id)
+  const pulls: LanePullRequest[] = []
+  let created = 0
+  for (const repo of repos) {
+    const already = existing.find((pull) => pull.lane === repo.lane)
+    if (already !== undefined) {
+      await pushLane(repo, ship.deps)
+      pulls.push(already)
+    } else {
+      pulls.push(await openLane(ship, { repo, opened: pulls }))
+      created += 1
+    }
+  }
+  return { pulls, created }
+}
+
+/**
+ * Push one lane and open its draft, or adopt the one already open on its
+ * branch. The lanes this one waits on are open by now — the caller runs in
+ * merge order — so the cross-links in its body are real URLs rather than
+ * "merges before this".
+ */
+async function openLane(
+  { order, shipment, deps }: Shipping,
+  { repo, opened }: { repo: ResolvedRepo; opened: readonly LanePullRequest[] }
+): Promise<LanePullRequest> {
+  const bodyPath = bodyPathFor(deps.root, order, repo.lane)
+  await writeBody(bodyPath, prBody(order, shipment, { lane: repo.lane, opened }))
+  await pushLane(repo, deps)
+  const open = await findOpenPull(repo, deps)
+  if (open !== null) {
+    const adopted = await adoptPull(order, { repo, bodyPath, open }, deps)
+    await deps.record(
+      'ship.draft_adopted',
+      adopted.url,
+      `A pull request was already open on ${repo.headBranch}; Foundry adopted it instead of opening another.`
+    )
+    return adopted
+  }
+  const pull = await openDraft(order, { repo, bodyPath }, deps)
+  await deps.record('ship.draft_opened', pull.url, openedNote(order, { repo, opened }))
+  return pull
+}
+
+/** The ledger's note for a draft just opened, saying when the lane may not merge yet. */
+function openedNote(
+  order: WorkOrder,
+  { repo, opened }: { repo: ResolvedRepo; opened: readonly LanePullRequest[] }
+): string {
+  const held = mayMergeLane(
+    order,
+    repo.lane,
+    opened.map((pull) => pull.lane)
+  )
+  return held.allowed
+    ? `Draft pull request for lane ${repo.lane}.`
+    : `Draft pull request for lane ${repo.lane}, held from merging: ${held.reason ?? ''}`
+}
+
+/**
+ * Now every sibling URL exists, so the earlier lanes can name the later ones.
+ * This has to go back to GitHub — `gh pr create` read the file once and
+ * rewriting it afterwards changes a local file and nothing else, which would
+ * leave lane 1 permanently saying "merges after this". Never for the last
+ * lane, whose body already had every URL when it was created.
+ */
+async function crossLink({ order, shipment, deps }: Shipping, pulls: readonly LanePullRequest[]) {
+  for (const pull of pulls.slice(0, -1)) {
+    const body = prBody(order, shipment, { lane: pull.lane, opened: pulls })
+    const edited = await rewriteBody(pull, body, deps)
+    // A failed cross-link is cosmetic. The drafts are open and the work is
+    // pushed; losing that over a description would be the worse failure.
+    if (edited.exitCode !== 0) {
+      await deps.record(
+        'ship.crosslink_failed',
+        pull.url,
+        `The cross-links could not be written back: ${edited.stderr.trim()}`
+      )
+    }
+  }
 }
 
 /**
@@ -782,12 +850,12 @@ export async function openDrafts(
  */
 export async function refreshBodies(
   order: WorkOrder,
-  shipment: Shipment,
-  pulls: readonly LanePullRequest[],
+  { shipment, pulls }: { shipment: Shipment; pulls: readonly LanePullRequest[] },
   deps: IntegrateDeps
 ): Promise<void> {
   for (const pull of pulls) {
-    const edited = await rewriteBody(pull, prBody(order, shipment, pull.lane, pulls), deps)
+    const body = prBody(order, shipment, { lane: pull.lane, opened: pulls })
+    const edited = await rewriteBody(pull, body, deps)
     if (edited.exitCode !== 0) {
       await deps.record(
         'ship.body_refresh_failed',
@@ -809,23 +877,28 @@ export async function shipOrder(
 ): Promise<ShipOutcome> {
   const opened = await openDrafts(order, shipment, deps)
   if (opened.held) return opened
-  return watchAndFinish(order, shipment, opened.pulls, opened.bodyPaths, deps)
+  return watchAndFinish(order, { shipment, drafts: opened }, deps)
 }
 
 /** Watch the drafts' CI, then `finishShipping`. */
 export async function watchAndFinish(
   order: WorkOrder,
-  shipment: Shipment,
-  pulls: readonly LanePullRequest[],
-  bodyPaths: readonly string[],
+  { shipment, drafts }: { shipment: Shipment; drafts: OpenDrafts },
   deps: IntegrateDeps
 ): Promise<ShipOutcome> {
   // Watched before the ready-for-review gate is raised (D2): a draft whose
   // CI has not been watched, or is still red, is not "ready for review" —
   // it is a fix round away, or the automatic rounds already ran and it needs
   // the operator, not a gate that reads as if the work were done.
-  const ci: CiOutcome = deps.watchCi ? await deps.watchCi(pulls) : { kind: 'none' }
-  return finishShipping(order, shipment, pulls, bodyPaths, ci, deps)
+  const ci: CiOutcome = deps.watchCi ? await deps.watchCi(drafts.pulls) : { kind: 'none' }
+  return finishShipping(order, { shipment, drafts, ci }, deps)
+}
+
+/** How shipping came out: what shipped, the drafts it opened, and what CI said of them. */
+export interface ShippedDrafts {
+  readonly shipment: Shipment
+  readonly drafts: OpenDrafts
+  readonly ci: CiOutcome
 }
 
 /**
@@ -839,75 +912,79 @@ export async function watchAndFinish(
  */
 export async function finishShipping(
   order: WorkOrder,
-  shipment: Shipment,
-  pulls: readonly LanePullRequest[],
-  bodyPaths: readonly string[],
-  ci: CiOutcome,
+  shipped: ShippedDrafts,
   deps: IntegrateDeps
 ): Promise<ShipOutcome> {
+  const { drafts, ci } = shipped
+  const { pulls, bodyPaths } = drafts
   if (ci.kind === 'halted') {
     // The run that halted raised its own gate; raising another here would
     // be a second interruption for the one thing that already stopped.
     await deps.record('ship.ci_halted', order.id, ci.reason)
     return { pulls, bodyPaths, held: true, reason: ci.reason }
   }
-
   if (ci.kind === 'red') {
-    const names = ci.checks
-      .filter((check) => check.bucket === 'fail' || check.bucket === 'cancel')
-      .map((check) => check.name)
-      .join(', ')
-    const tail = ci.excerpt.split('\n').slice(-20).join('\n')
-    const gate = await raiseOnDrafts(
-      {
-        id: `${order.id}-ci-red`,
-        rule: 'ci.red',
-        summary: `CI is still red on ${names} for ${order.title}`,
-        why: `**${ci.rounds} automatic rounds ran and CI is still red.**\n\n\`\`\`\n${tail}\n\`\`\``,
-        pulls,
-        action: 'ship.ci_red',
-      },
-      order,
-      deps
-    )
+    const gate = await raiseOnDrafts(ciRedAsk(order, { pulls, ci }), order, deps)
     return { pulls, bodyPaths, held: true, reason: gate.why, gate }
   }
-
-  const ciNote =
-    ci.kind === 'green'
-      ? `CI passed: ${ci.checks.length} checks.`
-      : ci.kind === 'not_measured'
-        ? `CI not measured: ${ci.reason}.`
-        : ''
-
   // The decision the operator is finally offered (FR-057). Raised here rather
   // than by the executor because it is about the pull request, which does not
   // exist until now — and it is one of the four rules that stay live at every
   // autonomy setting, so a lights-out run reaches exactly this point and stops.
+  const gate = await raiseOnDrafts(readyAsk(order, shipped), order, deps)
+  return { pulls, bodyPaths, held: false, reason: '', gate }
+}
+
+function ciRedAsk(
+  order: WorkOrder,
+  { pulls, ci }: { pulls: readonly LanePullRequest[]; ci: Extract<CiOutcome, { kind: 'red' }> }
+): DraftsAsk {
+  const names = ci.checks
+    .filter((check) => check.bucket === 'fail' || check.bucket === 'cancel')
+    .map((check) => check.name)
+    .join(', ')
+  const tail = ci.excerpt.split('\n').slice(-20).join('\n')
+  return {
+    id: `${order.id}-ci-red`,
+    rule: 'ci.red',
+    summary: `CI is still red on ${names} for ${order.title}`,
+    why: `**${ci.rounds} automatic rounds ran and CI is still red.**\n\n\`\`\`\n${tail}\n\`\`\``,
+    pulls,
+    action: 'ship.ci_red',
+  }
+}
+
+function readyAsk(order: WorkOrder, { shipment, drafts, ci }: ShippedDrafts): DraftsAsk {
+  const { pulls } = drafts
+  return {
+    id: `${order.id}-ready`,
+    rule: 'ready-for-review',
+    summary: `Mark ${pulls.length === 1 ? 'the draft' : `${pulls.length} drafts`} for ${order.title} ready?`,
+    why: readyWhy(order, shipment, ciNoteFor(ci)),
+    pulls,
+    action: 'ship.ready_asked',
+  }
+}
+
+function ciNoteFor(ci: CiOutcome): string {
+  if (ci.kind === 'green') return `CI passed: ${ci.checks.length} checks.`
+  if (ci.kind === 'not_measured') return `CI not measured: ${ci.reason}.`
+  return ''
+}
+
+function readyWhy(order: WorkOrder, shipment: Shipment, ciNote: string): string {
+  const units = order.plan.units.length
   const unmeasured = shipment.ladder?.unmeasured ?? []
   const rules = shipment.rulesInForce ?? []
-  const gate = await raiseOnDrafts(
-    {
-      id: `${order.id}-ready`,
-      rule: 'ready-for-review',
-      summary: `Mark ${pulls.length === 1 ? 'the draft' : `${pulls.length} drafts`} for ${order.title} ready?`,
-      why: [
-        `**${order.plan.units.length} ${order.plan.units.length === 1 ? 'unit' : 'units'}.**${ciNote === '' ? '' : ` ${ciNote}`}`,
-        '### Acceptance\n\n' + acceptanceLines(order, shipment).join('\n'),
-        '### Inspection\n\n' + inspectionLines(shipment).join('\n'),
-        unmeasured.length === 0
-          ? ''
-          : '### Not measured here\n\n' + unmeasured.map((name) => `- ${name}`).join('\n'),
-        rules.length === 0 ? '' : '### Judged against\n\n' + rules.map(ruleBullet).join('\n'),
-      ]
-        .filter((block) => block !== '')
-        .join('\n\n'),
-      pulls,
-      action: 'ship.ready_asked',
-    },
-    order,
-    deps
-  )
-
-  return { pulls, bodyPaths, held: false, reason: '', gate }
+  return [
+    `**${units} ${units === 1 ? 'unit' : 'units'}.**${ciNote === '' ? '' : ` ${ciNote}`}`,
+    '### Acceptance\n\n' + acceptanceLines(order, shipment).join('\n'),
+    '### Inspection\n\n' + inspectionLines(shipment).join('\n'),
+    unmeasured.length === 0
+      ? ''
+      : '### Not measured here\n\n' + unmeasured.map((name) => `- ${name}`).join('\n'),
+    rules.length === 0 ? '' : '### Judged against\n\n' + rules.map(ruleBullet).join('\n'),
+  ]
+    .filter((block) => block !== '')
+    .join('\n\n')
 }
