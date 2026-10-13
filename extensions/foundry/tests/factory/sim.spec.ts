@@ -444,7 +444,7 @@ describe('breakroom walk paths', () => {
       const stationSeat = seatOf(map, crew.nodeId)
       if (stationSeat === null) continue
       const seat = restSeatById.get(crew.restSeat) as RestSeat
-      const walked = findPath(map.walk, stationSeat, seat.tile)
+      const walked = findPath(map.walk, { from: stationSeat, to: seat.tile })
       expect(walked.length).toBeGreaterThan(0)
       for (const tile of walked) {
         const key = `${tile.x},${tile.y}`

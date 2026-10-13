@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { routeBelts } from '../../src/factory/belts.js'
+import type { BeltFloor } from '../../src/factory/belts.js'
 import type { HallProp } from '../../src/factory/layout.js'
 import type { RunNode } from '../../src/line/run-graph.js'
 
@@ -48,6 +49,19 @@ function openFloor(width: number, height: number): boolean[][] {
   return Array.from({ length: height }, () => Array(width).fill(false))
 }
 
+/** The floor routeBelts runs over: these rows, between the top wall at row 0 and `roomRow`. */
+function floorOf(solid: boolean[][], role: string[], roomRow: number): BeltFloor {
+  return {
+    solid,
+    role,
+    blockedForBelt: new Set(),
+    width: solid[0].length,
+    height: solid.length,
+    topWallRow: 0,
+    roomRow,
+  }
+}
+
 function roleRows(height: number, stationRow: number): string[] {
   const role = Array(height).fill('wall')
   role[stationRow] = 'station'
@@ -74,7 +88,7 @@ function straightBeltsTests() {
     ])
     const solid = openFloor(10, 6)
     const role = roleRows(6, 2)
-    const { belts, beltTiles } = routeBelts(nodes, byNode, solid, role, new Set(), 10, 6, 0, 5)
+    const { belts, beltTiles } = routeBelts(nodes, byNode, floorOf(solid, role, 5))
     expect(belts).toHaveLength(1)
     const belt = belts[0]
     expect(belt.path[0]).toEqual({ x: a.x + a.w, y: a.y })
@@ -104,7 +118,7 @@ function splitsTests() {
     role[5] = 'station'
     role[6] = 'seat'
     role[7] = 'belt'
-    const { belts, beltTiles } = routeBelts(nodes, byNode, solid, role, new Set(), 8, 8, 0, 8)
+    const { belts, beltTiles } = routeBelts(nodes, byNode, floorOf(solid, role, 8))
     expect(belts).toHaveLength(2)
     const kinds = beltTiles.map((t) => t.kind)
     expect(kinds).toContain('split')
@@ -127,7 +141,7 @@ function bfsFallbackTests() {
     ])
     const solid = openFloor(6, 5)
     const role = Array(5).fill('wall')
-    const { belts } = routeBelts(nodes, byNode, solid, role, new Set(), 6, 5, 0, 4)
+    const { belts } = routeBelts(nodes, byNode, floorOf(solid, role, 4))
     expect(belts).toHaveLength(1)
     const belt = belts[0]
     expect(belt.path[0]).toEqual({ x: a.x + a.w, y: a.y })
@@ -147,7 +161,7 @@ function missingStationsTests() {
     const byNode = new Map([['b', b]])
     const solid = openFloor(6, 5)
     const role = roleRows(5, 2)
-    const { belts, beltTiles } = routeBelts(nodes, byNode, solid, role, new Set(), 6, 5, 0, 4)
+    const { belts, beltTiles } = routeBelts(nodes, byNode, floorOf(solid, role, 4))
     expect(belts).toEqual([])
     expect(beltTiles).toEqual([])
   })

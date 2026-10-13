@@ -17,7 +17,7 @@ describe('findPath', () => {
 function walkingAndDetoursTests() {
   it('walks a straight line when nothing is in the way', () => {
     const solid = grid(['.....', '.....', '.....'])
-    const path = findPath(solid, { x: 0, y: 1 }, { x: 3, y: 1 })
+    const path = findPath(solid, { from: { x: 0, y: 1 }, to: { x: 3, y: 1 } })
     expect(path).toEqual([
       { x: 1, y: 1 },
       { x: 2, y: 1 },
@@ -27,7 +27,7 @@ function walkingAndDetoursTests() {
 
   it('detours around a wall', () => {
     const solid = grid(['.....', '.###.', '.....'])
-    const path = findPath(solid, { x: 0, y: 1 }, { x: 4, y: 1 })
+    const path = findPath(solid, { from: { x: 0, y: 1 }, to: { x: 4, y: 1 } })
     expect(path.length).toBeGreaterThan(0)
     expect(path[path.length - 1]).toEqual({ x: 4, y: 1 })
     for (const tile of path.slice(0, -1)) {
@@ -46,19 +46,19 @@ function walkingAndDetoursTests() {
 function edgeCasesTests() {
   it('returns [] when the target is unreachable', () => {
     const solid = grid(['.....', '#####', '.....'])
-    const path = findPath(solid, { x: 0, y: 0 }, { x: 0, y: 2 })
+    const path = findPath(solid, { from: { x: 0, y: 0 }, to: { x: 0, y: 2 } })
     expect(path).toEqual([])
   })
 
   it('returns [] when from equals to', () => {
     const solid = grid(['.....'])
-    const path = findPath(solid, { x: 2, y: 0 }, { x: 2, y: 0 })
+    const path = findPath(solid, { from: { x: 2, y: 0 }, to: { x: 2, y: 0 } })
     expect(path).toEqual([])
   })
 
   it('allows a solid destination — a crew member can walk up to a station', () => {
     const solid = grid(['...', '..#'])
-    const path = findPath(solid, { x: 0, y: 0 }, { x: 2, y: 1 })
+    const path = findPath(solid, { from: { x: 0, y: 0 }, to: { x: 2, y: 1 } })
     expect(path[path.length - 1]).toEqual({ x: 2, y: 1 })
     expect(path.length).toBeGreaterThan(0)
   })
@@ -95,7 +95,7 @@ describe('distancesFrom', () => {
 describe('findPath with extra blocked tiles', () => {
   it('walks around a blocked tile without altering the grid', () => {
     const solid = grid(['.....', '.....', '.....'])
-    const path = findPath(solid, { x: 0, y: 1 }, { x: 4, y: 1 }, new Set(['2,1']))
+    const path = findPath(solid, { from: { x: 0, y: 1 }, to: { x: 4, y: 1 } }, new Set(['2,1']))
     expect(path.length).toBeGreaterThan(0)
     expect(path.some((t) => t.x === 2 && t.y === 1)).toBe(false)
     expect(path[path.length - 1]).toEqual({ x: 4, y: 1 })
@@ -104,12 +104,14 @@ describe('findPath with extra blocked tiles', () => {
 
   it('finds no path when the blocked tile closes a one-tile corridor', () => {
     const solid = grid(['#####', '.....', '#####'])
-    expect(findPath(solid, { x: 0, y: 1 }, { x: 4, y: 1 }, new Set(['2,1']))).toEqual([])
+    expect(findPath(solid, { from: { x: 0, y: 1 }, to: { x: 4, y: 1 } }, new Set(['2,1']))).toEqual(
+      []
+    )
   })
 
   it('still enters the goal when the goal is blocked', () => {
     const solid = grid(['.....'])
-    const path = findPath(solid, { x: 0, y: 0 }, { x: 3, y: 0 }, new Set(['3,0']))
+    const path = findPath(solid, { from: { x: 0, y: 0 }, to: { x: 3, y: 0 } }, new Set(['3,0']))
     expect(path[path.length - 1]).toEqual({ x: 3, y: 0 })
   })
 })

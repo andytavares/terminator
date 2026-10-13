@@ -442,7 +442,7 @@ function tickBlocked(map: HallMap, crew: Crew, others: readonly Crew[], dtMs: nu
       ...open.filter((t) => theirs.has(key(t))),
     ]
     for (const t of options) {
-      const onward = key(t) === key(goal) ? [] : findPath(map.walk, t, goal)
+      const onward = key(t) === key(goal) ? [] : findPath(map.walk, { from: t, to: goal })
       if (onward.length > 0 || key(t) === key(goal)) return reroute([t, ...onward])
     }
     return null
@@ -451,8 +451,7 @@ function tickBlocked(map: HallMap, crew: Crew, others: readonly Crew[], dtMs: nu
   if (occupant !== undefined && nextKey(occupant) === key(here) && outranks(occupant, crew)) {
     const around = findPath(
       map.walk,
-      here,
-      goal,
+      { from: here, to: goal },
       new Set([key(tileOf(occupant.x, occupant.y)), ...occupant.path.slice(0, 1).map(key)])
     )
     if (around.length > 0 && !claimed.has(key(around[0]))) return reroute(around)
@@ -460,7 +459,7 @@ function tickBlocked(map: HallMap, crew: Crew, others: readonly Crew[], dtMs: nu
   }
 
   if (blockedMs > REPLAN_AFTER_MS) {
-    const around = findPath(map.walk, here, goal, claimed)
+    const around = findPath(map.walk, { from: here, to: goal }, claimed)
     if (around.length > 0) return reroute(around)
     // Stuck behind someone who is stuck too: make room rather than wait for ever.
     if (occupant !== undefined && occupant.anim === 'idle' && occupant.path.length > 0) {
@@ -476,7 +475,7 @@ function tickCrew(map: HallMap, crew: Crew, others: readonly Crew[], dtSec: numb
 
   let path = crew.path
   if (path.length === 0 && crew.goal !== null) {
-    path = findPath(map.walk, tileOf(crew.x, crew.y), crew.goal)
+    path = findPath(map.walk, { from: tileOf(crew.x, crew.y), to: crew.goal })
     if (path.length === 0) {
       // Already there, or nothing found: arrival either way.
       return { ...crew, goal: null, anim: crew.then, facing: crew.settle ?? crew.facing }

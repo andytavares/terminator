@@ -247,7 +247,7 @@ function reachabilityTests({ map }: Pick<LaidOut, 'map'>) {
     ]
     expect(targets.length).toBeGreaterThan(0)
     for (const target of targets) {
-      const p = findPath(map.walk, map.anchors.intake, target)
+      const p = findPath(map.walk, { from: map.anchors.intake, to: target })
       expect(p.length).toBeGreaterThan(0)
       expect(p[p.length - 1]).toEqual(target)
     }
