@@ -1,12 +1,12 @@
 import { z } from 'zod'
 import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import type { FileDiff } from '../../schemas/git.schema.js'
-import { parseDiff } from '../../github/pr-review-service.js'
+import { parsePrFileDiff } from '../../github/pr-review-service.js'
 import { runGit, type GitRunOptions } from '../../shell/run-git.js'
 import { RepoRoot, parseRemoteRepo } from '../repo-root.js'
 import { VALIDATION_ERROR, errorEnvelope } from '../register.js'
 import { isOverflow, type GithubContext } from './context.js'
-import { filesMetrics } from './file-metrics.js'
+import { measureFiles } from './file-metrics.js'
 
 /** One file of a pull request, at the head the caller last saw when it knows it. */
 interface PrFile {
@@ -49,7 +49,7 @@ async function remoteFileDiff(ctx: GithubContext, file: PrFile): Promise<FileDif
     jq: '[.[] | {filename, patch}]',
   })
   const files = JSON.parse(filesRaw) as Array<{ filename: string; patch?: string }>
-  return parseDiff(files.find((f) => f.filename === file.path)?.patch ?? '', file.path)
+  return parsePrFileDiff(files.find((f) => f.filename === file.path)?.patch ?? '', file.path)
 }
 
 /** Where the PR branched from its base; fetched once per head the caller names. */
@@ -58,36 +58,37 @@ async function mergeBaseOf(ctx: GithubContext, file: PrFile): Promise<string> {
   const cached = ctx.prDiffBases.get(cacheKey)
   if (file.headSHA && cached?.headSHA === file.headSHA) return cached.mergeBase
   await fetchPullRef(file.repoRoot, file.prNumber)
-  const view = () =>
+  const viewAtRef = () =>
     ctx.github.pullRequests.view(ctx.target(file.repoRoot), file.prNumber, ['baseRefName'])
-  const baseRefName = file.baseRef ?? String((await view()).baseRefName)
+  const baseRefName = file.baseRef ?? String((await viewAtRef()).baseRefName)
   const args = ['merge-base', `origin/${baseRefName}`, pullRef(file.prNumber)]
   const mergeBase = (await runGit(file.repoRoot, args)).trim()
   if (file.headSHA) ctx.prDiffBases.set(cacheKey, { headSHA: file.headSHA, mergeBase })
   return mergeBase
 }
 
-async function prFileDiff(ctx: GithubContext, file: PrFile): Promise<{ diff: FileDiff }> {
+async function loadPrFileDiff(ctx: GithubContext, file: PrFile): Promise<{ diff: FileDiff }> {
   if (parseRemoteRepo(file.repoRoot)) return { diff: await remoteFileDiff(ctx, file) }
   const mergeBase = await mergeBaseOf(ctx, file)
   const range = `${mergeBase}...${pullRef(file.prNumber)}`
   const diffRaw = await runGit(file.repoRoot, ['diff', range, '--', file.path])
-  return { diff: parseDiff(diffRaw, file.path) }
+  return { diff: parsePrFileDiff(diffRaw, file.path) }
 }
 
 /** The file at `ref` in the checkout, fetching the PR head when it is not there yet. */
 async function localFileAt(file: PrFile, ref: string): Promise<string> {
-  const show = () => runGit(file.repoRoot, ['show', `${ref}:${file.path}`], FILE_CONTENT_OUTPUT)
+  const showAtRef = () =>
+    runGit(file.repoRoot, ['show', `${ref}:${file.path}`], FILE_CONTENT_OUTPUT)
   try {
-    return await show()
+    return await showAtRef()
   } catch (e) {
     if (isOverflow(e)) throw e
     await fetchPullRef(file.repoRoot, file.prNumber)
-    return show()
+    return showAtRef()
   }
 }
 
-async function prFileContent(ctx: GithubContext, file: PrFile, ref: string) {
+async function readPrFileContent(ctx: GithubContext, file: PrFile, ref: string) {
   let content: string
   if (parseRemoteRepo(file.repoRoot)) {
     const encodedPath = file.path.split('/').map(encodeURIComponent).join('/')
@@ -112,21 +113,21 @@ export function prFileChannels(ctx: GithubContext): ChannelSpec[] {
         headSHA: z.string().min(1).optional(),
       }),
       invalid: VALIDATION_ERROR,
-      run: (file) => prFileDiff(ctx, file),
+      run: (file) => loadPrFileDiff(ctx, file),
       onError: errorEnvelope,
     }),
     defineChannel({
       channel: 'github:pr-file-content',
       schema: PrFilePayload.extend({ ref: z.string().min(1) }),
       invalid: VALIDATION_ERROR,
-      run: ({ ref, ...file }) => prFileContent(ctx, file, ref),
+      run: ({ ref, ...file }) => readPrFileContent(ctx, file, ref),
       onError: (e) => (isOverflow(e) ? { tooLarge: true } : errorEnvelope(e)),
     }),
     defineChannel({
       channel: 'github:files-metrics',
       schema: z.object({ repoRoot: RepoRoot, paths: z.array(z.string().min(1)) }),
       invalid: VALIDATION_ERROR,
-      run: async ({ repoRoot, paths }) => ({ metrics: await filesMetrics(repoRoot, paths) }),
+      run: async ({ repoRoot, paths }) => ({ metrics: await measureFiles(repoRoot, paths) }),
       onError: errorEnvelope,
     }),
   ]

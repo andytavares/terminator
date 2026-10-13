@@ -1,14 +1,14 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
-import { installBridge, eventually, task } from './helpers/bridge'
+import { installVaultBridge, eventually, task } from './helpers/bridge'
 import { invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 import { AreasView } from '../../src/components/AreasView'
 
 vi.setConfig({ testTimeout: 30_000 })
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 function areaProject(name: string, open: number, total = 4) {
   return {
@@ -58,7 +58,7 @@ const OLD = {
 
 beforeEach(() => {
   invalidateSmartInputCache()
-  bridge = installBridge({
+  bridge = installVaultBridge({
     extension: { getSettingsValues: vi.fn().mockResolvedValue({ values: {} }) },
   })
   bridge.responses['task-vault:vault:list-areas'] = (payload: unknown) => {
@@ -79,18 +79,18 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-async function openWork() {
+async function openWorkArea() {
   render(<AreasView />)
   fireEvent.click(await screen.findByText('Work'))
   await screen.findByRole('button', { name: 'Rename area' })
 }
 
-describe('AreasView list', listTests)
-describe('AreasView creating and archiving', createTests)
+describe('AreasView list', areaListTests)
+describe('AreasView creating and archiving', areaCreateTests)
 describe('AreaDetail tasks', detailTaskTests)
 describe('AreaDetail renaming and projects', detailRenameTests)
 
-function listTests() {
+function areaListTests() {
   describe('shows each area', listShowsEachAreaTests)
   describe('shows an error', listShowsAnErrorTests)
 }
@@ -164,7 +164,7 @@ function listShowsAnErrorTests() {
   })
 }
 
-function createTests() {
+function areaCreateTests() {
   describe('creates an area', createCreatesAnAreaTests)
   describe('cancels creating with', createCancelsCreatingWithTests)
 }
@@ -219,7 +219,7 @@ function detailTaskTests() {
 
 function detailTaskAddsATaskTests() {
   it('adds a task tagged with the area, unless already tagged', async () => {
-    await openWork()
+    await openWorkArea()
     const input = screen.getAllByRole('textbox')[0]
     fireEvent.change(input, { target: { value: 'call bob' } })
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
@@ -243,7 +243,7 @@ function detailTaskAddsATaskTests() {
 
 function detailTaskCompletesAnOpenTests() {
   it('completes an open task and restores a finished one', async () => {
-    await openWork()
+    await openWorkArea()
     fireEvent.click(screen.getByTitle('Complete'))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:complete-task')).toEqual([{ taskId: 'w1' }])
@@ -255,7 +255,7 @@ function detailTaskCompletesAnOpenTests() {
   })
 
   it('edits an open task from its tagged text, and cancels an edit', async () => {
-    await openWork()
+    await openWorkArea()
     fireEvent.doubleClick(screen.getByText('Plan sprint'))
     const field = screen.getAllByRole('textbox')[1] as HTMLInputElement
     expect(field.value).toBe('Plan sprint @Launch +desk #Work due:2026-02-01')
@@ -279,7 +279,7 @@ function detailRenameTests() {
 
 function detailRenameRenamesTheAreaTests() {
   it('renames the area, showing a failure, and cancels with Escape', async () => {
-    await openWork()
+    await openWorkArea()
     fireEvent.click(screen.getByRole('button', { name: 'Rename area' }))
     const input = screen.getByDisplayValue('Work')
     bridge.responses['task-vault:vault:rename-area'] = { error: 'AREA_EXISTS' }
@@ -303,7 +303,7 @@ function detailRenameRenamesTheAreaTests() {
 
 function detailRenameClosesTheRenameTests() {
   it('closes the rename without a call when the name is unchanged, or cancelled', async () => {
-    await openWork()
+    await openWorkArea()
     fireEvent.click(screen.getByRole('button', { name: 'Rename area' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     fireEvent.click(screen.getByRole('button', { name: 'Rename area' }))
@@ -312,7 +312,7 @@ function detailRenameClosesTheRenameTests() {
   })
 
   it('opens a project, and archives the area from its header', async () => {
-    await openWork()
+    await openWorkArea()
     expect(screen.getByText('Projects (4)')).toBeTruthy()
     expect(screen.getByText('2 open · 50% done')).toBeTruthy()
     fireEvent.click(screen.getByText('@Beta'))

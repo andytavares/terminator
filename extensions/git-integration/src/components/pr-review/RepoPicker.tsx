@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Dialog, formatRelativeTime } from '@terminator/extension-ui'
 import { Lock } from 'lucide-react'
 import { githubAPI } from '../../api/github'
+import { errorMessageOf } from '../text'
 
 interface Repo {
   fullName: string
@@ -49,16 +50,11 @@ function GroupCheckbox(props: GroupCheckboxProps): JSX.Element {
   )
 }
 
-function errorText(err: unknown): string {
-  if (err instanceof Error) return err.message
-  return String(err)
-}
-
 async function fetchAccessibleRepos(refresh: boolean): Promise<Loaded> {
   try {
     return (await githubAPI.accessibleRepos(refresh)) as Loaded
   } catch (err) {
-    return { error: errorText(err) }
+    return { error: errorMessageOf(err) }
   }
 }
 
@@ -80,7 +76,7 @@ function groupRepos(repos: Repo[], query: string) {
   return { shown, byOwner: [...byOwner.entries()] }
 }
 
-function toggled(prev: Set<string>, fullName: string): Set<string> {
+function toggledRepo(prev: Set<string>, fullName: string): Set<string> {
   const next = new Set(prev)
   if (!next.delete(fullName)) next.add(fullName)
   return next
@@ -127,7 +123,7 @@ function useRepoSelection(initial: string[], onSaved: () => void) {
       await githubAPI.setReviewRepos([...selected])
       onSaved()
     } catch (err) {
-      setSaveError(errorText(err))
+      setSaveError(errorMessageOf(err))
       setSaving(false)
     }
   }
@@ -149,7 +145,7 @@ function RepoRow(props: { repo: Repo; sel: Selection }) {
         aria-label={r.fullName}
         type="checkbox"
         checked={sel.selected.has(r.fullName)}
-        onChange={() => sel.setSelected((prev) => toggled(prev, r.fullName))}
+        onChange={() => sel.setSelected((prev) => toggledRepo(prev, r.fullName))}
       />
       <span className="rp-name">{r.fullName}</span>
       {r.private && (
@@ -227,7 +223,7 @@ interface RepoListProps {
   search: { query: string; setQuery: (q: string) => void }
 }
 
-function RepoList(props: RepoListProps) {
+function PickerRepoList(props: RepoListProps) {
   const { query, setQuery } = props.search
   const groups = useMemo(() => groupRepos(props.repos, query), [props.repos, query])
   const { sel } = props
@@ -281,7 +277,7 @@ export function RepoPicker({ initial, onClose, onSaved }: Props): JSX.Element {
           <LoadError error={loaded.error} onRetry={() => void load(false)} />
         )}
         {loaded !== null && 'repos' in loaded && (
-          <RepoList repos={repos} sel={sel} load={load} search={{ query, setQuery }} />
+          <PickerRepoList repos={repos} sel={sel} load={load} search={{ query, setQuery }} />
         )}
         {sel.saveError && (
           <div className="rp-error" role="alert">

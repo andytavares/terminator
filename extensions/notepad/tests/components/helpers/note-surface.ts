@@ -1,31 +1,21 @@
 import { vi } from 'vitest'
 import { EditorView } from '@codemirror/view'
 import type { Comment, NoteListItem } from '../../../src/db/types'
+import { installExtensionBridge } from '../../../../../tests/support/extension-bridge'
 
-/** Answers bridge invokes by channel, and lets a test push to bridge subscribers. */
-export function installBridge() {
-  const responses: Record<string, unknown> = {}
-  const handlers = new Map<string, (data: unknown) => void>()
-  const invoke = vi.fn(async (channel: string) => responses[channel] ?? { data: [] })
-  const on = vi.fn((channel: string, handler: (data: unknown) => void) => {
-    handlers.set(channel, handler)
-    return () => handlers.delete(channel)
-  })
-  Object.defineProperty(window, 'electronAPI', {
-    value: {
-      extensionBridge: { invoke, on },
+export { eventually } from '../../../../../tests/support/extension-bridge'
+
+/** The extension bridge as Notepad's views see it: unanswered channels list nothing. */
+export function installNotepadBridge() {
+  return installExtensionBridge(
+    { data: [] },
+    {
       extension: {
         getSettingsValues: vi.fn().mockResolvedValue({ values: {} }),
         onSettingsChanged: vi.fn(() => () => {}),
       },
-    },
-    writable: true,
-    configurable: true,
-  })
-  const push = (channel: string, data: unknown) => handlers.get(channel)?.(data)
-  const calls = (channel: string) =>
-    invoke.mock.calls.filter(([ch]) => ch === channel).map((call) => (call as unknown[])[1])
-  return { responses, invoke, push, calls }
+    }
+  )
 }
 
 /** Answers getSettingsValues with `values`, as Notepad's settings page stores them. */
@@ -52,7 +42,7 @@ export function listItem(id: string, title: string, tags: string[] = []): NoteLi
   }
 }
 
-export function comment(id: string, quote: string, offsets: [number, number]): Comment {
+export function anchoredComment(id: string, quote: string, offsets: [number, number]): Comment {
   return {
     id,
     noteId: 'n1',
@@ -72,7 +62,7 @@ export function comment(id: string, quote: string, offsets: [number, number]): C
 }
 
 /** The live CodeMirror view the surface mounted. */
-export function editorView(): EditorView {
+export function mountedEditorView(): EditorView {
   const dom = document.querySelector<HTMLElement>('.cm-editor')
   if (!dom) throw new Error('no editor mounted')
   const view = EditorView.findFromDOM(dom)
@@ -82,11 +72,6 @@ export function editorView(): EditorView {
 
 /** Types at the end of the document, as a local edit. */
 export function typeAtEnd(text: string): void {
-  const view = editorView()
+  const view = mountedEditorView()
   view.dispatch({ changes: { from: view.state.doc.length, insert: text } })
-}
-
-/** Waits for an assertion to hold, allowing for a loaded machine. */
-export function eventually(assertion: () => void, timeout = 8000) {
-  return vi.waitFor(assertion, { timeout })
 }

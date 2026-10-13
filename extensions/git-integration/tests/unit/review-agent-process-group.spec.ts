@@ -5,10 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runAgentReview, type RunAgentReviewInput } from '../../src/review/review-agent'
 
-// A real `claude` starts processes of its own (its tools' shells, MCP servers).
-// Cancelling a review, which the extension does for every run as it is
-// deactivated, must end those too, not only `claude`. The stand-in claude here
-// starts a `sleep` and writes the sleep's pid down.
+// A real `claude` starts processes of its own (tools' shells, MCP servers); cancelling a review,
+// as deactivation does for every run, must end those too. This stand-in claude starts a `sleep`
+// and writes its pid down.
 
 const scratch = mkdtempSync(join(tmpdir(), 'review-agent-group-'))
 const pidFile = join(scratch, 'grandchild.pid')
@@ -33,7 +32,7 @@ const input: RunAgentReviewInput = {
 }
 
 /** Running, and not a zombie waiting for its new parent to reap it. */
-function isAlive(pid: number): boolean {
+function isProcessAlive(pid: number): boolean {
   try {
     const state = execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' })
     return !state.startsWith('Z')
@@ -44,15 +43,18 @@ function isAlive(pid: number): boolean {
 
 describe('runAgentReview — cancelling a running claude', () => {
   it('ends the processes claude started as well as claude', async () => {
-    const exec = async () => ({ stdout: 'diff' })
-    const { done, cancel } = runAgentReview(input, { exec, resolveClaude: async () => claude })
+    const execDiff = async () => ({ stdout: 'diff' })
+    const { done, cancel } = runAgentReview(input, {
+      exec: execDiff,
+      resolveClaude: async () => claude,
+    })
     await expect.poll(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8') !== '').toBe(true)
     const grandchild = Number(readFileSync(pidFile, 'utf8'))
 
     cancel()
 
     expect((await done).status).toBe('cancelled')
-    await expect.poll(() => isAlive(grandchild)).toBe(false)
+    await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
   })
 })
 
@@ -62,15 +64,15 @@ describe('runAgentReview — cancelling while claude is looked up', () => {
   it('ends the login shell, and what it started, at once', async () => {
     rmSync(pidFile, { force: true })
     vi.stubEnv('SHELL', claude)
-    const exec = async () => ({ stdout: 'diff' })
-    const { done, cancel } = runAgentReview(input, { exec })
+    const execDiff = async () => ({ stdout: 'diff' })
+    const { done, cancel } = runAgentReview(input, { exec: execDiff })
     await expect.poll(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8') !== '').toBe(true)
     const grandchild = Number(readFileSync(pidFile, 'utf8'))
 
     cancel()
 
     expect((await done).status).toBe('cancelled')
-    await expect.poll(() => isAlive(grandchild)).toBe(false)
+    await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
     vi.unstubAllEnvs()
   })
 })

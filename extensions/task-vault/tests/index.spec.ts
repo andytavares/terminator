@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { partialFake } from '../../../tests/support/fakes'
+import { disposableSpy } from './support/disposable'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
@@ -34,17 +35,15 @@ vi.mock('../src/navigation.js', () => ({
   popPendingNavigation: vi.fn(),
 }))
 
-const disposable = () => ({ dispose: vi.fn() })
-
 /** The API Task Vault activates with; settings not in `settings` read as '0'. */
 function makeApi(settings: Record<string, unknown> = {}) {
-  const commandsRegister = vi.fn<ExtensionAPI['commands']['register']>(disposable)
-  const globalShortcutRegister = vi.fn(async () => disposable())
+  const commandsRegister = vi.fn<ExtensionAPI['commands']['register']>(disposableSpy)
+  const globalShortcutRegister = vi.fn(async () => disposableSpy())
   const api = partialFake<ExtensionAPI>({
     db: partialFake<ExtensionAPI['db']>({ get: vi.fn(async () => undefined) }),
-    ipc: partialFake<ExtensionAPI['ipc']>({ registerHandler: vi.fn(disposable) }),
+    ipc: partialFake<ExtensionAPI['ipc']>({ registerHandler: vi.fn(disposableSpy) }),
     settings: partialFake<ExtensionAPI['settings']>({
-      register: vi.fn(disposable),
+      register: vi.fn(disposableSpy),
       get: <T>(key: string) => (settings[key] ?? '0') as T,
     }),
     window: partialFake<ExtensionAPI['window']>({
@@ -54,9 +53,9 @@ function makeApi(settings: Record<string, unknown> = {}) {
     }),
     notifications: partialFake<ExtensionAPI['notifications']>({
       showToast: vi.fn(),
-      createNotification: vi.fn(disposable),
+      createNotification: vi.fn(disposableSpy),
     }),
-    nativeMenu: partialFake<ExtensionAPI['nativeMenu']>({ addViewMenuItem: vi.fn(disposable) }),
+    nativeMenu: partialFake<ExtensionAPI['nativeMenu']>({ addViewMenuItem: vi.fn(disposableSpy) }),
     globalShortcut: partialFake<ExtensionAPI['globalShortcut']>({
       register: globalShortcutRegister,
     }),

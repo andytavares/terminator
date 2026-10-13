@@ -2,10 +2,9 @@ import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { hashPassword } from '../../src/server/password-hash'
 
-// The remote server and fastify cost the extension host 25 MB (docs/research/perf/
-// 2026-10-12-extension-host.md). They load when Remote Control is turned on, not
-// when the extension activates with it off, which is the default. Vitest runs a
-// vi.mock factory when the module is first imported, so `loaded` records it.
+// The server and fastify cost the host 25 MB (docs/research/perf/2026-10-12-extension-host.md),
+// so they load when Remote Control is turned on, not on activation. Vitest runs a vi.mock
+// factory when the module is first imported, so `loaded` records it.
 
 const loaded = vi.hoisted(() => ({ server: false }))
 const createRemoteServer = vi.hoisted(() => vi.fn())
@@ -18,7 +17,7 @@ vi.mock('../../src/server/remote-server', () => {
 const settings = new Map<string, unknown>()
 const specs: ChannelSpec[] = []
 
-function api() {
+function fakeHostApi() {
   return {
     settings: {
       register: vi.fn(),
@@ -33,7 +32,7 @@ function api() {
   }
 }
 
-const toggle = (enabled: boolean) =>
+const toggleRemote = (enabled: boolean) =>
   dispatchChannel(specs.find((spec) => spec.channel === 'remote:toggle')!, { enabled })
 
 beforeAll(async () => {
@@ -52,10 +51,10 @@ beforeAll(async () => {
 describe('the remote server', () => {
   it('is not loaded while Remote Control is off, and is once it is turned on', async () => {
     const { activate } = await import('../../src/index.ts')
-    activate(api() as never)
+    activate(fakeHostApi() as never)
     expect(loaded.server).toBe(false)
 
-    await toggle(true)
+    await toggleRemote(true)
 
     await vi.waitFor(() => expect(createRemoteServer).toHaveBeenCalled())
     expect(loaded.server).toBe(true)

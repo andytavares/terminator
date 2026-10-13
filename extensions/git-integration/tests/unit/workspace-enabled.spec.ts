@@ -3,10 +3,9 @@ import { dispatchChannel } from '@terminator/extension-sdk'
 import { activateInWorkspaces, type FakeWorkspace } from './support/activate'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 
-// "Enable Git Integration" is workspace-scoped: a workspace may switch the
-// extension off for its own repositories, or on while it is off globally.
-// Switched off where a repository is, a channel answers GIT_DISABLED and runs
-// no git.
+// "Enable Git Integration" is workspace-scoped: a workspace may switch it off for its own
+// repositories, or on while it is off globally. Switched off, a channel answers GIT_DISABLED and
+// runs no git.
 
 const ENABLED = 'terminator.git-integration.git.enabled'
 

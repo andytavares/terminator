@@ -16,11 +16,9 @@ interface KeyedSession {
 const sessionStore = () => namedStore('pr-review-sessions')
 const activeReviewStore = () => namedStore('pr-active-reviews')
 
-/**
- * One session per PR. v2 keys are "repo:::pr"; v1 keys are "repo:::pr:::sha".
- * When both exist for the same PR, the new key wins — it's the one v2 code keeps current.
- */
-export function sessionsForRepo(
+/** One session per PR. v2 keys are "repo:::pr"; v1 keys are "repo:::pr:::sha". When both exist for
+ *  a PR the v2 key wins: it is the one v2 code keeps current. */
+export function storedSessionsForRepo(
   stored: Record<string, unknown>,
   repoRoot: string
 ): ReviewSession[] {
@@ -54,11 +52,9 @@ async function activeReviewsFor(repoRoot: string): Promise<unknown[]> {
     .map((entry) => entry.pr)
 }
 
-/**
- * Forgets a PR: its active-review snapshot and its sessions, "repo:::pr" and v1's
- * "repo:::pr:::sha", so it does not reappear as in progress on the next load.
- */
-async function removeActiveReview(repoRoot: string, prNumber: number): Promise<void> {
+/** Forgets a PR: its active-review snapshot and its sessions, "repo:::pr" and v1's
+ *  "repo:::pr:::sha", so it does not reappear as in progress on the next load. */
+async function forgetActiveReview(repoRoot: string, prNumber: number): Promise<void> {
   const [activeReviews, sessions] = await Promise.all([activeReviewStore(), sessionStore()])
   activeReviews.delete(`${repoRoot}:${prNumber}`)
   const sessionKey = `${repoRoot}:::${prNumber}`
@@ -68,7 +64,7 @@ async function removeActiveReview(repoRoot: string, prNumber: number): Promise<v
 }
 
 /** The given PRs still open on GitHub; a closed or merged one loses its snapshot. */
-async function pruneActiveReviews(ctx: GithubContext, repoRoot: string, prNumbers: number[]) {
+async function pruneStoredActiveReviews(ctx: GithubContext, repoRoot: string, prNumbers: number[]) {
   const results = await Promise.allSettled(
     prNumbers.map(async (num) => {
       const data = await ctx.github.pullRequests.view(ctx.target(repoRoot), num, [
@@ -93,7 +89,9 @@ function sessionsForRepoChannel(): ChannelSpec {
     channel: 'github:sessions-for-repo',
     schema: RepoRootPayload,
     invalid: { sessions: [] },
-    run: async ({ repoRoot }) => ({ sessions: sessionsForRepo(await storedSessions(), repoRoot) }),
+    run: async ({ repoRoot }) => ({
+      sessions: storedSessionsForRepo(await storedSessions(), repoRoot),
+    }),
   })
 }
 
@@ -127,10 +125,8 @@ function sessionChannels(): ChannelSpec[] {
   return [sessionsForRepoChannel(), sessionGetChannel(), sessionSetChannel()]
 }
 
-/**
- * A ReviewQueuePR snapshot per in-progress review, keyed "<repoRoot>:<prNumber>", so it shows
- * on every load whichever page it falls on; removed when dismissed or closed.
- */
+/** A ReviewQueuePR snapshot per in-progress review, keyed "<repoRoot>:<prNumber>", so it shows on
+ *  every load whichever page it falls on; removed when dismissed or closed. */
 function saveActiveReviewChannel(): ChannelSpec {
   return defineChannel({
     channel: 'github:save-active-review',
@@ -161,7 +157,7 @@ function removeActiveReviewChannel(): ChannelSpec {
     schema: PullRequestPayload,
     invalid: VALIDATION_ERROR,
     run: async ({ repoRoot, prNumber }) => {
-      await removeActiveReview(repoRoot, prNumber)
+      await forgetActiveReview(repoRoot, prNumber)
       return { ok: true as const }
     },
     onError: errorEnvelope,
@@ -174,7 +170,9 @@ function pruneActiveReviewsChannel(ctx: GithubContext): ChannelSpec {
     schema: z.object({ repoRoot: RepoRoot, prNumbers: z.array(z.number().int().positive()) }),
     invalid: VALIDATION_ERROR,
     run: ({ repoRoot, prNumbers }) =>
-      prNumbers.length === 0 ? { openNumbers: [] } : pruneActiveReviews(ctx, repoRoot, prNumbers),
+      prNumbers.length === 0
+        ? { openNumbers: [] }
+        : pruneStoredActiveReviews(ctx, repoRoot, prNumbers),
     onError: catchError,
   })
 }

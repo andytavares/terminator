@@ -1,26 +1,32 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
-import { installBridge, eventually, task } from './helpers/bridge'
+import { installVaultBridge, eventually, task, dayFromToday } from './helpers/bridge'
 
 /** The props each stubbed view was last rendered with. */
 const seen: Record<string, Record<string, unknown>> = {}
-function stub(name: string) {
+function stubComponent(name: string) {
   return (props: Record<string, unknown>) => {
     seen[name] = props
     return <div data-testid={name} />
   }
 }
-vi.mock('../../src/components/DailyLog', () => ({ DailyLog: stub('daily') }))
-vi.mock('../../src/components/CalendarDrawer', () => ({ CalendarDrawer: stub('calendar') }))
-vi.mock('../../src/components/KanbanBoard', () => ({ KanbanBoard: stub('kanban') }))
-vi.mock('../../src/components/InboxView', () => ({ InboxView: stub('inbox') }))
-vi.mock('../../src/components/ProjectsBrowser', () => ({ ProjectsBrowser: stub('projects') }))
-vi.mock('../../src/components/AreasView', () => ({ AreasView: stub('areas') }))
-vi.mock('../../src/components/ArchiveView', () => ({ ArchiveView: stub('archive') }))
-vi.mock('../../src/components/WeeklyReview', () => ({ WeeklyReview: stub('review') }))
-vi.mock('../../src/components/DatabaseAdmin', () => ({ DatabaseAdmin: stub('admin') }))
-vi.mock('../../src/components/TaskDetailPanel', () => ({ TaskDetailPanel: stub('detail') }))
+vi.mock('../../src/components/DailyLog', () => ({ DailyLog: stubComponent('daily') }))
+vi.mock('../../src/components/CalendarDrawer', () => ({
+  CalendarDrawer: stubComponent('calendar'),
+}))
+vi.mock('../../src/components/KanbanBoard', () => ({ KanbanBoard: stubComponent('kanban') }))
+vi.mock('../../src/components/InboxView', () => ({ InboxView: stubComponent('inbox') }))
+vi.mock('../../src/components/ProjectsBrowser', () => ({
+  ProjectsBrowser: stubComponent('projects'),
+}))
+vi.mock('../../src/components/AreasView', () => ({ AreasView: stubComponent('areas') }))
+vi.mock('../../src/components/ArchiveView', () => ({ ArchiveView: stubComponent('archive') }))
+vi.mock('../../src/components/WeeklyReview', () => ({ WeeklyReview: stubComponent('review') }))
+vi.mock('../../src/components/DatabaseAdmin', () => ({ DatabaseAdmin: stubComponent('admin') }))
+vi.mock('../../src/components/TaskDetailPanel', () => ({
+  TaskDetailPanel: stubComponent('detail'),
+}))
 vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
 
 import { TaskVaultView, CaptureModal } from '../../src/components/TaskVaultView'
@@ -32,16 +38,10 @@ import { partialFake } from '../../../../tests/support/fakes'
 
 vi.setConfig({ testTimeout: 30_000 })
 
-let bridge: ReturnType<typeof installBridge>
-
-function localToday(offset = 0): string {
-  const d = new Date()
-  d.setDate(d.getDate() + offset)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+let bridge: ReturnType<typeof installVaultBridge>
 
 const LOG = {
-  date: localToday(),
+  date: dayFromToday(),
   filePath: 'daily',
   tasks: [task('t1', 'Write'), task('t2', 'Read')],
   exists: true,
@@ -50,7 +50,7 @@ const LOG = {
 beforeEach(() => {
   vi.mocked(notify).mockClear()
   for (const key of Object.keys(seen)) delete seen[key]
-  bridge = installBridge({
+  bridge = installVaultBridge({
     extension: { getSettingsValues: vi.fn().mockResolvedValue({ values: {} }) },
   })
   bridge.responses['task-vault:vault:get-today'] = LOG
@@ -78,15 +78,15 @@ beforeEach(() => {
 
 afterEach(() => cleanup())
 
-async function renderView() {
+async function renderVaultView() {
   render(<TaskVaultView />)
   await screen.findByTestId('daily')
   return seen.daily
 }
 
-const daily = () => seen.daily as Record<string, (...args: unknown[]) => unknown>
+const dailyLogProps = () => seen.daily as Record<string, (...args: unknown[]) => unknown>
 
-describe('TaskVaultView loading', loadingTests)
+describe('TaskVaultView loading', viewLoadingTests)
 describe('TaskVaultView views', viewSwitchTests)
 describe('TaskVaultView daily handlers', dailyTests)
 describe('TaskVaultView days and selection', daySelectionTests)
@@ -97,9 +97,9 @@ describe('TaskVaultView data tools', dataToolsTests)
 describe('TaskVaultView import', importTests)
 describe('CaptureModal', captureTests)
 
-function loadingTests() {
+function viewLoadingTests() {
   it('loads today, the inbox count, contexts, someday tasks and lanes', async () => {
-    await renderView()
+    await renderVaultView()
     expect(useVaultDataStore.getState().inboxCount).toBe(1)
     expect(useVaultDataStore.getState().kanbanLanes).toHaveLength(1)
     expect(seen.daily.isToday).toBe(true)
@@ -108,7 +108,7 @@ function loadingTests() {
 
   it('loads the viewed date instead of today, and reloads on pushes', async () => {
     useVaultNavStore.setState({ viewingDate: '2026-01-02' })
-    await renderView()
+    await renderVaultView()
     expect(bridge.calls('task-vault:vault:get-daily')).toEqual([{ date: '2026-01-02' }])
     await act(async () => bridge.push('task-vault:push:index-updated', {}))
     await act(async () => bridge.push('task-vault:push:file-changed-externally', {}))
@@ -119,7 +119,7 @@ function loadingTests() {
 
 function viewSwitchTests() {
   it('shows the load error, and the other views by sidebar', async () => {
-    await renderView()
+    await renderVaultView()
     act(() => useVaultDataStore.setState({ error: 'nope' }))
     expect(screen.getByText('nope')).toBeTruthy()
     for (const [label, id] of [
@@ -137,8 +137,8 @@ function viewSwitchTests() {
 
 function dailyTests() {
   it('completes a task with a notification that leads back to it', async () => {
-    await renderView()
-    await act(async () => daily().onTaskComplete('t1'))
+    await renderVaultView()
+    await act(async () => dailyLogProps().onTaskComplete('t1'))
     expect(bridge.calls('task-vault:vault:complete-task')).toEqual([{ taskId: 't1' }])
     const [, message, options] = vi.mocked(notify).mock.calls.at(-1)!
     expect(message).toBe('Completed: Write')
@@ -147,20 +147,20 @@ function dailyTests() {
   })
 
   it('migrates a task unless the vault says nothing changed', async () => {
-    await renderView()
+    await renderVaultView()
     bridge.responses['task-vault:vault:migrate-task'] = { noop: true }
-    await act(async () => daily().onTaskMigrate('t2', '2026-09-09'))
+    await act(async () => dailyLogProps().onTaskMigrate('t2', '2026-09-09'))
     expect(notify).not.toHaveBeenCalled()
     bridge.responses['task-vault:vault:migrate-task'] = { newTaskId: 'x' }
-    await act(async () => daily().onTaskMigrate('zz', '2026-09-09'))
+    await act(async () => dailyLogProps().onTaskMigrate('zz', '2026-09-09'))
     expect(vi.mocked(notify).mock.calls.at(-1)?.[1]).toBe('Task migrated')
   })
 
   it('picks up and deletes backlog tasks, and refreshes', async () => {
-    await renderView()
-    await act(async () => daily().onPickUpToday('s1'))
-    await act(async () => daily().onDeleteBacklogTask('s1'))
-    await act(async () => daily().onRefresh())
+    await renderVaultView()
+    await act(async () => dailyLogProps().onPickUpToday('s1'))
+    await act(async () => dailyLogProps().onDeleteBacklogTask('s1'))
+    await act(async () => dailyLogProps().onRefresh())
     expect(bridge.calls('task-vault:vault:someday-to-today')).toEqual([{ taskId: 's1' }])
     expect(bridge.calls('task-vault:vault:delete-task')).toEqual([{ taskId: 's1' }])
   })
@@ -168,30 +168,30 @@ function dailyTests() {
 
 function daySelectionTests() {
   it('moves between days and back to today', async () => {
-    await renderView()
-    act(() => daily().onPrevDay())
+    await renderVaultView()
+    act(() => dailyLogProps().onPrevDay())
     await eventually(() =>
-      expect(bridge.calls('task-vault:vault:get-daily')).toEqual([{ date: localToday(-1) }])
+      expect(bridge.calls('task-vault:vault:get-daily')).toEqual([{ date: dayFromToday(-1) }])
     )
     await eventually(() => expect(seen.daily.isToday).toBe(false))
-    await act(async () => daily().onRefresh())
-    act(() => daily().onNextDay())
+    await act(async () => dailyLogProps().onRefresh())
+    act(() => dailyLogProps().onNextDay())
     await eventually(() =>
-      expect(bridge.calls('task-vault:vault:get-daily').at(-1)).toEqual({ date: localToday() })
+      expect(bridge.calls('task-vault:vault:get-daily').at(-1)).toEqual({ date: dayFromToday() })
     )
   })
 
   it('selects a task into the detail panel, toggles it, and closes on Escape or backdrop', async () => {
-    await renderView()
-    act(() => daily().onSelectTask('t1'))
+    await renderVaultView()
+    act(() => dailyLogProps().onSelectTask('t1'))
     expect(seen.detail.taskText).toBe('Write')
-    act(() => daily().onSelectTask('t1'))
+    act(() => dailyLogProps().onSelectTask('t1'))
     expect(screen.queryByTestId('detail')).toBeNull()
-    act(() => daily().onSelectTask('s1'))
+    act(() => dailyLogProps().onSelectTask('s1'))
     expect(seen.detail.taskText).toBe('Someday thing')
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByTestId('detail')).toBeNull()
-    act(() => daily().onSelectTask('t2'))
+    act(() => dailyLogProps().onSelectTask('t2'))
     fireEvent.click(document.querySelector('.tv-detail-panel__backdrop')!)
     expect(screen.queryByTestId('detail')).toBeNull()
   })
@@ -199,7 +199,7 @@ function daySelectionTests() {
 
 function navigationTests() {
   it('opens a task it is told to navigate to, and an explicit view', async () => {
-    await renderView()
+    await renderVaultView()
     await act(async () => bridge.push('task-vault:navigate', { taskId: 't2' }))
     await eventually(() => expect(seen.detail?.taskText).toBe('Read'))
     expect(useVaultNavStore.getState().pendingTaskId).toBeNull()
@@ -211,7 +211,7 @@ function navigationTests() {
   })
 
   it('clears a pending task the log does not have once loaded', async () => {
-    await renderView()
+    await renderVaultView()
     act(() => useVaultNavStore.setState({ pendingTaskId: 'ghost' }))
     await eventually(() => expect(useVaultNavStore.getState().pendingTaskId).toBeNull())
   })
@@ -231,7 +231,7 @@ function pendingNavigationTests() {
       taskId: 't1',
       view: 'daily',
     }
-    await renderView()
+    await renderVaultView()
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:get-daily')).toContainEqual({ date: '2026-03-03' })
     )
@@ -239,7 +239,7 @@ function pendingNavigationTests() {
   })
 
   it('returns to today when shown again, unless a navigation asked otherwise', async () => {
-    await renderView()
+    await renderVaultView()
     useVaultNavStore.setState({
       activeView: 'inbox',
       viewingDate: '2026-01-01',
@@ -255,7 +255,7 @@ function pendingNavigationTests() {
 
 function toolbarTests() {
   it('switches between list and board views', async () => {
-    await renderView()
+    await renderVaultView()
     fireEvent.click(screen.getByRole('button', { name: 'Board view' }))
     expect(screen.getByTestId('kanban')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'List view' }))
@@ -263,7 +263,7 @@ function toolbarTests() {
   })
 
   it('filters by contexts and labels the filter by what is chosen', async () => {
-    await renderView()
+    await renderVaultView()
     const filter = screen.getByRole('button', { name: 'Filter by context' })
     fireEvent.click(filter)
     fireEvent.click(await screen.findByLabelText('+home'))
@@ -276,7 +276,7 @@ function toolbarTests() {
 
   it('hides the calendar, and says when there are no contexts', async () => {
     bridge.responses['task-vault:kanban:list-contexts'] = { contexts: [] }
-    await renderView()
+    await renderVaultView()
     fireEvent.click(screen.getByRole('button', { name: 'Calendar' }))
     expect(screen.queryByTestId('calendar')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Filter by context' }))
@@ -284,8 +284,8 @@ function toolbarTests() {
   })
 }
 
-async function openDataTools() {
-  await renderView()
+async function openDataToolsMenu() {
+  await renderVaultView()
   fireEvent.click(screen.getByRole('button', { name: 'Data tools (export / import)' }))
 }
 
@@ -295,7 +295,7 @@ function dataToolsTests() {
     Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() })
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     bridge.responses['task-vault:vault:export-json'] = { version: 1 }
-    await openDataTools()
+    await openDataToolsMenu()
     fireEvent.click(screen.getByRole('button', { name: 'Export JSON' }))
     expect(await screen.findByText('Exported successfully.')).toBeTruthy()
     expect(click).toHaveBeenCalled()
@@ -308,23 +308,23 @@ function dataToolsTests() {
 
 function importTests() {
   it('imports a chosen JSON file, reporting the count or the failure', async () => {
-    await openDataTools()
+    await openDataToolsMenu()
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
-    const file = (text: string) => partialFake<File>({ text: async () => text })
+    const textFile = (text: string) => partialFake<File>({ text: async () => text })
     bridge.responses['task-vault:vault:import-json'] = { success: true, imported: 3 }
     fireEvent.click(screen.getByRole('button', { name: 'Import JSON' }))
-    fireEvent.change(input, { target: { files: [file('{"tasks":[]}')] } })
+    fireEvent.change(input, { target: { files: [textFile('{"tasks":[]}')] } })
     expect(await screen.findByText('Imported 3 records successfully.')).toBeTruthy()
     bridge.responses['task-vault:vault:import-json'] = { error: 'bad' }
-    fireEvent.change(input, { target: { files: [file('{}')] } })
+    fireEvent.change(input, { target: { files: [textFile('{}')] } })
     expect(await screen.findByText('Import failed: bad')).toBeTruthy()
-    fireEvent.change(input, { target: { files: [file('not json')] } })
+    fireEvent.change(input, { target: { files: [textFile('not json')] } })
     expect(await screen.findByText(/Import failed: SyntaxError/)).toBeTruthy()
     fireEvent.change(input, { target: { files: [] } })
   })
 
   it('shows the database console, which reloads after a write', async () => {
-    await openDataTools()
+    await openDataToolsMenu()
     fireEvent.click(screen.getByRole('tab', { name: 'Database' }))
     act(() => (seen.admin.onWrite as () => void)())
     await eventually(() =>

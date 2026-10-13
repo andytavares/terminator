@@ -33,37 +33,27 @@ const editorFocusedField = StateField.define<boolean>({
     return focused
   },
 })
-/* v8 ignore next 16 */
-const focusTrackPlugin = ViewPlugin.define((view) => {
-  // Seed from the live focus state. `focusChanged` only fires on a transition,
-  // so a view created while already focused would stay marked unfocused and
-  // render as though the user were not editing. Deferred because a view may not
-  // dispatch during its own construction.
+// CodeMirror reports focus changes from inside an update, where a plugin may not dispatch;
+// focusChangeEffect is its hook for turning one into a state effect.
+const focusChangeTracker = EditorView.focusChangeEffect.of((_state, focusing) =>
+  setEditorFocused.of(focusing)
+)
+// A preview switched on in an editor that already has focus sees no focus change, so it is
+// seeded here; deferred because a view may not dispatch while it is being updated.
+const focusSeedPlugin = ViewPlugin.define((view) => {
   if (view.hasFocus) {
     setTimeout(() => view.dispatch({ effects: setEditorFocused.of(true) }), 0)
   }
-  return {
-    update(update) {
-      if (update.focusChanged) {
-        view.dispatch({ effects: setEditorFocused.of(view.hasFocus) })
-      }
-    },
-  }
+  return {}
 })
 
 // ── Widgets ──────────────────────────────────────────────────────
 
-/* v8 ignore start */
 /** A click on the link opens `url` in the system browser (a new window outside the app). */
 function openOnClick(link: HTMLAnchorElement, url: string): void {
   link.addEventListener('click', (e) => {
     e.preventDefault()
-    const api: { shell?: { openExternal?: (u: string) => void } } | undefined = window.electronAPI
-    if (api?.shell?.openExternal) {
-      api.shell.openExternal(url)
-    } else {
-      window.open(url, '_blank', 'noopener')
-    }
+    void window.electronAPI.shell.openExternal(url)
   })
 }
 
@@ -113,10 +103,6 @@ class CheckboxWidget extends WidgetType {
     })
     wrap.appendChild(cb)
     return wrap
-  }
-
-  ignoreEvent(): boolean {
-    return false
   }
 
   eq(other: CheckboxWidget): boolean {
@@ -202,7 +188,7 @@ const INLINE_SPAN_TAGS = { code: 'code', strong: 'strong', em: 'em', del: 'del' 
 
 function inlineSpanToDOM(span: InlineSpan): Node {
   if (span.type === 'text') return document.createTextNode(span.text)
-  if (span.type === 'link') return inlineLinkToDOM(span.text, span.href ?? '')
+  if (span.type === 'link') return inlineLinkToDOM(span.text, span.href)
   const el = document.createElement(INLINE_SPAN_TAGS[span.type])
   if (span.type === 'code') el.className = 'notepad-code'
   el.textContent = span.text
@@ -351,8 +337,6 @@ class ImageWidget extends WidgetType {
   }
 }
 
-/* v8 ignore stop */
-
 // ── Decoration builder ────────────────────────────────────────────
 
 /** A span of the document. */
@@ -370,10 +354,7 @@ interface DecorationContext {
   onCursorLine: boolean
 }
 
-/**
- * Adds a node's decorations. Returning false skips its children; returning
- * nothing lets the tree walk continue into them.
- */
+/** Adds a node's decorations. Returning false skips its children; nothing lets the walk go on. */
 type NodeDecorator = (node: SyntaxNodeRef, ctx: DecorationContext) => false | void
 
 // focused defaults to true so callers that don't pass it (e.g. tests) get the
@@ -411,7 +392,10 @@ function offCursorLine(decorate: NodeDecorator): NodeDecorator {
 }
 
 /** Hides `markLen` characters at each end of the node and styles what lies between. */
-function wrapped(markLen: (node: SyntaxNodeRef) => number, className: string): NodeDecorator {
+function hideMarksAround(
+  markLen: (node: SyntaxNodeRef) => number,
+  className: string
+): NodeDecorator {
   return offCursorLine((node, { builder }) => {
     const length = markLen(node)
     const contentFrom = node.from + length
@@ -433,26 +417,12 @@ const decorateHeading = offCursorLine((node, { builder }) => {
   }
 })
 
-function strikethroughMarkLength(node: SyntaxNodeRef): number {
-  const firstChild = node.node.firstChild
-  /* v8 ignore next 2 */
-  if (firstChild?.name === 'StrikethroughMark') return firstChild.to - firstChild.from
-  return 2
-}
-
 const decorateInlineCode = offCursorLine((node, { builder }) => {
-  // Hide backtick markers, style only the inner content
-  const firstChild = node.node.firstChild
-  const lastChild = node.node.lastChild
-  /* v8 ignore next */
-  const openEnd = firstChild?.name === 'CodeMark' ? firstChild.to : node.from + 1
-  /* v8 ignore next */
-  const closeStart = lastChild?.name === 'CodeMark' ? lastChild.from : node.to - 1
-  if (openEnd < closeStart) {
-    builder.add(node.from, openEnd, Decoration.replace({}))
-    builder.add(openEnd, closeStart, Decoration.mark({ class: 'notepad-code' }))
-    builder.add(closeStart, node.to, Decoration.replace({}))
-  }
+  // Hide the backtick runs (lezer always gives both), style only the inner content
+  const [open, close] = node.node.getChildren('CodeMark')
+  builder.add(node.from, open.to, Decoration.replace({}))
+  builder.add(open.to, close.from, Decoration.mark({ class: 'notepad-code' }))
+  builder.add(close.from, node.to, Decoration.replace({}))
 })
 
 /** Adds a line decoration to every line from `from` up to (not including) `to`. */
@@ -471,18 +441,9 @@ function caretWithin(ctx: DecorationContext, range: TextRange): boolean {
   return !ctx.state.readOnly && ctx.cursorPos >= range.from && ctx.cursorPos <= range.to
 }
 
-/**
- * While the caret is on the opening fence line the user is still typing the
- * ``` and its language, so nothing may render — otherwise the line collapses
- * out from under them mid-keystroke. Deliberately not gated on `focused`: that
- * flag only flips on a focus-change event, so a stale false made a half-typed
- * fence disappear.
- *
- * A fence with no body yet is a block under construction; leaving it raw is
- * what makes it appear only once there is something to show. With the caret in
- * the body, the code is styled but both fences stay visible, so the language
- * stays readable and clickable while editing.
- */
+/** Raw while the caret is on the opening fence or the block has no body yet; with the caret in
+ *  the body both fences stay visible. Not gated on `focused`. Why: README.md, "Why the editor
+ *  behaves as it does". */
 function decorateFencedCode(node: SyntaxNodeRef, ctx: DecorationContext): false {
   const openingLine = ctx.state.doc.lineAt(node.from)
   const codeText = node.node.getChild('CodeText')
@@ -504,13 +465,9 @@ function decorateFencedCode(node: SyntaxNodeRef, ctx: DecorationContext): false 
   return false
 }
 
-/**
- * Opening fence: the line collapses to zero height through a line class, and
- * the fence text is replaced but not its trailing newline (codeText.from - 1),
- * so the code line keeps its own .cm-line element and its line decoration.
- * Closing fence: codeText.to is the newline ending the last code line, so the
- * closing fence line starts at codeText.to + 1.
- */
+/** The opening fence line collapses through a line class, replacing the fence text but not its
+ *  newline (codeText.from - 1), so the first code line keeps its .cm-line; codeText.to is the
+ *  newline ending the last code line, so the closing fence starts at codeText.to + 1. */
 function renderCodeBlock(node: SyntaxNodeRef, ctx: DecorationContext, codeText: TextRange): void {
   const { state, builder } = ctx
   const fenceLine = state.doc.lineAt(node.from)
@@ -524,30 +481,15 @@ function renderCodeBlock(node: SyntaxNodeRef, ctx: DecorationContext, codeText: 
   builder.add(closingLineFrom, node.to, Decoration.replace({}))
 }
 
-/**
- * Rendered as a whole: a table only reads as a grid if every row is replaced at
- * once. Raw pipes come back while the caret is inside, matching how FencedCode
- * behaves.
- *
- * Deliberately not gated on `focused`: that flag only flips on a focus-change
- * event, so a stale false kept the table rendered even with the caret inside
- * it — the caret then had nowhere to land and the table could not be edited at
- * all, by mouse or keyboard.
- *
- * Defensive checks: a Table node always carries a delimiter row, so parseTable
- * should never reject it, and falling through leaves the raw pipes visible
- * rather than throwing inside the state field. A block widget may only replace
- * whole lines; Table nodes do span whole lines, but a mismatch would throw and
- * take the whole editor down, so it falls back to an inline replace.
- */
+/** Rendered whole, since a table reads as a grid only when every row is replaced; raw pipes come
+ *  back while the caret is inside. Why it is not gated on `focused`, and its two fallbacks:
+ *  README.md, "Why the editor behaves as it does". */
 function decorateTable(node: SyntaxNodeRef, ctx: DecorationContext): false {
   if (caretWithin(ctx, node)) return false
   const { state, builder } = ctx
   const source = state.sliceDoc(node.from, node.to)
   const parsed = parseTable(source)
-  /* v8 ignore next */
   if (!parsed) return false
-  /* v8 ignore next */
   const wholeLines =
     node.from === state.doc.lineAt(node.from).from && node.to === state.doc.lineAt(node.to).to
   builder.add(
@@ -558,12 +500,8 @@ function decorateTable(node: SyntaxNodeRef, ctx: DecorationContext): false {
   return false
 }
 
-/**
- * GitHub alerts (`> [!NOTE]`) are not a lezer construct — they parse as an
- * ordinary blockquote, so the marker is matched textually here. An ordinary
- * blockquote is left to QuoteMark. Not gated on `focused`, for the same reason
- * as Table above.
- */
+/** GitHub alerts (`> [!NOTE]`) parse as an ordinary blockquote, so the marker is matched as text;
+ *  a plain blockquote is left to QuoteMark. Not gated on `focused`, as with tables. */
 function decorateBlockquote(node: SyntaxNodeRef, ctx: DecorationContext): false | void {
   const firstLine = ctx.state.doc.lineAt(node.from)
   const kind = parseAlertMarker(firstLine.text)
@@ -657,8 +595,8 @@ const decorateLink = offCursorLine((node, { state, builder }) => {
   const urlChild = node.node.getChild('URL')
   if (!urlChild) return
   const url = state.sliceDoc(urlChild.from, urlChild.to)
-  const raw = state.sliceDoc(node.from, urlChild.from - 2)
-  const label = raw.startsWith('[') ? raw.slice(1, raw.lastIndexOf(']')) : url
+  const [open, close] = node.node.getChildren('LinkMark')
+  const label = state.sliceDoc(open.to, close.from)
   builder.add(node.from, node.to, Decoration.replace({ widget: new LinkWidget(label || url, url) }))
 })
 
@@ -669,9 +607,10 @@ const NODE_DECORATORS: Record<string, NodeDecorator> = {
   ATXHeading4: decorateHeading,
   ATXHeading5: decorateHeading,
   ATXHeading6: decorateHeading,
-  StrongEmphasis: wrapped(() => 2, 'notepad-bold'),
-  Emphasis: wrapped(() => 1, 'notepad-italic'),
-  Strikethrough: wrapped(strikethroughMarkLength, 'notepad-strikethrough'),
+  StrongEmphasis: hideMarksAround(() => 2, 'notepad-bold'),
+  Emphasis: hideMarksAround(() => 1, 'notepad-italic'),
+  // GFM strikethrough is always `~~` (lezer's Strikethrough parser accepts no other delimiter).
+  Strikethrough: hideMarksAround(() => 2, 'notepad-strikethrough'),
   InlineCode: decorateInlineCode,
   FencedCode: decorateFencedCode,
   Table: decorateTable,
@@ -705,4 +644,9 @@ const livePreviewDecorations = StateField.define<DecorationSet>({
 })
 
 // Export as an array so callers add all required extensions at once
-export const livePreviewPlugin = [editorFocusedField, focusTrackPlugin, livePreviewDecorations]
+export const livePreviewPlugin = [
+  editorFocusedField,
+  focusChangeTracker,
+  focusSeedPlugin,
+  livePreviewDecorations,
+]

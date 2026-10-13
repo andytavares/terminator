@@ -43,10 +43,8 @@ function isWorkspaceRepoRoot(repoRoot: string): boolean {
     .some((root) => isInside(canonical(root), path))
 }
 
-/**
- * The checkout a channel works in. The remote browser chooses it, so it must
- * name a workspace root (or a directory inside one, such as a merge worktree).
- */
+/** The checkout a channel works in. The remote browser chooses it, so it must name a workspace root
+ *  (or a directory inside one, such as a merge worktree). */
 export const RepoRoot = z
   .string()
   .min(1)

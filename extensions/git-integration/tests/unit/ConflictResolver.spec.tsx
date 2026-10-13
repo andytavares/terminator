@@ -26,7 +26,7 @@ import { ConflictPanel } from '../../src/components/merge-flow/ConflictPanel'
 import { ActionBar } from '../../src/components/merge-flow/ActionBar'
 import { ResultPreviewStrip } from '../../src/components/merge-flow/ResultPreviewStrip'
 
-function makeBlock(index: number, overrides: Record<string, unknown> = {}) {
+function conflictBlock(index: number, overrides: Record<string, unknown> = {}) {
   return {
     blockId: `src/foo.ts#${index}`,
     index,
@@ -41,9 +41,9 @@ function makeBlock(index: number, overrides: Record<string, unknown> = {}) {
   }
 }
 
-const baseBlock = makeBlock(0, { oursText: 'const x = 1', theirsText: 'const x = 2' })
+const baseBlock = conflictBlock(0, { oursText: 'const x = 1', theirsText: 'const x = 2' })
 
-function makeSession(blockCount: number) {
+function sessionWithBlocks(blockCount: number) {
   return {
     repoRoot: '/repo',
     isRebase: false,
@@ -58,7 +58,7 @@ function makeSession(blockCount: number) {
         conflictDescription: 'both sides edited x',
         oursAuthor: { name: 'Alice', commitHash: 'abc', timestamp: '' },
         theirsAuthor: { name: 'Bob', commitHash: 'def', timestamp: '' },
-        blocks: Array.from({ length: blockCount }, (_, i) => makeBlock(i)),
+        blocks: Array.from({ length: blockCount }, (_, i) => conflictBlock(i)),
       },
     ],
   }
@@ -73,7 +73,7 @@ beforeEach(() => {
 })
 
 function renderResolver(blockCount: number) {
-  useMergeFlowStore.getState().startSession(makeSession(blockCount) as never)
+  useMergeFlowStore.getState().startSession(sessionWithBlocks(blockCount) as never)
   const handlers = { onBack: vi.fn(), onComplete: vi.fn() }
   const view = render(<ConflictResolver repoRoot="/repo" {...handlers} />)
   return { ...view, ...handlers }
@@ -120,7 +120,7 @@ describe('ConflictResolver — resolves with the chosen side and moves to the ne
       blockId: 'src/foo.ts#0',
       resolvedText: 'const x = 0',
       strategy: 'ours',
-      originalConflictText: makeBlock(0).originalConflictText,
+      originalConflictText: conflictBlock(0).originalConflictText,
     })
     expect(mockPersistSession).toHaveBeenCalledOnce()
     expect(useMergeFlowStore.getState().session!.files[0].blocks[0].isResolved).toBe(true)
@@ -223,7 +223,7 @@ describe('ConflictResolver — undoes the last decision and tells the main proce
       repoRoot: '/repo',
       blockId: 'src/foo.ts#0',
       resolvedText: 'const x = 0',
-      originalConflictText: makeBlock(0).originalConflictText,
+      originalConflictText: conflictBlock(0).originalConflictText,
     })
     expect(useMergeFlowStore.getState().session!.files[0].blocks[0].isResolved).toBe(false)
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(0)

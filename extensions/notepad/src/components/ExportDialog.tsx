@@ -114,7 +114,8 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
   const { notes } = useNotesStore()
   const previewNote = noteId ? notes.find((n) => n.id === noteId) : notes[0]
   const [options, setOptions] = useState<ExportOptions>(DEFAULT_OPTIONS)
-  const update: OptionsUpdate = (patch) => setOptions((previous) => ({ ...previous, ...patch }))
+  const updateOptions: OptionsUpdate = (patch) =>
+    setOptions((previous) => ({ ...previous, ...patch }))
   useExportSettings(setOptions)
   const { running, exportResult, handleExport } = useExportRun(options, noteId)
 
@@ -131,7 +132,7 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
       ]}
     >
       <div className="notepad-export-dialog__body">
-        <ExportOptionFields options={options} update={update} noteId={noteId} />
+        <ExportOptionFields options={options} update={updateOptions} noteId={noteId} />
         {previewNote && <ExportPreview note={previewNote} options={options} />}
       </div>
       <p className="notepad-export-dialog__footer-meta">

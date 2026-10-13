@@ -2,9 +2,9 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, act } from '@testing-library/react'
 import {
-  installBridge,
-  comment,
-  editorView,
+  installNotepadBridge,
+  anchoredComment,
+  mountedEditorView,
   eventually,
   typeAtEnd,
   storeSettings,
@@ -16,7 +16,7 @@ vi.hoisted(() => window.history.replaceState({}, '', '/?noteId=n1'))
 
 vi.setConfig({ testTimeout: 30_000 })
 
-const bridge = installBridge()
+const bridge = installNotepadBridge()
 
 import { NoteWindowView } from '../../src/components/NoteWindowView'
 import { useEditorStore } from '../../src/stores/editor.store'
@@ -37,11 +37,11 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-async function openWindow(comments = [comment('c1', 'hello', [7, 12])]) {
+async function openWindow(comments = [anchoredComment('c1', 'hello', [7, 12])]) {
   bridge.responses['terminator.notepad:notes.get'] = { data: NOTE }
   bridge.responses['terminator.notepad:comments.list'] = { data: comments }
   render(<NoteWindowView />)
-  await eventually(() => expect(editorView().state.doc.toString()).toBe(BODY))
+  await eventually(() => expect(mountedEditorView().state.doc.toString()).toBe(BODY))
 }
 
 describe('NoteWindowView loading', () => {
@@ -59,7 +59,10 @@ describe('NoteWindowView loading', () => {
   })
 
   it('moves a comment to where its quote now is, and orphans one whose quote is gone', async () => {
-    await openWindow([comment('c1', 'hello', [0, 5]), comment('c2', 'vanished', [0, 8])])
+    await openWindow([
+      anchoredComment('c1', 'hello', [0, 5]),
+      anchoredComment('c2', 'vanished', [0, 8]),
+    ])
     const byId = new Map(useCommentsStore.getState().comments.map((c) => [c.id, c]))
     expect(byId.get('c1')).toMatchObject({ startOffset: 7, endOffset: 12 })
     expect(byId.get('c2')?.status).toBe('orphaned')
@@ -96,9 +99,9 @@ describe('NoteWindowView saving and syncing', () => {
     await openWindow()
     const change = { title: 'New', tags: ['x'], updatedAt: '', originId: 'the-panel' }
     act(() => bridge.push(NOTES_CHANGED_CHANNEL, { ...change, id: 'n2', body: 'other' }))
-    expect(editorView().state.doc.toString()).toBe(BODY)
+    expect(mountedEditorView().state.doc.toString()).toBe(BODY)
     act(() => bridge.push(NOTES_CHANGED_CHANNEL, { ...change, id: 'n1', body: '# New\nbody' }))
-    expect(editorView().state.doc.toString()).toBe('# New\nbody')
+    expect(mountedEditorView().state.doc.toString()).toBe('# New\nbody')
     expect(document.title).toBe('New')
     expect(screen.getByText('#x')).toBeTruthy()
   })

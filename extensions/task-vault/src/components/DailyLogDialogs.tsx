@@ -148,13 +148,13 @@ function useBlockForm(onConfirm: BlockModalProps['onConfirm']) {
   const [reason, setReason] = useState('')
   const [checkInterval, setCheckInterval] = useState('1-day')
   const isCustom = !INTERVAL_LABELS[checkInterval]
-  function submit() {
+  function submitBlock() {
     if (!reason.trim()) return
     if (!checkInterval) return
     onConfirm(reason.trim(), checkInterval)
   }
   const disabled = !reason.trim() || (isCustom && !checkInterval)
-  return { reason, setReason, checkInterval, setCheckInterval, submit, disabled }
+  return { reason, setReason, checkInterval, setCheckInterval, submit: submitBlock, disabled }
 }
 
 function ReasonField({ form }: { form: ReturnType<typeof useBlockForm> }): React.JSX.Element {
@@ -204,7 +204,7 @@ const DEFAULT_DRAFT: RecurrenceDraft = {
   endCount: 10,
 }
 
-function draftFrom(existing?: ExistingRecurrence): RecurrenceDraft {
+function recurrenceDraftFrom(existing?: ExistingRecurrence): RecurrenceDraft {
   return { ...DEFAULT_DRAFT, ...definedFields(existing ?? {}) }
 }
 
@@ -216,7 +216,7 @@ function canSave(draft: RecurrenceDraft): boolean {
 
 /** The recurrence being edited, with a setter per field. */
 function useRecurrenceForm(existing?: ExistingRecurrence) {
-  const [draft, setDraft] = useState(() => draftFrom(existing))
+  const [draft, setDraft] = useState(() => recurrenceDraftFrom(existing))
   const set =
     <K extends keyof RecurrenceDraft>(key: K) =>
     (value: RecurrenceDraft[K]) =>
@@ -312,7 +312,7 @@ function EndChoice({ form }: DraftProps): React.JSX.Element {
 
 function RecurrenceActions(props: RecurrenceModalProps & DraftProps): React.JSX.Element {
   const { draft } = props.form
-  const save = () =>
+  const saveRecurrence = () =>
     props.onConfirm({ ...draft, days: draft.interval === 'weekly' ? draft.days : [] })
   return (
     <div className="daily-log__block-modal-actions">
@@ -324,7 +324,7 @@ function RecurrenceActions(props: RecurrenceModalProps & DraftProps): React.JSX.
       <Button variant="ghost" onClick={props.onClose}>
         Cancel
       </Button>
-      <Button variant="primary" onClick={save} disabled={!canSave(draft)}>
+      <Button variant="primary" onClick={saveRecurrence} disabled={!canSave(draft)}>
         Save
       </Button>
     </div>

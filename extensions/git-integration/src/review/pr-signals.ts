@@ -77,10 +77,8 @@ function fileRiskLevel(levels: RiskLevel[]): RiskLevel {
   return 'low'
 }
 
-/**
- * The PR's risk from its files, never below the queue's size-based level, so a large but
- * mechanically simple PR is not downgraded out of the High-risk filter once opened.
- */
+/** The PR's risk from its files, never below the queue's size-based level, so a large but simple
+ *  PR is not downgraded out of the High-risk filter once opened. */
 export function prRiskLevel(
   measured: MeasuredFile[],
   scores: Record<string, RiskScore>

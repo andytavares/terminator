@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import { installBridge, eventually } from './helpers/bridge'
+import { installVaultBridge, eventually } from './helpers/bridge'
 
 vi.mock('../../src/utils/open-in-browser', () => ({ openInBrowser: vi.fn() }))
 
@@ -9,10 +9,10 @@ import { TaskDetailPanel } from '../../src/components/TaskDetailPanel'
 
 vi.setConfig({ testTimeout: 30_000 })
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {
-  bridge = installBridge()
+  bridge = installVaultBridge()
   bridge.responses['task-vault:vault:get-task-detail'] = {
     description: 'Ship **it**',
     acceptanceCriteria: '',
@@ -22,7 +22,7 @@ beforeEach(() => {
 
 afterEach(() => cleanup())
 
-function renderPanel(taskId = 't1') {
+function renderDetailPanel(taskId = 't1') {
   const onClose = vi.fn()
   const utils = render(<TaskDetailPanel taskId={taskId} taskText="Launch" onClose={onClose} />)
   return { onClose, ...utils }
@@ -31,13 +31,13 @@ function renderPanel(taskId = 't1') {
 const editButtons = () => screen.getAllByRole('button', { name: 'Edit' })
 const textarea = () => screen.getByRole('textbox') as HTMLTextAreaElement
 
-describe('TaskDetailPanel loading', loadingTests)
+describe('TaskDetailPanel loading', detailLoadingTests)
 describe('TaskDetailPanel editing', editingTests)
-describe('TaskDetailPanel keys and cancelling', keysTests)
+describe('TaskDetailPanel keys and cancelling', detailKeysTests)
 
-function loadingTests() {
+function detailLoadingTests() {
   it('shows each section, rendering markdown or the first line of the hint', async () => {
-    renderPanel()
+    renderDetailPanel()
     expect(screen.getByText('Loading…')).toBeTruthy()
     expect((await screen.findByText('it')).tagName).toBe('STRONG')
     expect(screen.getByText('- [ ] Criterion one')).toBeTruthy()
@@ -46,7 +46,7 @@ function loadingTests() {
 
   it('shows an error, and closes from its header', async () => {
     bridge.responses['task-vault:vault:get-task-detail'] = { error: 'Task not found' }
-    const { onClose } = renderPanel()
+    const { onClose } = renderDetailPanel()
     expect(await screen.findByText('Task not found')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Close detail panel' }))
     expect(onClose).toHaveBeenCalled()
@@ -56,7 +56,7 @@ function loadingTests() {
     bridge.responses['task-vault:vault:get-task-detail'] = () => {
       throw new Error('gone')
     }
-    const { rerender } = renderPanel()
+    const { rerender } = renderDetailPanel()
     expect(await screen.findByText('Error: gone')).toBeTruthy()
     bridge.responses['task-vault:vault:get-task-detail'] = { description: 'other' }
     rerender(<TaskDetailPanel taskId="t2" taskText="Other" onClose={vi.fn()} />)
@@ -71,7 +71,7 @@ function editingTests() {
 
 function editingSavingTests() {
   it('edits a section and saves every field together', async () => {
-    renderPanel()
+    renderDetailPanel()
     await screen.findByText('it')
     fireEvent.click(editButtons()[1])
     fireEvent.change(textarea(), { target: { value: '- [x] done' } })
@@ -92,7 +92,7 @@ function editingSavingTests() {
 
 function editingTogglingAndLinksTests() {
   it('saves from the preview toggle, and starts editing by clicking the text', async () => {
-    renderPanel()
+    renderDetailPanel()
     fireEvent.click(await screen.findByText('it'))
     fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
     await eventually(() =>
@@ -101,15 +101,15 @@ function editingTogglingAndLinksTests() {
   })
 
   it('opens a link in the text instead of editing', async () => {
-    renderPanel()
+    renderDetailPanel()
     fireEvent.click(await screen.findByText('docs'))
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 }
 
-function keysTests() {
+function detailKeysTests() {
   it('saves with Cmd+Enter and cancels with Escape', async () => {
-    renderPanel()
+    renderDetailPanel()
     await screen.findByText('it')
     fireEvent.click(editButtons()[0])
     fireEvent.change(textarea(), { target: { value: 'changed' } })
@@ -124,7 +124,7 @@ function keysTests() {
   })
 
   it('discards a draft with Cancel', async () => {
-    renderPanel()
+    renderDetailPanel()
     await screen.findByText('it')
     fireEvent.click(editButtons()[2])
     fireEvent.change(textarea(), { target: { value: 'nope' } })

@@ -80,10 +80,9 @@ const RULE_CASES: Array<[string, string, Record<string, unknown>, Record<string,
   ],
 ]
 
-// The table above proves each channel has a schema, not what it refuses. These
-// are the rules the schemas carry: each payload is valid apart from one field,
-// and the valid one must reach run, so the refusal is the rule's and not the
-// repoRoot confinement's.
+// The table above proves each channel has a schema; these are the rules it carries: each payload
+// is valid apart from one field, and the valid one must reach run, so the refusal is the rule's
+// and not the repoRoot confinement's.
 describe('the rules the channel schemas carry', () => {
   let repo: string
   beforeAll(() => {

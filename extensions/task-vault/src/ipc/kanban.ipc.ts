@@ -115,7 +115,7 @@ function listContexts({ db }: IpcContext) {
   })
 }
 
-function moveTask({ db }: IpcContext, args: z.infer<typeof MoveTaskSchema>) {
+function moveTaskToLane({ db }: IpcContext, args: z.infer<typeof MoveTaskSchema>) {
   const { taskId, toStatus } = args
   return orErrorString(async () => {
     const now = nowIso()
@@ -135,7 +135,7 @@ const KANBAN_ROUTES = [
   route('task-vault:kanban:save-config', SaveConfigSchema, saveConfig),
   route('task-vault:kanban:list-tasks', noPayload, listTasks),
   route('task-vault:kanban:list-contexts', noPayload, listContexts),
-  route('task-vault:kanban:move-task', MoveTaskSchema, moveTask),
+  route('task-vault:kanban:move-task', MoveTaskSchema, moveTaskToLane),
 ]
 
 export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {

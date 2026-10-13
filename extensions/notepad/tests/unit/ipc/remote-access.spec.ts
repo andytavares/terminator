@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { ChannelSpec, ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 
 vi.mock('electron', () => ({ dialog: {} }))
 
@@ -10,37 +9,22 @@ import { registerExportIpcHandlers } from '../../../src/ipc/export.ipc.js'
 import { registerFoldersIpcHandlers } from '../../../src/ipc/folders.ipc.js'
 import { registerNotesIpcHandlers, registerTagsIpcHandlers } from '../../../src/ipc/notes.ipc.js'
 import { registerSearchIpcHandlers } from '../../../src/ipc/search.ipc.js'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { remoteAccessByChannel } from '../../../../../tests/support/extension-channels'
 
-function registerEverything(): Map<string, boolean> {
-  const remoteByChannel = new Map<string, boolean>()
-  const api = partialFake<ExtensionAPI>({
-    ipc: partialFake<ExtensionAPI['ipc']>({
-      registerHandler: (spec: ChannelSpec, opts?: { remoteAccessible?: boolean }) => {
-        remoteByChannel.set(spec.channel, opts?.remoteAccessible === true)
-        return { dispose: () => {} }
-      },
-    }),
-  })
-  const db = {} as ExtensionDB
-  for (const register of [
-    registerCommentsIpcHandlers,
-    registerDiagramCommentsIpcHandlers,
-    registerDiagramsIpcHandlers,
-    registerExportIpcHandlers,
-    registerFoldersIpcHandlers,
-    registerNotesIpcHandlers,
-    registerTagsIpcHandlers,
-    registerSearchIpcHandlers,
-  ]) {
-    register(api, db)
-  }
-  return remoteByChannel
-}
+const REGISTRARS = [
+  registerCommentsIpcHandlers,
+  registerDiagramCommentsIpcHandlers,
+  registerDiagramsIpcHandlers,
+  registerExportIpcHandlers,
+  registerFoldersIpcHandlers,
+  registerNotesIpcHandlers,
+  registerTagsIpcHandlers,
+  registerSearchIpcHandlers,
+]
 
 describe('notepad remote access', () => {
   it('keeps file import and export, which take a path on the desktop, local', () => {
-    const channels = registerEverything()
+    const channels = remoteAccessByChannel(REGISTRARS)
     const local = [...channels].filter(([, remote]) => !remote).map(([channel]) => channel)
 
     expect(local.sort()).toEqual([
@@ -51,7 +35,7 @@ describe('notepad remote access', () => {
   })
 
   it('lets the remote browser read and edit notes and diagrams', () => {
-    const channels = registerEverything()
+    const channels = remoteAccessByChannel(REGISTRARS)
 
     for (const channel of [
       'terminator.notepad:notes.list',

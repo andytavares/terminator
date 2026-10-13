@@ -145,13 +145,9 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
-/**
- * Opens the queue's PR inside an async act, which returns only once the open flow's
- * awaited calls and every render they schedule have run
- * (https://react.dev/reference/react/act). A test that ended on a timer instead left
- * those renders to the cleanup, after electronAPI was gone, and on a busy machine the
- * effect that subscribes through it threw there and broke React for the rest of the file.
- */
+/** Opens the PR inside an async act, which returns once the open flow's awaits and their renders
+ *  ran (https://react.dev/reference/react/act); left to cleanup, after electronAPI was gone, the
+ *  subscribing effect threw on a busy machine and broke React for the rest of the file. */
 async function openPr() {
   await act(async () => {
     fireEvent.click(screen.getByText('Open PR'))

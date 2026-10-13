@@ -72,10 +72,7 @@ export async function registerTerminalRoutes(
   return { cleanup: () => streams.cleanup() }
 }
 
-/**
- * The broadcast listeners and pending teardowns of the sessions this surface
- * streams: how they start, stop and are cleaned up.
- */
+/** The broadcast listeners and pending teardowns of the sessions this surface streams. */
 class SessionStreams {
   // One output-broadcast listener per session this surface is streaming.
   private broadcastDisposers = new Map<string, () => void>()
@@ -158,10 +155,10 @@ function registerCollectionRoutes(app: FastifyInstance, context: TerminalRouteCo
     }))
   })
 
-  app.post('/api/terminals', (request, reply) => createRemoteTerminal(context, request, reply))
+  app.post('/api/terminals', (request, reply) => postTerminal(context, request, reply))
 }
 
-async function createRemoteTerminal(
+async function postTerminal(
   context: TerminalRouteContext,
   request: FastifyRequest,
   reply: FastifyReply
@@ -267,11 +264,11 @@ async function assignWorkspace(
 
 function registerTerminalSocket(app: FastifyInstance, context: TerminalRouteContext): void {
   app.get<SocketRoute>('/ws/terminals/:sessionId', { websocket: true }, (ws: WebSocket, request) =>
-    openTerminalSocket(context, ws, request)
+    acceptTerminalSocket(context, ws, request)
   )
 }
 
-function openTerminalSocket(
+function acceptTerminalSocket(
   context: TerminalRouteContext,
   ws: WebSocket,
   request: FastifyRequest<SocketRoute>

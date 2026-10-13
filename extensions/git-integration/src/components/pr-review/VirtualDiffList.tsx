@@ -15,17 +15,13 @@ interface Props {
 
 /** One diff line at the review font; entries are measured once mounted. */
 const ESTIMATED_ITEM_PX = 18
-/**
- * Entries mounted past each edge of the viewport. Each one is rendered on every jump
- * (hunk navigation, open-at-line), and a scroll re-renders in the same frame (flushSync),
- * so a few cover measurement jitter. https://tanstack.com/virtual/latest/docs/api/virtualizer#overscan
- */
+/** Entries mounted past each edge of the viewport: each renders on every jump and a scroll
+ *  re-renders in the same frame (flushSync), so a few cover measurement jitter.
+ *  https://tanstack.com/virtual/latest/docs/api/virtualizer#overscan */
 const OVERSCAN_ITEMS = 5
 
-/**
- * Mounts only the diff entries near the viewport of `scrollRef` (TanStack Virtual),
- * measuring each one so comments and notes of any height keep their place.
- */
+/** Mounts only the diff entries near the viewport of `scrollRef` (TanStack Virtual), measuring each
+ *  so comments and notes of any height keep their place. */
 function useDiffVirtualizer(props: Omit<Props, 'renderItem'>) {
   const { items, scrollRef } = props
   const virtualizer = useVirtualizer({

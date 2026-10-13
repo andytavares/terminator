@@ -243,7 +243,7 @@ interface FindingContext {
 }
 
 /** Hides the finding at once, then records the dismissal with the run. */
-function dismissFinding(ctx: FindingContext, finding: AgentFinding): void {
+function dismissFindingInPanel(ctx: FindingContext, finding: AgentFinding): void {
   const { props, run } = ctx
   ctx.form.setDismissedIds((prev) => new Set(prev).add(finding.id))
   const markDismissed = (f: AgentFinding) =>
@@ -364,7 +364,7 @@ function FindingCard({ ctx, finding }: { ctx: FindingContext; finding: AgentFind
         <Button size="sm" onClick={() => postAsComment(ctx.store, finding)}>
           Post as comment
         </Button>
-        <Button size="sm" onClick={() => dismissFinding(ctx, finding)}>
+        <Button size="sm" onClick={() => dismissFindingInPanel(ctx, finding)}>
           Dismiss
         </Button>
         <Button size="sm" onClick={() => void reviewAgentAPI.openTerminal(ctx.run.id)}>

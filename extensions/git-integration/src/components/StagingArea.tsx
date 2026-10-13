@@ -145,7 +145,7 @@ interface FileSectionProps {
   item: SectionItem
 }
 
-function FileSection(props: FileSectionProps) {
+function StagingFileSection(props: FileSectionProps) {
   const { files, item, text } = props
   return (
     <div className="staging-area__section">
@@ -198,8 +198,8 @@ function StagingSections({ files, setStaged, item }: StagingSectionsProps): JSX.
     )
   return (
     <>
-      <FileSection text={STAGED_TEXT} files={staged} onBulk={unstageAll} item={item} />
-      <FileSection
+      <StagingFileSection text={STAGED_TEXT} files={staged} onBulk={unstageAll} item={item} />
+      <StagingFileSection
         text={CHANGES_TEXT}
         files={unstaged}
         onBulk={() => void setStaged(stageable, true)}

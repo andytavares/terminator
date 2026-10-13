@@ -132,11 +132,8 @@ function touchesRevealed(gapViews: Map<string, GapView>, sel: LineSelection): bo
   return revealed.some((line) => inSelection(line, sel))
 }
 
-/**
- * The unchanged lines between hunks: what each gap shows, how to reveal more (reading the
- * file the first time), and whether a selection reaches into revealed lines. All of it starts
- * again when the diff shown changes.
- */
+/** The unchanged lines between hunks: what each gap shows, how to reveal more (reading the file the
+ *  first time), and whether a selection reaches revealed lines; reset when the diff changes. */
 export function useGaps(source: GapSource) {
   const { fileText, setFileText, loadFileText } = useHeadText(source.target)
   const [expansions, setExpansions] = useState<Map<string, Expansion>>(new Map())

@@ -127,12 +127,12 @@ function useMonth(refreshKey: number) {
     void loadMonth()
   }, [year, month, refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const step = (delta: 1 | -1) => {
+  const stepMonth = (delta: 1 | -1) => {
     const next = month + delta
     if (next < 1 || next > 12) setYear((y) => y + delta)
     setMonth(((next + 11) % 12) + 1)
   }
-  return { year, month, dayMap, loadMonth, prev: () => step(-1), next: () => step(1) }
+  return { year, month, dayMap, loadMonth, prev: () => stepMonth(-1), next: () => stepMonth(1) }
 }
 
 /** The picked day and its tasks; picking a day also opens it in the vault. */
@@ -143,7 +143,7 @@ function useSelectedDay(todayStr: string) {
   const [selectedDayTasks, setSelectedDayTasks] = useState<Task[]>([])
   const [loadingDay, setLoadingDay] = useState(true)
 
-  async function pick(dateStr: string) {
+  async function pickDay(dateStr: string) {
     setPickedADay(true)
     setSelectedDate(dateStr)
     if (dateStr === todayStr) void loadToday()
@@ -159,14 +159,11 @@ function useSelectedDay(todayStr: string) {
     fetchDayTasks(date).then((tasks) => {
       if (tasks) setSelectedDayTasks(tasks)
     })
-  return { selectedDate, pickedADay, selectedDayTasks, loadingDay, pick, refreshTasks }
+  return { selectedDate, pickedADay, selectedDayTasks, loadingDay, pick: pickDay, refreshTasks }
 }
 
-/**
- * Refreshes the month dots AND the selected day's tasks whenever any task changes.
- * This covers both the embedded drawer (same WebContentsView as TaskVaultView) and
- * the standalone calendar panel (separate WebContentsView with its own store).
- */
+/** Refreshes the month dots and the selected day's tasks whenever any task changes, both in the
+ *  embedded drawer and in the standalone calendar panel, which has its own store. */
 function useIndexRefresh(loadMonth: () => Promise<void>, day: SelectedDay) {
   const selectedDateRef = useRef(day.selectedDate)
   useEffect(() => {
@@ -267,10 +264,7 @@ function MonthGrid(props: GridProps): React.JSX.Element {
   )
 }
 
-/**
- * Until a day is picked, the panel shows the week rather than today's tasks —
- * the same list the main column is already showing.
- */
+/** Until a day is picked, the panel shows the week: today's tasks are already the main column. */
 function WeekSummary({ dayMap, todayStr }: { dayMap: DayMap; todayStr: string }) {
   return (
     <div className="cal-drawer__week">

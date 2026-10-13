@@ -156,11 +156,9 @@ function parseBodyRows(lines: string[], lineStarts: number[], columnCount: numbe
 
 type InlineSpanType = 'text' | 'code' | 'strong' | 'em' | 'del' | 'link'
 
-export interface InlineSpan {
-  type: InlineSpanType
-  text: string
-  href?: string
-}
+export type InlineSpan =
+  | { type: Exclude<InlineSpanType, 'link'>; text: string }
+  | { type: 'link'; text: string; href: string }
 
 // Ordered by precedence: code first (its content is literal), then the
 // longest markers, so ** is not mistaken for two * delimiters.

@@ -12,7 +12,7 @@ interface StatusSink {
 type StatusAnswer = GitStatus | { error: string }
 
 /** Keeps the status, or none for an error, and whether the workspace switched the extension off. */
-function keep(sink: StatusSink, result: StatusAnswer): void {
+function keepStatus(sink: StatusSink, result: StatusAnswer): void {
   sink.setDisabled('error' in result && result.error === 'GIT_DISABLED')
   sink.setStatus('error' in result ? null : result)
 }
@@ -25,7 +25,7 @@ function statusRefresher(repoRoot: string, sink: StatusSink, isCancelled: () => 
     inFlight = true
     try {
       const result = (await gitAPI.status(repoRoot)) as StatusAnswer
-      if (!isCancelled()) keep(sink, result)
+      if (!isCancelled()) keepStatus(sink, result)
     } catch {
       if (!isCancelled()) sink.setStatus(null)
     } finally {

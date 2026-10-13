@@ -20,12 +20,9 @@ const PENDING_REQUEST_MS = 5000
 let pendingRequest: ViewRequest | null = null
 let pendingTimer: ReturnType<typeof setTimeout> | null = null
 
-/**
- * Brings the Git tab forward and asks its view to act. A view that is already
- * open hears the broadcast; one the tab is only now creating collects the
- * request on mount (consumePendingViewRequest), within five seconds, the shape
- * Notepad and Foundry use for the same race.
- */
+/** Brings the Git tab forward and asks its view to act. An open view hears the broadcast; one the
+ *  tab is only now creating collects it on mount (consumePendingViewRequest), within five seconds,
+ *  as Notepad and Foundry do for the same race. */
 function requestOfView(api: ExtensionAPI, request: ViewRequest): void {
   api.window.showSelf('project')
   api.window.broadcast(VIEW_REQUEST_CHANNEL[request.kind], { repoRoot: request.repoRoot })
@@ -80,16 +77,22 @@ function pullCommand(api: ExtensionAPI) {
 const GIT_COMMAND = { requires: 'repo', category: 'Git' } as const
 
 export function registerQuickActionCommands(api: ExtensionAPI): Disposable[] {
-  const register: ExtensionAPI['commands']['register'] = (spec, handler) =>
+  const registerGitCommand: ExtensionAPI['commands']['register'] = (spec, handler) =>
     api.commands.register(spec, handler)
   return [
-    register(
+    registerGitCommand(
       { id: 'commit', label: 'Commit…', mnemonic: 'c', ...GIT_COMMAND },
       viewCommand(api, 'commit')
     ),
-    register({ id: 'push', label: 'Push', mnemonic: 'p', ...GIT_COMMAND }, pushCommand(api)),
-    register({ id: 'pull', label: 'Pull', mnemonic: 'l', ...GIT_COMMAND }, pullCommand(api)),
-    register(
+    registerGitCommand(
+      { id: 'push', label: 'Push', mnemonic: 'p', ...GIT_COMMAND },
+      pushCommand(api)
+    ),
+    registerGitCommand(
+      { id: 'pull', label: 'Pull', mnemonic: 'l', ...GIT_COMMAND },
+      pullCommand(api)
+    ),
+    registerGitCommand(
       { id: 'create-pr', label: 'Create PR…', mnemonic: 'r', ...GIT_COMMAND },
       viewCommand(api, 'pull-request')
     ),

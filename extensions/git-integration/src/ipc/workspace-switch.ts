@@ -12,11 +12,9 @@ function repositoryOf(payload: unknown): string | undefined {
   return typeof root === 'string' && isAbsolute(root) ? root : undefined
 }
 
-/**
- * `spec`, answering GIT_DISABLED instead of running where "Enable Git
- * Integration" is off: in the workspace of the repository the payload names,
- * or globally for a payload that names none (a `gh:owner/name` root included).
- */
+/** `spec`, answering GIT_DISABLED instead of running where "Enable Git Integration" is off: in the
+ *  workspace of the repository the payload names, or globally for a payload that names none (a
+ *  `gh:owner/name` root included). */
 export function gatedByWorkspace(
   spec: ChannelSpec,
   isEnabled: (repoPath?: string) => boolean

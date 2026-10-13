@@ -15,7 +15,7 @@ beforeEach(() => {
   db = wrapDb(new DatabaseSync(':memory:'))
 })
 
-const disposable = () => ({ dispose: vi.fn() })
+const fakeDisposable = () => ({ dispose: vi.fn() })
 
 /** Activates Notepad on the test database and returns its channels by name. */
 async function activateNotepad(): Promise<Map<string, ChannelSpec>> {
@@ -26,21 +26,23 @@ async function activateNotepad(): Promise<Map<string, ChannelSpec>> {
       ipc: partialFake<ExtensionAPI['ipc']>({
         registerHandler: (spec: ChannelSpec) => {
           channels.set(spec.channel, spec)
-          return disposable()
+          return fakeDisposable()
         },
       }),
-      settings: partialFake<ExtensionAPI['settings']>({ register: vi.fn(disposable) }),
+      settings: partialFake<ExtensionAPI['settings']>({ register: vi.fn(fakeDisposable) }),
       window: partialFake<ExtensionAPI['window']>({ broadcast: vi.fn(), openAuxiliary: vi.fn() }),
       notifications: partialFake<ExtensionAPI['notifications']>({ showToast: vi.fn() }),
-      nativeMenu: partialFake<ExtensionAPI['nativeMenu']>({ addViewMenuItem: vi.fn(disposable) }),
-      commands: partialFake<ExtensionAPI['commands']>({ register: vi.fn(disposable) }),
+      nativeMenu: partialFake<ExtensionAPI['nativeMenu']>({
+        addViewMenuItem: vi.fn(fakeDisposable),
+      }),
+      commands: partialFake<ExtensionAPI['commands']>({ register: vi.fn(fakeDisposable) }),
     })
   )
   deactivate()
   return channels
 }
 
-const tableNames = async () =>
+const listTableNames = async () =>
   (await db.query<{ name: string }>(`SELECT name FROM sqlite_master WHERE type='table'`)).map(
     (row) => row.name
   )
@@ -55,7 +57,7 @@ describe('Re-initialise database', () => {
 
     expect(await dispatchChannel(reinit, undefined)).toEqual({ data: { ok: true } })
 
-    expect(await tableNames()).toContain('diagram_comments')
+    expect(await listTableNames()).toContain('diagram_comments')
     expect(await db.query(`SELECT id FROM notes`)).toEqual([{ id: 'n1' }])
   })
 })

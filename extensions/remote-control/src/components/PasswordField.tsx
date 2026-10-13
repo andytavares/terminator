@@ -35,11 +35,8 @@ function updatePassword(password: string): Promise<PasswordUpdate> {
     .then((result) => (result ?? {}) as PasswordUpdate)
 }
 
-/**
- * Sets or generates the password. Only a hash is kept, so there is nothing to
- * reveal: a chosen password is known to the person who typed it, and a
- * generated one is shown here once, straight after it is made.
- */
+/** Only a hash is kept, so there is nothing to reveal: a chosen password is known to whoever
+ *  typed it, and a generated one is shown here once, straight after it is made. */
 export function PasswordField({ hasPassword, onChanged }: PasswordFieldProps): React.JSX.Element {
   const [generated, setGenerated] = useState<string | null>(null)
 

@@ -92,7 +92,7 @@ async function deleteAreaContents(db: ExtensionDB, areaId: string): Promise<void
   await db.run(`DELETE FROM projects WHERE area_id=?`, [areaId])
 }
 
-async function deleteArea({ db }: IpcContext, args: z.infer<typeof DeleteAreaRequestSchema>) {
+async function deleteAreaRows({ db }: IpcContext, args: z.infer<typeof DeleteAreaRequestSchema>) {
   const areaName = path.basename(args.areaFilePath, '.md')
   const area = await db.get<{ id: string; status: string }>(
     `SELECT id, status FROM areas WHERE name=?`,
@@ -106,7 +106,7 @@ async function deleteArea({ db }: IpcContext, args: z.infer<typeof DeleteAreaReq
   return { success: true }
 }
 
-async function restoreArea({ db }: IpcContext, args: z.infer<typeof ArchiveAreaRequestSchema>) {
+async function unarchiveArea({ db }: IpcContext, args: z.infer<typeof ArchiveAreaRequestSchema>) {
   const now = nowIso()
   const area = await db.get<{ id: string; updated_at: string }>(
     `SELECT id, updated_at FROM areas WHERE name=?`,
@@ -119,7 +119,7 @@ async function restoreArea({ db }: IpcContext, args: z.infer<typeof ArchiveAreaR
   return { success: true }
 }
 
-async function updateProjectStatus(
+async function setProjectStatusFromArgs(
   { api, db }: IpcContext,
   args: z.infer<typeof UpdateProjectStatusRequestSchema>
 ) {
@@ -135,11 +135,11 @@ export const AREA_ROUTES = [
   route('task-vault:vault:create-area', CreateAreaRequestSchema, createArea),
   route('task-vault:vault:rename-area', RenameAreaRequestSchema, renameArea),
   route('task-vault:vault:archive-area', ArchiveAreaRequestSchema, archiveArea),
-  route('task-vault:vault:delete-area', DeleteAreaRequestSchema, deleteArea),
-  route('task-vault:vault:restore-area', ArchiveAreaRequestSchema, restoreArea),
+  route('task-vault:vault:delete-area', DeleteAreaRequestSchema, deleteAreaRows),
+  route('task-vault:vault:restore-area', ArchiveAreaRequestSchema, unarchiveArea),
   route(
     'task-vault:vault:update-project-status',
     UpdateProjectStatusRequestSchema,
-    updateProjectStatus
+    setProjectStatusFromArgs
   ),
 ]

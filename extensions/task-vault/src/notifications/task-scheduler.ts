@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionDB, Disposable } from '@terminator/extension-sdk'
 import { openInVault } from '../navigation.js'
+import { localDate } from '../vault/recurrence'
 
 let _tick: (() => void) | null = null
 
@@ -83,11 +84,6 @@ type BlockedRow = {
   updated_at: string
   metadata: string
   source_ref: string | null
-}
-
-function localDay(d: Date): string {
-  const pad = (n: number): string => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 /** Minutes after midnight of an "HH:MM" time; missing parts default to 9:00. */
@@ -184,10 +180,8 @@ function parseMeta(metadata: string): Record<string, string> | null {
   }
 }
 
-/**
- * Whether a blocked task is due a check-in: its interval (or custom date) has passed,
- * and, for a repeating interval, a full interval has passed since the last check-in.
- */
+/** A blocked task is due a check-in once its interval (or custom date) has passed and, for a
+ *  repeating interval, a full interval has passed since the last check-in. */
 function checkInDue(tick: Tick, task: BlockedRow, interval: string): boolean {
   const blockedAt = new Date(task.updated_at).getTime()
   const targetTs = getTargetTimestamp(interval, blockedAt)
@@ -231,7 +225,7 @@ async function runTick(api: ExtensionAPI, db: ExtensionDB, state: SchedulerState
   const wasStartup = state.isStartup
   try {
     const nowDate = new Date()
-    const tick = { api, db, state, now: Date.now(), nowDate, today: localDay(nowDate), wasStartup }
+    const tick = { api, db, state, now: Date.now(), nowDate, today: localDate(nowDate), wasStartup }
     rollDay(state)
     await dismissFinished(tick)
     await notifyDueTasks(tick)

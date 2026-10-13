@@ -20,6 +20,7 @@ import {
   TabPanel,
   TabsRoot,
 } from '@terminator/extension-ui'
+import { invokeVault } from './daily-log-format'
 
 interface ArchivedArea {
   id: string
@@ -57,7 +58,7 @@ function toArchiveData(r: Partial<ArchiveData>): ArchiveData {
   return { tasks: r.tasks ?? [], projects: r.projects ?? [], areas: r.areas ?? [] }
 }
 
-function outcomeOf(result: unknown): ArchiveOutcome {
+function archiveOutcomeOf(result: unknown): ArchiveOutcome {
   if (!result || typeof result !== 'object') return {}
   if ('error' in result) return { error: (result as { error: string }).error }
   return { data: toArchiveData(result as Partial<ArchiveData>) }
@@ -71,7 +72,7 @@ async function fetchArchive(windowDays: number): Promise<ArchiveOutcome> {
         days: windowDays,
       }
     )
-    return outcomeOf(result)
+    return archiveOutcomeOf(result)
   } catch (err) {
     return { error: String(err) }
   }
@@ -97,34 +98,29 @@ interface ArchiveActions {
   deleteArea: (areaName: string) => Promise<void>
 }
 
-function invoke(channel: string, payload: unknown): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
-}
-
 /** Builds the archive actions, each followed by `reload`. */
 function archiveActions(reload: () => Promise<void>): ArchiveActions {
-  const then = (run: () => Promise<unknown>) => run().then(reload)
+  const invokeAndReload = (channel: string, payload: unknown) =>
+    invokeVault(channel, payload).then(reload)
   return {
-    restoreTask: (taskId) => then(() => invoke('task-vault:vault:restore-task', { taskId })),
+    restoreTask: (taskId) => invokeAndReload('task-vault:vault:restore-task', { taskId }),
     deleteTask: async (taskId, text) => {
       if (!confirm(`Delete task: "${text}"?`)) return
-      await then(() => invoke('task-vault:vault:delete-task', { taskId }))
+      await invokeAndReload('task-vault:vault:delete-task', { taskId })
     },
     restoreProject: (filePath) =>
-      then(() =>
-        invoke('task-vault:vault:update-project-status', {
-          projectFilePath: filePath,
-          status: 'active',
-        })
-      ),
+      invokeAndReload('task-vault:vault:update-project-status', {
+        projectFilePath: filePath,
+        status: 'active',
+      }),
     deleteProject: async (filePath, name) => {
       if (!confirm(`Permanently delete project "${name}"?`)) return
-      await then(() => invoke('task-vault:projects:delete', { projectFilePath: filePath }))
+      await invokeAndReload('task-vault:projects:delete', { projectFilePath: filePath })
     },
-    restoreArea: (areaName) => then(() => invoke('task-vault:vault:restore-area', { areaName })),
+    restoreArea: (areaName) => invokeAndReload('task-vault:vault:restore-area', { areaName }),
     deleteArea: async (areaName) => {
       if (!confirm(`Permanently delete area "${areaName}"?`)) return
-      await then(() => invoke('task-vault:vault:delete-area', { areaFilePath: areaName }))
+      await invokeAndReload('task-vault:vault:delete-area', { areaFilePath: areaName })
     },
   }
 }
@@ -136,28 +132,29 @@ function useArchive() {
   const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState(30)
 
-  function applyOutcome(outcome: ArchiveOutcome) {
+  function applyArchiveOutcome(outcome: ArchiveOutcome) {
     if ('error' in outcome) setError(outcome.error)
     else if (outcome.data) setData(outcome.data)
     setIsLoading(false)
   }
 
-  function reload(windowDays: number): Promise<void> {
+  function reloadArchive(windowDays: number): Promise<void> {
     setIsLoading(true)
     setError(null)
-    return fetchArchive(windowDays).then(applyOutcome)
+    return fetchArchive(windowDays).then(applyArchiveOutcome)
   }
 
   useEffect(() => {
-    void fetchArchive(days).then(applyOutcome)
+    void fetchArchive(days).then(applyArchiveOutcome)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useIndexReload(() => void reload(days), [days])
+  useIndexReload(() => void reloadArchive(days), [days])
   const changeWindow = (newDays: number) => {
     setDays(newDays)
-    void reload(newDays)
+    void reloadArchive(newDays)
   }
-  return { data, isLoading, error, days, changeWindow, actions: archiveActions(() => reload(days)) }
+  const actions = archiveActions(() => reloadArchive(days))
+  return { data, isLoading, error, days, changeWindow, actions }
 }
 
 interface TaskSectionProps {

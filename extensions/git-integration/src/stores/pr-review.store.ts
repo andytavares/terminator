@@ -416,7 +416,7 @@ function noteActions(set: SetState, get: GetState) {
   }
 }
 
-function sessionActions(set: SetState, get: GetState) {
+function prSessionActions(set: SetState, get: GetState) {
   return {
     reorderFiles: (head: PrHead, chapterId: string, orderedPaths: string[]) => {
       set((s) => ({ fileOrderOverrides: { ...s.fileOrderOverrides, [chapterId]: orderedPaths } }))
@@ -476,5 +476,5 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   ...viewedActions(set, get),
   ...riskActions(set),
   ...noteActions(set, get),
-  ...sessionActions(set, get),
+  ...prSessionActions(set, get),
 }))

@@ -20,6 +20,7 @@ import { applyReadingOrder } from '../../review/apply-reading-order.js'
 import { findTestReferencesInRepo } from '../../review/test-references.js'
 import { VALIDATION_ERROR } from '../register.js'
 import { catchError, PullRequestPayload, type GithubContext } from './context.js'
+import { assigneeLoginsOf, asText } from '../../github/pr-review-service.js'
 
 type RawRecord = Record<string, unknown>
 
@@ -88,15 +89,8 @@ function requestedReviewersOf(reviewers: PrSources['reviewers']): string[] {
   return [...users, ...teams].filter(Boolean)
 }
 
-function assigneeLoginsOf(meta: RawRecord): string[] {
-  const assignees = (meta.assignees as RawRecord[] | undefined) ?? []
-  return assignees.map((a) => String(a.login ?? '')).filter(Boolean)
-}
-
-/**
- * The PR's check rollup; when it is empty (checks queued but not yet reported), its head's
- * check suites, so "Expected" checks show. Best-effort: a failed lookup keeps the rollup.
- */
+/** The PR's check rollup; when empty (checks queued, not yet reported), its head's check suites, so
+ *  "Expected" checks show. Best-effort: a failed lookup keeps the rollup. */
 async function checkRollup(ctx: GithubContext, meta: RawRecord, where: RepoAt) {
   const rollup = meta.statusCheckRollup
   const headSHA = String(meta.headRefOid ?? '')
@@ -118,26 +112,22 @@ async function checkRollup(ctx: GithubContext, meta: RawRecord, where: RepoAt) {
   }
 }
 
-function textOf(value: unknown): string {
-  return String(value ?? '')
-}
-
 /** Who opened the PR, when, from which branch, and where it stands. */
 function prIdentity(meta: RawRecord) {
   const author = (meta.author ?? {}) as RawRecord
   return {
     number: Number(meta.number),
-    title: textOf(meta.title),
-    body: textOf(meta.body),
-    author: textOf(author.login),
-    authorAvatarUrl: textOf(author.avatarUrl),
-    openedAt: textOf(meta.createdAt),
-    headRefName: textOf(meta.headRefName),
-    baseRefName: textOf(meta.baseRefName),
-    headSHA: textOf(meta.headRefOid),
+    title: asText(meta.title),
+    body: asText(meta.body),
+    author: asText(author.login),
+    authorAvatarUrl: asText(author.avatarUrl),
+    openedAt: asText(meta.createdAt),
+    headRefName: asText(meta.headRefName),
+    baseRefName: asText(meta.baseRefName),
+    headSHA: asText(meta.headRefOid),
     nodeId: typeof meta.id === 'string' ? meta.id : undefined,
     isDraft: Boolean(meta.isDraft),
-    mergeStateStatus: mapMergeStateStatus(textOf(meta.mergeStateStatus)),
+    mergeStateStatus: mapMergeStateStatus(asText(meta.mergeStateStatus)),
   }
 }
 

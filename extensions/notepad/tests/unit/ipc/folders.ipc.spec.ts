@@ -7,21 +7,10 @@ vi.mock('electron', () => ({
 }))
 
 import { ipcMain } from 'electron'
-import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
-import { partialFake } from '../../../../../tests/support/fakes'
 
-// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
-// capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
-const mockApi = partialFake<ExtensionAPI>({
-  ipc: partialFake<ExtensionAPI['ipc']>({
-    registerHandler: (spec: ChannelSpec) => {
-      vi.mocked(ipcMain.handle)(spec.channel, (_e, payload: unknown) =>
-        dispatchChannel(spec, payload)
-      )
-      return { dispose: () => vi.mocked(ipcMain.removeHandler)(spec.channel) }
-    },
-  }),
-})
+import { apiOverIpcMain } from '../support/ipc-main-api'
+
+const mockApi = apiOverIpcMain()
 import { wrapDb } from '../../../../../src/main/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'
 import {
@@ -45,13 +34,13 @@ beforeEach(async () => {
 
 /** Invokes the handler registered for a folders channel, as the renderer would. */
 function invokeFolders(action: string, payload?: unknown): Promise<unknown> {
-  const handler = vi
+  const folderHandler = vi
     .mocked(ipcMain.handle)
     .mock.calls.find(([c]) => c === `terminator.notepad:folders.${action}`)![1] as (
     e: unknown,
     payload?: unknown
   ) => Promise<unknown>
-  return handler({}, payload)
+  return folderHandler({}, payload)
 }
 
 describe('createFolder', () => {

@@ -73,7 +73,7 @@ async function applyRecurrence(tx: ExtensionDB, taskId: string, values: unknown[
   return ensureNextOccurrence(tx, taskId)
 }
 
-async function setRecurrence({ db }: IpcContext, args: SetArgs) {
+async function storeRecurrence({ db }: IpcContext, args: SetArgs) {
   const { taskId, time } = args
   const task = await db.get<{
     metadata: string
@@ -124,6 +124,6 @@ async function clearRecurrence(
 
 /** Channels that make a task repeat, or stop it repeating. */
 export const RECURRENCE_ROUTES = [
-  route('task-vault:vault:set-recurrence', SetRecurrenceRequestSchema, setRecurrence),
+  route('task-vault:vault:set-recurrence', SetRecurrenceRequestSchema, storeRecurrence),
   route('task-vault:vault:clear-recurrence', ClearRecurrenceRequestSchema, clearRecurrence),
 ]

@@ -25,15 +25,15 @@ export function createIpcRegistrar(api: ExtensionAPI): {
   cleanup(): void
 } {
   const disposables: Disposable[] = []
-  const register =
+  const registrarFor =
     (remoteAccessible: boolean): Register =>
     (channel, schema, run) => {
       const spec = defineChannel({ channel, schema, invalid: VALIDATION_ERROR, run })
       disposables.push(api.ipc.registerHandler(spec, { remoteAccessible }))
     }
   return {
-    handle: register(false),
-    handleRemote: register(true),
+    handle: registrarFor(false),
+    handleRemote: registrarFor(true),
     cleanup() {
       disposables.forEach((d) => d.dispose())
     },

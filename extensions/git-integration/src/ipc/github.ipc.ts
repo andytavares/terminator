@@ -12,10 +12,8 @@ import { viewedChannels } from './github/viewed.js'
 
 export type { GithubHandlerOptions } from './github/context.js'
 
-/**
- * Registers every github:* channel. Each registration has its own caches (the repository
- * owner and name, the viewer's login, merge bases, the accessible repositories).
- */
+/** Registers every github:* channel. Each registration has its own caches (the repository owner and
+ *  name, the viewer's login, merge bases, the accessible repositories). */
 export function registerGithubHandlers(
   registerRaw: RegisterFn,
   access: GithubAccess,

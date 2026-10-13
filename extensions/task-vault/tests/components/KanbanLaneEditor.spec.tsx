@@ -11,15 +11,15 @@ const LANES: KanbanLane[] = [
   { id: 'doing', label: 'Doing', taskStatuses: ['in-progress'], dotColor: '#ff0000' },
 ]
 
-function renderEditor() {
+function renderLaneEditor() {
   const onSave = vi.fn()
   const onClose = vi.fn()
   render(<KanbanLaneEditor lanes={LANES} onSave={onSave} onClose={onClose} />)
-  const save = () => {
+  const clickSave = () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save lanes' }))
     return onSave.mock.calls.at(-1)?.[0] as KanbanLane[]
   }
-  return { onSave, onClose, save }
+  return { onSave, onClose, save: clickSave }
 }
 
 const nameInputs = () => screen.getAllByPlaceholderText('Lane name') as HTMLInputElement[]
@@ -38,7 +38,7 @@ function laneTests() {
 
 function laneReorderingTests() {
   it('renames, reorders and removes lanes, saving the draft', () => {
-    const { save } = renderEditor()
+    const { save } = renderLaneEditor()
     fireEvent.change(nameInputs()[0], { target: { value: 'Backlog' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Move down' })[0])
     expect(nameInputs().map((i) => i.value)).toEqual(['Doing', 'Backlog'])
@@ -47,7 +47,7 @@ function laneReorderingTests() {
   })
 
   it('disables moving past either end and moves a lane up', () => {
-    renderEditor()
+    renderLaneEditor()
     const up = screen.getAllByRole('button', { name: 'Move up' })
     expect((up[0] as HTMLButtonElement).disabled).toBe(true)
     expect(
@@ -60,7 +60,7 @@ function laneReorderingTests() {
 
 function laneAddingAndCancellingTests() {
   it('adds a lane with an id from its name, by button or Enter', () => {
-    const { save } = renderEditor()
+    const { save } = renderLaneEditor()
     const add = screen.getByPlaceholderText('New lane name…')
     fireEvent.change(add, { target: { value: '  In Review! ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
@@ -74,7 +74,7 @@ function laneAddingAndCancellingTests() {
   })
 
   it('cancels without saving', () => {
-    const { onClose, onSave } = renderEditor()
+    const { onClose, onSave } = renderLaneEditor()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onClose).toHaveBeenCalled()
     expect(onSave).not.toHaveBeenCalled()
@@ -83,7 +83,7 @@ function laneAddingAndCancellingTests() {
 
 function statusTests() {
   it('maps a status to a lane, unmaps it, and blocks one used elsewhere', () => {
-    const { save } = renderEditor()
+    const { save } = renderLaneEditor()
     expect(chip(0, 'open').className).toContain('--on')
     expect(chip(1, 'open').className).toContain('--used')
     expect(chip(1, 'open').title).toBe('Used in another lane')
@@ -93,7 +93,7 @@ function statusTests() {
   })
 
   it('sets and resets a lane dot colour', () => {
-    const { save } = renderEditor()
+    const { save } = renderLaneEditor()
     const colours = document.querySelectorAll('input[type="color"]') as NodeListOf<HTMLInputElement>
     expect(colours[0].value).toBe('#6366f1')
     fireEvent.change(colours[0], { target: { value: '#00ff00' } })

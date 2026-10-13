@@ -13,7 +13,12 @@ import { Button, ConfirmDialog, useDismissible } from '@terminator/extension-ui'
 import { loadLibrary, useNotesStore } from '../stores/notes.store'
 import { useFilterStore } from '../stores/filter.store'
 import { EmptyState } from './EmptyState'
-import { ItemEditModal, ItemRow, type DragProps, type EditModalState } from './NoteListItems'
+import {
+  ItemEditModal,
+  NoteOrDiagramRow,
+  type DragProps,
+  type EditModalState,
+} from './NoteListItems'
 import {
   activeTagNamesOf,
   applyDrop,
@@ -107,7 +112,7 @@ export function NoteList(): React.JSX.Element {
 
   return (
     <div className="notepad-note-list">
-      <SearchBox />
+      <NoteSearchBox />
       {tags.length !== 0 && <TagFilter tags={tags} />}
       <ListBody view={view} activeTagNames={activeTagNames} />
       <ListFooter />
@@ -116,10 +121,8 @@ export function NoteList(): React.JSX.Element {
   )
 }
 
-/**
- * Text search runs over IPC (tags are filtered client-side). A newer query
- * supersedes a pending one; clearing the query drops the results at once.
- */
+/** Tags are filtered client-side; text search runs over IPC. A newer query supersedes a pending
+ *  one, and clearing the query drops the results at once. */
 function useSearchResults(searchQuery: string): SearchResult[] | null {
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
   const [resultsQuery, setResultsQuery] = useState(searchQuery)
@@ -131,7 +134,6 @@ function useSearchResults(searchQuery: string): SearchResult[] | null {
 
   useEffect(() => {
     const gen = ++searchGenRef.current
-    /* v8 ignore next */
     if (!searchQuery) return
     void window.electronAPI.extensionBridge
       .invoke('terminator.notepad:search.query', { query: searchQuery, includeArchived: true })
@@ -189,22 +191,19 @@ function useDragState() {
   const [dragged, setDragged] = useState<ItemRef | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [folderDropTarget, setFolderDropTarget] = useState<string | null>(null)
-  const endDrag = () => {
+  const clearDragState = () => {
     setDragged(null)
     setDropTarget(null)
     setFolderDropTarget(null)
   }
   return {
     ...{ dragged, setDragged, dropTarget, setDropTarget },
-    ...{ folderDropTarget, setFolderDropTarget, endDrag },
+    ...{ folderDropTarget, setFolderDropTarget, clearDragState },
   }
 }
 
-/**
- * Reordering by dropping beside an item, moving into a folder by dropping on
- * its header, and out of one by dropping on the list. Rows and headers stop a
- * dragover once handled: the list behind clears every drop target on dragover.
- */
+/** Drop beside an item to reorder, on a folder header to move in, on the list to move out. Rows
+ *  and headers stop a handled dragover: the list behind clears every drop target on dragover. */
 function useListDrag(model: ListModel) {
   const state = useDragState()
   return {
@@ -219,7 +218,7 @@ function useListDrag(model: ListModel) {
 /** Moves the dragged item into a folder (or the root, with null), then ends the drag. */
 function dropInto(state: DragState, folderId: string | null): void {
   const item = state.dragged
-  state.endDrag()
+  state.clearDragState()
   if (item) moveToFolder(item, folderId).catch(console.error)
 }
 
@@ -242,7 +241,7 @@ function rowDragProps(item: ItemRef, canDrag: boolean, ctx: RowDragContext) {
     onDragOver: (e) => markDropBeside(e, item, state),
     onDragLeave: () => state.setDropTarget((prev) => (prev?.id === item.id ? null : prev)),
     onDrop: (e) => dropBeside(e, ctx),
-    onDragEnd: state.endDrag,
+    onDragEnd: state.clearDragState,
   }
   return props
 }
@@ -265,7 +264,7 @@ function dropBeside(e: React.DragEvent, ctx: RowDragContext): void {
   e.stopPropagation()
   const { dragged, dropTarget } = state
   const plan = dragged && dropTarget ? planDrop(model, dragged, dropTarget) : null
-  state.endDrag()
+  state.clearDragState()
   if (dragged && plan) applyDrop(dragged, plan).catch(console.error)
 }
 
@@ -304,7 +303,7 @@ function listDropHandlers(model: ListModel, state: DragState) {
       if (!dragged) return
       e.preventDefault()
       const entry = model.activeItems.find((en) => en.item.id === dragged.id)
-      if (folderIdOf(entry) === null) state.endDrag()
+      if (folderIdOf(entry) === null) state.clearDragState()
       else dropInto(state, null)
     },
   }
@@ -312,7 +311,7 @@ function listDropHandlers(model: ListModel, state: DragState) {
 
 // ── Search and tag filter ─────────────────────────────────────────
 
-function SearchBox(): React.JSX.Element {
+function NoteSearchBox(): React.JSX.Element {
   const { searchQuery, setQuery } = useFilterStore()
   return (
     <div className="notepad-note-list__search">
@@ -447,7 +446,7 @@ function ListRow(props: { entry: MixedItem; view: ListView; dimmed?: boolean }) 
   const { entry, view, dimmed } = props
   const item = { id: entry.item.id, type: entry.kind }
   return (
-    <ItemRow
+    <NoteOrDiagramRow
       entry={entry}
       onContextMenu={(e, en) => view.ui.setContextMenu(contextMenuFor(e, en))}
       dimmed={dimmed}
@@ -520,7 +519,7 @@ function FolderToggle(props: FolderSectionProps & { count: number }): React.JSX.
 }
 
 function FolderRenameInput({ folder, ui }: { folder: Folder; ui: ListUi }): React.JSX.Element {
-  const commit = async (value: string) => {
+  const commitFolderRename = async (value: string) => {
     await renameFolder(folder.id, value || folder.name)
     ui.setRenamingFolderId(null)
     await loadLibrary()
@@ -530,9 +529,9 @@ function FolderRenameInput({ folder, ui }: { folder: Folder; ui: ListUi }): Reac
       className="notepad-folder-header__rename-input"
       autoFocus={true}
       defaultValue={folder.name}
-      onBlur={(e) => void commit(e.target.value)}
+      onBlur={(e) => void commitFolderRename(e.target.value)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') void commit(e.currentTarget.value)
+        if (e.key === 'Enter') void commitFolderRename(e.currentTarget.value)
         if (e.key === 'Escape') ui.setRenamingFolderId(null)
       }}
       onClick={(e) => e.stopPropagation()}
@@ -681,7 +680,7 @@ function ItemContextMenu({ ui, menuRef }: MenuProps): React.JSX.Element | null {
 function FolderContextMenu({ ui, menuRef }: MenuProps): React.JSX.Element | null {
   const menu = ui.folderContextMenu
   if (!menu) return null
-  const close = (then: () => void) => () => {
+  const closeMenuThen = (then: () => void) => () => {
     ui.setFolderContextMenu(null)
     then()
   }
@@ -691,8 +690,13 @@ function FolderContextMenu({ ui, menuRef }: MenuProps): React.JSX.Element | null
       className="notepad-context-menu"
       style={{ position: 'fixed', top: menu.y, left: menu.x }}
     >
-      <MenuItem onClick={close(() => ui.setRenamingFolderId(menu.folderId))}>Rename</MenuItem>
-      <MenuItem danger={true} onClick={close(() => ui.setFolderDeletePending(menu.folderId))}>
+      <MenuItem onClick={closeMenuThen(() => ui.setRenamingFolderId(menu.folderId))}>
+        Rename
+      </MenuItem>
+      <MenuItem
+        danger={true}
+        onClick={closeMenuThen(() => ui.setFolderDeletePending(menu.folderId))}
+      >
         Delete folder
       </MenuItem>
     </div>
@@ -703,17 +707,17 @@ function FolderMoves(props: { ui: ListUi; menu: ContextMenuState }): React.JSX.E
   const { ui, menu } = props
   const folders = useNotesStore((s) => s.folders)
   if (folders.length === 0) return null
-  const moveTo = (folderId: string | null) =>
+  const moveItemTo = (folderId: string | null) =>
     itemMenuAction(ui, (m) => void moveToFolder(m.item, folderId))
   const inFolder = menu.folderId !== null
   return (
     <>
       <div className="notepad-context-menu__separator" />
-      {inFolder && <MenuItem onClick={moveTo(null)}>Remove from folder</MenuItem>}
+      {inFolder && <MenuItem onClick={moveItemTo(null)}>Remove from folder</MenuItem>}
       {folders
         .filter((f) => f.id !== menu.folderId)
         .map((f) => (
-          <MenuItem key={f.id} onClick={moveTo(f.id)}>
+          <MenuItem key={f.id} onClick={moveItemTo(f.id)}>
             Move to {f.name}
           </MenuItem>
         ))}

@@ -2,11 +2,8 @@ import type { ExtensionDB } from '@terminator/extension-sdk'
 
 const UNFINISHED_STATUSES = `'open','in-progress','in-review','blocked'`
 
-/**
- * Archiving an area records the previous status of every project and task it
- * changes, so restoring puts back exactly those and nothing else. Subtasks
- * carry no project_id or area_id, so they are found through their parents.
- */
+/** Records the previous status of every project and task archiving changes, so restoring puts
+ *  back exactly those. Subtasks carry no project_id or area_id: they are found via parents. */
 export async function archiveAreaContents(
   db: ExtensionDB,
   areaId: string,

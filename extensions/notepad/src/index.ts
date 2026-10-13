@@ -190,10 +190,9 @@ function pendingQuickCreateChannel() {
   })
 }
 
-// Cmd+Shift+N lives on the View menu, not globalShortcut: menu accelerators fire only
-// while Terminator is focused, whereas a global registration would take the combo away
-// from every other app on the system (it collides with New Incognito Window / New Folder).
-// The quick-actions panel (⌘P) reaches the same path.
+// On the View menu, not globalShortcut: a menu accelerator fires only while Terminator is
+// focused, and a global one would take Cmd+Shift+N (New Incognito Window, New Folder) from every
+// other app. The quick-actions panel (⌘P) reaches the same path.
 function quickCreateEntryPoints(api: ExtensionAPI): Disposable[] {
   const menuItem = api.nativeMenu.addViewMenuItem({
     id: 'notepad-new-note',

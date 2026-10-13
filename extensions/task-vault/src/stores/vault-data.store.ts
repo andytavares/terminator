@@ -1,6 +1,7 @@
 import { create, type StoreApi } from 'zustand'
 import type { DailyLog, IndexedTask, KanbanLane } from '../vault/types'
 import { useVaultNavStore } from './vault-nav.store'
+import { localDate } from '../vault/recurrence'
 
 interface VaultDataStore {
   todayLog: DailyLog | null
@@ -31,25 +32,20 @@ function errorOf(result: unknown): string | null {
   return null
 }
 
-function localToday(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 type TodayResult = DailyLog & {
   rolledOver?: number
   rolledOverIds?: string[]
   staleDaysThreshold?: number
 }
 
-async function loadToday(set: SetState): Promise<void> {
+async function fetchTodayInto(set: SetState): Promise<void> {
   set({ isLoading: true, error: null })
   try {
     const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-today')
     const error = errorOf(result)
     if (error !== null) return set({ error, isLoading: false })
     const res = result as TodayResult
-    useVaultNavStore.getState().setViewingDate(localToday())
+    useVaultNavStore.getState().setViewingDate(localDate())
     set((s) => ({
       todayLog: res,
       isLoading: false,
@@ -109,7 +105,7 @@ export const useVaultDataStore = create<VaultDataStore>((set) => ({
   lastRolledOver: 0,
   rolledOverTaskIds: [],
   staleDaysThreshold: 7,
-  loadToday: () => loadToday(set),
+  loadToday: () => fetchTodayInto(set),
   loadDate: (date: string) => loadDate(set, date),
   refreshInboxCount: async () => {
     const tasks = await listedTasks<{ status: string }>('task-vault:vault:get-inbox')

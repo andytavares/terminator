@@ -76,10 +76,8 @@ interface ScratchDirs {
   outside: string
 }
 
-/**
- * A workspace folder, a project with a worktree inside it and a symlink leading out of it,
- * and a folder outside both; made before the describe's tests and removed after them.
- */
+/** A workspace folder, a project with a worktree inside it and a symlink out of it, and a folder
+ *  outside both; made before the describe's tests and removed after them. */
 function useScratchDirs(): ScratchDirs {
   const dirs = {} as ScratchDirs
   beforeAll(() => {

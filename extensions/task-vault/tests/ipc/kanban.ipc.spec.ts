@@ -10,7 +10,7 @@ import {
   seedArea,
   seedProject,
   seedTask,
-  taskRow,
+  selectTaskRow,
 } from '../support/vault-db'
 
 let db: ExtensionDB
@@ -21,8 +21,6 @@ beforeEach(async () => {
   harness = createIpcHarness()
   registerKanbanIpcHandlers(harness.api, db)
 })
-
-const invoke = (channel: string, payload?: unknown) => harness.invoke(channel, payload)
 
 describe('registerKanbanIpcHandlers', registerKanbanIpcHandlersTests)
 
@@ -75,7 +73,7 @@ function listTasksListingTests() {
     await seedTask(db, { id: 'cancelled', status: 'cancelled' })
     await seedTask(db, { id: 'child', parentId: 'shown' })
 
-    const result = (await invoke('task-vault:kanban:list-tasks')) as {
+    const result = (await harness.invoke('task-vault:kanban:list-tasks')) as {
       tasks: Record<string, unknown>[]
     }
 
@@ -97,7 +95,7 @@ function listTasksMetadataTests() {
     })
     await seedTask(db, { id: 'plain' })
 
-    const result = (await invoke('task-vault:kanban:list-tasks')) as {
+    const result = (await harness.invoke('task-vault:kanban:list-tasks')) as {
       tasks: Record<string, unknown>[]
     }
 
@@ -110,7 +108,7 @@ function listTasksMetadataTests() {
   it('tolerates malformed metadata', async () => {
     await seedTask(db, { id: 'bad', metadata: 'not-json{{{' })
 
-    const result = (await invoke('task-vault:kanban:list-tasks')) as {
+    const result = (await harness.invoke('task-vault:kanban:list-tasks')) as {
       tasks: Record<string, unknown>[]
     }
 
@@ -121,25 +119,25 @@ function listTasksMetadataTests() {
 
 function configTests() {
   it('returns the default config when nothing is stored', async () => {
-    expect(await invoke('task-vault:kanban:get-config')).toEqual(DEFAULT_KANBAN_CONFIG)
+    expect(await harness.invoke('task-vault:kanban:get-config')).toEqual(DEFAULT_KANBAN_CONFIG)
   })
 
   it('returns what save-config stored', async () => {
-    expect(await invoke('task-vault:kanban:save-config', config)).toEqual({ ok: true })
-    expect(await invoke('task-vault:kanban:get-config')).toEqual(config)
+    expect(await harness.invoke('task-vault:kanban:save-config', config)).toEqual({ ok: true })
+    expect(await harness.invoke('task-vault:kanban:get-config')).toEqual(config)
   })
 
   it("keeps a lane's calendar dot colour", async () => {
     const coloured = { ...config, lanes: [{ ...config.lanes[0], dotColor: '#ff8800' }] }
-    await invoke('task-vault:kanban:save-config', coloured)
-    expect(await invoke('task-vault:kanban:get-config')).toEqual(coloured)
+    await harness.invoke('task-vault:kanban:save-config', coloured)
+    expect(await harness.invoke('task-vault:kanban:get-config')).toEqual(coloured)
   })
 
   it('replaces the stored config on a second save instead of adding a row', async () => {
-    await invoke('task-vault:kanban:save-config', config)
-    await invoke('task-vault:kanban:save-config', { ...config, swimlaneGrouping: 'area' })
+    await harness.invoke('task-vault:kanban:save-config', config)
+    await harness.invoke('task-vault:kanban:save-config', { ...config, swimlaneGrouping: 'area' })
 
-    expect(await invoke('task-vault:kanban:get-config')).toMatchObject({
+    expect(await harness.invoke('task-vault:kanban:get-config')).toMatchObject({
       swimlaneGrouping: 'area',
     })
     expect(await db.query(`SELECT key FROM settings WHERE key = 'kanban_config'`)).toHaveLength(1)
@@ -149,7 +147,7 @@ function configTests() {
     await db.run(
       `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'kanban_config', 'oops{')`
     )
-    expect(await invoke('task-vault:kanban:get-config')).toEqual(DEFAULT_KANBAN_CONFIG)
+    expect(await harness.invoke('task-vault:kanban:get-config')).toEqual(DEFAULT_KANBAN_CONFIG)
   })
 }
 
@@ -161,7 +159,7 @@ function listContextsTests() {
     await seedTask(db, { id: 't4', context: '' })
     await seedTask(db, { id: 't5' })
 
-    expect(await invoke('task-vault:kanban:list-contexts')).toEqual({
+    expect(await harness.invoke('task-vault:kanban:list-contexts')).toEqual({
       contexts: ['home', 'work'],
     })
   })
@@ -172,14 +170,20 @@ function moveTaskTests() {
     await seedTask(db, { id: 'task-1' })
 
     expect(
-      await invoke('task-vault:kanban:move-task', { taskId: 'task-1', toStatus: 'in-progress' })
+      await harness.invoke('task-vault:kanban:move-task', {
+        taskId: 'task-1',
+        toStatus: 'in-progress',
+      })
     ).toEqual({ ok: true })
-    expect(await taskRow(db, 'task-1')).toMatchObject({ status: 'in-progress' })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({ status: 'in-progress' })
   })
 
   it('reports a missing task', async () => {
     expect(
-      await invoke('task-vault:kanban:move-task', { taskId: 'nonexistent', toStatus: 'done' })
+      await harness.invoke('task-vault:kanban:move-task', {
+        taskId: 'nonexistent',
+        toStatus: 'done',
+      })
     ).toEqual({ error: 'Task not found' })
   })
 }

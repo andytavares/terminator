@@ -138,10 +138,8 @@ function PendingDraft(props: { ctx: PaneContext; draft: DraftComment }) {
   )
 }
 
-/**
- * The annotation content for one line and side: composer, threads, agent notes, private
- * notes, drafts. Unwrapped so it can sit in a <tr><td> (unified) or a plain <div> (split).
- */
+/** The annotations for one line and side: composer, threads, agent and private notes, drafts.
+ *  Unwrapped so it can sit in a <tr><td> (unified) or a plain <div> (split). */
 export function AnnotationContent(at: LineRef) {
   const { ctx, lineNum, side } = at
   const { lookups } = ctx

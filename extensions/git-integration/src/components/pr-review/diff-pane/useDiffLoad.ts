@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { githubAPI } from '../../../api/github'
-import { parseDiff } from '../../../github/pr-review-service'
+import { parsePrFileDiff } from '../../../github/pr-review-service'
 import { FileDiffSchema, type FileDiff } from '../../../schemas/git.schema'
 
 interface CachedDiff {
@@ -76,10 +76,8 @@ async function loadFullDiff(req: DiffRequest, cb: LoadCallbacks, note: string | 
   }
 }
 
-/**
- * Shows the file's part of the comparison; otherwise says which note the whole diff, shown
- * instead, carries: the rewritten-history note when the history was rewritten.
- */
+/** Shows the file's part of the comparison; otherwise says which note the whole diff shown instead
+ *  carries: the rewritten-history note when the history was rewritten. */
 function showComparison(cmp: CompareAnswer, req: DiffRequest, cb: LoadCallbacks) {
   if ('error' in cmp) return { fallbackNote: null }
   if (cmp.rewritten) {
@@ -88,7 +86,7 @@ function showComparison(cmp: CompareAnswer, req: DiffRequest, cb: LoadCallbacks)
   }
   const entry = cmp.files.find((f) => f.path === req.path)
   if (!entry) return { fallbackNote: null }
-  cb.show(parseDiff(entry.patch, req.path), `Showing ${req.sinceSha!.slice(0, 8)} … head`)
+  cb.show(parsePrFileDiff(entry.patch, req.path), `Showing ${req.sinceSha!.slice(0, 8)} … head`)
   return null
 }
 
@@ -162,10 +160,8 @@ function sinceNoteOf(cached: CachedDiff | undefined, rewrittenFor: string | null
   return null
 }
 
-/**
- * The file's diff for the current range, cached per key: the diff once loaded, the error
- * when it failed, the note to show beside it, and whether it is still loading.
- */
+/** The file's diff for the current range, cached per key: the diff once loaded, the error when it
+ *  failed, the note to show beside it, and whether it is still loading. */
 export function useDiffLoad(req: DiffRequest, isBinary: boolean) {
   const [diffCache, setDiffCache] = useState<Map<string, CachedDiff>>(() => new Map())
   const [diffFailure, setDiffFailure] = useState<{ key: string; message: string } | null>(null)

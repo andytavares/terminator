@@ -310,7 +310,11 @@ function oneHunk(header: string, lines: DiffLineFixture[], path = 'src/foo.ts') 
 const oneLineDiff = () => oneHunk('@@ -1,1 +1,1 @@', [ctxLine(1, 'const x = 1')])
 
 /** Serves `diff` for the open file, renders the pane with `props`, and waits for `header`. */
-async function renderDiff(diff: unknown, header: string, props: Partial<typeof defaultProps> = {}) {
+async function renderDiffPane(
+  diff: unknown,
+  header: string,
+  props: Partial<typeof defaultProps> = {}
+) {
   mockPrFileDiff.mockResolvedValue({ diff })
   const view = await renderPane(props)
   await waitFor(() => expect(screen.getByText(header)).toBeTruthy())
@@ -624,7 +628,7 @@ describe('ReviewDiffPane — switches to split view mode when Split button is cl
   it('switches to split view mode when Split button is clicked', async () => {
     const diff = oneHunk('@@ -1,3 +1,3 @@', [ctxLine(1, 'x'), addLine(2, 'y'), removeLine(2, 'z')])
     uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), diffViewMode: 'split' })
-    const { container } = await renderDiff(diff, '@@ -1,3 +1,3 @@')
+    const { container } = await renderDiffPane(diff, '@@ -1,3 +1,3 @@')
 
     await waitFor(() => expect(container.querySelector('.diff-table--split')).toBeTruthy())
   })
@@ -632,7 +636,7 @@ describe('ReviewDiffPane — switches to split view mode when Split button is cl
 
 describe('ReviewDiffPane — gutter drag no longer opens the composer, but calls setSelection', () => {
   it('gutter drag no longer opens the composer, but calls setSelection', async () => {
-    await renderDiff(oneLineDiff(), '@@ -1,1 +1,1 @@')
+    await renderDiffPane(oneLineDiff(), '@@ -1,1 +1,1 @@')
 
     const btn = screen.getAllByRole('button', { name: 'Add comment' })[0]
     fireEvent.mouseDown(btn)
@@ -655,7 +659,7 @@ describe('ReviewDiffPane — a gutter drag across rows keeps the multi-line sele
       '@@ -1,3 +1,3 @@',
       [1, 2, 3].map((n) => ctxLine(n))
     )
-    const { container } = await renderDiff(diff, '@@ -1,3 +1,3 @@')
+    const { container } = await renderDiffPane(diff, '@@ -1,3 +1,3 @@')
 
     const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
     fireEvent.mouseDown(rows[0].querySelector('.diff-gutter-btn')!)
@@ -683,7 +687,7 @@ describe('ReviewDiffPane — a background click after the drag has settled still
       '@@ -1,2 +1,2 @@',
       [1, 2].map((n) => ctxLine(n))
     )
-    const { container } = await renderDiff(diff, '@@ -1,2 +1,2 @@')
+    const { container } = await renderDiffPane(diff, '@@ -1,2 +1,2 @@')
 
     const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
     fireEvent.mouseDown(rows[0].querySelector('.diff-gutter-btn')!)
@@ -702,7 +706,7 @@ describe('ReviewDiffPane — a background click after the drag has settled still
 describe('ReviewDiffPane — shows the float bar under a selection, with Comment opening the composer', () => {
   it('shows the float bar under a selection, with Comment opening the composer', async () => {
     selectLineOne()
-    await renderDiff(oneLineDiff(), '@@ -1,1 +1,1 @@')
+    await renderDiffPane(oneLineDiff(), '@@ -1,1 +1,1 @@')
 
     expect(screen.queryByTestId('composer')).toBeNull()
     fireEvent.click(screen.getByText('Comment'))
@@ -716,7 +720,7 @@ describe('ReviewDiffPane — shows the float bar under a selection, with Comment
 describe('ReviewDiffPane — calls openAgentPanel with the lines scope when Ask agent is clicked', () => {
   it('calls openAgentPanel with the lines scope when Ask agent is clicked', async () => {
     selectLineOne()
-    await renderDiff(oneLineDiff(), '@@ -1,1 +1,1 @@')
+    await renderDiffPane(oneLineDiff(), '@@ -1,1 +1,1 @@')
 
     fireEvent.click(screen.getByText(/Ask agent/))
     expect(mockOpenAgentPanel).toHaveBeenCalledWith(
@@ -770,7 +774,7 @@ describe('ReviewDiffPane — comment visibility (R2)', () => {
   async function renderThreads(threads: unknown[], visibility: string) {
     storeThreads(threads)
     uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), commentVisibility: visibility })
-    await renderDiff(oneLineDiff(), '@@ -1,1 +1,1 @@')
+    await renderDiffPane(oneLineDiff(), '@@ -1,1 +1,1 @@')
   }
 
   it('Hidden removes thread rendering and shows a gutter pip with the count', async () => {
@@ -1038,7 +1042,7 @@ const keyTwoHunkDiff = {
 
 /** Renders the two-hunk diff and waits for its first hunk. */
 const renderTwoHunks = (props: Partial<typeof defaultProps> = {}) =>
-  renderDiff(keyTwoHunkDiff, '@@ -1,1 +1,1 @@', props)
+  renderDiffPane(keyTwoHunkDiff, '@@ -1,1 +1,1 @@', props)
 
 /** The scroll position of the entry holding `header`. */
 const topOfHunk = (header: string) =>
@@ -1121,7 +1125,7 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — leaving the
 
   it('nextHunk at the last hunk calls onNextFile', async () => {
     const onNextFile = vi.fn()
-    await renderDiff(oneHunk('@@ -1,1 +1,1 @@', [ctxLine(1, 'a')]), '@@ -1,1 +1,1 @@', {
+    await renderDiffPane(oneHunk('@@ -1,1 +1,1 @@', [ctxLine(1, 'a')]), '@@ -1,1 +1,1 @@', {
       onNextFile,
     })
     window.dispatchEvent(new CustomEvent('review:next-hunk'))
@@ -1205,7 +1209,7 @@ describe('ReviewDiffPane — insight gutter chips (R4)', () => {
       { name: 'readBurnIn', line: 89, branchDelta: 3 },
     ]
     const insights = insightsFor(functions, ['readBurnIn'])
-    await renderDiff(splitDiff, '@@ -85,3 +88,3 @@', { pr: { ...mockPr, insights } })
+    await renderDiffPane(splitDiff, '@@ -85,3 +88,3 @@', { pr: { ...mockPr, insights } })
     expect(screen.getByText('+6')).toBeTruthy()
     expect(screen.getByText('untested')).toBeTruthy()
     // The gutter column is sized to its widest chip ("untested"), so it never overlaps code.
@@ -1217,23 +1221,23 @@ describe('ReviewDiffPane — insight gutter chips (R4)', () => {
 
 const FILE_LINES = 100
 const fileText = Array.from({ length: FILE_LINES }, (_, i) => `line ${i + 1}`).join('\n') + '\n'
-const ctx = (n: number) => ({
+const contextLineAt = (n: number) => ({
   type: 'context' as const,
   content: `line ${n}`,
   oldLineNumber: n,
   newLineNumber: n,
 })
-const hunk = (start: number) => ({
+const hunkAt = (start: number) => ({
   header: `@@ -${start},3 +${start},3 @@`,
   lines: [
-    ctx(start),
+    contextLineAt(start),
     { type: 'remove' as const, content: 'old', oldLineNumber: start + 1, newLineNumber: null },
     { type: 'add' as const, content: 'new', oldLineNumber: null, newLineNumber: start + 1 },
-    ctx(start + 2),
+    contextLineAt(start + 2),
   ],
 })
 // Gaps: top 1-9, after-0 13-49, bottom 53-100.
-const twoHunkDiff = { path: 'src/foo.ts', isBinary: false, hunks: [hunk(10), hunk(50)] }
+const twoHunkDiff = { path: 'src/foo.ts', isBinary: false, hunks: [hunkAt(10), hunkAt(50)] }
 
 const renderLoaded = async (
   diff: unknown = twoHunkDiff,
@@ -1334,14 +1338,14 @@ describe('ReviewDiffPane expandable context — Show all removes that expander a
         {
           header: '@@ -10,2 +10,3 @@',
           lines: [
-            ctx(10),
+            contextLineAt(10),
             { type: 'add' as const, content: 'x', oldLineNumber: null, newLineNumber: 11 },
             { type: 'context' as const, content: 'line 11', oldLineNumber: 11, newLineNumber: 12 },
           ],
         },
         {
           header: '@@ -20,1 +21,1 @@',
-          lines: [{ ...ctx(21), oldLineNumber: 20 }],
+          lines: [{ ...contextLineAt(21), oldLineNumber: 20 }],
         },
       ],
     }

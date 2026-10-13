@@ -1,10 +1,10 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
-import { installBridge, eventually, project, task } from './helpers/bridge'
+import { installVaultBridge, eventually, indexedProject, task } from './helpers/bridge'
 import { ArchiveView } from '../../src/components/ArchiveView'
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 const ARCHIVE = {
   tasks: [
@@ -12,12 +12,12 @@ const ARCHIVE = {
     task('c1', 'old idea', { status: 'cancelled' }),
     task('m1', 'moved on', { status: 'migrated' }),
   ],
-  projects: [project('Old launch', { status: 'archived', area: 'Work' })],
+  projects: [indexedProject('Old launch', { status: 'archived', area: 'Work' })],
   areas: [{ id: 'a1', name: 'Hobbies', updatedAt: '2026-01-01T00:00:00Z' }],
 }
 
 beforeEach(() => {
-  bridge = installBridge()
+  bridge = installVaultBridge()
   bridge.responses['task-vault:vault:list-archive'] = ARCHIVE
   vi.spyOn(window, 'confirm').mockReturnValue(true)
 })
@@ -27,7 +27,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-async function openTab(name: RegExp) {
+async function openArchiveTab(name: RegExp) {
   render(<ArchiveView />)
   fireEvent.click(await screen.findByRole('tab', { name }))
 }
@@ -89,7 +89,7 @@ function archiveProjectsAndAreasTests() {
 
 function archiveProjectsAndAreasProjectsTests() {
   it('restores and deletes an archived project', async () => {
-    await openTab(/Archived projects/)
+    await openArchiveTab(/Archived projects/)
     expect(screen.getByText('#Work')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Restore to active' }))
     await eventually(() =>
@@ -109,7 +109,7 @@ function archiveProjectsAndAreasProjectsTests() {
 
 function archiveProjectsAndAreasAreasTests() {
   it('restores and deletes an archived area', async () => {
-    await openTab(/Archived areas/)
+    await openArchiveTab(/Archived areas/)
     fireEvent.click(screen.getByRole('button', { name: 'Restore to active' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:restore-area')).toEqual([{ areaName: 'Hobbies' }])

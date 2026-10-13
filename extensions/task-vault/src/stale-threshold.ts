@@ -15,11 +15,8 @@ export function staleDaysThreshold(api: ExtensionAPI): number {
   return Math.min(STALE_THRESHOLD.max, Math.max(STALE_THRESHOLD.min, Math.round(days)))
 }
 
-/**
- * Earlier versions kept the threshold in the vault's own settings table, where
- * only the remote API could change it. It moves to the setting once, and the
- * row goes, so there is one place it is read from.
- */
+/** Earlier versions kept the threshold in the vault's own settings table, where only the remote
+ *  API could change it; it moves to the setting once and the row goes, so one place holds it. */
 export async function migrateStoredStaleThreshold(
   api: ExtensionAPI,
   db: ExtensionDB

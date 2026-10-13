@@ -72,10 +72,8 @@ function requestFor(request: ComposerRequest | null, path: string): ComposerRequ
   return request
 }
 
-/**
- * A request from elsewhere (the agent panel, a finding) opens the composer in this file,
- * prefilled, then clears the one-shot request.
- */
+/** A request from elsewhere (the agent panel, a finding) opens the composer in this file,
+ *  prefilled, then clears the one-shot request. */
 export function useComposerRequest(source: ComposerRequestSource): void {
   const { composerRequest, requestComposer } = source
   const requestForThisFile = requestFor(composerRequest, source.path)
@@ -89,11 +87,8 @@ export function useComposerRequest(source: ComposerRequestSource): void {
   }, [requestForThisFile, requestComposer])
 }
 
-/**
- * Moves between hunks; past the first or last it moves to the previous or next file. Which
- * hunk was last scrolled to is kept, since jsdom (and some real layouts) cannot be trusted
- * to report bounding-rect positions.
- */
+/** Moves between hunks, past the first or last into the previous or next file. The last hunk
+ *  scrolled to is kept, since jsdom (and some real layouts) report untrustworthy rects. */
 export function useHunkNav(src: HunkNavSource) {
   const { items, diffKey, onPrevFile, onNextFile, listRef } = src
   const currentHunkIndexRef = useRef(0)
@@ -137,7 +132,7 @@ function selectionHere(src: KeyEventSource): LineSelection | null {
 
 /** What each review key event does in this pane. */
 function keyEventHandlers(src: KeyEventSource): Array<[string, () => void]> {
-  const review = () => {
+  const reviewSelection = () => {
     const scope = agentScope(src)
     if (scope) src.openAgentPanel(scope, 'review')
   }
@@ -145,31 +140,29 @@ function keyEventHandlers(src: KeyEventSource): Array<[string, () => void]> {
     const scope = agentScope(src)
     if (scope) src.openAgentPanel(scope, 'explain', true)
   }
-  const comment = () => {
+  const commentOnSelection = () => {
     const sel = selectionHere(src)
     if (!sel || src.selectionTouchesRevealed(sel)) return
     const anchor = { line: sel.endLine, startLine: rangeStart(sel), side: sel.side }
     src.setComposerAnchor({ ...anchor, initialBody: '', fromFindingId: null })
   }
-  const note = () => {
+  const noteOnSelection = () => {
     const sel = selectionHere(src)
     if (sel) src.setNoteAnchor({ line: sel.endLine, side: sel.side })
   }
   return [
     [REVIEW_KEY_EVENTS.nextHunk, () => src.scrollHunkIntoView(1)],
     [REVIEW_KEY_EVENTS.prevHunk, () => src.scrollHunkIntoView(-1)],
-    [REVIEW_KEY_EVENTS.askAgent, review],
+    [REVIEW_KEY_EVENTS.askAgent, reviewSelection],
     [REVIEW_KEY_EVENTS.explain, explain],
-    [REVIEW_KEY_EVENTS.comment, comment],
-    [REVIEW_KEY_EVENTS.note, note],
+    [REVIEW_KEY_EVENTS.comment, commentOnSelection],
+    [REVIEW_KEY_EVENTS.note, noteOnSelection],
     [REVIEW_KEY_EVENTS.peekDefinition, () => src.peekDefinition()],
   ]
 }
 
-/**
- * REVIEW_KEY_EVENTS: the surface-level key handler (useReviewKeys, owned elsewhere) raises
- * these; only the pane knows its hunks and selection.
- */
+/** REVIEW_KEY_EVENTS: the surface-level key handler (useReviewKeys) raises these; only the pane
+ *  knows its hunks and selection. */
 export function useReviewKeyEvents(src: KeyEventSource): void {
   const { selection, path, diff, scrollHunkIntoView, openAgentPanel, selectionTouchesRevealed } =
     src

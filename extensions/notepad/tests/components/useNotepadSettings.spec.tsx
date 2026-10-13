@@ -5,7 +5,7 @@ import { useNotepadSettings, useNotepadSettingsStore } from '../../src/stores/se
 
 const getSettingsValues = vi.fn()
 const changeListeners = new Set<() => void>()
-const onSettingsChanged = (handler: () => void) => {
+const fakeOnSettingsChanged = (handler: () => void) => {
   changeListeners.add(handler)
   return () => void changeListeners.delete(handler)
 }
@@ -14,7 +14,7 @@ beforeEach(() => {
   changeListeners.clear()
   useNotepadSettingsStore.setState(notepadSettingsFrom({}))
   Object.defineProperty(window, 'electronAPI', {
-    value: { extension: { getSettingsValues, onSettingsChanged } },
+    value: { extension: { getSettingsValues, onSettingsChanged: fakeOnSettingsChanged } },
     writable: true,
     configurable: true,
   })

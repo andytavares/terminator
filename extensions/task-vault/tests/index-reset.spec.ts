@@ -4,6 +4,7 @@ import { wrapDb } from '../../../src/main/db/index'
 import { dispatchChannel } from '@terminator/extension-sdk'
 import type { ChannelSpec, ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 import { partialFake } from '../../../tests/support/fakes'
+import { disposableSpy } from './support/disposable'
 import { applyTaskVaultSchema } from '../src/vault/db'
 
 vi.mock('electron', () => ({
@@ -35,8 +36,6 @@ beforeEach(() => {
   db = wrapDb(new DatabaseSync(':memory:'))
 })
 
-const disposable = () => ({ dispose: vi.fn() })
-
 /** The API Task Vault activates with: channels collect into `handlers`, settings into `settings`. */
 function taskVaultApi(handlers: Map<string, Handler>, settings: Map<string, unknown>) {
   return partialFake<ExtensionAPI>({
@@ -44,11 +43,11 @@ function taskVaultApi(handlers: Map<string, Handler>, settings: Map<string, unkn
     ipc: partialFake<ExtensionAPI['ipc']>({
       registerHandler: vi.fn((spec: ChannelSpec) => {
         handlers.set(spec.channel, () => dispatchChannel(spec, undefined))
-        return disposable()
+        return disposableSpy()
       }),
     }),
     settings: partialFake<ExtensionAPI['settings']>({
-      register: vi.fn(disposable),
+      register: vi.fn(disposableSpy),
       get: <T>(key: string) => (settings.get(key) ?? '0') as T,
       set: (key: string, value: unknown) => void settings.set(key, value),
     }),
@@ -57,11 +56,11 @@ function taskVaultApi(handlers: Map<string, Handler>, settings: Map<string, unkn
       showToast: vi.fn(),
       createNotification: vi.fn(),
     }),
-    nativeMenu: partialFake<ExtensionAPI['nativeMenu']>({ addViewMenuItem: vi.fn(disposable) }),
+    nativeMenu: partialFake<ExtensionAPI['nativeMenu']>({ addViewMenuItem: vi.fn(disposableSpy) }),
     globalShortcut: partialFake<ExtensionAPI['globalShortcut']>({
-      register: vi.fn(async () => disposable()),
+      register: vi.fn(async () => disposableSpy()),
     }),
-    commands: partialFake<ExtensionAPI['commands']>({ register: vi.fn(disposable) }),
+    commands: partialFake<ExtensionAPI['commands']>({ register: vi.fn(disposableSpy) }),
   })
 }
 

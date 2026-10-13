@@ -159,7 +159,7 @@ function useCommentReply(comment: Comment, noteId: string) {
   async function handleReply() {
     if (!replyBody.trim()) return
     try {
-      const reply = await sendReply(comment, { noteId, body: replyBody })
+      const reply = await postReply(comment, { noteId, body: replyBody })
       if (!reply) return
       updateComment(comment.id, { replies: [...comment.replies, reply] })
       setReplyBody('')
@@ -173,7 +173,7 @@ function useCommentReply(comment: Comment, noteId: string) {
 }
 
 /** Posts a reply; resolves to the reply as the store keeps it, or null when none was made. */
-async function sendReply(
+async function postReply(
   parent: Comment,
   reply: { noteId: string; body: string }
 ): Promise<Comment | null> {

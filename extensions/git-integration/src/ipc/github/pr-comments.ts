@@ -64,10 +64,8 @@ function specificError(
   return undefined
 }
 
-/**
- * GitHub's own reason a review was refused, else gh's output, else the error. gh api writes
- * GitHub's JSON error to stdout; stderr only says "gh: Unprocessable Entity (HTTP 422)".
- */
+/** GitHub's own reason a review was refused, else gh's output, else the error. gh api writes the
+ *  JSON error to stdout; stderr only says "gh: Unprocessable Entity (HTTP 422)". */
 function reviewSubmitError(e: unknown): { error: string } {
   const err = e as { stderr?: string; stdout?: string }
   const ghOutput = (err.stdout || err.stderr || '').trim()
@@ -118,11 +116,9 @@ async function inlineComments(ctx: GithubContext, at: PrAt) {
   return { comments, resolvedCommentIds: await resolvedCommentIds(ctx, at) }
 }
 
-/**
- * Issue comments and review bodies, oldest first. A body submitted with "Submit review"
- * lives at /pulls/{n}/reviews, not /issues/{n}/comments, so the two are merged.
- */
-async function issueComments(ctx: GithubContext, at: PrAt) {
+/** Issue comments and review bodies, oldest first. A body sent with "Submit review" lives at
+ *  /pulls/{n}/reviews, not /issues/{n}/comments, so the two are merged. */
+async function fetchIssueComments(ctx: GithubContext, at: PrAt) {
   const [issueRaw, reviewsRaw] = await Promise.all([
     ctx.api(at.repoRoot, {
       path: `repos/{owner}/{repo}/issues/${at.prNumber}/comments`,
@@ -158,11 +154,9 @@ function reviewComment(c: DraftComment): Record<string, unknown> {
   return entry
 }
 
-/**
- * Submits a review. Drafts (S5) go in the same POST, so they land as one review rather than
- * separate calls; an empty body is left out, since GitHub rejects it for some events.
- */
-async function submitReview(ctx: GithubContext, payload: z.infer<typeof ReviewSubmitPayload>) {
+/** Submits a review. Drafts (S5) go in the same POST, so they land as one review; an empty body is
+ *  left out, since GitHub rejects it for some events. */
+async function submitPrReview(ctx: GithubContext, payload: z.infer<typeof ReviewSubmitPayload>) {
   const { repoRoot, prNumber, event, body, comments } = payload
   const { owner, repo } = await ctx.ownerAndName(repoRoot)
   const path = `repos/${owner}/${repo}/pulls/${prNumber}/reviews`
@@ -177,7 +171,7 @@ async function submitReview(ctx: GithubContext, payload: z.infer<typeof ReviewSu
 }
 
 /** POSTs a comment body to `path` of the checkout's repository; GitHub answers the comment. */
-async function postComment(
+async function createIssueComment(
   ctx: GithubContext,
   at: { repoRoot: string; path: string },
   body: string
@@ -201,7 +195,7 @@ function issueCommentsChannel(ctx: GithubContext): ChannelSpec {
     channel: 'github:pr-issue-comments',
     schema: PullRequestPayload,
     invalid: VALIDATION_ERROR,
-    run: (at) => issueComments(ctx, at),
+    run: (at) => fetchIssueComments(ctx, at),
     onError: catchError,
   })
 }
@@ -213,7 +207,7 @@ function issueCommentAddChannel(ctx: GithubContext): ChannelSpec {
     invalid: VALIDATION_ERROR,
     run: async ({ repoRoot, prNumber, body }) => {
       const path = `repos/{owner}/{repo}/issues/${prNumber}/comments`
-      return { comment: mapIssueComment(await postComment(ctx, { repoRoot, path }, body)) }
+      return { comment: mapIssueComment(await createIssueComment(ctx, { repoRoot, path }, body)) }
     },
     onError: errorEnvelope,
   })
@@ -226,7 +220,7 @@ function commentReplyChannel(ctx: GithubContext): ChannelSpec {
     invalid: VALIDATION_ERROR,
     run: async (reply) => {
       const path = `repos/{owner}/{repo}/pulls/${reply.prNumber}/comments/${reply.inReplyToId}/replies`
-      const raw = await postComment(ctx, { repoRoot: reply.repoRoot, path }, reply.body)
+      const raw = await createIssueComment(ctx, { repoRoot: reply.repoRoot, path }, reply.body)
       return { comment: mapComment(raw) }
     },
     onError: errorEnvelope,
@@ -238,7 +232,7 @@ function reviewSubmitChannel(ctx: GithubContext): ChannelSpec {
     channel: 'github:pr-review-submit',
     schema: ReviewSubmitPayload,
     invalid: VALIDATION_ERROR,
-    run: (payload) => submitReview(ctx, payload),
+    run: (payload) => submitPrReview(ctx, payload),
     onError: reviewSubmitError,
   })
 }

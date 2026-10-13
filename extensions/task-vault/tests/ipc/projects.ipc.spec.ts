@@ -7,7 +7,7 @@ import {
   seedArea,
   seedProject,
   seedTask,
-  taskRow,
+  selectTaskRow,
 } from '../support/vault-db'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
@@ -25,8 +25,7 @@ beforeEach(async () => {
   registerProjectsIpcHandlers(harness.api, db)
 })
 
-const invoke = (channel: string, payload?: unknown) => harness.invoke(channel, payload)
-const projectRow = (name: string) =>
+const projectRowNamed = (name: string) =>
   db.get<Record<string, unknown>>(`SELECT * FROM projects WHERE name = ?`, [name])
 
 describe('registerProjectsIpcHandlers', () => {
@@ -39,7 +38,7 @@ describe('registerProjectsIpcHandlers', () => {
   })
 })
 
-const names = (result: unknown) =>
+const projectNamesIn = (result: unknown) =>
   (result as { projects: { name: string }[] }).projects.map((project) => project.name)
 
 describe('task-vault:projects:list', taskVaultProjectsListTests)
@@ -56,8 +55,8 @@ type Review = {
   lastReviewDate: string | null
 }
 
-const review = () => invoke('task-vault:projects:weekly-review') as Promise<Review>
-const ids = (rows: { id: string }[]) => rows.map((row) => row.id).sort()
+const weeklyReviewVia = () => harness.invoke('task-vault:projects:weekly-review') as Promise<Review>
+const sortedIds = (rows: { id: string }[]) => rows.map((row) => row.id).sort()
 
 describe('task-vault:projects:weekly-review', taskVaultProjectsWeeklyReviewTests)
 describe('task-vault:projects:update-status', taskVaultProjectsUpdateStatusTests)
@@ -69,20 +68,26 @@ describe('task-vault:projects:update-area', () => {
     await seedProject(db, 'p1', 'Alpha')
 
     expect(
-      await invoke('task-vault:projects:update-area', { projectFilePath: 'Alpha', area: 'Home' })
+      await harness.invoke('task-vault:projects:update-area', {
+        projectFilePath: 'Alpha',
+        area: 'Home',
+      })
     ).toEqual({ success: true })
 
     const area = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name = 'Home'`)
-    expect(await projectRow('Alpha')).toMatchObject({ area_id: area?.id })
+    expect(await projectRowNamed('Alpha')).toMatchObject({ area_id: area?.id })
   })
 
   it('removes the project from its area when no area is given', async () => {
     await seedArea(db, 'a1', 'Home')
     await seedProject(db, 'p1', { name: 'Alpha', areaId: 'a1' })
 
-    await invoke('task-vault:projects:update-area', { projectFilePath: 'Alpha', area: null })
+    await harness.invoke('task-vault:projects:update-area', {
+      projectFilePath: 'Alpha',
+      area: null,
+    })
 
-    expect(await projectRow('Alpha')).toMatchObject({ area_id: null })
+    expect(await projectRowNamed('Alpha')).toMatchObject({ area_id: null })
   })
 })
 
@@ -90,17 +95,17 @@ describe('task-vault:projects:update-deadline', () => {
   it('sets the deadline and clears it again with null', async () => {
     await seedProject(db, 'p1', 'Alpha')
 
-    await invoke('task-vault:projects:update-deadline', {
+    await harness.invoke('task-vault:projects:update-deadline', {
       projectFilePath: 'Alpha',
       deadline: '2026-05-01',
     })
-    expect(await projectRow('Alpha')).toMatchObject({ deadline: '2026-05-01' })
+    expect(await projectRowNamed('Alpha')).toMatchObject({ deadline: '2026-05-01' })
 
-    await invoke('task-vault:projects:update-deadline', {
+    await harness.invoke('task-vault:projects:update-deadline', {
       projectFilePath: 'Alpha',
       deadline: null,
     })
-    expect(await projectRow('Alpha')).toMatchObject({ deadline: null })
+    expect(await projectRowNamed('Alpha')).toMatchObject({ deadline: null })
   })
 })
 
@@ -109,14 +114,14 @@ describe('task-vault:projects:rename', () => {
     await seedProject(db, 'p1', 'Old Name')
 
     expect(
-      await invoke('task-vault:projects:rename', {
+      await harness.invoke('task-vault:projects:rename', {
         projectFilePath: 'Old Name',
         newName: '  New Name ',
       })
     ).toEqual({ success: true })
 
-    expect(await projectRow('Old Name')).toBeUndefined()
-    expect(await projectRow('New Name')).toMatchObject({ id: 'p1' })
+    expect(await projectRowNamed('Old Name')).toBeUndefined()
+    expect(await projectRowNamed('New Name')).toMatchObject({ id: 'p1' })
   })
 
   it.each([
@@ -126,7 +131,7 @@ describe('task-vault:projects:rename', () => {
     await seedProject(db, 'p1', 'Old Name')
     await seedProject(db, 'p2', 'Taken')
 
-    expect(await invoke('task-vault:projects:rename', payload)).toEqual({ error })
+    expect(await harness.invoke('task-vault:projects:rename', payload)).toEqual({ error })
 
     const names = await db.query<{ name: string }>(`SELECT name FROM projects ORDER BY name`)
     expect(names.map((row) => row.name)).toEqual(['Old Name', 'Taken'])
@@ -146,22 +151,24 @@ function taskVaultProjectsListTests() {
 
 function taskVaultProjectsListStatusesTests() {
   it('returns only active projects by default', async () => {
-    expect(names(await invoke('task-vault:projects:list', {}))).toEqual(['Alpha'])
+    expect(projectNamesIn(await harness.invoke('task-vault:projects:list', {}))).toEqual(['Alpha'])
   })
 
   it('returns nothing when no project has the status', async () => {
     await db.run(`DELETE FROM projects`)
-    expect(names(await invoke('task-vault:projects:list', {}))).toEqual([])
+    expect(projectNamesIn(await harness.invoke('task-vault:projects:list', {}))).toEqual([])
   })
 
   it('filters by one status', async () => {
-    const result = await invoke('task-vault:projects:list', { status: 'someday' })
-    expect(names(result)).toEqual(['Beta'])
+    const result = await harness.invoke('task-vault:projects:list', { status: 'someday' })
+    expect(projectNamesIn(result)).toEqual(['Beta'])
   })
 
   it('accepts an array of statuses and orders by name', async () => {
-    const result = await invoke('task-vault:projects:list', { status: ['someday', 'active'] })
-    expect(names(result)).toEqual(['Alpha', 'Beta'])
+    const result = await harness.invoke('task-vault:projects:list', {
+      status: ['someday', 'active'],
+    })
+    expect(projectNamesIn(result)).toEqual(['Alpha', 'Beta'])
   })
 }
 
@@ -171,7 +178,7 @@ function taskVaultProjectsListCountsAreasTests() {
     await seedTask(db, { id: 't2', projectId: 'p-active' })
     await seedTask(db, { id: 't3', projectId: 'p-active', status: 'done' })
 
-    const result = (await invoke('task-vault:projects:list', {
+    const result = (await harness.invoke('task-vault:projects:list', {
       status: ['active', 'someday'],
     })) as {
       projects: { name: string; nextActionCount: number; isStale: boolean }[]
@@ -187,7 +194,7 @@ function taskVaultProjectsListCountsAreasTests() {
     await seedArea(db, 'a1', 'Work')
     await db.run(`UPDATE projects SET area_id = 'a1' WHERE id = 'p-active'`)
 
-    const result = (await invoke('task-vault:projects:list', {})) as {
+    const result = (await harness.invoke('task-vault:projects:list', {})) as {
       projects: { area?: string }[]
     }
 
@@ -208,7 +215,7 @@ function taskVaultProjectsWeeklyReviewInboxProjectsTests() {
     await seedTask(db, { id: 'inbox-done', source: 'inbox', status: 'done' })
     await seedTask(db, { id: 'daily-1', source: 'daily', sourceRef: localDate() })
 
-    expect(ids((await review()).inboxItems)).toEqual(['inbox-1'])
+    expect(sortedIds((await weeklyReviewVia()).inboxItems)).toEqual(['inbox-1'])
   })
 
   it('returns active projects and flags those with no open task as stale', async () => {
@@ -216,7 +223,7 @@ function taskVaultProjectsWeeklyReviewInboxProjectsTests() {
     await seedProject(db, 'p2', 'Idle')
     await seedTask(db, { id: 't1', projectId: 'p1' })
 
-    const result = await review()
+    const result = await weeklyReviewVia()
 
     expect(result.activeProjects.map((project) => project.name).sort()).toEqual(['Busy', 'Idle'])
     expect(result.staleProjects.map((project) => project.name)).toEqual(['Idle'])
@@ -229,10 +236,10 @@ function taskVaultProjectsWeeklyReviewSomedayCompletedTests() {
     await seedTask(db, { id: 'someday-1', source: 'someday' })
     await seedTask(db, { id: 'someday-child', source: 'someday', parentId: 'someday-1' })
 
-    const result = await review()
+    const result = await weeklyReviewVia()
 
     expect(result.somedayProjects.map((project) => project.name)).toEqual(['Beta'])
-    expect(ids(result.somedayTasks)).toEqual(['someday-1'])
+    expect(sortedIds(result.somedayTasks)).toEqual(['someday-1'])
   })
 
   it('returns tasks completed within the last seven days', async () => {
@@ -242,7 +249,7 @@ function taskVaultProjectsWeeklyReviewSomedayCompletedTests() {
     await seedTask(db, { id: 'old', status: 'done', updatedAt: old })
     await seedTask(db, { id: 'open', updatedAt: recent })
 
-    expect(ids((await review()).completedLastWeek)).toEqual(['recent'])
+    expect(sortedIds((await weeklyReviewVia()).completedLastWeek)).toEqual(['recent'])
   })
 }
 
@@ -263,20 +270,20 @@ function taskVaultProjectsWeeklyReviewStaleTasksTests() {
       todaySince: daysAgo(1),
     })
 
-    const result = await review()
+    const result = await weeklyReviewVia()
 
     expect(result.staleDaysThreshold).toBe(3)
-    expect(ids(result.staleTasks)).toEqual(['stale'])
+    expect(sortedIds(result.staleTasks)).toEqual(['stale'])
   })
 }
 
 function taskVaultProjectsWeeklyReviewThresholdLastReviewTests() {
   it('uses a threshold of seven days when none is stored', async () => {
-    expect((await review()).staleDaysThreshold).toBe(7)
+    expect((await weeklyReviewVia()).staleDaysThreshold).toBe(7)
   })
 
   it('has no lastReviewDate until a review is completed, then the latest completion', async () => {
-    expect((await review()).lastReviewDate).toBeNull()
+    expect((await weeklyReviewVia()).lastReviewDate).toBeNull()
 
     await db.run(
       `INSERT INTO weekly_reviews (id, started_at, completed_at, status) VALUES
@@ -285,7 +292,7 @@ function taskVaultProjectsWeeklyReviewThresholdLastReviewTests() {
          ('r3', '2026-01-15T09:00:00.000Z', NULL, 'in_progress')`
     )
 
-    expect((await review()).lastReviewDate).toBe('2026-01-08T10:00:00.000Z')
+    expect((await weeklyReviewVia()).lastReviewDate).toBe('2026-01-08T10:00:00.000Z')
   })
 }
 
@@ -299,20 +306,23 @@ function taskVaultProjectsUpdateStatusUpdatingTests() {
     await seedProject(db, 'p1', 'Alpha')
 
     expect(
-      await invoke('task-vault:projects:update-status', {
+      await harness.invoke('task-vault:projects:update-status', {
         projectFilePath: 'Alpha',
         status: 'someday',
       })
     ).toEqual({ success: true })
-    expect(await projectRow('Alpha')).toMatchObject({ status: 'someday' })
+    expect(await projectRowNamed('Alpha')).toMatchObject({ status: 'someday' })
   })
 
   it('finds the project by id when no project has that name', async () => {
     await seedProject(db, 'p1', 'Alpha')
 
-    await invoke('task-vault:projects:update-status', { projectFilePath: 'p1', status: 'done' })
+    await harness.invoke('task-vault:projects:update-status', {
+      projectFilePath: 'p1',
+      status: 'done',
+    })
 
-    expect(await projectRow('Alpha')).toMatchObject({ status: 'done' })
+    expect(await projectRowNamed('Alpha')).toMatchObject({ status: 'done' })
   })
 }
 
@@ -325,20 +335,23 @@ function taskVaultProjectsUpdateStatusArchivingTests() {
     await seedTask(db, { id: 'done', projectId: 'p1', status: 'done' })
     await seedTask(db, { id: 'elsewhere', projectId: 'p2' })
 
-    await invoke('task-vault:projects:update-status', {
+    await harness.invoke('task-vault:projects:update-status', {
       projectFilePath: 'Alpha',
       status: 'archived',
     })
 
-    expect(await taskRow(db, 'open')).toMatchObject({ status: 'cancelled' })
-    expect(await taskRow(db, 'blocked-child')).toMatchObject({ status: 'cancelled' })
-    expect(await taskRow(db, 'done')).toMatchObject({ status: 'done' })
-    expect(await taskRow(db, 'elsewhere')).toMatchObject({ status: 'open' })
+    expect(await selectTaskRow(db, 'open')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'blocked-child')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'done')).toMatchObject({ status: 'done' })
+    expect(await selectTaskRow(db, 'elsewhere')).toMatchObject({ status: 'open' })
   })
 
   it('returns NOT_FOUND for an unknown project', async () => {
     expect(
-      await invoke('task-vault:projects:update-status', { projectFilePath: 'nope', status: 'done' })
+      await harness.invoke('task-vault:projects:update-status', {
+        projectFilePath: 'nope',
+        status: 'done',
+      })
     ).toEqual({ error: 'NOT_FOUND' })
   })
 }
@@ -350,14 +363,14 @@ function taskVaultProjectsCreateTests() {
 
 function taskVaultProjectsCreateCreatingTests() {
   it('creates an active project named in display form', async () => {
-    const result = await invoke('task-vault:projects:create', {
+    const result = await harness.invoke('task-vault:projects:create', {
       name: 'new-project',
       deadline: '2026-06-01',
       outcome: 'Shipped',
     })
 
     expect(result).toEqual({ success: true, filePath: 'New Project' })
-    expect(await projectRow('New Project')).toMatchObject({
+    expect(await projectRowNamed('New Project')).toMatchObject({
       status: 'active',
       deadline: '2026-06-01',
       outcome: 'Shipped',
@@ -367,7 +380,7 @@ function taskVaultProjectsCreateCreatingTests() {
   it('returns PROJECT_EXISTS for a name already in use', async () => {
     await seedProject(db, 'p1', 'Existing')
 
-    expect(await invoke('task-vault:projects:create', { name: 'Existing' })).toEqual({
+    expect(await harness.invoke('task-vault:projects:create', { name: 'Existing' })).toEqual({
       error: 'PROJECT_EXISTS',
     })
     expect(await db.query('SELECT id FROM projects')).toHaveLength(1)
@@ -376,8 +389,8 @@ function taskVaultProjectsCreateCreatingTests() {
 
 function taskVaultProjectsCreateAreasTests() {
   it('creates the area when it is new and reuses it when it exists', async () => {
-    await invoke('task-vault:projects:create', { name: 'First', area: 'work' })
-    await invoke('task-vault:projects:create', { name: 'Second', area: 'work' })
+    await harness.invoke('task-vault:projects:create', { name: 'First', area: 'work' })
+    await harness.invoke('task-vault:projects:create', { name: 'Second', area: 'work' })
 
     const areas = await db.query<{ id: string; name: string }>(`SELECT id, name FROM areas`)
     expect(areas.map((area) => area.name)).toEqual(['Work'])
@@ -399,11 +412,11 @@ function taskVaultProjectsDeleteDeletingTests() {
     await seedTask(db, { id: 'child', parentId: 'parent' })
     await seedTask(db, { id: 'unrelated' })
 
-    expect(await invoke('task-vault:projects:delete', { projectFilePath: 'Old' })).toEqual({
+    expect(await harness.invoke('task-vault:projects:delete', { projectFilePath: 'Old' })).toEqual({
       success: true,
     })
 
-    expect(await projectRow('Old')).toBeUndefined()
+    expect(await projectRowNamed('Old')).toBeUndefined()
     expect((await db.query<{ id: string }>('SELECT id FROM tasks')).map((t) => t.id)).toEqual([
       'unrelated',
     ])
@@ -414,15 +427,19 @@ function taskVaultProjectsDeleteRefusingTests() {
   it('returns MUST_ARCHIVE_FIRST for a project that is not archived and keeps it', async () => {
     await seedProject(db, 'p1', 'Live')
 
-    expect(await invoke('task-vault:projects:delete', { projectFilePath: 'Live' })).toEqual({
-      error: 'MUST_ARCHIVE_FIRST',
-    })
-    expect(await projectRow('Live')).toBeDefined()
+    expect(await harness.invoke('task-vault:projects:delete', { projectFilePath: 'Live' })).toEqual(
+      {
+        error: 'MUST_ARCHIVE_FIRST',
+      }
+    )
+    expect(await projectRowNamed('Live')).toBeDefined()
   })
 
   it('returns NOT_FOUND for an unknown project', async () => {
-    expect(await invoke('task-vault:projects:delete', { projectFilePath: 'nope' })).toEqual({
-      error: 'NOT_FOUND',
-    })
+    expect(await harness.invoke('task-vault:projects:delete', { projectFilePath: 'nope' })).toEqual(
+      {
+        error: 'NOT_FOUND',
+      }
+    )
   })
 }

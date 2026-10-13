@@ -175,21 +175,21 @@ function useTriggers(props: SmartTaskInputProps, inputRef: Input) {
   const state = useTriggerState()
   const { active, setActive, setOptions } = state
 
-  function complete(insert: string) {
+  function completeTrigger(insert: string) {
     if (!active) return
     props.onChange(replaceTrigger(props.value, active, insert))
     setActive(null)
     inputRef.current?.focus()
   }
 
-  async function choose(option: DropdownOption) {
+  async function chooseOption(option: DropdownOption) {
     if (!active) return
     if (option.isCreate) await createTag(active.type, option.value)
-    complete(`${active.triggerChar}${option.value.replace(/ /g, '-')} `)
+    completeTrigger(`${active.triggerChar}${option.value.replace(/ /g, '-')} `)
     setOptions([])
   }
 
-  return { ...state, complete, choose }
+  return { ...state, complete: completeTrigger, choose: chooseOption }
 }
 
 type Triggers = ReturnType<typeof useTriggers>
@@ -236,7 +236,7 @@ function handleFieldKey(e: React.KeyboardEvent, props: SmartTaskInputProps, t: T
   }
 }
 
-function keyDownHandler(props: SmartTaskInputProps, t: Triggers) {
+function triggerKeyDownHandler(props: SmartTaskInputProps, t: Triggers) {
   return (e: React.KeyboardEvent<HTMLInputElement>) => {
     const inTag = t.active !== null && t.active.type !== 'date'
     if (inTag && e.key === ' ') {
@@ -279,7 +279,7 @@ interface OptionProps {
   onHover: () => void
 }
 
-function optionClass(opt: DropdownOption, selected: boolean): string {
+function dropdownOptionClass(opt: DropdownOption, selected: boolean): string {
   let cls = 'smart-input__option'
   if (selected) cls += ' smart-input__option--selected'
   if (opt.isCreate) cls += ' smart-input__option--create'
@@ -290,7 +290,7 @@ function OptionButton(props: OptionProps): React.JSX.Element {
   const { opt, triggerChar } = props
   return (
     <button
-      className={optionClass(opt, props.selected)}
+      className={dropdownOptionClass(opt, props.selected)}
       onClick={props.onChoose}
       onMouseEnter={props.onHover}
     >
@@ -371,7 +371,7 @@ export function SmartTaskInput(props: SmartTaskInputProps): React.JSX.Element {
         className={`smart-input__field${className ? ` ${className}` : ''}`}
         value={value}
         onChange={fieldChangeHandler(onChange, t)}
-        onKeyDown={keyDownHandler(props, t)}
+        onKeyDown={triggerKeyDownHandler(props, t)}
         placeholder={props.placeholder ?? DEFAULT_PLACEHOLDER}
         disabled={props.disabled ?? false}
         autoFocus={props.autoFocus ?? false}

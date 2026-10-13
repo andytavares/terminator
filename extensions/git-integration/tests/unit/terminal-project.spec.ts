@@ -4,14 +4,12 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { projectForCheckout } from '../../src/review/terminal-project'
 
-// "Continue in terminal" opens the review agent's session in the branch whose
-// checkout the review is of. The view names that checkout by the workspace's
-// folder; a project records git's top level, which is the real path. On macOS
-// the temporary and home folders sit behind symlinks (/var -> /private/var),
-// so the two strings differ for the same directory.
+// "Continue in terminal" opens the agent's session in the branch whose checkout is reviewed. The
+// view names it by the workspace's folder, a project by git's real top level; on macOS temp and
+// home sit behind symlinks (/var -> /private/var), so the strings differ for one directory.
 
 /** One workspace at `folderPath` holding `projects`. */
-const workspaceOf = (
+const oneWorkspaceAt = (
   projects: Array<{ id: string; worktreePath?: string }>,
   folderPath: string
 ) => ({
@@ -34,22 +32,24 @@ describe('projectForCheckout', () => {
 
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-  const workspace = (projects: Array<{ id: string; worktreePath?: string }>) =>
-    workspaceOf(projects, link)
+  const workspaceWithProjects = (projects: Array<{ id: string; worktreePath?: string }>) =>
+    oneWorkspaceAt(projects, link)
 
   it("finds the branch whose checkout is the review's, through a symlink", () => {
-    const api = workspace([{ id: 'main', worktreePath: realpathSync(real) }])
+    const api = workspaceWithProjects([{ id: 'main', worktreePath: realpathSync(real) }])
     expect(projectForCheckout(api, link)).toBe('main')
   })
 
   it("finds a branch that records no worktree path by its workspace's folder", () => {
-    expect(projectForCheckout(workspace([{ id: 'main' }]), realpathSync(real))).toBe('main')
+    expect(projectForCheckout(workspaceWithProjects([{ id: 'main' }]), realpathSync(real))).toBe(
+      'main'
+    )
   })
 
   it('finds nothing for a checkout no branch has', () => {
     const other = join(dir, 'other')
     mkdirSync(other)
-    const api = workspace([{ id: 'main', worktreePath: real }])
+    const api = workspaceWithProjects([{ id: 'main', worktreePath: real }])
     expect(projectForCheckout(api, other)).toBeUndefined()
   })
 })

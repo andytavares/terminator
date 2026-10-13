@@ -189,8 +189,9 @@ function useCollapsed(pr: PrReviewDetail) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(pr.chapters.map((c) => [c.id, false]))
   )
-  const toggle = (id: string) => setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }))
-  return { collapsed, toggle }
+  const toggleChapterCollapsed = (id: string) =>
+    setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }))
+  return { collapsed, toggle: toggleChapterCollapsed }
 }
 
 function useListContext(props: Props) {

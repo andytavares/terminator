@@ -10,7 +10,7 @@ import {
   classifyHunk,
   extractIssueRefs,
   detectDryViolations,
-  parseDiff,
+  parsePrFileDiff,
 } from '../../src/github/pr-review-service'
 import { ReviewSessionSchema } from '../../src/schemas/pr-review.schema'
 import type { PrChangedFile, FileMetrics } from '../../src/schemas/pr-review.schema'
@@ -1041,11 +1041,11 @@ describe('enrichIssueRefs — no tracker available', () => {
 const head = 'diff --git a/x b/x\n--- a/x\n+++ b/x\n'
 
 const flat = (raw: string) =>
-  parseDiff(raw, 'x').hunks.flatMap((h) =>
+  parsePrFileDiff(raw, 'x').hunks.flatMap((h) =>
     h.lines.map((l) => [l.type, l.content, l.oldLineNumber, l.newLineNumber])
   )
 
-describe('parseDiff', () => {
+describe('parsePrFileDiff', () => {
   it('drops the "No newline at end of file" marker and the trailing empty element', () => {
     const raw = `${head}@@ -1,2 +1,2 @@\n a\n-b\n+c\n\\ No newline at end of file\n`
     expect(flat(raw)).toEqual([
@@ -1074,7 +1074,7 @@ describe('parseDiff', () => {
 describe('parseDiff — numbers a second hunk from its own header', () => {
   it('numbers a second hunk from its own header', () => {
     const raw = `${head}@@ -1,1 +1,1 @@\n a\n@@ -10,2 +20,2 @@\n-x\n+y\n z\n`
-    const hunks = parseDiff(raw, 'x').hunks
+    const hunks = parsePrFileDiff(raw, 'x').hunks
     expect(hunks).toHaveLength(2)
     expect(hunks[1].lines.map((l) => [l.oldLineNumber, l.newLineNumber])).toEqual([
       [10, null],

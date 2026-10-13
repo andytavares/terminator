@@ -7,7 +7,8 @@ import {
   seedArea,
   seedProject,
   seedTask,
-  taskRow,
+  selectTaskRow,
+  taskMetadata,
 } from '../support/vault-db'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
@@ -26,15 +27,13 @@ beforeEach(async () => {
   registerVaultIpcHandlers(harness.api, db)
 })
 
-const invoke = (channel: string, payload?: unknown) => harness.invoke(channel, payload)
-const metadataOf = async (id: string) =>
-  JSON.parse((await taskRow(db, id))?.metadata as string) as Record<string, unknown>
-
-const setRecurrence = (payload: unknown) => invoke('task-vault:vault:set-recurrence', payload)
+const setRecurrenceVia = (payload: unknown) =>
+  harness.invoke('task-vault:vault:set-recurrence', payload)
 
 describe('task-vault:vault:set-recurrence', taskVaultVaultSetRecurrenceTests)
 
-const clear = (taskId: string) => invoke('task-vault:vault:clear-recurrence', { taskId })
+const clearRecurrenceVia = (taskId: string) =>
+  harness.invoke('task-vault:vault:clear-recurrence', { taskId })
 
 describe('task-vault:vault:clear-recurrence', taskVaultVaultClearRecurrenceTests)
 describe('task-vault:vault:get-calendar-month', taskVaultVaultGetCalendarTests)
@@ -45,20 +44,22 @@ describe('task-vault:vault:export-json and import-json', taskVaultVaultExportJso
 
 describe('task-vault settings and today_since', () => {
   it('set-stale-threshold writes the "Stale task threshold" setting', async () => {
-    await invoke('task-vault:settings:set-stale-threshold', { days: 5 })
-    await invoke('task-vault:settings:set-stale-threshold', { days: 9 })
+    await harness.invoke('task-vault:settings:set-stale-threshold', { days: 5 })
+    await harness.invoke('task-vault:settings:set-stale-threshold', { days: 9 })
 
     expect(harness.settings.get('terminator.task-vault.staleThresholdDays')).toBe(9)
-    expect(await invoke('task-vault:vault:get-today')).toMatchObject({ staleDaysThreshold: 9 })
+    expect(await harness.invoke('task-vault:vault:get-today')).toMatchObject({
+      staleDaysThreshold: 9,
+    })
   })
 
   it('reset-today-since sets today_since to today', async () => {
     await seedTask(db, { id: 't1', todaySince: '2026-01-01' })
 
-    expect(await invoke('task-vault:vault:reset-today-since', { taskId: 't1' })).toEqual({
+    expect(await harness.invoke('task-vault:vault:reset-today-since', { taskId: 't1' })).toEqual({
       success: true,
     })
-    expect(await taskRow(db, 't1')).toMatchObject({ today_since: localDate() })
+    expect(await selectTaskRow(db, 't1')).toMatchObject({ today_since: localDate() })
   })
 })
 
@@ -74,10 +75,10 @@ function taskVaultVaultSetRecurrenceRulesTests() {
   it('writes the rule and notify time to the recurrence columns', async () => {
     await seedTask(db, { id: 'task-1', dueDate: '2026-06-01' })
 
-    expect(await setRecurrence({ taskId: 'task-1', interval: 'daily', time: '08:00' })).toEqual({
+    expect(await setRecurrenceVia({ taskId: 'task-1', interval: 'daily', time: '08:00' })).toEqual({
       success: true,
     })
-    expect(await taskRow(db, 'task-1')).toMatchObject({
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       recurrence_rule: 'daily',
       recurrence_notify_at: '08:00',
       recurrence_end_type: 'none',
@@ -88,9 +89,9 @@ function taskVaultVaultSetRecurrenceRulesTests() {
   it('stores a weekly rule with its days sorted', async () => {
     await seedTask(db, { id: 'task-1', dueDate: '2026-06-01' })
 
-    await setRecurrence({ taskId: 'task-1', interval: 'weekly', days: [5, 1, 3] })
+    await setRecurrenceVia({ taskId: 'task-1', interval: 'weekly', days: [5, 1, 3] })
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({ recurrence_rule: 'weekly:1,3,5' })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({ recurrence_rule: 'weekly:1,3,5' })
   })
 }
 
@@ -98,19 +99,19 @@ function taskVaultVaultSetRecurrenceEndDateTests() {
   it('stores an on_date end condition in the columns and metadata', async () => {
     await seedTask(db, { id: 'task-1', dueDate: '2026-06-01' })
 
-    await setRecurrence({
+    await setRecurrenceVia({
       taskId: 'task-1',
       interval: 'daily',
       endType: 'on_date',
       endDate: '2026-12-31',
     })
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       recurrence_end_type: 'on_date',
       recurrence_end_date: '2026-12-31',
       recurrence_end_count: null,
     })
-    expect(await metadataOf('task-1')).toMatchObject({
+    expect(await taskMetadata(db, 'task-1')).toMatchObject({
       recurrence_end_type: 'on_date',
       recurrence_end_date: '2026-12-31',
       recurrence_completed_count: 0,
@@ -122,7 +123,7 @@ function taskVaultVaultSetRecurrenceEndAfterCountTests() {
   it('stores an after_count end condition in the columns and metadata', async () => {
     await seedTask(db, { id: 'task-1', dueDate: '2026-06-01' })
 
-    await setRecurrence({
+    await setRecurrenceVia({
       taskId: 'task-1',
       interval: 'weekly',
       days: [1],
@@ -130,12 +131,12 @@ function taskVaultVaultSetRecurrenceEndAfterCountTests() {
       endCount: 5,
     })
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       recurrence_end_type: 'after_count',
       recurrence_end_count: 5,
       recurrence_end_date: null,
     })
-    expect(await metadataOf('task-1')).toMatchObject({
+    expect(await taskMetadata(db, 'task-1')).toMatchObject({
       recurrence_end_type: 'after_count',
       recurrence_end_count: 5,
       recurrence_completed_count: 0,
@@ -147,9 +148,9 @@ function taskVaultVaultSetRecurrenceDueDatesTests() {
   it('backfills due_date from source_ref when the task has none', async () => {
     await seedTask(db, { id: 'task-1', source: 'daily', sourceRef: '2026-05-27' })
 
-    await setRecurrence({ taskId: 'task-1', interval: 'daily' })
+    await setRecurrenceVia({ taskId: 'task-1', interval: 'daily' })
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({ due_date: '2026-05-27' })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({ due_date: '2026-05-27' })
   })
 
   it('keeps an existing due_date', async () => {
@@ -160,9 +161,9 @@ function taskVaultVaultSetRecurrenceDueDatesTests() {
       dueDate: '2026-06-01',
     })
 
-    await setRecurrence({ taskId: 'task-1', interval: 'daily' })
+    await setRecurrenceVia({ taskId: 'task-1', interval: 'daily' })
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({ due_date: '2026-06-01' })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({ due_date: '2026-06-01' })
   })
 }
 
@@ -175,7 +176,7 @@ function taskVaultVaultSetRecurrenceOccurrencesSpawnsTheNextTests() {
   it('spawns the next occurrence as a linked open task', async () => {
     await seedTask(db, { id: 'task-1', dueDate: localDate() })
 
-    await setRecurrence({ taskId: 'task-1', interval: 'daily' })
+    await setRecurrenceVia({ taskId: 'task-1', interval: 'daily' })
 
     const next = await db.get<Record<string, unknown>>(
       `SELECT * FROM tasks WHERE recurrence_template_id = 'task-1'`
@@ -188,8 +189,8 @@ function taskVaultVaultSetRecurrenceOccurrencesSpawnsTheNextTests() {
 function taskVaultVaultSetRecurrenceOccurrencesReplacesTheFutureTests() {
   it('replaces the future occurrences of an earlier rule', async () => {
     await seedTask(db, { id: 'task-1', dueDate: localDate() })
-    await setRecurrence({ taskId: 'task-1', interval: 'daily' })
-    await setRecurrence({ taskId: 'task-1', interval: 'monthly' })
+    await setRecurrenceVia({ taskId: 'task-1', interval: 'daily' })
+    await setRecurrenceVia({ taskId: 'task-1', interval: 'monthly' })
 
     const spawned = await db.query<Record<string, unknown>>(
       `SELECT recurrence_rule FROM tasks WHERE recurrence_template_id = 'task-1'`
@@ -199,7 +200,7 @@ function taskVaultVaultSetRecurrenceOccurrencesReplacesTheFutureTests() {
   })
 
   it('returns STALE_ID for an unknown task', async () => {
-    expect(await setRecurrence({ taskId: 'missing', interval: 'daily' })).toEqual({
+    expect(await setRecurrenceVia({ taskId: 'missing', interval: 'daily' })).toEqual({
       error: 'STALE_ID',
     })
   })
@@ -232,9 +233,9 @@ const RECURRING_TASK = {
 function taskVaultVaultClearRecurrenceClearingTests() {
   it('nulls the recurrence columns, removes the recurrence metadata and keeps the rest', async () => {
     await seedTask(db, RECURRING_TASK)
-    expect(await clear('task-1')).toEqual({ success: true })
+    expect(await clearRecurrenceVia('task-1')).toEqual({ success: true })
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       recurrence_rule: null,
       recurrence_notify_at: null,
       recurrence_end_type: null,
@@ -242,7 +243,7 @@ function taskVaultVaultClearRecurrenceClearingTests() {
       recurrence_end_count: null,
       recurrence_completed_count: null,
     })
-    expect(await metadataOf('task-1')).toEqual({ other_key: 'keep' })
+    expect(await taskMetadata(db, 'task-1')).toEqual({ other_key: 'keep' })
   })
 }
 
@@ -262,10 +263,10 @@ function taskVaultVaultClearRecurrenceOccurrencesErrorsDeletesTheOpenTests() {
       status: 'done',
     })
 
-    await clear('task-1')
+    await clearRecurrenceVia('task-1')
 
-    expect(await taskRow(db, 'spawn-open')).toBeUndefined()
-    expect(await taskRow(db, 'spawn-done')).toBeDefined()
+    expect(await selectTaskRow(db, 'spawn-open')).toBeUndefined()
+    expect(await selectTaskRow(db, 'spawn-done')).toBeDefined()
   })
 }
 
@@ -278,12 +279,15 @@ function taskVaultVaultClearRecurrenceOccurrencesErrorsStillClearsTheTests() {
       metadata: 'NOT_VALID_JSON',
     })
 
-    expect(await clear('task-1')).toEqual({ success: true })
-    expect(await taskRow(db, 'task-1')).toMatchObject({ recurrence_rule: null, metadata: '{}' })
+    expect(await clearRecurrenceVia('task-1')).toEqual({ success: true })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
+      recurrence_rule: null,
+      metadata: '{}',
+    })
   })
 
   it('returns STALE_ID for an unknown task', async () => {
-    expect(await clear('missing')).toEqual({ error: 'STALE_ID' })
+    expect(await clearRecurrenceVia('missing')).toEqual({ error: 'STALE_ID' })
   })
 }
 
@@ -294,18 +298,18 @@ function taskVaultVaultGetCalendarTests() {
 
 function taskVaultVaultGetCalendarCountingTests() {
   it('counts top-level daily tasks per day and status within the month', async () => {
-    const daily = (id: string, day: string, extra = {}) =>
+    const insertDailyTask = (id: string, day: string, extra = {}) =>
       seedTask(db, { id, source: 'daily', sourceRef: day, ...extra })
-    await daily('a', '2026-06-01', { status: 'done' })
-    await daily('b', '2026-06-01', { status: 'done' })
-    await daily('c', '2026-06-01')
-    await daily('d', '2026-06-30')
-    await daily('sub', '2026-06-01', { parentId: 'a' })
-    await daily('may', '2026-05-31')
-    await daily('july', '2026-07-01')
+    await insertDailyTask('a', '2026-06-01', { status: 'done' })
+    await insertDailyTask('b', '2026-06-01', { status: 'done' })
+    await insertDailyTask('c', '2026-06-01')
+    await insertDailyTask('d', '2026-06-30')
+    await insertDailyTask('sub', '2026-06-01', { parentId: 'a' })
+    await insertDailyTask('may', '2026-05-31')
+    await insertDailyTask('july', '2026-07-01')
     await seedTask(db, { id: 'inbox-task' })
 
-    const result = (await invoke('task-vault:vault:get-calendar-month', {
+    const result = (await harness.invoke('task-vault:vault:get-calendar-month', {
       year: 2026,
       month: 6,
     })) as { days: { date: string; status: string; count: number }[] }
@@ -323,7 +327,9 @@ function taskVaultVaultGetCalendarCountingTests() {
 
 function taskVaultVaultGetCalendarEmptyMonthsTests() {
   it('returns no days for a month without tasks', async () => {
-    expect(await invoke('task-vault:vault:get-calendar-month', { year: 2026, month: 1 })).toEqual({
+    expect(
+      await harness.invoke('task-vault:vault:get-calendar-month', { year: 2026, month: 1 })
+    ).toEqual({
       days: [],
     })
   })
@@ -347,7 +353,7 @@ function taskVaultVaultExportJsonExportingTests() {
     await seedTask(db, { id: 't1' })
     await seedTask(db, { id: 't2' })
 
-    const result = (await invoke('task-vault:vault:export-json')) as {
+    const result = (await harness.invoke('task-vault:vault:export-json')) as {
       version: number
       exportedAt: string
       tasks: { id: string }[]
@@ -364,7 +370,7 @@ function taskVaultVaultExportJsonExportingTests() {
 
   it('returns the error when the database fails', async () => {
     await db.exec('DROP TABLE tasks')
-    expect(await invoke('task-vault:vault:export-json')).toMatchObject({
+    expect(await harness.invoke('task-vault:vault:export-json')).toMatchObject({
       error: expect.stringContaining('no such table'),
     })
   })
@@ -372,7 +378,7 @@ function taskVaultVaultExportJsonExportingTests() {
 
 function taskVaultVaultExportJsonImportingTests() {
   it('imports areas, projects and tasks, linking tasks to the project and area by name', async () => {
-    const result = await invoke('task-vault:vault:import-json', {
+    const result = await harness.invoke('task-vault:vault:import-json', {
       version: 1,
       areas: [{ id: 'a1', name: 'Work', created_at: now }],
       projects: [{ id: 'p1', name: 'Project', status: 'active', created_at: now, updated_at: now }],
@@ -389,7 +395,7 @@ function taskVaultVaultExportJsonImportingTests() {
     })
 
     expect(result).toEqual({ success: true, imported: 3 })
-    expect(await taskRow(db, 't1')).toMatchObject({
+    expect(await selectTaskRow(db, 't1')).toMatchObject({
       text: 'Task',
       status: 'open',
       source: 'inbox',
@@ -402,11 +408,11 @@ function taskVaultVaultExportJsonImportingTests() {
 function taskVaultVaultExportJsonImportingTasksAloneTests() {
   it('imports tasks alone and an empty payload as nothing', async () => {
     expect(
-      await invoke('task-vault:vault:import-json', {
+      await harness.invoke('task-vault:vault:import-json', {
         tasks: [{ id: 't1', text: 'Task', created_at: now, updated_at: now }],
       })
     ).toEqual({ success: true, imported: 1 })
-    expect(await invoke('task-vault:vault:import-json', {})).toEqual({
+    expect(await harness.invoke('task-vault:vault:import-json', {})).toEqual({
       success: true,
       imported: 0,
     })
@@ -415,11 +421,11 @@ function taskVaultVaultExportJsonImportingTasksAloneTests() {
   it('skips rows whose id already exists instead of overwriting them', async () => {
     await seedTask(db, { id: 't1', text: 'Original' })
 
-    await invoke('task-vault:vault:import-json', {
+    await harness.invoke('task-vault:vault:import-json', {
       tasks: [{ id: 't1', text: 'Imported', created_at: now, updated_at: now }],
     })
 
-    expect(await taskRow(db, 't1')).toMatchObject({ text: 'Original' })
+    expect(await selectTaskRow(db, 't1')).toMatchObject({ text: 'Original' })
   })
 }
 
@@ -432,13 +438,13 @@ function taskVaultVaultExportJsonRoundTripsTests() {
       dueDate: '2026-03-01',
       metadata: JSON.stringify({ description: 'kept' }),
     })
-    const exported = await invoke('task-vault:vault:export-json')
+    const exported = await harness.invoke('task-vault:vault:export-json')
     const other = await createVaultDb()
     const otherHarness = createIpcHarness()
     registerVaultIpcHandlers(otherHarness.api, other)
     await otherHarness.invoke('task-vault:vault:import-json', exported)
 
-    expect(await taskRow(other, 't1')).toMatchObject({
+    expect(await selectTaskRow(other, 't1')).toMatchObject({
       text: 'Round trip',
       status: 'done',
       due_date: '2026-03-01',
@@ -454,7 +460,7 @@ function taskVaultVaultExportJsonAreasThroughExportTests() {
     await seedProject(db, 'p1', { name: 'Alpha', areaId: 'a1' })
     await seedProject(db, 'p2', { name: 'Beta', areaId: 'a2' })
     await seedProject(db, 'p3', 'Loose')
-    const exported = await invoke('task-vault:vault:export-json')
+    const exported = await harness.invoke('task-vault:vault:export-json')
     const other = await createVaultDb()
     const otherHarness = createIpcHarness()
     registerVaultIpcHandlers(otherHarness.api, other)
@@ -477,14 +483,17 @@ function taskVaultVaultExportJsonTasksThroughExportTests() {
     await seedProject(db, 'p1', { name: 'Alpha', areaId: 'a1' })
     await seedTask(db, { id: 'in-project', projectId: 'p1' })
     await seedTask(db, { id: 'in-area', areaId: 'a1' })
-    const exported = await invoke('task-vault:vault:export-json')
+    const exported = await harness.invoke('task-vault:vault:export-json')
     const other = await createVaultDb()
     const otherHarness = createIpcHarness()
     registerVaultIpcHandlers(otherHarness.api, other)
     await otherHarness.invoke('task-vault:vault:import-json', exported)
 
-    expect(await taskRow(other, 'in-project')).toMatchObject({ project_id: 'p1', area_id: null })
-    expect(await taskRow(other, 'in-area')).toMatchObject({ project_id: null, area_id: 'a1' })
+    expect(await selectTaskRow(other, 'in-project')).toMatchObject({
+      project_id: 'p1',
+      area_id: null,
+    })
+    expect(await selectTaskRow(other, 'in-area')).toMatchObject({ project_id: null, area_id: 'a1' })
   })
 }
 
@@ -492,7 +501,7 @@ function taskVaultVaultExportJsonArchivedAreasTests() {
   it('keeps an archived area archived through an export', async () => {
     await seedArea(db, 'a1', { name: 'Old', status: 'archived' })
     await seedArea(db, 'a2', 'Live')
-    const exported = await invoke('task-vault:vault:export-json')
+    const exported = await harness.invoke('task-vault:vault:export-json')
     const other = await createVaultDb()
     const otherHarness = createIpcHarness()
     registerVaultIpcHandlers(otherHarness.api, other)
@@ -507,7 +516,7 @@ function taskVaultVaultExportJsonArchivedAreasTests() {
 
 function taskVaultVaultExportJsonLegacyErrorsTests() {
   it('places an imported project in the area named by its legacy area field', async () => {
-    await invoke('task-vault:vault:import-json', {
+    await harness.invoke('task-vault:vault:import-json', {
       areas: [{ id: 'a1', name: 'Work', created_at: now }],
       projects: [{ id: 'p1', name: 'Alpha', area: 'Work', created_at: now, updated_at: now }],
     })
@@ -516,7 +525,7 @@ function taskVaultVaultExportJsonLegacyErrorsTests() {
   })
 
   it('returns the database error when a row violates the schema', async () => {
-    const result = await invoke('task-vault:vault:import-json', {
+    const result = await harness.invoke('task-vault:vault:import-json', {
       areas: [{ id: 'a1', name: null, created_at: now }],
     })
 

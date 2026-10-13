@@ -148,15 +148,9 @@ function usePoppedOut(isPopoutWindow: boolean, activePr: PrReviewDetail | null):
   return isPoppedOut
 }
 
-/**
- * The queue is meant to be worked top to bottom, and "Load more pull
- * requests" made finishing it a manual chore — while the summary above it
- * could only count the rows already held, so it reported the page size as
- * the total. Pages follow on their own now, bounded so a repository with
- * thousands of open PRs cannot turn one screen into hundreds of API calls;
- * past the bound the summary still states the real total from `totalCount`,
- * and search reaches anything the list has not got to.
- */
+/** Pages follow on their own, bounded so thousands of open PRs cannot turn one screen into
+ *  hundreds of API calls; past the bound the summary states `totalCount`. Why: README.md, "Why the
+ *  review screen works as it does". */
 function useAutoPaging(repoRoot: string | null, loadQueue: ReturnType<typeof useLoadPrQueue>) {
   const { nextPrCursor, hasMorePrs, queueLoading, loadingMorePrs } = usePrReviewStore()
   const autoPagesRef = useRef(0)
@@ -250,10 +244,8 @@ async function showOpenedPr(ctx: TabContext, pr: ReviewQueuePR, detail: PrReview
   void loaders.loadIssueComments(detail.number)
 }
 
-/**
- * Leaves the PR. The store writes the whole session (notes, drafts, viewed marks included)
- * before reset(), so mergeSessionStatuses on the next queue load finds it as paused.
- */
+/** Leaves the PR. The store writes the whole session (notes, drafts, viewed marks) before reset(),
+ *  so mergeSessionStatuses on the next queue load finds it paused. */
 function closePr(ctx: TabContext, loadQueue: ReturnType<typeof useLoadPrQueue>): void {
   const { repoRoot, store, view } = ctx
   const { activePr } = store

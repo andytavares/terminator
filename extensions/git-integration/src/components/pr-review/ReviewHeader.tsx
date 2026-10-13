@@ -145,7 +145,7 @@ interface MenuItemProps {
   onSelect: () => void
 }
 
-function MenuItem(props: MenuItemProps & { close: () => void }) {
+function HeaderMenuItem(props: MenuItemProps & { close: () => void }) {
   return (
     <button
       type="button"
@@ -178,7 +178,7 @@ function menuItems(props: ReviewHeaderProps): MenuItemProps[] {
 
 function MoreMenu({ header }: { header: ReviewHeaderProps }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const close = () => setMenuOpen(false)
+  const closeHeaderMenu = () => setMenuOpen(false)
   return (
     <div className="rh-pill-wrap">
       <IconButton
@@ -189,10 +189,10 @@ function MoreMenu({ header }: { header: ReviewHeaderProps }) {
         onClick={() => setMenuOpen((v) => !v)}
       />
       {menuOpen && (
-        <Popover label="Review actions" className="rh-popover" onDismiss={close}>
+        <Popover label="Review actions" className="rh-popover" onDismiss={closeHeaderMenu}>
           <div role="menu" className="rh-menu">
             {menuItems(header).map((item) => (
-              <MenuItem key={item.label} {...item} close={close} />
+              <HeaderMenuItem key={item.label} {...item} close={closeHeaderMenu} />
             ))}
           </div>
         </Popover>
@@ -221,11 +221,8 @@ function HeaderPills({ header }: { header: ReviewHeaderProps }) {
   )
 }
 
-/**
- * One 44px row replacing the old top bar, StatusChecksBar band, progress
- * track and large-PR banner — everything that isn't the diff itself lives
- * here now (design: docs/research/review-screen-declutter.md).
- */
+/** One 44px row holding everything that is not the diff, in place of the old top bar, checks band,
+ *  progress track and large-PR banner (design: docs/research/review-screen-declutter.md). */
 export function ReviewHeader(props: ReviewHeaderProps): JSX.Element {
   return (
     <div className="rh-row">

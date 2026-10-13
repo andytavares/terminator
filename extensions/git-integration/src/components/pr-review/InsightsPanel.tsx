@@ -34,7 +34,7 @@ interface RowProps {
   children: React.ReactNode
 }
 
-function Row(props: RowProps) {
+function InsightRow(props: RowProps) {
   return (
     <div className="ib-score" title={props.source}>
       <div className="ib-lbl">{props.label}</div>
@@ -72,7 +72,7 @@ function complexityRow(insights: Insights) {
   const rising = functions.filter((f) => f.branchDelta > 0)
   const top3 = [...rising].sort((a, b) => b.branchDelta - a.branchDelta).slice(0, 3)
   return (
-    <Row label="Complexity" source={source}>
+    <InsightRow label="Complexity" source={source}>
       {branchChange(branchDelta)}. {rising.length === 0 && 'No function gained branches.'}
       {rising.length > 0 && (
         <>
@@ -89,7 +89,7 @@ function complexityRow(insights: Insights) {
           .
         </>
       )}
-    </Row>
+    </InsightRow>
   )
 }
 
@@ -125,16 +125,16 @@ function riskRow(allFiles: PrChangedFile[]) {
   const measured = allFiles.filter((f) => f.riskScore.composite != null)
   if (measured.length === 0) {
     return (
-      <Row label="Risk" source={RISK_SOURCE}>
+      <InsightRow label="Risk" source={RISK_SOURCE}>
         Not measured. Not enough measured files to rank drivers.
-      </Row>
+      </InsightRow>
     )
   }
   const maxComposite = Math.max(...measured.map((f) => f.riskScore.composite as number))
   return (
-    <Row label="Risk" source={RISK_SOURCE}>
+    <InsightRow label="Risk" source={RISK_SOURCE}>
       Highest score {maxComposite} / 100. <Hotspots hotspots={riskHotspots(measured)} />
-    </Row>
+    </InsightRow>
   )
 }
 
@@ -173,10 +173,10 @@ function coverageRow(insights: Insights) {
   const coverage = insights.coverage
   const { patchPercent } = coverage
   return (
-    <Row label="Test coverage" source={coverage.source}>
+    <InsightRow label="Test coverage" source={coverage.source}>
       {coverageValue(coverage)}. {coverageText(coverage)}
       {patchPercent != null && <> CI reports {patchPercent}% of new lines covered.</>}
-    </Row>
+    </InsightRow>
   )
 }
 
@@ -200,9 +200,9 @@ function healthText(flags: Insights['health']['flags']): string {
 function healthRow(insights: Insights) {
   const { flags, source } = insights.health
   return (
-    <Row label="Code health" source={source}>
+    <InsightRow label="Code health" source={source}>
       {healthText(flags)}
-    </Row>
+    </InsightRow>
   )
 }
 
@@ -210,11 +210,11 @@ function understandabilityRow(insights: Insights) {
   const { level, linesToRead, newExports, longestChain, source } = insights.understandability
   const value = level.charAt(0).toUpperCase() + level.slice(1)
   return (
-    <Row label="Understandability" source={source}>
+    <InsightRow label="Understandability" source={source}>
       {value}. {linesToRead.toLocaleString()} lines to read once formatting and lock files are set
       aside. {newExports} new exported {plural(newExports, 'symbol')}. Longest chain of definitions
       you must hold: {longestChain}.
-    </Row>
+    </InsightRow>
   )
 }
 

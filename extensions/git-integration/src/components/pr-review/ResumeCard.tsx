@@ -120,7 +120,7 @@ function noteScope(note: ReviewNote) {
 function NotesItem({ notes }: { notes: ReviewNote[] }) {
   const openAgentPanel = useReviewUiStore((s) => s.openAgentPanel)
   const questionNote = questionNoteOf(notes)
-  const askAgent = (note: ReviewNote) => openAgentPanel(noteScope(note), 'ask')
+  const askAgentAboutNote = (note: ReviewNote) => openAgentPanel(noteScope(note), 'ask')
   return (
     <li>
       <span className="rc-pip">{notes.length}</span>
@@ -129,7 +129,7 @@ function NotesItem({ notes }: { notes: ReviewNote[] }) {
         {questionSuffix(questionNote)}
       </span>
       {questionNote && (
-        <Button size="sm" onClick={() => askAgent(questionNote)}>
+        <Button size="sm" onClick={() => askAgentAboutNote(questionNote)}>
           Ask agent
         </Button>
       )}
@@ -171,11 +171,8 @@ function ChangedSinceItem({ count }: { count: number }) {
   )
 }
 
-/**
- * S2: shown over the diff area when a stored session's lastAccessedAt is
- * more than 15 minutes old, so the reviewer sees where they left off before
- * anything else renders.
- */
+/** S2: shown over the diff area when a stored session's lastAccessedAt is over 15 minutes old, so
+ *  the reviewer sees where they left off before anything else renders. */
 export function ResumeCard(props: Props) {
   const findings = unopenedFindingsOf(props.agentRuns)
   const { notes, drafts, changedSinceCount } = props

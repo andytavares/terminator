@@ -110,18 +110,18 @@ function viewerLookup(api: GithubContext['api']): GithubContext['viewer'] {
 
 /** Builds the helpers and caches one registration of the GitHub channels shares. */
 export function githubContext(access: GithubAccess, options: GithubHandlerOptions): GithubContext {
-  const target = (repoRoot: string) => githubTarget(repoRoot, access)
-  const api = (repoRoot: string, request: GithubApiRequest) =>
-    access.github.api(target(repoRoot), request)
+  const githubTargetOf = (repoRoot: string) => githubTarget(repoRoot, access)
+  const callGithubApi = (repoRoot: string, request: GithubApiRequest) =>
+    access.github.api(githubTargetOf(repoRoot), request)
   const isBranchExcluded = options.isBranchExcluded ?? (async () => false)
   return {
     github: access.github,
     noCheckoutCwd: access.noCheckoutCwd,
     options,
-    target,
-    api,
+    target: githubTargetOf,
+    api: callGithubApi,
     ownerAndName: ownerAndNameLookup(access),
-    viewer: viewerLookup(api),
+    viewer: viewerLookup(callGithubApi),
     excludedIn: (prs, repoPath) =>
       resolveBranchExclusions(
         isBranchExcluded,

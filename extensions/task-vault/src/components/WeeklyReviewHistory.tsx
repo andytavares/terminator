@@ -65,10 +65,7 @@ export function formatReviewDate(iso: string): string {
   })
 }
 
-/**
- * Groups a review's actions into the sections the detail view renders.
- * @internal
- */
+/** Groups a review's actions into the sections the detail view renders. @internal */
 export function groupActions(actions: ReviewAction[]): { kind: string; items: ReviewAction[] }[] {
   return ACTION_ORDER.map((kind) => ({
     kind,

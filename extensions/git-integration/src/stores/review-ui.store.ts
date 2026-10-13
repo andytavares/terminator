@@ -169,7 +169,7 @@ const NO_PR_STATE = {
   insightsOpen: false,
 }
 
-function sessionActions(set: SetState) {
+function uiSessionActions(set: SetState) {
   return {
     setSelection: (s: LineSelection | null) => set({ selection: s }),
     requestComposer: (r: ComposerRequest | null) => set({ composerRequest: r }),
@@ -194,5 +194,5 @@ export const useReviewUiStore = create<ReviewUiStore>((set, get) => ({
   agentPanelRequest: 'review',
   agentPanelAutoStart: false,
   ...prefActions(set, get),
-  ...sessionActions(set),
+  ...uiSessionActions(set),
 }))

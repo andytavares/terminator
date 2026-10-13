@@ -35,10 +35,8 @@ function createView(doc: string, cursor: number): EditorView {
   return view
 }
 
-/**
- * Finishes the parse now, as the background parse does a moment later. Each
- * transaction's own parse stops after 20ms, which a loaded machine can hit.
- */
+/** Finishes the parse now, as the background parse does a moment later. Each transaction's own
+ *  parse stops after 20ms, which a loaded machine can hit. */
 function finishParsing(v: EditorView): EditorView {
   forceParsing(v, v.state.doc.length, Infinity)
   return v
@@ -63,10 +61,8 @@ function type(v: EditorView, text: string): void {
 
 const tableRendered = (v: EditorView) => v.dom.querySelector('.notepad-table') !== null
 
-// CodeMirror's first parse of a new state stops once 20ms have passed
-// (Work.Apply in @codemirror/language) and the rest is parsed in the
-// background. A clock that jumps that far on every reading is a machine too
-// loaded to finish the first parse.
+// CodeMirror's first parse stops after 20ms (Work.Apply in @codemirror/language) and the rest runs
+// in the background; a clock jumping that far per reading is a machine too loaded to finish it.
 const FIRST_PARSE_BUDGET_MS = 20
 
 function mountOnALoadedMachine(cursor: number): EditorView {

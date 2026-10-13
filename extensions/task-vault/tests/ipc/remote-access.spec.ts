@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { ChannelSpec, ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 
 vi.mock('electron', () => ({
   dialog: {},
@@ -13,35 +12,20 @@ import { registerLinksIpcHandlers } from '../../src/ipc/links.ipc.js'
 import { registerProjectsIpcHandlers } from '../../src/ipc/projects.ipc.js'
 import { registerVaultIpcHandlers } from '../../src/ipc/vault.ipc.js'
 import { registerWeeklyReviewIpcHandlers } from '../../src/ipc/weekly-review.ipc.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { remoteAccessByChannel } from '../../../../tests/support/extension-channels'
 
-function registerEverything(): Map<string, boolean> {
-  const remoteByChannel = new Map<string, boolean>()
-  const api = partialFake<ExtensionAPI>({
-    ipc: partialFake<ExtensionAPI['ipc']>({
-      registerHandler: (spec: ChannelSpec, opts?: { remoteAccessible?: boolean }) => {
-        remoteByChannel.set(spec.channel, opts?.remoteAccessible === true)
-        return { dispose: () => {} }
-      },
-    }),
-  })
-  const db = {} as ExtensionDB
-  for (const register of [
-    registerAdminIpcHandlers,
-    registerKanbanIpcHandlers,
-    registerLinksIpcHandlers,
-    registerProjectsIpcHandlers,
-    registerVaultIpcHandlers,
-    registerWeeklyReviewIpcHandlers,
-  ]) {
-    register(api, db)
-  }
-  return remoteByChannel
-}
+const REGISTRARS = [
+  registerAdminIpcHandlers,
+  registerKanbanIpcHandlers,
+  registerLinksIpcHandlers,
+  registerProjectsIpcHandlers,
+  registerVaultIpcHandlers,
+  registerWeeklyReviewIpcHandlers,
+]
 
 describe('task-vault remote access', () => {
   it('keeps the SQL console, table inspection and bulk or file channels local to the desktop', () => {
-    const channels = registerEverything()
+    const channels = remoteAccessByChannel(REGISTRARS)
     const local = [...channels].filter(([, remote]) => !remote).map(([channel]) => channel)
 
     expect(local.sort()).toEqual([
@@ -54,7 +38,7 @@ describe('task-vault remote access', () => {
   })
 
   it('lets the remote browser use the task views', () => {
-    const channels = registerEverything()
+    const channels = remoteAccessByChannel(REGISTRARS)
 
     for (const channel of [
       'task-vault:vault:get-today',

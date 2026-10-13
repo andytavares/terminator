@@ -12,7 +12,7 @@ import { partialFake } from '../../../../tests/support/fakes'
 
 const disposable = { dispose: () => {} }
 
-async function activateCapturingChannels(): Promise<ChannelSpec[]> {
+async function activateNotepadCapturingChannels(): Promise<ChannelSpec[]> {
   const specs: ChannelSpec[] = []
   const api = partialFake<ExtensionAPI>({
     db: partialFake<ExtensionAPI['db']>({}),
@@ -39,7 +39,7 @@ async function activateCapturingChannels(): Promise<ChannelSpec[]> {
 // checks once, for every channel notepad registers, that one is declared.
 describe('every notepad channel', () => {
   it('declares a schema that keeps a malformed payload from reaching run', async () => {
-    const specs = await activateCapturingChannels()
+    const specs = await activateNotepadCapturingChannels()
 
     expect(specs.map((spec) => spec.channel)).toContain('terminator.notepad:notes.autosave')
     for (const spec of specs) {

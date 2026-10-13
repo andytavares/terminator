@@ -92,7 +92,7 @@ async function filingFor(db: ExtensionDB, destination: string): Promise<Filing> 
 }
 
 /** Files an inbox item under a project or area, onto today's log. */
-async function file(step: InboxStep, args: ProcessArgs) {
+async function fileInboxItem(step: InboxStep, args: ProcessArgs) {
   const { db, taskId, now } = step
   const { destination, newProjectName } = args
   let filing: Filing
@@ -123,7 +123,7 @@ async function processInboxItem({ db }: IpcContext, args: ProcessArgs) {
   if (!task) return { error: 'STALE_ID' }
   const step = { db, taskId, now }
   const simple = SIMPLE_ACTIONS[action]
-  if (!simple) return file(step, args)
+  if (!simple) return fileInboxItem(step, args)
   await simple(step)
   indexUpdated()
   return { success: true }

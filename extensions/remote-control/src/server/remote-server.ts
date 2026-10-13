@@ -155,7 +155,7 @@ function lacksSurfaceSession(request: FastifyRequest, surface: string, store: Se
   const pathname = request.url.split('?')[0]
   const prefix = `/${surface}/`
   if (!pathname.startsWith(prefix) || pathname === prefix) return false
-  return !store.hasValidSession(request.headers.cookie ?? '')
+  return !store.hasLiveSession(request.headers.cookie ?? '')
 }
 
 // Gate /app/* and /mobile/* static assets behind their respective session cookies.
@@ -196,11 +196,8 @@ interface SurfaceExchange {
   reply: FastifyReply
 }
 
-/**
- * Admit a request to a surface's entry page: an existing valid session cookie is
- * accepted (allows page refresh without re-auth); otherwise a one-use ticket
- * issues one. False when the request has neither.
- */
+/** A valid session cookie is accepted, so a refresh needs no new login; otherwise a one-use
+ *  ticket issues one. False when the request has neither. */
 function admitToSurface(
   parts: RemoteServerParts,
   surface: 'app' | 'mobile',
@@ -208,7 +205,7 @@ function admitToSurface(
 ): boolean {
   const { request, reply } = exchange
   const store = parts.sessions[surface]
-  if (store.hasValidSession(request.headers.cookie ?? '')) return true
+  if (store.hasLiveSession(request.headers.cookie ?? '')) return true
   const t = request.query.t ?? ''
   if (!t || !parts.ticketStore.consumeTicket(t, surface)) return false
   reply.header('Set-Cookie', store.issueSession().setCookie)
@@ -283,7 +280,7 @@ function registerSurfaceTickets(fastify: FastifyInstance, ticketStore: WsTicketS
 async function registerLogin(parts: RemoteServerParts): Promise<void> {
   const { fastify, sessions } = parts
   await registerAuthMiddleware(fastify, {
-    hasValidSession: (cookieHeader) => sessions.login.hasValidSession(cookieHeader),
+    hasValidSession: (cookieHeader) => sessions.login.hasLiveSession(cookieHeader),
   })
   await registerLoginRoute(fastify, {
     getPasswordHash: parts.options.deps.getPasswordHash,
@@ -335,7 +332,7 @@ export async function createRemoteServer(
   registerSurfaceTickets(parts.fastify, parts.ticketStore)
   await registerLogin(parts)
   const connections = await registerApi(parts)
-  return new RemoteServer(parts, connections).handle()
+  return new RemoteServer(parts, connections).toHandle()
 }
 
 /** The running state of a built server: whether it listens, and its sweep timer. */
@@ -348,7 +345,7 @@ class RemoteServer {
     private connections: ServerConnections
   ) {}
 
-  handle(): RemoteServerHandle {
+  toHandle(): RemoteServerHandle {
     const { fastify, deviceRegistry } = this.parts
     return {
       start: () => this.start(),
@@ -390,7 +387,7 @@ class RemoteServer {
       clearInterval(this.sessionCleanupTimer)
       this.sessionCleanupTimer = null
     }
-    forEachSessionStore(this.parts.sessions, (store) => store.clear())
+    forEachSessionStore(this.parts.sessions, (store) => store.revokeAll())
     await this.connections.terminalCleanup.cleanup()
     this.connections.bridgeCleanup.disconnectAll()
     this.parts.subscriberManager.destroyAll()
@@ -399,7 +396,7 @@ class RemoteServer {
   }
 
   private disconnectAllClients(): void {
-    forEachSessionStore(this.parts.sessions, (store) => store.clear())
+    forEachSessionStore(this.parts.sessions, (store) => store.revokeAll())
     // Kill all remote PTYs — password rotation invalidates existing sessions
     void this.connections.terminalCleanup.cleanup()
     this.connections.bridgeCleanup.disconnectAll()

@@ -112,7 +112,7 @@ interface Side {
   label: string
 }
 
-function sidesOf(props: Props): { ours: Side; theirs: Side } {
+function keepBothSides(props: Props): { ours: Side; theirs: Side } {
   const { block } = props
   return {
     ours: {
@@ -134,7 +134,7 @@ function sidesOf(props: Props): { ours: Side; theirs: Side } {
 
 /** The two sides in the chosen order. */
 function orderedSides(props: Props, order: Order): [Side, Side] {
-  const { ours, theirs } = sidesOf(props)
+  const { ours, theirs } = keepBothSides(props)
   if (order === 'ours-first') return [ours, theirs]
   return [theirs, ours]
 }
@@ -152,7 +152,7 @@ function flipped(order: Order): Order {
 /** Drag either block onto the other to swap the order. */
 function useBlockDrag(setOrder: (update: (o: Order) => Order) => void) {
   const [dragOver, setDragOver] = useState<Slot | null>(null)
-  const handlersFor = (slot: Slot) => ({
+  const slotDragHandlers = (slot: Slot) => ({
     onDragStart: (e: React.DragEvent) => {
       e.dataTransfer.setData('text/plain', slot)
       e.dataTransfer.effectAllowed = 'move'
@@ -169,7 +169,7 @@ function useBlockDrag(setOrder: (update: (o: Order) => Order) => void) {
       if (e.dataTransfer.getData('text/plain') !== slot) setOrder(flipped)
     },
   })
-  return { dragOver, handlersFor }
+  return { dragOver, handlersFor: slotDragHandlers }
 }
 
 type BlockDrag = ReturnType<typeof useBlockDrag>
@@ -279,7 +279,7 @@ function OrderControls(props: { order: Order; setOrder: (order: Order) => void }
   )
 }
 
-function dialogActions(onCancel: () => void, onConfirm: () => void) {
+function keepBothActions(onCancel: () => void, onConfirm: () => void) {
   return [
     { label: 'Cancel', onSelect: onCancel },
     { label: 'Use this order', tone: 'primary' as const, onSelect: onConfirm },
@@ -299,7 +299,7 @@ export function KeepBothModal(props: Props) {
     <Dialog
       title="Keep both changes — choose order"
       onDismiss={onCancel}
-      actions={dialogActions(onCancel, confirmOrder)}
+      actions={keepBothActions(onCancel, confirmOrder)}
     >
       <OrderControls order={order} setOrder={setOrder} />
       <OrderedBlocks sides={[first, second]} lang={lang} drag={drag} />

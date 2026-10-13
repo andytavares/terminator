@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import { installBridge, eventually } from './helpers/bridge'
+import { installVaultBridge, eventually } from './helpers/bridge'
 
 const store = {
   loadDate: vi.fn(),
@@ -15,12 +15,12 @@ import { CalendarDrawer, statusDotStyle } from '../../src/components/CalendarDra
 
 vi.setConfig({ testTimeout: 30_000 })
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 0, 15, 12))
-  bridge = installBridge()
+  bridge = installVaultBridge()
   bridge.responses['task-vault:vault:get-calendar-month'] = (payload: unknown) => {
     const { month } = payload as { month: number }
     if (month !== 1) return { days: [] }

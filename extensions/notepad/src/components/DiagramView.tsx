@@ -11,6 +11,7 @@ import {
   type ScreenPoint,
   type ThreadActions,
 } from './DiagramComments'
+import { useLatest } from './useLatest'
 
 // Lazy-load Excalidraw so it doesn't bloat the main bundle
 const ExcalidrawComponent = lazy(async () => {
@@ -84,11 +85,8 @@ function parseScene(sceneJson: string): SceneData {
   }
 }
 
-/**
- * Reads the diagram from the in-session scene cache when it has one, so
- * content is never lost to a race between a cleanup flush and a DB read. Title
- * and tags then come from the always-up-to-date diagrams list.
- */
+/** Reads the in-session scene cache first, so content is never lost to a race between a cleanup
+ *  flush and a DB read. Title and tags then come from the always-current diagrams list. */
 async function readDiagram(diagramId: string): Promise<DiagramRecord | undefined> {
   const { diagramCache, diagrams } = useNotesStore.getState()
   const cachedScene = diagramCache[diagramId]
@@ -106,7 +104,7 @@ async function readDiagram(diagramId: string): Promise<DiagramRecord | undefined
   return diagram
 }
 
-async function listDiagramComments(diagramId: string): Promise<DiagramComment[]> {
+async function fetchDiagramComments(diagramId: string): Promise<DiagramComment[]> {
   const result = await window.electronAPI.extensionBridge.invoke(
     'terminator.notepad:diagram-comments.list',
     { diagramId, includeResolved: false }
@@ -118,7 +116,7 @@ async function loadDiagram(diagramId: string): Promise<DiagramLoad> {
   try {
     const [diagram, comments] = await Promise.all([
       readDiagram(diagramId),
-      listDiagramComments(diagramId),
+      fetchDiagramComments(diagramId),
     ])
     if (!diagram) return { ok: false, error: 'Diagram not found.' }
     const scene = parseScene(diagram.sceneJson)
@@ -182,7 +180,7 @@ function saveDiagram(save: DiagramSave) {
 }
 
 /** Saves, then keeps the sidebar in step and caches the scene for an instant navigate-back. */
-async function autosaveDiagram(save: DiagramSave): Promise<void> {
+async function saveDiagramAndSync(save: DiagramSave): Promise<void> {
   await saveDiagram(save)
   const store = useNotesStore.getState()
   store.patchDiagram(save.diagramId, {
@@ -193,15 +191,6 @@ async function autosaveDiagram(save: DiagramSave): Promise<void> {
   store.setDiagramCache(save.diagramId, save.sceneJson)
 }
 
-/** A ref that always holds the latest value. */
-function useLatest<T>(value: T): React.MutableRefObject<T> {
-  const ref = useRef(value)
-  useEffect(() => {
-    ref.current = value
-  }, [value])
-  return ref
-}
-
 /** The autosave's timer, the scene it has yet to write, and the latest title and tags. */
 interface AutosaveRefs {
   autosaveTimerRef: TimerRef
@@ -210,10 +199,8 @@ interface AutosaveRefs {
   tagsRef: React.MutableRefObject<string[]>
 }
 
-/**
- * Saves the scene once drawing pauses. A scene not yet saved — or whose save
- * failed — is flushed when the diagram closes.
- */
+/** Saves the scene once drawing pauses; a scene not yet saved, or whose save failed, is flushed
+ *  when the diagram closes. */
 function useDiagramAutosave(diagramId: string, doc: DiagramDocument) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const refs: AutosaveRefs = {
@@ -248,7 +235,7 @@ async function runAutosave(
 ): Promise<void> {
   setSaveStatus('saving')
   try {
-    await autosaveDiagram(save)
+    await saveDiagramAndSync(save)
     pendingSceneRef.current = null
     setSaveStatus('saved')
   } catch (err) {
@@ -257,10 +244,8 @@ async function runAutosave(
   }
 }
 
-/**
- * Writes a pending scene when the diagram closes, cached optimistically so
- * navigating back never reads stale DB data.
- */
+/** Writes a pending scene when the diagram closes, cached optimistically so navigating back never
+ *  reads stale DB data. */
 function useFlushOnClose(diagramId: string, refs: AutosaveRefs): void {
   useEffect(() => {
     return () => {
@@ -315,13 +300,13 @@ function useCanvas(scheduleAutosave: (sceneJson: string) => void) {
 
 type SetComments = React.Dispatch<React.SetStateAction<DiagramComment[]>>
 
-async function createDiagramComment(payload: Record<string, unknown>, setComments: SetComments) {
+async function addDiagramComment(payload: Record<string, unknown>, setComments: SetComments) {
   const diagramId = payload.diagramId as string
   await window.electronAPI.extensionBridge.invoke(
     'terminator.notepad:diagram-comments.create',
     payload
   )
-  setComments(await listDiagramComments(diagramId))
+  setComments(await fetchDiagramComments(diagramId))
 }
 
 /** What a thread's actions change. */
@@ -344,7 +329,7 @@ function threadActionsFor(commentId: string, ctx: ThreadContext): ThreadActions 
   const reply = { diagramId, parentId: commentId, sceneX: 0, sceneY: 0 }
   return {
     onReply: (body) =>
-      void createDiagramComment({ ...reply, body }, setComments).catch((err) =>
+      void addDiagramComment({ ...reply, body }, setComments).catch((err) =>
         console.error('[notepad] DiagramView: reply failed', err)
       ),
     onResolve: () => void removeThread('terminator.notepad:diagram-comments.resolve', 'resolve'),
@@ -363,7 +348,7 @@ function useDiagramComments(diagramId: string, setComments: SetComments) {
   async function handleCreateComment(body: string) {
     if (!pendingPin) return
     const { sceneX, sceneY } = pendingPin
-    await createDiagramComment({ diagramId, body, sceneX, sceneY }, setComments).catch((err) =>
+    await addDiagramComment({ diagramId, body, sceneX, sceneY }, setComments).catch((err) =>
       console.error('[notepad] DiagramView: create comment failed', err)
     )
     setPendingPin(null)
@@ -435,7 +420,7 @@ function DiagramTitle(props: { diagramId: string; doc: DiagramDocument }): React
   return (
     <div className="diagram-view__title-area">
       {draftTitle !== null ? (
-        <TitleInput
+        <DiagramTitleInput
           draft={draftTitle}
           onChange={setDraftTitle}
           onCommit={() => void commitTitleEdit(draftTitle)}
@@ -460,7 +445,7 @@ interface TitleInputProps {
   onCommit: () => void
 }
 
-function TitleInput({ draft, onChange, onCommit }: TitleInputProps): React.JSX.Element {
+function DiagramTitleInput({ draft, onChange, onCommit }: TitleInputProps): React.JSX.Element {
   return (
     <input
       className="diagram-view__title-input"
@@ -511,10 +496,7 @@ interface DiagramCanvasProps {
   commenting: DiagramCommentControls
 }
 
-/**
- * The canvas, with the comment pins and popovers over it. In comment mode a
- * transparent overlay captures clicks before Excalidraw sees them.
- */
+/** In comment mode a transparent overlay captures clicks before Excalidraw sees them. */
 function DiagramCanvas(props: DiagramCanvasProps): React.JSX.Element {
   const { diagramId, doc, canvas, commenting } = props
   const { commentMode, pendingPin, setPendingPin } = commenting

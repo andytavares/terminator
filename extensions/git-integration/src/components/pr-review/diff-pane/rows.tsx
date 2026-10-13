@@ -104,7 +104,7 @@ function rowProps(at: LineRef, expanded: boolean) {
   }
 }
 
-function UnifiedTable(props: { ctx: PaneContext; children: React.ReactNode }) {
+function UnifiedRowsTable(props: { ctx: PaneContext; children: React.ReactNode }) {
   const { ctx, children } = props
   const { numColWidth } = ctx.layout
   return (
@@ -310,17 +310,17 @@ function GapExpander(props: { ctx: PaneContext; gapKey: string; hidden: number |
   const content = <ExpanderContent ctx={ctx} gapKey={gapKey} hidden={hidden} />
   if (ctx.mode !== 'unified') return <div className="diff-gap-row">{content}</div>
   return (
-    <UnifiedTable ctx={ctx}>
+    <UnifiedRowsTable ctx={ctx}>
       <tr className="diff-gap-row">
         <td colSpan={5}>{content}</td>
       </tr>
-    </UnifiedTable>
+    </UnifiedRowsTable>
   )
 }
 
 function TestsButton(props: TestsButtonProps) {
   const { ctx, anchor, code, hunkHeader } = props
-  const open = (e: React.MouseEvent) => {
+  const openPeek = (e: React.MouseEvent) => {
     e.stopPropagation()
     ctx.tests.openTests(anchor, code, hunkHeader)
   }
@@ -330,7 +330,7 @@ function TestsButton(props: TestsButtonProps) {
         aria-label="Jump to the tests for this block"
         type="button"
         className="rs-hunk-tests"
-        onClick={open}
+        onClick={openPeek}
       >
         Tests
       </button>
@@ -339,7 +339,7 @@ function TestsButton(props: TestsButtonProps) {
   )
 }
 
-function HunkHeader(props: { ctx: PaneContext; hunk: DiffHunk; hunkIndex: number }) {
+function PaneHunkHeader(props: { ctx: PaneContext; hunk: DiffHunk; hunkIndex: number }) {
   const { ctx, hunk, hunkIndex } = props
   const bar = (
     <div className="rs-hunk-bar">
@@ -354,13 +354,13 @@ function HunkHeader(props: { ctx: PaneContext; hunk: DiffHunk; hunkIndex: number
   )
   if (ctx.mode !== 'unified') return <div className="diff-split-header rs-hunk-anchor">{bar}</div>
   return (
-    <UnifiedTable ctx={ctx}>
+    <UnifiedRowsTable ctx={ctx}>
       <tr>
         <td colSpan={5} className="diff-hunk-header rs-hunk-anchor">
           {bar}
         </td>
       </tr>
-    </UnifiedTable>
+    </UnifiedRowsTable>
   )
 }
 
@@ -406,7 +406,7 @@ function FormattingNotice(props: { ctx: PaneContext; hiddenCount: number }) {
 function UnifiedItem(props: { ctx: PaneContext; line: DiffLine; moved: MovedMark | null }) {
   const { ctx, line, moved } = props
   return (
-    <UnifiedTable ctx={ctx}>
+    <UnifiedRowsTable ctx={ctx}>
       {moved?.isStart && (
         <tr>
           <td colSpan={5}>
@@ -415,7 +415,7 @@ function UnifiedItem(props: { ctx: PaneContext; line: DiffLine; moved: MovedMark
         </tr>
       )}
       <UnifiedLine ctx={ctx} line={line} expanded={false} />
-    </UnifiedTable>
+    </UnifiedRowsTable>
   )
 }
 
@@ -435,9 +435,9 @@ function GapLine(props: { ctx: PaneContext; line: DiffLine }) {
   const { ctx, line } = props
   if (ctx.mode !== 'unified') return <SplitPair expanded ctx={ctx} left={line} right={line} />
   return (
-    <UnifiedTable ctx={ctx}>
+    <UnifiedRowsTable ctx={ctx}>
       <UnifiedLine expanded ctx={ctx} line={line} />
-    </UnifiedTable>
+    </UnifiedRowsTable>
   )
 }
 
@@ -453,7 +453,7 @@ function Hotspot(props: { message: string }) {
 const ITEM_RENDERERS: ItemRenderers = {
   notice: (ctx, item) => <FormattingNotice ctx={ctx} hiddenCount={item.hiddenCount} />,
   'hunk-header': (ctx, item) => (
-    <HunkHeader ctx={ctx} hunk={item.hunk} hunkIndex={item.hunkIndex} />
+    <PaneHunkHeader ctx={ctx} hunk={item.hunk} hunkIndex={item.hunkIndex} />
   ),
   line: (ctx, item) => <UnifiedItem ctx={ctx} line={item.line} moved={item.moved} />,
   'split-row': (ctx, item) => <SplitItem ctx={ctx} item={item} />,
@@ -466,6 +466,9 @@ const ITEM_RENDERERS: ItemRenderers = {
 
 /** One entry of the virtual list. */
 export function renderDiffItem(ctx: PaneContext, item: DiffItem): React.ReactNode {
-  const render = ITEM_RENDERERS[item.kind] as (ctx: PaneContext, item: DiffItem) => React.ReactNode
-  return render(ctx, item)
+  const renderAs = ITEM_RENDERERS[item.kind] as (
+    ctx: PaneContext,
+    item: DiffItem
+  ) => React.ReactNode
+  return renderAs(ctx, item)
 }

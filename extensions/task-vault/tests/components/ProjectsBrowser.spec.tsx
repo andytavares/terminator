@@ -1,27 +1,31 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react'
-import { installBridge, eventually, project, task } from './helpers/bridge'
+import { installVaultBridge, eventually, indexedProject, task } from './helpers/bridge'
 import { invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 import { ProjectsBrowser } from '../../src/components/ProjectsBrowser'
 
 vi.setConfig({ testTimeout: 30_000 })
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 const listSessions = vi.fn()
 
-const LAUNCH = project('Launch', { area: 'Work', deadline: '2026-03-01', nextActionCount: 2 })
-const GARDEN = project('Garden', { isStale: true, nextActionCount: 0 })
-const BOAT = project('Boat', { status: 'someday', isStale: true, nextActionCount: 1 })
-const OLD = project('Old', { status: 'archived' })
+const LAUNCH = indexedProject('Launch', {
+  area: 'Work',
+  deadline: '2026-03-01',
+  nextActionCount: 2,
+})
+const GARDEN = indexedProject('Garden', { isStale: true, nextActionCount: 0 })
+const BOAT = indexedProject('Boat', { status: 'someday', isStale: true, nextActionCount: 1 })
+const OLD = indexedProject('Old', { status: 'archived' })
 
 beforeEach(() => {
   invalidateSmartInputCache()
   listSessions.mockResolvedValue([
     { sessionId: 'sess-12345678', projectId: 'pr1', tabTitle: 'zsh' },
   ])
-  bridge = installBridge({
+  bridge = installVaultBridge({
     extension: { getSettingsValues: vi.fn().mockResolvedValue({ values: {} }) },
     terminal: { listSessions },
     workspace: { list: vi.fn().mockResolvedValue({ workspaces: [{ id: 'w1', name: 'Home' }] }) },
@@ -49,7 +53,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-const card = (name: string) =>
+const projectCardNamed = (name: string) =>
   screen
     .getByText(name, { selector: '.projects-browser__name' })
     .closest('.projects-browser__card') as HTMLElement
@@ -59,13 +63,13 @@ async function renderBrowser() {
   await screen.findByText('Launch', { selector: '.projects-browser__name' })
 }
 
-describe('ProjectsBrowser list', listTests)
-describe('ProjectsBrowser creating', createTests)
+describe('ProjectsBrowser list', projectListTests)
+describe('ProjectsBrowser creating', projectCreateTests)
 describe('ProjectsBrowser renaming and deadlines', renameTests)
 describe('ProjectsBrowser areas and links', areaTests)
 describe('ProjectsBrowser tasks', taskTests)
 
-function listTests() {
+function projectListTests() {
   describe('marks stale someday', listMarksStaleSomedayTests)
   describe('archives a project', listArchivesAProjectTests)
 }
@@ -73,11 +77,13 @@ function listTests() {
 function listMarksStaleSomedayTests() {
   it('marks stale, someday and selected projects and counts next actions', async () => {
     await renderBrowser()
-    expect(card('Launch').className).toContain('--selected')
-    expect(card('Launch').textContent).toContain('2 next actions')
-    expect(within(card('Garden')).getByText('no next action')).toBeTruthy()
-    expect(within(card('Boat')).getByText('someday')).toBeTruthy()
-    fireEvent.click(within(card('Boat')).getByRole('button', { name: 'Promote to active' }))
+    expect(projectCardNamed('Launch').className).toContain('--selected')
+    expect(projectCardNamed('Launch').textContent).toContain('2 next actions')
+    expect(within(projectCardNamed('Garden')).getByText('no next action')).toBeTruthy()
+    expect(within(projectCardNamed('Boat')).getByText('someday')).toBeTruthy()
+    fireEvent.click(
+      within(projectCardNamed('Boat')).getByRole('button', { name: 'Promote to active' })
+    )
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:update-project-status')).toEqual([
         { projectFilePath: 'Boat', status: 'active' },
@@ -89,13 +95,15 @@ function listMarksStaleSomedayTests() {
 function listArchivesAProjectTests() {
   it('archives a project, and deletes an archived one after confirming', async () => {
     await renderBrowser()
-    fireEvent.click(within(card('Garden')).getByRole('button', { name: 'Archive project' }))
+    fireEvent.click(
+      within(projectCardNamed('Garden')).getByRole('button', { name: 'Archive project' })
+    )
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:update-project-status')).toHaveLength(1)
     )
     fireEvent.click(screen.getByRole('button', { name: 'Archived' }))
     await screen.findByText('archived')
-    fireEvent.click(within(card('Old')).getByRole('button', { name: 'Delete project' }))
+    fireEvent.click(within(projectCardNamed('Old')).getByRole('button', { name: 'Delete project' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:projects:delete')).toEqual([{ projectFilePath: 'Old' }])
     )
@@ -113,7 +121,7 @@ function listArchivesAProjectTests() {
   })
 }
 
-function createTests() {
+function projectCreateTests() {
   describe('creates a project', createCreatesAProjectTests)
   describe('picks an existing', createPicksAnExistingTests)
 }
@@ -189,7 +197,9 @@ function renameTests() {
 function renameRenamesAProjectTests() {
   it('renames a project, reporting a taken name, and cancels', async () => {
     await renderBrowser()
-    fireEvent.click(within(card('Launch')).getByRole('button', { name: 'Rename project' }))
+    fireEvent.click(
+      within(projectCardNamed('Launch')).getByRole('button', { name: 'Rename project' })
+    )
     const input = screen.getByDisplayValue('Launch')
     bridge.responses['task-vault:projects:rename'] = { error: 'PROJECT_EXISTS' }
     fireEvent.change(input, { target: { value: 'Garden' } })
@@ -213,7 +223,9 @@ function renameSavesANewTests() {
 function renameSavesANewSavesANewTests() {
   it('saves a new name and closes the editor', async () => {
     await renderBrowser()
-    fireEvent.click(within(card('Garden')).getByRole('button', { name: 'Rename project' }))
+    fireEvent.click(
+      within(projectCardNamed('Garden')).getByRole('button', { name: 'Rename project' })
+    )
     fireEvent.change(screen.getByDisplayValue('Garden'), { target: { value: 'Yard' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await eventually(() =>
@@ -221,7 +233,9 @@ function renameSavesANewSavesANewTests() {
         { projectFilePath: 'Garden', newName: 'Yard' },
       ])
     )
-    fireEvent.click(within(card('Launch')).getByRole('button', { name: 'Rename project' }))
+    fireEvent.click(
+      within(projectCardNamed('Launch')).getByRole('button', { name: 'Rename project' })
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Cancel rename' }))
     expect(screen.queryByRole('button', { name: 'Cancel rename' })).toBeNull()
   })
@@ -237,13 +251,13 @@ function renameSavesANewEditsClearsAndTests() {
         { projectFilePath: 'Launch', deadline: null },
       ])
     )
-    fireEvent.click(within(card('Garden')).getByTitle('Set deadline'))
+    fireEvent.click(within(projectCardNamed('Garden')).getByTitle('Set deadline'))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:projects:update-deadline')).toHaveLength(2)
     )
-    await eventually(() => within(card('Garden')).getByTitle('Set deadline'))
-    fireEvent.click(within(card('Garden')).getByTitle('Set deadline'))
+    await eventually(() => within(projectCardNamed('Garden')).getByTitle('Set deadline'))
+    fireEvent.click(within(projectCardNamed('Garden')).getByTitle('Set deadline'))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel deadline edit' }))
     expect(screen.queryByRole('button', { name: 'Cancel deadline edit' })).toBeNull()
   })
@@ -264,7 +278,7 @@ function areaGoesToAGoesToATests() {
     await renderBrowser()
     fireEvent.click(screen.getByTitle('Go to Work area'))
     expect(useVaultNavStore.getState().selectedAreaName).toBe('Work')
-    fireEvent.click(within(card('Launch')).getByRole('button', { name: 'Change area' }))
+    fireEvent.click(within(projectCardNamed('Launch')).getByRole('button', { name: 'Change area' }))
     fireEvent.change(await screen.findByDisplayValue('Work'), { target: { value: 'Ops' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save area' }))
     await eventually(() =>
@@ -273,7 +287,7 @@ function areaGoesToAGoesToATests() {
       ])
     )
     expect(bridge.calls('task-vault:vault:create-area')).toEqual([{ name: 'Ops' }])
-    fireEvent.click(within(card('Garden')).getByTitle('Assign to area'))
+    fireEvent.click(within(projectCardNamed('Garden')).getByTitle('Assign to area'))
     fireEvent.click(screen.getByRole('button', { name: 'Save area' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:projects:update-area')[1]).toEqual({
@@ -287,16 +301,16 @@ function areaGoesToAGoesToATests() {
 function areaGoesToACancelsAnAreaTests() {
   it('cancels an area change', async () => {
     await renderBrowser()
-    fireEvent.click(within(card('Garden')).getByTitle('Assign to area'))
-    fireEvent.click(within(card('Garden')).getByRole('button', { name: 'Cancel' }))
-    expect(within(card('Garden')).getByTitle('Assign to area')).toBeTruthy()
+    fireEvent.click(within(projectCardNamed('Garden')).getByTitle('Assign to area'))
+    fireEvent.click(within(projectCardNamed('Garden')).getByRole('button', { name: 'Cancel' }))
+    expect(within(projectCardNamed('Garden')).getByTitle('Assign to area')).toBeTruthy()
   })
 }
 
 function areaLinksAProjectTests() {
   it('links a project to a terminal session named by workspace and project', async () => {
     await renderBrowser()
-    fireEvent.click(within(card('Launch')).getByTitle('Link to terminal session'))
+    fireEvent.click(within(projectCardNamed('Launch')).getByTitle('Link to terminal session'))
     const option = await screen.findByRole('option', { name: 'Home › terminator › zsh' })
     fireEvent.change(option.closest('select')!, { target: { value: 'sess-12345678' } })
     await eventually(() =>
@@ -304,23 +318,25 @@ function areaLinksAProjectTests() {
         { projectFilePath: 'Launch', targetId: 'sess-12345678' },
       ])
     )
-    expect(await within(card('Launch')).findByTitle('Linked')).toBeTruthy()
+    expect(await within(projectCardNamed('Launch')).findByTitle('Linked')).toBeTruthy()
   })
 
   it('says when there is no session to link, and closes the picker', async () => {
     listSessions.mockResolvedValue([])
     await renderBrowser()
-    fireEvent.click(within(card('Garden')).getByTitle('Link to terminal session'))
+    fireEvent.click(within(projectCardNamed('Garden')).getByTitle('Link to terminal session'))
     expect(await screen.findByText('No active sessions')).toBeTruthy()
-    fireEvent.click(within(card('Garden')).getByRole('button', { name: 'Close' }))
-    expect(within(card('Garden')).getByTitle('Link to terminal session')).toBeTruthy()
+    fireEvent.click(within(projectCardNamed('Garden')).getByRole('button', { name: 'Close' }))
+    expect(within(projectCardNamed('Garden')).getByTitle('Link to terminal session')).toBeTruthy()
   })
 }
 
 async function openTasks(name = 'Launch') {
   await renderBrowser()
-  fireEvent.click(within(card(name)).getByRole('button', { name: `Show tasks tagged @${name}` }))
-  await within(card(name)).findByText(/tagged @/, { selector: 'span' })
+  fireEvent.click(
+    within(projectCardNamed(name)).getByRole('button', { name: `Show tasks tagged @${name}` })
+  )
+  await within(projectCardNamed(name)).findByText(/tagged @/, { selector: 'span' })
 }
 
 function taskTests() {
@@ -331,15 +347,17 @@ function taskTests() {
 function taskListsOpenAndTests() {
   it('lists open and finished tasks, completes and reopens them', async () => {
     await openTasks()
-    expect(within(card('Launch')).getByText('2 tasks tagged @Launch')).toBeTruthy()
+    expect(within(projectCardNamed('Launch')).getByText('2 tasks tagged @Launch')).toBeTruthy()
     expect(
-      within(card('Launch')).getByText('Launch', { selector: '.projects-browser__task-file' })
+      within(projectCardNamed('Launch')).getByText('Launch', {
+        selector: '.projects-browser__task-file',
+      })
     ).toBeTruthy()
-    fireEvent.click(within(card('Launch')).getByTitle('Complete'))
+    fireEvent.click(within(projectCardNamed('Launch')).getByTitle('Complete'))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:complete-task')).toEqual([{ taskId: 't1' }])
     )
-    fireEvent.click(within(card('Launch')).getByTitle("Reopen on today's log"))
+    fireEvent.click(within(projectCardNamed('Launch')).getByTitle("Reopen on today's log"))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:restore-task')).toEqual([{ taskId: 't2' }])
     )
@@ -354,18 +372,18 @@ function taskAddsATaskTests() {
 function taskAddsATaskAddsATaskTests() {
   it('adds a task tagged with the project, and edits one', async () => {
     await openTasks()
-    const field = within(card('Launch')).getByPlaceholderText('Add task to @Launch…')
+    const field = within(projectCardNamed('Launch')).getByPlaceholderText('Add task to @Launch…')
     fireEvent.change(field, { target: { value: 'email team' } })
-    fireEvent.click(within(card('Launch')).getByRole('button', { name: 'Add' }))
+    fireEvent.click(within(projectCardNamed('Launch')).getByRole('button', { name: 'Add' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:add-task')).toEqual([
         { filePath: 'projects/Launch.md', text: 'email team @Launch' },
       ])
     )
-    fireEvent.doubleClick(within(card('Launch')).getByText('Write brief'))
-    const edit = within(card('Launch')).getByDisplayValue('Write brief #Work')
+    fireEvent.doubleClick(within(projectCardNamed('Launch')).getByText('Write brief'))
+    const edit = within(projectCardNamed('Launch')).getByDisplayValue('Write brief #Work')
     fireEvent.change(edit, { target: { value: 'Write the brief' } })
-    fireEvent.click(within(card('Launch')).getByRole('button', { name: 'Save' }))
+    fireEvent.click(within(projectCardNamed('Launch')).getByRole('button', { name: 'Save' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:edit-task')).toEqual([
         { taskId: 't1', text: 'Write the brief' },
@@ -378,10 +396,10 @@ function taskAddsATaskHidesTheListTests() {
   it('hides the list, shows the count after, and an empty project', async () => {
     bridge.responses['task-vault:projects:get-tasks'] = { tasks: [] }
     await openTasks('Garden')
-    expect(within(card('Garden')).getByText('No tasks tagged @Garden.')).toBeTruthy()
-    fireEvent.click(within(card('Garden')).getByRole('button', { name: 'Hide tasks' }))
+    expect(within(projectCardNamed('Garden')).getByText('No tasks tagged @Garden.')).toBeTruthy()
+    fireEvent.click(within(projectCardNamed('Garden')).getByRole('button', { name: 'Hide tasks' }))
     expect(
-      within(card('Garden')).getByRole('button', { name: '0 tasks tagged @Garden' })
+      within(projectCardNamed('Garden')).getByRole('button', { name: '0 tasks tagged @Garden' })
     ).toBeTruthy()
   })
 }

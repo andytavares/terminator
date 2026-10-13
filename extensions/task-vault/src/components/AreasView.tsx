@@ -17,6 +17,7 @@ import { useVaultStore } from '../stores/vault.store'
 import { Button, IconButton } from '@terminator/extension-ui'
 import { useIndexReload } from './vault-hooks'
 import { RenameRow, TaskTextEditor, useTaskTextDraft } from './inline-edits'
+import { invokeVault } from './daily-log-format'
 
 interface AreaProject {
   id: string
@@ -104,10 +105,6 @@ async function fetchAreas(status: StatusFilter): Promise<AreasOutcome> {
   }
 }
 
-function invoke(channel: string, payload?: unknown): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
-}
-
 /** The areas for the chosen status; quiet reloads keep the list on screen. */
 function useAreaList() {
   const [areas, setAreas] = useState<AreaData[]>([])
@@ -115,7 +112,7 @@ function useAreaList() {
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active')
 
-  function applyOutcome(outcome: AreasOutcome, silent: boolean) {
+  function applyAreasOutcome(outcome: AreasOutcome, silent: boolean) {
     if ('areas' in outcome) setAreas(outcome.areas)
     else if ('error' in outcome) setError(outcome.error)
     if (!silent) setIsLoading(false)
@@ -123,25 +120,23 @@ function useAreaList() {
   async function load(silent = false): Promise<void> {
     if (!silent) setIsLoading(true)
     setError(null)
-    applyOutcome(await fetchAreas(statusFilter), silent)
+    applyAreasOutcome(await fetchAreas(statusFilter), silent)
   }
-  function changeStatusFilter(filter: StatusFilter) {
+  function changeAreaFilter(filter: StatusFilter) {
     if (filter === statusFilter) return
     setStatusFilter(filter)
     setIsLoading(true)
     setError(null)
   }
   useEffect(() => {
-    void fetchAreas(statusFilter).then((outcome) => applyOutcome(outcome, false))
+    void fetchAreas(statusFilter).then((outcome) => applyAreasOutcome(outcome, false))
   }, [statusFilter])
   useIndexReload(() => void load(true), [statusFilter])
-  return { areas, isLoading, error, statusFilter, changeStatusFilter, load }
+  return { areas, isLoading, error, statusFilter, changeStatusFilter: changeAreaFilter, load }
 }
 
-/**
- * The area open in the detail view, re-derived whenever the list or the requested
- * area changes: an area no longer listed (deleted or renamed) closes the detail.
- */
+/** The area open in the detail view, re-derived whenever the list or the requested area changes:
+ *  an area no longer listed (deleted or renamed) closes the detail. */
 function useSelectedArea(areas: AreaData[], selectedAreaName: string | null) {
   const [selectedArea, setSelectedArea] = useState<AreaData | null>(null)
   const [syncedSource, setSyncedSource] = useState({ areas, selectedAreaName })
@@ -171,8 +166,8 @@ function reselect(
 
 /** Archive and delete, each confirmed first and followed by a reload. */
 function useAreaActions(load: () => Promise<void>, closeIfOpen: (name: string) => void) {
-  async function act(channel: string, payload: unknown, name: string) {
-    await invoke(channel, payload)
+  async function runAreaAction(channel: string, payload: unknown, name: string) {
+    await invokeVault(channel, payload)
     invalidateSmartInputCache()
     await load()
     closeIfOpen(name)
@@ -185,12 +180,12 @@ function useAreaActions(load: () => Promise<void>, closeIfOpen: (name: string) =
         )
       )
         return
-      await act('task-vault:vault:archive-area', { areaName: name }, name)
+      await runAreaAction('task-vault:vault:archive-area', { areaName: name }, name)
     },
     remove: async (name: string) => {
       if (!confirm(`Permanently delete area "${name}" and all its data? This cannot be undone.`))
         return
-      await act('task-vault:vault:delete-area', { areaFilePath: name }, name)
+      await runAreaAction('task-vault:vault:delete-area', { areaFilePath: name }, name)
     },
   }
 }
@@ -207,7 +202,7 @@ function useCreateArea(load: () => Promise<void>) {
     setCreating(true)
     setCreateError(null)
     try {
-      const result = await invoke('task-vault:vault:create-area', { name: newAreaName.trim() })
+      const result = await invokeVault('task-vault:vault:create-area', { name: newAreaName.trim() })
       if (result && typeof result === 'object' && 'error' in result) {
         const err = (result as { error: string }).error
         setCreateError(err === 'AREA_EXISTS' ? 'An area with that name already exists.' : err)
@@ -397,7 +392,7 @@ export function AreasView(): React.JSX.Element {
   if (!selectedArea) {
     return <AreaList list={list} form={form} actions={actions} onOpen={setSelectedArea} />
   }
-  const back = () => {
+  const backToAreas = () => {
     setSelectedArea(null)
     void list.load()
   }
@@ -405,14 +400,14 @@ export function AreasView(): React.JSX.Element {
     <AreaDetail
       area={selectedArea}
       actions={actions}
-      onBack={back}
+      onBack={backToAreas}
       onRefresh={list.load}
       onNavToProject={navToProject}
     />
   )
 }
 
-const isDone = (t: IndexedTask) =>
+const isTaskDone = (t: IndexedTask) =>
   t.status === 'done' || t.status === 'cancelled' || t.status === 'migrated'
 
 /** The area's own tasks, kept in step with the list after every change. */
@@ -421,7 +416,7 @@ function useAreaTasks(area: AreaData, onRefresh: () => Promise<void>) {
   const [tasks, setTasks] = useState<IndexedTask[]>(area.tasks)
 
   async function reloadTasks() {
-    const result = await invoke('task-vault:vault:list-areas')
+    const result = await invokeVault('task-vault:vault:list-areas')
     if (result && typeof result === 'object' && 'areas' in result) {
       const updated = (result as { areas: AreaData[] }).areas.find(
         (a) => a.filePath === area.filePath
@@ -432,15 +427,15 @@ function useAreaTasks(area: AreaData, onRefresh: () => Promise<void>) {
     tickCalendar()
   }
 
-  const then = async (channel: string, payload: unknown) => {
-    await invoke(channel, payload)
+  const invokeThenRefresh = async (channel: string, payload: unknown) => {
+    await invokeVault(channel, payload)
     await reloadTasks()
   }
   return {
     tasks,
     reloadTasks,
-    complete: (taskId: string) => then('task-vault:vault:complete-task', { taskId }),
-    restore: (taskId: string) => then('task-vault:vault:restore-task', { taskId }),
+    complete: (taskId: string) => invokeThenRefresh('task-vault:vault:complete-task', { taskId }),
+    restore: (taskId: string) => invokeThenRefresh('task-vault:vault:restore-task', { taskId }),
   }
 }
 
@@ -451,14 +446,14 @@ function tagWithArea(text: string, areaName: string): string {
   return `${text} #${slug}`
 }
 
-function useAddTask(area: AreaData, tasks: AreaTasks) {
+function useAddAreaTask(area: AreaData, tasks: AreaTasks) {
   const [newTaskText, setNewTaskText] = useState('')
   const [adding, setAdding] = useState(false)
-  async function add() {
+  async function addAreaTask() {
     if (!newTaskText.trim()) return
     setAdding(true)
     try {
-      await invoke('task-vault:vault:add-task', {
+      await invokeVault('task-vault:vault:add-task', {
         filePath: `areas/${area.name}.md`,
         text: tagWithArea(newTaskText.trim(), area.name),
       })
@@ -468,11 +463,11 @@ function useAddTask(area: AreaData, tasks: AreaTasks) {
       setAdding(false)
     }
   }
-  return { newTaskText, setNewTaskText, adding, add }
+  return { newTaskText, setNewTaskText, adding, add: addAreaTask }
 }
 
 function AddAreaTask({ area, tasks }: { area: AreaData; tasks: AreaTasks }): React.JSX.Element {
-  const { newTaskText, setNewTaskText, adding, add } = useAddTask(area, tasks)
+  const { newTaskText, setNewTaskText, adding, add } = useAddAreaTask(area, tasks)
   return (
     <div className="area-detail__add-row">
       <SmartTaskInput
@@ -516,7 +511,7 @@ function AreaTaskEditor({ task, tasks, onDone }: TaskEditorProps): React.JSX.Ele
 
 function AreaTaskText(props: { task: IndexedTask; onEdit: () => void }): React.JSX.Element {
   const { task } = props
-  const done = isDone(task)
+  const done = isTaskDone(task)
   return (
     <span
       className={`area-detail__task-text${done ? ' area-detail__task-text--done' : ''}`}
@@ -539,7 +534,7 @@ function AreaTaskText(props: { task: IndexedTask; onEdit: () => void }): React.J
 
 function AreaTaskRow(props: TaskRowProps): React.JSX.Element {
   const { task, tasks, editing, setEditingId } = props
-  const done = isDone(task)
+  const done = isTaskDone(task)
   return (
     <div className={`area-detail__task${done ? ' area-detail__task--done' : ''}`}>
       <button
@@ -593,7 +588,7 @@ function useRename(area: AreaData, onRefresh: () => Promise<void>) {
     const trimmed = renameText.trim()
     if (!trimmed || trimmed === area.name) return setRenamingArea(false)
     setRenameError(null)
-    const result = (await invoke('task-vault:vault:rename-area', {
+    const result = (await invokeVault('task-vault:vault:rename-area', {
       areaFilePath: area.filePath,
       newName: trimmed,
     })) as { error?: string } | undefined
@@ -662,7 +657,7 @@ function DetailHeader(props: DetailProps): React.JSX.Element {
   )
 }
 
-function ProjectCard(props: { project: AreaProject; onOpen: (name: string) => void }) {
+function AreaProjectCard(props: { project: AreaProject; onOpen: (name: string) => void }) {
   const p = props.project
   const pct = p.totalTaskCount > 0 ? Math.round((p.doneTaskCount / p.totalTaskCount) * 100) : 0
   return (
@@ -699,7 +694,7 @@ function AreaDetail(props: DetailProps): React.JSX.Element {
         <section className="area-detail__projects">
           <h4>Projects ({projects.length})</h4>
           {projects.map((p) => (
-            <ProjectCard key={p.id} project={p} onOpen={props.onNavToProject} />
+            <AreaProjectCard key={p.id} project={p} onOpen={props.onNavToProject} />
           ))}
         </section>
       )}

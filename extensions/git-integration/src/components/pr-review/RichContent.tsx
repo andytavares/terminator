@@ -7,7 +7,7 @@ interface Props {
   className?: string
 }
 
-function highlight(code: string, language: string): string {
+function highlightFenced(code: string, language: string): string {
   try {
     return hljs.highlight(code, { language }).value
   } catch {
@@ -19,12 +19,12 @@ function openLink(url: string): void {
   window.electronAPI.shell.openExternal(url).catch(() => {})
 }
 
-function renderCode(code: string, language: string): React.ReactNode {
+function renderHighlightedCode(code: string, language: string): React.ReactNode {
   return (
     <pre>
       <code
         className={`hljs language-${language}`}
-        dangerouslySetInnerHTML={{ __html: highlight(code, language) }}
+        dangerouslySetInnerHTML={{ __html: highlightFenced(code, language) }}
       />
     </pre>
   )
@@ -36,7 +36,7 @@ export function RichContent({ children, className }: Props) {
     <Markdown
       className={`rich-content${className ? ` ${className}` : ''}`}
       onOpenLink={openLink}
-      renderCode={renderCode}
+      renderCode={renderHighlightedCode}
     >
       {children}
     </Markdown>

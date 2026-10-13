@@ -30,6 +30,8 @@ import { SmartTaskInput } from './SmartTaskInput'
 import { KanbanBoard } from './KanbanBoard'
 import { TaskDetailPanel } from './TaskDetailPanel'
 import { DatabaseAdmin } from './DatabaseAdmin'
+import { invokeVault, makeTaskNavHandler } from './daily-log-format'
+import { localDate } from '../vault/recurrence'
 
 interface NavigationTarget {
   date?: string
@@ -92,7 +94,7 @@ function useCaptureModal() {
     setShowCaptureModal(false)
   }, [setShowCaptureModal])
   useEscapeToClose(showCaptureModal, close)
-  async function capture() {
+  async function captureTyped() {
     if (!text.trim()) return
     setCapturing(true)
     try {
@@ -105,7 +107,7 @@ function useCaptureModal() {
       setCapturing(false)
     }
   }
-  return { show: showCaptureModal, text, setText, capturing, close, capture }
+  return { show: showCaptureModal, text, setText, capturing, close, capture: captureTyped }
 }
 
 export function CaptureModal(): React.JSX.Element | null {
@@ -132,11 +134,6 @@ export function CaptureModal(): React.JSX.Element | null {
     </Dialog>,
     document.body
   )
-}
-
-function localDateString(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 /** Saves `data` as a JSON download. */
@@ -173,7 +170,7 @@ async function exportVault(): Promise<string> {
   if (result && typeof result === 'object' && 'error' in result) {
     return `Export failed: ${(result as { error: string }).error}`
   }
-  downloadJson(result, `task-vault-export-${localDateString(new Date())}.json`)
+  downloadJson(result, `task-vault-export-${localDate(new Date())}.json`)
   return 'Exported successfully.'
 }
 
@@ -183,7 +180,7 @@ function useDataTransfer() {
   const [exporting, setExporting] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
 
-  async function exportJson() {
+  async function downloadExport() {
     setExporting(true)
     setStatus(null)
     try {
@@ -202,7 +199,7 @@ function useDataTransfer() {
     setImporting(false)
     input.value = ''
   }
-  return { importing, exporting, status, exportJson, importChosen }
+  return { importing, exporting, status, exportJson: downloadExport, importChosen }
 }
 
 function StatusLine({ status }: { status: string | null }): React.JSX.Element | null {
@@ -330,10 +327,8 @@ function reloadViewedDay(): void {
   else void useVaultDataStore.getState().loadToday()
 }
 
-/**
- * Opens a navigation target: the day (or today), then the task, then an explicit
- * view — after the task, because navigating to a task puts you on the daily log.
- */
+/** Opens the day (or today), then the task, then an explicit view: after the task, because
+ *  navigating to a task puts you on the daily log. */
 function followNavigation(target: NavigationTarget): void {
   const nav = useVaultNavStore.getState()
   const data = useVaultDataStore.getState()
@@ -344,12 +339,8 @@ function followNavigation(target: NavigationTarget): void {
   if (target.view) nav.setView(target.view)
 }
 
-/**
- * Navigation from the calendar arrives on `task-vault:navigate`; one sent before this
- * view existed is popped from main on mount. A second path used to read the core
- * registry's pendingNavigations map — but this view bundles its own copy of that
- * store, so nothing was ever put in the map it was reading.
- */
+/** Calendar navigation arrives on `task-vault:navigate`; one sent before this view existed is
+ *  popped from main on mount. (The core registry's map is not read: this view bundles a copy.) */
 function useNavigationRequests(): void {
   useEffect(() => {
     return window.electronAPI.extensionBridge.on('task-vault:navigate', (data) => {
@@ -366,11 +357,8 @@ function useNavigationRequests(): void {
   }, [])
 }
 
-/**
- * Resets to today whenever the vault panel becomes visible from hidden, so "open vault"
- * lands on today while in-session navigation is kept. skipNextVisibilityReset suppresses
- * it when a calendar navigation already set the target before the panel showed.
- */
+/** Resets to today when the panel becomes visible from hidden, so "open vault" lands on today;
+ *  skipNextVisibilityReset spares a calendar navigation that set the target first. */
 function useVisibilityReset(): void {
   useEffect(() => {
     function onVisibilityChange() {
@@ -441,13 +429,13 @@ function useTaskSelection() {
     if (todayLog.tasks.some((t) => t.id === pendingTaskId) || !isLoading) clearPendingTask()
   }, [pendingTaskId, todayLog, isLoading, clearPendingTask])
 
-  function select(taskId: string | null) {
+  function selectTask(taskId: string | null) {
     if (taskId === null || taskId === selected.id) return setSelected({ id: null, text: '' })
     const task = [...(todayLog?.tasks ?? []), ...somedayTasks].find((t) => t.id === taskId)
     setSelected({ id: taskId, text: task?.text ?? '' })
   }
-  useEscapeDeselect(selected.id, () => select(null))
-  return { selected, select }
+  useEscapeDeselect(selected.id, () => selectTask(null))
+  return { selected, select: selectTask }
 }
 
 /** Escape closes the detail panel, unless a suggestion list is open. */
@@ -465,25 +453,13 @@ function useEscapeDeselect(selectedId: string | null, deselect: () => void): voi
 function shiftDay(date: string, days: number): string {
   const d = new Date(date + 'T12:00:00')
   d.setDate(d.getDate() + days)
-  return localDateString(d)
-}
-
-/**
- * Leads back to the task. Already inside the vault view; the tab activation this
- * used to do reached a copy of the core registry bundled into this view and moved nothing.
- */
-function makeTaskNavHandler(taskId: string): () => void {
-  return () => useVaultNavStore.getState().navigateToTask(taskId)
-}
-
-function invoke(channel: string, payload: unknown): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
+  return localDate(d)
 }
 
 /** Completes the task, says so with a link back to it, and reloads the day. */
-async function completeTask(day: DayContext, taskId: string): Promise<void> {
+async function completeAndNotify(day: DayContext, taskId: string): Promise<void> {
   const text = day.textOf(taskId)
-  await invoke('task-vault:vault:complete-task', { taskId })
+  await invokeVault('task-vault:vault:complete-task', { taskId })
   notify('success', text ? `Completed: ${text}` : 'Task completed', {
     key: 'taskCompleted',
     onClick: makeTaskNavHandler(taskId),
@@ -492,9 +468,13 @@ async function completeTask(day: DayContext, taskId: string): Promise<void> {
 }
 
 /** Migrates the task; a no-op migration says nothing and reloads nothing. */
-async function migrateTask(day: DayContext, taskId: string, targetDate: string): Promise<void> {
+async function migrateAndNotify(
+  day: DayContext,
+  taskId: string,
+  targetDate: string
+): Promise<void> {
   const text = day.textOf(taskId)
-  const result = (await invoke('task-vault:vault:migrate-task', { taskId, targetDate })) as
+  const result = (await invokeVault('task-vault:vault:migrate-task', { taskId, targetDate })) as
     | { noop?: boolean }
     | undefined
   if (result?.noop) return
@@ -514,19 +494,19 @@ function useDailyActions() {
     textOf,
     reloadDay: () => (viewingDate ? loadDate(viewingDate) : loadToday()),
   }
-  const currentDate = viewingDate ?? localDateString(new Date())
+  const currentDate = viewingDate ?? localDate(new Date())
   return {
     currentDate,
-    isToday: viewingDate === null || viewingDate === localDateString(new Date()),
-    complete: (taskId: string) => completeTask(day, taskId),
-    migrate: (taskId: string, targetDate: string) => migrateTask(day, taskId, targetDate),
+    isToday: viewingDate === null || viewingDate === localDate(new Date()),
+    complete: (taskId: string) => completeAndNotify(day, taskId),
+    migrate: (taskId: string, targetDate: string) => migrateAndNotify(day, taskId, targetDate),
     pickUpToday: async (taskId: string) => {
-      await invoke('task-vault:vault:someday-to-today', { taskId })
+      await invokeVault('task-vault:vault:someday-to-today', { taskId })
       await loadToday()
       await loadSomeday()
     },
     deleteBacklogTask: async (taskId: string) => {
-      await invoke('task-vault:vault:delete-task', { taskId })
+      await invokeVault('task-vault:vault:delete-task', { taskId })
       await loadSomeday()
     },
     prevDay: () => void loadDate(shiftDay(currentDate, -1)),
@@ -626,11 +606,8 @@ function ViewModeToggles(): React.JSX.Element {
   )
 }
 
-/**
- * The view toggles carried `title` alone, so enumerating every button in the running
- * view returned neither: a tooltip is not a label, and never appears for keyboard or
- * touch. IconButton takes the label as a required prop.
- */
+/** Every view toggle is an IconButton, whose label is required: the toggles once carried `title`
+ *  alone, and a tooltip is not a label and never appears for keyboard or touch. */
 function VaultToolbar(props: ToolbarProps): React.JSX.Element {
   const { activeView } = useVaultStore()
   return (

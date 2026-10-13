@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { dispatchChannel } from '@terminator/extension-sdk'
-import { activateCapturingChannels, freshGlobalStorage } from './support/activate'
+import { activateCapturingChannels, freshExtensionStorage } from './support/activate'
 
 // git-integration keeps its stores in its own api.paths.globalStorage. Earlier
 // builds kept them in the shared userData folder, so activation moves them.
@@ -24,7 +24,7 @@ afterEach(() => {
 
 describe('the stores move from userData into its own folder', () => {
   it('moves each store on the first activation', () => {
-    globalStorage = freshGlobalStorage()
+    globalStorage = freshExtensionStorage()
     for (const store of STORES) writeFileSync(join(userData(), store), `{"store":"${store}"}`)
 
     const { warn } = activateCapturingChannels(undefined, globalStorage)
@@ -37,7 +37,7 @@ describe('the stores move from userData into its own folder', () => {
   })
 
   it('keeps the store already in its folder, leaves the old copy, and says where it is', () => {
-    globalStorage = freshGlobalStorage()
+    globalStorage = freshExtensionStorage()
     mkdirSync(globalStorage, { recursive: true })
     writeFileSync(join(userData(), 'config.json'), '{"old":true}')
     writeFileSync(join(globalStorage, 'config.json'), '{"new":true}')
@@ -52,7 +52,7 @@ describe('the stores move from userData into its own folder', () => {
 
 describe('gh that needs no checkout', () => {
   it('runs in its own folder, which activation creates', async () => {
-    globalStorage = freshGlobalStorage()
+    globalStorage = freshExtensionStorage()
     const { channels, githubApi } = activateCapturingChannels(undefined, globalStorage)
     const repos = channels.find((c) => c.spec.channel === 'github:accessible-repos')!.spec
 

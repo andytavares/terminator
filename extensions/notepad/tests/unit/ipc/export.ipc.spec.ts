@@ -73,7 +73,7 @@ async function insertDiagram(title: string, scene: { elements: unknown[] }): Pro
   )
 }
 
-function readJson(file: string): unknown {
+function readJsonFile(file: string): unknown {
   return JSON.parse(fs.readFileSync(file, 'utf-8'))
 }
 
@@ -347,7 +347,7 @@ function exportNotesIncludeDiagramsExportingDiagramsTests() {
     const diagramsFolder = path.join(exportDir, 'diagrams')
     const files = fs.readdirSync(diagramsFolder)
     expect(files.some((f) => f.endsWith('.excalidraw'))).toBe(true)
-    const content = readJson(path.join(diagramsFolder, files[0])) as {
+    const content = readJsonFile(path.join(diagramsFolder, files[0])) as {
       type: string
       elements: unknown[]
     }

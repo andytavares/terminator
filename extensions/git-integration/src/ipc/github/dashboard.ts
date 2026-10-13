@@ -14,7 +14,7 @@ import {
 import { runGit } from '../../shell/run-git.js'
 import { VALIDATION_ERROR } from '../register.js'
 import { catchError, type AccessibleRepo, type GithubContext } from './context.js'
-import { sessionsForRepo, storedSessions } from './sessions.js'
+import { storedSessionsForRepo, storedSessions } from './sessions.js'
 
 type SectionResults = Record<string, { issueCount?: number; nodes?: unknown[] }>
 
@@ -50,16 +50,16 @@ function parseAccessibleRepos(jsonLines: string): AccessibleRepo[] {
     .split('\n')
     .filter((line) => line.trim())
     .map((line) => JSON.parse(line) as ListedRepo)
-  const byName = (a: AccessibleRepo, b: AccessibleRepo) =>
+  const byFullName = (a: AccessibleRepo, b: AccessibleRepo) =>
     a.fullName.toLowerCase().localeCompare(b.fullName.toLowerCase())
   return listed
     .filter((repo) => !repo.archived)
     .map(accessibleRepoFrom)
-    .sort(byName)
+    .sort(byFullName)
 }
 
 /** One `gh api --paginate` over every repository the viewer can reach, kept until a refresh. */
-function accessibleRepos(ctx: GithubContext, refresh: boolean): Promise<AccessibleRepo[]> {
+function loadAccessibleRepos(ctx: GithubContext, refresh: boolean): Promise<AccessibleRepo[]> {
   if (!refresh && ctx.accessibleRepos) return ctx.accessibleRepos
   const lookup = ctx
     .api(ctx.noCheckoutCwd, {
@@ -164,7 +164,10 @@ function withSessionProgress(prs: DashboardPR[], stored: Record<string, unknown>
   const sessionsByRoot = new Map<string, Map<number, ReviewSession>>()
   const sessionsIn = (root: string) => {
     if (!sessionsByRoot.has(root)) {
-      sessionsByRoot.set(root, new Map(sessionsForRepo(stored, root).map((s) => [s.prNumber, s])))
+      sessionsByRoot.set(
+        root,
+        new Map(storedSessionsForRepo(stored, root).map((s) => [s.prNumber, s]))
+      )
     }
     return sessionsByRoot.get(root)!
   }
@@ -176,7 +179,7 @@ function withSessionProgress(prs: DashboardPR[], stored: Record<string, unknown>
   })
 }
 
-async function dashboardSearch(ctx: GithubContext) {
+async function runDashboardSearch(ctx: GithubContext) {
   const login = await ctx.viewer(ctx.noCheckoutCwd)
   const repos = ctx.options.getReviewRepos?.() ?? []
   const requests = buildSectionQueries(login, repos)
@@ -211,14 +214,14 @@ export function dashboardChannels(ctx: GithubContext): ChannelSpec[] {
       channel: 'github:accessible-repos',
       schema: z.object({ refresh: z.boolean().optional() }).optional(),
       invalid: VALIDATION_ERROR,
-      run: async (args) => ({ repos: await accessibleRepos(ctx, !!args?.refresh) }),
+      run: async (args) => ({ repos: await loadAccessibleRepos(ctx, !!args?.refresh) }),
       onError: catchError,
     }),
     defineChannel({
       channel: 'github:dashboard-search',
       schema: noPayload,
       invalid: VALIDATION_ERROR,
-      run: () => dashboardSearch(ctx),
+      run: () => runDashboardSearch(ctx),
       onError: catchError,
     }),
   ]

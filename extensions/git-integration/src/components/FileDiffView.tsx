@@ -4,6 +4,7 @@ import { Button, SegmentedControl } from '@terminator/extension-ui'
 import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
 import { choose } from './text'
 import { useSplitDrag } from '../hooks/useSplitDrag'
+import { escapeHtml } from '../utils/syntax'
 
 type ViewMode = 'unified' | 'split'
 
@@ -61,12 +62,6 @@ export function detectLanguage(path: string): string | undefined {
   return LANGUAGES[ext]
 }
 
-const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;' }
-
-function escapeHtml(s: string): string {
-  return s.replace(new RegExp('[&<>]', 'g'), (ch) => HTML_ESCAPES[ch])
-}
-
 export function highlight(content: string, lang: string | undefined): string {
   if (!lang) return escapeHtml(content)
   try {
@@ -99,7 +94,7 @@ interface TableProps {
   lang: string | undefined
 }
 
-function HunkHeader(props: { header: string; colSpan: number }) {
+function FileHunkHeader(props: { header: string; colSpan: number }) {
   return (
     <tr>
       <td colSpan={props.colSpan} className="diff-hunk-header">
@@ -115,7 +110,7 @@ function UnifiedTable({ hunks, lang }: TableProps): JSX.Element {
       <tbody>
         {hunks.map((hunk, hi) => (
           <React.Fragment key={hi}>
-            <HunkHeader header={hunk.header} colSpan={4} />
+            <FileHunkHeader header={hunk.header} colSpan={4} />
             {hunk.lines.map((line, li) => (
               <UnifiedRow key={`${hi}-${li}`} line={line} lang={lang} />
             ))}
@@ -243,7 +238,7 @@ function SplitTable({ hunks, lang, onDividerMouseDown }: SplitTableProps) {
       <tbody>
         {hunks.map((hunk, hi) => (
           <React.Fragment key={hi}>
-            <HunkHeader header={hunk.header} colSpan={5} />
+            <FileHunkHeader header={hunk.header} colSpan={5} />
             {buildSplitRows(hunk.lines).map((row, ri) => (
               <SplitTableRow
                 key={ri}
@@ -325,7 +320,7 @@ interface ViewState {
   divider: SplitDivider
 }
 
-function DiffBody({ diff, view }: { diff: FileDiff; view: ViewState }) {
+function FileDiffBody({ diff, view }: { diff: FileDiff; view: ViewState }) {
   const { splitLeftPct, scrollRef, onDividerMouseDown } = view.divider
   const { viewMode } = view
   const lang = detectLanguage(diff.path)
@@ -350,7 +345,7 @@ function LoadedDiff(props: FileDiffViewProps & { diff: FileDiff; view: ViewState
     <div className="file-diff-view">
       <DiffToolbar diff={props.diff} viewMode={view.viewMode} setViewMode={view.setViewMode} />
       <DiffNotices props={props} />
-      <DiffBody diff={props.diff} view={view} />
+      <FileDiffBody diff={props.diff} view={view} />
     </div>
   )
 }

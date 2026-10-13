@@ -43,10 +43,8 @@ function ensureInit(): Promise<void> {
 
 const languageCache = new Map<string, Promise<Language | null>>()
 
-/**
- * Cached per grammar, loaded lazily on first use. Returns null when `path`'s extension has no grammar.
- * @internal
- */
+/** Cached per grammar, loaded on first use; null when `path`'s extension has no grammar.
+ *  @internal */
 export function loadLanguageFor(path: string): Promise<Language | null> {
   const grammar = grammarNameFor(path)
   if (!grammar) return Promise.resolve(null)
@@ -326,11 +324,8 @@ function collectFunctions(root: Node): SnippetFunction[] {
 
 const parserCache = new Map<Language, Parser>()
 
-/**
- * Parses `code` as `path`'s language, hands the root to `read`, then frees the tree:
- * web-tree-sitter trees live in WASM memory that the JS garbage collector never reclaims.
- * Null when there is no grammar for `path`.
- */
+/** Parses `code` as `path`'s language, hands the root to `read`, then frees the tree:
+ *  web-tree-sitter trees live in WASM memory the JS GC never reclaims. Null with no grammar. */
 export async function withSyntaxTree<T>(
   path: string,
   code: string,

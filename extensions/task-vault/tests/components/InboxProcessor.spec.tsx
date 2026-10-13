@@ -1,16 +1,16 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
-import { installBridge, eventually, project, task } from './helpers/bridge'
+import { installVaultBridge, eventually, indexedProject, task } from './helpers/bridge'
 import { FileToPicker } from '../../src/components/FileToPicker'
 import { InboxProcessor } from '../../src/components/InboxProcessor'
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {
-  bridge = installBridge()
+  bridge = installVaultBridge()
   bridge.responses['task-vault:projects:list'] = {
-    projects: [project('Launch', { area: 'Work' }), project('Garden')],
+    projects: [indexedProject('Launch', { area: 'Work' }), indexedProject('Garden')],
   }
   bridge.responses['task-vault:vault:list-areas'] = { areas: [{ filePath: 'Work', name: 'Work' }] }
   bridge.responses['task-vault:vault:get-inbox'] = { tasks: [] }
@@ -24,7 +24,7 @@ function renderPicker(query = '') {
   return handlers
 }
 
-const options = () => screen.getAllByRole('listitem').map((li) => li.textContent)
+const listedOptions = () => screen.getAllByRole('listitem').map((li) => li.textContent)
 
 describe('FileToPicker', fileToPickerTests)
 describe('FileToPicker keyboard', fileToPickerKeyboardTests)
@@ -36,20 +36,20 @@ function fileToPickerTests() {
   it('lists projects with their area, then areas', async () => {
     renderPicker()
     await screen.findByText('Launch')
-    expect(options()).toEqual(['@Launch#Work', '@Garden', '#Work'])
+    expect(listedOptions()).toEqual(['@Launch#Work', '@Garden', '#Work'])
     expect(bridge.calls('task-vault:projects:list')).toEqual([{ status: ['active', 'someday'] }])
   })
 
   it('filters by name or area and offers to create what does not exist', async () => {
     renderPicker('@gard')
     await screen.findByText('Garden')
-    expect(options()).toEqual(['@Garden', '@Create project "@gard"', '#Create area "@gard"'])
+    expect(listedOptions()).toEqual(['@Garden', '@Create project "@gard"', '#Create area "@gard"'])
   })
 
   it('offers only the missing kind when the name matches exactly', async () => {
     renderPicker('work')
     await screen.findByText('Launch')
-    expect(options()).toEqual(['@Launch#Work', '#Work', '@Create project "work"'])
+    expect(listedOptions()).toEqual(['@Launch#Work', '#Work', '@Create project "work"'])
   })
 
   it('selects an existing destination by path, or a new one by name', async () => {

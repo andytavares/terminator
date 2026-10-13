@@ -90,9 +90,9 @@ interface Matching {
 /** Options matching the query, plus a create option for each kind it does not name exactly. */
 function matchingOptions({ baseOptions, query, canCreate }: Matching): DestOption[] {
   const q = query.trim().toLowerCase().replace(/^[@#]/, '')
-  const matches = (o: DestOption) =>
+  const matchesDestination = (o: DestOption) =>
     !q || o.label.toLowerCase().includes(q) || (o.sublabel ?? '').toLowerCase().includes(q)
-  const filtered = baseOptions.filter(matches)
+  const filtered = baseOptions.filter(matchesDestination)
   if (!canCreate || q.length === 0) return filtered
   for (const kind of ['project', 'area'] as const) {
     const exact = baseOptions.some((o) => o.kind === kind && o.label.toLowerCase() === q)
@@ -143,7 +143,7 @@ interface OptionProps {
   onHover: () => void
 }
 
-function optionClass(opt: DestOption, highlighted: boolean): string {
+function destOptionClass(opt: DestOption, highlighted: boolean): string {
   return [
     'file-to-picker__option',
     highlighted ? 'file-to-picker__option--highlighted' : '',
@@ -158,7 +158,7 @@ function OptionRow(props: OptionProps): React.JSX.Element {
   const kind = baseKind(opt)
   return (
     <li
-      className={optionClass(opt, highlighted)}
+      className={destOptionClass(opt, highlighted)}
       onMouseDown={(e) => {
         e.preventDefault()
         onPick()
@@ -209,7 +209,7 @@ function OptionList(props: ListProps): React.JSX.Element {
 }
 
 /** The picker's query, matching options, highlight and key handling. */
-function usePicker(props: PickerProps) {
+function useFileToPicker(props: PickerProps) {
   const { prefilledQuery, onSelect, onSelectNew, onClose } = props
   const [query, setQuery] = useState(prefilledQuery)
   const { baseOptions, loading } = useDestinations()
@@ -220,17 +220,19 @@ function usePicker(props: PickerProps) {
     else onSelect(opt.filePath)
   }
   const pick = () => options[highlighted] && select(options[highlighted])
-  const onKeyDown = keyHandler({ count: options.length, setHighlighted, pick, onClose })
+  const onKeyDown = keyHandler({
+    count: options.length,
+    setHighlighted,
+    pick,
+    onClose,
+  })
   return { query, setQuery, loading, options, highlighted, setHighlighted, select, onKeyDown }
 }
 
-/**
- * Picks where to file a task. Escape already worked while focus sat in the field;
- * useDismissible adds the two that did not — a click outside, and focus returning
- * to whatever opened it.
- */
+/** Picks where to file a task. useDismissible adds what Escape in the field did not cover: a click
+ *  outside, and focus returning to whatever opened it. */
 export function FileToPicker(props: PickerProps): React.JSX.Element {
-  const picker = usePicker(props)
+  const picker = useFileToPicker(props)
   const inputRef = useRef<HTMLInputElement>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
   useDismissible({ ref: surfaceRef, onDismiss: props.onClose, manageFocus: false })

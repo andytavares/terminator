@@ -1,33 +1,11 @@
-import { vi } from 'vitest'
+import { installExtensionBridge } from '../../../../../tests/support/extension-bridge'
 import type { IndexedProject, IndexedTask } from '../../../src/vault/types'
 
-type Responder = unknown | ((payload: unknown) => unknown)
+export { eventually } from '../../../../../tests/support/extension-bridge'
 
-/**
- * Installs a fake `window.electronAPI` whose extension bridge answers invokes by
- * channel (a value, or a function of the payload), and lets a test push to subscribers.
- */
-export function installBridge(extra: Record<string, unknown> = {}) {
-  const responses: Record<string, Responder> = {}
-  const handlers = new Map<string, (data: unknown) => void>()
-  const invoke = vi.fn(async (channel: string, payload?: unknown) => {
-    const answer = responses[channel]
-    if (typeof answer === 'function') return (answer as (p: unknown) => unknown)(payload)
-    return answer ?? { success: true }
-  })
-  const on = vi.fn((channel: string, handler: (data: unknown) => void) => {
-    handlers.set(channel, handler)
-    return () => handlers.delete(channel)
-  })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on }, ...extra },
-    writable: true,
-    configurable: true,
-  })
-  const push = (channel: string, data: unknown) => handlers.get(channel)?.(data)
-  const calls = (channel: string) =>
-    invoke.mock.calls.filter(([ch]) => ch === channel).map((call) => (call as unknown[])[1])
-  return { responses, invoke, push, calls }
+/** The extension bridge as task-vault's views see it: unanswered channels succeed. */
+export function installVaultBridge(extra: Record<string, unknown> = {}) {
+  return installExtensionBridge({ success: true }, extra)
 }
 
 /** A task as the vault channels return it. */
@@ -45,7 +23,10 @@ export function task(id: string, text: string, overrides: Partial<IndexedTask> =
 }
 
 /** A project as the vault channels return it. */
-export function project(name: string, overrides: Partial<IndexedProject> = {}): IndexedProject {
+export function indexedProject(
+  name: string,
+  overrides: Partial<IndexedProject> = {}
+): IndexedProject {
   return {
     id: `p-${name}`,
     filePath: name,
@@ -59,7 +40,9 @@ export function project(name: string, overrides: Partial<IndexedProject> = {}): 
   }
 }
 
-/** Waits for an assertion to hold, allowing for a loaded machine. */
-export function eventually(assertion: () => void, timeout = 8000) {
-  return vi.waitFor(assertion, { timeout })
+/** The local date `offset` days from today, as YYYY-MM-DD. */
+export function dayFromToday(offset = 0): string {
+  const d = new Date()
+  d.setDate(d.getDate() + offset)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

@@ -104,6 +104,11 @@ export async function seedProject(
   return id
 }
 
-export async function taskRow(db: ExtensionDB, id: string) {
+export async function selectTaskRow(db: ExtensionDB, id: string) {
   return db.get<Record<string, unknown>>(`SELECT * FROM tasks WHERE id = ?`, [id])
+}
+
+/** A task row's metadata JSON, parsed. */
+export async function taskMetadata(db: ExtensionDB, id: string): Promise<Record<string, unknown>> {
+  return JSON.parse((await selectTaskRow(db, id))?.metadata as string) as Record<string, unknown>
 }

@@ -67,7 +67,7 @@ function useInboxQueue(props: InboxProcessorProps) {
     else setCurrentIdx(currentIdx + 1)
   }
 
-  async function decide(decision: Decision) {
+  async function decideItem(decision: Decision) {
     if (!current || isProcessing) return
     setIsProcessing(true)
     try {
@@ -80,7 +80,7 @@ function useInboxQueue(props: InboxProcessorProps) {
     }
   }
 
-  return { current, currentIdx, total: queue.length, step, setStep, decide }
+  return { current, currentIdx, total: queue.length, step, setStep, decide: decideItem }
 }
 
 /** Files to a new area (created first, in the path form resolveSource expects) or a new project. */

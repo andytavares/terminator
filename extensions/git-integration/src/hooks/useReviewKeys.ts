@@ -27,13 +27,13 @@ type KeyAction = (handlers: ReviewKeyHandlers, ui: ReviewUi) => void
 const G_D_WINDOW_MS = 1000
 
 /** Raises a key event the diff pane performs, since only it knows its hunks and selection. */
-function emit(event: string): KeyAction {
+function emitKeyEvent(event: string): KeyAction {
   return () => window.dispatchEvent(new CustomEvent(event))
 }
 
 const KEY_ACTIONS: Record<string, KeyAction> = {
-  k: emit(REVIEW_KEY_EVENTS.nextHunk),
-  j: emit(REVIEW_KEY_EVENTS.prevHunk),
+  k: emitKeyEvent(REVIEW_KEY_EVENTS.nextHunk),
+  j: emitKeyEvent(REVIEW_KEY_EVENTS.prevHunk),
   ']': (h) => h.nextFile(),
   '[': (h) => h.prevFile(),
   '}': (h) => h.nextChapter(),
@@ -43,19 +43,17 @@ const KEY_ACTIONS: Record<string, KeyAction> = {
   s: (_h, ui) => ui.setDiffRange(ui.diffRange === 'since' ? 'whole' : 'since'),
   c: (_h, ui) => ui.cycleCommentVisibility(),
   C: (_h, ui) => ui.setAgentNotesOn(!ui.agentNotesOn),
-  a: emit(REVIEW_KEY_EVENTS.askAgent),
-  e: emit(REVIEW_KEY_EVENTS.explain),
-  r: emit(REVIEW_KEY_EVENTS.comment),
-  m: emit(REVIEW_KEY_EVENTS.note),
+  a: emitKeyEvent(REVIEW_KEY_EVENTS.askAgent),
+  e: emitKeyEvent(REVIEW_KEY_EVENTS.explain),
+  r: emitKeyEvent(REVIEW_KEY_EVENTS.comment),
+  m: emitKeyEvent(REVIEW_KEY_EVENTS.note),
   t: (h, ui) => (h.toggleFileList ? h.toggleFileList() : ui.toggleFileList()),
   i: (h) => h.toggleInsights(),
   '?': (_h, ui) => ui.setKeyboardHelpOpen(!ui.keyboardHelpOpen),
 }
 
-/**
- * Handles the `g d` chord (peek definition): `g` starts it, `d` within a second ends it.
- * True when the key was part of the chord; any other key cancels a started one.
- */
+/** The `g d` chord (peek definition): `g` starts it, `d` within a second ends it. True when the key
+ *  was part of the chord; any other key cancels a started one. */
 function chordKey(key: string, gPressedAtRef: { current: number | null }): boolean {
   if (key === 'g') {
     gPressedAtRef.current = Date.now()

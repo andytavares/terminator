@@ -3,7 +3,7 @@ import { defineChannel } from '@terminator/extension-sdk'
 import type { ExtensionAPI, ExtensionDB, Disposable } from '@terminator/extension-sdk'
 
 /** What every task-vault channel answers to a payload its schema rejects. */
-function validationError(error: z.ZodError): { error: string; message: string } {
+function validationErrorOf(error: z.ZodError): { error: string; message: string } {
   return { error: 'VALIDATION_ERROR', message: error.message }
 }
 
@@ -18,11 +18,9 @@ type Register = <S extends z.ZodType>(
   run: (args: z.infer<S>) => Promise<unknown> | unknown
 ) => void
 
-// All task-vault IPC channels register through the ExtensionAPI — never through
-// ipcMain directly (Extension Isolation). Each declares the schema its payload
-// is parsed with before `run` sees it (ADR 096). A channel is local-only
-// unless it registers through handleRemote. With `onError`, a channel whose
-// run throws answers with it instead of rejecting.
+// Channels register through the ExtensionAPI, never ipcMain (Extension Isolation), each with the
+// schema its payload is parsed with (ADR 096); local-only unless registered through handleRemote.
+// With `onError`, a channel whose run throws answers with it instead of rejecting.
 export function createIpcRegistrar(
   api: ExtensionAPI,
   onError?: (err: unknown) => unknown
@@ -33,15 +31,15 @@ export function createIpcRegistrar(
   cleanup(): void
 } {
   const disposables: Disposable[] = []
-  const register =
+  const channelRegistrar =
     (remoteAccessible: boolean): Register =>
     (channel, schema, run) => {
-      const spec = defineChannel({ channel, schema, invalid: validationError, run, onError })
+      const spec = defineChannel({ channel, schema, invalid: validationErrorOf, run, onError })
       disposables.push(api.ipc.registerHandler(spec, { remoteAccessible }))
     }
   return {
-    handle: register(false),
-    handleRemote: register(true),
+    handle: channelRegistrar(false),
+    handleRemote: channelRegistrar(true),
     cleanup() {
       disposables.forEach((d) => d.dispose())
     },

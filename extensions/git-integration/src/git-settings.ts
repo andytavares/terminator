@@ -5,11 +5,8 @@ const SETTING = 'terminator.git-integration.git'
 
 export const MAX_DISPLAYED_FILES = { default: 500, min: 10, max: 5000 }
 
-/**
- * The commit and status settings, read on every call; a number outside the
- * declared bounds is clamped. Sign-off is workspace-scoped: the repository's
- * workspace's own value, else the global one.
- */
+/** The commit and status settings, read on every call; a number outside the declared bounds is
+ *  clamped. Sign-off is workspace-scoped: the repository's workspace's, else the global one. */
 export function gitSettings(api: ExtensionAPI): GitSettings {
   return {
     signOff: (repoRoot) =>

@@ -9,7 +9,7 @@ import {
   seedArea,
   seedProject,
   seedTask,
-  taskRow,
+  selectTaskRow,
 } from '../support/vault-db'
 
 const TARGET = '11111111-1111-4111-8111-111111111111'
@@ -24,8 +24,6 @@ beforeEach(async () => {
   registerLinksIpcHandlers(harness.api, db)
 })
 
-const invoke = (channel: string, payload?: unknown) => harness.invoke(channel, payload)
-
 async function linksOf(table: 'tasks' | 'projects', key: string): Promise<string[]> {
   const column = table === 'tasks' ? 'id' : 'name'
   const row = await db.get<{ terminator_links: string }>(
@@ -39,7 +37,9 @@ describe('task-vault:links:create', () => {
   it('replaces all existing links of a task with the new one', async () => {
     await seedTask(db, { id: 't1', terminatorLinks: JSON.stringify([OTHER]) })
 
-    expect(await invoke('task-vault:links:create', { taskId: 't1', targetId: TARGET })).toEqual({
+    expect(
+      await harness.invoke('task-vault:links:create', { taskId: 't1', targetId: TARGET })
+    ).toEqual({
       success: true,
     })
     expect(await linksOf('tasks', 't1')).toEqual([TARGET])
@@ -48,19 +48,21 @@ describe('task-vault:links:create', () => {
   it('appends a link to a project once, however often it is created', async () => {
     await seedProject(db, 'p1', 'alpha')
 
-    await invoke('task-vault:links:create', { projectFilePath: 'alpha', targetId: OTHER })
-    await invoke('task-vault:links:create', { projectFilePath: 'alpha', targetId: TARGET })
-    await invoke('task-vault:links:create', { projectFilePath: 'alpha', targetId: TARGET })
+    await harness.invoke('task-vault:links:create', { projectFilePath: 'alpha', targetId: OTHER })
+    await harness.invoke('task-vault:links:create', { projectFilePath: 'alpha', targetId: TARGET })
+    await harness.invoke('task-vault:links:create', { projectFilePath: 'alpha', targetId: TARGET })
 
     expect(await linksOf('projects', 'alpha')).toEqual([OTHER, TARGET])
   })
 
   it('returns NOT_FOUND for an unknown task or project', async () => {
-    expect(await invoke('task-vault:links:create', { taskId: 'x', targetId: TARGET })).toEqual({
+    expect(
+      await harness.invoke('task-vault:links:create', { taskId: 'x', targetId: TARGET })
+    ).toEqual({
       error: 'NOT_FOUND',
     })
     expect(
-      await invoke('task-vault:links:create', { projectFilePath: 'nope', targetId: TARGET })
+      await harness.invoke('task-vault:links:create', { projectFilePath: 'nope', targetId: TARGET })
     ).toEqual({ error: 'NOT_FOUND' })
   })
 })
@@ -69,7 +71,9 @@ describe('task-vault:links:remove', () => {
   it('removes only the given link from a task', async () => {
     await seedTask(db, { id: 't1', terminatorLinks: JSON.stringify([TARGET, OTHER]) })
 
-    expect(await invoke('task-vault:links:remove', { taskId: 't1', targetId: TARGET })).toEqual({
+    expect(
+      await harness.invoke('task-vault:links:remove', { taskId: 't1', targetId: TARGET })
+    ).toEqual({
       success: true,
     })
     expect(await linksOf('tasks', 't1')).toEqual([OTHER])
@@ -81,17 +85,19 @@ describe('task-vault:links:remove', () => {
       JSON.stringify([TARGET, OTHER]),
     ])
 
-    await invoke('task-vault:links:remove', { projectFilePath: 'alpha', targetId: OTHER })
+    await harness.invoke('task-vault:links:remove', { projectFilePath: 'alpha', targetId: OTHER })
 
     expect(await linksOf('projects', 'alpha')).toEqual([TARGET])
   })
 
   it('returns NOT_FOUND for an unknown task or project', async () => {
-    expect(await invoke('task-vault:links:remove', { taskId: 'x', targetId: TARGET })).toEqual({
+    expect(
+      await harness.invoke('task-vault:links:remove', { taskId: 'x', targetId: TARGET })
+    ).toEqual({
       error: 'NOT_FOUND',
     })
     expect(
-      await invoke('task-vault:links:remove', { projectFilePath: 'nope', targetId: TARGET })
+      await harness.invoke('task-vault:links:remove', { projectFilePath: 'nope', targetId: TARGET })
     ).toEqual({ error: 'NOT_FOUND' })
   })
 })
@@ -142,8 +148,8 @@ describe('registerLinksIpcHandlers', () => {
   it('leaves unrelated tasks untouched by a link change', async () => {
     await seedTask(db, { id: 't1' })
     await seedTask(db, { id: 't2' })
-    await invoke('task-vault:links:create', { taskId: 't1', targetId: TARGET })
-    expect(await taskRow(db, 't2')).toMatchObject({ terminator_links: '[]' })
+    await harness.invoke('task-vault:links:create', { taskId: 't1', targetId: TARGET })
+    expect(await selectTaskRow(db, 't2')).toMatchObject({ terminator_links: '[]' })
   })
 })
 
@@ -163,7 +169,7 @@ function taskVaultLinksGetTerminatorLinkedTests() {
       JSON.stringify([TARGET]),
     ])
 
-    const result = (await invoke('task-vault:links:get-for-terminator-target', {
+    const result = (await harness.invoke('task-vault:links:get-for-terminator-target', {
       targetId: TARGET,
     })) as { tasks: { id: string }[]; projects: { name: string }[] }
 
@@ -180,7 +186,7 @@ function taskVaultLinksGetTerminatorAreasNothingTests() {
       JSON.stringify([TARGET]),
     ])
 
-    const result = (await invoke('task-vault:links:get-for-terminator-target', {
+    const result = (await harness.invoke('task-vault:links:get-for-terminator-target', {
       targetId: TARGET,
     })) as { projects: { name: string; area?: string }[] }
 
@@ -191,7 +197,7 @@ function taskVaultLinksGetTerminatorAreasNothingTests() {
     await seedTask(db, { id: 'other', terminatorLinks: JSON.stringify([OTHER]) })
 
     expect(
-      await invoke('task-vault:links:get-for-terminator-target', { targetId: TARGET })
+      await harness.invoke('task-vault:links:get-for-terminator-target', { targetId: TARGET })
     ).toEqual({ tasks: [], projects: [] })
   })
 }

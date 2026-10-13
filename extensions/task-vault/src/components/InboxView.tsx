@@ -7,6 +7,8 @@ import { useVaultStore } from '../stores/vault.store'
 import { useVaultDataStore } from '../stores/vault-data.store'
 import { useIndexReload } from './vault-hooks'
 import { Button, IconButton } from '@terminator/extension-ui'
+import { invokeVault } from './daily-log-format'
+import { localDate } from '../vault/recurrence'
 
 type InboxOutcome = { tasks?: IndexedTask[] } | { error: string }
 
@@ -64,17 +66,15 @@ async function fetchInbox(): Promise<InboxOutcome> {
   }
 }
 
-/**
- * The inbox items, reloaded on demand and whenever the index changes. Each load
- * keeps the store's inboxCount in sync so the sidebar badge is always accurate.
- */
+/** The inbox items, reloaded on demand and whenever the index changes. Each load keeps the
+ *  store's inboxCount in step, so the sidebar badge is right. */
 function useInbox() {
   const [items, setItems] = useState<IndexedTask[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function applyOutcome(outcome: InboxOutcome) {
+  function applyInboxOutcome(outcome: InboxOutcome) {
     if ('error' in outcome) {
       setError(outcome.error)
     } else if (outcome.tasks) {
@@ -88,11 +88,11 @@ function useInbox() {
   async function load() {
     setIsLoading(true)
     setError(null)
-    applyOutcome(await fetchInbox())
+    applyInboxOutcome(await fetchInbox())
   }
 
   useEffect(() => {
-    void fetchInbox().then(applyOutcome)
+    void fetchInbox().then(applyInboxOutcome)
   }, [])
   useIndexReload(() => void load(), [])
 
@@ -195,11 +195,11 @@ function InboxBody({ items, load, processing: mode }: BodyProps) {
 
   if (items.length === 0) return <EmptyInbox />
   if (processing) {
-    const back = () => {
+    const backToInbox = () => {
       setProcessing(false)
       void load()
     }
-    return <ProcessingPane items={items} onBack={back} onDone={handleDone} />
+    return <ProcessingPane items={items} onBack={backToInbox} onDone={handleDone} />
   }
   const process = async () => {
     await load()
@@ -242,18 +242,11 @@ function rawText(item: IndexedTask): string {
   return parts.join(' ')
 }
 
-function localToday(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 /** Delete, backlog and move-to-today for one inbox item, each refreshing what it touches. */
 function useItemActions({ item, onRefresh }: ItemProps) {
   const { refreshInboxCount, loadSomeday, loadToday } = useVaultStore()
-  const invoke = (channel: string, payload: unknown) =>
-    window.electronAPI.extensionBridge.invoke(channel, payload)
   const fileTo = async (payload: Record<string, unknown>, reload: () => Promise<void>) => {
-    await invoke('task-vault:vault:process-inbox-item', { taskId: item.id, ...payload })
+    await invokeVault('task-vault:vault:process-inbox-item', { taskId: item.id, ...payload })
     await onRefresh()
     await refreshInboxCount()
     await reload()
@@ -261,12 +254,12 @@ function useItemActions({ item, onRefresh }: ItemProps) {
   return {
     remove: async () => {
       if (!confirm(`Delete: "${item.text}"?`)) return
-      await invoke('task-vault:vault:delete-task', { taskId: item.id })
+      await invokeVault('task-vault:vault:delete-task', { taskId: item.id })
       await onRefresh()
       await refreshInboxCount()
     },
     toBacklog: () => fileTo({ action: 'someday' }, loadSomeday),
-    toToday: () => fileTo({ action: 'file', destination: `daily/${localToday()}.md` }, loadToday),
+    toToday: () => fileTo({ action: 'file', destination: `daily/${localDate()}.md` }, loadToday),
   }
 }
 

@@ -27,10 +27,7 @@ interface CardLayoutOptions {
   panelRef?: PanelRef
 }
 
-/**
- * Re-applies the comment highlights and re-lays out the cards whenever the
- * comments change.
- */
+/** Re-applies the comment highlights and re-lays out the cards whenever the comments change. */
 export function useCommentCards(viewRef: ViewRef, comments: Comment[], options: CardLayoutOptions) {
   const [anchorTops, setAnchorTops] = useState<Record<string, number>>({})
   const [panelContentHeight, setPanelContentHeight] = useState(0)
@@ -111,17 +108,14 @@ export function hoveredAnchor(e: React.MouseEvent<HTMLDivElement>) {
   return anchor && id ? { anchor, id } : null
 }
 
-/**
- * Highlights the stored comments in a freshly mounted view at once, so React
- * Strict Mode's double mount does not leave the second view bare: the anchors
- * effect does not re-run when its dependencies are unchanged.
- */
+/** Highlights at once, so React Strict Mode's double mount does not leave the second view bare:
+ *  the anchors effect does not re-run when its dependencies are unchanged. */
 export function applyStoredAnchors(view: EditorView): void {
   applyAnchors(view, visibleAnchors(useCommentsStore.getState().comments))
 }
 
 /** The selection a comment may be added to, and the one being commented on. */
-export function useCommentDraft() {
+export function useCommentAnchors() {
   const [pendingAnchor, setPendingAnchor] = useState<SelectionAnchor | null>(null)
   const [composingAnchor, setComposingAnchor] = useState<SelectionAnchor | null>(null)
   const onSelectionChange = useCallback((sel: SelectionAnchor | null) => {
@@ -135,7 +129,7 @@ export function useCommentDraft() {
   return { pendingAnchor, composingAnchor, setComposingAnchor, onSelectionChange, startComposing }
 }
 
-type CommentDraft = ReturnType<typeof useCommentDraft>
+type CommentDraft = ReturnType<typeof useCommentAnchors>
 
 interface EditorOverlayProps {
   draft: CommentDraft
@@ -202,7 +196,7 @@ export function CommentColumn(props: CommentColumnProps): React.JSX.Element {
   return (
     <>
       {draft.composingAnchor && (
-        <NewCommentComposer noteId={noteId} draft={draft} anchor={draft.composingAnchor} />
+        <NoteCommentComposer noteId={noteId} draft={draft} anchor={draft.composingAnchor} />
       )}
       <CommentMargin
         noteId={noteId}
@@ -222,7 +216,7 @@ interface NewCommentComposerProps {
   anchor: SelectionAnchor
 }
 
-function NewCommentComposer({ noteId, draft, anchor }: NewCommentComposerProps) {
+function NoteCommentComposer({ noteId, draft, anchor }: NewCommentComposerProps) {
   const { from, to, quote, prefix, suffix } = anchor
   return (
     <CommentComposer

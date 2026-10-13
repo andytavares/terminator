@@ -30,7 +30,7 @@ type RunReview = NonNullable<ReviewAgentDeps['runReview']>
 
 type Handler = (payload: unknown) => Promise<unknown>
 
-function captureHandlers(deps: Partial<ReviewAgentDeps>) {
+function captureAgentHandlers(deps: Partial<ReviewAgentDeps>) {
   const handlers: Record<string, Handler> = {}
   const broadcast = vi.fn()
   const openTerminal = vi.fn()
@@ -128,7 +128,7 @@ describe('review-agent IPC', () => {
     const runReview = vi.fn<RunReview>(() => ({ runId: 'run-done', done: donePromise, cancel }))
     const ensureWorktree = vi.fn(async () => '/wt')
 
-    const { handlers, broadcast } = captureHandlers({ ensureWorktree, runReview })
+    const { handlers, broadcast } = captureAgentHandlers({ ensureWorktree, runReview })
 
     const result = (await handlers['review-agent:start'](
       startPayload({ title: 't', body: 'b' })
@@ -154,7 +154,7 @@ describe('review-agent IPC — a second start with the same scope while running 
     const { done: donePromise, resolveDone } = deferredRun()
     const runReview = vi.fn<RunReview>(() => ({ runId: 'x', done: donePromise, cancel: vi.fn() }))
     const ensureWorktree = vi.fn(async () => '/wt')
-    const { handlers } = captureHandlers({ ensureWorktree, runReview })
+    const { handlers } = captureAgentHandlers({ ensureWorktree, runReview })
 
     const first = (await handlers['review-agent:start'](startPayload())) as { run: AgentRun }
 
@@ -174,7 +174,7 @@ describe('review-agent IPC — uses the model override when given, else the sett
       cancel: vi.fn(),
     }))
     const ensureWorktree = vi.fn(async () => '/wt')
-    const { handlers, settings } = captureHandlers({ ensureWorktree, runReview })
+    const { handlers, settings } = captureAgentHandlers({ ensureWorktree, runReview })
 
     await handlers['review-agent:start'](startPayload())
     await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(1))
@@ -201,7 +201,7 @@ describe('review-agent IPC — passes no effort for the Default choice or an uns
       cancel: vi.fn(),
     }))
     const ensureWorktree = vi.fn(async () => '/wt')
-    const { handlers, settings } = captureHandlers({ ensureWorktree, runReview })
+    const { handlers, settings } = captureAgentHandlers({ ensureWorktree, runReview })
     const start = (prNumber: number) =>
       handlers['review-agent:start'](startPayload({ prNumber, headSHA: `sha${prNumber}` }))
 
@@ -223,7 +223,7 @@ describe('review-agent IPC — stops a run after the configured timeout', () => 
       cancel: vi.fn(),
     }))
     const ensureWorktree = vi.fn(async () => '/wt')
-    const { handlers, settings } = captureHandlers({ ensureWorktree, runReview })
+    const { handlers, settings } = captureAgentHandlers({ ensureWorktree, runReview })
 
     await handlers['review-agent:start'](startPayload())
     await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(1))
@@ -237,7 +237,7 @@ describe('review-agent IPC — stops a run after the configured timeout', () => 
 
 describe('review-agent IPC — review-agent:settings returns the configured default model', () => {
   it('review-agent:settings returns the configured default model', async () => {
-    const { handlers, settings } = captureHandlers({})
+    const { handlers, settings } = captureAgentHandlers({})
     expect(await handlers['review-agent:settings']({})).toEqual({ model: 'sonnet' })
     settings['terminator.git-integration.review.agentModel'] = 'opus'
     expect(await handlers['review-agent:settings']({})).toEqual({ model: 'opus' })
@@ -250,7 +250,7 @@ describe('review-agent IPC — review-agent:cancel cancels a live run', () => {
     const donePromise = new Promise<AgentRun>(() => {})
     const runReview = vi.fn<RunReview>(() => ({ runId: 'x', done: donePromise, cancel }))
     const ensureWorktree = vi.fn(async () => '/wt')
-    const { handlers } = captureHandlers({ ensureWorktree, runReview })
+    const { handlers } = captureAgentHandlers({ ensureWorktree, runReview })
 
     const started = (await handlers['review-agent:start'](startPayload())) as { run: AgentRun }
     await vi.waitFor(() => expect(runReview).toHaveBeenCalled())
@@ -264,7 +264,7 @@ describe('review-agent IPC — review-agent:cancel cancels a live run', () => {
     const cancel = vi.fn()
     const runReview = vi.fn(() => ({ runId: 'x', done: new Promise<AgentRun>(() => {}), cancel }))
     const ensureWorktree = vi.fn(async () => '/wt')
-    const { handlers, registration } = captureHandlers({ ensureWorktree, runReview })
+    const { handlers, registration } = captureAgentHandlers({ ensureWorktree, runReview })
     await handlers['review-agent:start'](startPayload())
     await vi.waitFor(() => expect(runReview).toHaveBeenCalled())
 
@@ -274,14 +274,14 @@ describe('review-agent IPC — review-agent:cancel cancels a live run', () => {
   })
 
   it('review-agent:cancel returns ok:false for an unknown run', async () => {
-    const { handlers } = captureHandlers({})
+    const { handlers } = captureAgentHandlers({})
     expect(await handlers['review-agent:cancel']({ runId: 'nope' })).toEqual({ ok: false })
   })
 })
 
 describe('review-agent IPC — review-agent:list returns persisted runs newest first', () => {
   it('review-agent:list returns persisted runs newest first', async () => {
-    const { handlers } = captureHandlers({})
+    const { handlers } = captureAgentHandlers({})
     storeState.data['/repo:::1:::sha1'] = [
       makeDoneRun({ id: 'older' }),
       makeDoneRun({ id: 'newer' }),
@@ -297,7 +297,7 @@ describe('review-agent IPC — review-agent:list returns persisted runs newest f
 
 describe('review-agent IPC — review-agent:dismiss marks a finding dismissed and persists it', () => {
   it('review-agent:dismiss marks a finding dismissed and persists it', async () => {
-    const { handlers } = captureHandlers({})
+    const { handlers } = captureAgentHandlers({})
     const run = makeDoneRun({
       id: 'run-1',
       findings: [nitFinding('f1')],
@@ -320,7 +320,7 @@ describe('review-agent IPC — review-agent:dismiss marks a finding dismissed an
 
 describe('review-agent IPC — review-agent:dismiss returns NOT_FOUND for an unknown finding', () => {
   it('review-agent:dismiss returns NOT_FOUND for an unknown finding', async () => {
-    const { handlers } = captureHandlers({})
+    const { handlers } = captureAgentHandlers({})
     storeState.data['/repo:::1:::sha1'] = [makeDoneRun({ id: 'run-1' })]
     const result = await handlers['review-agent:dismiss']({
       repoRoot: '/repo',
@@ -336,7 +336,7 @@ describe('review-agent IPC — review-agent:dismiss returns NOT_FOUND for an unk
 describe('review-agent IPC — review-agent:open-terminal opens claude --resume <sessionId> in the run worktree', () => {
   it('review-agent:open-terminal opens `claude --resume <sessionId>` in the run worktree', async () => {
     const ensureWorktree = vi.fn(async () => '/wt/pr-1-sha1')
-    const { handlers, openTerminal } = captureHandlers({ ensureWorktree })
+    const { handlers, openTerminal } = captureAgentHandlers({ ensureWorktree })
     storeState.data['/repo:::1:::sha1'] = [makeDoneRun({ id: 'run-1', sessionId: 'sess-123' })]
 
     const result = await handlers['review-agent:open-terminal']({ runId: 'run-1' })
@@ -350,7 +350,7 @@ describe('review-agent IPC — review-agent:open-terminal opens claude --resume 
   })
 
   it('review-agent:open-terminal returns NOT_FOUND for an unknown run', async () => {
-    const { handlers } = captureHandlers({})
+    const { handlers } = captureAgentHandlers({})
     const result = await handlers['review-agent:open-terminal']({ runId: 'nope' })
     expect(result).toEqual({ error: 'NOT_FOUND' })
   })

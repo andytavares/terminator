@@ -81,25 +81,25 @@ const StartPayload = z.object({
 
 const SETTING = 'terminator.git-integration.review'
 
-const store = () => namedStore<AgentRun[]>('pr-agent-reviews')
+const agentRunStore = () => namedStore<AgentRun[]>('pr-agent-reviews')
 
 function storeKey(head: PrHead): string {
   return `${head.repoRoot}:::${head.prNumber}:::${head.headSHA}`
 }
 
-type RunStore = Awaited<ReturnType<typeof store>>
+type RunStore = Awaited<ReturnType<typeof agentRunStore>>
 
 function runsIn(runStore: RunStore, head: PrHead): AgentRun[] {
   return (runStore.get(storeKey(head)) as AgentRun[] | undefined) ?? []
 }
 
 async function loadRuns(head: PrHead): Promise<AgentRun[]> {
-  return runsIn(await store(), head)
+  return runsIn(await agentRunStore(), head)
 }
 
 // Reads and writes in one turn once the store is open, so two upserts never lose one.
 async function upsertRun(head: PrHead, run: AgentRun): Promise<void> {
-  const runStore = await store()
+  const runStore = await agentRunStore()
   const runs = runsIn(runStore, head)
   const idx = runs.findIndex((r) => r.id === run.id)
   if (idx >= 0) runs[idx] = run
@@ -108,7 +108,7 @@ async function upsertRun(head: PrHead, run: AgentRun): Promise<void> {
 }
 
 async function findStoredRun(runId: string): Promise<(PrHead & { run: AgentRun }) | null> {
-  const all = (await store()).store as Record<string, AgentRun[]>
+  const all = (await agentRunStore()).store as Record<string, AgentRun[]>
   for (const [key, runs] of Object.entries(all)) {
     const found = runs?.find((r) => r.id === runId)
     if (!found) continue
@@ -155,7 +155,7 @@ function newRun(input: StartInput, sessionId: string): AgentRun {
 }
 
 /** Stores the run's outcome under its PR head, forgets it as running, and tells the views. */
-async function finishRun(ctx: AgentContext, slot: RunSlot, finished: AgentRun): Promise<void> {
+async function finishAgentRun(ctx: AgentContext, slot: RunSlot, finished: AgentRun): Promise<void> {
   ctx.runningByScope.delete(slot.runningKey)
   ctx.liveRuns.delete(slot.run.id)
   await upsertRun(slot.head, finished)
@@ -163,7 +163,7 @@ async function finishRun(ctx: AgentContext, slot: RunSlot, finished: AgentRun): 
 }
 
 /** Runs the agent in the PR head's worktree; any failure ends the run as failed. */
-async function executeRun(ctx: AgentContext, input: StartInput, slot: RunSlot) {
+async function runAgentToEnd(ctx: AgentContext, input: StartInput, slot: RunSlot) {
   const { run } = slot
   try {
     const worktreePath = await ctx.ensureWorktree(input)
@@ -179,27 +179,27 @@ async function executeRun(ctx: AgentContext, input: StartInput, slot: RunSlot) {
       timeoutMs,
     })
     ctx.liveRuns.set(run.id, cancel)
-    await finishRun(ctx, slot, await done)
+    await finishAgentRun(ctx, slot, await done)
   } catch (e) {
     const finishedAt = new Date().toISOString()
-    await finishRun(ctx, slot, { ...run, status: 'failed', finishedAt, error: String(e) })
+    await finishAgentRun(ctx, slot, { ...run, status: 'failed', finishedAt, error: String(e) })
   }
 }
 
 /** Starts a run for the PR and scope, or answers the one already running for them. */
-async function startRun(ctx: AgentContext, input: StartInput): Promise<{ run: AgentRun }> {
+async function startAgentRun(ctx: AgentContext, input: StartInput): Promise<{ run: AgentRun }> {
   const runningKey = `${input.repoRoot}:::${input.prNumber}:::${JSON.stringify(input.scope)}`
   const existing = ctx.runningByScope.get(runningKey)
   if (existing && existing.status === 'running') return { run: existing }
   const run = newRun(input, randomUUID())
   ctx.runningByScope.set(runningKey, run)
   await upsertRun(input, run)
-  void executeRun(ctx, input, { run, runningKey, head: headOf(input) })
+  void runAgentToEnd(ctx, input, { run, runningKey, head: headOf(input) })
   return { run }
 }
 
 async function dismissFinding(input: PrHead & { runId: string; findingId: string }) {
-  const runStore = await store()
+  const runStore = await agentRunStore()
   const runs = runsIn(runStore, input)
   const run = runs.find((r) => r.id === input.runId)
   const finding = run?.findings.find((f) => f.id === input.findingId)
@@ -236,7 +236,7 @@ function runChannels(ctx: AgentContext): ChannelSpec[] {
       channel: 'review-agent:start',
       schema: StartPayload,
       invalid: VALIDATION_ERROR,
-      run: (input) => startRun(ctx, input),
+      run: (input) => startAgentRun(ctx, input),
     }),
     defineChannel({
       channel: 'review-agent:cancel',
@@ -277,11 +277,8 @@ function storedRunChannels(deps: ReviewAgentDeps): ChannelSpec[] {
   ]
 }
 
-/**
- * Registers the review agent's channels. Disposing the result cancels every run
- * still going: its `claude` is this process's child, and an extension host that
- * quits does not take its children with it, so a run left alone outlives the app.
- */
+/** Disposing the result cancels every run still going: its `claude` is this process's child, and
+ *  a quitting extension host leaves its children running, so a run left alone outlives the app. */
 export function registerReviewAgentHandlers(
   register: RegisterFn,
   deps: ReviewAgentDeps

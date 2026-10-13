@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { dispatchChannel } from '@terminator/extension-sdk'
-import { activateCapturingChannels, freshGlobalStorage } from './support/activate'
+import { activateCapturingChannels, freshExtensionStorage } from './support/activate'
 
 // "GitHub token" is handed to gh as GH_TOKEN by the core's api.github, which
 // takes it as `token` (https://cli.github.com/manual/gh_help_environment).
@@ -9,7 +9,7 @@ import { activateCapturingChannels, freshGlobalStorage } from './support/activat
 async function askViewer(settings: Record<string, unknown>) {
   const { channels, githubApi } = activateCapturingChannels(
     undefined,
-    freshGlobalStorage(),
+    freshExtensionStorage(),
     settings
   )
   const spec = channels.find((c) => c.spec.channel === 'github:current-user')!.spec

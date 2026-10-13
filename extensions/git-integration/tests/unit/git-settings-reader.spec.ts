@@ -3,10 +3,8 @@ import type { ExtensionAPI, SettingScope } from '@terminator/extension-sdk'
 import { gitSettings } from '../../src/git-settings'
 import { partialFake } from '../../../../tests/support/fakes'
 
-/**
- * The settings reader over stored values, as the settings page writes them:
- * `ownValues` by workspace folder, read for a repository there, else `stored`.
- */
+/** The settings reader over stored values as the settings page writes them: `ownValues` by
+ *  workspace folder, read for a repository there, else `stored`. */
 function readerOver(
   stored: Record<string, unknown>,
   ownValues: Record<string, Record<string, unknown>> = {}

@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
-import { installBridge, eventually, task } from './helpers/bridge'
+import { installVaultBridge, eventually, task, dayFromToday } from './helpers/bridge'
 import type { IndexedTask } from '../../src/vault/types'
 
 vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
@@ -13,13 +13,7 @@ vi.setConfig({ testTimeout: 30_000 })
 
 type Props = React.ComponentProps<typeof DailyLog>
 
-let bridge: ReturnType<typeof installBridge>
-
-function localDay(offset = 0): string {
-  const d = new Date()
-  d.setDate(d.getDate() + offset)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+let bridge: ReturnType<typeof installVaultBridge>
 
 function logOf(tasks: IndexedTask[]) {
   return { date: '2026-01-05', filePath: 'daily/2026-01-05.md', tasks, exists: true }
@@ -37,13 +31,13 @@ function renderLog(overrides: Partial<Props> = {}) {
   return props
 }
 
-const rows = () =>
+const taskRowElements = () =>
   Array.from(document.querySelectorAll('.daily-log__task .daily-log__task-text')).map(
     (el) => el.textContent
   )
 
 beforeEach(() => {
-  bridge = installBridge()
+  bridge = installVaultBridge()
 })
 
 afterEach(() => cleanup())
@@ -53,7 +47,7 @@ describe('DailyLog progress and sections', sectionTests)
 describe('DailyLog progress and sections, continued', sectionTestsPart2)
 describe('DailyLog empty day', emptyDayTests)
 describe('DailyLog adding tasks', addTaskTests)
-describe('DailyLog reordering', dragTests)
+describe('DailyLog reordering', dailyLogDragTests)
 describe('DailyLog reordering, continued', dragTestsPart2)
 describe('DailyLog stale tasks', staleTests)
 describe('DailyLog backlog', backlogTests)
@@ -97,7 +91,7 @@ function sectionTests() {
     const fill = document.querySelector('.daily-log__progress-fill') as HTMLElement
     expect(fill.style.width).toBe('50%')
     expect(fill.className).not.toContain('--complete')
-    expect(rows()).toEqual(['Open one', 'Done one'])
+    expect(taskRowElements()).toEqual(['Open one', 'Done one'])
     expect(document.querySelector('.daily-log__done-divider')).toBeTruthy()
   })
 
@@ -120,10 +114,10 @@ function sectionTestsPart2() {
       selectedContexts: ['home', 'desk'],
     })
     expect(screen.getByText(/From previous days \(1\)/)).toBeTruthy()
-    expect(rows()).toEqual(['Old', 'Desk'])
+    expect(taskRowElements()).toEqual(['Old', 'Desk'])
     expect(document.querySelector('.daily-log__today-label')?.textContent).toBe('Today')
     fireEvent.click(screen.getByText(/From previous days/))
-    expect(rows()).toEqual(['Desk'])
+    expect(taskRowElements()).toEqual(['Desk'])
   })
 }
 
@@ -175,7 +169,7 @@ function addTaskTests() {
   })
 }
 
-function taskRow(text: string): HTMLElement {
+function taskRowNamed(text: string): HTMLElement {
   return screen.getByText(text).closest('.daily-log__task') as HTMLElement
 }
 
@@ -183,36 +177,36 @@ function dataTransfer() {
   return { dropEffect: '', effectAllowed: '' }
 }
 
-function dragTests() {
+function dailyLogDragTests() {
   it('reorders active tasks by drag and drop', async () => {
     const props = renderLog({ log: logOf([task('a', 'A'), task('b', 'B'), task('c', 'C')]) })
     const transfer = dataTransfer()
-    fireEvent.dragStart(taskRow('A'), { dataTransfer: transfer })
+    fireEvent.dragStart(taskRowNamed('A'), { dataTransfer: transfer })
     expect(transfer.effectAllowed).toBe('move')
-    fireEvent.dragOver(taskRow('C'), { dataTransfer: transfer })
+    fireEvent.dragOver(taskRowNamed('C'), { dataTransfer: transfer })
     expect(transfer.dropEffect).toBe('move')
-    expect(taskRow('C').className).toContain('daily-log__task--drag-over')
-    fireEvent.drop(taskRow('C'), { dataTransfer: transfer })
+    expect(taskRowNamed('C').className).toContain('daily-log__task--drag-over')
+    fireEvent.drop(taskRowNamed('C'), { dataTransfer: transfer })
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:reorder-tasks')).toEqual([
         { orderedIds: ['b', 'c', 'a'] },
       ])
     )
     expect(props.onRefresh).toHaveBeenCalled()
-    expect(taskRow('C').className).not.toContain('drag-over')
+    expect(taskRowNamed('C').className).not.toContain('drag-over')
   })
 }
 
 function dragTestsPart2() {
   it('ignores a drop on itself, a drop with no drag, and finished tasks', async () => {
     renderLog({ log: logOf([task('a', 'A'), task('d', 'D', { status: 'done' })]) })
-    expect(taskRow('D').getAttribute('draggable')).not.toBe('true')
-    fireEvent.drop(taskRow('A'), { dataTransfer: dataTransfer() })
-    fireEvent.dragStart(taskRow('A'), { dataTransfer: dataTransfer() })
-    fireEvent.drop(taskRow('A'), { dataTransfer: dataTransfer() })
-    fireEvent.dragStart(taskRow('A'), { dataTransfer: dataTransfer() })
-    fireEvent.dragEnd(taskRow('A'))
-    fireEvent.drop(taskRow('A'), { dataTransfer: dataTransfer() })
+    expect(taskRowNamed('D').getAttribute('draggable')).not.toBe('true')
+    fireEvent.drop(taskRowNamed('A'), { dataTransfer: dataTransfer() })
+    fireEvent.dragStart(taskRowNamed('A'), { dataTransfer: dataTransfer() })
+    fireEvent.drop(taskRowNamed('A'), { dataTransfer: dataTransfer() })
+    fireEvent.dragStart(taskRowNamed('A'), { dataTransfer: dataTransfer() })
+    fireEvent.dragEnd(taskRowNamed('A'))
+    fireEvent.drop(taskRowNamed('A'), { dataTransfer: dataTransfer() })
     await act(async () => {})
     expect(bridge.calls('task-vault:vault:reorder-tasks')).toEqual([])
   })
@@ -224,14 +218,14 @@ function staleTests() {
       isToday: true,
       staleDaysThreshold: 3,
       log: logOf([
-        task('old', 'Old', { todaySince: localDay(-3) }),
-        task('new', 'New', { todaySince: localDay(-2) }),
-        task('fin', 'Fin', { todaySince: localDay(-9), status: 'done' }),
+        task('old', 'Old', { todaySince: dayFromToday(-3) }),
+        task('new', 'New', { todaySince: dayFromToday(-2) }),
+        task('fin', 'Fin', { todaySince: dayFromToday(-9), status: 'done' }),
       ]),
     })
-    expect(taskRow('Old').className).toContain('daily-log__task--stale')
-    expect(taskRow('New').className).not.toContain('stale')
-    expect(taskRow('Fin').className).not.toContain('stale')
+    expect(taskRowNamed('Old').className).toContain('daily-log__task--stale')
+    expect(taskRowNamed('New').className).not.toContain('stale')
+    expect(taskRowNamed('Fin').className).not.toContain('stale')
     fireEvent.click(screen.getByRole('button', { name: 'keep' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:reset-today-since')).toEqual([{ taskId: 'old' }])

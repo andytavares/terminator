@@ -24,10 +24,8 @@ function ownerOf(args: LinkArgs): LinkOwner | null {
   return null
 }
 
-/**
- * Rewrites an owner's link list with `change`; answers NOT_FOUND for an unknown owner
- * and does nothing when the payload names no owner.
- */
+/** Rewrites an owner's link list with `change`; NOT_FOUND for an unknown owner, and nothing when
+ *  the payload names no owner. */
 async function updateLinks(db: ExtensionDB, args: LinkArgs, change: (links: string[]) => string[]) {
   const owner = ownerOf(args)
   if (!owner) return { success: true }
@@ -46,10 +44,7 @@ async function updateLinks(db: ExtensionDB, args: LinkArgs, change: (links: stri
   return { success: true }
 }
 
-/**
- * A task links to exactly one terminal at a time, so linking replaces its list;
- * a project collects links.
- */
+/** A task links to one terminal at a time, so linking replaces its list; a project collects. */
 function createLink({ db }: IpcContext, args: LinkArgs) {
   const { targetId } = args
   return orErrorString(() =>

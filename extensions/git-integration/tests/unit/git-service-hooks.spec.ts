@@ -1,25 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { execFileSync } from 'child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { commitChanges } from '../../src/git/git-service'
 import { bindRealShell } from './support/shell'
+import { GIT_FREE_ENV, runGitIn } from './support/git-repo'
 
-// A hook git runs for `git commit` and `--no-verify` skips (pre-commit,
-// commit-msg) aborts the commit by exiting non-zero, and git adds nothing of
-// its own to what the hook printed (https://git-scm.com/docs/githooks#_pre_commit).
-// These run real git against real hooks.
-
-const env = Object.fromEntries(
-  Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_'))
-) as NodeJS.ProcessEnv
-
-const gitIn = (repo: string, args: string[]) =>
-  execFileSync('git', args, { cwd: repo, env, encoding: 'utf-8' }).trim()
+// A hook `git commit` runs and `--no-verify` skips (pre-commit, commit-msg) aborts by exiting
+// non-zero, and git adds nothing to what it printed
+// (https://git-scm.com/docs/githooks#_pre_commit). These run real git against real hooks.
 
 /** An executable hook `name` running `script`, in `dir` of `repo` (.git/hooks unless given). */
-function installHook(repo: string, hook: { name: string; script: string; dir?: string }): void {
+function installGitHook(repo: string, hook: { name: string; script: string; dir?: string }): void {
   const dir = join(repo, hook.dir ?? '.git/hooks')
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, hook.name), hook.script)
@@ -29,22 +21,22 @@ function installHook(repo: string, hook: { name: string; script: string; dir?: s
 /** A new repository with a.txt staged and nothing committed. */
 function repoWithStagedFile(): string {
   const repo = mkdtempSync(join(tmpdir(), 'commit-hooks-'))
-  gitIn(repo, ['init', '-q', '-b', 'main'])
-  gitIn(repo, ['config', 'user.email', 'e@x.dev'])
-  gitIn(repo, ['config', 'user.name', 'E'])
+  runGitIn(repo, ['init', '-q', '-b', 'main'])
+  runGitIn(repo, ['config', 'user.email', 'e@x.dev'])
+  runGitIn(repo, ['config', 'user.name', 'E'])
   writeFileSync(join(repo, 'a.txt'), 'a\n')
-  gitIn(repo, ['add', 'a.txt'])
+  runGitIn(repo, ['add', 'a.txt'])
   return repo
 }
 
 describe('commitChanges with a plain git hook', () => {
   let repo: string
-  const git = (...args: string[]) => gitIn(repo, args)
+  const git = (...args: string[]) => runGitIn(repo, args)
   const hook = (name: string, script: string, dir?: string) =>
-    installHook(repo, { name, script, dir })
+    installGitHook(repo, { name, script, dir })
 
   beforeEach(() => {
-    bindRealShell(env)
+    bindRealShell(GIT_FREE_ENV)
     repo = repoWithStagedFile()
   })
 
@@ -75,10 +67,10 @@ describe('commitChanges with a plain git hook', () => {
 
 describe('commitChanges with a plain git hook — and a failure of git itself', () => {
   let repo: string
-  const hook = (name: string, script: string) => installHook(repo, { name, script })
+  const hook = (name: string, script: string) => installGitHook(repo, { name, script })
 
   beforeEach(() => {
-    bindRealShell(env)
+    bindRealShell(GIT_FREE_ENV)
     repo = repoWithStagedFile()
   })
 

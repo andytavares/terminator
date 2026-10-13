@@ -266,10 +266,8 @@ function nodesBySection(
   }
 }
 
-/**
- * Pure: turns the raw GraphQL response into deduped, section-tagged rows,
- * leaving out pull requests opened from an excluded branch.
- */
+/** Pure: turns the raw GraphQL response into deduped, section-tagged rows, leaving out pull requests
+ *  opened from an excluded branch. */
 export function parseDashboard(
   raw: unknown,
   viewer: DashboardViewer,

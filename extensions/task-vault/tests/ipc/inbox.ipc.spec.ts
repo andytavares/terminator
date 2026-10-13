@@ -7,7 +7,7 @@ import {
   seedArea,
   seedProject,
   seedTask,
-  taskRow,
+  selectTaskRow,
 } from '../support/vault-db'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
@@ -52,20 +52,20 @@ function taskVaultVaultProcessInboxTrashDoNowTests() {
     expect(await processItem({ taskId: TASK_ID, action: 'trash' })).toMatchObject({
       success: true,
     })
-    expect(await taskRow(db, TASK_ID)).toMatchObject({ status: 'cancelled' })
-    expect(await taskRow(db, SUBTASK_ID)).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, TASK_ID)).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, SUBTASK_ID)).toMatchObject({ status: 'cancelled' })
   })
 
   it('do-now moves the task and its subtasks to today and starts the task', async () => {
     expect(await processItem({ taskId: TASK_ID, action: 'do-now' })).toMatchObject({
       success: true,
     })
-    expect(await taskRow(db, TASK_ID)).toMatchObject({
+    expect(await selectTaskRow(db, TASK_ID)).toMatchObject({
       status: 'in-progress',
       source: 'daily',
       source_ref: localDate(),
     })
-    expect(await taskRow(db, SUBTASK_ID)).toMatchObject({
+    expect(await selectTaskRow(db, SUBTASK_ID)).toMatchObject({
       source: 'daily',
       source_ref: localDate(),
     })
@@ -83,7 +83,7 @@ function taskVaultVaultProcessInboxSomedayTests() {
     })
 
     for (const id of [TASK_ID, SUBTASK_ID]) {
-      expect(await taskRow(db, id)).toMatchObject({
+      expect(await selectTaskRow(db, id)).toMatchObject({
         source: 'someday',
         source_ref: null,
         today_since: null,
@@ -103,12 +103,12 @@ function taskVaultVaultProcessInboxFilingExistingDestinationsTests() {
     })
 
     expect(result).toMatchObject({ success: true, newTaskId: TASK_ID })
-    expect(await taskRow(db, TASK_ID)).toMatchObject({
+    expect(await selectTaskRow(db, TASK_ID)).toMatchObject({
       project_id: 'p-alpha',
       source: 'daily',
       source_ref: localDate(),
     })
-    expect(await taskRow(db, SUBTASK_ID)).toMatchObject({ project_id: 'p-alpha' })
+    expect(await selectTaskRow(db, SUBTASK_ID)).toMatchObject({ project_id: 'p-alpha' })
   })
 
   it('file with an area destination links the task to that area', async () => {
@@ -116,7 +116,7 @@ function taskVaultVaultProcessInboxFilingExistingDestinationsTests() {
 
     await processItem({ taskId: TASK_ID, action: 'file', destination: 'areas/home.md' })
 
-    expect(await taskRow(db, TASK_ID)).toMatchObject({ area_id: 'a-home', project_id: null })
+    expect(await selectTaskRow(db, TASK_ID)).toMatchObject({ area_id: 'a-home', project_id: null })
   })
 }
 
@@ -128,7 +128,7 @@ function taskVaultVaultProcessInboxFilingNewProjectsTests() {
       `SELECT id, status FROM projects WHERE name = 'Brand New Project'`
     )
     expect(project?.status).toBe('active')
-    expect(await taskRow(db, TASK_ID)).toMatchObject({ project_id: project?.id })
+    expect(await selectTaskRow(db, TASK_ID)).toMatchObject({ project_id: project?.id })
   })
 
   it('file with newProjectName reuses the project when it exists', async () => {
@@ -137,7 +137,7 @@ function taskVaultVaultProcessInboxFilingNewProjectsTests() {
     await processItem({ taskId: TASK_ID, action: 'file', newProjectName: 'Existing Project' })
 
     expect(await db.query('SELECT id FROM projects')).toHaveLength(1)
-    expect(await taskRow(db, TASK_ID)).toMatchObject({ project_id: 'p-existing' })
+    expect(await selectTaskRow(db, TASK_ID)).toMatchObject({ project_id: 'p-existing' })
   })
 }
 
@@ -146,7 +146,7 @@ function taskVaultVaultProcessInboxErrorsTests() {
     const result = await processItem({ taskId: TASK_ID, action: 'file' })
 
     expect(result).toMatchObject({ error: 'destination required for action: file' })
-    expect(await taskRow(db, TASK_ID)).toMatchObject({ source: 'inbox' })
+    expect(await selectTaskRow(db, TASK_ID)).toMatchObject({ source: 'inbox' })
   })
 
   it('returns STALE_ID when the task does not exist', async () => {

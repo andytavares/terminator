@@ -81,10 +81,8 @@ async function persistReanchoring(r: Reanchoring): Promise<void> {
   ])
 }
 
-/**
- * Re-checks the stored comments against the live body after a save, which may
- * be newer than the body that was saved: the user can type during the round-trip.
- */
+/** The live body may be newer than the one saved, since typing continues during the round-trip,
+ *  so the stored comments are re-checked against it. */
 export async function reanchorAfterSave(liveBody: string): Promise<void> {
   const r = reanchorComments(useCommentsStore.getState().comments, liveBody)
   if (!hasReanchorChanges(r)) return
@@ -132,11 +130,8 @@ interface CardTarget {
   createdAt: string
 }
 
-/**
- * Push-down layout: each card sits level with its anchor unless the card above
- * would overlap it. Anchor positions come from the editor's live-mapped field,
- * which follows every keystroke, before the stored offsets.
- */
+/** Each card sits level with its anchor unless the card above would overlap it. Anchors come
+ *  from the editor's live-mapped field, which follows every keystroke, before stored offsets. */
 export function layoutCommentCards(view: EditorView, comments: Comment[]): CardLayout {
   const targets = cardTargets(view, comments)
   targets.sort((a, b) => a.targetTop - b.targetTop || a.createdAt.localeCompare(b.createdAt))

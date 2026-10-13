@@ -24,13 +24,13 @@ export function SessionPicker({ onSelect, onClose }: SessionPickerProps): React.
       </span>
     )
   }
-  const choose = (id: string) => {
+  const chooseSession = (id: string) => {
     const s = activeSessions.find((a) => a.sessionId === id)
     if (s) onSelect({ sessionId: s.sessionId, projectId: s.projectId })
   }
   return (
     <span className="daily-log__link-picker">
-      <select onChange={(e) => choose(e.target.value)} defaultValue="">
+      <select onChange={(e) => chooseSession(e.target.value)} defaultValue="">
         <SessionOptions
           sessions={activeSessions}
           labelOf={labelOf}

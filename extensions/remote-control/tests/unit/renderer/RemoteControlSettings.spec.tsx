@@ -8,13 +8,15 @@ import { RemoteControlSettings } from '../../../src/components/RemoteControlSett
 
 const invoke = vi.fn()
 
-function settings(hasPassword: boolean) {
+function settingsReply(hasPassword: boolean) {
   return { enabled: false, port: 7681, maxSubscribers: 5, ngrokAuthToken: '', hasPassword }
 }
 
-function respond(hasPassword: boolean, updatePassword: unknown = { ok: true }) {
+function answerInvokes(hasPassword: boolean, updatePassword: unknown = { ok: true }) {
   invoke.mockImplementation((channel: string) =>
-    Promise.resolve(channel === 'remote:update-password' ? updatePassword : settings(hasPassword))
+    Promise.resolve(
+      channel === 'remote:update-password' ? updatePassword : settingsReply(hasPassword)
+    )
   )
 }
 
@@ -39,13 +41,13 @@ function settingsPasswordTests() {
 
 function settingsPasswordStateTests() {
   it('says whether a password is set without showing it', async () => {
-    respond(true)
+    answerInvokes(true)
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     await waitFor(() => expect(screen.getByText(/A password is set/)).toBeTruthy())
   })
 
   it('says none is set, so Remote Control cannot start yet', async () => {
-    respond(false)
+    answerInvokes(false)
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     await waitFor(() => expect(screen.getByText(/No password is set/)).toBeTruthy())
   })
@@ -53,7 +55,7 @@ function settingsPasswordStateTests() {
 
 function settingsPasswordSetTests() {
   it('sets the typed password on request and clears the field', async () => {
-    respond(false)
+    answerInvokes(false)
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     const field = await screen.findByPlaceholderText('New password')
     fireEvent.change(field, { target: { value: ' chosen-secret ' } })
@@ -68,7 +70,7 @@ function settingsPasswordSetTests() {
 
 function settingsPasswordWithholdTests() {
   it('does not send a password merely because the field lost focus', async () => {
-    respond(true)
+    answerInvokes(true)
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     const field = await screen.findByPlaceholderText('New password')
     fireEvent.focus(field)
@@ -77,7 +79,7 @@ function settingsPasswordWithholdTests() {
   })
 
   it('does not set an empty password', async () => {
-    respond(true)
+    answerInvokes(true)
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     await screen.findByPlaceholderText('New password')
     const button = screen.getByRole('button', { name: 'Set password' }) as HTMLButtonElement
@@ -87,7 +89,7 @@ function settingsPasswordWithholdTests() {
 
 function settingsPasswordGenerateTests() {
   it('shows a generated password once, with a warning that it cannot be shown again', async () => {
-    respond(true, { password: 'generated-abc123' })
+    answerInvokes(true, { password: 'generated-abc123' })
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     await screen.findByPlaceholderText('New password')
     fireEvent.click(screen.getByRole('button', { name: 'Generate new' }))

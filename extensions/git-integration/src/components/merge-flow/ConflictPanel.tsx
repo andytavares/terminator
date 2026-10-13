@@ -11,7 +11,7 @@ interface DiffLine {
 const MAX_DIFF_LINES = 300
 
 /** The text's lines, without the empty one a trailing newline leaves. */
-function splitLines(text: string): string[] {
+function splitTextLines(text: string): string[] {
   const lines = text.split('\n')
   if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
   return lines
@@ -36,7 +36,7 @@ function lcsTable(a: string[], b: string[]): LcsTable {
 }
 
 /** Which way the walk back from (i, j) goes: a shared line, a line only in b, or one only in a. */
-function nextStep(t: LcsTable, i: number, j: number): DiffLine['type'] {
+function lcsNextStep(t: LcsTable, i: number, j: number): DiffLine['type'] {
   if (i > 0 && j > 0 && t.a[i - 1] === t.b[j - 1]) return 'common'
   if (j > 0 && (i === 0 || t.dp[i][j - 1] >= t.dp[i - 1][j])) return 'added'
   return 'removed'
@@ -47,7 +47,7 @@ function walkBack(t: LcsTable): DiffLine[] {
   let i = t.a.length
   let j = t.b.length
   while (i > 0 || j > 0) {
-    const type = nextStep(t, i, j)
+    const type = lcsNextStep(t, i, j)
     if (type === 'added') result.unshift({ line: t.b[j - 1], type })
     else result.unshift({ line: t.a[i - 1], type })
     if (type !== 'added') i--
@@ -61,8 +61,8 @@ function allAs(lines: string[], type: DiffLine['type']): DiffLine[] {
 }
 
 function computeLineDiff(base: string, modified: string): DiffLine[] {
-  const a = splitLines(base)
-  const b = splitLines(modified)
+  const a = splitTextLines(base)
+  const b = splitTextLines(modified)
   if (a.length === 0) return allAs(b, 'added')
   if (b.length === 0) return allAs(a, 'removed')
   if (a.length + b.length > MAX_DIFF_LINES) return allAs(b, 'added')
@@ -96,19 +96,19 @@ function diffLineClass(type: DiffLine['type'], side: DiffCodeViewProps['side']):
 /** Context, diff and context rows, numbered on the new side: removed lines take no number. */
 function codeRows(props: DiffCodeViewProps): CodeRow[] {
   let lineNum = 1
-  const next = () => String(lineNum++)
+  const nextLineNumber = () => String(lineNum++)
   const numberFor = (type: DiffLine['type']) => {
     if (type === 'removed') return ''
-    return next()
+    return nextLineNumber()
   }
-  const context = (keyPrefix: string) => (line: string, idx: number) => ({
+  const contextLineFor = (keyPrefix: string) => (line: string, idx: number) => ({
     key: `${keyPrefix}${idx}`,
     cls: 'conflict-line--context',
-    num: next(),
+    num: nextLineNumber(),
     prefix: ' ',
     line,
   })
-  const before = props.contextBefore.map(context('b'))
+  const before = props.contextBefore.map(contextLineFor('b'))
   const diff = props.diffLines.map(({ line, type }, idx) => ({
     key: `d${idx}`,
     cls: diffLineClass(type, props.side),
@@ -116,7 +116,7 @@ function codeRows(props: DiffCodeViewProps): CodeRow[] {
     prefix: DIFF_PREFIX[type],
     line,
   }))
-  return [...before, ...diff, ...props.contextAfter.map(context('a'))]
+  return [...before, ...diff, ...props.contextAfter.map(contextLineFor('a'))]
 }
 
 function DiffCodeView(props: DiffCodeViewProps) {

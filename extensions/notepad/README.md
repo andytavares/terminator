@@ -16,6 +16,17 @@ Markdown notepad with live preview, margin comments, tags, and full-text search.
 - **Diagrams** — diagram notes with their own comments and tags
 - **Export / Import** — export notes to a folder (`.md`), with comments as sidecar/inline/both; import `.md` files, matching existing notes by frontmatter `id`
 
+## Why the editor behaves as it does
+
+Reasoning the code comments point to (`src/editor/livePreview.ts`, `src/components/NotepadView.tsx`, `src/components/QuickCreateOverlay.tsx`).
+
+- **Fenced code stays raw while it is being typed.** With the caret on the opening fence line the user is still typing the ` ``` ` and its language, so nothing renders; otherwise the line would collapse out from under them mid-keystroke. A fence with no body yet is a block under construction and also stays raw, so it appears only once there is something to show. With the caret in the body the code is styled but both fences stay visible, so the language stays readable and clickable.
+- **Fences, tables and alerts are not gated on `focused`.** That flag flips only on a focus-change event. A stale `false` made a half-typed fence disappear, and kept a table rendered with the caret inside it, so the caret had nowhere to land and the table could not be edited by mouse or keyboard.
+- **Some tables are not drawn as a block.** A table inside a quote carries `> ` on its later lines, which `parseTable` rejects, so it stays raw markdown rather than throwing inside the state field. A table inside a list item does not start at the start of its line, and a block widget may replace only whole lines (a mismatch would take the whole editor down), so it is replaced inline.
+- **Focus is tracked with `EditorView.focusChangeEffect`.** CodeMirror reports a focus change from inside an update, where a plugin may not dispatch ("Calls to EditorView.update are not allowed while an update is in progress"); a plugin that tried crashed, so the caret line never showed its raw markdown. [`focusChangeEffect`](https://codemirror.net/docs/ref/#view.EditorView^focusChangeEffect) turns the change into a state effect instead. A preview switched on in an editor that already has focus sees no change, so a small plugin seeds it.
+- **Cmd+Alt+M and Cmd+Shift+F are handled in the view, not with `globalShortcut`.** They fire only while Terminator is focused and the view is mounted. The Cmd+Alt+M chord matches the `CommandOrControl+Alt+M` accelerator it replaced; keep them in sync so the binding users know does not silently move. The keys are matched on `e.code`: on macOS Option+M types the dead key `µ`, so `e.key === 'm'` never fires while Alt is held.
+- **Quick create is an open surface for double-Escape.** `useDismissible` gives the overlay Escape, focus and a place in the open-surface count that the double-Escape "leave the extension" gesture reads ([ADR 026](../../docs/adr/026-double-escape-extension-exit.md)). Without it the host saw no open modal: focus in the composer was saved by the text-field guard, but focus on any button was not, so two Escapes closed Notepad and took the draft with it. `captureEscape` keeps the capture-phase listener because CodeMirror stops propagation before the document sees the key. The backdrop owns the outside click.
+
 ## Settings
 
 Under **Settings → Extensions → Notepad**:

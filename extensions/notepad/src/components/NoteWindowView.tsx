@@ -15,7 +15,7 @@ import {
   applyStoredAnchors,
   hoveredAnchor,
   useCommentCards,
-  useCommentDraft,
+  useCommentAnchors,
   useCommentHover,
   useMarginScrollSync,
   type ViewRef,
@@ -109,7 +109,7 @@ function useNoteWindow() {
   return {
     ...{ note, loadError, showOutline, setShowOutline, activeCommentId, setActiveCommentId },
     ...{ editorViewRef, commentPanelRef, scheduleAutosave, ...cards },
-    ...{ draft: useCommentDraft(), hover: useCommentHover() },
+    ...{ draft: useCommentAnchors(), hover: useCommentHover() },
   }
 }
 
@@ -146,11 +146,8 @@ async function loadWindowNote(anchorTimerRef: TimerRef): Promise<NoteData | null
   return data
 }
 
-/**
- * Adopts bodies saved by the docked panel so this window and the panel never
- * hold different content for the same note. A local edit still in flight
- * outranks the push.
- */
+/** Adopts bodies the docked panel saved, so both surfaces hold one content per note. A local
+ *  edit still in flight outranks the push. */
 function useAdoptPanelSaves(editorViewRef: ViewRef, setNote: SetNote): void {
   useEffect(() => {
     return onForeignNoteChange((event) => {

@@ -31,7 +31,7 @@ interface CreatedPr {
   pr: PullRequest
 }
 
-async function pushBranch(repoRoot: string): Promise<Failure | null> {
+async function pushBeforePr(repoRoot: string): Promise<Failure | null> {
   const result = await window.electronAPI.shell.exec({
     command: 'git',
     args: ['push', '--set-upstream', 'origin', 'HEAD'],
@@ -85,7 +85,7 @@ async function prepareBranch(
     }
   }
   onStatus('Pushing branch…')
-  return pushBranch(draft.repoRoot)
+  return pushBeforePr(draft.repoRoot)
 }
 
 async function ghPrCreate(
@@ -223,7 +223,7 @@ function submitLabel(isCreating: boolean, isDraft: boolean): string {
   return choose(isDraft, 'Create Draft PR', 'Create PR')
 }
 
-function dialogActions(props: PrDialogProps, form: PrForm, create: PrCreate) {
+function prDialogActions(props: PrDialogProps, form: PrForm, create: PrCreate) {
   const { isCreating } = create
   return [
     { label: 'Cancel', disabled: isCreating, onSelect: props.onClose },
@@ -313,7 +313,7 @@ function BranchGroup({ label, branches }: { label: string; branches: Branch[] })
 
 function BaseField({ form }: { form: PrForm }) {
   const [baseFilter, setBaseFilter] = useState('')
-  const matches = (b: Branch) => b.name.toLowerCase().includes(baseFilter.toLowerCase())
+  const matchesBaseFilter = (b: Branch) => b.name.toLowerCase().includes(baseFilter.toLowerCase())
   return (
     <div className="pr-dialog__field pr-dialog__field--flex">
       <label className="pr-dialog__label">Base branch</label>
@@ -330,8 +330,8 @@ function BaseField({ form }: { form: PrForm }) {
         onChange={(e) => form.setBase(e.target.value)}
         size={6}
       >
-        <BranchGroup label="Local" branches={form.localBranches.filter(matches)} />
-        <BranchGroup label="Remote" branches={form.remoteBranches.filter(matches)} />
+        <BranchGroup label="Local" branches={form.localBranches.filter(matchesBaseFilter)} />
+        <BranchGroup label="Remote" branches={form.remoteBranches.filter(matchesBaseFilter)} />
       </select>
     </div>
   )
@@ -362,7 +362,7 @@ export function PrDialog(props: PrDialogProps): JSX.Element {
     <Dialog
       title="Open Pull Request"
       onDismiss={props.onClose}
-      actions={dialogActions(props, form, create)}
+      actions={prDialogActions(props, form, create)}
     >
       {existingPr && <ExistingPr pr={existingPr} />}
       {isDefaultBranch && (

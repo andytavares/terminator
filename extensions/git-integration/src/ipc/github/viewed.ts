@@ -21,7 +21,7 @@ const ViewedPayload = z.object({
   viewed: z.boolean(),
 })
 
-async function pullRequestNodeId(ctx: GithubContext, pr: PrNode): Promise<string> {
+async function nodeIdOfPullRequest(ctx: GithubContext, pr: PrNode): Promise<string> {
   if (pr.nodeId) return pr.nodeId
   const { owner, repo } = await ctx.ownerAndName(pr.repoRoot)
   const idRaw = await ctx.api(pr.repoRoot, {
@@ -45,7 +45,7 @@ async function setViewed(
   change: { paths: string[]; viewed: boolean }
 ) {
   const { paths, viewed } = change
-  const id = await pullRequestNodeId(ctx, pr)
+  const id = await nodeIdOfPullRequest(ctx, pr)
   const mutation = viewedMutation(viewed)
   const variables = paths.map((_, i) => `$p${i}:String!`).join(',')
   const calls = paths
@@ -69,7 +69,7 @@ async function setOneViewed(
   change: { path: string; viewed: boolean }
 ) {
   const { path, viewed } = change
-  const id = await pullRequestNodeId(ctx, pr)
+  const id = await nodeIdOfPullRequest(ctx, pr)
   const query = `mutation($id:ID!,$p:String!){${viewedMutation(viewed)}(input:{pullRequestId:$id,path:$p}){clientMutationId}}`
   await ctx.api(pr.repoRoot, { path: 'graphql', fields: { query, id, p: path } })
   return { ok: true }

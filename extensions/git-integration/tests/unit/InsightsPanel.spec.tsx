@@ -10,7 +10,7 @@ interface Risk {
   dominantDriver: string
 }
 
-const riskScoreOf = ({ level, composite, dominantDriver }: Risk) => ({
+const insightRiskScore = ({ level, composite, dominantDriver }: Risk) => ({
   level,
   composite,
   metrics: {
@@ -35,7 +35,7 @@ const makeFile = (path: string, risk: Risk, estimatedMinutes = 6) => ({
   isBinary: false,
   tier: 1 as const,
   whyHere: 'test',
-  riskScore: riskScoreOf(risk),
+  riskScore: insightRiskScore(risk),
   estimatedMinutes,
 })
 
@@ -105,7 +105,7 @@ const prHeader = () => ({
 })
 
 /** The "Sharding" chapter holding `files`. */
-const chapterWith = (files: ReturnType<typeof makeFile>[]) => ({
+const chapterOfFiles = (files: ReturnType<typeof makeFile>[]) => ({
   id: 'ch1',
   name: 'Sharding',
   estimatedMinutes: 18,
@@ -286,7 +286,7 @@ describe('InsightsPanel — shows Not measured for risk when no file has a compo
   it('shows "Not measured" for risk when no file has a composite score', () => {
     const pr = buildPr({
       chapters: [
-        chapterWith([
+        chapterOfFiles([
           makeFile(
             'scripts/e2e-shard.ts',
             { level: 'low', composite: null, dominantDriver: 'No dominant risk signal' },

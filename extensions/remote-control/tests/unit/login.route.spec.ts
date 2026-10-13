@@ -22,7 +22,7 @@ beforeEach(async () => {
   })
   app = Fastify({ logger: false })
   await registerAuthMiddleware(app, {
-    hasValidSession: (cookie) => sessionStore.hasValidSession(cookie),
+    hasValidSession: (cookie) => sessionStore.hasLiveSession(cookie),
   })
   await registerLoginRoute(app, {
     getPasswordHash: () => storedHash,

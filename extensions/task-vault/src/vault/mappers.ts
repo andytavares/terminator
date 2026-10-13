@@ -55,12 +55,9 @@ function explicitNoEnd(row: Row): RecurrenceEndFields {
   return fields
 }
 
-/**
- * Recurrence end-conditions, read through the SAME reader the scheduler uses
- * (readRecurrenceEndState) so the UI and ensure-next-occurrence can never
- * disagree about a row — including partially-migrated rows whose column says
- * 'none' while real end-conditions still live in the metadata JSON.
- */
+/** Read through the scheduler's own reader (readRecurrenceEndState), so the UI and
+ *  ensure-next-occurrence agree on every row, including partly migrated ones whose column says
+ *  'none' while the end-conditions still live in the metadata JSON. */
 function recurrenceEndFields(row: Row): RecurrenceEndFields {
   const endState = readRecurrenceEndState(row as Parameters<typeof readRecurrenceEndState>[0])
   if (endState.endType !== 'none') {
@@ -76,7 +73,7 @@ function recurrenceEndFields(row: Row): RecurrenceEndFields {
 }
 
 /** Where the task is filed, as `source/sourceRef` (or just the source). */
-function filePathOf(row: Row): string {
+function rowFilePath(row: Row): string {
   const source = row.source as string
   const sourceRef = row.source_ref as string | null
   if (sourceRef) return `${source}/${sourceRef}`
@@ -88,7 +85,7 @@ export function rowToTask(row: Row): IndexedTask {
   const end = recurrenceEndFields(row)
   return {
     id: row.id as string,
-    filePath: filePathOf(row),
+    filePath: rowFilePath(row),
     line: 0,
     status: row.status as TaskStatus,
     text: row.text as string,
