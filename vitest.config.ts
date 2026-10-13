@@ -1,4 +1,3 @@
-/* v8 ignore file */
 import { defineConfig, configDefaults } from 'vitest/config'
 import { resolve } from 'path'
 
