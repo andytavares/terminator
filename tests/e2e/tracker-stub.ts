@@ -5,7 +5,7 @@ import { createServer as createHttpsServer } from 'node:https'
 import type { AddressInfo, Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readJsonBody, sendJson } from './stub-http'
+import { readJsonBody, sendJson, type StubServer } from './stub-http'
 import { answerJira, type JiraState } from './tracker-stub-jira'
 import { answerLinear, type LinearState } from './tracker-stub-linear'
 
@@ -16,14 +16,13 @@ import { answerLinear, type LinearState } from './tracker-stub-linear'
 const LINEAR_HOST = 'api.linear.app'
 export const JIRA_SITE = 'acme.atlassian.net'
 
-export interface TrackerStub {
+export interface TrackerStub extends StubServer {
   /** Environment the app needs for its tracker calls to reach this stub. */
   env: Record<string, string>
   linear: LinearState
   jira: JiraState
   /** Each tunnel the app opened and each TLS handshake it refused, for a failure message. */
   diagnostics: string[]
-  shutDown(): Promise<void>
 }
 
 // Every extension and the digest are written out, so the certificates do not

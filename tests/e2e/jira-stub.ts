@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
 import { closeSettingsPanel, openSettingsSection } from './helpers'
-import { readJsonBody, sendJson } from './stub-http'
+import { readJsonBody, sendJson, type StubServer } from './stub-http'
 
 // A local Jira Cloud REST v3. The app's Jira client speaks only https, so the stub serves TLS
 // from a throwaway CA the app trusts through NODE_EXTRA_CA_CERTS
@@ -19,7 +19,7 @@ export interface StubIssue {
   status: 'To Do' | 'In Progress' | 'Done'
 }
 
-export interface JiraStub {
+export interface JiraStub extends StubServer {
   /** What the app's "Site" field takes: host and port, no scheme. */
   site: string
   /** The CA the app must trust, for NODE_EXTRA_CA_CERTS. */
@@ -28,7 +28,6 @@ export interface JiraStub {
   requests: string[]
   /** Comments the app posted, by issue key, as plain text. */
   comments: Map<string, string[]>
-  shutDown(): Promise<void>
 }
 
 const OPERATOR = 'operator@example.com'

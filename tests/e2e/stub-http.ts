@@ -1,5 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
+/** A stub server a spec starts and stops. */
+export interface StubServer {
+  /** Stops the server; resolves once it has. */
+  shutDown(): Promise<void>
+}
+
 /** The whole body of a request to a stub server, as text. */
 export function readRequestBody(request: IncomingMessage): Promise<string> {
   return new Promise((resolve) => {

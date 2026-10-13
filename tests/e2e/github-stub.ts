@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readRequestBody } from './stub-http'
+import { readRequestBody, type StubServer } from './stub-http'
 import {
   addPullRequest,
   findPullRequest,
@@ -26,7 +26,7 @@ export interface GithubStubOptions {
   viewer?: string
 }
 
-export interface GithubStub {
+export interface GithubStub extends StubServer {
   owner: string
   name: string
   viewer: string
@@ -37,7 +37,6 @@ export interface GithubStub {
   calls: GhCall[]
   openPullRequest(input: NewStubPullRequest): StubPullRequest
   pullRequest(number: number): StubPullRequest
-  shutDown(): Promise<void>
 }
 
 /** Starts the stub; pass its `env` to `launchApp`. */
