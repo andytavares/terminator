@@ -72,7 +72,7 @@ describe('FlowControl — reset', () => {
   it('resumes a paused process and forgets what was owed when reset', () => {
     const { flow, output } = makeFlow()
     flow.sent(HIGH_WATERMARK_CHARS + 1)
-    flow.reset()
+    flow.forgetOwed()
     expect(output.resume).toHaveBeenCalledTimes(1)
 
     flow.sent(HIGH_WATERMARK_CHARS)
@@ -82,7 +82,7 @@ describe('FlowControl — reset', () => {
   it('does not resume on reset when it never paused', () => {
     const { flow, output } = makeFlow()
     flow.sent(10)
-    flow.reset()
+    flow.forgetOwed()
     expect(output.resume).not.toHaveBeenCalled()
   })
 })

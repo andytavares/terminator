@@ -16,13 +16,13 @@ export class BatchedPtyStream {
     const batcher = new OutputBatcher((data) => {
       if (active) listener(data)
     })
-    const dispose = this.source.onData(sessionId, (data) => batcher.push(data))
-    if (!dispose) return () => {}
+    const unsubscribe = this.source.onData(sessionId, (data) => batcher.push(data))
+    if (!unsubscribe) return () => {}
     const batchers = this.batchersOf(sessionId)
     batchers.add(batcher)
     return () => {
       active = false
-      dispose()
+      unsubscribe()
       batchers.delete(batcher)
     }
   }

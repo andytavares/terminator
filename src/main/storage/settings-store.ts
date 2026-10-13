@@ -65,7 +65,7 @@ export interface WorkspaceExtensionSettingChange {
   value?: unknown
 }
 
-export function updateWorkspaceExtensionSetting(
+export function writeWorkspaceExtensionSetting(
   workspaceId: string,
   change: WorkspaceExtensionSettingChange
 ): WorkspaceSettings {

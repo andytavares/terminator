@@ -115,7 +115,7 @@ function catalogueChannels(extensionHost: ExtensionHost): ChannelSpec[] {
       channel: 'extension:list',
       schema: noPayload,
       invalid,
-      run: () => ({ extensions: extensionHost.listExtensions() }),
+      run: () => ({ extensions: extensionHost.listAll() }),
     }),
     defineChannel({
       channel: 'extension:install',
@@ -133,7 +133,7 @@ function enablementChannels(extensionHost: ExtensionHost): ChannelSpec[] {
       schema: z.object({ id: z.string().min(1), enabled: z.boolean() }),
       invalid,
       run: async ({ id, enabled }) => {
-        const extension = await extensionHost.toggle(id, enabled)
+        const extension = await extensionHost.setEnabled(id, enabled)
         if (!extension) return { error: 'NOT_FOUND' }
         return { extension }
       },
@@ -143,7 +143,7 @@ function enablementChannels(extensionHost: ExtensionHost): ChannelSpec[] {
       schema: IdSchema,
       invalid,
       run: async ({ id }) => {
-        const removed = await extensionHost.uninstall(id)
+        const removed = await extensionHost.uninstallExtension(id)
         if (!removed) return { error: 'NOT_FOUND' }
         return { ok: true }
       },
@@ -160,7 +160,7 @@ function reloadChannel(
     schema: IdSchema,
     invalid,
     run: async ({ id }) => {
-      const result = await extensionHost.reload(id)
+      const result = await extensionHost.reloadExtension(id)
       if (!('error' in result)) broadcast('extension:renderer-reload', { id })
       return result
     },
@@ -179,7 +179,7 @@ function panelBoundsChannel(
       // A view talks to its extension's backend as soon as it loads.
       await extensionHost.whenActivated(placement.extensionId)
       await getViewHost()?.updatePanelBounds(
-        () => extensionHost.listExtensions().find((e) => e.id === placement.extensionId),
+        () => extensionHost.listAll().find((e) => e.id === placement.extensionId),
         placement
       )
     },

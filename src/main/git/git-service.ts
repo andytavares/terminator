@@ -1,17 +1,17 @@
 import { join } from 'path'
 import type { Branch, WorktreeInfo } from '../../shared/types/index.js'
 import type { ChangeStats } from '../../shared/schemas/git.schema.js'
-import { runCommand } from '../shell/command-runner.js'
+import { runTextCommand } from '../shell/command-runner.js'
 import { GIT_ENV } from './git-env.js'
 
 const GIT_TIMEOUT = 10_000
 const FETCH_TIMEOUT = 60_000
 
 /** Runs git and resolves with its trimmed stdout, or rejects with its stderr. Through
- * runCommand, so a git still running when the app quits is stopped with whatever it started
+ * runTextCommand, so a git still running when the app quits is stopped with whatever it started
  * (stopRunningCommands). */
 async function git(args: string[], cwd: string, timeoutMs = GIT_TIMEOUT): Promise<string> {
-  const result = await runCommand({ command: 'git', args, cwd, timeoutMs }, GIT_ENV)
+  const result = await runTextCommand({ command: 'git', args, cwd, timeoutMs }, GIT_ENV)
   if (result.exitCode !== 0) {
     throw new Error(`Command failed: git ${args.join(' ')}\n${result.stderr}`)
   }

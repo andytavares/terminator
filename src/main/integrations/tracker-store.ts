@@ -95,7 +95,7 @@ function serialized<T>(op: (file: string) => Promise<T>): Promise<T> {
   return run
 }
 
-function change(edit: (data: StoreFile) => void): Promise<void> {
+function editStoreFile(edit: (data: StoreFile) => void): Promise<void> {
   return serialized(async (file) => {
     const data = await read(file)
     edit(data)
@@ -104,7 +104,7 @@ function change(edit: (data: StoreFile) => void): Promise<void> {
 }
 
 function update(tracker: TrackerId, patch: Partial<StoredTracker>): Promise<void> {
-  return change((data) => {
+  return editStoreFile((data) => {
     data[tracker] = { ...data[tracker], ...patch }
   })
 }
@@ -137,7 +137,7 @@ export async function getCredential(tracker: TrackerId): Promise<StoredCredentia
 }
 
 export function clearCredential(tracker: TrackerId): Promise<void> {
-  return change((data) => {
+  return editStoreFile((data) => {
     // The mine selector survives a disconnect: it is the operator's
     // configuration, not the credential's, and retyping a JQL query because a
     // token expired is a small insult that adds up.
@@ -209,7 +209,7 @@ export async function migrateLegacyCredentials(): Promise<void> {
   }
 
   try {
-    await change((data) => adoptLegacy(data, legacy))
+    await editStoreFile((data) => adoptLegacy(data, legacy))
     await fs.rename(legacyPath(), `${legacyPath()}.bak`)
   } catch {
     // A migration that cannot finish leaves the legacy file in place so it can

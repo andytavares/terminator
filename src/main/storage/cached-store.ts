@@ -18,7 +18,7 @@ export class CachedStore<Schema extends object> {
   }
 
   /** Calls `listener` after any change, this store's own writes and other processes' alike. */
-  onChange(listener: () => void): () => void {
+  onAnyChange(listener: () => void): () => void {
     return this.store.onDidAnyChange(() => listener())
   }
 

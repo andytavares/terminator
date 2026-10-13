@@ -35,7 +35,7 @@ export class FlowControl {
   }
 
   /** Forget what is owed: the renderer that owed it is gone or starting over. */
-  reset(): void {
+  forgetOwed(): void {
     this.unacknowledged = 0
     if (this.paused) this.resumeOutput()
   }

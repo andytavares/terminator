@@ -146,7 +146,7 @@ class NotificationManager {
     return id
   }
 
-  dismiss(id: string): void {
+  dismissNotification(id: string): void {
     this.records.delete(id)
   }
 
@@ -160,7 +160,7 @@ class NotificationManager {
     // asked for teaches you to dismiss without reading — approve a phase and
     // the request to approve that phase is still sitting there. Opening the
     // thing is not a decision, though, so it leaves the row alone.
-    if (actionId !== OPEN_ACTION_ID) this.dismiss(notifId)
+    if (actionId !== OPEN_ACTION_ID) this.dismissNotification(notifId)
     return { ok: true }
   }
 

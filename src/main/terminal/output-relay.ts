@@ -16,7 +16,7 @@ export class OutputRelay {
     private readonly send: RendererSend
   ) {}
 
-  start(sessionId: string): void {
+  startRelaying(sessionId: string): void {
     const flow = new FlowControl({
       pause: () => this.ptyManager.pause(sessionId),
       resume: () => this.ptyManager.resume(sessionId),
@@ -34,12 +34,12 @@ export class OutputRelay {
   }
 
   /** The renderer has written `count` characters of this session's output. */
-  acknowledge(sessionId: string, count: number): void {
+  acknowledgeOutput(sessionId: string, count: number): void {
     this.flows.get(sessionId)?.acknowledged(count)
   }
 
   /** A renderer has just attached: whatever the previous one owed is forgotten. */
-  reset(sessionId: string): void {
-    this.flows.get(sessionId)?.reset()
+  rendererAttached(sessionId: string): void {
+    this.flows.get(sessionId)?.forgetOwed()
   }
 }

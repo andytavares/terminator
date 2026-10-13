@@ -1,7 +1,8 @@
 import { runProcess, type ShellExecInput, type ShellExecOutput } from './command-runner.js'
 import { loginShellPathReady } from './login-shell-path.js'
+import { isPathWithin } from '../fs/path-within.js'
 import { realpath } from 'fs/promises'
-import { basename, dirname, isAbsolute, join, relative, sep } from 'path'
+import { basename, dirname, isAbsolute, join } from 'path'
 
 export type { ShellExecInput, ShellExecOutput } from './command-runner.js'
 
@@ -38,7 +39,7 @@ export async function assertCwdInScope(cwd: string, roots: readonly string[]): P
   if (!isAbsolute(cwd)) throw new CwdOutOfScopeError(cwd)
   const real = await realPathOf(cwd)
   const realRoots = await Promise.all(roots.filter((root) => isAbsolute(root)).map(realPathOf))
-  if (!realRoots.some((root) => isWithin(real, root))) throw new CwdOutOfScopeError(cwd)
+  if (!realRoots.some((root) => isPathWithin(real, root))) throw new CwdOutOfScopeError(cwd)
 }
 
 /** The real path of `target`, or of its nearest existing ancestor with the rest appended: a
@@ -52,11 +53,6 @@ async function realPathOf(target: string): Promise<string> {
 }
 
 /** A path-segment check: `/a/bc` is not within `/a/b`. */
-function isWithin(path: string, root: string): boolean {
-  const rel = relative(root, path)
-  return rel === '' || (!isAbsolute(rel) && rel !== '..' && !rel.startsWith(`..${sep}`))
-}
-
 function baseEnvironment(): NodeJS.ProcessEnv {
   return {
     PATH: process.env.PATH,

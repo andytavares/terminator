@@ -1,5 +1,6 @@
 import { onChannel } from './channel-registrar.js'
 import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
+import { validationError } from './validation-error.js'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { getLink } from '../integrations/issue-link-store.js'
 import { readContextFile } from '../integrations/agent-context.js'
@@ -114,8 +115,8 @@ function createChannel(context: TerminalContext): ChannelSpec {
   return defineChannel({
     channel: 'terminal:create',
     schema: CreateTerminalSchema,
-    invalid: (error: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: error.message }),
-    run: (input) => createTerminal(context, input),
+    invalid: validationError,
+    run: (input) => createTerminalSession(context, input),
     // Reported rather than thrown, so the renderer can say which folder is
     // gone. A branch whose worktree was deleted outside the app otherwise
     // produced a tab that died instantly with nothing written in it.
@@ -156,7 +157,7 @@ function attachChannel({ ptyManager, relay }: TerminalContext): ChannelSpec {
     // printed before now was held back rather than dropped.
     run: ({ sessionId }) => {
       // A renderer attaching owes nothing for output an earlier one was sent.
-      relay.reset(sessionId)
+      relay.rendererAttached(sessionId)
       return { released: ptyManager.releaseOutput(sessionId) }
     },
   })
@@ -204,7 +205,7 @@ function registerStreamHandlers({ ptyManager, relay }: TerminalContext): void {
 
   onChannel('terminal:acknowledge', (_event, payload) => {
     const parsed = TerminalAcknowledgeSchema.safeParse(payload)
-    if (parsed.success) relay.acknowledge(parsed.data.sessionId, parsed.data.count)
+    if (parsed.success) relay.acknowledgeOutput(parsed.data.sessionId, parsed.data.count)
   })
 
   onChannel('terminal:resize', (_event, payload) => {
@@ -232,7 +233,7 @@ export function registerTerminalHandlers(
   registerStreamHandlers(context)
 }
 
-function createTerminal(
+function createTerminalSession(
   { ptyManager, getWindow, relay }: TerminalContext,
   input: z.infer<typeof CreateTerminalSchema>
 ): { sessionId: string; shell: string } {
@@ -252,7 +253,7 @@ function createTerminal(
     // application or by hand — can be placed against this session (ADR 055).
     env: { ...issueEnvFor(projectId), TERMINATOR_SESSION_ID: sessionId },
   })
-  relay.start(sessionId)
+  relay.startRelaying(sessionId)
   void announceIssueContext(projectId, sessionId, getWindow)
 
   // Written straight in: the line discipline holds it until the shell reads

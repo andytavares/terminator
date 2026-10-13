@@ -2,6 +2,7 @@ import { shell } from 'electron'
 import { homedir } from 'os'
 import { z } from 'zod'
 import { defineChannel } from '@terminator/extension-sdk'
+import { validationError } from './validation-error.js'
 import { registerInvokeTable } from './invoke-table.js'
 import {
   execShell,
@@ -46,7 +47,7 @@ const openExternalChannel = defineChannel({
 const execChannel = defineChannel({
   channel: 'shell:exec',
   schema: ShellExecPayloadSchema,
-  invalid: (error: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: error.message }),
+  invalid: validationError,
   run: async ({ command, args, cwd, timeoutMs = 10000, workspaceRoot }) => {
     if (workspaceRoot) await assertCwdInScope(cwd, [workspaceRoot])
     return await execShell({ command, args, cwd, timeoutMs })

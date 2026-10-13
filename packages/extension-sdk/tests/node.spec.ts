@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { moveFromUserData, writeJsonAtomic } from '@terminator/extension-sdk/node'
+import { moveFromUserData, shellQuote, writeJsonAtomic } from '@terminator/extension-sdk/node'
 import { makeTempDir } from '../../../tests/support/temp-dir'
 
 describe('writeJsonAtomic', () => {
@@ -41,7 +41,7 @@ let globalStorage: string
 
 const warn = vi.fn()
 
-const api = () => ({ paths: { app: '/app', globalStorage }, log: { warn } })
+const fakeApi = () => ({ paths: { app: '/app', globalStorage }, log: { warn } })
 
 /** The hooks every "moveFromUserData" describe registers. */
 function setUpMoveFromUserData(): void {
@@ -64,7 +64,7 @@ describe('moveFromUserData', () => {
     writeFileSync(join(userData, 'tool', 'orders', 'ledger.jsonl'), '{"n":1}\n')
     writeFileSync(join(userData, 'tool-state.json'), '{"open":true}')
 
-    const outcomes = moveFromUserData(api(), [
+    const outcomes = moveFromUserData(fakeApi(), [
       { from: 'tool', to: 'records' },
       { from: 'tool-state.json', to: 'state.json' },
     ])
@@ -81,9 +81,11 @@ describe('moveFromUserData', () => {
 
   it('moves nothing on a later activation, once the data is in globalStorage', () => {
     mkdirSync(join(userData, 'tool'))
-    moveFromUserData(api(), [{ from: 'tool', to: 'records' }])
+    moveFromUserData(fakeApi(), [{ from: 'tool', to: 'records' }])
 
-    expect(moveFromUserData(api(), [{ from: 'tool', to: 'records' }])).toEqual(['nothing-to-move'])
+    expect(moveFromUserData(fakeApi(), [{ from: 'tool', to: 'records' }])).toEqual([
+      'nothing-to-move',
+    ])
     expect(existsSync(join(globalStorage, 'records'))).toBe(true)
   })
 })
@@ -97,14 +99,26 @@ describe('moveFromUserData — leaves both copies untouched when the new locatio
     mkdirSync(join(globalStorage, 'records'), { recursive: true })
     writeFileSync(join(globalStorage, 'records', 'ledger.jsonl'), 'new')
 
-    expect(moveFromUserData(api(), [{ from: 'tool', to: 'records' }])).toEqual(['kept-both'])
+    expect(moveFromUserData(fakeApi(), [{ from: 'tool', to: 'records' }])).toEqual(['kept-both'])
     expect(readFileSync(join(userData, 'tool', 'ledger.jsonl'), 'utf8')).toBe('old')
     expect(readFileSync(join(globalStorage, 'records', 'ledger.jsonl'), 'utf8')).toBe('new')
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(join(userData, 'tool')))
   })
 
   it('creates nothing when there is nothing to move', () => {
-    expect(moveFromUserData(api(), [{ from: 'tool', to: 'records' }])).toEqual(['nothing-to-move'])
+    expect(moveFromUserData(fakeApi(), [{ from: 'tool', to: 'records' }])).toEqual([
+      'nothing-to-move',
+    ])
     expect(existsSync(globalStorage)).toBe(false)
+  })
+})
+
+describe('shellQuote', () => {
+  it('single-quotes a value so a POSIX shell reads it as one word', () => {
+    expect(shellQuote('/Users/me/My Project')).toBe("'/Users/me/My Project'")
+  })
+
+  it("closes, escapes and reopens the quotes around a value's own single quote", () => {
+    expect(shellQuote("it's")).toBe("'it'\\''s'")
   })
 })

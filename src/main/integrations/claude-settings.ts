@@ -14,11 +14,6 @@ interface HookEntry {
   hooks?: Array<{ command?: string }>
 }
 
-/** Single-quoted for a POSIX shell, which is what runs a hook command. */
-export function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
-
 /** True when the entry runs a command containing `marker`. */
 export function runsCommandContaining(entry: unknown, marker: string): boolean {
   const hooks = (entry as HookEntry | null)?.hooks

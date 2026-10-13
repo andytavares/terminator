@@ -80,7 +80,7 @@ const extensionHostProcess: ExtensionHostProcess = new ExtensionHostProcess({
     workspaces: workspacesOf(coreView.workspace),
     trackers: trackerAbilitiesOf(coreView.issues),
   }),
-  apiFor: (id) => extensionHost.hostedApi(id),
+  apiFor: (id) => extensionHost.apiOf(id),
   onBackendsFailed: (ids, message) => extensionHost.failHostedBackends(ids, message),
   log: (message) => logger.warn(message),
 })
@@ -364,7 +364,7 @@ function registerExtensionViewChannels(): void {
     if (!viewHost || !mainWindow || mainWindow.isDestroyed()) return
     routeExtensionExitRequest(event.sender, {
       findViewByWebContents: (wc) => viewHost!.findViewByWebContents(wc),
-      listExtensions: () => extensionHost.listExtensions(),
+      listExtensions: () => extensionHost.listAll(),
       focusMainRenderer: () => {
         viewHost!.noteFocused(null)
         mainWindow!.webContents.focus()
@@ -487,7 +487,7 @@ function startExtensions(
   userData: string
 ): void {
   extensionHost
-    .start({
+    .startAll({
       bundledDirectory: join(__dirname, '../../extensions'),
       beforeActivation: loginShellPath,
       afterActivation: importLegacy ? () => importLegacyDatabase(userData, getAppDb()) : undefined,
@@ -550,7 +550,7 @@ app.on('before-quit', async (event) => {
   event.preventDefault()
   isQuitting = true
   await extensionHost.unloadAll()
-  extensionHostProcess.stop()
+  extensionHostProcess.stopHost()
   // After the extensions, which start most of them: a git or gh command still
   // running, and whatever it started, would outlive the app.
   stopRunningCommands()

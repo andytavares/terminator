@@ -49,3 +49,8 @@ function movePath(legacy: string, target: string): UserDataMoveOutcome {
   renameSync(legacy, target)
   return 'moved'
 }
+
+/** `value` single-quoted for a POSIX shell, so it reads as one word whatever it holds. */
+export function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}

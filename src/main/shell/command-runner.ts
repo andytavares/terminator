@@ -71,9 +71,9 @@ interface CommandRun {
 }
 
 /** Keeps each stream's output up to `maxBuffer` bytes; past it the command is stopped. */
-function collectOutput(run: CommandRun, input: ShellExecInput): void {
+function collectCommandOutput(run: CommandRun, input: ShellExecInput): void {
   const limit = input.maxBuffer ?? DEFAULT_MAX_BUFFER
-  const keep = (stream: 'stdout' | 'stderr') => {
+  const collectStream = (stream: 'stdout' | 'stderr') => {
     const decoder = new StringDecoder('utf8')
     let bytes = 0
     return (chunk: Buffer): void => {
@@ -84,8 +84,8 @@ function collectOutput(run: CommandRun, input: ShellExecInput): void {
       stopGroup(run.child)
     }
   }
-  run.child.stdout?.on('data', keep('stdout'))
-  run.child.stderr?.on('data', keep('stderr'))
+  run.child.stdout?.on('data', collectStream('stdout'))
+  run.child.stderr?.on('data', collectStream('stderr'))
 }
 
 function startCommand(input: ShellExecInput, environment: NodeJS.ProcessEnv): CommandRun {
@@ -104,7 +104,7 @@ function startCommand(input: ShellExecInput, environment: NodeJS.ProcessEnv): Co
     exceededMaxBuffer: false,
   }
   running.add(child)
-  collectOutput(run, input)
+  collectCommandOutput(run, input)
   // A command that has exited, or never started, cannot take its input.
   child.stdin?.on('error', () => {})
   if (input.input !== undefined) child.stdin?.end(input.input)
@@ -177,7 +177,7 @@ export function runProcess(
 /**
  * Runs a command in `environment` as given, and resolves with its output as text.
  */
-export async function runCommand(
+export async function runTextCommand(
   input: Omit<ShellExecInput, 'encoding'>,
   environment: NodeJS.ProcessEnv
 ): Promise<ShellExecOutput> {

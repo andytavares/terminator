@@ -2,7 +2,8 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { app } from 'electron'
 import { sessionContextDirectory } from '../integrations/session-context.js'
-import { putSessionStartHook, shellQuote } from '../integrations/claude-settings.js'
+import { shellQuote } from '@terminator/extension-sdk/node'
+import { putSessionStartHook } from '../integrations/claude-settings.js'
 
 // How a conversation comes to be known.
 //

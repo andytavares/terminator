@@ -16,12 +16,12 @@ vi.mock('os', () => ({
   totalmem: mockTotalmem,
 }))
 
-// metrics.ipc.ts runs netstat and ps through runCommand; this fake gets the
+// metrics.ipc.ts runs netstat and ps through runTextCommand; this fake gets the
 // command, its arguments and its options, and resolves with the output or rejects.
 const mockExecFile = vi.fn()
 const mockReadFile = vi.fn()
 vi.mock('../../../src/main/shell/command-runner.js', () => ({
-  runCommand: (input: { command: string; args: string[]; timeoutMs: number }) =>
+  runTextCommand: (input: { command: string; args: string[]; timeoutMs: number }) =>
     Promise.resolve(mockExecFile(input.command, input.args, { timeout: input.timeoutMs })).then(
       ({ stdout }: { stdout: string }) => ({ exitCode: 0, stdout, stderr: '' }),
       (error: Error) => ({ exitCode: 1, stdout: '', stderr: error.message })

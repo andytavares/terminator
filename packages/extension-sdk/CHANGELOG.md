@@ -6,6 +6,8 @@ Minor: 4.1.0. Every addition is optional, so an extension built for 4.0.0 runs u
 
 ### Added
 
+- `@terminator/extension-sdk/node`: `shellQuote(value)`, a value single-quoted for a POSIX shell.
+  The core's hook commands use it; Foundry kept a copy of the same function.
 - `settings.get(key, { repoPath })` (`SettingScope`): a `workspaceScoped` setting resolves to the
   value the workspace owning `repoPath` sets for itself, else the global value, else the schema's
   default. Without a scope it is the global value, as before. Workspace Settings shows every

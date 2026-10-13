@@ -37,7 +37,7 @@ beforeEach(async () => {
   await records.loadRecords()
   await links.loadLinks()
   for (const notification of notificationManager.list())
-    notificationManager.dismiss(notification.id)
+    notificationManager.dismissNotification(notification.id)
   updateGlobalSettings({ terminal: { defaultShell: '/bin/zsh' } })
 })
 

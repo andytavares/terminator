@@ -85,7 +85,7 @@ async function hostedApi(contributes: Record<string, unknown> = {}): Promise<Ext
     JSON.stringify({ ...manifest, minAppVersion: '0.0.1', contributes })
   )
   await host.load(extension)
-  return host.hostedApi(ID)!
+  return host.apiOf(ID)!
 }
 
 function registerFolderSetting(api: ExtensionAPI, type: 'folder' | 'string' = 'folder'): void {

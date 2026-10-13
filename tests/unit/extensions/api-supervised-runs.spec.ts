@@ -94,7 +94,7 @@ function build(withWindow = true) {
   }
   return createExtensionAPI('test.pilot', {
     ptyManager: ptyManager as never,
-    terminalRelay: { start: (id: string) => relayed.push(id) } as never,
+    terminalRelay: { startRelaying: (id: string) => relayed.push(id) } as never,
     broadcastToWindows: withWindow
       ? (channel: string, payload: unknown) =>
           broadcasts.push({ channel, payload: payload as Record<string, unknown> })

@@ -77,7 +77,7 @@ type Gh = (call: GhCall) => Promise<string>
 
 function ghRunner(run: RunCommand): Gh {
   return async (call) => {
-    const attempt = (token: string | undefined) =>
+    const runGh = (token: string | undefined) =>
       run({
         command: 'gh',
         args: call.args,
@@ -87,25 +87,25 @@ function ghRunner(run: RunCommand): Gh {
         ...(call.input === undefined ? {} : { input: call.input }),
         env: environment(call.target, token),
       })
-    let output = await attempt(call.target.token)
+    let output = await runGh(call.target.token)
     // An expired configured token must not hide gh's own login, which may still work.
     if (output.exitCode !== 0 && call.target.token && isAuthenticationFailure(output)) {
-      output = await attempt(undefined)
+      output = await runGh(undefined)
     }
     if (output.exitCode !== 0) throw new GhCommandError(output)
     return output.stdout
   }
 }
 
-function pullRequestVerbs(gh: Gh): GithubAPI['pullRequests'] {
-  const json = async <T>(call: GhCall) => JSON.parse(await gh(call)) as T
+function ghPullRequestVerbs(gh: Gh): GithubAPI['pullRequests'] {
+  const ghJson = async <T>(call: GhCall) => JSON.parse(await gh(call)) as T
   return {
     view: (target, pullRequest, fields) =>
-      json({ target, args: ['pr', 'view', String(pullRequest), '--json', fields.join(',')] }),
+      ghJson({ target, args: ['pr', 'view', String(pullRequest), '--json', fields.join(',')] }),
     list: (target, { state, search, limit, fields }) => {
       const args = ['pr', 'list', '--state', state, ...(search ? ['--search', search] : [])]
       args.push('--limit', String(limit), '--json', fields.join(','))
-      return json({ target, args })
+      return ghJson({ target, args })
     },
     create: async (target, { title, body, base, head, draft }) => {
       const args = ['pr', 'create', '--title', title, '--body', body, '--base', base]
@@ -132,7 +132,7 @@ export function createGithubApi(run: RunCommand): GithubAPI {
         maxBuffer: request.maxBuffer,
         input: request.body === undefined ? undefined : JSON.stringify(request.body),
       }),
-    pullRequests: pullRequestVerbs(gh),
+    pullRequests: ghPullRequestVerbs(gh),
     repositories: {
       view: async (target, fields) =>
         JSON.parse(await gh({ target, args: ['repo', 'view', '--json', fields.join(',')] })),

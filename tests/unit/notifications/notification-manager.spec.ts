@@ -371,7 +371,7 @@ describe('NotificationManager.list', () => {
 describe('NotificationManager.dismiss', () => {
   it('removes the notification so it no longer appears in list', () => {
     const id = notificationManager.create({ type: 'info', title: 'To dismiss', key: 'dismissKey' })
-    notificationManager.dismiss(id)
+    notificationManager.dismissNotification(id)
     expect(notificationManager.list().some((n) => n.id === id)).toBe(false)
   })
 })

@@ -47,7 +47,7 @@ export class CallbackRegistry {
   }
 
   /** Calls the callback `id`; one already released is not called. */
-  invoke(id: number, args: unknown[]): unknown {
+  invokeById(id: number, args: unknown[]): unknown {
     return this.callbacks.get(id)?.(...args)
   }
 

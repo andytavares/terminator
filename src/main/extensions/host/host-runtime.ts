@@ -47,7 +47,7 @@ export class HostRuntime {
     this.snapshot = snapshot
     this.db = db
     this.loader = loader
-    endpoint.handle('activate', (record: BackendRecord) => this.activate(record))
+    endpoint.handle('activate', (record: BackendRecord) => this.loadAndActivate(record))
     endpoint.handle('deactivate', (id: string) => this.deactivate(id))
     endpoint.handle('channel.dispatch', (_id: string, channel: string, payload: unknown) =>
       this.dispatch(channel, payload)
@@ -56,7 +56,7 @@ export class HostRuntime {
       this.runCommand(`${extensionId}.command.${commandId}`, context, args)
     )
     endpoint.handle('callback', (id: string, callbackId: number, args: unknown[]) =>
-      this.active.get(id)?.callbacks.invoke(callbackId, args)
+      this.active.get(id)?.callbacks.invokeById(callbackId, args)
     )
     endpoint.handle('settings.changed', (settings: ExtensionSettingsSnapshot) => {
       snapshot.settings = settings
@@ -68,7 +68,7 @@ export class HostRuntime {
 
   /** Requires the backend and runs its activate. A backend that fails, like one deactivated,
    * leaves the require cache, so its next activation (a reload) runs the code on disk then. */
-  private async activate(record: BackendRecord): Promise<void> {
+  private async loadAndActivate(record: BackendRecord): Promise<void> {
     try {
       const module = this.loader.load(record.entryPoint)
       const active: Active = {

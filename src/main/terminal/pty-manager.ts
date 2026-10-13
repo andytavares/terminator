@@ -86,7 +86,7 @@ function assertUsableCwd(cwd: string): void {
   if (!isDirectory) throw new MissingCwdError(cwd)
 }
 
-function startSession(opts: SpawnSessionOptions): ActiveSession {
+function spawnPtySession(opts: SpawnSessionOptions): ActiveSession {
   const ptyProcess = pty.spawn(opts.shell, opts.args ?? ['-l'], {
     name: 'xterm-256color',
     cols: 80,
@@ -158,7 +158,7 @@ export class PtyManager {
     // the operator exited.
     assertUsableCwd(opts.cwd)
 
-    const session = startSession(opts)
+    const session = spawnPtySession(opts)
     session.pty.onData((data) => deliverOrHold(session, data))
     session.pty.onExit((exit) => this.endSession(session, exit))
 
