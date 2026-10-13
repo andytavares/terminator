@@ -261,13 +261,14 @@ describe('registerTerminalHandlers — terminal:create explicit shell', () => {
 
 /** A project in a new workspace whose own default shell is `shell`. */
 function projectInWorkspaceUsing(shell: string): string {
-  const created = createWorkspace({ name: `ws ${shell}`, folderPath: '/repo' })
+  const created = createWorkspace({ name: `ws ${shell}`, folderPath: '/repo', color: '', tags: [] })
   if (!('workspace' in created)) throw new Error('workspace not created')
   updateWorkspaceSettings(created.workspace.id, { terminal: { defaultShell: shell } })
   const made = createProject({
     workspaceId: created.workspace.id,
     name: 'main',
     worktreePath: '/repo',
+    isWorktree: false,
   })
   if (!('project' in made)) throw new Error('project not created')
   return made.project.id

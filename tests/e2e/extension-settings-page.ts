@@ -7,7 +7,7 @@ import { openSettings } from './helpers'
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 /** The extension's entry in Settings → Extensions, by the name it is listed under. */
-export function extensionEntry(page: Page, name: string): Locator {
+function extensionEntry(page: Page, name: string): Locator {
   return page
     .locator('.extension-item-wrapper')
     .filter({ has: page.locator('.extension-item__name', { hasText: new RegExp(`^${name}$`) }) })

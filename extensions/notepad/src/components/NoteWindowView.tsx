@@ -4,11 +4,11 @@ import { Button } from '@terminator/extension-ui'
 import type { EditorView } from '@codemirror/view'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
+import { useNotepadSettings, useNotepadSettingsStore } from '../stores/settings.store'
 import { NoteOutline } from './NoteOutline'
 import { NoteEditor, applyExternalDoc, scrollToPosition } from '../editor/NoteEditor'
 import { ORIGIN_ID, onForeignNoteChange } from '../editor/noteSync'
 import { reanchorAfterSave, reanchorComments, schedulePersist } from './noteComments'
-import { useNotepadSettings, useNotepadSettingsStore } from '../stores/settings.store'
 import {
   CommentColumn,
   EditorCommentOverlays,
