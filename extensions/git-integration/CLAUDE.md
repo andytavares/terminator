@@ -62,7 +62,7 @@ PR descriptions, templates and comments are rendered only through `src/component
 
 ### Lint and typecheck
 
-`npx tsc -p extensions/git-integration/tsconfig.json` and `npx eslint extensions/git-integration` must both exit 0; fix a React Compiler finding at its cause, do not silence it. The React Compiler rules apply: derive state during render instead of syncing it in an effect, read and write refs in handlers and effects, never during render.
+`npx tsc -p extensions/git-integration/tsconfig.json` and `npx eslint extensions/git-integration` must both exit 0; fix a React Compiler finding at its cause, do not silence it. ESLint also holds every function here, specs included, to at most 30 lines (blank lines and comments aside), complexity 10 and three parameters (`eslint.config.mjs`); pass more values as one named object, and split a long spec `describe` into several. The React Compiler rules apply: derive state during render instead of syncing it in an effect, read and write refs in handlers and effects, never during render.
 
 ### What extensions MUST NOT do
 
