@@ -180,20 +180,20 @@ function usePanelRows(props: QuickActionsProps, panel: PanelState) {
   const { groups, actions } = props
   const groupById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups])
   const top = useTopRows(props, groupById)
-  const groupActions = useMemo<Row[]>(() => {
+  const openGroupRows = useMemo<Row[]>(() => {
     if (!panel.groupId) return []
     return actions
       .filter((a) => a.group === panel.groupId)
       .map((a) => actionRow(a, a.mnemonic ?? ''))
   }, [panel.groupId, actions])
-  const search = useMemo<Row[]>(() => {
+  const searchRows = useMemo<Row[]>(() => {
     if (panel.mode !== 'search') return []
     return searchActions(actions, groups, panel.query).map((a) =>
       actionRow(a, '', groupById.get(a.group)?.label)
     )
   }, [panel.mode, panel.query, actions, groups, groupById])
-  const visible = { top: top.all, group: groupActions, search }[panel.mode]
-  return { groupById, ...top, groupActions, search, visible }
+  const visible = { top: top.all, group: openGroupRows, search: searchRows }[panel.mode]
+  return { groupById, ...top, openGroupRows, searchRows, visible }
 }
 
 type PanelRows = ReturnType<typeof usePanelRows>
@@ -262,9 +262,9 @@ function useQuickActionKeys(props: QuickActionsProps, panel: PanelState, rows: P
     contextRef.current = context
   })
   useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => handleQuickActionKey(e, contextRef.current)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const dispatchKey = (e: KeyboardEvent): void => handleQuickActionKey(e, contextRef.current)
+    window.addEventListener('keydown', dispatchKey)
+    return () => window.removeEventListener('keydown', dispatchKey)
   }, [])
 }
 
@@ -278,7 +278,7 @@ type HeaderProps = PanelPartProps & { inputRef: React.RefObject<HTMLInputElement
 /** The search box while searching; else where you are, and the context chip at the top. */
 function PanelHeader({ panel, rows, contextLabel, inputRef }: HeaderProps): JSX.Element {
   if (panel.mode === 'search') {
-    return <SearchBox panel={panel} results={rows.search} inputRef={inputRef} />
+    return <SearchBox panel={panel} results={rows.searchRows} inputRef={inputRef} />
   }
   const group = panel.groupId ? rows.groupById.get(panel.groupId) : undefined
   return (
@@ -341,12 +341,12 @@ function PanelBody(props: PanelPartProps): JSX.Element {
           role="listbox"
           aria-label={rows.groupById.get(panel.groupId ?? '')?.label ?? 'Group'}
         >
-          <RowList rows={rows.groupActions} offset={0} {...rowProps} />
+          <RowList rows={rows.openGroupRows} offset={0} {...rowProps} />
         </ul>
       )}
       {panel.mode === 'search' && (
         <ul className="qa-list" id="qa-search-list" role="listbox" aria-label="Search results">
-          <RowList rows={rows.search} offset={0} {...rowProps} />
+          <RowList rows={rows.searchRows} offset={0} {...rowProps} />
         </ul>
       )}
     </div>

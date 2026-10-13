@@ -28,14 +28,14 @@ export function useInitialLoad(): void {
   // Read before the first ⌘P, so the keys typed straight after it find them,
   // and again whenever a backend registers or drops a command.
   useEffect(() => {
-    const refresh = (): void => {
+    const refreshCommands = (): void => {
       useExtensionCommandsStore
         .getState()
         .refresh()
         .catch((error: unknown) => console.warn('Could not read extension commands', error))
     }
-    refresh()
-    return window.electronAPI.extension?.onCommandsChanged?.(refresh)
+    refreshCommands()
+    return window.electronAPI.extension?.onCommandsChanged?.(refreshCommands)
   }, [])
 
   useEffect(() => {

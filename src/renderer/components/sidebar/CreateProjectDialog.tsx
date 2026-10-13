@@ -67,13 +67,13 @@ function dialogActions({ busy, fields, submit }: Form, onClose: () => void): Dia
 function useCreateProjectForm(workspaceId: string, onClose: () => void) {
   const target = useTarget(workspaceId)
   const fields = useProjectFields(target.hasNonWorktreeProject)
-  const repo = useRepo(target.folderPath, fields.update)
+  const repo = useRepoInfo(target.folderPath, fields.update)
   const fetch = useBranchFetch(repo, fields.setError)
   useWorktreePath(fields, { gitRoot: repo.gitRoot, baseDir: target.worktreeBaseDir })
   const [busy, setBusy] = useState(false)
   // Creating a worktree is seconds of git work. Without `busy` the dialog sits
   // there looking untouched, and a second press starts the whole thing again.
-  async function submit(): Promise<void> {
+  async function submitProject(): Promise<void> {
     if (busy) return
     setBusy(true)
     try {
@@ -82,7 +82,7 @@ function useCreateProjectForm(workspaceId: string, onClose: () => void) {
       setBusy(false)
     }
   }
-  return { target, fields, repo, ...fetch, busy, submit }
+  return { target, fields, repo, ...fetch, busy, submit: submitProject }
 }
 
 const NO_PROJECTS: Project[] = []
@@ -137,7 +137,7 @@ function useStartingIssue(update: Update, setNameError: (error: string) => void)
 }
 
 /** Whether the folder is a git repo and, if so, its branches and worktrees. */
-function useRepo(folderPath: string | undefined, update: Update) {
+function useRepoInfo(folderPath: string | undefined, update: Update) {
   const [gitRoot, setGitRoot] = useState<string | null>(null)
   const [branches, setBranches] = useState<Branch[]>([])
   const [worktrees, setWorktrees] = useState<WorktreeInfo[]>([])
@@ -159,7 +159,7 @@ function useRepo(folderPath: string | undefined, update: Update) {
   return { gitRoot, branches, setBranches, worktrees }
 }
 
-type Repo = ReturnType<typeof useRepo>
+type Repo = ReturnType<typeof useRepoInfo>
 
 /** Fetching from the remote, then relisting, so newly pushed branches can be chosen. */
 function useBranchFetch({ gitRoot, setBranches }: Repo, setError: (error: string) => void) {
@@ -218,11 +218,11 @@ async function create({ target, repo, fields }: FormCore): Promise<boolean> {
   // branch chosen below is the name, and it is validated where it is chosen.
   if (!repo.gitRoot) {
     const nameErr = validateProjectName(fields.draft.name, target.existing)
-    if (nameErr) return refuse(fields.setNameError, nameErr)
+    if (nameErr) return refuseWith(fields.setNameError, nameErr)
   }
   fields.setError('')
   if (fields.draft.branchMode === 'existing' && target.hasNonWorktreeProject) {
-    return refuse(fields.setError, 'A branch-based entry already exists in this repo')
+    return refuseWith(fields.setError, 'A branch-based entry already exists in this repo')
   }
   const outcome = await createFromDraft({
     workspaceId: target.workspaceId,
@@ -231,13 +231,16 @@ async function create({ target, repo, fields }: FormCore): Promise<boolean> {
     draft: fields.draft,
   })
   if (typeof outcome !== 'string') {
-    return refuse(outcome.field === 'name' ? fields.setNameError : fields.setError, outcome.message)
+    return refuseWith(
+      outcome.field === 'name' ? fields.setNameError : fields.setError,
+      outcome.message
+    )
   }
   await attachIssue(outcome, fields.issue)
   return true
 }
 
-function refuse(show: (message: string) => void, message: string): false {
+function refuseWith(show: (message: string) => void, message: string): false {
   show(message)
   return false
 }

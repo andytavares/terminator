@@ -290,7 +290,7 @@ function newSessionRecord(
 }
 
 /** Adds the session, appending it to its project's order when one is kept. */
-function withSession(s: SessionData, session: TerminalSession): Partial<SessionData> {
+function withSessionAdded(s: SessionData, session: TerminalSession): Partial<SessionData> {
   const sessions = new Map(s.sessions)
   sessions.set(session.id, session)
   const view = viewOf(s.projectViews, session.projectId)
@@ -316,7 +316,7 @@ async function createSession(
   // the message names the folder, and the folder is the whole answer.
   if ('error' in result) throw new Error(result.message ?? result.error)
   const session = newSessionRecord(request, tabTitle, result)
-  set((s) => withSession(s, session))
+  set((s) => withSessionAdded(s, session))
   return result.sessionId
 }
 
@@ -335,7 +335,7 @@ function adoptedSession(s: SessionData, adopted: Adopted): Partial<SessionData> 
     lastActivityAt: Date.parse(createdAt),
     agentState: 'idle',
   }
-  const added = withSession(s, session)
+  const added = withSessionAdded(s, session)
   const projectViews = new Map(added.projectViews)
   const view = viewOf(projectViews, adopted.projectId)
   // Made active when the project has nothing showing. Without this the

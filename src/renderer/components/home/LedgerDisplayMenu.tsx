@@ -45,7 +45,7 @@ export function LedgerDisplayMenu({ prefs, onChange }: Props): JSX.Element {
 
 /** Grouping and sort, which close the menu once picked, then the toggles. */
 function LedgerOptions({ prefs, onChange, close }: Props & { close: () => void }): JSX.Element {
-  const pick = (patch: Partial<HomePrefs>): void => {
+  const pickDisplay = (patch: Partial<HomePrefs>): void => {
     onChange(patch)
     close()
   }
@@ -55,11 +55,11 @@ function LedgerOptions({ prefs, onChange, close }: Props & { close: () => void }
       <RadioChoices
         choices={GROUPS}
         current={prefs.groupBy}
-        onPick={(groupBy) => pick({ groupBy })}
+        onPick={(groupBy) => pickDisplay({ groupBy })}
       />
       <div className="sidebar-menu__separator" />
       <div className="sidebar-menu__heading">Sort</div>
-      <RadioChoices choices={SORTS} current={prefs.sort} onPick={(sort) => pick({ sort })} />
+      <RadioChoices choices={SORTS} current={prefs.sort} onPick={(sort) => pickDisplay({ sort })} />
       <div className="sidebar-menu__separator" />
       <LedgerToggles prefs={prefs} onChange={onChange} />
     </>

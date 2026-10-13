@@ -41,7 +41,7 @@ function emptyDraft(): Draft {
   return { id: null, label: '', mnemonic: '', kind: 'shell', target: 'focused', body: '' }
 }
 
-function draftFrom(a: CustomAction): Draft {
+function draftOfAction(a: CustomAction): Draft {
   return {
     id: a.id,
     label: a.label,
@@ -88,12 +88,12 @@ function useCustomActions(props: Props) {
         ? s.globalSettings?.quickActions.custom
         : s.workspaceSettings.get(workspaceId)?.overrides.quickActions?.custom
     ) ?? NO_ACTIONS
-  const save = (list: CustomAction[]): void => {
+  const saveCustomActions = (list: CustomAction[]): void => {
     const store = useSettingsStore.getState()
     if (workspaceId === null) void store.updateQuickActions({ custom: list })
     else void store.updateWorkspaceQuickActions(workspaceId, list)
   }
-  return { custom, save }
+  return { custom, save: saveCustomActions }
 }
 
 const NO_ACTIONS: CustomAction[] = []
@@ -122,25 +122,25 @@ function actionFrom(draft: Draft): CustomAction {
 function useActionDraft(custom: CustomAction[], save: (list: CustomAction[]) => void) {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const open = (next: Draft | null): void => {
+  const openDraft = (next: Draft | null): void => {
     setDraft(next)
     setError(null)
   }
-  function handleSave(current: Draft): void {
+  function saveDraft(current: Draft): void {
     const err = validateDraft(current, custom)
     if (err) return setError(err)
     const action = actionFrom(current)
     save(current.id ? custom.map((a) => (a.id === current.id ? action : a)) : [...custom, action])
-    open(null)
+    openDraft(null)
   }
   return {
     draft,
     error,
     update: (patch: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...patch } : d)),
-    startAdd: () => open(emptyDraft()),
-    startEdit: (a: CustomAction) => open(draftFrom(a)),
-    cancel: () => open(null),
-    handleSave,
+    startAdd: () => openDraft(emptyDraft()),
+    startEdit: (a: CustomAction) => openDraft(draftOfAction(a)),
+    cancel: () => openDraft(null),
+    saveDraft,
   }
 }
 
@@ -199,7 +199,7 @@ function ActionForm({ form, draft }: { form: ActionDraft; draft: Draft }): JSX.E
       <KindAndTarget draft={draft} update={update} />
       <BodyField body={draft.body} onChange={(body) => update({ body })} />
       {form.error && <p className="qa-settings-form__error">{form.error}</p>}
-      <FormButtons onSave={() => form.handleSave(draft)} onCancel={form.cancel} />
+      <FormButtons onSave={() => form.saveDraft(draft)} onCancel={form.cancel} />
     </div>
   )
 }

@@ -147,7 +147,7 @@ async function loadConnections(set: SetIntegrations): Promise<void> {
   set({ connections: result.connections })
 }
 
-async function connect(
+async function submitCredential(
   set: SetIntegrations,
   get: GetIntegrations,
   input: ConnectLinearInput | ConnectJiraInput
@@ -193,7 +193,7 @@ async function loadLink(set: SetIntegrations, projectId: string): Promise<void> 
   }))
 }
 
-function subscribe(set: SetIntegrations, get: GetIntegrations): () => void {
+function subscribeToIntegrations(set: SetIntegrations, get: GetIntegrations): () => void {
   const offStatus = subscribeTo('onStatusChanged', (payload) => {
     const connections = (payload as { connections?: TrackerConnection[] } | undefined)?.connections
     if (Array.isArray(connections)) set({ connections })
@@ -220,7 +220,7 @@ function connectionSlice(
 > {
   return {
     loadConnections: () => loadConnections(set),
-    connect: (input) => connect(set, get, input),
+    connect: (input) => submitCredential(set, get, input),
     disconnect: async (tracker) => {
       await api().disconnect?.({ tracker })
       await get().loadConnections()
@@ -231,7 +231,7 @@ function connectionSlice(
     },
     clearConnectError: (tracker) =>
       set((state) => ({ connectError: { ...state.connectError, [tracker]: undefined } })),
-    subscribe: () => subscribe(set, get),
+    subscribe: () => subscribeToIntegrations(set, get),
   }
 }
 
@@ -276,7 +276,7 @@ function surfaceSlice(
   }
 }
 
-function querySlice(
+function issueQuerySlice(
   get: GetIntegrations
 ): Slice<'issueByKey' | 'connectionFor' | 'linkFor' | 'issueFor' | 'isAnyConnected'> {
   return {
@@ -301,5 +301,5 @@ export const useIntegrationsStore = create<IntegrationsState>((set, get) => ({
   ...connectionSlice(set, get),
   ...linkSlice(set, get),
   ...surfaceSlice(set),
-  ...querySlice(get),
+  ...issueQuerySlice(get),
 }))

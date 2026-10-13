@@ -38,7 +38,7 @@ import { MainArea } from './shell/MainArea'
 import { ShellOverlays } from './shell/ShellOverlays'
 
 export function App(): JSX.Element {
-  const { windows, palette, launch, note, scratchActive, quickActions } = useShell()
+  const { windows, palette, launch, note, scratchActive, quickActions } = useShellParts()
   const showMetricsBar = useMetricsBar()
   return (
     <ErrorBoundary>
@@ -67,7 +67,7 @@ export function App(): JSX.Element {
 }
 
 /** The shell's state and everything it keeps running, wired together. */
-function useShell() {
+function useShellParts() {
   const windows = useShellWindows()
   const palette = useQuickActionsPanel()
   const launch = useTerminalLaunch()

@@ -23,8 +23,8 @@ type MoveTo = (targetProjectId: string, targetWorkspaceId: string) => Promise<vo
 export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.Element {
   useModalEffect()
   useLoadAllProjects()
-  const { currentProjectId, moveTo } = useMoveSession(sessionId, onClose, onMoved)
-  const branch = useNewBranch(moveTo)
+  const { currentProjectId, moveSessionTo } = useMoveSession(sessionId, onClose, onMoved)
+  const branch = useNewBranch(moveSessionTo)
   const { subView, back, startBranch, newWorkspace } = useSubView(() => branch.edit(''))
 
   if (subView?.type === 'new-workspace') return <CreateWorkspaceDialog onClose={onClose} />
@@ -41,7 +41,7 @@ export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.E
           <NewBranchField branch={branch} workspaceId={creatingIn} onBack={back} />
         ) : (
           <BranchList
-            {...{ currentProjectId, moveTo, startBranch }}
+            {...{ currentProjectId, moveSessionTo, startBranch }}
             onNewWorkspace={newWorkspace}
           />
         )}
@@ -84,7 +84,7 @@ function useLoadAllProjects(): void {
 function useMoveSession(sessionId: string, onClose: () => void, onMoved: Props['onMoved']) {
   const currentProjectId = useSessionStore((s) => s.sessions.get(sessionId)?.projectId ?? null)
 
-  const moveTo: MoveTo = async (targetProjectId, targetWorkspaceId) => {
+  const moveSessionTo: MoveTo = async (targetProjectId, targetWorkspaceId) => {
     if (targetProjectId === currentProjectId) return onClose()
     useSessionStore.getState().moveSession(sessionId, targetProjectId)
     if (currentProjectId) await deleteIfEmpty(currentProjectId)
@@ -95,7 +95,7 @@ function useMoveSession(sessionId: string, onClose: () => void, onMoved: Props['
     onClose()
   }
 
-  return { currentProjectId, moveTo }
+  return { currentProjectId, moveSessionTo }
 }
 
 /** Deletes a branch nothing is open in any more; never the scratch one. */
@@ -106,30 +106,30 @@ async function deleteIfEmpty(projectId: string): Promise<void> {
 }
 
 /** The new branch's name, its error, and creating it then moving the session into it. */
-function useNewBranch(moveTo: MoveTo) {
+function useNewBranch(moveSessionTo: MoveTo) {
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function create(workspaceId: string): Promise<void> {
+  async function createAndMove(workspaceId: string): Promise<void> {
     const trimmed = name.trim()
     if (!trimmed) return setError('Name is required')
     setLoading(true)
     setError('')
     const result = await useWorkspaceStore.getState().createProject({ workspaceId, name: trimmed })
     setLoading(false)
-    if (!('error' in result)) return moveTo(result.project.id, workspaceId)
+    if (!('error' in result)) return moveSessionTo(result.project.id, workspaceId)
     setError(
       result.error === 'DUPLICATE_NAME' ? 'Name already in use' : 'Could not create the branch'
     )
   }
 
-  const edit = (value: string): void => {
+  const editName = (value: string): void => {
     setName(value)
     setError('')
   }
 
-  return { name, error, loading, create, edit }
+  return { name, error, loading, create: createAndMove, edit: editName }
 }
 
 type NewBranch = ReturnType<typeof useNewBranch>
@@ -185,7 +185,7 @@ function NewBranchField({ branch, workspaceId, onBack }: NewBranchFieldProps): J
 
 interface BranchListProps {
   currentProjectId: string | null
-  moveTo: MoveTo
+  moveSessionTo: MoveTo
   startBranch: (workspaceId: string) => void
   onNewWorkspace: () => void
 }
@@ -218,7 +218,7 @@ type WorkspaceBranchesProps = Omit<BranchListProps, 'onNewWorkspace'> & { worksp
 function WorkspaceBranches({
   workspace: ws,
   currentProjectId,
-  moveTo,
+  moveSessionTo,
   startBranch,
 }: WorkspaceBranchesProps): JSX.Element {
   const projects = useWorkspaceStore((s) => s.projectsByWorkspaceId.get(ws.id)) ?? []
@@ -236,7 +236,7 @@ function WorkspaceBranches({
           key={project.id}
           project={project}
           current={project.id === currentProjectId}
-          onSelect={() => void moveTo(project.id, ws.id)}
+          onSelect={() => void moveSessionTo(project.id, ws.id)}
         />
       ))}
       <button className="move-session-dialog__new-btn" onClick={() => startBranch(ws.id)}>

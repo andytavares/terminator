@@ -112,14 +112,14 @@ function useWallSessions(text: string) {
 /** The wall's arrangement, saved as it changes. */
 function useWallPrefs(): [WallPrefs, (patch: Partial<WallPrefs>) => void] {
   const [prefs, setPrefs] = useState<WallPrefs>(loadWallPrefs)
-  function update(patch: Partial<WallPrefs>): void {
+  function updatePrefs(patch: Partial<WallPrefs>): void {
     setPrefs((current) => {
       const next = { ...current, ...patch }
       saveWallPrefs(next)
       return next
     })
   }
-  return [prefs, update]
+  return [prefs, updatePrefs]
 }
 
 /** Polls the process load of the open sessions while the wall is up. */

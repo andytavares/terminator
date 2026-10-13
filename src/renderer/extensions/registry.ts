@@ -241,11 +241,11 @@ function exitExtensionToTerminal(
   }
   const tabs = [s.activeGlobalTabId, s.activeWorkspaceTabId, s.activeProjectTabId]
   if (!tabs.some(isExitable)) return false
-  const keep = (id: string | null): string | null => (isExitable(id) ? null : id)
+  const keepUnlessExitable = (id: string | null): string | null => (isExitable(id) ? null : id)
   set((prev) => ({
-    activeGlobalTabId: keep(prev.activeGlobalTabId),
-    activeWorkspaceTabId: keep(prev.activeWorkspaceTabId),
-    activeProjectTabId: keep(prev.activeProjectTabId),
+    activeGlobalTabId: keepUnlessExitable(prev.activeGlobalTabId),
+    activeWorkspaceTabId: keepUnlessExitable(prev.activeWorkspaceTabId),
+    activeProjectTabId: keepUnlessExitable(prev.activeProjectTabId),
   }))
   return true
 }

@@ -187,7 +187,7 @@ function preferenceSlice(
   }
 }
 
-function workspaceSlice(
+function workspaceSettingsSlice(
   set: SetSettings
 ): Slice<
   | 'updateWorkspaceTheme'
@@ -224,7 +224,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   loadSettings: (workspaceId) => loadSettings(set, get, workspaceId),
   ...globalSlice(set),
   ...preferenceSlice(set),
-  ...workspaceSlice(set),
+  ...workspaceSettingsSlice(set),
   resolveSettings: (workspaceId) => {
     const global = get().globalSettings ?? DEFAULT_SETTINGS
     const ws = workspaceId ? get().workspaceSettings.get(workspaceId) : null

@@ -62,7 +62,7 @@ function saveIds(key: string, ids: Set<string>): void {
 }
 
 /** `ids` with `id` added when it was absent, removed when it was present. */
-function toggled(ids: Set<string>, id: string): Set<string> {
+function toggledId(ids: Set<string>, id: string): Set<string> {
   const next = new Set(ids)
   if (next.has(id)) next.delete(id)
   else next.add(id)
@@ -176,13 +176,13 @@ function withProjectsLoaded(
 
 type WorkspaceResult = Awaited<ReturnType<WorkspaceState['createWorkspace']>>
 
-async function createWorkspace(set: SetWorkspaces, input: unknown): Promise<WorkspaceResult> {
+async function saveNewWorkspace(set: SetWorkspaces, input: unknown): Promise<WorkspaceResult> {
   const result = await window.electronAPI.workspace.create(input)
   if ('workspace' in result) set((s) => ({ workspaces: [...s.workspaces, result.workspace] }))
   return result
 }
 
-async function updateWorkspace(set: SetWorkspaces, input: unknown): Promise<WorkspaceResult> {
+async function saveWorkspaceEdit(set: SetWorkspaces, input: unknown): Promise<WorkspaceResult> {
   const result = await window.electronAPI.workspace.update(input)
   if ('workspace' in result) {
     const updated = result.workspace
@@ -191,12 +191,12 @@ async function updateWorkspace(set: SetWorkspaces, input: unknown): Promise<Work
   return result
 }
 
-async function deleteWorkspace(set: SetWorkspaces, id: string): Promise<void> {
+async function removeWorkspace(set: SetWorkspaces, id: string): Promise<void> {
   await window.electronAPI.workspace.delete(id)
   set((s) => withoutWorkspace(s, id))
 }
 
-async function deleteProject(set: SetWorkspaces, id: string): Promise<void> {
+async function removeProject(set: SetWorkspaces, id: string): Promise<void> {
   await window.electronAPI.project.delete(id)
   set((s) => withProjectRemoved(s, id))
 }
@@ -206,7 +206,7 @@ async function loadProjects(set: SetWorkspaces, workspaceId: string): Promise<vo
   set((s) => withProjectsLoaded(s, workspaceId, result.projects))
 }
 
-async function reorderProjects(
+async function saveProjectOrder(
   set: SetWorkspaces,
   workspaceId: string,
   ids: string[]
@@ -232,9 +232,9 @@ function workspaceSlice(
       const result = await window.electronAPI.workspace.list()
       set({ workspaces: result.workspaces })
     },
-    createWorkspace: (input) => createWorkspace(set, input),
-    updateWorkspace: (input) => updateWorkspace(set, input),
-    deleteWorkspace: (id) => deleteWorkspace(set, id),
+    createWorkspace: (input) => saveNewWorkspace(set, input),
+    updateWorkspace: (input) => saveWorkspaceEdit(set, input),
+    deleteWorkspace: (id) => removeWorkspace(set, id),
     setActiveWorkspace: (id) => {
       set({ activeWorkspaceId: id, activeProjectId: null })
       if (id) get().loadProjects(id)
@@ -270,8 +270,8 @@ function projectSlice(
       ),
     renameProject: async (id, name) =>
       keepProject(set, await window.electronAPI.project.rename(id, name), withProjectReplaced),
-    reorderProjects: (workspaceId, ids) => reorderProjects(set, workspaceId, ids),
-    deleteProject: (id) => deleteProject(set, id),
+    reorderProjects: (workspaceId, ids) => saveProjectOrder(set, workspaceId, ids),
+    deleteProject: (id) => removeProject(set, id),
     setActiveProject: (id) => set({ activeProjectId: id }),
   }
 }
@@ -295,16 +295,16 @@ function disclosureSlice(
     set({ collapsedProjectIds: ids })
   }
   return {
-    toggleWorkspaceCollapse: (id) => setExpanded(toggled(get().expandedWorkspaceIds, id)),
+    toggleWorkspaceCollapse: (id) => setExpanded(toggledId(get().expandedWorkspaceIds, id)),
     setExpandedWorkspaceIds: setExpanded,
-    toggleProjectCollapse: (id) => setCollapsed(toggled(get().collapsedProjectIds, id)),
+    toggleProjectCollapse: (id) => setCollapsed(toggledId(get().collapsedProjectIds, id)),
     ensureProjectExpanded: (id) => {
-      if (get().collapsedProjectIds.has(id)) setCollapsed(toggled(get().collapsedProjectIds, id))
+      if (get().collapsedProjectIds.has(id)) setCollapsed(toggledId(get().collapsedProjectIds, id))
     },
   }
 }
 
-function resolveActiveCwd(s: WorkspaceState): string {
+function activeCwdOf(s: WorkspaceState): string {
   const { activeWorkspaceId, activeProjectId, workspaces, projectsByWorkspaceId } = s
   const workspace = workspaces.find((w) => w.id === activeWorkspaceId)
   const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
@@ -330,7 +330,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   ...workspaceSlice(set, get),
   ...projectSlice(set),
   ...disclosureSlice(set, get),
-  resolveActiveCwd: () => resolveActiveCwd(get()),
+  resolveActiveCwd: () => activeCwdOf(get()),
 }))
 
 // Subscribe to push notifications from the main process so the sidebar

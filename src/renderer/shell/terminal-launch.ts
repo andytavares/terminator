@@ -43,7 +43,7 @@ function pendingTabFor(projectId: string, cwd: string, scrollbackLimit: number):
 }
 
 /** Opens a human terminal; a failure is left to the session store to report. */
-function openTerminal(createSession: CreateSession, tab: PendingTab, title: string): void {
+function openPendingTab(createSession: CreateSession, tab: PendingTab, title: string): void {
   const { projectId, cwd, scrollbackLimit } = tab
   void createSession({ projectId, type: 'human', title, cwd, scrollbackLimit }).catch(() => {})
 }
@@ -74,14 +74,14 @@ export function useTerminalLaunch() {
     const { cwd, scrollbackLimit, promptForName } = terminalPlace()
     const tab = pendingTabFor(projectId, cwd, scrollbackLimit)
     if (promptForName) setPendingTab(tab)
-    else openTerminal(createSession, tab, '')
+    else openPendingTab(createSession, tab, '')
   }
 
   /** Opens the tab the name prompt was for, under the name given. */
   function confirmPendingTab(title: string): void {
     if (!pendingTab) return
     setPendingTab(null)
-    openTerminal(createSession, pendingTab, title)
+    openPendingTab(createSession, pendingTab, title)
   }
 
   return {

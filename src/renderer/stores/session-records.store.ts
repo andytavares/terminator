@@ -59,7 +59,7 @@ async function load(set: SetRecords): Promise<void> {
   }
 }
 
-async function transfer(
+async function transferRecord(
   set: SetRecords,
   fromSessionId: string,
   session: SessionSnapshot
@@ -75,7 +75,7 @@ async function transfer(
   return true
 }
 
-async function forget(set: SetRecords, sessionId: string): Promise<boolean> {
+async function forgetRecord(set: SetRecords, sessionId: string): Promise<boolean> {
   const result = await api().forget?.({ sessionId })
   if (result === undefined || 'error' in result || result.data !== true) return false
   set((state) => withRecord(state, sessionId, null))
@@ -93,6 +93,6 @@ export const useSessionRecordsStore = create<SessionRecordsState>((set) => ({
   setDescription: (session, description) =>
     write(set, session.sessionId, api().setDescription?.({ session, description })),
   setLink: (session, link) => write(set, session.sessionId, api().setLink?.({ session, link })),
-  transfer: (fromSessionId, session) => transfer(set, fromSessionId, session),
-  forget: (sessionId) => forget(set, sessionId),
+  transfer: (fromSessionId, session) => transferRecord(set, fromSessionId, session),
+  forget: (sessionId) => forgetRecord(set, sessionId),
 }))

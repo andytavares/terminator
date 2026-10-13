@@ -12,7 +12,7 @@ describe('WebglContextBudget', () => {
   it('grants a freed context to the next requester', () => {
     const budget = new WebglContextBudget(1)
     budget.acquire('a')
-    budget.release('a')
+    budget.releaseContext('a')
     expect(budget.acquire('b')).toBe(true)
   })
 
@@ -20,14 +20,14 @@ describe('WebglContextBudget', () => {
     const budget = new WebglContextBudget(1)
     expect(budget.acquire('a')).toBe(true)
     expect(budget.acquire('a')).toBe(true)
-    budget.release('a')
+    budget.releaseContext('a')
     expect(budget.acquire('b')).toBe(true)
   })
 
   it('ignores a release from an owner that holds nothing', () => {
     const budget = new WebglContextBudget(1)
     budget.acquire('a')
-    budget.release('stranger')
+    budget.releaseContext('stranger')
     expect(budget.acquire('b')).toBe(false)
   })
 })

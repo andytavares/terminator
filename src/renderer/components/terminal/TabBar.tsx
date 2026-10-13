@@ -269,7 +269,7 @@ function SessionTab(props: SessionTabProps): JSX.Element {
   const { projectId, session, editing, dragProps, isDragOver } = props
   const isActive = session.id === props.tabs.activeId
   const isRenaming = editing.rename.id === session.id
-  const show = (): void => {
+  const showSession = (): void => {
     useSessionStore.getState().setActiveSessionForProject(projectId, session.id)
     useSessionStore.getState().requestFocus(session.id)
   }
@@ -277,7 +277,7 @@ function SessionTab(props: SessionTabProps): JSX.Element {
     <div
       {...dragProps}
       className={`tab-bar__tab tab-bar__tab--session${isActive ? ' tab-bar__tab--active' : ''}${isDragOver ? ' tab-bar__tab--dnd-over' : ''}`}
-      onClick={show}
+      onClick={showSession}
       onContextMenu={(e) => props.onContextMenu(e, session.id)}
       onDoubleClick={(e) => {
         e.stopPropagation()

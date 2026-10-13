@@ -16,7 +16,7 @@ export function MobileApp() {
   const { workspaces, terminals, refreshTerminals } = useListings()
 
   const handleCreateTerminal = async (_workspaceId: string, folderPath: string) => {
-    const sessionId = await createRemoteTerminal(folderPath)
+    const sessionId = await createTerminalInFolder(folderPath)
     if (sessionId !== null) setRoute({ view: 'terminal', sessionId, cwd: folderPath })
   }
 
@@ -43,7 +43,7 @@ export function MobileApp() {
 }
 
 /** A new terminal in the folder, or null when the server would not make one. */
-async function createRemoteTerminal(folderPath: string): Promise<string | null> {
+async function createTerminalInFolder(folderPath: string): Promise<string | null> {
   try {
     const { sessionId } = await createTerminal({ cwd: folderPath, tabTitle: 'Remote' })
     return sessionId

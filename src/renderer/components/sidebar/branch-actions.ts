@@ -23,7 +23,7 @@ const EDITOR_ERRORS: Record<string, string> = {
 /** Opening reports back. The first version discarded the result, so a folder that had moved, or
  * a machine with no editor, produced exactly nothing on screen — indistinguishable from the
  * action not being wired up at all. */
-export function openInEditor(folderPath: string | undefined): void {
+export function openFolderInEditor(folderPath: string | undefined): void {
   const say = (message: string): void =>
     useToastStore.getState().addToast({ type: 'error', message })
 
@@ -80,7 +80,7 @@ export function useBranchActions({ data, sessionList, onSelectProject }: Actions
   const { createSession } = useTerminalSession()
   useNewTerminalCommands(data, createSession)
 
-  const selectProjectScope = (project: Project): void => selectProject(project, onSelectProject)
+  const selectProjectScope = (project: Project): void => selectProjectRow(project, onSelectProject)
 
   /** Selecting a session sets activeProjectId as well as the project's active session. Leaving
    * activeProjectId undefined under a non-project grouping would break per-project auto-open
@@ -117,7 +117,7 @@ export function useBranchActions({ data, sessionList, onSelectProject }: Actions
 
 /** Selecting a project is what the tree's project row did on click, and what the per-project
  * auto-open effect keys off: a project with no sessions gets its first terminal from this. */
-function selectProject(project: Project, onSelectProject: (() => void) | undefined): void {
+function selectProjectRow(project: Project, onSelectProject: (() => void) | undefined): void {
   useWorkspaceStore.getState().setActiveWorkspace(project.workspaceId)
   useWorkspaceStore.getState().setActiveProject(project.id)
   onSelectProject?.()

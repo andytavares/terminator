@@ -12,21 +12,28 @@ function useMenu() {
 
   useEffect(() => {
     if (!open) return
-    const close = (): void => setOpen(false)
-    window.addEventListener('click', close)
-    window.addEventListener('close-context-menus', close)
+    const closeDropdown = (): void => setOpen(false)
+    window.addEventListener('click', closeDropdown)
+    window.addEventListener('close-context-menus', closeDropdown)
     return () => {
-      window.removeEventListener('click', close)
-      window.removeEventListener('close-context-menus', close)
+      window.removeEventListener('click', closeDropdown)
+      window.removeEventListener('close-context-menus', closeDropdown)
     }
   }, [open])
 
-  const toggle = (): void => {
+  const toggleDropdown = (): void => {
     closeAllContextMenus()
     setOpen((v) => !v)
   }
 
-  return { open, close: () => setOpen(false), toggle, buttonRef, panelRef, placement }
+  return {
+    open,
+    close: () => setOpen(false),
+    toggle: toggleDropdown,
+    buttonRef,
+    panelRef,
+    placement,
+  }
 }
 
 interface MenuButtonProps {

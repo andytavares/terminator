@@ -15,6 +15,7 @@ import type { QuickActionTarget } from './use-active-scope'
 import type { CoreActionDeps } from './core-actions'
 import type { PaneSplitDirection, TerminalSession, Workspace } from '../../shared/types/index'
 import type { QuickAction } from './types'
+import { cycleTab } from './shortcut-behaviors'
 
 /** What the app shell does on behalf of an action: its own dialogs, panes and toggles. */
 export interface ShellCommands {
@@ -117,23 +118,6 @@ function closePane(projectId: string | null): void {
   }
 }
 
-function cycleTab(projectId: string | null, delta: number): void {
-  if (!projectId) return
-  const store = useSessionStore.getState()
-  const list = store.getSessionsForProject(projectId)
-  if (list.length === 0) return
-  const idx = list.findIndex((s) => s.id === store.getActiveSessionForProject?.(projectId))
-  const next = list[(((idx + delta) % list.length) + list.length) % list.length]
-  // Cycling stays within the project already on screen — unlike the other "go to session" paths it
-  // must not switch to the session's own projectId — but still has to leave whatever tab is showing
-  // and ask for focus, the way every other path does.
-  useExtensionRegistry.getState().setActiveGlobalTab(null)
-  useExtensionRegistry.getState().setActiveWorkspaceTab(null)
-  useExtensionRegistry.getState().setActiveProjectTab(null)
-  store.setActiveSessionForProject(projectId, next.id)
-  useSessionStore.getState().requestFocus(next.id)
-}
-
 function terminalHandlers(
   c: CoreContext
 ): Handlers<
@@ -148,7 +132,10 @@ function terminalHandlers(
     },
     onNewScratch: c.shell.onNewScratch,
     onEditNote: () => c.shell.onEditNote(c.focusedSessionId),
-    onCycleTab: (delta) => cycleTab(c.projectId, delta),
+    // Within the project on screen, not the session's own: cycleTab leaves any other tab first.
+    onCycleTab: (delta) => {
+      if (c.projectId) cycleTab(c.projectId, delta, useSessionStore.getState())
+    },
   }
 }
 
@@ -171,7 +158,7 @@ function nextWaiting(c: CoreContext): void {
   revealSession(waiting[(idx + 1) % waiting.length].id)
 }
 
-const openHome = (): void => useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+const showHome = (): void => useExtensionRegistry.getState().setActiveGlobalTab('core.home')
 
 function sessionHandlers(
   c: CoreContext
@@ -180,12 +167,12 @@ function sessionHandlers(
     onCycleRecentSession: (delta) => cycleRecent(c, delta),
     onSelectSession: (session) => revealSession(session.id),
     onNextWaiting: () => nextWaiting(c),
-    onResume: openHome,
-    onHome: openHome,
+    onResume: showHome,
+    onHome: showHome,
   }
 }
 
-function cycleWorkspace(c: CoreContext, delta: number): void {
+function cycleActiveWorkspace(c: CoreContext, delta: number): void {
   if (c.workspaces.length === 0) return
   const idx = c.workspaces.findIndex((w) => w.id === c.activeWorkspaceId)
   const next = c.workspaces[(idx + delta + c.workspaces.length) % c.workspaces.length]
@@ -198,7 +185,7 @@ function workspaceHandlers(
   const integrations = useIntegrationsStore.getState()
   return {
     onSwitchWorkspace: (id) => useWorkspaceStore.getState().setActiveWorkspace(id),
-    onCycleWorkspace: (delta) => cycleWorkspace(c, delta),
+    onCycleWorkspace: (delta) => cycleActiveWorkspace(c, delta),
     onLinkIssueBranch: () => c.activeProjectId && integrations.openLinkDialog(c.activeProjectId),
     onViewIssue: () => c.activeProjectId && integrations.openDrawer(c.activeProjectId),
   }

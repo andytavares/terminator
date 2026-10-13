@@ -70,16 +70,16 @@ interface ResizeTarget {
 function trackResize(startX: number, { sidebarRef, widthRef, commit }: ResizeTarget): void {
   const widthAt = (ev: MouseEvent): number => clampWidth(widthRef.current + ev.clientX - startX)
 
-  function onMouseMove(ev: MouseEvent): void {
+  function dragTo(ev: MouseEvent): void {
     if (sidebarRef.current) sidebarRef.current.style.width = `${widthAt(ev)}px`
   }
 
-  function onMouseUp(ev: MouseEvent): void {
+  function endDrag(ev: MouseEvent): void {
     commit(widthAt(ev))
-    document.removeEventListener('mousemove', onMouseMove)
-    document.removeEventListener('mouseup', onMouseUp)
+    document.removeEventListener('mousemove', dragTo)
+    document.removeEventListener('mouseup', endDrag)
   }
 
-  document.addEventListener('mousemove', onMouseMove)
-  document.addEventListener('mouseup', onMouseUp)
+  document.addEventListener('mousemove', dragTo)
+  document.addEventListener('mouseup', endDrag)
 }

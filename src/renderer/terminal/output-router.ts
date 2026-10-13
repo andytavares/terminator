@@ -3,13 +3,14 @@ type OutputHandler = (data: string, written: () => void) => void
 const subscribers = new Map<string, OutputHandler>()
 let listening = false
 
-function route(sessionId: string, data: string): void {
-  const acknowledge = (): void => window.electronAPI.terminal.acknowledge(sessionId, data.length)
+function routeOutput(sessionId: string, data: string): void {
+  const acknowledgeWritten = (): void =>
+    window.electronAPI.terminal.acknowledge(sessionId, data.length)
   const handler = subscribers.get(sessionId)
   // Output with nowhere to go is acknowledged at once: main would otherwise wait
   // for a renderer that will never write it.
-  if (handler) handler(data, acknowledge)
-  else acknowledge()
+  if (handler) handler(data, acknowledgeWritten)
+  else acknowledgeWritten()
 }
 
 /** One session's output, through one shared `terminal:output` listener kept for the page's life,
@@ -17,7 +18,7 @@ function route(sessionId: string, data: string): void {
  * the data, which lets main pause a process that outruns the renderer (flow control). */
 export function subscribeToSessionOutput(sessionId: string, handler: OutputHandler): () => void {
   if (!listening) {
-    window.electronAPI.terminal.onOutput(route)
+    window.electronAPI.terminal.onOutput(routeOutput)
     listening = true
   }
   subscribers.set(sessionId, handler)

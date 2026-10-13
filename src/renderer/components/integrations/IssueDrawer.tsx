@@ -20,7 +20,7 @@ const CONTEXT_WARN_AT = 0.85
 
 // Issue text is written by anyone who can comment on the ticket, so it renders
 // with `fetchesNothing` and its links leave through the shell, never navigation.
-function openInBrowser(url: string): void {
+function openExternalUrl(url: string): void {
   void window.electronAPI?.shell?.openExternal(url)
 }
 
@@ -83,26 +83,26 @@ function useDrawerActions(projectId: string) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [commentText, setCommentText] = useState('')
-  const reload = (): Promise<void> => useIntegrationsStore.getState().loadLink(projectId)
-  const working = async (run: () => Promise<void>): Promise<void> => {
+  const reloadLink = (): Promise<void> => useIntegrationsStore.getState().loadLink(projectId)
+  const whileBusy = async (run: () => Promise<void>): Promise<void> => {
     setBusy(true)
     setError(null)
     await run()
   }
+  const effects = { setBusy, setError, setCommentText, reload: reloadLink }
   return {
     busy,
     error,
     commentText,
     setCommentText,
     refresh: (link: IssueLink) =>
-      working(async () => {
+      whileBusy(async () => {
         await window.electronAPI.integrations.getIssue({ ...trackerKey(link), refresh: true })
-        await reload()
+        await reloadLink()
         setBusy(false)
       }),
-    comment: (link: IssueLink) =>
-      working(() => postComment(link, commentText, { setBusy, setError, setCommentText, reload })),
-    toggleInjection: (next: boolean) => setInjection(projectId, next, { setError, reload }),
+    comment: (link: IssueLink) => whileBusy(() => postIssueComment(link, commentText, effects)),
+    toggleInjection: (next: boolean) => setInjection(projectId, next, effects),
   }
 }
 
@@ -130,7 +130,11 @@ interface CommentEffects {
   reload: () => Promise<void>
 }
 
-async function postComment(link: IssueLink, text: string, effects: CommentEffects): Promise<void> {
+async function postIssueComment(
+  link: IssueLink,
+  text: string,
+  effects: CommentEffects
+): Promise<void> {
   const result = await window.electronAPI.integrations.comment({
     ...trackerKey(link),
     body: text.trim(),
@@ -228,7 +232,7 @@ function DescriptionSection({ issue }: { issue: Issue }): JSX.Element {
   return (
     <section className="issue-drawer__section">
       {issue.description.trim().length > 0 ? (
-        <Markdown fetchesNothing className="issue-markdown" onOpenLink={openInBrowser}>
+        <Markdown fetchesNothing className="issue-markdown" onOpenLink={openExternalUrl}>
           {issue.description}
         </Markdown>
       ) : (
@@ -249,7 +253,7 @@ function CommentsSection({ issue }: { issue: Issue }): JSX.Element {
           <span className="issue-drawer__who">
             {c.author} · <RelativeTime value={c.createdAt} />
           </span>
-          <Markdown fetchesNothing className="issue-markdown" onOpenLink={openInBrowser}>
+          <Markdown fetchesNothing className="issue-markdown" onOpenLink={openExternalUrl}>
             {c.body}
           </Markdown>
         </div>

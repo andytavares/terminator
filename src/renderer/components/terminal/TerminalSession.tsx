@@ -209,14 +209,14 @@ export class TerminalInstance {
       this.terminal.loadAddon(addon)
       this.webglAddon = addon
     } catch {
-      webglContexts.release(this.sessionId)
+      webglContexts.releaseContext(this.sessionId)
     }
   }
 
   private disableWebgl(): void {
     this.webglAddon?.dispose()
     this.webglAddon = null
-    webglContexts.release(this.sessionId)
+    webglContexts.releaseContext(this.sessionId)
   }
 
   // Call once after the element is in a visible, sized container.

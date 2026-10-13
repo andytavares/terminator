@@ -49,14 +49,14 @@ export function useIssueSearch(
     if (!enabled) return
     const id = ++requestId.current
     const trimmed = term.trim()
-    const run = async (): Promise<void> => {
+    const runSearch = async (): Promise<void> => {
       const next = await query(trimmed)
       if (id !== requestId.current) return
       setResult(next)
       setAnsweredTerm(trimmed)
     }
-    if (trimmed.length === 0) return void run()
-    const timer = setTimeout(() => void run(), SEARCH_DEBOUNCE_MS)
+    if (trimmed.length === 0) return void runSearch()
+    const timer = setTimeout(() => void runSearch(), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [term, enabled, query])
 

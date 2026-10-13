@@ -37,7 +37,7 @@ function useCreateWorkspace(onClose: () => void) {
     (value) => workspaces.some((w) => w.name.toLowerCase() === value.toLowerCase())
   )
 
-  async function create(): Promise<void> {
+  async function submitWorkspace(): Promise<void> {
     if (!form.nameIsValid()) return
     const { name, folderPath, color } = form.draft
     // Main refuses a workspace without a folder; say so before sending anything.
@@ -56,7 +56,7 @@ function useCreateWorkspace(onClose: () => void) {
     onClose()
   }
 
-  return { form, create }
+  return { form, create: submitWorkspace }
 }
 
 /** A folder that is a git checkout becomes the workspace's first branch. */

@@ -10,11 +10,11 @@ declare global {
   }
 }
 
-const openTerminals = () => [...useSessionStore.getState().terminalInstances.values()]
+const openTerminalInstances = () => [...useSessionStore.getState().terminalInstances.values()]
 
 /** The rows of the one terminal drawn in `element`, such as a pane's `.xterm-screen`. */
-function terminalRowsIn(element: Element): string[] {
-  const terminal = openTerminals().find((open) => open.element.contains(element))
+function rowsOfTerminalIn(element: Element): string[] {
+  const terminal = openTerminalInstances().find((open) => open.element.contains(element))
   if (!terminal) throw new Error('no open terminal draws in this element')
   return terminal.readVisibleRows()
 }
@@ -24,7 +24,7 @@ function terminalRowsIn(element: Element): string[] {
  * needs a row's place on screen. */
 export function exposeTerminalRows(): void {
   window.terminatorE2E = {
-    terminalRows: () => openTerminals().flatMap((terminal) => terminal.readVisibleRows()),
-    terminalRowsIn,
+    terminalRows: () => openTerminalInstances().flatMap((terminal) => terminal.readVisibleRows()),
+    terminalRowsIn: rowsOfTerminalIn,
   }
 }

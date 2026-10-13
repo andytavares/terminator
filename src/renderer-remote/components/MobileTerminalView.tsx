@@ -59,7 +59,7 @@ function useTerminalSocket(sessionId: string, wsRef: SocketRef, termRef: Termina
       prev.close()
     }
     try {
-      const socket = await openTerminalSocket(sessionId, termRef)
+      const socket = await connectTerminalSocket(sessionId, termRef)
       wsRef.current = socket
       setWs(socket)
     } catch {
@@ -75,7 +75,7 @@ function useTerminalSocket(sessionId: string, wsRef: SocketRef, termRef: Termina
   return { status, retry, openWs }
 }
 
-async function openTerminalSocket(sessionId: string, termRef: TerminalRef): Promise<WebSocket> {
+async function connectTerminalSocket(sessionId: string, termRef: TerminalRef): Promise<WebSocket> {
   const ticket = await getWsTicket(sessionId)
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   const socket = new WebSocket(

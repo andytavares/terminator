@@ -56,7 +56,7 @@ interface CoreKey {
   run(c: ShortcutContext, e: KeyboardEvent): void
 }
 
-const projectOf = (c: ShortcutContext): string | null =>
+const effectiveProjectOf = (c: ShortcutContext): string | null =>
   c.options.scratchProjectId ?? useWorkspaceStore.getState().activeProjectId
 
 /** What newTerminalTab and splitPane read: the settings, the cwd and the terminal factory. */
@@ -127,13 +127,15 @@ const TERMINAL_KEYS: CoreKey[] = [
   {
     test: (e, at) => at.isMeta && e.key === 'k' && !at.inTextField,
     actionId: 'core.clear',
-    run: (c) => clearTerminal(projectOf(c), useSessionStore.getState()),
+    run: (c) => clearTerminal(effectiveProjectOf(c), useSessionStore.getState()),
   },
   {
     test: (e, at) => at.isMeta && e.key === 't',
     actionId: 'core.new-tab',
     run: (c) =>
-      c.options.onNewTab ? c.options.onNewTab() : newTerminalTab(projectOf(c), terminalDeps(c)),
+      c.options.onNewTab
+        ? c.options.onNewTab()
+        : newTerminalTab(effectiveProjectOf(c), terminalDeps(c)),
   },
   // Cmd+D splits side by side, Cmd+Shift+D top and bottom. The effective project rather than the
   // active one, so a scratch terminal splits too — it used to do nothing at all there, and say
@@ -141,18 +143,18 @@ const TERMINAL_KEYS: CoreKey[] = [
   {
     test: (e, at) => at.isMeta && !e.shiftKey && e.key === 'd',
     actionId: 'core.split-vertical',
-    run: (c) => splitPane(projectOf(c), 'vertical', terminalDeps(c)),
+    run: (c) => splitPane(effectiveProjectOf(c), 'vertical', terminalDeps(c)),
   },
   {
     test: (e, at) => at.isMeta && e.shiftKey && e.key === 'd',
     actionId: 'core.split-horizontal',
-    run: (c) => splitPane(projectOf(c), 'horizontal', terminalDeps(c)),
+    run: (c) => splitPane(effectiveProjectOf(c), 'horizontal', terminalDeps(c)),
   },
   // Cmd+W: close focused split pane (or active tab if not in split mode)
   {
     test: (e, at) => at.isMeta && e.key === 'w',
     actionId: 'core.close-tab',
-    run: (c) => closeFocusedPane(projectOf(c), useSessionStore.getState()),
+    run: (c) => closeFocusedPane(effectiveProjectOf(c), useSessionStore.getState()),
   },
 ]
 
@@ -164,12 +166,16 @@ const SESSION_KEYS: CoreKey[] = [
     test: (e, at) => at.isMeta && (e.key === ']' || e.key === '[') && !at.inTextField,
     actionId: (e) => (e.key === ']' ? 'core.cycle-recent-next' : 'core.cycle-recent-prev'),
     run: (c, e) =>
-      cycleMostRecentlyAttended(projectOf(c), e.key === ']' ? 1 : -1, useSessionStore.getState()),
+      cycleMostRecentlyAttended(
+        effectiveProjectOf(c),
+        e.key === ']' ? 1 : -1,
+        useSessionStore.getState()
+      ),
   },
   {
     test: (e, at) => at.isMeta && e.shiftKey && (e.key === 'a' || e.key === 'A') && !at.inTextField,
     actionId: 'core.next-waiting',
-    run: (c) => jumpToNextAwaitingInput(projectOf(c), useSessionStore.getState()),
+    run: (c) => jumpToNextAwaitingInput(effectiveProjectOf(c), useSessionStore.getState()),
   },
   {
     test: (e, at) =>
@@ -181,12 +187,12 @@ const SESSION_KEYS: CoreKey[] = [
   {
     test: (e, at) => at.isMeta && e.key === 'ArrowLeft' && !at.inTextField,
     actionId: 'core.prev-tab',
-    run: (c) => cycleTabIn(projectOf(c), -1),
+    run: (c) => cycleTabIn(effectiveProjectOf(c), -1),
   },
   {
     test: (e, at) => at.isMeta && e.key === 'ArrowRight' && !at.inTextField,
     actionId: 'core.next-tab',
-    run: (c) => cycleTabIn(projectOf(c), 1),
+    run: (c) => cycleTabIn(effectiveProjectOf(c), 1),
   },
 ]
 
@@ -255,8 +261,8 @@ export function useKeyboardShortcuts(options: Options = {}): void {
   })
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent): void => handleKeyDown(e, latest.current)
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    const handleWindowKey = (e: KeyboardEvent): void => handleKeyDown(e, latest.current)
+    window.addEventListener('keydown', handleWindowKey)
+    return () => window.removeEventListener('keydown', handleWindowKey)
   }, [])
 }

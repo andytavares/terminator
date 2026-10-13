@@ -1,5 +1,5 @@
 import { matchesFilter, type IssueTitles } from './session-filter'
-import type { SessionFacts } from './session-facts'
+import { byStarted, type SessionFacts } from './session-facts'
 import type { IssueSummary } from '../../shared/types/index'
 
 export interface LogbookGroup {
@@ -16,9 +16,6 @@ const GROUPS: Array<{ key: string; label: string; match: (facts: SessionFacts) =
 
 const CLOSED = 'Closed'
 const SUGGESTIONS = 3
-
-const byStarted = (a: SessionFacts, b: SessionFacts): number =>
-  Date.parse(a.startedAt) - Date.parse(b.startedAt)
 
 /** The Logbook's list: by what each session is doing, then closed history, newest first. */
 export function buildLogbook(

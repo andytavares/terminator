@@ -62,7 +62,7 @@ function openGroups(open: SessionFacts[], prefs: HomePrefs): LedgerGroup[] {
 }
 
 /** A group of its own, or none when it would be empty. */
-function groupOf(key: string, label: string, facts: SessionFacts[]): LedgerGroup[] {
+function ledgerGroupOf(key: string, label: string, facts: SessionFacts[]): LedgerGroup[] {
   return facts.length === 0 ? [] : [{ key, label, facts }]
 }
 
@@ -84,8 +84,8 @@ export function buildLedger(
     .sort((a, b) => Date.parse(b.closedAt ?? '') - Date.parse(a.closedAt ?? ''))
 
   return [
-    ...groupOf(NEEDS_YOU, 'Needs you', needsYou.sort(compare(prefs.sort))),
+    ...ledgerGroupOf(NEEDS_YOU, 'Needs you', needsYou.sort(compare(prefs.sort))),
     ...openGroups(rest, prefs),
-    ...groupOf(CLOSED, CLOSED, closed),
+    ...ledgerGroupOf(CLOSED, CLOSED, closed),
   ]
 }

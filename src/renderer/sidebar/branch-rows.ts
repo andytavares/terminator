@@ -113,7 +113,7 @@ type OrderIndex = Map<string, number>
 
 type Comparator<T> = (a: T, b: T) => number
 
-const activity = (row: { lastActivityAt: number | null }): number => row.lastActivityAt ?? 0
+const activityOf = (row: { lastActivityAt: number | null }): number => row.lastActivityAt ?? 0
 
 function branchComparator(sortBy: SortKey, order: OrderIndex): Comparator<BranchRow> {
   const position = (row: BranchRow): number => order.get(row.projectId) ?? 0
@@ -121,8 +121,8 @@ function branchComparator(sortBy: SortKey, order: OrderIndex): Comparator<Branch
     manual: (a, b) => position(a) - position(b),
     name: (a, b) => a.label.localeCompare(b.label),
     status: (a, b) => STATUS_ORDER.indexOf(a.state) - STATUS_ORDER.indexOf(b.state),
-    oldest: (a, b) => activity(a) - activity(b),
-    recent: (a, b) => activity(b) - activity(a),
+    oldest: (a, b) => activityOf(a) - activityOf(b),
+    recent: (a, b) => activityOf(b) - activityOf(a),
   }
   return comparators[sortBy] ?? comparators.recent
 }
@@ -150,13 +150,13 @@ function groupSeverity(group: RepoGroup): number {
 function groupComparator(sortBy: SortKey, order: OrderIndex): Comparator<RepoGroup> {
   const position = (group: RepoGroup): number => order.get(group.workspaceId) ?? 0
   const recency = (group: RepoGroup): number => groupActivity(group) ?? 0
-  const byName: Comparator<RepoGroup> = (a, b) => a.label.localeCompare(b.label)
+  const byRepoName: Comparator<RepoGroup> = (a, b) => a.label.localeCompare(b.label)
   const comparators: Record<SortKey, Comparator<RepoGroup>> = {
     manual: (a, b) => position(a) - position(b),
-    name: byName,
-    status: (a, b) => groupSeverity(a) - groupSeverity(b) || byName(a, b),
-    oldest: (a, b) => recency(a) - recency(b) || byName(a, b),
-    recent: (a, b) => recency(b) - recency(a) || byName(a, b),
+    name: byRepoName,
+    status: (a, b) => groupSeverity(a) - groupSeverity(b) || byRepoName(a, b),
+    oldest: (a, b) => recency(a) - recency(b) || byRepoName(a, b),
+    recent: (a, b) => recency(b) - recency(a) || byRepoName(a, b),
   }
   return comparators[sortBy] ?? comparators.recent
 }
@@ -200,7 +200,7 @@ function sessionsByProject(sessions: TerminalSession[]) {
   return { byProject, scratch }
 }
 
-function branchRow(
+function toBranchRow(
   project: Project,
   own: TerminalSession[],
   workItems: WorkItemsBySession
@@ -236,10 +236,10 @@ function matchesStaleness(
   own: TerminalSession[],
   clock: StaleClock
 ): boolean {
-  const stale = (s: TerminalSession): boolean => isStale(s, clock.now, clock.staleAfterMs)
-  if (filters.staleOnly === true && !own.some(stale)) return false
+  const isStaleSession = (s: TerminalSession): boolean => isStale(s, clock.now, clock.staleAfterMs)
+  if (filters.staleOnly === true && !own.some(isStaleSession)) return false
   // A branch nobody has opened is not abandoned work, so hideStale passes it by.
-  return !(filters.hideStale === true && own.length > 0 && own.every(stale))
+  return !(filters.hideStale === true && own.length > 0 && own.every(isStaleSession))
 }
 
 /** The kept branches under their repos, or under one heading when grouping is off. */
@@ -296,7 +296,7 @@ export function buildBranchRows(
   const kept = candidates
     .map((project): Candidate => {
       const own = byProject.get(project.id) ?? []
-      const row = branchRow(project, own, source.workItems ?? new Map())
+      const row = toBranchRow(project, own, source.workItems ?? new Map())
       return { row, repo: workspaceById.get(project.workspaceId)!, own }
     })
     .filter(

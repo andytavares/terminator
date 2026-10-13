@@ -25,7 +25,7 @@ export function App(): JSX.Element {
         <h1 className="login__title">Terminator Remote</h1>
         <PasswordInput value={password} onChange={setPassword} />
         <div className="login__error">{error}</div>
-        <ConnectButton loading={loading} />
+        <LoginButton loading={loading} />
       </form>
     </div>
   )
@@ -50,7 +50,7 @@ function PasswordInput({
   )
 }
 
-function ConnectButton({ loading }: { loading: boolean }): JSX.Element {
+function LoginButton({ loading }: { loading: boolean }): JSX.Element {
   return (
     <button className="login__btn" type="submit" disabled={loading}>
       {loading ? 'Connecting…' : 'Connect'}

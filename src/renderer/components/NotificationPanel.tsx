@@ -1,7 +1,8 @@
 import { useShallow } from 'zustand/react/shallow'
-import React, { useEffect, useCallback, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
 import { RelativeTime } from '@terminator/extension-ui'
+import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { useNotificationStore, type Notification } from '../stores/notification.store'
 import './NotificationPanel.css'
 
@@ -153,20 +154,6 @@ function useLeftInset(panelRef: React.RefObject<HTMLDivElement>): void {
       setInset(0)
     }
   }, [panelRef])
-}
-
-function useCloseOnEscape(closePanel: () => void): void {
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') closePanel()
-    },
-    [closePanel]
-  )
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
 }
 
 function NotificationPanelInner(): JSX.Element {

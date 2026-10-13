@@ -17,7 +17,7 @@ export class WebglContextBudget {
     return true
   }
 
-  release(owner: string): void {
+  releaseContext(owner: string): void {
     this.holders.delete(owner)
   }
 }
