@@ -69,6 +69,16 @@ function captureHandlers(
   return handlers
 }
 
+/** Handlers registered afresh, with mocks cleared, before each test of the describe. */
+function freshHandlers(): Record<string, Handler> {
+  const handlers: Record<string, Handler> = {}
+  beforeEach(() => {
+    vi.clearAllMocks()
+    Object.assign(handlers, captureHandlers())
+  })
+  return handlers
+}
+
 function captureHandlersWithToken(token: string): Record<string, Handler> {
   const handlers: Record<string, Handler> = {}
   registerGithubHandlers(answerInto(handlers), {
@@ -154,34 +164,170 @@ function mockPrDetail(meta: unknown, files: unknown[] = PR_FILES_REST, reviews: 
   mockGitSuccess('{"users":[],"teams":[]}') // requested_reviewers — empty by default
 }
 
-describe('github:pr-review-detail', () => {
-  let handlers: Record<string, Handler>
+/** A caller in usePrReview.ts and the computeRiskScore it calls, defined in the same PR. */
+const CALLER_AND_DEFINITION_FILES = [
+  {
+    filename: 'src/hooks/usePrReview.ts',
+    status: 'modified',
+    additions: 2,
+    deletions: 0,
+    patch:
+      '@@ -309,4 +309,6 @@ export function useFetchFileMetrics\n       for (const { file, metrics } of collected) {\n+        const riskScore = computeRiskScore(metrics, allMetrics)\n+        updateFileRiskScore(chapter.id, file.path, riskScore)\n       }',
+  },
+  {
+    filename: 'src/github/pr-review-service.ts',
+    status: 'modified',
+    additions: 4,
+    deletions: 0,
+    patch:
+      '@@ -86,3 +86,7 @@\n+export function computeRiskScore(metrics: FileMetrics, all: FileMetrics[]): RiskScore {\n+  if (all.length === 0 && metrics) return defaultRiskScore()\n+  return score(metrics, all)\n+}',
+  },
+]
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
+/** What pr-review-detail answers that the reading-order test reads. */
+interface AnalysedPr {
+  readingOrder: Array<{ path: string; reason: string }>
+  chapters: Array<{ files: Array<{ path: string; whyHere: string }> }>
+  insights: { complexity: { branchDelta: number } } | null
+}
+
+/** A GraphQL page of a repository's pull requests holding `nodes`, the last page. */
+function openPrPage(nodes: unknown[], extra: Record<string, unknown> = {}) {
+  const pageInfo = { endCursor: null, hasNextPage: false }
+  return { data: { repository: { pullRequests: { ...extra, pageInfo, nodes } } } }
+}
+
+/** A GraphQL pull request node with none of the optional fields. */
+function minimalPrNode(number: number, title: string, headRefName: string) {
+  return {
+    number,
+    title,
+    isDraft: false,
+    additions: 0,
+    deletions: 0,
+    changedFiles: 0,
+    createdAt: '2025-06-01T00:00:00Z',
+    headRefName,
+    baseRefName: 'main',
+    mergeStateStatus: 'CLEAN',
+    author: { login: 'alice', avatarUrl: '' },
+  }
+}
+
+/** A node's optional fields: an assignee, bob's approval, carol requested, CI passing. */
+const OPTIONAL_PR_FIELDS = {
+  assignees: { nodes: [{ login: 'reviewer1' }] },
+  latestReviews: {
+    nodes: [
+      {
+        author: { login: 'bob', avatarUrl: '' },
+        state: 'APPROVED',
+        submittedAt: '2025-06-02T00:00:00Z',
+      },
+    ],
+  },
+  reviewRequests: { nodes: [{ requestedReviewer: { login: 'carol', avatarUrl: '' } }] },
+  commits: {
+    nodes: [
+      {
+        commit: {
+          statusCheckRollup: {
+            contexts: { nodes: [{ name: 'CI', conclusion: 'SUCCESS', status: 'COMPLETED' }] },
+          },
+        },
+      },
+    ],
+  },
+}
+
+/** A REST review comment by alice on line 10 of src/foo.ts. */
+const REST_REVIEW_COMMENT = {
+  id: 1,
+  user: { login: 'alice', avatar_url: '' },
+  body: 'Nice code',
+  created_at: '2025-01-01T00:00:00Z',
+  updated_at: '2025-01-01T00:00:00Z',
+  path: 'src/foo.ts',
+  line: 10,
+  start_line: null,
+  side: 'RIGHT',
+  diff_hunk: '@@ -1,3 +1,4 @@',
+  in_reply_to_id: null,
+  pull_request_review_id: 1,
+}
+
+/** A stored review session of PR 42 in /repo at abc123, with `overrides`. */
+function storedSession(overrides: Record<string, unknown> = {}) {
+  return {
+    repoRoot: '/repo',
+    prNumber: 42,
+    headSHA: 'abc123',
+    currentChapterId: null,
+    currentFilePath: null,
+    viewedFiles: [],
+    fileOrderOverrides: {},
+    scrollPosition: null,
+    pausedAt: null,
+    lastAccessedAt: '2026-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+/** Makes the stores' set and delete write through to their data; returns the delete spy. */
+function keepStoreWrites() {
+  vi.spyOn(ElectronStore.prototype, 'set').mockImplementation(function (
+    this: { store: Record<string, unknown> },
+    key: string,
+    value: unknown
+  ) {
+    this.store[key] = value
   })
+  return vi.spyOn(ElectronStore.prototype, 'delete').mockImplementation(function (
+    this: { store: Record<string, unknown> },
+    key: string
+  ) {
+    delete this.store[key]
+  })
+}
+
+/** Handlers whose project checkouts are `projectRoots`. */
+function handlersWithProjectRoots(projectRoots: string[]): Record<string, Handler> {
+  const handlers: Record<string, Handler> = {}
+  registerGithubHandlers(
+    answerInto(handlers),
+    { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
+    { listProjectRoots: () => projectRoots }
+  )
+  return handlers
+}
+
+/** A dashboard search node: alice's PR `number` of `repo`, with nothing to note, and `overrides`. */
+function dashboardNode(repo: string, number: number, overrides: Record<string, unknown> = {}) {
+  return {
+    number,
+    title: `PR ${number}`,
+    url: `https://github.com/${repo}/pull/${number}`,
+    isDraft: false,
+    additions: 1,
+    deletions: 1,
+    changedFiles: 1,
+    createdAt: '2026-09-01T00:00:00Z',
+    repository: { nameWithOwner: repo },
+    author: { login: 'alice' },
+    reviewDecision: null,
+    reviewRequests: { totalCount: 0 },
+    reviewThreads: { nodes: [] },
+    commits: { nodes: [] },
+    latestReviews: { nodes: [] },
+    ...overrides,
+  }
+}
+
+describe('github:pr-review-detail', () => {
+  const handlers = freshHandlers()
 
   it('puts definitions before their callers and attaches the analysis', async () => {
-    const files = [
-      {
-        filename: 'src/hooks/usePrReview.ts',
-        status: 'modified',
-        additions: 2,
-        deletions: 0,
-        patch:
-          '@@ -309,4 +309,6 @@ export function useFetchFileMetrics\n       for (const { file, metrics } of collected) {\n+        const riskScore = computeRiskScore(metrics, allMetrics)\n+        updateFileRiskScore(chapter.id, file.path, riskScore)\n       }',
-      },
-      {
-        filename: 'src/github/pr-review-service.ts',
-        status: 'modified',
-        additions: 4,
-        deletions: 0,
-        patch:
-          '@@ -86,3 +86,7 @@\n+export function computeRiskScore(metrics: FileMetrics, all: FileMetrics[]): RiskScore {\n+  if (all.length === 0 && metrics) return defaultRiskScore()\n+  return score(metrics, all)\n+}',
-      },
-    ]
-    mockPrDetail(PR_META, files)
+    mockPrDetail(PR_META, CALLER_AND_DEFINITION_FILES)
     mockGitFailure('no history') // co-change git log
     mockGitFailure('not found') // check-suites fallback
     mockGitFailure('no match') // git grep for test references
@@ -189,34 +335,18 @@ describe('github:pr-review-detail', () => {
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',
       prNumber: 6,
-    })) as {
-      pr: {
-        readingOrder: Array<{ path: string; reason: string }>
-        chapters: Array<{ files: Array<{ path: string; whyHere: string }> }>
-        insights: { complexity: { branchDelta: number } } | null
-      }
-    }
-    expect(result.pr.readingOrder.map((s) => s.path)).toEqual([
-      'src/github/pr-review-service.ts',
-      'src/hooks/usePrReview.ts',
-    ])
+    })) as { pr: AnalysedPr }
+    const order = ['src/github/pr-review-service.ts', 'src/hooks/usePrReview.ts']
+    expect(result.pr.readingOrder.map((s) => s.path)).toEqual(order)
     const flat = result.pr.chapters.flatMap((c) => c.files)
-    expect(flat.map((f) => f.path)).toEqual([
-      'src/github/pr-review-service.ts',
-      'src/hooks/usePrReview.ts',
-    ])
+    expect(flat.map((f) => f.path)).toEqual(order)
     expect(flat[1].whyHere).toBe('Calls computeRiskScore (step 1)')
     expect(result.pr.insights?.complexity.branchDelta).toBeGreaterThan(0)
   })
 })
 
 describe('github:pr-review-detail — returns a pr object on success with no status checks', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns a pr object on success with no status checks', async () => {
     mockPrDetail(PR_META)
@@ -235,12 +365,7 @@ describe('github:pr-review-detail — returns a pr object on success with no sta
 })
 
 describe('github:pr-review-detail — falls back to check-suites when statusCheckRollup is empty and suites are returned', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('falls back to check-suites when statusCheckRollup is empty and suites are returned', async () => {
     mockPrDetail(PR_META)
@@ -258,12 +383,7 @@ describe('github:pr-review-detail — falls back to check-suites when statusChec
 })
 
 describe('github:pr-review-detail — leaves statusChecks empty when check-suites also returns empty array', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('leaves statusChecks empty when check-suites also returns empty array', async () => {
     mockPrDetail(PR_META)
@@ -279,12 +399,7 @@ describe('github:pr-review-detail — leaves statusChecks empty when check-suite
 })
 
 describe('github:pr-review-detail — skips check-suites fallback when headSHA is empty', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('skips check-suites fallback when headSHA is empty', async () => {
     mockPrDetail({ ...PR_META, headRefOid: '' })
@@ -302,12 +417,7 @@ describe('github:pr-review-detail — skips check-suites fallback when headSHA i
 })
 
 describe('github:pr-review-detail — maps isDraft=true onto pr object', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps isDraft=true onto pr object', async () => {
     mockPrDetail({ ...PR_META, isDraft: true })
@@ -323,12 +433,7 @@ describe('github:pr-review-detail — maps isDraft=true onto pr object', () => {
 })
 
 describe('github:pr-review-detail — maps SUCCESS conclusion to pass state', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps SUCCESS conclusion to pass state', async () => {
     mockPrDetail({
@@ -348,12 +453,7 @@ describe('github:pr-review-detail — maps SUCCESS conclusion to pass state', ()
 })
 
 describe('github:pr-review-detail — maps FAILURE conclusion to fail state', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps FAILURE conclusion to fail state', async () => {
     mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'lint', conclusion: 'FAILURE' }] })
@@ -368,16 +468,11 @@ describe('github:pr-review-detail — maps FAILURE conclusion to fail state', ()
 })
 
 describe('github:pr-review-detail — maps TIMED_OUT and ACTION_REQUIRED conclusions to fail', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps TIMED_OUT and ACTION_REQUIRED conclusions to fail', async () => {
     for (const conclusion of ['TIMED_OUT', 'ACTION_REQUIRED', 'ERROR']) {
-      handlers = captureHandlers() // the owner lookup is cached per registration
+      Object.assign(handlers, captureHandlers()) // the owner lookup is cached per registration
       mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
 
       const result = (await handlers['github:pr-review-detail']({
@@ -391,16 +486,11 @@ describe('github:pr-review-detail — maps TIMED_OUT and ACTION_REQUIRED conclus
 })
 
 describe('github:pr-review-detail — maps IN_PROGRESS and QUEUED to pending state', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps IN_PROGRESS and QUEUED to pending state', async () => {
     for (const conclusion of ['IN_PROGRESS', 'QUEUED', 'PENDING', 'WAITING']) {
-      handlers = captureHandlers() // the owner lookup is cached per registration
+      Object.assign(handlers, captureHandlers()) // the owner lookup is cached per registration
       mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
 
       const result = (await handlers['github:pr-review-detail']({
@@ -414,16 +504,11 @@ describe('github:pr-review-detail — maps IN_PROGRESS and QUEUED to pending sta
 })
 
 describe('github:pr-review-detail — maps SKIPPED, NEUTRAL, CANCELLED to skipped state', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps SKIPPED, NEUTRAL, CANCELLED to skipped state', async () => {
     for (const conclusion of ['SKIPPED', 'NEUTRAL', 'CANCELLED']) {
-      handlers = captureHandlers() // the owner lookup is cached per registration
+      Object.assign(handlers, captureHandlers()) // the owner lookup is cached per registration
       mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
 
       const result = (await handlers['github:pr-review-detail']({
@@ -437,12 +522,7 @@ describe('github:pr-review-detail — maps SKIPPED, NEUTRAL, CANCELLED to skippe
 })
 
 describe('github:pr-review-detail — maps unknown conclusion string to unknown state', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps unknown conclusion string to unknown state', async () => {
     mockPrDetail({
@@ -460,12 +540,7 @@ describe('github:pr-review-detail — maps unknown conclusion string to unknown 
 })
 
 describe('github:pr-review-detail — uses state field when conclusion is absent (StatusContext)', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('uses state field when conclusion is absent (StatusContext)', async () => {
     mockPrDetail({
@@ -484,12 +559,7 @@ describe('github:pr-review-detail — uses state field when conclusion is absent
 })
 
 describe('github:pr-review-detail — preserves multiple checks with mixed states', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('preserves multiple checks with mixed states', async () => {
     mockPrDetail({
@@ -514,12 +584,7 @@ describe('github:pr-review-detail — preserves multiple checks with mixed state
 })
 
 describe('github:pr-review-detail — maps mergeStateStatus BEHIND to behind', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps mergeStateStatus BEHIND to behind', async () => {
     mockPrDetail({ ...PR_META, mergeStateStatus: 'BEHIND' })
@@ -543,12 +608,7 @@ describe('github:pr-review-detail — maps mergeStateStatus BEHIND to behind', (
 })
 
 describe('github:pr-review-detail — maps mergeStateStatus CLEAN to clean', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps mergeStateStatus CLEAN to clean', async () => {
     mockPrDetail({ ...PR_META, mergeStateStatus: 'CLEAN' })
@@ -562,12 +622,7 @@ describe('github:pr-review-detail — maps mergeStateStatus CLEAN to clean', () 
 })
 
 describe('github:pr-review-detail — maps lintStatus to fail when eslint check has FAILURE conclusion', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps lintStatus to fail when eslint check has FAILURE conclusion', async () => {
     mockPrDetail({
@@ -583,12 +638,7 @@ describe('github:pr-review-detail — maps lintStatus to fail when eslint check 
 })
 
 describe('github:pr-review-detail — maps lintStatus to warn when lint check is PENDING', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps lintStatus to warn when lint check is PENDING', async () => {
     mockPrDetail({
@@ -604,12 +654,7 @@ describe('github:pr-review-detail — maps lintStatus to warn when lint check is
 })
 
 describe('github:pr-review-detail — maps lintStatus to pass when lint check has SUCCESS conclusion', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps lintStatus to pass when lint check has SUCCESS conclusion', async () => {
     mockPrDetail({
@@ -625,12 +670,7 @@ describe('github:pr-review-detail — maps lintStatus to pass when lint check ha
 })
 
 describe('github:pr-review-detail — maps lintStatus to unknown when lint check is SKIPPED (non-blocking)', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps lintStatus to unknown when lint check is SKIPPED (non-blocking)', async () => {
     mockPrDetail({
@@ -646,12 +686,7 @@ describe('github:pr-review-detail — maps lintStatus to unknown when lint check
 })
 
 describe('github:pr-review-detail — extracts approvals from REST reviews field', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('extracts approvals from REST reviews field', async () => {
     const reviews = [
@@ -678,12 +713,7 @@ describe('github:pr-review-detail — extracts approvals from REST reviews field
 })
 
 describe('github:pr-review-detail — skips reviews with no login in mapApprovals', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('skips reviews with no login in mapApprovals', async () => {
     const reviews = [{ user: {}, state: 'APPROVED', submitted_at: '2026-05-01T10:00:00Z' }]
@@ -698,12 +728,7 @@ describe('github:pr-review-detail — skips reviews with no login in mapApproval
 })
 
 describe('github:pr-review-detail — deduplicates approvals keeping the later non-COMMENTED review', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('deduplicates approvals keeping the later non-COMMENTED review', async () => {
     const reviews = [
@@ -731,12 +756,7 @@ describe('github:pr-review-detail — deduplicates approvals keeping the later n
 })
 
 describe('github:pr-review-detail — lintStatus is unknown for a lint check with a non-blocking-but-unrecognized conclusion', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('lintStatus is unknown for a lint check with a non-blocking-but-unrecognized conclusion', async () => {
     // STARTUP_FAILURE is not in FAILURE/ERROR/TIMED_OUT/ACTION_REQUIRED, not in PENDING set,
@@ -757,12 +777,7 @@ describe('github:pr-review-detail — lintStatus is unknown for a lint check wit
 })
 
 describe('github:pr-review-detail — maps mergeStateStatus CONFLICTING to dirty', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps mergeStateStatus CONFLICTING to dirty', async () => {
     mockPrDetail({
@@ -779,12 +794,7 @@ describe('github:pr-review-detail — maps mergeStateStatus CONFLICTING to dirty
 })
 
 describe('github:pr-review-detail — maps unknown mergeStateStatus to unknown', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps unknown mergeStateStatus to unknown', async () => {
     mockPrDetail({
@@ -801,12 +811,7 @@ describe('github:pr-review-detail — maps unknown mergeStateStatus to unknown',
 })
 
 describe('github:pr-review-detail — exercises computeCoChangeAffinityFromGit when PR has 2+ files', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('exercises computeCoChangeAffinityFromGit when PR has 2+ files', async () => {
     const twoFiles = [
@@ -833,12 +838,7 @@ describe('github:pr-review-detail — exercises computeCoChangeAffinityFromGit w
 })
 
 describe('github:pr-file-diff', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('fetches PR ref with --force so stale local refs do not block the diff', async () => {
     mockGitSuccess('') // git fetch
@@ -872,6 +872,10 @@ describe('github:pr-file-diff', () => {
 
     expect(result).toMatchObject({ error: expect.stringContaining('cannot lock ref') })
   })
+})
+
+describe('github:pr-file-diff — parses a diff with binary file indicator', () => {
+  const handlers = freshHandlers()
 
   it('parses a diff with binary file indicator', async () => {
     mockGitSuccess('') // git fetch
@@ -887,6 +891,10 @@ describe('github:pr-file-diff', () => {
 
     expect(result.diff.isBinary).toBe(true)
   })
+})
+
+describe('github:pr-file-diff — parses a diff with actual hunks', () => {
+  const handlers = freshHandlers()
 
   it('parses a diff with actual hunks', async () => {
     const diffContent = `diff --git a/src/foo.ts b/src/foo.ts
@@ -1080,12 +1088,7 @@ describe('github:pr-file-content — returns tooLarge when the read overflows, w
 })
 
 describe('github:list-open-prs', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns NOT_AUTHENTICATED when auth error is thrown', async () => {
     mockGitFailure('You need to run: gh auth login')
@@ -1106,12 +1109,7 @@ describe('github:list-open-prs', () => {
 })
 
 describe('github:list-open-prs — returns generic error message for other failures', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns generic error message for other failures', async () => {
     mockGitFailure('network timeout')
@@ -1123,12 +1121,7 @@ describe('github:list-open-prs — returns generic error message for other failu
 })
 
 describe('github:list-open-prs — handles numeric PR number search', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('handles numeric PR number search', async () => {
     const prData = {
@@ -1156,12 +1149,7 @@ describe('github:list-open-prs — handles numeric PR number search', () => {
 })
 
 describe('github:list-open-prs — handles text search', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('handles text search', async () => {
     const prList = [
@@ -1194,34 +1182,21 @@ describe('github:list-open-prs — handles text search', () => {
 })
 
 describe('github:list-open-prs — leaves out pull requests opened from an excluded branch', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('leaves out pull requests opened from an excluded branch', async () => {
-    handlers = captureHandlers(undefined, async (branch, repoPath) =>
-      repoPath === '/repo' ? branch.startsWith('renovate/') : false
+    Object.assign(
+      handlers,
+      captureHandlers(undefined, async (branch, repoPath) =>
+        repoPath === '/repo' ? branch.startsWith('renovate/') : false
+      )
     )
     mockGitSuccess(JSON.stringify(REPO_VIEW))
-    mockGitSuccess(
-      JSON.stringify({
-        data: {
-          repository: {
-            pullRequests: {
-              totalCount: 2,
-              pageInfo: { endCursor: null, hasNextPage: false },
-              nodes: [
-                { number: 1, title: 'bump', state: 'OPEN', headRefName: 'renovate/vitest-4' },
-                { number: 2, title: 'login', state: 'OPEN', headRefName: 'feat/login' },
-              ],
-            },
-          },
-        },
-      })
-    )
+    const nodes = [
+      { number: 1, title: 'bump', state: 'OPEN', headRefName: 'renovate/vitest-4' },
+      { number: 2, title: 'login', state: 'OPEN', headRefName: 'feat/login' },
+    ]
+    mockGitSuccess(JSON.stringify(openPrPage(nodes, { totalCount: 2 })))
     const result = (await handlers['github:list-open-prs']({ repoRoot: '/repo' })) as {
       prs: { number: number }[]
       totalCount: number
@@ -1232,15 +1207,13 @@ describe('github:list-open-prs — leaves out pull requests opened from an exclu
 })
 
 describe('github:list-open-prs — leaves excluded branches out of a text search too', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('leaves excluded branches out of a text search too', async () => {
-    handlers = captureHandlers(undefined, async (branch) => branch.startsWith('renovate/'))
+    Object.assign(
+      handlers,
+      captureHandlers(undefined, async (branch) => branch.startsWith('renovate/'))
+    )
     mockGitSuccess(
       JSON.stringify([
         { number: 1, title: 'bump', headRefName: 'renovate/x', author: { login: 'bot' } },
@@ -1256,12 +1229,7 @@ describe('github:list-open-prs — leaves excluded branches out of a text search
 })
 
 describe('github:list-open-prs — handles paginated GraphQL load with cursor', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('handles paginated GraphQL load with cursor', async () => {
     mockGitSuccess(JSON.stringify(REPO_VIEW)) // repo view
@@ -1287,12 +1255,7 @@ describe('github:list-open-prs — handles paginated GraphQL load with cursor', 
 })
 
 describe('github:list-open-prs — always asks GraphQL for open PRs, newest first, and ignores includeClosedPrs', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('always asks GraphQL for open PRs, newest first, and ignores includeClosedPrs', async () => {
     mockGitSuccess(JSON.stringify(REPO_VIEW))
@@ -1323,12 +1286,7 @@ describe('github:list-open-prs — always asks GraphQL for open PRs, newest firs
 })
 
 describe('github:list-open-prs — maps the PR state of a GraphQL node', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('maps the PR state of a GraphQL node', async () => {
     mockGitSuccess(JSON.stringify(REPO_VIEW))
@@ -1352,12 +1310,7 @@ describe('github:list-open-prs — maps the PR state of a GraphQL node', () => {
 })
 
 describe('github:list-open-prs — searches open PRs only for plain text', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('searches open PRs only for plain text', async () => {
     mockGitSuccess('[]')
@@ -1374,12 +1327,7 @@ describe('github:list-open-prs — searches open PRs only for plain text', () =>
 })
 
 describe('github:list-open-prs — searches merged PRs for is:merged and strips the qualifier', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('searches merged PRs for is:merged and strips the qualifier', async () => {
     mockGitSuccess('[]')
@@ -1399,67 +1347,19 @@ describe('github:list-open-prs — searches merged PRs for is:merged and strips 
 })
 
 describe('github:list-open-prs — normalizes GQL nodes with optional fields when response contains PRs', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('normalizes GQL nodes with optional fields when response contains PRs', async () => {
     mockGitSuccess(JSON.stringify(REPO_VIEW))
-    const gqlResponse = {
-      data: {
-        repository: {
-          pullRequests: {
-            pageInfo: { endCursor: null, hasNextPage: false },
-            nodes: [
-              {
-                number: 7,
-                title: 'Test PR',
-                isDraft: false,
-                additions: 10,
-                deletions: 5,
-                changedFiles: 2,
-                createdAt: '2025-06-01T00:00:00Z',
-                headRefName: 'feat/test',
-                baseRefName: 'main',
-                mergeStateStatus: 'CLEAN',
-                author: { login: 'alice', avatarUrl: 'https://example.com/alice.png' },
-                // Optional fields present:
-                assignees: { nodes: [{ login: 'reviewer1' }] },
-                latestReviews: {
-                  nodes: [
-                    {
-                      author: { login: 'bob', avatarUrl: '' },
-                      state: 'APPROVED',
-                      submittedAt: '2025-06-02T00:00:00Z',
-                    },
-                  ],
-                },
-                reviewRequests: {
-                  nodes: [{ requestedReviewer: { login: 'carol', avatarUrl: '' } }],
-                },
-                commits: {
-                  nodes: [
-                    {
-                      commit: {
-                        statusCheckRollup: {
-                          contexts: {
-                            nodes: [{ name: 'CI', conclusion: 'SUCCESS', status: 'COMPLETED' }],
-                          },
-                        },
-                      },
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        },
-      },
+    const node = {
+      ...minimalPrNode(7, 'Test PR', 'feat/test'),
+      additions: 10,
+      deletions: 5,
+      changedFiles: 2,
+      author: { login: 'alice', avatarUrl: 'https://example.com/alice.png' },
+      ...OPTIONAL_PR_FIELDS,
     }
-    mockGitSuccess(JSON.stringify(gqlResponse))
+    mockGitSuccess(JSON.stringify(openPrPage([node])))
 
     const result = (await handlers['github:list-open-prs']({
       repoRoot: '/repo',
@@ -1471,41 +1371,12 @@ describe('github:list-open-prs — normalizes GQL nodes with optional fields whe
 })
 
 describe('github:list-open-prs — normalizes GQL nodes when optional fields are absent', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('normalizes GQL nodes when optional fields are absent', async () => {
     mockGitSuccess(JSON.stringify(REPO_VIEW))
-    const gqlResponse = {
-      data: {
-        repository: {
-          pullRequests: {
-            pageInfo: { endCursor: null, hasNextPage: false },
-            nodes: [
-              {
-                number: 8,
-                title: 'Minimal PR',
-                isDraft: false,
-                additions: 0,
-                deletions: 0,
-                changedFiles: 0,
-                createdAt: '2025-06-01T00:00:00Z',
-                headRefName: 'fix/minor',
-                baseRefName: 'main',
-                mergeStateStatus: 'CLEAN',
-                author: { login: 'alice', avatarUrl: '' },
-                // Optional fields ABSENT (undefined paths in normalizeGraphQLNode)
-              },
-            ],
-          },
-        },
-      },
-    }
-    mockGitSuccess(JSON.stringify(gqlResponse))
+    // Optional fields ABSENT (undefined paths in normalizeGraphQLNode)
+    mockGitSuccess(JSON.stringify(openPrPage([minimalPrNode(8, 'Minimal PR', 'fix/minor')])))
 
     const result = (await handlers['github:list-open-prs']({
       repoRoot: '/repo',
@@ -1516,48 +1387,18 @@ describe('github:list-open-prs — normalizes GQL nodes when optional fields are
 })
 
 describe('github:pr-inline-comments', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns comments and resolvedCommentIds on success', async () => {
-    const comments = [
-      {
-        id: 1,
-        user: { login: 'alice', avatar_url: '' },
-        body: 'Nice code',
-        created_at: '2025-01-01T00:00:00Z',
-        updated_at: '2025-01-01T00:00:00Z',
-        path: 'src/foo.ts',
-        line: 10,
-        start_line: null,
-        side: 'RIGHT',
-        diff_hunk: '@@ -1,3 +1,4 @@',
-        in_reply_to_id: null,
-        pull_request_review_id: 1,
-      },
-    ]
-    mockGitSuccess(JSON.stringify(comments))
+    mockGitSuccess(JSON.stringify([REST_REVIEW_COMMENT]))
     mockGitSuccess(JSON.stringify({ owner: { login: 'owner' }, name: 'repo' }))
-    mockGitSuccess(
-      JSON.stringify({
-        data: {
-          repository: {
-            pullRequest: {
-              reviewThreads: {
-                nodes: [
-                  { isResolved: true, comments: { nodes: [{ databaseId: 1 }] } },
-                  { isResolved: false, comments: { nodes: [{ databaseId: 2 }] } },
-                ],
-              },
-            },
-          },
-        },
-      })
-    )
+    const reviewThreads = {
+      nodes: [
+        { isResolved: true, comments: { nodes: [{ databaseId: 1 }] } },
+        { isResolved: false, comments: { nodes: [{ databaseId: 2 }] } },
+      ],
+    }
+    mockGitSuccess(JSON.stringify({ data: { repository: { pullRequest: { reviewThreads } } } }))
 
     const result = (await handlers['github:pr-inline-comments']({
       repoRoot: '/repo',
@@ -1569,31 +1410,10 @@ describe('github:pr-inline-comments', () => {
 })
 
 describe('github:pr-inline-comments — returns resolvedCommentIds: [] when the GraphQL resolved-threads call fails', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns resolvedCommentIds: [] when the GraphQL resolved-threads call fails', async () => {
-    const comments = [
-      {
-        id: 1,
-        user: { login: 'alice', avatar_url: '' },
-        body: 'Nice code',
-        created_at: '2025-01-01T00:00:00Z',
-        updated_at: '2025-01-01T00:00:00Z',
-        path: 'src/foo.ts',
-        line: 10,
-        start_line: null,
-        side: 'RIGHT',
-        diff_hunk: '@@ -1,3 +1,4 @@',
-        in_reply_to_id: null,
-        pull_request_review_id: 1,
-      },
-    ]
-    mockGitSuccess(JSON.stringify(comments))
+    mockGitSuccess(JSON.stringify([REST_REVIEW_COMMENT]))
     mockGitFailure('boom')
 
     const result = (await handlers['github:pr-inline-comments']({
@@ -1606,12 +1426,7 @@ describe('github:pr-inline-comments — returns resolvedCommentIds: [] when the 
 })
 
 describe('github:pr-inline-comments — returns NOT_AUTHENTICATED on auth error', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns NOT_AUTHENTICATED on auth error', async () => {
     mockGitFailure('GH_TOKEN is not set — run: gh auth login')
@@ -1624,12 +1439,7 @@ describe('github:pr-inline-comments — returns NOT_AUTHENTICATED on auth error'
 })
 
 describe('github:pr-comment-reply', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('posts a reply and returns comment', async () => {
     const reply = {
@@ -1660,12 +1470,7 @@ describe('github:pr-comment-reply', () => {
 })
 
 describe('github:pr-review-submit', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('submits an APPROVE review and returns reviewId', async () => {
     mockGitSuccess(JSON.stringify({ owner: { login: 'owner' }, name: 'repo' }))
@@ -1682,12 +1487,7 @@ describe('github:pr-review-submit', () => {
 })
 
 describe('github:pr-review-submit — returns error string on failure', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns error string on failure', async () => {
     mockGitFailure('permission denied')
@@ -1703,12 +1503,7 @@ describe('github:pr-review-submit — returns error string on failure', () => {
 })
 
 describe('github:pr-review-submit — extracts string error from JSON stdout errors array (covers 731T, 740T branches)', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('extracts string error from JSON stdout errors array (covers 731T, 740T branches)', async () => {
     const errBody = JSON.stringify({
@@ -1727,61 +1522,50 @@ describe('github:pr-review-submit — extracts string error from JSON stdout err
   })
 })
 
-describe('github:pr-review-submit — sends draft comments in the same POST via --input (S5)', () => {
-  let handlers: Record<string, Handler>
+/** The draft comments as the review POST carries them, a range with its start. */
+const DRAFTS_AS_SENT = [
+  { path: 'src/foo.ts', line: 10, side: 'RIGHT', body: 'nit' },
+  {
+    path: 'src/foo.ts',
+    line: 20,
+    side: 'RIGHT',
+    body: 'range comment',
+    start_line: 15,
+    start_side: 'RIGHT',
+  },
+]
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+type SubmitCall = [string, string[], { input: string }]
+
+describe('github:pr-review-submit — sends draft comments in the same POST via --input (S5)', () => {
+  const handlers = freshHandlers()
 
   it('sends draft comments in the same POST via --input (S5)', async () => {
     mockGitSuccess(JSON.stringify({ owner: { login: 'owner' }, name: 'repo' }))
     mockGitSuccess(JSON.stringify({ id: 555 }))
 
+    const comments = [
+      { path: 'src/foo.ts', line: 10, startLine: null, side: 'RIGHT', body: 'nit' },
+      { path: 'src/foo.ts', line: 20, startLine: 15, side: 'RIGHT', body: 'range comment' },
+    ]
+    const review = { event: 'COMMENT', body: 'Some findings', comments }
     const result = (await handlers['github:pr-review-submit']({
       repoRoot: '/repo',
       prNumber: 6,
-      event: 'COMMENT',
-      body: 'Some findings',
-      comments: [
-        { path: 'src/foo.ts', line: 10, startLine: null, side: 'RIGHT', body: 'nit' },
-        { path: 'src/foo.ts', line: 20, startLine: 15, side: 'RIGHT', body: 'range comment' },
-      ],
+      ...review,
     })) as { reviewId: number }
     expect(result.reviewId).toBe(555)
 
-    const [, submitArgs, submitOptions] = mockExecFile.mock.calls[1] as [
-      string,
-      string[],
-      { input: string },
-    ]
+    const [, submitArgs, { input }] = mockExecFile.mock.calls[1] as SubmitCall
     expect(submitArgs.slice(submitArgs.indexOf('--input'))).toEqual(['--input', '-'])
-
-    const written = JSON.parse(submitOptions.input)
-    expect(written.event).toBe('COMMENT')
-    expect(written.body).toBe('Some findings')
-    expect(written.comments).toEqual([
-      { path: 'src/foo.ts', line: 10, side: 'RIGHT', body: 'nit' },
-      {
-        path: 'src/foo.ts',
-        line: 20,
-        side: 'RIGHT',
-        body: 'range comment',
-        start_line: 15,
-        start_side: 'RIGHT',
-      },
-    ])
+    const written = JSON.parse(input)
+    expect([written.event, written.body]).toEqual(['COMMENT', 'Some findings'])
+    expect(written.comments).toEqual(DRAFTS_AS_SENT)
   })
 })
 
 describe('github:sessions-for-repo and github:session-get/set', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('github:sessions-for-repo returns sessions for valid repo', async () => {
     const result = (await handlers['github:sessions-for-repo']({
@@ -1799,12 +1583,7 @@ describe('github:sessions-for-repo and github:session-get/set', () => {
 })
 
 describe('github:sessions-for-repo and github:session-get/set — github:session-set stores a valid session', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('github:session-set stores a valid session', async () => {
     const validSession = {
@@ -1829,12 +1608,7 @@ describe('github:sessions-for-repo and github:session-get/set — github:session
 })
 
 describe('github:remove-active-review', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns { ok: true } when entry is deleted successfully', async () => {
     const result = (await handlers['github:remove-active-review']({
@@ -1846,12 +1620,7 @@ describe('github:remove-active-review', () => {
 })
 
 describe('github:prune-active-reviews', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns { openNumbers: [] } immediately for empty prNumbers array (no gh calls)', async () => {
     const result = (await handlers['github:prune-active-reviews']({
@@ -1873,12 +1642,7 @@ describe('github:prune-active-reviews', () => {
 })
 
 describe('github:prune-active-reviews — excludes CLOSED PRs from openNumbers and removes them from the store', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('excludes CLOSED PRs from openNumbers and removes them from the store', async () => {
     mockGitSuccess(JSON.stringify({ number: 8, state: 'CLOSED' }))
@@ -1900,12 +1664,7 @@ describe('github:prune-active-reviews — excludes CLOSED PRs from openNumbers a
 })
 
 describe('github:prune-active-reviews — silently skips PRs whose gh call fails and excludes them from openNumbers', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('silently skips PRs whose gh call fails and excludes them from openNumbers', async () => {
     mockGitFailure('not found')
@@ -1929,12 +1688,7 @@ describe('github:prune-active-reviews — silently skips PRs whose gh call fails
 })
 
 describe('github:pr-review-detail — catchError branches', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns NOT_AUTHENTICATED when auth error thrown', async () => {
     mockGitFailure('You need to run: gh auth login')
@@ -1948,12 +1702,7 @@ describe('github:pr-review-detail — catchError branches', () => {
 })
 
 describe('github:pr-review-detail — catchError branches — returns RATE_LIMITED when rate limit error thrown', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns RATE_LIMITED when rate limit error thrown', async () => {
     mockGitFailure('rate limit exceeded')
@@ -1968,12 +1717,7 @@ describe('github:pr-review-detail — catchError branches — returns RATE_LIMIT
 })
 
 describe('github:pr-review-detail — catchError branches — returns generic error string for other failures', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns generic error string for other failures', async () => {
     mockGitFailure('ENOENT: gh not found')
@@ -1995,12 +1739,7 @@ describe('github:pr-create', () => {
     head: 'feat/x',
     draft: false,
   }
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('opens the pull request in the main process and returns its number and URL', async () => {
     mockGitSuccess('https://github.com/o/r/pull/12\n')
@@ -2023,18 +1762,20 @@ describe('github:pr-create', () => {
   })
 })
 
+/** The open draft pull request from feat/greeting. */
+const openPr = {
+  number: 4,
+  title: 'Greet in either order',
+  body: 'Adds a greeting.',
+  url: 'https://github.com/o/r/pull/4',
+  state: 'OPEN',
+  isDraft: true,
+  baseRefName: 'main',
+  headRefName: 'feat/greeting',
+}
+
 describe('git:pr-status', () => {
   let handlers: Record<string, Handler>
-  const openPr = {
-    number: 4,
-    title: 'Greet in either order',
-    body: 'Adds a greeting.',
-    url: 'https://github.com/o/r/pull/4',
-    state: 'OPEN',
-    isDraft: true,
-    baseRefName: 'main',
-    headRefName: 'feat/greeting',
-  }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -2052,6 +1793,15 @@ describe('git:pr-status', () => {
     const [command, args] = mockExecFile.mock.calls[1]
     expect([command, args.slice(0, 3)]).toEqual(['gh', ['pr', 'view', 'feat/greeting']])
   })
+})
+
+describe('git:pr-status — answers null when the branch has no pull request', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('answers null when the branch has no pull request', async () => {
     mockGitSuccess('feat/greeting\n')
@@ -2066,6 +1816,15 @@ describe('git:pr-status', () => {
 
     expect(await handlers['git:pr-status']({ repoRoot: '/repo' })).toEqual({ pr: null })
   })
+})
+
+describe('git:pr-status — answers null on a detached HEAD without asking GitHub', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
 
   it('answers null on a detached HEAD without asking GitHub', async () => {
     mockGitSuccess('\n')
@@ -2076,12 +1835,7 @@ describe('git:pr-status', () => {
 })
 
 describe('github:pr-mark-ready', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns { ok: true } on success', async () => {
     mockGitSuccess('')
@@ -2098,12 +1852,7 @@ describe('github:pr-mark-ready', () => {
 })
 
 describe('github:pr-mark-ready — returns error string when gh fails', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns error string when gh fails', async () => {
     mockGitFailure('not in draft state')
@@ -2117,12 +1866,7 @@ describe('github:pr-mark-ready — returns error string when gh fails', () => {
 })
 
 describe('github:pr-issue-comments', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns mapped comments on success', async () => {
     const raw = [
@@ -2151,33 +1895,15 @@ describe('github:pr-issue-comments', () => {
 })
 
 describe('github:pr-issue-comments — includes PR review body comments merged with issue comments', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('includes PR review body comments merged with issue comments', async () => {
-    const issueComments = [
-      {
-        id: 1,
-        user: { login: 'alice', avatar_url: '' },
-        body: 'Issue comment',
-        created_at: '2025-01-02T00:00:00Z',
-        updated_at: '2025-01-02T00:00:00Z',
-      },
-    ]
-    const reviewBodies = [
-      {
-        id: 2,
-        user: { login: 'bob', avatar_url: '' },
-        body: 'Review body comment',
-        submitted_at: '2025-01-01T00:00:00Z',
-      },
-    ]
-    mockGitSuccess(JSON.stringify(issueComments))
-    mockGitSuccess(JSON.stringify(reviewBodies))
+    const author = (login: string) => ({ login, avatar_url: '' })
+    const issueComment = { id: 1, user: author('alice'), body: 'Issue comment' }
+    const at = { created_at: '2025-01-02T00:00:00Z', updated_at: '2025-01-02T00:00:00Z' }
+    mockGitSuccess(JSON.stringify([{ ...issueComment, ...at }]))
+    const reviewBody = { id: 2, user: author('bob'), body: 'Review body comment' }
+    mockGitSuccess(JSON.stringify([{ ...reviewBody, submitted_at: '2025-01-01T00:00:00Z' }]))
 
     const result = (await handlers['github:pr-issue-comments']({
       repoRoot: '/repo',
@@ -2192,12 +1918,7 @@ describe('github:pr-issue-comments — includes PR review body comments merged w
 })
 
 describe('github:pr-issue-comments — returns error string when gh fails', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns error string when gh fails', async () => {
     mockGitFailure('network error')
@@ -2211,12 +1932,7 @@ describe('github:pr-issue-comments — returns error string when gh fails', () =
 })
 
 describe('github:pr-issue-comment-add', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns mapped comment on success', async () => {
     const raw = {
@@ -2244,12 +1960,7 @@ describe('github:pr-issue-comment-add', () => {
 })
 
 describe('github:pr-issue-comment-add — returns error string when gh fails', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns error string when gh fails', async () => {
     mockGitFailure('forbidden')
@@ -2304,12 +2015,7 @@ describe('github:pr-update-branch — returns error string when gh fails', () =>
 })
 
 describe('github:current-user', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('returns login on success', async () => {
     mockGitSuccess('alice\n')
@@ -2366,12 +2072,7 @@ describe('github:current-user — retries without token when token is set but gh
 })
 
 describe('github:save-active-review and github:active-reviews-for-repo', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   it('github:save-active-review stores and returns ok:true', async () => {
     const result = (await handlers['github:save-active-review']({
@@ -2390,12 +2091,7 @@ describe('github:save-active-review and github:active-reviews-for-repo', () => {
 })
 
 describe('github:remove-active-review — store side-effects', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   afterEach(() => {
     vi.restoreAllMocks()
@@ -2403,33 +2099,8 @@ describe('github:remove-active-review — store side-effects', () => {
 
   it('deletes matching session-store keys when a session key shares the repoRoot+prNumber prefix', async () => {
     // Make set/delete functional so the store records the session
-    vi.spyOn(ElectronStore.prototype, 'set').mockImplementation(function (
-      this: { store: Record<string, unknown> },
-      key: string,
-      value: unknown
-    ) {
-      this.store[key] = value
-    })
-    const deleteSpy = vi.spyOn(ElectronStore.prototype, 'delete').mockImplementation(function (
-      this: { store: Record<string, unknown> },
-      key: string
-    ) {
-      delete this.store[key]
-    })
-
-    const validSession = {
-      repoRoot: '/repo',
-      prNumber: 42,
-      headSHA: 'abc123',
-      currentChapterId: null,
-      currentFilePath: null,
-      viewedFiles: [],
-      fileOrderOverrides: {},
-      scrollPosition: null,
-      pausedAt: null,
-      lastAccessedAt: '2026-01-01T00:00:00Z',
-    }
-    await handlers['github:session-set']({ key: '/repo:::42:::abc123', session: validSession })
+    const deleteSpy = keepStoreWrites()
+    await handlers['github:session-set']({ key: '/repo:::42:::abc123', session: storedSession() })
 
     const result = (await handlers['github:remove-active-review']({
       repoRoot: '/repo',
@@ -2442,45 +2113,18 @@ describe('github:remove-active-review — store side-effects', () => {
 })
 
 describe('github:remove-active-review — store side-effects — returns { error } when activeReviewStore.delete throws (line 846)', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    handlers = captureHandlers()
-  })
+  const handlers = freshHandlers()
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
   it("deletes the pull request's own session key, so a refresh does not bring it back as paused", async () => {
-    vi.spyOn(ElectronStore.prototype, 'set').mockImplementation(function (
-      this: { store: Record<string, unknown> },
-      key: string,
-      value: unknown
-    ) {
-      this.store[key] = value
-    })
-    vi.spyOn(ElectronStore.prototype, 'delete').mockImplementation(function (
-      this: { store: Record<string, unknown> },
-      key: string
-    ) {
-      delete this.store[key]
-    })
-    const session = (prNumber: number) => ({
-      repoRoot: '/repo',
-      prNumber,
-      headSHA: 'abc123',
-      currentChapterId: null,
-      currentFilePath: null,
-      viewedFiles: [],
-      fileOrderOverrides: {},
-      scrollPosition: null,
-      pausedAt: '2026-01-01T00:00:00Z',
-      lastAccessedAt: '2026-01-01T00:00:00Z',
-    })
-    await handlers['github:session-set']({ key: '/repo:::42', session: session(42) })
-    await handlers['github:session-set']({ key: '/repo:::420', session: session(420) })
+    keepStoreWrites()
+    const paused = (prNumber: number) =>
+      storedSession({ prNumber, pausedAt: '2026-01-01T00:00:00Z' })
+    await handlers['github:session-set']({ key: '/repo:::42', session: paused(42) })
+    await handlers['github:session-set']({ key: '/repo:::420', session: paused(420) })
 
     await handlers['github:remove-active-review']({ repoRoot: '/repo', prNumber: 42 })
 
@@ -2508,13 +2152,7 @@ describe('github:sessions-for-repo — v1/v2 key precedence', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.spyOn(ElectronStore.prototype, 'set').mockImplementation(function (
-      this: { store: Record<string, unknown> },
-      key: string,
-      value: unknown
-    ) {
-      this.store[key] = value
-    })
+    keepStoreWrites()
     handlers = captureHandlers()
   })
 
@@ -2522,21 +2160,7 @@ describe('github:sessions-for-repo — v1/v2 key precedence', () => {
     vi.restoreAllMocks()
   })
 
-  function session(overrides: Record<string, unknown>) {
-    return {
-      repoRoot: '/repo',
-      prNumber: 42,
-      headSHA: 'abc123',
-      currentChapterId: null,
-      currentFilePath: null,
-      viewedFiles: [],
-      fileOrderOverrides: {},
-      scrollPosition: null,
-      pausedAt: null,
-      lastAccessedAt: '2026-01-01T00:00:00Z',
-      ...overrides,
-    }
-  }
+  const session = storedSession
 
   it('reads a v1 key ("repo:::pr:::sha")', async () => {
     await handlers['github:session-set']({
@@ -2549,6 +2173,22 @@ describe('github:sessions-for-repo — v1/v2 key precedence', () => {
     expect(result.sessions).toHaveLength(1)
     expect(result.sessions[0].prNumber).toBe(42)
   })
+})
+
+describe('github:sessions-for-repo — v1/v2 key precedence — reads a v2 key ("repo:::pr")', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    keepStoreWrites()
+    handlers = captureHandlers()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const session = storedSession
 
   it('reads a v2 key ("repo:::pr")', async () => {
     await handlers['github:session-set']({
@@ -2560,6 +2200,22 @@ describe('github:sessions-for-repo — v1/v2 key precedence', () => {
     }
     expect(result.sessions).toHaveLength(1)
   })
+})
+
+describe('github:sessions-for-repo — v1/v2 key precedence — prefers the v2 key over a v1 key for the same PR', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    keepStoreWrites()
+    handlers = captureHandlers()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const session = storedSession
 
   it('prefers the v2 key over a v1 key for the same PR', async () => {
     await handlers['github:session-set']({
@@ -2765,6 +2421,16 @@ describe('github:clone-repo', () => {
   })
 })
 
+/** shardByDuration gaining a guard against fewer than one shard. */
+const SHARD_GUARD_FILE = {
+  filename: 'scripts/e2e-shard.ts',
+  status: 'modified',
+  additions: 2,
+  deletions: 0,
+  patch:
+    '@@ -40,2 +40,4 @@\n export function shardByDuration(t: Timing[], n: number) {\n+  if (n < 1) throw new Error("shards must be at least 1")\n+  return split(t, n)\n }',
+}
+
 describe('review revamp — edge branches', () => {
   let handlers: Record<string, Handler>
 
@@ -2775,25 +2441,11 @@ describe('review revamp — edge branches', () => {
   })
 
   it('reads patch coverage from a status context description', async () => {
-    mockPrDetail(
-      {
-        ...PR_META,
-        statusCheckRollup: [
-          { context: 'codecov/patch', state: 'SUCCESS', description: '84.21% of diff hit' },
-          { name: 'Lint', conclusion: 'SUCCESS' },
-        ],
-      },
-      [
-        {
-          filename: 'scripts/e2e-shard.ts',
-          status: 'modified',
-          additions: 2,
-          deletions: 0,
-          patch:
-            '@@ -40,2 +40,4 @@\n export function shardByDuration(t: Timing[], n: number) {\n+  if (n < 1) throw new Error("shards must be at least 1")\n+  return split(t, n)\n }',
-        },
-      ]
-    )
+    const statusCheckRollup = [
+      { context: 'codecov/patch', state: 'SUCCESS', description: '84.21% of diff hit' },
+      { name: 'Lint', conclusion: 'SUCCESS' },
+    ]
+    mockPrDetail({ ...PR_META, statusCheckRollup }, [SHARD_GUARD_FILE])
     mockGitFailure('no match') // git grep for test references
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',
@@ -2898,31 +2550,9 @@ describe('review revamp — edge branches — maps ssh remotes, and ignores non-
   })
 
   it('maps ssh remotes, and ignores non-GitHub and unreadable ones', async () => {
-    const hs: Record<string, Handler> = {}
-    registerGithubHandlers(
-      answerInto(hs),
-      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
-      { listProjectRoots: () => ['/src/widgets', '/src/gadgets', '/src/broken'] }
-    )
-    const node = (repo: string, number: number) => ({
-      number,
-      title: `PR ${number}`,
-      url: `https://github.com/${repo}/pull/${number}`,
-      isDraft: false,
-      additions: 1,
-      deletions: 1,
-      changedFiles: 1,
-      createdAt: '2026-09-01T00:00:00Z',
-      repository: { nameWithOwner: repo },
-      author: { login: 'alice' },
-      reviewDecision: null,
-      reviewRequests: { totalCount: 0 },
-      reviewThreads: { nodes: [] },
-      commits: { nodes: [] },
-      latestReviews: { nodes: [] },
-    })
+    const hs = handlersWithProjectRoots(['/src/widgets', '/src/gadgets', '/src/broken'])
     mockDashboardExec(
-      { mine: [node('acme/widgets', 1), node('acme/gadgets', 2)] },
+      { mine: [dashboardNode('acme/widgets', 1), dashboardNode('acme/gadgets', 2)] },
       {
         '/src/widgets': 'git@github.com:acme/widgets.git',
         '/src/gadgets': 'https://gitlab.com/acme/gadgets.git',
@@ -2937,6 +2567,25 @@ describe('review revamp — edge branches — maps ssh remotes, and ignores non-
   })
 })
 
+const WIDGETS_REMOTE = 'https://github.com/acme/widgets.git'
+
+/** alice's acme/widgets PR 1, "Fix bug", waiting on review with CI passing. */
+const FIX_BUG_NODE = dashboardNode('acme/widgets', 1, {
+  title: 'Fix bug',
+  additions: 10,
+  deletions: 5,
+  changedFiles: 2,
+  createdAt: '2026-01-01T00:00:00Z',
+  reviewDecision: 'REVIEW_REQUIRED',
+  commits: {
+    nodes: [
+      {
+        commit: { oid: 'a', committedDate: '2026-01-01', statusCheckRollup: { state: 'SUCCESS' } },
+      },
+    ],
+  },
+})
+
 describe('github:dashboard-search', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -2944,52 +2593,12 @@ describe('github:dashboard-search', () => {
   })
 
   it('runs gh from api.paths.globalStorage, builds the dashboard, and maps local roots', async () => {
-    const handlers: Record<string, Handler> = {}
-    registerGithubHandlers(
-      answerInto(handlers),
-      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
-      { listProjectRoots: () => ['/Users/me/repos/widgets'] }
-    )
-
-    mockDashboardExec(
-      {
-        mine: [
-          {
-            number: 1,
-            title: 'Fix bug',
-            url: 'https://github.com/acme/widgets/pull/1',
-            isDraft: false,
-            additions: 10,
-            deletions: 5,
-            changedFiles: 2,
-            createdAt: '2026-01-01T00:00:00Z',
-            repository: { nameWithOwner: 'acme/widgets' },
-            author: { login: 'alice' },
-            reviewDecision: 'REVIEW_REQUIRED',
-            reviewRequests: { totalCount: 0 },
-            reviewThreads: { nodes: [] },
-            commits: {
-              nodes: [
-                {
-                  commit: {
-                    oid: 'a',
-                    committedDate: '2026-01-01',
-                    statusCheckRollup: { state: 'SUCCESS' },
-                  },
-                },
-              ],
-            },
-            latestReviews: { nodes: [] },
-          },
-        ],
-      },
-      { '/Users/me/repos/widgets': 'https://github.com/acme/widgets.git' }
-    )
+    const handlers = handlersWithProjectRoots(['/Users/me/repos/widgets'])
+    mockDashboardExec({ mine: [FIX_BUG_NODE] }, { '/Users/me/repos/widgets': WIDGETS_REMOTE })
 
     const result = (await handlers['github:dashboard-search']({})) as {
       prs: Array<{ localRepoRoot: string | null; repo: string }>
       login: string
-      fetchedAt: string
     }
     expect(result.login).toBe('alice')
     expect(result.prs).toHaveLength(1)
@@ -3065,32 +2674,13 @@ describe('github:dashboard-search — keeps the other sections when one fails, n
 
   it('keeps the other sections when one fails, naming the failure briefly', async () => {
     const handlers = captureHandlers()
-    const node = {
-      number: 7,
+    const node = dashboardNode('acme/widgets', 7, {
       title: 'Mine',
-      url: 'https://github.com/acme/widgets/pull/7',
-      isDraft: false,
-      additions: 1,
-      deletions: 1,
-      changedFiles: 1,
       createdAt: '2026-01-01T00:00:00Z',
-      repository: { nameWithOwner: 'acme/widgets' },
-      author: { login: 'alice' },
-      reviewDecision: null,
-      reviewRequests: { totalCount: 0 },
-      reviewThreads: { nodes: [] },
-      commits: { nodes: [] },
-      latestReviews: { nodes: [] },
-    }
-    mockDashboardExec(
-      { mine: [node] },
-      {},
-      {
-        team: new Error(
-          'Command failed: gh api graphql -f query=query { team: search(...) }\ngh: HTTP 502\n'
-        ),
-      }
-    )
+    })
+    const failure =
+      'Command failed: gh api graphql -f query=query { team: search(...) }\ngh: HTTP 502\n'
+    mockDashboardExec({ mine: [node] }, {}, { team: new Error(failure) })
     const result = (await handlers['github:dashboard-search']({})) as {
       prs: Array<{ number: number }>
       failed: Array<{ section: string; error: string }>
@@ -3465,59 +3055,64 @@ describe('repository lookups run once — looks up the signed-in user once acros
   })
 })
 
+const REPO_FILES: Record<string, string> = {
+  'src/a.ts': 'export const a = 1',
+  'src/b.ts': "import { a } from './a'\nexport const b = a",
+  'src/c.ts': "import x from './b'\nimport y from './a'",
+  'src/a.spec.ts': "import { a } from './a'",
+  'lib/d.py': 'import a',
+  'top.ts': 'export const t = 1',
+  'top.spec.ts': 'x',
+}
+const COMMITS: Record<string, string[]> = {
+  ['1'.repeat(40)]: ['src/a.ts', 'src/b.ts'],
+  ['2'.repeat(40)]: ['src/a.ts'],
+  ['3'.repeat(40)]: ['lib/d.py', 'top.ts'],
+}
+const globToRegExp = (g: string) =>
+  new RegExp('^' + g.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*') + '$')
+
+/** `git log`: every commit with its files, or the commits touching the one path asked. */
+function fakeLog(a: string[]): string {
+  if (a.includes('--name-only')) {
+    return Object.entries(COMMITS)
+      .map(([h, files]) => `${h}\n\n${files.join('\n')}`)
+      .join('\n\n')
+  }
+  const path = a[a.indexOf('--') + 1]
+  return Object.entries(COMMITS)
+    .filter(([, files]) => files.includes(path))
+    .map(([h]) => `${h.slice(0, 7)} c`)
+    .join('\n')
+}
+
+/** `git grep` over REPO_FILES: matching files with -rl, else file, line and text. */
+function fakeGrep(a: string[]): string {
+  const pattern = new RegExp(a[a.length - 1])
+  const lines = Object.entries(REPO_FILES).flatMap(([file, text]) =>
+    text
+      .split('\n')
+      .map((l, i) => ({ file, n: i + 1, l }))
+      .filter((x) => pattern.test(x.l))
+  )
+  if (a.includes('-rl')) return [...new Set(lines.map((x) => x.file))].join('\n')
+  return lines.map((x) => `${x.file}\0${x.n}\0${x.l}`).join('\n')
+}
+
+/** A fake repository answering the git commands the metrics handlers use. */
+function fakeGit(a: string[]): string {
+  if (a.includes('log')) return fakeLog(a)
+  if (a[0] === 'grep') return fakeGrep(a)
+  if (a[0] === 'ls-files') {
+    const globs = a.slice(a.indexOf('--') + 1).map(globToRegExp)
+    return Object.keys(REPO_FILES)
+      .filter((f) => globs.some((g) => g.test(f)))
+      .join('\n')
+  }
+  return ''
+}
+
 describe('github:files-metrics', () => {
-  const REPO_FILES: Record<string, string> = {
-    'src/a.ts': 'export const a = 1',
-    'src/b.ts': "import { a } from './a'\nexport const b = a",
-    'src/c.ts': "import x from './b'\nimport y from './a'",
-    'src/a.spec.ts': "import { a } from './a'",
-    'lib/d.py': 'import a',
-    'top.ts': 'export const t = 1',
-    'top.spec.ts': 'x',
-  }
-  const COMMITS: Record<string, string[]> = {
-    ['1'.repeat(40)]: ['src/a.ts', 'src/b.ts'],
-    ['2'.repeat(40)]: ['src/a.ts'],
-    ['3'.repeat(40)]: ['lib/d.py', 'top.ts'],
-  }
-  const globToRegExp = (g: string) =>
-    new RegExp('^' + g.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*') + '$')
-
-  /** A fake repository answering the git commands the metrics handlers use. */
-  function fakeGit(a: string[]): string {
-    const log = a.indexOf('log')
-    if (log >= 0 && a.includes('--name-only')) {
-      return Object.entries(COMMITS)
-        .map(([h, files]) => `${h}\n\n${files.join('\n')}`)
-        .join('\n\n')
-    }
-    if (log >= 0) {
-      const path = a[a.indexOf('--') + 1]
-      return Object.entries(COMMITS)
-        .filter(([, files]) => files.includes(path))
-        .map(([h]) => `${h.slice(0, 7)} c`)
-        .join('\n')
-    }
-    if (a[0] === 'grep') {
-      const pattern = new RegExp(a[a.length - 1])
-      const lines = Object.entries(REPO_FILES).flatMap(([file, text]) =>
-        text
-          .split('\n')
-          .map((l, i) => ({ file, n: i + 1, l }))
-          .filter((x) => pattern.test(x.l))
-      )
-      if (a.includes('-rl')) return [...new Set(lines.map((x) => x.file))].join('\n')
-      return lines.map((x) => `${x.file}\0${x.n}\0${x.l}`).join('\n')
-    }
-    if (a[0] === 'ls-files') {
-      const globs = a.slice(a.indexOf('--') + 1).map(globToRegExp)
-      return Object.keys(REPO_FILES)
-        .filter((f) => globs.some((g) => g.test(f)))
-        .join('\n')
-    }
-    return ''
-  }
-
   let handlers: Record<string, Handler>
   beforeEach(() => {
     handlers = captureHandlers()
@@ -3548,6 +3143,13 @@ describe('github:files-metrics', () => {
 
     expect(few.length).toBe(3)
     expect(many.length).toBe(few.length)
+  })
+})
+
+describe('github:files-metrics — falls back to a search per file when the combined search overflows', () => {
+  let handlers: Record<string, Handler>
+  beforeEach(() => {
+    handlers = captureHandlers()
   })
 
   it('falls back to a search per file when the combined search overflows', async () => {
@@ -3686,54 +3288,41 @@ describe('stateForSearch', () => {
   })
 })
 
-describe('github:dashboard-search sessions and cap', () => {
-  const node = {
-    number: 5,
-    title: 'Mine',
-    url: 'https://github.com/acme/widgets/pull/5',
-    isDraft: false,
-    additions: 1,
-    deletions: 1,
-    changedFiles: 4,
-    createdAt: '2026-01-01T00:00:00Z',
-    repository: { nameWithOwner: 'acme/widgets' },
-    author: { login: 'alice' },
-    reviewDecision: null,
-    reviewRequests: { totalCount: 0 },
-    reviewThreads: { nodes: [] },
-    commits: { nodes: [] },
-    latestReviews: { nodes: [] },
-  }
-  const session = (over: Record<string, unknown>) => ({
-    repoRoot: '/Users/me/repos/widgets',
-    prNumber: 5,
-    headSHA: 'a',
-    currentChapterId: null,
-    currentFilePath: null,
-    viewedFiles: ['a.ts', 'b.ts'],
-    fileOrderOverrides: {},
-    scrollPosition: null,
-    pausedAt: null,
-    lastAccessedAt: '2026-02-01T00:00:00Z',
-    ...over,
-  })
-  const run = async () => {
-    const handlers: Record<string, Handler> = {}
-    registerGithubHandlers(
-      answerInto(handlers),
-      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
-      { listProjectRoots: () => ['/Users/me/repos/widgets'] }
-    )
-    mockDashboardExec(
-      { mine: [node] },
-      { '/Users/me/repos/widgets': 'https://github.com/acme/widgets.git' }
-    )
-    return (await handlers['github:dashboard-search']({})) as {
-      prs: Array<{ sessionStatus: string; viewedFileCount: number }>
-      capped: string[]
-    }
-  }
+const widgetsNode = dashboardNode('acme/widgets', 5, {
+  title: 'Mine',
+  changedFiles: 4,
+  createdAt: '2026-01-01T00:00:00Z',
+})
 
+/** A stored session of acme/widgets PR 5 that viewed two files, with `over`. */
+const widgetsSession = (over: Record<string, unknown>) => ({
+  repoRoot: '/Users/me/repos/widgets',
+  prNumber: 5,
+  headSHA: 'a',
+  currentChapterId: null,
+  currentFilePath: null,
+  viewedFiles: ['a.ts', 'b.ts'],
+  fileOrderOverrides: {},
+  scrollPosition: null,
+  pausedAt: null,
+  lastAccessedAt: '2026-02-01T00:00:00Z',
+  ...over,
+})
+
+/** The dashboard with widgets PR 5 in "mine", checked out at /Users/me/repos/widgets. */
+async function widgetsDashboard() {
+  const handlers = handlersWithProjectRoots(['/Users/me/repos/widgets'])
+  mockDashboardExec(
+    { mine: [widgetsNode] },
+    { '/Users/me/repos/widgets': 'https://github.com/acme/widgets.git' }
+  )
+  return (await handlers['github:dashboard-search']({})) as {
+    prs: Array<{ sessionStatus: string; viewedFileCount: number }>
+    capped: string[]
+  }
+}
+
+describe('github:dashboard-search sessions and cap', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockExecFile.mockReset()
@@ -3741,21 +3330,31 @@ describe('github:dashboard-search sessions and cap', () => {
   })
 
   it('fills the latest local session for a row with a checkout', async () => {
-    sessionData['/Users/me/repos/widgets:::5'] = session({})
-    sessionData['/Users/me/repos/widgets:::5:::old'] = session({ viewedFiles: [] })
-    const result = await run()
+    sessionData['/Users/me/repos/widgets:::5'] = widgetsSession({})
+    sessionData['/Users/me/repos/widgets:::5:::old'] = widgetsSession({ viewedFiles: [] })
+    const result = await widgetsDashboard()
     expect(result.prs[0]).toMatchObject({ sessionStatus: 'in-progress', viewedFileCount: 2 })
   })
 
   it('marks a paused session paused', async () => {
-    sessionData['/Users/me/repos/widgets:::5'] = session({ pausedAt: '2026-02-02T00:00:00Z' })
-    const result = await run()
+    sessionData['/Users/me/repos/widgets:::5'] = widgetsSession({
+      pausedAt: '2026-02-02T00:00:00Z',
+    })
+    const result = await widgetsDashboard()
     expect(result.prs[0].sessionStatus).toBe('paused')
   })
 
   it('leaves a row with no session not-started', async () => {
-    const result = await run()
+    const result = await widgetsDashboard()
     expect(result.prs[0]).toMatchObject({ sessionStatus: 'not-started', viewedFileCount: 0 })
+  })
+})
+
+describe('github:dashboard-search sessions and cap — reports sections whose search matched more than it returned', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    for (const k of Object.keys(sessionData)) delete sessionData[k]
   })
 
   it('reports sections whose search matched more than it returned', async () => {
