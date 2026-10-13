@@ -1572,6 +1572,20 @@ conversations in `forge/intake-sessions.ts`, executing and adopted orders in
 `held-calls.ts`, `palette-commands.ts`, `agent-policy.ts`).
 `extensions/foundry/CLAUDE.md` has the full table.
 
+Every function in the extension, its specs included, is within the size limits
+`npm run lint` enforces ([CONTRIBUTING.md](CONTRIBUTING.md#lint-and-format)). The
+three surfaces that were once a function each are a state hook, a model worked
+out from it, and parts: the Forge is `useForgeState`, `deriveForge` and one
+component per step (`STEP_BODIES`); the Floor is `useFloor` and a panel per
+section; the factory hall is `useFactoryHall`, `hallModel` and `HallStage`. Each
+state hook calls the others in the order their effects ran before the split. The
+Inbox and the factory site share the signal dock's hooks
+(`renderer/use-signals.ts`). A channel module lists its channels as
+`ChannelSpec[]` by topic. In the factory, the art draws through tables keyed by
+kind (`PROP_DRAWERS` in `factory/art/props.ts`), the scene through
+`draw(paint, layers, frame)` in `components/factory/HallScene.tsx`, and the
+layout and the belts through small state classes (`HallBuilder`, `BeltRouter`).
+
 #### ADRs
 
 - [ADR-007: agent-runner-subprocess](adr/007-agent-runner-subprocess.md) — spawn Claude Code as a child process rather than using the Anthropic API directly.
