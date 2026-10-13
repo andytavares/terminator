@@ -1,4 +1,4 @@
-import type { Paint } from './kit.js'
+import type { At, Paint } from './kit.js'
 import { rect } from './kit.js'
 
 // The hall's one pixel font: 3 wide by 5 tall, row-major, one bit per cell.
@@ -56,13 +56,17 @@ export function textWidth(text: string): number {
 }
 
 /** Draw `text` at 1px with its top-left at (x, y); a character the font lacks is a space. */
-export function drawText(paint: Paint, x: number, y: number, text: string, color: string): void {
+export function drawText(
+  paint: Paint,
+  [x, y]: At,
+  { text, color }: { text: string; color: string }
+): void {
   let cx = x
   for (const ch of text) {
     const bits = GLYPHS[ch] ?? GLYPHS[' ']
     for (let j = 0; j < GLYPH_H; j++) {
       for (let i = 0; i < GLYPH_W; i++) {
-        if (bits[j * GLYPH_W + i] === '1') rect(paint, cx + i, y + j, 1, 1, color)
+        if (bits[j * GLYPH_W + i] === '1') rect(paint, [cx + i, y + j, 1, 1], color)
       }
     }
     cx += 4
@@ -70,12 +74,16 @@ export function drawText(paint: Paint, x: number, y: number, text: string, color
 }
 
 /** One digit at 2px — the status wall, the queue plate and the lane stencil. */
-export function drawDigit(paint: Paint, x: number, y: number, digit: string, color: string): void {
+export function drawDigit(
+  paint: Paint,
+  [x, y]: At,
+  { digit, color }: { digit: string; color: string }
+): void {
   const bits = digit.length === 1 && digit >= '0' && digit <= '9' ? GLYPHS[digit] : undefined
   if (bits === undefined) return
   for (let j = 0; j < GLYPH_H; j++) {
     for (let i = 0; i < GLYPH_W; i++) {
-      if (bits[j * GLYPH_W + i] === '1') rect(paint, x + i * 2, y + j * 2, 2, 2, color)
+      if (bits[j * GLYPH_W + i] === '1') rect(paint, [x + i * 2, y + j * 2, 2, 2], color)
     }
   }
 }
@@ -91,13 +99,11 @@ export const ICON_SIZE = 7
 
 export function drawIcon(
   paint: Paint,
-  x: number,
-  y: number,
-  icon: keyof typeof ICONS,
-  color: string
+  [x, y]: At,
+  { icon, color }: { icon: keyof typeof ICONS; color: string }
 ): void {
   ICONS[icon].forEach((row, j) => {
-    for (let i = 0; i < ICON_SIZE; i++) if (row[i] === '1') rect(paint, x + i, y + j, 1, 1, color)
+    for (let i = 0; i < ICON_SIZE; i++) if (row[i] === '1') rect(paint, [x + i, y + j, 1, 1], color)
   })
 }
 

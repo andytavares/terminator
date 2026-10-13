@@ -15,9 +15,8 @@ export function toPaint(ctx: CanvasRenderingContext2D): Paint {
     set globalCompositeOperation(value: string) {
       ctx.globalCompositeOperation = value as GlobalCompositeOperation
     },
-    fillRect: (x, y, w, h) => ctx.fillRect(x, y, w, h),
-    createRadialGradient: (x0, y0, r0, x1, y1, r1) =>
-      ctx.createRadialGradient(x0, y0, r0, x1, y1, r1),
+    fillRect: ctx.fillRect.bind(ctx),
+    createRadialGradient: ctx.createRadialGradient.bind(ctx),
     drawImage: (image, dx, dy) => ctx.drawImage(image, dx, dy),
   }
 }

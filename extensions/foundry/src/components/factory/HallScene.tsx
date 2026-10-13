@@ -108,14 +108,10 @@ function bakeLight(map: HallMap, paint: Paint): void {
   paint.fillRect(0, 0, map.width * TILE_PX, map.height * TILE_PX)
   paint.globalCompositeOperation = 'destination-out'
   for (const light of map.lights) {
-    glow(
-      paint,
-      light.x * TILE_PX + TILE_PX / 2,
-      light.y * TILE_PX + TILE_PX / 2,
-      LIGHT_RADIUS,
-      'rgba(0,0,0,.85)',
-      'rgba(0,0,0,0)'
-    )
+    glow(paint, [light.x * TILE_PX + TILE_PX / 2, light.y * TILE_PX + TILE_PX / 2, LIGHT_RADIUS], {
+      rgba0: 'rgba(0,0,0,.85)',
+      rgba1: 'rgba(0,0,0,0)',
+    })
   }
 }
 
@@ -145,13 +141,13 @@ function draw(
   }
 
   const moving = new Set(world.crates.map((c) => c.beltId))
-  drawBelts(paint, map, moving, tMs)
-  drawQueuePlate(paint, map.anchors.exit, context, tMs)
+  drawBelts(paint, map, { movingBeltIds: moving, tMs })
+  drawQueuePlate(paint, map.anchors.exit, { context, tMs })
 
   type Drawable = { readonly y: number; readonly draw: () => void }
   const drawables: Drawable[] = []
   for (const prop of map.props) {
-    drawables.push({ y: drawOrderY(prop), draw: () => drawProp(paint, prop, context, tMs) })
+    drawables.push({ y: drawOrderY(prop), draw: () => drawProp(paint, prop, { context, tMs }) })
   }
   for (const crew of world.crew) {
     drawables.push({ y: crew.y, draw: () => drawCrew(paint, crew, tMs) })
@@ -171,9 +167,15 @@ function draw(
   for (const crew of world.crew) {
     if (!crew.present) continue
     if (crew.anim === 'type') {
-      glow(paint, crew.x, crew.y - 14, 26, 'rgba(90,200,235,.28)', 'rgba(90,200,235,0)')
+      glow(paint, [crew.x, crew.y - 14, 26], {
+        rgba0: 'rgba(90,200,235,.28)',
+        rgba1: 'rgba(90,200,235,0)',
+      })
     } else if (crew.anim === 'scan') {
-      glow(paint, crew.x, crew.y - 14, 26, 'rgba(140,230,120,.3)', 'rgba(140,230,120,0)')
+      glow(paint, [crew.x, crew.y - 14, 26], {
+        rgba0: 'rgba(140,230,120,.3)',
+        rgba1: 'rgba(140,230,120,0)',
+      })
     }
   }
   for (const nodeId of world.gatesWaiting) {
@@ -181,14 +183,10 @@ function draw(
     if (gate === undefined) continue
     const flashOn = Math.floor(tMs / 250) % 2 === 0
     if (!flashOn) continue
-    glow(
-      paint,
-      (gate.x + gate.w / 2) * TILE_PX,
-      gate.y * TILE_PX - 8,
-      36,
-      'rgba(230,160,60,.5)',
-      'rgba(230,160,60,0)'
-    )
+    glow(paint, [(gate.x + gate.w / 2) * TILE_PX, gate.y * TILE_PX - 8, 36], {
+      rgba0: 'rgba(230,160,60,.5)',
+      rgba1: 'rgba(230,160,60,0)',
+    })
   }
   for (const prop of map.props) {
     if (prop.nodeId === null) continue
@@ -200,18 +198,17 @@ function draw(
       const tool = context.tools[prop.nodeId]
       if (!typing && tool === undefined) continue
       const tint = SCREEN_TINT[tool ?? 'desk']
-      glow(paint, cx, prop.y * TILE_PX - 2, 30, `rgba(${tint},.16)`, `rgba(${tint},0)`)
+      glow(paint, [cx, prop.y * TILE_PX - 2, 30], {
+        rgba0: `rgba(${tint},.16)`,
+        rgba1: `rgba(${tint},0)`,
+      })
     } else if (prop.kind === 'press') {
       const step = states[prop.nodeId]
       if (step !== 'running') continue
-      glow(
-        paint,
-        cx,
-        prop.y * TILE_PX - TILE_PX - 4,
-        18,
-        'rgba(230,160,60,.35)',
-        'rgba(230,160,60,0)'
-      )
+      glow(paint, [cx, prop.y * TILE_PX - TILE_PX - 4, 18], {
+        rgba0: 'rgba(230,160,60,.35)',
+        rgba1: 'rgba(230,160,60,0)',
+      })
     }
   }
   paint.globalCompositeOperation = 'source-over'

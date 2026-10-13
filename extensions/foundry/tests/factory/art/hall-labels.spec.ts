@@ -76,7 +76,7 @@ function boundsTests() {
     ['an order that has not shipped', { leadTimeMs: null, reworks: 3, ciRounds: 1 }],
   ])('keeps every pixel inside its three tiles for %s', (_name, metrics) => {
     const paint = createRecordingPaint()
-    drawProp(paint, board, context({ metrics }), 0)
+    drawProp(paint, board, { context: context({ metrics }), tMs: 0 })
     expect(fills(paint.calls).length).toBeGreaterThan(0)
     expect(outside(paint.calls, boardRect(board))).toEqual([])
   })
@@ -85,12 +85,10 @@ function boundsTests() {
 function tilesAndFiguresTests() {
   it('is three tiles wide and one cell per figure, each under its own icon colour', () => {
     const paint = createRecordingPaint()
-    drawProp(
-      paint,
-      board,
-      context({ metrics: { leadTimeMs: 25 * 60_000, reworks: 2, ciRounds: 3 } }),
-      0
-    )
+    drawProp(paint, board, {
+      context: context({ metrics: { leadTimeMs: 25 * 60_000, reworks: 2, ciRounds: 3 } }),
+      tMs: 0,
+    })
     const rect = boardRect(board)
     expect(rect.right - rect.left).toBe(3 * TILE_PX)
     const cell = (rect.right - rect.left) / 3
@@ -108,15 +106,13 @@ function tilesAndFiguresTests() {
 function noProgressBarTests() {
   it("draws no progress bar: that is the heads-up display's job", () => {
     const paint = createRecordingPaint()
-    drawProp(
-      paint,
-      board,
-      context({
+    drawProp(paint, board, {
+      context: context({
         states: { a: 'passed', b: 'waiting' },
         metrics: { leadTimeMs: 0, reworks: 0, ciRounds: 0 },
       }),
-      0
-    )
+      tMs: 0,
+    })
     expect(fills(paint.calls).some((c) => c.style === HALL.green)).toBe(false)
   })
 }
@@ -127,7 +123,7 @@ describe('the queue plate', () => {
   it.each([1, 12, 99, 100])('keeps position %i inside the plate, on whole pixels', (position) => {
     for (const tMs of [0, 250]) {
       const paint = createRecordingPaint()
-      drawQueuePlate(paint, exit, context({ queue: { position } }), tMs)
+      drawQueuePlate(paint, exit, { context: context({ queue: { position } }), tMs })
       const all = fills(paint.calls)
       expect(all.length).toBeGreaterThan(0)
       expect(outside(paint.calls, plateRect(exit))).toEqual([])
@@ -141,7 +137,7 @@ describe('the queue plate', () => {
     const rect = plateRect(exit)
     expect(rect.bottom - rect.top).toBe(16)
     const paint = createRecordingPaint()
-    drawQueuePlate(paint, exit, context({ queue: { position: 1 } }), 0)
+    drawQueuePlate(paint, exit, { context: context({ queue: { position: 1 } }), tMs: 0 })
     const ink = fills(paint.calls).filter((c) => c.style === '#1a1508')
     expect(ink.length).toBe(setBits('1'))
     expect(ink.every((c) => c.w === 1 && c.h === 1)).toBe(true)
@@ -149,7 +145,7 @@ describe('the queue plate', () => {
 
   it('draws nothing out of a queue', () => {
     const paint = createRecordingPaint()
-    drawQueuePlate(paint, exit, context(), 0)
+    drawQueuePlate(paint, exit, { context: context(), tMs: 0 })
     expect(paint.calls).toEqual([])
   })
 })
@@ -183,7 +179,7 @@ function towerBoundsTests() {
         bottom: (tower.y + 1) * TILE_PX + 2,
       }
       const paint = createRecordingPaint()
-      drawProp(paint, tower, context({ ci: { checks: checks(p, w, f) } }), 0)
+      drawProp(paint, tower, { context: context({ ci: { checks: checks(p, w, f) } }), tMs: 0 })
       const strays = outside(paint.calls, towerRect(tower)).filter(
         (c) =>
           c.x < exitTile.left ||
@@ -199,7 +195,7 @@ function towerBoundsTests() {
 function lampsTests() {
   it('shows three lamps however many checks there are, each with its count in one-pixel digits', () => {
     const paint = createRecordingPaint()
-    drawProp(paint, tower, context({ ci: { checks: checks(12, 5, 2) } }), 0)
+    drawProp(paint, tower, { context: context({ ci: { checks: checks(12, 5, 2) } }), tMs: 0 })
     expect(
       lamps(paint.calls)
         .map((c) => c.style)
@@ -211,7 +207,7 @@ function lampsTests() {
 
   it('lights a lamp only for a bucket that has checks in it', () => {
     const paint = createRecordingPaint()
-    drawProp(paint, tower, context({ ci: { checks: checks(3, 0, 0) } }), 0)
+    drawProp(paint, tower, { context: context({ ci: { checks: checks(3, 0, 0) } }), tMs: 0 })
     expect(lamps(paint.calls).map((c) => c.style)).toEqual([HALL.green])
   })
 }
@@ -225,21 +221,24 @@ function theBeaconTests() {
       )
 
     const on = createRecordingPaint()
-    drawProp(on, tower, context({ ci: { checks: checks(1, 1, 0) } }), 0)
+    drawProp(on, tower, { context: context({ ci: { checks: checks(1, 1, 0) } }), tMs: 0 })
     expect(beacon(on.calls, HALL.amber)).toBe(true)
     expect(fills(on.calls).some((c) => c.style === crate)).toBe(true)
 
     const off = createRecordingPaint()
-    drawProp(off, tower, context({ ci: { checks: checks(1, 1, 0) } }), 400)
+    drawProp(off, tower, { context: context({ ci: { checks: checks(1, 1, 0) } }), tMs: 400 })
     expect(beacon(off.calls, HALL.amber)).toBe(false)
     expect(beacon(off.calls, HALL.amberDim)).toBe(true)
 
     const steady = createRecordingPaint()
-    drawProp(steady, tower, context({ steady: true, ci: { checks: checks(1, 1, 0) } }), 400)
+    drawProp(steady, tower, {
+      context: context({ steady: true, ci: { checks: checks(1, 1, 0) } }),
+      tMs: 400,
+    })
     expect(beacon(steady.calls, HALL.amber)).toBe(true)
 
     const quiet = createRecordingPaint()
-    drawProp(quiet, tower, context({ ci: { checks: checks(2, 0, 0) } }), 0)
+    drawProp(quiet, tower, { context: context({ ci: { checks: checks(2, 0, 0) } }), tMs: 0 })
     expect(beacon(quiet.calls, HALL.amber)).toBe(false)
     expect(beacon(quiet.calls, HALL.amberDim)).toBe(false)
     expect(fills(quiet.calls).some((c) => c.style === crate)).toBe(false)
@@ -305,12 +304,10 @@ describe('the ship gate while its step runs through the final check and CI', () 
     over: Partial<SceneContext> = {}
   ) => {
     const paint = createRecordingPaint()
-    drawProp(
-      paint,
-      gate,
-      context({ states: state === undefined ? {} : { ship: state }, ...over }),
-      0
-    )
+    drawProp(paint, gate, {
+      context: context({ states: state === undefined ? {} : { ship: state }, ...over }),
+      tMs: 0,
+    })
     return fills(paint.calls).find((c) => c.y === 6 * TILE_PX - 30 && c.h === 5)?.style
   }
 

@@ -62,7 +62,7 @@ function measuringAndDrawingTextTests() {
 
   it('draws lit cells 1px square at a 4px advance, in the colour it was given', () => {
     const paint = createRecordingPaint()
-    drawText(paint, 10, 20, 'A-', '#123456')
+    drawText(paint, [10, 20], { text: 'A-', color: '#123456' })
     const rects = paint.calls.filter((c) => c.op === 'fillRect')
     // A = 010 101 111 101 101 (10 cells); '-' = the middle row (3 cells).
     expect(rects).toHaveLength(13)
@@ -80,13 +80,13 @@ function measuringAndDrawingTextTests() {
 function missingCharactersAndDigitsTests() {
   it('draws a character the font lacks as a space', () => {
     const paint = createRecordingPaint()
-    drawText(paint, 0, 0, 'é', '#fff')
+    drawText(paint, [0, 0], { text: 'é', color: '#fff' })
     expect(paint.calls).toHaveLength(0)
   })
 
   it('draws a digit at 2px scale from the same table', () => {
     const paint = createRecordingPaint()
-    drawDigit(paint, 0, 0, '7', '#abc')
+    drawDigit(paint, [0, 0], { digit: '7', color: '#abc' })
     // 7 = 111 001 010 010 010: seven lit cells, each 2x2.
     expect(paint.calls).toHaveLength(7)
     expect(paint.calls[0]).toMatchObject({ x: 0, y: 0, w: 2, h: 2, style: '#abc' })
@@ -97,7 +97,7 @@ function missingCharactersAndDigitsTests() {
   it('draws nothing for something that is not a digit', () => {
     for (const bad of ['A', '', '12', '-']) {
       const paint = createRecordingPaint()
-      drawDigit(paint, 0, 0, bad, '#abc')
+      drawDigit(paint, [0, 0], { digit: bad, color: '#abc' })
       expect(paint.calls, bad).toHaveLength(0)
     }
   })

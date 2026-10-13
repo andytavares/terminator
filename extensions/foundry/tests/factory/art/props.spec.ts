@@ -187,7 +187,7 @@ type Lamp = (over: Partial<SceneContext>, tMs?: number) => readonly PaintCall[]
 function lampOf(kind: PropKind): Lamp {
   return (over, tMs = 0) => {
     const paint = createRecordingPaint()
-    drawProp(paint, prop(kind), context(over), tMs)
+    drawProp(paint, prop(kind), { context: context(over), tMs })
     return paint.calls
   }
 }
@@ -197,7 +197,7 @@ const STAGES = [0, 300, 714, 1500, 5000]
 /** The calls a `kind` prop paints in `ctx` at `tMs`. */
 function draw(kind: PropKind, ctx: SceneContext, tMs: number) {
   const paint = createRecordingPaint()
-  drawProp(paint, prop(kind), ctx, tMs)
+  drawProp(paint, prop(kind), { context: ctx, tMs })
   return paint.calls
 }
 
@@ -219,31 +219,38 @@ function everyKindAndDesksTests() {
   it('draws every PropKind without throwing', () => {
     for (const kind of ALL_PROP_KINDS) {
       const paint = createRecordingPaint()
-      expect(() => drawProp(paint, prop(kind), context(), 1234)).not.toThrow()
+      expect(() => drawProp(paint, prop(kind), { context: context(), tMs: 1234 })).not.toThrow()
       expect(paint.calls.length).toBeGreaterThan(0)
     }
   })
 
   it('lights a desk only when a present crew member of its own node is typing', () => {
     const lit = createRecordingPaint()
-    drawProp(lit, prop('desk'), context({ crew: [crew({ nodeId: 'n1', anim: 'type' })] }), 0)
+    drawProp(lit, prop('desk'), {
+      context: context({ crew: [crew({ nodeId: 'n1', anim: 'type' })] }),
+      tMs: 0,
+    })
     expect(containsColor(lit.calls, HALL.screenOn)).toBe(true)
 
     const idle = createRecordingPaint()
-    drawProp(idle, prop('desk'), context({ crew: [crew({ nodeId: 'n1', anim: 'idle' })] }), 0)
+    drawProp(idle, prop('desk'), {
+      context: context({ crew: [crew({ nodeId: 'n1', anim: 'idle' })] }),
+      tMs: 0,
+    })
     expect(containsColor(idle.calls, HALL.screenOn)).toBe(false)
 
     const orphaned = createRecordingPaint()
-    drawProp(
-      orphaned,
-      prop('desk'),
-      context({ crew: [crew({ nodeId: 'n1', anim: 'type', present: false })] }),
-      0
-    )
+    drawProp(orphaned, prop('desk'), {
+      context: context({ crew: [crew({ nodeId: 'n1', anim: 'type', present: false })] }),
+      tMs: 0,
+    })
     expect(containsColor(orphaned.calls, HALL.screenOn)).toBe(false)
 
     const otherNode = createRecordingPaint()
-    drawProp(otherNode, prop('desk'), context({ crew: [crew({ nodeId: 'n2', anim: 'type' })] }), 0)
+    drawProp(otherNode, prop('desk'), {
+      context: context({ crew: [crew({ nodeId: 'n2', anim: 'type' })] }),
+      tMs: 0,
+    })
     expect(containsColor(otherNode.calls, HALL.screenOn)).toBe(false)
   })
 }
@@ -251,25 +258,29 @@ function everyKindAndDesksTests() {
 function rigsBenchesAndGatesTests() {
   it('draws a rig waveform only while its crew scans', () => {
     const scanning = createRecordingPaint()
-    drawProp(scanning, prop('rig'), context({ crew: [crew({ nodeId: 'n1', anim: 'scan' })] }), 0)
+    drawProp(scanning, prop('rig'), {
+      context: context({ crew: [crew({ nodeId: 'n1', anim: 'scan' })] }),
+      tMs: 0,
+    })
     expect(containsColor(scanning.calls, HALL.green)).toBe(true)
 
     const idle = createRecordingPaint()
-    drawProp(idle, prop('rig'), context({ crew: [crew({ nodeId: 'n1', anim: 'idle' })] }), 0)
+    drawProp(idle, prop('rig'), {
+      context: context({ crew: [crew({ nodeId: 'n1', anim: 'idle' })] }),
+      tMs: 0,
+    })
     expect(containsColor(idle.calls, HALL.green)).toBe(false)
   })
 
   it('draws a rest bench identically regardless of crew or clock — it is breakroom furniture, not a station', () => {
     const scanning = createRecordingPaint()
-    drawProp(
-      scanning,
-      prop('restbench'),
-      context({ crew: [crew({ nodeId: 'n1', anim: 'scan' })] }),
-      0
-    )
+    drawProp(scanning, prop('restbench'), {
+      context: context({ crew: [crew({ nodeId: 'n1', anim: 'scan' })] }),
+      tMs: 0,
+    })
 
     const idleLater = createRecordingPaint()
-    drawProp(idleLater, prop('restbench'), context(), 900)
+    drawProp(idleLater, prop('restbench'), { context: context(), tMs: 900 })
 
     expect(scanning.calls).toEqual(idleLater.calls)
     expect(scanning.calls.length).toBeGreaterThan(0)
@@ -277,7 +288,7 @@ function rigsBenchesAndGatesTests() {
 
   it('draws the gate arm open when its node has passed', () => {
     const open = createRecordingPaint()
-    drawProp(open, prop('gate'), context({ states: { n1: 'passed' } }), 0)
+    drawProp(open, prop('gate'), { context: context({ states: { n1: 'passed' } }), tMs: 0 })
     expect(open.calls.length).toBeGreaterThan(0)
   })
 }
@@ -285,25 +296,28 @@ function rigsBenchesAndGatesTests() {
 function beaconsAndChairsTests() {
   it('flashes the gate beacon only while its node is in gatesWaiting', () => {
     const t0 = createRecordingPaint()
-    drawProp(t0, prop('gate'), context({ gatesWaiting: ['n1'] }), 0)
+    drawProp(t0, prop('gate'), { context: context({ gatesWaiting: ['n1'] }), tMs: 0 })
     const t1 = createRecordingPaint()
-    drawProp(t1, prop('gate'), context({ gatesWaiting: ['n1'] }), 250)
+    drawProp(t1, prop('gate'), { context: context({ gatesWaiting: ['n1'] }), tMs: 250 })
     expect(t0.calls).not.toEqual(t1.calls)
 
     const idleT0 = createRecordingPaint()
-    drawProp(idleT0, prop('gate'), context(), 0)
+    drawProp(idleT0, prop('gate'), { context: context(), tMs: 0 })
     const idleT1 = createRecordingPaint()
-    drawProp(idleT1, prop('gate'), context(), 250)
+    drawProp(idleT1, prop('gate'), { context: context(), tMs: 250 })
     expect(idleT0.calls).toEqual(idleT1.calls)
   })
 
   it('hides the chair silhouette only while its owner is typing', () => {
     const seated = createRecordingPaint()
-    drawProp(seated, prop('chair'), context({ crew: [crew({ nodeId: 'n1', anim: 'type' })] }), 0)
+    drawProp(seated, prop('chair'), {
+      context: context({ crew: [crew({ nodeId: 'n1', anim: 'type' })] }),
+      tMs: 0,
+    })
     expect(containsColor(seated.calls, '#3a4150')).toBe(false)
 
     const empty = createRecordingPaint()
-    drawProp(empty, prop('chair'), context(), 0)
+    drawProp(empty, prop('chair'), { context: context(), tMs: 0 })
     expect(containsColor(empty.calls, '#3a4150')).toBe(true)
   })
 }
@@ -311,12 +325,10 @@ function beaconsAndChairsTests() {
 function theDispatchTowerTests() {
   it('lights the dispatch tower with one lamp per check, coloured by bucket', () => {
     const paint = createRecordingPaint()
-    drawProp(
-      paint,
-      prop('dispatch'),
-      context({ ci: { checks: { test: 'fail', lint: 'pass', typecheck: 'pending' } } }),
-      0
-    )
+    drawProp(paint, prop('dispatch'), {
+      context: context({ ci: { checks: { test: 'fail', lint: 'pass', typecheck: 'pending' } } }),
+      tMs: 0,
+    })
     expect(containsColor(paint.calls, HALL.red)).toBe(true)
     expect(containsColor(paint.calls, HALL.green)).toBe(true)
     expect(containsColor(paint.calls, HALL.amber)).toBe(true)
@@ -324,7 +336,7 @@ function theDispatchTowerTests() {
 
   it('draws no lamps for a dispatch tower nothing has reported checks for', () => {
     const paint = createRecordingPaint()
-    drawProp(paint, prop('dispatch'), context({ ci: { checks: {} } }), 0)
+    drawProp(paint, prop('dispatch'), { context: context({ ci: { checks: {} } }), tMs: 0 })
     expect(containsColor(paint.calls, HALL.red)).toBe(false)
     expect(containsColor(paint.calls, HALL.green)).toBe(false)
   })
@@ -333,12 +345,10 @@ function theDispatchTowerTests() {
 function theStatusWallTests() {
   it('draws the status wall the order metrics own numbers', () => {
     const paint = createRecordingPaint()
-    drawProp(
-      paint,
-      prop('statuswall', { w: 6 }),
-      context({ metrics: { leadTimeMs: 80 * 60_000, reworks: 2, ciRounds: 3 } }),
-      0
-    )
+    drawProp(paint, prop('statuswall', { w: 6 }), {
+      context: context({ metrics: { leadTimeMs: 80 * 60_000, reworks: 2, ciRounds: 3 } }),
+      tMs: 0,
+    })
     expect(containsColor(paint.calls, HALL.cyan)).toBe(true)
     expect(containsColor(paint.calls, HALL.red)).toBe(true)
     expect(containsColor(paint.calls, HALL.amber)).toBe(true)
@@ -346,12 +356,10 @@ function theStatusWallTests() {
 
   it('skips the lead-time readout while the order has not shipped', () => {
     const paint = createRecordingPaint()
-    drawProp(
-      paint,
-      prop('statuswall', { w: 6 }),
-      context({ metrics: { leadTimeMs: null, reworks: 0, ciRounds: 0 } }),
-      0
-    )
+    drawProp(paint, prop('statuswall', { w: 6 }), {
+      context: context({ metrics: { leadTimeMs: null, reworks: 0, ciRounds: 0 } }),
+      tMs: 0,
+    })
     expect(containsColor(paint.calls, HALL.cyan)).toBe(false)
     // Zero reworks and zero CI rounds are still numbers worth drawing.
     expect(containsColor(paint.calls, HALL.red)).toBe(true)
@@ -362,14 +370,12 @@ function theStatusWallTests() {
 function noMetricsRowTests() {
   it('draws no readouts at all when there is no metrics row for this order', () => {
     const withMetrics = createRecordingPaint()
-    drawProp(
-      withMetrics,
-      prop('statuswall', { w: 6 }),
-      context({ metrics: { leadTimeMs: 0, reworks: 0, ciRounds: 0 } }),
-      0
-    )
+    drawProp(withMetrics, prop('statuswall', { w: 6 }), {
+      context: context({ metrics: { leadTimeMs: 0, reworks: 0, ciRounds: 0 } }),
+      tMs: 0,
+    })
     const without = createRecordingPaint()
-    drawProp(without, prop('statuswall', { w: 6 }), context(), 0)
+    drawProp(without, prop('statuswall', { w: 6 }), { context: context(), tMs: 0 })
     expect(containsColor(without.calls, HALL.cyan)).toBe(false)
     expect(containsColor(without.calls, HALL.red)).toBe(false)
     expect(containsColor(without.calls, HALL.amber)).toBe(false)
@@ -537,7 +543,7 @@ function straightTilesTests() {
     const tile: BeltTile = { x: 2, y: 2, ins: ['N'], outs: ['S'], kind: 'straight', over: null }
     const map = baseMap({ beltTiles: [tile] })
     const paint = createRecordingPaint()
-    drawBelts(paint, map, new Set(), 0)
+    drawBelts(paint, map, { movingBeltIds: new Set(), tMs: 0 })
     const x = tile.x * TILE_PX
     const y = tile.y * TILE_PX
     expect(hasRect(paint.calls, [x + 2, y + 2, 1, 12], HALL.steelLight)).toBe(true)
@@ -548,7 +554,7 @@ function straightTilesTests() {
     const tile: BeltTile = { x: 5, y: 5, ins: ['W'], outs: ['E'], kind: 'straight', over: null }
     const map = baseMap({ beltTiles: [tile] })
     const paint = createRecordingPaint()
-    drawBelts(paint, map, new Set(), 0)
+    drawBelts(paint, map, { movingBeltIds: new Set(), tMs: 0 })
     const x = tile.x * TILE_PX
     const y = tile.y * TILE_PX
     expect(hasRect(paint.calls, [x + 2, y + 2, 12, 1], HALL.steelLight)).toBe(true)
@@ -561,7 +567,7 @@ function junctionsTests() {
     const tile: BeltTile = { x: 12, y: 7, ins: ['N'], outs: ['E', 'S'], kind: 'split', over: null }
     const map = baseMap({ beltTiles: [tile] })
     const paint = createRecordingPaint()
-    drawBelts(paint, map, new Set(), 0)
+    drawBelts(paint, map, { movingBeltIds: new Set(), tMs: 0 })
     const x = tile.x * TILE_PX
     const y = tile.y * TILE_PX
     expect(hasRect(paint.calls, [x + 6, y + 6, 4, 4], '#20252c')).toBe(true)
@@ -574,9 +580,9 @@ function junctionsTests() {
     const merge: BeltTile = { x: 17, y: 7, ins: ['W', 'S'], outs: ['N'], kind: 'merge', over: null }
     const split: BeltTile = { ...merge, kind: 'split' }
     const mergePaint = createRecordingPaint()
-    drawBelts(mergePaint, baseMap({ beltTiles: [merge] }), new Set(), 0)
+    drawBelts(mergePaint, baseMap({ beltTiles: [merge] }), { movingBeltIds: new Set(), tMs: 0 })
     const splitPaint = createRecordingPaint()
-    drawBelts(splitPaint, baseMap({ beltTiles: [split] }), new Set(), 0)
+    drawBelts(splitPaint, baseMap({ beltTiles: [split] }), { movingBeltIds: new Set(), tMs: 0 })
     expect(containsColor(mergePaint.calls, HALL.amber)).toBe(false)
     expect(mergePaint.calls).toEqual(splitPaint.calls)
   })
@@ -596,7 +602,7 @@ function wallFixturesTests() {
   it('keeps every partition rect between its side walls, so the glazing does not overhang them', () => {
     const paint = createRecordingPaint()
     const p = prop('partition')
-    drawProp(paint, p, context(), 0)
+    drawProp(paint, p, { context: context(), tMs: 0 })
     const left = p.x * TILE_PX + 10
     const right = (p.x + p.w) * TILE_PX - 10
     const rects = paint.calls.filter((c) => c.op === 'fillRect')
@@ -621,7 +627,7 @@ function crossTilesTests() {
     }
     const map = baseMap({ beltTiles: [tile] })
     const paint = createRecordingPaint()
-    drawBelts(paint, map, new Set(), 0)
+    drawBelts(paint, map, { movingBeltIds: new Set(), tMs: 0 })
     expect(containsColor(paint.calls, '#20252c')).toBe(true)
   })
 
@@ -629,7 +635,7 @@ function crossTilesTests() {
     const tile: BeltTile = { x: 25, y: 6, ins: ['W'], outs: ['E'], kind: 'straight', over: null }
     const map = baseMap({ beltTiles: [tile], crossovers: [{ x: 25, y: 6 }] })
     const paint = createRecordingPaint()
-    drawBelts(paint, map, new Set(), 0)
+    drawBelts(paint, map, { movingBeltIds: new Set(), tMs: 0 })
     const x = tile.x * TILE_PX
     const y = tile.y * TILE_PX
     expect(hasRect(paint.calls, [x + 3, y, 10, 16], HALL.steelDark)).toBe(true)
@@ -648,15 +654,15 @@ function treadsTests() {
     const map = baseMap({ beltTiles: [tile], belts: [belt] })
 
     const stillA = createRecordingPaint()
-    drawBelts(stillA, map, new Set(), 0)
+    drawBelts(stillA, map, { movingBeltIds: new Set(), tMs: 0 })
     const stillB = createRecordingPaint()
-    drawBelts(stillB, map, new Set(), 500)
+    drawBelts(stillB, map, { movingBeltIds: new Set(), tMs: 500 })
     expect(stillA.calls).toEqual(stillB.calls)
 
     const movingA = createRecordingPaint()
-    drawBelts(movingA, map, new Set(['b1']), 0)
+    drawBelts(movingA, map, { movingBeltIds: new Set(['b1']), tMs: 0 })
     const movingB = createRecordingPaint()
-    drawBelts(movingB, map, new Set(['b1']), 500)
+    drawBelts(movingB, map, { movingBeltIds: new Set(['b1']), tMs: 500 })
     expect(movingA.calls).not.toEqual(movingB.calls)
   })
 }
@@ -674,27 +680,29 @@ describe('factory/art/props drawQueuePlate', () => {
 
   it('draws nothing when the order is not queued behind anything', () => {
     const paint = createRecordingPaint()
-    drawQueuePlate(paint, exit, context(), 0)
+    drawQueuePlate(paint, exit, { context: context(), tMs: 0 })
     expect(paint.calls).toHaveLength(0)
   })
 
   it('draws the plate once a queue position is on the scene context', () => {
     const paint = createRecordingPaint()
-    drawQueuePlate(paint, exit, context({ queue: { position: 2 } }), 0)
+    drawQueuePlate(paint, exit, { context: context({ queue: { position: 2 } }), tMs: 0 })
     expect(paint.calls.length).toBeGreaterThan(0)
   })
 
   it('flashes the beacon on the same clock as a waiting gate', () => {
     const t0 = createRecordingPaint()
-    drawQueuePlate(t0, exit, context({ queue: { position: 1 } }), 0)
+    drawQueuePlate(t0, exit, { context: context({ queue: { position: 1 } }), tMs: 0 })
     const t1 = createRecordingPaint()
-    drawQueuePlate(t1, exit, context({ queue: { position: 1 } }), 250)
+    drawQueuePlate(t1, exit, { context: context({ queue: { position: 1 } }), tMs: 250 })
     expect(t0.calls).not.toEqual(t1.calls)
   })
 
   it('draws the same plate regardless of position value beyond the digits shown', () => {
     const paint = createRecordingPaint()
-    expect(() => drawQueuePlate(paint, exit, context({ queue: { position: 12 } }), 0)).not.toThrow()
+    expect(() =>
+      drawQueuePlate(paint, exit, { context: context({ queue: { position: 12 } }), tMs: 0 })
+    ).not.toThrow()
     expect(paint.calls.length).toBeGreaterThan(0)
   })
 })
