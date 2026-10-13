@@ -135,33 +135,8 @@ function summarise(toolName: string, input: unknown): { summary: string; detail:
 
   // A question carries its text in a shape of its own, and its options are
   // most of what you need to answer it.
-  const questions = record.questions
-  if (Array.isArray(questions) && questions.length > 0) {
-    const asked = questions
-      .map((entry) => {
-        const question = entry as Record<string, unknown>
-        const text = typeof question.question === 'string' ? question.question : ''
-        const options = Array.isArray(question.options)
-          ? question.options
-              .map((option) =>
-                typeof option === 'object' && option !== null
-                  ? String((option as Record<string, unknown>).label ?? '')
-                  : String(option)
-              )
-              .filter((label) => label !== '')
-          : []
-        return options.length === 0 ? text : `${text}\n  ${options.join('\n  ')}`
-      })
-      .filter((text) => text.trim() !== '')
-
-    if (asked.length > 0) {
-      const first =
-        typeof (questions[0] as Record<string, unknown>).question === 'string'
-          ? ((questions[0] as Record<string, unknown>).question as string)
-          : `${toolName} request`
-      return { summary: first, detail: asked.join('\n\n') }
-    }
-  }
+  const asked = questionSummary(toolName, record.questions)
+  if (asked !== null) return asked
 
   // The headline: the field an operator would recognise the request by.
   const headline = ['command', 'url', 'file_path', 'path', 'pattern', 'prompt']
@@ -175,6 +150,41 @@ function summarise(toolName: string, input: unknown): { summary: string; detail:
     summary: headline ?? `${toolName} request`,
     detail: renderInput(record),
   }
+}
+
+/** A question's summary and its questions in full, or null when nothing is asked. */
+function questionSummary(
+  toolName: string,
+  questions: unknown
+): { summary: string; detail: string } | null {
+  if (!Array.isArray(questions) || questions.length === 0) return null
+  const asked = questions
+    .map((entry) => {
+      const question = entry as Record<string, unknown>
+      const text = typeof question.question === 'string' ? question.question : ''
+      const options = optionLabels(question.options)
+      return options.length === 0 ? text : `${text}\n  ${options.join('\n  ')}`
+    })
+    .filter((text) => text.trim() !== '')
+  if (asked.length === 0) return null
+
+  const first = (questions[0] as Record<string, unknown>).question
+  return {
+    summary: typeof first === 'string' ? first : `${toolName} request`,
+    detail: asked.join('\n\n'),
+  }
+}
+
+/** What each of a question's options is called; none when it offers none. */
+function optionLabels(options: unknown): string[] {
+  if (!Array.isArray(options)) return []
+  return options
+    .map((option) =>
+      typeof option === 'object' && option !== null
+        ? String((option as Record<string, unknown>).label ?? '')
+        : String(option)
+    )
+    .filter((label) => label !== '')
 }
 
 /**
@@ -192,15 +202,7 @@ function questionsOf(input: unknown): Array<{ question: string; options: string[
   const asked = questions.flatMap((entry) => {
     const record = entry as Record<string, unknown>
     const question = typeof record.question === 'string' ? record.question : ''
-    const options = Array.isArray(record.options)
-      ? record.options
-          .map((option) =>
-            typeof option === 'object' && option !== null
-              ? String((option as Record<string, unknown>).label ?? '')
-              : String(option)
-          )
-          .filter((label) => label !== '')
-      : []
+    const options = optionLabels(record.options)
     return question === '' && options.length === 0 ? [] : [{ question, options }]
   })
 
@@ -238,119 +240,150 @@ function renderInput(record: Record<string, unknown>): string | null {
   return lines.length === 0 ? null : lines.join('\n')
 }
 
+/** A held tool call: how to answer it, what it asked with, and its hand-back timer. */
+interface Outstanding {
+  readonly settle: (result: HookDecision) => void
+  /** An `allow` must return the input the agent asked with, not an empty one. */
+  readonly input: unknown
+  readonly timer: ReturnType<typeof setTimeout>
+}
+
+/** One bridge's options, and the tool calls it is holding. */
+interface BridgeState {
+  readonly options: PermissionBridgeOptions
+  readonly askAfterMs: number
+  readonly outstanding: Map<string, Outstanding>
+  /** How many calls this session has held, which numbers each request. */
+  held: number
+}
+
 export function createPermissionBridge(options: PermissionBridgeOptions): PermissionBridge {
-  const { onPending, onResolved, now, autoDecide, onAutoDenied } = options
-  const sessionId = options.sessionId
-  const askAfterMs = options.askAfterMs ?? DEFAULT_ASK_AFTER_MS
-  // The original input is held alongside the resolver: an `allow` must return
-  // the input the agent asked with, not an empty one.
-  const outstanding = new Map<
-    string,
-    { settle: (result: HookDecision) => void; input: unknown; timer: ReturnType<typeof setTimeout> }
-  >()
-  let counter = 0
-
-  /**
-   * Gives the decision back to Claude Code, which prompts in the terminal.
-   *
-   * Not an allow and not a deny: nothing is approved on the operator's behalf,
-   * and nothing is refused because they were away from the console.
-   */
-  function handBack(requestId: string): void {
-    const entry = outstanding.get(requestId)
-    if (entry === undefined) return
-    outstanding.delete(requestId)
-    clearTimeout(entry.timer)
-    // Handed back, not denied: the runtime asks in the terminal instead. The
-    // feed said "denied" for a request nobody had refused.
-    onResolved(requestId, 'handback')
-    entry.settle({ permissionDecision: 'ask' })
+  const state: BridgeState = {
+    options,
+    askAfterMs: options.askAfterMs ?? DEFAULT_ASK_AFTER_MS,
+    outstanding: new Map(),
+    held: 0,
   }
-
-  function toResult(decision: PermissionDecision, input: unknown): HookDecision {
-    if (decision.answer !== undefined && decision.answer.trim() !== '') {
-      return { permissionDecision: 'deny', reason: decision.answer.trim() }
-    }
-    return decision.allow
-      ? { permissionDecision: 'allow', updatedInput: input }
-      : {
-          permissionDecision: 'deny',
-          reason: decision.reason ?? 'Denied by the operator',
-        }
-  }
-
   return {
-    canUseTool(toolName: string, input: unknown): Promise<HookDecision> {
-      const auto = autoDecide?.(toolName, input) ?? null
-      if (auto === 'mode') return Promise.resolve({ permissionDecision: 'defer' })
-      if (auto !== null) {
-        // Resolved by the autonomy ladder — the operator is never interrupted,
-        // and no prompt is raised for a surface to display.
-        //
-        // A *refusal* is said out loud, though. An allow is one of hundreds and
-        // would drown the feed; a denial is the reason an agent is about to do
-        // something else, or nothing, and it was invisible: four live runs died
-        // on refused commands and the console showed an agent that had simply
-        // gone quiet. Reading its transcript was the only way to find out.
-        if (!auto.allow) onAutoDenied?.(toolName, auto.reason ?? 'no reason given')
-        return Promise.resolve(toResult(auto, input))
+    canUseTool: (toolName, input) => canUseTool(state, toolName, input),
+    resolve: (requestId, decision) => resolveRequest(state, requestId, decision),
+    handBackToTerminal: (requestId) => handBack(state, requestId),
+    rejectAll: (reason) => rejectAll(state, reason),
+  }
+}
+
+/** Takes a held call off the books; undefined when it was no longer held. */
+function takeOutstanding(state: BridgeState, requestId: string): Outstanding | undefined {
+  const entry = state.outstanding.get(requestId)
+  if (entry === undefined) return undefined
+  state.outstanding.delete(requestId)
+  clearTimeout(entry.timer)
+  return entry
+}
+
+/**
+ * Gives the decision back to Claude Code, which prompts in the terminal.
+ *
+ * Not an allow and not a deny: nothing is approved on the operator's behalf,
+ * and nothing is refused because they were away from the console.
+ */
+function handBack(state: BridgeState, requestId: string): void {
+  const entry = takeOutstanding(state, requestId)
+  if (entry === undefined) return
+  // Handed back, not denied: the runtime asks in the terminal instead. The
+  // feed said "denied" for a request nobody had refused.
+  state.options.onResolved(requestId, 'handback')
+  entry.settle({ permissionDecision: 'ask' })
+}
+
+/** The operator's typed answer, trimmed; empty when they gave none. */
+function answerOf(decision: PermissionDecision): string {
+  return decision.answer?.trim() ?? ''
+}
+
+function toResult(decision: PermissionDecision, input: unknown): HookDecision {
+  const answer = answerOf(decision)
+  if (answer !== '') return { permissionDecision: 'deny', reason: answer }
+  return decision.allow
+    ? { permissionDecision: 'allow', updatedInput: input }
+    : {
+        permissionDecision: 'deny',
+        reason: decision.reason ?? 'Denied by the operator',
       }
+}
 
-      const requestId = `${sessionId}-perm-${++counter}`
-      onPending({
-        sessionId,
-        requestId,
-        toolName,
-        ...summarise(toolName, input),
-        questions: questionsOf(input),
-        targetHost: targetHostOf(input),
-        at: now(),
-      })
+function canUseTool(state: BridgeState, toolName: string, input: unknown): Promise<HookDecision> {
+  const { options } = state
+  const auto = options.autoDecide?.(toolName, input) ?? null
+  if (auto === 'mode') return Promise.resolve({ permissionDecision: 'defer' })
+  if (auto !== null) {
+    // Resolved by the autonomy ladder — the operator is never interrupted,
+    // and no prompt is raised for a surface to display.
+    //
+    // A *refusal* is said out loud, though. An allow is one of hundreds and
+    // would drown the feed; a denial is the reason an agent is about to do
+    // something else, or nothing, and it was invisible: four live runs died
+    // on refused commands and the console showed an agent that had simply
+    // gone quiet. Reading its transcript was the only way to find out.
+    if (!auto.allow) options.onAutoDenied?.(toolName, auto.reason ?? 'no reason given')
+    return Promise.resolve(toResult(auto, input))
+  }
+  return hold(state, toolName, input)
+}
 
-      return new Promise<HookDecision>((resolvePromise) => {
-        const timer = setTimeout(() => handBack(requestId), askAfterMs)
-        // Never keep the process alive for a prompt nobody is watching.
-        timer.unref?.()
-        outstanding.set(requestId, { settle: resolvePromise, input, timer })
-      })
-    },
+/** Raises the call for a person and holds it until answered or handed back. */
+function hold(state: BridgeState, toolName: string, input: unknown): Promise<HookDecision> {
+  const { options } = state
+  const { sessionId } = options
+  const requestId = `${sessionId}-perm-${++state.held}`
+  options.onPending({
+    sessionId,
+    requestId,
+    toolName,
+    ...summarise(toolName, input),
+    questions: questionsOf(input),
+    targetHost: targetHostOf(input),
+    at: options.now(),
+  })
 
-    resolve(requestId: string, decision: PermissionDecision): boolean {
-      const entry = outstanding.get(requestId)
-      // Unknown or already-settled: a stale click must not publish a second
-      // resolution or reopen a closed prompt. Reported, so the surface can say
-      // the request is gone instead of showing a success that did nothing.
-      if (entry === undefined) return false
-      outstanding.delete(requestId)
-      clearTimeout(entry.timer)
-      // An answer is its own outcome. `toResult` encodes one as a deny
-      // carrying the words, so reporting it as `allow` — or as `deny` — both
-      // misread what the operator did.
-      onResolved(
-        requestId,
-        decision.answer !== undefined && decision.answer.trim() !== ''
-          ? 'answered'
-          : decision.allow
-            ? 'allow'
-            : 'deny'
-      )
-      entry.settle(toResult(decision, entry.input))
-      return true
-    },
+  return new Promise<HookDecision>((resolvePromise) => {
+    const timer = setTimeout(() => handBack(state, requestId), state.askAfterMs)
+    // Never keep the process alive for a prompt nobody is watching.
+    timer.unref?.()
+    state.outstanding.set(requestId, { settle: resolvePromise, input, timer })
+  })
+}
 
-    handBackToTerminal(requestId: string): void {
-      handBack(requestId)
-    },
+function resolveRequest(
+  state: BridgeState,
+  requestId: string,
+  decision: PermissionDecision
+): boolean {
+  const entry = takeOutstanding(state, requestId)
+  // Unknown or already-settled: a stale click must not publish a second
+  // resolution or reopen a closed prompt. Reported, so the surface can say
+  // the request is gone instead of showing a success that did nothing.
+  if (entry === undefined) return false
+  // An answer is its own outcome. `toResult` encodes one as a deny
+  // carrying the words, so reporting it as `allow` — or as `deny` — both
+  // misread what the operator did.
+  state.options.onResolved(requestId, outcomeOf(decision))
+  entry.settle(toResult(decision, entry.input))
+  return true
+}
 
-    rejectAll(reason: string): void {
-      for (const [requestId, entry] of outstanding) {
-        outstanding.delete(requestId)
-        clearTimeout(entry.timer)
-        entry.settle({ permissionDecision: 'deny', reason })
-        // Told, not just settled. Without this the board went on listing tool
-        // calls from a run that had ended, and clicking them did nothing.
-        onResolved(requestId, 'deny')
-      }
-    },
+function outcomeOf(decision: PermissionDecision): PermissionOutcome {
+  if (answerOf(decision) !== '') return 'answered'
+  return decision.allow ? 'allow' : 'deny'
+}
+
+function rejectAll(state: BridgeState, reason: string): void {
+  for (const [requestId, entry] of state.outstanding) {
+    state.outstanding.delete(requestId)
+    clearTimeout(entry.timer)
+    entry.settle({ permissionDecision: 'deny', reason })
+    // Told, not just settled. Without this the board went on listing tool
+    // calls from a run that had ended, and clicking them did nothing.
+    state.options.onResolved(requestId, 'deny')
   }
 }
