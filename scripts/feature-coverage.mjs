@@ -71,25 +71,36 @@ export function drivenFeatures(traces) {
     quickActions: new Map(),
   }
   for (const { spec, entries } of traces) {
-    for (const [kind, channel, payload] of entries) {
-      drove(kind === 'event' ? driven.events : driven.channels, channel, spec)
-      if (channel === 'extension:execute-command' || channel === 'extension:run-command') {
-        if (payload?.key) drove(driven.commands, payload.key, spec)
-      }
-      if (channel === 'extension:update-setting' && payload?.key) {
-        drove(driven.extensionSettings, payload.key, spec)
-      }
-      if (channel === 'settings:update-global' && payload?.patch) {
-        for (const path of patchPaths(payload.patch)) drove(driven.globalSettings, path, spec)
-        for (const list of ['usage', 'directUse']) {
-          for (const { id } of payload.patch.quickActions?.[list] ?? []) {
-            drove(driven.quickActions, id, spec)
-          }
-        }
-      }
-    }
+    for (const entry of entries) credit(driven, spec, entry)
   }
   return driven
+}
+
+/** The channels whose payload `key` names a feature, and the kind of feature it names. */
+const KEYED_CHANNELS = new Map([
+  ['extension:execute-command', 'commands'],
+  ['extension:run-command', 'commands'],
+  ['extension:update-setting', 'extensionSettings'],
+])
+
+/** Credits `spec` with what one trace entry drove. */
+function credit(driven, spec, [kind, channel, payload]) {
+  drove(kind === 'event' ? driven.events : driven.channels, channel, spec)
+  const keyed = KEYED_CHANNELS.get(channel)
+  if (keyed && payload?.key) drove(driven[keyed], payload.key, spec)
+  if (channel === 'settings:update-global' && payload?.patch) {
+    creditPatch(driven, spec, payload.patch)
+  }
+}
+
+/** Credits `spec` with every global setting and Quick Action a settings patch wrote. */
+function creditPatch(driven, spec, patch) {
+  for (const path of patchPaths(patch)) drove(driven.globalSettings, path, spec)
+  for (const list of ['usage', 'directUse']) {
+    for (const { id } of patch.quickActions?.[list] ?? []) {
+      drove(driven.quickActions, id, spec)
+    }
+  }
 }
 
 /** The extension whose built backend or view names `channel`, or null for core. */
@@ -143,7 +154,8 @@ function table(rows, columns) {
   return [header, rule, ...body].join('\n')
 }
 
-function section(title, items, specsOf, describe) {
+/** One section of the report: what was not driven, then what was and by which specs. */
+function section({ title, items, specsOf, describe }) {
   const driven = items.filter((item) => specsOf(item))
   const lines = [`### ${title}: ${driven.length} of ${items.length} driven`, '']
   const undriven = items.filter((item) => !specsOf(item))
@@ -163,17 +175,18 @@ function section(title, items, specsOf, describe) {
   return { lines, driven: driven.length, total: items.length }
 }
 
-export function coverageReport(inventory, traces) {
-  const driven = drivenFeatures(traces)
+/**
+ * Core: every manifest method, events included; extension: every channel the
+ * running app handles that no manifest method declares and one extension names.
+ * The rest are unowned.
+ */
+function channelItems(inventory) {
   const manifest = coreChannels(
     readFileSync(join(REPO_ROOT, 'src/shared/electron-api/manifest.ts'), 'utf8')
   )
   const coreByChannel = new Map(manifest.map((method) => [method.channel, method]))
   const bundles = extensionBundles(inventory.extensions)
   const handled = [...new Set([...inventory.channels.invoke, ...inventory.channels.send])]
-
-  // Core: every manifest method, events included; extension: every channel the
-  // running app handles that no manifest method declares and one extension names.
   const coreItems = manifest.map((method) => ({
     name: method.channel,
     detail: `${method.path} (${method.kind})`,
@@ -186,56 +199,74 @@ export function coverageReport(inventory, traces) {
     if (owner && byExtension.has(owner)) byExtension.get(owner).push({ name: channel })
     else unowned.push(channel)
   }
-  const channelSpecs = (item) => (item.events ? driven.events : driven.channels).get(item.name)
+  return { coreItems, byExtension, unowned }
+}
 
-  const sections = [
-    {
-      area: 'Core IPC (window.electronAPI)',
-      ...section('Core IPC', coreItems, channelSpecs, (i) => `\`${i.name}\` — ${i.detail}`),
-    },
+function ipcSections({ coreItems, byExtension }, driven) {
+  const specsOf = (item) => (item.events ? driven.events : driven.channels).get(item.name)
+  const core = section({
+    title: 'Core IPC',
+    items: coreItems,
+    specsOf,
+    describe: (i) => `\`${i.name}\` — ${i.detail}`,
+  })
+  return [
+    { area: 'Core IPC (window.electronAPI)', ...core },
     ...[...byExtension].map(([id, items]) => ({
       area: `${id} IPC`,
-      ...section(`${id} IPC`, items, channelSpecs, (i) => `\`${i.name}\``),
+      ...section({ title: `${id} IPC`, items, specsOf, describe: (i) => `\`${i.name}\`` }),
     })),
-    {
-      area: 'Commands (Quick Actions, menus)',
-      ...section(
-        'Extension commands',
-        inventory.commands,
-        (c) => driven.commands.get(c.key),
-        (c) => `\`${c.key}\` — ${c.label}`
-      ),
-    },
-    {
-      area: 'Core Quick Actions',
-      ...section(
-        'Core Quick Actions',
-        [...coreQuickActions(), ...CORE_QUICK_ACTION_TEMPLATES],
-        (a) =>
-          a.id === 'session:*'
-            ? new Set(
-                [...driven.quickActions]
-                  .filter(([id]) => id.startsWith('session:'))
-                  .flatMap(([, specs]) => [...specs])
-              )
-            : driven.quickActions.get(a.id),
-        (a) => `\`${a.id}\`${a.note ? ` (${a.note})` : ''}`
-      ),
-    },
-    {
-      area: 'Extension settings',
-      ...section(
-        'Extension settings',
-        inventory.settings,
-        (s) => settingSpecs(s, driven),
-        (s) => `\`${s.key}\` — ${s.label}`
-      ),
-    },
   ]
-  // A section with nothing driven still reports its total, so the summary has it.
-  for (const s of sections) if (s.total === 0) s.lines = [`### ${s.area}: none registered`, '']
+}
 
-  const summary = table(sections, [
+function commandSection(commands, driven) {
+  return {
+    area: 'Commands (Quick Actions, menus)',
+    ...section({
+      title: 'Extension commands',
+      items: commands,
+      specsOf: (c) => driven.commands.get(c.key),
+      describe: (c) => `\`${c.key}\` — ${c.label}`,
+    }),
+  }
+}
+
+/** The specs that drove a core Quick Action; `session:*` stands for every session's. */
+function quickActionSpecs(action, driven) {
+  if (action.id !== 'session:*') return driven.quickActions.get(action.id)
+  return new Set(
+    [...driven.quickActions]
+      .filter(([id]) => id.startsWith('session:'))
+      .flatMap(([, specs]) => [...specs])
+  )
+}
+
+function quickActionSection(driven) {
+  return {
+    area: 'Core Quick Actions',
+    ...section({
+      title: 'Core Quick Actions',
+      items: [...coreQuickActions(), ...CORE_QUICK_ACTION_TEMPLATES],
+      specsOf: (a) => quickActionSpecs(a, driven),
+      describe: (a) => `\`${a.id}\`${a.note ? ` (${a.note})` : ''}`,
+    }),
+  }
+}
+
+function settingSection(settings, driven) {
+  return {
+    area: 'Extension settings',
+    ...section({
+      title: 'Extension settings',
+      items: settings,
+      specsOf: (s) => settingSpecs(s, driven),
+      describe: (s) => `\`${s.key}\` — ${s.label}`,
+    }),
+  }
+}
+
+function summaryTable(sections) {
+  return table(sections, [
     { title: 'Area', value: (s) => s.area },
     { title: 'Driven', value: (s) => String(s.driven) },
     { title: 'Total', value: (s) => String(s.total) },
@@ -244,18 +275,22 @@ export function coverageReport(inventory, traces) {
       value: (s) => (s.total ? `${Math.round((100 * s.driven) / s.total)}%` : '—'),
     },
   ])
-  const globalSettings = [...driven.globalSettings]
+}
+
+function globalSettingLines(driven) {
+  const written = [...driven.globalSettings]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([path, specs]) => `- \`${path}\`: ${specList(specs)}`)
-
   return [
-    summary,
-    '',
-    ...sections.flatMap((s) => s.lines),
     '### Global settings written by a spec',
     '',
-    ...(globalSettings.length ? globalSettings : ['None.']),
+    ...(written.length ? written : ['None.']),
     '',
+  ]
+}
+
+function unownedLines(unowned, driven) {
+  return [
     '### Channels the app handles that no manifest method or single extension names',
     '',
     'Electron internals and core channels outside the bridge manifest; not counted above.',
@@ -265,6 +300,27 @@ export function coverageReport(inventory, traces) {
         `- \`${c}\`${driven.channels.has(c) ? ` (driven: ${specList(driven.channels.get(c))})` : ''}`
     ),
     '',
+  ]
+}
+
+export function coverageReport(inventory, traces) {
+  const driven = drivenFeatures(traces)
+  const channels = channelItems(inventory)
+  const sections = [
+    ...ipcSections(channels, driven),
+    commandSection(inventory.commands, driven),
+    quickActionSection(driven),
+    settingSection(inventory.settings, driven),
+  ]
+  // A section with nothing driven still reports its total, so the summary has it.
+  for (const s of sections) if (s.total === 0) s.lines = [`### ${s.area}: none registered`, '']
+
+  return [
+    summaryTable(sections),
+    '',
+    ...sections.flatMap((s) => s.lines),
+    ...globalSettingLines(driven),
+    ...unownedLines(channels.unowned, driven),
   ].join('\n')
 }
 
