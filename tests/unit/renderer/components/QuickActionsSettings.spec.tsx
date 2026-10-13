@@ -226,3 +226,43 @@ describe('QuickActionsSettings — workspace scope', () => {
     expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
 })
+
+const askClaude: CustomAction = {
+  id: 'a2',
+  label: 'Ask Claude',
+  kind: 'prompt',
+  target: 'agent',
+  body: 'review this',
+}
+
+describe('QuickActionsSettings — actions without a key, and scopes with nothing yet', () => {
+  it('lists a prompt action against the focused Claude session, with no key', () => {
+    mockStore([askClaude])
+    render(<QuickActionsSettings scope="global" />)
+    expect(screen.getByText('Focused Claude session')).toBeTruthy()
+    expect(document.querySelector('.qa-settings-list__key')!.textContent).toBe('')
+  })
+
+  it('edits a keyless action with an empty Key field, and keeps it keyless', () => {
+    mockStore([askClaude])
+    render(<QuickActionsSettings scope="global" />)
+    fireEvent.click(screen.getByText('Edit'))
+    expect((screen.getByLabelText('Key') as HTMLInputElement).value).toBe('')
+    fireEvent.click(screen.getByText('Save'))
+    expect(settings.updateQuickActions).toHaveBeenCalledWith({
+      custom: [{ ...askClaude, mnemonic: undefined }],
+    })
+  })
+
+  it('shows no actions while global settings have not loaded', () => {
+    seedStore(useSettingsStore, { globalSettings: null, workspaceSettings: new Map() })
+    render(<QuickActionsSettings scope="global" />)
+    expect(screen.getByText('No custom actions yet.')).toBeTruthy()
+  })
+
+  it('shows no actions for a workspace with no settings of its own', () => {
+    mockStore([])
+    render(<QuickActionsSettings scope="workspace" workspaceId="ws-unknown" />)
+    expect(screen.getByText('No custom actions yet.')).toBeTruthy()
+  })
+})
