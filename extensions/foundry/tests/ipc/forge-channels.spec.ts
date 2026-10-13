@@ -783,9 +783,9 @@ function agreeingTwiceTests() {
     const store = createOrderStore(root)
     await store.save(await agreeable())
     const channels = createForgeChannels(forgeDeps({ onAgreed }))
-    await channels.compile({ id: 'WO-1', commit: true })
+    await channels.compile(compiling('WO-1', true))
 
-    const again = (await channels.compile({ id: 'WO-1', commit: true })) as {
+    const again = (await channels.compile(compiling('WO-1', true))) as {
       compile: { ok: boolean; failures: { detail: string }[] }
     }
     expect(again.compile.ok).toBe(false)
