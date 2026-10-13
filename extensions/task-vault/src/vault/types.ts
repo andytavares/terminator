@@ -54,7 +54,7 @@ export interface Task {
 export interface DailyLog {
   date: string
   filePath: string
-  tasks: Task[]
+  tasks: IndexedTask[]
   exists: boolean
 }
 
