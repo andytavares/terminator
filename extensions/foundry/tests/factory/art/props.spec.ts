@@ -503,8 +503,10 @@ function propsBelowAndUnsignedTests() {
 describe('factory/art/props drawBelts', () => {
   describe('straight tiles', straightTilesTests)
   describe('junctions', junctionsTests)
+  describe('corners', cornerTilesTests)
   describe('wall fixtures', wallFixturesTests)
   describe('cross tiles', crossTilesTests)
+  describe('crossing at right angles', rightAngleCrossingTests)
   describe('treads', treadsTests)
 })
 
@@ -555,6 +557,25 @@ function junctionsTests() {
     drawBelts(splitPaint, baseMap({ beltTiles: [split] }), { movingBeltIds: new Set(), tMs: 0 })
     expect(containsColor(mergePaint.calls, HALL.amber)).toBe(false)
     expect(mergePaint.calls).toEqual(splitPaint.calls)
+  })
+}
+
+function cornerTilesTests() {
+  it('paints a corner as a belt with the small grey hub at its turn, which a straight tile has not', () => {
+    const corner: BeltTile = { x: 9, y: 4, ins: ['W'], outs: ['S'], kind: 'corner', over: null }
+    const straight: BeltTile = { ...corner, outs: ['E'], kind: 'straight' }
+    const cornerPaint = createRecordingPaint()
+    drawBelts(cornerPaint, baseMap({ beltTiles: [corner] }), { movingBeltIds: new Set(), tMs: 0 })
+    const straightPaint = createRecordingPaint()
+    drawBelts(straightPaint, baseMap({ beltTiles: [straight] }), {
+      movingBeltIds: new Set(),
+      tMs: 0,
+    })
+    const [x, y] = [corner.x * TILE_PX, corner.y * TILE_PX]
+    expect(hasRect(cornerPaint.calls, [x + 6, y + 6, 4, 4], '#20252c')).toBe(true)
+    expect(hasRect(cornerPaint.calls, [x + 7, y + 7, 2, 2], HALL.steelDark)).toBe(true)
+    expect(hasRect(straightPaint.calls, [x + 6, y + 6, 4, 4], '#20252c')).toBe(false)
+    expect(containsColor(cornerPaint.calls, HALL.amberDim)).toBe(true)
   })
 }
 
@@ -609,6 +630,36 @@ function crossTilesTests() {
     const x = tile.x * TILE_PX
     const y = tile.y * TILE_PX
     expect(hasRect(paint.calls, [x + 3, y, 10, 16], HALL.steelDark)).toBe(true)
+  })
+}
+
+function rightAngleCrossingTests() {
+  it('raises an east-west belt over a north-south one on a 16x12 deck, rimmed above in steel', () => {
+    const tile: BeltTile = {
+      x: 8,
+      y: 9,
+      ins: ['N'],
+      outs: ['S'],
+      kind: 'cross',
+      over: { from: 'W', to: 'E' },
+    }
+    const paint = createRecordingPaint()
+    drawBelts(paint, baseMap({ beltTiles: [tile] }), { movingBeltIds: new Set(), tMs: 0 })
+    const [x, y] = [tile.x * TILE_PX, tile.y * TILE_PX]
+    expect(hasRect(paint.calls, [x, y + 2, 16, 12], '#20252c')).toBe(true)
+    expect(hasRect(paint.calls, [x, y + 1, 16, 1], HALL.steelLight)).toBe(true)
+    expect(hasRect(paint.calls, [x + 2, y, 12, 16], '#20252c')).toBe(false)
+  })
+
+  it('paints a crossover over a vertical belt as a 16x10 HALL.steelDark plate at y+3', () => {
+    const tile: BeltTile = { x: 25, y: 6, ins: ['N'], outs: ['S'], kind: 'straight', over: null }
+    const map = baseMap({ beltTiles: [tile], crossovers: [{ x: 25, y: 6 }] })
+    const paint = createRecordingPaint()
+    drawBelts(paint, map, { movingBeltIds: new Set(), tMs: 0 })
+    const [x, y] = [tile.x * TILE_PX, tile.y * TILE_PX]
+    expect(hasRect(paint.calls, [x, y + 3, 16, 10], HALL.steelDark)).toBe(true)
+    expect(hasRect(paint.calls, [x + 3, y, 10, 16], HALL.steelDark)).toBe(false)
+    expect(hasRect(paint.calls, [x, y + 2, 2, 1], HALL.amber)).toBe(true)
   })
 }
 
