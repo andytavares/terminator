@@ -42,15 +42,8 @@ async function describe(page: Page, group: string, text: string): Promise<void> 
   await box.press('Enter')
 }
 
-test('capture Home and the Overview wall', async () => {
-  test.setTimeout(180_000)
-  mkdirSync(REVIEW, { recursive: true })
-  const folder = e2eTempDir('home-shots-')
-  handle = await launchApp()
-  const { page } = handle
-  await page.setViewportSize({ width: 1440, height: 900 })
-  await createWorkspace(page, 'terminator', folder)
-
+/** Four sessions, one in each state: waiting on a prompt, busy, idle and ended. */
+async function startFourSessions(page: Page): Promise<void> {
   await addAndSelectProject(page, 'terminator', 'session-home')
   await run(
     page,
@@ -65,7 +58,10 @@ test('capture Home and the Overview wall', async () => {
 
   await addAndSelectProject(page, 'terminator', 'bundle-check')
   await run(page, 'exit')
+}
 
+/** Describes two of them on Home, and waits for the prompt to be read as needing you. */
+async function describeAndSettle(page: Page): Promise<void> {
   await tab(page, 'Home')
   await describe(
     page,
@@ -78,16 +74,10 @@ test('capture Home and the Overview wall', async () => {
     page.getByRole('region', { name: 'Home' }).getByRole('button', { name: /Needs you/ })
   ).toContainText('1', { timeout: 15_000 })
   await page.waitForTimeout(2000)
+}
 
-  await page
-    .getByRole('rowgroup', { name: 'terminator / session-home' })
-    .getByRole('row')
-    .first()
-    .click()
-  await page.waitForTimeout(800)
-  await page.screenshot({ path: join(DOCS, '11a-home-ledger.png') })
-
-  // What Tab reaches from the filter onwards.
+/** What Tab reaches from the filter onwards, twelve presses. */
+async function tabOrder(page: Page): Promise<string[]> {
   await page
     .getByRole('region', { name: 'Home' })
     .getByRole('searchbox', { name: 'Filter sessions' })
@@ -104,8 +94,11 @@ test('capture Home and the Overview wall', async () => {
       })
     )
   }
-  writeFileSync(join(REVIEW, 'home-tab-order.json'), JSON.stringify(reached, null, 2))
+  return reached
+}
 
+/** The Logbook and the Overview wall, for the guide. */
+async function captureLogbookAndWall(page: Page): Promise<void> {
   await page.getByRole('radio', { name: 'Logbook' }).click()
   await page.getByRole('option', { name: /Moving kitty config/ }).click()
   await page.waitForTimeout(800)
@@ -114,7 +107,10 @@ test('capture Home and the Overview wall', async () => {
   await tab(page, 'Overview')
   await page.waitForTimeout(1500)
   await page.screenshot({ path: join(DOCS, '12-overview-screen.png') })
+}
 
+/** The wall, the Logbook and the Ledger in the light theme, for review only. */
+async function captureLightTheme(page: Page): Promise<void> {
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
   await page.waitForTimeout(500)
   await page.screenshot({ path: join(REVIEW, 'wall-light.png') })
@@ -124,4 +120,28 @@ test('capture Home and the Overview wall', async () => {
   await page.getByRole('radio', { name: 'Ledger' }).click()
   await page.waitForTimeout(500)
   await page.screenshot({ path: join(REVIEW, 'ledger-light.png') })
+}
+
+test('capture Home and the Overview wall', async () => {
+  test.setTimeout(180_000)
+  mkdirSync(REVIEW, { recursive: true })
+  const folder = e2eTempDir('home-shots-')
+  handle = await launchApp()
+  const { page } = handle
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await createWorkspace(page, 'terminator', folder)
+  await startFourSessions(page)
+  await describeAndSettle(page)
+
+  await page
+    .getByRole('rowgroup', { name: 'terminator / session-home' })
+    .getByRole('row')
+    .first()
+    .click()
+  await page.waitForTimeout(800)
+  await page.screenshot({ path: join(DOCS, '11a-home-ledger.png') })
+
+  writeFileSync(join(REVIEW, 'home-tab-order.json'), JSON.stringify(await tabOrder(page), null, 2))
+  await captureLogbookAndWall(page)
+  await captureLightTheme(page)
 })
