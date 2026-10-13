@@ -1461,6 +1461,13 @@ at once without a lock, and what makes the curator's citations meaningful
 later. Every entry names an actor (`operator`, `rule:<id>` or `role:<id>`), an
 action, a subject and a reason.
 
+An entry is filed under its order's id, never under its subject. Shipping once
+filed by subject, and `ship.draft_opened`'s subject is the pull request URL, so
+the entry went to `orders/https:/github.com/owner/repo/pull/8/ledger.jsonl` and
+the order's own ledger never mentioned its draft. A spy on `record` cannot see
+that, because it is handed the arguments, not the file;
+`tests/live/ship-live.spec.ts` reads the order's ledger file.
+
 The **curator** (`ledger/curator.ts`) reads it and, _only when asked_, proposes
 a rule for anything the operator has rejected three times for the same reason,
 citing the entries. It imports no filesystem module and schedules nothing, and

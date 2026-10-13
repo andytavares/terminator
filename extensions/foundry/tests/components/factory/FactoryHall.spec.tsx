@@ -5,15 +5,9 @@ import { act, render, screen, waitFor, fireEvent, within } from '@testing-librar
 import { FactoryHall } from '../../../src/components/factory/FactoryHall.js'
 import { raiseGate } from '../../../src/gates/rules.js'
 
-// The Factory surface for one order: a hall drawn from the run graph, a
-// station per node, and the two moves this view keeps — attach, and opening
-// the inbox to decide a gate. Everything else stays in the List view.
-//
-// The point here is what the stations and the drawer say, not the pixels
-// `HallScene.spec.tsx` already covers, so the canvas has no 2D context and the
-// hall draws nothing. A recording fake would take every pixel of the bake and
-// every frame: 220,000 fillRect calls in the transcript test alone, which ran
-// past five seconds on a loaded machine.
+// The Factory surface for one order: its stations, attach, and opening the inbox for a gate.
+// The canvas has no 2D context (pixels are `HallScene.spec.tsx`'s): a recording fake took
+// 220,000 fillRect calls in the transcript test alone, past five seconds on a loaded machine.
 
 function node(over: Record<string, unknown> = {}) {
   return {

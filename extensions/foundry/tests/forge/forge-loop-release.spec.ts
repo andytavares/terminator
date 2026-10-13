@@ -220,10 +220,8 @@ describe('a round that asks to see the fix, finishing while held', () => {
   })
 })
 
-/**
- * A turn's terminal outlives the proposal it wrote: it is still open when the
- * follow-up starts, until something ends it for a reason.
- */
+/** A turn's terminal outlives the proposal it wrote: it is still open when the follow-up starts,
+ * until something ends it for a reason. */
 function terminalsStayOpen(): void {
   const ended = new Set<string>()
   theRunner.stop.mockImplementation((id: unknown, reason?: unknown) => {

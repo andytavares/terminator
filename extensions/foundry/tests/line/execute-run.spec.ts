@@ -148,11 +148,8 @@ describe('an order whose CI goes red', () => {
   })
 })
 
-/**
- * Build, then ship, with one automatic CI round: the least a recipe can be
- * and still open a draft whose CI is watched. Kept in the records location,
- * the rung that wins over the built-ins.
- */
+/** Build, then ship, with one automatic CI round: the least a recipe can be and still open a draft
+ * whose CI is watched. Kept in the records location, the rung that wins over the built-ins. */
 const BUILD_AND_SHIP = `schemaVersion: 1
 id: build-and-ship
 ci:
@@ -201,10 +198,8 @@ function markingReadyTests() {
 
 function redCiSentBackTests() {
   it('runs one more CI round on the open drafts when red CI is sent back, and asks again once it is green', async () => {
-    // Every step and every automatic round before the question is a whole
-    // round of agents over real git, and none of them is what this asks about.
-    // On the built-in recipe, with its inspector, scribe and two automatic
-    // rounds, this ran past five seconds under load.
+    // Each step and automatic round before the question is a round of agents over real git;
+    // on the built-in recipe (inspector, scribe, two automatic rounds) this ran past 5 s.
     const recipe = buildAndShip()
     // A fresh failing run for every pushed fix, the way CI reports one.
     let run = 20

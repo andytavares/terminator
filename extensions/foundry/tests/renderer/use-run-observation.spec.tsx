@@ -3,10 +3,8 @@ import { renderHook, waitFor, act } from '@testing-library/react'
 import { useRunObservation } from '../../src/renderer/use-run-observation.js'
 import { createChangeBus } from '../helpers/change-bus.js'
 
-// The pushed half of the Floor: fetch the run's observation and the pending
-// asks against it on mount and again when Foundry says they changed, without
-// the rest of the Floor's own state (review, feed, stalls, transcript) along
-// for the ride.
+// The pushed half of the Floor: the run's observation and its pending asks, read on mount and
+// again when Foundry says they changed, without the rest of the Floor's state.
 
 const NODES = [
   {

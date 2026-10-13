@@ -321,10 +321,8 @@ interface AskingInput {
   onAutoDenied: (tool: string, reason: string) => void
 }
 
-/**
- * An architect whose turn is refused an edit and then asks the operator a
- * question; `answered` is handed the runner's resolve once the turn starts.
- */
+/** An architect whose turn is refused an edit and then asks the operator a question; `answered` is
+ * handed the runner's resolve once the turn starts. */
 function askingArchitect(answered: (resolve: (requestId: string) => void) => void) {
   return async (input: AskingInput) => {
     input.onRegistered({ sessionId: 'architect-1', transcriptFrom: 0 })

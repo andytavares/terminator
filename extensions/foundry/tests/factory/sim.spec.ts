@@ -1026,10 +1026,8 @@ describe('tick: a box carried back to an earlier station', () => {
   describe('cancelled errands', cancelledErrandsTests)
 })
 
-/**
- * Ticks until the verifier's errand is over, failing the moment two present
- * crew members share a tile, and says whether it carried the box on the way.
- */
+/** Ticks until the verifier's errand is over, failing the moment two present crew members share a
+ * tile, and says whether it carried the box on the way. */
 function walkTheErrand(start: World): { world: World; carried: boolean } {
   let world = start
   let carried = false

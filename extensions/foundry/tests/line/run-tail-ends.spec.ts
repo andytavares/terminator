@@ -58,11 +58,8 @@ beforeEach(async () => {
   agentsAnswer(theRunner, parent)
 })
 
-/**
- * The author's turn: hands `document` back the way an author does, in its
- * step's rung output, or — given none — writes an answer into the checkout
- * and says nothing of where it is.
- */
+/** The author's turn: hands `document` back the way an author does, in its step's rung output,
+ * or — given none — writes an answer into the checkout and says nothing of where it is. */
 function authorHandsBack(document: WorkOrder['document']): void {
   const answer = theRunner.start.getMockImplementation()
   theRunner.start.mockImplementation(async (...args: unknown[]) => {

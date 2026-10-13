@@ -93,13 +93,9 @@ function order(): WorkOrder {
   }
 }
 
-/**
- * The whole of `index.ts`'s `collect`, over a real role registry.
- *
- * Written out rather than mocked, because a stub here would prove the shape
- * of a call and not the behaviour — which is exactly how twelve mechanisms
- * once passed their tests while being called by nothing.
- */
+/** The whole of `index.ts`'s `collect`, over a real role registry. Not mocked: a stub proves the
+ * shape of a call, not the behaviour, which is how twelve mechanisms once passed their tests while
+ * called by nothing (specs/037-foundry-software-factory/tasks.md, T144). */
 function collectorFor(sources: Sources) {
   const roles = createRoleRegistry(sources)
   let saved: WorkOrder | null = null
@@ -160,11 +156,8 @@ function runOrder(
   )
 }
 
-/**
- * The write the agent is about to make, put through the decision it would
- * actually meet. A refusal here is the live defect: an agent told to write a
- * file it is not allowed to write.
- */
+/** The write the agent is about to make, put through the decision it would actually meet. A refusal
+ * here is the live defect: an agent told to write a file it is not allowed to write. */
 function expectMayWriteItsOutput(
   input: AgentInput & { outputPath: string },
   roles: ReturnType<typeof createRoleRegistry>
@@ -203,10 +196,8 @@ function writeJson(file: string, value: unknown): void {
   fs.writeFileSync(file, JSON.stringify(value))
 }
 
-/**
- * An agent that does exactly what its brief says, and nothing else: it finds
- * the path in the contract and writes the JSON the contract shows.
- */
+/** An agent that does exactly what its brief says, and nothing else: it finds the path in the
+ * contract and writes the JSON the contract shows. */
 function briefFollowingAgent(prompts: Map<string, string>) {
   const roles = createRoleRegistry({ dataRoot, repoPaths: [repo], builtInDir })
   return async (input: AgentInput): Promise<StartedRun> => {

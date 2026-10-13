@@ -240,15 +240,9 @@ function falsifiableCriteriaTests() {
 }
 
 function picturesAndNamesTests() {
-  // Measured on WO-0910-1fb, an order whose whole content was "make all text
-  // red". The picture check fired because the plan touched CSS, and the
-  // architect closed it by inventing three screenshot criteria naming five
-  // extension views in two themes. Five criteria became eight, coverage then
-  // pulled every one of those views into the unit's `touches`, and a
-  // one-line ask became a 41-file plan the builder spent 53 minutes on.
-  //
-  // The check asks for a picture. It has never asked for three, and the
-  // failure it hands the architect is the only place that can say so.
+  // The check asks for one picture, never three, and its failure is the only place that can
+  // say so: on WO-0910-1fb the architect invented three and a one-line ask became a 41-file
+  // plan (ADR 049).
   it('says one picture closes it, on a surface the plan already touches', () => {
     const order = complete()
     order.acceptance = order.acceptance.filter((c) => c.verify.kind !== 'screenshot')

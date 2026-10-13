@@ -1,9 +1,7 @@
 import type { ExecutorDeps } from '../../src/line/executor.js'
 
-/**
- * The seams a host always supplies, answering as a host with nothing to
- * report would: no session to resume, nothing measured, nothing to commit.
- */
+/** The seams a host always supplies, answering as a host with nothing to report would: no
+ * session to resume, nothing measured, nothing to commit. */
 export function idleExecutorSeams(): Omit<
   ExecutorDeps,
   'run' | 'runCommand' | 'collect' | 'now' | 'sources' | 'onEvent'

@@ -7,10 +7,8 @@ import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
-// The moves on the Forge that sit outside a step's own controls: watching the
-// architect, redrafting, opening the run an order started, telling the
-// architect why its proposal was refused from the row that failed, and a
-// hand-off that compile turns down. Each is one channel, and each says so.
+// The Forge's moves outside a step's own controls: watching and redrafting, opening the run,
+// answering a refused proposal from its row, a refused hand-off. Each is one channel.
 
 // jsdom doesn't implement scrollIntoView
 window.HTMLElement.prototype.scrollIntoView = vi.fn()
@@ -71,10 +69,8 @@ const RUNNING = {
 
 const REFUSED = { kind: 'refused', at: '2026-09-09T19:33:21Z', reason: 'it named a status' }
 
-/**
- * Renders the Forge over `shown`, with `extra` folded into what compile
- * answers; `answers` overrides any other channel, which otherwise says nothing.
- */
+// Renders the Forge over `shown`, with `extra` folded into what compile answers;
+// `answers` overrides any other channel, which otherwise says nothing.
 function mount(
   shown: WorkOrder,
   {

@@ -45,10 +45,8 @@ export function agreedOrder(repo: string, over: Partial<WorkOrder> = {}): WorkOr
   } as WorkOrder
 }
 
-/**
- * Every agent ends its turn at once. A builder leaves `<order id>.css` in its
- * checkout, so each order's change is its own.
- */
+/** Every agent ends its turn at once. A builder leaves `<order id>.css` in its checkout, so each
+ * order's change is its own. */
 export function agentsAnswer(runner: ReturnType<typeof fakeRunner>, transcripts: string): void {
   runner.start.mockImplementation((async (input: {
     phase: string

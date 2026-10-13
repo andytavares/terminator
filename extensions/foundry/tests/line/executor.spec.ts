@@ -2054,12 +2054,8 @@ describe('a budget exceeded while agents are still running', () => {
   describe('inside the budget', insideTheBudgetTests)
 })
 
-/**
- * A clock that starts where the test says and moves on every poll.
- *
- * A fixed clock plus a wave that never settles is an infinite loop with no
- * delay in it — which is a busy spin, not a test.
- */
+/** A clock that starts where the test says and moves on every poll. A fixed clock plus a wave that
+ * never settles is an infinite loop with no delay in it — which is a busy spin, not a test. */
 function from(minutes: number) {
   let now = minutes
   return {

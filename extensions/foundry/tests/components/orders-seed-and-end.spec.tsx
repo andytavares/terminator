@@ -10,11 +10,8 @@ import { Orders } from '../../src/components/Orders.js'
 type Answer = (payload: Record<string, unknown>) => unknown
 let invoke = vi.fn()
 
-/**
- * Renders the surface over channels answered by `answers`. A channel left out
- * never answers, which is what keeps the Forge and the Floor at their loading
- * lines while this surface is what is under test.
- */
+// Renders the surface over channels answered by `answers`. A channel left out never
+// answers, which keeps the Forge and the Floor at their loading lines.
 function mount(answers: Record<string, Answer>, props: Record<string, unknown> = {}): void {
   invoke = vi.fn(async (channel: string, payload: Record<string, unknown> = {}) => {
     const answer = answers[channel]

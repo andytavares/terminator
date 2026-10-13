@@ -154,10 +154,8 @@ type StartInput = {
   onTurnEnd?: () => void
 }
 
-/**
- * Makes the next read of `file`, once armed, come back 100 ms late, holding
- * the order as it was before whatever wrote it in the meantime.
- */
+/** Makes the next read of `file`, once armed, come back 100 ms late, holding the order as it was
+ * before whatever wrote it in the meantime. */
 function slowNextRead(file: string): { arm: () => void; restore: () => void } {
   const readFile = fs.promises.readFile
   let armed = false

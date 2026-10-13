@@ -72,11 +72,8 @@ function inboxList(over: Record<string, unknown>) {
   }
 }
 
-/**
- * What each channel answers. The signals are a live list, so a dismiss during
- * the test is reflected the next time the component re-polls it, the way the
- * real channel behaves.
- */
+// What each channel answers. The signals are a live list, so a dismiss shows on the
+// component's next poll, the way the real channel behaves.
 function inboxReplies(
   over: Record<string, unknown>
 ): Record<string, (payload: unknown) => unknown> {

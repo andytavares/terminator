@@ -1255,13 +1255,9 @@ const REFUSED = {
   reason: "acceptance.5.verify.evidence.1: Invalid enum value. Expected 'exit_code' | 'stdout'",
 }
 
-/**
- * A ledger that turns over after `polls` reads.
- *
- * The channel's `intake` field, not `provenance.decisions`, because a turn
- * can end without the document moving at all — which is what a refusal is,
- * and what the old fixture could not express.
- */
+// A ledger that turns over after `polls` reads. It answers in `intake`, not
+// `provenance.decisions`: a turn can end without the document moving at all,
+// which is what a refusal is.
 function landsAfter(polls: number, ending: Record<string, unknown>) {
   const before = order()
   const shown = (intake: unknown) => ({ order: before, compile: compileOrder(before), intake })
@@ -1341,13 +1337,8 @@ function readingAgainTests() {
 }
 
 function clearingTests() {
-  // Deleted: "stops once the architect has written its line" and "stops
-  // when the turn was refused, though nothing was saved" asserted that the
-  // 3s poll itself stopped once a turn ended. The view now listens to its
-  // order for as long as it is a draft, independent of whether a turn is
-  // running, so there is no longer a "poll stopped" moment to assert. What
-  // each test actually cared about — the "architect is working" strip
-  // clearing once the turn ends — still holds, and is kept below.
+  // The view listens to a draft whether or not a turn runs, so there is no "poll stopped"
+  // moment to assert; what is left to check is the "architect is working" strip clearing.
   it('clears "the architect is working" once the redraft lands', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     landsAfter(1, REDRAFTED)

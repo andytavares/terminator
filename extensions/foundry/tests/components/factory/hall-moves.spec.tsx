@@ -3,10 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { FactoryHall } from '../../../src/components/factory/FactoryHall.js'
 
-// The hall's moves FactoryHall.spec.tsx leaves out: pausing a replay and
-// playing it again from the start once it has ended, denying a held call and
-// saying why a denial did not land, a parked agent with no terminal left, and
-// what an open monitor says of a station nothing is running or that failed.
+// The hall's moves FactoryHall.spec.tsx leaves out: replaying, denying a held call, a
+// parked agent with no terminal, and a monitor on an idle or failed station.
 
 function node(over: Record<string, unknown> = {}) {
   return {

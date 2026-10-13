@@ -790,10 +790,8 @@ describe('a finished run no longer holds a new one back', () => {
   })
 })
 
-// The detector's own shape. `signal` is 'silence' or 'loop' and nothing else
-// — a fixture that put a readable sentence in it meant this panel was only
-// ever tested rendering words production could never send it, and what it
-// actually drew was "s-1 — silence".
+// The detector's own shape: `signal` is only ever 'silence' or 'loop'. A fixture with a
+// sentence there tested words production never sends, while the panel drew "s-1 — silence".
 const FIRING = {
   firing: {
     sessionId: 's-1',

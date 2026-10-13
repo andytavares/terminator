@@ -958,10 +958,8 @@ function openingTheTabTests() {
     })
   })
 
-  // The terminal's own process is the command's script, so the exit node-pty
-  // reports is the command's. Typing it into an interactive shell made the
-  // verdict that shell's exit, and closing the tab killed the shell with a
-  // signal that read as exit 0.
+  // Typed into an interactive shell, the verdict was that shell's exit, and closing the tab
+  // read as exit 0 (extensions/foundry/CLAUDE.md, "Verification commands").
   it("runs the command's script as the terminal's process, typing nothing", async () => {
     void runner().runCommand(command)
     await settled()
@@ -1057,11 +1055,9 @@ function loggedCommandTests(shell: string) {
   })
 }
 
-// A check used to be typed into the tab's interactive login shell, so whatever
-// the user's startup files export (JAVA_HOME, GOPATH, nvm's PATH) reached it.
-// The app adopts only PATH from the login shell, so a check run as a bare
-// `$SHELL script` lost the rest. A real PTY, a temporary HOME whose startup
-// file is the only place a variable is set, and the check must see it.
+// The app adopts only PATH from the login shell, so a bare `$SHELL script` lost what startup
+// files export (extensions/foundry/CLAUDE.md, "Verification commands"). A real PTY and a
+// temporary HOME whose startup file is the only place a variable is set; the check must see it.
 interface StartupShell {
   shell: string
   files: Record<string, string>

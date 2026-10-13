@@ -1432,12 +1432,9 @@ function whoAcceptedTests() {
   })
 }
 
-/**
- * The failure an operator actually meets: a unit changes a file a person
- * looks at, and no criterion asks for a picture of it. The other half of
- * this check — a criterion with no proof at all — cannot survive the
- * schema, so this is the one the escape has to answer.
- */
+/** The failure an operator meets: a unit changes a file a person looks at, and no criterion asks
+ * for a picture of it. The other half of this check — a criterion with no proof at all —
+ * cannot survive the schema, so this is the one the escape has to answer. */
 function blockedOnAPicture(o: WorkOrder): WorkOrder {
   const proof = { kind: 'command' as const, command: 'npm test', assert: 'ok' }
   const unit = builderUnit('U-1', {
