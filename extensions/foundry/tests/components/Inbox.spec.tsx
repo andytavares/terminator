@@ -5,6 +5,7 @@ import { Inbox, SIGNAL_POLL_MS } from '../../src/components/Inbox.js'
 import { createChangeBus } from '../helpers/change-bus.js'
 import { raiseGate, GATE_RULES, ruleInWords } from '../../src/gates/rules.js'
 import type { Signal } from '../../src/sensors/types.js'
+import { timesInvoked } from '../helpers/bridge-calls.js'
 
 // The one surface the operator is required to visit. Every row names the rule
 // that raised it, says what it looked at, and says what happens if it is
@@ -72,11 +73,8 @@ function inboxList(over: Record<string, unknown>) {
   }
 }
 
-/**
- * What each channel answers. The signals are a live list, so a dismiss during
- * the test is reflected the next time the component re-polls it, the way the
- * real channel behaves.
- */
+// What each channel answers. The signals are a live list, so a dismiss shows on the
+// component's next poll, the way the real channel behaves.
 function inboxReplies(
   over: Record<string, unknown>
 ): Record<string, (payload: unknown) => unknown> {
@@ -146,9 +144,9 @@ beforeEach(() => {
 
 describe('a row the operator can act on', () => {
   describe('the rule and the evidence', theRuleAndTheEvidenceTests)
-  describe('links', linksTests)
+  describe('links', inboxLinksTests)
   describe('options', optionsTests)
-  describe('deciding', decidingTests)
+  describe('deciding', inboxDecidingTests)
 })
 
 const budgetGate = () =>
@@ -181,7 +179,7 @@ function theRuleAndTheEvidenceTests() {
   })
 }
 
-function linksTests() {
+function inboxLinksTests() {
   it('links the order\u2019s pull request and ticket from the gate', async () => {
     const pullUrl = 'https://github.com/andytavares/terminator/pull/233'
     const ticketUrl = 'https://linear.app/team/issue/TAV-15'
@@ -217,7 +215,7 @@ function optionsTests() {
   })
 }
 
-function decidingTests() {
+function inboxDecidingTests() {
   it('sends the decision, and asks again afterwards', async () => {
     mount({ gates: [gate()] })
     await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
@@ -239,11 +237,11 @@ function decidingTests() {
 }
 
 describe('raising a budget from the inbox', () => {
-  describe('the new limit', theNewLimitTests)
+  describe('the new limit', inboxTheNewLimitTests)
   describe('no recorded budget', noRecordedBudgetTests)
 })
 
-function theNewLimitTests() {
+function inboxTheNewLimitTests() {
   it('asks for the new limit, then sends it with the decision', async () => {
     mount({ gates: [budgetGate()] })
     await waitFor(() => screen.getByText(ruleInWords('budget.exceeded')))
@@ -431,15 +429,15 @@ const lowSignal = () =>
 // gates band, because gates are the surface's whole point and a heuristic's
 // hunch is not the same class of interruption as a gate that blocks work.
 describe("from the factory's sensors", () => {
-  describe('listing', listingTests)
+  describe('listing', inboxListingTests)
   describe('several signals and arrivals', severalSignalsAndArrivalsTests)
   describe('refreshing and empty', refreshingAndEmptyTests)
-  describe('promoting', promotingTests)
+  describe('promoting', inboxPromotingTests)
   describe('changing the repository', changingTheRepositoryTests)
   describe('dismissing and the badge', dismissingAndTheBadgeTests)
 })
 
-function listingTests() {
+function inboxListingTests() {
   it('lists open signals, each with its count, severity, sensor and evidence link', async () => {
     mount({
       signals: [highSignal()],
@@ -499,12 +497,11 @@ function severalSignalsAndArrivalsTests() {
 function refreshingAndEmptyTests() {
   it('reads the inbox again when Foundry says a gate changed, not before', async () => {
     mount({})
-    const lists = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:inbox.list').length
-    await waitFor(() => expect(lists()).toBeGreaterThan(0))
-    const before = lists()
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:inbox.list')).toBeGreaterThan(0))
+    const before = timesInvoked(invoke, 'foundry:inbox.list')
 
     bus.emit({ kind: 'gates', orderId: 'WO-1' })
-    await waitFor(() => expect(lists()).toBe(before + 1))
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:inbox.list')).toBe(before + 1))
   })
 
   it('does not show the section when there are no open signals', async () => {
@@ -517,7 +514,7 @@ function refreshingAndEmptyTests() {
   })
 }
 
-function promotingTests() {
+function inboxPromotingTests() {
   it('promotes with the repository, defaulting to the sensor’s own', async () => {
     mount({
       signals: [highSignal()],

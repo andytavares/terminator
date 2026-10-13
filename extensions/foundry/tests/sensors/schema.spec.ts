@@ -19,13 +19,13 @@ source:
 `
 
 describe('parseSensor', () => {
-  describe('parsing', parsingTests)
-  describe('refusals', refusalsTests)
-  describe('malformed and newer', malformedAndNewerTests)
+  describe('parsing', schemaParsingTests)
+  describe('refusals', schemaRefusalsTests)
+  describe('malformed and newer', schemaMalformedAndNewerTests)
   describe('tracker sources', trackerSourcesTests)
 })
 
-function parsingTests() {
+function schemaParsingTests() {
   it('parses a well-formed sensor', () => {
     const r = parseSensor(SENSOR, 'ci-main-red.yaml')
     expect(r.ok).toBe(true)
@@ -44,7 +44,7 @@ function parsingTests() {
   })
 }
 
-function refusalsTests() {
+function schemaRefusalsTests() {
   it('refuses an interval shorter than 5 minutes', () => {
     const r = parseSensor(SENSOR.replace('every: 30m', 'every: 1m'), 'ci-main-red.yaml')
     expect(r.ok).toBe(false)
@@ -61,7 +61,7 @@ function refusalsTests() {
   })
 }
 
-function malformedAndNewerTests() {
+function schemaMalformedAndNewerTests() {
   it('reports malformed YAML by path instead of throwing', () => {
     const r = parseSensor('id: [unclosed\n', 'broken.yaml')
     expect(r.ok).toBe(false)

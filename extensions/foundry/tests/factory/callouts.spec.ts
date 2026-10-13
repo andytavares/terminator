@@ -225,13 +225,13 @@ function theQueueTests() {
 }
 
 describe('interruptionsFor', () => {
-  describe('held tool calls', heldToolCallsTests)
+  describe('held tool calls', calloutsHeldToolCallsTests)
   describe('questions and gates', questionsAndGatesTests)
-  describe('parked agents', parkedAgentsTests)
+  describe('parked agents', calloutsParkedAgentsTests)
   describe('unmatched sessions', unmatchedSessionsTests)
 })
 
-function heldToolCallsTests() {
+function calloutsHeldToolCallsTests() {
   it('pins a held tool call to the station whose agent is holding it', () => {
     const [ask] = interruptionsFor({
       graph,
@@ -278,7 +278,7 @@ function questionsAndGatesTests() {
   })
 }
 
-function parkedAgentsTests() {
+function calloutsParkedAgentsTests() {
   it('pins an agent parked at its terminal, unless a held call already says so', () => {
     expect(interruptionsFor({ graph, waiting: [], stranded: ['s-build'], pending: [] })).toEqual([
       {

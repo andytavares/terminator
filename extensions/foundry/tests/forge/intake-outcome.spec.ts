@@ -311,13 +311,13 @@ describe('intakeRefusal', () => {
 })
 
 describe('loopFacts', () => {
-  describe('rounds', roundsTests)
+  describe('rounds', intakeOutcomeRoundsTests)
   describe('a refused round', refusedRoundTests)
-  describe('holds', holdsTests)
+  describe('holds', intakeOutcomeHoldsTests)
   describe('exhaustion', exhaustionTests)
 })
 
-function roundsTests() {
+function intakeOutcomeRoundsTests() {
   it('is empty, unheld, not exhausted with no review lines', () => {
     expect(loopFacts([])).toEqual({ rounds: [], heldAt: null, exhausted: false })
   })
@@ -365,7 +365,7 @@ function refusedRoundTests() {
   })
 }
 
-function holdsTests() {
+function intakeOutcomeHoldsTests() {
   it('is held when the last hold is after the last release', () => {
     const out = loopFacts([
       entry({ action: 'review.held', at: '2026-09-09T19:30:00Z' }),

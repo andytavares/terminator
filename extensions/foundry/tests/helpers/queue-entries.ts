@@ -2,7 +2,7 @@
 import type { QueueEntry } from '../../src/line/refinery.js'
 
 /** An unmerged order on `main` of `repo`, agreed on 1 September; `over` changes any part. */
-export function queued(orderId: string, over: Partial<QueueEntry> = {}): QueueEntry {
+export function queueEntry(orderId: string, over: Partial<QueueEntry> = {}): QueueEntry {
   return {
     orderId,
     title: orderId,

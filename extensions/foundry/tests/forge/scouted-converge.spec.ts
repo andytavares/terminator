@@ -114,11 +114,11 @@ describe('withScoutContext', () => {
 })
 
 describe('waitForScout', () => {
-  describe('waiting', waitingTests)
+  describe('waiting', scoutedConvergeWaitingTests)
   describe('giving up', givingUpTests)
 })
 
-function waitingTests() {
+function scoutedConvergeWaitingTests() {
   it('returns at once when no scout is running for the order', async () => {
     await expect(waitForScout('WO-none')).resolves.toBe('none')
   })

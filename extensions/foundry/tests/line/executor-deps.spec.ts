@@ -11,7 +11,7 @@ import * as path from 'node:path'
 import {
   fakeHost,
   fakeRunner,
-  realGit,
+  gitAt,
   seededRepository,
   temporaryDirectory,
   type FoundryHost,
@@ -33,6 +33,7 @@ import type { Recipe } from '../../src/recipe/parse.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { LadderStep } from '../../src/verify/ladder.js'
 import type { ExecutorDeps } from '../../src/line/executor.js'
+import { ledgerActions } from '../helpers/order-ledger.js'
 
 let root: string
 let repo: string
@@ -137,20 +138,12 @@ function agentStarts(sessionId: string): { started: Promise<StartInput> } {
   return { started }
 }
 
-async function ledger(): Promise<string[]> {
-  return (await createOrderStore(root).entries('WO-1')).map((entry) => entry.action)
-}
-
-function git(cwd: string, ...args: string[]) {
-  return realGit({ command: 'git', args, cwd })
-}
-
 describe('an agent node', () => {
   describe('launching', launchingTests)
   describe('failing and never starting', failingAndNeverStartingTests)
   describe('asking about a tool', askingAboutAToolTests)
   describe('refused tools', refusedToolsTests)
-  describe('resuming', resumingTests)
+  describe('resuming', executorDepsResumingTests)
 })
 
 const step: LadderStep = {
@@ -261,7 +254,7 @@ function refusedToolsTests() {
   })
 }
 
-function resumingTests() {
+function executorDepsResumingTests() {
   it('carries on the conversation a resumed run recorded on its graph', async () => {
     const resumed = withNode(graph, builderNode().id, { sessionId: 'earlier-builder' })
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph: resumed })
@@ -379,8 +372,8 @@ describe('committing a node', () => {
     const checkout = checkoutPath(root, order, 'app')
     const node = { ...builderNode(), startedAt: new Date(Date.now() - 60_000).toISOString() }
     fs.writeFileSync(path.join(checkout, 'red.css'), 'a { color: red }')
-    await git(checkout, 'add', '-A')
-    await git(checkout, 'commit', '-q', '-m', 'agent did it')
+    await gitAt(checkout, 'add', '-A')
+    await gitAt(checkout, 'commit', '-q', '-m', 'agent did it')
     expect(await deps.commitNode({ node, message: 'red' })).toEqual({ kind: 'committed' })
   })
 })
@@ -425,18 +418,18 @@ function whatItWroteTests() {
     expect(
       await deps.collect({ nodeId: 'scout', role: 'scout', outputPath: outputPath() })
     ).toBeNull()
-    expect(await ledger()).toContain('rung.refused')
+    expect(await ledgerActions(root)).toContain('rung.refused')
   })
 }
 
 describe('the run’s records', () => {
-  describe('gates', gatesTests)
-  describe('verdicts', verdictsTests)
-  describe('the graph', theGraphTests)
+  describe('gates', executorDepsGatesTests)
+  describe('verdicts', executorDepsVerdictsTests)
+  describe('the graph', executorDepsTheGraphTests)
   describe('measuring the change', measuringTheChangeTests)
 })
 
-function gatesTests() {
+function executorDepsGatesTests() {
   it('raises a gate on the inbox and names it on the ledger', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     await deps.raise(
@@ -451,11 +444,11 @@ function gatesTests() {
       })
     )
     expect((await createGateStore(root).list()).map((gate) => gate.id)).toEqual(['WO-1-conflict'])
-    expect(await ledger()).toContain('gate.raised')
+    expect(await ledgerActions(root)).toContain('gate.raised')
   })
 }
 
-function verdictsTests() {
+function executorDepsVerdictsTests() {
   it('records a verdict and nothing for any other event', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     deps.onEvent({
@@ -471,7 +464,7 @@ function verdictsTests() {
     deps.onEvent({ type: 'wave', nodes: [] } as never)
     await deps.record('run.note', 'WO-1', 'a line')
     await vi.waitFor(async () =>
-      expect((await ledger()).sort()).toEqual(['run.note', 'verify.verdict'])
+      expect((await ledgerActions(root)).sort()).toEqual(['run.note', 'verify.verdict'])
     )
     const entries = await createOrderStore(root).entries('WO-1')
     expect(entries.find((entry) => entry.action === 'verify.verdict')?.reason).toBe(
@@ -480,14 +473,14 @@ function verdictsTests() {
   })
 }
 
-function theGraphTests() {
+function executorDepsTheGraphTests() {
   it('writes the graph on every change, and the files a checkout changed once a step settles', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const checkout = checkoutPath(root, order, 'app')
     fs.mkdirSync(path.join(checkout, 'src'))
     fs.writeFileSync(path.join(checkout, 'src', 'a.ts'), 'export const red = 1\n')
-    await git(checkout, 'add', '-A')
-    await git(checkout, 'commit', '-q', '-m', 'red')
+    await gitAt(checkout, 'add', '-A')
+    await gitAt(checkout, 'commit', '-q', '-m', 'red')
 
     await deps.persist(graph)
     expect(await readObservedFiles(root, 'WO-1')).toEqual([])
@@ -507,8 +500,8 @@ function measuringTheChangeTests() {
     const checkout = checkoutPath(root, order, 'app')
     fs.writeFileSync(path.join(checkout, 'a.ts'), 'one\ntwo\n')
     fs.writeFileSync(path.join(checkout, 'package-lock.json'), '{\n}\n')
-    await git(checkout, 'add', '-A')
-    await git(checkout, 'commit', '-q', '-m', 'work')
+    await gitAt(checkout, 'add', '-A')
+    await gitAt(checkout, 'commit', '-q', '-m', 'work')
     const change = await deps.observedChange()
     expect([...change.changedFiles].sort()).toEqual(['a.ts', 'package-lock.json'])
     expect(change.linesChanged).toBe(2)

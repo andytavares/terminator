@@ -9,9 +9,9 @@ import { readRunGraph, writeRunGraph } from '../../src/ipc/run-channels.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
-import type { RunGraph } from '../../src/line/run-graph.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { partialFake } from '../../../../tests/support/fakes'
+import { emptyRunGraph } from '../helpers/run-nodes.js'
 
 // The store modules and the index together, on real files: what a write left
 // on disk is what the index answers with, and the windows are told which order
@@ -24,7 +24,7 @@ function indexOver(directory: string) {
   return createFoundryIndexes(diskSourceFor, (change) => changes.push(change)).forRoot(directory)
 }
 
-function order(id: string, createdAt = '2026-09-06T10:00:00.000Z'): WorkOrder {
+function draftedOrder(id: string, createdAt = '2026-09-06T10:00:00.000Z'): WorkOrder {
   return draftOrder({
     id,
     title: `Order ${id}`,
@@ -34,7 +34,7 @@ function order(id: string, createdAt = '2026-09-06T10:00:00.000Z'): WorkOrder {
   })
 }
 
-function gate(id: string, orderId: string): Gate {
+function budgetExceededGate(id: string, orderId: string): Gate {
   return partialFake<Gate>({
     id,
     rule: 'budget.exceeded',
@@ -46,10 +46,6 @@ function gate(id: string, orderId: string): Gate {
     decision: null,
     breach: null,
   })
-}
-
-function graph(orderId: string): RunGraph {
-  return partialFake<RunGraph>({ orderId, recipe: 'direct', nodes: [] })
 }
 
 beforeEach(() => {
@@ -64,14 +60,14 @@ afterEach(() => {
 
 describe('orders through the index', () => {
   describe('listing and reading', listingAndReadingTests)
-  describe('loading', loadingTests)
+  describe('loading', indexedStoresLoadingTests)
 })
 
 function listingAndReadingTests() {
   it('lists what was saved, newest first, and names the order that changed', async () => {
     const store = createOrderStore(root, indexOver(root))
-    await store.save(order('WO-1', '2026-09-06T10:00:00.000Z'))
-    await store.save(order('WO-2', '2026-09-07T10:00:00.000Z'))
+    await store.save(draftedOrder('WO-1', '2026-09-06T10:00:00.000Z'))
+    await store.save(draftedOrder('WO-2', '2026-09-07T10:00:00.000Z'))
     expect((await store.list()).map((o) => o.id)).toEqual(['WO-2', 'WO-1'])
     expect(changes).toEqual([
       { kind: 'order', orderId: 'WO-1' },
@@ -81,16 +77,16 @@ function listingAndReadingTests() {
 
   it('answers exactly what a fresh read of the same disk answers', async () => {
     const store = createOrderStore(root, indexOver(root))
-    await store.save(order('WO-1'))
+    await store.save(draftedOrder('WO-1'))
     const fromDisk = await createOrderStore(root).load('WO-1')
     expect(await store.load('WO-1')).toEqual(fromDisk)
   })
 }
 
-function loadingTests() {
+function indexedStoresLoadingTests() {
   it('does not read an order file again once it has been loaded', async () => {
     const store = createOrderStore(root, indexOver(root))
-    await store.save(order('WO-1'))
+    await store.save(draftedOrder('WO-1'))
     await store.list()
     const read = vi.spyOn(fs.promises, 'readFile')
     await store.list()
@@ -99,7 +95,7 @@ function loadingTests() {
   })
 
   it('loads from disk the first time, so orders from an earlier session are there', async () => {
-    await createOrderStore(root).save(order('WO-1'))
+    await createOrderStore(root).save(draftedOrder('WO-1'))
     const store = createOrderStore(root, indexOver(root))
     expect((await store.list()).map((o) => o.id)).toEqual(['WO-1'])
   })
@@ -107,7 +103,7 @@ function loadingTests() {
   it('finds an open order by its issue from memory', async () => {
     const store = createOrderStore(root, indexOver(root))
     const seeded = {
-      ...order('WO-1'),
+      ...draftedOrder('WO-1'),
       source: { kind: 'tracker', tracker: 'linear', key: 'ENG-1', url: null },
     } as WorkOrder
     await store.save(seeded)
@@ -160,9 +156,9 @@ describe('gates through the index', () => {
   it('lists a saved gate and names the order it belongs to', async () => {
     const store = createGateStore(root, indexOver(root))
     await store.list()
-    await store.save(gate('g1', 'WO-1'))
-    await store.save({ ...gate('g1', 'WO-1'), summary: 'changed' })
-    await store.save(gate('g2', 'WO-2'))
+    await store.save(budgetExceededGate('g1', 'WO-1'))
+    await store.save({ ...budgetExceededGate('g1', 'WO-1'), summary: 'changed' })
+    await store.save(budgetExceededGate('g2', 'WO-2'))
     const listed = await store.list()
     expect(listed.map((g) => [g.id, g.summary])).toEqual([
       ['g1', 'changed'],
@@ -175,7 +171,7 @@ describe('gates through the index', () => {
 
   it('answers what a fresh read of the same disk answers', async () => {
     const store = createGateStore(root, indexOver(root))
-    await store.save(gate('g1', 'WO-1'))
+    await store.save(budgetExceededGate('g1', 'WO-1'))
     expect(await store.list()).toEqual(await createGateStore(root).list())
   })
 })
@@ -183,14 +179,14 @@ describe('gates through the index', () => {
 describe('run graphs through the index', () => {
   it('reads back a written graph and names the order whose run moved', async () => {
     const index = indexOver(root)
-    await writeRunGraph(root, graph('WO-1'), index)
+    await writeRunGraph(root, emptyRunGraph('WO-1'), index)
     expect((await readRunGraph(root, 'WO-1', index))?.orderId).toBe('WO-1')
     expect(changes).toEqual([{ kind: 'graph', orderId: 'WO-1' }])
   })
 
   it('does not read the graph file again once it is known', async () => {
     const index = indexOver(root)
-    await writeRunGraph(root, graph('WO-1'), index)
+    await writeRunGraph(root, emptyRunGraph('WO-1'), index)
     const read = vi.spyOn(fs.promises, 'readFile')
     await readRunGraph(root, 'WO-1', index)
     expect(read).not.toHaveBeenCalled()
@@ -198,7 +194,7 @@ describe('run graphs through the index', () => {
 
   it('answers what a fresh read of the same disk answers', async () => {
     const index = indexOver(root)
-    await writeRunGraph(root, graph('WO-1'), index)
+    await writeRunGraph(root, emptyRunGraph('WO-1'), index)
     expect(await readRunGraph(root, 'WO-1', index)).toEqual(await readRunGraph(root, 'WO-1'))
   })
 })

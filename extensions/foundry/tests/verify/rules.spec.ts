@@ -62,11 +62,11 @@ afterEach(() => {
 })
 
 describe('accepting a proposal', () => {
-  describe('writing', writingTests)
+  describe('writing', rulesWritingTests)
   describe('rungs and later work', rungsAndLaterWorkTests)
 })
 
-function writingTests() {
+function rulesWritingTests() {
   it('writes a rule the ordinary parser can read', async () => {
     const p = proposal()
     await acceptProposal(root, p)
@@ -116,14 +116,14 @@ function rungsAndLaterWorkTests() {
 }
 
 describe('declining a proposal', () => {
-  describe('remembering', rememberingTests)
+  describe('remembering', rulesRememberingTests)
   describe('the curator', theCuratorTests)
   describe('the assertion', theAssertionTests)
   describe('removed rules', removedRulesTests)
   describe('unreadable records', unreadableRecordsTests)
 })
 
-function rememberingTests() {
+function rulesRememberingTests() {
   it('is remembered, so it is never offered again', async () => {
     const p = proposal()
     await declineProposal(root, p.id, { reason: 'we do that on purpose' })

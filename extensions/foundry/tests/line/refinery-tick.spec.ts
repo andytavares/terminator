@@ -75,7 +75,7 @@ describe('refineryTick', () => {
   describe('restacking', restackingTests)
   describe('already recorded', alreadyRecordedTests)
   describe('already restacked', alreadyRestackedTests)
-  describe('conflicts', conflictsTests)
+  describe('conflicts', refineryTickConflictsTests)
   describe('failed restacks', failedRestacksTests)
 })
 
@@ -181,7 +181,7 @@ function alreadyRestackedTests() {
   })
 }
 
-function conflictsTests() {
+function refineryTickConflictsTests() {
   it('raises refinery.conflict on a conflicting rebase, once', async () => {
     const deps = baseDeps({
       candidates: async () => [
@@ -239,7 +239,7 @@ function failedRestacksTests() {
 
 describe('refineryTick tells the tracker when an order is merged', () => {
   describe('once all lanes merged', onceAllLanesMergedTests)
-  describe('tracker failures', trackerFailuresTests)
+  describe('tracker failures', refineryTickTrackerFailuresTests)
 })
 
 function onceAllLanesMergedTests() {
@@ -276,7 +276,7 @@ function onceAllLanesMergedTests() {
   })
 }
 
-function trackerFailuresTests() {
+function refineryTickTrackerFailuresTests() {
   it('carries on when the tracker write throws', async () => {
     const deps = baseDeps({
       candidates: candidate,

@@ -7,6 +7,7 @@ import { checkCapability, writeBack } from '../../src/trackers/write-back.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { orderLedger } from '../helpers/order-ledger.js'
 
 // Write-back over the application's own tracker connection: what reaches the
 // issue, and what the order's ledger says about it.
@@ -35,10 +36,6 @@ beforeEach(async () => {
   await createOrderStore(root).save(trackedOrder())
 })
 
-async function ledger(): Promise<Array<{ action: string; actor: string }>> {
-  return createOrderStore(root).entries('WO-1')
-}
-
 describe('an agreed order from a tracker issue', () => {
   describe('the agreed order comment', theAgreedOrderCommentTests)
   describe('the state move', theStateMoveTests)
@@ -57,7 +54,7 @@ function theAgreedOrderCommentTests() {
       'ENG-1',
       expect.stringContaining('Make it red')
     )
-    expect((await ledger()).map((entry) => entry.actor)).toEqual(['rule:writeback'])
+    expect((await orderLedger(root)).map((entry) => entry.actor)).toEqual(['rule:writeback'])
   })
 }
 

@@ -101,13 +101,13 @@ afterEach(() => {
 })
 
 describe('foundry:ledger.query', () => {
-  describe('reading', readingTests)
+  describe('reading', ledgerChannelsReadingTests)
   describe('filtering', filteringTests)
   describe('time and order', timeAndOrderTests)
   describe('limits and values', limitsAndValuesTests)
 })
 
-function readingTests() {
+function ledgerChannelsReadingTests() {
   it('is empty before anything has happened', async () => {
     const r = (await channels().query({})) as { entries: LedgerEntry[]; total: number }
     expect(r.entries).toEqual([])
@@ -230,12 +230,12 @@ async function firstProposalId(): Promise<string> {
 }
 
 describe('deciding a proposal', () => {
-  describe('accepting', acceptingTests)
+  describe('accepting', ledgerChannelsAcceptingTests)
   describe('declining', decliningTests)
   describe('an unsupported proposal', anUnsupportedProposalTests)
 })
 
-function acceptingTests() {
+function ledgerChannelsAcceptingTests() {
   it('accepting writes a rule that later work will load', async () => {
     await repeatedRejections()
     const id = await firstProposalId()
@@ -441,7 +441,7 @@ function graph(orderId: string): RunGraph {
 
 describe('foundry:factory.metrics', () => {
   describe('gathering', gatheringTests)
-  describe('windows', windowsTests)
+  describe('windows', ledgerChannelsWindowsTests)
 })
 
 function gatheringTests() {
@@ -477,7 +477,7 @@ function gatheringTests() {
   })
 }
 
-function windowsTests() {
+function ledgerChannelsWindowsTests() {
   it('defaults to the 30 day window', async () => {
     await seedOrder('WO-1')
     const r = (await channels().factoryMetrics({})) as { window: string }

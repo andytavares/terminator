@@ -76,10 +76,10 @@ afterEach(() => {
 describe('foundry:inbox.list', () => {
   describe('empty and orders waiting', emptyAndOrdersWaitingTests)
   describe('raised gates', raisedGatesTests)
-  describe('links', linksTests)
+  describe('links', inboxChannelsLinksTests)
   describe('typed orders and ranking', typedOrdersAndRankingTests)
   describe('silenced and unconditional rules', silencedAndUnconditionalRulesTests)
-  describe('deadlines', deadlinesTests)
+  describe('deadlines', inboxChannelsDeadlinesTests)
   describe('undefaulted gates and failures', undefaultedGatesAndFailuresTests)
   describe('acting once and no deadline', actingOnceAndNoDeadlineTests)
   describe('counts', countsTests)
@@ -126,7 +126,7 @@ const TAV_15 = {
   url: 'https://linear.app/team/issue/TAV-15',
 }
 
-function linksTests() {
+function inboxChannelsLinksTests() {
   it('carries the order\u2019s pull requests and ticket on each gate, so the row can link them', async () => {
     const orders = createOrderStore(root)
     await orders.save(order({ source: TAV_15 }))
@@ -189,7 +189,7 @@ function silencedAndUnconditionalRulesTests() {
   })
 }
 
-function deadlinesTests() {
+function inboxChannelsDeadlinesTests() {
   it('takes the stated default once a deadline has passed, and records it as automatic', async () => {
     await createGateStore(root).save(gate({ id: 'G-late', deadline: '2026-09-06T11:00:00.000Z' }))
     const c = channels()
@@ -278,12 +278,12 @@ function countsTests() {
 }
 
 describe('foundry:inbox.decide', () => {
-  describe('recording', recordingTests)
-  describe('refusals', refusalsTests)
+  describe('recording', inboxChannelsRecordingTests)
+  describe('refusals', inboxChannelsRefusalsTests)
   describe('no note', noNoteTests)
 })
 
-function recordingTests() {
+function inboxChannelsRecordingTests() {
   it('records the decision and keeps it', async () => {
     await createGateStore(root).save(gate())
     const c = channels()
@@ -310,7 +310,7 @@ function recordingTests() {
   })
 }
 
-function refusalsTests() {
+function inboxChannelsRefusalsTests() {
   it('refuses an option the gate never offered', async () => {
     await createGateStore(root).save(gate())
     const r = (await channels().decide({ gateId: 'G-1', option: 'ship_it' })) as { error: string }
@@ -432,8 +432,8 @@ async function halted() {
 // straight back past it and stopped again. Raising now takes the new limit.
 describe('raising a budget', () => {
   describe('setting the limit', settingTheLimitTests)
-  describe('refusing', refusingTests)
-  describe('resuming', resumingTests)
+  describe('refusing', inboxChannelsRefusingTests)
+  describe('resuming', inboxChannelsResumingTests)
 })
 
 function settingTheLimitTests() {
@@ -466,7 +466,7 @@ function settingTheLimitTests() {
   })
 }
 
-function refusingTests() {
+function inboxChannelsRefusingTests() {
   it('refuses a limit the run is already past, and decides nothing', async () => {
     await halted()
     const act = vi.fn(async () => undefined)
@@ -489,7 +489,7 @@ function refusingTests() {
   })
 }
 
-function resumingTests() {
+function inboxChannelsResumingTests() {
   // ADR 056 retired the files budget. A run halted on it before then has a
   // gate naming a budget that no longer exists, so there is nothing to raise.
   it('resumes a gate stopped at the retired files budget, and changes no budget', async () => {

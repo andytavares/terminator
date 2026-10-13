@@ -5,6 +5,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { FactorySite } from '../../../src/components/factory/FactorySite.js'
 import type { FactoryOrderRow } from '../../../src/components/factory/FactorySite.js'
 import type { Signal } from '../../../src/sensors/types.js'
+import { timesInvoked } from '../../helpers/bridge-calls.js'
 
 function dockSignal(over: Partial<Signal> = {}): Signal {
   return {
@@ -79,15 +80,14 @@ describe('FactorySite reading', () => {
   it('reads the orders again when Foundry says one changed, and not for time passing', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { invoke } = mount([])
-    const lists = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:order.list').length
-    await waitFor(() => expect(lists()).toBe(1))
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:order.list')).toBe(1))
 
     await vi.advanceTimersByTimeAsync(60_000)
-    expect(lists()).toBe(1)
+    expect(timesInvoked(invoke, 'foundry:order.list')).toBe(1)
     vi.useRealTimers()
 
     bus.emit({ kind: 'order', orderId: 'WO-1' })
-    await waitFor(() => expect(lists()).toBe(2))
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:order.list')).toBe(2))
   })
 })
 
@@ -97,9 +97,9 @@ describe('FactorySite', () => {
   describe('no Completed section', noCompletedSectionTests)
   describe('waiting shipped orders', waitingShippedOrdersTests)
   describe('beacons', beaconsTests)
-  describe('CI', ciTests)
+  describe('CI', factorySiteCiTests)
   describe('the refinery track', theRefineryTrackTests)
-  describe('opening', openingTests)
+  describe('opening', factorySiteOpeningTests)
 })
 
 function theCardsTests() {
@@ -233,7 +233,7 @@ function beaconsTests() {
   })
 }
 
-function ciTests() {
+function factorySiteCiTests() {
   it('shows the CI round and status in plain words, never a raw code', async () => {
     mount([
       { id: 'WO-1', title: 'Shipping', status: 'running', ci: { status: 'red', round: 2, max: 3 } },
@@ -275,7 +275,7 @@ function theRefineryTrackTests() {
   })
 }
 
-function openingTests() {
+function factorySiteOpeningTests() {
   it('opens the order it is given', async () => {
     const { onOpen } = mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
     await waitFor(() => screen.getByText('Only one'))
@@ -311,11 +311,11 @@ describe('FactorySite status wall', () => {
 })
 
 describe('the Dock', () => {
-  describe('crates', cratesTests)
-  describe('promoting', promotingTests)
+  describe('crates', factorySiteCratesTests)
+  describe('promoting', factorySitePromotingTests)
 })
 
-function cratesTests() {
+function factorySiteCratesTests() {
   it('shows nothing when there are no open signals', async () => {
     mount([])
     await waitFor(() => screen.getByText(/no orders yet/i))
@@ -330,7 +330,7 @@ function cratesTests() {
   })
 }
 
-function promotingTests() {
+function factorySitePromotingTests() {
   it('promotes a crate the same way the Inbox does', async () => {
     const { invoke } = mount([], METRICS, {
       signals: [dockSignal()],

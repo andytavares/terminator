@@ -120,7 +120,7 @@ describe('forgetting', () => {
 
 describe('the record of what is over', () => {
   describe('what is over', whatIsOverTests)
-  describe('reading', readingTests)
+  describe('reading', runRegistryReadingTests)
   describe('copies and unknown sessions', copiesAndUnknownSessionsTests)
 })
 
@@ -150,7 +150,7 @@ function whatIsOverTests() {
   })
 }
 
-function readingTests() {
+function runRegistryReadingTests() {
   it('reads newest first, because the last thing that happened is what you want', () => {
     const registry = createRunRegistry()
     add(registry)

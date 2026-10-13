@@ -413,7 +413,7 @@ function breakroomBox(map: HallMap): Box {
 }
 
 /** Whether a fill starts inside `box`. */
-function inside(call: PaintCall, box: Box): boolean {
+function paintedInside(call: PaintCall, box: Box): boolean {
   if (call.op !== 'fillRect') return false
   return call.x >= box.x0 && call.x < box.x1 && call.y >= box.y0 && call.y < box.y1
 }
@@ -461,9 +461,9 @@ function theBreakroomTests() {
     const room = breakroomBox(map)
     const fills = paint.calls.filter((c) => c.op === 'fillRect')
     const floor = fills.filter((c) => c.style === '#4a4038' || c.style === '#524740')
-    expect(floor.some((c) => inside(c, room))).toBe(true)
+    expect(floor.some((c) => paintedInside(c, room))).toBe(true)
     const rug = fills.filter((c) => c.style === HALL.rug)
-    expect(rug.some((c) => !inside(c, room))).toBe(false)
+    expect(rug.some((c) => !paintedInside(c, room))).toBe(false)
   })
 }
 
@@ -506,7 +506,7 @@ describe('factory/art/props drawBelts', () => {
   describe('straight tiles', straightTilesTests)
   describe('junctions', junctionsTests)
   describe('corners', cornerTilesTests)
-  describe('wall fixtures', wallFixturesTests)
+  describe('wall fixtures', propsWallFixturesTests)
   describe('cross tiles', crossTilesTests)
   describe('crossing at right angles', rightAngleCrossingTests)
   describe('treads', treadsTests)
@@ -581,7 +581,7 @@ function cornerTilesTests() {
   })
 }
 
-function wallFixturesTests() {
+function propsWallFixturesTests() {
   it('hangs the vending machine on the wall face instead of over the floor', () => {
     const paint = createRecordingPaint()
     bakeHall(baseMap(), paint)
@@ -755,12 +755,12 @@ describe('factory/art/props station work', () => {
 
   describe('rig', () => {
     describe('the ticker', theTickerTests)
-    describe('verdicts', verdictsTests)
+    describe('verdicts', propsVerdictsTests)
     describe('other and newest verdicts', otherAndNewestVerdictsTests)
   })
 
   describe('press', () => {
-    describe('working', workingTests)
+    describe('working', propsWorkingTests)
     describe('stripes', stripesTests)
   })
 
@@ -883,7 +883,7 @@ function theTickerTests() {
   })
 }
 
-function verdictsTests() {
+function propsVerdictsTests() {
   it('flashes a tick or a cross only inside the verdict window', () => {
     const PASS_BG = '#0d2412'
     const FAIL_BG = '#2a0f0b'
@@ -922,7 +922,7 @@ function otherAndNewestVerdictsTests() {
   })
 }
 
-function workingTests() {
+function propsWorkingTests() {
   const BEACON = '#20242c'
 
   const SPARK = '#ffd27a'

@@ -72,14 +72,14 @@ function input(over: Partial<StandingInput> = {}): StandingInput {
 }
 
 describe('standingOf', () => {
-  describe('working', workingTests)
+  describe('working', standingWorkingTests)
   describe('sent back', sentBackTests)
   describe('checks no longer there', checksNoLongerThereTests)
-  describe('ordinary work', ordinaryWorkTests)
-  describe('halted', haltedTests)
+  describe('ordinary work', standingOrdinaryWorkTests)
+  describe('halted', standingHaltedTests)
   describe('adrift and asking', adriftAndAskingTests)
   describe('stranded and stalled', strandedAndStalledTests)
-  describe('stopped', stoppedTests)
+  describe('stopped', standingStoppedTests)
   describe('stopped for no reason', stoppedForNoReasonTests)
   describe('between steps and drafts', betweenStepsAndDraftsTests)
   describe('draft questions', draftQuestionsTests)
@@ -98,7 +98,7 @@ const finished = graph([
   node({ id: 'ship', state: 'waiting' }),
 ])
 
-function workingTests() {
+function standingWorkingTests() {
   it('counts finished steps out of every step, and says who is working', () => {
     const standing = standingOf(
       input({
@@ -176,7 +176,7 @@ const CHECK_FAILED: RunNode['feedback'][number] = {
   logPath: null,
 }
 
-function ordinaryWorkTests() {
+function standingOrdinaryWorkTests() {
   it('leaves the ordinary working detail alone when nothing has been sent back', () => {
     const standing = standingOf(
       input({ graph: graph([node({ id: 'a', state: 'running' }), node({ id: 'b' })]) })
@@ -194,7 +194,7 @@ function ordinaryWorkTests() {
   })
 }
 
-function haltedTests() {
+function standingHaltedTests() {
   it('is halted, and names the gate, when an undecided gate stopped the line', () => {
     const standing = standingOf(input({ gates: [gate()] }))
     expect(standing.kind).toBe('halted')
@@ -259,7 +259,7 @@ function strandedAndStalledTests() {
   })
 }
 
-function stoppedTests() {
+function standingStoppedTests() {
   // The defect this change fixes. WO-0913-0bd: every node passed, the order
   // still said `running`, and the ledger's tail was `run.complete` then
   // `run.failed` ("Opening the pull request for terminator failed: "). Before
@@ -551,11 +551,11 @@ function alwaysSaysSomethingTests() {
 }
 
 describe('a run that finished on a document', () => {
-  describe('done', doneTests)
+  describe('done', standingDoneTests)
   describe('not running', notRunningTests)
 })
 
-function doneTests() {
+function standingDoneTests() {
   it('is done, with foundry holding the turn, and never says it was not shipped', () => {
     const standing = standingOf(
       input({ graph: finished, documentReady: 'outputs: /data/orders/WO-1/outputs/answer.md' })
@@ -597,7 +597,7 @@ function notRunningTests() {
 describe('readStanding', () => {
   describe('sources', sourcesTests)
   describe('asking the caller', askingTheCallerTests)
-  describe('refusals', refusalsTests)
+  describe('refusals', standingRefusalsTests)
 })
 
 function sourcesTests() {
@@ -651,7 +651,7 @@ function askingTheCallerTests() {
   })
 }
 
-function refusalsTests() {
+function standingRefusalsTests() {
   it('reads why the run refused to start for an agreed order', async () => {
     const standing = await readStanding(
       partialFake<WorkOrder>({ id: 'WO-1', status: 'agreed', openQuestions: [] }),

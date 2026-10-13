@@ -1,10 +1,8 @@
 import { vi } from 'vitest'
 import type { FoundryChange } from '../../src/state/foundry-index.js'
 
-/**
- * A stand-in for the bridge's `on`, so a test can say "Foundry just told the
- * window this changed" and see what a view reads in answer.
- */
+/** A stand-in for the bridge's `on`, so a test can say "Foundry just told the window this changed"
+ * and see what a view reads in answer. */
 export function createChangeBus(): {
   on: ReturnType<typeof vi.fn>
   emit: (change: FoundryChange) => void

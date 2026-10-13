@@ -21,13 +21,13 @@ const ask = (over: Partial<PendingAsk> = {}): PendingAsk => ({
 })
 
 describe('holding what is waiting on the operator', () => {
-  describe('listing', listingTests)
-  describe('clearing', clearingTests)
+  describe('listing', pendingPermissionsListingTests)
+  describe('clearing', pendingPermissionsClearingTests)
   describe('which run', whichRunTests)
   describe('run ends and duplicates', runEndsAndDuplicatesTests)
 })
 
-function listingTests() {
+function pendingPermissionsListingTests() {
   it('lists a raised request', () => {
     const pending = createPendingPermissions()
     pending.add(ask())
@@ -42,7 +42,7 @@ function listingTests() {
   })
 }
 
-function clearingTests() {
+function pendingPermissionsClearingTests() {
   it('clears one that has been answered', () => {
     const pending = createPendingPermissions()
     pending.add(ask())

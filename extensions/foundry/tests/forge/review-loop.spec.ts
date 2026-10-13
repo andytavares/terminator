@@ -280,7 +280,7 @@ function ready(over: Partial<WorkOrder> = {}): WorkOrder {
 
 describe('afterRelease', () => {
   describe('reviewing and handing off', reviewingAndHandingOffTests)
-  describe('blocking findings', blockingFindingsTests)
+  describe('blocking findings', reviewLoopBlockingFindingsTests)
   describe('other checks and questions', otherChecksAndQuestionsTests)
 })
 
@@ -318,7 +318,7 @@ function reviewingAndHandingOffTests() {
   })
 }
 
-function blockingFindingsTests() {
+function reviewLoopBlockingFindingsTests() {
   it('sends open blocking findings back to the architect for the last round', () => {
     const next = afterRelease(ready({ redTeam: [finding()] }), {
       loop: reviewed,

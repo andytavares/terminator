@@ -261,7 +261,7 @@ describe('a question with nobody to answer it', () => {
   describe('refusing instead of waiting', refusingInsteadOfWaitingTests)
   describe('as strict as the wait', asStrictAsTheWaitTests)
   describe('scratch files and somebody there', scratchFilesAndSomebodyThereTests)
-  describe('ordinary work', ordinaryWorkTests)
+  describe('ordinary work', toolDecisionOrdinaryWorkTests)
 })
 
 const rung = (over: Partial<ToolRequest> = {}) =>
@@ -350,7 +350,7 @@ function scratchFilesAndSomebodyThereTests() {
   })
 }
 
-function ordinaryWorkTests() {
+function toolDecisionOrdinaryWorkTests() {
   it('leaves ordinary work alone — it was never a question', () => {
     expect(
       policyAnswer(unattended({ tool: 'Edit', input: { file_path: '/work/checkout/src/a.ts' } }))
@@ -590,7 +590,7 @@ function noMountTests() {
 // a terminal nobody is watching.
 describe('letting auto mode decide', () => {
   describe('handing to auto mode', handingToAutoModeTests)
-  describe('holding', holdingTests)
+  describe('holding', toolDecisionHoldingTests)
   describe('decided calls', decidedCallsTests)
 })
 
@@ -629,7 +629,7 @@ function handingToAutoModeTests() {
   })
 }
 
-function holdingTests() {
+function toolDecisionHoldingTests() {
   it('still holds a destructive action when auto mode may not decide', () => {
     expect(decideTool(request({ input: { command: 'git reset --hard' } }))).toBeNull()
   })
@@ -771,11 +771,11 @@ function noOutputsAndTheShellTests() {
 }
 
 describe('pushing and opening pull requests', () => {
-  describe('refusals', refusalsTests)
+  describe('refusals', toolDecisionRefusalsTests)
   describe('other gh commands', otherGhCommandsTests)
 })
 
-function refusalsTests() {
+function toolDecisionRefusalsTests() {
   it("refuses the scribe's own pull request", () => {
     const command =
       'gh pr create --draft --base main --head foundry/wo-1008-1de --title "git integration: render sanitized HTML in comments and PR descriptions" --body-file "$S/pr-body.md" 2>&1 | tail -3'

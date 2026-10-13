@@ -21,12 +21,12 @@ function entry(
 }
 
 describe('queue', () => {
-  describe('ordering', orderingTests)
-  describe('base branches', baseBranchesTests)
+  describe('ordering', refineryOrderingTests)
+  describe('base branches', refineryBaseBranchesTests)
   describe('merged entries', mergedEntriesTests)
 })
 
-function orderingTests() {
+function refineryOrderingTests() {
   it('orders unmerged entries by agreedAt within a repo+base group, noting only overlaps behind', () => {
     const entries = [
       entry({ orderId: 'WO-1', agreedAt: '2026-09-01T00:00:00.000Z', files: ['a.ts'] }),
@@ -47,7 +47,7 @@ function orderingTests() {
   })
 }
 
-function baseBranchesTests() {
+function refineryBaseBranchesTests() {
   it('keeps different base branches in separate queues', () => {
     const entries = [
       entry({ orderId: 'WO-1', agreedAt: '2026-09-01T00:00:00.000Z', files: ['a.ts'] }),

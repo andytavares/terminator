@@ -4,11 +4,11 @@ import { render, screen } from '@testing-library/react'
 import { GateEvidence } from '../../src/components/GateEvidence'
 
 describe('GateEvidence', () => {
-  describe('the failed step', theFailedStepTests)
+  describe('the failed step', gateEvidenceTheFailedStepTests)
   describe('other evidence', otherEvidenceTests)
 })
 
-function theFailedStepTests() {
+function gateEvidenceTheFailedStepTests() {
   it('shows the failed step’s last lines, labelled in words', () => {
     render(
       <GateEvidence

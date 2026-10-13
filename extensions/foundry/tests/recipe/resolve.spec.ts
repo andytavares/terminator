@@ -49,12 +49,12 @@ afterEach(() => {
 })
 
 describe('resolveFile', () => {
-  describe('overrides', overridesTests)
+  describe('overrides', resolveOverridesTests)
   describe('names', namesTests)
   describe('the repository', theRepositoryTests)
 })
 
-function overridesTests() {
+function resolveOverridesTests() {
   it('finds a built-in when nothing else defines the name', () => {
     put(builtIn, 'recipes/direct', recipe('direct'))
     expect(resolveFile('recipes', 'direct', sources())?.rung).toBe('built-in')
@@ -244,7 +244,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 
 describe('checkRequirements', () => {
   describe('paths', pathsTests)
-  describe('toolchain', toolchainTests)
+  describe('toolchain', resolveToolchainTests)
   describe('counts and unknown kinds', countsAndUnknownKindsTests)
   describe('every unmet requirement', everyUnmetRequirementTests)
 })
@@ -268,7 +268,7 @@ function pathsTests() {
   })
 }
 
-function toolchainTests() {
+function resolveToolchainTests() {
   it('withholds a recipe needing a toolchain command this repository lacks', () => {
     const r = checkRequirements([{ kind: 'toolchain', value: 'test' }], order())
     expect(r.available).toBe(false)

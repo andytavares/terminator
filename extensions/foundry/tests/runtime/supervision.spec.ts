@@ -176,7 +176,7 @@ describe('the snapshot a surface reads', () => {
 
 describe('how it reaches git', () => {
   describe('the extension shell', theExtensionShellTests)
-  describe('the branch', theBranchTests)
+  describe('the branch', supervisionTheBranchTests)
   describe('no working copy', noWorkingCopyTests)
   describe('runs it does not have', runsItDoesNotHaveTests)
 })
@@ -203,7 +203,7 @@ function theExtensionShellTests() {
   })
 }
 
-function theBranchTests() {
+function supervisionTheBranchTests() {
   it('measures against the branch it was told to', async () => {
     const calls: string[][] = []
     const s = build({

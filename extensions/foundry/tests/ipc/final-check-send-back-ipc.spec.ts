@@ -22,65 +22,33 @@ import { raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { Evidence } from '../../src/verify/verdict.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
-
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn().mockReturnValue(false),
-    encryptString: vi.fn(),
-    decryptString: vi.fn(),
-  },
-}))
+import { theRunner } from '../helpers/supervision-mocks.js'
 
 /** Agents that start and never finish: the reopened nodes stay where they were put. */
-const runner = {
-  start: vi.fn(),
-  resolve: vi.fn(),
-  handBackToTerminal: vi.fn(),
-  interrupt: vi.fn(),
-  stop: vi.fn().mockReturnValue(true),
-  send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue(null),
-  watchable: vi.fn().mockReturnValue([]),
-  dispose: vi.fn(),
-}
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner,
-}))
-
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let host: FoundryHost
-const call = (channel: string, payload: unknown = {}) => host.call(channel, payload)
 // One order per test: the run a send-back resumes is still in flight when the
 // test ends, and this process runs one execution per order.
 let orderId = ''
 let orders = 0
-const orderDir = (): string => path.join(dataDir, 'orders', orderId)
+const orderFolder = (): string => path.join(dataDir, 'orders', orderId)
 
 const AT = '2026-09-06T10:00:00.000Z'
 
 /** Every node passed: the builder and the scribe wrote the work, the inspector read it. */
 function passedGraph(): RunGraph {
-  const passed = (id: string, over: Partial<RunNode>): RunNode =>
+  const passedAgentNode = (id: string, over: Partial<RunNode>): RunNode =>
     agentNode(id, { state: 'passed', attempts: 1, startedAt: AT, endedAt: AT, ...over })
   return {
     orderId,
     recipe: 'direct',
     nodes: [
-      passed('build:U-1', { stepId: 'build', role: 'builder', unitIds: ['U-1'], lane: 1 }),
-      passed('docs', { role: 'scribe', dependsOn: ['build:U-1'] }),
-      passed('inspect', { role: 'inspector', dependsOn: ['build:U-1'] }),
+      passedAgentNode('build:U-1', { stepId: 'build', role: 'builder', unitIds: ['U-1'], lane: 1 }),
+      passedAgentNode('docs', { role: 'scribe', dependsOn: ['build:U-1'] }),
+      passedAgentNode('inspect', { role: 'inspector', dependsOn: ['build:U-1'] }),
     ],
   }
 }
@@ -113,17 +81,17 @@ async function seedFailedFinalCheck(gates: readonly Gate[]): Promise<void> {
     recipe: 'direct',
     plan: { ...base.plan, units: [builderUnit('U-1', { title: 'the first bit' })] },
   })
-  fs.writeFileSync(path.join(orderDir(), 'run-graph.json'), JSON.stringify(passedGraph()))
-  fs.writeFileSync(path.join(orderDir(), 'gates.json'), JSON.stringify(gates))
+  fs.writeFileSync(path.join(orderFolder(), 'run-graph.json'), JSON.stringify(passedGraph()))
+  fs.writeFileSync(path.join(orderFolder(), 'gates.json'), JSON.stringify(gates))
 }
 
 /** The graph once the executor the resume hands it to has started the reopened nodes. */
-async function sentBack(): Promise<RunGraph> {
-  await vi.waitFor(() => expect(runner.start).toHaveBeenCalled())
-  return JSON.parse(fs.readFileSync(path.join(orderDir(), 'run-graph.json'), 'utf8')) as RunGraph
+async function graphOnceSentBack(): Promise<RunGraph> {
+  await vi.waitFor(() => expect(theRunner.start).toHaveBeenCalled())
+  return JSON.parse(fs.readFileSync(path.join(orderFolder(), 'run-graph.json'), 'utf8')) as RunGraph
 }
 
-const node = (graph: RunGraph, id: string): RunNode | undefined =>
+const nodeIn = (graph: RunGraph, id: string): RunNode | undefined =>
   graph.nodes.find((n) => n.id === id)
 
 beforeAll(async () => {
@@ -134,8 +102,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   orderId = `WO-${++orders}`
-  runner.start.mockReset()
-  runner.start.mockImplementation(() => new Promise(() => {}))
+  theRunner.start.mockReset()
+  theRunner.start.mockImplementation(() => new Promise(() => {}))
 })
 
 describe('sending a failed final check back', () => {
@@ -146,13 +114,13 @@ describe('sending a failed final check back', () => {
 function whoGetsItTests() {
   it('gives the failure to every node that wrote the work, and reopens what came after', async () => {
     await seedFailedFinalCheck([finalCheckGate('G-final', [])])
-    await call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
+    await host.call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
 
-    const graph = await sentBack()
-    expect(node(graph, 'build:U-1')?.feedback).toHaveLength(1)
-    expect(node(graph, 'docs')?.feedback).toHaveLength(1)
-    expect(node(graph, 'inspect')?.feedback).toEqual([])
-    expect(node(graph, 'inspect')?.state).not.toBe('passed')
+    const graph = await graphOnceSentBack()
+    expect(nodeIn(graph, 'build:U-1')?.feedback).toHaveLength(1)
+    expect(nodeIn(graph, 'docs')?.feedback).toHaveLength(1)
+    expect(nodeIn(graph, 'inspect')?.feedback).toEqual([])
+    expect(nodeIn(graph, 'inspect')?.state).not.toBe('passed')
   })
 
   it('counts the send-backs before this one, so the builder knows how often it has failed', async () => {
@@ -161,10 +129,10 @@ function whoGetsItTests() {
       decision: { option: 'send_back', by: 'operator' as const, at: AT, note: '' },
     }
     await seedFailedFinalCheck([earlier, finalCheckGate('G-final', [])])
-    await call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
+    await host.call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
 
-    const graph = await sentBack()
-    expect(node(graph, 'build:U-1')?.feedback[0]?.attempt).toBe(2)
+    const graph = await graphOnceSentBack()
+    expect(nodeIn(graph, 'build:U-1')?.feedback[0]?.attempt).toBe(2)
   })
 }
 
@@ -179,9 +147,9 @@ const FAILED_OUTPUT: Evidence = {
 function whatTheyAreToldTests() {
   it('hands over why the check failed with its output, exit code and log', async () => {
     await seedFailedFinalCheck([finalCheckGate('G-final', [FAILED_OUTPUT])])
-    await call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
+    await host.call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
 
-    expect(node(await sentBack(), 'build:U-1')?.feedback).toEqual([
+    expect(nodeIn(await graphOnceSentBack(), 'build:U-1')?.feedback).toEqual([
       {
         from: 'final check',
         attempt: 1,
@@ -196,9 +164,9 @@ function whatTheyAreToldTests() {
 
   it('hands over only why, when the check left no output', async () => {
     await seedFailedFinalCheck([finalCheckGate('G-final', [])])
-    await call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
+    await host.call('foundry:inbox.decide', { gateId: 'G-final', option: 'send_back' })
 
-    expect(node(await sentBack(), 'build:U-1')?.feedback[0]).toMatchObject({
+    expect(nodeIn(await graphOnceSentBack(), 'build:U-1')?.feedback[0]).toMatchObject({
       exitCode: null,
       excerpt: 'npm test failed on the merged lanes',
       logPath: null,
@@ -223,11 +191,11 @@ function stepGate(id: string): Gate {
 describe('sending a step back', () => {
   it('retries the step its gate names, and leaves the others as they were', async () => {
     await seedFailedFinalCheck([stepGate('G-step')])
-    await call('foundry:inbox.decide', { gateId: 'G-step', option: 'send_back' })
+    await host.call('foundry:inbox.decide', { gateId: 'G-step', option: 'send_back' })
 
-    const graph = await sentBack()
-    expect(node(graph, 'docs')?.state).not.toBe('passed')
-    expect(node(graph, 'docs')?.feedback).toEqual([])
-    expect(node(graph, 'build:U-1')?.state).toBe('passed')
+    const graph = await graphOnceSentBack()
+    expect(nodeIn(graph, 'docs')?.state).not.toBe('passed')
+    expect(nodeIn(graph, 'docs')?.feedback).toEqual([])
+    expect(nodeIn(graph, 'build:U-1')?.state).toBe('passed')
   })
 })

@@ -79,8 +79,8 @@ const AUTHOR = ['document'] as const
 
 describe('a document hand-back', () => {
   describe('declaring', declaringTests)
-  describe('accepting', acceptingTests)
-  describe('refusing', refusingTests)
+  describe('accepting', rungOutputAcceptingTests)
+  describe('refusing', rungOutputRefusingTests)
   describe('on the order', onTheOrderTests)
 })
 
@@ -100,7 +100,7 @@ function declaringTests() {
   })
 }
 
-function acceptingTests() {
+function rungOutputAcceptingTests() {
   it('takes a document with a location', () => {
     const parsed = parseRungOutput(
       { document: { path: '/o/answer.md', location: 'outputs' }, note: 'written' },
@@ -118,7 +118,7 @@ function acceptingTests() {
   })
 }
 
-function refusingTests() {
+function rungOutputRefusingTests() {
   it('refuses a document with no location, or one in a fourth place', () => {
     expect(() => parseRungOutput({ document: { path: 'a.md' } }, [...AUTHOR])).toThrow(
       RungOutputRejected
@@ -213,12 +213,12 @@ describe('rungOutputContract', () => {
 })
 
 describe('parseRungOutput', () => {
-  describe('keys', keysTests)
-  describe('findings', findingsTests)
+  describe('keys', rungOutputKeysTests)
+  describe('findings', rungOutputFindingsTests)
   describe('reopens', reopensTests)
 })
 
-function keysTests() {
+function rungOutputKeysTests() {
   it('takes what the role was entitled to write', () => {
     const parsed = parseRungOutput(
       { findings: { entryPoints: ['src/a.ts'], conventions: ['tokens'] }, note: 'read it' },
@@ -241,7 +241,7 @@ function keysTests() {
   })
 }
 
-function findingsTests() {
+function rungOutputFindingsTests() {
   it('refuses a finding with no text', () => {
     expect(() =>
       parseRungOutput({ redTeam: [{ severity: 'high', category: 'unprovable', text: '' }] }, [
@@ -286,12 +286,12 @@ function reopensTests() {
 describe('applyRungOutput', () => {
   describe('what the scout read', whatTheScoutReadTests)
   describe('reports only', reportsOnlyTests)
-  describe('red team findings', redTeamFindingsTests)
+  describe('red team findings', rungOutputRedTeamFindingsTests)
   describe('known findings', knownFindingsTests)
   describe('numbering', numberingTests)
   describe('non-blocking findings', nonBlockingFindingsTests)
   describe('review rounds', reviewRoundsTests)
-  describe('reopening', reopeningTests)
+  describe('reopening', rungOutputReopeningTests)
   describe('reopens without evidence', reopensWithoutEvidenceTests)
   describe('near-duplicates', nearDuplicatesTests)
   describe('a disagreeing architect', aDisagreeingArchitectTests)
@@ -338,7 +338,7 @@ function reportsOnlyTests() {
   })
 }
 
-function redTeamFindingsTests() {
+function rungOutputRedTeamFindingsTests() {
   it("puts the red team's findings where the structural ones go", () => {
     const after = applyRungOutput(order(), {
       role: 'red-team',
@@ -489,7 +489,7 @@ function redTeamWrote(before: WorkOrder, redTeam: unknown[]) {
   })
 }
 
-function reopeningTests() {
+function rungOutputReopeningTests() {
   it('reopens a settled finding when new evidence answers what settled it', () => {
     const after = redTeamWrote({ ...order(), redTeam: [SETTLED_FINDING] }, [
       {
@@ -648,14 +648,14 @@ describe('readRungOutput', () => {
     fs.rmSync(dir, { recursive: true, force: true })
   })
 
-  describe('reading', readingTests)
+  describe('reading', rungOutputReadingTests)
   describe('a passed-through round', aPassedThroughRoundTests)
   describe('the default round', theDefaultRoundTests)
   describe('clearing the file', clearingTheFileTests)
   describe('nothing or not JSON', nothingOrNotJsonTests)
 })
 
-function readingTests() {
+function rungOutputReadingTests() {
   it('reads what the rung wrote and puts it on the order', () => {
     fs.writeFileSync(
       file,

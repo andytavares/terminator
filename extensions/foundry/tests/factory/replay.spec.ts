@@ -8,6 +8,7 @@ import type { Gate } from '../../src/gates/rules.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
 import { partialFake } from '../../../../tests/support/fakes'
+import { pullRequestChecks } from '../helpers/hall-views.js'
 
 const REAL_TIMELINE = '/Users/atavares/repos/orders/WO-1006-6b5/run-timeline.jsonl'
 
@@ -95,11 +96,11 @@ function gate(raisedAt: number, decidedAt: number | null): Gate {
 }
 
 describe('observationAt', () => {
-  describe('frames', framesTests)
+  describe('frames', replayFramesTests)
   describe('tools, gates and liveness', toolsGatesAndLivenessTests)
 })
 
-function framesTests() {
+function replayFramesTests() {
   it('shows the states of the latest frame at or before the moment', () => {
     const at3 = observationAt({ timeline, gates: [], base }, 3000)
     expect(at3.graph.nodes.map((n) => [n.id, n.state])).toEqual([
@@ -214,22 +215,23 @@ describe('replayClock', () => {
   })
 })
 
-const pull = (buckets: ('pass' | 'pending')[]) => [
-  {
-    url: 'https://github.com/a/b/pull/1',
-    checks: buckets.map((bucket, i) => ({
-      name: `check-${i}`,
-      bucket,
-      link: '',
-      workflow: 'CI',
-    })),
-  },
-]
 const withCi: Timeline = {
   ...timeline,
   ci: [
-    { at: 5500, round: 0, max: 2, status: 'watching', pulls: pull(['pass', 'pending']) },
-    { at: 7500, round: 1, max: 2, status: 'green', pulls: pull(['pass', 'pass']) },
+    {
+      at: 5500,
+      round: 0,
+      max: 2,
+      status: 'watching',
+      pulls: [pullRequestChecks('https://github.com/a/b/pull/1', ['pass', 'pending'])],
+    },
+    {
+      at: 7500,
+      round: 1,
+      max: 2,
+      status: 'green',
+      pulls: [pullRequestChecks('https://github.com/a/b/pull/1', ['pass', 'pass'])],
+    },
   ],
 }
 

@@ -80,8 +80,8 @@ function agents(order: WorkOrder, name: string): string[] {
 
 describe('the shape WO-0907-3c1 would get now', () => {
   describe('the proposed shape and its cost', theProposedShapeAndItsCostTests)
-  describe('what it keeps', whatItKeepsTests)
-  describe('nodes', nodesTests)
+  describe('what it keeps', orderShapeWhatItKeepsTests)
+  describe('nodes', orderShapeNodesTests)
   describe('the standard shape and the architect', theStandardShapeAndTheArchitectTests)
 })
 
@@ -110,7 +110,7 @@ function theProposedShapeAndItsCostTests() {
   })
 }
 
-function whatItKeepsTests() {
+function orderShapeWhatItKeepsTests() {
   it('keeps every unit, because the plan is still what the builder is told to do', () => {
     const build = buildRunGraph(allTextRed(), recipe('direct')).nodes.find(
       (node) => node.stepId === 'build'
@@ -126,7 +126,7 @@ function whatItKeepsTests() {
   })
 }
 
-function nodesTests() {
+function orderShapeNodesTests() {
   it('is eight nodes end to end, where it was twenty-one', () => {
     const graph = buildRunGraph(allTextRed(), recipe('direct'))
     expect(graph.nodes.length).toBeLessThanOrEqual(8)

@@ -78,8 +78,8 @@ function graph(units = [unit('U-1'), unit('U-2'), unit('U-3')]): RunGraph {
 
 describe('readyNodes', () => {
   describe('readiness and the budget', readinessAndTheBudgetTests)
-  describe('dependencies', dependenciesTests)
-  describe('gates', gatesTests)
+  describe('dependencies', schedulerDependenciesTests)
+  describe('gates', schedulerGatesTests)
 })
 
 function readinessAndTheBudgetTests() {
@@ -98,7 +98,7 @@ function readinessAndTheBudgetTests() {
   })
 }
 
-function dependenciesTests() {
+function schedulerDependenciesTests() {
   it('does not offer a node whose dependency has not passed', () => {
     expect(readyNodes(graph(), BUDGETS).map((n) => n.id)).not.toContain('integrate')
   })
@@ -121,7 +121,7 @@ function dependenciesTests() {
   })
 }
 
-function gatesTests() {
+function schedulerGatesTests() {
   it('never counts a gate against the budget — it waits on a person, not an agent', () => {
     let g = graph([unit('U-1')])
     g = markPassed(g, 'build:U-1', 'now')
@@ -223,12 +223,12 @@ describe('blockedReason', () => {
 })
 
 describe('stalledWhy', () => {
-  describe('the failed step', theFailedStepTests)
+  describe('the failed step', schedulerTheFailedStepTests)
   describe('several or last failures', severalOrLastFailuresTests)
   describe('nothing failed', nothingFailedTests)
 })
 
-function theFailedStepTests() {
+function schedulerTheFailedStepTests() {
   it('names the failed step, why it failed, and everything held up behind it', () => {
     const g = markFailed(graph([unit('U-1')]), 'build:U-1', {
       at: 'at',

@@ -16,10 +16,8 @@ import type { FoundryHost } from './foundry-host.js'
 
 export { deactivate } from '../../src/index.ts'
 
-/**
- * Activates Foundry over the host and waits for the supervision runtime, so a
- * spec's first call finds the runner the way a call minutes after start does.
- */
+/** Activates Foundry over the host and waits for the supervision runtime, so a spec's first call
+ * finds the runner the way a call minutes after start does. */
 export async function activateFoundry(host: FoundryHost): Promise<void> {
   activate(host.api)
   await vi.waitFor(() => {

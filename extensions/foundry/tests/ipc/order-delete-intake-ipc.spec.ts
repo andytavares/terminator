@@ -18,45 +18,13 @@ import { activateFoundry } from '../helpers/foundry-activation.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
 
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn().mockReturnValue(false),
-    encryptString: vi.fn(),
-    decryptString: vi.fn(),
-  },
-}))
-
-const runner = {
-  start: vi.fn(),
-  resolve: vi.fn(),
-  handBackToTerminal: vi.fn(),
-  interrupt: vi.fn(),
-  stop: vi.fn().mockReturnValue(true),
-  send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue(null),
-  watchable: vi.fn().mockReturnValue([]),
-  dispose: vi.fn(),
-}
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner,
-}))
-
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let host: FoundryHost
-const call = (channel: string, payload: unknown = {}) => host.call(channel, payload)
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -82,9 +50,10 @@ type Started = {
 }
 
 beforeEach(() => {
-  runner.start.mockReset()
-  runner.start.mockImplementation(async (input: Started) => {
-    const sessionId = `session-${runner.start.mock.calls.length}`
+  theRunner.start.mockReset()
+  theRunner.start.mockImplementation(async (...args: unknown[]) => {
+    const input = args[0] as Started
+    const sessionId = `session-${theRunner.start.mock.calls.length}`
     input.onRegistered?.({ sessionId })
     return { sessionId }
   })
@@ -96,17 +65,17 @@ describe('deleting an order while its scout is still reading', () => {
     await createOrderStore(dataDir).save(order())
 
     // The architect starts at seed, beside the scout rather than after it.
-    await call('foundry:order.converge', { id: 'WO-1' })
-    expect(runner.start).toHaveBeenCalledTimes(2)
-    const started = runner.start.mock.calls.map((c) => c[0] as Started)
+    await host.call('foundry:order.converge', { id: 'WO-1' })
+    expect(theRunner.start).toHaveBeenCalledTimes(2)
+    const started = theRunner.start.mock.calls.map((c) => c[0] as Started)
 
-    await call('foundry:order.delete', { id: 'WO-1' })
+    await host.call('foundry:order.delete', { id: 'WO-1' })
     // Deleting the project closes both terminals.
     for (const run of started) run.onEnd?.(0)
     // What would follow is a chain of file reads and writes; let it run out.
     await new Promise((settle) => setTimeout(settle, 200))
 
-    expect(runner.start).toHaveBeenCalledTimes(2)
+    expect(theRunner.start).toHaveBeenCalledTimes(2)
     expect(fs.existsSync(path.join(dataDir, 'orders', 'WO-1'))).toBe(false)
   })
 })

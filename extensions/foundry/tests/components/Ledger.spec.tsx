@@ -218,9 +218,9 @@ function countsAndEmptyTests() {
 }
 
 describe('asking what it keeps rejecting (FR-076)', () => {
-  describe('asking', askingTests)
+  describe('asking', ledgerAskingTests)
   describe('citations and threshold', citationsAndThresholdTests)
-  describe('accepting', acceptingTests)
+  describe('accepting', ledgerAcceptingTests)
   describe('declining and refusals', decliningAndRefusalsTests)
 })
 
@@ -236,7 +236,7 @@ const IN_FORCE = {
   declined: [],
 }
 
-function askingTests() {
+function ledgerAskingTests() {
   it('proposes nothing until asked', async () => {
     mount({ proposals: [PROPOSAL] })
     await waitFor(() => screen.getByText('G-1'))
@@ -272,7 +272,7 @@ function citationsAndThresholdTests() {
   })
 }
 
-function acceptingTests() {
+function ledgerAcceptingTests() {
   it('accepts one, and says what that means', async () => {
     mount({ proposals: [PROPOSAL] })
     await waitFor(() => screen.getByText('G-1'))
@@ -433,12 +433,12 @@ function tileValue(label: string): string | null {
 }
 
 describe('the Factory view (FR: the factory’s numbers)', () => {
-  describe('switching', switchingTests)
+  describe('switching', ledgerSwitchingTests)
   describe('null numbers', nullNumbersTests)
-  describe('windows', windowsTests)
+  describe('windows', ledgerWindowsTests)
 })
 
-function switchingTests() {
+function ledgerSwitchingTests() {
   it('stays on Record until asked', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
@@ -482,7 +482,7 @@ function nullNumbersTests() {
   })
 }
 
-function windowsTests() {
+function ledgerWindowsTests() {
   it('refetches with the chosen window', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))

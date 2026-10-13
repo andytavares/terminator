@@ -3,12 +3,8 @@ import { render, waitFor } from '@testing-library/react'
 import React from 'react'
 import { Floor } from '../../src/components/Floor.js'
 
-// What an open Floor costs the main process while nothing is happening: how
-// many bridge calls it makes in a minute, and of what. Run it on its own with
-//
-//   npx vitest run extensions/foundry/tests/components/floor-ipc-load.spec.tsx
-//
-// to see the counts printed per channel.
+// The bridge calls an idle open Floor makes in a minute, per channel. Run this file on its
+// own (`npx vitest run <this file>`) to see the counts printed.
 
 const RUNNING_NODE = {
   id: 'N-1',

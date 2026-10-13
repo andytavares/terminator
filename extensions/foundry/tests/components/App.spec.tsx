@@ -6,6 +6,7 @@ import '../helpers/app-views.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 import { partialFake } from '../../../../tests/support/fakes'
+import { timesInvoked } from '../helpers/bridge-calls.js'
 
 // Two surfaces and a way into settings. The board, the card drawer, the phase
 // rail and the ticket importer are gone with the pipeline underneath them, so
@@ -61,7 +62,7 @@ function compiledShapingOrder() {
   return { order: shapingOrder, compile: compileOrder(shapingOrder) }
 }
 
-function setView(payload: unknown) {
+function setViewReply(payload: unknown) {
   const view = (payload as { view?: string }).view
   currentView = view === 'factory' ? 'factory' : 'list'
   return { view: currentView }
@@ -82,7 +83,7 @@ const replies: Record<string, (payload: unknown) => unknown> = {
   }),
   'foundry:ui.consume-pending-new-order': () => ({ pending: pendingNewOrder }),
   'foundry:ui.view': () => ({ view: currentView }),
-  'foundry:ui.set-view': setView,
+  'foundry:ui.set-view': setViewReply,
   'foundry:run.observe': observedRun,
   'foundry:run.activity': () => ({ activity: {} }),
   'foundry:permissions-list': () => ({ pending: [] }),
@@ -149,7 +150,7 @@ const WORKING_ROW = {
   risk: 'low',
   failures: 0,
   source: { kind: 'typed', tracker: null, key: null },
-  standing: standingOf({
+  standing: stepStanding({
     kind: 'working',
     turn: 'foundry',
     label: 'building',
@@ -158,7 +159,7 @@ const WORKING_ROW = {
 }
 
 /** A standing for one step, with no gate unless one is named. */
-function standingOf(over: {
+function stepStanding(over: {
   kind: string
   turn: string
   label: string
@@ -183,7 +184,7 @@ describe('App', () => {
   describe('the Forge', theForgeTests)
   describe('what is waiting', whatIsWaitingTests)
   describe('the surface showing', theSurfaceShowingTests)
-  describe('settings', settingsTests)
+  describe('settings', appSettingsTests)
   describe('leaving settings', leavingSettingsTests)
   describe('a waiting order', aWaitingOrderTests)
   describe('a workspace change', aWorkspaceChangeTests)
@@ -254,7 +255,7 @@ function theSurfaceShowingTests() {
   })
 }
 
-function settingsTests() {
+function appSettingsTests() {
   it('opens settings and comes back', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
@@ -374,31 +375,29 @@ async function keepsTheLastCountWhenAReadFails(): Promise<void> {
 }
 
 describe('the counts on the chrome', () => {
-  const asked = () => mockBridgeInvoke.mock.calls.filter((c) => c[0] === 'foundry:attention')
-
   it('are read on mount, then again only when Foundry says something changed', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     render(<App />)
-    await waitFor(() => expect(asked()).toHaveLength(1))
+    await waitFor(() => expect(timesInvoked(mockBridgeInvoke, 'foundry:attention')).toBe(1))
 
     await vi.advanceTimersByTimeAsync(60_000)
-    expect(asked()).toHaveLength(1)
+    expect(timesInvoked(mockBridgeInvoke, 'foundry:attention')).toBe(1)
     vi.useRealTimers()
 
     everyHandler['foundry:changed'].forEach((handler) =>
       handler({ kind: 'gates', orderId: 'WO-1' })
     )
-    await waitFor(() => expect(asked()).toHaveLength(2))
+    await waitFor(() => expect(timesInvoked(mockBridgeInvoke, 'foundry:attention')).toBe(2))
   })
 
   it('leave the last count up when a later read fails', keepsTheLastCountWhenAReadFails)
 
   it('are read again when the workspace switches, which writes nothing to say so', async () => {
     render(<App />)
-    await waitFor(() => expect(asked()).toHaveLength(1))
+    await waitFor(() => expect(timesInvoked(mockBridgeInvoke, 'foundry:attention')).toBe(1))
 
     everyHandler['workspace:changed'].forEach((handler) => handler({ repoRoot: '/other' }))
-    await waitFor(() => expect(asked()).toHaveLength(2))
+    await waitFor(() => expect(timesInvoked(mockBridgeInvoke, 'foundry:attention')).toBe(2))
   })
 })
 
@@ -472,7 +471,7 @@ function anEarlierRequestTests() {
 // exactly as they did before this feature.
 describe('the Factory view toggle', () => {
   describe('where it is offered and starts', whereItIsOfferedAndStartsTests)
-  describe('switching', switchingTests)
+  describe('switching', appSwitchingTests)
   describe('opening orders', openingOrdersTests)
   describe('a shaping order', aShapingOrderTests)
   describe('flipping back', flippingBackTests)
@@ -501,7 +500,7 @@ function whereItIsOfferedAndStartsTests() {
   })
 }
 
-function switchingTests() {
+function appSwitchingTests() {
   it('switches to the hall grid and persists the choice', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
@@ -639,7 +638,7 @@ function aGatedHallTests() {
   // sends you anywhere to find it.
   it('keeps a gated hall under the queue that answers it', async () => {
     inboxWaiting = [waitingRow]
-    observeStanding = standingOf({
+    observeStanding = stepStanding({
       kind: 'halted',
       turn: 'you',
       label: 'halted',
@@ -655,7 +654,7 @@ function aGatedHallTests() {
 
 function aHallBandWithoutAGateTests() {
   it('opens a hall band with no gate behind it in the List view', async () => {
-    observeStanding = standingOf({
+    observeStanding = stepStanding({
       kind: 'adrift',
       turn: 'you',
       label: 'adrift',

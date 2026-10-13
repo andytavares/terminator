@@ -36,7 +36,7 @@ const exec: ShellExec = ({ command, args, cwd }) =>
     })
   })
 
-function git(...args: string[]): void {
+function gitInLive(...args: string[]): void {
   gitIn(LIVE, ...args)
 }
 
@@ -63,7 +63,7 @@ const READ_TTL = builderUnit('U-1', {
   touches: ['src/session.js'],
 })
 
-function order(): WorkOrder {
+function liveOrder(): WorkOrder {
   const base = draftOrder({
     id: 'WO-LIVE-1',
     title: 'Read the session TTL from configuration',
@@ -101,35 +101,26 @@ function sessionSource(): string {
   ].join('\n')
 }
 
-/**
- * A real change on a real branch **in a real worktree**, because that is
- * where a builder leaves it — and where shipping has to look for it. This
- * used to commit in the repository itself, which is the shape the bug had:
- * `shipOrder` pushed `HEAD:<branch>` from `context.repos[].path`, where
- * `main` is checked out, so the branch reached the remote at the commit it
- * was cut from and GitHub said "No commits between main and <branch>". The
- * test passed throughout, because it had put the work where the bug looked.
- */
+/** A real change on a real branch in a real worktree, where a builder leaves it and shipping must
+ * look. Committing in the repository itself hid the "No commits between" bug
+ * (docs/ARCHITECTURE.md, "Every command runs in the lane's worktree"). */
 function commitTheChangeInAWorktree(): void {
   dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-'))
   branch = `foundry/live-${Date.now().toString(36)}`
-  git('fetch', 'origin')
-  const worktree = checkoutPath(dataRoot, order(), order().context.repos[0].name)
+  gitInLive('fetch', 'origin')
+  const worktree = checkoutPath(dataRoot, liveOrder(), liveOrder().context.repos[0].name)
   fs.mkdirSync(path.dirname(worktree), { recursive: true })
-  git('worktree', 'add', '-b', branch, worktree, 'origin/main')
+  gitInLive('worktree', 'add', '-b', branch, worktree, 'origin/main')
   fs.writeFileSync(path.join(worktree, 'src', 'session.js'), sessionSource())
   gitIn(worktree, 'add', '-A')
   gitIn(worktree, 'commit', '-m', 'read the session TTL from the environment')
 }
 
-/**
- * vitest.live.config.ts has no tests/setup.ts, so this spec removes its own
- * directory. The worktree inside it is registered in the live checkout;
- * `git worktree prune` drops that record once the directory is gone.
- */
+/** vitest.live.config.ts has no tests/setup.ts, so this spec removes its own directory, and
+ * `git worktree prune` drops the live checkout's record of the worktree inside it. */
 function removeTheLiveRecords(): void {
   fs.rmSync(dataRoot, { recursive: true, force: true })
-  git('worktree', 'prune')
+  gitInLive('worktree', 'prune')
 }
 
 /** A verified change: the one criterion passed, lint and the unit's tests passed. */
@@ -177,18 +168,12 @@ const PASSED_LADDER: Shipment['ladder'] = {
   ok: true,
 }
 
-/**
- * The real writer, not a spy. `integrateDepsFor` filed every shipping entry
- * under `orderId: subject`, and `ship.draft_opened`'s subject is the pull
- * request URL — so the entry that says the Line did its job went to
- * `orders/https:/github.com/owner/repo/pull/8/ledger.jsonl` and the order's
- * own ledger never mentioned the draft. A spy for `record` cannot see that:
- * it is handed the arguments, not the file.
- */
+/** The real writer, not a spy: a spy on `record` sees the arguments, not the file an entry lands
+ * in (docs/ARCHITECTURE.md, "The ledger"). */
 async function recordInTheLedger(action: string, subject: string, reason: string) {
   await createOrderStore(dataRoot).record({
     at: new Date().toISOString(),
-    orderId: order().id,
+    orderId: liveOrder().id,
     actor: 'rule:ship',
     action,
     subject,
@@ -236,7 +221,7 @@ async function viewOnGitHub(url: string): Promise<PullView> {
 
 async function opensADraftGitHubCanShowBack(): Promise<void> {
   const raised: Gate[] = []
-  const result = await shipOrder(order(), verifiedShipment(), liveShipDeps(raised))
+  const result = await shipOrder(liveOrder(), verifiedShipment(), liveShipDeps(raised))
 
   expect(result.pulls, `shipOrder reported: ${JSON.stringify(result)}`).toHaveLength(1)
   const pull = result.pulls[0]
@@ -300,14 +285,9 @@ async function marksTheDraftReady(): Promise<void> {
 }
 
 async function recordsTheDraftInTheOrdersLedger(): Promise<void> {
-  // The entry that says the Line did the thing it exists to do. Its subject
-  // is the pull request URL, and filing by subject built a directory tree
-  // out of one:
-  //
-  //   orders/https:/github.com/owner/repo/pull/8/ledger.jsonl
-  //
-  // while the order's ledger said nothing about the draft it had opened.
-  const ledger = path.join(dataRoot, 'orders', order().id, 'ledger.jsonl')
+  // `ship.draft_opened`'s subject is the pull request URL; filing by subject once put it in
+  // `orders/https:/github.com/…/ledger.jsonl`, not here (docs/ARCHITECTURE.md, "The ledger").
+  const ledger = path.join(dataRoot, 'orders', liveOrder().id, 'ledger.jsonl')
   expect(fs.existsSync(ledger), 'the order has no ledger').toBe(true)
   const actions = fs
     .readFileSync(ledger, 'utf8')
@@ -319,7 +299,7 @@ async function recordsTheDraftInTheOrdersLedger(): Promise<void> {
 
   // And no order directory named after anything but an order.
   const orders = fs.readdirSync(path.join(dataRoot, 'orders'))
-  expect(orders, 'a ledger was filed somewhere that is not an order').toEqual([order().id])
+  expect(orders, 'a ledger was filed somewhere that is not an order').toEqual([liveOrder().id])
 }
 
 describe.skipIf(LIVE === '')('shipping, for real', () => {

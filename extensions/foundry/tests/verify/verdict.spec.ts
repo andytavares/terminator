@@ -25,9 +25,9 @@ function base() {
 describe('makeVerdict', () => {
   describe('passes', passesTests)
   describe('the working session', theWorkingSessionTests)
-  describe('no session', noSessionTests)
+  describe('no session', verdictNoSessionTests)
   describe('citations', citationsTests)
-  describe('not measured', notMeasuredTests)
+  describe('not measured', verdictNotMeasuredTests)
 })
 
 function verdict(criterionId: string, result: Verdict['result']): Verdict {
@@ -81,7 +81,7 @@ function theWorkingSessionTests() {
   })
 }
 
-function noSessionTests() {
+function verdictNoSessionTests() {
   it('allows a verdict when the work had no session of its own', () => {
     expect(() =>
       makeVerdict({
@@ -120,7 +120,7 @@ function citationsTests() {
   })
 }
 
-function notMeasuredTests() {
+function verdictNotMeasuredTests() {
   it('allows "not measured" to cite nothing, because there was nothing to cite', () => {
     const v = makeVerdict({
       ...base(),
@@ -139,10 +139,10 @@ function notMeasuredTests() {
 }
 
 describe('summarise', () => {
-  describe('summaries', summariesTests)
+  describe('summaries', verdictSummariesTests)
 })
 
-function summariesTests() {
+function verdictSummariesTests() {
   it('counts each kind', () => {
     const s = summarise([
       verdict('AC-1', 'pass'),
@@ -169,12 +169,12 @@ function summariesTests() {
 }
 
 describe('verdictFromExit', () => {
-  describe('exit statuses', exitStatusesTests)
+  describe('exit statuses', verdictExitStatusesTests)
   describe('output', outputTests)
   describe('judging itself', judgingItselfTests)
 })
 
-function exitStatusesTests() {
+function verdictExitStatusesTests() {
   it('passes on a zero exit', () => {
     const v = verdictFromExit({ ...base(), command: 'npm test', exitCode: 0 })
     expect(v.result).toBe('pass')

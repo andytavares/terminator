@@ -3,7 +3,7 @@ import { roleStyle } from '../../../src/factory/art/palette.js'
 
 describe('factory/art/palette roleStyle', () => {
   describe('hats, visors and hair', hatsVisorsAndHairTests)
-  describe('fallbacks', fallbacksTests)
+  describe('fallbacks', paletteFallbacksTests)
 })
 
 function hatsVisorsAndHairTests() {
@@ -31,7 +31,7 @@ function hatsVisorsAndHairTests() {
   })
 }
 
-function fallbacksTests() {
+function paletteFallbacksTests() {
   it('falls back to a neutral silhouette for an unknown role', () => {
     const known = ['builder', 'verifier', 'inspector', 'architect', 'author', 'scribe', 'scout']
     const unknown = roleStyle('unlisted')

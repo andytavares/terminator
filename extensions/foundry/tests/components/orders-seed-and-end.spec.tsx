@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { Orders } from '../../src/components/Orders.js'
+import { payloadsSentOn } from '../helpers/bridge-calls.js'
 
 // The two ends of an order's life on this surface: starting one from a ticket
 // picked from your own, and getting rid of one that is open. Each goes through
@@ -10,11 +11,8 @@ import { Orders } from '../../src/components/Orders.js'
 type Answer = (payload: Record<string, unknown>) => unknown
 let invoke = vi.fn()
 
-/**
- * Renders the surface over channels answered by `answers`. A channel left out
- * never answers, which is what keeps the Forge and the Floor at their loading
- * lines while this surface is what is under test.
- */
+// Renders the surface over channels answered by `answers`. A channel left out never
+// answers, which keeps the Forge and the Floor at their loading lines.
 function mount(answers: Record<string, Answer>, props: Record<string, unknown> = {}): void {
   invoke = vi.fn(async (channel: string, payload: Record<string, unknown> = {}) => {
     const answer = answers[channel]
@@ -27,9 +25,6 @@ function mount(answers: Record<string, Answer>, props: Record<string, unknown> =
   })
   render(<Orders repoRoot="/repos/app" {...props} />)
 }
-
-const calls = (channel: string) =>
-  invoke.mock.calls.filter(([c]) => c === channel).map(([, payload]) => payload)
 
 function row(over: Record<string, unknown> = {}) {
   return {
@@ -73,7 +68,7 @@ function pickingTests() {
   it('makes a tracker order from the ticket and opens it', async () => {
     await pickTicket({ 'foundry:order.create': () => ({ order: row({ id: 'WO-7' }) }) })
     await screen.findByRole('button', { name: 'All orders' })
-    expect(calls('foundry:order.create')).toEqual([
+    expect(payloadsSentOn(invoke, 'foundry:order.create')).toEqual([
       { source: { kind: 'tracker', tracker: 'linear', key: 'TAV-14' }, repoPaths: ['/repos/app'] },
     ])
   })
@@ -104,12 +99,15 @@ function searchingTests() {
     await screen.findByRole('button', { name: /TAV-14/ })
     const search = screen.getByLabelText('Search your tickets')
     fireEvent.change(search, { target: { value: 'ledger' } })
-    expect(calls('foundry:issues.mine')).toEqual([{ term: '' }])
+    expect(payloadsSentOn(invoke, 'foundry:issues.mine')).toEqual([{ term: '' }])
     fireEvent.keyDown(search, { key: 'a' })
     fireEvent.keyDown(search, { key: 'Enter' })
     fireEvent.click(screen.getByRole('button', { name: 'Find' }))
-    await waitFor(() => expect(calls('foundry:issues.mine')).toHaveLength(3))
-    expect(calls('foundry:issues.mine').slice(1)).toEqual([{ term: 'ledger' }, { term: 'ledger' }])
+    await waitFor(() => expect(payloadsSentOn(invoke, 'foundry:issues.mine')).toHaveLength(3))
+    expect(payloadsSentOn(invoke, 'foundry:issues.mine').slice(1)).toEqual([
+      { term: 'ledger' },
+      { term: 'ledger' },
+    ])
   })
 }
 
@@ -145,7 +143,7 @@ function nothingToPickTests() {
 describe('an open order', () => {
   describe('the way back', theWayBackTests)
   describe('discarding', discardingTests)
-  describe('deleting', deletingTests)
+  describe('deleting', ordersSeedAndEndDeletingTests)
 })
 
 function openOn(status: string, answers: Record<string, Answer> = {}): void {
@@ -166,7 +164,7 @@ function theWayBackTests() {
     openOn('draft')
     fireEvent.click(await screen.findByRole('button', { name: 'All orders' }))
     await screen.findByRole('heading', { name: /Orders/ })
-    expect(calls('foundry:order.list').length).toBeGreaterThan(1)
+    expect(payloadsSentOn(invoke, 'foundry:order.list').length).toBeGreaterThan(1)
   })
 }
 
@@ -175,13 +173,13 @@ function discardingTests() {
     openOn('draft', { 'foundry:order.cancel': () => ({}) })
     fireEvent.click(await screen.findByRole('button', { name: 'Discard this order' }))
     await screen.findByRole('heading', { name: /Orders/ })
-    expect(calls('foundry:order.cancel')).toEqual([{ id: 'WO-1' }])
+    expect(payloadsSentOn(invoke, 'foundry:order.cancel')).toEqual([{ id: 'WO-1' }])
   })
 
   it('stays open when the discard is refused, and the list says why', async () => {
     openOn('draft', { 'foundry:order.cancel': () => ({ error: 'It is running.' }) })
     fireEvent.click(await screen.findByRole('button', { name: 'Discard this order' }))
-    await waitFor(() => expect(calls('foundry:order.cancel')).toHaveLength(1))
+    await waitFor(() => expect(payloadsSentOn(invoke, 'foundry:order.cancel')).toHaveLength(1))
     await backToTheList()
     await screen.findByText('It is running.')
   })
@@ -199,12 +197,12 @@ async function confirmDelete(): Promise<void> {
   fireEvent.click(await screen.findByRole('button', { name: 'Delete it and everything it made' }))
 }
 
-function deletingTests() {
+function ordersSeedAndEndDeletingTests() {
   it('deletes the order, whatever its status, and goes back to the list', async () => {
     openOn('running', { 'foundry:order.delete': () => ({}) })
     await confirmDelete()
     await screen.findByRole('heading', { name: /Orders/ })
-    expect(calls('foundry:order.delete')).toEqual([{ id: 'WO-1' }])
+    expect(payloadsSentOn(invoke, 'foundry:order.delete')).toEqual([{ id: 'WO-1' }])
   })
 
   it('stays open after a partial teardown, and the list says what it left behind', async () => {
@@ -212,7 +210,7 @@ function deletingTests() {
       'foundry:order.delete': () => ({ failed: ['branch foundry/WO-1', 'worktree lane-1'] }),
     })
     await confirmDelete()
-    await waitFor(() => expect(calls('foundry:order.delete')).toHaveLength(1))
+    await waitFor(() => expect(payloadsSentOn(invoke, 'foundry:order.delete')).toHaveLength(1))
     await backToTheList()
     await screen.findByText('branch foundry/WO-1; worktree lane-1')
   })
@@ -220,7 +218,7 @@ function deletingTests() {
   it('says the refusal rather than what was left, when the delete is refused', async () => {
     openOn('draft', { 'foundry:order.delete': () => ({ error: 'No such order.', failed: ['x'] }) })
     await confirmDelete()
-    await waitFor(() => expect(calls('foundry:order.delete')).toHaveLength(1))
+    await waitFor(() => expect(payloadsSentOn(invoke, 'foundry:order.delete')).toHaveLength(1))
     await backToTheList()
     await screen.findByText('No such order.')
   })

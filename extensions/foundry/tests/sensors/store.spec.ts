@@ -37,7 +37,7 @@ function signal(overrides: Partial<Signal> = {}): Signal {
 
 describe('createSignalStore', () => {
   describe('saving and listing', savingAndListingTests)
-  describe('skipping', skippingTests)
+  describe('skipping', storeSkippingTests)
   describe('getting and empty state', gettingAndEmptyStateTests)
   describe('merging state', mergingStateTests)
   describe('the signals directory', theSignalsDirectoryTests)
@@ -69,7 +69,7 @@ function savingAndListingTests() {
   })
 }
 
-function skippingTests() {
+function storeSkippingTests() {
   it('skips an identical save, appending nothing', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)

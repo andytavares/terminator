@@ -14,6 +14,7 @@ import { decideTool } from '../../src/runtime/tool-decision.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { writeFileWithDirs } from '../helpers/files.js'
 
 // The whole chain, with the real role files and the real policy.
 //
@@ -93,13 +94,9 @@ function order(): WorkOrder {
   }
 }
 
-/**
- * The whole of `index.ts`'s `collect`, over a real role registry.
- *
- * Written out rather than mocked, because a stub here would prove the shape
- * of a call and not the behaviour — which is exactly how twelve mechanisms
- * once passed their tests while being called by nothing.
- */
+/** The whole of `index.ts`'s `collect`, over a real role registry. Not mocked: a stub proves the
+ * shape of a call, not the behaviour, which is how twelve mechanisms once passed their tests while
+ * called by nothing (specs/037-foundry-software-factory/tasks.md, T144). */
 function collectorFor(sources: Sources) {
   const roles = createRoleRegistry(sources)
   let saved: WorkOrder | null = null
@@ -160,11 +157,8 @@ function runOrder(
   )
 }
 
-/**
- * The write the agent is about to make, put through the decision it would
- * actually meet. A refusal here is the live defect: an agent told to write a
- * file it is not allowed to write.
- */
+/** The write the agent is about to make, put through the decision it would actually meet. A refusal
+ * here is the live defect: an agent told to write a file it is not allowed to write. */
 function expectMayWriteItsOutput(
   input: AgentInput & { outputPath: string },
   roles: ReturnType<typeof createRoleRegistry>
@@ -198,15 +192,8 @@ const SCOUT_ANSWER = {
   note: 'four colour authorities, not one',
 }
 
-function writeJson(file: string, value: unknown): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  fs.writeFileSync(file, JSON.stringify(value))
-}
-
-/**
- * An agent that does exactly what its brief says, and nothing else: it finds
- * the path in the contract and writes the JSON the contract shows.
- */
+/** An agent that does exactly what its brief says, and nothing else: it finds the path in the
+ * contract and writes the JSON the contract shows. */
 function briefFollowingAgent(prompts: Map<string, string>) {
   const roles = createRoleRegistry({ dataRoot, repoPaths: [repo], builtInDir })
   return async (input: AgentInput): Promise<StartedRun> => {
@@ -214,7 +201,7 @@ function briefFollowingAgent(prompts: Map<string, string>) {
     if (input.outputPath !== null) {
       expectMayWriteItsOutput({ ...input, outputPath: input.outputPath }, roles)
       const answer = input.node.id === 'scout' ? SCOUT_ANSWER : { note: 'nothing to add' }
-      writeJson(input.outputPath, answer)
+      writeFileWithDirs(input.outputPath, answer)
     }
     return { sessionId: `sess-${input.node.id}`, exitCode: 0 }
   }
@@ -235,7 +222,7 @@ const UNPROVABLE_CHALLENGE = {
 /** An agent whose challenge rung says the order is wrong; every other rung writes nothing. */
 async function challengingAgent(input: AgentInput): Promise<StartedRun> {
   if (input.node.id === 'challenge' && input.outputPath !== null) {
-    writeJson(input.outputPath, UNPROVABLE_CHALLENGE)
+    writeFileWithDirs(input.outputPath, UNPROVABLE_CHALLENGE)
   }
   return { sessionId: `sess-${input.node.id}`, exitCode: 0 }
 }

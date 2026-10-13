@@ -11,22 +11,11 @@ import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
+import { ledgerActions } from '../helpers/order-ledger.js'
 
-const userData = vi.hoisted(() => ({ path: '' }))
-const runner = vi.hoisted(() => ({ current: null as unknown }))
-
-vi.mock('electron', () => ({ app: { getPath: () => userData.path } }))
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner.current,
-}))
-vi.mock('../../src/runtime/control-server.js', async () => {
-  const { quietControlServer } = await import('../helpers/foundry-host.js')
-  return { createControlServer: async () => quietControlServer() }
-})
-
-const { fakeRunner } = await import('../helpers/foundry-host.js')
-const theRunner = fakeRunner()
-runner.current = theRunner
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 const { runtime, stallFirings } = await import('../../src/runtime/runtime-state.ts')
 const { startPaletteRefresh, stopPaletteRefresh } = await import(
@@ -38,7 +27,6 @@ let dataDir = ''
 let host: FoundryHost
 
 beforeAll(async () => {
-  userData.path = temporaryDirectory('fdry-userdata')
   vi.stubEnv('HOME', temporaryDirectory('fdry-home'))
   host = fakeHost(() => dataDir)
   await activateFoundry(host)
@@ -78,10 +66,6 @@ function heldCall(requestId: string, questions?: Array<{ question: string; optio
     at: Date.now(),
     featureDir: orderDir(dataDir, 'WO-1'),
   }
-}
-
-async function ledger(): Promise<string[]> {
-  return (await createOrderStore(dataDir).entries('WO-1')).map((entry) => entry.action)
 }
 
 describe('a held tool call', () => {
@@ -134,7 +118,7 @@ function questionsAndWordsTests() {
       id: 'WO-1',
       root: dataDir,
     })
-    await vi.waitFor(async () => expect(await ledger()).toContain('intake.defect'))
+    await vi.waitFor(async () => expect(await ledgerActions(dataDir)).toContain('intake.defect'))
     noteResolved('req-2')
   })
 
@@ -188,9 +172,9 @@ function handingBackTests() {
 
 describe('the actions on one run', () => {
   describe('the terminal', theTerminalTests)
-  describe('the transcript', theTranscriptTests)
+  describe('the transcript', supervisionConsoleTheTranscriptTests)
   describe('redirecting and interrupting', redirectingAndInterruptingTests)
-  describe('stopping', stoppingTests)
+  describe('stopping', supervisionConsoleStoppingTests)
 })
 
 function theTerminalTests() {
@@ -209,7 +193,7 @@ function theTerminalTests() {
   })
 }
 
-function theTranscriptTests() {
+function supervisionConsoleTheTranscriptTests() {
   it('reads what the agent was doing from its transcript, and nothing for a run it does not know', async () => {
     const transcript = path.join(dataDir, 'transcript.jsonl')
     fs.writeFileSync(
@@ -252,7 +236,7 @@ function redirectingAndInterruptingTests() {
   })
 }
 
-function stoppingTests() {
+function supervisionConsoleStoppingTests() {
   it('stops a run and keeps it in the history as stopped', async () => {
     registerRun('stopped-1')
     expect(
@@ -314,7 +298,7 @@ describe('a run that stops making progress', () => {
 function shadowModeTests() {
   it('in shadow mode is recorded on the order and listed, and interrupts nobody', async () => {
     watchStalledRun('quiet-1')
-    await vi.waitFor(async () => expect(await ledger()).toContain('run.stalled'))
+    await vi.waitFor(async () => expect(await ledgerActions(dataDir)).toContain('run.stalled'))
     const listed = (await host.call('foundry:stalls-list')) as {
       firings: Array<{ firing: { sessionId: string; signal: string }; shadow: boolean }>
       shadowMode: boolean
@@ -374,7 +358,7 @@ function outsideAnOrderTests() {
     ] as never)
     runtime.stallWatcher?.tick()
     expect(stallFirings[0].firing.sessionId).toBe('loose-1')
-    expect(await ledger()).not.toContain('run.stalled')
+    expect(await ledgerActions(dataDir)).not.toContain('run.stalled')
   })
 }
 

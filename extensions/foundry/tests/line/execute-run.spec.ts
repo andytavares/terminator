@@ -7,33 +7,24 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { fakeHost, temporaryDirectory } from '../helpers/foundry-host.js'
+import { fakeHost, temporaryDirectory, execSucceeded } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
-import { agentsAnswer, agreedOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
+import { agentsAnswer, agreedLineOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import { readGraph } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
+import { ledgerActions } from '../helpers/order-ledger.js'
 
 // These cases drive real git and give each step up to 20 s (the vi.waitFor
 // calls below); the 5 s default case timeout cut them off first on a busy machine.
 vi.setConfig({ testTimeout: 45_000 })
 
-const runner = vi.hoisted(() => ({ current: null as unknown }))
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner.current,
-}))
-vi.mock('../../src/runtime/control-server.js', async () => {
-  const { quietControlServer } = await import('../helpers/foundry-host.js')
-  return { createControlServer: async () => quietControlServer() }
-})
-
-const { fakeRunner } = await import('../helpers/foundry-host.js')
-const theRunner = fakeRunner()
-runner.current = theRunner
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 const PULL = 'https://github.com/owner/app/pull/7'
 
@@ -55,40 +46,31 @@ afterAll(async () => {
 })
 
 /** GitHub with no pull request open yet, reporting `checksFor()` for the draft. */
-function githubAnswers(checksFor: () => string): void {
+function githubWithOneDraft(checksFor: () => string): void {
   host.gh.mockImplementation(async ({ args }: { args: string[] }) => {
-    const answer = (stdout: string) => ({ exitCode: 0, stdout, stderr: '', timedOut: false })
     const verb = `${args[0]} ${args[1]}`
-    if (verb === 'pr list') return answer('[]')
-    if (verb === 'pr create') return answer(`${PULL}\n`)
-    if (verb === 'pr checks') return answer(checksFor())
-    return answer('')
+    if (verb === 'pr list') return execSucceeded('[]')
+    if (verb === 'pr create') return execSucceeded(`${PULL}\n`)
+    if (verb === 'pr checks') return execSucceeded(checksFor())
+    return execSucceeded('')
   })
 }
 
-function order(over: Partial<WorkOrder> = {}): WorkOrder {
-  return agreedOrder(repo, over)
-}
-
-async function ledger(): Promise<string[]> {
-  return (await createOrderStore(dataDir).entries('WO-1')).map((entry) => entry.action)
-}
-
-async function started(saved: WorkOrder, recipe = 'direct'): Promise<void> {
+async function startOrderRun(saved: WorkOrder, recipe = 'direct'): Promise<void> {
   await createOrderStore(dataDir).save(saved)
   expect(await host.call('foundry:run.start', { id: saved.id, recipe })).toMatchObject({
     started: true,
   })
 }
 
-async function shipped(): Promise<void> {
+async function untilShipped(): Promise<void> {
   await vi.waitFor(
     async () => expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('shipped'),
     { timeout: 20_000, interval: 100 }
   )
 }
 
-async function gateFor(rule: string): Promise<string> {
+async function gateIdFor(rule: string): Promise<string> {
   const gate = (await createGateStore(dataDir).list()).find((g) => g.rule === rule)
   if (gate === undefined) throw new Error(`no ${rule} gate`)
   return gate.id
@@ -108,26 +90,28 @@ beforeEach(async () => {
 
 describe('an agreed order whose checks pass', () => {
   it('opens a draft, watches CI to green, asks whether it is ready, and is shipped', async () => {
-    githubAnswers(() => checks('pass'))
-    await started(order())
-    await shipped()
-    expect(await ledger()).toEqual(expect.arrayContaining(['run.complete', 'ship.draft_opened']))
-    expect(await gateFor('ready-for-review')).toBeTruthy()
+    githubWithOneDraft(() => checks('pass'))
+    await startOrderRun(agreedLineOrder(repo))
+    await untilShipped()
+    expect(await ledgerActions(dataDir)).toEqual(
+      expect.arrayContaining(['run.complete', 'ship.draft_opened'])
+    )
+    expect(await gateIdFor('ready-for-review')).toBeTruthy()
   })
 })
 
 describe('an order taken from a tracker issue', () => {
   it('moves the issue to in progress when work starts and to in review when the draft opens', async () => {
-    githubAnswers(() => checks('pass'))
+    githubWithOneDraft(() => checks('pass'))
     vi.mocked(host.issues.supportsTransitions).mockReturnValue(true)
     vi.mocked(host.issues.transition).mockClear()
-    await started(
-      order({
+    await startOrderRun(
+      agreedLineOrder(repo, {
         source: { kind: 'tracker', tracker: 'linear', key: 'ENG-1', url: null },
         writeBack: ['status'],
       })
     )
-    await shipped()
+    await untilShipped()
     expect(vi.mocked(host.issues.transition).mock.calls.map((call) => call[2])).toEqual([
       'started',
       'in_review',
@@ -138,9 +122,9 @@ describe('an order taken from a tracker issue', () => {
 describe('an order whose CI goes red', () => {
   it('sends the failure back to the builder and ships once the fix is green', async () => {
     let round = 0
-    githubAnswers(() => (++round === 1 ? checks('fail', 11) : checks('pass', 12)))
-    await started(order())
-    await shipped()
+    githubWithOneDraft(() => (++round === 1 ? checks('fail', 11) : checks('pass', 12)))
+    await startOrderRun(agreedLineOrder(repo))
+    await untilShipped()
     const builders = theRunner.start.mock.calls.filter(
       (call) => (call[0] as { phase: string }).phase === 'builder'
     )
@@ -148,11 +132,8 @@ describe('an order whose CI goes red', () => {
   })
 })
 
-/**
- * Build, then ship, with one automatic CI round: the least a recipe can be
- * and still open a draft whose CI is watched. Kept in the records location,
- * the rung that wins over the built-ins.
- */
+/** Build, then ship, with one automatic CI round: the least a recipe can be and still open a draft
+ * whose CI is watched. Kept in the records location, the rung that wins over the built-ins. */
 const BUILD_AND_SHIP = `schemaVersion: 1
 id: build-and-ship
 ci:
@@ -187,11 +168,11 @@ describe('answering the inbox after a run shipped', () => {
 
 function markingReadyTests() {
   it('marks the drafts ready for review when the operator says so', async () => {
-    githubAnswers(() => checks('pass'))
-    await started(order())
-    await shipped()
+    githubWithOneDraft(() => checks('pass'))
+    await startOrderRun(agreedLineOrder(repo))
+    await untilShipped()
     const decided = await host.call('foundry:inbox.decide', {
-      gateId: await gateFor('ready-for-review'),
+      gateId: await gateIdFor('ready-for-review'),
       option: 'mark_ready',
     })
     expect(decided).toMatchObject({ ok: true })
@@ -201,26 +182,24 @@ function markingReadyTests() {
 
 function redCiSentBackTests() {
   it('runs one more CI round on the open drafts when red CI is sent back, and asks again once it is green', async () => {
-    // Every step and every automatic round before the question is a whole
-    // round of agents over real git, and none of them is what this asks about.
-    // On the built-in recipe, with its inspector, scribe and two automatic
-    // rounds, this ran past five seconds under load.
+    // Each step and automatic round before the question is a round of agents over real git;
+    // on the built-in recipe (inspector, scribe, two automatic rounds) this ran past 5 s.
     const recipe = buildAndShip()
     // A fresh failing run for every pushed fix, the way CI reports one.
     let run = 20
-    githubAnswers(() => checks('fail', ++run))
-    await started(order(), recipe)
-    await vi.waitFor(async () => expect(await gateFor('ci.red')).toBeTruthy(), {
+    githubWithOneDraft(() => checks('fail', ++run))
+    await startOrderRun(agreedLineOrder(repo), recipe)
+    await vi.waitFor(async () => expect(await gateIdFor('ci.red')).toBeTruthy(), {
       timeout: 20_000,
       interval: 100,
     })
 
-    githubAnswers(() => checks('pass', 99))
+    githubWithOneDraft(() => checks('pass', 99))
     await host.call('foundry:inbox.decide', {
-      gateId: await gateFor('ci.red'),
+      gateId: await gateIdFor('ci.red'),
       option: 'send_back',
     })
-    await vi.waitFor(async () => expect(await gateFor('ready-for-review')).toBeTruthy(), {
+    await vi.waitFor(async () => expect(await gateIdFor('ready-for-review')).toBeTruthy(), {
       timeout: 20_000,
       interval: 100,
     })
@@ -229,24 +208,26 @@ function redCiSentBackTests() {
 
 describe('an order whose check keeps failing', () => {
   it('does not ship, and says on the ledger why not', async () => {
-    githubAnswers(() => '[]')
+    githubWithOneDraft(() => '[]')
     theRunner.runCommand.mockResolvedValue(1)
-    await started(order())
+    await startOrderRun(agreedLineOrder(repo))
     await vi.waitFor(
-      async () => expect(await ledger()).toEqual(expect.arrayContaining(['run.halted'])),
+      async () =>
+        expect(await ledgerActions(dataDir)).toEqual(expect.arrayContaining(['run.halted'])),
       { timeout: 20_000, interval: 100 }
     )
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
-    await expect(gateFor('ready-for-review')).rejects.toThrow()
+    await expect(gateIdFor('ready-for-review')).rejects.toThrow()
   })
 })
 
-async function halted(): Promise<void> {
-  githubAnswers(() => '[]')
+async function untilHalted(): Promise<void> {
+  githubWithOneDraft(() => '[]')
   theRunner.runCommand.mockResolvedValue(1)
-  await started(order())
+  await startOrderRun(agreedLineOrder(repo))
   await vi.waitFor(
-    async () => expect(await ledger()).toEqual(expect.arrayContaining(['run.halted'])),
+    async () =>
+      expect(await ledgerActions(dataDir)).toEqual(expect.arrayContaining(['run.halted'])),
     { timeout: 20_000, interval: 100 }
   )
 }
@@ -258,7 +239,7 @@ describe('the run’s own channels', () => {
 
 function agentTranscriptsTests() {
   it('show what each agent has been doing, from its transcript', async () => {
-    await halted()
+    await untilHalted()
     const graph = await readGraph(dataDir, 'WO-1')
     const builder = graph?.nodes.find((node) => node.role === 'builder')
     fs.writeFileSync(
@@ -282,23 +263,23 @@ function agentTranscriptsTests() {
 
 function startingOverAndStoppingTests() {
   it('start an order over: its checkout is gone and it can be run again from the start', async () => {
-    await halted()
+    await untilHalted()
     const reset = (await host.call('foundry:run.reset', { id: 'WO-1' })) as {
       ok: boolean
       removed: string[]
     }
     expect(reset.ok).toBe(true)
     expect(reset.removed.length).toBeGreaterThan(0)
-    expect(fs.existsSync(checkoutPath(dataDir, order(), 'app'))).toBe(false)
+    expect(fs.existsSync(checkoutPath(dataDir, agreedLineOrder(repo), 'app'))).toBe(false)
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('agreed')
-    expect(await ledger()).toContain('run.reset')
+    expect(await ledgerActions(dataDir)).toContain('run.reset')
   })
 
   it('stop the whole order', async () => {
-    await halted()
+    await untilHalted()
     expect(await host.call('foundry:run.stop', { id: 'WO-1' })).toEqual({ ok: true })
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('cancelled')
-    expect(await ledger()).toContain('run.stopped')
+    expect(await ledgerActions(dataDir)).toContain('run.stopped')
   })
 
   it('refuse to start over an order that does not exist', async () => {

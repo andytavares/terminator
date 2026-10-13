@@ -246,11 +246,11 @@ function ciRoundsAndForgeDecisionsTests() {
 }
 
 describe('factoryMetrics', () => {
-  describe('windows', windowsTests)
+  describe('windows', metricsWindowsTests)
   describe('rates and nulls', ratesAndNullsTests)
 })
 
-function windowsTests() {
+function metricsWindowsTests() {
   it('sorts orders newest-first by order.seeded and drops nothing in "all"', () => {
     const fm = factoryMetrics(all, 'all', NOW)
     expect(fm.orders.map((o) => o.orderId)).toEqual(['WO-D', 'WO-C', 'WO-B', 'WO-A', 'WO-E'])

@@ -11,27 +11,17 @@ import * as path from 'node:path'
 import { fakeHost, temporaryDirectory } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
-import { agentsAnswer, agreedOrder, repositoryWithRemote } from '../helpers/line-run.js'
+import { agentsAnswer, agreedLineOrder, repositoryWithRemote } from '../helpers/line-run.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { readGraph } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
 
 // Real git, and every step given up to 20 s; see execute-run.spec.ts.
 vi.setConfig({ testTimeout: 45_000 })
 
-const runner = vi.hoisted(() => ({ current: null as unknown }))
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner.current,
-}))
-vi.mock('../../src/runtime/control-server.js', async () => {
-  const { quietControlServer } = await import('../helpers/foundry-host.js')
-  return { createControlServer: async () => quietControlServer() }
-})
-
-const { fakeRunner } = await import('../helpers/foundry-host.js')
-const theRunner = fakeRunner()
-runner.current = theRunner
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let repo = ''
@@ -58,11 +48,8 @@ beforeEach(async () => {
   agentsAnswer(theRunner, parent)
 })
 
-/**
- * The author's turn: hands `document` back the way an author does, in its
- * step's rung output, or — given none — writes an answer into the checkout
- * and says nothing of where it is.
- */
+/** The author's turn: hands `document` back the way an author does, in its step's rung output,
+ * or — given none — writes an answer into the checkout and says nothing of where it is. */
 function authorHandsBack(document: WorkOrder['document']): void {
   const answer = theRunner.start.getMockImplementation()
   theRunner.start.mockImplementation(async (...args: unknown[]) => {
@@ -81,7 +68,7 @@ function authorHandsBack(document: WorkOrder['document']): void {
 /** Starts a research order whose author hands back `document`. */
 async function startResearch(document: WorkOrder['document']): Promise<void> {
   authorHandsBack(document)
-  await createOrderStore(dataDir).save(agreedOrder(repo))
+  await createOrderStore(dataDir).save(agreedLineOrder(repo))
   expect(await host.call('foundry:run.start', { id: 'WO-1', recipe: 'research' })).toMatchObject({
     started: true,
   })
@@ -137,7 +124,7 @@ describe('an order that turns out to alter a schema', () => {
   // opens ahead of the final check; the decision to push is the operator's,
   // and is asked once the run is done.
   it('asks before anything is pushed, and pushes nothing yet', async () => {
-    const saved = agreedOrder(repo)
+    const saved = agreedLineOrder(repo)
     const units = saved.plan.units.map((u) => ({ ...u, touches: ['red.css', 'red.schema.ts'] }))
     await createOrderStore(dataDir).save({ ...saved, plan: { ...saved.plan, units } })
     expect(await host.call('foundry:run.start', { id: 'WO-1', recipe: 'direct' })).toMatchObject({

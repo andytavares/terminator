@@ -182,8 +182,8 @@ describe('execute', () => {
   describe('a change of role', aChangeOfRoleTests)
   describe('the prompt and the verdict', thePromptAndTheVerdictTests)
   describe('who checks the work', whoChecksTheWorkTests)
-  describe('failures', failuresTests)
-  describe('gates', gatesTests)
+  describe('failures', executorFailuresTests)
+  describe('gates', executorGatesTests)
   describe('silenced checkpoints and decisions', silencedCheckpointsAndDecisionsTests)
   describe('events and inspection', eventsAndInspectionTests)
   describe('an empty graph', anEmptyGraphTests)
@@ -346,7 +346,7 @@ function whoChecksTheWorkTests() {
   })
 }
 
-function failuresTests() {
+function executorFailuresTests() {
   it('reports a run with no exit status as not measured, not as a failure', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
@@ -373,7 +373,7 @@ function failuresTests() {
   })
 }
 
-function gatesTests() {
+function executorGatesTests() {
   it('says on the stall gate which step failed, why, and what it holds up', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
@@ -558,7 +558,7 @@ function declarationsTests() {
 
 describe('executor edge cases', () => {
   describe('slash commands', slashCommandsTests)
-  describe('joins', joinsTests)
+  describe('joins', executorJoinsTests)
   describe('steps not about a unit and completion', stepsNotAboutAUnitAndCompletionTests)
   describe('verdicts per criterion', verdictsPerCriterionTests)
 })
@@ -583,7 +583,7 @@ steps:
   })
 }
 
-function joinsTests() {
+function executorJoinsTests() {
   it('never launches an agent for a join, which is coordination and not work', async () => {
     const run = vi.fn(ok)
     const nameless = `
@@ -1903,11 +1903,11 @@ steps:
 // `context: fresh` is how a shape demands a clean conversation from a role
 // that is otherwise allowed to resume.
 describe('what a step declares about its gate and its conversation', () => {
-  describe('deadlines', deadlinesTests)
+  describe('deadlines', executorDeadlinesTests)
   describe('fresh conversations', freshConversationsTests)
 })
 
-function deadlinesTests() {
+function executorDeadlinesTests() {
   it('gives the gate the deadline its step declared', async () => {
     const raised: Gate[] = []
     const o = order([unit('U-1')])
@@ -2049,17 +2049,13 @@ function clock() {
 // back — is the one case it could not catch. A live run sat forty minutes past
 // a twenty-minute budget with nothing to show for it.
 describe('a budget exceeded while agents are still running', () => {
-  describe('stopping', stoppingTests)
+  describe('stopping', executorStoppingTests)
   describe('a silenced rule', aSilencedRuleTests)
   describe('inside the budget', insideTheBudgetTests)
 })
 
-/**
- * A clock that starts where the test says and moves on every poll.
- *
- * A fixed clock plus a wave that never settles is an infinite loop with no
- * delay in it — which is a busy spin, not a test.
- */
+/** A clock that starts where the test says and moves on every poll. A fixed clock plus a wave that
+ * never settles is an infinite loop with no delay in it — which is a busy spin, not a test. */
 function from(minutes: number) {
   let now = minutes
   return {
@@ -2081,7 +2077,7 @@ async function runFrom(minutes: number) {
   })
 }
 
-function stoppingTests() {
+function executorStoppingTests() {
   it('stops the run rather than waiting for the wave that will not end', async () => {
     const o = order([unit('U-1')], {
       budgets: { agents: 2, wallClockMinutes: 20, tokens: null },
@@ -2227,7 +2223,7 @@ interface HeldAgent {
     node: { id: string }
     onStarted?: (sessionId: string) => void
   }) => Promise<StartedRun>
-  release: () => void
+  releaseAgent: () => void
 }
 
 /** An agent that reports its session at once and ends its turn only when released. */
@@ -2241,14 +2237,14 @@ function heldAgent(): HeldAgent {
     await blocked
     return { sessionId: `sess-${input.node.id}`, exitCode: 0 }
   }
-  return { run, release: () => release() }
+  return { run, releaseAgent: () => release() }
 }
 
 function theMomentTheAgentExistsTests() {
   it('puts the session on the node the moment the agent exists', async () => {
     const o = order([unit('U-1')])
     const seen: (string | null)[] = []
-    const { run, release: released } = heldAgent()
+    const { run, releaseAgent: released } = heldAgent()
 
     const running = execute(planOf(o), {
       ...deps(run as never),
@@ -2601,7 +2597,7 @@ function fastRolesAndNoDeclarationTests() {
 // sends the work back there instead of stopping.
 describe('a failed check pushes back on the builder', () => {
   describe('command steps', commandStepsTests)
-  describe('reworking', reworkingTests)
+  describe('reworking', executorReworkingTests)
   describe('used-up reworks', usedUpReworksTests)
   describe('unknown commands', unknownCommandsTests)
   describe('slash commands stay with agents', slashCommandsStayWithAgentsTests)
@@ -2635,7 +2631,7 @@ function failsOnceThenPasses(): (input: { logPath: string }) => Promise<number> 
   }
 }
 
-function reworkingTests() {
+function executorReworkingTests() {
   it('reworks the target instead of failing, and carries the excerpt forward', async () => {
     const o = order([])
     const buildRuns = vi.fn(ok)

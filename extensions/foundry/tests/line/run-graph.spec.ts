@@ -73,13 +73,13 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 }
 
 describe('buildRunGraph', () => {
-  describe('nodes', nodesTests)
-  describe('dependencies', dependenciesTests)
+  describe('nodes', runGraphNodesTests)
+  describe('dependencies', runGraphDependenciesTests)
   describe('waiting and conditions', waitingAndConditionsTests)
   describe('provenance and empty fan-outs', provenanceAndEmptyFanOutsTests)
 })
 
-function nodesTests() {
+function runGraphNodesTests() {
   it('makes one node per plain step', () => {
     const graph = buildRunGraph(order(), recipe())
     expect(nodeById(graph, 'reproduce')?.kind).toBe('agent')
@@ -105,7 +105,7 @@ function nodesTests() {
   })
 }
 
-function dependenciesTests() {
+function runGraphDependenciesTests() {
   it("gives a fan-out child its parent's dependencies", () => {
     const graph = buildRunGraph(order(), recipe())
     expect(nodeById(graph, 'build:U-1')?.dependsOn).toContain('reproduce')
@@ -217,7 +217,7 @@ function unit(
 describe('a fan-out by lane', () => {
   describe('one node per lane', oneNodePerLaneTests)
   describe('units and filters', unitsAndFiltersTests)
-  describe('waiting', waitingTests)
+  describe('waiting', runGraphWaitingTests)
   describe('empty filters and plan order', emptyFiltersAndPlanOrderTests)
   describe('cycles and outside dependencies', cyclesAndOutsideDependenciesTests)
   describe('naming', namingTests)
@@ -264,7 +264,7 @@ function unitsAndFiltersTests() {
   })
 }
 
-function waitingTests() {
+function runGraphWaitingTests() {
   it('waits on the lane that holds a unit it depends on', () => {
     const o = laneOrder([unit('U-1', 1), unit('U-2', 2, ['U-1'])], [1, 2])
     const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
@@ -487,8 +487,8 @@ function foreignNodesTests() {
 // operator watching a run tells them which array slot the work came from and
 // nothing about what is being built — which is the whole point of the surface.
 describe('what to call a node', () => {
-  describe('units', unitsTests)
-  describe('fallbacks', fallbacksTests)
+  describe('units', runGraphUnitsTests)
+  describe('fallbacks', runGraphFallbacksTests)
   describe('the whole graph', theWholeGraphTests)
 })
 
@@ -525,7 +525,7 @@ function nodeOf(text: string) {
   return { recipe: r, node: buildRunGraph(o, r).nodes[0] }
 }
 
-function unitsTests() {
+function runGraphUnitsTests() {
   it("uses the unit's own title, which is what the operator asked for", () => {
     expect(nodeLabel(withUnit(), node({ id: 'n2', unitIds: ['U-1'], role: 'builder' }))).toBe(
       'builder · U-1 refresh the token on a 401'
@@ -539,7 +539,7 @@ function unitsTests() {
   })
 }
 
-function fallbacksTests() {
+function runGraphFallbacksTests() {
   it('falls back to the role for a node that is not about one unit', () => {
     expect(nodeLabel(withUnit(), node({ id: 'n1', role: 'architect' }))).toBe('architect')
   })

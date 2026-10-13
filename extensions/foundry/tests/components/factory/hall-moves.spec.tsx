@@ -2,45 +2,10 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { FactoryHall } from '../../../src/components/factory/FactoryHall.js'
+import { hallNode, hallView } from '../../helpers/hall-views.js'
 
-// The hall's moves FactoryHall.spec.tsx leaves out: pausing a replay and
-// playing it again from the start once it has ended, denying a held call and
-// saying why a denial did not land, a parked agent with no terminal left, and
-// what an open monitor says of a station nothing is running or that failed.
-
-function node(over: Record<string, unknown> = {}) {
-  return {
-    id: 'N-1',
-    stepId: 'build',
-    kind: 'agent',
-    state: 'running',
-    unitIds: [],
-    lane: null,
-    role: 'builder',
-    dependsOn: [],
-    attempts: 1,
-    reworks: 0,
-    feedback: [],
-    sessionId: 's-1',
-    worktreePath: null,
-    startedAt: null,
-    endedAt: null,
-    ...over,
-  }
-}
-
-function view(over: Record<string, unknown> = {}) {
-  return {
-    graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node()] },
-    labels: { 'N-1': 'Build the thing' },
-    ready: [],
-    blocked: [],
-    orphaned: [],
-    stranded: [],
-    waiting: [],
-    ...over,
-  }
-}
+// The hall's moves FactoryHall.spec.tsx leaves out: replaying, denying a held call, a
+// parked agent with no terminal, and a monitor on an idle or failed station.
 
 const FRAMES = [
   { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
@@ -52,14 +17,14 @@ const HELD = { requestId: 'r-1', sessionId: 's-1', toolName: 'Bash', summary: 'n
 let invoke = vi.fn()
 
 /** The hall over `shown`, with `answers` overriding what a channel says. */
-function mount(shown: unknown, answers: Record<string, () => unknown> = {}): void {
+function mountHall(shown: unknown, answers: Record<string, () => unknown> = {}): void {
   const replies: Record<string, () => unknown> = {
     'foundry:run.observe': () => shown,
     'foundry:permissions-list': () => ({ pending: [] }),
     'foundry:run.activity': () => ({ activity: {} }),
     'foundry:run-transcript': () => ({ lines: [] }),
     'foundry:run.timeline': () => ({
-      graph: view().graph,
+      graph: hallView().graph,
       timeline: { frames: FRAMES, tools: [] },
       gates: [],
     }),
@@ -85,7 +50,7 @@ afterEach(() => {
 
 describe('playing a replay', () => {
   it('pauses where it is, and plays again from the start once it has ended', async () => {
-    mount(view())
+    mountHall(hallView())
     // The replay's clock stands still: on a real one every step redraws the
     // hall, and every query waiting for a button reads the whole hall again.
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
@@ -110,7 +75,7 @@ describe('playing a replay', () => {
 
 describe('a held call on its card', () => {
   it('is denied there', async () => {
-    mount(view(), {
+    mountHall(hallView(), {
       'foundry:permissions-list': () => ({ pending: [HELD] }),
       'foundry:permission-resolve': () => ({ ok: true }),
     })
@@ -125,7 +90,7 @@ describe('a held call on its card', () => {
   })
 
   it('says why an answer did not land, on the card it came from', async () => {
-    mount(view(), {
+    mountHall(hallView(), {
       'foundry:permissions-list': () => ({ pending: [HELD] }),
       'foundry:permission-resolve': () => ({ ok: false }),
     })
@@ -137,7 +102,7 @@ describe('a held call on its card', () => {
 
 describe('a parked agent with no terminal left', () => {
   it('says so on its card', async () => {
-    mount(view({ stranded: ['s-1'] }), { 'foundry:run-terminal': () => ({ ok: false }) })
+    mountHall(hallView({ stranded: ['s-1'] }), { 'foundry:run-terminal': () => ({ ok: false }) })
     const card = await screen.findByRole('group', { name: 'Waiting at its terminal' })
     fireEvent.click(within(card).getByRole('button', { name: 'Go to terminal' }))
     await within(card).findByText('That agent is no longer in a terminal.')
@@ -146,15 +111,15 @@ describe('a parked agent with no terminal left', () => {
 
 describe('what an open monitor says of its station', () => {
   it('says no agent for a station nothing is running', async () => {
-    mount(view({ orphaned: ['N-1'] }))
+    mountHall(hallView({ orphaned: ['N-1'] }))
     fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
     await screen.findByRole('img', { name: 'No agent' })
   })
 
   it('says a failed station failed, with the run’s own headline', async () => {
-    mount(
-      view({
-        graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'failed' })] },
+    mountHall(
+      hallView({
+        graph: { orderId: 'WO-1', recipe: 'standard', nodes: [hallNode({ state: 'failed' })] },
         standing: {
           kind: 'stopped',
           turn: 'you',

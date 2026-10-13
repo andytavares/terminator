@@ -28,6 +28,7 @@ import type { RunGraph } from '../../src/line/run-graph.js'
 import type { Observation } from '../../src/factory/events.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import { findPath } from '../../src/factory/path.js'
+import { idleWorld } from '../helpers/hall-views.js'
 
 // createWorld settles a run onto its floor with no motion at all: nothing
 // walked in, it is simply where the run already is. tick is the only thing
@@ -226,7 +227,7 @@ describe('createWorld', () => {
   describe('running and failed nodes', runningAndFailedNodesTests)
   describe('resting nodes', restingNodesTests)
   describe('absent crew', absentCrewTests)
-  describe('waiting gates', waitingGatesTests)
+  describe('waiting gates', simWaitingGatesTests)
   describe('stationless and determinism', stationlessAndDeterminismTests)
   describe('distinct rest seats', distinctRestSeatsTests)
 })
@@ -300,7 +301,7 @@ function absentCrewTests() {
   })
 }
 
-function waitingGatesTests() {
+function simWaitingGatesTests() {
   it('gatesWaiting is empty unless a gate is waiting', () => {
     const g = graph()
     const map = layoutHall(g)
@@ -462,7 +463,7 @@ describe('tick', () => {
   describe('arriving', arrivingTests)
   describe('rest seat facing', restSeatFacingTests)
   describe('releasing seats', releasingSeatsTests)
-  describe('crates', cratesTests)
+  describe('crates', simCratesTests)
   describe('queued work and unknown belts', queuedWorkAndUnknownBeltsTests)
   describe('the clock and replays', theClockAndReplaysTests)
   describe('empty paths', emptyPathsTests)
@@ -563,7 +564,7 @@ function releasingSeatsTests() {
   })
 }
 
-function cratesTests() {
+function simCratesTests() {
   it('a crate bound for a started step advances and is consumed on arrival', () => {
     const g = graph()
     const map = layoutHall(g)
@@ -753,17 +754,7 @@ function member(
   }
 }
 function world(crew: Crew[]): World {
-  return {
-    map: corridor,
-    crew,
-    crates: [],
-    gatesWaiting: [],
-    openCalls: [],
-    verdicts: [],
-    clockMs: 0,
-    ci: null,
-    queue: null,
-  }
+  return idleWorld(corridor, crew)
 }
 function atGoal(c: Crew): boolean {
   const t = tileOf(c.x, c.y)
@@ -1022,14 +1013,12 @@ function absentCrewAndDeterminismTests() {
 }
 
 describe('tick: a box carried back to an earlier station', () => {
-  describe('carrying the box', carryingTheBoxTests)
+  describe('carrying the box', simCarryingTheBoxTests)
   describe('cancelled errands', cancelledErrandsTests)
 })
 
-/**
- * Ticks until the verifier's errand is over, failing the moment two present
- * crew members share a tile, and says whether it carried the box on the way.
- */
+/** Ticks until the verifier's errand is over, failing the moment two present crew members share a
+ * tile, and says whether it carried the box on the way. */
 function walkTheErrand(start: World): { world: World; carried: boolean } {
   let world = start
   let carried = false
@@ -1041,7 +1030,7 @@ function walkTheErrand(start: World): { world: World; carried: boolean } {
   return { world, carried }
 }
 
-function carryingTheBoxTests() {
+function simCarryingTheBoxTests() {
   it.each([
     ['build:lane-1', 0],
     ['lint', 1],

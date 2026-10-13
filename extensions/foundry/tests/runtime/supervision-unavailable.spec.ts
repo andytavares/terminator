@@ -3,18 +3,14 @@
  * told, and nothing that needs an agent pretends to have started one.
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
-import { builderUnit } from '../helpers/order-parts.js'
 import { activate, deactivate } from '../../src/index.ts'
 import * as path from 'node:path'
 
 import { fakeHost, seededRepository, temporaryDirectory } from '../helpers/foundry-host.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
-import { draftOrder } from '../../src/order/draft.js'
 
-const userData = vi.hoisted(() => ({ path: '' }))
-
-vi.mock('electron', () => ({ app: { getPath: () => userData.path } }))
+import { readyDraft } from '../helpers/forge-turns.js'
 vi.mock('../../src/runtime/control-server.js', () => ({
   createControlServer: async () => {
     throw new Error('EADDRINUSE')
@@ -27,7 +23,6 @@ let host: FoundryHost
 
 beforeAll(async () => {
   const parent = temporaryDirectory('fdry-no-runtime')
-  userData.path = path.join(parent, 'user-data')
   vi.stubEnv('HOME', path.join(parent, 'home'))
   dataDir = path.join(parent, 'records')
   repo = await seededRepository(parent)
@@ -41,40 +36,9 @@ afterAll(async () => {
   vi.unstubAllEnvs()
 })
 
-function readyDraft() {
-  const base = draftOrder({
-    id: 'WO-1',
-    title: 'Make it red',
-    source: { kind: 'typed', tracker: null, key: null, url: null },
-    repoPaths: [repo],
-    now: '2026-10-12T10:00:00.000Z',
-  })
-  return {
-    ...base,
-    intent: { problem: 'text is blue', outcome: 'text is red', nonGoals: ['icons'] },
-    context: { ...base.context, entryPoints: ['src/theme.ts'] },
-    risk: { grade: 'P2' as const, triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'all text renders red',
-        priority: 'P1' as const,
-        verify: { kind: 'test' as const, command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
-    plan: {
-      ...base.plan,
-      units: [
-        builderUnit('U-1', { title: 'red text', satisfies: ['AC-1'], touches: ['src/theme.ts'] }),
-      ],
-    },
-  }
-}
-
 describe('a supervision runtime that could not start', () => {
   describe('saying so', sayingSoTests)
-  describe('refusals', refusalsTests)
+  describe('refusals', supervisionUnavailableRefusalsTests)
 })
 
 function sayingSoTests() {
@@ -96,9 +60,9 @@ function sayingSoTests() {
   })
 }
 
-function refusalsTests() {
+function supervisionUnavailableRefusalsTests() {
   it('refuses an architect turn and says why', async () => {
-    await createOrderStore(dataDir).save(readyDraft())
+    await createOrderStore(dataDir).save(readyDraft(repo))
     const started = (await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })) as {
       error?: string
     }
@@ -106,7 +70,7 @@ function refusalsTests() {
   })
 
   it('records the red team as refused when a released order would be reviewed', async () => {
-    await createOrderStore(dataDir).save(readyDraft())
+    await createOrderStore(dataDir).save(readyDraft(repo))
     await host.call('foundry:order.hold', { id: 'WO-1', held: true })
     await host.call('foundry:order.hold', { id: 'WO-1', held: false })
     await vi.waitFor(async () => {

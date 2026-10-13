@@ -166,7 +166,7 @@ describe('isOverdue', () => {
 
 describe('autonomy', () => {
   describe('live rules', liveRulesTests)
-  describe('settings', settingsTests)
+  describe('settings', rulesSettingsTests)
 })
 
 function ranked(over: Partial<Parameters<typeof raiseGate>[0]> & { blockedUnits?: number } = {}) {
@@ -191,7 +191,7 @@ function liveRulesTests() {
   })
 }
 
-function settingsTests() {
+function rulesSettingsTests() {
   it('asks about a repeat failure at standard, and not at lights-out', () => {
     for (const rule of ['verify.repeat-fail', 'verify.base-fail', 'forge-defect'] as GateRuleId[]) {
       expect(isLive(rule, 'standard')).toBe(true)
@@ -217,7 +217,7 @@ function settingsTests() {
 describe('ranking', () => {
   describe('ranking', rankingTests)
   describe('the queue and ties', theQueueAndTiesTests)
-  describe('summaries', summariesTests)
+  describe('summaries', rulesSummariesTests)
 })
 
 function rankingTests() {
@@ -257,7 +257,7 @@ function theQueueAndTiesTests() {
   })
 }
 
-function summariesTests() {
+function rulesSummariesTests() {
   it('summarises what is waiting and what was decided without anyone', () => {
     const automatic = applyDefault(ranked({ id: 'auto' }), 'now')
     const summary = summariseInbox([

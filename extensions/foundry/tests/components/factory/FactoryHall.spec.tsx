@@ -4,50 +4,11 @@ import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vite
 import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { FactoryHall } from '../../../src/components/factory/FactoryHall.js'
 import { raiseGate } from '../../../src/gates/rules.js'
+import { hallNode, hallView, pullRequestChecks } from '../../helpers/hall-views.js'
 
-// The Factory surface for one order: a hall drawn from the run graph, a
-// station per node, and the two moves this view keeps — attach, and opening
-// the inbox to decide a gate. Everything else stays in the List view.
-//
-// The point here is what the stations and the drawer say, not the pixels
-// `HallScene.spec.tsx` already covers, so the canvas has no 2D context and the
-// hall draws nothing. A recording fake would take every pixel of the bake and
-// every frame: 220,000 fillRect calls in the transcript test alone, which ran
-// past five seconds on a loaded machine.
-
-function node(over: Record<string, unknown> = {}) {
-  return {
-    id: 'N-1',
-    stepId: 'build',
-    kind: 'agent',
-    state: 'running',
-    unitIds: [],
-    lane: null,
-    role: 'builder',
-    dependsOn: [],
-    attempts: 1,
-    reworks: 0,
-    feedback: [],
-    sessionId: 's-1',
-    worktreePath: null,
-    startedAt: null,
-    endedAt: null,
-    ...over,
-  }
-}
-
-function view(over: Record<string, unknown> = {}) {
-  return {
-    graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node()] },
-    labels: { 'N-1': 'Build the thing' },
-    ready: [],
-    blocked: [],
-    orphaned: [],
-    stranded: [],
-    waiting: [],
-    ...over,
-  }
-}
+// The Factory surface for one order: its stations, attach, and opening the inbox for a gate.
+// The canvas has no 2D context (pixels are `HallScene.spec.tsx`'s): a recording fake took
+// 220,000 fillRect calls in the transcript test alone, past five seconds on a loaded machine.
 
 let invoke: Mock<Window['electronAPI']['extensionBridge']['invoke']>
 const openExternal = vi.fn()
@@ -65,7 +26,7 @@ interface MountProps {
 /** What each channel answers for the hall `props` describe. */
 function hallReplies(props: MountProps): Record<string, () => unknown> {
   return {
-    'foundry:run.observe': () => props.view ?? view(),
+    'foundry:run.observe': () => props.view ?? hallView(),
     'foundry:permissions-list': () => ({ pending: props.pending ?? [] }),
     'foundry:run.activity': () => ({ activity: props.activity ?? {} }),
     'foundry:run-transcript': () => ({ lines: props.lines ?? [] }),
@@ -118,11 +79,11 @@ function sizeEveryBox(): void {
 
 /** Two stations in the same state. */
 function twoStations(state: string) {
-  return view({
+  return hallView({
     graph: {
       orderId: 'WO-1',
       recipe: 'standard',
-      nodes: [node({ state }), node({ id: 'N-2', sessionId: 's-2', state })],
+      nodes: [hallNode({ state }), hallNode({ id: 'N-2', sessionId: 's-2', state })],
     },
     labels: { 'N-1': 'Build the thing', 'N-2': 'Build the other' },
   })
@@ -148,15 +109,15 @@ const MERGE_GATE = {
 }
 
 function waitingAtTheGate() {
-  const gate = node({
+  const gate = hallNode({
     id: 'G',
     kind: 'gate',
     state: 'waiting',
     sessionId: null,
     dependsOn: ['N-1'],
   })
-  return view({
-    graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' }), gate] },
+  return hallView({
+    graph: { orderId: 'WO-1', recipe: 'standard', nodes: [hallNode({ state: 'passed' }), gate] },
     waiting: [MERGE_GATE],
   })
 }
@@ -193,12 +154,12 @@ describe('FactoryHall status wall plumbing', () => {
 
 function replayable(frames: unknown[], ci?: unknown[]) {
   invoke = vi.fn(async (channel: string) => {
-    if (channel === 'foundry:run.observe') return view()
+    if (channel === 'foundry:run.observe') return hallView()
     if (channel === 'foundry:permissions-list') return { pending: [] }
     if (channel === 'foundry:run.activity') return { activity: {} }
     if (channel === 'foundry:run.timeline')
       return {
-        graph: view().graph,
+        graph: hallView().graph,
         timeline: { frames, tools: [], ci },
         gates: [],
       }
@@ -225,10 +186,10 @@ describe('FactoryHall', () => {
   describe('the order bar', theOrderBarTests)
   describe('callouts raised together', calloutsRaisedTogetherTests)
   describe('callouts on state change', calloutsOnStateChangeTests)
-  describe('held tool calls', heldToolCallsTests)
+  describe('held tool calls', factoryHallHeldToolCallsTests)
   describe('markdown questions', markdownQuestionsTests)
-  describe('waiting gates', waitingGatesTests)
-  describe('parked agents', parkedAgentsTests)
+  describe('waiting gates', factoryHallWaitingGatesTests)
+  describe('parked agents', factoryHallParkedAgentsTests)
   describe('replaying', replayingTests)
   describe('replaying CI', replayingCiTests)
   describe('playback', playbackTests)
@@ -253,7 +214,7 @@ function addressingAndBadgesTests() {
   })
 
   it('flags a station whose session is stranded', async () => {
-    mount({ view: view({ stranded: ['s-1'] }) })
+    mount({ view: hallView({ stranded: ['s-1'] }) })
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
     const station = screen.getByRole('button', { name: /Build the thing/ })
     expect(station.querySelector('.fdry-hall-flag')).not.toBeNull()
@@ -276,7 +237,7 @@ function pendingAsksTests() {
 function theStandingBandTests() {
   it('shows the standing band only when it is the operator’s move', async () => {
     mount({
-      view: view({
+      view: hallView({
         standing: {
           kind: 'working',
           turn: 'foundry',
@@ -299,7 +260,7 @@ function gatedMovesTests() {
   // sends nobody to a surface that no longer exists.
   it('names a gated move without a button to somewhere else', async () => {
     mount({
-      view: view({
+      view: hallView({
         standing: {
           kind: 'halted',
           turn: 'you',
@@ -321,7 +282,7 @@ function gatedMovesTests() {
 function movesWithoutAGateTests() {
   it('sends a move with no gate behind it to the List view', async () => {
     const { onOpenInList } = mount({
-      view: view({
+      view: hallView({
         standing: {
           kind: 'adrift',
           turn: 'you',
@@ -364,7 +325,7 @@ function monitorsTests() {
 function cardSummariesAndPlatesTests() {
   it('shows the waiting station’s own card summary on its monitor', async () => {
     mount({
-      view: view({
+      view: hallView({
         waiting: [],
         stranded: ['s-1'],
       }),
@@ -416,11 +377,11 @@ function calloutsRaisedTogetherTests() {
 
 function calloutsOnStateChangeTests() {
   it('raises a callout at the station when its state changes, not a line under the picture', async () => {
-    let current = view()
+    let current = hallView()
     const bus = mountLive(() => current)
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
-    current = view({
-      graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' })] },
+    current = hallView({
+      graph: { orderId: 'WO-1', recipe: 'standard', nodes: [hallNode({ state: 'passed' })] },
     })
     bus.emit({ kind: 'graph', orderId: 'WO-1' })
     await waitFor(
@@ -434,7 +395,7 @@ function calloutsOnStateChangeTests() {
   })
 }
 
-function heldToolCallsTests() {
+function factoryHallHeldToolCallsTests() {
   it('pins a held tool call over its station and answers it there', async () => {
     mount({
       pending: [
@@ -489,7 +450,7 @@ function markdownQuestionsTests() {
   })
 }
 
-function waitingGatesTests() {
+function factoryHallWaitingGatesTests() {
   it('pins a waiting gate over the gate and decides it with the gate’s own options', async () => {
     mount({ view: waitingAtTheGate() })
     const card = await screen.findByRole('group', { name: 'Merge the pull request?' })
@@ -503,9 +464,9 @@ function waitingGatesTests() {
   })
 }
 
-function parkedAgentsTests() {
+function factoryHallParkedAgentsTests() {
   it('pins an agent parked at its terminal and takes you there', async () => {
-    mount({ view: view({ stranded: ['s-1'] }) })
+    mount({ view: hallView({ stranded: ['s-1'] }) })
     const card = await screen.findByRole('group', { name: 'Waiting at its terminal' })
     fireEvent.click(within(card).getByRole('button', { name: 'Go to terminal' }))
     await waitFor(() =>
@@ -617,7 +578,7 @@ function theSiteAndFailuresTests() {
 
   it('says nothing to attach to when the failure comes back', async () => {
     invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:run.observe') return view()
+      if (channel === 'foundry:run.observe') return hallView()
       if (channel === 'foundry:permissions-list') return { pending: [] }
       if (channel === 'foundry:run.activity') return { activity: {} }
       if (channel === 'foundry:run-transcript') return { lines: [] }
@@ -640,27 +601,23 @@ function theSiteAndFailuresTests() {
 
 describe('an open station monitor is live', () => {
   describe('reading the transcript', readingTheTranscriptTests)
-  describe('no session', noSessionTests)
+  describe('no session', factoryHallNoSessionTests)
 })
 
-const pull = (buckets: ('pass' | 'pending')[]) => ({
-  url: 'https://github.com/a/b/pull/233',
-  checks: buckets.map((bucket, i) => ({ name: `check-${i}`, bucket, link: '', workflow: 'CI' })),
-})
 const ci = (buckets: ('pass' | 'pending')[]) => ({
   round: 0,
   max: 2,
   status: 'watching',
   reason: '',
   at: '2026-10-05T10:00:00.000Z',
-  pulls: [pull(buckets)],
+  pulls: [pullRequestChecks('https://github.com/a/b/pull/233', buckets)],
 })
 const shipGraph = {
   orderId: 'WO-1',
   recipe: 'standard',
   nodes: [
-    node({ id: 'N-1', state: 'passed', sessionId: 's-1' }),
-    node({
+    hallNode({ id: 'N-1', state: 'passed', sessionId: 's-1' }),
+    hallNode({
       id: 'ship',
       kind: 'gate',
       state: 'running',
@@ -714,11 +671,11 @@ function readingTheTranscriptTests() {
   })
 }
 
-function noSessionTests() {
+function factoryHallNoSessionTests() {
   it('does not read a transcript for a station with no session', async () => {
     mount({
-      view: view({
-        graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ sessionId: null })] },
+      view: hallView({
+        graph: { orderId: 'WO-1', recipe: 'standard', nodes: [hallNode({ sessionId: null })] },
       }),
     })
     fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
@@ -729,7 +686,7 @@ function noSessionTests() {
 }
 
 describe('FactoryHall labels what it draws', () => {
-  describe('the scoreboard', theScoreboardTests)
+  describe('the scoreboard', factoryHallTheScoreboardTests)
   describe('tower callouts', towerCalloutsTests)
   describe('finished monitors', finishedMonitorsTests)
 })
@@ -746,7 +703,7 @@ function readyGate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
   })
 }
 
-function theScoreboardTests() {
+function factoryHallTheScoreboardTests() {
   it("names the scoreboard with this order's real figures", async () => {
     mount({
       metrics: [{ orderId: 'WO-1', leadTimeMs: 25 * 60_000, reworks: 0, ciRounds: 0 }],
@@ -760,14 +717,15 @@ function theScoreboardTests() {
 }
 
 function towerCalloutsTests() {
+  const shipView = (buckets: ('pass' | 'pending')[]) =>
+    hallView({ graph: shipGraph, labels: { 'N-1': 'Build', ship: 'Ship' }, ci: ci(buckets) })
+
   it('keeps a callout pinned to the tower while checks are pending, and drops it when they land', async () => {
     const pending = [...Array(12).fill('pass'), ...Array(7).fill('pending')] as (
       | 'pass'
       | 'pending'
     )[]
-    mount({
-      view: view({ graph: shipGraph, labels: { 'N-1': 'Build', ship: 'Ship' }, ci: ci(pending) }),
-    })
+    mount({ view: shipView(pending) })
     await waitFor(() =>
       expect(document.querySelector('.fdry-callout[data-pinned="true"]')?.textContent).toBe(
         'Waiting on checks · 12 of 19 done'
@@ -777,13 +735,7 @@ function towerCalloutsTests() {
   })
 
   it('pins no wait when every check has landed', async () => {
-    mount({
-      view: view({
-        graph: shipGraph,
-        labels: { 'N-1': 'Build', ship: 'Ship' },
-        ci: ci(['pass', 'pass']),
-      }),
-    })
+    mount({ view: shipView(['pass', 'pass']) })
     await waitFor(() => screen.getByRole('img', { name: 'Checks · 2 passed · 0 failed' }))
     expect(document.querySelector('.fdry-callout[data-pinned="true"]')).toBeNull()
   })
@@ -792,7 +744,7 @@ function towerCalloutsTests() {
 function finishedMonitorsTests() {
   it("opens the ship gate's monitor with what it decided and no attach key", async () => {
     mount({
-      view: view({
+      view: hallView({
         graph: shipGraph,
         labels: { 'N-1': 'Build', ship: 'Ship' },
         ci: ci(['pass', 'pending']),
@@ -807,8 +759,8 @@ function finishedMonitorsTests() {
 
   it("opens a finished agent's monitor with its transcript and attach disabled", async () => {
     mount({
-      view: view({
-        graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' })] },
+      view: hallView({
+        graph: { orderId: 'WO-1', recipe: 'standard', nodes: [hallNode({ state: 'passed' })] },
       }),
       lines: [{ role: 'assistant', kind: 'text', text: 'All done.', at: 1 }],
     })
@@ -823,20 +775,20 @@ function finishedMonitorsTests() {
 // A gate is one line with its answers on it, the reason a click away and written
 // in markdown — the same card the list views draw, not a second rendering of it.
 describe('FactoryHall gates and links', () => {
-  describe('links', linksTests)
+  describe('links', factoryHallLinksTests)
   describe('gate cards', gateCardsTests)
   describe('a ready-for-review gate', aReadyForReviewGateTests)
   describe('a new limit', aNewLimitTests)
 })
 
-function linksTests() {
+function factoryHallLinksTests() {
   const pullUrl = 'https://github.com/andytavares/terminator/pull/233'
 
   const ticketUrl = 'https://linear.app/team/issue/TAV-15'
 
   it('links the pull request and the ticket on the heads-up bar', async () => {
     mount({
-      view: view({
+      view: hallView({
         pulls: [{ repo: 'terminator', url: pullUrl, number: 233, cwd: '/wt' }],
         source: { key: 'TAV-15', url: ticketUrl },
       }),
@@ -855,7 +807,7 @@ function linksTests() {
 
 function gateCardsTests() {
   it('draws a waiting gate collapsed, with its answers on the line, and reads the reason as markdown', async () => {
-    mount({ view: view({ waiting: [readyGate()] }) })
+    mount({ view: hallView({ waiting: [readyGate()] }) })
     expect(await screen.findByRole('button', { name: 'Mark ready' })).toBeTruthy()
     expect(document.querySelectorAll('.fdry-card li')).toHaveLength(0)
 
@@ -865,7 +817,7 @@ function gateCardsTests() {
   })
 
   it('bounds an open gate card by the room between its station and the edge it grows toward', async () => {
-    mount({ view: view({ waiting: [readyGate()] }) })
+    mount({ view: hallView({ waiting: [readyGate()] }) })
     await screen.findByRole('button', { name: 'Mark ready' })
     const card = document.querySelector('.fdry-card--gate') as HTMLElement
     const top = Number.parseFloat(card.style.top)
@@ -881,8 +833,8 @@ function gateCardsTests() {
 function aReadyForReviewGateTests() {
   it('lets a shipped order\u2019s open ready-for-review gate be answered in the hall', async () => {
     mount({
-      view: view({
-        graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' })] },
+      view: hallView({
+        graph: { orderId: 'WO-1', recipe: 'standard', nodes: [hallNode({ state: 'passed' })] },
         waiting: [readyGate()],
         standing: {
           kind: 'halted',
@@ -909,7 +861,7 @@ function aReadyForReviewGateTests() {
 function aNewLimitTests() {
   it('asks for a new limit on the card itself, rather than sending the operator to the Inbox', async () => {
     mount({
-      view: view({
+      view: hallView({
         waiting: [
           raiseGate({
             id: 'G-2',

@@ -3,13 +3,13 @@
  *
  * Real files under a temporary records location and real `git`; `gh` and the
  * tracker answer from what a spec gives them, because both reach the network.
- * A spec mocks `electron`, the supervised runner and the control server itself
- * (`vi.mock` is per file) and hands over the runner from `fakeRunner`.
+ * A spec mocks the supervised runner and the control server itself (`vi.mock`
+ * is per file), with `supervision-mocks.ts`, and drives its `theRunner`.
  */
 import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { vi } from 'vitest'
+import { expect, vi } from 'vitest'
 import {
   dispatchChannel,
   type ChannelSpec,
@@ -61,18 +61,22 @@ export const realGit: ShellExec = ({ command, args, cwd }) =>
     })
   })
 
+/** Real `git` with `args` in `cwd`. */
+export function gitAt(cwd: string, ...args: string[]): Promise<ExecResult> {
+  return realGit({ command: 'git', args, cwd })
+}
+
 /** A repository with one commit on `main`, its own identity, and nothing else. */
 export async function seededRepository(parent: string, name = 'app'): Promise<string> {
   const repo = path.join(parent, name)
   fs.mkdirSync(repo, { recursive: true })
-  const git = (...args: string[]) => realGit({ command: 'git', args, cwd: repo })
-  await git('init', '-q', '-b', 'main')
-  await git('config', 'user.name', 'Foundry Test')
-  await git('config', 'user.email', 'foundry@example.com')
-  await git('config', 'commit.gpgsign', 'false')
+  await gitAt(repo, 'init', '-q', '-b', 'main')
+  await gitAt(repo, 'config', 'user.name', 'Foundry Test')
+  await gitAt(repo, 'config', 'user.email', 'foundry@example.com')
+  await gitAt(repo, 'config', 'commit.gpgsign', 'false')
   fs.writeFileSync(path.join(repo, 'README.md'), '# app\n')
-  await git('add', '-A')
-  await git('commit', '-q', '-m', 'seed')
+  await gitAt(repo, 'add', '-A')
+  await gitAt(repo, 'commit', '-q', '-m', 'seed')
   return repo
 }
 
@@ -114,7 +118,7 @@ const noIssues = (): ExtensionAPI['issues'] =>
   })
 
 /** A `paths.globalStorage` in a fresh userData, `<userData>/extensions/terminator.foundry`. */
-export function freshGlobalStorage(): string {
+export function freshFoundryStorage(): string {
   return path.join(temporaryDirectory('foundry-user-data'), 'extensions', 'terminator.foundry')
 }
 
@@ -146,7 +150,10 @@ function hostParts() {
 
 type HostParts = ReturnType<typeof hostParts>
 
-const disposable = () => ({ dispose: vi.fn() })
+/** A disposable whose `dispose` is a spy. */
+export function disposableStub() {
+  return { dispose: vi.fn() }
+}
 
 function hostCommands(commands: HostParts['commands']): ExtensionAPI['commands'] {
   return partialFake<ExtensionAPI['commands']>({
@@ -159,7 +166,7 @@ function hostCommands(commands: HostParts['commands']): ExtensionAPI['commands']
 
 function hostSettings(dataDir: () => string, settings: HostParts['settings']) {
   return partialFake<ExtensionAPI['settings']>({
-    register: vi.fn(disposable),
+    register: vi.fn(disposableStub),
     get: <T>(key: string) =>
       (key === 'terminator.foundry.dataDir' ? dataDir() : settings.get(key)) as T | undefined,
     set: (key: string, value: unknown) => settings.set(key, value),
@@ -174,11 +181,11 @@ interface HostApiInput {
   parts: HostParts
 }
 
-function hostApi({ dataDir, globalStorage, handlers, parts }: HostApiInput): ExtensionAPI {
+function foundryHostApi({ dataDir, globalStorage, handlers, parts }: HostApiInput): ExtensionAPI {
   const registerHandler = vi.fn((spec: ChannelSpec, options?: { remoteAccessible?: boolean }) => {
     handlers.set(spec.channel, spec)
     if (options?.remoteAccessible === true) parts.remoteChannels.push(spec.channel)
-    return disposable()
+    return disposableStub()
   })
   return partialFake<ExtensionAPI>({
     ipc: partialFake<ExtensionAPI['ipc']>({ registerHandler }),
@@ -206,8 +213,8 @@ function hostApi({ dataDir, globalStorage, handlers, parts }: HostApiInput): Ext
 
 function hostShell(exec: HostParts['exec']): ExtensionAPI['shell'] {
   // Foundry never asks for bytes, so the string overload is the only one called.
-  const run = (options: ShellExecOptions) => exec(options)
-  return { exec: run as ExtensionAPI['shell']['exec'] }
+  const execText = (options: ShellExecOptions) => exec(options)
+  return { exec: execText as ExtensionAPI['shell']['exec'] }
 }
 
 function hostWorkspace(workspaces: HostParts['workspaces']): ExtensionAPI['workspace'] {
@@ -221,11 +228,11 @@ function hostWorkspace(workspaces: HostParts['workspaces']): ExtensionAPI['works
 
 /** A host whose records location is `dataDir()` and which has nothing connected. */
 export function fakeHost(dataDir: () => string): FoundryHost {
-  const globalStorage = freshGlobalStorage()
+  const globalStorage = freshFoundryStorage()
   const handlers = new Map<string, ChannelSpec>()
   const parts = hostParts()
   return {
-    api: hostApi({ dataDir, globalStorage, handlers, parts }),
+    api: foundryHostApi({ dataDir, globalStorage, handlers, parts }),
     call: async (channel, payload = {}) => {
       const spec = handlers.get(channel)
       if (spec === undefined) throw new Error(`${channel} is not registered`)
@@ -234,6 +241,21 @@ export function fakeHost(dataDir: () => string): FoundryHost {
     ...parts,
     globalStorage,
   }
+}
+
+/** What a command that exited 0 and printed `stdout` hands back. */
+export function execSucceeded(stdout: string): ExecResult {
+  return { exitCode: 0, stdout, stderr: '', timedOut: false }
+}
+
+/** The message of every toast the host has shown, oldest first. */
+export function toastsShown(host: FoundryHost): string[] {
+  return host.showToast.mock.calls.map((call) => call[1] as string)
+}
+
+/** Until the host has shown a toast saying `message`. */
+export async function untilToastShown(host: FoundryHost, message: string): Promise<void> {
+  await vi.waitFor(() => expect(toastsShown(host)).toContain(message), { timeout: 10_000 })
 }
 
 /** A fresh temporary directory under the OS temp directory. */

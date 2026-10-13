@@ -151,11 +151,11 @@ function mountForgeWithOrder(over: Partial<WorkOrder>) {
 }
 
 describe('the Red team step holds open findings, but only the ones that block need a decision', () => {
-  describe('blocking findings', blockingFindingsTests)
-  describe('notes', notesTests)
+  describe('blocking findings', needsYouBlockingFindingsTests)
+  describe('notes', needsYouNotesTests)
 })
 
-function blockingFindingsTests() {
+function needsYouBlockingFindingsTests() {
   it('puts a blocking finding in the "Needs your decision" group, with a way to decide it', async () => {
     mountForgeWithOrder({
       redTeam: [
@@ -178,7 +178,7 @@ function blockingFindingsTests() {
   })
 }
 
-function notesTests() {
+function needsYouNotesTests() {
   it('puts a non-blocking finding in the neutral "Notes" group instead', async () => {
     mountForgeWithOrder({
       redTeam: [

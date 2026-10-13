@@ -80,13 +80,13 @@ function mount(over: Record<string, unknown> = {}) {
 beforeEach(() => vi.clearAllMocks())
 
 describe('the sensors panel', () => {
-  describe('enabling', enablingTests)
+  describe('enabling', settingsViewEnablingTests)
   describe('enabling with a repository', enablingWithARepositoryTests)
   describe('the last run', theLastRunTests)
   describe('running now', runningNowTests)
 })
 
-function enablingTests() {
+function settingsViewEnablingTests() {
   it('shows one row per sensor, with its description and rung', async () => {
     mount()
     await waitFor(() => expect(screen.getByText('CI flake watch')).toBeTruthy())

@@ -21,7 +21,7 @@ export async function repositoryWithRemote(parent: string): Promise<string> {
 }
 
 /** One unit in one lane, checked by the repository's own `npm test`. */
-export function agreedOrder(repo: string, over: Partial<WorkOrder> = {}): WorkOrder {
+export function agreedLineOrder(repo: string, over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
     id: over.id ?? 'WO-1',
     title: 'Make it red',
@@ -45,10 +45,8 @@ export function agreedOrder(repo: string, over: Partial<WorkOrder> = {}): WorkOr
   } as WorkOrder
 }
 
-/**
- * Every agent ends its turn at once. A builder leaves `<order id>.css` in its
- * checkout, so each order's change is its own.
- */
+/** Every agent ends its turn at once. A builder leaves `<order id>.css` in its checkout, so each
+ * order's change is its own. */
 export function agentsAnswer(runner: ReturnType<typeof fakeRunner>, transcripts: string): void {
   runner.start.mockImplementation((async (input: {
     phase: string

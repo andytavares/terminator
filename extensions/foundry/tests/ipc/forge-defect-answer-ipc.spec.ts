@@ -21,45 +21,14 @@ import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
+import { ledgerFileText } from '../helpers/order-ledger.js'
 
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn().mockReturnValue(false),
-    encryptString: vi.fn(),
-    decryptString: vi.fn(),
-  },
-}))
-
-const runner = {
-  start: vi.fn(),
-  resolve: vi.fn(),
-  handBackToTerminal: vi.fn(),
-  interrupt: vi.fn(),
-  stop: vi.fn().mockReturnValue(true),
-  send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue(null),
-  watchable: vi.fn().mockReturnValue([]),
-  dispose: vi.fn(),
-}
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner,
-}))
-
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let host: FoundryHost
-const call = (channel: string, payload: unknown = {}) => host.call(channel, payload)
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -70,11 +39,6 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
     now: '2026-09-06T10:00:00.000Z',
   })
   return { ...base, status: 'draft', recipe: 'direct', ...over }
-}
-
-function ledger(): string {
-  const file = path.join(dataDir, 'orders', 'WO-1', 'ledger.jsonl')
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
 }
 
 function saveGate(gate: Gate): void {
@@ -110,13 +74,12 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
-  runner.start.mockReset()
-  runner.start.mockImplementation(
-    async (input: { onRegistered?: (run: { sessionId: string }) => void }) => {
-      input.onRegistered?.({ sessionId: 'architect-session' })
-      return { sessionId: 'architect-session' }
-    }
-  )
+  theRunner.start.mockReset()
+  theRunner.start.mockImplementation(async (...args: unknown[]) => {
+    const input = args[0] as StartInput
+    input.onRegistered?.({ sessionId: 'architect-session' })
+    return { sessionId: 'architect-session' }
+  })
 })
 
 describe('answering a forge-defect gate', () => {
@@ -154,11 +117,9 @@ type StartInput = {
   onTurnEnd?: () => void
 }
 
-/**
- * Makes the next read of `file`, once armed, come back 100 ms late, holding
- * the order as it was before whatever wrote it in the meantime.
- */
-function slowNextRead(file: string): { arm: () => void; restore: () => void } {
+/** Makes the next read of `file`, once armed, come back 100 ms late, holding the order as it was
+ * before whatever wrote it in the meantime. */
+function slowNextRead(file: string): { delayNextRead: () => void; restore: () => void } {
   const readFile = fs.promises.readFile
   let armed = false
   const spy = vi.spyOn(fs.promises, 'readFile').mockImplementation((async (
@@ -172,12 +133,13 @@ function slowNextRead(file: string): { arm: () => void; restore: () => void } {
     }
     return contents
   }) as typeof fs.promises.readFile)
-  return { arm: () => (armed = true), restore: () => spy.mockRestore() }
+  return { delayNextRead: () => (armed = true), restore: () => spy.mockRestore() }
 }
 
 /** An architect that amends the order, then has the next order read come back late. */
 function architectAmendsThenReadsLate(armSlowRead: () => void): void {
-  runner.start.mockImplementation(async (input: StartInput) => {
+  theRunner.start.mockImplementation(async (...args: unknown[]) => {
+    const input = args[0] as StartInput
     const sessionId = `${input.phase}-session`
     if (input.phase === 'architect') {
       writeAmendment()
@@ -205,7 +167,8 @@ function cleanOrder(): WorkOrder {
   }
 }
 function architectAmends(): void {
-  runner.start.mockImplementation(async (input: StartInput) => {
+  theRunner.start.mockImplementation(async (...args: unknown[]) => {
+    const input = args[0] as StartInput
     const sessionId = `${input.phase}-session`
     input.onRegistered?.({ sessionId })
     if (input.phase === 'architect') {
@@ -241,14 +204,14 @@ function startingTheArchitectTests() {
     await store.save(order({ redTeam: [regression('RT-2', 'drops canceled tickets')] }))
     saveGate(forgeDefectGate())
 
-    const r = (await call('foundry:inbox.decide', {
+    const r = (await host.call('foundry:inbox.decide', {
       gateId: 'WO-1-forge-defect',
       option: 'answer',
     })) as { ok: boolean; actionError?: string }
 
     expect(r.actionError).toBeUndefined()
-    expect(runner.start).toHaveBeenCalledTimes(1)
-    const started = runner.start.mock.calls[0][0] as { phase: string; prompt: string }
+    expect(theRunner.start).toHaveBeenCalledTimes(1)
+    const started = theRunner.start.mock.calls[0][0] as { phase: string; prompt: string }
     expect(started.phase).toBe('architect')
     expect(started.prompt).toContain('RT-2')
   })
@@ -272,14 +235,14 @@ function resumeFailuresTests() {
       ],
     })
 
-    const r = (await call('foundry:inbox.decide', {
+    const r = (await host.call('foundry:inbox.decide', {
       gateId: 'WO-1-unit-boundary',
       option: 'approve',
     })) as { ok: boolean; actionError?: string }
 
     expect(r.actionError).toContain('draft')
-    expect(ledger()).toContain('gate.action_failed')
-    expect(runner.start).not.toHaveBeenCalled()
+    expect(ledgerFileText(dataDir)).toContain('gate.action_failed')
+    expect(theRunner.start).not.toHaveBeenCalled()
   })
 }
 
@@ -298,12 +261,12 @@ describe('after the architect amends an answered defect', () => {
 function agreeingAgainTests() {
   it('agrees the released order again and starts its run', async () => {
     await seed(true)
-    await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+    await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
 
-    await vi.waitFor(() => expect(ledger()).toContain('"action":"run.started"'), {
+    await vi.waitFor(() => expect(ledgerFileText(dataDir)).toContain('"action":"run.started"'), {
       timeout: 5000,
     })
-    const lines = ledger()
+    const lines = ledgerFileText(dataDir)
       .trim()
       .split('\n')
       .map((l) => JSON.parse(l) as { action: string; actor: string })
@@ -316,12 +279,14 @@ function agreeingAgainTests() {
 function theInboxTests() {
   it('lists an order nobody released on the Inbox, and counts it on the badge', async () => {
     await seed(false)
-    await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+    await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
 
-    await vi.waitFor(() => expect(ledger()).toContain('order.redrafted'), { timeout: 5000 })
+    await vi.waitFor(() => expect(ledgerFileText(dataDir)).toContain('order.redrafted'), {
+      timeout: 5000,
+    })
     await vi.waitFor(
       async () => {
-        const inbox = (await call('foundry:inbox.list')) as {
+        const inbox = (await host.call('foundry:inbox.list')) as {
           waiting: { orderId: string; headline: string }[]
         }
         expect(inbox.waiting).toEqual([
@@ -330,9 +295,9 @@ function theInboxTests() {
       },
       { timeout: 5000 }
     )
-    expect(((await call('foundry:attention')) as { inbox: number }).inbox).toBe(1)
+    expect(((await host.call('foundry:attention')) as { inbox: number }).inbox).toBe(1)
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('draft')
-    expect(ledger()).not.toContain('run.started')
+    expect(ledgerFileText(dataDir)).not.toContain('run.started')
   })
 }
 
@@ -345,20 +310,23 @@ function theOrderBeforeTests() {
   it('never puts the order from before the amendment back', async () => {
     await seed(true)
     const slow = slowNextRead(path.join(dataDir, 'orders', 'WO-1', 'order.json'))
-    architectAmendsThenReadsLate(slow.arm)
+    architectAmendsThenReadsLate(slow.delayNextRead)
 
     try {
-      await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
-      await vi.waitFor(() => expect(ledger()).toMatch(/"action":"run\.(started|refused)"/), {
-        timeout: 2000,
-      })
+      await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+      await vi.waitFor(
+        () => expect(ledgerFileText(dataDir)).toMatch(/"action":"run\.(started|refused)"/),
+        {
+          timeout: 2000,
+        }
+      )
       await new Promise((resolve) => setTimeout(resolve, 200))
     } finally {
       slow.restore()
     }
 
-    expect(ledger()).not.toContain('run.refused')
-    expect(ledger()).toContain('"action":"run.started"')
+    expect(ledgerFileText(dataDir)).not.toContain('run.refused')
+    expect(ledgerFileText(dataDir)).toContain('"action":"run.started"')
     const saved = await createOrderStore(dataDir).load('WO-1')
     expect(saved?.redTeam.find((f) => f.id === 'RT-inspector-6')?.status).toBe('resolved')
   })

@@ -21,50 +21,19 @@ import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { Gate } from '../../src/gates/rules.js'
-
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn().mockReturnValue(false),
-    encryptString: vi.fn(),
-    decryptString: vi.fn(),
-  },
-}))
+import { theRunner } from '../helpers/supervision-mocks.js'
+import { ledgerFileText } from '../helpers/order-ledger.js'
 
 /**
  * Nothing is running. That is the state a fresh application is always in —
  * every agent's terminal was a child of the process that died with it.
  */
-const runner = {
-  start: vi.fn(),
-  resolve: vi.fn(),
-  handBackToTerminal: vi.fn(),
-  interrupt: vi.fn(),
-  stop: vi.fn().mockReturnValue(true),
-  send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue(null),
-  watchable: vi.fn().mockReturnValue([]),
-  dispose: vi.fn(),
-}
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner,
-}))
-
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 /** Read by the extension through `settings.get`; a fresh one per test. */
 let dataDir = ''
 let host: FoundryHost
-const call = (channel: string, payload: unknown = {}) => host.call(channel, payload)
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -133,11 +102,6 @@ function graphOnDisk(): RunGraph {
   ) as RunGraph
 }
 
-function ledger(): string {
-  const file = path.join(dataDir, 'orders', 'WO-1', 'ledger.jsonl')
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
-}
-
 beforeAll(async () => {
   host = fakeHost(() => dataDir)
   host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
@@ -149,14 +113,18 @@ beforeAll(async () => {
  * the reclaimed node again. Read the graph after that, not while it races.
  */
 async function restarted(): Promise<RunGraph> {
-  await vi.waitFor(() => expect(runner.start).toHaveBeenCalledTimes(1))
+  await vi.waitFor(() => expect(theRunner.start).toHaveBeenCalledTimes(1))
   return graphOnDisk()
 }
 
 beforeEach(() => {
-  runner.start.mockClear()
-  runner.terminalFor.mockReturnValue(null)
-  runner.stop.mockReturnValue(true)
+  // This spec stops at the restart: a start that throws leaves the node as resuming put it
+  // and ends that executor before the next test resumes the same order.
+  theRunner.start.mockClear().mockImplementation(() => {
+    throw new Error('no agent starts in this spec')
+  })
+  theRunner.terminalFor.mockReturnValue(null)
+  theRunner.stop.mockReturnValue(true)
 })
 
 describe('a fresh application opening on a run the last one left in flight', () => {
@@ -168,48 +136,48 @@ describe('a fresh application opening on a run the last one left in flight', () 
 function noticingTests() {
   it('notices without being asked, on the poll the chrome already makes', async () => {
     await seedInterruptedRun()
-    await call('foundry:attention')
+    await host.call('foundry:attention')
     expect(gatesOnDisk().map((g) => g.rule)).toEqual(['run.interrupted'])
   })
 
   it('counts it on the inbox, so the badge says so within one poll', async () => {
     await seedInterruptedRun()
-    const counts = (await call('foundry:attention')) as { inbox: number }
+    const counts = (await host.call('foundry:attention')) as { inbox: number }
     expect(counts.inbox).toBe(1)
   })
 
   it('says what stopped, in the operator’s words rather than node ids', async () => {
     await seedInterruptedRun()
-    await call('foundry:attention')
+    await host.call('foundry:attention')
     expect(gatesOnDisk()[0].why).toContain('builder · U-1 the first bit')
   })
 
   it('writes it to the order’s own record, so it is answerable afterwards', async () => {
     await seedInterruptedRun()
-    await call('foundry:attention')
-    expect(ledger()).toContain('run.interrupted')
+    await host.call('foundry:attention')
+    expect(ledgerFileText(dataDir)).toContain('run.interrupted')
   })
 }
 
 function onceOnlyAndLiveAgentsTests() {
   it('raises one row however many times the application is reopened', async () => {
     await seedInterruptedRun()
-    await call('foundry:attention')
-    await call('foundry:inbox.list')
-    await call('foundry:attention')
+    await host.call('foundry:attention')
+    await host.call('foundry:inbox.list')
+    await host.call('foundry:attention')
     expect(gatesOnDisk()).toHaveLength(1)
   })
 
   it('leaves a run alone whose agents are still in their terminals', async () => {
-    runner.terminalFor.mockReturnValue({ terminalSessionId: 't1', projectId: 'p1' })
+    theRunner.terminalFor.mockReturnValue({ terminalSessionId: 't1', projectId: 'p1' })
     await seedInterruptedRun()
-    await call('foundry:attention')
+    await host.call('foundry:attention')
     expect(gatesOnDisk()).toEqual([])
   })
 
   it('leaves an order alone that is not running', async () => {
     await seedInterruptedRun({ status: 'shipped' })
-    await call('foundry:attention')
+    await host.call('foundry:attention')
     expect(gatesOnDisk()).toEqual([])
   })
 }
@@ -217,13 +185,13 @@ function onceOnlyAndLiveAgentsTests() {
 function theFloorAndTerminalsTests() {
   it('tells the Floor which steps nothing is running', async () => {
     await seedInterruptedRun()
-    const view = (await call('foundry:run.observe', { id: 'WO-1' })) as { orphaned: string[] }
+    const view = (await host.call('foundry:run.observe', { id: 'WO-1' })) as { orphaned: string[] }
     expect(view.orphaned).toEqual(['build:U-1'])
   })
 
   it('refuses to send the operator to a terminal that no longer exists', async () => {
     await seedInterruptedRun()
-    const r = (await call('foundry:session.attach', {
+    const r = (await host.call('foundry:session.attach', {
       orderId: 'WO-1',
       nodeId: 'build:U-1',
     })) as { error: string }
@@ -232,15 +200,15 @@ function theFloorAndTerminalsTests() {
 }
 
 describe('answering the gate', () => {
-  describe('picking up', pickingUpTests)
+  describe('picking up', interruptedRunIpcPickingUpTests)
   describe('stopping and holding', stoppingAndHoldingTests)
 })
 
-function pickingUpTests() {
+function interruptedRunIpcPickingUpTests() {
   it('picks the run back up, putting the abandoned step back in the queue', async () => {
     await seedInterruptedRun()
-    await call('foundry:attention')
-    const r = (await call('foundry:inbox.decide', {
+    await host.call('foundry:attention')
+    const r = (await host.call('foundry:inbox.decide', {
       gateId: 'WO-1-run.interrupted',
       option: 'resume',
     })) as { ok: boolean }
@@ -251,15 +219,15 @@ function pickingUpTests() {
 
   it('gives the attempt back, because the application closing is not a failed try', async () => {
     await seedInterruptedRun()
-    await call('foundry:attention')
-    await call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'resume' })
+    await host.call('foundry:attention')
+    await host.call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'resume' })
     expect((await restarted()).nodes[0].attempts).toBe(1)
   })
 
   it('keeps the session on the node, so the agent resumes its own conversation', async () => {
     await seedInterruptedRun()
-    await call('foundry:attention')
-    await call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'resume' })
+    await host.call('foundry:attention')
+    await host.call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'resume' })
     expect(graphOnDisk().nodes[0].sessionId).toBe('session-from-a-dead-process')
   })
 }
@@ -267,15 +235,15 @@ function pickingUpTests() {
 function stoppingAndHoldingTests() {
   it('stopping actually stops: the order is cancelled rather than left running', async () => {
     await seedInterruptedRun()
-    await call('foundry:attention')
-    await call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'stop' })
+    await host.call('foundry:attention')
+    await host.call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'stop' })
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('cancelled')
   })
 
   it('holding changes nothing, which is what holding means', async () => {
     await seedInterruptedRun()
-    await call('foundry:attention')
-    await call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'hold' })
+    await host.call('foundry:attention')
+    await host.call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'hold' })
     expect(graphOnDisk().nodes[0].state).toBe('running')
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
   })
@@ -315,7 +283,7 @@ const RAISED = {
 
 describe('stopping a run whose agents are still alive', () => {
   it('ends each one, saying why, before the order is cancelled', async () => {
-    runner.terminalFor.mockReturnValue({ terminalSessionId: 't1', projectId: 'p1' })
+    theRunner.terminalFor.mockReturnValue({ terminalSessionId: 't1', projectId: 'p1' })
     await seedInterruptedRun()
     // Raised by hand: with live agents nothing adopts it, which is the point.
     const store = createOrderStore(dataDir)
@@ -325,8 +293,8 @@ describe('stopping a run whose agents are still alive', () => {
       JSON.stringify([BUDGET_GATE])
     )
 
-    await call('foundry:inbox.decide', { gateId: 'WO-1-budget', option: 'stop' })
-    expect(runner.stop).toHaveBeenCalledWith(
+    await host.call('foundry:inbox.decide', { gateId: 'WO-1-budget', option: 'stop' })
+    expect(theRunner.stop).toHaveBeenCalledWith(
       'session-from-a-dead-process',
       expect.stringContaining('a run going past its time or agent budget')
     )
@@ -336,13 +304,13 @@ describe('stopping a run whose agents are still alive', () => {
 
 describe('stopping the whole order rather than one agent', () => {
   it('is reachable as its own channel, because a gate was the only way out', async () => {
-    await expect(call('foundry:run.stop', { id: 'WO-none' })).resolves.toBeDefined()
+    await expect(host.call('foundry:run.stop', { id: 'WO-none' })).resolves.toBeDefined()
   })
 
   it('cancels the order and writes down that a person did it', async () => {
     await seedInterruptedRun()
-    expect(await call('foundry:run.stop', { id: 'WO-1' })).toEqual({ ok: true })
+    expect(await host.call('foundry:run.stop', { id: 'WO-1' })).toEqual({ ok: true })
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('cancelled')
-    expect(ledger()).toContain('run.stopped')
+    expect(ledgerFileText(dataDir)).toContain('run.stopped')
   })
 })

@@ -42,7 +42,7 @@ function scriptOf(input: { args: string[] }): string {
   return match[1]
 }
 
-function api() {
+function runnerCoreApi() {
   return {
     workspace: {
       addProject: async (input: Record<string, unknown>) => {
@@ -74,11 +74,11 @@ function api() {
 }
 
 /** Lets the runner's awaits on the core (addProject, openTerminal) finish. */
-const settled = () => new Promise((resolve) => setImmediate(resolve))
+const coreCallsSettled = () => new Promise((resolve) => setImmediate(resolve))
 
 function runner(now: () => number = () => 1_000) {
   return createSupervisedRunner({
-    api: api(),
+    api: runnerCoreApi(),
     control,
     stateDir: join(dir, 'state'),
     now,
@@ -157,7 +157,7 @@ describe('starting a supervised run', () => {
   describe('the project', theProjectTests)
   describe('the terminal and session', theTerminalAndSessionTests)
   describe('skills and transcripts', skillsAndTranscriptsTests)
-  describe('resuming', resumingTests)
+  describe('resuming', supervisedRunnerResumingTests)
   describe('nothing started', nothingStartedTests)
 })
 
@@ -239,7 +239,7 @@ function skillsAndTranscriptsTests() {
   })
 }
 
-function resumingTests() {
+function supervisedRunnerResumingTests() {
   it('resumes an existing conversation rather than starting a second one', async () => {
     const run = await runner().start({ ...start, resumeSessionId: 'earlier-session' })
     expect(run?.sessionId).toBe('earlier-session')
@@ -502,7 +502,7 @@ function endingTheRunTests() {
 
 function aHostThatCannotCloseTabsTests() {
   it('still stops answering the agent on a host that cannot close the tab', async () => {
-    const host = api() as { pty: { closeTerminalTab?: unknown } }
+    const host = runnerCoreApi() as { pty: { closeTerminalTab?: unknown } }
     delete host.pty.closeTerminalTab
     const r = createSupervisedRunner({
       api: host as never,
@@ -859,7 +859,7 @@ function theHeredocTests() {
 // live runs died on it.
 describe('the parent session it must not inherit', () => {
   describe('unsetting', unsettingTests)
-  describe('what it keeps', whatItKeepsTests)
+  describe('what it keeps', supervisedRunnerWhatItKeepsTests)
 })
 
 function unsettingTests() {
@@ -879,7 +879,7 @@ function unsettingTests() {
   })
 }
 
-function whatItKeepsTests() {
+function supervisedRunnerWhatItKeepsTests() {
   it('still forces session persistence, which is the other half of the same problem', async () => {
     await runner().start(start)
     expect(launchScriptBody()).toContain('CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1')
@@ -936,19 +936,19 @@ const command = {
 
 describe('running one command in a terminal, with no agent', () => {
   describe('opening the tab', openingTheTabTests)
-  describe('exit statuses', exitStatusesTests)
+  describe('exit statuses', supervisedRunnerExitStatusesTests)
 })
 
 function openingTheTabTests() {
   it("links the order's ticket to the project a command opens, too", async () => {
     void runner().runCommand({ ...command, issue: { tracker: 'linear', key: 'TAV-15' } })
-    await settled()
+    await coreCallsSettled()
     expect(created[0]).toMatchObject({ issue: { tracker: 'linear', key: 'TAV-15' } })
   })
 
   it('opens a plain terminal tab in the worktree project', async () => {
     void runner().runCommand(command)
-    await settled()
+    await coreCallsSettled()
     expect(created[0]).toMatchObject({ worktreePath: '/wt/feat-thing', gitBranch: 'feat/thing' })
     expect(ran[0]).toMatchObject({
       projectId: 'project-1',
@@ -958,13 +958,11 @@ function openingTheTabTests() {
     })
   })
 
-  // The terminal's own process is the command's script, so the exit node-pty
-  // reports is the command's. Typing it into an interactive shell made the
-  // verdict that shell's exit, and closing the tab killed the shell with a
-  // signal that read as exit 0.
+  // Typed into an interactive shell, the verdict was that shell's exit, and closing the tab
+  // read as exit 0 (extensions/foundry/CLAUDE.md, "Verification commands").
   it("runs the command's script as the terminal's process, typing nothing", async () => {
     void runner().runCommand(command)
-    await settled()
+    await coreCallsSettled()
     expect(written).toEqual([])
     const shell = process.env.SHELL ?? '/bin/sh'
     expect(ran[0].file).toBe(shell)
@@ -974,7 +972,7 @@ function openingTheTabTests() {
   })
 }
 
-function exitStatusesTests() {
+function supervisedRunnerExitStatusesTests() {
   it('resolves 0 for a command that exited 0, and closes its tab', async () => {
     exitWith({ exitCode: 0 })
     await expect(runner().runCommand(command)).resolves.toBe(0)
@@ -1021,7 +1019,7 @@ async function scriptFor(commandLine: string, logPath?: string): Promise<string>
     command: commandLine,
     logPath,
   })
-  await settled()
+  await coreCallsSettled()
   return scriptOf(ran[ran.length - 1])
 }
 
@@ -1057,11 +1055,9 @@ function loggedCommandTests(shell: string) {
   })
 }
 
-// A check used to be typed into the tab's interactive login shell, so whatever
-// the user's startup files export (JAVA_HOME, GOPATH, nvm's PATH) reached it.
-// The app adopts only PATH from the login shell, so a check run as a bare
-// `$SHELL script` lost the rest. A real PTY, a temporary HOME whose startup
-// file is the only place a variable is set, and the check must see it.
+// The app adopts only PATH from the login shell, so a bare `$SHELL script` lost what startup
+// files export (extensions/foundry/CLAUDE.md, "Verification commands"). A real PTY and a
+// temporary HOME whose startup file is the only place a variable is set; the check must see it.
 interface StartupShell {
   shell: string
   files: Record<string, string>
@@ -1145,7 +1141,7 @@ function runCheck(commandLine: string, logPath?: string): Promise<number | null>
   })
 }
 
-async function check(commandLine: string, logPath?: string): Promise<number | null> {
+async function checkOrTimeOut(commandLine: string, logPath?: string): Promise<number | null> {
   const ended = runCheck(commandLine, logPath)
   let timer: ReturnType<typeof setTimeout> | undefined
   const stuck = new Promise<never>((_, reject) => {
@@ -1162,7 +1158,7 @@ async function check(commandLine: string, logPath?: string): Promise<number | nu
 }
 
 /** Makes `startup.shell` the user's shell, in a HOME holding only its startup files. */
-function useShell(startup: StartupShell): void {
+function withStartupShell(startup: StartupShell): void {
   for (const [name, body] of Object.entries(startup.files)) writeFileSync(join(home, name), body)
   process.env.HOME = home
   process.env.SHELL = startup.shell
@@ -1188,26 +1184,26 @@ function startupFileTests(startup: StartupShell) {
   const { shell } = startup
 
   it(`(${shell}) passes a check that needs a variable only a startup file exports`, async () => {
-    useShell(startup)
-    await expect(check('test "$FOUNDRY_RC_ONLY" = from-rc')).resolves.toBe(0)
+    withStartupShell(startup)
+    await expect(checkOrTimeOut('test "$FOUNDRY_RC_ONLY" = from-rc')).resolves.toBe(0)
   })
 
   it(`(${shell}) still resolves the command's own exit code, not the shell's`, async () => {
-    useShell(startup)
-    await expect(check('echo "$FOUNDRY_RC_ONLY"; exit 3')).resolves.toBe(3)
+    withStartupShell(startup)
+    await expect(checkOrTimeOut('echo "$FOUNDRY_RC_ONLY"; exit 3')).resolves.toBe(3)
   })
 
   // bash ends by the signal (null, "not measured"); zsh catches SIGHUP and
   // exits 1. Either way a check nobody let finish is never a pass.
   it(`(${shell}) never passes a check whose tab was closed while it ran`, async () => {
-    useShell(startup)
-    await expect(check('echo hang-up-"now"; sleep 30')).resolves.not.toBe(0)
+    withStartupShell(startup)
+    await expect(checkOrTimeOut('echo hang-up-"now"; sleep 30')).resolves.not.toBe(0)
   })
 
   it(`(${shell}) keeps both through the log file`, async () => {
-    useShell(startup)
+    withStartupShell(startup)
     const logPath = join(home, 'logs', 'check.log')
-    await expect(check('echo "$FOUNDRY_RC_ONLY"; exit 3', logPath)).resolves.toBe(3)
+    await expect(checkOrTimeOut('echo "$FOUNDRY_RC_ONLY"; exit 3', logPath)).resolves.toBe(3)
     expect(readFileSync(logPath, 'utf8')).toContain('from-rc')
   })
 }

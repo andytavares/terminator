@@ -221,7 +221,7 @@ function ask(toolName: string, input: unknown) {
 // tool's name, not its question — you cannot approve or deny that.
 
 describe('what the operator is told is being asked', () => {
-  describe('questions', questionsTests)
+  describe('questions', permissionBridgeQuestionsTests)
   describe('shell requests', shellRequestsTests)
   describe('unknown tools and bounds', unknownToolsAndBoundsTests)
   describe('multi-line values and non-objects', multiLineValuesAndNonObjectsTests)
@@ -242,7 +242,7 @@ function questionsOn(events: PendingPermission[]) {
   return events[0].questions
 }
 
-function questionsTests() {
+function permissionBridgeQuestionsTests() {
   it('leads with the question itself', () => {
     const event = ask('AskUserQuestion', {
       questions: [{ question: 'Which database should the worker write to?', options: [] }],

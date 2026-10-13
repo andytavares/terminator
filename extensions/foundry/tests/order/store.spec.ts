@@ -34,7 +34,7 @@ describe('createOrderStore', () => {
   describe('atomic saves', atomicSavesTests)
   describe('the rendering', theRenderingTests)
   describe('missing and corrupt orders', missingAndCorruptOrdersTests)
-  describe('listing', listingTests)
+  describe('listing', storeListingTests)
   describe('finding by issue', findingByIssueTests)
   describe('trackers and the ledger', trackersAndTheLedgerTests)
 })
@@ -99,7 +99,7 @@ function missingAndCorruptOrdersTests() {
   })
 }
 
-function listingTests() {
+function storeListingTests() {
   it('lists orders newest first', async () => {
     const store = createOrderStore(root)
     await store.save(order({ id: 'WO-1', createdAt: '2026-09-01T10:00:00.000Z' }))
@@ -175,12 +175,12 @@ function trackersAndTheLedgerTests() {
 }
 
 describe('a store whose root follows the workspace', () => {
-  describe('writing', writingTests)
+  describe('writing', storeWritingTests)
   describe('reading through the resolver', readingThroughTheResolverTests)
-  describe('the ledger', theLedgerTests)
+  describe('the ledger', storeTheLedgerTests)
 })
 
-function writingTests() {
+function storeWritingTests() {
   it('writes wherever the resolver points, on each call', async () => {
     const a = makeTempDir('fdry-live-a-')
     const b = makeTempDir('fdry-live-b-')
@@ -233,7 +233,7 @@ function readingThroughTheResolverTests() {
   })
 }
 
-function theLedgerTests() {
+function storeTheLedgerTests() {
   // Some of what happens to an order is recorded here and nowhere else — an
   // intake turn whose proposal was refused writes a line and never touches
   // `order.json` — so a store that could only append was a store no surface

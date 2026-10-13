@@ -10,12 +10,12 @@ function git(state: { head: string; dirty: boolean }) {
 }
 
 describe('createPassCache', () => {
-  describe('remembering', rememberingTests)
+  describe('remembering', passCacheRememberingTests)
   describe('dirty trees', dirtyTreesTests)
   describe('failures and unreadable checkouts', failuresAndUnreadableCheckoutsTests)
 })
 
-function rememberingTests() {
+function passCacheRememberingTests() {
   it('remembers a command that passed on a clean commit', async () => {
     const cache = createPassCache(git({ head: 'abc', dirty: false }))
     await cache.record('/wt', 'npm run lint', 0)

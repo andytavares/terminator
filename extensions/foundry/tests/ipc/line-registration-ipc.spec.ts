@@ -15,20 +15,10 @@ import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { strandedAgents } from '../../src/runtime/runtime-state.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
 
-const runner = vi.hoisted(() => ({ current: null as unknown }))
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner.current,
-}))
-vi.mock('../../src/runtime/control-server.js', async () => {
-  const { quietControlServer } = await import('../helpers/foundry-host.js')
-  return { createControlServer: async () => quietControlServer() }
-})
-
-const { fakeRunner } = await import('../helpers/foundry-host.js')
-const theRunner = fakeRunner()
-runner.current = theRunner
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 const AT = '2026-09-06T10:00:00.000Z'
 
@@ -58,7 +48,7 @@ afterEach(() => {
   theRunner.terminalFor.mockReset().mockReturnValue(null)
 })
 
-async function saveOrder(over: Partial<WorkOrder>): Promise<void> {
+async function saveTypedOrder(over: Partial<WorkOrder>): Promise<void> {
   await createOrderStore(dataDir).save({
     ...draftOrder({
       id: 'WO-1',
@@ -73,7 +63,7 @@ async function saveOrder(over: Partial<WorkOrder>): Promise<void> {
 
 describe('agents handed back to their terminals', () => {
   it('are offered for this order only, and only while their terminal is open', async () => {
-    await saveOrder({ status: 'running', recipe: 'direct' })
+    await saveTypedOrder({ status: 'running', recipe: 'direct' })
     const graph = {
       orderId: 'WO-1',
       recipe: 'direct',
@@ -94,7 +84,7 @@ describe('agents handed back to their terminals', () => {
 
 describe('starting over an order its run left nothing behind for', () => {
   it('puts it back to agreed and says there was nothing to remove', async () => {
-    await saveOrder({ status: 'cancelled', recipe: 'direct', recipeOverriddenBy: 'operator' })
+    await saveTypedOrder({ status: 'cancelled', recipe: 'direct', recipeOverriddenBy: 'operator' })
     // Git has no checkout and no branch to remove: the run never cut them.
     host.exec.mockResolvedValue({
       exitCode: 128,

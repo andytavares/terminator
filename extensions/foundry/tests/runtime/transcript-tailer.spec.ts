@@ -261,11 +261,11 @@ function unknownBlocksTests() {
 }
 
 describe('counting turns', () => {
-  describe('counting', countingTests)
+  describe('counting', transcriptTailerCountingTests)
   describe('subagents and torn lines', subagentsAndTornLinesTests)
 })
 
-function countingTests() {
+function transcriptTailerCountingTests() {
   // Turns used to arrive in the runtime's own result message. A terminal
   // produces no such message, so they are counted from the record instead.
   it('counts nothing for a transcript that does not exist yet', () => {

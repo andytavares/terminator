@@ -15,20 +15,10 @@ import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
 import { priorArtFor } from '../../src/ipc/forge-registration.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
 
-const runner = vi.hoisted(() => ({ current: null as unknown }))
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner.current,
-}))
-vi.mock('../../src/runtime/control-server.js', async () => {
-  const { quietControlServer } = await import('../helpers/foundry-host.js')
-  return { createControlServer: async () => quietControlServer() }
-})
-
-const { fakeRunner } = await import('../helpers/foundry-host.js')
-const theRunner = fakeRunner()
-runner.current = theRunner
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let parent = ''
@@ -187,11 +177,15 @@ describe('the record of earlier decisions', () => {
         now: '2026-10-12T10:00:00.000Z',
       })
     )
-    const decided = (at: string, subject: string, reason: string) =>
+    const recordDecision = (at: string, subject: string, reason: string) =>
       store.record({ ...ACCEPTED, at, subject, reason })
-    await decided('2026-10-01T10:00:00.000Z', 'src/theme.ts', 'keep tokens')
-    await decided('2026-10-05T10:00:00.000Z', 'RT-1', 'src/theme.ts stays the source of colour')
-    await decided('2026-10-06T10:00:00.000Z', 'src/other.ts', 'unrelated')
+    await recordDecision('2026-10-01T10:00:00.000Z', 'src/theme.ts', 'keep tokens')
+    await recordDecision(
+      '2026-10-05T10:00:00.000Z',
+      'RT-1',
+      'src/theme.ts stays the source of colour'
+    )
+    await recordDecision('2026-10-06T10:00:00.000Z', 'src/other.ts', 'unrelated')
 
     expect(await priorArtFor(dataDir, ['src/theme.ts'])).toEqual([
       '2026-10-05 operator: finding.accepted — src/theme.ts stays the source of colour',
@@ -202,7 +196,7 @@ describe('the record of earlier decisions', () => {
 
 describe('deleting an order', () => {
   describe('an unknown order', anUnknownOrderTests)
-  describe('deleting', deletingTests)
+  describe('deleting', forgeRegistrationDeletingTests)
 })
 
 function anUnknownOrderTests() {
@@ -213,7 +207,7 @@ function anUnknownOrderTests() {
   })
 }
 
-function deletingTests() {
+function forgeRegistrationDeletingTests() {
   it('stops its architect, removes its records, and leaves no trace on the list', async () => {
     const repo = await seededRepository(parent)
     const order = draftOrder({

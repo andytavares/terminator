@@ -7,32 +7,23 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { fakeHost, realGit, temporaryDirectory } from '../helpers/foundry-host.js'
+import { fakeHost, realGit, temporaryDirectory, execSucceeded } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
-import { agentsAnswer, agreedOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
+import { agentsAnswer, agreedLineOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { writeObservedFiles } from '../../src/line/observed-files.js'
 import { checkoutPath } from '../../src/line/worktree.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
+import { ledgerActions } from '../helpers/order-ledger.js'
 
 // These cases drive real git and give each step up to 20 s (the vi.waitFor
 // calls below); the 5 s default case timeout cut them off first on a busy machine.
 vi.setConfig({ testTimeout: 45_000 })
 
-const runner = vi.hoisted(() => ({ current: null as unknown }))
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner.current,
-}))
-vi.mock('../../src/runtime/control-server.js', async () => {
-  const { quietControlServer } = await import('../helpers/foundry-host.js')
-  return { createControlServer: async () => quietControlServer() }
-})
-
-const { fakeRunner } = await import('../helpers/foundry-host.js')
-const theRunner = fakeRunner()
-runner.current = theRunner
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 const pullOf = (orderId: string): string =>
   `https://github.com/owner/app/pull/${orderId.replace('WO-', '')}`
@@ -58,28 +49,27 @@ afterAll(async () => {
 })
 
 /** GitHub: one draft per order's branch, green checks, and merged once `merged` says so. */
-function githubAnswers(): void {
+function githubWithADraftPerOrder(): void {
   let run = 0
   host.gh.mockImplementation(async ({ args }: { args: string[] }) => {
-    const answer = (stdout: string) => ({ exitCode: 0, stdout, stderr: '', timedOut: false })
     const verb = `${args[0]} ${args[1]}`
-    if (verb === 'pr list') return answer('[]')
+    if (verb === 'pr list') return execSucceeded('[]')
     if (verb === 'pr create') {
       const head = args[args.indexOf('--head') + 1]
-      return answer(`${pullOf(head.replace('foundry/wo-', 'WO-'))}\n`)
+      return execSucceeded(`${pullOf(head.replace('foundry/wo-', 'WO-'))}\n`)
     }
-    if (verb === 'pr checks') return answer(checks('pass', ++run))
+    if (verb === 'pr checks') return execSucceeded(checks('pass', ++run))
     if (verb === 'pr view') {
-      return answer(JSON.stringify({ state: merged.has(args[2]) ? 'MERGED' : 'OPEN' }))
+      return execSucceeded(JSON.stringify({ state: merged.has(args[2]) ? 'MERGED' : 'OPEN' }))
     }
-    return answer('')
+    return execSucceeded('')
   })
 }
 
 async function shipBoth(): Promise<void> {
   const store = createOrderStore(dataDir)
-  await store.save(agreedOrder(repo, { id: 'WO-1', agreedAt: '2026-10-12T10:01:00.000Z' }))
-  await store.save(agreedOrder(repo, { id: 'WO-2', agreedAt: '2026-10-12T10:02:00.000Z' }))
+  await store.save(agreedLineOrder(repo, { id: 'WO-1', agreedAt: '2026-10-12T10:01:00.000Z' }))
+  await store.save(agreedLineOrder(repo, { id: 'WO-2', agreedAt: '2026-10-12T10:02:00.000Z' }))
   for (const id of ['WO-1', 'WO-2']) {
     await host.call('foundry:run.start', { id, recipe: 'direct' })
     await vi.waitFor(async () => expect((await store.load(id))?.status).toBe('shipped'), {
@@ -98,10 +88,6 @@ async function mergeFirst(): Promise<void> {
   merged.add(pullOf('WO-1'))
 }
 
-async function ledgerOf(id: string): Promise<string[]> {
-  return (await createOrderStore(dataDir).entries(id)).map((entry) => entry.action)
-}
-
 beforeEach(async () => {
   const parent = temporaryDirectory('fdry-refinery-order')
   dataDir = path.join(parent, 'records')
@@ -109,7 +95,7 @@ beforeEach(async () => {
   merged.clear()
   theRunner.runCommand.mockReset().mockResolvedValue(0)
   agentsAnswer(theRunner, parent)
-  githubAnswers()
+  githubWithADraftPerOrder()
 })
 
 describe('a minute after an order merged', () => {
@@ -125,11 +111,14 @@ function rebasingTests() {
     host.gh.mockClear()
 
     await vi.advanceTimersByTimeAsync(60_000)
-    await vi.waitFor(async () => expect(await ledgerOf('WO-2')).toContain('refinery.rebased'), {
-      timeout: 20_000,
-      interval: 100,
-    })
-    expect(await ledgerOf('WO-1')).toContain('refinery.merged')
+    await vi.waitFor(
+      async () => expect(await ledgerActions(dataDir, 'WO-2')).toContain('refinery.rebased'),
+      {
+        timeout: 20_000,
+        interval: 100,
+      }
+    )
+    expect(await ledgerActions(dataDir, 'WO-1')).toContain('refinery.merged')
     // The rebased branch is the one on the remote, and CI was asked about it again.
     await vi.waitFor(() =>
       expect(host.gh).toHaveBeenCalledWith(
@@ -150,17 +139,20 @@ function aFailedRebaseTests() {
   it('puts an order that no longer rebases in front of the operator', async () => {
     await shipBoth()
     // main moves under WO-2's own file with different contents.
-    const clash = path.join(checkoutPath(dataDir, agreedOrder(repo, { id: 'WO-1' }), 'app'))
+    const clash = path.join(checkoutPath(dataDir, agreedLineOrder(repo, { id: 'WO-1' }), 'app'))
     fs.writeFileSync(path.join(clash, 'wo-2.css'), 'a { color: blue }\n')
     await realGit({ command: 'git', args: ['add', '-A'], cwd: clash })
     await realGit({ command: 'git', args: ['commit', '-q', '-m', 'blue'], cwd: clash })
     await mergeFirst()
 
     await vi.advanceTimersByTimeAsync(60_000)
-    await vi.waitFor(async () => expect(await ledgerOf('WO-2')).toContain('refinery.conflict'), {
-      timeout: 20_000,
-      interval: 100,
-    })
+    await vi.waitFor(
+      async () => expect(await ledgerActions(dataDir, 'WO-2')).toContain('refinery.conflict'),
+      {
+        timeout: 20_000,
+        interval: 100,
+      }
+    )
     const gates = await createGateStore(dataDir).list()
     expect(gates.find((gate) => gate.rule === 'refinery.conflict')).toMatchObject({
       orderId: 'WO-2',
@@ -175,7 +167,7 @@ function theMergedIssueTests() {
     try {
       const store = createOrderStore(dataDir)
       await store.save(
-        agreedOrder(repo, {
+        agreedLineOrder(repo, {
           id: 'WO-1',
           source: { kind: 'tracker', tracker: 'linear', key: 'ENG-1', url: null },
           writeBack: ['status'],

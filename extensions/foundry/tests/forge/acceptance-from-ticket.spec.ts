@@ -23,7 +23,7 @@ const TICKET = [
 describe('acceptanceFromTicket', () => {
   describe('taking the criteria', takingTheCriteriaTests)
   describe('other headings and lists', otherHeadingsAndListsTests)
-  describe('nothing stated', nothingStatedTests)
+  describe('nothing stated', acceptanceFromTicketNothingStatedTests)
 })
 
 function takingTheCriteriaTests() {
@@ -85,7 +85,7 @@ function otherHeadingsAndListsTests() {
   })
 }
 
-function nothingStatedTests() {
+function acceptanceFromTicketNothingStatedTests() {
   it('finds nothing in a ticket that states nothing', () => {
     expect(acceptanceFromTicket('# Summary\nJust do the thing.\n')).toEqual([])
     expect(acceptanceFromTicket('')).toEqual([])

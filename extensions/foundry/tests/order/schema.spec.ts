@@ -91,7 +91,7 @@ describe('parseWorkOrder', () => {
   describe('optional fields', optionalFieldsTests)
   describe('budgets', budgetsTests)
   describe('proof', proofTests)
-  describe('red-team findings', redTeamFindingsTests)
+  describe('red-team findings', schemaRedTeamFindingsTests)
   describe('rounds and categories', roundsAndCategoriesTests)
   describe('repositories', repositoriesTests)
 })
@@ -336,7 +336,7 @@ function proofTests() {
   })
 }
 
-function redTeamFindingsTests() {
+function schemaRedTeamFindingsTests() {
   it('rejects a red-team finding accepted without a reason, and keeps one with', () => {
     const o = valid() as Record<string, unknown>
     o.redTeam = [{ id: 'RT-1', text: 'ambiguous', status: 'accepted', reason: '' }]
@@ -402,7 +402,7 @@ describe('a signal-sourced order', () => {
 
 describe('draftOrder', () => {
   describe('parsing and lanes', parsingAndLanesTests)
-  describe('base branches', baseBranchesTests)
+  describe('base branches', schemaBaseBranchesTests)
   describe('nothing assumed', nothingAssumedTests)
 })
 
@@ -433,7 +433,7 @@ function parsingAndLanesTests() {
   })
 }
 
-function baseBranchesTests() {
+function schemaBaseBranchesTests() {
   it('defaults the base branch to main, and takes one when given', () => {
     const common = {
       id: 'WO-0101-aaa',

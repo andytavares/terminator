@@ -7,43 +7,22 @@
  * cover that — but that the channel a surface calls reaches it. Every bug this
  * branch shipped was in exactly that gap.
  */
-import { freshGlobalStorage } from '../helpers/foundry-host.js'
+import { freshFoundryStorage } from '../helpers/foundry-host.js'
 
 // A real userData, created before any spec mocks `node:fs`: the supervision
 // runtime writes its feed, mutes and per-session settings in Foundry's own
 // folder under it.
-const GLOBAL_STORAGE = freshGlobalStorage()
+const GLOBAL_STORAGE = freshFoundryStorage()
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { partialFake } from '../../../../tests/support/fakes'
 import { activate } from '../../src/index.ts'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
 
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn().mockReturnValue(false),
-    encryptString: vi.fn(),
-    decryptString: vi.fn(),
-  },
-}))
-
-const runner = {
-  start: vi.fn(),
-  resolve: vi.fn(),
-  handBackToTerminal: vi.fn(),
-  interrupt: vi.fn(),
-  stop: vi.fn().mockReturnValue(true),
-  send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue({ terminalSessionId: 'terminal-1', projectId: 'project-1' }),
-  watchable: vi.fn().mockReturnValue([]),
-  dispose: vi.fn(),
-}
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner,
-}))
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 vi.mock('../../src/runner/agent-runner.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
@@ -52,16 +31,6 @@ vi.mock('../../src/runner/agent-runner.js', async (importOriginal) => {
     setPermissionSink: () => undefined,
   }
 })
-
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
 
 // Reading a transcript is a file read; the run's path is fabricated here.
 vi.mock('../../src/runtime/transcript-excerpt.js', () => ({
@@ -161,9 +130,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  runner.stop.mockReturnValue(true)
-  runner.send.mockReturnValue(true)
-  runner.terminalFor.mockReturnValue({ terminalSessionId: 'terminal-1', projectId: 'project-1' })
+  theRunner.stop.mockReturnValue(true)
+  theRunner.send.mockReturnValue(true)
+  theRunner.terminalFor.mockReturnValue({ terminalSessionId: 'terminal-1', projectId: 'project-1' })
   exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
 })
 
@@ -201,7 +170,7 @@ describe('going to a run', () => {
   })
 
   it('says so rather than navigating nowhere once the run has ended', async () => {
-    runner.terminalFor.mockReturnValue(null)
+    theRunner.terminalFor.mockReturnValue(null)
     expect(await call('foundry:run-terminal', { sessionId: 'gone' })).toEqual({ ok: false })
     expect(vi.mocked(api.window.broadcast).mock.calls).not.toContainEqual([
       'terminal:navigate-to-session',
@@ -232,7 +201,7 @@ describe('interrupting and redirecting', () => {
 function interruptingTests() {
   it('interrupts the session', async () => {
     expect(await call('foundry:run-interrupt', { sessionId: 'session-1' })).toEqual({ ok: true })
-    expect(runner.interrupt).toHaveBeenCalledWith('session-1')
+    expect(theRunner.interrupt).toHaveBeenCalledWith('session-1')
   })
 
   it('ends the turn before sending, or the redirect queues behind it', async () => {
@@ -240,8 +209,8 @@ function interruptingTests() {
       sessionId: 'session-1',
       message: 'try the other approach',
     })
-    expect(runner.interrupt).toHaveBeenCalledWith('session-1')
-    expect(runner.send).toHaveBeenCalledWith('session-1', 'try the other approach')
+    expect(theRunner.interrupt).toHaveBeenCalledWith('session-1')
+    expect(theRunner.send).toHaveBeenCalledWith('session-1', 'try the other approach')
   })
 }
 
@@ -256,7 +225,7 @@ function refusingAndRecordingTests() {
     expect(await call('foundry:run-redirect', { sessionId: 'session-1', message: '   ' })).toEqual({
       ok: false,
     })
-    expect(runner.interrupt).not.toHaveBeenCalled()
+    expect(theRunner.interrupt).not.toHaveBeenCalled()
   })
 
   it('records the redirect, attributed to the pilot', async () => {
@@ -276,11 +245,11 @@ function refusingAndRecordingTests() {
 describe('ending a run', () => {
   it('stops it with the reason, so the agent record carries it', async () => {
     await call('foundry:run-stop', { sessionId: 'session-1', reason: 'wrong branch' })
-    expect(runner.stop).toHaveBeenCalledWith('session-1', 'wrong branch')
+    expect(theRunner.stop).toHaveBeenCalledWith('session-1', 'wrong branch')
   })
 
   it('reports a stop that did not land', async () => {
-    runner.stop.mockReturnValue(false)
+    theRunner.stop.mockReturnValue(false)
     expect(await call('foundry:run-stop', { sessionId: 'gone' })).toEqual({ ok: false })
   })
 })

@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useRunObservation } from '../../src/renderer/use-run-observation.js'
 import { createChangeBus } from '../helpers/change-bus.js'
+import { timesInvoked } from '../helpers/bridge-calls.js'
+import { settlePushedReads } from '../helpers/fake-time.js'
 
-// The pushed half of the Floor: fetch the run's observation and the pending
-// asks against it on mount and again when Foundry says they changed, without
-// the rest of the Floor's own state (review, feed, stalls, transcript) along
-// for the ride.
+// The pushed half of the Floor: the run's observation and its pending asks, read on mount and
+// again when Foundry says they changed, without the rest of the Floor's state.
 
 const NODES = [
   {
@@ -68,17 +68,14 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-const observed = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe').length
-const settle = () => act(async () => void (await vi.advanceTimersByTimeAsync(200)))
-
 describe('useRunObservation', () => {
-  describe('reading', readingTests)
+  describe('reading', runObservationReadingTests)
   describe('live changes', liveChangesTests)
   describe('errors and unmount', errorsAndUnmountTests)
   describe('a new order id', aNewOrderIdTests)
 })
 
-function readingTests() {
+function runObservationReadingTests() {
   it('reads the observation and the pending asks on mount', async () => {
     mockBridge(reply(), [ASK])
     const { result } = renderHook(() => useRunObservation('WO-1'))
@@ -93,41 +90,39 @@ function readingTests() {
   it('reads the observation again when a record of this order changes', async () => {
     mockBridge(reply())
     renderHook(() => useRunObservation('WO-1'))
-    await waitFor(() => expect(observed()).toBe(1))
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:run.observe')).toBe(1))
 
     for (const kind of ['order', 'graph', 'gates', 'ledger'] as const) {
-      const before = observed()
+      const before = timesInvoked(invoke, 'foundry:run.observe')
       bus.emit({ kind, orderId: 'WO-1' })
-      await settle()
-      expect(observed(), kind).toBe(before + 1)
+      await settlePushedReads()
+      expect(timesInvoked(invoke, 'foundry:run.observe'), kind).toBe(before + 1)
     }
   })
 }
 
 function liveChangesTests() {
-  const asked = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:permissions-list').length
-
   it('does not read again for another order, nor for time passing', async () => {
     mockBridge(reply())
     renderHook(() => useRunObservation('WO-1'))
-    await waitFor(() => expect(observed()).toBe(1))
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:run.observe')).toBe(1))
 
     bus.emit({ kind: 'graph', orderId: 'WO-2' })
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000)
     })
-    expect(observed()).toBe(1)
-    expect(asked()).toBe(1)
+    expect(timesInvoked(invoke, 'foundry:run.observe')).toBe(1)
+    expect(timesInvoked(invoke, 'foundry:permissions-list')).toBe(1)
   })
 
   it('reads the pending asks again on a live change, whichever order it names', async () => {
     mockBridge(reply())
     renderHook(() => useRunObservation('WO-1'))
-    await waitFor(() => expect(asked()).toBe(1))
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:permissions-list')).toBe(1))
 
     bus.emit({ kind: 'live', orderId: '' })
-    await settle()
-    expect(asked()).toBe(2)
+    await settlePushedReads()
+    expect(timesInvoked(invoke, 'foundry:permissions-list')).toBe(2)
   })
 }
 
@@ -155,10 +150,10 @@ function errorsAndUnmountTests() {
       expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe')).toHaveLength(1)
     )
     unmount()
-    const before = observed()
+    const before = timesInvoked(invoke, 'foundry:run.observe')
     bus.emit({ kind: 'graph', orderId: 'WO-1' })
-    await settle()
-    expect(observed()).toBe(before)
+    await settlePushedReads()
+    expect(timesInvoked(invoke, 'foundry:run.observe')).toBe(before)
   })
 }
 

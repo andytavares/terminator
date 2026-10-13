@@ -3,8 +3,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
 import { HallScene } from '../../../src/components/factory/HallScene.js'
 import type { HallMap, HallProp } from '../../../src/factory/layout.js'
-import type { Crew, World } from '../../../src/factory/sim.js'
+import type { Crew } from '../../../src/factory/sim.js'
 import { partialFake } from '../../../../../tests/support/fakes'
+import { idleWorld } from '../../helpers/hall-views.js'
 
 // What HallScene.spec.tsx leaves out: the light a working station gives off —
 // a hot press, a crew member scanning at the rack — and a loop that stops
@@ -23,7 +24,7 @@ const PRESS: HallProp = {
   sign: null,
 }
 
-function map(props: HallProp[] = []): HallMap {
+function emptyHallMap(props: HallProp[] = []): HallMap {
   const solid = Array.from({ length: 6 }, () => Array(6).fill(false))
   return {
     width: 6,
@@ -45,20 +46,6 @@ function map(props: HallProp[] = []): HallMap {
       wait: { x: 3, y: 2 },
     },
     lights: [],
-  }
-}
-
-function world(on: HallMap, crew: Crew[] = []): World {
-  return {
-    map: on,
-    crew,
-    crates: [],
-    gatesWaiting: [],
-    openCalls: [],
-    verdicts: [],
-    clockMs: 0,
-    ci: null,
-    queue: null,
   }
 }
 
@@ -111,32 +98,32 @@ afterEach(() => {
 
 function drawOnce(on: HallMap, states: Record<string, 'running' | 'passed'>, crew: Crew[] = []) {
   render(
-    <HallScene map={on} worldRef={{ current: world(on, crew) }} states={states} reducedMotion />
+    <HallScene map={on} worldRef={{ current: idleWorld(on, crew) }} states={states} reducedMotion />
   )
 }
 
 describe('the light a working station gives off', () => {
   it('glows over a press whose step is running, and not once it has passed', () => {
-    drawOnce(map([PRESS]), { 'N-1': 'running' })
+    drawOnce(emptyHallMap([PRESS]), { 'N-1': 'running' })
     expect(stops).toContain('rgba(230,160,60,.35)')
     cleanup()
     stops = []
-    drawOnce(map([PRESS]), { 'N-1': 'passed' })
+    drawOnce(emptyHallMap([PRESS]), { 'N-1': 'passed' })
     expect(stops).not.toContain('rgba(230,160,60,.35)')
   })
 
   it('glows over a crew member scanning, and not over one who has gone', () => {
-    drawOnce(map(), {}, [scanning])
+    drawOnce(emptyHallMap(), {}, [scanning])
     expect(stops).toContain('rgba(140,230,120,.3)')
     cleanup()
     stops = []
-    drawOnce(map(), {}, [{ ...scanning, present: false }])
+    drawOnce(emptyHallMap(), {}, [{ ...scanning, present: false }])
     expect(stops).not.toContain('rgba(140,230,120,.3)')
   })
 })
 
 describe('a hidden page', () => {
-  function setHidden(hidden: boolean): void {
+  function setPageHidden(hidden: boolean): void {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
     document.dispatchEvent(new Event('visibilitychange'))
   }
@@ -147,16 +134,16 @@ describe('a hidden page', () => {
     const cancel = vi.fn()
     vi.stubGlobal('requestAnimationFrame', raf)
     vi.stubGlobal('cancelAnimationFrame', cancel)
-    const on = map()
-    render(<HallScene map={on} worldRef={{ current: world(on) }} states={{}} />)
+    const on = emptyHallMap()
+    render(<HallScene map={on} worldRef={{ current: idleWorld(on) }} states={{}} />)
     expect(raf).toHaveBeenCalledTimes(1)
-    setHidden(true)
+    setPageHidden(true)
     expect(cancel).toHaveBeenCalledWith(1)
-    setHidden(true)
+    setPageHidden(true)
     expect(raf).toHaveBeenCalledTimes(1)
-    setHidden(false)
+    setPageHidden(false)
     expect(raf).toHaveBeenCalledTimes(2)
-    setHidden(false)
+    setPageHidden(false)
     expect(raf).toHaveBeenCalledTimes(2)
     Reflect.deleteProperty(document, 'hidden')
   })

@@ -34,7 +34,7 @@ const CRITERION = {
 
 describe('what a proposal may contain', () => {
   describe('taking', takingTests)
-  describe('refusing', refusingTests)
+  describe('refusing', proposalRefusingTests)
   describe('empty proposals and unprovable criteria', emptyProposalsAndUnprovableCriteriaTests)
 })
 
@@ -51,7 +51,7 @@ function takingTests() {
   })
 }
 
-function refusingTests() {
+function proposalRefusingTests() {
   it('refuses a status, rather than quietly dropping it', () => {
     // An agent that tried it will try again, and the operator should know.
     expect(() => parseProposal({ status: 'agreed' })).toThrow(ProposalRejected)
@@ -83,7 +83,7 @@ function emptyProposalsAndUnprovableCriteriaTests() {
 describe('merging one in', () => {
   describe('untouched fields and budgets', untouchedFieldsAndBudgetsTests)
   describe('what it said', whatItSaidTests)
-  describe('struck assumptions', struckAssumptionsTests)
+  describe('struck assumptions', proposalStruckAssumptionsTests)
   describe('answered questions', answeredQuestionsTests)
   describe('new assumptions and plans', newAssumptionsAndPlansTests)
   describe('intent, risk and refusals', intentRiskAndRefusalsTests)
@@ -127,7 +127,7 @@ function whatItSaidTests() {
   })
 }
 
-function struckAssumptionsTests() {
+function proposalStruckAssumptionsTests() {
   it('keeps a struck assumption struck, however the architect restates it', () => {
     const before = order({
       assumptions: [{ id: 'A-1', text: 'sessions are in Redis', struck: true, affects: [] }],
@@ -214,12 +214,12 @@ function intentRiskAndRefusalsTests() {
 }
 
 describe('what an agent read, as opposed to what Foundry measured', () => {
-  describe('findings', findingsTests)
+  describe('findings', proposalFindingsTests)
   describe('the measured half', theMeasuredHalfTests)
   describe('leaving alone', leavingAloneTests)
 })
 
-function findingsTests() {
+function proposalFindingsTests() {
   it('takes the findings half of context', () => {
     const after = applyProposal(
       order(),

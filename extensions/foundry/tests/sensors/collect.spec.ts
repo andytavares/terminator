@@ -3,14 +3,11 @@ import { collect } from '../../src/sensors/collect.js'
 import type { CollectDeps } from '../../src/sensors/collect.js'
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
 import type { SensorSource } from '../../src/sensors/types.js'
+import { execSucceeded } from '../helpers/foundry-host.js'
 
 // Collectors turn one sensor source into sensed items, or a one-sentence
 // problem when the command they depend on fails. They never throw: a bad
 // `gh` call is a signal about the environment, not the sensor's own bug.
-
-function ok(stdout: string): ExecResult {
-  return { exitCode: 0, stdout, stderr: '', timedOut: false }
-}
 
 function fail(stderr: string): ExecResult {
   return { exitCode: 1, stdout: '', stderr, timedOut: false }
@@ -82,7 +79,7 @@ const RUN_LIST_ARGS = [
 
 function mappingRunsTests() {
   it('maps failed runs to one item each, keyed by workflow', async () => {
-    const exec = queuedExec([ok(JSON.stringify(FAILED_RUNS))])
+    const exec = queuedExec([execSucceeded(JSON.stringify(FAILED_RUNS))])
     const result = await collect(runsSource, deps({ exec }))
 
     expect(result.problem).toBeNull()
@@ -107,7 +104,7 @@ function mappingRunsTests() {
 
 function theDefaultBranchTests() {
   it('resolves the default branch first when branch is null', async () => {
-    const exec = queuedExec([ok('main\n'), ok('[]')])
+    const exec = queuedExec([execSucceeded('main\n'), execSucceeded('[]')])
     const source: SensorSource = { kind: 'github-runs', branch: null, limit: 10 }
 
     const result = await collect(source, deps({ exec }))
@@ -152,7 +149,7 @@ function problemsTests() {
   })
 
   it('reports a problem when gh run list returns output that does not parse', async () => {
-    const exec = queuedExec([ok('not json')])
+    const exec = queuedExec([execSucceeded('not json')])
 
     const result = await collect(runsSource, deps({ exec }))
 
@@ -206,7 +203,7 @@ const ISSUE_LIST_ARGS = [
 
 function normalisingTitlesTests() {
   it('normalises titles with digits and paths into one shared key', async () => {
-    const exec = queuedExec([ok(JSON.stringify(CRASHES))])
+    const exec = queuedExec([execSucceeded(JSON.stringify(CRASHES))])
 
     const result = await collect(issuesSource, deps({ exec }))
 
@@ -234,7 +231,7 @@ function issueProblemsTests() {
 
   it('dates an issue gh gave no update time by when it was sensed', async () => {
     const [crash] = CRASHES
-    const exec = queuedExec([ok(JSON.stringify([{ ...crash, updatedAt: undefined }]))])
+    const exec = queuedExec([execSucceeded(JSON.stringify([{ ...crash, updatedAt: undefined }]))])
 
     const result = await collect(issuesSource, deps({ exec }))
 
@@ -242,7 +239,7 @@ function issueProblemsTests() {
   })
 
   it('reports a problem when gh issue list returns output that does not parse', async () => {
-    const exec = queuedExec([ok('not json')])
+    const exec = queuedExec([execSucceeded('not json')])
 
     const result = await collect(issuesSource, deps({ exec }))
 
