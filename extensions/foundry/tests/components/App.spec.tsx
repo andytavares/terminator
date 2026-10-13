@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { App } from '../../src/renderer/App.js'
+import '../helpers/app-views.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 

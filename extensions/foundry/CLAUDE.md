@@ -99,38 +99,39 @@ not only against its specs.
 the module that owns each part, and `deactivate` asks each to stop. Add code to
 the owning module, never back into `index.ts`.
 
-| Responsibility                                                                                | Module                                                                                            |
-| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Registering a channel (`reg`), the disposables, `ActivationContext`                           | `src/ipc/register.ts`                                                                             |
-| Where the records live, the untracked notice, the three rungs (`resolveSources`)              | `src/workspace-root.ts` (at `src/` because `resolveSources` finds the built-ins from `__dirname`) |
-| Foundry's own folder, moving its data out of the shared userData folder                       | `src/storage-folder.ts`                                                                           |
-| The in-memory index, `announceLive`, `indexFor`, the store helpers                            | `src/state/live-index.ts`                                                                         |
-| Setting readers (autonomy, models, budgets, critical paths, read-only tools)                  | `src/state/settings.ts`                                                                           |
-| The settings page contribution                                                                | `src/state/settings-schema.ts`                                                                    |
-| The supervision runtime's parts (`runtime`), held calls, stalls, stranded agents              | `src/runtime/runtime-state.ts`                                                                    |
-| Starting and stopping the runtime, the stall watcher                                          | `src/runtime/supervision-runtime.ts`                                                              |
-| Notifications for a held call, `notePending` / `noteResolved`                                 | `src/runtime/held-calls.ts`                                                                       |
-| The palette's run entries and `gotoRun`                                                       | `src/runtime/palette-commands.ts`                                                                 |
-| Workspace trust, the probed-command and read-only decisions                                   | `src/runtime/agent-policy.ts`                                                                     |
-| The tracker port and write-back deps                                                          | `src/trackers/issues-port.ts`                                                                     |
-| The sensor tick                                                                               | `src/sensors/sensor-tick.ts`                                                                      |
-| One architect turn, one read-only round (red team, scout)                                     | `src/forge/intake-turn.ts`, `src/forge/intake-sessions.ts`                                        |
-| The Forge loop: follow-ups, review rounds, hand-off, release                                  | `src/forge/forge-loop.ts`                                                                         |
-| The executor's deps (worktrees, sessions, rungs)                                              | `src/line/executor-deps.ts`                                                                       |
-| One run's shared context (`OrderRun`, `RunContext`), checkouts, conversations                 | `src/line/run-context.ts`                                                                         |
-| One node's agent session, from launch to the end of its turn                                  | `src/line/node-session.ts`                                                                        |
-| Rungs and commands in a lane's checkout, the base checkout, reinstall                         | `src/line/lane-commands.ts`                                                                       |
-| Running an order to its tail                                                                  | `src/line/execute-run.ts`                                                                         |
-| Shipping and CI round deps, settling the ship node                                            | `src/line/ship-deps.ts`                                                                           |
-| One more CI round on drafts already open (inbox "another round", refinery recheck)            | `src/line/ci-round-again.ts`                                                                      |
-| Stopping an order, adopting runs a previous process left                                      | `src/line/run-control.ts`                                                                         |
-| The refinery tick                                                                             | `src/line/refinery-run.ts`                                                                        |
-| Standings drawn from this process, "deciding"                                                 | `src/ipc/standing.ts`                                                                             |
-| Channel registration per surface                                                              | `src/ipc/{forge,line,inbox,record,supervision,model,ui}-registration.ts`                          |
-| The Forge's state (`useForgeState`), what it draws (`deriveForge`), its steps (`STEP_BODIES`) | `src/components/Forge.tsx`                                                                        |
-| The Floor's state (`useFloor`) and its panels                                                 | `src/components/Floor.tsx`                                                                        |
-| The factory hall's state (`useFactoryHall`), what it draws (`hallModel`), its parts           | `src/components/factory/FactoryHall.tsx`                                                          |
-| The signal dock's poll and promotion, shared by the Inbox and the factory site                | `src/renderer/use-signals.ts`                                                                     |
+| Responsibility                                                                                               | Module                                                                                            |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Registering a channel (`reg`), the disposables, `ActivationContext`                                          | `src/ipc/register.ts`                                                                             |
+| Where the records live, the untracked notice, the three rungs (`resolveSources`)                             | `src/workspace-root.ts` (at `src/` because `resolveSources` finds the built-ins from `__dirname`) |
+| Foundry's own folder, moving its data out of the shared userData folder                                      | `src/storage-folder.ts`                                                                           |
+| The in-memory index, `announceLive`, `indexFor`, the store helpers                                           | `src/state/live-index.ts`                                                                         |
+| Setting readers (autonomy, models, budgets, critical paths, read-only tools)                                 | `src/state/settings.ts`                                                                           |
+| The settings page contribution                                                                               | `src/state/settings-schema.ts`                                                                    |
+| The supervision runtime's parts (`runtime`), held calls, stalls, stranded agents                             | `src/runtime/runtime-state.ts`                                                                    |
+| Starting and stopping the runtime, the stall watcher                                                         | `src/runtime/supervision-runtime.ts`                                                              |
+| Notifications for a held call, `notePending` / `noteResolved`                                                | `src/runtime/held-calls.ts`                                                                       |
+| The palette's run entries and `gotoRun`                                                                      | `src/runtime/palette-commands.ts`                                                                 |
+| Workspace trust, the probed-command and read-only decisions                                                  | `src/runtime/agent-policy.ts`                                                                     |
+| The tracker port and write-back deps                                                                         | `src/trackers/issues-port.ts`                                                                     |
+| The sensor tick                                                                                              | `src/sensors/sensor-tick.ts`                                                                      |
+| One architect turn, one read-only round (red team, scout)                                                    | `src/forge/intake-turn.ts`, `src/forge/intake-sessions.ts`                                        |
+| The Forge loop: follow-ups, review rounds, hand-off, release                                                 | `src/forge/forge-loop.ts`                                                                         |
+| The executor's deps (worktrees, sessions, rungs)                                                             | `src/line/executor-deps.ts`                                                                       |
+| One run's shared context (`OrderRun`, `RunContext`), checkouts, conversations                                | `src/line/run-context.ts`                                                                         |
+| One node's agent session, from launch to the end of its turn                                                 | `src/line/node-session.ts`                                                                        |
+| Rungs and commands in a lane's checkout, the base checkout, reinstall                                        | `src/line/lane-commands.ts`                                                                       |
+| Running an order to its tail                                                                                 | `src/line/execute-run.ts`                                                                         |
+| Shipping and CI round deps, settling the ship node                                                           | `src/line/ship-deps.ts`                                                                           |
+| One more CI round on drafts already open (inbox "another round", refinery recheck)                           | `src/line/ci-round-again.ts`                                                                      |
+| Stopping an order, adopting runs a previous process left                                                     | `src/line/run-control.ts`                                                                         |
+| The refinery tick                                                                                            | `src/line/refinery-run.ts`                                                                        |
+| Standings drawn from this process, "deciding"                                                                | `src/ipc/standing.ts`                                                                             |
+| Channel registration per surface                                                                             | `src/ipc/{forge,line,inbox,record,supervision,model,ui}-registration.ts`                          |
+| The Forge's state (`useForgeState`), what it draws (`deriveForge`), its steps (`STEP_BODIES`)                | `src/components/Forge.tsx`                                                                        |
+| The Floor's state (`useFloor`) and its panels                                                                | `src/components/Floor.tsx`                                                                        |
+| The factory hall's state (`useFactoryHall`), what it draws (`hallModel`), its parts                          | `src/components/factory/FactoryHall.tsx`                                                          |
+| The signal dock's poll and promotion, shared by the Inbox and the factory site                               | `src/renderer/use-signals.ts`                                                                     |
+| The window's chrome; each view loaded with `React.lazy` as its own chunk (budget: `vite.renderer.config.ts`) | `src/renderer/App.tsx`                                                                            |
 
 ## Extension Isolation (MANDATORY)
 
