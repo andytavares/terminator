@@ -5,15 +5,11 @@ import { useExtensionRegistry } from './extensions/registry'
 import { ToastContainer } from './components/ToastContainer'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
-export function ExtensionWindowView({ view }: { view: string }): JSX.Element {
+/** Loads the settings and follows their theme, as the main window does. */
+function useWindowTheme(): void {
   const { loadSettings, resolvedTheme } = useSettingsStore(
     useShallow((s) => ({ loadSettings: s.loadSettings, resolvedTheme: s.resolvedTheme }))
   )
-  const params = new URLSearchParams(window.location.search)
-  const repoRoot = params.get('repoRoot')
-  const accentColor = params.get('accentColor')
-  const windowViews = useExtensionRegistry((s) => s.windowViews)
-  const ViewComponent = windowViews.get(view)
 
   useEffect(() => {
     loadSettings()
@@ -22,6 +18,15 @@ export function ExtensionWindowView({ view }: { view: string }): JSX.Element {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', resolvedTheme)
   }, [resolvedTheme])
+}
+
+export function ExtensionWindowView({ view }: { view: string }): JSX.Element {
+  useWindowTheme()
+  const params = new URLSearchParams(window.location.search)
+  const repoRoot = params.get('repoRoot')
+  const accentColor = params.get('accentColor')
+  const windowViews = useExtensionRegistry((s) => s.windowViews)
+  const ViewComponent = windowViews.get(view)
 
   return (
     <ErrorBoundary>
