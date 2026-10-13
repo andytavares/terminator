@@ -1,19 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { promisify } from 'node:util'
+import type { ShellExecInput } from '../../../src/main/shell/shell-executor'
 
-// git-service.ts runs `promisify(execFile)`. Node's execFile carries a
-// [util.promisify.custom] function that resolves with { stdout, stderr };
-// the fake carries one too, and it is the function every case drives.
-type PromisifiedExecFile = (
+// git-service.ts runs git through runCommand (src/main/shell/shell-executor.ts).
+// Every case drives this fake, which gets the command, its arguments and its
+// options, and resolves with git's output or rejects with its error.
+type GitRun = (
   command: string,
   args: string[],
-  options: { cwd: string }
+  options: { cwd: string; env: NodeJS.ProcessEnv }
 ) => Promise<{ stdout: string; stderr: string }>
-const execFileCustom = vi.hoisted(() => vi.fn<PromisifiedExecFile>())
+const execFileCustom = vi.hoisted(() => vi.fn<GitRun>())
 const customMock = () => execFileCustom
 
-vi.mock('child_process', () => ({
-  execFile: Object.assign(vi.fn(), { [promisify.custom]: execFileCustom }),
+vi.mock('../../../src/main/shell/shell-executor.js', () => ({
+  runCommand: (input: ShellExecInput, env: NodeJS.ProcessEnv) =>
+    execFileCustom(input.command, input.args, { cwd: input.cwd, env }).then(
+      ({ stdout, stderr }) => ({ exitCode: 0, stdout, stderr, timedOut: false }),
+      (error: Error) => ({ exitCode: 1, stdout: '', stderr: error.message, timedOut: false })
+    ),
 }))
 
 function mockResolve(stdout: string) {

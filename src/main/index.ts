@@ -25,6 +25,7 @@ import { registerSessionRecordsHandlers } from './ipc/session-records.ipc.js'
 import { ensureHookScript } from './integrations/context-sync.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { startAdoptingLoginShellPath } from './shell/login-shell-path.js'
+import { stopRunningCommands } from './shell/shell-executor.js'
 import { registerEditorHandlers } from './ipc/editor.ipc.js'
 import { registerFsHandlers } from './ipc/fs.ipc.js'
 import { registerLogHandlers } from './ipc/log.ipc.js'
@@ -567,6 +568,9 @@ app.on('before-quit', async (event) => {
   isQuitting = true
   await extensionHost.unloadAll()
   extensionHostProcess.stop()
+  // After the extensions, which start most of them: a git or gh command still
+  // running, and whatever it started, would outlive the app.
+  stopRunningCommands()
   await ptyManager.killAll()
   closeAppDb()
   app.exit(0)
