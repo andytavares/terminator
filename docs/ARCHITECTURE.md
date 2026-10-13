@@ -841,7 +841,7 @@ See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural deci
 
 The Git project tab (status, staging, commit, pull requests), the Code Reviews workspace tab and the Reviews global tab. It runs git and gh through `api.shell.exec` and `api.github`, and is the only git parser in the repository ([ADR 094](adr/094-extensions-follow-the-vs-code-model.md) ended ADR-025's two parsers).
 
-Its e2e specs run against real local repositories with a bare `origin` and a stub GitHub at the boundary the app has, the gh CLI: `tests/e2e/fixtures/bin/gh`, on the app's PATH beside the `claude` stub, forwards a call to `tests/e2e/github-stub.ts` when the app's `XDG_CONFIG_HOME` holds `gh/e2e-stub-url`, and otherwise runs the real gh. gh itself cannot be pointed at a local server (`GH_HOST` means HTTPS to `<host>/api/v3`, and the core passes no `GH_HOST`). Each extension view is a WebContentsView, which Playwright lists among the app's windows, so `tests/e2e/git-harness.ts` drives it as a page.
+Its e2e specs run against real local repositories with a bare `origin` and a stub GitHub at the boundary the app has, the gh CLI: `tests/e2e/fixtures/bin/gh`, on the app's PATH beside the `claude` stub, forwards a call to `tests/e2e/github-stub.ts` when the app's `XDG_CONFIG_HOME` holds `gh/e2e-stub-url`, and otherwise runs the real gh: the next gh on PATH whose real path is not the stub's own, since PATH reaches the stub as `fixtures/zdotdir/../bin` too. gh itself cannot be pointed at a local server (`GH_HOST` means HTTPS to `<host>/api/v3`, and the core passes no `GH_HOST`). Each extension view is a WebContentsView, which Playwright lists among the app's windows, so `tests/e2e/git-harness.ts` drives it as a page.
 
 #### The review window
 
