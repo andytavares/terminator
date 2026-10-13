@@ -62,32 +62,38 @@ describe('dueSensors', () => {
   })
 })
 
-describe('runSensor', () => {
-  function fakeCollectDeps(over: Partial<CollectDeps> = {}): CollectDeps {
-    return {
-      exec: async () => ({ exitCode: 0, stdout: '[]', stderr: '', timedOut: false }),
-      cwd: '/repo',
-      issues: null,
-      now: () => '2026-01-01T00:20:00.000Z',
-      ...over,
-    }
+function fakeCollectDeps(over: Partial<CollectDeps> = {}): CollectDeps {
+  return {
+    exec: async () => ({ exitCode: 0, stdout: '[]', stderr: '', timedOut: false }),
+    cwd: '/repo',
+    issues: null,
+    now: () => '2026-01-01T00:20:00.000Z',
+    ...over,
   }
+}
 
+describe('runSensor', () => {
+  describe('recording', recordingTests)
+  describe('failures', failuresTests)
+})
+
+/** gh listing one open bug. */
+const LOGIN_CRASHES = {
+  exitCode: 0,
+  stdout: JSON.stringify([
+    { title: 'Login crashes', url: 'https://x/1', updatedAt: '2026-01-01T00:00:00.000Z' },
+  ]),
+  stderr: '',
+  timedOut: false,
+}
+
+function recordingTests() {
   it('records a signal collected this run and remembers when it ran', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
     const def = sensor({ source: { kind: 'github-issues', label: 'bug', limit: 5 } })
 
-    const collectDeps = fakeCollectDeps({
-      exec: async () => ({
-        exitCode: 0,
-        stdout: JSON.stringify([
-          { title: 'Login crashes', url: 'https://x/1', updatedAt: '2026-01-01T00:00:00.000Z' },
-        ]),
-        stderr: '',
-        timedOut: false,
-      }),
-    })
+    const collectDeps = fakeCollectDeps({ exec: async () => LOGIN_CRASHES })
 
     const result = await runSensor(def, {
       store,
@@ -108,7 +114,9 @@ describe('runSensor', () => {
       lastProblem: null,
     })
   })
+}
 
+function failuresTests() {
   it('stores the problem and records nothing when the collector fails', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -131,4 +139,4 @@ describe('runSensor', () => {
     const states = await store.sensorState()
     expect(states['ci-flake'].lastProblem).toMatch(/gh issue list failed/)
   })
-})
+}

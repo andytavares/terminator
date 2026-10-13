@@ -54,6 +54,11 @@ beforeEach(() => vi.clearAllMocks())
 afterEach(() => vi.useRealTimers())
 
 describe('the orders list', () => {
+  describe('standings', standingsTests)
+  describe('older rows and refetching', olderRowsAndRefetchingTests)
+})
+
+function standingsTests() {
   it('says where each order stands, in the standing own words', async () => {
     mount([row({ standing: standing({ label: '2 to answer', turn: 'you' }) })])
     await waitFor(() => expect(screen.getByText('2 to answer')).toBeTruthy())
@@ -83,7 +88,9 @@ describe('the orders list', () => {
     await waitFor(() => expect(screen.getByText('halted')).toBeTruthy())
     expect(screen.queryByText('ready to hand off')).toBeNull()
   })
+}
 
+function olderRowsAndRefetchingTests() {
   // The row is polled, and a host mid-upgrade can answer without one.
   it('survives a row from an older shape that carries no standing', async () => {
     const { standing: _omitted, ...older } = row({ failures: 0 })
@@ -109,7 +116,7 @@ describe('the orders list', () => {
     await vi.advanceTimersByTimeAsync(60_000)
     expect(invoke.mock.calls.length).toBe(first)
   })
-})
+}
 
 describe('the New work order quick action', () => {
   it('leaves the idea box alone until asked', async () => {
@@ -137,36 +144,41 @@ describe('the New work order quick action', () => {
   })
 })
 
+function mountWith(offer: unknown, created: unknown = { key: 'TAV-16' }) {
+  const invoke = vi.fn(async (channel: string) => {
+    if (channel === 'foundry:order.list') return { orders: [] }
+    if (channel === 'foundry:ticket.offer') return { offer }
+    if (channel === 'foundry:ticket.create') return created
+    if (channel === 'foundry:order.create') return {}
+    return {}
+  })
+  ;(window as unknown as Record<string, unknown>).electronAPI = {
+    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+  }
+  render(<Orders repoRoot="/repos/app" />)
+  return invoke
+}
+async function submitIdea(text = 'Only list open tickets') {
+  const { fireEvent } = await import('@testing-library/react')
+  fireEvent.change(screen.getByLabelText('Describe what you want built or fixed'), {
+    target: { value: text },
+  })
+  fireEvent.click(screen.getByRole('button', { name: /New order/ }))
+  return fireEvent
+}
+const orderCreates = (invoke: ReturnType<typeof vi.fn>) =>
+  invoke.mock.calls.filter(([c]) => c === 'foundry:order.create').map(([, p]) => p)
+
 // Spec 061, FR-4: a typed idea is offered a Linear ticket before it becomes an
 // order, so the order — and its one project — are named after the ticket.
 describe('offering a ticket for a typed idea', () => {
-  function mountWith(offer: unknown, created: unknown = { key: 'TAV-16' }) {
-    const invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:order.list') return { orders: [] }
-      if (channel === 'foundry:ticket.offer') return { offer }
-      if (channel === 'foundry:ticket.create') return created
-      if (channel === 'foundry:order.create') return {}
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-    }
-    render(<Orders repoRoot="/repos/app" />)
-    return invoke
-  }
+  describe('seeding', seedingTests)
+  describe('declining', decliningTests)
+  describe('teams', teamsTests)
+  describe('failure', failureTests)
+})
 
-  async function submitIdea(text = 'Only list open tickets') {
-    const { fireEvent } = await import('@testing-library/react')
-    fireEvent.change(screen.getByLabelText('Describe what you want built or fixed'), {
-      target: { value: text },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /New order/ }))
-    return fireEvent
-  }
-
-  const orderCreates = (invoke: ReturnType<typeof vi.fn>) =>
-    invoke.mock.calls.filter(([c]) => c === 'foundry:order.create').map(([, p]) => p)
-
+function seedingTests() {
   it('asks nothing and seeds a typed order when no ticket can be made', async () => {
     const invoke = mountWith(null)
     await submitIdea()
@@ -191,7 +203,9 @@ describe('offering a ticket for a typed idea', () => {
       source: { kind: 'tracker', tracker: 'linear', key: 'TAV-16' },
     })
   })
+}
 
+function decliningTests() {
   it('seeds a typed order when the operator declines', async () => {
     const invoke = mountWith({ teams: [{ id: 't1', key: 'TAV', name: 'Team' }] })
     const fire = await submitIdea()
@@ -201,7 +215,9 @@ describe('offering a ticket for a typed idea', () => {
     expect(orderCreates(invoke)[0]).toMatchObject({ source: { kind: 'typed' } })
     expect(invoke).not.toHaveBeenCalledWith('foundry:ticket.create', expect.anything())
   })
+}
 
+function teamsTests() {
   it('lets the operator pick the team only when there is more than one', async () => {
     const invoke = mountWith({
       teams: [
@@ -220,7 +236,9 @@ describe('offering a ticket for a typed idea', () => {
       })
     )
   })
+}
 
+function failureTests() {
   it('says why and makes no order when the ticket cannot be created', async () => {
     const invoke = mountWith(
       { teams: [{ id: 't1', key: 'TAV', name: 'Team' }] },
@@ -232,7 +250,7 @@ describe('offering a ticket for a typed idea', () => {
     await waitFor(() => screen.getByText('Linear refused'))
     expect(orderCreates(invoke)).toHaveLength(0)
   })
-})
+}
 
 // A shipped order still has a gate to answer (mark the draft ready), and the
 // Floor is where gates are answered. It used to open in the Forge, which only
@@ -263,31 +281,59 @@ describe('opening an order that has a run', () => {
   })
 })
 
+const ticket = {
+  kind: 'tracker',
+  tracker: 'linear',
+  key: 'TAV-15',
+  url: 'https://linear.app/team/issue/TAV-15',
+}
+const watching = {
+  status: 'watching',
+  round: 0,
+  max: 2,
+  reason: '',
+  checks: { done: 1, total: 3 },
+}
+const readyGate = {
+  id: 'G-1',
+  options: [
+    { id: 'mark_ready', label: 'Mark ready', consequence: 'The draft becomes a review request.' },
+    { id: 'hold', label: 'Hold', consequence: 'Nothing proceeds until you come back to it.' },
+  ],
+  breach: null,
+}
+
 // What a row has to say without being opened: where the order's pull request and
 // ticket are, how CI is going, and the one answer the operator owes.
 describe('what a row carries without being opened', () => {
+  describe('links', linksTests)
+  describe('CI', ciTests)
+  describe('answering on the row', answeringOnTheRowTests)
+  describe('a new limit', aNewLimitTests)
+})
+
+function mountWithTickets(orders: unknown[]) {
+  const invoke = vi.fn(async (channel: string) => {
+    if (channel === 'foundry:order.list') return { orders }
+    if (channel === 'foundry:issues.mine')
+      return {
+        connected: [{ tracker: 'linear', account: 'me' }],
+        issues: [
+          { tracker: 'linear', key: 'TAV-14', title: 'Make all text red', status: 'Todo' },
+          { tracker: 'linear', key: 'TAV-16', title: 'Group the Ledger', status: 'Backlog' },
+        ],
+      }
+    return {}
+  })
+  ;(window as unknown as Record<string, unknown>).electronAPI = {
+    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    shell: { openExternal: vi.fn() },
+  }
+  return render(<Orders repoRoot="/repos/app" />)
+}
+
+function linksTests() {
   const pull = { number: 233, url: 'https://github.com/andytavares/terminator/pull/233' }
-  const ticket = {
-    kind: 'tracker',
-    tracker: 'linear',
-    key: 'TAV-15',
-    url: 'https://linear.app/team/issue/TAV-15',
-  }
-  const watching = {
-    status: 'watching',
-    round: 0,
-    max: 2,
-    reason: '',
-    checks: { done: 1, total: 3 },
-  }
-  const readyGate = {
-    id: 'G-1',
-    options: [
-      { id: 'mark_ready', label: 'Mark ready', consequence: 'The draft becomes a review request.' },
-      { id: 'hold', label: 'Hold', consequence: 'Nothing proceeds until you come back to it.' },
-    ],
-    breach: null,
-  }
 
   it('links the pull request and the ticket, and opens them outside the application', async () => {
     const { openExternal } = mount([row({ status: 'running', pulls: [pull], source: ticket })])
@@ -300,7 +346,9 @@ describe('what a row carries without being opened', () => {
     // A link is not the door: it must not open the order behind it.
     expect(screen.queryByRole('heading', { name: 'What is being asked' })).toBeNull()
   })
+}
 
+function ciTests() {
   it('shows a spinner and the CI wording while CI is watching', async () => {
     const { container } = mount([
       row({
@@ -327,7 +375,9 @@ describe('what a row carries without being opened', () => {
     await screen.findByText('shipped')
     expect(screen.queryByRole('status')).toBeNull()
   })
+}
 
+function answeringOnTheRowTests() {
   it('answers a shipped order open ready-for-review gate on the row', async () => {
     const { invoke } = mount([
       row({
@@ -350,7 +400,9 @@ describe('what a row carries without being opened', () => {
     )
     expect(screen.getByRole('button', { name: 'Hold' })).toBeTruthy()
   })
+}
 
+function aNewLimitTests() {
   it('offers no inline answers for a gate that needs a new limit typed in', async () => {
     mount([
       row({
@@ -370,31 +422,15 @@ describe('what a row carries without being opened', () => {
     expect(screen.queryByRole('button', { name: 'Raise it' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Stop' })).toBeTruthy()
   })
-})
+}
 
 // Tickets and orders are two different lists stacked on one screen; without a
 // name each they read as one list in two styles.
 describe('the ticket picker beside the orders', () => {
-  function mountWithTickets(orders: unknown[]) {
-    const invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:order.list') return { orders }
-      if (channel === 'foundry:issues.mine')
-        return {
-          connected: [{ tracker: 'linear', account: 'me' }],
-          issues: [
-            { tracker: 'linear', key: 'TAV-14', title: 'Make all text red', status: 'Todo' },
-            { tracker: 'linear', key: 'TAV-16', title: 'Group the Ledger', status: 'Backlog' },
-          ],
-        }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-      shell: { openExternal: vi.fn() },
-    }
-    return render(<Orders repoRoot="/repos/app" />)
-  }
+  describe('the lists', theListsTests)
+})
 
+function theListsTests() {
   it('names each list and counts it', async () => {
     mountWithTickets([row()])
     screen.getByRole('radio', { name: 'Ticket' }).click()
@@ -415,4 +451,4 @@ describe('the ticket picker beside the orders', () => {
     await screen.findByText('WO-1006-6b5 · low risk')
     expect(screen.getAllByText('shipped')).toHaveLength(1)
   })
-})
+}

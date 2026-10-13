@@ -60,35 +60,111 @@ function view(over: Record<string, unknown> = {}) {
 let invoke: ReturnType<typeof vi.fn>
 const openExternal = vi.fn()
 
-function mount(
-  props: {
-    view?: Record<string, unknown>
-    pending?: unknown[]
-    activity?: Record<string, unknown>
-    lines?: unknown[]
-    metrics?: Record<string, unknown>[]
-    onBack?: () => void
-    onOpenInList?: () => void
-  } = {}
-) {
+interface MountProps {
+  view?: Record<string, unknown>
+  pending?: unknown[]
+  activity?: Record<string, unknown>
+  lines?: unknown[]
+  metrics?: Record<string, unknown>[]
+  onBack?: () => void
+  onOpenInList?: () => void
+}
+
+/** What each channel answers for the hall `props` describe. */
+function hallReplies(props: MountProps): Record<string, () => unknown> {
+  return {
+    'foundry:run.observe': () => props.view ?? view(),
+    'foundry:permissions-list': () => ({ pending: props.pending ?? [] }),
+    'foundry:run.activity': () => ({ activity: props.activity ?? {} }),
+    'foundry:run-transcript': () => ({ lines: props.lines ?? [] }),
+    'foundry:session.attach': () => ({ terminalSessionId: 't-1' }),
+    'foundry:run-terminal': () => ({ ok: true }),
+    'foundry:factory.metrics': () => ({ orders: props.metrics ?? [] }),
+  }
+}
+
+function mount(props: MountProps = {}) {
   const onBack = props.onBack ?? vi.fn()
   const onOpenInList = props.onOpenInList ?? vi.fn()
-  invoke = vi.fn(async (channel: string) => {
-    if (channel === 'foundry:run.observe') return props.view ?? view()
-    if (channel === 'foundry:permissions-list') return { pending: props.pending ?? [] }
-    if (channel === 'foundry:run.activity') return { activity: props.activity ?? {} }
-    if (channel === 'foundry:run-transcript') return { lines: props.lines ?? [] }
-    if (channel === 'foundry:session.attach') return { terminalSessionId: 't-1' }
-    if (channel === 'foundry:run-terminal') return { ok: true }
-    if (channel === 'foundry:factory.metrics') return { orders: props.metrics ?? [] }
-    return {}
-  })
+  const replies = hallReplies(props)
+  invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     shell: { openExternal },
   }
   render(<FactoryHall orderId="WO-1" onOpenInList={onOpenInList} onBack={onBack} />)
   return { onOpenInList, onBack }
+}
+
+/** A hall whose observation is `read()` on every read, and the bus that says it changed. */
+function mountLive(read: () => unknown) {
+  const bus = createChangeBus()
+  const replies: Record<string, () => unknown> = {
+    'foundry:run.observe': read,
+    'foundry:permissions-list': () => ({ pending: [] }),
+    'foundry:run.activity': () => ({ activity: {} }),
+  }
+  invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
+  Object.defineProperty(window, 'electronAPI', {
+    value: { extensionBridge: { invoke, on: bus.on } },
+    configurable: true,
+    writable: true,
+  })
+  render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
+  return bus
+}
+
+/** jsdom lays nothing out: give every box a size, and the hall one too. */
+function sizeEveryBox(): void {
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(400)
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000)
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+}
+
+/** Two stations in the same state. */
+function twoStations(state: string) {
+  return view({
+    graph: {
+      orderId: 'WO-1',
+      recipe: 'standard',
+      nodes: [node({ state }), node({ id: 'N-2', sessionId: 's-2', state })],
+    },
+    labels: { 'N-1': 'Build the thing', 'N-2': 'Build the other' },
+  })
+}
+
+/** A merge gate waiting on the gate station G, which follows a passed build. */
+const MERGE_GATE = {
+  id: 'g-1',
+  rule: 'merge',
+  orderId: 'WO-1',
+  nodeId: 'G',
+  summary: 'Merge the pull request?',
+  why: 'Every check passed.',
+  evidence: [],
+  options: [
+    { id: 'approve', label: 'Approve', consequence: 'Merges.' },
+    { id: 'hold', label: 'Hold', consequence: 'Waits.' },
+  ],
+  defaultIfIgnored: 'hold',
+  deadline: null,
+  blockedUnits: 1,
+  riskGrade: 'P2',
+}
+
+function waitingAtTheGate() {
+  const gate = node({
+    id: 'G',
+    kind: 'gate',
+    state: 'waiting',
+    sessionId: null,
+    dependsOn: ['N-1'],
+  })
+  return view({
+    graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' }), gate] },
+    waiting: [MERGE_GATE],
+  })
 }
 
 beforeEach(() => {
@@ -123,7 +199,49 @@ describe('FactoryHall status wall plumbing', () => {
   })
 })
 
+function replayable(frames: unknown[], ci?: unknown[]) {
+  invoke = vi.fn(async (channel: string) => {
+    if (channel === 'foundry:run.observe') return view()
+    if (channel === 'foundry:permissions-list') return { pending: [] }
+    if (channel === 'foundry:run.activity') return { activity: {} }
+    if (channel === 'foundry:run.timeline')
+      return {
+        graph: view().graph,
+        timeline: { frames, tools: [], ci },
+        gates: [],
+      }
+    return {}
+  })
+  ;(window as unknown as Record<string, unknown>).electronAPI = {
+    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+  }
+  render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
+}
+const plateText = () =>
+  screen.getByRole('button', { name: /Build the thing/ }).getAttribute('aria-label')
+
 describe('FactoryHall', () => {
+  describe('addressing and badges', addressingAndBadgesTests)
+  describe('pending asks', pendingAsksTests)
+  describe('the standing band', theStandingBandTests)
+  describe('gated moves', gatedMovesTests)
+  describe('moves without a gate', movesWithoutAGateTests)
+  describe('monitors', monitorsTests)
+  describe('card summaries and plates', cardSummariesAndPlatesTests)
+  describe('the order bar', theOrderBarTests)
+  describe('callouts raised together', calloutsRaisedTogetherTests)
+  describe('callouts on state change', calloutsOnStateChangeTests)
+  describe('held tool calls', heldToolCallsTests)
+  describe('markdown questions', markdownQuestionsTests)
+  describe('waiting gates', waitingGatesTests)
+  describe('parked agents', parkedAgentsTests)
+  describe('replaying', replayingTests)
+  describe('replaying CI', replayingCiTests)
+  describe('playback', playbackTests)
+  describe('the site and failures', theSiteAndFailuresTests)
+})
+
+function addressingAndBadgesTests() {
   it('addresses a station by its label, role, state and attempt', async () => {
     mount()
     await waitFor(() =>
@@ -146,7 +264,9 @@ describe('FactoryHall', () => {
     const station = screen.getByRole('button', { name: /Build the thing/ })
     expect(station.querySelector('.fdry-hall-flag')).not.toBeNull()
   })
+}
 
+function pendingAsksTests() {
   it('flags a station holding a pending ask', async () => {
     mount({
       pending: [
@@ -157,7 +277,9 @@ describe('FactoryHall', () => {
     const station = screen.getByRole('button', { name: /Build the thing/ })
     expect(station.querySelector('.fdry-hall-flag')).not.toBeNull()
   })
+}
 
+function theStandingBandTests() {
   it('shows the standing band only when it is the operator’s move', async () => {
     mount({
       view: view({
@@ -176,7 +298,9 @@ describe('FactoryHall', () => {
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
     expect(screen.queryByText('Building')).toBeNull()
   })
+}
 
+function gatedMovesTests() {
   // The gate itself is in the queue above the hall; the band names the move and
   // sends nobody to a surface that no longer exists.
   it('names a gated move without a button to somewhere else', async () => {
@@ -198,7 +322,9 @@ describe('FactoryHall', () => {
     expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Open in List view' })).toBeNull()
   })
+}
 
+function movesWithoutAGateTests() {
   it('sends a move with no gate behind it to the List view', async () => {
     const { onOpenInList } = mount({
       view: view({
@@ -219,7 +345,9 @@ describe('FactoryHall', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open in List view' }))
     expect(onOpenInList).toHaveBeenCalled()
   })
+}
 
+function monitorsTests() {
   it('opens a station’s monitor and attaches to it', async () => {
     mount()
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
@@ -237,7 +365,9 @@ describe('FactoryHall', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 't-1' })
     )
   })
+}
 
+function cardSummariesAndPlatesTests() {
   it('shows the waiting station’s own card summary on its monitor', async () => {
     mount({
       view: view({
@@ -259,7 +389,9 @@ describe('FactoryHall', () => {
     expect(station.getAttribute('aria-label')).toContain('Working')
     expect(station.getAttribute('title')).toContain('Build the thing')
   })
+}
 
+function theOrderBarTests() {
   it('keeps the order bar above the hall rather than over its top row', async () => {
     mount()
     const back = await screen.findByRole('button', { name: /All halls/ })
@@ -267,36 +399,15 @@ describe('FactoryHall', () => {
     expect(frame.contains(back)).toBe(false)
     expect(back.compareDocumentPosition(frame) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
+}
 
+function calloutsRaisedTogetherTests() {
   it('lifts callouts raised together clear of each other', async () => {
-    // jsdom lays nothing out: give every box a size, and the hall one too.
-    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(400)
-    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000)
-    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
-    const two = (state: string) =>
-      view({
-        graph: {
-          orderId: 'WO-1',
-          recipe: 'standard',
-          nodes: [node({ state }), node({ id: 'N-2', sessionId: 's-2', state })],
-        },
-        labels: { 'N-1': 'Build the thing', 'N-2': 'Build the other' },
-      })
-    let current = two('running')
-    const bus = createChangeBus()
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:run.observe') return current
-      if (channel === 'foundry:permissions-list') return { pending: [] }
-      if (channel === 'foundry:run.activity') return { activity: {} }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
+    sizeEveryBox()
+    let current = twoStations('running')
+    const bus = mountLive(() => current)
     await screen.findByRole('button', { name: /Build the other/ })
-    current = two('passed')
+    current = twoStations('passed')
     bus.emit({ kind: 'graph', orderId: 'WO-1' })
     await waitFor(
       () => expect(document.querySelectorAll('.fdry-hall-overlay .fdry-callout')).toHaveLength(2),
@@ -307,20 +418,12 @@ describe('FactoryHall', () => {
     )
     expect(new Set(lifts).size).toBe(2)
   })
+}
 
+function calloutsOnStateChangeTests() {
   it('raises a callout at the station when its state changes, not a line under the picture', async () => {
     let current = view()
-    const bus = createChangeBus()
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:run.observe') return current
-      if (channel === 'foundry:permissions-list') return { pending: [] }
-      if (channel === 'foundry:run.activity') return { activity: {} }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
+    const bus = mountLive(() => current)
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
     current = view({
       graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' })] },
@@ -335,7 +438,9 @@ describe('FactoryHall', () => {
     )
     expect(document.querySelector('.fdry-hall-ticker')).toBeNull()
   })
+}
 
+function heldToolCallsTests() {
   it('pins a held tool call over its station and answers it there', async () => {
     mount({
       pending: [
@@ -359,7 +464,9 @@ describe('FactoryHall', () => {
       })
     )
   })
+}
 
+function markdownQuestionsTests() {
   it("renders an agent's question on its card as markdown, and a command literally", async () => {
     mount({
       pending: [
@@ -386,45 +493,11 @@ describe('FactoryHall', () => {
     const command = await screen.findByRole('group', { name: 'Wants to run Bash' })
     expect(command.textContent).toContain('rm **/*.tmp')
   })
+}
 
+function waitingGatesTests() {
   it('pins a waiting gate over the gate and decides it with the gate’s own options', async () => {
-    mount({
-      view: view({
-        graph: {
-          orderId: 'WO-1',
-          recipe: 'standard',
-          nodes: [
-            node({ state: 'passed' }),
-            node({
-              id: 'G',
-              kind: 'gate',
-              state: 'waiting',
-              sessionId: null,
-              dependsOn: ['N-1'],
-            }),
-          ],
-        },
-        waiting: [
-          {
-            id: 'g-1',
-            rule: 'merge',
-            orderId: 'WO-1',
-            nodeId: 'G',
-            summary: 'Merge the pull request?',
-            why: 'Every check passed.',
-            evidence: [],
-            options: [
-              { id: 'approve', label: 'Approve', consequence: 'Merges.' },
-              { id: 'hold', label: 'Hold', consequence: 'Waits.' },
-            ],
-            defaultIfIgnored: 'hold',
-            deadline: null,
-            blockedUnits: 1,
-            riskGrade: 'P2',
-          },
-        ],
-      }),
-    })
+    mount({ view: waitingAtTheGate() })
     const card = await screen.findByRole('group', { name: 'Merge the pull request?' })
     fireEvent.click(within(card).getByRole('button', { name: 'Approve' }))
     await waitFor(() =>
@@ -434,7 +507,9 @@ describe('FactoryHall', () => {
       })
     )
   })
+}
 
+function parkedAgentsTests() {
   it('pins an agent parked at its terminal and takes you there', async () => {
     mount({ view: view({ stranded: ['s-1'] }) })
     const card = await screen.findByRole('group', { name: 'Waiting at its terminal' })
@@ -443,29 +518,9 @@ describe('FactoryHall', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })
     )
   })
+}
 
-  function replayable(frames: unknown[], ci?: unknown[]) {
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:run.observe') return view()
-      if (channel === 'foundry:permissions-list') return { pending: [] }
-      if (channel === 'foundry:run.activity') return { activity: {} }
-      if (channel === 'foundry:run.timeline')
-        return {
-          graph: view().graph,
-          timeline: { frames, tools: [], ci },
-          gates: [],
-        }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-    }
-    render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
-  }
-
-  const plateText = () =>
-    screen.getByRole('button', { name: /Build the thing/ }).getAttribute('aria-label')
-
+function replayingTests() {
   it('replays the run from what was recorded, and scrubs to any moment of it', async () => {
     replayable([
       { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
@@ -485,24 +540,31 @@ describe('FactoryHall', () => {
     )
     expect(plateText()).toContain('Working')
   })
+}
 
+/** One pull request whose checks stand in the buckets given. */
+const pullWith = (buckets: ('pass' | 'pending')[]) => [
+  {
+    url: 'https://github.com/a/b/pull/1',
+    checks: buckets.map((bucket, i) => ({ name: `c${i}`, bucket, link: '', workflow: '' })),
+  },
+]
+
+/** A build that ran from 1 s and passed at 9 s. */
+const BUILD_FRAMES = [
+  { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
+  { at: 9000, nodes: [{ id: 'N-1', state: 'passed', attempts: 1, sessionId: 's-1' }] },
+]
+
+/** CI waiting on one of two checks from the start, green at 9 s. */
+const CI_STATES = [
+  { at: 0, round: 0, max: 2, status: 'watching', pulls: pullWith(['pass', 'pending']) },
+  { at: 9000, round: 0, max: 2, status: 'green', pulls: pullWith(['pass', 'pass']) },
+]
+
+function replayingCiTests() {
   it('replays the wait on CI, and the tower to wait at, from what was recorded', async () => {
-    const pulls = (buckets: ('pass' | 'pending')[]) => [
-      {
-        url: 'https://github.com/a/b/pull/1',
-        checks: buckets.map((bucket, i) => ({ name: `c${i}`, bucket, link: '', workflow: '' })),
-      },
-    ]
-    replayable(
-      [
-        { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
-        { at: 9000, nodes: [{ id: 'N-1', state: 'passed', attempts: 1, sessionId: 's-1' }] },
-      ],
-      [
-        { at: 0, round: 0, max: 2, status: 'watching', pulls: pulls(['pass', 'pending']) },
-        { at: 9000, round: 0, max: 2, status: 'green', pulls: pulls(['pass', 'pass']) },
-      ]
-    )
+    replayable(BUILD_FRAMES, CI_STATES)
     fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
     const position = (await screen.findByRole('slider', {
       name: 'Replay position',
@@ -517,7 +579,9 @@ describe('FactoryHall', () => {
       expect(document.querySelector('.fdry-callout[data-pinned="true"]')).toBeNull()
     )
   })
+}
 
+function playbackTests() {
   it('plays, pauses and changes speed', async () => {
     replayable([
       { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
@@ -538,7 +602,9 @@ describe('FactoryHall', () => {
     await screen.findByText('Nothing recorded for this run yet.')
     expect(screen.queryByRole('slider', { name: 'Replay position' })).toBeNull()
   })
+}
 
+function theSiteAndFailuresTests() {
   it('goes back to the site', async () => {
     const { onBack } = mount()
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
@@ -565,20 +631,57 @@ describe('FactoryHall', () => {
     fireEvent.click(screen.getByRole('button', { name: /ATTACH/ }))
     await waitFor(() => screen.getByText('gone'))
   })
-})
+}
 
 describe('an open station monitor is live', () => {
+  describe('reading the transcript', readingTheTranscriptTests)
+  describe('no session', noSessionTests)
+})
+
+const pull = (buckets: ('pass' | 'pending')[]) => ({
+  url: 'https://github.com/a/b/pull/233',
+  checks: buckets.map((bucket, i) => ({ name: `check-${i}`, bucket, link: '', workflow: 'CI' })),
+})
+const ci = (buckets: ('pass' | 'pending')[]) => ({
+  round: 0,
+  max: 2,
+  status: 'watching',
+  reason: '',
+  at: '2026-10-05T10:00:00.000Z',
+  pulls: [pull(buckets)],
+})
+const shipGraph = {
+  orderId: 'WO-1',
+  recipe: 'standard',
+  nodes: [
+    node({ id: 'N-1', state: 'passed', sessionId: 's-1' }),
+    node({
+      id: 'ship',
+      kind: 'gate',
+      state: 'running',
+      role: null,
+      sessionId: null,
+      dependsOn: ['N-1'],
+    }),
+  ],
+}
+
+/** The bridge hands back a fresh array on every read; the fake would not. */
+function freshLinesOnEveryRead(): void {
+  const fake = invoke.getMockImplementation()!
+  invoke.mockImplementation(async (channel: string, payload?: unknown) => {
+    const r = (await fake(channel, payload)) as { lines?: unknown[] }
+    return channel === 'foundry:run-transcript' ? { lines: [...(r.lines ?? [])] } : r
+  })
+}
+
+function readingTheTranscriptTests() {
   const line = (text: string, at: number) => ({ role: 'assistant', kind: 'text', text, at })
 
   it('reads the transcript at once, then on the activity beat, and stops when closed', async () => {
     const lines = [line('first', 1)]
     mount({ lines })
-    // The bridge hands back a fresh array on every read; the fake would not.
-    const fake = invoke.getMockImplementation()!
-    invoke.mockImplementation(async (channel: string, payload?: unknown) => {
-      const r = (await fake(channel, payload)) as { lines?: unknown[] }
-      return channel === 'foundry:run-transcript' ? { lines: [...(r.lines ?? [])] } : r
-    })
+    freshLinesOnEveryRead()
     const station = await screen.findByRole('button', { name: /Build the thing/ })
     vi.useFakeTimers()
     try {
@@ -604,7 +707,9 @@ describe('an open station monitor is live', () => {
       vi.useRealTimers()
     }
   })
+}
 
+function noSessionTests() {
   it('does not read a transcript for a station with no session', async () => {
     mount({
       view: view({
@@ -616,37 +721,27 @@ describe('an open station monitor is live', () => {
     expect(invoke.mock.calls.some((c) => c[0] === 'foundry:run-transcript')).toBe(false)
     expect(screen.getByRole('log', { name: 'Transcript' }).textContent?.trim()).toBe('NOTHING YET.')
   })
-})
+}
 
 describe('FactoryHall labels what it draws', () => {
-  const pull = (buckets: ('pass' | 'pending')[]) => ({
-    url: 'https://github.com/a/b/pull/233',
-    checks: buckets.map((bucket, i) => ({ name: `check-${i}`, bucket, link: '', workflow: 'CI' })),
-  })
-  const ci = (buckets: ('pass' | 'pending')[]) => ({
-    round: 0,
-    max: 2,
-    status: 'watching',
-    reason: '',
-    at: '2026-10-05T10:00:00.000Z',
-    pulls: [pull(buckets)],
-  })
-  const shipGraph = {
-    orderId: 'WO-1',
-    recipe: 'standard',
-    nodes: [
-      node({ id: 'N-1', state: 'passed', sessionId: 's-1' }),
-      node({
-        id: 'ship',
-        kind: 'gate',
-        state: 'running',
-        role: null,
-        sessionId: null,
-        dependsOn: ['N-1'],
-      }),
-    ],
-  }
+  describe('the scoreboard', theScoreboardTests)
+  describe('tower callouts', towerCalloutsTests)
+  describe('finished monitors', finishedMonitorsTests)
+})
 
+function readyGate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
+  return raiseGate({
+    id: 'G-1',
+    rule: 'ready-for-review',
+    orderId: 'WO-1',
+    summary: 'Mark the pull request ready for review',
+    why: 'The work shipped as a draft:\n\n- the checks passed\n- nothing is blocked',
+    at: '2026-09-06T10:00:00.000Z',
+    ...over,
+  })
+}
+
+function theScoreboardTests() {
   it("names the scoreboard with this order's real figures", async () => {
     mount({
       metrics: [{ orderId: 'WO-1', leadTimeMs: 25 * 60_000, reworks: 0, ciRounds: 0 }],
@@ -657,7 +752,9 @@ describe('FactoryHall labels what it draws', () => {
       ).toBeTruthy()
     )
   })
+}
 
+function towerCalloutsTests() {
   it('keeps a callout pinned to the tower while checks are pending, and drops it when they land', async () => {
     const pending = [...Array(12).fill('pass'), ...Array(7).fill('pending')] as (
       | 'pass'
@@ -685,7 +782,9 @@ describe('FactoryHall labels what it draws', () => {
     await waitFor(() => screen.getByRole('img', { name: 'Checks · 2 passed · 0 failed' }))
     expect(document.querySelector('.fdry-callout[data-pinned="true"]')).toBeNull()
   })
+}
 
+function finishedMonitorsTests() {
   it("opens the ship gate's monitor with what it decided and no attach key", async () => {
     mount({
       view: view({
@@ -714,25 +813,21 @@ describe('FactoryHall labels what it draws', () => {
       (screen.getByRole('button', { name: /Agent closed/i }) as HTMLButtonElement).disabled
     ).toBe(true)
   })
-})
+}
 
 // A gate is one line with its answers on it, the reason a click away and written
 // in markdown — the same card the list views draw, not a second rendering of it.
 describe('FactoryHall gates and links', () => {
-  const pullUrl = 'https://github.com/andytavares/terminator/pull/233'
-  const ticketUrl = 'https://linear.app/team/issue/TAV-15'
+  describe('links', linksTests)
+  describe('gate cards', gateCardsTests)
+  describe('a ready-for-review gate', aReadyForReviewGateTests)
+  describe('a new limit', aNewLimitTests)
+})
 
-  function readyGate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
-    return raiseGate({
-      id: 'G-1',
-      rule: 'ready-for-review',
-      orderId: 'WO-1',
-      summary: 'Mark the pull request ready for review',
-      why: 'The work shipped as a draft:\n\n- the checks passed\n- nothing is blocked',
-      at: '2026-09-06T10:00:00.000Z',
-      ...over,
-    })
-  }
+function linksTests() {
+  const pullUrl = 'https://github.com/andytavares/terminator/pull/233'
+
+  const ticketUrl = 'https://linear.app/team/issue/TAV-15'
 
   it('links the pull request and the ticket on the heads-up bar', async () => {
     mount({
@@ -751,7 +846,9 @@ describe('FactoryHall gates and links', () => {
     expect(openExternal).toHaveBeenCalledWith(pullUrl)
     expect(openExternal).toHaveBeenCalledWith(ticketUrl)
   })
+}
 
+function gateCardsTests() {
   it('draws a waiting gate collapsed, with its answers on the line, and reads the reason as markdown', async () => {
     mount({ view: view({ waiting: [readyGate()] }) })
     expect(await screen.findByRole('button', { name: 'Mark ready' })).toBeTruthy()
@@ -774,7 +871,9 @@ describe('FactoryHall gates and links', () => {
       expect(room).toBe(`calc(${top}% - 50px)`)
     }
   })
+}
 
+function aReadyForReviewGateTests() {
   it('lets a shipped order\u2019s open ready-for-review gate be answered in the hall', async () => {
     mount({
       view: view({
@@ -800,7 +899,9 @@ describe('FactoryHall gates and links', () => {
       })
     )
   })
+}
 
+function aNewLimitTests() {
   it('asks for a new limit on the card itself, rather than sending the operator to the Inbox', async () => {
     mount({
       view: view({
@@ -822,4 +923,4 @@ describe('FactoryHall gates and links', () => {
     const raise = screen.getAllByRole('button').find((b) => /raise/i.test(b.textContent ?? ''))
     expect(raise).toBeTruthy()
   })
-})
+}

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -74,29 +75,10 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
   return {
     ...base,
     status: 'agreed',
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a' })],
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'a',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'a', satisfies: ['AC-1'], touches: ['src/a'] })],
     },
     ...over,
   }
@@ -122,6 +104,13 @@ beforeEach(() => {
 })
 
 describe('what run.observe says about where an order stands', () => {
+  describe('halted', haltedTests)
+  describe('asking and stalled', askingAndStalledTests)
+  describe('stopped', stoppedTests)
+  describe('resumed', resumedTests)
+})
+
+function haltedTests() {
   it('carries a standing with the graph', async () => {
     await store.save(order())
     await channels().start({ id: 'WO-1' })
@@ -153,7 +142,9 @@ describe('what run.observe says about where an order stands', () => {
     expect(view.standing.kind).not.toBe('halted')
     expect(view.waiting).toEqual([])
   })
+}
 
+function askingAndStalledTests() {
   it('is asking when an agent is holding a tool call', async () => {
     await store.save(order())
     await channels().start({ id: 'WO-1' })
@@ -167,7 +158,9 @@ describe('what run.observe says about where an order stands', () => {
     const view = (await channels({ stalls: 1 }).observe({ id: 'WO-1' })) as Observed
     expect(view.standing.kind).toBe('stalled')
   })
+}
 
+function stoppedTests() {
   // The WO-0913-0bd shape: every node in the graph finished, but the ledger's
   // tail says the run went on to fail — here, opening the pull request.
   // Before `runFailureFor` was wired in, this read `working`/"Between steps.
@@ -201,7 +194,9 @@ describe('what run.observe says about where an order stands', () => {
     expect(view.standing.label).toBe('not shipped')
     expect(view.standing.detail).toContain('Opening the pull request')
   })
+}
 
+function resumedTests() {
   // Resuming records `run.resumed`, so a run that failed once and is retried
   // stops reading `stopped` while the retry is in flight.
   it('clears a stopped standing once the run is resumed', async () => {
@@ -230,4 +225,4 @@ describe('what run.observe says about where an order stands', () => {
     view = (await channels().observe({ id: 'WO-1' })) as Observed
     expect(view.standing.kind).not.toBe('stopped')
   })
-})
+}

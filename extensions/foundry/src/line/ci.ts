@@ -40,77 +40,84 @@ function verdictFor(checks: readonly Check[]): CiVerdict | null {
   return { kind: 'green', checks }
 }
 
+export interface WatchOptions {
+  sleep: (ms: number) => Promise<void>
+  pollMs?: number
+  timeoutMs?: number
+  appearWithinMs?: number
+  /** Run ids a previous round already judged; a pushed fix starts new ones. */
+  ignoreRuns?: ReadonlySet<string>
+  onPoll?: (checks: readonly Check[]) => void
+}
+
+/** What one `gh pr checks` said: nothing yet, an error, or the checks to judge. */
+type Poll =
+  | { readonly kind: 'none_yet'; readonly reason: string }
+  | { readonly kind: 'unreadable'; readonly reason: string }
+  | { readonly kind: 'checks'; readonly checks: readonly Check[] }
+
+async function pollChecks(
+  pull: { url: string; cwd: string },
+  exec: ShellExec,
+  ignoreRuns: ReadonlySet<string> | undefined
+): Promise<Poll> {
+  const result: ExecResult = await exec({
+    command: 'gh',
+    args: ['pr', 'checks', pull.url, '--json', 'name,bucket,link,workflow'],
+    cwd: pull.cwd,
+  })
+  const message = `${result.stderr}${result.stdout}`.trim()
+  if (result.exitCode !== 0) {
+    return /no checks reported/i.test(message)
+      ? { kind: 'none_yet', reason: message }
+      : { kind: 'unreadable', reason: result.stderr.trim() || message }
+  }
+  const fresh = parseChecks(result.stdout)?.filter((c) => !ignoreRuns?.has(runIdFrom(c.link) ?? ''))
+  if (fresh === undefined) {
+    return { kind: 'unreadable', reason: result.stderr.trim() || 'unparseable checks output' }
+  }
+  if (fresh.length === 0) {
+    return { kind: 'none_yet', reason: message === '[]' ? 'no checks were reported' : message }
+  }
+  return { kind: 'checks', checks: fresh }
+}
+
 export async function watchChecks(
   pull: { url: string; cwd: string },
   exec: ShellExec,
-  opts: {
-    sleep: (ms: number) => Promise<void>
-    pollMs?: number
-    timeoutMs?: number
-    appearWithinMs?: number
-    /** Run ids a previous round already judged; a pushed fix starts new ones. */
-    ignoreRuns?: ReadonlySet<string>
-    onPoll?: (checks: readonly Check[]) => void
-  }
+  opts: WatchOptions
 ): Promise<CiVerdict> {
-  const pollMs = opts.pollMs ?? DEFAULT_POLL_MS
-  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
-  const appearWithinMs = opts.appearWithinMs ?? DEFAULT_APPEAR_WITHIN_MS
-  let waited = 0
-
-  for (;;) {
-    const result: ExecResult = await exec({
-      command: 'gh',
-      args: ['pr', 'checks', pull.url, '--json', 'name,bucket,link,workflow'],
-      cwd: pull.cwd,
-    })
-
-    const message = `${result.stderr}${result.stdout}`.trim()
-    const fresh =
-      result.exitCode === 0
-        ? parseChecks(result.stdout)?.filter((c) => !opts.ignoreRuns?.has(runIdFrom(c.link) ?? ''))
-        : undefined
-    const noneYet =
-      result.exitCode === 0 ? fresh?.length === 0 : /no checks reported/i.test(message)
-    if (noneYet) {
-      if (waited >= appearWithinMs) {
-        return {
-          kind: 'not_measured',
-          checks: [],
-          reason: message === '[]' ? 'no checks were reported' : message,
-        }
-      }
-      await opts.sleep(pollMs)
-      waited += pollMs
-      continue
+  const { pollMs, timeoutMs, appearWithinMs } = timingOf(opts)
+  for (let waited = 0; ; waited += pollMs) {
+    const poll = await pollChecks(pull, exec, opts.ignoreRuns)
+    if (poll.kind === 'unreadable') return { kind: 'not_measured', checks: [], reason: poll.reason }
+    if (poll.kind === 'none_yet') {
+      if (waited >= appearWithinMs) return { kind: 'not_measured', checks: [], reason: poll.reason }
+    } else {
+      opts.onPoll?.(poll.checks)
+      const verdict = verdictFor(poll.checks) ?? stillPending(poll.checks, { waited, timeoutMs })
+      if (verdict !== null) return verdict
     }
-
-    if (result.exitCode !== 0) {
-      return { kind: 'not_measured', checks: [], reason: result.stderr.trim() || message }
-    }
-
-    const checks = fresh
-    if (!checks) {
-      return {
-        kind: 'not_measured',
-        checks: [],
-        reason: result.stderr.trim() || 'unparseable checks output',
-      }
-    }
-
-    opts.onPoll?.(checks)
-
-    const verdict = verdictFor(checks)
-    if (verdict) return verdict
-
-    if (waited >= timeoutMs) {
-      const minutes = Math.round(timeoutMs / 60_000)
-      return { kind: 'not_measured', checks, reason: `still pending after ${minutes} minutes` }
-    }
-
     await opts.sleep(pollMs)
-    waited += pollMs
   }
+}
+
+function timingOf(opts: WatchOptions) {
+  return {
+    pollMs: opts.pollMs ?? DEFAULT_POLL_MS,
+    timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    appearWithinMs: opts.appearWithinMs ?? DEFAULT_APPEAR_WITHIN_MS,
+  }
+}
+
+/** Not measured once checks have stayed pending for the whole timeout; null until then. */
+function stillPending(
+  checks: readonly Check[],
+  { waited, timeoutMs }: { waited: number; timeoutMs: number }
+): CiVerdict | null {
+  if (waited < timeoutMs) return null
+  const minutes = Math.round(timeoutMs / 60_000)
+  return { kind: 'not_measured', checks, reason: `still pending after ${minutes} minutes` }
 }
 
 /** Pulls the numeric run id out of a `.../actions/runs/<id>/job/<id>` link. */
@@ -119,41 +126,33 @@ export function runIdFrom(link: string): string | null {
   return match ? match[1] : null
 }
 
+/** How much of the failed runs' logs to keep: the end, where the failure is. */
+const MAX_LOG_LINES = 200
+
 export async function failedLogs(
   checks: readonly Check[],
   cwd: string,
-  exec: ShellExec,
-  maxLines = 200
+  exec: ShellExec
 ): Promise<string> {
   const failed = checks.filter((c) => c.bucket === 'fail' || c.bucket === 'cancel')
-  const runIds = new Set<string>()
-  const noRunId: Check[] = []
-
-  for (const c of failed) {
-    const id = runIdFrom(c.link)
-    if (id) runIds.add(id)
-    else noRunId.push(c)
-  }
-
+  const runIds = new Set(failed.map((c) => runIdFrom(c.link)).filter((id) => id !== null))
   const blocks: string[] = []
-
   for (const id of runIds) {
     const heading = failed.find((c) => runIdFrom(c.link) === id)
     const label = heading ? `${heading.workflow}/${heading.name}` : id
-    try {
-      const result = await exec({ command: 'gh', args: ['run', 'view', id, '--log-failed'], cwd })
-      blocks.push(`## ${label} (run ${id})\n${result.stdout}`)
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err)
-      blocks.push(`## ${label} (run ${id})\nlog could not be read: ${reason}`)
-    }
+    blocks.push(`## ${label} (run ${id})\n${await runLog(id, cwd, exec)}`)
   }
-
-  for (const c of noRunId) {
+  for (const c of failed.filter((check) => runIdFrom(check.link) === null)) {
     blocks.push(`## ${c.workflow}/${c.name}\n${c.link}`)
   }
+  return blocks.join('\n\n').split('\n').slice(-MAX_LOG_LINES).join('\n')
+}
 
-  const combined = blocks.join('\n\n')
-  const lines = combined.split('\n')
-  return lines.slice(-maxLines).join('\n')
+async function runLog(id: string, cwd: string, exec: ShellExec): Promise<string> {
+  try {
+    return (await exec({ command: 'gh', args: ['run', 'view', id, '--log-failed'], cwd })).stdout
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    return `log could not be read: ${reason}`
+  }
 }

@@ -101,6 +101,13 @@ afterEach(() => {
 })
 
 describe('foundry:ledger.query', () => {
+  describe('reading', readingTests)
+  describe('filtering', filteringTests)
+  describe('time and order', timeAndOrderTests)
+  describe('limits and values', limitsAndValuesTests)
+})
+
+function readingTests() {
   it('is empty before anything has happened', async () => {
     const r = (await channels().query({})) as { entries: LedgerEntry[]; total: number }
     expect(r.entries).toEqual([])
@@ -124,7 +131,9 @@ describe('foundry:ledger.query', () => {
     const r = (await channels().query({ orderId: 'WO-2' })) as { entries: LedgerEntry[] }
     expect(r.entries.map((e) => e.subject)).toEqual(['b'])
   })
+}
 
+function filteringTests() {
   it('filters by actor', async () => {
     await seedOrder('WO-1')
     await record('WO-1', { actor: 'operator', subject: 'a' })
@@ -147,7 +156,9 @@ describe('foundry:ledger.query', () => {
     const r = (await channels().query({ actor: '', action: '' })) as { entries: LedgerEntry[] }
     expect(r.entries).toHaveLength(1)
   })
+}
 
+function timeAndOrderTests() {
   it('filters by time', async () => {
     await seedOrder('WO-1')
     await record('WO-1', { at: '2026-09-01T10:00:00.000Z', subject: 'old' })
@@ -165,7 +176,9 @@ describe('foundry:ledger.query', () => {
     const r = (await channels().query({})) as { entries: LedgerEntry[] }
     expect(r.entries.map((e) => e.subject)).toEqual(['new', 'old'])
   })
+}
 
+function limitsAndValuesTests() {
   it('honours a limit while still reporting the true total', async () => {
     await repeatedRejections()
     const r = (await channels().query({ limit: 2 })) as { entries: LedgerEntry[]; total: number }
@@ -181,7 +194,7 @@ describe('foundry:ledger.query', () => {
     expect(r.actors).toEqual(['operator', 'rule:risk.p0'])
     expect(r.actions).toEqual(['gate.decided', 'gate.default'])
   })
-})
+}
 
 describe('foundry:rules.propose', () => {
   it('produces nothing until there is a pattern', async () => {
@@ -211,12 +224,18 @@ describe('foundry:rules.propose', () => {
   })
 })
 
-describe('deciding a proposal', () => {
-  async function firstProposalId(): Promise<string> {
-    const r = (await channels().proposeRules({})) as { proposals: { id: string }[] }
-    return r.proposals[0].id
-  }
+async function firstProposalId(): Promise<string> {
+  const r = (await channels().proposeRules({})) as { proposals: { id: string }[] }
+  return r.proposals[0].id
+}
 
+describe('deciding a proposal', () => {
+  describe('accepting', acceptingTests)
+  describe('declining', decliningTests)
+  describe('an unsupported proposal', anUnsupportedProposalTests)
+})
+
+function acceptingTests() {
   it('accepting writes a rule that later work will load', async () => {
     await repeatedRejections()
     const id = await firstProposalId()
@@ -230,7 +249,9 @@ describe('deciding a proposal', () => {
         .ok
     ).toBe(true)
   })
+}
 
+function decliningTests() {
   it('declining records it and never offers it again', async () => {
     await repeatedRejections()
     const id = await firstProposalId()
@@ -247,7 +268,9 @@ describe('deciding a proposal', () => {
     await channels().decideProposal({ proposalId: id, accept: false })
     expect(fs.existsSync(path.join(root, 'rules', `${id}.yaml`))).toBe(false)
   })
+}
 
+function anUnsupportedProposalTests() {
   it('refuses a proposal the ledger no longer supports', async () => {
     await seedOrder('WO-1')
     const r = (await channels().decideProposal({
@@ -256,7 +279,7 @@ describe('deciding a proposal', () => {
     })) as { error: string }
     expect(r.error).toMatch(/no longer supports/)
   })
-})
+}
 
 describe('nothing is proposed unprompted (FR-076)', () => {
   it('the path a run writes decisions through cannot reach the curator', () => {
@@ -293,15 +316,21 @@ describe('nothing is proposed unprompted (FR-076)', () => {
   })
 })
 
-describe('removing an accepted check (FR-081)', () => {
-  async function accept(): Promise<string> {
-    await repeatedRejections()
-    const r = (await channels().proposeRules({})) as { proposals: { id: string }[] }
-    const id = r.proposals[0].id
-    await channels().decideProposal({ proposalId: id, accept: true })
-    return id
-  }
+async function accept(): Promise<string> {
+  await repeatedRejections()
+  const r = (await channels().proposeRules({})) as { proposals: { id: string }[] }
+  const id = r.proposals[0].id
+  await channels().decideProposal({ proposalId: id, accept: true })
+  return id
+}
 
+describe('removing an accepted check (FR-081)', () => {
+  describe('listing and removing', listingAndRemovingTests)
+  describe('recording the removal', recordingTheRemovalTests)
+  describe('proposing and refusing', proposingAndRefusingTests)
+})
+
+function listingAndRemovingTests() {
   it('lists what the operator accepted, and nothing that shipped with the tool', async () => {
     const id = await accept()
     const view = (await channels().rulesInForce({})) as {
@@ -320,7 +349,9 @@ describe('removing an accepted check (FR-081)', () => {
         .ok
     ).toBe(false)
   })
+}
 
+function recordingTheRemovalTests() {
   it('records the removal, with the reason, where it can be read back', async () => {
     const id = await accept()
     await channels().removeAcceptedRule({ ruleId: id, reason: 'it fired on everything' })
@@ -335,7 +366,9 @@ describe('removing an accepted check (FR-081)', () => {
       },
     ])
   })
+}
 
+function proposingAndRefusingTests() {
   it('never proposes a removed check again', async () => {
     const id = await accept()
     await channels().removeAcceptedRule({ ruleId: id })
@@ -350,7 +383,7 @@ describe('removing an accepted check (FR-081)', () => {
     }
     expect(result.error).toMatch(/not yours to remove/)
   })
-})
+}
 
 describe('the skills in force', () => {
   it('lists every skill available, each with the rung it comes from', async () => {
@@ -407,6 +440,11 @@ function graph(orderId: string): RunGraph {
 }
 
 describe('foundry:factory.metrics', () => {
+  describe('gathering', gatheringTests)
+  describe('windows', windowsTests)
+})
+
+function gatheringTests() {
   it('gathers every order on disk, with its ledger, gates and run graph', async () => {
     await seedOrder('WO-1')
     await record('WO-1', {
@@ -437,7 +475,9 @@ describe('foundry:factory.metrics', () => {
     expect(r.firstPassYield).toBe(1)
     expect(r.orders.map((o) => o.orderId).sort()).toEqual(['WO-1', 'WO-2'])
   })
+}
 
+function windowsTests() {
   it('defaults to the 30 day window', async () => {
     await seedOrder('WO-1')
     const r = (await channels().factoryMetrics({})) as { window: string }
@@ -449,4 +489,4 @@ describe('foundry:factory.metrics', () => {
     const r = (await channels().factoryMetrics({ window: 'all' })) as { window: string }
     expect(r.window).toBe('all')
   })
-})
+}

@@ -7,12 +7,8 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import {
-  activateFoundry,
-  fakeHost,
-  seededRepository,
-  temporaryDirectory,
-} from '../helpers/foundry-host.js'
+import { fakeHost, seededRepository, temporaryDirectory } from '../helpers/foundry-host.js'
+import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -46,7 +42,6 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  const { deactivate } = await import('../../src/index.ts')
   deactivate()
   vi.unstubAllEnvs()
 })
@@ -58,12 +53,19 @@ beforeEach(() => {
 })
 
 describe('your tickets', () => {
+  describe('nothing connected', nothingConnectedTests)
+  describe('own and searched', ownAndSearchedTests)
+})
+
+function nothingConnectedTests() {
   it('say nothing is connected rather than showing an empty list', async () => {
     vi.mocked(host.issues.connections).mockResolvedValueOnce([])
     expect(await host.call('foundry:issues.mine', {})).toEqual({ connected: [], issues: [] })
     expect(host.issues.listMine).not.toHaveBeenCalled()
   })
+}
 
+function ownAndSearchedTests() {
   it('are the operator’s own, or a search when a term is typed, with each tracker’s failure said', async () => {
     vi.mocked(host.issues.connections).mockResolvedValue([
       { tracker: 'linear', account: 'andrew' },
@@ -93,7 +95,7 @@ describe('your tickets', () => {
     vi.mocked(host.issues.connections).mockRejectedValueOnce(new Error('token expired'))
     expect(await host.call('foundry:issues.mine', {})).toEqual({ error: 'token expired' })
   })
-})
+}
 
 describe('a ticket for a typed idea', () => {
   it('is offered only where the tracker can create one, and filed with the idea as its text', async () => {
@@ -111,6 +113,11 @@ describe('a ticket for a typed idea', () => {
 })
 
 describe('an order from a tracker issue', () => {
+  describe('reading the issue', readingTheIssueTests)
+  describe('capabilities and unknown trackers', capabilitiesAndUnknownTrackersTests)
+})
+
+function readingTheIssueTests() {
   it('reads the issue through the application’s connection', async () => {
     const repo = await seededRepository(parent)
     vi.mocked(host.issues.get).mockResolvedValueOnce({
@@ -130,7 +137,9 @@ describe('an order from a tracker issue', () => {
       source: { tracker: 'linear', key: 'ENG-3', branch: 'eng-3-red' },
     })
   })
+}
 
+function capabilitiesAndUnknownTrackersTests() {
   it('says up front when its tracker cannot move the issue, and records it', async () => {
     await createOrderStore(dataDir).save(
       draftOrder({
@@ -156,7 +165,15 @@ describe('an order from a tracker issue', () => {
     })) as { error?: string }
     expect(created.error).toBeDefined()
   })
-})
+}
+
+/** A finding the operator accepted on WO-1; each use says when, about what and why. */
+const ACCEPTED = {
+  orderId: 'WO-1',
+  actor: 'operator',
+  action: 'finding.accepted',
+  evidence: [],
+}
 
 describe('the record of earlier decisions', () => {
   it('names the newest decisions about the files a plan touches, and nothing else', async () => {
@@ -171,15 +188,7 @@ describe('the record of earlier decisions', () => {
       })
     )
     const decided = (at: string, subject: string, reason: string) =>
-      store.record({
-        at,
-        orderId: 'WO-1',
-        actor: 'operator',
-        action: 'finding.accepted',
-        subject,
-        reason,
-        evidence: [],
-      })
+      store.record({ ...ACCEPTED, at, subject, reason })
     await decided('2026-10-01T10:00:00.000Z', 'src/theme.ts', 'keep tokens')
     await decided('2026-10-05T10:00:00.000Z', 'RT-1', 'src/theme.ts stays the source of colour')
     await decided('2026-10-06T10:00:00.000Z', 'src/other.ts', 'unrelated')
@@ -192,12 +201,19 @@ describe('the record of earlier decisions', () => {
 })
 
 describe('deleting an order', () => {
+  describe('an unknown order', anUnknownOrderTests)
+  describe('deleting', deletingTests)
+})
+
+function anUnknownOrderTests() {
   it('refuses an order that does not exist', async () => {
     expect(await host.call('foundry:order.delete', { id: 'WO-9' })).toEqual({
       error: 'No order WO-9.',
     })
   })
+}
 
+function deletingTests() {
   it('stops its architect, removes its records, and leaves no trace on the list', async () => {
     const repo = await seededRepository(parent)
     const order = draftOrder({
@@ -225,4 +241,4 @@ describe('deleting an order', () => {
     const listed = (await host.call('foundry:order.list')) as { orders: unknown[] }
     expect(listed.orders).toEqual([])
   })
-})
+}

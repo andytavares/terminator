@@ -2,8 +2,8 @@
  * Every channel Foundry registers, read from the registry `activate` builds
  * rather than from its source.
  */
-import { tmpdir } from 'node:os'
 import { freshGlobalStorage } from './helpers/foundry-host.js'
+import { partialFake } from '../../../tests/support/fakes'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 const GLOBAL_STORAGE = freshGlobalStorage()
 
 import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { activate } from '../src/index.ts'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 
 vi.mock('electron', () => ({
@@ -50,39 +51,53 @@ const contract = fs.readFileSync(
 const disposable = { dispose: vi.fn() }
 const specs: ChannelSpec[] = []
 
-beforeAll(async () => {
-  const api = {
-    ipc: {
+/** Records every channel `activate` registers; everything else answers with nothing. */
+function registeringApi(): ExtensionAPI {
+  return partialFake<ExtensionAPI>({
+    ipc: partialFake<ExtensionAPI['ipc']>({
       registerHandler: (spec: ChannelSpec) => {
         specs.push(spec)
         return disposable
       },
       onWindowEvent: () => () => {},
-    },
-    window: { broadcast: vi.fn(), openAuxiliary: vi.fn(), focusSelf: vi.fn(), showSelf: vi.fn() },
-    commands: { register: () => disposable, setEnabled: vi.fn() },
-    shell: { exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }) },
-    notifications: { showToast: vi.fn(), createNotification: () => disposable },
+    }),
+    window: partialFake<ExtensionAPI['window']>({
+      broadcast: vi.fn(),
+      openAuxiliary: vi.fn(),
+      focusSelf: vi.fn(),
+      showSelf: vi.fn(),
+    }),
+    commands: partialFake<ExtensionAPI['commands']>({ register: () => disposable }),
+    shell: partialFake<ExtensionAPI['shell']>({
+      exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
+    }),
+    notifications: partialFake<ExtensionAPI['notifications']>({
+      showToast: vi.fn(),
+      createNotification: () => disposable,
+    }),
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     paths: { app: '', globalStorage: GLOBAL_STORAGE },
-    settings: {
+    ...quietHost(),
+  })
+}
+
+/** The settings and workspaces of a host where nothing has been set up. */
+function quietHost(): Partial<ExtensionAPI> {
+  return {
+    settings: partialFake<ExtensionAPI['settings']>({
       register: () => disposable,
       get: vi.fn(),
       set: vi.fn(),
-      resolveWorktreeBaseDir: () => path.join(tmpdir(), 'fdry-channel-schemas'),
-    },
-    terminal: { onSessionCreate: () => disposable, onSessionClose: () => disposable },
-    workspace: {
+    }),
+    workspace: partialFake<ExtensionAPI['workspace']>({
       list: () => [],
       listProjects: () => [],
-      onDelete: () => disposable,
-      onProjectDelete: () => disposable,
-    },
-    pty: { listSessions: () => [], attachOnData: () => null, attachOnExit: () => null },
-    app: { version: '0.0.0-test' },
-  } as unknown as ExtensionAPI
+    }),
+  }
+}
 
-  const { activate } = await import('../src/index.ts')
+beforeAll(async () => {
+  const api = registeringApi()
   const { startSupervisionRuntime } = await import('../src/runtime/supervision-runtime.ts')
   activate(api)
   await startSupervisionRuntime(api)

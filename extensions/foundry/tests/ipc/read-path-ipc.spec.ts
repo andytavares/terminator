@@ -6,16 +6,12 @@
  * checkout had changed, on every list and every observe), and a write names
  * what it changed so a window can read just that instead of polling.
  */
-import { tmpdir } from 'node:os'
-import { freshGlobalStorage } from '../helpers/foundry-host.js'
 import * as fs from 'node:fs'
-import * as path from 'node:path'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
-
-const GLOBAL_STORAGE = freshGlobalStorage()
-
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
-import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
+
+import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
+import { activateFoundry } from '../helpers/foundry-activation.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { checkoutPath } from '../../src/line/worktree.js'
@@ -59,19 +55,9 @@ vi.mock('../../src/runtime/control-server.js', () => ({
   }),
 }))
 
-let getHandler: (channel: string) => ((payload: unknown) => Promise<unknown>) | undefined
 let dataDir = ''
-const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' })
-const broadcast = vi.fn()
-const settingsGet = vi.fn((key: string) =>
-  key === 'terminator.foundry.dataDir' ? dataDir : undefined
-)
-
-function call(channel: string, payload: unknown = {}): Promise<unknown> {
-  const handler = getHandler(channel)
-  if (handler === undefined) throw new Error(`${channel} is not registered`)
-  return handler(payload)
-}
+let host: FoundryHost
+const call = (channel: string, payload: unknown = {}) => host.call(channel, payload)
 
 function runningOrder(id: string, touches: string[], agreedAt: string): WorkOrder {
   const base = draftOrder({
@@ -104,64 +90,10 @@ function runningOrder(id: string, touches: string[], agreedAt: string): WorkOrde
   }
 }
 
-const remoteChannels: string[] = []
-
 beforeAll(async () => {
-  const handlers = new Map<string, (payload: unknown) => Promise<unknown>>()
-  const api = {
-    ipc: {
-      registerHandler: vi.fn((spec: ChannelSpec, opts?: { remoteAccessible?: boolean }) => {
-        handlers.set(spec.channel, (payload) => dispatchChannel(spec, payload))
-        if (opts?.remoteAccessible === true) remoteChannels.push(spec.channel)
-        return { dispose: vi.fn() }
-      }),
-      invokeChannel: vi.fn(),
-      sendChannel: vi.fn(),
-      onWindowEvent: vi.fn().mockReturnValue(() => {}),
-      isRemoteAccessible: vi.fn().mockReturnValue(false),
-    },
-    window: { broadcast, openAuxiliary: vi.fn(), focusSelf: vi.fn(), showSelf: vi.fn() },
-    commands: { register: vi.fn().mockReturnValue({ dispose: vi.fn() }), setEnabled: vi.fn() },
-    shell: { exec },
-    notifications: { showToast: vi.fn(), createNotification: vi.fn() },
-    log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    paths: { app: '', globalStorage: GLOBAL_STORAGE },
-    settings: {
-      register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      get: settingsGet,
-      set: vi.fn(),
-      resolveWorktreeBaseDir: vi.fn().mockReturnValue(path.join(tmpdir(), 'fdry-worktrees')),
-    },
-    terminal: {
-      onSessionCreate: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onSessionClose: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    workspace: {
-      list: vi.fn().mockReturnValue([]),
-      listProjects: vi.fn().mockReturnValue([]),
-      createProject: vi.fn(),
-      deleteProject: vi.fn(),
-      onDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onProjectDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    pty: {
-      spawn: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      listSessions: vi.fn().mockReturnValue([]),
-      attachOnData: vi.fn().mockReturnValue(null),
-      attachOnExit: vi.fn().mockReturnValue(null),
-      openTerminalTab: vi.fn(),
-    },
-    app: { version: '0.0.0-test' },
-  } as unknown as ExtensionAPI
-
-  const { activate } = await import('../../src/index.ts')
-  const { startSupervisionRuntime } = await import('../../src/runtime/supervision-runtime.ts')
-  activate(api)
-  getHandler = (channel) => handlers.get(channel)
-  await startSupervisionRuntime(api)
+  host = fakeHost(() => dataDir)
+  host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+  await activateFoundry(host)
 })
 
 /** A records location with two in-flight orders, each with a checkout on disk. */
@@ -184,15 +116,15 @@ async function seedTwoRunningOrders(): Promise<void> {
 }
 
 beforeEach(() => {
-  exec.mockClear()
-  broadcast.mockClear()
+  host.exec.mockClear()
+  host.broadcast.mockClear()
 })
 
 describe('the remote browser client', () => {
   // A logged-in remote browser reaches only what is opted in (ADR 094); a
   // channel added here is a decision, so the list is spelled out.
   it('may call exactly these read-only channels, and nothing that writes or runs', () => {
-    expect([...remoteChannels].sort()).toEqual([
+    expect([...host.remoteChannels].sort()).toEqual([
       'foundry:ask-model',
       'foundry:factory.metrics',
       'foundry:feed-list',
@@ -215,12 +147,12 @@ describe('the remote browser client', () => {
 describe('reading the order list and a run', () => {
   it('starts no process even though every in-flight order has a checkout on disk', async () => {
     await seedTwoRunningOrders()
-    exec.mockClear()
+    host.exec.mockClear()
     await call('foundry:order.list')
     await call('foundry:run.observe', { id: 'WO-1' })
     await call('foundry:inbox.list')
     await call('foundry:attention')
-    expect(exec).not.toHaveBeenCalled()
+    expect(host.exec).not.toHaveBeenCalled()
   })
 
   it('queues an order behind another by the files recorded for it', async () => {
@@ -240,14 +172,19 @@ describe('telling the windows what changed', () => {
   it('names the order and the kind of record after a write through a channel', async () => {
     await seedTwoRunningOrders()
     await call('foundry:order.hold', { id: 'WO-1', held: true })
-    expect(broadcast).toHaveBeenCalledWith('foundry:changed', { kind: 'ledger', orderId: 'WO-1' })
+    expect(host.broadcast).toHaveBeenCalledWith('foundry:changed', {
+      kind: 'ledger',
+      orderId: 'WO-1',
+    })
   })
 
   it('says nothing about an order for a read', async () => {
     await seedTwoRunningOrders()
-    broadcast.mockClear()
+    host.broadcast.mockClear()
     await call('foundry:order.list')
     await call('foundry:run.observe', { id: 'WO-1' })
-    expect(broadcast.mock.calls.filter(([channel]) => channel === 'foundry:changed')).toEqual([])
+    expect(host.broadcast.mock.calls.filter(([channel]) => channel === 'foundry:changed')).toEqual(
+      []
+    )
   })
 })

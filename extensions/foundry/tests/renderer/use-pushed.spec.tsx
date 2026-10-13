@@ -33,6 +33,13 @@ async function settle(): Promise<void> {
 }
 
 describe('usePushed', () => {
+  describe('reading on mount and on change', readingOnMountAndOnChangeTests)
+  describe('filtering and bursts', filteringAndBurstsTests)
+  describe('a read in flight', aReadInFlightTests)
+  describe('after unmount', afterUnmountTests)
+})
+
+function readingOnMountAndOnChangeTests() {
   it('reads once on mount and shows the answer', async () => {
     const read = vi.fn(async () => 'first')
     const show = vi.fn()
@@ -53,7 +60,9 @@ describe('usePushed', () => {
     await settle()
     expect(read).toHaveBeenCalledTimes(2)
   })
+}
 
+function filteringAndBurstsTests() {
   it('ignores a change to another order when it draws one order', async () => {
     const read = vi.fn(async () => 1)
     renderHook(() => usePushed(read, vi.fn(), { kinds: ['graph'], orderId: 'WO-1' }))
@@ -74,7 +83,9 @@ describe('usePushed', () => {
     await settle()
     expect(read).toHaveBeenCalledTimes(2)
   })
+}
 
+function aReadInFlightTests() {
   it('reads again when a change lands while a read is still in flight', async () => {
     let arrive: (value: number) => void = () => {}
     const read = vi
@@ -91,7 +102,9 @@ describe('usePushed', () => {
     expect(read).toHaveBeenCalledTimes(2)
     expect(show).toHaveBeenLastCalledWith(2)
   })
+}
 
+function afterUnmountTests() {
   it('stops listening and reading once unmounted', async () => {
     const read = vi.fn(async () => 1)
     const { unmount } = renderHook(() => usePushed(read, vi.fn(), { kinds: ['graph'] }))
@@ -113,7 +126,7 @@ describe('usePushed', () => {
     await settle()
     expect(show).not.toHaveBeenCalled()
   })
-})
+}
 
 describe('isRelevant', () => {
   it('treats a change tied to no order as concerning every order', () => {

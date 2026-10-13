@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import { readiness } from '../../src/forge/readiness.js'
 import type { LoopFacts, ReadinessInput } from '../../src/forge/readiness.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -34,18 +35,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
     risk: { grade: 'P3', triggers: [], blastRadius: ['a.ts'], criticalPaths: [] },
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'Filter',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['a.ts'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'Filter', satisfies: ['AC-1'], touches: ['a.ts'] })],
     },
     ...over,
   }

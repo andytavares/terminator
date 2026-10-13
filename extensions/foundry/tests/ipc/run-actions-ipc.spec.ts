@@ -15,6 +15,8 @@ import { freshGlobalStorage } from '../helpers/foundry-host.js'
 const GLOBAL_STORAGE = freshGlobalStorage()
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
+import { partialFake } from '../../../../tests/support/fakes'
+import { activate } from '../../src/index.ts'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
 
@@ -98,64 +100,52 @@ function startRun(sessionId = 'session-1'): void {
   })
 }
 
-beforeAll(async () => {
-  const handlers = new Map<string, (payload: unknown) => Promise<unknown>>()
-  const commands = new Map<string, () => void>()
-  api = {
-    ipc: {
+type Handlers = Map<string, (payload: unknown) => Promise<unknown>>
+
+/** Commands registered into `commands` by id, so a spec can run one. */
+function keptCommands(commands: Map<string, () => void>): ExtensionAPI['commands'] {
+  return partialFake<ExtensionAPI['commands']>({
+    register: vi.fn((command: { id: string }, handler: () => void) => {
+      commands.set(command.id, handler)
+      return { dispose: vi.fn(() => commands.delete(command.id)) }
+    }),
+  })
+}
+
+/** A host that keeps every channel and command registered, so a spec can call them. */
+function actionsApi(handlers: Handlers, commands: Map<string, () => void>): ExtensionAPI {
+  const disposable = () => ({ dispose: vi.fn() })
+  return partialFake<ExtensionAPI>({
+    ipc: partialFake<ExtensionAPI['ipc']>({
       registerHandler: vi.fn((spec: ChannelSpec) => {
         handlers.set(spec.channel, (payload) => dispatchChannel(spec, payload))
-        return { dispose: vi.fn() }
+        return disposable()
       }),
-      invokeChannel: vi.fn(),
-      sendChannel: vi.fn(),
-      onWindowEvent: vi.fn().mockReturnValue(() => {}),
-      isRemoteAccessible: vi.fn().mockReturnValue(false),
-    },
-    window: { broadcast: vi.fn(), openAuxiliary: vi.fn(), focusSelf: vi.fn(), showSelf: vi.fn() },
-    commands: {
-      register: vi.fn((command: { id: string }, handler: () => void) => {
-        commands.set(command.id, handler)
-        return { dispose: vi.fn(() => commands.delete(command.id)) }
-      }),
-      setEnabled: vi.fn(),
-    },
-    shell: { exec },
-    notifications: { showToast, createNotification },
+    }),
+    window: partialFake<ExtensionAPI['window']>({
+      broadcast: vi.fn(),
+      openAuxiliary: vi.fn(),
+      focusSelf: vi.fn(),
+      showSelf: vi.fn(),
+    }),
+    commands: keptCommands(commands),
+    shell: partialFake<ExtensionAPI['shell']>({ exec }),
+    notifications: partialFake<ExtensionAPI['notifications']>({ showToast, createNotification }),
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     paths: { app: '', globalStorage: GLOBAL_STORAGE },
-    settings: {
-      register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+    settings: partialFake<ExtensionAPI['settings']>({
+      register: vi.fn(disposable),
       get: vi.fn(),
       set: vi.fn(),
-      resolveWorktreeBaseDir: vi.fn().mockReturnValue('/tmp/speckit-run-actions'),
-    },
-    terminal: {
-      onSessionCreate: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onSessionClose: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    workspace: {
-      list: vi.fn().mockReturnValue([]),
-      listProjects: vi.fn().mockReturnValue([]),
-      createProject: vi.fn(),
-      deleteProject: vi.fn(),
-      onDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onProjectDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    pty: {
-      spawn: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      listSessions: vi.fn().mockReturnValue([]),
-      attachOnData: vi.fn().mockReturnValue(null),
-      attachOnExit: vi.fn().mockReturnValue(null),
-      openTerminalTab: vi.fn(),
-    },
-    app: { version: '0.0.0-test' },
-  } as unknown as ExtensionAPI
+    }),
+    workspace: partialFake<ExtensionAPI['workspace']>({ list: () => [], listProjects: () => [] }),
+  })
+}
 
-  const { activate } = await import('../../src/index.ts')
+beforeAll(async () => {
+  const handlers: Handlers = new Map()
+  const commands = new Map<string, () => void>()
+  api = actionsApi(handlers, commands)
   const { startSupervisionRuntime } = await import('../../src/runtime/supervision-runtime.ts')
   activate(api)
   getHandler = (channel) => handlers.get(channel)
@@ -234,6 +224,11 @@ describe('reading what it was doing', () => {
 })
 
 describe('interrupting and redirecting', () => {
+  describe('interrupting', interruptingTests)
+  describe('refusing and recording', refusingAndRecordingTests)
+})
+
+function interruptingTests() {
   it('interrupts the session', async () => {
     expect(await call('foundry:run-interrupt', { sessionId: 'session-1' })).toEqual({ ok: true })
     expect(runner.interrupt).toHaveBeenCalledWith('session-1')
@@ -247,7 +242,9 @@ describe('interrupting and redirecting', () => {
     expect(runner.interrupt).toHaveBeenCalledWith('session-1')
     expect(runner.send).toHaveBeenCalledWith('session-1', 'try the other approach')
   })
+}
 
+function refusingAndRecordingTests() {
   it('refuses a payload with no message at all, rather than throwing', async () => {
     // A handler that throws on a missing field takes the channel down for
     // everyone rather than refusing one call. Found by driving the real app.
@@ -273,7 +270,7 @@ describe('interrupting and redirecting', () => {
       true
     )
   })
-})
+}
 
 describe('ending a run', () => {
   it('stops it with the reason, so the agent record carries it', async () => {

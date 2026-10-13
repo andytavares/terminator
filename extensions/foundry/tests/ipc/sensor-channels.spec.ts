@@ -166,6 +166,11 @@ describe('foundry:sensors.list', () => {
 })
 
 describe('foundry:sensors.set', () => {
+  describe('enabling', enablingTests)
+  describe('disabling and clearing', disablingAndClearingTests)
+})
+
+function enablingTests() {
   it('refuses to enable a sensor with no repository', async () => {
     const { c } = channels()
     expect(await c.sensorsSet({ id: 'ci-flake', enabled: true })).toEqual({
@@ -186,7 +191,9 @@ describe('foundry:sensors.set', () => {
       lastProblem: null,
     })
   })
+}
 
+function disablingAndClearingTests() {
   it('disables a sensor without needing a repository', async () => {
     const { c } = channels()
     await c.sensorsSet({ id: 'ci-flake', repoPath: repo, enabled: true })
@@ -209,7 +216,7 @@ describe('foundry:sensors.set', () => {
       lastProblem: null,
     })
   })
-})
+}
 
 describe('foundry:sensors.run-now', () => {
   it('runs the sensor once and reports what it recorded', async () => {

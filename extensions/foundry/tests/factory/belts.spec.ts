@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { routeBelts } from '../../src/factory/belts.js'
+import type { BeltFloor } from '../../src/factory/belts.js'
 import type { HallProp } from '../../src/factory/layout.js'
 import type { RunNode } from '../../src/line/run-graph.js'
 
@@ -25,7 +26,8 @@ function node(over: Partial<RunNode> & Pick<RunNode, 'id'>): RunNode {
   }
 }
 
-function station(id: string, x: number, y: number, w = 1): HallProp {
+/** A one-row desk for node `id` whose top-left tile is `[x, y]`. */
+function station(id: string, [x, y]: [number, number], w = 1): HallProp {
   return {
     id: `station-${id}`,
     kind: 'desk',
@@ -47,6 +49,19 @@ function openFloor(width: number, height: number): boolean[][] {
   return Array.from({ length: height }, () => Array(width).fill(false))
 }
 
+/** The floor routeBelts runs over: these rows, between the top wall at row 0 and `roomRow`. */
+function floorOf(solid: boolean[][], role: string[], roomRow: number): BeltFloor {
+  return {
+    solid,
+    role,
+    blockedForBelt: new Set(),
+    width: solid[0].length,
+    height: solid.length,
+    topWallRow: 0,
+    roomRow,
+  }
+}
+
 function roleRows(height: number, stationRow: number): string[] {
   const role = Array(height).fill('wall')
   role[stationRow] = 'station'
@@ -56,9 +71,16 @@ function roleRows(height: number, stationRow: number): string[] {
 }
 
 describe('routeBelts', () => {
+  describe('straight belts', straightBeltsTests)
+  describe('splits', splitsTests)
+  describe('BFS fallback', bfsFallbackTests)
+  describe('missing stations', missingStationsTests)
+})
+
+function straightBeltsTests() {
   it('routes a straight belt on the belt row when source and target share a row', () => {
-    const a = station('a', 0, 2, 2)
-    const b = station('b', 6, 2, 2)
+    const a = station('a', [0, 2], 2)
+    const b = station('b', [6, 2], 2)
     const nodes = [node({ id: 'a' }), node({ id: 'b', dependsOn: ['a'] })]
     const byNode = new Map([
       ['a', a],
@@ -66,7 +88,7 @@ describe('routeBelts', () => {
     ])
     const solid = openFloor(10, 6)
     const role = roleRows(6, 2)
-    const { belts, beltTiles } = routeBelts(nodes, byNode, solid, role, new Set(), 10, 6, 0, 5)
+    const { belts, beltTiles } = routeBelts(nodes, byNode, floorOf(solid, role, 5))
     expect(belts).toHaveLength(1)
     const belt = belts[0]
     expect(belt.path[0]).toEqual({ x: a.x + a.w, y: a.y })
@@ -74,11 +96,13 @@ describe('routeBelts', () => {
     expect(beltTiles.length).toBeGreaterThan(0)
     expect(beltTiles.every((t) => t.kind === 'straight' || t.kind === 'corner')).toBe(true)
   })
+}
 
+function splitsTests() {
   it('gives the shared tile of two belts from the same source a split, in graph order', () => {
-    const a = station('a', 0, 2, 1)
-    const b = station('b', 5, 2, 1)
-    const c = station('c', 5, 5, 1)
+    const a = station('a', [0, 2], 1)
+    const b = station('b', [5, 2], 1)
+    const c = station('c', [5, 5], 1)
     const nodes = [
       node({ id: 'a' }),
       node({ id: 'b', dependsOn: ['a'] }),
@@ -94,20 +118,22 @@ describe('routeBelts', () => {
     role[5] = 'station'
     role[6] = 'seat'
     role[7] = 'belt'
-    const { belts, beltTiles } = routeBelts(nodes, byNode, solid, role, new Set(), 8, 8, 0, 8)
+    const { belts, beltTiles } = routeBelts(nodes, byNode, floorOf(solid, role, 8))
     expect(belts).toHaveLength(2)
     const kinds = beltTiles.map((t) => t.kind)
     expect(kinds).toContain('split')
     const splitTile = beltTiles.find((t) => t.kind === 'split')!
     expect(splitTile.outs.length).toBeGreaterThan(1)
   })
+}
 
+function bfsFallbackTests() {
   it('falls back to a plain BFS path when the routed search can never turn', () => {
     // Every row is 'wall', so a horizontal step is never legal for the
     // routed search — it cannot reach a target one column removed no matter
     // how it turns, and must fall back to findPath over `solid`.
-    const a = station('a', 0, 2, 1)
-    const b = station('b', 4, 2, 1)
+    const a = station('a', [0, 2], 1)
+    const b = station('b', [4, 2], 1)
     const nodes = [node({ id: 'a' }), node({ id: 'b', dependsOn: ['a'] })]
     const byNode = new Map([
       ['a', a],
@@ -115,7 +141,7 @@ describe('routeBelts', () => {
     ])
     const solid = openFloor(6, 5)
     const role = Array(5).fill('wall')
-    const { belts } = routeBelts(nodes, byNode, solid, role, new Set(), 6, 5, 0, 4)
+    const { belts } = routeBelts(nodes, byNode, floorOf(solid, role, 4))
     expect(belts).toHaveLength(1)
     const belt = belts[0]
     expect(belt.path[0]).toEqual({ x: a.x + a.w, y: a.y })
@@ -126,15 +152,17 @@ describe('routeBelts', () => {
       prev = t
     }
   })
+}
 
+function missingStationsTests() {
   it('skips an edge whose source or target station is missing from the map', () => {
-    const b = station('b', 4, 2, 1)
+    const b = station('b', [4, 2], 1)
     const nodes = [node({ id: 'b', dependsOn: ['ghost'] })]
     const byNode = new Map([['b', b]])
     const solid = openFloor(6, 5)
     const role = roleRows(5, 2)
-    const { belts, beltTiles } = routeBelts(nodes, byNode, solid, role, new Set(), 6, 5, 0, 4)
+    const { belts, beltTiles } = routeBelts(nodes, byNode, floorOf(solid, role, 4))
     expect(belts).toEqual([])
     expect(beltTiles).toEqual([])
   })
-})
+}

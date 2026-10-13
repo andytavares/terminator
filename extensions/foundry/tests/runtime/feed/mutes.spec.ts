@@ -19,6 +19,11 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }))
 
 describe('muting', () => {
+  describe('muting', mutingTests)
+  describe('unmuting', unmutingTests)
+})
+
+function mutingTests() {
   it('starts with nothing muted', () => {
     expect(createMuteStore(file).list()).toEqual([])
   })
@@ -41,7 +46,9 @@ describe('muting', () => {
     store.add({ author: 'console' })
     expect(store.list()).toHaveLength(2)
   })
+}
 
+function unmutingTests() {
   it('unmutes one without touching the others', () => {
     const store = createMuteStore(file)
     store.add({ sessionId: 'session-1' })
@@ -56,7 +63,7 @@ describe('muting', () => {
     store.clear()
     expect(store.list()).toEqual([])
   })
-})
+}
 
 describe('a file that is not what was written', () => {
   it('reads nothing rather than throwing on nonsense', () => {

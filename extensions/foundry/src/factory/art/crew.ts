@@ -1,7 +1,7 @@
 import type { Crew, CrewAnim, Facing } from '../sim.js'
-import type { Paint } from './kit.js'
+import type { At, Paint } from './kit.js'
 import { rect, bevel } from './kit.js'
-import { roleStyle } from './palette.js'
+import { roleStyle, type RoleStyle } from './palette.js'
 import { HALL } from './palette.js'
 import { drawCrate } from './props.js'
 
@@ -13,8 +13,8 @@ import { drawCrate } from './props.js'
 const WALK_FRAME_MS = 110
 const WALK_FRAMES = 4
 
-function shadow(paint: Paint, x: number, y: number, w: number): void {
-  rect(paint, x - w / 2, y - 1, w, 2, 'rgba(0,0,0,.35)')
+function shadow(paint: Paint, [x, y]: At, w: number): void {
+  rect(paint, [x - w / 2, y - 1, w, 2], 'rgba(0,0,0,.35)')
 }
 
 function walkFrame(tMs: number, seed: number): number {
@@ -23,112 +23,125 @@ function walkFrame(tMs: number, seed: number): number {
 
 function drawLegs(
   paint: Paint,
-  x: number,
-  y: number,
-  facing: Facing,
-  pants: string,
-  frame: number
+  [x, y]: At,
+  { facing, pants, frame }: { facing: Facing; pants: string; frame: number }
 ): void {
   const lift = [0, 1, 0, -1][frame]
   if (facing === 'E' || facing === 'W') {
-    rect(paint, x - 2 + lift, y - 7, 3, 6, pants)
-    rect(paint, x - 1 - lift, y - 7, 3, 6, '#1f222a')
+    rect(paint, [x - 2 + lift, y - 7, 3, 6], pants)
+    rect(paint, [x - 1 - lift, y - 7, 3, 6], '#1f222a')
     return
   }
-  rect(paint, x - 3, y - 7 + Math.min(lift, 0), 3, 6 + Math.max(-lift, 0), pants)
-  rect(paint, x, y - 7 + Math.max(-lift, 0), 3, 6 + Math.max(lift, 0), pants)
+  rect(paint, [x - 3, y - 7 + Math.min(lift, 0), 3, 6 + Math.max(-lift, 0)], pants)
+  rect(paint, [x, y - 7 + Math.max(-lift, 0), 3, 6 + Math.max(lift, 0)], pants)
 }
 
-function drawArms(
-  paint: Paint,
-  x: number,
-  topY: number,
-  anim: CrewAnim,
-  skin: string,
-  shirtDark: string,
-  tMs: number
-): void {
-  function arm(side: -1 | 1, dy: number, len: number): void {
+/** One arm: how far below the shoulder it starts, and how long the sleeve is. */
+type Arm = readonly [dy: number, len: number]
+
+/** Each anim's arms, left then right, at a moment; none while sunk in the couch. */
+const ARM_POSES: Record<CrewAnim, (tMs: number) => readonly [Arm, Arm] | null> = {
+  type: (tMs) => {
+    const k = Math.floor(tMs / 100) % 2
+    return [
+      [k ? -1 : 0, 4],
+      [k ? 0 : -1, 4],
+    ]
+  },
+  reach: () => [
+    [0, 5],
+    [-3, 6],
+  ],
+  wave: (tMs) => {
+    const wv = Math.floor(tMs / 200) % 2
+    return [
+      [0, 5],
+      [-6 - wv, 8],
+    ]
+  },
+  scan: () => [
+    [0, 5],
+    [1, 3],
+  ],
+  slump: () => [
+    [2, 4],
+    [2, 4],
+  ],
+  couch: () => null,
+  walk: (tMs) => {
+    const swing = [1, 0, -1, 0][walkFrame(tMs, 0)]
+    return [
+      [swing, 5],
+      [-swing, 5],
+    ]
+  },
+  idle: () => [
+    [0, 5],
+    [0, 5],
+  ],
+}
+
+/** What an arm is drawn in: the sleeve's shade and the hand's skin. */
+interface ArmLook {
+  readonly anim: CrewAnim
+  readonly skin: string
+  readonly shirtDark: string
+  readonly tMs: number
+}
+
+function drawArms(paint: Paint, [x, topY]: At, { anim, skin, shirtDark, tMs }: ArmLook): void {
+  const pose = ARM_POSES[anim](tMs)
+  if (pose === null) return
+  const arm = (side: -1 | 1, [dy, len]: Arm): void => {
     const ax = side < 0 ? x - 6 : x + 4
-    rect(paint, ax, topY + dy, 2, len, shirtDark)
-    rect(paint, ax, topY + dy + len, 2, 2, skin)
+    rect(paint, [ax, topY + dy, 2, len], shirtDark)
+    rect(paint, [ax, topY + dy + len, 2, 2], skin)
   }
-  switch (anim) {
-    case 'type': {
-      const k = Math.floor(tMs / 100) % 2
-      arm(-1, k ? -1 : 0, 4)
-      arm(1, k ? 0 : -1, 4)
-      return
-    }
-    case 'reach':
-      arm(-1, 0, 5)
-      arm(1, -3, 6)
-      return
-    case 'wave': {
-      const wv = Math.floor(tMs / 200) % 2
-      arm(-1, 0, 5)
-      arm(1, -6 - wv, 8)
-      return
-    }
-    case 'scan':
-      arm(-1, 0, 5)
-      arm(1, 1, 3)
-      return
-    case 'slump':
-      arm(-1, 2, 4)
-      arm(1, 2, 4)
-      return
-    case 'couch':
-      return
-    case 'walk':
-    case 'idle': {
-      const swing = anim === 'walk' ? [1, 0, -1, 0][walkFrame(tMs, 0)] : 0
-      arm(-1, swing, 5)
-      arm(1, -swing, 5)
-      return
-    }
-    /* v8 ignore next 3 -- exhaustive union, unreachable */
-    default: {
-      const never: never = anim
-      throw new Error(`unhandled crew anim: ${String(never)}`)
-    }
-  }
+  arm(-1, pose[0])
+  arm(1, pose[1])
 }
 
-function drawHead(
-  paint: Paint,
-  x: number,
-  topY: number,
-  facing: Facing,
-  skin: string,
-  hair: string,
-  visor: boolean
-): void {
-  rect(paint, x - 3, topY + 1, 6, 7, skin)
-  switch (facing) {
-    case 'N':
-      rect(paint, x - 3, topY, 6, 5, hair)
-      return
-    case 'S':
-      rect(paint, x - 3, topY, 6, 2, hair)
-      if (visor) rect(paint, x - 3, topY + 3, 6, 2, HALL.cyan)
-      return
-    case 'E':
-      rect(paint, x - 3, topY, 6, 2, hair)
-      rect(paint, x - 3, topY + 2, 2, 3, hair)
-      if (visor) rect(paint, x, topY + 3, 3, 2, HALL.cyan)
-      return
-    case 'W':
-      rect(paint, x - 3, topY, 6, 2, hair)
-      rect(paint, x + 1, topY + 2, 2, 3, hair)
-      if (visor) rect(paint, x - 3, topY + 3, 3, 2, HALL.cyan)
-      return
-    /* v8 ignore next 3 -- exhaustive union, unreachable */
-    default: {
-      const never: never = facing
-      throw new Error(`unhandled facing: ${String(never)}`)
-    }
-  }
+/** How a head looks: which way it faces, and its skin, hair and visor. */
+interface HeadLook {
+  readonly facing: Facing
+  readonly skin: string
+  readonly hair: string
+  readonly visor: boolean
+}
+
+/** The hair, and the visor when there is one, as each facing shows them. */
+const HAIR: Record<Facing, (paint: Paint, at: At, look: HeadLook) => void> = {
+  N: (paint, [x, topY], { hair }) => {
+    rect(paint, [x - 3, topY, 6, 5], hair)
+  },
+  S: (paint, [x, topY], { hair, visor }) => {
+    rect(paint, [x - 3, topY, 6, 2], hair)
+    if (visor) rect(paint, [x - 3, topY + 3, 6, 2], HALL.cyan)
+  },
+  E: (paint, [x, topY], { hair, visor }) => {
+    rect(paint, [x - 3, topY, 6, 2], hair)
+    rect(paint, [x - 3, topY + 2, 2, 3], hair)
+    if (visor) rect(paint, [x, topY + 3, 3, 2], HALL.cyan)
+  },
+  W: (paint, [x, topY], { hair, visor }) => {
+    rect(paint, [x - 3, topY, 6, 2], hair)
+    rect(paint, [x + 1, topY + 2, 2, 3], hair)
+    if (visor) rect(paint, [x - 3, topY + 3, 3, 2], HALL.cyan)
+  },
+}
+
+function drawHead(paint: Paint, at: At, look: HeadLook): void {
+  const [x, topY] = at
+  rect(paint, [x - 3, topY + 1, 6, 7], look.skin)
+  HAIR[look.facing](paint, at, look)
+}
+
+/** Where a crew member is drawn, in which colours, and when. */
+interface Figure {
+  readonly x: number
+  readonly y: number
+  readonly style: RoleStyle
+  readonly tMs: number
 }
 
 export function drawCrew(paint: Paint, crew: Crew, tMs: number): void {
@@ -138,54 +151,67 @@ export function drawCrew(paint: Paint, crew: Crew, tMs: number): void {
   const x = Math.round(crew.x)
   const y = Math.round(crew.y)
   const seated = crew.anim === 'type'
-  const couch = crew.anim === 'couch'
-  const lift = seated || couch ? -3 : 0
+  const lift = seated || crew.anim === 'couch' ? -3 : 0
   const bob = crew.anim === 'walk' ? walkFrame(tMs, crew.x) % 2 : 0
   const top = y - 22 + bob + lift
+  const figure: Figure = { x, y, style, tMs }
 
-  shadow(paint, x, y, 10)
-
-  if (couch) {
-    rect(paint, x - 4, y - 6, 3, 4, style.pants)
-    rect(paint, x + 1, y - 6, 3, 4, style.pants)
-  } else if (!seated) {
-    drawLegs(
-      paint,
-      x,
-      y,
-      crew.facing,
-      style.pants,
-      crew.anim === 'walk' ? walkFrame(tMs, crew.x) : 0
-    )
-  }
-
-  const torsoY = top + 8
-  const boxY = torsoY + 10
-  // Facing away, the box is held in front of a body the viewer sees from behind.
-  if (crew.carrying === true && crew.facing === 'N') drawCrate(paint, x, boxY)
-  rect(paint, x - 4, torsoY, 8, 8, style.shirt)
-  bevel(paint, x - 4, torsoY, 8, 8, 'rgba(255,255,255,.18)', '#1c1f26')
-  rect(paint, x + 2, torsoY, 2, 8, style.shirtDark)
-
-  if (crew.carrying === true) {
-    if (crew.facing !== 'N') {
-      drawCrate(paint, x, boxY)
-      rect(paint, x - 6, torsoY + 2, 2, 5, style.shirtDark)
-      rect(paint, x + 4, torsoY + 2, 2, 5, style.shirtDark)
-      rect(paint, x - 6, torsoY + 6, 2, 2, style.skin)
-      rect(paint, x + 4, torsoY + 6, 2, 2, style.skin)
-    }
-  } else {
-    drawArms(paint, x, torsoY, crew.anim, style.skin, style.shirtDark, tMs)
-  }
-  drawHead(paint, x, top, crew.facing, style.skin, style.hair, style.visor)
+  shadow(paint, [x, y], 10)
+  drawLower(paint, crew, figure)
+  drawTorso(paint, crew, { ...figure, y: top + 8 })
+  drawHead(paint, [x, top], {
+    facing: crew.facing,
+    skin: style.skin,
+    hair: style.hair,
+    visor: style.visor,
+  })
 
   if (style.hat !== null) {
-    rect(paint, x - 4, top - 1, 8, 3, style.hat)
-    rect(paint, x - 4, top + 1, 8, 1, 'rgba(0,0,0,.25)')
+    rect(paint, [x - 4, top - 1, 8, 3], style.hat)
+    rect(paint, [x - 4, top + 1, 8, 1], 'rgba(0,0,0,.25)')
   }
 
   if (seated && crew.facing === 'N') {
-    rect(paint, x - 4, y - 10, 8, 7, '#343b49')
+    rect(paint, [x - 4, y - 10, 8, 7], '#343b49')
   }
+}
+
+/** The legs, folded on the couch or hidden behind the desk while typing. */
+function drawLower(paint: Paint, crew: Crew, { x, y, style, tMs }: Figure): void {
+  if (crew.anim === 'couch') {
+    rect(paint, [x - 4, y - 6, 3, 4], style.pants)
+    rect(paint, [x + 1, y - 6, 3, 4], style.pants)
+  } else if (crew.anim !== 'type') {
+    drawLegs(paint, [x, y], {
+      facing: crew.facing,
+      pants: style.pants,
+      frame: crew.anim === 'walk' ? walkFrame(tMs, crew.x) : 0,
+    })
+  }
+}
+
+/** The torso at `y`, with the arms — or the crate they carry. */
+function drawTorso(paint: Paint, crew: Crew, { x, y: torsoY, style, tMs }: Figure): void {
+  const boxY = torsoY + 10
+  // Facing away, the box is held in front of a body the viewer sees from behind.
+  if (crew.carrying === true && crew.facing === 'N') drawCrate(paint, x, boxY)
+  rect(paint, [x - 4, torsoY, 8, 8], style.shirt)
+  bevel(paint, [x - 4, torsoY, 8, 8], { hi: 'rgba(255,255,255,.18)', lo: '#1c1f26' })
+  rect(paint, [x + 2, torsoY, 2, 8], style.shirtDark)
+
+  if (crew.carrying !== true) {
+    drawArms(paint, [x, torsoY], {
+      anim: crew.anim,
+      skin: style.skin,
+      shirtDark: style.shirtDark,
+      tMs,
+    })
+    return
+  }
+  if (crew.facing === 'N') return
+  drawCrate(paint, x, boxY)
+  rect(paint, [x - 6, torsoY + 2, 2, 5], style.shirtDark)
+  rect(paint, [x + 4, torsoY + 2, 2, 5], style.shirtDark)
+  rect(paint, [x - 6, torsoY + 6, 2, 2], style.skin)
+  rect(paint, [x + 4, torsoY + 6, 2, 2], style.skin)
 }

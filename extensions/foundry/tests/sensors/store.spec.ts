@@ -36,6 +36,14 @@ function signal(overrides: Partial<Signal> = {}): Signal {
 }
 
 describe('createSignalStore', () => {
+  describe('saving and listing', savingAndListingTests)
+  describe('skipping', skippingTests)
+  describe('getting and empty state', gettingAndEmptyStateTests)
+  describe('merging state', mergingStateTests)
+  describe('the signals directory', theSignalsDirectoryTests)
+})
+
+function savingAndListingTests() {
   it('saves then lists signals', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -59,7 +67,9 @@ describe('createSignalStore', () => {
     expect(listed[0].status).toBe('promoted')
     expect(listed[0].orderId).toBe('order-1')
   })
+}
 
+function skippingTests() {
   it('skips an identical save, appending nothing', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -83,7 +93,9 @@ describe('createSignalStore', () => {
     const listed = await store.list()
     expect(listed).toEqual([signal()])
   })
+}
 
+function gettingAndEmptyStateTests() {
   it('gets a signal by id, or null when absent', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -92,12 +104,24 @@ describe('createSignalStore', () => {
     expect(await store.get('missing')).toBeNull()
   })
 
+  it('reads empty sensor state from a state file that is not an object of sensors', async () => {
+    const root = tempRoot()
+    const file = path.join(root, 'signals', 'state.json')
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    for (const content of ['[]', 'null', 'not json']) {
+      fs.writeFileSync(file, content)
+      expect(await createSignalStore(root).sensorState(), content).toEqual({})
+    }
+  })
+
   it('reads empty sensor state when nothing was stored', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
     expect(await store.sensorState()).toEqual({})
   })
+}
 
+function mergingStateTests() {
   it('merges and persists sensor state across a new store instance', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -128,7 +152,9 @@ describe('createSignalStore', () => {
 
     expect(merged['sensor-a'].repoPath).toBeNull()
   })
+}
 
+function theSignalsDirectoryTests() {
   it('writes nothing outside <dataRoot>/signals', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -141,4 +167,4 @@ describe('createSignalStore', () => {
     const signalsEntries = fs.readdirSync(path.join(root, 'signals')).sort()
     expect(signalsEntries).toEqual(['signals.jsonl', 'state.json'])
   })
-})
+}

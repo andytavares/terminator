@@ -50,28 +50,32 @@ describe('issueOf', () => {
   })
 })
 
-describe('projectRemover', () => {
-  function workspace() {
-    const deleteProject = vi.fn()
-    return {
+function workspace() {
+  const deleteProject = vi.fn()
+  return {
+    deleteProject,
+    api: {
+      list: () => [
+        { id: 'ws-1', folderPath: '/repos/a' },
+        { id: 'ws-2', folderPath: '/repos/b' },
+      ],
+      listProjects: (id: string) =>
+        id === 'ws-2'
+          ? [
+              { id: 'p-main', workspaceId: 'ws-2', name: 'main' },
+              { id: 'p-wt', workspaceId: 'ws-2', name: 'x', worktreePath: '/data/wt/b' },
+            ]
+          : [],
       deleteProject,
-      api: {
-        list: () => [
-          { id: 'ws-1', folderPath: '/repos/a' },
-          { id: 'ws-2', folderPath: '/repos/b' },
-        ],
-        listProjects: (id: string) =>
-          id === 'ws-2'
-            ? [
-                { id: 'p-main', workspaceId: 'ws-2', name: 'main' },
-                { id: 'p-wt', workspaceId: 'ws-2', name: 'x', worktreePath: '/data/wt/b' },
-              ]
-            : [],
-        deleteProject,
-      },
-    }
+    },
   }
+}
 
+describe('projectRemover', () => {
+  describe('deleting the project', deletingTheProjectTests)
+})
+
+function deletingTheProjectTests() {
   it('deletes the project pointing at the checkout, in whichever workspace holds it', () => {
     const { api, deleteProject } = workspace()
     expect(projectRemover(api)('/data/wt/b')).toBe(true)
@@ -84,4 +88,4 @@ describe('projectRemover', () => {
     expect(projectRemover(api)('/data/wt/none')).toBe(false)
     expect(deleteProject).not.toHaveBeenCalled()
   })
-})
+}

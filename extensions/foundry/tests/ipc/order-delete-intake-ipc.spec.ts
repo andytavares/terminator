@@ -8,17 +8,13 @@
  * an order nobody had any more. On CI the sidebar row came back for good
  * (run 36342472487, foundry-intake.spec.ts:216).
  */
-import { tmpdir } from 'node:os'
-import { freshGlobalStorage } from '../helpers/foundry-host.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
+
 import { makeTempDir } from '../../../../tests/support/temp-dir'
-
-const GLOBAL_STORAGE = freshGlobalStorage()
-
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
-import { vi } from 'vitest'
-import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
+import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
+import { activateFoundry } from '../helpers/foundry-activation.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -58,18 +54,9 @@ vi.mock('../../src/runtime/control-server.js', () => ({
   }),
 }))
 
-let getHandler: (channel: string) => ((payload: unknown) => Promise<unknown>) | undefined
-let api: ExtensionAPI
 let dataDir = ''
-const settingsGet = vi.fn((key: string) =>
-  key === 'terminator.foundry.dataDir' ? dataDir : undefined
-)
-
-function call(channel: string, payload: unknown = {}): Promise<unknown> {
-  const handler = getHandler(channel)
-  if (handler === undefined) throw new Error(`${channel} is not registered`)
-  return handler(payload)
-}
+let host: FoundryHost
+const call = (channel: string, payload: unknown = {}) => host.call(channel, payload)
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -83,62 +70,9 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 }
 
 beforeAll(async () => {
-  const handlers = new Map<string, (payload: unknown) => Promise<unknown>>()
-  api = {
-    ipc: {
-      registerHandler: vi.fn((spec: ChannelSpec) => {
-        handlers.set(spec.channel, (payload) => dispatchChannel(spec, payload))
-        return { dispose: vi.fn() }
-      }),
-      invokeChannel: vi.fn(),
-      sendChannel: vi.fn(),
-      onWindowEvent: vi.fn().mockReturnValue(() => {}),
-      isRemoteAccessible: vi.fn().mockReturnValue(false),
-    },
-    window: { broadcast: vi.fn(), openAuxiliary: vi.fn(), focusSelf: vi.fn(), showSelf: vi.fn() },
-    commands: { register: vi.fn().mockReturnValue({ dispose: vi.fn() }), setEnabled: vi.fn() },
-    shell: { exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }) },
-    notifications: { showToast: vi.fn(), createNotification: vi.fn() },
-    log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    paths: { app: '', globalStorage: GLOBAL_STORAGE },
-    settings: {
-      register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      get: settingsGet,
-      set: vi.fn(),
-      resolveWorktreeBaseDir: vi.fn().mockReturnValue(path.join(tmpdir(), 'fdry-worktrees')),
-    },
-    terminal: {
-      onSessionCreate: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onSessionClose: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    workspace: {
-      list: vi.fn().mockReturnValue([]),
-      listProjects: vi.fn().mockReturnValue([]),
-      createProject: vi.fn(),
-      deleteProject: vi.fn(),
-      onDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onProjectDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    pty: {
-      spawn: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      listSessions: vi.fn().mockReturnValue([]),
-      attachOnData: vi.fn().mockReturnValue(null),
-      attachOnExit: vi.fn().mockReturnValue(null),
-      openTerminalTab: vi.fn(),
-    },
-    app: { version: '0.0.0-test' },
-  } as unknown as ExtensionAPI
-
-  const { activate } = await import('../../src/index.ts')
-  const { startSupervisionRuntime } = await import('../../src/runtime/supervision-runtime.ts')
-  activate(api)
-  getHandler = (channel) => handlers.get(channel)
-  if ((await startSupervisionRuntime(api)) === null) {
-    throw new Error('the supervision runtime did not start')
-  }
+  host = fakeHost(() => dataDir)
+  host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+  await activateFoundry(host)
 })
 
 type Started = {

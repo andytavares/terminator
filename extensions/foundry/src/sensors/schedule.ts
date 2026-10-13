@@ -49,9 +49,7 @@ export async function runSensor(def: SensorDef, deps: RunSensorDeps): Promise<Ru
   const merged = mergeSensed(
     existing,
     { id: def.id, severity: def.severity },
-    result.items,
-    now,
-    deps.newId
+    { items: result.items, now, newId: deps.newId }
   )
   await deps.store.save(merged)
   await deps.store.setSensorState(def.id, { lastRunAt: now, lastProblem: result.problem })

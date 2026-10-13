@@ -9,10 +9,10 @@ import { orderStoreAt } from '../state/live-index.js'
 export function issuesPortFor(api: ExtensionAPI): IssuesPort {
   const issues = api.issues
   return {
-    comment: (tracker, key, body) => issues.comment(tracker as never, key, body),
-    transition: (tracker, key, intent, optionId) =>
+    comment: ({ tracker, key }, body) => issues.comment(tracker as never, key, body),
+    transition: ({ tracker, key }, intent, optionId) =>
       issues.transition(tracker as never, key, intent, optionId),
-    states: async (tracker, key) => issues.states(tracker as never, key),
+    states: async ({ tracker, key }) => issues.states(tracker as never, key),
     supportsTransitions: (tracker) => issues.supportsTransitions(tracker as never),
   }
 }

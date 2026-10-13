@@ -117,7 +117,7 @@ export function createForgeLoop(
   return {
     convergeWithFollowUps: (ask) => convergeWithFollowUps(forge, ask),
     convergeMaybeScouted: (order, message, recordStart) =>
-      convergeMaybeScouted(forge, order, message, recordStart),
+      convergeMaybeScouted(forge, { order, message, recordStart }),
     onReleased: (order) => onReleased(forge, order),
   }
 }
@@ -202,8 +202,7 @@ async function endPreviousTurn(orderId: string): Promise<void> {
       stop: (id, reason) => runtime.supervisedRunner?.stop(id, reason) ?? false,
       isLive: isLiveSession,
     },
-    previous,
-    'continuing in a follow-up turn'
+    { sessionId: previous, reason: 'continuing in a follow-up turn' }
   )
 }
 
@@ -633,9 +632,7 @@ async function convergeAfterRelease(
  */
 function convergeMaybeScouted(
   forge: Forge,
-  order: WorkOrder,
-  message: string,
-  recordStart?: RecordStart
+  { order, message, recordStart }: Pick<ArchitectAsk, 'order' | 'message' | 'recordStart'>
 ): Promise<ConvergeStarted> {
   const root = forge.dataRoot()
   return scoutedConverge(

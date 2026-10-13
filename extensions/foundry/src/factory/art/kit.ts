@@ -24,6 +24,15 @@ export interface Paint {
   drawImage(image: CanvasImageSource, dx: number, dy: number): void
 }
 
+/** A rectangle in pixels: left, top, width, height. */
+export type Box = readonly [x: number, y: number, w: number, h: number]
+
+/** A point in pixels. */
+export type At = readonly [x: number, y: number]
+
+/** A circle in pixels: its centre and radius. */
+export type Circle = readonly [cx: number, cy: number, r: number]
+
 /** A tiny deterministic PRNG — the same seed always draws the same wear. */
 export function mulberry32(seed: number): () => number {
   let state = seed | 0
@@ -36,14 +45,7 @@ export function mulberry32(seed: number): () => number {
 }
 
 /** A flat-filled rectangle, rounded to whole device pixels. */
-export function rect(
-  paint: Paint,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  color: string
-): void {
+export function rect(paint: Paint, [x, y, w, h]: Box, color: string): void {
   paint.fillStyle = color
   paint.fillRect(Math.round(x), Math.round(y), w, h)
 }
@@ -51,44 +53,28 @@ export function rect(
 /** A one-pixel top/left highlight and bottom/right shadow — the plate's bevel. */
 export function bevel(
   paint: Paint,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  hi: string,
-  lo: string
+  [x, y, w, h]: Box,
+  { hi, lo }: { hi: string; lo: string }
 ): void {
-  rect(paint, x, y, w, 1, hi)
-  rect(paint, x, y, 1, h, hi)
-  rect(paint, x, y + h - 1, w, 1, lo)
-  rect(paint, x + w - 1, y, 1, h, lo)
+  rect(paint, [x, y, w, 1], hi)
+  rect(paint, [x, y, 1, h], hi)
+  rect(paint, [x, y + h - 1, w, 1], lo)
+  rect(paint, [x + w - 1, y, 1, h], lo)
 }
 
 /** Four corner rivets, inset by 2px, the plated-floor detail the mock used. */
-export function rivets(
-  paint: Paint,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  color: string
-): void {
-  rect(paint, x + 2, y + 2, 1, 1, color)
-  rect(paint, x + w - 3, y + 2, 1, 1, color)
-  rect(paint, x + 2, y + h - 3, 1, 1, color)
-  rect(paint, x + w - 3, y + h - 3, 1, 1, color)
+export function rivets(paint: Paint, [x, y, w, h]: Box, color: string): void {
+  rect(paint, [x + 2, y + 2, 1, 1], color)
+  rect(paint, [x + w - 3, y + 2, 1, 1], color)
+  rect(paint, [x + 2, y + h - 3, 1, 1], color)
+  rect(paint, [x + w - 3, y + h - 3, 1, 1], color)
 }
 
 /** Scattered smudges over a tile, seeded so the same tile always wears the same way. */
 export function wear(
   paint: Paint,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  seed: number,
-  color: string,
-  count = 5
+  [x, y, w, h]: Box,
+  { seed, color, count = 5 }: { seed: number; color: string; count?: number }
 ): void {
   const rnd = mulberry32(seed)
   for (let i = 0; i < count; i++) {
@@ -96,7 +82,7 @@ export function wear(
     const sx = x + 2 + Math.floor(rnd() * (w - 4))
     const sy = y + 2 + Math.floor(rnd() * (h - 4))
     const sw = 1 + Math.floor(rnd() * 2)
-    rect(paint, sx, sy, sw, 1, color)
+    rect(paint, [sx, sy, sw, 1], color)
   }
 }
 
@@ -107,11 +93,8 @@ export function wear(
  */
 export function glow(
   paint: Paint,
-  cx: number,
-  cy: number,
-  r: number,
-  rgba0: string,
-  rgba1: string
+  [cx, cy, r]: Circle,
+  { rgba0, rgba1 }: { rgba0: string; rgba1: string }
 ): void {
   const gradient = paint.createRadialGradient(cx, cy, 0, cx, cy, r)
   gradient.addColorStop(0, rgba0)

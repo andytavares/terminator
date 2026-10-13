@@ -31,6 +31,13 @@ function node(over: Partial<RunNode> = {}): RunNode {
 }
 
 describe('factory/art/glyphs', () => {
+  describe('the table', theTableTests)
+  describe('measuring and drawing text', measuringAndDrawingTextTests)
+  describe('missing characters and digits', missingCharactersAndDigitsTests)
+  describe('shipped ids', shippedIdsTests)
+})
+
+function theTableTests() {
   it('has a 15-bit glyph for every letter, digit, hyphen, full stop and space', () => {
     const expected = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-. ']
     expect(Object.keys(GLYPHS).sort()).toEqual([...expected].sort())
@@ -44,7 +51,9 @@ describe('factory/art/glyphs', () => {
       expect(bits.includes('1'), ch).toBe(ch !== ' ')
     }
   })
+}
 
+function measuringAndDrawingTextTests() {
   it('measures text as four pixels a character less the gap after the last', () => {
     expect(textWidth('A')).toBe(3)
     expect(textWidth('AB')).toBe(7)
@@ -53,7 +62,7 @@ describe('factory/art/glyphs', () => {
 
   it('draws lit cells 1px square at a 4px advance, in the colour it was given', () => {
     const paint = createRecordingPaint()
-    drawText(paint, 10, 20, 'A-', '#123456')
+    drawText(paint, [10, 20], { text: 'A-', color: '#123456' })
     const rects = paint.calls.filter((c) => c.op === 'fillRect')
     // A = 010 101 111 101 101 (10 cells); '-' = the middle row (3 cells).
     expect(rects).toHaveLength(13)
@@ -66,16 +75,18 @@ describe('factory/art/glyphs', () => {
       { x: 16, y: 22 },
     ])
   })
+}
 
+function missingCharactersAndDigitsTests() {
   it('draws a character the font lacks as a space', () => {
     const paint = createRecordingPaint()
-    drawText(paint, 0, 0, 'é', '#fff')
+    drawText(paint, [0, 0], { text: 'é', color: '#fff' })
     expect(paint.calls).toHaveLength(0)
   })
 
   it('draws a digit at 2px scale from the same table', () => {
     const paint = createRecordingPaint()
-    drawDigit(paint, 0, 0, '7', '#abc')
+    drawDigit(paint, [0, 0], { digit: '7', color: '#abc' })
     // 7 = 111 001 010 010 010: seven lit cells, each 2x2.
     expect(paint.calls).toHaveLength(7)
     expect(paint.calls[0]).toMatchObject({ x: 0, y: 0, w: 2, h: 2, style: '#abc' })
@@ -86,11 +97,13 @@ describe('factory/art/glyphs', () => {
   it('draws nothing for something that is not a digit', () => {
     for (const bad of ['A', '', '12', '-']) {
       const paint = createRecordingPaint()
-      drawDigit(paint, 0, 0, bad, '#abc')
+      drawDigit(paint, [0, 0], { digit: bad, color: '#abc' })
       expect(paint.calls, bad).toHaveLength(0)
     }
   })
+}
 
+function shippedIdsTests() {
   it('has a glyph for every character a shipped recipe role or step id folds to', () => {
     const files = fs.readdirSync(RECIPES).filter((f) => f.endsWith('.yaml'))
     expect(files.length).toBeGreaterThan(0)
@@ -110,9 +123,15 @@ describe('factory/art/glyphs', () => {
     }
     expect(names).toBeGreaterThan(files.length)
   })
-})
+}
 
 describe('factory/layout signText', () => {
+  describe('picking a candidate', pickingACandidateTests)
+  describe('fallbacks and cuts', fallbacksAndCutsTests)
+  describe('ids and folding', idsAndFoldingTests)
+})
+
+function pickingACandidateTests() {
   it('shows the role and its one unit when they fit', () => {
     expect(signText(node({ role: 'builder', unitIds: ['U-1'] }), 12)).toBe('BUILDER U-1')
   })
@@ -134,7 +153,9 @@ describe('factory/layout signText', () => {
     expect(signText(n, 10)).toBe('U-1')
     expect(signText(node({ role: 'builder', unitIds: ['LONGUNIT-1'] }), 8)).toBe('BUILDER')
   })
+}
 
+function fallbacksAndCutsTests() {
   it('shows the role alone for a node with no unit or with several', () => {
     expect(signText(node({ role: 'builder' }), 12)).toBe('BUILDER')
     expect(signText(node({ role: 'builder', unitIds: ['U-1', 'U-2'] }), 12)).toBe('BUILDER')
@@ -145,7 +166,9 @@ describe('factory/layout signText', () => {
     expect(signText(node({ role: 'documentation' }), 4)).toBe('DOC.')
     expect(signText(node({ role: 'documentation', unitIds: ['U-1'] }), 8)).toBe('U-1')
   })
+}
 
+function idsAndFoldingTests() {
   it('names a step by its step id when it has no role', () => {
     expect(signText(node({ id: 'lint', stepId: 'lint' }), 8)).toBe('LINT')
   })
@@ -161,4 +184,4 @@ describe('factory/layout signText', () => {
     expect(signText(node({ role: 'é' }), 12)).toBe('-')
     expect(signText(node({ role: 'qa', unitIds: ['fix:auth/1'] }), 13)).toBe('QA FIX-AUTH-1')
   })
-})
+}

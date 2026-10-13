@@ -39,12 +39,7 @@ function gate(over: Partial<Gate> & Pick<Gate, 'id' | 'orderId' | 'raisedAt'>): 
   }
 }
 
-function order(
-  id: string,
-  title: string,
-  createdAt: string,
-  over: Partial<WorkOrder> = {}
-): WorkOrder {
+function order(id: string, title: string, createdAt: string): WorkOrder {
   const base = draftOrder({
     id,
     title,
@@ -52,7 +47,7 @@ function order(
     repoPaths: ['/repo/one'],
     now: createdAt,
   })
-  return { ...base, ...over }
+  return base
 }
 
 // Order A: clean shipped order. Seeded and run both an hour apart, ships a
@@ -176,13 +171,14 @@ const recordsC: OrderRecords = { order: orderC, ledger: ledgerC, gates: gatesC, 
 
 // Order D: never shipped. Two Forge decisions (A-Q-*), one struck, plus one
 // follow-up. Not counted in any "per shipped order" average.
-const orderD = order('WO-D', 'Order D', '2026-09-14T23:00:00.000Z', {
+const orderD = {
+  ...order('WO-D', 'Order D', '2026-09-14T23:00:00.000Z'),
   assumptions: [
     { id: 'A-Q-1', text: 'q1', struck: true, affects: [] },
     { id: 'A-Q-2', text: 'q2', struck: false, affects: [] },
     { id: 'A-OTHER', text: 'not a forge decision', struck: true, affects: [] },
   ],
-})
+}
 const ledgerD: LedgerEntry[] = [
   entry({ orderId: 'WO-D', action: 'order.seeded', at: '2026-09-15T00:00:00.000Z' }),
   entry({ orderId: 'WO-D', action: 'converge.followed_up', at: '2026-09-15T01:00:00.000Z' }),
@@ -198,6 +194,13 @@ const ledgerE: LedgerEntry[] = [
 const recordsE: OrderRecords = { order: orderE, ledger: ledgerE, gates: [], graph: null }
 
 describe('orderMetrics', () => {
+  describe('clean ships and reworks', cleanShipsAndReworksTests)
+  describe('CI rounds and Forge decisions', ciRoundsAndForgeDecisionsTests)
+})
+
+const all = [recordsA, recordsB, recordsC, recordsD, recordsE]
+
+function cleanShipsAndReworksTests() {
   it('computes a clean first-pass ship', () => {
     const m = orderMetrics(recordsA)
     expect(m.shipped).toBe(true)
@@ -220,7 +223,9 @@ describe('orderMetrics', () => {
     expect(m.leadTimeMs).toBe(36 * 60 * 60 * 1000)
     expect(m.buildTimeMs).toBe(34 * 60 * 60 * 1000)
   })
+}
 
+function ciRoundsAndForgeDecisionsTests() {
   it('counts a CI round and an operator gate, ignores a default-decided gate', () => {
     const m = orderMetrics(recordsC)
     expect(m.ciRounds).toBe(1)
@@ -238,11 +243,14 @@ describe('orderMetrics', () => {
     expect(m.forgeDecisionsStruck).toBe(1)
     expect(m.firstPass).toBe(false)
   })
-})
+}
 
 describe('factoryMetrics', () => {
-  const all = [recordsA, recordsB, recordsC, recordsD, recordsE]
+  describe('windows', windowsTests)
+  describe('rates and nulls', ratesAndNullsTests)
+})
 
+function windowsTests() {
   it('sorts orders newest-first by order.seeded and drops nothing in "all"', () => {
     const fm = factoryMetrics(all, 'all', NOW)
     expect(fm.orders.map((o) => o.orderId)).toEqual(['WO-D', 'WO-C', 'WO-B', 'WO-A', 'WO-E'])
@@ -253,7 +261,9 @@ describe('factoryMetrics', () => {
     expect(fm.orders.map((o) => o.orderId)).not.toContain('WO-E')
     expect(fm.orders).toHaveLength(4)
   })
+}
 
+function ratesAndNullsTests() {
   it('computes yield, medians and per-order rates over shipped orders only', () => {
     const fm = factoryMetrics(all, '30d', NOW)
     expect(fm.shipped).toBe(3) // A, B, C
@@ -277,4 +287,4 @@ describe('factoryMetrics', () => {
     expect(fm.sessionsPerOrder).toBeNull()
     expect(fm.medianLeadTimeMs).toBeNull() // D has no leadTime
   })
-})
+}

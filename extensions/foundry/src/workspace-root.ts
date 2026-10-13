@@ -78,31 +78,43 @@ export function resolveSources(api: ExtensionAPI, root: string): ResolveSources 
 const dataRootMemo = new Map<string, string>()
 
 export function resolveFoundryDataRoot(api: ExtensionAPI): string {
-  // Every read here is optional. Activation is called synchronously by the
-  // host and must not throw because one capability is absent — a host that
-  // has no workspace yet is a normal state, not a reason to fail to load.
-  let configured = ''
-  let workdir: string | null = null
-  try {
-    configured = api.settings?.get<string>('terminator.foundry.dataDir') ?? ''
-    workdir = api.workspace?.list()[0]?.folderPath ?? null
-  } catch {
-    // Leave the defaults.
-  }
-
+  const { configured, workdir } = configuredLocation(api)
   const key = `${configured}\u0000${workdir ?? ''}`
   const memo = dataRootMemo.get(key)
   if (memo !== undefined) return memo
 
-  const base = workdir ?? fallbackRecordsBase(api)
-  let root: string
-  try {
-    root = resolveDataRoot(configured, base).root
-  } catch {
-    // A relative path was configured, which is ambiguous once an order spans
-    // repositories. Fall back to the default rather than refusing to activate.
-    root = resolveDataRoot('', base).root
-  }
+  const root = rootUnder(configured, workdir ?? fallbackRecordsBase(api))
   dataRootMemo.set(key, root)
   return root
+}
+
+/**
+ * The configured data directory and the first workspace folder.
+ *
+ * Every read here is optional. Activation is called synchronously by the host
+ * and must not throw because one capability is absent — a host that has no
+ * workspace yet is a normal state, not a reason to fail to load.
+ */
+function configuredLocation(api: ExtensionAPI): { configured: string; workdir: string | null } {
+  let configured = ''
+  try {
+    configured = api.settings?.get<string>('terminator.foundry.dataDir') ?? ''
+    return { configured, workdir: api.workspace?.list()[0]?.folderPath ?? null }
+  } catch {
+    return { configured, workdir: null }
+  }
+}
+
+/**
+ * The records root for `configured` over `base`. A relative path was
+ * configured when that throws, which is ambiguous once an order spans
+ * repositories, so it falls back to the default rather than refusing to
+ * activate.
+ */
+function rootUnder(configured: string, base: string): string {
+  try {
+    return resolveDataRoot(configured, base).root
+  } catch {
+    return resolveDataRoot('', base).root
+  }
 }

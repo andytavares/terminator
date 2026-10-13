@@ -54,64 +54,78 @@ function mapKeyOf(observation: Observation): string {
 }
 
 export function createLiveHall(): LiveHall {
-  const world: { current: World | null } = { current: null }
-  let scene: LiveScene = { map: null, shown: {}, queue: null }
-  let mapKey: string | null = null
-  let previous: Observation | null = null
-  let beats: Beats | null = null
-  const sceneListeners = new Set<() => void>()
-  const eventListeners = new Set<EventsListener>()
+  const hall = new LiveHallState()
+  return {
+    world: hall.world,
+    subscribe(listener) {
+      hall.sceneListeners.add(listener)
+      return () => hall.sceneListeners.delete(listener)
+    },
+    snapshot: () => hall.scene,
+    onEvents(listener) {
+      hall.eventListeners.add(listener)
+      return () => hall.eventListeners.delete(listener)
+    },
+    observe: (observation, labels, nowMs) => hall.observe(observation, { labels, nowMs }),
+    releaseDue: (labels, nowMs) => hall.releaseDue(labels, nowMs),
+  }
+}
 
-  function publish(next: Partial<LiveScene>): void {
+/** One live hall's world, scene, beats and listeners. */
+class LiveHallState {
+  readonly world: { current: World | null } = { current: null }
+  scene: LiveScene = { map: null, shown: {}, queue: null }
+  readonly sceneListeners = new Set<() => void>()
+  readonly eventListeners = new Set<EventsListener>()
+  private mapKey: string | null = null
+  private previous: Observation | null = null
+  private beats: Beats | null = null
+
+  private publish(next: Partial<LiveScene>): void {
+    const { scene } = this
     const merged = { ...scene, ...next }
     if (merged.map === scene.map && merged.shown === scene.shown && merged.queue === scene.queue)
       return
-    scene = merged
-    for (const listener of sceneListeners) listener()
+    this.scene = merged
+    for (const listener of this.sceneListeners) listener()
   }
 
-  function play(released: ReturnType<typeof release>, nowMs: number): void {
-    beats = released.beats
-    world.current = direct(world.current as World, released.events, nowMs)
-    publish({ shown: released.beats.shown, queue: world.current.queue })
+  private play(released: ReturnType<typeof release>, nowMs: number): void {
+    this.beats = released.beats
+    this.world.current = direct(this.world.current as World, released.events, nowMs)
+    this.publish({ shown: released.beats.shown, queue: this.world.current.queue })
   }
 
-  function rebuild(observation: Observation, labels: Labels, key: string): void {
+  private rebuild(observation: Observation, labels: Labels, key: string): void {
     const map = layoutHall(observation.graph, labels, observation.ci !== null)
-    mapKey = key
-    world.current = createWorld(map, observation)
-    previous = observation
-    beats = createBeats(statesOf(observation.graph))
-    publish({ map, shown: beats.shown, queue: world.current.queue })
+    this.mapKey = key
+    this.world.current = createWorld(map, observation)
+    this.previous = observation
+    this.beats = createBeats(statesOf(observation.graph))
+    this.publish({ map, shown: this.beats.shown, queue: this.world.current.queue })
   }
 
-  return {
-    world,
-    subscribe(listener) {
-      sceneListeners.add(listener)
-      return () => sceneListeners.delete(listener)
-    },
-    snapshot: () => scene,
-    onEvents(listener) {
-      eventListeners.add(listener)
-      return () => eventListeners.delete(listener)
-    },
-    observe(observation, labels, nowMs) {
-      const key = mapKeyOf(observation)
-      if (mapKey !== key) return rebuild(observation, labels, key)
-      const seen = diffObservation(previous, observation)
-      const held = schedule(beats as Beats, seen, observation.graph.nodes, nowMs)
-      const released = release(held, nowMs)
-      play(released, nowMs)
-      previous = observation
-      for (const listener of eventListeners) listener(released.events, labels)
-    },
-    releaseDue(labels, nowMs) {
-      if (beats === null || beats.held.length === 0 || world.current === null) return
-      const released = release(beats, nowMs)
-      if (released.events.length === 0) return
-      play(released, nowMs)
-      for (const listener of eventListeners) listener(released.events, labels)
-    },
+  observe(observation: Observation, { labels, nowMs }: { labels: Labels; nowMs: number }): void {
+    const key = mapKeyOf(observation)
+    if (this.mapKey !== key) return this.rebuild(observation, labels, key)
+    const seen = diffObservation(this.previous, observation)
+    const held = schedule(
+      this.beats as Beats,
+      { events: seen, nodes: observation.graph.nodes },
+      nowMs
+    )
+    const released = release(held, nowMs)
+    this.play(released, nowMs)
+    this.previous = observation
+    for (const listener of this.eventListeners) listener(released.events, labels)
+  }
+
+  releaseDue(labels: Labels, nowMs: number): void {
+    const { beats } = this
+    if (beats === null || beats.held.length === 0 || this.world.current === null) return
+    const released = release(beats, nowMs)
+    if (released.events.length === 0) return
+    this.play(released, nowMs)
+    for (const listener of this.eventListeners) listener(released.events, labels)
   }
 }

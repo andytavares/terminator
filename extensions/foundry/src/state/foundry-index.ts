@@ -63,40 +63,47 @@ interface Slot<T> {
   replace(value: T): void
 }
 
-function createSlot<T>(load: () => Promise<T>): Slot<T> {
-  let loaded: { value: T } | undefined
-  let loading: Promise<T> | undefined
-  return {
-    read() {
-      if (loaded !== undefined) return Promise.resolve(loaded.value)
-      if (loading !== undefined) return loading
-      const pending: Promise<T> = load().then(
-        (value) => {
-          if (loading === pending) {
-            loaded = { value }
-            loading = undefined
-          }
-          return value
-        },
-        (error: unknown) => {
-          if (loading === pending) loading = undefined
-          throw error
+class CachedSlot<T> implements Slot<T> {
+  private loaded: { value: T } | undefined
+  private loading: Promise<T> | undefined
+
+  constructor(private readonly load: () => Promise<T>) {}
+
+  read(): Promise<T> {
+    if (this.loaded !== undefined) return Promise.resolve(this.loaded.value)
+    if (this.loading !== undefined) return this.loading
+    const pending: Promise<T> = this.load().then(
+      (value) => {
+        if (this.loading === pending) {
+          this.loaded = { value }
+          this.loading = undefined
         }
-      )
-      loading = pending
-      return pending
-    },
-    apply(change) {
-      // A read still in flight may or may not have seen this write, so it is
-      // not trusted to be kept: the next read starts over.
-      if (loaded === undefined) loading = undefined
-      else loaded = { value: change(loaded.value) }
-    },
-    replace(value) {
-      loaded = { value }
-      loading = undefined
-    },
+        return value
+      },
+      (error: unknown) => {
+        if (this.loading === pending) this.loading = undefined
+        throw error
+      }
+    )
+    this.loading = pending
+    return pending
   }
+
+  apply(change: (value: T) => T): void {
+    // A read still in flight may or may not have seen this write, so it is
+    // not trusted to be kept: the next read starts over.
+    if (this.loaded === undefined) this.loading = undefined
+    else this.loaded = { value: change(this.loaded.value) }
+  }
+
+  replace(value: T): void {
+    this.loaded = { value }
+    this.loading = undefined
+  }
+}
+
+function createSlot<T>(load: () => Promise<T>): Slot<T> {
+  return new CachedSlot(load)
 }
 
 function createKeyedSlots<T>(load: (key: string) => Promise<T>): (key: string) => Slot<T> {
@@ -165,8 +172,16 @@ function readsOver(slots: Slots): Reads {
 }
 
 type Writes = Omit<FoundryIndex, keyof Reads | 'announce'>
+type Removals = Pick<Writes, 'runReset' | 'orderRemoved'>
 
 function writesOver(slots: Slots, announce: (change: FoundryChange) => void): Writes {
+  return { ...savesOver(slots, announce), ...removalsOver(slots, announce) }
+}
+
+function savesOver(
+  slots: Slots,
+  announce: (change: FoundryChange) => void
+): Omit<Writes, keyof Removals> {
   return {
     orderSaved(order) {
       slots.orders.apply((all) => new Map(all).set(order.id, copy(order)))
@@ -184,6 +199,11 @@ function writesOver(slots: Slots, announce: (change: FoundryChange) => void): Wr
       slots.ledger(entry.orderId).apply((all) => [...all, entry])
       announce({ kind: 'ledger', orderId: entry.orderId })
     },
+  }
+}
+
+function removalsOver(slots: Slots, announce: (change: FoundryChange) => void): Removals {
+  return {
     runReset(orderId) {
       slots.graph(orderId).replace(null)
       slots.gates.apply((all) => without(all, orderId))

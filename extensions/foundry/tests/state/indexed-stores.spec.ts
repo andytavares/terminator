@@ -62,6 +62,11 @@ afterEach(() => {
 })
 
 describe('orders through the index', () => {
+  describe('listing and reading', listingAndReadingTests)
+  describe('loading', loadingTests)
+})
+
+function listingAndReadingTests() {
   it('lists what was saved, newest first, and names the order that changed', async () => {
     const store = createOrderStore(root, indexOver(root))
     await store.save(order('WO-1', '2026-09-06T10:00:00.000Z'))
@@ -79,7 +84,9 @@ describe('orders through the index', () => {
     const fromDisk = await createOrderStore(root).load('WO-1')
     expect(await store.load('WO-1')).toEqual(fromDisk)
   })
+}
 
+function loadingTests() {
   it('does not read an order file again once it has been loaded', async () => {
     const store = createOrderStore(root, indexOver(root))
     await store.save(order('WO-1'))
@@ -105,9 +112,14 @@ describe('orders through the index', () => {
     await store.save(seeded)
     expect(await store.findByIssue('linear', 'ENG-1')).toEqual({ id: 'WO-1', title: 'Order WO-1' })
   })
-})
+}
 
 describe('ledgers through the index', () => {
+  describe('an appended entry', anAppendedEntryTests)
+  describe('an entry with no actor', anEntryWithNoActorTests)
+})
+
+function anAppendedEntryTests() {
   it('reads back an appended entry and names the order whose ledger grew', async () => {
     const store = createOrderStore(root, indexOver(root))
     await store.entries('WO-1')
@@ -123,7 +135,9 @@ describe('ledgers through the index', () => {
     expect((await store.entries('WO-1')).map((e) => e.action)).toEqual(['order.agreed'])
     expect(changes).toEqual([{ kind: 'ledger', orderId: 'WO-1' }])
   })
+}
 
+function anEntryWithNoActorTests() {
   it('still refuses an entry with no actor, and announces nothing for it', async () => {
     const store = createOrderStore(root, indexOver(root))
     await expect(
@@ -139,7 +153,7 @@ describe('ledgers through the index', () => {
     ).rejects.toThrow()
     expect(changes).toEqual([])
   })
-})
+}
 
 describe('gates through the index', () => {
   it('lists a saved gate and names the order it belongs to', async () => {

@@ -77,6 +77,12 @@ describe('normalising a stated reason', () => {
 })
 
 describe('proposing', () => {
+  describe('the threshold and citations', theThresholdAndCitationsTests)
+  describe('wording and ordering', wordingAndOrderingTests)
+  describe('the rung', theRungTests)
+})
+
+function theThresholdAndCitationsTests() {
   it('produces nothing from an empty ledger', () => {
     expect(propose({ entries: [] })).toEqual([])
   })
@@ -104,7 +110,9 @@ describe('proposing', () => {
     expect(proposal.origin).toContain('2026-09-01T10:00:00.000Z/U-1')
     expect(proposal.origin).toContain('2026-09-05T10:00:00.000Z/U-9')
   })
+}
 
+function wordingAndOrderingTests() {
   it("uses the operator's own words, not a paraphrase", () => {
     const [proposal] = propose({ entries: threeOfTheSame() })
     expect(proposal.asserts).toBe('`U-9` hardcodes the timeout')
@@ -131,7 +139,9 @@ describe('proposing', () => {
     ]
     expect(propose({ entries: mixed })[0].occurrences).toBe(5)
   })
+}
 
+function theRungTests() {
   it('picks the rung from what the rejections were about', () => {
     const testy = Array.from({ length: 3 }, (_, n) =>
       entry({ at: `2026-09-0${n + 1}T10:00:00.000Z`, reason: 'no test covers the new branch' })
@@ -157,9 +167,14 @@ describe('proposing', () => {
   it('falls back to the correctness rung for a complaint it cannot place', () => {
     expect(propose({ entries: threeOfTheSame() })[0].rung).toBe('L3')
   })
-})
+}
 
 describe('what counts as a rejection', () => {
+  describe('approvals and send-backs', approvalsAndSendBacksTests)
+  describe('other actions', otherActionsTests)
+})
+
+function approvalsAndSendBacksTests() {
   it('ignores an approval, which is not a rejection however often it happens', () => {
     const approvals = Array.from({ length: 5 }, (_, n) =>
       entry({
@@ -181,7 +196,9 @@ describe('what counts as a rejection', () => {
     )
     expect(propose({ entries: sentBack })).toHaveLength(1)
   })
+}
 
+function otherActionsTests() {
   it('ignores an action that is not a rejection at all', () => {
     const noise = Array.from({ length: 5 }, (_, n) =>
       entry({ at: `2026-09-0${n + 1}T10:00:00.000Z`, action: 'order.seeded' })
@@ -196,11 +213,18 @@ describe('what counts as a rejection', () => {
     expect(propose({ entries: silent })).toEqual([])
   })
 
+  it('ignores a reason that is nothing but the identifiers it names', () => {
+    const named = Array.from({ length: 5 }, (_, n) =>
+      entry({ at: `2026-09-0${n + 1}T10:00:00.000Z`, reason: '`U-1` src/a.ts 42' })
+    )
+    expect(propose({ entries: named })).toEqual([])
+  })
+
   it('names the actions it reads, rather than reading everything', () => {
     expect(REJECTION_ACTIONS).toContain('review.rejected')
     expect(REJECTION_ACTIONS).not.toContain('order.agreed')
   })
-})
+}
 
 describe('not offering the same thing twice', () => {
   it('skips a proposal the operator already turned down', () => {

@@ -25,6 +25,12 @@ function setup(over: Partial<Parameters<typeof ConfirmButton>[0]> = {}) {
 }
 
 describe('ConfirmButton', () => {
+  describe('arming', armingTests)
+  describe('acting and backing out', actingAndBackingOutTests)
+  describe('after firing and while busy', afterFiringAndWhileBusyTests)
+})
+
+function armingTests() {
   it('shows only its own label until it is armed', () => {
     setup()
     expect(screen.getByRole('button', { name: 'Start over' })).toBeTruthy()
@@ -42,7 +48,9 @@ describe('ConfirmButton', () => {
     await user.click(screen.getByRole('button', { name: 'Start over' }))
     expect(screen.getByText(/removes the checkout and the branch wip/)).toBeTruthy()
   })
+}
 
+function actingAndBackingOutTests() {
   it('acts on the second click', async () => {
     const { onConfirm, user } = setup()
     await user.click(screen.getByRole('button', { name: 'Start over' }))
@@ -57,7 +65,9 @@ describe('ConfirmButton', () => {
     expect(onConfirm).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Start over' })).toBeTruthy()
   })
+}
 
+function afterFiringAndWhileBusyTests() {
   it('disarms after it fires, so a second run is a second decision', async () => {
     const { user } = setup()
     await user.click(screen.getByRole('button', { name: 'Start over' }))
@@ -71,4 +81,4 @@ describe('ConfirmButton', () => {
     expect(screen.queryByText(/removes the checkout/)).toBeNull()
     expect(onConfirm).not.toHaveBeenCalled()
   })
-})
+}

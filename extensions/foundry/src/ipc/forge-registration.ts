@@ -86,7 +86,7 @@ function createForge(
     // move is known before the run rather than after it.
     capability: (order) => checkCapability(order, writeBackDepsFor(dataRoot(), order, issuesPort)),
     onAgreed: async (order) => {
-      await writeBack(order, 'agreed', writeBackDepsFor(dataRoot(), order, issuesPort))
+      await writeBack(order, { event: 'agreed' }, writeBackDepsFor(dataRoot(), order, issuesPort))
     },
     readIssue: (tracker, key) => readIssue(api, tracker, key),
     queueEntries: () => computeQueueEntries(dataRoot(), orderStoreAt(dataRoot())),

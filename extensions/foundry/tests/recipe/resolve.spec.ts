@@ -28,9 +28,10 @@ function sources(): ResolveSources {
   return { dataRoot, repoPaths: [repo], builtInDir: builtIn }
 }
 
-function put(dir: string, kind: string, name: string, body: string): void {
-  fs.mkdirSync(path.join(dir, kind), { recursive: true })
-  fs.writeFileSync(path.join(dir, kind, `${name}.yaml`), body)
+/** Writes `body` as `<dir>/<entry>.yaml`, where entry is a kind's folder and a name: `recipes/direct`. */
+function put(dir: string, entry: string, body: string): void {
+  fs.mkdirSync(path.dirname(path.join(dir, entry)), { recursive: true })
+  fs.writeFileSync(path.join(dir, `${entry}.yaml`), body)
 }
 
 function recipe(id: string, extra = ''): string {
@@ -48,24 +49,32 @@ afterEach(() => {
 })
 
 describe('resolveFile', () => {
+  describe('overrides', overridesTests)
+  describe('names', namesTests)
+  describe('the repository', theRepositoryTests)
+})
+
+function overridesTests() {
   it('finds a built-in when nothing else defines the name', () => {
-    put(builtIn, 'recipes', 'direct', recipe('direct'))
+    put(builtIn, 'recipes/direct', recipe('direct'))
     expect(resolveFile('recipes', 'direct', sources())?.rung).toBe('built-in')
   })
 
   it('lets a repository override a built-in', () => {
-    put(builtIn, 'recipes', 'direct', recipe('direct'))
-    put(path.join(repo, '.foundry'), 'recipes', 'direct', recipe('direct'))
+    put(builtIn, 'recipes/direct', recipe('direct'))
+    put(path.join(repo, '.foundry'), 'recipes/direct', recipe('direct'))
     expect(resolveFile('recipes', 'direct', sources())?.rung).toBe('repository')
   })
 
   it('lets the operator override everything', () => {
-    put(builtIn, 'recipes', 'direct', recipe('direct'))
-    put(path.join(repo, '.foundry'), 'recipes', 'direct', recipe('direct'))
-    put(dataRoot, 'recipes', 'direct', recipe('direct'))
+    put(builtIn, 'recipes/direct', recipe('direct'))
+    put(path.join(repo, '.foundry'), 'recipes/direct', recipe('direct'))
+    put(dataRoot, 'recipes/direct', recipe('direct'))
     expect(resolveFile('recipes', 'direct', sources())?.rung).toBe('data-root')
   })
+}
 
+function namesTests() {
   it('accepts a .yml file as readily as .yaml', () => {
     fs.mkdirSync(path.join(builtIn, 'recipes'), { recursive: true })
     fs.writeFileSync(path.join(builtIn, 'recipes', 'direct.yml'), recipe('direct'))
@@ -75,24 +84,26 @@ describe('resolveFile', () => {
   it('returns nothing for a name nobody defines', () => {
     expect(resolveFile('recipes', 'nowhere', sources())).toBeNull()
   })
+}
 
+function theRepositoryTests() {
   it('never requires a repository to carry a .foundry directory', () => {
-    put(builtIn, 'recipes', 'direct', recipe('direct'))
+    put(builtIn, 'recipes/direct', recipe('direct'))
     expect(resolveFile('recipes', 'direct', sources())).not.toBeNull()
     expect(fs.existsSync(path.join(repo, '.foundry'))).toBe(false)
   })
 
   it('creates nothing in the repository while resolving', () => {
-    put(builtIn, 'recipes', 'direct', recipe('direct'))
+    put(builtIn, 'recipes/direct', recipe('direct'))
     const before = fs.readdirSync(repo)
     resolveFile('recipes', 'direct', sources())
     expect(fs.readdirSync(repo)).toEqual(before)
   })
-})
+}
 
 describe('resolveRecipe', () => {
   it('parses and reports which rung it came from', () => {
-    put(builtIn, 'recipes', 'direct', recipe('direct'))
+    put(builtIn, 'recipes/direct', recipe('direct'))
     const r = resolveRecipe('direct', sources())
     expect(r.ok).toBe(true)
     if (r.ok) {
@@ -102,8 +113,8 @@ describe('resolveRecipe', () => {
   })
 
   it('reports a malformed override by path rather than falling through to the built-in', () => {
-    put(builtIn, 'recipes', 'direct', recipe('direct'))
-    put(dataRoot, 'recipes', 'direct', 'id: [unclosed\n')
+    put(builtIn, 'recipes/direct', recipe('direct'))
+    put(dataRoot, 'recipes/direct', 'id: [unclosed\n')
     const r = resolveRecipe('direct', sources())
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toContain('direct.yaml')
@@ -118,10 +129,10 @@ describe('resolveRecipe', () => {
 
 describe('availableNames', () => {
   it('is the union across the three rungs, without duplicates', () => {
-    put(builtIn, 'recipes', 'direct', recipe('direct'))
-    put(builtIn, 'recipes', 'bugfix', recipe('bugfix'))
-    put(dataRoot, 'recipes', 'direct', recipe('direct'))
-    put(path.join(repo, '.foundry'), 'recipes', 'house', recipe('house'))
+    put(builtIn, 'recipes/direct', recipe('direct'))
+    put(builtIn, 'recipes/bugfix', recipe('bugfix'))
+    put(dataRoot, 'recipes/direct', recipe('direct'))
+    put(path.join(repo, '.foundry'), 'recipes/house', recipe('house'))
     expect(availableNames('recipes', sources())).toEqual(['bugfix', 'direct', 'house'])
   })
 
@@ -135,8 +146,8 @@ describe('loadAllRules', () => {
     `schemaVersion: 1\nid: ${id}\nscope: universal\nrung: L2\nasserts: something\n`
 
   it('loads every rule that parses', () => {
-    put(builtIn, 'rules', 'exit-code', rule('exit-code'))
-    put(builtIn, 'rules', 'coverage', rule('coverage'))
+    put(builtIn, 'rules/exit-code', rule('exit-code'))
+    put(builtIn, 'rules/coverage', rule('coverage'))
     expect(
       loadAllRules(sources())
         .rules.map((r) => r.id)
@@ -145,8 +156,8 @@ describe('loadAllRules', () => {
   })
 
   it('reports a broken rule without losing the good ones', () => {
-    put(builtIn, 'rules', 'good', rule('good'))
-    put(builtIn, 'rules', 'broken', 'scope: [unclosed\n')
+    put(builtIn, 'rules/good', rule('good'))
+    put(builtIn, 'rules/broken', 'scope: [unclosed\n')
     const loaded = loadAllRules(sources())
     expect(loaded.rules.map((r) => r.id)).toEqual(['good'])
     expect(loaded.problems).toHaveLength(1)
@@ -220,18 +231,25 @@ describe('availableSkills', () => {
   })
 })
 
-describe('checkRequirements', () => {
-  function order(over: Partial<WorkOrder> = {}): WorkOrder {
-    const base = draftOrder({
-      id: 'WO-1',
-      title: 'x',
-      source: { kind: 'typed', tracker: null, key: null, url: null },
-      repoPaths: [repo],
-      now: '2026-09-06T10:00:00.000Z',
-    })
-    return { ...base, ...over }
-  }
+function order(over: Partial<WorkOrder> = {}): WorkOrder {
+  const base = draftOrder({
+    id: 'WO-1',
+    title: 'x',
+    source: { kind: 'typed', tracker: null, key: null, url: null },
+    repoPaths: [repo],
+    now: '2026-09-06T10:00:00.000Z',
+  })
+  return { ...base, ...over }
+}
 
+describe('checkRequirements', () => {
+  describe('paths', pathsTests)
+  describe('toolchain', toolchainTests)
+  describe('counts and unknown kinds', countsAndUnknownKindsTests)
+  describe('every unmet requirement', everyUnmetRequirementTests)
+})
+
+function pathsTests() {
   it('offers a recipe with no requirements', () => {
     expect(checkRequirements([], order()).available).toBe(true)
   })
@@ -248,7 +266,9 @@ describe('checkRequirements', () => {
       true
     )
   })
+}
 
+function toolchainTests() {
   it('withholds a recipe needing a toolchain command this repository lacks', () => {
     const r = checkRequirements([{ kind: 'toolchain', value: 'test' }], order())
     expect(r.available).toBe(false)
@@ -266,11 +286,30 @@ describe('checkRequirements', () => {
       false
     )
   })
+}
 
+function countsAndUnknownKindsTests() {
   it('compares repository counts', () => {
     expect(checkRequirements([{ kind: 'repos', value: '>1' }], order()).available).toBe(false)
     expect(checkRequirements([{ kind: 'repos', value: '>=1' }], order()).available).toBe(true)
     expect(checkRequirements([{ kind: 'repos', value: '1' }], order()).available).toBe(true)
+  })
+
+  it('compares with at most and fewer than, and says how many the order has', () => {
+    expect(checkRequirements([{ kind: 'repos', value: '<=1' }], order()).available).toBe(true)
+    expect(checkRequirements([{ kind: 'repos', value: '<2' }], order()).available).toBe(true)
+    const r = checkRequirements([{ kind: 'repos', value: '<1' }], order())
+    expect(r.unmet).toEqual(['needs < 1 repositories, this order has 1'])
+  })
+
+  it('withholds a recipe whose repository count it cannot read', () => {
+    const r = checkRequirements([{ kind: 'repos', value: 'several' }], order())
+    expect(r.unmet).toEqual(['unreadable repos requirement'])
+  })
+
+  it('treats a kind named like a built-in property as unknown, not as a check', () => {
+    const r = checkRequirements([{ kind: 'toString', value: '1' }], order())
+    expect(r.unmet).toEqual(['unknown requirement "toString"'])
   })
 
   it('treats an unknown requirement kind as unmet, never as satisfied', () => {
@@ -278,7 +317,9 @@ describe('checkRequirements', () => {
     expect(r.available).toBe(false)
     expect(r.unmet[0]).toContain('phase_of_moon')
   })
+}
 
+function everyUnmetRequirementTests() {
   it('reports every unmet requirement, not just the first', () => {
     const r = checkRequirements(
       [
@@ -289,4 +330,4 @@ describe('checkRequirements', () => {
     )
     expect(r.unmet).toHaveLength(2)
   })
-})
+}

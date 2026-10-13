@@ -99,7 +99,7 @@ function refineryDepsFor(place: RefineryPlace): RefineryTickDeps {
     restack: (lane) => restack(lane, (options) => api.shell.exec(options)),
     watchCi: (orderId) => watchRestackedCi(api, root, orderId),
     raiseConflict: (orderId, why, files) => raiseRefineryConflict(root, { orderId, why, files }),
-    record: (orderId, action, subject, reason) =>
+    record: ({ orderId, action, subject, reason }) =>
       store.record({
         at: new Date().toISOString(),
         orderId,
@@ -168,7 +168,7 @@ async function moveIssueToDone(
 ): Promise<void> {
   const order = await store.load(orderId)
   if (order !== null) {
-    await writeBack(order, 'merged', writeBackDepsFor(root, order, issuesPortFor(api)))
+    await writeBack(order, { event: 'merged' }, writeBackDepsFor(root, order, issuesPortFor(api)))
   }
 }
 

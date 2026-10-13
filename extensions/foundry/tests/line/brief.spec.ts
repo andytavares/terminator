@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { testCriterion } from '../helpers/order-parts.js'
 import { brief } from '../../src/line/brief.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { PlanUnit, WorkOrder } from '../../src/order/schema.js'
@@ -57,13 +58,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
       nonGoals: ['rotating the signing key'],
     },
     acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'an expired token is refused',
-        priority: 'P0',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
+      testCriterion('AC-1', { statement: 'an expired token is refused', priority: 'P0' }),
     ],
     context: {
       ...base.context,
@@ -112,7 +107,37 @@ describe('the instruction', () => {
   })
 })
 
+describe('a node with no role', () => {
+  it('gets the order and nothing it would have to be permitted to read', () => {
+    const text = brief({ order: order(), role: null, units: [unit()], rules: [] })
+    expect(text.startsWith('---')).toBe(true)
+    expect(text).toContain('# Refuse an expired refresh token')
+    expect(text).toContain('it is refused with a 401')
+    expect(text).not.toContain('## The unit:')
+    expect(text).not.toContain('## The repository')
+  })
+
+  it('has no output contract to end on', () => {
+    const text = brief({
+      order: order(),
+      role: null,
+      units: [],
+      rules: [],
+      outputPath: '/data/orders/WO-1/rungs/x.json',
+    })
+    expect(text).not.toContain('What to write, and where')
+  })
+})
+
 describe('what each role may read is declared, not assumed', () => {
+  describe('the builder brief', theBuilderBriefTests)
+  describe('open findings', openFindingsTests)
+  describe('blocking findings', blockingFindingsTests)
+  describe('lanes', lanesTests)
+  describe('verifiers and silent roles', verifiersAndSilentRolesTests)
+})
+
+function theBuilderBriefTests() {
   it('gives a builder its unit, what it may touch and what makes it done', () => {
     const text = brief({ order: order(), role: role(), units: [unit()], rules: [] })
     expect(text).toContain('U-1')
@@ -120,7 +145,9 @@ describe('what each role may read is declared, not assumed', () => {
     expect(text).toContain('AC-1')
     expect(text).toContain('an expired token is refused')
   })
+}
 
+function openFindingsTests() {
   it('tells a builder about an open non-blocking finding, and to leave it if it is not theirs', () => {
     const text = brief({
       order: order({
@@ -145,7 +172,9 @@ describe('what each role may read is declared, not assumed', () => {
     expect(text).toContain('No ADR for this change.')
     expect(text).not.toContain('see CLAUDE.md')
   })
+}
 
+function blockingFindingsTests() {
   it('says nothing about a blocking finding — that never reaches a builder', () => {
     const text = brief({
       order: order({
@@ -167,7 +196,9 @@ describe('what each role may read is declared, not assumed', () => {
     })
     expect(text).not.toContain('## Notes from review')
   })
+}
 
+function lanesTests() {
   // A fan-out `by lane` gives one agent a whole lane. The plan's detail is
   // the point of keeping units at all, so the brief lists every one of them,
   // in the order the graph resolved — not a summary and not just the first.
@@ -201,7 +232,9 @@ describe('what each role may read is declared, not assumed', () => {
     const text = brief({ order: order(), role: role(), units: [unit()], rules: [] })
     expect(text).toContain('## The unit: U-1')
   })
+}
 
+function verifiersAndSilentRolesTests() {
   it('gives a verifier the criteria and never the unit — that is the whole point', () => {
     const verifier = role({ id: 'verifier', reads: ['criteria'], writes: [], allowResume: false })
     const text = brief({ order: order(), role: verifier, units: [unit()], rules: [] })
@@ -217,7 +250,7 @@ describe('what each role may read is declared, not assumed', () => {
     expect(text).not.toContain('no-stubs')
     expect(text).not.toContain('src/auth/session.ts')
   })
-})
+}
 
 function feedback(over: Partial<Feedback> = {}): Feedback {
   return {
@@ -233,6 +266,12 @@ function feedback(over: Partial<Feedback> = {}): Feedback {
 }
 
 describe('a builder sent back is told why', () => {
+  describe('the failed check', theFailedCheckTests)
+  describe('unknown and empty feedback', unknownAndEmptyFeedbackTests)
+  describe('who reads it and where', whoReadsItAndWhereTests)
+})
+
+function theFailedCheckTests() {
   it('names the failed check, its exit status and the excerpt', () => {
     const text = brief({
       order: order(),
@@ -262,7 +301,9 @@ describe('a builder sent back is told why', () => {
     expect(text.indexOf('first failure')).toBeLessThan(text.indexOf('second failure'))
     expect(text).toContain('`npm run lint`')
   })
+}
 
+function unknownAndEmptyFeedbackTests() {
   it('says so when the command is unknown', () => {
     const text = brief({
       order: order(),
@@ -284,7 +325,9 @@ describe('a builder sent back is told why', () => {
     const text = brief({ order: order(), role: role(), units: [unit()], rules: [] })
     expect(text).not.toContain('failed a check')
   })
+}
 
+function whoReadsItAndWhereTests() {
   it('renders nothing for a role that does not read feedback', () => {
     const verifier = role({ id: 'verifier', reads: ['criteria'], writes: [], allowResume: false })
     const text = brief({
@@ -308,9 +351,17 @@ describe('a builder sent back is told why', () => {
     expect(text.indexOf('## The unit:')).toBeLessThan(text.indexOf('failed a check'))
     expect(text.indexOf('failed a check')).toBeLessThan(text.indexOf('## The repository'))
   })
-})
+}
 
 describe('the repository, for a role that reads it', () => {
+  describe('the commands', theCommandsTests)
+  describe('no commands and the project notes', noCommandsAndTheProjectNotesTests)
+  describe('earlier decisions', earlierDecisionsTests)
+  describe('assumptions', assumptionsTests)
+  describe('struck assumptions', struckAssumptionsTests)
+})
+
+function theCommandsTests() {
   it('names the real commands and forbids inventing others', () => {
     const runs = role({ tools: ['read', 'edit', 'run_tests'] })
     const text = brief({ order: order(), role: runs, units: [unit()], rules: [] })
@@ -328,7 +379,9 @@ describe('the repository, for a role that reads it', () => {
     expect(text).toContain('run for you')
     expect(text).not.toContain('do not invent others')
   })
+}
 
+function noCommandsAndTheProjectNotesTests() {
   it('says so when there are none, rather than leaving the agent to guess', () => {
     const bare = order()
     const text = brief({
@@ -354,7 +407,9 @@ describe('the repository, for a role that reads it', () => {
       'CLAUDE.md'
     )
   })
+}
 
+function earlierDecisionsTests() {
   it('carries what was already decided about these files', () => {
     const base = order()
     const text = brief({
@@ -368,7 +423,9 @@ describe('the repository, for a role that reads it', () => {
     })
     expect(text).toContain('Already decided about these files')
   })
+}
 
+function assumptionsTests() {
   it('carries the assumptions, and says to stop rather than work around one', () => {
     const base = order()
     const text = brief({
@@ -385,7 +442,9 @@ describe('the repository, for a role that reads it', () => {
     expect(text).toContain('sessions are stored in Redis')
     expect(text).toContain('stop and say so')
   })
+}
 
+function struckAssumptionsTests() {
   it('leaves out an assumption the operator struck', () => {
     const base = order()
     const text = brief({
@@ -399,7 +458,7 @@ describe('the repository, for a role that reads it', () => {
     })
     expect(text).not.toContain('sessions are in Redis')
   })
-})
+}
 
 describe('house rules', () => {
   it('are named with the rung they sit on', () => {
@@ -461,6 +520,13 @@ describe('a unit with nothing declared', () => {
 })
 
 describe('where a rung hands back what it found', () => {
+  describe('read-only roles', readOnlyRolesTests)
+  describe('authors', authorsTests)
+  describe('roles with no document', rolesWithNoDocumentTests)
+  describe('its place in the brief', itsPlaceInTheBriefTests)
+})
+
+function readOnlyRolesTests() {
   it('tells a read-only role the file, and that nothing else counts', () => {
     const text = brief({
       order: order(),
@@ -484,7 +550,9 @@ describe('where a rung hands back what it found', () => {
     expect(text).toContain('"redTeam"')
     expect(text).not.toContain('"entryPoints"')
   })
+}
 
+function authorsTests() {
   it('gives an author the outputs directory beside the file to hand back', () => {
     const text = brief({
       order: order(),
@@ -509,7 +577,9 @@ describe('where a rung hands back what it found', () => {
     })
     expect(text).not.toContain('/data/orders/WO-1/outputs')
   })
+}
 
+function rolesWithNoDocumentTests() {
   it('says nothing to a role whose product is the diff', () => {
     // The builder writes the worktree. A second channel would be two answers
     // to the question of what the rung did.
@@ -532,7 +602,9 @@ describe('where a rung hands back what it found', () => {
     })
     expect(text).not.toContain('What to write, and where')
   })
+}
 
+function itsPlaceInTheBriefTests() {
   it('is the last thing an agent reads', () => {
     // After the assumptions, which end with "stop and say so rather than
     // working around it" — the instruction that most often produces one.
@@ -550,4 +622,4 @@ describe('where a rung hands back what it found', () => {
       text.indexOf('Assumed, and not verified')
     )
   })
-})
+}

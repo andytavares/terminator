@@ -62,6 +62,11 @@ afterEach(() => {
 })
 
 describe('accepting a proposal', () => {
+  describe('writing', writingTests)
+  describe('rungs and later work', rungsAndLaterWorkTests)
+})
+
+function writingTests() {
   it('writes a rule the ordinary parser can read', async () => {
     const p = proposal()
     await acceptProposal(root, p)
@@ -84,7 +89,9 @@ describe('accepting a proposal', () => {
     expect(resolved.resolved.value.origin).toMatch(/^curator:/)
     expect(resolved.resolved.value.origin).toContain('2026-09-01T10:00:00.000Z/U-1')
   })
+}
 
+function rungsAndLaterWorkTests() {
   it('keeps the rung the proposal chose', async () => {
     const p = proposal()
     await acceptProposal(root, p)
@@ -106,48 +113,58 @@ describe('accepting a proposal', () => {
     expect(file.startsWith(root)).toBe(true)
     expect(fs.existsSync(file)).toBe(true)
   })
-})
+}
 
 describe('declining a proposal', () => {
+  describe('remembering', rememberingTests)
+  describe('the curator', theCuratorTests)
+  describe('the assertion', theAssertionTests)
+  describe('removed rules', removedRulesTests)
+  describe('unreadable records', unreadableRecordsTests)
+})
+
+function rememberingTests() {
   it('is remembered, so it is never offered again', async () => {
     const p = proposal()
-    await declineProposal(root, p.id, 'we do that on purpose')
+    await declineProposal(root, p.id, { reason: 'we do that on purpose' })
     expect(await declinedProposals(root)).toEqual([p.id])
   })
 
   it('keeps the reason, not just the fact', async () => {
-    await declineProposal(root, 'curator-x', 'we do that on purpose')
+    await declineProposal(root, 'curator-x', { reason: 'we do that on purpose' })
     const raw = fs.readFileSync(path.join(root, 'rules', 'declined.json'), 'utf8')
     expect(raw).toContain('we do that on purpose')
   })
 
   it('accumulates rather than replacing', async () => {
-    await declineProposal(root, 'curator-a', 'no')
-    await declineProposal(root, 'curator-b', 'also no')
+    await declineProposal(root, 'curator-a', { reason: 'no' })
+    await declineProposal(root, 'curator-b', { reason: 'also no' })
     expect(await declinedProposals(root)).toEqual(['curator-a', 'curator-b'])
   })
 
   it('adds no rule', async () => {
-    await declineProposal(root, 'curator-a', 'no')
+    await declineProposal(root, 'curator-a', { reason: 'no' })
     expect(resolveRule('curator-a', sources()).ok).toBe(false)
   })
+}
 
+function theCuratorTests() {
   it('stops the curator proposing it again', async () => {
     const p = proposal()
-    await declineProposal(root, p.id, 'no')
+    await declineProposal(root, p.id, { reason: 'no' })
     const entries = [1, 2, 3].map((n) =>
       entry({ at: `2026-09-0${n}T10:00:00.000Z`, subject: `U-${n}` })
     )
     expect(propose({ entries, rejectedIds: await declinedProposals(root) })).toEqual([])
   })
+}
 
+function theAssertionTests() {
   it('keeps what the check would have asserted, so it can be shown in words', async () => {
-    await declineProposal(
-      root,
-      'curator-x',
-      'we do that on purpose',
-      'The timeout is not hard-coded.'
-    )
+    await declineProposal(root, 'curator-x', {
+      reason: 'we do that on purpose',
+      asserts: 'The timeout is not hard-coded.',
+    })
     expect(await declinedWithReasons(root)).toEqual([
       {
         id: 'curator-x',
@@ -168,14 +185,21 @@ describe('declining a proposal', () => {
     ])
     expect(await declinedProposals(root)).toEqual(['curator-hardcodes-the-timeout'])
   })
+}
 
+function removedRulesTests() {
   it('keeps the assertion of a removed rule', async () => {
-    await removeRule(root, 'docs-in-pr', 'too strict', 'Docs change in the same PR.')
+    await removeRule(root, 'docs-in-pr', {
+      reason: 'too strict',
+      asserts: 'Docs change in the same PR.',
+    })
     expect(await declinedWithReasons(root)).toEqual([
       { id: 'docs-in-pr', reason: 'too strict', asserts: 'Docs change in the same PR.' },
     ])
   })
+}
 
+function unreadableRecordsTests() {
   it('reads an unreadable record as nothing declined', async () => {
     fs.mkdirSync(path.join(root, 'rules'), { recursive: true })
     fs.writeFileSync(path.join(root, 'rules', 'declined.json'), '{{{')
@@ -187,13 +211,13 @@ describe('declining a proposal', () => {
     fs.writeFileSync(path.join(root, 'rules', 'declined.json'), '["nope"]')
     expect(await declinedProposals(root)).toEqual([])
   })
-})
+}
 
 describe('removing an accepted rule', () => {
   it('takes it out of force', async () => {
     const p = proposal()
     await acceptProposal(root, p)
-    expect(await removeRule(root, p.id, 'it fired on everything')).toBe(true)
+    expect(await removeRule(root, p.id, { reason: 'it fired on everything' })).toBe(true)
     expect(
       rulesFor(sources(), { repoPaths: [repo], houseDocs: [] }).rules.map((r) => r.id)
     ).not.toContain(p.id)
@@ -202,18 +226,18 @@ describe('removing an accepted rule', () => {
   it('records why, and never proposes it again', async () => {
     const p = proposal()
     await acceptProposal(root, p)
-    await removeRule(root, p.id, 'it fired on everything')
+    await removeRule(root, p.id, { reason: 'it fired on everything' })
     expect(await declinedProposals(root)).toContain(p.id)
     const raw = fs.readFileSync(path.join(root, 'rules', 'declined.json'), 'utf8')
     expect(raw).toContain('it fired on everything')
   })
 
   it('reports a rule that was not there rather than pretending it removed one', async () => {
-    expect(await removeRule(root, 'curator-nothing', 'x')).toBe(false)
+    expect(await removeRule(root, 'curator-nothing', { reason: 'x' })).toBe(false)
   })
 
   it('leaves the rules that ship with the tool alone', async () => {
-    await removeRule(root, 'no-stubs', 'x')
+    await removeRule(root, 'no-stubs', { reason: 'x' })
     expect(
       rulesFor(sources(), { repoPaths: [repo], houseDocs: [] }).rules.map((r) => r.id)
     ).toContain('no-stubs')

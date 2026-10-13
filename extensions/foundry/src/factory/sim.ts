@@ -262,6 +262,32 @@ function isCrewed(node: RunNode): boolean {
 
 /** Placement settled on first load: nobody walks in, everyone is where the run left them. */
 export function createWorld(map: HallMap, observation: Observation): World {
+  const gatesWaiting = new Set<string>()
+  for (const gate of observation.waiting) {
+    const nodeId = gateNodeId(gate, observation.graph)
+    if (nodeId !== null) gatesWaiting.add(nodeId)
+  }
+  return {
+    map,
+    crew: placedCrew(map, observation),
+    crates: queuedCrates(map, observation.graph),
+    gatesWaiting: [...gatesWaiting],
+    openCalls: [],
+    verdicts: [],
+    clockMs: 0,
+    ci: worldCi(observation.ci),
+    queue:
+      observation.queue === null
+        ? null
+        : {
+            position: observation.queue.position,
+            behind: observation.queue.behind.map((entry) => entry.title),
+          },
+  }
+}
+
+/** Each crewed node's crew member, where its state puts them. */
+function placedCrew(map: HallMap, observation: Observation): Crew[] {
   const orphaned = new Set(observation.orphaned)
   const crew: Crew[] = []
   const taken = new Set<number>()
@@ -285,53 +311,32 @@ export function createWorld(map: HallMap, observation: Observation): World {
       settle: placement.settle,
     })
   }
+  return crew
+}
 
-  const gatesWaiting = new Set<string>()
-  for (const gate of observation.waiting) {
-    const nodeId = gateNodeId(gate, observation.graph)
-    if (nodeId !== null) gatesWaiting.add(nodeId)
-  }
-
-  // Work already finished and not yet taken in shows as a crate waiting at
-  // the step it feeds, so a hall opened mid-run reads the queue at a glance.
-  const states = new Map(observation.graph.nodes.map((n) => [n.id, n.state]))
-  const crates: Crate[] = map.belts
+/**
+ * Work already finished and not yet taken in shows as a crate waiting at the
+ * step it feeds, so a hall opened mid-run reads the queue at a glance.
+ */
+function queuedCrates(map: HallMap, graph: Observation['graph']): Crate[] {
+  const states = new Map(graph.nodes.map((n) => [n.id, n.state]))
+  return map.belts
     .filter(
       (belt) =>
         states.get(belt.fromNodeId) === 'passed' &&
         !hasStarted(states.get(belt.toNodeId) as NodeState)
     )
     .map((belt) => ({ id: `${belt.id}@queued`, beltId: belt.id, progress: 1, parks: true }))
+}
 
-  const ci: WorldCi | null =
-    observation.ci === null
-      ? null
-      : {
-          round: observation.ci.round,
-          max: observation.ci.max,
-          checks: Object.fromEntries(
-            observation.ci.pulls.flatMap((pull) => pull.checks.map((c) => [c.name, c.bucket]))
-          ),
-        }
-
-  const queue =
-    observation.queue === null
-      ? null
-      : {
-          position: observation.queue.position,
-          behind: observation.queue.behind.map((entry) => entry.title),
-        }
-
+function worldCi(ci: Observation['ci']): WorldCi | null {
+  if (ci === null) return null
   return {
-    map,
-    crew,
-    crates,
-    gatesWaiting: [...gatesWaiting],
-    openCalls: [],
-    verdicts: [],
-    clockMs: 0,
-    ci,
-    queue,
+    round: ci.round,
+    max: ci.max,
+    checks: Object.fromEntries(
+      ci.pulls.flatMap((pull) => pull.checks.map((c) => [c.name, c.bucket]))
+    ),
   }
 }
 
@@ -408,13 +413,71 @@ function moving(from: Crew, to: Crew): Crew {
     : { ...stepped, blockedMs: 0 }
 }
 
+/** The others a crew member moves among this tick. */
+interface Among {
+  readonly others: readonly Crew[]
+}
+
+/** Every tile another crew member stands on or is about to enter. */
+function claimedTiles(others: readonly Crew[]): Set<string> {
+  const claimed = new Set<string>()
+  for (const o of others) {
+    claimed.add(key(tileOf(o.x, o.y)))
+    const n = nextKey(o)
+    if (n !== null) claimed.add(n)
+  }
+  return claimed
+}
+
+/** A crew member held up on the way to `goal`, and the floor around it. */
+interface Jam {
+  readonly map: HallMap
+  readonly crew: Crew
+  readonly here: Tile
+  readonly goal: Tile
+  readonly claimed: ReadonlySet<string>
+  /** The crew member standing still, as it is if nothing better turns up. */
+  readonly waiting: Crew
+}
+
+function reroute(jam: Jam, path: readonly Tile[]): Crew {
+  return { ...jam.waiting, path, blockedMs: 0 }
+}
+
+/**
+ * A tile to step to, then on to the goal: aside first, then back where it came
+ * from, then back along the other's own way so the other can still pass.
+ */
+function stepAway(jam: Jam, other: Crew): Crew | null {
+  const { map, crew, here, goal, claimed } = jam
+  const theirs = new Set([key(tileOf(other.x, other.y)), ...other.path.map(key)])
+  const open = NEIGHBOUR_STEPS.map((d) => ({ x: here.x + d.x, y: here.y + d.y })).filter(
+    (t) => map.walk[t.y]?.[t.x] === false && !claimed.has(key(t))
+  )
+  const back = crew.prev != null && !claimed.has(key(crew.prev)) ? [crew.prev] : []
+  const options = [
+    ...open.filter((t) => !theirs.has(key(t))),
+    ...back,
+    ...open.filter((t) => theirs.has(key(t))),
+  ]
+  for (const t of options) {
+    const onward = key(t) === key(goal) ? [] : findPath(map.walk, { from: t, to: goal })
+    if (onward.length > 0 || key(t) === key(goal)) return reroute(jam, [t, ...onward])
+  }
+  return null
+}
+
 /**
  * What a crew member does when the tile it is heading for is taken. Nobody
  * ever moves into a tile another present crew member stands on or is about to
  * enter, so people are solid. Face to face, the one with the lower claim steps
  * aside, or back, to let the other through.
  */
-function tickBlocked(map: HallMap, crew: Crew, others: readonly Crew[], dtMs: number): Crew {
+function tickBlocked(
+  map: HallMap,
+  crew: Crew,
+  { others, dtMs }: Among & { readonly dtMs: number }
+): Crew {
   const here = tileOf(crew.x, crew.y)
   const goal = crew.goal
   const blockedMs = (crew.blockedMs ?? 0) + dtMs
@@ -422,77 +485,69 @@ function tickBlocked(map: HallMap, crew: Crew, others: readonly Crew[], dtMs: nu
   const occupant = others.find((o) => key(tileOf(o.x, o.y)) === key(crew.path[0]))
   if (goal === null) return waiting
 
-  const claimed = new Set<string>()
-  for (const o of others) {
-    claimed.add(key(tileOf(o.x, o.y)))
-    const n = nextKey(o)
-    if (n !== null) claimed.add(n)
-  }
-  const reroute = (path: readonly Tile[]): Crew => ({ ...waiting, path, blockedMs: 0 })
-
-  // A tile to step to, then on to the goal: aside first, then back where it came
-  // from, then back along the other's own way so the other can still pass.
-  const stepAway = (other: Crew): Crew | null => {
-    const theirs = new Set([key(tileOf(other.x, other.y)), ...other.path.map(key)])
-    const open = NEIGHBOUR_STEPS.map((d) => ({ x: here.x + d.x, y: here.y + d.y })).filter(
-      (t) => map.walk[t.y]?.[t.x] === false && !claimed.has(key(t))
-    )
-    const back = crew.prev != null && !claimed.has(key(crew.prev)) ? [crew.prev] : []
-    const options = [
-      ...open.filter((t) => !theirs.has(key(t))),
-      ...back,
-      ...open.filter((t) => theirs.has(key(t))),
-    ]
-    for (const t of options) {
-      const onward = key(t) === key(goal) ? [] : findPath(map.walk, t, goal)
-      if (onward.length > 0 || key(t) === key(goal)) return reroute([t, ...onward])
-    }
-    return null
-  }
-
+  const jam: Jam = { map, crew, here, goal, claimed: claimedTiles(others), waiting }
   if (occupant !== undefined && nextKey(occupant) === key(here) && outranks(occupant, crew)) {
-    const around = findPath(
-      map.walk,
-      here,
-      goal,
-      new Set([key(tileOf(occupant.x, occupant.y)), ...occupant.path.slice(0, 1).map(key)])
-    )
-    if (around.length > 0 && !claimed.has(key(around[0]))) return reroute(around)
-    return stepAway(occupant) ?? waiting
+    return giveWay(jam, occupant)
   }
-
-  if (blockedMs > REPLAN_AFTER_MS) {
-    const around = findPath(map.walk, here, goal, claimed)
-    if (around.length > 0) return reroute(around)
-    // Stuck behind someone who is stuck too: make room rather than wait for ever.
-    if (occupant !== undefined && occupant.anim === 'idle' && occupant.path.length > 0) {
-      return stepAway(occupant) ?? { ...waiting, blockedMs: 0 }
-    }
-    return { ...waiting, blockedMs: 0 }
-  }
+  if (blockedMs > REPLAN_AFTER_MS) return replan(jam, occupant)
   return waiting
 }
 
-function tickCrew(map: HallMap, crew: Crew, others: readonly Crew[], dtSec: number): Crew {
+/** Face to face with someone who outranks it: round them, or out of their way. */
+function giveWay(jam: Jam, occupant: Crew): Crew {
+  const around = findPath(
+    jam.map.walk,
+    { from: jam.here, to: jam.goal },
+    new Set([key(tileOf(occupant.x, occupant.y)), ...occupant.path.slice(0, 1).map(key)])
+  )
+  if (around.length > 0 && !jam.claimed.has(key(around[0]))) return reroute(jam, around)
+  return stepAway(jam, occupant) ?? jam.waiting
+}
+
+/** Behind someone for too long: another way round, or room made. */
+function replan(jam: Jam, occupant: Crew | undefined): Crew {
+  const around = findPath(jam.map.walk, { from: jam.here, to: jam.goal }, jam.claimed)
+  if (around.length > 0) return reroute(jam, around)
+  // Stuck behind someone who is stuck too: make room rather than wait for ever.
+  if (occupant !== undefined && occupant.anim === 'idle' && occupant.path.length > 0) {
+    return stepAway(jam, occupant) ?? { ...jam.waiting, blockedMs: 0 }
+  }
+  return { ...jam.waiting, blockedMs: 0 }
+}
+
+function tickCrew(
+  map: HallMap,
+  crew: Crew,
+  { others, dtSec }: Among & { readonly dtSec: number }
+): Crew {
   if (crew.goal === null && crew.path.length === 0) return crew
 
   let path = crew.path
   if (path.length === 0 && crew.goal !== null) {
-    path = findPath(map.walk, tileOf(crew.x, crew.y), crew.goal)
+    path = findPath(map.walk, { from: tileOf(crew.x, crew.y), to: crew.goal })
     if (path.length === 0) {
       // Already there, or nothing found: arrival either way.
       return { ...crew, goal: null, anim: crew.then, facing: crew.settle ?? crew.facing }
     }
   }
 
-  const here = key(tileOf(crew.x, crew.y))
-  const wanted = key(path[0])
-  if (wanted !== here) {
-    const taken = others.some((o) => key(tileOf(o.x, o.y)) === wanted)
-    const beaten = others.some((o) => nextKey(o) === wanted && outranks(o, crew))
-    if (taken || beaten) return tickBlocked(map, { ...crew, path }, others, dtSec * 1000)
+  if (isHeldUp(crew, path[0], others)) {
+    return tickBlocked(map, { ...crew, path }, { others, dtMs: dtSec * 1000 })
   }
+  return walkOn(crew, path, dtSec)
+}
 
+/** Whether the next tile is taken, or about to be by someone who outranks this crew member. */
+function isHeldUp(crew: Crew, next: Tile, others: readonly Crew[]): boolean {
+  const wanted = key(next)
+  if (wanted === key(tileOf(crew.x, crew.y))) return false
+  const taken = others.some((o) => key(tileOf(o.x, o.y)) === wanted)
+  const beaten = others.some((o) => nextKey(o) === wanted && outranks(o, crew))
+  return taken || beaten
+}
+
+/** One tick's walk along `path`, arriving when it reaches the last tile. */
+function walkOn(crew: Crew, path: readonly Tile[], dtSec: number): Crew {
   const target = tileCenter(path[0])
   const dx = target.x - crew.x
   const dy = target.y - crew.y
@@ -571,6 +626,22 @@ export function loiterPoints(map: HallMap): readonly Tile[] {
   return points
 }
 
+/** Where an idle stroll goes next, from each point of it. */
+const STROLL_STEPS: Record<
+  NonNullable<Crew['wander']>,
+  (crew: Crew, moment: { readonly seat: RestSeat; readonly clockMs: number }) => Crew
+> = {
+  back: (crew) => ({ ...crew, wander: null, idleAt: null }),
+  out: (crew, { clockMs }) => {
+    const idleAt = clockMs + seededSpan(crew.nodeId, clockMs, STROLL_LINGER_MS)
+    return { ...crew, wander: 'there', idleAt }
+  },
+  there: (crew, { seat, clockMs }) => {
+    if (clockMs < (crew.idleAt ?? 0)) return crew
+    return { ...crew, goal: seat.tile, then: 'couch', settle: seat.facing, wander: 'back' }
+  },
+}
+
 /**
  * Ambient life for a crew member at rest: every 20-40s, seeded, they walk to a
  * loiter point, linger a few seconds and walk back to their own seat. The seat
@@ -581,17 +652,12 @@ function idle(map: HallMap, crew: Crew, clockMs: number): Crew {
   const seat = crew.restSeat === null ? undefined : map.restSeats[crew.restSeat]
   if (seat === undefined || crew.goal !== null || crew.path.length > 0) return crew
   const wander = crew.wander ?? null
+  if (wander !== null) return STROLL_STEPS[wander](crew, { seat, clockMs })
+  return startStroll(map, crew, clockMs)
+}
 
-  if (wander === 'back') return { ...crew, wander: null, idleAt: null }
-  if (wander === 'out') {
-    const idleAt = clockMs + seededSpan(crew.nodeId, clockMs, STROLL_LINGER_MS)
-    return { ...crew, wander: 'there', idleAt }
-  }
-  if (wander === 'there') {
-    if (clockMs < (crew.idleAt ?? 0)) return crew
-    return { ...crew, goal: seat.tile, then: 'couch', settle: seat.facing, wander: 'back' }
-  }
-
+/** A seated crew member's next stroll: scheduled, then — once due — set off on. */
+function startStroll(map: HallMap, crew: Crew, clockMs: number): Crew {
   if (crew.then !== 'couch') return crew
   if (crew.idleAt === undefined || crew.idleAt === null) {
     return { ...crew, idleAt: clockMs + seededSpan(crew.nodeId, clockMs, STROLL_EVERY_MS) }
@@ -611,8 +677,7 @@ function idle(map: HallMap, crew: Crew, clockMs: number): Crew {
  */
 function advanceErrand(
   map: HallMap,
-  before: Crew,
-  after: Crew,
+  { before, after }: { readonly before: Crew; readonly after: Crew },
   clockMs: number
 ): { readonly crew: Crew; readonly crate: Crate | null } {
   const stops = after.errand
@@ -620,16 +685,7 @@ function advanceErrand(
     return { crew: after, crate: null }
   }
   const [done, ...rest] = stops
-  let crate: Crate | null = null
-  let carrying = after.carrying ?? false
-  if (done.act === 'pickup') carrying = true
-  if (done.act === 'drop') {
-    carrying = false
-    const belt = map.belts.find((b) => b.toNodeId === done.nodeId)
-    if (belt !== undefined) {
-      crate = { id: `${belt.id}@${clockMs}:carried`, beltId: belt.id, progress: 1, parks: true }
-    }
-  }
+  const { carrying, crate } = actOn(map, done, { carrying: after.carrying ?? false, clockMs })
   if (rest.length === 0) return { crew: { ...after, carrying, errand: undefined }, crate }
   const next = rest[0]
   const home = next.act === 'home'
@@ -647,6 +703,24 @@ function advanceErrand(
   }
 }
 
+/** What arriving at an errand's stop does: picks the box up, sets it down, or nothing. */
+function actOn(
+  map: HallMap,
+  done: ErrandStop,
+  { carrying, clockMs }: { readonly carrying: boolean; readonly clockMs: number }
+): { readonly carrying: boolean; readonly crate: Crate | null } {
+  if (done.act === 'pickup') return { carrying: true, crate: null }
+  if (done.act !== 'drop') return { carrying, crate: null }
+  const belt = map.belts.find((b) => b.toNodeId === done.nodeId)
+  return {
+    carrying: false,
+    crate:
+      belt === undefined
+        ? null
+        : { id: `${belt.id}@${clockMs}:carried`, beltId: belt.id, progress: 1, parks: true },
+  }
+}
+
 export function tick(world: World, dtMs: number): World {
   const dtSec = dtMs / 1000
   const clock = world.clockMs + dtMs
@@ -655,8 +729,8 @@ export function tick(world: World, dtMs: number): World {
   const carried: Crate[] = []
   for (let i = 0; i < crew.length; i++) {
     const others = crew.filter((o, j) => j !== i && o.present)
-    const moved = tickCrew(world.map, crew[i], others, dtSec)
-    const arrived = advanceErrand(world.map, crew[i], moved, clock)
+    const moved = tickCrew(world.map, crew[i], { others, dtSec })
+    const arrived = advanceErrand(world.map, { before: crew[i], after: moved }, clock)
     if (arrived.crate !== null) carried.push(arrived.crate)
     crew[i] = idle(world.map, arrived.crew, clock)
   }

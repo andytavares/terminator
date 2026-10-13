@@ -31,6 +31,12 @@ const outcome = (over: Record<string, unknown>): RunOutcome =>
   ({ ...finished, ...over }) as unknown as RunOutcome
 
 describe('why a finished run opened nothing', () => {
+  describe('shapes and passing checks', shapesAndPassingChecksTests)
+  describe('unfinished, gated, unchecked', unfinishedGatedUncheckedTests)
+  describe('the failed rung', theFailedRungTests)
+})
+
+function shapesAndPassingChecksTests() {
   it('names a shape that never opens a pull request', () => {
     const direct = recipe('direct')
     // An operator's own shape with no ready-for-review gate: it answers a question.
@@ -49,7 +55,9 @@ describe('why a finished run opened nothing', () => {
       'it was not shippable, and this build cannot say which check said so'
     )
   })
+}
 
+function unfinishedGatedUncheckedTests() {
   it('names unfinished nodes before anything else', () => {
     expect(whyNotShipped(recipe('direct'), outcome({ complete: false }))).toBe(
       'not every node finished'
@@ -66,7 +74,9 @@ describe('why a finished run opened nothing', () => {
       'verification never ran, so nothing has been checked'
     )
   })
+}
 
+function theFailedRungTests() {
   it('names the rung that failed, or what could not be measured', () => {
     const failed = outcome({
       ladder: {
@@ -84,4 +94,4 @@ describe('why a finished run opened nothing', () => {
       'verification could not measure lint, typecheck'
     )
   })
-})
+}

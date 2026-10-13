@@ -4,15 +4,12 @@
  * off. Agents answer by writing the one file each is allowed to write.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import {
-  activateFoundry,
-  fakeHost,
-  seededRepository,
-  temporaryDirectory,
-} from '../helpers/foundry-host.js'
+import { fakeHost, seededRepository, temporaryDirectory } from '../helpers/foundry-host.js'
+import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -54,7 +51,6 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  const { deactivate } = await import('../../src/index.ts')
   deactivate()
   vi.unstubAllEnvs()
 })
@@ -66,28 +62,39 @@ beforeEach(async () => {
   writes = {}
   host.showToast.mockClear()
   theRunner.start.mockReset()
+  theRunner.start.mockImplementation(scriptedTurns() as never)
+})
+
+type Phase = 'architect' | 'red-team' | 'scout'
+
+interface TurnInput {
+  phase: Phase
+  onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
+  onTurnEnd: () => void
+  onEnd: (exitCode: number | null) => void
+}
+
+/** The one file a turn of `phase` may write: the architect's proposal, or a rung's output. */
+function answerPath(phase: Phase, turn: number): string {
+  const order = orderDir(dataDir, 'WO-1')
+  if (phase === 'architect') return path.join(order, 'proposal.json')
+  return rungOutputPath(order, phase === 'scout' ? 'forge-scout' : `review-${turn}`)
+}
+
+function writeAnswer(target: string, written: unknown): void {
+  fs.mkdirSync(path.dirname(target), { recursive: true })
+  fs.writeFileSync(target, typeof written === 'string' ? written : JSON.stringify(written))
+}
+
+/** Agents that write what `writes` says for their role and turn, then end the turn. */
+function scriptedTurns() {
   const turns = new Map<string, number>()
-  theRunner.start.mockImplementation((async (input: {
-    phase: 'architect' | 'red-team' | 'scout'
-    onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
-    onTurnEnd: () => void
-    onEnd: (exitCode: number | null) => void
-  }) => {
+  return async (input: TurnInput) => {
     const turn = (turns.get(input.phase) ?? 0) + 1
     turns.set(input.phase, turn)
     const sessionId = `${input.phase}-${turn}`
     const written = writes[input.phase]?.(turn)
-    if (written !== undefined) {
-      const target =
-        input.phase === 'architect'
-          ? path.join(orderDir(dataDir, 'WO-1'), 'proposal.json')
-          : rungOutputPath(
-              orderDir(dataDir, 'WO-1'),
-              input.phase === 'scout' ? 'forge-scout' : `review-${turn}`
-            )
-      fs.mkdirSync(path.dirname(target), { recursive: true })
-      fs.writeFileSync(target, typeof written === 'string' ? written : JSON.stringify(written))
-    }
+    if (written !== undefined) writeAnswer(answerPath(input.phase, turn), written)
     input.onRegistered({ sessionId, transcriptFrom: 0 })
     setTimeout(() => {
       input.onTurnEnd()
@@ -95,8 +102,8 @@ beforeEach(async () => {
       if (written === undefined) input.onEnd(0)
     }, 0)
     return { sessionId, transcriptFrom: 0, terminalSessionId: 't', transcriptPath: '/none' }
-  }) as never)
-})
+  }
+}
 
 /** A draft that passes every check but the red team's, worth reviewing unless `over` says not. */
 function readyDraft(over: Partial<WorkOrder> = {}): WorkOrder {
@@ -112,28 +119,11 @@ function readyDraft(over: Partial<WorkOrder> = {}): WorkOrder {
     intent: { problem: 'text is blue', outcome: 'text is red', nonGoals: ['icons'] },
     context: { ...base.context, entryPoints: ['src/theme.ts'] },
     risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'all text renders red',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'all text renders red' })],
     plan: {
       ...base.plan,
       units: [
-        {
-          id: 'U-1',
-          title: 'red text',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/theme.ts'],
-          verify: [],
-        },
+        builderUnit('U-1', { title: 'red text', satisfies: ['AC-1'], touches: ['src/theme.ts'] }),
       ],
     },
     ...over,
@@ -324,33 +314,47 @@ describe('an architect turn that cannot start', () => {
   })
 })
 
+interface AskingInput {
+  onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
+  onPending: (pending: Record<string, unknown>) => void
+  onResolved: (requestId: string) => void
+  onAutoDenied: (tool: string, reason: string) => void
+}
+
+/**
+ * An architect whose turn is refused an edit and then asks the operator a
+ * question; `answered` is handed the runner's resolve once the turn starts.
+ */
+function askingArchitect(answered: (resolve: (requestId: string) => void) => void) {
+  return async (input: AskingInput) => {
+    input.onRegistered({ sessionId: 'architect-1', transcriptFrom: 0 })
+    input.onAutoDenied('Edit', 'the architect proposes; it does not edit')
+    input.onPending({
+      sessionId: 'architect-1',
+      requestId: 'ask-1',
+      toolName: 'AskUserQuestion',
+      summary: 'Which shade of red?',
+      detail: null,
+      at: Date.now(),
+    })
+    answered(input.onResolved)
+    return {
+      sessionId: 'architect-1',
+      transcriptFrom: 0,
+      terminalSessionId: 't',
+      transcriptPath: '/none',
+    }
+  }
+}
+
 describe('a question the architect asks', () => {
   it('waits on the console for the operator, and is gone once answered', async () => {
     let answer: (requestId: string) => void = () => undefined
-    theRunner.start.mockImplementation((async (input: {
-      onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
-      onPending: (pending: Record<string, unknown>) => void
-      onResolved: (requestId: string) => void
-      onAutoDenied: (tool: string, reason: string) => void
-    }) => {
-      input.onRegistered({ sessionId: 'architect-1', transcriptFrom: 0 })
-      input.onAutoDenied('Edit', 'the architect proposes; it does not edit')
-      input.onPending({
-        sessionId: 'architect-1',
-        requestId: 'ask-1',
-        toolName: 'AskUserQuestion',
-        summary: 'Which shade of red?',
-        detail: null,
-        at: Date.now(),
-      })
-      answer = input.onResolved
-      return {
-        sessionId: 'architect-1',
-        transcriptFrom: 0,
-        terminalSessionId: 't',
-        transcriptPath: '/none',
-      }
-    }) as never)
+    theRunner.start.mockImplementation(
+      askingArchitect((resolve) => {
+        answer = resolve
+      }) as never
+    )
     await createOrderStore(dataDir).save(readyDraft())
     await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })
 

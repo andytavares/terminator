@@ -61,36 +61,43 @@ let openExternal: ReturnType<typeof vi.fn>
 let runCommand: ReturnType<typeof vi.fn>
 let hasCommand: ReturnType<typeof vi.fn>
 
+const ok = () => ({ ok: true })
+
+/** What each channel answers for a Floor showing `view`; `live` overrides the defaults. */
+function floorReplies(view: Record<string, unknown>, live: Record<string, unknown>) {
+  const control = () => live.control ?? ok()
+  const replies: Record<string, () => unknown> = {
+    'foundry:run.observe': () => view,
+    'foundry:permissions-list': () => ({ pending: live.pending ?? [] }),
+    'foundry:stalls-list': () => ({
+      firings: live.stalls ?? [],
+      shadowMode: live.shadowMode ?? true,
+    }),
+    'foundry:run.resume': () => live.resume ?? { started: true, reclaimed: [] },
+    'foundry:inbox.decide': () => live.decide ?? ok(),
+    'foundry:run.stop': () => live.stop ?? ok(),
+    'foundry:permission-hand-back': () => live.handBack ?? ok(),
+    'foundry:run-terminal': () => live.terminal ?? ok(),
+    'foundry:feed-list': () => ({ entries: live.feed ?? [], mutes: live.mutes ?? [] }),
+    'foundry:feed-unmute': () => ({ mutes: [] }),
+    'foundry:feed-dismiss': ok,
+    'foundry:feed-mute': ok,
+    'foundry:run-transcript': () => ({ lines: live.lines ?? [] }),
+    'foundry:permission-resolve': () => live.resolve ?? ok(),
+    'foundry:run-interrupt': control,
+    'foundry:run-stop': control,
+    'foundry:run-redirect': control,
+    'foundry:session.attach': () => live.attach ?? { terminalSessionId: 't-1' },
+  }
+  return replies
+}
+
 function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}) {
   bus = createChangeBus()
-  invoke = vi.fn(async (channel: string) => {
-    if (channel === 'foundry:run.observe') return view
-    if (channel === 'foundry:permissions-list') return { pending: live.pending ?? [] }
-    if (channel === 'foundry:stalls-list') {
-      return { firings: live.stalls ?? [], shadowMode: live.shadowMode ?? true }
-    }
-    if (channel === 'foundry:run.resume') return live.resume ?? { started: true, reclaimed: [] }
-    if (channel === 'foundry:inbox.decide') return live.decide ?? { ok: true }
-    if (channel === 'foundry:run.stop') return live.stop ?? { ok: true }
-    if (channel === 'foundry:permission-hand-back') return live.handBack ?? { ok: true }
-    if (channel === 'foundry:run-terminal') return live.terminal ?? { ok: true }
-    if (channel === 'foundry:feed-list') {
-      return { entries: live.feed ?? [], mutes: live.mutes ?? [] }
-    }
-    if (channel === 'foundry:feed-unmute') return { mutes: [] }
-    if (channel === 'foundry:feed-dismiss' || channel === 'foundry:feed-mute') return { ok: true }
-    if (channel === 'foundry:run-transcript') return { lines: live.lines ?? [] }
-    if (channel === 'foundry:permission-resolve') return live.resolve ?? { ok: true }
-    if (
-      channel === 'foundry:run-interrupt' ||
-      channel === 'foundry:run-stop' ||
-      channel === 'foundry:run-redirect'
-    ) {
-      return live.control ?? { ok: true }
-    }
-    if (channel === 'foundry:session.attach') return live.attach ?? { terminalSessionId: 't-1' }
-    return { terminalSessionId: 't-1', ok: true }
-  })
+  const replies = floorReplies(view, live)
+  invoke = vi.fn(async (channel: string) =>
+    channel in replies ? replies[channel]() : { terminalSessionId: 't-1', ok: true }
+  )
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: bus.on },
     shell: { openExternal },
@@ -126,6 +133,11 @@ beforeEach(() => {
 })
 
 describe('the refinery queue', () => {
+  describe('the position', thePositionTests)
+  describe('nothing queued', nothingQueuedTests)
+})
+
+function thePositionTests() {
   it('says the position and what it is behind, with the shared-file count', async () => {
     mount(
       reply({
@@ -151,7 +163,9 @@ describe('the refinery queue', () => {
     await waitFor(() => expect(screen.getByLabelText('Refinery queue')).toBeTruthy())
     expect(screen.getByText('Queued 1st, behind The other order (1 shared file)')).toBeTruthy()
   })
+}
 
+function nothingQueuedTests() {
   it('says nothing when it is not queued behind anything', async () => {
     mount(reply({ queue: null }))
     await waitFor(() => screen.getByText(/WO-1/))
@@ -163,9 +177,43 @@ describe('the refinery queue', () => {
     await waitFor(() => screen.getByText(/WO-1/))
     expect(screen.queryByLabelText('Refinery queue')).toBeNull()
   })
-})
+}
 
 describe('the merge order section', () => {
+  describe('lanes and shared files', lanesAndSharedFilesTests)
+  describe('holds', holdsTests)
+  describe('nothing to show', nothingToShowTests)
+})
+
+const CHECKS = [
+  {
+    name: 'lint',
+    bucket: 'pass',
+    link: 'https://github.com/x/y/actions/runs/1',
+    workflow: 'CI',
+  },
+  {
+    name: 'test',
+    bucket: 'pending',
+    link: 'https://github.com/x/y/actions/runs/2',
+    workflow: 'CI',
+  },
+]
+function watching(over: Record<string, unknown> = {}) {
+  return reply({
+    ci: {
+      round: 0,
+      max: 2,
+      status: 'watching',
+      pulls: [{ url: 'https://github.com/x/y/pull/233', checks: CHECKS }],
+      reason: '',
+      at: '2026-09-06T10:00:00.000Z',
+      ...over,
+    },
+  })
+}
+
+function lanesAndSharedFilesTests() {
   it('lists the repositories in the order they land', async () => {
     mount(reply({ lanes: TWO_LANES }))
     await waitFor(() => expect(screen.getByText('Merge order')).toBeTruthy())
@@ -186,7 +234,9 @@ describe('the merge order section', () => {
     await waitFor(() => screen.getByText('Merge order'))
     expect(screen.getAllByText(/shares proto\/session\.proto/)).toHaveLength(2)
   })
+}
 
+function holdsTests() {
   it("gives the rule's own reason for a hold, not a lane number", async () => {
     mount(reply({ lanes: TWO_LANES }))
     await waitFor(() => screen.getByText('Merge order'))
@@ -198,7 +248,9 @@ describe('the merge order section', () => {
     await waitFor(() => screen.getByText('Merge order'))
     expect(screen.getByText('free to merge')).toBeTruthy()
   })
+}
 
+function nothingToShowTests() {
   it('shows nothing at all for a single-repository order (FR-068)', async () => {
     mount(reply({ lanes: [{ ...TWO_LANES[0], collisions: [], role: null }] }))
     await waitFor(() => screen.getByText(/WO-1/))
@@ -210,9 +262,32 @@ describe('the merge order section', () => {
     await waitFor(() => screen.getByText(/WO-1/))
     expect(screen.queryByText('Merge order')).toBeNull()
   })
-})
+}
+
+/** A run whose CI is in round 1 of 3 and has decided; `over` says how. */
+function withCi(over: Record<string, unknown>) {
+  return reply({
+    ci: { round: 1, max: 3, pulls: [], reason: '', at: '2026-09-06T10:00:00.000Z', ...over },
+  })
+}
+
+const FAILED_TEST = {
+  name: 'test',
+  bucket: 'fail',
+  link: 'https://github.com/x/y/actions/runs/1',
+  workflow: 'CI',
+}
 
 describe('the CI band', () => {
+  describe('a decided run', aDecidedRunTests)
+  describe('while it is still running', () => {
+    describe('the round and spinner', theRoundAndSpinnerTests)
+    describe('checks and links', checksAndLinksTests)
+  })
+  describe('the checks', theChecksTests)
+})
+
+function aDecidedRunTests() {
   it('shows nothing when the run has no CI state', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
@@ -220,154 +295,111 @@ describe('the CI band', () => {
   })
 
   it('says a green run is green, and its round', async () => {
-    mount(
-      reply({
-        ci: {
-          round: 2,
-          max: 3,
-          status: 'green',
-          pulls: [{ url: 'https://github.com/x/y/pull/1', checks: [] }],
-          reason: '',
-          at: '2026-09-06T10:00:00.000Z',
-        },
-      })
-    )
+    const pulls = [{ url: 'https://github.com/x/y/pull/1', checks: [] }]
+    mount(withCi({ round: 2, status: 'green', pulls }))
     await waitFor(() => screen.getByText('CI'))
     expect(screen.getByText('Passed')).toBeTruthy()
     expect(document.body.textContent).not.toMatch(/Round \d of \d/)
   })
 
   it('says why CI is not measured', async () => {
-    mount(
-      reply({
-        ci: {
-          round: 1,
-          max: 3,
-          status: 'not_measured',
-          pulls: [],
-          reason: 'no checks were reported',
-          at: '2026-09-06T10:00:00.000Z',
-        },
-      })
-    )
+    mount(withCi({ status: 'not_measured', reason: 'no checks were reported' }))
     await waitFor(() => screen.getByText('CI'))
     expect(screen.getByText(/Not measured: no checks were reported/)).toBeTruthy()
   })
+}
 
-  describe('while it is still running', () => {
-    const CHECKS = [
-      {
-        name: 'lint',
-        bucket: 'pass',
-        link: 'https://github.com/x/y/actions/runs/1',
-        workflow: 'CI',
-      },
-      {
-        name: 'test',
-        bucket: 'pending',
-        link: 'https://github.com/x/y/actions/runs/2',
-        workflow: 'CI',
-      },
-    ]
-
-    function watching(over: Record<string, unknown> = {}) {
-      return reply({
-        ci: {
-          round: 0,
-          max: 2,
-          status: 'watching',
-          pulls: [{ url: 'https://github.com/x/y/pull/233', checks: CHECKS }],
-          reason: '',
-          at: '2026-09-06T10:00:00.000Z',
-          ...over,
-        },
-      })
-    }
-
-    it('says what round it is in words, and how many fixes are allowed', async () => {
-      mount(watching())
-      await waitFor(() => screen.getByText('CI'))
-      expect(screen.getByText('First run · up to 2 fixes')).toBeTruthy()
-    })
-
-    it('shows a spinner while it watches, and says what it is for', async () => {
-      mount(watching())
-      await waitFor(() => screen.getByText('CI'))
-      expect(screen.getByRole('status', { name: 'Checks are running' })).toBeTruthy()
-    })
-
-    it('keeps spinning while it sends the failures back', async () => {
-      mount(watching({ status: 'reworking', round: 1 }))
-      await waitFor(() => screen.getByText('CI'))
-      expect(screen.getByText('Fixing: round 1 of 2')).toBeTruthy()
-      expect(screen.getByRole('status', { name: 'Checks are running' })).toBeTruthy()
-    })
-
-    it('stops spinning once there is an answer', async () => {
-      mount(watching({ status: 'green' }))
-      await waitFor(() => screen.getByText('CI'))
-      expect(screen.queryByRole('status', { name: 'Checks are running' })).toBeNull()
-    })
-
-    it('counts the checks that have finished out of those that have arrived', async () => {
-      mount(watching())
-      await waitFor(() => screen.getByText('CI'))
-      expect(screen.getByText('1 of 2 checks done')).toBeTruthy()
-      expect(screen.getByText('lint')).toBeTruthy()
-      expect(screen.getByText('test')).toBeTruthy()
-    })
-
-    it('links the pull request', async () => {
-      mount(watching())
-      await waitFor(() => screen.getByText('CI'))
-      fireEvent.click(screen.getByRole('link', { name: 'Pull request #233' }))
-      expect(openExternal).toHaveBeenCalledWith('https://github.com/x/y/pull/233')
-    })
-
-    it('opens a check outside the application, with no window of its own', async () => {
-      mount(watching())
-      await waitFor(() => screen.getByText('CI'))
-      const link = screen.getByRole('link', { name: /lint/ })
-      expect(link.getAttribute('target')).toBeNull()
-      fireEvent.click(link)
-      expect(openExternal).toHaveBeenCalledWith('https://github.com/x/y/actions/runs/1')
-    })
-  })
-
+function theChecksTests() {
   it('lists each check by name, bucket and a link to it', async () => {
-    mount(
-      reply({
-        ci: {
-          round: 1,
-          max: 3,
-          status: 'red',
-          pulls: [
-            {
-              url: 'https://github.com/x/y/pull/1',
-              checks: [
-                {
-                  name: 'test',
-                  bucket: 'fail',
-                  link: 'https://github.com/x/y/actions/runs/1',
-                  workflow: 'CI',
-                },
-              ],
-            },
-          ],
-          reason: '',
-          at: '2026-09-06T10:00:00.000Z',
-        },
-      })
-    )
+    const pulls = [{ url: 'https://github.com/x/y/pull/1', checks: [FAILED_TEST] }]
+    mount(withCi({ status: 'red', pulls }))
     await waitFor(() => screen.getByText('CI'))
     expect(screen.getByText('test')).toBeTruthy()
     expect(screen.getByText('fail')).toBeTruthy()
     const link = screen.getByRole('link', { name: /test/i })
     expect(link.getAttribute('href')).toBe('https://github.com/x/y/actions/runs/1')
   })
-})
+}
+
+function theRoundAndSpinnerTests() {
+  it('says what round it is in words, and how many fixes are allowed', async () => {
+    mount(watching())
+    await waitFor(() => screen.getByText('CI'))
+    expect(screen.getByText('First run · up to 2 fixes')).toBeTruthy()
+  })
+
+  it('shows a spinner while it watches, and says what it is for', async () => {
+    mount(watching())
+    await waitFor(() => screen.getByText('CI'))
+    expect(screen.getByRole('status', { name: 'Checks are running' })).toBeTruthy()
+  })
+
+  it('keeps spinning while it sends the failures back', async () => {
+    mount(watching({ status: 'reworking', round: 1 }))
+    await waitFor(() => screen.getByText('CI'))
+    expect(screen.getByText('Fixing: round 1 of 2')).toBeTruthy()
+    expect(screen.getByRole('status', { name: 'Checks are running' })).toBeTruthy()
+  })
+
+  it('stops spinning once there is an answer', async () => {
+    mount(watching({ status: 'green' }))
+    await waitFor(() => screen.getByText('CI'))
+    expect(screen.queryByRole('status', { name: 'Checks are running' })).toBeNull()
+  })
+}
+
+function checksAndLinksTests() {
+  it('counts the checks that have finished out of those that have arrived', async () => {
+    mount(watching())
+    await waitFor(() => screen.getByText('CI'))
+    expect(screen.getByText('1 of 2 checks done')).toBeTruthy()
+    expect(screen.getByText('lint')).toBeTruthy()
+    expect(screen.getByText('test')).toBeTruthy()
+  })
+
+  it('links the pull request', async () => {
+    mount(watching())
+    await waitFor(() => screen.getByText('CI'))
+    fireEvent.click(screen.getByRole('link', { name: 'Pull request #233' }))
+    expect(openExternal).toHaveBeenCalledWith('https://github.com/x/y/pull/233')
+  })
+
+  it('opens a check outside the application, with no window of its own', async () => {
+    mount(watching())
+    await waitFor(() => screen.getByText('CI'))
+    const link = screen.getByRole('link', { name: /lint/ })
+    expect(link.getAttribute('target')).toBeNull()
+    fireEvent.click(link)
+    expect(openExternal).toHaveBeenCalledWith('https://github.com/x/y/actions/runs/1')
+  })
+}
 
 describe('the units', () => {
+  describe('row names', rowNamesTests)
+  describe('sessions and blocks', sessionsAndBlocksTests)
+})
+
+const REWORKED_NODES = NODES.map((n) =>
+  n.id === 'N-2'
+    ? {
+        ...n,
+        reworks: 2,
+        feedback: [
+          {
+            from: 'N-1',
+            attempt: 1,
+            source: 'check',
+            command: 'npm test',
+            exitCode: 1,
+            excerpt: 'FAIL: expected 2 got 3',
+            logPath: null,
+          },
+        ],
+      }
+    : n
+)
+
+function rowNamesTests() {
   it('names each row by its repository rather than by a lane number', async () => {
     mount(reply({ lanes: TWO_LANES }))
     await waitFor(() => screen.getByText('Merge order'))
@@ -381,7 +413,9 @@ describe('the units', () => {
     await waitFor(() => screen.getByText(/WO-1/))
     expect(screen.getByText('lane 1')).toBeTruthy()
   })
+}
 
+function sessionsAndBlocksTests() {
   it('offers a way into a running agent session, and only a running one', async () => {
     mount(reply({ lanes: TWO_LANES }))
     await waitFor(() => screen.getByText('Merge order'))
@@ -402,29 +436,14 @@ describe('the units', () => {
     await waitFor(() => screen.getByText('Blocked'))
     expect(screen.getByText(/N-1 has not passed/)).toBeTruthy()
   })
-})
+}
 
 describe('a rework', () => {
-  const REWORKED_NODES = NODES.map((n) =>
-    n.id === 'N-2'
-      ? {
-          ...n,
-          reworks: 2,
-          feedback: [
-            {
-              from: 'N-1',
-              attempt: 1,
-              source: 'check',
-              command: 'npm test',
-              exitCode: 1,
-              excerpt: 'FAIL: expected 2 got 3',
-              logPath: null,
-            },
-          ],
-        }
-      : n
-  )
+  describe('the rework chip', theReworkChipTests)
+  describe('the feedback disclosure', theFeedbackDisclosureTests)
+})
 
+function theReworkChipTests() {
   it('shows a chip counting how many times a node has been sent back', async () => {
     mount(reply({ graph: { orderId: 'WO-1', recipe: 'standard', nodes: REWORKED_NODES } }))
     await waitFor(() => screen.getByText(/Sent back 2×/))
@@ -435,7 +454,9 @@ describe('a rework', () => {
     await waitFor(() => expect(document.querySelector('[title="N-1"]')).toBeTruthy())
     expect(screen.queryByText(/Sent back/)).toBeNull()
   })
+}
 
+function theFeedbackDisclosureTests() {
   it('discloses each feedback entry’s command, exit status and excerpt', async () => {
     mount(reply({ graph: { orderId: 'WO-1', recipe: 'standard', nodes: REWORKED_NODES } }))
     await waitFor(() => screen.getByText('Why it was sent back'))
@@ -450,7 +471,7 @@ describe('a rework', () => {
     await waitFor(() => expect(document.querySelector('[title="N-1"]')).toBeTruthy())
     expect(screen.queryByText('Why it was sent back')).toBeNull()
   })
-})
+}
 
 describe('a node with skills', () => {
   it('shows which skills that node gets', async () => {
@@ -484,6 +505,13 @@ const ASK = {
 }
 
 describe('a held tool call', () => {
+  describe('the ask', theAskTests)
+  describe('answering and refusing', answeringAndRefusingTests)
+  describe('silent clicks and the terminal', silentClicksAndTheTerminalTests)
+  describe('nothing waiting', nothingWaitingTests)
+})
+
+function theAskTests() {
   it('shows what is being asked, and which tool is asking', async () => {
     mount(reply(), { pending: [ASK] })
     await waitFor(() => expect(screen.getByText('Waiting on you — 1')).toBeTruthy())
@@ -496,7 +524,9 @@ describe('a held tool call', () => {
     await waitFor(() => screen.getByText('Waiting on you — 1'))
     expect(screen.getByText(/file_path/)).toBeTruthy()
   })
+}
 
+function answeringAndRefusingTests() {
   it('can be answered without leaving the surface', async () => {
     mount(reply(), { pending: [ASK] })
     await waitFor(() => screen.getByText('Waiting on you — 1'))
@@ -520,7 +550,9 @@ describe('a held tool call', () => {
       })
     )
   })
+}
 
+function silentClicksAndTheTerminalTests() {
   it('says why a click did nothing, rather than looking answered', async () => {
     mount(reply(), {
       pending: [ASK],
@@ -540,13 +572,15 @@ describe('a held tool call', () => {
     )
     expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })
   })
+}
 
+function nothingWaitingTests() {
   it('shows no panel when nothing is waiting', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
     expect(screen.queryByText(/Waiting on you/)).toBeNull()
   })
-})
+}
 
 /** A transcript line as `foundry:run-transcript` returns it, not as a string. */
 function said(text: string, secondsAgo = 5) {
@@ -554,6 +588,22 @@ function said(text: string, secondsAgo = 5) {
 }
 
 describe('watching a run', () => {
+  describe('the watch panel', theWatchPanelTests)
+  describe('message lines', messageLinesTests)
+  describe('redirecting', redirectingTests)
+  describe('interrupting and stopping', interruptingAndStoppingTests)
+  describe('finished runs and no session', finishedRunsAndNoSessionTests)
+})
+
+const ENTRY = {
+  id: 'f-1',
+  at: 1,
+  sessionId: 's-1',
+  author: 'agent',
+  summary: 'edited session.ts',
+}
+
+function theWatchPanelTests() {
   it('opens no watch panel until a unit is chosen', async () => {
     mount(reply(), { lines: [said('reading src/auth/session.ts')] })
     await waitFor(() => screen.getByText(/WO-1/))
@@ -570,7 +620,9 @@ describe('watching a run', () => {
     await waitFor(() => expect(within(panel).getByText(/reading src\/auth/)).toBeTruthy())
     expect(panel.textContent).not.toContain('[object Object]')
   })
+}
 
+function messageLinesTests() {
   // One message now arrives as a line per block; the panel still prints it as
   // the single block of text it printed before.
   it('prints a message with text and tool calls exactly as it did as one line', async () => {
@@ -598,7 +650,9 @@ describe('watching a run', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Transcript' }))
     await waitFor(() => expect(screen.getByText('Nothing yet.')).toBeTruthy())
   })
+}
 
+function redirectingTests() {
   it('redirects it', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
@@ -616,7 +670,9 @@ describe('watching a run', () => {
       })
     )
   })
+}
 
+function interruptingAndStoppingTests() {
   it('interrupts it', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
@@ -641,7 +697,9 @@ describe('watching a run', () => {
       })
     )
   })
+}
 
+function finishedRunsAndNoSessionTests() {
   it('says so when the run is already over', async () => {
     mount(reply(), { control: { ok: false } })
     await waitFor(() => screen.getByText(/WO-1/))
@@ -658,17 +716,14 @@ describe('watching a run', () => {
     expect(screen.getAllByRole('button', { name: 'Transcript' })).toHaveLength(1)
     expect(screen.getAllByRole('button', { name: /^Attach to/ })).toHaveLength(1)
   })
-})
+}
 
 describe('what happened while you were away', () => {
-  const ENTRY = {
-    id: 'f-1',
-    at: 1,
-    sessionId: 's-1',
-    author: 'agent',
-    summary: 'edited session.ts',
-  }
+  describe('listing and clearing', listingAndClearingTests)
+  describe('muting and nothing', mutingAndNothingTests)
+})
 
+function listingAndClearingTests() {
   it('lists it, newest first', async () => {
     mount(reply(), { feed: [ENTRY, { ...ENTRY, id: 'f-2', summary: 'ran the tests' }] })
     await waitFor(() => expect(screen.getByText('Activity')).toBeTruthy())
@@ -684,7 +739,9 @@ describe('what happened while you were away', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:feed-dismiss', { id: 'f-1', sessionId: 's-1' })
     )
   })
+}
 
+function mutingAndNothingTests() {
   it('mutes a run that keeps interrupting, without hiding what it does', async () => {
     mount(reply(), { feed: [ENTRY] })
     await waitFor(() => screen.getByText('Activity'))
@@ -699,7 +756,7 @@ describe('what happened while you were away', () => {
     await waitFor(() => screen.getByText(/WO-1/))
     expect(screen.queryByText('Activity')).toBeNull()
   })
-})
+}
 
 describe('a mute you can find again', () => {
   it('shows what is silenced', async () => {
@@ -731,28 +788,37 @@ describe('a finished run no longer holds a new one back', () => {
   })
 })
 
-describe('work that stopped making progress', () => {
-  // The detector's own shape. `signal` is 'silence' or 'loop' and nothing else
-  // — a fixture that put a readable sentence in it meant this panel was only
-  // ever tested rendering words production could never send it, and what it
-  // actually drew was "s-1 — silence".
-  const FIRING = {
-    firing: {
-      sessionId: 's-1',
-      signal: 'silence',
-      firedAt: 1,
-      inputs: {
-        toolSilenceMs: 8 * 60_000,
-        diffSilenceMs: 8 * 60_000,
-        distinctFiles: 1,
-        netChange: 0,
-        shellInFlight: false,
-      },
+// The detector's own shape. `signal` is 'silence' or 'loop' and nothing else
+// — a fixture that put a readable sentence in it meant this panel was only
+// ever tested rendering words production could never send it, and what it
+// actually drew was "s-1 — silence".
+const FIRING = {
+  firing: {
+    sessionId: 's-1',
+    signal: 'silence',
+    firedAt: 1,
+    inputs: {
+      toolSilenceMs: 8 * 60_000,
+      diffSilenceMs: 8 * 60_000,
+      distinctFiles: 1,
+      netChange: 0,
+      shellInFlight: false,
     },
-    featureDir: '/d',
-    shadow: true,
-  }
+  },
+  featureDir: '/d',
+  shadow: true,
+}
 
+describe('work that stopped making progress', () => {
+  describe('what it shows', whatItShowsTests)
+  describe('reading and taking over', readingAndTakingOverTests)
+  describe('ending it', endingItTests)
+  describe('shadow mode and nothing stalled', shadowModeAndNothingStalledTests)
+})
+
+const LABELS = { 'N-1': 'builder · U-1 refresh the token on a 401', 'N-2': 'verifier · U-2' }
+
+function whatItShowsTests() {
   it('shows it — the failure nobody instruments looks exactly like work', async () => {
     mount(reply(), { stalls: [FIRING] })
     await waitFor(() => expect(screen.getByText(/Stopped making progress/)).toBeTruthy())
@@ -774,7 +840,9 @@ describe('work that stopped making progress', () => {
     await waitFor(() => screen.getByText(/Stopped making progress/))
     expect(screen.getByText(/round in circles/)).toBeTruthy()
   })
+}
 
+function readingAndTakingOverTests() {
   // A panel that names a stall and offers nothing is a wall. These are the
   // three things you actually do about one.
   it('offers reading what it was saying', async () => {
@@ -794,7 +862,9 @@ describe('work that stopped making progress', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })
     )
   })
+}
 
+function endingItTests() {
   it('offers ending it, which is the answer when it is not coming back', async () => {
     mount(reply(), { stalls: [FIRING] })
     await waitFor(() => screen.getByText(/Stopped making progress/))
@@ -808,7 +878,9 @@ describe('work that stopped making progress', () => {
       )
     )
   })
+}
 
+function shadowModeAndNothingStalledTests() {
   it('says when it is only recording, so a quiet list is not read as a clean run', async () => {
     mount(reply(), { stalls: [FIRING], shadowMode: true })
     await waitFor(() => screen.getByText(/Stopped making progress/))
@@ -826,11 +898,15 @@ describe('work that stopped making progress', () => {
     await waitFor(() => screen.getByText(/WO-1/))
     expect(screen.queryByText(/Stopped making progress/)).toBeNull()
   })
-})
+}
 
 describe('what a node is called on the Floor', () => {
-  const LABELS = { 'N-1': 'builder · U-1 refresh the token on a 401', 'N-2': 'verifier · U-2' }
+  describe('label and id', labelAndIdTests)
+  describe('controls and fallbacks', controlsAndFallbacksTests)
+  describe('blocked nodes', blockedNodesTests)
+})
 
+function labelAndIdTests() {
   it('shows what the node is, not the id the graph uses', async () => {
     mount(reply({ labels: LABELS }))
     await waitFor(() =>
@@ -846,7 +922,9 @@ describe('what a node is called on the Floor', () => {
     )
     expect(chip?.getAttribute('title')).toBe('N-1')
   })
+}
 
+function controlsAndFallbacksTests() {
   it('names the node in the controls that act on it', async () => {
     mount(reply({ labels: LABELS }))
     await waitFor(() =>
@@ -860,7 +938,9 @@ describe('what a node is called on the Floor', () => {
     mount(reply())
     await waitFor(() => expect(screen.getAllByText('builder').length).toBeGreaterThan(0))
   })
+}
 
+function blockedNodesTests() {
   it('names a blocked node the same way the chips do', async () => {
     mount(
       reply({
@@ -874,37 +954,30 @@ describe('what a node is called on the Floor', () => {
     expect(screen.getAllByText('verifier · U-2')).toHaveLength(2)
     expect(screen.getByText(/waiting on builder · U-1 refresh the token on a 401/)).toBeTruthy()
   })
-})
+}
+
+/** The ship gate of a direct run, which belongs to no lane. */
+const SHIP_GATE = {
+  id: 'N-9',
+  unitId: null,
+  lane: null,
+  role: null,
+  kind: 'gate',
+  state: 'waiting',
+  sessionId: null,
+  attempts: 0,
+  startedAt: null,
+  endedAt: null,
+  dependsOn: [],
+  stepId: 'ship',
+  reworks: 0,
+  feedback: [],
+}
 
 describe('the group that is not a lane', () => {
   it('says the nodes with no lane belong to the whole order', async () => {
-    mount(
-      reply({
-        graph: {
-          orderId: 'WO-1',
-          recipe: 'direct',
-          nodes: [
-            {
-              id: 'N-9',
-              unitId: null,
-              lane: null,
-              role: null,
-              kind: 'gate',
-              state: 'waiting',
-              sessionId: null,
-              attempts: 0,
-              startedAt: null,
-              endedAt: null,
-              dependsOn: [],
-              stepId: 'ship',
-              reworks: 0,
-              feedback: [],
-            },
-          ],
-        },
-        labels: { 'N-9': 'ship' },
-      })
-    )
+    const graph = { orderId: 'WO-1', recipe: 'direct', nodes: [SHIP_GATE] }
+    mount(reply({ graph, labels: { 'N-9': 'ship' } }))
     await waitFor(() => expect(screen.getByText('the whole order')).toBeTruthy())
   })
 })
@@ -935,25 +1008,34 @@ describe('the refusals a click used to swallow', () => {
   })
 })
 
-describe('a run whose agents are gone', () => {
-  // It is the standing band that says this now, rather than a second panel
-  // underneath saying the same thing in a different voice.
-  const ORPHANED = reply({
-    orphaned: ['N-1'],
-    labels: { 'N-1': 'builder · U-1 the first bit' },
-    standing: {
-      kind: 'adrift',
-      turn: 'you',
-      label: 'nothing running it',
-      headline: 'Nothing is running this',
-      detail:
-        "1 step was still working when the application last closed, and an agent's terminal does not outlive it.",
-      done: 0,
-      total: 2,
-      gateId: null,
-    },
-  })
+// It is the standing band that says this now, rather than a second panel
+// underneath saying the same thing in a different voice.
+const ORPHANED = reply({
+  orphaned: ['N-1'],
+  labels: { 'N-1': 'builder · U-1 the first bit' },
+  standing: {
+    kind: 'adrift',
+    turn: 'you',
+    label: 'nothing running it',
+    headline: 'Nothing is running this',
+    detail:
+      "1 step was still working when the application last closed, and an agent's terminal does not outlive it.",
+    done: 0,
+    total: 2,
+    gateId: null,
+  },
+})
 
+describe('a run whose agents are gone', () => {
+  describe('the band', theBandTests)
+  describe('picking up and stopping', pickingUpAndStoppingTests)
+  describe('a way out', aWayOutTests)
+  describe('starting over', startingOverTests)
+  describe('the building chip', theBuildingChipTests)
+  describe('terminals and nothing gone', terminalsAndNothingGoneTests)
+})
+
+function theBandTests() {
   it('says so at the top, across the width, before anything only there to be read', async () => {
     mount(ORPHANED)
     await waitFor(() => expect(screen.getByText(/Nothing is running this/)).toBeTruthy())
@@ -980,7 +1062,9 @@ describe('a run whose agents are gone', () => {
     await waitFor(() => screen.getByText(/Nothing is running this/))
     expect(screen.getByText(/does not outlive/)).toBeTruthy()
   })
+}
 
+function pickingUpAndStoppingTests() {
   it('picks the run back up', async () => {
     mount(ORPHANED)
     await waitFor(() => screen.getByText(/Nothing is running this/))
@@ -1002,7 +1086,9 @@ describe('a run whose agents are gone', () => {
       )
     )
   })
+}
 
+function aWayOutTests() {
   // Both order-level controls used to live inside the "nothing is running
   // this" band, so a live run — or one halted at a gate — had no way out on
   // this screen, and `order.cancel` refuses a running order and points back at
@@ -1022,7 +1108,9 @@ describe('a run whose agents are gone', () => {
     expect(screen.getByText(/destroys the checkout, the branch/)).toBeTruthy()
     expect(invoke).not.toHaveBeenCalledWith('foundry:run.reset', expect.anything())
   })
+}
 
+function startingOverTests() {
   it('starts the same order over, rather than making a fourth one for the same ask', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
@@ -1042,7 +1130,9 @@ describe('a run whose agents are gone', () => {
     fireEvent.click(screen.getByRole('button', { name: /Pick it back up/ }))
     await waitFor(() => expect(screen.getByText('No order WO-1.')).toBeTruthy())
   })
+}
 
+function theBuildingChipTests() {
   it('stops the chip claiming to be building, which the band has just denied', async () => {
     mount(ORPHANED)
     await screen.findByText(/Nothing is running this/)
@@ -1062,7 +1152,9 @@ describe('a run whose agents are gone', () => {
     expect(chip.textContent).toContain('building')
     expect(chip.className).not.toContain('is-orphaned')
   })
+}
 
+function terminalsAndNothingGoneTests() {
   it('offers no way into a terminal that is gone', async () => {
     mount(ORPHANED)
     await screen.findByText(/Nothing is running this/)
@@ -1077,7 +1169,7 @@ describe('a run whose agents are gone', () => {
     await waitFor(() => screen.getByText(/WO-1/))
     expect(screen.queryByText(/Nothing is running this/)).toBeNull()
   })
-})
+}
 
 describe('getting into a running agent’s terminal', () => {
   it('actually goes there, rather than resolving an id and dropping it', async () => {
@@ -1092,6 +1184,56 @@ describe('getting into a running agent’s terminal', () => {
   })
 })
 
+function standing(over: Record<string, unknown> = {}) {
+  return {
+    kind: 'working',
+    turn: 'foundry',
+    label: 'building 0/6',
+    headline: 'Building',
+    detail: '1 agent is working — 0 of 6 steps done.',
+    done: 0,
+    total: 6,
+    gateId: null,
+    ...over,
+  }
+}
+
+const GATE = {
+  id: 'WO-1-budget.exceeded-1',
+  rule: 'budget.exceeded',
+  orderId: 'WO-1',
+  nodeId: null,
+  summary: 'Make all text red has gone past its wall clock budget',
+  why: 'The order budgets 90 and this run is at 90.',
+  evidence: [],
+  options: [
+    { id: 'raise', label: 'Raise the budget', consequence: 'Work continues with more room.' },
+    { id: 'stop', label: 'Stop here', consequence: 'The order is cancelled and reconciled.' },
+    { id: 'hold', label: 'Hold', consequence: 'Nothing proceeds until you come back to it.' },
+  ],
+  defaultIfIgnored: 'hold',
+  deadline: null,
+  blockedUnits: 5,
+  riskGrade: 'P2',
+  raisedAt: '2026-09-09T18:12:21.514Z',
+  decision: null,
+}
+
+const RECORDED = {
+  ...GATE,
+  summary: 'Make all text red has gone past its wall clock budget',
+  why: 'The order budgets 10 minutes and this run is at 47.',
+  breach: { kind: 'wall_clock', limit: 10, actual: 47 },
+}
+function halted() {
+  mount(
+    reply({
+      standing: standing({ kind: 'halted', turn: 'you', headline: 'Halted — your move' }),
+      waiting: [RECORDED],
+    })
+  )
+}
+
 // What to do next.
 //
 // This screen used to open with an order id, a recipe name and a wall of grey
@@ -1099,41 +1241,21 @@ describe('getting into a running agent’s terminal', () => {
 // like a run mid-build, the gate holding it was named nowhere on the screen,
 // and the list that sent you here said the same order was "ready to hand off".
 describe('the standing band', () => {
-  function standing(over: Record<string, unknown> = {}) {
-    return {
-      kind: 'working',
-      turn: 'foundry',
-      label: 'building 0/6',
-      headline: 'Building',
-      detail: '1 agent is working — 0 of 6 steps done.',
-      done: 0,
-      total: 6,
-      gateId: null,
-      ...over,
-    }
-  }
+  describe('the headline', theHeadlineTests)
+  describe('the live band', theLiveBandTests)
+  describe('progress and the gate', progressAndTheGateTests)
+  describe('answering the gate', answeringTheGateTests)
+  describe('raising the budget it stopped at', raisingTheBudgetItStoppedAtTests)
+  describe('options and whose move', optionsAndWhoseMoveTests)
+  describe('refetching', refetchingTests)
+  describe('reading transcripts', readingTranscriptsTests)
+  describe('live state', liveStateTests)
+  describe('handed back terminals', handedBackTerminalsTests)
+  describe('no standing', noStandingTests)
+  describe('trying again', tryingAgainTests)
+})
 
-  const GATE = {
-    id: 'WO-1-budget.exceeded-1',
-    rule: 'budget.exceeded',
-    orderId: 'WO-1',
-    nodeId: null,
-    summary: 'Make all text red has gone past its wall clock budget',
-    why: 'The order budgets 90 and this run is at 90.',
-    evidence: [],
-    options: [
-      { id: 'raise', label: 'Raise the budget', consequence: 'Work continues with more room.' },
-      { id: 'stop', label: 'Stop here', consequence: 'The order is cancelled and reconciled.' },
-      { id: 'hold', label: 'Hold', consequence: 'Nothing proceeds until you come back to it.' },
-    ],
-    defaultIfIgnored: 'hold',
-    deadline: null,
-    blockedUnits: 5,
-    riskGrade: 'P2',
-    raisedAt: '2026-09-09T18:12:21.514Z',
-    decision: null,
-  }
-
+function theHeadlineTests() {
   it('opens with where the run stands and what the order is called', async () => {
     mount(reply({ standing: standing(), title: 'Make all text in the application red' }))
     await waitFor(() => expect(screen.getByText('Building')).toBeTruthy())
@@ -1157,7 +1279,9 @@ describe('the standing band', () => {
       expect.objectContaining({ sessionId: 's-1' })
     )
   })
+}
 
+function theLiveBandTests() {
   it('shows one row per message in the live band, the first line of it', async () => {
     const at = Date.now() - 3000
     mount(reply({ standing: standing() }), {
@@ -1188,7 +1312,9 @@ describe('the standing band', () => {
       .map((c) => (c[1] as { sessionId: string }).sessionId)
     expect(new Set(asked)).toEqual(new Set(['s-1']))
   })
+}
 
+function progressAndTheGateTests() {
   it('says how far along the run is', async () => {
     mount(reply({ standing: standing({ done: 2, total: 6 }) }))
     await waitFor(() => expect(screen.getByText('2 of 6')).toBeTruthy())
@@ -1213,7 +1339,9 @@ describe('the standing band', () => {
       expect(screen.getByRole('button', { name: new RegExp(option.label) })).toBeTruthy()
     }
   })
+}
 
+function answeringTheGateTests() {
   it('answers the gate through the same channel the inbox answers it with', async () => {
     mount(
       reply({
@@ -1230,78 +1358,15 @@ describe('the standing band', () => {
       })
     )
   })
+}
 
-  // "Raise the budget" resumed with the same budget and stopped again. A gate
-  // that knows which budget it stopped at asks for the new limit first.
-  describe('raising the budget it stopped at', () => {
-    const RECORDED = {
-      ...GATE,
-      summary: 'Make all text red has gone past its wall clock budget',
-      why: 'The order budgets 10 minutes and this run is at 47.',
-      breach: { kind: 'wall_clock', limit: 10, actual: 47 },
-    }
+function raisingTheBudgetItStoppedAtTests() {
+  describe('asking for a limit', askingForALimitTests)
 
-    function halted() {
-      mount(
-        reply({
-          standing: standing({ kind: 'halted', turn: 'you', headline: 'Halted — your move' }),
-          waiting: [RECORDED],
-        })
-      )
-    }
+  describe('no limit and cancel', noLimitAndCancelTests)
+}
 
-    it('asks for the new limit instead of deciding', async () => {
-      halted()
-      await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
-      fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
-      const field = screen.getByRole('spinbutton', { name: 'Minutes' }) as HTMLInputElement
-      expect(Number(field.value)).toBeGreaterThanOrEqual(47)
-      expect(screen.getByText('At least 47.')).toBeTruthy()
-      expect(invoke).not.toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
-    })
-
-    it('sends the limit the operator chose with the decision', async () => {
-      halted()
-      await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
-      fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
-      fireEvent.change(screen.getByRole('spinbutton', { name: 'Minutes' }), {
-        target: { value: '80' },
-      })
-      fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
-      await waitFor(() =>
-        expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
-          gateId: RECORDED.id,
-          option: 'raise',
-          limit: 80,
-        })
-      )
-    })
-
-    it('sends no limit', async () => {
-      halted()
-      await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
-      fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
-      fireEvent.click(screen.getByRole('checkbox', { name: 'No limit on minutes' }))
-      fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
-      await waitFor(() =>
-        expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
-          gateId: RECORDED.id,
-          option: 'raise',
-          limit: null,
-        })
-      )
-    })
-
-    it('goes back to the options on cancel', async () => {
-      halted()
-      await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
-      fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-      expect(screen.queryByRole('spinbutton', { name: 'Minutes' })).toBeNull()
-      expect(screen.getByRole('button', { name: /Stop here/ })).toBeTruthy()
-    })
-  })
-
+function optionsAndWhoseMoveTests() {
   it('says what happens to each option, and what happens if you do nothing', async () => {
     mount(
       reply({
@@ -1325,7 +1390,9 @@ describe('the standing band', () => {
     await waitFor(() => expect(screen.getByText('Building')).toBeTruthy())
     expect(document.querySelector('.fdry-standing.is-yours')).toBeNull()
   })
+}
 
+function refetchingTests() {
   // The graph half of this screen was fetched once, on mount, and never again
   // — so a state chip was a snapshot of whenever the panel happened to open.
   it('refetches the graph when Foundry says this order changed, and not for another', async () => {
@@ -1344,7 +1411,9 @@ describe('the standing band', () => {
     expect(observed()).toBe(before + 1)
     vi.useRealTimers()
   })
+}
 
+function readingTranscriptsTests() {
   // What the agents are saying is written by their own processes, so it is the
   // one thing still asked for on a timer.
   it('keeps reading what the agents are saying, and stops while hidden', async () => {
@@ -1365,7 +1434,9 @@ describe('the standing band', () => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
     vi.useRealTimers()
   })
+}
 
+function liveStateTests() {
   it('reads the feed and the stalls when Foundry says live state changed, not on a timer', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     mount(reply({ standing: standing() }))
@@ -1380,7 +1451,9 @@ describe('the standing band', () => {
     expect(feedReads()).toBe(2)
     vi.useRealTimers()
   })
+}
 
+function handedBackTerminalsTests() {
   // The failure the whole band came out of: a tool call nobody answered was
   // handed back to the terminal's own prompt, the agent stopped there, and the
   // screen went on drawing a working build over it for two hours.
@@ -1405,7 +1478,9 @@ describe('the standing band', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })
     )
   })
+}
 
+function noStandingTests() {
   // A host part way through an upgrade answers without one. The panel has to
   // render the run anyway rather than blank.
   it('renders the run when the host sends no standing', async () => {
@@ -1413,7 +1488,9 @@ describe('the standing band', () => {
     await waitFor(() => expect(screen.getByText('Stop the run')).toBeTruthy())
     expect(document.querySelector('.fdry-standing')).toBeNull()
   })
+}
 
+function tryingAgainTests() {
   // Every step passed and the run still never opened its pull request — the
   // one move left is to have Foundry check the work again and try.
   it('offers to try again when a finished run never shipped', async () => {
@@ -1443,11 +1520,71 @@ describe('the standing band', () => {
     await waitFor(() => expect(screen.getByText('Building')).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
   })
-})
+}
+
+function askingForALimitTests() {
+  it('asks for the new limit instead of deciding', async () => {
+    halted()
+    await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
+    const field = screen.getByRole('spinbutton', { name: 'Minutes' }) as HTMLInputElement
+    expect(Number(field.value)).toBeGreaterThanOrEqual(47)
+    expect(screen.getByText('At least 47.')).toBeTruthy()
+    expect(invoke).not.toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
+  })
+
+  it('sends the limit the operator chose with the decision', async () => {
+    halted()
+    await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Minutes' }), {
+      target: { value: '80' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
+        gateId: RECORDED.id,
+        option: 'raise',
+        limit: 80,
+      })
+    )
+  })
+}
+
+function noLimitAndCancelTests() {
+  it('sends no limit', async () => {
+    halted()
+    await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'No limit on minutes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
+        gateId: RECORDED.id,
+        option: 'raise',
+        limit: null,
+      })
+    )
+  })
+
+  it('goes back to the options on cancel', async () => {
+    halted()
+    await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('spinbutton', { name: 'Minutes' })).toBeNull()
+    expect(screen.getByRole('button', { name: /Stop here/ })).toBeTruthy()
+  })
+}
 
 // An agent's own words are markdown and shown as markdown; a command it wants
 // to run is shown literally, because rendering it would eat its `*`s.
 describe('agent text on the Floor', () => {
+  describe('questions', questionsTests)
+  describe('commands and activity', commandsAndActivityTests)
+})
+
+function questionsTests() {
   it("renders an agent's question as markdown", async () => {
     mount(reply(), {
       pending: [
@@ -1463,7 +1600,9 @@ describe('agent text on the Floor', () => {
     expect(screen.getByText('done').tagName).toBe('STRONG')
     expect(screen.getByText('Grey').tagName).toBe('LI')
   })
+}
 
+function commandsAndActivityTests() {
   it('keeps a command literal', async () => {
     mount(reply(), {
       pending: [{ ...ASK, toolName: 'Bash', detail: 'rm **/*.tmp' }],
@@ -1479,7 +1618,7 @@ describe('agent text on the Floor', () => {
     await waitFor(() => screen.getByText('a.ts'))
     expect(screen.getByText('a.ts').tagName).toBe('CODE')
   })
-})
+}
 
 const PULL = {
   repo: 'proto',
@@ -1515,6 +1654,12 @@ describe('where the order lives', () => {
 })
 
 describe('reviewing the pull request', () => {
+  describe('the review', theReviewTests)
+  describe('labels and refusals', labelsAndRefusalsTests)
+  describe('several pulls and no per-hunk review', severalPullsAndNoPerHunkReviewTests)
+})
+
+function theReviewTests() {
   const COMMAND = 'terminator.git-integration.command.review-pull-request'
 
   it('hands the pull request to the git extension’s review, against the lane checkout', async () => {
@@ -1534,7 +1679,9 @@ describe('reviewing the pull request', () => {
     await waitFor(() => expect(openExternal).toHaveBeenCalledWith(PULL.url))
     expect(await screen.findByRole('button', { name: 'Open on GitHub' })).toBeTruthy()
   })
+}
 
+function labelsAndRefusalsTests() {
   it('says Open on GitHub from the start when the review is not there', async () => {
     hasCommand.mockResolvedValue(false)
     mount(reply({ pulls: [PULL] }))
@@ -1550,7 +1697,9 @@ describe('reviewing the pull request', () => {
     expect(await screen.findByText(/invalid-args: number/)).toBeTruthy()
     expect(openExternal).not.toHaveBeenCalled()
   })
+}
 
+function severalPullsAndNoPerHunkReviewTests() {
   it('names the pull request on each button when there is more than one', async () => {
     mount(reply({ pulls: [PULL, { ...PULL, repo: 'cli', number: 41, url: 'https://x/pull/41' }] }))
     expect(await screen.findByRole('button', { name: 'Review #233' })).toBeTruthy()
@@ -1563,43 +1712,39 @@ describe('reviewing the pull request', () => {
     expect(screen.queryByText(/To review/)).toBeNull()
     expect(invoke.mock.calls.some((c) => String(c[0]).startsWith('foundry:review-'))).toBe(false)
   })
-})
+}
+
+const READY_GATE = {
+  id: 'G-1',
+  rule: 'ready-for-review',
+  orderId: 'WO-1',
+  nodeId: null,
+  summary: 'Ready for you to look at',
+  why: 'Every step passed.',
+  evidence: [],
+  options: [{ id: 'approve', label: 'Approve', consequence: 'It ships.' }],
+  defaultIfIgnored: 'hold',
+  deadline: null,
+  blockedUnits: 0,
+  riskGrade: 'P2',
+  raisedAt: '2026-09-09T18:12:21.514Z',
+  decision: null,
+}
+
+const HALTED_AT_G1 = {
+  kind: 'halted',
+  turn: 'you',
+  label: 'x',
+  headline: 'Halted — your move',
+  detail: 'd',
+  done: 0,
+  total: 0,
+  gateId: 'G-1',
+}
 
 describe('a gate on the Floor', () => {
   it('links the pull request and the ticket on its line', async () => {
-    const gate = {
-      id: 'G-1',
-      rule: 'ready-for-review',
-      orderId: 'WO-1',
-      nodeId: null,
-      summary: 'Ready for you to look at',
-      why: 'Every step passed.',
-      evidence: [],
-      options: [{ id: 'approve', label: 'Approve', consequence: 'It ships.' }],
-      defaultIfIgnored: 'hold',
-      deadline: null,
-      blockedUnits: 0,
-      riskGrade: 'P2',
-      raisedAt: '2026-09-09T18:12:21.514Z',
-      decision: null,
-    }
-    mount(
-      reply({
-        pulls: [PULL],
-        source: TICKET,
-        waiting: [gate],
-        standing: {
-          kind: 'halted',
-          turn: 'you',
-          label: 'x',
-          headline: 'Halted — your move',
-          detail: 'd',
-          done: 0,
-          total: 0,
-          gateId: 'G-1',
-        },
-      })
-    )
+    mount(reply({ pulls: [PULL], source: TICKET, waiting: [READY_GATE], standing: HALTED_AT_G1 }))
     await screen.findByText('Ready for you to look at')
     const line = screen
       .getByText('Ready for you to look at')
@@ -1611,15 +1756,22 @@ describe('a gate on the Floor', () => {
   })
 })
 
+function node(over: Record<string, unknown>) {
+  return { ...NODES[0], ...over }
+}
+function chipOf(label: string): HTMLElement {
+  return screen.getAllByText(label)[0].closest('.fdry-unit') as HTMLElement
+}
+
 describe('the step chips', () => {
-  function node(over: Record<string, unknown>) {
-    return { ...NODES[0], ...over }
-  }
+  describe('done', doneTests)
+  describe('skipped steps', skippedStepsTests)
+  describe('tooltips and the terminal', tooltipsAndTheTerminalTests)
+  describe('the transcript', theTranscriptTests)
+  describe('refusals beside the step', refusalsBesideTheStepTests)
+})
 
-  function chipOf(label: string): HTMLElement {
-    return screen.getAllByText(label)[0].closest('.fdry-unit') as HTMLElement
-  }
-
+function doneTests() {
   it('reads done for a step that passed, whatever the step was', async () => {
     mount(
       reply({
@@ -1634,7 +1786,9 @@ describe('the step chips', () => {
     expect(chipOf('scout').textContent).toContain('done')
     expect(document.body.textContent).not.toContain('verified')
   })
+}
 
+function skippedStepsTests() {
   it('says why a skipped step was skipped, as a tooltip and as a description', async () => {
     const reason = 'runs only when risk triggers fire; this order has none'
     mount(
@@ -1661,7 +1815,9 @@ describe('the step chips', () => {
     expect(described).not.toBeNull()
     expect(document.getElementById(described as string)?.textContent).toBe(`Skipped: ${reason}`)
   })
+}
 
+function tooltipsAndTheTerminalTests() {
   it('keeps the id as the tooltip for a step that was not skipped', async () => {
     mount(reply())
     await waitFor(() => screen.getAllByText('builder'))
@@ -1684,7 +1840,9 @@ describe('the step chips', () => {
     // What it said is still there to read.
     expect(screen.getByRole('button', { name: 'Transcript' })).toBeTruthy()
   })
+}
 
+function theTranscriptTests() {
   it('opens the transcript directly under the row of the step it belongs to', async () => {
     mount(
       reply({
@@ -1704,7 +1862,9 @@ describe('the step chips', () => {
     expect(panel.closest('.fdry-lane')).toBe(chipOf('verifier').closest('.fdry-lane'))
     expect(chipOf('builder').closest('.fdry-lane')?.contains(panel)).toBe(false)
   })
+}
 
+function refusalsBesideTheStepTests() {
   it('shows an attach refusal beside the step that caused it, not at the foot', async () => {
     mount(reply(), { attach: { error: 'builder finished at 09:41; its agent has closed.' } })
     await waitFor(() => screen.getAllByText('builder'))
@@ -1722,4 +1882,4 @@ describe('the step chips', () => {
     const message = await screen.findByText('That agent is no longer in a terminal.')
     expect(chipOf('builder').nextElementSibling).toBe(message)
   })
-})
+}

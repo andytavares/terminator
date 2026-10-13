@@ -34,7 +34,8 @@ export function createRecordingPaint(): RecordingPaint {
     calls,
     fillStyle: '#000',
     globalCompositeOperation: 'source-over',
-    fillRect(x, y, w, h) {
+    // The canvas signature, taken as one tuple: x, y, width, height.
+    fillRect(...[x, y, w, h]: [number, number, number, number]) {
       calls.push({ op: 'fillRect', x, y, w, h, style: paint.fillStyle })
     },
     createRadialGradient() {

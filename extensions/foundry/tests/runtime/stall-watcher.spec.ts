@@ -101,6 +101,31 @@ describe('reading what a run has been doing', () => {
 })
 
 describe('what the watcher fires on', () => {
+  describe('firing', firingTests)
+  describe('long commands and waiting runs', longCommandsAndWaitingRunsTests)
+  describe('runs that did nothing', runsThatDidNothingTests)
+  describe('once per run', oncePerRunTests)
+  describe('afresh', afreshTests)
+  describe('every run and the numbers', everyRunAndTheNumbersTests)
+})
+
+const INTERVAL_MS = 1_000
+/** A watcher on a fake clock that counts how often it looks at the runs. */
+function counted() {
+  let looks = 0
+  const watcher = createStallWatcher({
+    runs: () => {
+      looks++
+      return []
+    },
+    onFiring: () => undefined,
+    now: () => 0,
+    intervalMs: INTERVAL_MS,
+  })
+  return { watcher, looks: () => looks }
+}
+
+function firingTests() {
   it('fires when a run has gone quiet past the threshold', () => {
     const path = transcript([{ tool: 'Read', callId: 'a', at: 0 }])
     const { fired } = watch([run({ transcriptPath: path })], 9 * MIN)
@@ -118,7 +143,9 @@ describe('what the watcher fires on', () => {
     const path = transcript([{ tool: 'Read', callId: 'a', at: 0 }])
     expect(watch([run({ transcriptPath: path })], 7 * MIN).fired).toEqual([])
   })
+}
 
+function longCommandsAndWaitingRunsTests() {
   it('does NOT fire while a shell command has been running for twelve minutes', () => {
     // The exemption, and the gate on shipping this at all: a run blocked inside
     // one long command it started is working, not stuck. Without this every test
@@ -141,7 +168,9 @@ describe('what the watcher fires on', () => {
     const path = transcript([{ tool: 'Read', callId: 'a', at: 0 }])
     expect(watch([run({ transcriptPath: path, isWaiting: true })], 9 * MIN).fired).toEqual([])
   })
+}
 
+function runsThatDidNothingTests() {
   it('measures a run that has done nothing yet from when it started', () => {
     // Not from the epoch — that reported fifty-six years of silence and stalled
     // every run the instant it began.
@@ -152,7 +181,9 @@ describe('what the watcher fires on', () => {
   it('fires on a run that has still called nothing well after starting', () => {
     expect(watch([run({ startedAt: 0 })], 9 * MIN).fired).toHaveLength(1)
   })
+}
 
+function oncePerRunTests() {
   it('fires once per run, not on every tick', () => {
     // A detector that reports the same stall every thirty seconds is one you
     // mute, and muting it loses the next real one.
@@ -169,7 +200,9 @@ describe('what the watcher fires on', () => {
     watcher.tick()
     expect(fired).toHaveLength(1)
   })
+}
 
+function afreshTests() {
   it('can fire again for a run that ended and started afresh', () => {
     const path = transcript([{ tool: 'Read', callId: 'a', at: 0 }])
     let runs = [run({ transcriptPath: path })]
@@ -186,7 +219,9 @@ describe('what the watcher fires on', () => {
     watcher.tick()
     expect(fired).toHaveLength(2)
   })
+}
 
+function everyRunAndTheNumbersTests() {
   it('looks at every run, not only the first', () => {
     const path = transcript([{ tool: 'Read', callId: 'a', at: 0 }])
     const { fired } = watch(
@@ -205,29 +240,16 @@ describe('what the watcher fires on', () => {
     expect(fired[0].firing.inputs.toolSilenceMs).toBe(9 * MIN)
     expect(fired[0].firing.inputs.shellInFlight).toBe(false)
   })
-})
+}
 
 describe('starting and stopping', () => {
-  const INTERVAL_MS = 1_000
-
-  /** A watcher on a fake clock that counts how often it looks at the runs. */
-  function counted() {
-    let looks = 0
-    const watcher = createStallWatcher({
-      runs: () => {
-        looks++
-        return []
-      },
-      onFiring: () => undefined,
-      now: () => 0,
-      intervalMs: INTERVAL_MS,
-    })
-    return { watcher, looks: () => looks }
-  }
-
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
+  describe('the timer', theTimerTests)
+})
+
+function theTimerTests() {
   it('looks at the runs once every interval after it starts', () => {
     const { watcher, looks } = counted()
     watcher.start()
@@ -254,7 +276,7 @@ describe('starting and stopping', () => {
     watcher.stop()
     expect(looks()).toBe(3)
   })
-})
+}
 
 describe('the facts the loop signal is made of', () => {
   // `recentToolPaths` was hardcoded empty and `recentNetChange` hardcoded to 1,

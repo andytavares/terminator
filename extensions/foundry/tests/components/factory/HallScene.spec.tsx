@@ -53,10 +53,27 @@ function fakeContext2D(fillRectSpy: ReturnType<typeof vi.fn>) {
   }
 }
 
+const standAt = (tile: { x: number; y: number }, over: Partial<Crew> = {}): Crew => ({
+  nodeId: 'N-1',
+  role: null,
+  x: tile.x * 16 + 8,
+  y: tile.y * 16 + 12,
+  facing: 'down',
+  anim: 'reach',
+  path: [],
+  goal: null,
+  then: 'idle',
+  present: true,
+  restSeat: null,
+  settle: null,
+  ...over,
+})
+
+let fillRectSpy: ReturnType<typeof vi.fn>
+let rafSpy: ReturnType<typeof vi.fn>
+let cancelSpy: ReturnType<typeof vi.fn>
+
 describe('components/factory/HallScene', () => {
-  let fillRectSpy: ReturnType<typeof vi.fn>
-  let rafSpy: ReturnType<typeof vi.fn>
-  let cancelSpy: ReturnType<typeof vi.fn>
   let nextRafId: number
 
   beforeEach(() => {
@@ -77,6 +94,17 @@ describe('components/factory/HallScene', () => {
     vi.unstubAllGlobals()
   })
 
+  describe('the frame loop', theFrameLoopTests)
+  describe('drawing', drawingTests)
+  describe('drawOrderY', draworderyTests)
+
+  describe('sceneActivity', () => {
+    describe('tools', toolsTests)
+    describe('fixtures', fixturesTests)
+  })
+})
+
+function theFrameLoopTests() {
   it('starts one rAF loop on mount and cancels it on unmount', () => {
     const map = fakeMap()
     const worldRef = { current: fakeWorld(map) }
@@ -112,7 +140,9 @@ describe('components/factory/HallScene', () => {
 
     expect(cancelSpy).toHaveBeenCalledTimes(1)
   })
+}
 
+function drawingTests() {
   it('draws the bake and the frame at least once on mount', () => {
     const map = fakeMap()
     const worldRef = { current: fakeWorld(map) }
@@ -141,81 +171,69 @@ describe('components/factory/HallScene', () => {
     expect(canvas?.width).toBe(map.width * 16)
     expect(canvas?.height).toBe(map.height * 16)
   })
+}
 
-  describe('drawOrderY', () => {
-    const roomRow = 19
-    const room: HallProp = {
-      id: 'room-partition',
-      kind: 'partition',
-      x: 7,
-      y: roomRow,
-      w: 15,
-      h: 5,
-      solid: false,
-      nodeId: null,
-      seat: null,
-      sign: null,
+function draworderyTests() {
+  const roomRow = 19
+
+  const room: HallProp = {
+    id: 'room-partition',
+    kind: 'partition',
+    x: 7,
+    y: roomRow,
+    w: 15,
+    h: 5,
+    solid: false,
+    nodeId: null,
+    seat: null,
+    sign: null,
+  }
+
+  const standingOn = (row: number): number => row * 16 + 12
+
+  it('sorts the breakroom partition by its wall row, so crew on the room first row draw over it', () => {
+    expect(drawOrderY(room)).toBeLessThan(standingOn(roomRow + 1))
+    expect(drawOrderY(room)).toBeGreaterThan(standingOn(roomRow - 1))
+  })
+
+  it('sorts other props by their floor edge, and seating furniture by its top', () => {
+    expect(drawOrderY({ ...room, kind: 'desk', y: 5, h: 2 })).toBe(7 * 16)
+    expect(drawOrderY({ ...room, kind: 'sofa', y: 5, h: 2 })).toBe(5 * 16)
+  })
+}
+
+function toolsTests() {
+  it('keeps the newest open tool per station and passes the verdicts through', () => {
+    const map = fakeMap()
+    const verdicts = [{ nodeId: 'N-2', pass: false, at: 40 }]
+    const world: World = {
+      ...fakeWorld(map),
+      verdicts,
+      openCalls: [
+        { nodeId: 'N-1', prop: 'archive', callId: 'a', at: 10 },
+        { nodeId: 'N-1', prop: 'rack', callId: 'b', at: 30 },
+        { nodeId: 'N-1', prop: 'desk', callId: 'c', at: 20 },
+        { nodeId: 'N-2', prop: 'archive', callId: 'd', at: 5 },
+      ],
     }
-    const standingOn = (row: number): number => row * 16 + 12
-
-    it('sorts the breakroom partition by its wall row, so crew on the room first row draw over it', () => {
-      expect(drawOrderY(room)).toBeLessThan(standingOn(roomRow + 1))
-      expect(drawOrderY(room)).toBeGreaterThan(standingOn(roomRow - 1))
-    })
-
-    it('sorts other props by their floor edge, and seating furniture by its top', () => {
-      expect(drawOrderY({ ...room, kind: 'desk', y: 5, h: 2 })).toBe(7 * 16)
-      expect(drawOrderY({ ...room, kind: 'sofa', y: 5, h: 2 })).toBe(5 * 16)
-    })
+    const activity = sceneActivity(world)
+    expect(activity.tools).toEqual({ 'N-1': 'rack', 'N-2': 'archive' })
+    expect(activity.verdicts).toBe(verdicts)
   })
+}
 
-  describe('sceneActivity', () => {
-    const standAt = (tile: { x: number; y: number }, over: Partial<Crew> = {}): Crew => ({
-      nodeId: 'N-1',
-      role: null,
-      x: tile.x * 16 + 8,
-      y: tile.y * 16 + 12,
-      facing: 'down',
-      anim: 'reach',
-      path: [],
-      goal: null,
-      then: 'idle',
-      present: true,
-      restSeat: null,
-      settle: null,
-      ...over,
-    })
-
-    it('keeps the newest open tool per station and passes the verdicts through', () => {
-      const map = fakeMap()
-      const verdicts = [{ nodeId: 'N-2', pass: false, at: 40 }]
-      const world: World = {
-        ...fakeWorld(map),
-        verdicts,
-        openCalls: [
-          { nodeId: 'N-1', prop: 'archive', callId: 'a', at: 10 },
-          { nodeId: 'N-1', prop: 'rack', callId: 'b', at: 30 },
-          { nodeId: 'N-1', prop: 'desk', callId: 'c', at: 20 },
-          { nodeId: 'N-2', prop: 'archive', callId: 'd', at: 5 },
-        ],
-      }
-      const activity = sceneActivity(world)
-      expect(activity.tools).toEqual({ 'N-1': 'rack', 'N-2': 'archive' })
-      expect(activity.verdicts).toBe(verdicts)
-    })
-
-    it('reports a fixture only for a present crew member reaching at it', () => {
-      const map = fakeMap()
-      const { archive, rack } = map.anchors
-      const crew = [
-        standAt(archive),
-        standAt(rack, { present: false }),
-        standAt(rack, { goal: { x: 2, y: 2 } }),
-        standAt({ x: 4, y: 4 }),
-        standAt(rack, { anim: 'type' }),
-      ]
-      expect(sceneActivity({ ...fakeWorld(map), crew }).reaching).toEqual(['archive'])
-      expect(sceneActivity({ ...fakeWorld(map), crew: [standAt(rack)] }).reaching).toEqual(['rack'])
-    })
+function fixturesTests() {
+  it('reports a fixture only for a present crew member reaching at it', () => {
+    const map = fakeMap()
+    const { archive, rack } = map.anchors
+    const crew = [
+      standAt(archive),
+      standAt(rack, { present: false }),
+      standAt(rack, { goal: { x: 2, y: 2 } }),
+      standAt({ x: 4, y: 4 }),
+      standAt(rack, { anim: 'type' }),
+    ]
+    expect(sceneActivity({ ...fakeWorld(map), crew }).reaching).toEqual(['archive'])
+    expect(sceneActivity({ ...fakeWorld(map), crew: [standAt(rack)] }).reaching).toEqual(['rack'])
   })
-})
+}

@@ -21,6 +21,8 @@ import { stepFacts } from '../../factory/step-facts.js'
 import type { FactoryEvent, Observation } from '../../factory/events.js'
 import { direct } from '../../factory/director.js'
 import { createLiveHall, statesOf } from '../../factory/live-hall.js'
+import type { LiveHall } from '../../factory/live-hall.js'
+import type { CiState } from '../../line/ci-state.js'
 import { createBeats, release, schedule } from '../../factory/beats.js'
 import type { Beats } from '../../factory/beats.js'
 import {
@@ -42,6 +44,7 @@ import type { NodeState, RunGraph } from '../../line/run-graph.js'
 import type { ToolActivity } from '../../runtime/transcript-tailer.js'
 import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
 import { openInBrowser } from '../ExternalLink.js'
+import { attachTo } from '../../renderer/attach-to-step.js'
 import { GateCard } from '../GateCard.js'
 import { OrderLinks } from '../OrderLinks.js'
 import { Markdown, usePolling, everyWhileVisible } from '@terminator/extension-ui'
@@ -149,56 +152,113 @@ function stationStyle(map: HallMap, prop: HallProp): React.CSSProperties {
 }
 
 export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps): JSX.Element {
-  const { view, problem, pending, refresh } = useRunObservation(orderId)
-  const [activity, setActivity] = useState<Readonly<Record<string, readonly ToolActivity[]>>>({})
-  const [orderMetrics, setOrderMetrics] = useState<OrderMetrics | null>(null)
-  const [callouts, setCallouts] = useState<readonly Callout[]>([])
-  const [calloutLift, setCalloutLift] = useState<Readonly<Record<string, number>>>({})
+  // The overlay the callouts are measured in. Held here, apart from the rest
+  // of the hall, so that what the parts draw from is never a ref.
   const overlayRef = useRef<HTMLDivElement | null>(null)
-  const [spoken, setSpoken] = useState('')
-  const [selected, setSelected] = useState<string | null>(null)
-  const [transcript, setTranscript] = useState<TranscriptLine[]>([])
-  const [attachProblem, setAttachProblem] = useState<string | null>(null)
-  const [answerProblem, setAnswerProblem] = useState<Readonly<Record<string, string>>>({})
-  const [busy, setBusy] = useState<string | null>(null)
+  const hall = useFactoryHall(orderId, overlayRef)
+  const { view, problem } = hall.observed
+  const map = hall.live.map
+  if (problem !== null && view === null) return <p className="fdry-note">{problem}</p>
+  if (view === null || map === null) {
+    return <div className="fdry-empty">Loading the hall{'…'}</div>
+  }
+  const model = hallModel(hall, { view, map })
+  return (
+    <HallStage hall={hall} model={model} nav={{ onBack, onOpenInList }} overlayRef={overlayRef} />
+  )
+}
+
+type Activity = Readonly<Record<string, readonly ToolActivity[]>>
+type Labels = Readonly<Record<string, string>>
+
+/** Everything the hall keeps, with its hooks and effects in the order they ran. */
+function useFactoryHall(orderId: string, overlayRef: OverlayRef) {
+  const observed = useRunObservation(orderId)
+  const [activity, setActivity] = useState<Activity>({})
+  const rp = useReplayState()
+  const { liveHall, live } = useLiveStore()
+  const orderMetrics = useOrderMetrics(orderId)
+  const talk = useCallouts()
+  useLiveFeed(liveHall, {
+    view: observed.view,
+    activity,
+    announce: talk.announce,
+    replayRef: rp.refs.replayRef,
+  })
+  const replay = useReplay(orderId, { labels: observed.view?.labels, talk, refs: rp.refs })
+  usePlayback(rp.replay?.playing ?? false, { moveReplay: replay.moveReplay, refs: rp.refs })
+  const shownCi = (rp.replay === null ? observed.view?.ci : rp.replay.observation.ci) ?? null
+  const liveMap = rp.replay?.map ?? live.map
+  const layout = useCalloutLayout({ liveMap, shownCi, talk, overlayRef })
+  const station = useStation(orderId, { view: observed.view, setActivity })
+  const answers = useAnswers(observed.refresh)
+  const parts = { orderId, observed, rp, liveHall, live, orderMetrics, talk, replay }
+  return { ...parts, shownCi, layout, station, answers }
+}
+
+type Hall = ReturnType<typeof useFactoryHall>
+
+/**
+ * The replay on show, what it last said, and the refs its own world lives in,
+ * beside the live one: live polling carries on underneath a replay, so leaving
+ * it lands back on the run as it is now. `refs` keeps one identity for the
+ * life of the hall.
+ */
+function useReplayState() {
   const [replay, setReplay] = useState<Replay | null>(null)
   const [replayNote, setReplayNote] = useState<string | null>(null)
-  // The replay's own world, beside the live one: live polling carries on
-  // underneath a replay, so leaving it lands back on the run as it is now.
   const replayRef = useRef<Replay | null>(null)
   const replayWorldRef = useRef<World | null>(null)
   const replayPrevRef = useRef<Observation | null>(null)
   const replayBeatsRef = useRef<Beats | null>(null)
+  const refs = useMemo(
+    () => ({ replayRef, replayWorldRef, replayPrevRef, replayBeatsRef, setReplay, setReplayNote }),
+    []
+  )
+  return { replay, replayNote, refs }
+}
 
-  // The live world and the beats that gate it live outside React; a render
-  // reads only the part of them it draws (see `LiveHall`).
+type ReplayRefs = ReturnType<typeof useReplayState>['refs']
+
+/**
+ * The live world and the beats that gate it live outside React; a render
+ * reads only the part of them it draws (see `LiveHall`).
+ */
+function useLiveStore() {
   const [liveHall] = useState(createLiveHall)
   const live = useSyncExternalStore(liveHall.subscribe, liveHall.snapshot)
-  const map = live.map
+  return { liveHall, live }
+}
 
-  const readActivity = useCallback(async () => {
-    const r = (await invoke('foundry:run.activity', { id: orderId })) as {
-      activity?: Record<string, readonly ToolActivity[]>
-      error?: string
-    }
-    return r.error === undefined ? (r.activity ?? {}) : null
-  }, [orderId])
+/** This order's numbers from the factory's metrics; undefined when they could not be read. */
+async function readOrderMetrics(orderId: string): Promise<OrderMetrics | null | undefined> {
+  const r = (await invoke('foundry:factory.metrics', { window: 'all' })) as {
+    orders?: OrderMetrics[]
+    error?: string
+  }
+  if (r.error !== undefined) return undefined
+  return r.orders?.find((o) => o.orderId === orderId) ?? null
+}
 
-  // The order's own numbers for the status wall, read again when anything
-  // recorded about this order changes — a rework or a new CI round included.
-  const readOrderMetrics = useCallback(async () => {
-    const r = (await invoke('foundry:factory.metrics', { window: 'all' })) as {
-      orders?: OrderMetrics[]
-      error?: string
-    }
-    if (r.error !== undefined) return undefined
-    return r.orders?.find((o) => o.orderId === orderId) ?? null
-  }, [orderId])
-  const showOrderMetrics = useCallback((read: OrderMetrics | null | undefined) => {
+/**
+ * The order's own numbers for the status wall, read again when anything
+ * recorded about this order changes — a rework or a new CI round included.
+ */
+function useOrderMetrics(orderId: string): OrderMetrics | null {
+  const [orderMetrics, setOrderMetrics] = useState<OrderMetrics | null>(null)
+  const read = useCallback(() => readOrderMetrics(orderId), [orderId])
+  const show = useCallback((read: OrderMetrics | null | undefined) => {
     if (read !== undefined) setOrderMetrics(read)
   }, [])
-  usePushed(readOrderMetrics, showOrderMetrics, { kinds: ANY_RECORD, orderId })
+  usePushed(read, show, { kinds: ANY_RECORD, orderId })
+  return orderMetrics
+}
 
+/** The callouts raised at their stations, how high each is stacked, and the sentence for a screen reader. */
+function useCallouts() {
+  const [callouts, setCallouts] = useState<readonly Callout[]>([])
+  const [calloutLift, setCalloutLift] = useState<Readonly<Record<string, number>>>({})
+  const [spoken, setSpoken] = useState('')
   // Risen callouts leave on their own; nothing has to happen for them to go.
   useEffect(() => {
     if (callouts.length === 0) return
@@ -207,270 +267,417 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
       setCallouts((live) => live.filter((c) => now - c.at < CALLOUT_MS))
     }, 500)
   }, [callouts.length])
-
   // What a batch of events says: callouts at their stations, and one sentence
   // for a screen reader. Live polls and a playing replay both come through here.
-  const announce = useCallback(
-    (events: readonly FactoryEvent[], labels: Readonly<Record<string, string>>) => {
-      if (events.length === 0) return
-      const now = Date.now()
-      const raised = calloutsFor(events, labels, now)
-      if (raised.length > 0) {
-        const owners = new Set(raised.map((c) => c.nodeId))
-        setCallouts((live) => [...live.filter((c) => !owners.has(c.nodeId)), ...raised])
-      }
-      setSpoken(events.map((event) => describeEvent(event, labels)).join(' '))
-    },
-    []
-  )
+  const announce = useCallback((events: readonly FactoryEvent[], labels: Labels) => {
+    if (events.length === 0) return
+    const now = Date.now()
+    const raised = calloutsFor(events, labels, now)
+    if (raised.length > 0) {
+      const owners = new Set(raised.map((c) => c.nodeId))
+      setCallouts((live) => [...live.filter((c) => !owners.has(c.nodeId)), ...raised])
+    }
+    setSpoken(events.map((event) => describeEvent(event, labels)).join(' '))
+  }, [])
+  return { callouts, setCallouts, calloutLift, setCalloutLift, spoken, announce }
+}
 
+type Talk = ReturnType<typeof useCallouts>
+
+/** What the live hall is handed: the run as observed, with the tool activity polled beside it. */
+function observationOf(view: FloorView, activity: Activity): Observation {
+  return {
+    graph: view.graph,
+    orphaned: view.orphaned ?? [],
+    stranded: view.stranded ?? [],
+    waiting: view.waiting ?? [],
+    activity,
+    ci: view.ci ?? null,
+    queue: view.queue ?? null,
+  }
+}
+
+interface LiveFeedDeps {
+  readonly view: FloorView | null
+  readonly activity: Activity
+  readonly announce: Talk['announce']
+  readonly replayRef: React.MutableRefObject<Replay | null>
+}
+
+function useLiveFeed(liveHall: LiveHall, { view, activity, announce, replayRef }: LiveFeedDeps) {
   useEffect(
     () =>
       liveHall.onEvents((events, eventLabels) => {
         // A replay has the stage; live events still move the live world, silently.
         if (replayRef.current === null) announce(events, eventLabels)
       }),
-    [liveHall, announce]
+    [liveHall, announce, replayRef]
   )
-
   // The one place the live hall is handed an observation — on every poll of
   // either the graph or the activity feed, event or no event, with a real
   // clock. A call held open across polls only crosses its walking threshold
   // on a poll that brought no new event at all.
   useEffect(() => {
     if (view === null) return
-    liveHall.observe(
-      {
-        graph: view.graph,
-        orphaned: view.orphaned ?? [],
-        stranded: view.stranded ?? [],
-        waiting: view.waiting ?? [],
-        activity,
-        ci: view.ci ?? null,
-        queue: view.queue ?? null,
-      },
-      view.labels ?? {},
-      Date.now()
-    )
+    liveHall.observe(observationOf(view, activity), view.labels ?? {}, Date.now())
   }, [liveHall, view, activity])
-
   // A held beat comes due with no poll to carry it.
   const liveLabels = view?.labels
   useEffect(() => {
     return everyWhileVisible(() => liveHall.releaseDue(liveLabels ?? {}, Date.now()), BEAT_CHECK_MS)
   }, [liveHall, liveLabels])
+}
 
-  const labelsNow = view?.labels
+interface Recording {
+  readonly graph: RunGraph
+  readonly timeline: Timeline
+  readonly gates: readonly Gate[]
+}
 
+/** The run as recorded; null when nothing was. */
+async function readTimeline(orderId: string): Promise<Recording | null> {
+  const r = (await invoke('foundry:run.timeline', { id: orderId })) as {
+    graph?: RunGraph
+    timeline?: Timeline
+    gates?: Gate[]
+    error?: string
+  }
+  if (r.graph === undefined || r.timeline === undefined || r.timeline.frames.length === 0) {
+    return null
+  }
+  return { graph: r.graph, timeline: r.timeline, gates: r.gates ?? [] }
+}
+
+/** A replay of `recording` from its start, with its world and beats set in `refs`. */
+function beginReplay(
+  recording: Recording,
+  { labels, refs }: { labels: Labels; refs: ReplayRefs }
+): Replay {
+  const { graph, timeline, gates } = recording
+  const clock = replayClock(momentsOf(timeline, gates), REPLAY_MAX_GAP_MS)
+  const observation = observationAt({ timeline, gates, base: graph }, clock.toReal(0))
+  // A recording that wrote CI down has a tower to wait at.
+  const map = layoutHall(graph, labels, (timeline.ci?.length ?? 0) > 0)
+  const world = createWorld(map, observation)
+  const beats = createBeats(statesOf(observation.graph))
+  refs.replayWorldRef.current = world
+  refs.replayPrevRef.current = observation
+  refs.replayBeatsRef.current = beats
+  const start = { pos: 0, playing: true, speed: 1 as const }
+  return {
+    graph,
+    timeline,
+    gates,
+    map,
+    clock,
+    ...start,
+    observation,
+    shown: beats.shown,
+    queue: world.queue,
+  }
+}
+
+/** Puts `next` on show. */
+function showReplay(refs: ReplayRefs, next: Replay): void {
+  refs.replayRef.current = next
+  refs.setReplay(next)
+}
+
+/** Changes the replay on show, if there is one. */
+function patchReplay(refs: ReplayRefs, change: Partial<Replay>): void {
+  const r = refs.replayRef.current
+  if (r === null) return
+  showReplay(refs, { ...r, ...change })
+}
+
+/** Back to the run as it is now. */
+function leaveReplay(refs: ReplayRefs, setCallouts: Talk['setCallouts']): void {
+  refs.replayRef.current = null
+  refs.replayWorldRef.current = null
+  refs.replayBeatsRef.current = null
+  setCallouts([])
+  refs.setReplay(null)
+}
+
+/** Rebuilds the replayed hall settled at `observation`, as a hall opened then would have been. */
+function settleReplay(r: Replay, observation: Observation, refs: ReplayRefs): void {
+  refs.replayWorldRef.current = createWorld(r.map, observation)
+  refs.replayBeatsRef.current = createBeats(statesOf(observation.graph))
+}
+
+/**
+ * Plays the replay forward to `observation`, at replay time `at`, through the
+ * same diff and director as a live poll; the events that came due.
+ */
+function playReplay(
+  r: Replay,
+  [observation, at]: readonly [Observation, number],
+  refs: ReplayRefs
+): readonly FactoryEvent[] {
+  const real = r.clock.toReal(at)
+  const seen = diffObservation(refs.replayPrevRef.current, observation)
+  const held = schedule(
+    refs.replayBeatsRef.current as Beats,
+    { events: seen, nodes: r.graph.nodes },
+    real
+  )
+  // The recording's end shows everything still held rather than cutting it off.
+  const { beats, events } = release(held, at >= r.clock.duration ? Infinity : real)
+  refs.replayBeatsRef.current = beats
+  refs.replayWorldRef.current = direct(refs.replayWorldRef.current as World, events, real)
+  return events
+}
+
+interface ReplayMove {
+  readonly at: number
+  readonly seek: boolean
+  readonly refs: ReplayRefs
+}
+
+/** The replay moved to `at`, and what playing there said; null for a seek, which says nothing. */
+function replayTo(
+  r: Replay,
+  { at, seek, refs }: ReplayMove
+): { readonly next: Replay; readonly events: readonly FactoryEvent[] | null } {
+  const observation = observationAt(
+    { timeline: r.timeline, gates: r.gates, base: r.graph },
+    r.clock.toReal(at)
+  )
+  let events: readonly FactoryEvent[] | null = null
+  if (seek) settleReplay(r, observation, refs)
+  else events = playReplay(r, [observation, at], refs)
+  refs.replayPrevRef.current = observation
+  const next: Replay = {
+    ...r,
+    pos: at,
+    observation,
+    shown: (refs.replayBeatsRef.current as Beats).shown,
+    queue: (refs.replayWorldRef.current as World).queue,
+    playing: r.playing && at < r.clock.duration,
+  }
+  return { next, events }
+}
+
+interface ReplayDeps {
+  readonly labels: Labels | undefined
+  readonly talk: Talk
+  readonly refs: ReplayRefs
+}
+
+/** Starting a replay, and moving one: a seek rebuilds the hall, playing forward animates it. */
+function useReplay(orderId: string, { labels, talk, refs }: ReplayDeps) {
+  const { announce, setCallouts } = talk
   const startReplay = useCallback(async () => {
-    setReplayNote(null)
-    const r = (await invoke('foundry:run.timeline', { id: orderId })) as {
-      graph?: RunGraph
-      timeline?: Timeline
-      gates?: Gate[]
-      error?: string
-    }
-    if (r.graph === undefined || r.timeline === undefined || r.timeline.frames.length === 0) {
-      setReplayNote('Nothing recorded for this run yet.')
+    refs.setReplayNote(null)
+    const recording = await readTimeline(orderId)
+    if (recording === null) {
+      refs.setReplayNote('Nothing recorded for this run yet.')
       return
     }
-    const gates = r.gates ?? []
-    const clock = replayClock(momentsOf(r.timeline, gates), REPLAY_MAX_GAP_MS)
-    const observation = observationAt(r.timeline, gates, r.graph, clock.toReal(0))
-    // A recording that wrote CI down has a tower to wait at.
-    const replayMap = layoutHall(r.graph, labelsNow ?? {}, (r.timeline.ci?.length ?? 0) > 0)
-    const replayWorld = createWorld(replayMap, observation)
-    replayWorldRef.current = replayWorld
-    replayPrevRef.current = observation
-    replayBeatsRef.current = createBeats(statesOf(observation.graph))
+    const next = beginReplay(recording, { labels: labels ?? {}, refs })
     setCallouts([])
-    const next: Replay = {
-      graph: r.graph,
-      timeline: r.timeline,
-      gates,
-      map: replayMap,
-      clock,
-      pos: 0,
-      playing: true,
-      speed: 1,
-      observation,
-      shown: (replayBeatsRef.current as Beats).shown,
-      queue: replayWorld.queue,
-    }
-    replayRef.current = next
-    setReplay(next)
-  }, [orderId, labelsNow])
-
-  // Move the replay to `pos`. Playing forward goes through the same diff and
-  // director as a live poll, so it animates; a seek rebuilds the hall settled
-  // at that moment, as a hall opened then would have been.
+    showReplay(refs, next)
+  }, [orderId, labels, refs, setCallouts])
   const moveReplay = useCallback(
     (pos: number, seek: boolean) => {
-      const r = replayRef.current
+      const r = refs.replayRef.current
       if (r === null) return
       const at = Math.min(Math.max(pos, 0), r.clock.duration)
-      const real = r.clock.toReal(at)
-      const observation = observationAt(r.timeline, r.gates, r.graph, real)
-      if (seek) {
-        replayWorldRef.current = createWorld(r.map, observation)
-        replayBeatsRef.current = createBeats(statesOf(observation.graph))
-        setCallouts([])
-      } else {
-        const seen = diffObservation(replayPrevRef.current, observation)
-        const held = schedule(replayBeatsRef.current as Beats, seen, r.graph.nodes, real)
-        // The recording's end shows everything still held rather than cutting it off.
-        const { beats, events } = release(held, at >= r.clock.duration ? Infinity : real)
-        replayBeatsRef.current = beats
-        replayWorldRef.current = direct(replayWorldRef.current as World, events, real)
-        announce(events, labelsNow ?? {})
-      }
-      replayPrevRef.current = observation
-      const next = {
-        ...r,
-        pos: at,
-        observation,
-        shown: (replayBeatsRef.current as Beats).shown,
-        queue: (replayWorldRef.current as World).queue,
-        playing: r.playing && at < r.clock.duration,
-      }
-      replayRef.current = next
-      setReplay(next)
+      const { next, events } = replayTo(r, { at, seek, refs })
+      if (events === null) setCallouts([])
+      else announce(events, labels ?? {})
+      showReplay(refs, next)
     },
-    [announce, labelsNow]
+    [announce, labels, refs, setCallouts]
   )
+  return { startReplay, moveReplay }
+}
 
-  const setReplayWith = (change: Partial<Replay>): void => {
-    const r = replayRef.current
-    if (r === null) return
-    const next = { ...r, ...change }
-    replayRef.current = next
-    setReplay(next)
-  }
+type ReplayMoves = ReturnType<typeof useReplay>
 
-  const leaveReplay = (): void => {
-    replayRef.current = null
-    replayWorldRef.current = null
-    replayBeatsRef.current = null
-    setCallouts([])
-    setReplay(null)
-  }
-
-  const replayPlaying = replay?.playing ?? false
+/** A playing replay advances on its own. */
+function usePlayback(
+  playing: boolean,
+  { moveReplay, refs }: { moveReplay: ReplayMoves['moveReplay']; refs: ReplayRefs }
+): void {
   useEffect(() => {
-    if (!replayPlaying) return
+    if (!playing) return
     const timer = setInterval(() => {
-      const r = replayRef.current
+      const r = refs.replayRef.current
       if (r !== null) moveReplay(r.pos + REPLAY_STEP_MS * r.speed, false)
     }, REPLAY_STEP_MS)
     return () => clearInterval(timer)
-  }, [replayPlaying, moveReplay])
+  }, [playing, moveReplay, refs])
+}
 
-  // Callouts are sized by their text, so only the laid-out page knows which
-  // ones would cover each other. Measured before paint, so a
-  // callout is never seen at the level it is about to leave.
-  const liveMap = replay?.map ?? map
-  const shownCi = (replay === null ? view?.ci : replay.observation.ci) ?? null
+/** Where each callout would sit on the ground, measured on the laid-out page. */
+function calloutBoxes(
+  overlay: HTMLElement,
+  { map, callouts }: { map: HallMap; callouts: readonly Callout[] }
+): CalloutBox[] {
+  const width = overlay.clientWidth
+  const height = overlay.clientHeight
+  const raised = new Map(
+    [...overlay.querySelectorAll<HTMLElement>('[data-callout-id]')].map((el) => [
+      el.dataset.calloutId,
+      el,
+    ])
+  )
+  return callouts.map((c) => {
+    const el = raised.get(c.id)
+    const at = anchorOf(map, c.nodeId)
+    const x = (at.left / 100) * width
+    const y = (at.top / 100) * height
+    return {
+      id: c.id,
+      x,
+      y: y - CALLOUT_BASE_PX,
+      w: el?.offsetWidth ?? 0,
+      h: el?.offsetHeight ?? 0,
+    }
+  })
+}
+
+/** `kept` when `next` says the same, so an unchanged stack does not render again. */
+function sameOrNext(
+  kept: Readonly<Record<string, number>>,
+  next: Readonly<Record<string, number>>
+): Readonly<Record<string, number>> {
+  const same =
+    Object.keys(next).length === Object.keys(kept).length &&
+    Object.entries(next).every(([id, level]) => kept[id] === level)
+  return same ? kept : next
+}
+
+type OverlayRef = React.MutableRefObject<HTMLDivElement | null>
+
+interface LayoutDeps {
+  readonly overlayRef: OverlayRef
+  readonly liveMap: HallMap | null
+  readonly shownCi: CiState | null
+  readonly talk: Talk
+}
+
+/**
+ * Callouts are sized by their text, so only the laid-out page knows which
+ * ones would cover each other. Measured before paint, so a callout is never
+ * seen at the level it is about to leave.
+ */
+function useCalloutLayout({ liveMap, shownCi, talk, overlayRef }: LayoutDeps) {
+  const { callouts, setCalloutLift } = talk
   // Pinned to the tower while any check is pending; stacked like a raised one.
   const pinnedWait = useMemo(() => ciWaitingCallout(shownCi), [shownCi])
   useLayoutEffect(() => {
     const overlay = overlayRef.current
     if (overlay === null || liveMap === null) return
-    const width = overlay.clientWidth
-    const height = overlay.clientHeight
-    const ground = (nodeId: string | null) => {
-      const at = anchorOf(liveMap, nodeId)
-      return { x: (at.left / 100) * width, y: (at.top / 100) * height }
-    }
-    const raised = new Map(
-      [...overlay.querySelectorAll<HTMLElement>('[data-callout-id]')].map((el) => [
-        el.dataset.calloutId,
-        el,
-      ])
-    )
     const everything = pinnedWait === null ? callouts : [pinnedWait, ...callouts]
-    const boxes: CalloutBox[] = everything.map((c) => {
-      const el = raised.get(c.id)
-      const { x, y } = ground(c.nodeId)
-      return {
-        id: c.id,
-        x,
-        y: y - CALLOUT_BASE_PX,
-        w: el?.offsetWidth ?? 0,
-        h: el?.offsetHeight ?? 0,
-      }
-    })
-    setCalloutLift((kept) => {
-      const next = calloutLevels(boxes, [], kept, CALLOUT_PITCH_PX)
-      const same =
-        Object.keys(next).length === Object.keys(kept).length &&
-        Object.entries(next).every(([id, level]) => kept[id] === level)
-      return same ? kept : next
-    })
-  }, [callouts, liveMap, pinnedWait])
+    const boxes = calloutBoxes(overlay, { map: liveMap, callouts: everything })
+    setCalloutLift((kept) =>
+      sameOrNext(kept, calloutLevels(boxes, { obstacles: [], kept }, CALLOUT_PITCH_PX))
+    )
+  }, [callouts, liveMap, pinnedWait, setCalloutLift, overlayRef])
+  return { pinnedWait }
+}
 
-  const selectedSessionId =
-    selected === null ? null : (view?.graph.nodes.find((n) => n.id === selected)?.sessionId ?? null)
+async function readActivity(orderId: string): Promise<Activity | null> {
+  const r = (await invoke('foundry:run.activity', { id: orderId })) as {
+    activity?: Record<string, readonly ToolActivity[]>
+    error?: string
+  }
+  return r.error === undefined ? (r.activity ?? {}) : null
+}
 
-  // An open station's transcript is live: read as often as the activity is,
-  // and only for as long as this station stays open.
-  const readTranscript = useCallback(async () => {
-    if (selectedSessionId === null) return null
-    const r = (await invoke('foundry:run-transcript', {
-      sessionId: selectedSessionId,
-      limit: MONITOR_LINES,
-    })) as { lines?: TranscriptLine[] }
-    return r.lines ?? []
-  }, [selectedSessionId])
+/** The open station's transcript; null when no station with a session is open. */
+async function readStationLines(sessionId: string | null): Promise<TranscriptLine[] | null> {
+  if (sessionId === null) return null
+  const r = (await invoke('foundry:run-transcript', {
+    sessionId,
+    limit: MONITOR_LINES,
+  })) as { lines?: TranscriptLine[] }
+  return r.lines ?? []
+}
 
-  // The one poll left on this view. Tool activity and a station's transcript
-  // are both read from the agents' own transcript files, which change in their
-  // processes with nothing Foundry writes to announce it.
+interface AgentWordsDeps {
+  readonly selectedSessionId: string | null
+  readonly setActivity: (activity: Activity) => void
+  readonly setTranscript: (lines: TranscriptLine[]) => void
+}
+
+/**
+ * The one poll left on this view. Tool activity and a station's transcript are
+ * both read from the agents' own transcript files, which change in their
+ * processes with nothing Foundry writes to announce it. An open station's
+ * transcript is read as often as the activity is, and only for as long as
+ * this station stays open.
+ */
+function useAgentWords(orderId: string, deps: AgentWordsDeps): void {
+  const { selectedSessionId, setActivity, setTranscript } = deps
+  const readTranscript = useCallback(() => readStationLines(selectedSessionId), [selectedSessionId])
   const readAgentWords = useCallback(
-    async () => ({ activity: await readActivity(), lines: await readTranscript() }),
-    [readActivity, readTranscript]
+    async () => ({ activity: await readActivity(orderId), lines: await readTranscript() }),
+    [orderId, readTranscript]
   )
   const showAgentWords = useCallback(
-    (read: {
-      activity: Readonly<Record<string, readonly ToolActivity[]>> | null
-      lines: TranscriptLine[] | null
-    }) => {
+    (read: { activity: Activity | null; lines: TranscriptLine[] | null }) => {
       if (read.activity !== null) setActivity(read.activity)
       if (read.lines !== null) setTranscript(read.lines)
     },
-    []
+    [setActivity, setTranscript]
   )
   usePolling(readAgentWords, showAgentWords, ACTIVITY_POLL_MS)
+}
 
+/** A station opened on another session starts with an empty transcript. */
+function useForgetTranscript(
+  selectedSessionId: string | null,
+  setTranscript: (lines: TranscriptLine[]) => void
+): void {
   const [transcriptFor, setTranscriptFor] = useState(selectedSessionId)
   if (transcriptFor !== selectedSessionId) {
     setTranscriptFor(selectedSessionId)
     setTranscript([])
   }
+}
 
+function sessionOf(view: FloorView | null, selected: string | null): string | null {
+  if (selected === null) return null
+  return view?.graph.nodes.find((n) => n.id === selected)?.sessionId ?? null
+}
+
+interface StationDeps {
+  readonly view: FloorView | null
+  readonly setActivity: (activity: Activity) => void
+}
+
+/** The station open on its monitor, what its agent is saying, and attaching to it. */
+function useStation(orderId: string, { view, setActivity }: StationDeps) {
+  const [selected, setSelected] = useState<string | null>(null)
+  const [transcript, setTranscript] = useState<TranscriptLine[]>([])
+  const [attachProblem, setAttachProblem] = useState<string | null>(null)
+  const selectedSessionId = sessionOf(view, selected)
+  useAgentWords(orderId, { selectedSessionId, setActivity, setTranscript })
+  useForgetTranscript(selectedSessionId, setTranscript)
   const openStation = useCallback((nodeId: string) => {
     setSelected(nodeId)
     setAttachProblem(null)
   }, [])
-
   const attach = useCallback(
     async (nodeId: string) => {
-      const r = (await invoke('foundry:session.attach', { orderId, nodeId })) as
-        | { terminalSessionId: string }
-        | { error: string }
-      if ('error' in r) {
-        setAttachProblem(r.error)
-        return
-      }
-      const gone = (await invoke('foundry:run-terminal', {
-        sessionId: r.terminalSessionId,
-      })) as { ok?: boolean }
-      if (gone.ok !== true) setAttachProblem('That agent is no longer in a terminal.')
+      const trouble = await attachTo(orderId, nodeId)
+      if (trouble !== null) setAttachProblem(trouble)
     },
     [orderId]
   )
+  return { selected, setSelected, transcript, attachProblem, openStation, attach }
+}
 
-  // Answers go through the same channels the Floor and the Inbox use; a
-  // refusal is shown on the card it came from, never swallowed.
+/**
+ * Answers go through the same channels the Floor and the Inbox use; a refusal
+ * is shown on the card it came from, never swallowed.
+ */
+function useAnswers(refresh: () => Promise<void>) {
+  const [answerProblem, setAnswerProblem] = useState<Readonly<Record<string, string>>>({})
+  const [busy, setBusy] = useState<string | null>(null)
   const answer = useCallback(
     async (id: string, run: () => Promise<string | null>) => {
       setBusy(id)
@@ -487,324 +694,495 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
     },
     [refresh]
   )
+  return { answerProblem, busy, answer }
+}
 
-  const resolveAsk = (requestId: string, decision: 'allow' | 'deny'): void =>
-    void answer(requestId, async () => {
-      const r = (await invoke('foundry:permission-resolve', { requestId, decision })) as {
-        ok?: boolean
-        reason?: string
-      }
-      return r.ok === true ? null : (r.reason ?? 'That request is no longer waiting.')
-    })
-
-  const decideGate = (gateId: string, option: string, limit?: number | null): void =>
-    void answer(gateId, async () => {
-      const payload = limit === undefined ? { gateId, option } : { gateId, option, limit }
-      const r = (await invoke('foundry:inbox.decide', payload)) as { error?: string }
-      return r.error ?? null
-    })
-
-  const goToTerminal = (id: string, sessionId: string): void =>
-    void answer(id, async () => {
-      const r = (await invoke('foundry:run-terminal', { sessionId })) as { ok?: boolean }
-      return r.ok === true ? null : 'That agent is no longer in a terminal.'
-    })
-
-  if (problem !== null && view === null) return <p className="fdry-note">{problem}</p>
-  if (view === null || map === null) {
-    return <div className="fdry-empty">Loading the hall{'…'}</div>
+/** Allows or denies a held call; why not, when it is no longer waiting. */
+function askResolved(requestId: string, decision: 'allow' | 'deny') {
+  return async (): Promise<string | null> => {
+    const r = (await invoke('foundry:permission-resolve', { requestId, decision })) as {
+      ok?: boolean
+      reason?: string
+    }
+    return r.ok === true ? null : (r.reason ?? 'That request is no longer waiting.')
   }
+}
 
-  const labels = view.labels ?? {}
-  // In a replay the hall shows the recording; everything else is the run now.
-  const shownMap = replay?.map ?? map
-  const shownGraph = replay?.observation.graph ?? view.graph
-  const shownWorldRef = (
-    replay === null ? liveHall.world : replayWorldRef
-  ) as React.MutableRefObject<World>
-  const orphaned = new Set(replay === null ? (view.orphaned ?? []) : [])
-  const interruptions = interruptionsFor({
-    graph: shownGraph,
+/** Answers a gate; why not, when it was refused. */
+function gateDecided(gateId: string, [option, limit]: readonly [string, (number | null)?]) {
+  return async (): Promise<string | null> => {
+    const payload = limit === undefined ? { gateId, option } : { gateId, option, limit }
+    const r = (await invoke('foundry:inbox.decide', payload)) as { error?: string }
+    return r.error ?? null
+  }
+}
+
+/** Goes to an agent's terminal; why not, when it has none. */
+function terminalOpened(sessionId: string) {
+  return async (): Promise<string | null> => {
+    const r = (await invoke('foundry:run-terminal', { sessionId })) as { ok?: boolean }
+    return r.ok === true ? null : 'That agent is no longer in a terminal.'
+  }
+}
+
+interface LiveSight {
+  readonly view: FloorView
+  readonly map: HallMap
+}
+
+/** In a replay the hall shows the recording; everything else is the run now. */
+function shownOf(hall: Hall, { view, map }: LiveSight) {
+  const { replay } = hall.rp
+  return {
+    view,
+    replay,
+    labels: view.labels ?? {},
+    map: replay?.map ?? map,
+    graph: replay?.observation.graph ?? view.graph,
+    worldRef: (replay === null
+      ? hall.liveHall.world
+      : hall.rp.refs.replayWorldRef) as React.MutableRefObject<World>,
+  }
+}
+
+/** What is waiting on you in what is on show; a replay's past waits only, and nothing to answer. */
+function waitsOf(hall: Hall, view: FloorView) {
+  const { replay } = hall.rp
+  const live = replay === null
+  return {
+    orphaned: new Set(live ? (view.orphaned ?? []) : []),
     waiting: replay?.observation.waiting ?? view.waiting ?? [],
-    stranded: replay === null ? (view.stranded ?? []) : [],
-    pending: replay === null ? pending : [],
-  })
-  const flaggedNodes = new Set(interruptions.map((i) => i.nodeId))
-  const needsYou = [...flaggedNodes].filter((id): id is string => id !== null)
-  const states: Record<string, NodeState> = {}
-  // The scene shows what the beat scheduler has released, not the raw graph.
-  const shownStates = replay === null ? live.shown : replay.shown
-  for (const n of shownGraph.nodes) states[n.id] = shownStates[n.id] ?? n.state
-  const selectedNode =
-    selected === null ? null : (view.graph.nodes.find((n) => n.id === selected) ?? null)
-  const monitorStatus: MonitorStatus =
-    selectedNode === null
-      ? 'idle'
-      : flaggedNodes.has(selectedNode.id)
-        ? 'waiting'
-        : orphaned.has(selectedNode.id)
-          ? 'gone'
-          : selectedNode.state === 'failed' || selectedNode.state === 'blocked'
-            ? 'failed'
-            : selectedNode.state === 'running'
-              ? 'running'
-              : 'idle'
-  const monitorAlert =
-    monitorStatus === 'waiting'
-      ? `WAITING FOR YOU: ${interruptions.find((i) => i.nodeId === selectedNode?.id)?.title ?? ''}`
-          .trim()
-          .toUpperCase()
-      : monitorStatus === 'failed'
-        ? (view.standing === undefined
-            ? 'FAILED'
-            : `FAILED: ${view.standing.headline}`
-          ).toUpperCase()
-        : null
+    stranded: live ? (view.stranded ?? []) : [],
+    pending: live ? hall.observed.pending : [],
+  }
+}
 
+/** What each station shows: what the beat scheduler has released, not the raw graph. */
+function shownStatesOf(hall: Hall, graph: RunGraph): Record<string, NodeState> {
+  const { replay } = hall.rp
+  const shownStates = replay === null ? hall.live.shown : replay.shown
+  const states: Record<string, NodeState> = {}
+  for (const n of graph.nodes) states[n.id] = shownStates[n.id] ?? n.state
+  return states
+}
+
+type HallNode = RunGraph['nodes'][number]
+
+function monitorStatusOf(
+  node: HallNode | null,
+  { flagged, orphaned }: { flagged: ReadonlySet<string | null>; orphaned: ReadonlySet<string> }
+): MonitorStatus {
+  if (node === null) return 'idle'
+  if (flagged.has(node.id)) return 'waiting'
+  if (orphaned.has(node.id)) return 'gone'
+  if (node.state === 'failed' || node.state === 'blocked') return 'failed'
+  return node.state === 'running' ? 'running' : 'idle'
+}
+
+interface AlertFacts {
+  readonly interruptions: readonly Interruption[]
+  readonly node: HallNode | null
+  readonly standing: FloorView['standing']
+}
+
+function monitorAlertOf(status: MonitorStatus, { interruptions, node, standing }: AlertFacts) {
+  if (status === 'waiting') {
+    return `WAITING FOR YOU: ${interruptions.find((i) => i.nodeId === node?.id)?.title ?? ''}`
+      .trim()
+      .toUpperCase()
+  }
+  if (status !== 'failed') return null
+  return (standing === undefined ? 'FAILED' : `FAILED: ${standing.headline}`).toUpperCase()
+}
+
+function metricsOf(orderMetrics: OrderMetrics | null) {
+  if (orderMetrics === null) return null
+  const { leadTimeMs, reworks, ciRounds } = orderMetrics
+  return { leadTimeMs, reworks, ciRounds }
+}
+
+function signsOf(hall: Hall, map: HallMap, labels: Labels): readonly HallSign[] {
+  const { replay } = hall.rp
+  const { shownCi } = hall
   const ciChecks = Object.fromEntries(
     (shownCi?.pulls ?? []).flatMap((pull) => pull.checks.map((c) => [c.name, c.bucket] as const))
   )
-  const signs = hallSigns(shownMap, {
+  return hallSigns(map, {
     labels,
-    metrics:
-      orderMetrics === null
-        ? null
-        : {
-            leadTimeMs: orderMetrics.leadTimeMs,
-            reworks: orderMetrics.reworks,
-            ciRounds: orderMetrics.ciRounds,
-          },
-    queue: replay === null ? live.queue : replay.queue,
+    metrics: metricsOf(hall.orderMetrics),
+    queue: replay === null ? hall.live.queue : replay.queue,
     ci: shownCi === null ? null : { checks: ciChecks },
   })
-  const waitingGates = replay?.observation.waiting ?? view.waiting ?? []
-  const monitorFacts =
-    selectedNode === null
-      ? null
-      : stepFacts({
-          node: selectedNode,
-          graph: shownGraph,
-          labels,
-          pulls: view.pulls,
-          ci: shownCi,
-          waiting: waitingGates,
-        })
-  // An agent step that has finished has closed its agent; there is nothing to attach to.
-  const agentClosed =
-    selectedNode !== null &&
-    monitorFacts === null &&
-    (selectedNode.state === 'passed' || selectedNode.state === 'skipped')
+}
 
+interface FactsFor {
+  readonly shown: ReturnType<typeof shownOf>
+  readonly waiting: readonly Gate[]
+}
+
+function monitorFactsOf(hall: Hall, node: HallNode | null, { shown, waiting }: FactsFor) {
+  if (node === null) return null
+  return stepFacts({
+    node,
+    graph: shown.graph,
+    labels: shown.labels,
+    pulls: shown.view.pulls,
+    ci: hall.shownCi,
+    waiting,
+  })
+}
+
+/** Everything the hall draws, from what it keeps and the run as it stands. */
+function hallModel(hall: Hall, sight: LiveSight) {
+  const shown = shownOf(hall, sight)
+  const waits = waitsOf(hall, sight.view)
+  const interruptions = interruptionsFor({ graph: shown.graph, ...waits })
+  const flaggedNodes = new Set(interruptions.map((i) => i.nodeId))
+  const node = selectedNodeOf(sight.view, hall.station.selected)
+  const monitorStatus = monitorStatusOf(node, { flagged: flaggedNodes, orphaned: waits.orphaned })
+  const monitorFacts = monitorFactsOf(hall, node, { shown, waiting: waits.waiting })
+  return {
+    ...shown,
+    orphaned: waits.orphaned,
+    interruptions,
+    flaggedNodes,
+    states: shownStatesOf(hall, shown.graph),
+    selectedNode: node,
+    monitorStatus,
+    monitorAlert: monitorAlertOf(monitorStatus, {
+      interruptions,
+      node,
+      standing: sight.view.standing,
+    }),
+    signs: signsOf(hall, shown.map, shown.labels),
+    monitorFacts,
+    agentClosed: agentClosedOf(node, monitorFacts),
+  }
+}
+
+function selectedNodeOf(view: FloorView, selected: string | null): HallNode | null {
+  return selected === null ? null : (view.graph.nodes.find((n) => n.id === selected) ?? null)
+}
+
+/** An agent step that has finished has closed its agent; there is nothing to attach to. */
+function agentClosedOf(node: HallNode | null, facts: unknown): boolean {
+  return node !== null && facts === null && (node.state === 'passed' || node.state === 'skipped')
+}
+
+type HallModel = ReturnType<typeof hallModel>
+
+interface StageProps {
+  readonly hall: Hall
+  readonly model: HallModel
+}
+
+interface Nav {
+  readonly onBack: () => void
+  readonly onOpenInList: () => void
+}
+
+interface OverlayProps extends StageProps {
+  readonly overlayRef: OverlayRef
+}
+
+function HallStage({ hall, model, nav, overlayRef }: OverlayProps & { readonly nav: Nav }) {
+  const { map } = model
   return (
     <div
       className="fdry-hall-shell"
-      style={{ '--fdry-hall-aspect': shownMap.width / shownMap.height } as React.CSSProperties}
+      style={{ '--fdry-hall-aspect': map.width / map.height } as React.CSSProperties}
     >
       <HallHud
-        view={view}
-        shownGraph={shownGraph}
-        replaying={replay !== null}
-        waitingCount={interruptions.length}
-        note={replayNote}
-        onBack={onBack}
-        onReplay={() => void startReplay()}
-        onOpenInList={onOpenInList}
+        view={model.view}
+        shownGraph={model.graph}
+        replaying={model.replay !== null}
+        waitingCount={model.interruptions.length}
+        note={hall.rp.replayNote}
+        onBack={nav.onBack}
+        onReplay={() => void hall.replay.startReplay()}
+        onOpenInList={nav.onOpenInList}
       />
-      <div
-        className="fdry-hall-frame"
-        style={{ aspectRatio: `${shownMap.width} / ${shownMap.height}` }}
-      >
-        <HallScene
-          map={shownMap}
-          worldRef={shownWorldRef}
-          states={states}
-          needsYou={needsYou}
-          orphaned={[...orphaned]}
-          speed={replay?.speed ?? 1}
-          metrics={
-            orderMetrics === null
-              ? null
-              : {
-                  leadTimeMs: orderMetrics.leadTimeMs,
-                  reworks: orderMetrics.reworks,
-                  ciRounds: orderMetrics.ciRounds,
-                }
-          }
-        />
-
-        <div className="fdry-hall-overlay" ref={overlayRef}>
-          {shownMap.props
-            .filter((prop) => prop.nodeId !== null)
-            .map((prop) => {
-              const node = shownGraph.nodes.find((n) => n.id === prop.nodeId)
-              if (node === undefined) return null
-              const label = labels[node.id] ?? node.id
-              const gone = orphaned.has(node.id)
-              const standing = gone ? 'no agent' : stateWord(node.state)
-              return (
-                <button
-                  key={prop.id}
-                  type="button"
-                  className="fdry-hall-station"
-                  title={`${label} · ${standing}${node.attempts > 1 ? ` · try ${node.attempts}` : ''}`}
-                  style={stationStyle(shownMap, prop)}
-                  aria-label={`${label}, ${node.role ?? 'unassigned'}, ${standing}, attempt ${node.attempts}`}
-                  onClick={() => openStation(node.id)}
-                >
-                  {flaggedNodes.has(node.id) ? (
-                    <span className="fdry-hall-flag" aria-hidden="true">
-                      <ShieldQuestion />
-                    </span>
-                  ) : null}
-                </button>
-              )
-            })}
-
-          {callouts.map((c) => {
-            const at = anchorOf(shownMap, c.nodeId)
-            const lift = CALLOUT_BASE_PX + (calloutLift[c.id] ?? 0) * CALLOUT_PITCH_PX
-            return (
-              <div
-                key={c.id}
-                className="fdry-callout"
-                data-tone={c.tone}
-                data-callout-id={c.id}
-                aria-hidden="true"
-                style={
-                  {
-                    left: `${at.left}%`,
-                    top: `${at.top}%`,
-                    '--fdry-lift': `${lift}px`,
-                  } as React.CSSProperties
-                }
-              >
-                <span className="fdry-callout__text">{c.text}</span>
-              </div>
-            )
-          })}
-
-          {pinnedWait === null ? null : (
-            <div
-              className="fdry-callout"
-              data-tone={pinnedWait.tone}
-              data-pinned="true"
-              data-callout-id={pinnedWait.id}
-              aria-hidden="true"
-              style={
-                {
-                  left: `${anchorOf(shownMap, pinnedWait.nodeId).left}%`,
-                  top: `${anchorOf(shownMap, pinnedWait.nodeId).top}%`,
-                  '--fdry-lift': `${CALLOUT_BASE_PX + (calloutLift[pinnedWait.id] ?? 0) * CALLOUT_PITCH_PX}px`,
-                } as React.CSSProperties
-              }
-            >
-              <span className="fdry-callout__text">{pinnedWait.text}</span>
-            </div>
-          )}
-
-          {signs.map((sign) => (
-            <HallSignLabel key={sign.id} sign={sign} map={shownMap} />
-          ))}
-
-          {interruptions.map((item) => (
-            <InterruptionCard
-              key={`${item.kind}:${item.id}`}
-              item={item}
-              anchor={anchorOf(shownMap, item.nodeId)}
-              flip={anchorOf(shownMap, item.nodeId).top < (CARD_FLIP_ROW / shownMap.height) * 100}
-              readOnly={replay !== null}
-              busy={busy === item.id}
-              problem={answerProblem[item.id] ?? null}
-              onAllow={() => resolveAsk(item.id, 'allow')}
-              onDeny={() => resolveAsk(item.id, 'deny')}
-              onDecide={(option, limit) => decideGate(item.id, option, limit)}
-              pulls={view.pulls}
-              source={view.source}
-              onTerminal={() => {
-                const sessionId =
-                  item.kind === 'stranded'
-                    ? item.id
-                    : (pending.find((p: PendingAsk) => p.requestId === item.id)?.sessionId ?? '')
-                goToTerminal(item.id, sessionId)
-              }}
-            />
-          ))}
-        </div>
-
-        {replay === null ? null : (
-          <div className="fdry-replay" role="group" aria-label="Replay">
-            <button
-              type="button"
-              className="fdry-hall-btn is-primary"
-              aria-label={replay.playing ? 'Pause' : 'Play'}
-              onClick={() =>
-                replay.playing
-                  ? setReplayWith({ playing: false })
-                  : replay.pos >= replay.clock.duration
-                    ? (moveReplay(0, true), setReplayWith({ playing: true }))
-                    : setReplayWith({ playing: true })
-              }
-            >
-              {replay.playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
-            </button>
-            <input
-              type="range"
-              className="fdry-replay__track"
-              aria-label="Replay position"
-              min={0}
-              max={Math.max(replay.clock.duration, 1)}
-              step={REPLAY_STEP_MS}
-              value={replay.pos}
-              onChange={(e) => moveReplay(Number(e.currentTarget.value), true)}
-            />
-            <span className="fdry-replay__time">
-              {clockText(replay.pos)} / {clockText(replay.clock.duration)}
-            </span>
-            <span className="fdry-replay__speeds">
-              {REPLAY_SPEEDS.map((speed) => (
-                <button
-                  key={speed}
-                  type="button"
-                  className="fdry-hall-btn"
-                  aria-pressed={replay.speed === speed}
-                  onClick={() => setReplayWith({ speed })}
-                >
-                  {speed}x
-                </button>
-              ))}
-            </span>
-            <span className="fdry-replay__at">
-              {new Date(replay.clock.toReal(replay.pos)).toLocaleTimeString()}
-            </span>
-            <button type="button" className="fdry-hall-btn" onClick={leaveReplay}>
-              <Radio aria-hidden="true" /> Back to live
-            </button>
-          </div>
-        )}
-
-        {selectedNode === null ? null : (
-          <StationMonitor
-            node={selectedNode}
-            label={labels[selectedNode.id] ?? selectedNode.id}
-            sign={shownMap.props.find((p) => p.nodeId === selectedNode.id)?.sign ?? null}
-            orderId={orderId}
-            lines={transcript}
-            status={monitorStatus}
-            alert={monitorAlert}
-            attachProblem={attachProblem}
-            facts={monitorFacts}
-            attachable={!agentClosed}
-            onAttach={() => void attach(selectedNode.id)}
-            onClose={() => setSelected(null)}
-          />
-        )}
-      </div>
-
+      <HallFrame hall={hall} model={model} overlayRef={overlayRef} />
       <p className="fdry-sr-only" aria-live="polite">
-        {spoken}
+        {hall.talk.spoken}
       </p>
     </div>
   )
+}
+
+function HallFrame({ hall, model, overlayRef }: OverlayProps) {
+  const { map, replay, selectedNode } = model
+  return (
+    <div className="fdry-hall-frame" style={{ aspectRatio: `${map.width} / ${map.height}` }}>
+      <HallScene
+        map={map}
+        worldRef={model.worldRef}
+        states={model.states}
+        needsYou={[...model.flaggedNodes].filter((id): id is string => id !== null)}
+        orphaned={[...model.orphaned]}
+        speed={replay?.speed ?? 1}
+        metrics={metricsOf(hall.orderMetrics)}
+      />
+      <HallOverlay hall={hall} model={model} overlayRef={overlayRef} />
+      {replay === null ? null : <ReplayBar hall={hall} replay={replay} />}
+      {selectedNode === null ? null : (
+        <StationPanel hall={hall} model={model} node={selectedNode} />
+      )}
+    </div>
+  )
+}
+
+function liftOf(hall: Hall, id: string): number {
+  return CALLOUT_BASE_PX + (hall.talk.calloutLift[id] ?? 0) * CALLOUT_PITCH_PX
+}
+
+function HallOverlay({ hall, model, overlayRef }: OverlayProps) {
+  const { map } = model
+  const { pinnedWait } = hall.layout
+  return (
+    <div className="fdry-hall-overlay" ref={overlayRef}>
+      {map.props
+        .filter((prop) => prop.nodeId !== null)
+        .map((prop) => (
+          <StationButton key={prop.id} hall={hall} model={model} prop={prop} />
+        ))}
+      {hall.talk.callouts.map((c) => (
+        <CalloutBubble key={c.id} callout={c} map={map} lift={liftOf(hall, c.id)} />
+      ))}
+      {pinnedWait === null ? null : (
+        <CalloutBubble callout={pinnedWait} map={map} lift={liftOf(hall, pinnedWait.id)} pinned />
+      )}
+      {model.signs.map((sign) => (
+        <HallSignLabel key={sign.id} sign={sign} map={map} />
+      ))}
+      {model.interruptions.map((item) => (
+        <HallInterruption key={`${item.kind}:${item.id}`} hall={hall} model={model} item={item} />
+      ))}
+    </div>
+  )
+}
+
+function StationButton({ hall, model, prop }: StageProps & { readonly prop: HallProp }) {
+  const node = model.graph.nodes.find((n) => n.id === prop.nodeId)
+  if (node === undefined) return null
+  const label = model.labels[node.id] ?? node.id
+  const standing = model.orphaned.has(node.id) ? 'no agent' : stateWord(node.state)
+  return (
+    <button
+      type="button"
+      className="fdry-hall-station"
+      title={`${label} · ${standing}${node.attempts > 1 ? ` · try ${node.attempts}` : ''}`}
+      style={stationStyle(model.map, prop)}
+      aria-label={`${label}, ${node.role ?? 'unassigned'}, ${standing}, attempt ${node.attempts}`}
+      onClick={() => hall.station.openStation(node.id)}
+    >
+      {model.flaggedNodes.has(node.id) ? (
+        <span className="fdry-hall-flag" aria-hidden="true">
+          <ShieldQuestion />
+        </span>
+      ) : null}
+    </button>
+  )
+}
+
+interface CalloutBubbleProps {
+  readonly callout: Callout
+  readonly map: HallMap
+  readonly lift: number
+  /** The CI wait, pinned to the tower rather than risen and gone. */
+  readonly pinned?: boolean
+}
+
+function CalloutBubble({ callout, map, lift, pinned = false }: CalloutBubbleProps) {
+  const at = anchorOf(map, callout.nodeId)
+  return (
+    <div
+      className="fdry-callout"
+      data-tone={callout.tone}
+      data-pinned={pinned ? 'true' : undefined}
+      data-callout-id={callout.id}
+      aria-hidden="true"
+      style={
+        {
+          left: `${at.left}%`,
+          top: `${at.top}%`,
+          '--fdry-lift': `${lift}px`,
+        } as React.CSSProperties
+      }
+    >
+      <span className="fdry-callout__text">{callout.text}</span>
+    </div>
+  )
+}
+
+/** The session an interruption's terminal is: the stranded agent's own, or the held call's. */
+function terminalSessionOf(item: Interruption, pending: readonly PendingAsk[]): string {
+  if (item.kind === 'stranded') return item.id
+  return pending.find((p: PendingAsk) => p.requestId === item.id)?.sessionId ?? ''
+}
+
+function HallInterruption({ hall, model, item }: StageProps & { readonly item: Interruption }) {
+  const { map, view } = model
+  const { answer, busy, answerProblem } = hall.answers
+  const anchor = anchorOf(map, item.nodeId)
+  return (
+    <InterruptionCard
+      item={item}
+      anchor={anchor}
+      flip={anchor.top < (CARD_FLIP_ROW / map.height) * 100}
+      readOnly={model.replay !== null}
+      busy={busy === item.id}
+      problem={answerProblem[item.id] ?? null}
+      onAllow={() => void answer(item.id, askResolved(item.id, 'allow'))}
+      onDeny={() => void answer(item.id, askResolved(item.id, 'deny'))}
+      onDecide={(option, limit) => void answer(item.id, gateDecided(item.id, [option, limit]))}
+      pulls={view.pulls}
+      source={view.source}
+      onTerminal={() =>
+        void answer(item.id, terminalOpened(terminalSessionOf(item, hall.observed.pending)))
+      }
+    />
+  )
+}
+
+/** Play or pause; at the end, playing starts again from the beginning. */
+function togglePlay(hall: Hall, replay: Replay): void {
+  const { refs } = hall.rp
+  if (replay.playing) {
+    patchReplay(refs, { playing: false })
+    return
+  }
+  if (replay.pos >= replay.clock.duration) hall.replay.moveReplay(0, true)
+  patchReplay(refs, { playing: true })
+}
+
+interface ReplayBarProps {
+  readonly hall: Hall
+  readonly replay: Replay
+}
+
+function ReplayBar({ hall, replay }: ReplayBarProps) {
+  return (
+    <div className="fdry-replay" role="group" aria-label="Replay">
+      <button
+        type="button"
+        className="fdry-hall-btn is-primary"
+        aria-label={replay.playing ? 'Pause' : 'Play'}
+        onClick={() => togglePlay(hall, replay)}
+      >
+        {replay.playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+      </button>
+      <ReplayTrack hall={hall} replay={replay} />
+      <ReplaySpeeds hall={hall} replay={replay} />
+      <span className="fdry-replay__at">
+        {new Date(replay.clock.toReal(replay.pos)).toLocaleTimeString()}
+      </span>
+      <button
+        type="button"
+        className="fdry-hall-btn"
+        onClick={() => leaveReplay(hall.rp.refs, hall.talk.setCallouts)}
+      >
+        <Radio aria-hidden="true" /> Back to live
+      </button>
+    </div>
+  )
+}
+
+function ReplayTrack({ hall, replay }: ReplayBarProps) {
+  return (
+    <>
+      <input
+        type="range"
+        className="fdry-replay__track"
+        aria-label="Replay position"
+        min={0}
+        max={Math.max(replay.clock.duration, 1)}
+        step={REPLAY_STEP_MS}
+        value={replay.pos}
+        onChange={(e) => hall.replay.moveReplay(Number(e.currentTarget.value), true)}
+      />
+      <span className="fdry-replay__time">
+        {clockText(replay.pos)} / {clockText(replay.clock.duration)}
+      </span>
+    </>
+  )
+}
+
+function ReplaySpeeds({ hall, replay }: ReplayBarProps) {
+  return (
+    <span className="fdry-replay__speeds">
+      {REPLAY_SPEEDS.map((speed) => (
+        <button
+          key={speed}
+          type="button"
+          className="fdry-hall-btn"
+          aria-pressed={replay.speed === speed}
+          onClick={() => patchReplay(hall.rp.refs, { speed })}
+        >
+          {speed}x
+        </button>
+      ))}
+    </span>
+  )
+}
+
+function StationPanel({ hall, model, node }: StageProps & { readonly node: HallNode }) {
+  const { station } = hall
+  return (
+    <StationMonitor
+      node={node}
+      label={model.labels[node.id] ?? node.id}
+      sign={model.map.props.find((p) => p.nodeId === node.id)?.sign ?? null}
+      orderId={hall.orderId}
+      lines={station.transcript}
+      status={model.monitorStatus}
+      alert={model.monitorAlert}
+      attachProblem={station.attachProblem}
+      facts={model.monitorFacts}
+      attachable={!model.agentClosed}
+      onAttach={() => void station.attach(node.id)}
+      onClose={() => station.setSelected(null)}
+    />
+  )
+}
+
+function AskButtons({
+  busy,
+  onAllow,
+  onDeny,
+  onTerminal,
+}: Pick<InterruptionCardProps, 'busy' | 'onAllow' | 'onDeny' | 'onTerminal'>) {
+  return (
+    <>
+      <button type="button" className="fdry-hall-btn is-primary" disabled={busy} onClick={onAllow}>
+        Allow
+      </button>
+      <button type="button" className="fdry-hall-btn" disabled={busy} onClick={onDeny}>
+        Deny
+      </button>
+      <button type="button" className="fdry-hall-btn" disabled={busy} onClick={onTerminal}>
+        <Terminal aria-hidden="true" /> Terminal
+      </button>
+    </>
+  )
+}
+
+/** Where a fixture's tip sits, and the box it covers, as fractions of the hall. */
+function signPlacement(sign: HallSign, map: HallMap) {
+  const width = map.width * TILE_PX
+  const height = map.height * TILE_PX
+  const { left, top, right, bottom } = sign.rect
+  const centre = (left + right) / 2 / width
+  return {
+    align: centre > 0.75 ? 'end' : centre < 0.25 ? 'start' : 'middle',
+    place: top / height < 0.25 ? 'below' : 'above',
+    style: {
+      left: `${(left / width) * 100}%`,
+      top: `${(top / height) * 100}%`,
+      width: `${((right - left) / width) * 100}%`,
+      height: `${((bottom - top) / height) * 100}%`,
+    },
+  }
 }
 
 /** A fixture's one sentence: its accessible name, and a tip on hover or focus. */
@@ -815,24 +1193,16 @@ function HallSignLabel({
   readonly sign: HallSign
   readonly map: HallMap
 }): JSX.Element {
-  const width = map.width * TILE_PX
-  const height = map.height * TILE_PX
-  const { left, top, right, bottom } = sign.rect
-  const centre = (left + right) / 2 / width
+  const { align, place, style } = signPlacement(sign, map)
   return (
     <div
       role="img"
       tabIndex={0}
       aria-label={sign.text}
       className="fdry-hall-sign"
-      data-align={centre > 0.75 ? 'end' : centre < 0.25 ? 'start' : 'middle'}
-      data-place={top / height < 0.25 ? 'below' : 'above'}
-      style={{
-        left: `${(left / width) * 100}%`,
-        top: `${(top / height) * 100}%`,
-        width: `${((right - left) / width) * 100}%`,
-        height: `${((bottom - top) / height) * 100}%`,
-      }}
+      data-align={align}
+      data-place={place}
+      style={style}
     >
       <span className="fdry-hall-sign__tip" aria-hidden="true">
         {sign.text}
@@ -854,38 +1224,19 @@ interface HallHudProps {
 }
 
 /** The order's own status, on the hall's top edge rather than above or below it. */
-function HallHud({
-  view,
-  shownGraph,
-  replaying,
-  waitingCount,
-  note,
-  onBack,
-  onReplay,
-  onOpenInList,
-}: HallHudProps): JSX.Element {
+function HallHud(props: HallHudProps): JSX.Element {
+  const { view, replaying, waitingCount, note } = props
   const standing = replaying ? undefined : view.standing
-  const finished = (s: NodeState): boolean => s === 'passed' || s === 'skipped'
-  const done = standing?.done ?? shownGraph.nodes.filter((n) => finished(n.state)).length
-  const total = standing?.total ?? shownGraph.nodes.length
   return (
     <div className="fdry-hall-hud">
-      <button type="button" className="fdry-hall-btn" onClick={onBack}>
+      <button type="button" className="fdry-hall-btn" onClick={props.onBack}>
         <ArrowLeft aria-hidden="true" /> All halls
       </button>
-      <div className="fdry-hall-hud__order">
-        <span className="fdry-hall-hud__title">{view.title ?? view.graph.orderId}</span>
-        <span className="fdry-hall-hud__progress" aria-label={`${done} of ${total} steps done`}>
-          <span style={{ width: `${total === 0 ? 0 : (done / total) * 100}%` }} />
-        </span>
-        <span className="fdry-hall-hud__steps">
-          {done}/{total}
-        </span>
-      </div>
+      <HudOrder view={view} shownGraph={props.shownGraph} standing={standing} />
       {replaying ? (
         <span className="fdry-hall-hud__tag">Replay</span>
       ) : (
-        <button type="button" className="fdry-hall-btn" onClick={onReplay}>
+        <button type="button" className="fdry-hall-btn" onClick={props.onReplay}>
           <History aria-hidden="true" /> Replay
         </button>
       )}
@@ -898,18 +1249,54 @@ function HallHud({
       {!replaying && waitingCount > 0 ? (
         <span className="fdry-hall-hud__needs">{waitingCount} need you</span>
       ) : null}
-      {/* A move no card owns — a run nothing is running, say — still names
-          its place. A gate is decided in the queue above the hall. */}
-      {standing !== undefined && standing.turn === 'you' && waitingCount === 0 ? (
-        <div className="fdry-hall-hud__alert">
-          <span>{standing.headline}</span>
-          {standing.gateId !== null ? null : (
-            <button type="button" className="fdry-hall-btn is-primary" onClick={onOpenInList}>
-              Open in List view
-            </button>
-          )}
-        </div>
-      ) : null}
+      <HudAlert standing={standing} waitingCount={waitingCount} onOpenInList={props.onOpenInList} />
+    </div>
+  )
+}
+
+interface HudOrderProps {
+  readonly view: FloorView
+  readonly shownGraph: RunGraph
+  readonly standing: FloorView['standing']
+}
+
+function HudOrder({ view, shownGraph, standing }: HudOrderProps) {
+  const finished = (s: NodeState): boolean => s === 'passed' || s === 'skipped'
+  const done = standing?.done ?? shownGraph.nodes.filter((n) => finished(n.state)).length
+  const total = standing?.total ?? shownGraph.nodes.length
+  return (
+    <div className="fdry-hall-hud__order">
+      <span className="fdry-hall-hud__title">{view.title ?? view.graph.orderId}</span>
+      <span className="fdry-hall-hud__progress" aria-label={`${done} of ${total} steps done`}>
+        <span style={{ width: `${total === 0 ? 0 : (done / total) * 100}%` }} />
+      </span>
+      <span className="fdry-hall-hud__steps">
+        {done}/{total}
+      </span>
+    </div>
+  )
+}
+
+interface HudAlertProps {
+  readonly standing: FloorView['standing']
+  readonly waitingCount: number
+  readonly onOpenInList: () => void
+}
+
+/**
+ * A move no card owns — a run nothing is running, say — still names its
+ * place. A gate is decided in the queue above the hall.
+ */
+function HudAlert({ standing, waitingCount, onOpenInList }: HudAlertProps) {
+  if (standing === undefined || standing.turn !== 'you' || waitingCount !== 0) return null
+  return (
+    <div className="fdry-hall-hud__alert">
+      <span>{standing.headline}</span>
+      {standing.gateId !== null ? null : (
+        <button type="button" className="fdry-hall-btn is-primary" onClick={onOpenInList}>
+          Open in List view
+        </button>
+      )}
     </div>
   )
 }
@@ -930,58 +1317,64 @@ interface InterruptionCardProps {
   readonly onTerminal: () => void
 }
 
+type GateItem = Extract<Interruption, { kind: 'gate' }>
+type AskItem = Exclude<Interruption, { kind: 'gate' }>
+
 /** Pinned over the station that is waiting, and answerable where it stands. */
-function InterruptionCard({
-  item,
-  readOnly,
-  anchor,
-  flip,
-  busy,
-  problem,
-  onAllow,
-  onDeny,
-  onDecide,
-  pulls,
-  source,
-  onTerminal,
-}: InterruptionCardProps): JSX.Element {
+function InterruptionCard(props: InterruptionCardProps): JSX.Element {
+  const { item } = props
+  return item.kind === 'gate' ? (
+    <GateInterruption {...props} item={item} />
+  ) : (
+    <AskInterruption {...props} item={item} />
+  )
+}
+
+function gateCardStyle(anchor: Anchor, flip: boolean): React.CSSProperties {
+  return {
+    // Centred on its anchor but kept whole inside the scene: the inset is
+    // half the card's own width (see .fdry-card--gate) plus a margin.
+    left: `clamp(${GATE_CARD_INSET}, ${anchor.left}%, calc(100% - ${GATE_CARD_INSET}))`,
+    top: `${flip ? anchor.bottom : anchor.top}%`,
+    // An opened reason grows the card toward the scene's edge; past this
+    // it scrolls instead of running off it. The offsets mirror the card's
+    // transform (34px above, 10px below) plus 16px of air.
+    '--fdry-card-room': flip
+      ? `calc(${100 - anchor.bottom}% - 26px)`
+      : `calc(${anchor.top}% - 50px)`,
+  } as React.CSSProperties
+}
+
+/**
+ * The same one-line gate the list views draw: collapsed, its answers on the
+ * line, the reason a click away and read as markdown. A replay shows it where
+ * it happened with every answer disabled.
+ */
+function GateInterruption(props: InterruptionCardProps & { readonly item: GateItem }) {
+  const { item, readOnly, flip, problem } = props
+  return (
+    <div
+      role="group"
+      aria-label={item.title}
+      className={`fdry-card fdry-card--gate${flip ? ' is-below' : ''}`}
+      style={gateCardStyle(props.anchor, flip)}
+    >
+      <GateCard
+        gate={item.gate}
+        busy={props.busy || readOnly}
+        pulls={props.pulls}
+        source={props.source}
+        onDecide={props.onDecide}
+      />
+      {problem !== null ? <p className="fdry-card__problem">{problem}</p> : null}
+      {readOnly ? <p className="fdry-card__history">Waited on you here.</p> : null}
+    </div>
+  )
+}
+
+function AskInterruption(props: InterruptionCardProps & { readonly item: AskItem }) {
+  const { item, anchor, flip, problem } = props
   const titleId = `fdry-card-${item.kind}-${item.id}`
-  if (item.kind === 'gate') {
-    // The same one-line gate the list views draw: collapsed, its answers on
-    // the line, the reason a click away and read as markdown. A replay shows
-    // it where it happened with every answer disabled.
-    return (
-      <div
-        role="group"
-        aria-label={item.title}
-        className={`fdry-card fdry-card--gate${flip ? ' is-below' : ''}`}
-        style={
-          {
-            // Centred on its anchor but kept whole inside the scene: the inset is
-            // half the card's own width (see .fdry-card--gate) plus a margin.
-            left: `clamp(${GATE_CARD_INSET}, ${anchor.left}%, calc(100% - ${GATE_CARD_INSET}))`,
-            top: `${flip ? anchor.bottom : anchor.top}%`,
-            // An opened reason grows the card toward the scene's edge; past this
-            // it scrolls instead of running off it. The offsets mirror the card's
-            // transform (34px above, 10px below) plus 16px of air.
-            '--fdry-card-room': flip
-              ? `calc(${100 - anchor.bottom}% - 26px)`
-              : `calc(${anchor.top}% - 50px)`,
-          } as React.CSSProperties
-        }
-      >
-        <GateCard
-          gate={item.gate}
-          busy={busy || readOnly}
-          pulls={pulls}
-          source={source}
-          onDecide={onDecide}
-        />
-        {problem !== null ? <p className="fdry-card__problem">{problem}</p> : null}
-        {readOnly ? <p className="fdry-card__history">Waited on you here.</p> : null}
-      </div>
-    )
-  }
   return (
     <div
       role="group"
@@ -996,48 +1389,45 @@ function InterruptionCard({
         <ShieldQuestion aria-hidden="true" />
         <span id={titleId}>{item.title}</span>
       </div>
-      <p className="fdry-card__detail">
-        {item.kind === 'ask' && item.prose ? (
-          <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
-            {item.detail}
-          </Markdown>
-        ) : (
-          item.detail
-        )}
-      </p>
+      <AskDetail item={item} />
       {problem !== null ? <p className="fdry-card__problem">{problem}</p> : null}
-      {readOnly ? (
+      {props.readOnly ? (
         <p className="fdry-card__history">Waited on you here.</p>
       ) : (
-        <div className="fdry-card__actions">
-          {item.kind === 'ask' ? (
-            <>
-              <button
-                type="button"
-                className="fdry-hall-btn is-primary"
-                disabled={busy}
-                onClick={onAllow}
-              >
-                Allow
-              </button>
-              <button type="button" className="fdry-hall-btn" disabled={busy} onClick={onDeny}>
-                Deny
-              </button>
-              <button type="button" className="fdry-hall-btn" disabled={busy} onClick={onTerminal}>
-                <Terminal aria-hidden="true" /> Terminal
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="fdry-hall-btn is-primary"
-              disabled={busy}
-              onClick={onTerminal}
-            >
-              <Terminal aria-hidden="true" /> Go to terminal
-            </button>
-          )}
-        </div>
+        <AskActions {...props} />
+      )}
+    </div>
+  )
+}
+
+function AskDetail({ item }: { readonly item: AskItem }) {
+  return (
+    <p className="fdry-card__detail">
+      {item.kind === 'ask' && item.prose ? (
+        <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
+          {item.detail}
+        </Markdown>
+      ) : (
+        item.detail
+      )}
+    </p>
+  )
+}
+
+function AskActions({ item, busy, onAllow, onDeny, onTerminal }: InterruptionCardProps) {
+  return (
+    <div className="fdry-card__actions">
+      {item.kind === 'ask' ? (
+        <AskButtons busy={busy} onAllow={onAllow} onDeny={onDeny} onTerminal={onTerminal} />
+      ) : (
+        <button
+          type="button"
+          className="fdry-hall-btn is-primary"
+          disabled={busy}
+          onClick={onTerminal}
+        >
+          <Terminal aria-hidden="true" /> Go to terminal
+        </button>
       )}
     </div>
   )

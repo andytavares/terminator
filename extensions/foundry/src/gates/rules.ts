@@ -259,23 +259,8 @@ export class UnattributedGateError extends Error {
 export function raiseGate(input: RaiseInput): Gate {
   if (input.why.trim() === '') throw new UnattributedGateError()
   const shape = RULE_SHAPE[input.rule]
-
-  // A default naming an option the gate does not offer would produce a
-  // decision nobody could have made. Caught here rather than at the moment a
-  // deadline passes, unattended, which is the worst possible time to find out.
-  if (!shape.options.some((option) => option.id === shape.defaultIfIgnored)) {
-    throw new Error(
-      `The "${input.rule}" rule defaults to "${shape.defaultIfIgnored}", which is not one of the options it offers.`
-    )
-  }
-
   const omitted = input.omitOptions ?? []
-  if (omitted.includes(shape.defaultIfIgnored)) {
-    throw new Error(
-      `The "${input.rule}" rule defaults to "${shape.defaultIfIgnored}", so that option cannot be omitted.`
-    )
-  }
-
+  assertDefaultOffered(input.rule, omitted)
   return {
     id: input.id,
     rule: input.rule,
@@ -295,6 +280,26 @@ export function raiseGate(input: RaiseInput): Gate {
   }
 }
 
+/**
+ * A default naming an option the gate does not offer would produce a decision
+ * nobody could have made. Caught when the gate is raised rather than at the
+ * moment a deadline passes, unattended, which is the worst possible time to
+ * find out.
+ */
+function assertDefaultOffered(rule: GateRuleId, omitted: readonly string[]): void {
+  const shape = RULE_SHAPE[rule]
+  if (!shape.options.some((option) => option.id === shape.defaultIfIgnored)) {
+    throw new Error(
+      `The "${rule}" rule defaults to "${shape.defaultIfIgnored}", which is not one of the options it offers.`
+    )
+  }
+  if (omitted.includes(shape.defaultIfIgnored)) {
+    throw new Error(
+      `The "${rule}" rule defaults to "${shape.defaultIfIgnored}", so that option cannot be omitted.`
+    )
+  }
+}
+
 /** @internal */
 export class AlreadyDecidedError extends Error {
   readonly code = 'GATE_ALREADY_DECIDED'
@@ -304,11 +309,19 @@ export class AlreadyDecidedError extends Error {
   }
 }
 
-export function decide(gate: Gate, option: string, note: string, at: string): Gate {
+/** What the operator answered: the option they took, what they said, and when. */
+export interface Answer {
+  readonly option: string
+  readonly note: string
+  readonly at: string
+}
+
+export function decide(gate: Gate, answer: Answer): Gate {
   if (gate.decision !== null) throw new AlreadyDecidedError(gate.id)
-  if (!gate.options.some((o) => o.id === option)) {
-    throw new Error(`"${option}" is not one of the options on gate ${gate.id}.`)
+  if (!gate.options.some((o) => o.id === answer.option)) {
+    throw new Error(`"${answer.option}" is not one of the options on gate ${gate.id}.`)
   }
+  const { option, note, at } = answer
   return { ...gate, decision: { option, by: 'operator', note, at } }
 }
 

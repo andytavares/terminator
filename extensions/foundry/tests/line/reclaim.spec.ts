@@ -79,6 +79,12 @@ describe('orphanedNodes', () => {
 })
 
 describe('reclaim', () => {
+  describe('putting a node back', puttingANodeBackTests)
+  describe('end marks and blocked nodes', endMarksAndBlockedNodesTests)
+  describe('nothing to reclaim, or everything', nothingToReclaimOrEverythingTests)
+})
+
+function puttingANodeBackTests() {
   it('puts an orphaned node back where the scheduler can offer it again', () => {
     const g = withNode(graph(), 'build:U-1', { state: 'running', sessionId: 's1', attempts: 1 })
     const out = reclaim(g, nothingLive)
@@ -100,7 +106,9 @@ describe('reclaim', () => {
     const g = withNode(graph(), 'build:U-1', { state: 'running', sessionId: 's1' })
     expect(nodeById(reclaim(g, nothingLive).graph, 'build:U-1')?.sessionId).toBe('s1')
   })
+}
 
+function endMarksAndBlockedNodesTests() {
   it('clears the end mark, which a waiting node has not reached', () => {
     const g = withNode(graph(), 'build:U-1', {
       state: 'running',
@@ -115,7 +123,9 @@ describe('reclaim', () => {
     g = withNode(g, 'integrate', { state: 'blocked' })
     expect(nodeById(reclaim(g, nothingLive).graph, 'integrate')?.state).toBe('waiting')
   })
+}
 
+function nothingToReclaimOrEverythingTests() {
   it('changes nothing when every agent is still in its terminal', () => {
     const g = withNode(graph(), 'build:U-1', { state: 'running', sessionId: 's1' })
     const out = reclaim(g, everythingLive)
@@ -135,7 +145,7 @@ describe('reclaim', () => {
     g = withNode(g, 'build:U-2', { state: 'running', sessionId: 's2' })
     expect(reclaim(g, nothingLive).reclaimed).toEqual(['build:U-1', 'build:U-2'])
   })
-})
+}
 
 describe('a running gate', () => {
   it('is the tail owed, not an agent that died', () => {

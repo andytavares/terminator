@@ -23,6 +23,13 @@ function setup(over: Partial<Parameters<typeof BudgetForm>[0]> = {}) {
 }
 
 describe('BudgetForm', () => {
+  describe('showing and submitting', showingAndSubmittingTests)
+  describe('limits', limitsTests)
+  describe('empty limits and cancel', emptyLimitsAndCancelTests)
+  describe('no cancel and disabled', noCancelAndDisabledTests)
+})
+
+function showingAndSubmittingTests() {
   it('shows each limit, and a budget with no limit as ticked and without a number', () => {
     setup()
     expect(
@@ -42,7 +49,9 @@ describe('BudgetForm', () => {
     await user.click(screen.getByRole('button', { name: 'Save budgets' }))
     expect(onSubmit).toHaveBeenCalledWith({ agents: 5, wallClockMinutes: null })
   })
+}
 
+function limitsTests() {
   it('takes a limit off, and puts one back', async () => {
     const { onSubmit, user } = setup()
     await user.click(screen.getByRole('checkbox', { name: 'No limit on agents at once' }))
@@ -68,7 +77,9 @@ describe('BudgetForm', () => {
     await user.click(button)
     expect(onSubmit).toHaveBeenCalledWith({ wall_clock: 47 })
   })
+}
 
+function emptyLimitsAndCancelTests() {
   it('will not submit an empty or fractional limit', async () => {
     const { user } = setup()
     const agents = screen.getByRole('spinbutton', { name: 'Agents at once' })
@@ -85,7 +96,9 @@ describe('BudgetForm', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onCancel).toHaveBeenCalled()
   })
+}
 
+function noCancelAndDisabledTests() {
   it('offers no cancel when there is nothing to go back to', () => {
     setup()
     expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull()
@@ -101,4 +114,4 @@ describe('BudgetForm', () => {
       expect((control as HTMLInputElement).disabled).toBe(true)
     }
   })
-})
+}

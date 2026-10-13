@@ -69,12 +69,11 @@ describe('a read-only turn in the Forge', () => {
   })
 })
 
-describe('trusting the repository an agent starts in', () => {
-  let home: string
-  const entries: LedgerEntry[] = []
-  const store = { record: async (entry: LedgerEntry) => void entries.push(entry) }
-  const api = { log: { error: vi.fn() } } as unknown as ExtensionAPI
+let home: string
+const entries: LedgerEntry[] = []
+const api = { log: { error: vi.fn() } } as unknown as ExtensionAPI
 
+describe('trusting the repository an agent starts in', () => {
   beforeEach(() => {
     home = temporaryDirectory('fdry-home')
     vi.stubEnv('HOME', home)
@@ -84,9 +83,15 @@ describe('trusting the repository an agent starts in', () => {
 
   afterEach(() => vi.unstubAllEnvs())
 
+  describe('trusting', trustingTests)
+})
+
+function trustingTests() {
+  const store = { record: async (entry: LedgerEntry) => void entries.push(entry) }
+
   it('marks it trusted in the Claude Code configuration and says so on the order', async () => {
     fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ projects: {} }))
-    trustRepository(api, '/repos/app', 'WO-1', store)
+    trustRepository(api, '/repos/app', { orderId: 'WO-1', store })
     const config = JSON.parse(fs.readFileSync(path.join(home, '.claude.json'), 'utf8'))
     expect(config.projects['/repos/app'].hasTrustDialogAccepted).toBe(true)
     await vi.waitFor(() => expect(entries.map((e) => e.action)).toEqual(['workspace.trusted']))
@@ -98,7 +103,7 @@ describe('trusting the repository an agent starts in', () => {
       path.join(home, '.claude.json'),
       JSON.stringify({ projects: { '/repos/app': { hasTrustDialogAccepted: true } } })
     )
-    trustRepository(api, '/repos/app', 'WO-1', store)
+    trustRepository(api, '/repos/app', { orderId: 'WO-1', store })
     await Promise.resolve()
     expect(entries).toEqual([])
     expect(api.log.error).not.toHaveBeenCalled()
@@ -109,8 +114,8 @@ describe('trusting the repository an agent starts in', () => {
     fs.writeFileSync(config, JSON.stringify({ projects: {} }))
     // Something already sits where the new configuration is written first.
     fs.mkdirSync(`${config}.foundry-${process.pid}.tmp`)
-    trustRepository(api, '/repos/app', 'WO-1', store)
+    trustRepository(api, '/repos/app', { orderId: 'WO-1', store })
     expect(api.log.error).toHaveBeenCalledWith(expect.stringContaining('trust dialog'))
     expect(entries).toEqual([])
   })
-})
+}

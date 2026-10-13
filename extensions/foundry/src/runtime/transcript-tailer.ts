@@ -83,43 +83,65 @@ function eventsFromEntry(
 
   const events: ToolActivity[] = []
   for (const block of blocksOf(entry)) {
-    if (block.type === 'tool_use') {
-      const callId = typeof block.id === 'string' ? block.id : null
-      // Without an id the call can never be paired with its result, so the
-      // long-command exemption could not close it. Better to skip it.
-      if (callId === null) continue
-      const toolName = typeof block.name === 'string' ? block.name : 'unknown'
-      const isShell = SHELL_TOOLS.has(toolName)
-      callInfo.set(callId, { toolName, isShell })
-      const input = block.input
-      const named =
-        typeof input === 'object' && input !== null
-          ? ((input as Record<string, unknown>).file_path ??
-            (input as Record<string, unknown>).notebook_path)
+    const event =
+      block.type === 'tool_use'
+        ? startedEvent(block, callInfo, at)
+        : block.type === 'tool_result'
+          ? finishedEvent(block, callInfo, at)
           : null
-      events.push({
-        kind: 'tool_started',
-        toolName,
-        callId,
-        isShell,
-        path: typeof named === 'string' ? named : null,
-        at,
-      })
-    } else if (block.type === 'tool_result') {
-      const callId = typeof block.tool_use_id === 'string' ? block.tool_use_id : null
-      if (callId === null) continue
-      const info = callInfo.get(callId)
-      events.push({
-        kind: 'tool_finished',
-        toolName: info?.toolName ?? '',
-        callId,
-        isShell: info?.isShell ?? false,
-        path: null,
-        at,
-      })
-    }
+    if (event !== null) events.push(event)
   }
   return events
+}
+
+/** A `tool_use` block as the call starting, remembered so its result can be labelled. */
+function startedEvent(
+  block: ToolUseBlock,
+  callInfo: Map<string, CallInfo>,
+  at: number
+): ToolActivity | null {
+  const callId = typeof block.id === 'string' ? block.id : null
+  // Without an id the call can never be paired with its result, so the
+  // long-command exemption could not close it. Better to skip it.
+  if (callId === null) return null
+  const toolName = typeof block.name === 'string' ? block.name : 'unknown'
+  const isShell = SHELL_TOOLS.has(toolName)
+  callInfo.set(callId, { toolName, isShell })
+  const named = namedFile(block.input)
+  return {
+    kind: 'tool_started',
+    toolName,
+    callId,
+    isShell,
+    path: typeof named === 'string' ? named : null,
+    at,
+  }
+}
+
+/** The file a call's input names, if it names one. */
+function namedFile(input: unknown): unknown {
+  if (typeof input !== 'object' || input === null) return null
+  const fields = input as Record<string, unknown>
+  return fields.file_path ?? fields.notebook_path
+}
+
+/** A `tool_result` block as the call finishing, labelled by the `tool_use` that opened it. */
+function finishedEvent(
+  block: ToolUseBlock,
+  callInfo: Map<string, CallInfo>,
+  at: number
+): ToolActivity | null {
+  const callId = typeof block.tool_use_id === 'string' ? block.tool_use_id : null
+  if (callId === null) return null
+  const info = callInfo.get(callId)
+  return {
+    kind: 'tool_finished',
+    toolName: info?.toolName ?? '',
+    callId,
+    isShell: info?.isShell ?? false,
+    path: null,
+    at,
+  }
 }
 
 /**

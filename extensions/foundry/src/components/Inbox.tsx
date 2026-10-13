@@ -16,10 +16,11 @@ import {
 import type { Gate, GateRuleId } from '../gates/rules.js'
 import { ExternalLink } from './ExternalLink.js'
 import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
-import { Button, usePolling } from '@terminator/extension-ui'
+import { Button } from '@terminator/extension-ui'
 import type { Signal } from '../sensors/types.js'
 import { invoke } from '@terminator/extension-sdk/renderer'
-import { readSignals, type SensorRow, type SignalsRead } from './signals-read.js'
+import type { SensorRow } from './signals-read.js'
+import { usePromotion, useSignalFeed } from '../renderer/use-signals.js'
 
 // Everything waiting on the operator, as a band above the Forge.
 //
@@ -83,36 +84,37 @@ export function Inbox({
   onOpenOrder?: (orderId: string) => void
 } = {}): JSX.Element | null {
   const [view, setView] = useState<InboxView | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [problem, setProblem] = useState<string | null>(null)
-  const [signals, setSignals] = useState<Signal[]>([])
-  const [sensors, setSensors] = useState<SensorRow[]>([])
-  const [promoting, setPromoting] = useState<string | null>(null)
-  const [repoDraft, setRepoDraft] = useState('')
-  const [signalProblem, setSignalProblem] = useState<string | null>(null)
-  const [promoted, setPromoted] = useState<string | null>(null)
-
-  const showSignals = useCallback((read: SignalsRead): void => {
-    setSignals(read.signals)
-    setSensors(read.sensors)
-  }, [])
-
-  const refreshSignals = useCallback(() => readSignals().then(showSignals), [showSignals])
-
   const refreshList = useCallback(() => readInbox().then(setView), [])
-
-  const refresh = useCallback(async () => {
-    await refreshList()
-    await refreshSignals()
-  }, [refreshList, refreshSignals])
-
   // An order can start waiting on you at any moment; Foundry says when.
   usePushed(readInbox, setView, { kinds: ANY_RECORD })
+  const signals = useSignals()
+  const answers = useAnswers(refreshList, signals.refreshSignals)
 
-  // Sensors record signals on their own tick and tell nobody, so this is the
-  // one thing here still asked for on a timer — and not while hidden.
-  usePolling(readSignals, showSignals, SIGNAL_POLL_MS)
+  if (view === null) return null
 
+  const waiting = view.waiting ?? []
+  const quiet =
+    waiting.length === 0 &&
+    view.gates.length === 0 &&
+    signals.signals.length === 0 &&
+    answers.problem === null &&
+    signals.promoted === null
+  if (quiet) return null
+
+  return (
+    <section className="fdry-inbox" aria-label="Waiting on you">
+      {answers.problem !== null ? <p className="fdry-problem">{answers.problem}</p> : null}
+      <WaitingOrders waiting={waiting} onOpenOrder={onOpenOrder} />
+      <GateQueue gates={view.gates} busy={answers.busy} onAnswer={answers.answer} />
+      <SignalsSection signals={signals} />
+    </section>
+  )
+}
+
+/** Answering a gate: which one is being sent, and what the last refusal said. */
+function useAnswers(refreshList: () => Promise<void>, refreshSignals: () => Promise<void>) {
+  const [busy, setBusy] = useState<string | null>(null)
+  const [problem, setProblem] = useState<string | null>(null)
   const answer = useCallback(
     async (gateId: string, option: string, limit?: number | null) => {
       setBusy(gateId)
@@ -127,43 +129,21 @@ export function Inbox({
           error?: string
         }
         if (result.error !== undefined) setProblem(result.error)
-        await refresh()
+        await refreshList()
+        await refreshSignals()
       } finally {
         setBusy(null)
       }
     },
-    [refresh]
+    [refreshList, refreshSignals]
   )
+  return { busy, problem, answer }
+}
 
-  const startPromote = useCallback(
-    (signal: Signal) => {
-      const sensor = sensors.find((s) => s.def.id === signal.sensorId)
-      setSignalProblem(null)
-      setPromoted(null)
-      setRepoDraft(sensor?.state.repoPath ?? '')
-      setPromoting(signal.id)
-    },
-    [sensors]
-  )
-
-  const confirmPromote = useCallback(
-    async (id: string) => {
-      setSignalProblem(null)
-      const result = (await invoke('foundry:signals.promote', {
-        id,
-        repoPaths: [repoDraft],
-      })) as { order?: { id: string }; error?: string }
-      if (result.error !== undefined) {
-        setSignalProblem(result.error)
-        return
-      }
-      setPromoting(null)
-      setPromoted(`Draft ${result.order?.id ?? ''} created — open it in the Forge`)
-      await refreshSignals()
-    },
-    [repoDraft, refreshSignals]
-  )
-
+/** The sensors' signals, and promoting one into a draft. */
+function useSignals() {
+  const { signals, sensors, refreshSignals } = useSignalFeed(SIGNAL_POLL_MS)
+  const promotion = usePromotion(sensors, refreshSignals)
   const dismissSignal = useCallback(
     async (id: string) => {
       await invoke('foundry:signals.dismiss', { id })
@@ -171,150 +151,200 @@ export function Inbox({
     },
     [refreshSignals]
   )
+  return { signals, sensors, refreshSignals, dismissSignal, ...promotion }
+}
 
-  if (view === null) return null
+type Signals = ReturnType<typeof useSignals>
 
-  const waiting = view.waiting ?? []
-  const quiet =
-    waiting.length === 0 &&
-    view.gates.length === 0 &&
-    signals.length === 0 &&
-    problem === null &&
-    promoted === null
-  if (quiet) return null
-
+function WaitingOrders({
+  waiting,
+  onOpenOrder,
+}: {
+  readonly waiting: NonNullable<InboxView['waiting']>
+  readonly onOpenOrder?: (orderId: string) => void
+}) {
+  if (waiting.length === 0) return null
   return (
-    <section className="fdry-inbox" aria-label="Waiting on you">
-      {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
-      {waiting.length > 0 ? (
-        <ul className="fdry-queue" aria-label="Orders waiting on you">
-          {waiting.map((row) => (
-            <li key={row.orderId} className="fdry-gate is-warn">
-              <span className="fdry-gate-stripe" aria-hidden="true" />
-              <div className="fdry-waiting">
-                <span className="fdry-gate-icon" aria-hidden="true">
-                  <Hand />
-                </span>
-                <div className="fdry-waiting-main">
-                  <b>{row.headline}</b>
-                  <span className="fdry-waiting-title">{row.title}</span>
-                  <p>{row.detail}</p>
-                </div>
-                <div className="fdry-gate-actions">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    aria-label={`Open ${row.title} in the Forge`}
-                    onClick={() => onOpenOrder?.(row.orderId)}
-                  >
-                    Open
-                  </Button>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {view.gates.length === 0 ? null : (
-        <ul className="fdry-queue">
-          {view.gates.map((gate) => {
-            const Icon = RULE_ICON[gate.rule]
-            return (
-              <li key={gate.id} className={`fdry-gate ${RULE_TONE[gate.rule]}`}>
-                <span className="fdry-gate-stripe" aria-hidden="true" />
-                <GateCard
-                  gate={gate}
-                  busy={busy === gate.id}
-                  pulls={gate.pulls}
-                  source={gate.source}
-                  onDecide={(option, limit) => void answer(gate.id, option, limit)}
-                  lead={
-                    <>
-                      <span className="fdry-gate-icon" aria-hidden="true">
-                        <Icon />
-                      </span>
-                      <code className="fdry-gate-rule" title={ruleInWords(gate.rule)}>
-                        {ruleInWords(gate.rule)}
-                      </code>
-                    </>
-                  }
-                  meta={
-                    <>
-                      <span>{gate.orderTitle ?? `work order ${gate.orderId}`}</span>
-                      {gate.blockedUnits > 0 ? (
-                        <span>{gate.blockedUnits} units waiting</span>
-                      ) : null}
-                    </>
-                  }
-                />
-              </li>
-            )
-          })}
-        </ul>
-      )}
+    <ul className="fdry-queue" aria-label="Orders waiting on you">
+      {waiting.map((row) => (
+        <WaitingRow key={row.orderId} row={row} onOpen={() => onOpenOrder?.(row.orderId)} />
+      ))}
+    </ul>
+  )
+}
 
-      {signals.length > 0 ? (
-        <section className="fdry-signals" aria-label="From the factory's sensors">
-          <h2 className="fdry-panel-h">From the factory&rsquo;s sensors</h2>
-          {signalProblem !== null ? <p className="fdry-problem">{signalProblem}</p> : null}
-          {promoted !== null ? <p className="fdry-note">{promoted}</p> : null}
-          <ul className="fdry-signal-list">
-            {signals.map((signal) => {
-              const sensor = sensors.find((s) => s.def.id === signal.sensorId)
-              const evidence = latestEvidence(signal)
-              return (
-                <li key={signal.id} className="fdry-signal">
-                  <div className="fdry-signal-main">
-                    <b>{signal.title}</b>
-                    <div className="fdry-signal-meta">
-                      <span>×{signal.occurrences}</span>
-                      <span>{signal.severity}</span>
-                      <span>{sensor?.def.description ?? signal.sensorId}</span>
-                      {evidence !== undefined ? (
-                        <ExternalLink href={evidence.url}>{evidence.title}</ExternalLink>
-                      ) : null}
-                    </div>
-                    {promoting === signal.id ? (
-                      <div className="fdry-signal-promote">
-                        <label>
-                          Repository
-                          <input
-                            type="text"
-                            value={repoDraft}
-                            placeholder="/path/to/repo"
-                            onChange={(event) => setRepoDraft(event.target.value)}
-                          />
-                        </label>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          disabled={repoDraft.trim() === ''}
-                          onClick={() => void confirmPromote(signal.id)}
-                        >
-                          Confirm promote
-                        </Button>
-                        <Button size="sm" onClick={() => setPromoting(null)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-                  {promoting === signal.id ? null : (
-                    <div className="fdry-signal-actions">
-                      <Button variant="primary" size="sm" onClick={() => startPromote(signal)}>
-                        Promote
-                      </Button>
-                      <Button size="sm" onClick={() => void dismissSignal(signal.id)}>
-                        Dismiss
-                      </Button>
-                    </div>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      ) : null}
+function WaitingRow({
+  row,
+  onOpen,
+}: {
+  readonly row: NonNullable<InboxView['waiting']>[number]
+  readonly onOpen: () => void
+}) {
+  return (
+    <li className="fdry-gate is-warn">
+      <span className="fdry-gate-stripe" aria-hidden="true" />
+      <div className="fdry-waiting">
+        <span className="fdry-gate-icon" aria-hidden="true">
+          <Hand />
+        </span>
+        <WaitingText row={row} />
+        <div className="fdry-gate-actions">
+          <Button
+            variant="primary"
+            size="sm"
+            aria-label={`Open ${row.title} in the Forge`}
+            onClick={onOpen}
+          >
+            Open
+          </Button>
+        </div>
+      </div>
+    </li>
+  )
+}
+
+interface GateQueueProps {
+  readonly gates: InboxView['gates']
+  readonly busy: string | null
+  readonly onAnswer: (gateId: string, option: string, limit?: number | null) => Promise<void>
+}
+
+function WaitingText({ row }: { readonly row: NonNullable<InboxView['waiting']>[number] }) {
+  return (
+    <div className="fdry-waiting-main">
+      <b>{row.headline}</b>
+      <span className="fdry-waiting-title">{row.title}</span>
+      <p>{row.detail}</p>
+    </div>
+  )
+}
+
+function GateQueue({ gates, busy, onAnswer }: GateQueueProps) {
+  if (gates.length === 0) return null
+  return (
+    <ul className="fdry-queue">
+      {gates.map((gate) => (
+        <li key={gate.id} className={`fdry-gate ${RULE_TONE[gate.rule]}`}>
+          <span className="fdry-gate-stripe" aria-hidden="true" />
+          <GateCard
+            gate={gate}
+            busy={busy === gate.id}
+            pulls={gate.pulls}
+            source={gate.source}
+            onDecide={(option, limit) => void onAnswer(gate.id, option, limit)}
+            lead={<GateLead rule={gate.rule} />}
+            meta={
+              <>
+                <span>{gate.orderTitle ?? `work order ${gate.orderId}`}</span>
+                {gate.blockedUnits > 0 ? <span>{gate.blockedUnits} units waiting</span> : null}
+              </>
+            }
+          />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** What leads a gate's row here: the rule's icon and its name. */
+function GateLead({ rule }: { readonly rule: GateRuleId }) {
+  const Icon = RULE_ICON[rule]
+  return (
+    <>
+      <span className="fdry-gate-icon" aria-hidden="true">
+        <Icon />
+      </span>
+      <code className="fdry-gate-rule" title={ruleInWords(rule)}>
+        {ruleInWords(rule)}
+      </code>
+    </>
+  )
+}
+
+function SignalsSection({ signals: model }: { readonly signals: Signals }) {
+  const { signals, signalProblem, promoted } = model
+  if (signals.length === 0) return null
+  return (
+    <section className="fdry-signals" aria-label="From the factory's sensors">
+      <h2 className="fdry-panel-h">From the factory&rsquo;s sensors</h2>
+      {signalProblem !== null ? <p className="fdry-problem">{signalProblem}</p> : null}
+      {promoted !== null ? <p className="fdry-note">{promoted}</p> : null}
+      <ul className="fdry-signal-list">
+        {signals.map((signal) => (
+          <SignalItem key={signal.id} signal={signal} model={model} />
+        ))}
+      </ul>
     </section>
+  )
+}
+
+function SignalItem({ signal, model }: { readonly signal: Signal; readonly model: Signals }) {
+  const promoting = model.promoting === signal.id
+  return (
+    <li className="fdry-signal">
+      <div className="fdry-signal-main">
+        <b>{signal.title}</b>
+        <SignalMeta signal={signal} sensors={model.sensors} />
+        {promoting ? <PromoteForm signal={signal} model={model} /> : null}
+      </div>
+      {promoting ? null : (
+        <div className="fdry-signal-actions">
+          <Button variant="primary" size="sm" onClick={() => model.startPromote(signal)}>
+            Promote
+          </Button>
+          <Button size="sm" onClick={() => void model.dismissSignal(signal.id)}>
+            Dismiss
+          </Button>
+        </div>
+      )}
+    </li>
+  )
+}
+
+function SignalMeta({
+  signal,
+  sensors,
+}: {
+  readonly signal: Signal
+  readonly sensors: readonly SensorRow[]
+}) {
+  const sensor = sensors.find((s) => s.def.id === signal.sensorId)
+  const evidence = latestEvidence(signal)
+  return (
+    <div className="fdry-signal-meta">
+      <span>×{signal.occurrences}</span>
+      <span>{signal.severity}</span>
+      <span>{sensor?.def.description ?? signal.sensorId}</span>
+      {evidence !== undefined ? (
+        <ExternalLink href={evidence.url}>{evidence.title}</ExternalLink>
+      ) : null}
+    </div>
+  )
+}
+
+function PromoteForm({ signal, model }: { readonly signal: Signal; readonly model: Signals }) {
+  return (
+    <div className="fdry-signal-promote">
+      <label>
+        Repository
+        <input
+          type="text"
+          value={model.repoDraft}
+          placeholder="/path/to/repo"
+          onChange={(event) => model.setRepoDraft(event.target.value)}
+        />
+      </label>
+      <Button
+        variant="primary"
+        size="sm"
+        disabled={model.repoDraft.trim() === ''}
+        onClick={() => void model.confirmPromote(signal.id)}
+      >
+        Confirm promote
+      </Button>
+      <Button size="sm" onClick={() => model.setPromoting(null)}>
+        Cancel
+      </Button>
+    </div>
   )
 }

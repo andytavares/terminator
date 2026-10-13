@@ -78,16 +78,8 @@ export function GateAnswers({
   )
 }
 
-export function GateCard({
-  gate,
-  busy = false,
-  onDecide,
-  pulls = [],
-  source = null,
-  lead,
-  meta,
-  className,
-}: GateCardProps): JSX.Element {
+export function GateCard(props: GateCardProps): JSX.Element {
+  const { gate, busy = false, onDecide, className } = props
   const [open, setOpen] = useState(false)
   const [raising, setRaising] = useState(false)
 
@@ -99,74 +91,144 @@ export function GateCard({
 
   return (
     <div className={`fdry-gate-card${open || raising ? ' is-open' : ''} ${className ?? ''}`.trim()}>
-      {/* The whole row opens the gate, but a control on it does its own job. */}
-      <div
-        className="fdry-gate-row"
-        onClick={(event) => {
-          if ((event.target as HTMLElement).closest('button, a, input') === null) {
-            setOpen((was) => !was)
-          }
-        }}
-      >
-        <IconButton
-          icon={ChevronRight}
-          size="sm"
-          className="fdry-gate-chevron"
-          aria-expanded={open}
-          label={open ? 'Hide the reason' : 'Show the reason'}
-          onClick={() => setOpen((was) => !was)}
-        />
-        {lead}
-        <div className="fdry-gate-text">
-          <b className="fdry-gate-summary" title={gate.summary}>
-            {gate.summary}
-          </b>
-          <div className="fdry-gate-meta">
-            {meta}
-            <span>{gradeInWords(gate.riskGrade)}</span>
-            <OrderLinks pulls={pulls} source={source} />
-            <span className="fdry-gate-default">
-              If nobody answers: {defaultInWords(gate)}
-              {gate.deadline === null ? ' (it waits for you)' : ''}
-            </span>
-          </div>
-        </div>
-        {raising ? null : (
-          <GateAnswers
-            gate={gate}
-            busy={busy}
-            onDecide={(option) => decide(option)}
-            onRaise={() => setRaising(true)}
-          />
-        )}
-      </div>
-
+      <GateRow
+        {...props}
+        busy={busy}
+        open={open}
+        raising={raising}
+        onToggle={() => setOpen((was) => !was)}
+        onDecide={(option) => decide(option)}
+        onRaise={() => setRaising(true)}
+      />
       {open || raising ? (
-        <div className="fdry-gate-detail">
-          {open ? (
-            <>
-              <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
-                {gate.why}
-              </Markdown>
-              <GateEvidence evidence={gate.evidence} />
-              <ul className="fdry-gate-consequences">
-                {gate.options.map((option) => (
-                  <li key={option.id}>
-                    <b>{option.label}</b> {option.consequence}
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-          {raising && gate.breach ? (
-            <RaiseBudgetForm
-              breach={gate.breach}
-              disabled={busy}
-              onRaise={(limit) => decide('raise', limit)}
-              onCancel={() => setRaising(false)}
-            />
-          ) : null}
-        </div>
+        <GateDetail
+          {...{ gate, busy, open, raising }}
+          onRaise={(limit) => decide('raise', limit)}
+          onCancel={() => setRaising(false)}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+interface GateRowProps extends Omit<GateCardProps, 'onDecide'> {
+  readonly busy: boolean
+  readonly open: boolean
+  readonly raising: boolean
+  readonly onToggle: () => void
+  readonly onDecide: (option: string) => void
+  readonly onRaise: () => void
+}
+
+/** The gate's one line: what it asks, what it is about, and its answers. */
+function GateRow({
+  gate,
+  busy,
+  open,
+  raising,
+  lead,
+  onToggle,
+  onDecide,
+  onRaise,
+  ...facts
+}: GateRowProps) {
+  return (
+    // The whole row opens the gate, but a control on it does its own job.
+    <div
+      className="fdry-gate-row"
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest('button, a, input') === null) onToggle()
+      }}
+    >
+      <GateChevron open={open} onToggle={onToggle} />
+      {lead}
+      <GateText gate={gate} {...facts} />
+      {raising ? null : (
+        <GateAnswers gate={gate} busy={busy} onDecide={onDecide} onRaise={onRaise} />
+      )}
+    </div>
+  )
+}
+
+function GateChevron({
+  open,
+  onToggle,
+}: {
+  readonly open: boolean
+  readonly onToggle: () => void
+}) {
+  return (
+    <IconButton
+      icon={ChevronRight}
+      size="sm"
+      className="fdry-gate-chevron"
+      aria-expanded={open}
+      label={open ? 'Hide the reason' : 'Show the reason'}
+      onClick={onToggle}
+    />
+  )
+}
+
+/** The question, and the line of facts under it. */
+function GateText({
+  gate,
+  meta,
+  pulls = [],
+  source = null,
+}: Pick<GateCardProps, 'gate' | 'meta' | 'pulls' | 'source'>) {
+  return (
+    <div className="fdry-gate-text">
+      <b className="fdry-gate-summary" title={gate.summary}>
+        {gate.summary}
+      </b>
+      <div className="fdry-gate-meta">
+        {meta}
+        <span>{gradeInWords(gate.riskGrade)}</span>
+        <OrderLinks pulls={pulls} source={source} />
+        <span className="fdry-gate-default">
+          If nobody answers: {defaultInWords(gate)}
+          {gate.deadline === null ? ' (it waits for you)' : ''}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+interface GateDetailProps {
+  readonly gate: Gate
+  readonly busy: boolean
+  readonly open: boolean
+  readonly raising: boolean
+  readonly onRaise: (limit: number | null) => void
+  readonly onCancel: () => void
+}
+
+/** Under the row: why the gate fired and what it saw, or the form a raise needs. */
+function GateDetail({ gate, busy, open, raising, onRaise, onCancel }: GateDetailProps) {
+  return (
+    <div className="fdry-gate-detail">
+      {open ? (
+        <>
+          <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
+            {gate.why}
+          </Markdown>
+          <GateEvidence evidence={gate.evidence} />
+          <ul className="fdry-gate-consequences">
+            {gate.options.map((option) => (
+              <li key={option.id}>
+                <b>{option.label}</b> {option.consequence}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {raising && gate.breach ? (
+        <RaiseBudgetForm
+          breach={gate.breach}
+          disabled={busy}
+          onRaise={onRaise}
+          onCancel={onCancel}
+        />
       ) : null}
     </div>
   )

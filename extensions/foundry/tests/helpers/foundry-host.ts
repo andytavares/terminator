@@ -10,9 +10,16 @@ import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { vi } from 'vitest'
-import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
+import {
+  dispatchChannel,
+  type ChannelSpec,
+  type ExtensionAPI,
+  type ShellExecOptions,
+  type WorkspaceSnapshot,
+} from '@terminator/extension-sdk'
 
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
+import { partialFake } from '../../../../tests/support/fakes'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 /** The runner's surface every Foundry module reaches, as `vi.fn`s a spec can drive. */
@@ -85,12 +92,14 @@ export interface FoundryHost {
   readonly exec: ReturnType<typeof vi.fn>
   readonly issues: ExtensionAPI['issues']
   readonly workspaces: Array<{ id: string; folderPath: string }>
+  /** The channels registered as reachable from the remote browser client. */
+  readonly remoteChannels: string[]
   /** `api.paths.globalStorage`, `<userData>/extensions/terminator.foundry`, not created yet. */
   readonly globalStorage: string
 }
 
 const noIssues = (): ExtensionAPI['issues'] =>
-  ({
+  partialFake<ExtensionAPI['issues']>({
     connections: vi.fn(async () => []),
     listMine: vi.fn(async () => ({ issues: [], failures: [] })),
     search: vi.fn(async () => ({ issues: [], failures: [] })),
@@ -102,20 +111,15 @@ const noIssues = (): ExtensionAPI['issues'] =>
     teams: vi.fn(async () => []),
     create: vi.fn(),
     supportsCreate: vi.fn(() => false),
-  }) as unknown as ExtensionAPI['issues']
+  })
 
 /** A `paths.globalStorage` in a fresh userData, `<userData>/extensions/terminator.foundry`. */
 export function freshGlobalStorage(): string {
   return path.join(temporaryDirectory('foundry-user-data'), 'extensions', 'terminator.foundry')
 }
 
-/** A host whose records location is `dataDir()` and which has nothing connected. */
-export function fakeHost(dataDir: () => string): FoundryHost {
-  const globalStorage = freshGlobalStorage()
-  const handlers = new Map<string, ChannelSpec>()
-  const settings = new Map<string, unknown>()
-  const commands = new Map<string, () => void>()
-  const workspaces: Array<{ id: string; folderPath: string }> = []
+/** The parts of a host a spec reads back: every call lands in one of these. */
+function hostParts() {
   const gh = vi.fn(
     async (..._options: Parameters<ShellExec>): Promise<ExecResult> => ({
       exitCode: 1,
@@ -124,67 +128,110 @@ export function fakeHost(dataDir: () => string): FoundryHost {
       timedOut: false,
     })
   )
-  const exec = vi.fn((options: Parameters<ShellExec>[0]) =>
-    options.command === 'gh' ? gh(options) : realGit(options)
-  )
-  const broadcast = vi.fn()
-  const showToast = vi.fn()
-  const createNotification = vi.fn(() => ({ dispose: vi.fn() }))
-  const issues = noIssues()
-  const disposable = () => ({ dispose: vi.fn() })
+  return {
+    settings: new Map<string, unknown>(),
+    commands: new Map<string, () => void>(),
+    workspaces: [] as Array<{ id: string; folderPath: string }>,
+    gh,
+    exec: vi.fn((options: Parameters<ShellExec>[0]) =>
+      options.command === 'gh' ? gh(options) : realGit(options)
+    ),
+    broadcast: vi.fn(),
+    showToast: vi.fn(),
+    createNotification: vi.fn(() => ({ dispose: vi.fn() })),
+    issues: noIssues(),
+    remoteChannels: [] as string[],
+  }
+}
 
-  const api = {
-    ipc: {
-      registerHandler: vi.fn((spec: ChannelSpec) => {
-        handlers.set(spec.channel, spec)
-        return disposable()
-      }),
-    },
-    window: { broadcast, focusSelf: vi.fn(), showSelf: vi.fn(), openAuxiliary: vi.fn() },
-    commands: {
-      register: vi.fn((contribution: { id: string }, handler: () => void) => {
-        commands.set(contribution.id, handler)
-        return { dispose: () => commands.delete(contribution.id) }
-      }),
-    },
-    shell: { exec },
-    notifications: { showToast, createNotification },
+type HostParts = ReturnType<typeof hostParts>
+
+const disposable = () => ({ dispose: vi.fn() })
+
+function hostCommands(commands: HostParts['commands']): ExtensionAPI['commands'] {
+  return partialFake<ExtensionAPI['commands']>({
+    register: vi.fn((contribution: { id: string }, handler: () => void) => {
+      commands.set(contribution.id, handler)
+      return { dispose: () => commands.delete(contribution.id) }
+    }),
+  })
+}
+
+function hostSettings(dataDir: () => string, settings: HostParts['settings']) {
+  return partialFake<ExtensionAPI['settings']>({
+    register: vi.fn(disposable),
+    get: <T>(key: string) =>
+      (key === 'terminator.foundry.dataDir' ? dataDir() : settings.get(key)) as T | undefined,
+    set: (key: string, value: unknown) => settings.set(key, value),
+    isBranchExcluded: async () => false,
+  })
+}
+
+interface HostApiInput {
+  dataDir: () => string
+  globalStorage: string
+  handlers: Map<string, ChannelSpec>
+  parts: HostParts
+}
+
+function hostApi({ dataDir, globalStorage, handlers, parts }: HostApiInput): ExtensionAPI {
+  const registerHandler = vi.fn((spec: ChannelSpec, options?: { remoteAccessible?: boolean }) => {
+    handlers.set(spec.channel, spec)
+    if (options?.remoteAccessible === true) parts.remoteChannels.push(spec.channel)
+    return disposable()
+  })
+  return partialFake<ExtensionAPI>({
+    ipc: partialFake<ExtensionAPI['ipc']>({ registerHandler }),
+    window: partialFake<ExtensionAPI['window']>({
+      broadcast: parts.broadcast,
+      focusSelf: vi.fn(),
+      showSelf: vi.fn(),
+      openAuxiliary: vi.fn(),
+    }),
+    commands: hostCommands(parts.commands),
+    shell: hostShell(parts.exec),
+    notifications: partialFake<ExtensionAPI['notifications']>({
+      showToast: parts.showToast,
+      createNotification: parts.createNotification,
+    }),
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    settings: {
-      register: vi.fn(disposable),
-      get: (key: string) => (key === 'terminator.foundry.dataDir' ? dataDir() : settings.get(key)),
-      set: (key: string, value: unknown) => settings.set(key, value),
-      isBranchExcluded: async () => false,
-    },
-    workspace: {
-      list: () => workspaces,
-      listProjects: () => [],
-      addProject: vi.fn(async () => null),
-      deleteProject: vi.fn(),
-    },
-    issues,
+    settings: hostSettings(dataDir, parts.settings),
+    workspace: hostWorkspace(parts.workspaces),
+    issues: parts.issues,
     // Foundry keeps its runtime state in its own folder: a throw-away one per
     // host, so a spec never writes it into the working tree.
     paths: { app: path.resolve(__dirname, '../..'), globalStorage },
-    app: { version: '0.0.0-test' },
-  } as unknown as ExtensionAPI
+  })
+}
 
+function hostShell(exec: HostParts['exec']): ExtensionAPI['shell'] {
+  // Foundry never asks for bytes, so the string overload is the only one called.
+  const run = (options: ShellExecOptions) => exec(options)
+  return { exec: run as ExtensionAPI['shell']['exec'] }
+}
+
+function hostWorkspace(workspaces: HostParts['workspaces']): ExtensionAPI['workspace'] {
+  return partialFake<ExtensionAPI['workspace']>({
+    list: () => workspaces as WorkspaceSnapshot[],
+    listProjects: () => [],
+    addProject: vi.fn(async () => null),
+    deleteProject: vi.fn(),
+  })
+}
+
+/** A host whose records location is `dataDir()` and which has nothing connected. */
+export function fakeHost(dataDir: () => string): FoundryHost {
+  const globalStorage = freshGlobalStorage()
+  const handlers = new Map<string, ChannelSpec>()
+  const parts = hostParts()
   return {
-    api,
+    api: hostApi({ dataDir, globalStorage, handlers, parts }),
     call: async (channel, payload = {}) => {
       const spec = handlers.get(channel)
       if (spec === undefined) throw new Error(`${channel} is not registered`)
       return dispatchChannel(spec, payload)
     },
-    settings,
-    broadcast,
-    showToast,
-    createNotification,
-    commands,
-    gh,
-    exec,
-    issues,
-    workspaces,
+    ...parts,
     globalStorage,
   }
 }
@@ -192,17 +239,4 @@ export function fakeHost(dataDir: () => string): FoundryHost {
 /** A fresh temporary directory under the OS temp directory. */
 export function temporaryDirectory(prefix: string): string {
   return makeTempDir(`${prefix}-`)
-}
-
-/**
- * Activates Foundry over the host and waits for the supervision runtime, so a
- * spec's first call finds the runner the way a call minutes after start does.
- */
-export async function activateFoundry(host: FoundryHost): Promise<void> {
-  const { activate } = await import('../../src/index.ts')
-  const { runtime } = await import('../../src/runtime/runtime-state.ts')
-  activate(host.api)
-  await vi.waitFor(() => {
-    if (runtime.supervision === null) throw new Error('the supervision runtime is not up yet')
-  })
 }

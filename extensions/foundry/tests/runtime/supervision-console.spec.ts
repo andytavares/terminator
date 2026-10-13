@@ -6,12 +6,8 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import {
-  activateFoundry,
-  fakeHost,
-  temporaryDirectory,
-  type FoundryHost,
-} from '../helpers/foundry-host.js'
+import { fakeHost, temporaryDirectory, type FoundryHost } from '../helpers/foundry-host.js'
+import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
@@ -33,6 +29,9 @@ const theRunner = fakeRunner()
 runner.current = theRunner
 
 const { runtime, stallFirings } = await import('../../src/runtime/runtime-state.ts')
+const { startPaletteRefresh, stopPaletteRefresh } = await import(
+  '../../src/runtime/palette-commands.ts'
+)
 const { notePending, noteResolved } = await import('../../src/runtime/held-calls.ts')
 
 let dataDir = ''
@@ -46,7 +45,6 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  const { deactivate } = await import('../../src/index.ts')
   deactivate()
   vi.unstubAllEnvs()
 })
@@ -87,6 +85,27 @@ async function ledger(): Promise<string[]> {
 }
 
 describe('a held tool call', () => {
+  describe('listing and answering', listingAndAnsweringTests)
+  describe('questions and words', questionsAndWordsTests)
+  describe('let go and unheld', letGoAndUnheldTests)
+  describe('handing back', handingBackTests)
+})
+
+function registerRun(sessionId: string, transcriptPath = '/nowhere.jsonl'): void {
+  runtime.supervision?.runs.add({
+    sessionId,
+    featureDir: orderDir(dataDir, 'WO-1'),
+    phase: 'builder',
+    worktreePath: '/repos/app',
+    branch: 'foundry/WO-1',
+    baseBranch: 'main',
+    terminalSessionId: `term-${sessionId}`,
+    transcriptPath,
+    startedAt: Date.now(),
+  })
+}
+
+function listingAndAnsweringTests() {
   it('is listed, interrupts with Allow and Deny, and answering it takes the notification away', async () => {
     const dispose = vi.fn()
     host.createNotification.mockReturnValueOnce({ dispose })
@@ -107,7 +126,9 @@ describe('a held tool call', () => {
     expect(dispose).toHaveBeenCalled()
     expect(await host.call('foundry:permissions-list')).toEqual({ pending: [] })
   })
+}
 
+function questionsAndWordsTests() {
   it('asked as a question during a run is recorded against the order as an intake defect', async () => {
     notePending(host.api, heldCall('req-2', [{ question: 'Which colour?', options: ['red'] }]), {
       id: 'WO-1',
@@ -132,7 +153,9 @@ describe('a held tool call', () => {
     })
     noteResolved('req-3')
   })
+}
 
+function letGoAndUnheldTests() {
   it('that the bridge already let go is cleared from the list and reported as no longer waiting', async () => {
     notePending(host.api, heldCall('req-4'))
     theRunner.resolve.mockReturnValueOnce(false)
@@ -150,7 +173,9 @@ describe('a held tool call', () => {
       ok: false,
     })
   })
+}
 
+function handingBackTests() {
   it('is handed back to the terminal when the operator asks', async () => {
     notePending(host.api, heldCall('req-5'))
     expect(await host.call('foundry:permission-hand-back', { requestId: 'req-5' })).toEqual({
@@ -159,23 +184,16 @@ describe('a held tool call', () => {
     expect(theRunner.handBackToTerminal).toHaveBeenCalledWith('builder-1', 'req-5')
     noteResolved('req-5')
   })
-})
+}
 
 describe('the actions on one run', () => {
-  function registerRun(sessionId: string, transcriptPath = '/nowhere.jsonl'): void {
-    runtime.supervision?.runs.add({
-      sessionId,
-      featureDir: orderDir(dataDir, 'WO-1'),
-      phase: 'builder',
-      worktreePath: '/repos/app',
-      branch: 'foundry/WO-1',
-      baseBranch: 'main',
-      terminalSessionId: `term-${sessionId}`,
-      transcriptPath,
-      startedAt: Date.now(),
-    })
-  }
+  describe('the terminal', theTerminalTests)
+  describe('the transcript', theTranscriptTests)
+  describe('redirecting and interrupting', redirectingAndInterruptingTests)
+  describe('stopping', stoppingTests)
+})
 
+function theTerminalTests() {
   it('takes the operator to the terminal the run is in, and refuses when it has none', async () => {
     expect(await host.call('foundry:run-terminal', { sessionId: 'builder-1' })).toEqual({
       ok: false,
@@ -189,7 +207,9 @@ describe('the actions on one run', () => {
       projectId: 'p-1',
     })
   })
+}
 
+function theTranscriptTests() {
   it('reads what the agent was doing from its transcript, and nothing for a run it does not know', async () => {
     const transcript = path.join(dataDir, 'transcript.jsonl')
     fs.writeFileSync(
@@ -209,7 +229,9 @@ describe('the actions on one run', () => {
       lines: [],
     })
   })
+}
 
+function redirectingAndInterruptingTests() {
   it('redirects a run: interrupts it, sends the message, and says so in the feed', async () => {
     registerRun('redirected-1')
     expect(
@@ -228,7 +250,9 @@ describe('the actions on one run', () => {
     })
     expect(theRunner.interrupt).toHaveBeenCalledWith('builder-1')
   })
+}
 
+function stoppingTests() {
   it('stops a run and keeps it in the history as stopped', async () => {
     registerRun('stopped-1')
     expect(
@@ -240,7 +264,7 @@ describe('the actions on one run', () => {
       outcome: 'stopped',
     })
   })
-})
+}
 
 describe('the feed', () => {
   it('drops a line the operator dismissed', async () => {
@@ -268,20 +292,26 @@ describe('the feed', () => {
   })
 })
 
-describe('a run that stops making progress', () => {
-  function watchStalledRun(sessionId: string): void {
-    theRunner.watchable.mockReturnValue([
-      {
-        sessionId,
-        featureDir: orderDir(dataDir, 'WO-1'),
-        transcriptPath: path.join(dataDir, `${sessionId}.jsonl`),
-        startedAt: Date.now() - 3 * 60 * 60 * 1000,
-        isWaiting: false,
-      },
-    ] as never)
-    runtime.stallWatcher?.tick()
-  }
+function watchStalledRun(sessionId: string): void {
+  theRunner.watchable.mockReturnValue([
+    {
+      sessionId,
+      featureDir: orderDir(dataDir, 'WO-1'),
+      transcriptPath: path.join(dataDir, `${sessionId}.jsonl`),
+      startedAt: Date.now() - 3 * 60 * 60 * 1000,
+      isWaiting: false,
+    },
+  ] as never)
+  runtime.stallWatcher?.tick()
+}
 
+describe('a run that stops making progress', () => {
+  describe('shadow mode', shadowModeTests)
+  describe('indications', indicationsTests)
+  describe('outside an order', outsideAnOrderTests)
+})
+
+function shadowModeTests() {
   it('in shadow mode is recorded on the order and listed, and interrupts nobody', async () => {
     watchStalledRun('quiet-1')
     await vi.waitFor(async () => expect(await ledger()).toContain('run.stalled'))
@@ -300,7 +330,9 @@ describe('a run that stops making progress', () => {
     )
     expect(host.showToast).not.toHaveBeenCalled()
   })
+}
 
+function indicationsTests() {
   it('with shadow mode off raises an indication that takes the operator to the run', async () => {
     host.settings.set('terminator.foundry.stallShadowMode', false)
     try {
@@ -327,7 +359,9 @@ describe('a run that stops making progress', () => {
       await host.call('foundry:feed-unmute', { sessionId: 'quiet-3' })
     }
   })
+}
 
+function outsideAnOrderTests() {
   it('outside any order records nothing on a ledger', async () => {
     theRunner.watchable.mockReturnValue([
       {
@@ -342,27 +376,29 @@ describe('a run that stops making progress', () => {
     expect(stallFirings[0].firing.sessionId).toBe('loose-1')
     expect(await ledger()).not.toContain('run.stalled')
   })
-})
+}
+
+/** A builder run on WO-1 that is waiting on the operator. */
+function addWaitingRun(sessionId: string): void {
+  runtime.supervision?.runs.add({
+    sessionId,
+    featureDir: orderDir(dataDir, 'WO-1'),
+    phase: 'builder',
+    worktreePath: '/repos/app',
+    branch: 'foundry/WO-1',
+    baseBranch: 'main',
+    terminalSessionId: 'term-w',
+    transcriptPath: '/nowhere.jsonl',
+    startedAt: Date.now(),
+  })
+  runtime.supervision?.runs.setState(sessionId, 'waiting', Date.now())
+}
 
 describe('the palette', () => {
   it('lists a run waiting on the operator first, and going to it opens the run when it has no terminal', async () => {
-    runtime.supervision?.runs.add({
-      sessionId: 'waiting-1',
-      featureDir: orderDir(dataDir, 'WO-1'),
-      phase: 'builder',
-      worktreePath: '/repos/app',
-      branch: 'foundry/WO-1',
-      baseBranch: 'main',
-      terminalSessionId: 'term-w',
-      transcriptPath: '/nowhere.jsonl',
-      startedAt: Date.now(),
-    })
-    runtime.supervision?.runs.setState('waiting-1', 'waiting', Date.now())
+    addWaitingRun('waiting-1')
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     try {
-      const { startPaletteRefresh, stopPaletteRefresh } = await import(
-        '../../src/runtime/palette-commands.ts'
-      )
       stopPaletteRefresh()
       startPaletteRefresh(host.api)
       const go = host.commands.get('run.waiting-1')

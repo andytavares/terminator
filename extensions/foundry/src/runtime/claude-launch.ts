@@ -135,6 +135,16 @@ function realPath(target: string): string {
   }
 }
 
+/** What a hook command line carries: the script, how to reach the console, and whose session it is. */
+interface HookCommandOptions {
+  hookScriptPath: string
+  controlUrl: string
+  controlEventUrl: string
+  controlToken: string
+  sessionId: string
+  nodePath: string
+}
+
 /**
  * The settings handed to one run.
  *
@@ -145,34 +155,7 @@ function realPath(target: string): string {
  * never touched.
  * @internal
  */
-export function buildSettings(options: {
-  hookScriptPath: string
-  controlUrl: string
-  controlEventUrl: string
-  controlToken: string
-  sessionId: string
-  nodePath: string
-}): unknown {
-  const invoke = (url: string, kind?: string): string =>
-    [
-      // Electron refuses to be a node unless told; without this the hook script
-      // would launch a second copy of the application.
-      'ELECTRON_RUN_AS_NODE=1',
-      shellQuote(options.nodePath),
-      shellQuote(options.hookScriptPath),
-      shellQuote(url),
-      shellQuote(options.controlToken),
-      shellQuote(options.sessionId),
-      ...(kind === undefined ? [] : [shellQuote(kind)]),
-    ].join(' ')
-
-  const notify = (kind: string): unknown => ({
-    matcher: '*',
-    // Seconds, not hours: nothing is waiting on the answer, and a lifecycle
-    // hook that hangs would hold up the agent for no reason at all.
-    hooks: [{ type: 'command', command: invoke(options.controlEventUrl, kind), timeout: 10 }],
-  })
-
+export function buildSettings(options: HookCommandOptions): unknown {
   return {
     hooks: {
       PreToolUse: [
@@ -182,23 +165,67 @@ export function buildSettings(options: {
           // console where it can be changed without restarting an agent.
           matcher: '*',
           hooks: [
-            { type: 'command', command: invoke(options.controlUrl), timeout: HOOK_TIMEOUT_SECONDS },
+            {
+              type: 'command',
+              command: hookCommand(options, options.controlUrl),
+              timeout: HOOK_TIMEOUT_SECONDS,
+            },
           ],
         },
       ],
       // The agent finished responding and is waiting for input. Without this a
       // session that had finished would look identical to one that was stuck,
       // and the stall detector would call it a stall eight minutes later.
-      Stop: [notify('stop')],
-      SessionEnd: [notify('session_end')],
+      Stop: [notifyHook(options, 'stop')],
+      SessionEnd: [notifyHook(options, 'session_end')],
     },
   }
 }
 
-export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
-  const nodePath = options.nodePath ?? process.execPath
-  const claudePath = options.claudePath ?? 'claude'
+/** The hook script run against one of the console's URLs, for one session. */
+function hookCommand(options: HookCommandOptions, url: string, kind?: string): string {
+  return [
+    // Electron refuses to be a node unless told; without this the hook script
+    // would launch a second copy of the application.
+    'ELECTRON_RUN_AS_NODE=1',
+    shellQuote(options.nodePath),
+    shellQuote(options.hookScriptPath),
+    shellQuote(url),
+    shellQuote(options.controlToken),
+    shellQuote(options.sessionId),
+    ...(kind === undefined ? [] : [shellQuote(kind)]),
+  ].join(' ')
+}
 
+/** A lifecycle hook that tells the console `kind` happened. */
+function notifyHook(options: HookCommandOptions, kind: string): unknown {
+  return {
+    matcher: '*',
+    // Seconds, not hours: nothing is waiting on the answer, and a lifecycle
+    // hook that hangs would hold up the agent for no reason at all.
+    hooks: [
+      {
+        type: 'command',
+        command: hookCommand(options, options.controlEventUrl, kind),
+        timeout: 10,
+      },
+    ],
+  }
+}
+
+export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
+  const settingsPath = writeSettings(options)
+  return {
+    sessionId: options.sessionId,
+    cwd: options.cwd,
+    command: claudeCommand(options, settingsPath),
+    settingsPath,
+    transcriptPath: transcriptPathFor(options.cwd, options.sessionId),
+  }
+}
+
+/** The run's settings, written to a file of its own; returns where. */
+function writeSettings(options: LaunchSpecOptions): string {
   // Absolute, or the command is wrong in a way that only shows up at runtime:
   // the runtime resolves `--settings` against the terminal's cwd, which is the
   // card's worktree, and a relative path put it somewhere that never exists.
@@ -209,28 +236,30 @@ export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
   }
   mkdirSync(options.settingsDirectory, { recursive: true })
   const settingsPath = join(options.settingsDirectory, `${options.sessionId}.settings.json`)
-  writeFileSync(
-    settingsPath,
-    JSON.stringify(
-      buildSettings({
-        hookScriptPath: options.hookScriptPath,
-        controlUrl: options.controlUrl,
-        controlEventUrl: options.controlEventUrl,
-        controlToken: options.controlToken,
-        sessionId: options.sessionId,
-        nodePath,
-      }),
-      null,
-      2
-    ),
-    'utf8'
-  )
+  const settings = buildSettings({
+    hookScriptPath: options.hookScriptPath,
+    controlUrl: options.controlUrl,
+    controlEventUrl: options.controlEventUrl,
+    controlToken: options.controlToken,
+    sessionId: options.sessionId,
+    nodePath: options.nodePath ?? process.execPath,
+  })
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8')
+  return settingsPath
+}
 
-  const command = [
+/** `flag value`, or nothing when the value is absent or empty. */
+function optionalFlag(flag: string, value: string | undefined): string[] {
+  return value === undefined || value === '' ? [] : [flag, shellQuote(value)]
+}
+
+/** The command line that starts, or resumes, the agent. */
+function claudeCommand(options: LaunchSpecOptions, settingsPath: string): string {
+  return [
     // Lets the operator's own Claude Code hooks tell a Foundry agent from the
     // operator's sessions; their settings load in every session we start.
     'FOUNDRY_RUN=1',
-    claudePath,
+    options.claudePath ?? 'claude',
     // `--resume` for a conversation that already exists, `--session-id` only
     // for one being created. The runtime refuses a `--session-id` it has seen
     // — "Session ID … is already in use" — and it refuses it by exiting, while
@@ -241,12 +270,8 @@ export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
     options.sessionId,
     '--settings',
     shellQuote(settingsPath),
-    ...(options.model === undefined || options.model === ''
-      ? []
-      : ['--model', shellQuote(options.model)]),
-    ...(options.effort === undefined || options.effort === ''
-      ? []
-      : ['--effort', shellQuote(options.effort)]),
+    ...optionalFlag('--model', options.model),
+    ...optionalFlag('--effort', options.effort),
     // One per mounted skill directory, so Claude Code loads
     // `<dir>/.claude/skills/<name>/SKILL.md` from each of them.
     ...(options.addDirs ?? []).flatMap((dir) => ['--add-dir', shellQuote(dir)]),
@@ -262,12 +287,4 @@ export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
     'auto',
     shellQuote(options.prompt),
   ].join(' ')
-
-  return {
-    sessionId: options.sessionId,
-    cwd: options.cwd,
-    command,
-    settingsPath,
-    transcriptPath: transcriptPathFor(options.cwd, options.sessionId),
-  }
 }

@@ -2,6 +2,7 @@ import { interruptedRuns, interruptedGate } from './adopt.js'
 
 import { orderStoreAt, gateStoreAt, readGraph } from '../state/live-index.js'
 import { runtime, isLiveSession } from '../runtime/runtime-state.js'
+import type { RunNode } from './run-graph.js'
 
 /**
  * The orders an executor in this process is currently driving.
@@ -22,6 +23,22 @@ export const executingOrders = new Set<string>()
  */
 export const adoptedRoots = new Set<string>()
 
+/** Stops every node's agent that is still alive, and names the nodes it stopped. */
+function stopLiveAgents(nodes: readonly RunNode[], reason: string): string[] {
+  const stopped: string[] = []
+  for (const node of nodes) {
+    if (node.sessionId === null || !isLiveSession(node.sessionId)) continue
+    // Told why first, so the agent's own transcript carries the reason rather
+    // than ending mid-sentence for no stated cause.
+    if (runtime.supervisedRunner?.stop(node.sessionId, reason) === true) {
+      runtime.supervision?.finish(node.sessionId, Date.now())
+      runtime.supervision?.runs.archive(node.sessionId, 'stopped', Date.now())
+      stopped.push(node.id)
+    }
+  }
+  return stopped
+}
+
 /**
  * Stop a run, and mean it.
  *
@@ -37,19 +54,7 @@ export const adoptedRoots = new Set<string>()
  */
 export async function stopOrder(root: string, orderId: string, reason: string): Promise<void> {
   const store = orderStoreAt(root)
-  const graph = await readGraph(root, orderId)
-  const stopped: string[] = []
-  for (const node of graph?.nodes ?? []) {
-    if (node.sessionId === null || !isLiveSession(node.sessionId)) continue
-    // Told why first, so the agent's own transcript carries the reason rather
-    // than ending mid-sentence for no stated cause.
-    if (runtime.supervisedRunner?.stop(node.sessionId, reason) === true) {
-      runtime.supervision?.finish(node.sessionId, Date.now())
-      runtime.supervision?.runs.archive(node.sessionId, 'stopped', Date.now())
-      stopped.push(node.id)
-    }
-  }
-
+  const stopped = stopLiveAgents((await readGraph(root, orderId))?.nodes ?? [], reason)
   const order = await store.load(orderId)
   if (order !== null && order.status === 'running') {
     await store.save({ ...order, status: 'cancelled' })

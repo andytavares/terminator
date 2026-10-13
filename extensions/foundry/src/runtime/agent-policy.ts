@@ -16,8 +16,7 @@ import type { WorkOrder } from '../order/schema.js'
 export function trustRepository(
   api: ExtensionAPI,
   repoRoot: string,
-  orderId: string,
-  store: { record: (entry: LedgerEntry) => Promise<void> }
+  { orderId, store }: { orderId: string; store: { record: (entry: LedgerEntry) => Promise<void> } }
 ): void {
   const result = ensureTrusted(repoRoot)
   if (!result.changed) {

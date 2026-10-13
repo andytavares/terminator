@@ -26,38 +26,49 @@ function sensorRow(over: Record<string, unknown> = {}) {
   }
 }
 
-function mount(over: Record<string, unknown> = {}) {
+type SensorRow = { def: { id: string }; state: { enabled: boolean; repoPath: string | null } }
+
+/** Sets a sensor the way the channel does: no enabling without a repository. */
+function setSensor(sensors: unknown[], payload: unknown) {
+  const { id, enabled, repoPath } = payload as {
+    id: string
+    enabled?: boolean
+    repoPath?: string | null
+  }
+  const row = (sensors as SensorRow[]).find((s) => s.def.id === id)
+  if (row === undefined) return { error: `No sensor ${id}.` }
+  const nextRepoPath = repoPath === undefined ? row.state.repoPath : repoPath
+  const nextEnabled = enabled ?? row.state.enabled
+  if (nextEnabled && nextRepoPath === null) {
+    return { error: 'A sensor needs a repository before it can be enabled.' }
+  }
+  row.state.enabled = nextEnabled
+  row.state.repoPath = nextRepoPath
+  return { state: row.state }
+}
+
+function settingsReplies(
+  over: Record<string, unknown>
+): Record<string, (payload: unknown) => unknown> {
   const sensors = [...(((over.sensors as unknown[] | undefined) ?? [sensorRow()]) as unknown[])]
-  invoke = vi.fn(async (channel: string, payload?: unknown) => {
-    if (channel === 'foundry:models-list') return { models: [], selected: '' }
-    if (channel === 'foundry:ask-model') return { selected: over.askModel ?? 'sonnet' }
-    if (channel === 'foundry:ask-model-set')
-      return { ok: true, selected: (payload as { model: string }).model }
-    if (channel === 'foundry:sensors.list') return { sensors }
-    if (channel === 'foundry:sensors.set') {
-      const { id, enabled, repoPath } = payload as {
-        id: string
-        enabled?: boolean
-        repoPath?: string | null
-      }
-      const row = sensors.find((s) => (s as { def: { id: string } }).def.id === id) as
-        | { state: { enabled: boolean; repoPath: string | null } }
-        | undefined
-      if (row === undefined) return { error: `No sensor ${id}.` }
-      const nextRepoPath = repoPath === undefined ? row.state.repoPath : repoPath
-      const nextEnabled = enabled ?? row.state.enabled
-      if (nextEnabled && nextRepoPath === null) {
-        return { error: 'A sensor needs a repository before it can be enabled.' }
-      }
-      row.state.enabled = nextEnabled
-      row.state.repoPath = nextRepoPath
-      return { state: row.state }
-    }
-    if (channel === 'foundry:sensors.run-now') {
-      return over.runNow ?? { recorded: 2, problem: null }
-    }
-    return { ok: true }
-  })
+  return {
+    'foundry:models-list': () => ({ models: [], selected: '' }),
+    'foundry:ask-model': () => ({ selected: over.askModel ?? 'sonnet' }),
+    'foundry:ask-model-set': (payload) => ({
+      ok: true,
+      selected: (payload as { model: string }).model,
+    }),
+    'foundry:sensors.list': () => ({ sensors }),
+    'foundry:sensors.set': (payload) => setSensor(sensors, payload),
+    'foundry:sensors.run-now': () => over.runNow ?? { recorded: 2, problem: null },
+  }
+}
+
+function mount(over: Record<string, unknown> = {}) {
+  const replies = settingsReplies(over)
+  invoke = vi.fn(async (channel: string, payload?: unknown) =>
+    channel in replies ? replies[channel](payload) : { ok: true }
+  )
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
   }
@@ -67,6 +78,13 @@ function mount(over: Record<string, unknown> = {}) {
 beforeEach(() => vi.clearAllMocks())
 
 describe('the sensors panel', () => {
+  describe('enabling', enablingTests)
+  describe('enabling with a repository', enablingWithARepositoryTests)
+  describe('the last run', theLastRunTests)
+  describe('running now', runningNowTests)
+})
+
+function enablingTests() {
   it('shows one row per sensor, with its description and rung', async () => {
     mount()
     await waitFor(() => expect(screen.getByText('CI flake watch')).toBeTruthy())
@@ -81,7 +99,9 @@ describe('the sensors panel', () => {
       expect(screen.getByText('A sensor needs a repository before it can be enabled.')).toBeTruthy()
     )
   })
+}
 
+function enablingWithARepositoryTests() {
   it('enables once a repository is given', async () => {
     mount()
     await waitFor(() => screen.getByText('CI flake watch'))
@@ -103,7 +123,9 @@ describe('the sensors panel', () => {
       ).toBe(true)
     )
   })
+}
 
+function theLastRunTests() {
   it('shows the last run, next due and last problem', async () => {
     mount({
       sensors: [
@@ -123,7 +145,9 @@ describe('the sensors panel', () => {
     expect(screen.getByText(/2026-09-20T12:00:00.000Z/)).toBeTruthy()
     expect(screen.getByText(/the toolchain was unavailable/)).toBeTruthy()
   })
+}
 
+function runningNowTests() {
   it('runs a sensor now and shows what it recorded', async () => {
     mount({ runNow: { recorded: 3, problem: null } })
     await waitFor(() => screen.getByText('CI flake watch'))
@@ -140,7 +164,7 @@ describe('the sensors panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
     expect(await screen.findByText(/could not reach the repository/)).toBeTruthy()
   })
-})
+}
 
 describe('the model that answers asks', () => {
   it('shows Sonnet chosen by default', async () => {
