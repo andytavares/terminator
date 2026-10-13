@@ -213,7 +213,7 @@ function seatsTests({ g, map }: LaidOut) {
   })
 }
 
-function beltsAndAnchorsTests({ map }: LaidOut) {
+function beltsAndAnchorsTests({ map }: Pick<LaidOut, 'map'>) {
   it('never lets a belt tile stand in for a walkable tile, except a crossover', () => {
     expect(map.beltTiles.length).toBeGreaterThan(0)
     const crossoverKeys = new Set(map.crossovers.map((t) => `${t.x},${t.y}`))
@@ -235,7 +235,7 @@ function beltsAndAnchorsTests({ map }: LaidOut) {
   })
 }
 
-function reachabilityTests({ map }: LaidOut) {
+function reachabilityTests({ map }: Pick<LaidOut, 'map'>) {
   it('reaches every station seat, rest seat, anchor and the exit from the intake', () => {
     const stationSeats = map.props.filter((p) => p.seat !== null).map((p) => p.seat as Tile)
     const targets: Tile[] = [
@@ -267,7 +267,7 @@ function reachabilityTests({ map }: LaidOut) {
   })
 }
 
-function beltPathsTests({ map }: LaidOut) {
+function beltPathsTests({ map }: Pick<LaidOut, 'map'>) {
   it('routes every belt as a 4-contiguous path from port to port', () => {
     expect(map.belts.length).toBeGreaterThan(0)
     const byNode = new Map(map.props.filter((p) => p.nodeId).map((p) => [p.nodeId as string, p]))
@@ -293,7 +293,7 @@ function beltPathsTests({ map }: LaidOut) {
   })
 }
 
-function noFallbackAndTheBackRowTests({ map }: LaidOut) {
+function noFallbackAndTheBackRowTests({ map }: Pick<LaidOut, 'map'>) {
   it('never falls back to the BFS path', () => {
     expect(map.belts.length).toBeGreaterThan(0)
     const blocked = blockedForBeltKeys(map)
@@ -315,7 +315,7 @@ function noFallbackAndTheBackRowTests({ map }: LaidOut) {
   })
 }
 
-function wallFixturesTests({ map }: LaidOut) {
+function wallFixturesTests({ map }: Pick<LaidOut, 'map'>) {
   it('gives the scoreboard three tiles, and no wall fixture overlaps another', () => {
     const board = map.props.find((p) => p.kind === 'statuswall') as HallProp
     expect(board.w).toBe(3)

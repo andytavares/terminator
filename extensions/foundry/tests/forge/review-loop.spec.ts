@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import {
   MAX_REVIEW_ROUNDS,
   reviewPrompt,
@@ -206,29 +207,10 @@ function everyOtherCheckPassingTests() {
           test: { command: 'npm test', source: 'package.json' as const },
         },
       },
-      acceptance: [
-        {
-          id: 'AC-1',
-          statement: 'it works',
-          priority: 'P0',
-          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-          unverifiable: null,
-        },
-      ],
+      acceptance: [testCriterion('AC-1', { statement: 'it works', priority: 'P0' })],
       plan: {
         ...order().plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'do it',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: ['src/a.ts'],
-            verify: [],
-          },
-        ],
+        units: [builderUnit('U-1', { title: 'do it', satisfies: ['AC-1'], touches: ['src/a.ts'] })],
         lanes: [{ ord: 1, repo: '/repos/a', branch: '', role: null, blocks: [], blockedBy: [] }],
         sharedFiles: [],
       },
@@ -283,29 +265,10 @@ function ready(over: Partial<WorkOrder> = {}): WorkOrder {
   return order({
     intent: { problem: 'p', outcome: 'o', nonGoals: [] },
     risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'it works',
-        priority: 'P0',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'it works', priority: 'P0' })],
     plan: {
       ...order().plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'do it',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a.ts'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'do it', satisfies: ['AC-1'], touches: ['src/a.ts'] })],
       lanes: [{ ord: 1, repo: '/repos/a', branch: '', role: null, blocks: [], blockedBy: [] }],
       sharedFiles: [],
     },

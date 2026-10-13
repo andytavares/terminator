@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -73,13 +74,10 @@ function write(value: unknown): string {
   fs.writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value))
   return file
 }
-const CRITERION = {
-  id: 'AC-1',
+const CRITERION = testCriterion('AC-1', {
   statement: 'an expired token is refused',
   priority: 'P0',
-  verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-  unverifiable: null,
-}
+})
 
 function laneBranchesTests() {
   it('shows a lane branch the ticket fixed, and says to keep it', () => {
@@ -270,29 +268,10 @@ function nothingWrongTests() {
     const complete = order({
       intent: { problem: 'p', outcome: 'o', nonGoals: [] },
       risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-      acceptance: [
-        {
-          id: 'AC-1',
-          statement: 'a',
-          priority: 'P1',
-          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-          unverifiable: null,
-        },
-      ],
+      acceptance: [testCriterion('AC-1', { statement: 'a' })],
       plan: {
         ...order().plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'a',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: ['src/a.ts'],
-            verify: [],
-          },
-        ],
+        units: [builderUnit('U-1', { title: 'a', satisfies: ['AC-1'], touches: ['src/a.ts'] })],
       },
     })
     const plan = convergeBrief({ order: complete, root, sources: sources(), rules: [] })
@@ -541,27 +520,15 @@ function drafted(over: Partial<WorkOrder> = {}): WorkOrder {
   return {
     ...base,
     acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'an expired token is refused',
-        priority: 'P0',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
+      testCriterion('AC-1', { statement: 'an expired token is refused', priority: 'P0' }),
     ],
     plan: {
       ...base.plan,
       units: [
-        {
-          id: 'U-1',
+        builderUnit('U-1', {
           title: 'check the expiry on the refresh path',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: [],
           touches: ['src/auth.ts'],
-          verify: [],
-        },
+        }),
       ],
     },
     provenance: {

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { strikeAssumption, liveAssumptions } from '../../src/forge/assumptions.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -19,44 +20,14 @@ function order(): WorkOrder {
   return {
     ...base,
     acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-      {
-        id: 'AC-2',
-        statement: 'b',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
+      testCriterion('AC-1', { statement: 'a' }),
+      testCriterion('AC-2', { statement: 'b' }),
     ],
     plan: {
       ...base.plan,
       units: [
-        {
-          id: 'U-1',
-          title: 'one',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
-        {
-          id: 'U-2',
-          title: 'two',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-2'],
-          touches: [],
-          verify: [],
-        },
+        builderUnit('U-1', { title: 'one', satisfies: ['AC-1'] }),
+        builderUnit('U-2', { title: 'two', satisfies: ['AC-2'] }),
       ],
     },
     assumptions: [

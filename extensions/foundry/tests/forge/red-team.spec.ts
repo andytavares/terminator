@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import {
   structuralFindings,
   applyFindings,
@@ -17,6 +18,23 @@ import type { WorkOrder } from '../../src/order/schema.js'
 // need a model and never disagree with themselves. An agent pass adds
 // judgement on top, but these fire every time and cost nothing.
 
+const CLIPPED_ROWS: WorkOrder['intent'] = {
+  problem: 'rows are clipped',
+  outcome: 'rows are not clipped',
+  nonGoals: ['scrollbar styling'],
+}
+
+const FINAL_GLYPH = testCriterion('AC-1', {
+  statement: 'a full-width row renders its final glyph',
+  priority: 'P0',
+})
+
+const WIDEN_THE_ROW = builderUnit('U-1', {
+  title: 'widen the row',
+  satisfies: ['AC-1'],
+  touches: ['src/a.css'],
+})
+
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
     id: 'WO-0101-aaa',
@@ -27,11 +45,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
   })
   return {
     ...base,
-    intent: {
-      problem: 'rows are clipped',
-      outcome: 'rows are not clipped',
-      nonGoals: ['scrollbar styling'],
-    },
+    intent: CLIPPED_ROWS,
     // A well-formed order has been through Scout, so its toolchain is filled.
     // Leaving it empty here would make every fixture trip `no-runnable-check`.
     context: {
@@ -41,30 +55,8 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
         test: { command: 'npm test', source: 'package.json' as const },
       },
     },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a full-width row renders its final glyph',
-        priority: 'P0',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
-    plan: {
-      ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'widen the row',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a.css'],
-          verify: [],
-        },
-      ],
-    },
+    acceptance: [{ ...FINAL_GLYPH }],
+    plan: { ...base.plan, units: [{ ...WIDEN_THE_ROW }] },
     ...over,
   }
 }
@@ -125,46 +117,25 @@ function dependencyChainsTests() {
   it('attacks a dependency chain with no parallelism when there is more than one unit', () => {
     const o = order()
     o.plan.units = [
-      {
-        id: 'U-1',
-        title: 'a',
-        role: 'builder',
-        lane: 1,
-        dependsOn: [],
-        satisfies: ['AC-1'],
-        touches: ['src/a'],
-        verify: [],
-      },
-      {
-        id: 'U-2',
+      builderUnit('U-1', { title: 'a', satisfies: ['AC-1'], touches: ['src/a'] }),
+      builderUnit('U-2', {
         title: 'b',
-        role: 'builder',
-        lane: 1,
         dependsOn: ['U-1'],
         satisfies: ['AC-1'],
         touches: ['src/b'],
-        verify: [],
-      },
-      {
-        id: 'U-3',
+      }),
+      builderUnit('U-3', {
         title: 'c',
-        role: 'builder',
-        lane: 1,
         dependsOn: ['U-2'],
         satisfies: ['AC-1'],
         touches: ['src/c'],
-        verify: [],
-      },
-      {
-        id: 'U-4',
+      }),
+      builderUnit('U-4', {
         title: 'd',
-        role: 'builder',
-        lane: 1,
         dependsOn: ['U-3'],
         satisfies: ['AC-1'],
         touches: ['src/d'],
-        verify: [],
-      },
+      }),
     ]
     expect(ids(o)).toContain('fully-serial-plan')
   })

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { agentNode } from '../helpers/run-nodes.js'
 import { countAttention } from '../../src/gates/attention.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -271,25 +272,7 @@ function standing(over: Partial<StandingInput>): StandingInput {
     graph: {
       orderId: 'WO-1',
       recipe: 'direct',
-      nodes: [
-        {
-          id: 'build',
-          stepId: 'build',
-          kind: 'agent',
-          state: 'running',
-          unitIds: [],
-          lane: null,
-          role: null,
-          dependsOn: [],
-          attempts: 0,
-          reworks: 0,
-          feedback: [],
-          sessionId: null,
-          worktreePath: null,
-          startedAt: null,
-          endedAt: null,
-        },
-      ],
+      nodes: [agentNode('build', { state: 'running' })],
     },
     gates: [],
     asks: 0,

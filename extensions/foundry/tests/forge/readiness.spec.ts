@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { REWRITING_UNREADABLE } from '../../src/forge/autonomy.js'
 import { readiness } from '../../src/forge/readiness.js'
 import type { LoopFacts, ReadinessInput } from '../../src/forge/readiness.js'
@@ -20,6 +21,28 @@ const UNIT_PATH = 'src/main/integrations/providers/linear.provider.ts'
 
 const clock = (iso: string): string => iso
 
+/** WO-0928's two criteria: the spec as a whole, and the one case that names Done. */
+const WO0928_ACCEPTANCE: WorkOrder['acceptance'] = [
+  testCriterion('AC-1', {
+    statement: 'Listing issues excludes those in the Done state',
+    verify: { kind: 'test', command: `npx vitest run ${SPEC_PATH}`, assert: 'exit_code == 0' },
+  }),
+  testCriterion('AC-2', {
+    statement: 'A ticket moved to Done drops out of the next list call',
+    verify: {
+      kind: 'test',
+      command: `npx vitest run ${SPEC_PATH} -t "excludes done"`,
+      assert: 'exit_code == 0',
+    },
+  }),
+]
+
+const WO0928_INTENT: WorkOrder['intent'] = {
+  problem: 'The Forge lists DONE tickets.',
+  outcome: 'DONE tickets are excluded.',
+  nonGoals: [],
+}
+
 function wo0928Order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
     id: 'WO-0928-9c6',
@@ -30,45 +53,17 @@ function wo0928Order(over: Partial<WorkOrder> = {}): WorkOrder {
   })
   return {
     ...base,
-    intent: {
-      problem: 'The Forge lists DONE tickets.',
-      outcome: 'DONE tickets are excluded.',
-      nonGoals: [],
-    },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'Listing issues excludes those in the Done state',
-        priority: 'P1',
-        verify: { kind: 'test', command: `npx vitest run ${SPEC_PATH}`, assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-      {
-        id: 'AC-2',
-        statement: 'A ticket moved to Done drops out of the next list call',
-        priority: 'P1',
-        verify: {
-          kind: 'test',
-          command: `npx vitest run ${SPEC_PATH} -t "excludes done"`,
-          assert: 'exit_code == 0',
-        },
-        unverifiable: null,
-      },
-    ],
+    intent: WO0928_INTENT,
+    acceptance: WO0928_ACCEPTANCE,
     risk: { grade: 'P3', triggers: [], blastRadius: [UNIT_PATH, SPEC_PATH], criticalPaths: [] },
     plan: {
       ...base.plan,
       units: [
-        {
-          id: 'U-1',
+        builderUnit('U-1', {
           title: 'Filter DONE issues out of the Linear provider',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
           satisfies: ['AC-1', 'AC-2'],
           touches: [UNIT_PATH, SPEC_PATH],
-          verify: [],
-        },
+        }),
       ],
     },
     writeBack: ['summary_comment', 'status', 'pr_link'],
@@ -84,21 +79,38 @@ function baseLoop(over: Partial<LoopFacts> = {}): LoopFacts {
   return { rounds: [], heldAt: null, exhausted: false, ...over }
 }
 
+type RunningIntake = Extract<IntakeOutcome, { kind: 'running' }>
+
+/** An architect turn the Forge started at T0, with whatever `over` says differs. */
+function runningTurn(over: Partial<Omit<RunningIntake, 'kind'>> = {}): RunningIntake {
+  return {
+    kind: 'running',
+    at: T0,
+    sessionId: 's',
+    asked: 'x',
+    actor: 'architect',
+    trigger: 'automatic',
+    round: null,
+    autoTurn: null,
+    ...over,
+  }
+}
+
 function baseInput(
   over: Partial<ReadinessInput> = {},
   orderOver: Partial<WorkOrder> = {}
 ): ReadinessInput {
   const order = over.order ?? wo0928Order(orderOver)
   return {
+    intake: baseIntake(),
+    loop: baseLoop(),
+    agreed: null,
+    turnEndedAt: null,
+    shape: { name: 'Direct', yours: false },
+    offers: { shape: true, tracker: true },
+    ...over,
     order,
     compile: over.compile ?? compileOrder(order),
-    intake: over.intake ?? baseIntake(),
-    loop: over.loop ?? baseLoop(),
-    agreed: over.agreed ?? null,
-    turnEndedAt: over.turnEndedAt ?? null,
-    shape: over.shape ?? { name: 'Direct', yours: false },
-    offers: over.offers ?? { shape: true, tracker: true },
-    turn: over.turn,
     clock,
   }
 }
@@ -251,16 +263,7 @@ function anUnreadablePlanTests() {
   it('3b. running: rewriting a plan it could not read says so, not which checks it closes', () => {
     const result = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's1',
-          asked: REWRITING_UNREADABLE,
-          actor: 'architect',
-          trigger: 'automatic',
-          round: null,
-          autoTurn: 1,
-        },
+        intake: runningTurn({ sessionId: 's1', asked: REWRITING_UNREADABLE, autoTurn: 1 }),
       })
     )
     expect(result.strip.detail).toBe(
@@ -273,16 +276,7 @@ function theScoutTests() {
   it('3. running: scout', () => {
     const result = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's1',
-          asked: 'scout',
-          actor: 'scout',
-          trigger: 'automatic',
-          round: null,
-          autoTurn: null,
-        },
+        intake: runningTurn({ sessionId: 's1', asked: 'scout', actor: 'scout' }),
       })
     )
     expect(result.holder).toBe('scout')
@@ -298,16 +292,13 @@ function redTeamWithAPreviousRoundTests() {
   it('3. running: red team, with a previous finished round, says the hand-off is yours', () => {
     const result = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
+        intake: runningTurn({
           at: T2,
           sessionId: 's2',
           asked: 'red team, round 2',
           actor: 'red team',
-          trigger: 'automatic',
           round: 2,
-          autoTurn: null,
-        },
+        }),
         loop: baseLoop({
           rounds: [
             { round: 1, startedAt: T0, finishedAt: T1 },
@@ -330,16 +321,12 @@ function redTeamHeldTests() {
   it('3. running: red team, no previous round, held shows release', () => {
     const result = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
+        intake: runningTurn({
           sessionId: 's2',
           asked: 'red team, round 1',
           actor: 'red team',
-          trigger: 'automatic',
           round: 1,
-          autoTurn: null,
-        },
+        }),
         loop: baseLoop({ rounds: [{ round: 1, startedAt: T0, finishedAt: null }], heldAt: T1 }),
       })
     )
@@ -354,16 +341,7 @@ function fixingFindingsTests() {
     const result = readiness(
       baseInput({
         order: wo0928Order({ redTeam: findings }),
-        intake: {
-          kind: 'running',
-          at: T2,
-          sessionId: 's3',
-          asked: 'red team round 2 fix',
-          actor: 'architect',
-          trigger: 'automatic',
-          round: 2,
-          autoTurn: null,
-        },
+        intake: runningTurn({ at: T2, sessionId: 's3', asked: 'red team round 2 fix', round: 2 }),
       })
     )
     expect(result.holder).toBe('architect')
@@ -380,16 +358,7 @@ function fixingOneFindingTests() {
     const result = readiness(
       baseInput({
         order: wo0928Order({ redTeam: [blockingFinding()] }),
-        intake: {
-          kind: 'running',
-          at: T2,
-          sessionId: 's3',
-          asked: 'red team round 1 fix',
-          actor: 'architect',
-          trigger: 'automatic',
-          round: 1,
-          autoTurn: null,
-        },
+        intake: runningTurn({ at: T2, sessionId: 's3', asked: 'red team round 1 fix', round: 1 }),
       })
     )
     expect(result.strip.headline).toBe('The architect is fixing 1 red-team finding · round 1 of 3')
@@ -404,16 +373,7 @@ function revisingTests() {
       baseInput({
         order,
         compile,
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's4',
-          asked: 'follow-up',
-          actor: 'architect',
-          trigger: 'automatic',
-          round: null,
-          autoTurn: 1,
-        },
+        intake: runningTurn({ sessionId: 's4', asked: 'follow-up', autoTurn: 1 }),
       })
     )
     expect(result.strip.headline).toBe(
@@ -430,16 +390,7 @@ function yourRequestTests() {
   it('3. running: architect working on your request', () => {
     const result = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's5',
-          asked: 'make it faster',
-          actor: 'architect',
-          trigger: 'you',
-          round: null,
-          autoTurn: null,
-        },
+        intake: runningTurn({ sessionId: 's5', asked: 'make it faster', trigger: 'you' }),
       })
     )
     expect(result.holder).toBe('architect')
@@ -705,16 +656,7 @@ function inProgressChecksTests() {
     const result = readiness(
       baseInput({
         order,
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's1',
-          asked: 'x',
-          actor: 'architect',
-          trigger: 'you',
-          round: null,
-          autoTurn: null,
-        },
+        intake: runningTurn({ sessionId: 's1', trigger: 'you' }),
       })
     )
     expect(result.rows[1].state).toBe('in-progress')
@@ -745,16 +687,7 @@ function turnRowPerActorTests() {
   it('turn row: in-progress per actor', () => {
     const redTeam = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's',
-          asked: 'x',
-          actor: 'red team',
-          trigger: 'automatic',
-          round: 2,
-          autoTurn: null,
-        },
+        intake: runningTurn({ actor: 'red team', round: 2 }),
       })
     ).rows[5]
     expect(redTeam.detail).toBe(
@@ -763,16 +696,7 @@ function turnRowPerActorTests() {
 
     const architect = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's',
-          asked: 'x',
-          actor: 'architect',
-          trigger: 'you',
-          round: null,
-          autoTurn: null,
-        },
+        intake: runningTurn({ trigger: 'you' }),
       })
     ).rows[5]
     expect(architect.detail).toBe(
@@ -781,16 +705,7 @@ function turnRowPerActorTests() {
 
     const scout = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's',
-          asked: 'scout',
-          actor: 'scout',
-          trigger: 'automatic',
-          round: null,
-          autoTurn: null,
-        },
+        intake: runningTurn({ asked: 'scout', actor: 'scout' }),
       })
     ).rows[5]
     expect(scout.detail).toBe('The scout is reading the repository.')
@@ -856,16 +771,11 @@ function anEmptyPlanTests() {
     const idle = readiness(baseInput({ order: empty }))
     expect(idle.steps.find((s) => s.id === 'plan')?.word).toBe('Not drafted yet')
 
-    const running: IntakeOutcome = {
-      kind: 'running',
-      at: T0,
+    const running: IntakeOutcome = runningTurn({
       sessionId: 'S-1',
       asked: 'drafting the plan',
-      actor: 'architect',
       trigger: 'you',
-      round: null,
-      autoTurn: null,
-    }
+    })
     const drafting = readiness(baseInput({ order: empty, intake: running }))
     expect(drafting.steps.find((s) => s.id === 'plan')).toMatchObject({
       state: 'work',
@@ -880,16 +790,11 @@ function aPlanBeingRevisedTests() {
     const order = wo0928Order({
       risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] },
     })
-    const running: IntakeOutcome = {
-      kind: 'running',
-      at: T0,
+    const running: IntakeOutcome = runningTurn({
       sessionId: 'S-1',
       asked: 'fix it',
-      actor: 'architect',
       trigger: 'you',
-      round: null,
-      autoTurn: null,
-    }
+    })
     const plan = readiness(baseInput({ order, intake: running })).steps.find((s) => s.id === 'plan')
     expect(plan).toMatchObject({ state: 'work', mark: 'spin', word: 'Being revised' })
   })
@@ -952,16 +857,7 @@ function fixingTests() {
     const result = readiness(
       baseInput({
         order,
-        intake: {
-          kind: 'running',
-          at: T2,
-          sessionId: 's',
-          asked: 'x',
-          actor: 'architect',
-          trigger: 'automatic',
-          round: 2,
-          autoTurn: null,
-        },
+        intake: runningTurn({ at: T2, round: 2 }),
         loop: baseLoop({
           rounds: [
             { round: 1, startedAt: T0, finishedAt: T1 },
@@ -1061,6 +957,18 @@ function aCleanDraftTests() {
   })
 }
 
+/** A question nobody has answered yet. */
+const UNANSWERED: WorkOrder['openQuestions'][number] = {
+  id: 'Q-1',
+  text: 'a',
+  why: '',
+  options: [],
+  recommended: null,
+  answer: null,
+  rank: 0,
+  confidence: null,
+}
+
 function handoffLockAcrossStatesTests() {
   it('locks.handOff is null exactly when canHandOff, across several draft states', () => {
     // "Held, with nothing running and compile ok" is a deliberate exception to
@@ -1069,34 +977,10 @@ function handoffLockAcrossStatesTests() {
       baseInput(),
       baseInput({ intake: { kind: 'refused', at: T1, reason: 'x' } }),
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's',
-          asked: 'x',
-          actor: 'red team',
-          trigger: 'automatic',
-          round: 1,
-          autoTurn: null,
-        },
+        intake: runningTurn({ actor: 'red team', round: 1 }),
       }),
       baseInput({ order: wo0928Order({ redTeam: [blockingFinding()] }) }),
-      baseInput({
-        order: wo0928Order({
-          openQuestions: [
-            {
-              id: 'Q-1',
-              text: 'a',
-              why: '',
-              options: [],
-              recommended: null,
-              answer: null,
-              rank: 0,
-              confidence: null,
-            },
-          ],
-        }),
-      }),
+      baseInput({ order: wo0928Order({ openQuestions: [UNANSWERED] }) }),
       baseInput({
         order: wo0928Order({ acceptance: [], plan: { ...wo0928Order().plan, units: [] } }),
       }),
@@ -1146,16 +1030,7 @@ function theRedraftLockTests() {
   it('redraft lock: red team running warns of loss, architect/scout say to wait', () => {
     const redTeam = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's',
-          asked: 'x',
-          actor: 'red team',
-          trigger: 'automatic',
-          round: 1,
-          autoTurn: null,
-        },
+        intake: runningTurn({ actor: 'red team', round: 1 }),
       })
     )
     expect(redTeam.locks.redraft).toBe(
@@ -1165,16 +1040,7 @@ function theRedraftLockTests() {
 
     const architect = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's',
-          asked: 'x',
-          actor: 'architect',
-          trigger: 'you',
-          round: null,
-          autoTurn: null,
-        },
+        intake: runningTurn({ trigger: 'you' }),
       })
     )
     expect(architect.locks.redraft).toBe(
@@ -1187,48 +1053,21 @@ function handoffwhyTests() {
   it('handOffWhy names what finishing opens hand-off, and is null when ready', () => {
     const redTeam = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's',
-          asked: 'x',
-          actor: 'red team',
-          trigger: 'automatic',
-          round: 2,
-          autoTurn: null,
-        },
+        intake: runningTurn({ actor: 'red team', round: 2 }),
       })
     )
     expect(redTeam.handOffWhy).toBe('Hand-off opens when the red team finishes round 2.')
 
     const architect = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's',
-          asked: 'x',
-          actor: 'architect',
-          trigger: 'you',
-          round: null,
-          autoTurn: null,
-        },
+        intake: runningTurn({ trigger: 'you' }),
       })
     )
     expect(architect.handOffWhy).toBe('Hand-off opens when the architect finishes.')
 
     const scout = readiness(
       baseInput({
-        intake: {
-          kind: 'running',
-          at: T0,
-          sessionId: 's',
-          asked: 'scout',
-          actor: 'scout',
-          trigger: 'automatic',
-          round: null,
-          autoTurn: null,
-        },
+        intake: runningTurn({ asked: 'scout', actor: 'scout' }),
       })
     )
     expect(scout.handOffWhy).toBe('Hand-off opens when the scout finishes.')
