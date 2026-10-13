@@ -117,7 +117,7 @@ export function createForgeLoop(
   return {
     convergeWithFollowUps: (ask) => convergeWithFollowUps(forge, ask),
     convergeMaybeScouted: (order, message, recordStart) =>
-      convergeMaybeScouted(forge, order, message, recordStart),
+      convergeMaybeScouted(forge, { order, message, recordStart }),
     onReleased: (order) => onReleased(forge, order),
   }
 }
@@ -633,9 +633,7 @@ async function convergeAfterRelease(
  */
 function convergeMaybeScouted(
   forge: Forge,
-  order: WorkOrder,
-  message: string,
-  recordStart?: RecordStart
+  { order, message, recordStart }: Pick<ArchitectAsk, 'order' | 'message' | 'recordStart'>
 ): Promise<ConvergeStarted> {
   const root = forge.dataRoot()
   return scoutedConverge(

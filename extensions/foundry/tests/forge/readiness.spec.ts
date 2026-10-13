@@ -144,6 +144,7 @@ describe('readiness — holder and strip', () => {
   describe('your request', yourRequestTests)
   describe('held and exhausted', heldAndExhaustedTests)
   describe('one blocking finding', oneBlockingFindingTests)
+  describe('three blocking findings', threeBlockingFindingsTests)
   describe('open questions', openQuestionsTests)
   describe('no criteria', noCriteriaTests)
   describe('compile failures and ok', compileFailuresAndOkTests)
@@ -442,6 +443,19 @@ function oneBlockingFindingTests() {
   })
 }
 
+function threeBlockingFindingsTests() {
+  it('5. three blocking findings, plural wording', () => {
+    const order = wo0928Order({
+      redTeam: ['RT-1', 'RT-2', 'RT-3'].map((id) => blockingFinding({ id, text: `Wrong ${id}.` })),
+    })
+    const result = readiness(baseInput({ order }))
+    expect(result.strip.headline).toBe('3 findings need your decision')
+    expect(result.strip.detail).toBe(
+      'Nothing moves until you decide. Hand-off opens when all are decided and the architect has applied them.'
+    )
+  })
+}
+
 function openQuestionsTests() {
   it('6. unanswered open questions', () => {
     const order = wo0928Order({
@@ -733,7 +747,29 @@ describe('readiness — steps and the not-yet rule', () => {
   describe('a plan being revised', aPlanBeingRevisedTests)
   describe('a clean order', aCleanOrderTests)
   describe('not draft', notDraftTests)
+  describe('not draft, review skipped', notDraftReviewSkippedTests)
 })
+
+function notDraftReviewSkippedTests() {
+  it('says the review was skipped, and why, on an order handed off without one', () => {
+    const order = wo0928Order({ status: 'agreed', agreedAt: T1 })
+    const result = readiness(
+      baseInput({
+        order,
+        agreed: { at: T1, by: 'you' },
+        loop: baseLoop({ skipped: 'P3, one lane' }),
+      })
+    )
+    const redTeam = result.steps.find((s) => s.id === 'redTeam')
+    expect(redTeam?.word).toBe('Skipped: P3, one lane')
+  })
+
+  it('says not reviewed when nothing reviewed it and nothing skipped it', () => {
+    const order = wo0928Order({ status: 'agreed', agreedAt: T1 })
+    const result = readiness(baseInput({ order, agreed: { at: T1, by: 'you' } }))
+    expect(result.steps.find((s) => s.id === 'redTeam')?.word).toBe('Not reviewed')
+  })
+}
 
 function aPlanGoneBadTests() {
   it('a plan gone bad cascades: redTeam, shape and tracker become not-yet, handOff is exempt', () => {

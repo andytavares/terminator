@@ -27,7 +27,21 @@ import type { ResolveSources } from '../recipe/resolve.js'
 
 /** What the architect is told to produce, and where to put it. */
 function outputContract(file: string, order: WorkOrder): string {
-  const failures = compileOrder(order).failures
+  return [
+    ...contractHead(file),
+    ...exampleIntentAndUnits(),
+    ...exampleLanesAndRest(order),
+    ...verifyKinds(),
+    ...closedLabels(),
+    ...fixedFields(order),
+    ...refusals(order),
+    ...decideNotAsk(),
+    ...planSize(),
+  ].join('\n')
+}
+
+/** Where the proposal goes, and what it may hold. */
+function contractHead(file: string): string[] {
   return [
     '',
     '---',
@@ -41,6 +55,12 @@ function outputContract(file: string, order: WorkOrder): string {
     'and `plan` the same holds key by key, but a list you send replaces that list',
     'whole — send every unit, not just the new one:',
     '',
+  ]
+}
+
+/** The example proposal, down to its units. */
+function exampleIntentAndUnits(): string[] {
+  return [
     '```json',
     '{',
     '  "intent":   { "problem": "…", "outcome": "…", "nonGoals": ["…"] },',
@@ -67,6 +87,12 @@ function outputContract(file: string, order: WorkOrder): string {
     '        "verify": [{ "kind": "command", "command": "…", "assert": "exit_code == 0" }]',
     '      }',
     '    ],',
+  ]
+}
+
+/** The example proposal, from its lanes to its note. */
+function exampleLanesAndRest(order: WorkOrder): string[] {
+  return [
     '    "lanes": [',
     `      { "ord": 1, "repo": "…", "branch": ${JSON.stringify(
       order.plan.lanes.find((l) => l.branch !== '')?.branch ?? ''
@@ -89,6 +115,12 @@ function outputContract(file: string, order: WorkOrder): string {
     '}',
     '```',
     '',
+  ]
+}
+
+/** The closed shapes a criterion is proved by, and a judge reads. */
+function verifyKinds(): string[] {
+  return [
     '`verify.kind` is one of `test`, `command`, `judge`, `artifact` or `screenshot`.',
     "A unit's `verify` is a list of those same objects, or `[]` —",
     'never a bare command string, which is refused with the whole proposal.',
@@ -105,6 +137,12 @@ function outputContract(file: string, order: WorkOrder): string {
     'never `evidence: ["src/app.css"]`. A path written here is refused, and the',
     'whole proposal with it.',
     '',
+  ]
+}
+
+/** The two other closed sets: risk triggers, and a lane’s role. */
+function closedLabels(): string[] {
+  return [
     // Shown for the same reason `grade` shows its four values, and absent for
     // the whole of the feature that preceded this one. See RISK_TRIGGERS.
     `\`risk.triggers\` is a closed set: each entry is exactly one of ${RISK_TRIGGERS.map(
@@ -123,6 +161,12 @@ function outputContract(file: string, order: WorkOrder): string {
     'is not the same field as a unit\u2019s `role`, which names a role from the',
     'toolchain. Leave it `null` unless lanes share files.',
     '',
+  ]
+}
+
+/** What the architect may not change. */
+function fixedFields(order: WorkOrder): string[] {
+  return [
     ...(order.plan.lanes.some((l) => l.branch !== '')
       ? ['A lane\u2019s `branch` is fixed by the ticket and must be kept exactly as shown.', '']
       : []),
@@ -131,6 +175,13 @@ function outputContract(file: string, order: WorkOrder): string {
     '',
     'Budgets are the operator’s, and not yours to set.',
     '',
+  ]
+}
+
+/** What the compile gate and the red team would hold against it now. */
+function refusals(order: WorkOrder): string[] {
+  const failures = compileOrder(order).failures
+  return [
     '## What will refuse this order if you get it wrong',
     '',
     failures.length === 0
@@ -138,6 +189,12 @@ function outputContract(file: string, order: WorkOrder): string {
       : failures.map((failure) => `- **${failure.check}** — ${failure.detail}`).join('\n'),
     '',
     ...openFindings(order),
+  ]
+}
+
+/** Questions decided at 90%, findings fixed or dismissed. */
+function decideNotAsk(): string[] {
+  return [
     '## Decide, do not ask',
     '',
     'Every question you ask stops the operator. For each open decision, work out',
@@ -157,6 +214,12 @@ function outputContract(file: string, order: WorkOrder): string {
     'stops hand-off. A `process`, `pre-existing`, `infra` or `scope` finding is',
     'a note: it needs no action from you or the operator.',
     '',
+  ]
+}
+
+/** How small the plan should be. */
+function planSize(): string[] {
+  return [
     '## How big the plan should be',
     '',
     'Write the smallest plan that covers the ask. A unit is not a file and not',
@@ -167,7 +230,7 @@ function outputContract(file: string, order: WorkOrder): string {
     'Split a unit when it belongs to a different repository, or when a later',
     'unit genuinely cannot begin until an earlier one has landed. Not because',
     'it touches different files, and not to make the plan look thorough.',
-  ].join('\n')
+  ]
 }
 
 /** The red team's open findings, named — a count alone is not something anyone can fix. */
@@ -310,6 +373,30 @@ export function convergeBrief(input: ConvergeInput): ConvergeBrief {
   }
 }
 
+/** What the architect wrote, merged into the order and its findings settled, or why not. */
+function mergeProposal(order: WorkOrder, raw: string, at: string): ConvergeResult {
+  try {
+    const proposal = parseProposal(JSON.parse(raw))
+    const applied = dismissConfidentFindings(
+      applyProposal(order, proposal, at),
+      proposal.dismissFindings ?? []
+    )
+    const resolved = resolveFindings(
+      decideConfidentQuestions(applied),
+      proposal.resolveFindings ?? []
+    )
+    return { ok: true, order: settleFindings(resolved), note: proposal.note }
+  } catch (error) {
+    return {
+      ok: false,
+      reason:
+        error instanceof ProposalRejected
+          ? error.message
+          : `the proposal was not readable: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+}
+
 export type ConvergeResult =
   | { ok: true; order: WorkOrder; note: string }
   | { ok: false; reason: string }
@@ -330,30 +417,7 @@ export function readProposal(order: WorkOrder, proposalPath: string, at: string)
   }
 
   try {
-    const proposal = parseProposal(JSON.parse(raw))
-    return {
-      ok: true,
-      order: settleFindings(
-        resolveFindings(
-          decideConfidentQuestions(
-            dismissConfidentFindings(
-              applyProposal(order, proposal, at),
-              proposal.dismissFindings ?? []
-            )
-          ),
-          proposal.resolveFindings ?? []
-        )
-      ),
-      note: proposal.note,
-    }
-  } catch (error) {
-    return {
-      ok: false,
-      reason:
-        error instanceof ProposalRejected
-          ? error.message
-          : `the proposal was not readable: ${error instanceof Error ? error.message : String(error)}`,
-    }
+    return mergeProposal(order, raw, at)
   } finally {
     try {
       fs.unlinkSync(proposalPath)

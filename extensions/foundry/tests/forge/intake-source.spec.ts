@@ -267,6 +267,7 @@ function noHeadingAndABareTitleTests() {
 describe('seedOrder from a signal (ADR-066)', () => {
   describe('seeding from the signal', seedingFromTheSignalTests)
   describe('an unreadable signal', anUnreadableSignalTests)
+  describe('a signal with no evidence', aSignalWithNoEvidenceTests)
 })
 
 function seedingFromTheSignalTests() {
@@ -293,6 +294,18 @@ function seedingFromTheSignalTests() {
       key: 'sig-1',
       url: 'https://x/1',
     })
+  })
+}
+
+function aSignalWithNoEvidenceTests() {
+  it('seeds a signal that carries no evidence, with no url to point at', async () => {
+    const r = await seedOrder(
+      { kind: 'signal', signalId: 'sig-1', repoPaths: [repo] },
+      deps({ readSignal: vi.fn(async () => ({ ...signal, evidence: [] })) })
+    )
+    if (!('order' in r)) throw new Error('expected an order')
+    expect(r.order.intent.problem).toBe('CI is flaky on main')
+    expect(r.order.source.url).toBeNull()
   })
 }
 
