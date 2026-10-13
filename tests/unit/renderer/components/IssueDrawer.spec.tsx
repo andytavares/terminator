@@ -292,3 +292,35 @@ describe('IssueDrawer — agent context (FR-023) — says plainly when nothing i
     expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false)
   })
 })
+
+describe('IssueDrawer — failures that say nothing of their own', () => {
+  it('reports a failed comment in its own words when the tracker gives none', async () => {
+    api.comment.mockResolvedValue({ error: 'failed' })
+    await setupSettled()
+    fireEvent.change(screen.getByPlaceholderText(/Add a comment/), { target: { value: 'note' } })
+    fireEvent.click(screen.getByText('Post comment'))
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe('Could not post that comment.')
+    )
+  })
+
+  it('reports a failed toggle in its own words when main gives none', async () => {
+    api.setInjectContext.mockResolvedValue({ error: 'failed' })
+    await setupSettled()
+    fireEvent.click(screen.getByRole('checkbox'))
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe('Could not change that setting.')
+    )
+  })
+
+  it('survives a preview that rejects outright', async () => {
+    api.contextPreview.mockRejectedValue(new Error('gone'))
+    setup()
+    expect(await screen.findByText(/Nothing is fed to agent sessions/)).toBeTruthy()
+  })
+
+  it('says nothing of when an issue was updated if the tracker did not say', async () => {
+    await setupSettled({ issue: issue({ updatedAt: '' }) })
+    expect(screen.queryByText(/updated/)).toBeNull()
+  })
+})

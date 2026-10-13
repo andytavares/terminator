@@ -244,3 +244,26 @@ describe('LinkIssueDialog — dismissal', () => {
     expect(onClose).toHaveBeenCalled()
   })
 })
+
+describe('LinkIssueDialog — shortcuts and odd failures', () => {
+  it('links a row on double click, and tells the caller', async () => {
+    const onClose = vi.fn()
+    const onLinked = vi.fn()
+    open({ onClose, onLinked })
+    const row = await screen.findByText('TAV-42')
+    fireEvent.click(row)
+    fireEvent.doubleClick(row)
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(linkIssue).toHaveBeenCalledWith(P, { tracker: 'linear', key: 'TAV-42' })
+    expect(onLinked).toHaveBeenCalledWith(expect.objectContaining({ key: 'TAV-42' }))
+  })
+
+  it('names a failure it has no words for by its code', async () => {
+    listMine.mockResolvedValue({
+      issues: [issueSummaryOf()],
+      failures: [{ tracker: 'jira', error: 'brand-new-error' }],
+    })
+    open()
+    expect((await screen.findByRole('status')).textContent).toBe('Jira brand-new-error')
+  })
+})
