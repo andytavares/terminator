@@ -48,10 +48,7 @@ export function resolveDataRoot(setting: string | undefined, workdir: string): D
   return { root: configured, usingDefault: false }
 }
 
-/**
- * An order id that does not name a directory under `orders/`.
- * @internal
- */
+/** An order id that does not name a directory under `orders/`. @internal */
 export class OrderIdEscapesRootError extends Error {
   readonly code = 'ORDER_ID_ESCAPES_ROOT'
   constructor(orderId: string) {

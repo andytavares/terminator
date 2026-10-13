@@ -182,12 +182,8 @@ interface Quoting {
   readonly bare: boolean
 }
 
-/**
- * The quoting after the character at `at`.
- *
- * A backslash outside single quotes escapes whatever follows, including a
- * quote; inside quotes only the matching quote means anything.
- */
+// The quoting after the character at `at`: a backslash outside single quotes escapes
+// what follows, a quote included; inside quotes only the matching quote counts.
 function quotingAt(command: string, at: number, quote: Quote | null): Quoting {
   const char = command[at]
   if (char === '\\' && quote !== "'") return { quote, skip: 1, bare: false }
@@ -201,13 +197,8 @@ function opensSubstitution(command: string, at: number): boolean {
   return command[at] === '`' || (command[at] === '$' && command[at + 1] === '(')
 }
 
-/**
- * The text inside a substitution that opens at `from`, and where it ends.
- *
- * Nesting counts, so `$(dirname $(pwd))` is read whole rather than stopping
- * at the first `)`. An unbalanced one returns null and is reported as
- * unreadable rather than guessed at.
- */
+// The text inside a substitution opening at `from`, and where it ends. Nesting counts,
+// so `$(dirname $(pwd))` reads whole; an unbalanced one is null, reported unreadable.
 function substitution(command: string, from: number): { inner: string; end: number } | null {
   return command[from] === '`'
     ? backtickSubstitution(command, from)
@@ -229,15 +220,9 @@ function backtickSubstitution(
 }
 
 function parenSubstitution(command: string, from: number): { inner: string; end: number } | null {
-  // Past the `$(` itself, so the opening parenthesis is not counted as one
-  // more level of nesting than there is.
-  //
-  // Quoting counts here for the same reason it counts in the main loop: a
-  // parenthesis inside an argument belongs to the argument. Counting them
-  // raw meant `$(grep -c "var(--x" a.css)` opened a level that nothing
-  // closed, so the scan ran off the end and the whole shape was reported
-  // unreadable — which `isDestructive` reads as destruction. Measured on a
-  // live run: a read-only `grep` inventory was held for 276 seconds.
+  // Past the `$(`, which is not itself a level. Quoting counts as in the main loop: a
+  // raw count made `$(grep -c "var(--x" a.css)` unreadable, which `isDestructive`
+  // reads as destruction, and held a read-only grep for 276 seconds.
   let depth = 0
   let quote: Quote | null = null
   for (let j = from + 2; j < command.length; j += 1) {
@@ -255,16 +240,11 @@ function parenSubstitution(command: string, from: number): { inner: string; end:
 }
 
 export function readShell(command: string): ShellReading {
-  return new ShellReader(command).read()
+  return new ShellReader(command).reading()
 }
 
-/**
- * One pass over a command, a character at a time.
- *
- * Each character is offered to the readers in `step` in turn, and the first
- * that takes it decides what it was; one none of them takes is part of the
- * current command's text.
- */
+// One pass over a command, a character at a time: the first reader in `takeChar` to
+// take a character decides what it was; otherwise it is command text.
 class ShellReader {
   private readonly segments: string[] = []
   private readonly nested: string[] = []
@@ -284,9 +264,9 @@ class ShellReader {
     this.command = command
   }
 
-  read(): ShellReading {
+  reading(): ShellReading {
     for (this.i = 0; this.i < this.command.length && !this.stopped; this.i += 1) {
-      this.step(this.command[this.i])
+      this.takeChar(this.command[this.i])
     }
     this.segments.push(this.current)
     return {
@@ -300,7 +280,7 @@ class ShellReader {
     }
   }
 
-  private step(char: string): void {
+  private takeChar(char: string): void {
     if (this.escape(char)) return
     if (this.quote !== null) {
       this.inQuote(char)
@@ -318,11 +298,8 @@ class ShellReader {
     this.current += char
   }
 
-  /**
-   * A backslash outside single quotes escapes whatever follows, including a
-   * quote — so it has to be consumed here or the quote state goes wrong for
-   * the rest of the command.
-   */
+  // A backslash outside single quotes escapes what follows, a quote included, so it is
+  // consumed here or the quote state goes wrong for the rest of the command.
   private escape(char: string): boolean {
     if (char !== '\\' || this.quote === "'") return false
     this.current += char + (this.command[this.i + 1] ?? '')
@@ -376,16 +353,9 @@ class ShellReader {
     return found.end
   }
 
-  /**
-   * `<<WORD` names the end of a body rather than a file. The operator and
-   * its delimiter stay in the segment — the words around them are still the
-   * command — and the body is skipped when this line ends.
-   *
-   * `command[i - 1]` as well as `command[i + 2]`: the loop walks `<<<` one
-   * character at a time, so its middle `<` also has a `<` after it and a
-   * non-`<` after that. Without this, `grep x <<< "$(…)"` read its
-   * here-string as a heredoc delimiter and lost the substitution inside it.
-   */
+  // `<<WORD` names the end of a body: operator and delimiter stay in the segment, and
+  // the body is skipped when the line ends. Checking `command[i - 1]` too keeps
+  // `<<<`'s middle `<` from reading a here-string as a heredoc.
   private heredoc(char: string): boolean {
     const { command, i } = this
     if (
@@ -405,10 +375,8 @@ class ShellReader {
     return true
   }
 
-  /**
-   * A file descriptor immediately before a redirect (`2>`) belongs to it, and
-   * `&>` is one operator rather than a joiner followed by a redirect.
-   */
+  // A file descriptor right before a redirect (`2>`) belongs to it, and `&>` is one
+  // operator, not a joiner and a redirect.
   private redirect(char: string): boolean {
     if (char === '>' || char === '<') {
       this.redirects = true
@@ -482,11 +450,8 @@ export function redirectTargets(command: string): string[] {
   return targets
 }
 
-/**
- * The word the redirect operator at `at` writes to, and where reading carries
- * on; an empty word for a file descriptor, and null when the command ends
- * before any word.
- */
+// The word the redirect at `at` writes to and where reading resumes: empty for a file
+// descriptor, null when the command ends first.
 function redirectTargetAt(command: string, at: number): ReadWord | null {
   // Past the operator, then one word — quoted or not.
   let j = at + 1

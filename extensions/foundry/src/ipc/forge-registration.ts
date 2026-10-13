@@ -6,7 +6,6 @@ import { foundryChannel } from './channel.js'
 import { IssuesMinePayload, OrderIdPayload, TicketCreatePayload } from './payloads.js'
 import { createLiveOrderStore } from '../order/store.js'
 import { deleteOrder } from '../line/teardown.js'
-import { computeQueueEntries } from '../line/refinery-entries.js'
 import { projectRemover } from '../line/order-project.js'
 import { fileTicket, ticketOffer } from '../forge/ticket-offer.js'
 import { checkCapability, writeBack } from '../trackers/write-back.js'
@@ -14,7 +13,7 @@ import { checkCapability, writeBack } from '../trackers/write-back.js'
 import type { ForgeChannels, ForgeDeps } from './forge-channels.js'
 import { reg } from './register.js'
 import type { ActivationContext } from './register.js'
-import { announceLive, indexFor, orderStoreAt } from '../state/live-index.js'
+import { announceLive, indexFor, orderStoreAt, queueEntriesOf } from '../state/live-index.js'
 import { intakeSessions, deletedOrders } from '../forge/intake-sessions.js'
 import { defaultWriteBack, defaultBudgets, declaredCriticalPaths } from '../state/settings.js'
 import { runtime } from '../runtime/runtime-state.js'
@@ -22,15 +21,12 @@ import { issuesPortFor, writeBackDepsFor } from '../trackers/issues-port.js'
 import { stopOrder } from '../line/run-control.js'
 import type { LiveStandingSources } from './standing.js'
 import type { ForgeLoop } from '../forge/forge-loop.js'
+import { isoNow, shellExecOf } from '../host-calls.js'
 
-/**
- * What the record already says about these files (FR-077).
- *
- * One line per past decision, newest first and bounded — the point is to tell
- * the Architect "this was decided before", not to hand it the whole ledger.
- * @internal
- */
-export async function priorArtFor(root: string, paths: readonly string[]): Promise<string[]> {
+// What the record already says about these files (FR-077): one line per past
+// decision, newest first and bounded, to tell the Architect it was decided before.
+/** @internal */
+export async function priorArtInRecords(root: string, paths: readonly string[]): Promise<string[]> {
   const store = orderStoreAt(root)
   const orders = await store.list()
   const entries = (await Promise.all(orders.map((order) => store.entries(order.id)))).flat()
@@ -48,11 +44,8 @@ export interface ForgeRegistrationDeps {
   readonly loop: ForgeLoop
 }
 
-/**
- * The Forge: an idea or a tracker issue in, a compilable work order out, and
- * the channels around it — your tickets, a ticket for a typed idea, and
- * deleting an order outright.
- */
+// The Forge: an idea or tracker issue in, a compilable work order out, and the
+// channels around it (your tickets, a ticket for a typed idea, deleting an order).
 export function registerForgeChannels(
   context: ActivationContext,
   deps: ForgeRegistrationDeps
@@ -72,12 +65,12 @@ function createForge(
   return createForgeChannels({
     store: createLiveOrderStore(dataRoot, indexFor),
     dataRoot,
-    now: () => new Date().toISOString(),
+    now: isoNow,
     standingSources,
     writeBackDefault: () => defaultWriteBack(api),
     budgetDefaults: () => defaultBudgets(api),
     criticalPaths: (repoPaths) => declaredCriticalPaths(api, repoPaths),
-    priorArtFor: (paths) => priorArtFor(dataRoot(), paths),
+    priorArtFor: (paths) => priorArtInRecords(dataRoot(), paths),
     // The redraft lands here, when the architect's turn ends — minutes after
     // the channel that started it answered.
     converge: (order, message, recordStart) =>
@@ -88,13 +81,13 @@ function createForge(
     onAgreed: async (order) => {
       await writeBack(order, { event: 'agreed' }, writeBackDepsFor(dataRoot(), order, issuesPort))
     },
-    readIssue: (tracker, key) => readIssue(api, tracker, key),
-    queueEntries: () => computeQueueEntries(dataRoot(), orderStoreAt(dataRoot())),
+    readIssue: (tracker, key) => readTrackerIssue(api, tracker, key),
+    queueEntries: queueEntriesOf(dataRoot),
     onReleased: loop.onReleased,
   })
 }
 
-async function readIssue(
+async function readTrackerIssue(
   api: ExtensionAPI,
   tracker: Parameters<ForgeDeps['readIssue']>[0],
   key: string
@@ -114,13 +107,8 @@ async function readIssue(
 }
 
 function registerIssueChannels(api: ExtensionAPI): void {
-  // Your tickets, so a ticket can be picked rather than typed from memory.
-  //
-  // The Forge has always taken a tracker key, and the only way to give it one
-  // was to know it already. The host lists and searches issues — `listMine`
-  // and `search` have been there the whole time — and nothing here asked.
-  // Importing work is the front door of a tool that does work, and it did not
-  // have one.
+  // Your tickets, so one can be picked rather than typed from memory, through the
+  // host's `listMine` and `search`.
   const myIssues = foundryChannel('foundry:issues.mine', IssuesMinePayload, (payload) =>
     listMyIssues(api, payload?.term ?? '')
   )
@@ -166,12 +154,8 @@ async function listMyIssues(api: ExtensionAPI, rawTerm: string) {
   }
 }
 
-// Gone, rather than hidden.
-//
-// `order.cancel` marks an order `cancelled` and drops it off the list, and
-// leaves its directory, its ledger, its worktree and its branch exactly
-// where they were — so the records location and the target repository fill
-// up with work nobody can reach or restart. This is the other answer.
+// Deletes an order outright. `order.cancel` only marks it, leaving its directory,
+// ledger, worktree and branch to fill the records and the repository.
 function registerOrderDelete({ api, dataRoot }: ActivationContext): void {
   reg(
     api,
@@ -193,7 +177,7 @@ function registerOrderDelete({ api, dataRoot }: ActivationContext): void {
         announceLive(id)
       }
       const result = await deleteOrder(order, {
-        exec: (o) => api.shell.exec(o),
+        exec: shellExecOf(api),
         root,
         removeProjectAt: projectRemover(api.workspace),
       })

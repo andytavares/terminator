@@ -3,21 +3,12 @@ import type { RunGraph } from '../line/run-graph.js'
 import type { Gate } from '../gates/rules.js'
 import type { LedgerEntry } from '../ledger/append.js'
 
-// What Foundry knows about its own records, held in memory.
-//
-// Disk is the source of truth and every write still goes there first. This
-// holds what the store modules read back, loads each piece the first time it
-// is asked for, and is told about each write after it succeeded. Reading then
-// stops re-parsing every order, graph, gate file and ledger on every poll.
-//
-// Only Foundry's own writes reach it. A file edited by hand under the data root
-// is not noticed until the application restarts.
+// Foundry's own records held in memory: disk stays the truth and is written first;
+// each piece loads on first ask and hears of every successful write, so polls stop
+// reparsing. A file edited by hand is not noticed until a restart.
 
-/**
- * `live` is the one kind with no file behind it: held tool calls, stalls,
- * stranded agents and running intakes live in the process, and a standing is
- * drawn from them. `orderId` is empty when the change is not tied to one order.
- */
+// `live` has no file behind it: held calls, stalls, stranded agents and running
+// intakes live in the process. `orderId` is empty for a change tied to no order.
 export type ChangeKind = 'order' | 'graph' | 'gates' | 'ledger' | 'live'
 
 export interface FoundryChange {
@@ -132,10 +123,8 @@ function without<T>(all: ReadonlyMap<string, T>, key: string): Map<string, T> {
   return next
 }
 
-/**
- * Callers get copies. Every read used to parse a file into a fresh object, so
- * code that edits what it was given — and some does — never touched a shared one.
- */
+// Callers get copies: reads used to parse a fresh object each time, and some callers
+// edit what they are given.
 const copy = <T>(value: T): T => structuredClone(value)
 
 interface Slots {

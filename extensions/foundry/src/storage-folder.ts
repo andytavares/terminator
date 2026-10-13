@@ -12,16 +12,14 @@ const MOVES = [
   { from: 'foundry-runtime', to: 'runtime' },
 ]
 
-/** Where the records go with no workspace open and no data directory set. */
+// Where the records go with no workspace open and no data directory set; never
+// `process.cwd()` (SUPERVISION.md, "Incidents behind the code").
 export function fallbackRecordsBase(api: ExtensionAPI): string {
   return path.join(api.paths.globalStorage, 'records')
 }
 
-/**
- * Moves Foundry's data out of the shared userData folder on the first
- * activation after the change, then reconnects the lane worktrees that moved
- * with the records, in the background.
- */
+// Moves Foundry's data out of the shared userData folder on the first activation
+// after the change, then reconnects the lane worktrees that moved, in the background.
 export function moveFromSharedUserData(api: ExtensionAPI): void {
   const [records] = moveFromUserData(api, MOVES)
   if (records !== 'moved') return
@@ -44,12 +42,12 @@ async function reconnectLaneWorktrees(api: ExtensionAPI, root: string): Promise<
 /** `<root>/orders/<id>/worktrees/<repo>`, the shape `checkoutPath` builds. */
 function laneWorktrees(root: string): string[] {
   const orders = path.join(root, 'orders')
-  return entries(orders).flatMap((order) => {
+  return directoryEntries(orders).flatMap((order) => {
     const worktrees = path.join(orders, order, 'worktrees')
-    return entries(worktrees).map((repo) => path.join(worktrees, repo))
+    return directoryEntries(worktrees).map((repo) => path.join(worktrees, repo))
   })
 }
 
-function entries(directory: string): string[] {
+function directoryEntries(directory: string): string[] {
   return fs.existsSync(directory) ? fs.readdirSync(directory) : []
 }

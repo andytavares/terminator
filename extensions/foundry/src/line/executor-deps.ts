@@ -7,7 +7,6 @@ import type { Gate } from '../gates/rules.js'
 import type { OrderStore } from '../order/store.js'
 import type { ShellExec } from './integrate.js'
 import { writeObservedFiles } from './observed-files.js'
-import { endAndWait } from '../runtime/end-session.js'
 import { readChangedFiles, readDiffSummary } from '../runtime/diff-metrics.js'
 import { isLockfile } from '../runtime/review/risk-grader.js'
 import { createRoleRegistry } from './roles.js'
@@ -19,17 +18,18 @@ import { collectableWrites, readRungOutput } from './rung-output.js'
 import { resolveSources } from '../workspace-root.js'
 import { indexFor, writeGraph } from '../state/live-index.js'
 import { autonomyFor } from '../state/settings.js'
-import { runtime, isLiveSession } from '../runtime/runtime-state.js'
+import { endLiveSession } from '../runtime/runtime-state.js'
 import { baseBranchOf, conversationKey, createRunContext } from './run-context.js'
 import type { OrderRun, RunContext } from './run-context.js'
-import { runNode } from './node-session.js'
+import { runNodeSession } from './node-session.js'
 import {
-  reinstall,
-  releaseBase,
+  reinstallDependencies,
+  releaseBaseCheckout,
   runRecipeCommand,
-  runStep,
-  runStepOnBase,
+  runLaneStep,
+  runStepOnBaseCheckout,
 } from './lane-commands.js'
+import { isoNow } from '../host-calls.js'
 
 export type { OrderRun } from './run-context.js'
 
@@ -45,18 +45,9 @@ interface DepsParts {
   readonly startedAt: number
 }
 
-/**
- * Actually run a graph.
- *
- * The seam `run.start` hands the graph to, and the one place the Line's pieces
- * meet the application: worktrees from `line/worktree.ts`, sessions from the
- * supervised runner, and the wave loop from `line/executor.ts`.
- *
- * Everything the executor enforces is enforced structurally rather than asked
- * for in a prompt — a role that may not resume is never handed a session, and
- * a role with no write list is run read-only, refused by the `PreToolUse` hook
- * rather than by a reminder in its own instructions.
- */
+// Runs a graph: the seam `run.start` hands it to, where worktrees, supervised sessions
+// and the wave loop meet. Rules are structural, not prompted: a role that may not
+// resume gets no session, and one with no write list is refused by the hook.
 export async function buildExecutorDeps(
   api: ExtensionAPI,
   run: OrderRun
@@ -92,9 +83,9 @@ async function executorDepsFor(
   graph: RunGraph
 ): Promise<ExecutorDeps> {
   return {
-    now: () => new Date().toISOString(),
+    now: isoNow,
     sources: parts.sources,
-    run: (input) => runNode(context, input),
+    run: (input) => runNodeSession(context, input),
     sessionFor: (lane, role) => context.conversations.get(conversationKey(lane, role)),
     record: (action, subject, reason) => recordLineEntry(context, { action, subject, reason }),
     autonomy: autonomyFor(context.api),
@@ -105,20 +96,17 @@ async function executorDepsFor(
     commitNode: (input) => commitNode(context, input),
     priorGates: await parts.gates.list(),
     raise: (gate) => raiseGate(context, parts.gates, gate),
-    runStep: (step, logPath) => runStep(context, step, logPath),
-    runStepOnBase: (step, logPath) => runStepOnBase(context, step, logPath),
-    reinstall: (where, logPath) => reinstall(context, where, logPath),
-    releaseBase: () => releaseBase(context),
+    runStep: (step, logPath) => runLaneStep(context, step, logPath),
+    runStepOnBase: (step, logPath) => runStepOnBaseCheckout(context, step, logPath),
+    reinstall: (where, logPath) => reinstallDependencies(context, where, logPath),
+    releaseBase: () => releaseBaseCheckout(context),
     runCommand: (input) => runRecipeCommand(context, input),
-    endSession,
+    endSession: endPreviousProcess,
     observe: async () => ({ elapsedMinutes: minutesSince(parts.startedAt) }),
     onEvent: (event) => recordVerdict(context, event),
     persist: graphPersister(context, graph),
-    // What the work actually changed, so the regrade answers for the change
-    // rather than for the plan that predicted it. Without this the executor
-    // was handed the units' own `touches` list and a hardcoded zero lines, so
-    // a builder that went outside what it declared was invisible to the check
-    // that exists to notice, and nothing could ever grade worse than planned.
+    // What the work changed, so the regrade answers for the change and not the plan:
+    // a builder going outside its declared `touches` must be visible to the check.
     observedChange: () => readObservedChange(context),
     // Lets the budget be re-read while agents are in flight. Without it the
     // wall-clock budget can only fire between waves, which is every case
@@ -127,10 +115,8 @@ async function executorDepsFor(
   }
 }
 
-// Fractional on purpose. Rounded, a run at 19:31 reported "20" and a
-// twenty-minute budget could only be exceeded at 20:30 — so a run whose
-// deadline was the budget never saw the gate at all. The gate rounds it
-// for the sentence it prints; the comparison is exact.
+// Fractional on purpose: rounded, a twenty-minute budget could only be exceeded at
+// minute 21. The gate rounds for its sentence; the comparison is exact.
 const minutesSince = (startedAt: number): number => (Date.now() - startedAt) / 60_000
 
 async function recordLineEntry(
@@ -148,17 +134,9 @@ async function recordLineEntry(
   })
 }
 
-/**
- * Take what a read-only rung wrote, put it on the order, and save it.
- *
- * The Forge has always had this and the Line never did: four of the
- * standard shape's nine steps are roles whose whole product is a document,
- * and every one of them ended its turn with the document in a terminal
- * nobody reads. Watched on a live run — a scout's complete report of where
- * the application picks its colours, gone; an architect's three defects in
- * the order it was about to be built from, gone, refused on the way out by
- * the very policy that makes the rung trustworthy.
- */
+// Take what a read-only rung wrote, put it on the order and save it, as the Forge
+// does: a scout's report or an architect's defects otherwise end in a terminal
+// nobody reads.
 async function collectRungOutput(
   context: RunContext,
   roleRegistry: RoleRegistry,
@@ -236,14 +214,8 @@ async function raiseGate(context: RunContext, gates: GateStore, gate: Gate): Pro
 // The previous process of this conversation may still be sitting at its
 // prompt when a node resumes it. Two processes must not share one
 // conversation — the same reason `endAndWait` exists for a follow-up turn.
-function endSession(sessionId: string): Promise<void> {
-  return endAndWait(
-    {
-      stop: (id, reason) => runtime.supervisedRunner?.stop(id, reason) ?? false,
-      isLive: isLiveSession,
-    },
-    { sessionId, reason: 'continuing the lane in its next step' }
-  ).then(() => undefined)
+function endPreviousProcess(sessionId: string): Promise<void> {
+  return endLiveSession(sessionId, 'continuing the lane in its next step')
 }
 
 function recordVerdict(context: RunContext, event: ExecutorEvent): void {
@@ -277,11 +249,8 @@ function graphPersister(context: RunContext, graph: RunGraph): ExecutorDeps['per
   }
 }
 
-/**
- * Written down when a step settles, so reading the refinery's queue never
- * has to ask git what a checkout has changed. Git reporting nothing means
- * it could not be read, so an empty answer keeps what was recorded before.
- */
+// Recorded when a step settles, so the refinery's queue never asks git. Git reporting
+// nothing means it could not be read, so an empty answer keeps the previous record.
 async function recordObservedFiles(context: RunContext): Promise<void> {
   const { root, order } = context
   const files: string[] = []

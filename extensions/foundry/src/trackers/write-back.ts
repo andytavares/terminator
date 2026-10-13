@@ -40,10 +40,7 @@ export interface IssuesPort {
 
 type WriteBackEvent = 'agreed' | 'amended' | 'started' | 'draft_opened' | 'merged'
 
-/**
- * What each moment in an order's life means in the tracker's own terms.
- * @internal
- */
+/** What each moment in an order's life means in the tracker's terms. @internal */
 export const INTENT_FOR_EVENT: Record<WriteBackEvent, TransitionIntent | null> = {
   agreed: null,
   amended: null,
@@ -70,10 +67,7 @@ function withNoReviewState(error: unknown, key: string): unknown {
   )
 }
 
-/**
- * One retry. A tracker refusing twice is a tracker with a problem.
- * @internal
- */
+/** One retry: a tracker refusing twice has a problem. @internal */
 export const MAX_ATTEMPTS = 2
 
 export interface WriteBackDeps {
@@ -180,7 +174,7 @@ async function attempt(
   work: () => Promise<void>,
   deps: WriteBackDeps
 ): Promise<WriteBackResult> {
-  for (let n = 1; n <= MAX_ATTEMPTS; n++) {
+  for (let n = 1; ; n++) {
     try {
       await work()
       await deps.record('writeback.ok', subject, done)
@@ -198,8 +192,6 @@ async function attempt(
       }
     }
   }
-  /* c8 ignore next */
-  return { write, ok: false, unsupported: false, reason: 'unreachable' }
 }
 
 function linkComment(order: WorkOrder, pulls: readonly { repo: string; url: string }[]): string {

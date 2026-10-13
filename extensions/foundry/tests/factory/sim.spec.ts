@@ -24,7 +24,7 @@ import { parseRecipe } from '../../src/recipe/parse.js'
 import type { Recipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import type { RunGraph } from '../../src/line/run-graph.js'
+import type { NodeState, RunGraph } from '../../src/line/run-graph.js'
 import type { Observation } from '../../src/factory/events.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import { findPath } from '../../src/factory/path.js'
@@ -1072,3 +1072,20 @@ function cancelledErrandsTests() {
     expect(verifier.carrying).toBe(false)
   })
 }
+
+describe('createWorld: a hall that cannot seat everyone, and a corrupted state', () => {
+  it('keeps an idle crew member at its station when no rest seat is free', () => {
+    const g = graph()
+    const map = { ...layoutHall(g), restSeats: [] }
+    const crew = createWorld(map, obs(g)).crew.find((c) => c.nodeId === 'a')!
+    expect(tileOf(crew.x, crew.y)).toEqual(seatOf(map, 'a'))
+    expect(crew.anim).toBe('idle')
+    expect(crew.restSeat).toBe(null)
+  })
+
+  it('throws on a state a corrupted run graph file holds', () => {
+    const corrupted: NodeState = JSON.parse('"rebuilding"')
+    const g = withNode(graph(), 'a', { state: corrupted })
+    expect(() => createWorld(layoutHall(g), obs(g))).toThrow('unhandled node state: rebuilding')
+  })
+})

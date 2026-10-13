@@ -26,7 +26,7 @@ interface Shortfall {
   readonly refusal: Refusal | null
 }
 
-export async function settle(run: Execution, launched: Launched): Promise<void> {
+export async function settleNode(run: Execution, launched: Launched): Promise<void> {
   // A command this repository's toolchain could not resolve. It never ran —
   // not a pass, and not a failure, which is why it does not go through the
   // pass/fail machinery below.
@@ -59,13 +59,8 @@ export async function settle(run: Execution, launched: Launched): Promise<void> 
 
 const NOTHING_SHORT: Shortfall = { unmet: [], madeNoChange: false, refusal: null }
 
-/**
- * What the rung actually produced, which for a read-only role is the whole of
- * its work. Before this the brief named no destination and nothing read a
- * result past its exit status, so a scout's report, an architect's plan and a
- * red team's attack all ended in a terminal nobody read and the node passed
- * regardless.
- */
+// What the rung produced, which for a read-only role is all of its work: without it
+// a scout's report or a red team's attack ended in a terminal nobody read.
 async function collectRung(run: Execution, ran: Ran): Promise<DocumentHandBack | null> {
   const { node, roleId, outputPath } = ran
   if (outputPath === null || roleId === null) return null
@@ -102,7 +97,7 @@ async function filed(
   await run.deps.record('rung.collected', node.id, note)
   if (collected.defect !== null) {
     const summary = `${run.order.title} is contradicted by its own ${roleId}`
-    const stops = await run.raise('forge-defect', {
+    const stops = await run.stopAtGate('forge-defect', {
       summary,
       why: collected.defect,
       nodeId: node.id,
@@ -112,27 +107,9 @@ async function filed(
   return handedBack
 }
 
-/**
- * The verdict comes from the exit status. Whatever the run printed is
- * evidence, never the decision.
- *
- * **Only from a checking party.** A role that may write is the one that did
- * the work, and its turn ending says nothing whatever about whether the
- * criteria its unit claims are met — that claim is precisely what
- * verification exists to test. This used to run for every node with a unit,
- * so a builder finishing stamped `pass` on every criterion the unit
- * `satisfies`, off its own exit code, labelled `verifier`.
- *
- * `makeVerdict` has a structural guard against exactly that, and this caller
- * walked around it: passing `${sessionId}-verify` as the checking session is a
- * string that differs from the working one by a suffix, so the guard sees two
- * sessions where there is one. The independence is real now — the checker's
- * own session, held against the builder's.
- *
- * Found by a live run: a verifier read the file, saw the change had never been
- * made, and then found a `pass` already in the ledger for the criterion it was
- * there to judge, stamped at the millisecond the builder's turn ended.
- */
+// The verdict comes from the exit status; the output is evidence. Only a checking
+// party stamps one, in its own session held against the builder's
+// (ARCHITECTURE.md, "Only a checking party stamps a verdict").
 function judgeUnits(run: Execution, { node, result, roleId, readOnly }: Ran): void {
   if (node.unitIds.length === 0 || !readOnly) return
   for (const unit of unitsOf(run.order, node)) {
@@ -154,23 +131,9 @@ function judgeUnits(run: Execution, { node, result, roleId, readOnly }: Ran): vo
   }
 }
 
-/**
- * A judge declares what it expects; checking it is what makes it a judge
- * rather than another agent. What a step's own result actually offers:
- * `suite_exit_code` is an alias — for a `run` step the suite *is* the step,
- * and the bugfix shape names it that way to say which exit status it means.
- *
- * A key nothing can supply is *not measured* — never a silent pass and never a
- * silent failure. `tests_added` needs diff metrics this path does not gather,
- * so an expectation naming it is recorded and the step falls back to its exit
- * status, rather than becoming a shape that can never pass.
- *
- * A measurable expectation *replaces* the exit-status judgement rather than
- * adding to it. That is what lets the bugfix shape say a reproduction must
- * fail before the fix exists — the one place a passing command is the wrong
- * answer, and where reading exit 0 as success would pass a reproduction that
- * reproduces nothing.
- */
+// A judge's declared expectations, checked; `suite_exit_code` aliases a `run` step's
+// exit. An unsuppliable key (`tests_added`) is not measured and falls back to the exit
+// status; a measurable one replaces it, so a reproduction can be required to fail.
 async function judgeExpectations(
   run: Execution,
   { node, result }: Ran
@@ -198,13 +161,9 @@ async function judgeExpectations(
   return { passed: promised ? unmet.length === 0 : result.exitCode === 0, unmet }
 }
 
-/**
- * An agent that may write has to have written something: committed by the
- * agent itself, or committed here, since a branch the agent only edited has
- * nothing to push. A role that only ever documents may have nothing to
- * document, and an author whose document is outside the checkout changes
- * nothing in it. NOTHING_SHORT when the work stands.
- */
+// An agent that may write must have written something, committed by it or here. A
+// documenting role may have nothing, and a document outside the checkout changes
+// nothing in it. NOTHING_SHORT when the work stands.
 async function commitWork(
   run: Execution,
   { node, roleId }: Ran,
@@ -247,14 +206,11 @@ async function notPassed(run: Execution, ran: Ran, short: Shortfall): Promise<vo
   }
   const sendTo = reworkTarget(run, ran)
   if (sendTo === null) await failNode(run, ran, short)
-  else await sendBack(run, ran, sendTo)
+  else await sendBackForRework(run, ran, sendTo)
 }
 
-/**
- * A check that names a place to send its failure back to, rather than
- * stopping the line over it. The role it sends work back to has to be one
- * that may actually write, or "rework" is a decision nobody scoped it to make.
- */
+// A check that names where to send its failure back, rather than stopping the line;
+// the target role must be one that may write, or the rework is nobody's to make.
 function reworkTarget(run: Execution, { node }: Ran): { to: string; max: number } | null {
   const onFail = stepFor(run.recipe, node)?.onFail
   if (onFail === undefined || node.reworks >= onFail.max) return null
@@ -266,7 +222,7 @@ function reworkTarget(run: Execution, { node }: Ran): { to: string; max: number 
   return { to: onFail.rework, max: onFail.max }
 }
 
-async function sendBack(run: Execution, ran: Ran, sendTo: { to: string; max: number }) {
+async function sendBackForRework(run: Execution, ran: Ran, sendTo: { to: string; max: number }) {
   const { node, result, command, logPath } = ran
   const excerpt =
     logPath !== null && fs.existsSync(logPath)
@@ -301,7 +257,7 @@ async function failNode(run: Execution, ran: Ran, short: Shortfall): Promise<voi
   run.awaitingDecision.push(node.id)
   // Two failures is a pattern, not bad luck. The third attempt is a decision
   // rather than a retry, and this is where it is asked for.
-  const stops = await run.raise('verify.repeat-fail', repeatFailAsk(ran, short))
+  const stops = await run.stopAtGate('verify.repeat-fail', repeatFailAsk(ran, short))
   run.halted = stops || run.halted
 }
 

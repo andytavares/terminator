@@ -559,7 +559,7 @@ is empty in a fresh application by construction. `run.observe` carries
 to `waiting` before it re-enters the executor. The attempt is **given back** —
 the counter exists to catch an agent thrashing on the same check, and an
 application closing is not the agent's doing. The **session id stays on the
-node**, and `executeRun` seeds its lane/role conversation map from the graph, so
+node**, and `executeOrderRun` seeds its lane/role conversation map from the graph, so
 a resumed step continues its own conversation through `claude --resume` rather
 than putting a cold agent that has read nothing into a half-finished worktree.
 
@@ -890,3 +890,15 @@ failure rather than running it unwatched.
   audit log were removed rather than shipped as a promise the code cannot keep.
 - **Stale-lane detection after an upstream merge.** It needs per-lane start and
   merge times, and nothing records a lane merging, so it could not be driven.
+
+## Incidents behind the code
+
+What a comment in the code points here for: the live run that showed why the
+code is the way it is.
+
+- `resume` (`src/ipc/run-channels.ts`) keeps the executor already driving an order: starting a second one produced `run.halted: waiting on a gate` three times in 23 seconds on WO-0927-4fd.
+- `onPending` (`src/line/node-session.ts`) posts a held question to the console as well as the inbox. Before it did, a builder redirected its test output to a scratch file outside the checkout, FR-050 asked about it, nobody was there, the bridge handed the call back to the terminal five minutes later, and the run sat until the wall-clock budget ended it half an hour on, with nothing saying a question had been asked.
+- `stallInputs` (`src/runtime/evaluate-stall.ts`) counts silence from the later of the last activity and `stateSince`. A session spans turns and the transcript keeps every turn's tool calls, so a session given a new turn after a long gap carried the previous turn's last call as its latest activity: a run twenty-three seconds old was reported silent for twenty-one minutes, and `run.stalled` was on the order before the builder's third command.
+- `runtimeStateDir` (`src/runtime/runtime-state.ts`) is absolute. It used to be `resolveWorktreeBaseDir('')`, which is `join('', '.worktrees')`, a relative path, so the `--settings` handed to claude resolved against the worktree it started in. The file was never there, so every supervised run died on "Settings file not found" the moment it launched: the card sat at WORKING with 0 turns and the console stayed empty.
+- `recordStall` (`src/runtime/supervision-runtime.ts`) writes a stall to the order's ledger as well as the console. The detector was timely and nothing consumed it: on a live run the builder fell silent at 07:27:08, the stall fired at 07:34:21, and the run waited until the wall-clock budget stopped it at 07:52:10, eighteen minutes after the console knew. With shadow mode on by default, nothing an operator reads afterwards showed those minutes; the ledger said "budget exceeded".
+- `fallbackRecordsBase` (`src/storage-folder.ts`) is never `process.cwd()`. The extension host's working directory is wherever the application was launched from (in development, the Terminator repository itself), so defaulting to it wrote one workspace's orders into another repository's working tree: a `.foundry/` directory in this repository held twelve orders from four different fixtures.

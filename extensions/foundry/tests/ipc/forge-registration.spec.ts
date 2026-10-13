@@ -13,7 +13,7 @@ import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
-import { priorArtFor } from '../../src/ipc/forge-registration.js'
+import { priorArtInRecords } from '../../src/ipc/forge-registration.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 
@@ -187,7 +187,7 @@ describe('the record of earlier decisions', () => {
     )
     await recordDecision('2026-10-06T10:00:00.000Z', 'src/other.ts', 'unrelated')
 
-    expect(await priorArtFor(dataDir, ['src/theme.ts'])).toEqual([
+    expect(await priorArtInRecords(dataDir, ['src/theme.ts'])).toEqual([
       '2026-10-05 operator: finding.accepted — src/theme.ts stays the source of colour',
       '2026-10-01 operator: finding.accepted — keep tokens',
     ])

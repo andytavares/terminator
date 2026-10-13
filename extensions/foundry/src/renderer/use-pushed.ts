@@ -10,19 +10,13 @@ export interface ChangeFilter {
 /** Every kind of record an order's state is drawn from. */
 export const ANY_RECORD: readonly ChangeKind[] = ['order', 'graph', 'gates', 'ledger', 'live']
 
-/**
- * A change with no order of its own (a held tool call) concerns every view of that kind.
- * @internal
- */
+/** A change with no order (a held tool call) concerns every view of its kind. @internal */
 export function isRelevant(change: FoundryChange, filter: ChangeFilter): boolean {
   if (!filter.kinds.includes(change.kind)) return false
   return filter.orderId === undefined || change.orderId === '' || change.orderId === filter.orderId
 }
 
-/**
- * A run writes several records in a burst; one read after the burst answers
- * for all of them.
- */
+/** A run writes records in a burst; one read after the burst answers for all of them. */
 const SETTLE_MS = 100
 
 interface SettledReader {
@@ -33,34 +27,32 @@ interface SettledReader {
   cancel(): void
 }
 
-/**
- * A change that arrives while a read is in flight is read again afterwards,
- * because that read may have started before the write it reports.
- */
+// A change arriving mid-read is read again afterwards: that read may have begun before
+// the write it reports.
 function createSettledReader(load: () => Promise<void>): SettledReader {
   let reading = false
   let stale = false
   let cancelled = false
   let timer: ReturnType<typeof setTimeout> | null = null
-  const run = async (): Promise<void> => {
+  const readNow = async (): Promise<void> => {
     reading = true
     try {
       await load()
     } finally {
       reading = false
-      if (stale && !cancelled) settle()
+      if (stale && !cancelled) readOnceSettled()
     }
   }
-  const settle = (): void => {
+  const readOnceSettled = (): void => {
     stale = false
     timer ??= setTimeout(() => {
       timer = null
-      void run()
+      void readNow()
     }, SETTLE_MS)
   }
   return {
-    now: () => void run(),
-    notify: () => (reading ? (stale = true) : settle()),
+    now: () => void readNow(),
+    notify: () => (reading ? (stale = true) : readOnceSettled()),
     cancel() {
       cancelled = true
       if (timer !== null) clearTimeout(timer)
@@ -68,11 +60,9 @@ function createSettledReader(load: () => Promise<void>): SettledReader {
   }
 }
 
-/**
- * Switching workspace moves the records location under every view, and nothing
- * is written there to say so, so it counts as a change to all of them.
- */
-function onChanged(filter: ChangeFilter, relevant: () => void): () => void {
+// Switching workspace moves the records location under every view with nothing written
+// to say so, so it counts as a change to all of them.
+function onFoundryChanged(filter: ChangeFilter, relevant: () => void): () => void {
   const bridge = window.electronAPI.extensionBridge
   const stopChanges = bridge.on('foundry:changed', (data: unknown) => {
     if (isRelevant(data as FoundryChange, filter)) relevant()
@@ -84,11 +74,8 @@ function onChanged(filter: ChangeFilter, relevant: () => void): () => void {
   }
 }
 
-/**
- * Read once on mount, then read again only when Foundry says something this
- * view draws has changed (`foundry:changed`). Reading and showing are separate
- * so that state is only set in the callback of a read.
- */
+// Read once on mount, then again only when `foundry:changed` names something this view
+// draws. Reading and showing are separate, so state is set only in a read's callback.
 export function usePushed<T>(
   read: () => Promise<T>,
   show: (answer: T) => void,
@@ -114,7 +101,7 @@ export function usePushed<T>(
   }, [read, show])
   useEffect(
     () =>
-      onChanged({ kinds: kinds.split(',') as ChangeKind[], orderId }, () =>
+      onFoundryChanged({ kinds: kinds.split(',') as ChangeKind[], orderId }, () =>
         reader.current?.notify()
       ),
     [kinds, orderId]

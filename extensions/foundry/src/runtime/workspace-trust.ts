@@ -98,11 +98,11 @@ export function ensureTrusted(repoRoot: string, home = os.homedir()): TrustResul
     },
   }
 
-  return writeConfig(file, next)
+  return writeClaudeConfig(file, next)
 }
 
 /** The config, written through a temporary file and renamed into place. */
-function writeConfig(file: string, next: ClaudeConfig): TrustResult {
+function writeClaudeConfig(file: string, next: ClaudeConfig): TrustResult {
   const temporary = `${file}.foundry-${process.pid}.tmp`
   try {
     fs.writeFileSync(temporary, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })

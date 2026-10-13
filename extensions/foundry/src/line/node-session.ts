@@ -35,15 +35,10 @@ interface NodeLaunch {
   readonly checkout: Checkout
 }
 
-/**
- * One node, from launch to the end of its turn.
- *
- * A promise around the runner's callbacks rather than an await, because the
- * runner reports an ending through `onEnd` and returns as soon as the
- * session exists. Settled exactly once: an agent that both fails to start
- * and reports an end would otherwise resolve twice.
- */
-export function runNode(context: RunContext, input: NodeInput): Promise<StartedRun> {
+// One node, from launch to the end of its turn: a promise around the runner's
+// callbacks, since the runner returns once the session exists. Settled once, so an
+// agent that fails to start and also reports an end cannot resolve twice.
+export function runNodeSession(context: RunContext, input: NodeInput): Promise<StartedRun> {
   const checkout = context.checkouts.get(input.node.lane ?? 1)
   // No checkout and no runner mean nothing ran. Reported with a null exit
   // status, which the verdict path reads as "not measured" — calling it a
@@ -63,14 +58,8 @@ function startNode(
   resolve: (run: StartedRun) => void
 ): void {
   const turn = openTurn(launch.input.node.id, resolve)
-  // Claude Code shows its workspace trust dialog for a directory it has
-  // not seen, in interactive sessions only — and this is an interactive
-  // session by design. Without this the agent comes up, sits at that
-  // dialog, and never starts: the process is running, the register has it,
-  // the graph says `running`, and nothing happens for ever.
-  //
-  // Keyed to the repository rather than the worktree, because that is what
-  // the documentation says trust is keyed to for a worktree.
+  // Trust the repository first (the key Claude Code uses for a worktree): its trust
+  // dialog shows in interactive sessions, and an agent sitting at it never starts.
   const { context, checkout } = launch
   trustRepository(context.api, checkout.origin, { orderId: context.order.id, store: context.store })
   void runner
@@ -116,29 +105,20 @@ function startOptions(launch: NodeLaunch, turn: NodeTurn): StartSupervisedRunOpt
     addDirs: input.skillsMount === null ? undefined : [input.skillsMount],
     autoDecide: toolDecisionFor(launch),
     onPending: (pending) => onPending(context, pending),
-    onResolved: (requestId, outcome) => onResolved(context, turn, { requestId, outcome }),
+    onResolved: (requestId, outcome) => recordResolution(context, turn, { requestId, outcome }),
     // Refusals reach the console. An agent being turned down looks
     // exactly like one that has gone quiet, and reading its transcript
     // was the only way to tell them apart.
     onAutoDenied: (tool, reason) => postToConsole(turn.sessionId, `refused ${tool}: ${reason}`),
-    onRegistered: (run) => onRegistered(input, turn, run),
-    onEnd: (exitCode) => onEnd(turn, exitCode),
-    onTurnEnd: (turns) => onTurnEnd(turn, turns),
+    onRegistered: (run) => adoptRegisteredRun(input, turn, run),
+    onEnd: (exitCode) => archiveEndedSession(turn, exitCode),
+    onTurnEnd: (turns) => finishNodeTurn(turn, turns),
   }
 }
 
-// The read-only decision is taken by the same policy the hook
-// applies, so a verifier that decides to fix what it found is
-// refused rather than reminded.
-// Two gates, not one. Read-only is the whole-role decision; the
-// second holds a role that may write to what it said it writes with
-// — a scribe that decided to edit source rather than documentation
-// is refused by the first if it has no checkout, and by neither if
-// the only check were "may this role write at all".
-// Composed in `runtime/tool-decision.ts`, where it can be tested:
-// every live failure of this feature that was not a stall came from
-// this decision, and the tests that mention `autoDecide` all pass a
-// stub, so they covered the bridge and never the decision.
+// The hook's own decision, composed and tested in `runtime/tool-decision.ts`: the
+// whole-role read-only gate, then the role's declared write paths, so a writer that
+// strays from them is refused rather than reminded.
 function toolDecisionFor({
   context,
   input,
@@ -171,15 +151,8 @@ function postToConsole(sessionId: string, summary: string): void {
 type PendingCall = Parameters<StartSupervisedRunOptions['onPending']>[0]
 
 function onPending(context: RunContext, pending: PendingCall): void {
-  // Asks reach the console as well as the inbox. A refusal is posted
-  // here and a *question* was not, so an agent waiting on one looked
-  // exactly like an agent that had gone quiet — which is what it
-  // then became. Watched live: a builder redirected its test output
-  // to a scratch file outside the checkout, FR-050 asked about it,
-  // nobody was there, the bridge handed the call back to the
-  // terminal's own prompt five minutes later, and the run sat until
-  // the wall-clock budget ended it half an hour on. Nothing anywhere
-  // said a question had been asked.
+  // Asks reach the console as well as the inbox, so an agent waiting on a question
+  // does not look like one gone quiet (SUPERVISION.md, "Incidents behind the code").
   postToConsole(pending.sessionId, `asked about ${pending.toolName}: waiting for a decision`)
   // An agent that is asking again is an agent that got past the
   // prompt somebody answered for it.
@@ -192,7 +165,7 @@ function onPending(context: RunContext, pending: PendingCall): void {
   )
 }
 
-function onResolved(
+function recordResolution(
   context: RunContext,
   turn: NodeTurn,
   resolution: {
@@ -221,17 +194,15 @@ function onResolved(
 // Set here as well as after `start` resolves, so a turn that ends
 // before the promise settles still names the right session rather
 // than the placeholder.
-function onRegistered(input: NodeInput, turn: NodeTurn, run: SupervisedRun): void {
+function adoptRegisteredRun(input: NodeInput, turn: NodeTurn, run: SupervisedRun): void {
   turn.sessionId = run.sessionId
   turn.transcriptFrom = run.transcriptFrom
-  // The graph learns the session while there is still an agent in
-  // it. Before this the Floor's Watch and Attach appeared only after
-  // the turn ended, so the one moment you needed a terminal was the
-  // one moment there was no way into it.
+  // The graph learns the session while the agent is in it, so Watch and Attach are
+  // there while the step runs.
   input.onStarted?.(run.sessionId)
 }
 
-function onEnd(turn: NodeTurn, exitCode: number | null): void {
+function archiveEndedSession(turn: NodeTurn, exitCode: number | null): void {
   // Off the live list and into the record, so a finished unit stops
   // holding a review slot and the next wave can start.
   runtime.supervision?.finish(turn.sessionId, Date.now())
@@ -243,18 +214,11 @@ function onEnd(turn: NodeTurn, exitCode: number | null): void {
   turn.finish(exitCode)
 }
 
-function onTurnEnd(turn: NodeTurn, turns: number): void {
+function finishNodeTurn(turn: NodeTurn, turns: number): void {
   void runtime.supervision?.finishTurn(turn.sessionId, turns, Date.now())
-  // The node is over when the *turn* is over, not when the process
-  // is. A supervised session sits at its prompt after answering —
-  // that is the whole point of running it in a terminal you can
-  // type into — so waiting for `onEnd` waits for something that
-  // never happens, and the Line could not complete a single agent
-  // node. Intake has always got this right; this is the same rule.
-  //
-  // Zero because the turn ended, not because the work was good:
-  // whether it was is the verifier's to say and the ladder's to
-  // measure, never the producing agent's (FR-033).
+  // The node is over when its turn is: a supervised session waits at its prompt, so
+  // `onEnd` never comes. Zero because the turn ended, not because the work was good,
+  // which is the verifier's and the ladder's to say (FR-033).
   turn.finish(0)
   // Nothing types into it again: a later node in the lane resumes
   // the conversation in a fresh tab. Left at its prompt, every
@@ -267,10 +231,8 @@ function registerStartedRun(launch: NodeLaunch, turn: NodeTurn, run: SupervisedR
   turn.sessionId = run.sessionId
   turn.transcriptFrom = run.transcriptFrom
   input.onStarted?.(run.sessionId)
-  // The lane's open conversation, for the next node that may carry it
-  // on. A role that may not resume is never offered it — the registry
-  // refuses, structurally — and neither is a role that is not the one
-  // whose conversation this is.
+  // The lane's open conversation, for the next node of this role; the registry
+  // refuses it to a role that may not resume.
   context.conversations.set(conversationKey(input.node.lane ?? 1, input.role), run.sessionId)
   // On the register, which is what the stall detector and the palette
   // read from. Without this the agent is running and both see an idle factory —

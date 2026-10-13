@@ -1,4 +1,4 @@
-import { gateNodeId } from './events.js'
+import { gateNodeId, nodeOfSession } from './events.js'
 import type { FactoryEvent, ToolProp } from './events.js'
 import { ordinal } from './format.js'
 import type { Gate } from '../gates/rules.js'
@@ -24,10 +24,7 @@ export interface Callout {
   readonly at: number
 }
 
-/**
- * The pinned wait's id: one at a time, so it keeps its place in a stack.
- * @internal
- */
+/** The pinned wait's id: one at a time, so it keeps its place in a stack. @internal */
 export const CI_WAITING_ID = 'ci-waiting'
 
 /**
@@ -191,12 +188,7 @@ export interface InterruptionInput {
 
 /** Everything in this hall waiting on the operator, each pinned to a station where one owns it. */
 export function interruptionsFor(input: InterruptionInput): Interruption[] {
-  return [...asksOf(input), ...gatesOf(input), ...parkedOf(input)]
-}
-
-/** The node whose agent runs in `sessionId`, when one does. */
-function nodeOfSession(graph: RunGraph, sessionId: string): string | null {
-  return graph.nodes.find((n) => n.sessionId === sessionId)?.id ?? null
+  return [...asksOf(input), ...gateInterruptions(input), ...parkedOf(input)]
 }
 
 /** The held tool calls, each over its agent's station. */
@@ -212,7 +204,7 @@ function asksOf(input: InterruptionInput): Interruption[] {
 }
 
 /** The gates waiting on the operator, each over the station it holds. */
-function gatesOf(input: InterruptionInput): Interruption[] {
+function gateInterruptions(input: InterruptionInput): Interruption[] {
   return input.waiting.map((gate) => ({
     kind: 'gate',
     id: gate.id,
@@ -346,7 +338,6 @@ export function stateWord(state: NodeState): string {
       return 'Blocked'
     case 'skipped':
       return 'Skipped'
-    /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = state
       throw new Error(`unhandled node state: ${String(never)}`)

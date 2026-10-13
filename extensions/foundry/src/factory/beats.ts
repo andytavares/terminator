@@ -17,16 +17,10 @@ import { VERDICT_MS, WALK_PX_PER_S } from './sim.js'
 /** How long a crate takes to ride a two-tile belt (34px/s over 32px, `sim.ts`). */
 const CRATE_RIDE_MS = 940
 
-/**
- * What an upstream step's last animation needs before the step it feeds may begin its own.
- * @internal
- */
+/** What an upstream step's last animation needs before the step it feeds begins. @internal */
 export const MIN_DWELL_MS = CRATE_RIDE_MS + VERDICT_MS
 
-/**
- * No event waits longer than this behind the beats ahead of it; past it the rest catch up together.
- * @internal
- */
+/** The longest an event waits behind the beats ahead; then the rest catch up. @internal */
 export const MAX_LAG_MS = 10_000
 
 /**
@@ -39,10 +33,7 @@ export const MAX_LAG_MS = 10_000
  */
 export const REWORK_WALK_MS = Math.round(((30 * 16) / WALK_PX_PER_S) * 1000)
 
-/**
- * One press stroke, for a join step that passes without ever being seen running.
- * @internal
- */
+/** One press stroke, for a join step that passes without being seen running. @internal */
 export const STROKE_MS = 700
 
 /** @internal */

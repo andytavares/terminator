@@ -75,10 +75,8 @@ export function registerCommands(api: ExtensionAPI): void {
 
 function openNewOrder(api: ExtensionAPI): void {
   api.window.showSelf('main')
-  // Broadcast to an already-running view immediately, and set a pending
-  // flag for one that has not been created yet — the same shape as
-  // Notepad's quick-create, because a command run before the extension's
-  // own view exists is otherwise silently dropped.
+  // Broadcast to a running view, and set a pending flag for one not yet created, as
+  // Notepad's quick-create does; otherwise a command run before the view is dropped.
   api.window.broadcast('foundry:ui.open-new-order', {})
   pendingNewOrder = true
   if (pendingNewOrderTimer !== null) clearTimeout(pendingNewOrderTimer)

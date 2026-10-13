@@ -4,23 +4,10 @@ import * as path from 'node:path'
 import type { ResolveSources } from './recipe/resolve.js'
 import { resolveDataRoot, untrackedNotice } from './data-root.js'
 import { fallbackRecordsBase } from './storage-folder.js'
+import type { ActivationContext } from './ipc/register.js'
 
-/** Where the chosen model lives, on the side of the bridge that launches runs. */
-/**
- * Where Foundry keeps its records, resolved once at activation.
- *
- * Empty means beside the working directory, which leaves an untracked
- * directory behind — Foundry says so once and never edits a `.gitignore`,
- * because that would be writing into a repository the order did not ask to
- * change. A configured absolute path takes every order, which is the only
- * workable answer once an order spans repositories.
- */
-/**
- * Tell the operator once that the default records location is untracked.
- *
- * Best-effort in every direction: a host with no notification surface, or a
- * settings store that will not answer, must not stop the extension loading.
- */
+// Tell the operator once that the default records location is untracked. Best effort:
+// no notification surface or settings answer may stop the extension loading.
 export function noteUntrackedDataRoot(api: ExtensionAPI, root: string): void {
   try {
     const configured = api.settings?.get<string>('terminator.foundry.dataDir') ?? ''
@@ -34,23 +21,11 @@ export function noteUntrackedDataRoot(api: ExtensionAPI, root: string): void {
   }
 }
 
-/**
- * Where the records go when there is no workspace to be beside.
- *
- * Never `process.cwd()`. The extension host's working directory is wherever
- * the application was launched from — in development, the Terminator
- * repository itself — so defaulting to it writes one workspace's orders into
- * another repository's working tree. That happened, and the evidence was a
- * `.foundry/` directory in this repository with twelve orders in it from four
- * different fixtures.
- */
-/**
- * The three rungs a recipe, role or rule is looked up in.
- *
- * Built on every read rather than captured at activation: which repositories
- * are open — and therefore which `.foundry/` directories are honoured — is not
- * known when the host loads the extension.
- */
+/** `resolveSources` read afresh each call: which repositories are open changes. */
+export function sourcesOf({ api, dataRoot }: ActivationContext): () => ResolveSources {
+  return () => resolveSources(api, dataRoot())
+}
+
 export function resolveSources(api: ExtensionAPI, root: string): ResolveSources {
   return {
     dataRoot: root,
@@ -61,20 +36,9 @@ export function resolveSources(api: ExtensionAPI, root: string): ResolveSources 
   }
 }
 
-/**
- * Where Foundry keeps its records.
- *
- * Resolved from the setting and the current workspace on each read rather than
- * once at activation, because activation runs before a workspace exists: the
- * host calls it synchronously at load, and `api.workspace.list()` is empty
- * until the operator opens something. Resolving once there pinned every order
- * to the fallback for the life of the process.
- *
- * Still one resolver in one place — `data-root.ts` — and every writer still
- * receives an absolute path it never resolves again. Memoised on the inputs so
- * a surface polling a channel is not recomputing a path, and so the untracked
- * notice is decided from the same answer the writers use.
- */
+// Where Foundry keeps its records, resolved per read: activation runs before any
+// workspace exists. Still one resolver (`data-root.ts`), memoised on its inputs so
+// polling does not recompute and the untracked notice matches the writers.
 const dataRootMemo = new Map<string, string>()
 
 export function resolveFoundryDataRoot(api: ExtensionAPI): string {
@@ -88,13 +52,8 @@ export function resolveFoundryDataRoot(api: ExtensionAPI): string {
   return root
 }
 
-/**
- * The configured data directory and the first workspace folder.
- *
- * Every read here is optional. Activation is called synchronously by the host
- * and must not throw because one capability is absent — a host that has no
- * workspace yet is a normal state, not a reason to fail to load.
- */
+// The configured data directory and the first workspace folder. Every read is optional:
+// a host with no workspace yet is normal, and activation must not throw.
 function configuredLocation(api: ExtensionAPI): { configured: string; workdir: string | null } {
   let configured = ''
   try {
@@ -105,12 +64,8 @@ function configuredLocation(api: ExtensionAPI): { configured: string; workdir: s
   }
 }
 
-/**
- * The records root for `configured` over `base`. A relative path was
- * configured when that throws, which is ambiguous once an order spans
- * repositories, so it falls back to the default rather than refusing to
- * activate.
- */
+// The records root for `configured` over `base`. A relative path throws, ambiguous for
+// orders spanning repositories, so it falls back to the default rather than fail.
 function rootUnder(configured: string, base: string): string {
   try {
     return resolveDataRoot(configured, base).root

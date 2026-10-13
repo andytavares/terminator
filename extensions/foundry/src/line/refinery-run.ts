@@ -4,7 +4,6 @@ import { createLiveGateStore } from '../gates/store.js'
 import { raiseGate } from '../gates/rules.js'
 import { readPulls } from './integrate.js'
 import { branchFor, checkoutPath } from './worktree.js'
-import { computeQueueEntries } from './refinery-entries.js'
 import { readRefineryState, writeRefineryState } from './refinery-state.js'
 import { refineryTick } from './refinery-tick.js'
 import type { RefineryTickDeps } from './refinery-tick.js'
@@ -13,27 +12,18 @@ import { writeBack } from '../trackers/write-back.js'
 import type { OrderStore } from '../order/store.js'
 
 import type { ActivationContext } from '../ipc/register.js'
-import { indexFor, orderStoreAt } from '../state/live-index.js'
+import { indexFor, orderStoreAt, queueEntriesOf } from '../state/live-index.js'
 import { issuesPortFor, writeBackDepsFor } from '../trackers/issues-port.js'
 import { ciRoundAgain } from './ci-round-again.js'
+import { isoNow, shellExecOf } from '../host-calls.js'
 
-/**
- * The refinery tick: once a minute, watch merged predecessors and restack
- * whatever queued behind them (R4). Nothing runs when nothing has shipped a
- * pull yet — `computeQueueEntries`'s candidates are empty.
- */
+// The refinery tick: once a minute, watch merged predecessors and restack what queued
+// behind them (R4). Nothing runs until something has shipped a pull.
 let refineryTimer: NodeJS.Timeout | null = null
 
-/**
- * One CI watch for an order whose lanes the refinery just rebased.
- *
- * The same shape as the `ci.red` gate's "another round" — `ciRounds` against
- * the drafts that already exist, then `finishShipping` so the order gets its
- * ready gate again, or `ci.red` if the rebase broke something. The recipe's
- * own round count, not the fixed `1` the inbox path uses: this is a full
- * re-check of a change nothing has looked at since it moved, not one more
- * attempt at a failure the operator already saw.
- */
+// One CI watch for an order whose lanes the refinery just rebased, as "another round"
+// does, but with the recipe's own round count: a full recheck of a moved change,
+// not one more try at a failure the operator saw.
 async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string): Promise<void> {
   // A rebased order with no drafts has nothing to watch.
   if ((await readPulls(root, orderId)).length === 0) return
@@ -46,12 +36,8 @@ async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string
   })
 }
 
-/**
- * The refinery's own gate: an overlapping order's lanes no longer rebase
- * cleanly onto their base after a predecessor merged. Never resolved
- * automatically — `restack` already refused to guess, and this just says so
- * where the operator will see it.
- */
+// The refinery's own gate: an overlapping order's lanes no longer rebase cleanly
+// after a predecessor merged. Never resolved automatically; `restack` refused to guess.
 async function raiseRefineryConflict(
   root: string,
   { orderId, why, files }: { orderId: string; why: string; files: readonly string[] }
@@ -75,11 +61,8 @@ interface RefineryPlace {
   readonly store: OrderStore
 }
 
-/**
- * One pass of the refinery: watch for merges, restack what queued behind,
- * recheck it. Built fresh on every tick so it always reads the workspace's
- * current data root, the same reason every other tick function does.
- */
+// One refinery pass: watch merges, restack what queued behind, recheck it. Built
+// fresh each tick so it reads the workspace's current data root.
 async function runRefineryTick(api: ExtensionAPI, root: string): Promise<void> {
   await refineryTick(refineryDepsFor({ api, root, store: orderStoreAt(root) }))
 }
@@ -94,9 +77,9 @@ function refineryDepsFor(place: RefineryPlace): RefineryTickDeps {
       indexFor(root).announce({ kind: 'graph', orderId })
     },
     viewPr: (url) => viewPullRequest(place, url),
-    entries: () => computeQueueEntries(root, orderStoreAt(root)),
+    entries: queueEntriesOf(() => root),
     lanesFor: (orderId) => lanesOf(place, orderId),
-    restack: (lane) => restack(lane, (options) => api.shell.exec(options)),
+    restack: (lane) => restack(lane, shellExecOf(api)),
     watchCi: (orderId) => watchRestackedCi(api, root, orderId),
     raiseConflict: (orderId, why, files) => raiseRefineryConflict(root, { orderId, why, files }),
     record: ({ orderId, action, subject, reason }) =>
@@ -111,7 +94,7 @@ function refineryDepsFor(place: RefineryPlace): RefineryTickDeps {
       }),
     titleOf: async (orderId) => (await store.load(orderId))?.title ?? orderId,
     onMerged: (orderId) => moveIssueToDone(place, orderId),
-    now: () => new Date().toISOString(),
+    now: isoNow,
   }
 }
 

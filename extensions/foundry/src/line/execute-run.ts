@@ -7,7 +7,7 @@ import type { GateStore } from '../gates/store.js'
 import { shipOrder } from './integrate.js'
 import { afterFinalCheck, ciRounds, settledOnce } from './ship-tail.js'
 import { createEarlyShip } from './early-ship.js'
-import { execute } from './executor.js'
+import { executePlan } from './executor.js'
 import type { ExecutorDeps, RunOutcome } from './executor.js'
 import type { RunGraph } from './run-graph.js'
 import type { Recipe } from '../recipe/parse.js'
@@ -64,7 +64,7 @@ interface Found {
   reason: string
 }
 
-export async function executeRun(api: ExtensionAPI, run: OrderRun): Promise<void> {
+export async function executeOrderRun(api: ExtensionAPI, run: OrderRun): Promise<void> {
   const tail = await prepareRun(api, run)
   const { order } = tail
 
@@ -143,13 +143,13 @@ function shipDepsFor(tail: RunTail): IntegrateDeps {
         writeBackDepsFor(root, order, tail.issuesPort)
       )
     },
-    watchCi: (pulls) => watchCi(tail, pulls),
+    watchCi: (pulls) => watchShippedCi(tail, pulls),
   }
 }
 
 // A recipe with no `ci` never asks to watch anything (`rounds: null`
 // makes `ciRounds` return `{ kind: 'none' }` without a single poll).
-function watchCi(
+function watchShippedCi(
   tail: RunTail,
   pulls: Parameters<NonNullable<IntegrateDeps['watchCi']>>[0]
 ): ReturnType<typeof ciRounds> {
@@ -172,7 +172,7 @@ async function executeGraph(tail: RunTail, early: EarlyShip, graph: RunGraph): P
   const { order, recipe, store } = tail
   let outcome: RunOutcome
   try {
-    outcome = await execute(
+    outcome = await executePlan(
       { order, recipe, graph },
       {
         ...tail.executorDeps,
@@ -230,11 +230,8 @@ async function finishTail(
   // (FR-053). Work that is waiting on somebody does not — the run halts, the
   // inbox has the question, and answering it resumes from here.
   if (!ran.outcome.shippable) {
-    // Out loud. A run that finishes every node and then quietly does not ship
-    // is indistinguishable, from every surface, from one that shipped — the
-    // graph is all green either way, and the only way to find out was to go
-    // and look at GitHub. Watched on a live run: every node passed, nothing
-    // was pushed, and nothing anywhere said why.
+    // Said out loud: a run that passes every node and does not ship looks, on every
+    // surface, just like one that shipped.
     await recordTailEntry(tail, {
       action: 'ship.refused',
       reason: whyNotShipped(tail.recipe, ran.outcome),
@@ -245,10 +242,8 @@ async function finishTail(
   await shipFinishedRun(tail, ran)
 }
 
-// A shape whose product is a document ends on where its author put it. In
-// the checkout it ships as a pull request below; anywhere else there is no
-// change to open one on, and an author that handed nothing back has not
-// finished.
+// A document shape ends on where its author put it: in the checkout it ships as a
+// pull request below; elsewhere, an author that handed nothing back has not finished.
 async function endedOnDocument(tail: RunTail, outcome: RunOutcome): Promise<boolean> {
   const latest = await tail.store.load(tail.order.id)
   const documentEnd = outcome.shippable

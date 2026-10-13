@@ -25,6 +25,7 @@ import { askModel, modelForTier } from '../state/settings.js'
 import { trustRepository, readOnlyAutoDecide } from '../runtime/agent-policy.js'
 import { runtime } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
+import { shellExecOf } from '../host-calls.js'
 
 /** One architect turn: the order, what it is told, and who hears how it ended. */
 export interface ArchitectTurn {
@@ -59,19 +60,9 @@ type ArchitectPlace =
 const reasonOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
-/**
- * One turn of intake, in a session the operator can see and type into.
- *
- * The architect runs read-only in the order's lane checkout — the one its
- * lanes will build in — so the whole order is one sidebar project (ADR-061).
- * It writes one file, and that file is
- * validated before any of it reaches the order — an agent that could write the
- * order directly could set its status and agree its own work.
- *
- * Resolves as soon as the architect is *running*, not when it finishes: a turn
- * takes minutes, and a channel that waited would hold the bridge for all of
- * them while the surface spun on a promise.
- */
+// One intake turn, in a session the operator can see, read-only in the order's lane
+// checkout (ADR-061). It writes one file, validated before it reaches the order, and
+// resolves once the architect is running, not when the minutes-long turn finishes.
 export async function convergeOnce(
   api: ExtensionAPI,
   turn: ArchitectTurn
@@ -87,13 +78,13 @@ export async function convergeOnce(
   const memory = rememberSessions(turn.root, order.id)
   return new Promise<ConvergeStarted>((resolve) => {
     let answered = false
-    const answer = (started: ConvergeStarted): void => {
+    const answerOnce = (started: ConvergeStarted): void => {
       if (answered) return
       answered = true
       resolve(started)
     }
     const progress: ArchitectLaunch['progress'] = { done: false, architectSession: null }
-    startArchitect({ api, turn, runner, ...place, memory, answer, progress })
+    launchArchitect({ api, turn, runner, ...place, memory, answer: answerOnce, progress })
   })
 }
 
@@ -120,7 +111,7 @@ async function prepareArchitect(api: ExtensionAPI, turn: ArchitectTurn): Promise
   // The lane's own checkout, so the order is one project from its first turn
   // (ADR-061) and the architect reads the base the builder will change.
   try {
-    const checkout = await ensureCheckout(order, 1, { exec: (o) => api.shell.exec(o), root })
+    const checkout = await ensureCheckout(order, 1, { exec: shellExecOf(api), root })
     return { ok: true, plan, featureDir, checkout }
   } catch (error) {
     return { ok: false, reason: reasonOf(error) }
@@ -133,16 +124,9 @@ interface SessionMemory {
   readonly remembered: () => Promise<void>
 }
 
-/**
- * Write the conversation onto the order.
- *
- * `provenance.forgeSession` existed and nothing ever set it, so the Forge's
- * "Attach" — the way back into the conversation that wrote the plan — had
- * nothing to attach to and was never rendered.
- */
-// The record loads the whole order and saves it back, so the turn's outcome
-// waits for it: a save that landed after the amendment's put the old plan
-// back, with the answered finding open again.
+// Writes the conversation onto the order, so the Forge's "Attach" has a session.
+// The turn's outcome waits for this load-and-save: one landing after the amendment
+// put the old plan back, with the answered finding open again.
 function rememberSessions(root: string, orderId: string): SessionMemory {
   let remembering: Promise<void> = Promise.resolve()
   const remember = (sessionId: string): void => {
@@ -165,7 +149,7 @@ function rememberSessions(root: string, orderId: string): SessionMemory {
   return { remember, remembered: () => remembering }
 }
 
-function startArchitect(launch: ArchitectLaunch): void {
+function launchArchitect(launch: ArchitectLaunch): void {
   const { api, turn, memory, answer, progress } = launch
   const { order } = turn
   trustRepository(api, launch.plan.cwd, { orderId: order.id, store: orderStoreAt(turn.root) })
@@ -225,12 +209,8 @@ function architectStartOptions(launch: ArchitectLaunch): StartSupervisedRunOptio
   }
 }
 
-// One conversation per order, so a follow-up does not make the architect
-// read the repository again to answer "why not the other approach".
-//
-// The recorded one is the fallback: the in-memory map dies with the process,
-// and an order reopened after a restart should still know which conversation
-// produced it.
+// One conversation per order, so a follow-up does not re-read the repository; the
+// recorded one is the fallback once the in-memory map dies with a restart.
 const resumingFor = (order: WorkOrder): string | undefined =>
   intakeSessions.get(order.id) ?? order.provenance.forgeSession ?? undefined
 
@@ -271,16 +251,9 @@ function postRefusal(sessionId: string, refused: { tool: string; reason: string 
   })
 }
 
-/**
- * Take the proposal, if there is one to take.
- *
- * A turn ending is not the architect finishing: it thinks, replies, asks
- * something, and may write on a later turn. Reading at the first turn end
- * reported "the architect wrote no proposal" while it was still working,
- * so a turn only counts when the file is actually there. The session
- * ending is the deadline — then the answer is whatever it left, including
- * nothing.
- */
+// Take the proposal if it is there. A turn ending is not the architect finishing (it
+// may write on a later turn), so a turn counts only when the file exists; the
+// session ending is the deadline, and then the answer is whatever it left.
 function collectProposal(launch: ArchitectLaunch, deadline: boolean, code: number | null): void {
   const { turn, plan, progress } = launch
   const { order } = turn
@@ -321,10 +294,7 @@ export interface ReadOnlyRound {
   readonly onFinished: (order: WorkOrder | null, anotherPass?: boolean) => Promise<void>
   /** Stamped onto every fresh finding — only meaningful for the red team. */
   readonly round?: number
-  /**
-   * Called the moment the round's session exists, before its turn ends.
-   * Absent for a round nothing else needs to answer early for.
-   */
+  /** Called once the round's session exists, before its turn ends; absent if unneeded. */
   readonly onStarted?: (sessionId: string) => void
   /** Overrides the role's own tier, for a round the operator asked to keep light. */
   readonly model?: string
@@ -342,14 +312,9 @@ interface RoundLaunch {
   readonly progress: { done: boolean; announced: boolean; roundSession: string | null }
 }
 
-/**
- * One read-only round in the Forge, before the order is agreed: the red
- * team's attack, or the scout's reconnaissance.
- *
- * The same mechanism as the architect's own turn — a session in the lane
- * checkout that writes one file back — reused for the two roles that only
- * ever read. See docs/research/foundry-red-team-loop.md ("Design → Loop").
- */
+// One read-only Forge round before agreement (the red team's attack or the scout's
+// reading): the architect's mechanism, a lane-checkout session writing one file back.
+// See docs/research/foundry-red-team-loop.md ("Design → Loop").
 export async function readOnlyRound(input: ReadOnlyRound): Promise<void> {
   const { api, root, order } = input
   if (deletedOrders.has(order.id)) return
@@ -367,7 +332,7 @@ export async function readOnlyRound(input: ReadOnlyRound): Promise<void> {
   const featureDir = orderDir(root, order.id)
   let checkout: Checkout
   try {
-    checkout = await ensureCheckout(order, 1, { exec: (o) => api.shell.exec(o), root })
+    checkout = await ensureCheckout(order, 1, { exec: shellExecOf(api), root })
   } catch (error) {
     await refuseRound(input, store, reasonOf(error))
     return

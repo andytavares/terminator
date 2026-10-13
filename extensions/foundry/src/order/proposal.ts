@@ -133,12 +133,9 @@ export function parseProposal(value: unknown): Proposal {
   return parsed.data
 }
 
-/**
- * Findings only. `repos`, `toolchain` and `houseDocs` are what Foundry
- * measured, and an agent that could rewrite them could tell the ladder a
- * command exists that does not.
- */
-function withFindings(
+// Findings only: `repos`, `toolchain` and `houseDocs` are Foundry's measurements, and
+// an agent rewriting them could tell the ladder a command exists that does not.
+function contextWithFindings(
   context: WorkOrder['context'],
   findings: Proposal['findings']
 ): WorkOrder['context'] {
@@ -150,10 +147,8 @@ function withFindings(
   }
 }
 
-/**
- * The proposal's plan over the order's. A lane's branch can be fixed by the
- * ticket; a proposal that leaves it blank must not erase it.
- */
+// The proposal's plan over the order's, keeping a lane branch the ticket fixed when
+// the proposal leaves it blank.
 function mergedPlan(plan: WorkOrder['plan'], proposed: Proposal['plan']): WorkOrder['plan'] {
   const merged = { ...plan, ...proposed }
   if (proposed?.lanes === undefined) return merged
@@ -164,10 +159,7 @@ function mergedPlan(plan: WorkOrder['plan'], proposed: Proposal['plan']): WorkOr
   return { ...merged, lanes }
 }
 
-/**
- * An operator's struck assumption stays struck: the proposal's version of one
- * already on the order does not resurrect it.
- */
+/** An assumption the operator struck stays struck whatever the proposal says. */
 function keptStruck(
   current: WorkOrder['assumptions'],
   proposed: WorkOrder['assumptions']
@@ -215,7 +207,7 @@ export function applyProposal(order: WorkOrder, proposal: Proposal, at: string):
   const next: WorkOrder = {
     ...order,
     intent: { ...order.intent, ...proposal.intent },
-    context: withFindings(order.context, proposal.findings),
+    context: contextWithFindings(order.context, proposal.findings),
     acceptance: proposal.acceptance ?? order.acceptance,
     risk: { ...order.risk, ...proposal.risk },
     plan: mergedPlan(order.plan, proposal.plan),

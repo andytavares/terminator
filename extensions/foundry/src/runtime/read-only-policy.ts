@@ -220,11 +220,8 @@ function decideCommand(command: string): PolicyDecision {
   return reading.segments.length === 0 ? NO_COMMAND : decideSegments(reading.segments)
 }
 
-/**
- * Every segment, not the first one. Each has to read on its own, so the whole
- * reads — and a joined command whose second half writes is refused by the
- * half that writes rather than being missed because the first half was fine.
- */
+// Every segment must read on its own, so a joined command whose second half writes is
+// refused by that half, not passed because the first was fine.
 function decideSegments(segments: readonly string[]): PolicyDecision {
   let last: PolicyDecision | null = null
   for (const segment of segments) {
@@ -348,12 +345,8 @@ function decideSegment(segment: string): PolicyDecision {
     : { allow: false, reason: `${binary} is not on the review's read-only list` }
 }
 
-/**
- * The words with their leading run of assignments dropped.
- *
- * Only a *leading* run of them: a `KEY=value` argument in the middle belongs
- * to the command and is none of this policy's business.
- */
+// The words without their leading `KEY=value` assignments; one mid-command belongs to
+// the command and is not this policy's business.
 function withoutLeadingAssignments(words: readonly string[]): string[] {
   return words.filter((word, index, all) => {
     if (!ASSIGNMENT.test(word)) return true

@@ -1,13 +1,10 @@
-import type { Paint, PaintGradient } from '../../factory/art/kit.js'
+import type { Paint } from '../../factory/art/kit.js'
 
 /** The art kit's drawing surface over a real canvas context. */
-export function toPaint(ctx: CanvasRenderingContext2D): Paint {
+export function toPaint(ctx: CanvasRenderingContext2D): Paint<CanvasGradient> {
   return {
-    get fillStyle() {
-      return ctx.fillStyle as unknown as string
-    },
-    set fillStyle(value: string | PaintGradient) {
-      ctx.fillStyle = value as unknown as string
+    set fillStyle(value: string | CanvasGradient) {
+      ctx.fillStyle = value
     },
     get globalCompositeOperation() {
       return ctx.globalCompositeOperation

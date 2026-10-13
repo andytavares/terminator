@@ -72,10 +72,7 @@ export function pathsNamedIn(text: string): string[] {
   return [...new Set(matches.filter((token) => token.includes('/')))]
 }
 
-/**
- * Whatever the repository says about itself. Absence is a normal answer.
- * @internal
- */
+/** Whatever the repository says about itself. Absence is a normal answer. @internal */
 export function houseDocsIn(repoPath: string): string[] {
   return HOUSE_DOCS.filter((rel) => fs.existsSync(path.join(repoPath, rel)))
 }
@@ -127,7 +124,7 @@ export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedR
   // Scout's pack, before any question could be asked.
   const toolchain = probeToolchain(input.repoPaths[0])
   const houseDocs = input.repoPaths.flatMap((repoPath) => houseDocsIn(repoPath))
-  const priorArt = await priorArtFor(origin.problem, deps)
+  const priorArt = await priorArtForProblem(origin.problem, deps)
   const seeded = seededFrom(order, { origin, context: { toolchain, houseDocs, priorArt } })
   return { order: seeded, unavailableChecks: unavailableChecks(toolchain) }
 }
@@ -187,12 +184,9 @@ async function signalOrigin(signalId: string, deps: SeedDeps): Promise<Read> {
   }
 }
 
-/**
- * What was already decided about the files this idea names. A failure to read
- * the record is not a failure to seed an order: the draft is what the operator
- * asked for, and prior art is a courtesy on top of it.
- */
-async function priorArtFor(problem: string, deps: SeedDeps): Promise<string[]> {
+// What was already decided about the files this idea names. Failing to read the
+// record does not fail the seed: prior art is a courtesy on top of the draft.
+async function priorArtForProblem(problem: string, deps: SeedDeps): Promise<string[]> {
   const named = pathsNamedIn(problem)
   if (named.length === 0) return []
   try {
@@ -210,11 +204,9 @@ function seededFrom(
   }: { origin: Origin; context: Pick<WorkOrder['context'], 'toolchain' | 'houseDocs' | 'priorArt'> }
 ): WorkOrder {
   const { problem, branchName } = origin
-  // What the ticket already said done looks like. Not the architect's job done
-  // for it — coverage still runs both ways, so a criterion no unit satisfies
-  // fails the compile exactly as before. What this stops is an order seeded
-  // from a ticket with a heading called "Acceptance Criteria" opening with "No
-  // criteria yet", and its outcome with "Not stated yet".
+  // What the ticket already said done looks like, so an order seeded from a ticket
+  // with acceptance criteria does not open with "No criteria yet". Coverage still
+  // runs both ways: a criterion no unit satisfies fails the compile.
   const acceptance = acceptanceFromTicket(problem)
   const outcome = acceptance.map((criterion) => `- ${criterion.statement}`).join('\n')
   return {

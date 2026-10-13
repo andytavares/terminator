@@ -25,10 +25,7 @@ function isCheckName(value: string): value is CheckName {
 
 const MET: RequirementCheck = { met: true, reason: '' }
 
-/**
- * Checked against every repository the order names: a recipe that needs a
- * directory needs it where the work will happen.
- */
+/** Checked in every repository the order names: a directory is needed where work runs. */
 function pathExists(requirement: Requirement, order: WorkOrder): RequirementCheck {
   const missing = order.context.repos.filter(
     (repo) => !fs.existsSync(path.join(repo.path, requirement.value))

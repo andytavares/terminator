@@ -128,7 +128,7 @@ export interface StandingInput {
   readonly blocker: string | null
 }
 
-function plural(n: number, one: string, many: string): string {
+export function plural(n: number, one: string, many: string): string {
   return n === 1 ? one : many
 }
 
@@ -172,14 +172,12 @@ export function standingOf(input: StandingInput): Standing {
     const standing = rule(input, facts)
     if (standing !== null) return standing
   }
-  return working(facts)
+  return workingStanding(facts)
 }
 
-/**
- * A shipped order can still be waiting: the draft pull request's
- * ready-for-review gate opens after the work is done, and it is the operator's.
- */
-const shipped: Rule = (input, { counts, holding }) => {
+// A shipped order can still wait: the draft's ready-for-review gate opens after the
+// work, and it is the operator's.
+const shippedRule: Rule = (input, { counts, holding }) => {
   if (input.status !== 'shipped') return null
   if (holding !== undefined) {
     return {
@@ -202,7 +200,7 @@ const shipped: Rule = (input, { counts, holding }) => {
   }
 }
 
-const draft: Rule = (input, { counts }) => {
+const draftingRule: Rule = (input, { counts }) => {
   if (input.status !== 'draft') return null
   const shaping = (over: Omit<Standing, 'kind' | 'done' | 'total' | 'gateId'>): Standing => ({
     ...counts,
@@ -218,11 +216,8 @@ const draft: Rule = (input, { counts }) => {
 
 type Shaping = (over: Omit<Standing, 'kind' | 'done' | 'total' | 'gateId'>) => Standing
 
-/**
- * Ahead of the open questions: a refused turn is why the questions are still
- * open. Answering them is not the move — nothing will pick the answers up
- * until intake runs again.
- */
+// Ahead of the open questions, because a refused turn is why they are open: answers
+// are not picked up until intake runs again.
 function refusedDraft(input: StandingInput, shaping: Shaping): Standing | null {
   if (input.intakeRefused === null) return null
   return shaping({
@@ -280,11 +275,9 @@ function idleDraft(input: StandingInput, shaping: Shaping): Standing {
   })
 }
 
-/**
- * Halted before anything else. Nothing the line does next is scheduled until
- * this is answered, so every other condition below is a symptom of it.
- */
-const halted: Rule = (_input, { counts, holding }) => {
+// Halted comes first: nothing is scheduled until it is answered, so every condition
+// below is a symptom of it.
+const haltedRule: Rule = (_input, { counts, holding }) => {
   if (holding === undefined) return null
   return {
     ...counts,
@@ -297,7 +290,7 @@ const halted: Rule = (_input, { counts, holding }) => {
   }
 }
 
-const adrift: Rule = (input, { counts }) => {
+const adriftRule: Rule = (input, { counts }) => {
   const n = input.orphaned.length
   if (n === 0) return null
   return {
@@ -310,7 +303,7 @@ const adrift: Rule = (input, { counts }) => {
   }
 }
 
-const asking: Rule = (input, { counts }) => {
+const askingRule: Rule = (input, { counts }) => {
   const n = input.asks
   if (n <= 0) return null
   return {
@@ -323,11 +316,9 @@ const asking: Rule = (input, { counts }) => {
   }
 }
 
-/**
- * After `asking` deliberately: a held call is answerable from the surface in
- * one click, and this one can only be answered by going to the terminal.
- */
-const stranded: Rule = (input, { counts }) => {
+// After `asking` on purpose: a held call is answered in one click, this one only by
+// going to the terminal.
+const strandedRule: Rule = (input, { counts }) => {
   const n = input.stranded
   if (n <= 0) return null
   return {
@@ -344,7 +335,7 @@ const stranded: Rule = (input, { counts }) => {
   }
 }
 
-const stalled: Rule = (input, { counts }) => {
+const stalledRule: Rule = (input, { counts }) => {
   const n = input.stalls
   if (n <= 0) return null
   return {
@@ -357,7 +348,7 @@ const stalled: Rule = (input, { counts }) => {
   }
 }
 
-const documentReady: Rule = (input, { counts }) => {
+const documentReadyRule: Rule = (input, { counts }) => {
   if (input.documentReady === undefined || input.documentReady === null) return null
   return {
     ...counts,
@@ -369,7 +360,7 @@ const documentReady: Rule = (input, { counts }) => {
   }
 }
 
-const runFailed: Rule = (input, { counts }) => {
+const runFailedRule: Rule = (input, { counts }) => {
   if (input.runFailure === null) return null
   const { label, headline } = howFarItGot(counts)
   return {
@@ -391,7 +382,7 @@ function howFarItGot({ done, total }: Facts['counts']): Pick<Standing, 'label' |
   return { label: 'stopped', headline: 'The run stopped on an error' }
 }
 
-const failedSteps: Rule = (_input, { counts, failed }) => {
+const failedStepsRule: Rule = (_input, { counts, failed }) => {
   if (failed <= 0) return null
   return {
     ...counts,
@@ -403,11 +394,8 @@ const failedSteps: Rule = (_input, { counts, failed }) => {
   }
 }
 
-/**
- * No graph is not "0 of 0 steps done", which reads as finished. It is an
- * order the line has not picked up yet.
- */
-const starting: Rule = (_input, { counts }) => {
+/** No graph is an order the line has not picked up, not "0 of 0 steps done". */
+const startingRule: Rule = (_input, { counts }) => {
   if (counts.total !== 0) return null
   return {
     ...counts,
@@ -420,20 +408,20 @@ const starting: Rule = (_input, { counts }) => {
 }
 
 const RULES: readonly Rule[] = [
-  shipped,
-  draft,
-  halted,
-  adrift,
-  asking,
-  stranded,
-  stalled,
-  documentReady,
-  runFailed,
-  failedSteps,
-  starting,
+  shippedRule,
+  draftingRule,
+  haltedRule,
+  adriftRule,
+  askingRule,
+  strandedRule,
+  stalledRule,
+  documentReadyRule,
+  runFailedRule,
+  failedStepsRule,
+  startingRule,
 ]
 
-function working({ nodes, running, counts }: Facts): Standing {
+function workingStanding({ nodes, running, counts }: Facts): Standing {
   const { done, total } = counts
   return {
     ...counts,
@@ -449,10 +437,8 @@ function working({ nodes, running, counts }: Facts): Standing {
   }
 }
 
-/**
- * A step being worked can carry feedback from a check that sent it back — the
- * run is not merely "building", it is redoing what a check rejected.
- */
+// A step being worked may carry a check's feedback: then the run is redoing what a
+// check rejected, not merely building.
 function reworkDetail(nodes: Facts['nodes']): string | null {
   const reworking = nodes.find(
     (n) => (n.state === 'running' || n.state === 'waiting') && (n.feedback?.length ?? 0) > 0
@@ -542,11 +528,8 @@ function heldCounts(
   }
 }
 
-/**
- * Only a draft can be sitting on a refused turn, be shaped, or be blocked by
- * a check, and reading the ledger of every running order to be told 'no' is a
- * file read per row for nothing.
- */
+// Only a draft can sit on a refused turn, be shaped or be blocked by a check, so no
+// other status reads its ledger just to be told no.
 async function draftFacts(
   order: WorkOrder,
   sources: StandingSources
@@ -559,11 +542,8 @@ async function draftFacts(
   }
 }
 
-/**
- * Only an agreed or running order can have a run that failed or refused to
- * start, and only a running one can have left a document; reading the ledger
- * of every other status to be told 'no' is a file read for nothing.
- */
+// Only an agreed or running order can have a failed or refused run, and only a
+// running one a document, so no other status reads its ledger for nothing.
 async function runFacts(
   order: WorkOrder,
   sources: StandingSources

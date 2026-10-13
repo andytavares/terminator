@@ -7,7 +7,7 @@ import { load } from 'js-yaml'
 
 export type ParseResult<T> = { ok: true; value: T } | { ok: false; reason: string }
 
-export function fail(file: string, message: string): { ok: false; reason: string } {
+export function yamlFailure(file: string, message: string): { ok: false; reason: string } {
   return { ok: false, reason: `${file}: ${message}` }
 }
 
@@ -16,7 +16,7 @@ export function loadYaml(text: string, file: string): ParseResult<unknown> {
   try {
     return { ok: true, value: load(text) }
   } catch (error) {
-    return fail(file, `could not be read as YAML — ${(error as Error).message}`)
+    return yamlFailure(file, `could not be read as YAML — ${(error as Error).message}`)
   }
 }
 
@@ -30,11 +30,11 @@ export function checkVersion(
   // what is wrong with the file rather than letting zod report a type mismatch
   // several levels down.
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return fail(file, 'is not a mapping')
+    return yamlFailure(file, 'is not a mapping')
   }
   const declared = (value as { schemaVersion?: unknown }).schemaVersion
   if (typeof declared === 'number' && declared > knownVersion) {
-    return fail(
+    return yamlFailure(
       file,
       `declares schema version ${declared}; this build knows version ${knownVersion}`
     )

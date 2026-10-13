@@ -8,9 +8,10 @@ import { createLiveOrderStore } from '../order/store.js'
 
 import { reg } from './register.js'
 import type { ActivationContext } from './register.js'
-import { resolveSources } from '../workspace-root.js'
+import { resolveSources, sourcesOf } from '../workspace-root.js'
 import { indexFor } from '../state/live-index.js'
 import { sensorCollectDepsFor } from '../sensors/sensor-tick.js'
+import { isoNow } from '../host-calls.js'
 
 /** The record (the ledger) and the signals the sensors collect. */
 export function registerRecordChannels(context: ActivationContext, signalStore: SignalStore): void {
@@ -19,12 +20,8 @@ export function registerRecordChannels(context: ActivationContext, signalStore: 
 }
 
 function registerLedger({ api, dataRoot }: ActivationContext): void {
-  // ── The record ─────────────────────────────────────────────────────────
-  //
-  // Every decision, by whom or by what rule, and why. The one place the
-  // factory ever argues back — and only when asked: `rules.propose` is a
-  // channel the operator's own button reaches, never a subscription and never
-  // anything the append path can trigger.
+  // The record: every decision, by whom or what rule, and why. `rules.propose` is
+  // the one place it argues back, reached only by the operator's own button.
   const ledger = createLedgerChannels({
     store: createLiveOrderStore(dataRoot, indexFor),
     dataRoot,
@@ -39,8 +36,8 @@ function registerLedger({ api, dataRoot }: ActivationContext): void {
     // is theirs to remove whether or not it applies to the repository they
     // happen to have open.
     acceptedRules: () => acceptedRulesIn(resolveSources(api, dataRoot())),
-    sources: () => resolveSources(api, dataRoot()),
-    now: () => new Date().toISOString(),
+    sources: sourcesOf({ api, dataRoot }),
+    now: isoNow,
   })
   reg(api, ...ledgerChannelSpecs(ledger))
 }
@@ -69,7 +66,7 @@ function registerSensors({ api, dataRoot }: ActivationContext, signalStore: Sign
     orderStore: createLiveOrderStore(dataRoot, indexFor),
     availableSensors: () => availableSensors(resolveSources(api, dataRoot())),
     collectDepsFor: (repoPath) => sensorCollectDepsFor(api, repoPath),
-    now: () => new Date().toISOString(),
+    now: isoNow,
     newId: () => newOrderId(new Date()),
   })
   reg(api, ...sensorChannelSpecs(sensors))

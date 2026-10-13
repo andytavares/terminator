@@ -51,10 +51,7 @@ const SEAT_FURNITURE: ReadonlySet<PropKind> = new Set(['restbench', 'sofa', 'pla
 // wall: sorted at its floor it would be drawn over everyone inside.
 const WALL_KINDS: ReadonlySet<PropKind> = new Set(['partition'])
 
-/**
- * The y a prop sorts at against crew and crates: its top, its first row, or its floor edge.
- * @internal
- */
+/** The y a prop sorts at against crew and crates: its top, first row or floor edge. @internal */
 export function drawOrderY(prop: HallProp): number {
   if (WALL_KINDS.has(prop.kind)) return (prop.y + 1) * TILE_PX
   return SEAT_FURNITURE.has(prop.kind) ? prop.y * TILE_PX : (prop.y + prop.h) * TILE_PX
@@ -85,12 +82,9 @@ function reachingFixtures(world: World): ('archive' | 'rack')[] {
   return reaching
 }
 
-/**
- * What the world is doing at the fixtures, in the terms the art draws it:
- * each station's newest open tool, the fresh verdicts, and which shared
- * fixtures somebody is standing at and using. Pure, so it needs no canvas.
- * @internal
- */
+// What the world is doing at the fixtures, in the art's terms: each station's newest
+// open tool, fresh verdicts, and the shared fixtures in use. Pure: no canvas needed.
+/** @internal */
 export function sceneActivity(
   world: World
 ): Required<Pick<SceneContext, 'tools' | 'verdicts' | 'reaching'>> {
@@ -269,12 +263,8 @@ function draw(paint: Paint, { bake, lightLayer }: Layers, frame: Frame): void {
   paint.globalCompositeOperation = 'source-over'
 }
 
-/**
- * The previous record when the next one holds the same entries.
- *
- * Callers build `states` afresh on every render; an effect that depends on the
- * object itself would restart on each of them.
- */
+// The previous record when the next holds the same entries: callers rebuild `states`
+// every render, and an effect keyed on the object would restart each time.
 function useStableRecord<T>(next: Readonly<Record<string, T>>): Readonly<Record<string, T>> {
   const [held, setHeld] = useState(next)
   const keys = Object.keys(next)
@@ -332,10 +322,7 @@ function drawNow({ paint, layers, map, worldRef, states, live }: Loop): void {
   })
 }
 
-/**
- * Ticks and draws the world on every animation frame, pausing while the page
- * is hidden; the function that stops it.
- */
+/** Ticks and draws the world every frame, paused while hidden; returns its stop. */
 function runLoop(loop: Loop): () => void {
   let rafId = 0
   let running = true
@@ -400,10 +387,8 @@ interface SceneLoopDeps extends Pick<Loop, 'map' | 'states' | 'worldRef' | 'live
   readonly reducedMotion: boolean | undefined
 }
 
-/**
- * Bakes the map's layers once each, then draws the world once for someone
- * who asked for less motion, or on every frame for everyone else.
- */
+// Bakes the map's layers once, then draws the world once for someone who asked for
+// less motion, or every frame for everyone else.
 function useSceneLoop(
   canvasRef: React.MutableRefObject<HTMLCanvasElement | null>,
   { map, states, worldRef, reducedMotion, live }: SceneLoopDeps

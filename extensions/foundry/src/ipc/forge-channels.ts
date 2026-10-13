@@ -182,21 +182,9 @@ export interface ForgeDeps {
   readonly criticalPaths: (repoPaths: readonly string[]) => readonly string[]
   /** Past decisions about the files a new idea names (FR-077). */
   readonly priorArtFor: (paths: readonly string[]) => Promise<string[]>
-  /**
-   * Start one turn of intake, and resolve as soon as it is *running*.
-   *
-   * Not when it finishes. An architect takes minutes, and a channel that
-   * waited would hold the bridge for all of them — the surface would spin with
-   * no way to see what the agent was doing, which is the opposite of running
-   * it in a terminal you can watch.
-   *
-   * The redraft lands later, through the store, and the surface sees it on its
-   * next read. A seam, so this file starts no sessions and knows nothing about
-   * terminals.
-   *
-   * `recordStart` writes the turn's start to the ledger, and the turn's end
-   * waits for it, so its redraft is never on the ledger before its start.
-   */
+  // Starts one intake turn and resolves once it is running, not after the minutes it
+  // takes; the redraft lands later through the store. `recordStart` writes the start
+  // to the ledger, and the turn's end waits for it so the redraft never precedes it.
   readonly converge: (
     order: WorkOrder,
     message: string,
@@ -372,12 +360,8 @@ async function create(deps: ForgeDeps, payload: CreateInput): Promise<unknown> {
   return { ...view(attacked), unavailableChecks: seeded.unavailableChecks }
 }
 
-/**
- * The order already drafted from the same tracker issue, if there is one.
- *
- * The duplicate check reads the store, so it happens here rather than
- * inside seeding — seeding stays a pure function of its inputs.
- */
+// The order already drafted from the same tracker issue, if any. It reads the store,
+// so it lives here and seeding stays a pure function of its inputs.
 async function existingFor(
   deps: ForgeDeps,
   order: WorkOrder
@@ -516,13 +500,8 @@ function recordArchitectStart(
   })
 }
 
-/**
- * Start one architect turn, on the order and with the message given.
- *
- * The half of `converge` that actually talks to the architect — shared by a
- * plain turn and by a settle that ends in a fix or an ask, so there is one
- * place that starts a session and one place that records it.
- */
+// Start one architect turn on the order with the message given: shared by a plain
+// turn and a settle ending in a fix or an ask, so one place starts and records it.
 async function runArchitectTurn(
   deps: ForgeDeps,
   order: WorkOrder,
@@ -531,10 +510,10 @@ async function runArchitectTurn(
   // Once, from inside the turn when the architect starts, or here when
   // `converge` answered without starting one.
   let recorded: Promise<void> | null = null
-  const recordStart = (s: ConvergeStarted): Promise<void> =>
+  const recordConvergeStart = (s: ConvergeStarted): Promise<void> =>
     (recorded ??= recordArchitectStart(deps, { order, message }, s))
-  const started = await deps.converge(order, message ?? '', recordStart)
-  await recordStart(started)
+  const started = await deps.converge(order, message ?? '', recordConvergeStart)
+  await recordConvergeStart(started)
   if (!started.ok) {
     return {
       ...view(order),
@@ -543,13 +522,9 @@ async function runArchitectTurn(
     }
   }
 
-  // The order as it stands, plus the session the architect is working in —
-  // so the surface can say it is running and take the operator to it.
-  //
-  // `intake` comes back on this call too, and not only on the poll: the
-  // Forge reads whether a turn is running from it, and a first answer that
-  // omitted it would leave the surface idle until the next poll it was
-  // never going to start.
+  // The order and the architect's session, so the surface can say it is running and
+  // go there. `intake` comes back here too, not only on the poll: the Forge reads from
+  // it whether a turn runs, and without it would sit idle until a poll never started.
   return {
     ...view(order),
     converging: started.sessionId,
@@ -557,19 +532,9 @@ async function runArchitectTurn(
   }
 }
 
-/**
- * Settle everything the operator decided in the band, in one submit.
- *
- * An answer and an accept change the order directly and need no turn — they
- * are recorded exactly as `turn` records them, one ledger line each. A fix
- * or an ask is the architect's, and every one of those is folded into the
- * single turn this starts once, naming every finding it carries, rather
- * than the one-at-a-time loop that cost seven findings seven serial turns.
- *
- * A blank accept reason refuses the whole settle rather than applying the
- * rest and dropping the one that was a shrug: a partially-applied batch is
- * a batch the operator did not actually send.
- */
+// Settle everything decided in the band in one submit: answers and accepts change the
+// order and are recorded as `turn` records them; all fixes and asks fold into one
+// architect turn. A blank accept reason refuses the whole batch, not part of it.
 async function settleTurn(
   deps: ForgeDeps,
   order: WorkOrder,
@@ -647,14 +612,9 @@ function fixMessage(
     : `${parts.join(' ')} ${message}`
 }
 
-/**
- * One turn of intake.
- *
- * The architect reads the draft and the repository and proposes criteria, a
- * plan, a risk grade and budgets. It runs read-only and writes one file,
- * which is validated before any of it reaches the order — an agent that
- * could write the order directly could set its status and agree its own work.
- */
+// One intake turn: the architect reads the draft and the repository and proposes
+// criteria, plan, risk and budgets, read-only, in one file validated before it
+// reaches the order, so no agent can set its own status or agree its own work.
 async function converge(deps: ForgeDeps, payload: z.infer<typeof TurnPayload>): Promise<unknown> {
   const id = payload.id
   const order = await deps.store.load(id)
@@ -677,12 +637,8 @@ async function compile(deps: ForgeDeps, payload: z.infer<typeof CompilePayload>)
   if (order === null) return { error: `No order ${id}.` }
 
   const result = compileOrder(order)
-  // How the last intake turn ended, on the read the Forge polls.
-  //
-  // A refusal is recorded in the ledger and nowhere else, so a surface that
-  // only reads the document cannot tell "the architect is working" from "the
-  // architect finished an hour ago and nothing was accepted". The Forge
-  // could not, and spun on the first while it was the second.
+  // How the last intake turn ended, on the read the Forge polls: a refusal is only in
+  // the ledger, and without this "working" and "finished, nothing accepted" look alike.
   const facts = await readFacts(deps.store, id)
   if (!commit || !result.ok) return { compile: result, order, ...facts }
 
@@ -724,12 +680,8 @@ function recordAgreed(deps: ForgeDeps, id: string, automatic: boolean | undefine
   })
 }
 
-/**
- * What the tracker offers an agreed order, after telling it the order is agreed.
- *
- * Both of these are about the tracker, and neither may unmake an
- * agreement that has already been recorded (FR-063).
- */
+// What the tracker offers an agreed order, after telling it so. Neither may unmake
+// an agreement already recorded (FR-063).
 async function afterAgreed(
   deps: ForgeDeps,
   order: WorkOrder
@@ -748,13 +700,8 @@ async function afterAgreed(
   return capability
 }
 
-/**
- * What the tracker offers, for the mapping panel.
- *
- * Its own channel rather than part of `compile` because compile is polled
- * and this is a network read: asking the tracker every time the document
- * redraws would spend the operator's rate limit on nothing.
- */
+// What the tracker offers, for the mapping panel. Its own channel because compile is
+// polled and this is a network read that would spend the operator's rate limit.
 async function states(deps: ForgeDeps, payload: z.infer<typeof StatesPayload>): Promise<unknown> {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
@@ -794,18 +741,9 @@ async function mapState(
   return { ok: true, mapping: next.stateMapping }
 }
 
-/**
- * Discard an order.
- *
- * `cancelled` has been in the schema since the beginning and nothing ever
- * set it: an order made by mistake stayed on the list for good, and there
- * was no way to start again. Marked rather than deleted — the records are
- * the point of this thing, and a discarded order is part of what happened.
- *
- * A running one is refused. Its agents are in their terminals with work in
- * their worktrees, and throwing that away silently is the opposite of what
- * every budget and gate here is for; stop it at its gate first.
- */
+// Discard an order: marked `cancelled`, not deleted, because the records are the
+// point. A running order is refused: its agents' work is in their worktrees, so
+// stop it at its gate first.
 async function cancel(deps: ForgeDeps, payload: z.infer<typeof CancelPayload>): Promise<unknown> {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
@@ -862,11 +800,8 @@ async function listRow(
     // that sends you to a list saying nothing about where it came from
     // is a number you have to open every row to act on.
     openQuestions: order.status === 'draft' ? surfacedQuestions(order.openQuestions).length : 0,
-    // Where the order actually stands. The row used to derive that from
-    // `failures`, which is a draft-time compile result and therefore
-    // zero for every running order for ever — so every running order,
-    // including one halted at a gate two hours earlier, said "ready to
-    // hand off".
+    // Where the order stands, not derived from `failures`, a draft-time count that
+    // called every running order "ready to hand off".
     standing,
     gate,
     // Null once a records location exists and this order has not shipped
@@ -929,14 +864,8 @@ async function rowPulls(
   return pulls.map((pull) => ({ number: pullNumber(pull.url), url: pull.url }))
 }
 
-/**
- * Which write-backs this order does.
- *
- * Per order, defaulting from configuration (FR-062): a run against somebody
- * else's repository, or one seeded from an issue nobody else watches, is a
- * reason to turn one off without changing the setting for every order after
- * it.
- */
+// Which write-backs this order does: per order, defaulting from configuration
+// (FR-062), so one run against someone else's repository can turn one off alone.
 async function setWriteBack(
   deps: ForgeDeps,
   payload: z.infer<typeof WriteBackPayload>
@@ -987,13 +916,8 @@ async function setBudgets(
   return view(next)
 }
 
-/**
- * Choose the shape hand-off will run, overriding the proposal (FR-014).
- *
- * A draft only — a running order's recipe is fixed by `run.start`, and
- * changing it here would say one thing while the graph already cut ran
- * another.
- */
+// Choose the shape hand-off will run, overriding the proposal (FR-014). A draft only:
+// a running order's recipe was fixed by `run.start`.
 async function recipe(deps: ForgeDeps, payload: z.infer<typeof RecipePayload>): Promise<unknown> {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
@@ -1015,13 +939,8 @@ async function recipe(deps: ForgeDeps, payload: z.infer<typeof RecipePayload>): 
   return view(next)
 }
 
-/**
- * Hold the loop for the operator, or release it.
- *
- * Recording the decision is all this channel does. What "release" actually
- * resumes — the next review round, a follow-up, hand-off — is
- * `deps.onReleased`'s job, over in the loop that knows what those are.
- */
+// Hold the loop for the operator, or release it. This only records the decision;
+// what release resumes is `deps.onReleased`'s job, in the loop.
 async function hold(deps: ForgeDeps, payload: z.infer<typeof HoldPayload>): Promise<unknown> {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }

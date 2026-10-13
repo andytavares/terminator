@@ -3,25 +3,22 @@ import { foundryChannel } from './channel.js'
 import { OrderIdPayload } from './payloads.js'
 import { createLiveOrderStore } from '../order/store.js'
 import { tearDownRun } from '../line/teardown.js'
-import { computeQueueEntries } from '../line/refinery-entries.js'
 import { projectRemover } from '../line/order-project.js'
 import { readTranscript } from '../runtime/transcript-tailer.js'
 
 import type { RunChannels } from './run-channels.js'
 import { reg } from './register.js'
 import type { ActivationContext } from './register.js'
-import { resolveSources } from '../workspace-root.js'
-import { announceLive, indexFor, orderStoreAt } from '../state/live-index.js'
+import { sourcesOf } from '../workspace-root.js'
+import { announceLive, indexFor, orderStoreAt, queueEntriesOf } from '../state/live-index.js'
 import { runtime, strandedAgents, isLiveSession } from '../runtime/runtime-state.js'
 import { executingOrders, stopOrder } from '../line/run-control.js'
-import { executeRun } from '../line/execute-run.js'
+import { executeOrderRun } from '../line/execute-run.js'
 import type { OrderRun } from '../line/run-context.js'
 import type { LiveStandingSources } from './standing.js'
+import { isoNow, shellExecOf } from '../host-calls.js'
 
-/**
- * The Line's channels: the run channels, stopping a whole order, and starting
- * one over.
- */
+/** The Line's channels: the run channels, stopping a whole order, starting one over. */
 export function registerLineChannels(
   context: ActivationContext,
   standingSources: LiveStandingSources
@@ -33,20 +30,17 @@ export function registerLineChannels(
   return runs
 }
 
-// ── The Line ───────────────────────────────────────────────────────────
-//
-// An agreed order plus a shape of work becomes a run graph. Everything that
-// can refuse does so before any agent starts: the order has to be agreed,
-// the shape has to be one this repository can actually support, and the
-// records location has to be writable.
+// The Line: an agreed order plus a shape becomes a run graph. Everything that can
+// refuse does so before any agent starts: the order agreed, the shape supported here,
+// the records location writable.
 function createRuns(context: ActivationContext, standingSources: LiveStandingSources): RunChannels {
-  const { api, dataRoot } = context
+  const { dataRoot } = context
   return createRunChannels({
     store: createLiveOrderStore(dataRoot, indexFor),
     dataRoot,
     index: indexFor,
-    sources: () => resolveSources(api, dataRoot()),
-    now: () => new Date().toISOString(),
+    sources: sourcesOf(context),
+    now: isoNow,
     execute: (order, recipe, graph) => executeMarked(context, { order, recipe, graph }),
     isLive: isLiveSession,
     executing: (orderId) => executingOrders.has(orderId),
@@ -56,7 +50,7 @@ function createRuns(context: ActivationContext, standingSources: LiveStandingSou
     strandedFor: standingSources.strandedFor,
     strandedSessions: liveStrandedSessions,
     activityFor: transcriptActivity,
-    queueEntries: () => computeQueueEntries(dataRoot(), orderStoreAt(dataRoot())),
+    queueEntries: queueEntriesOf(dataRoot),
   })
 }
 
@@ -70,7 +64,7 @@ async function executeMarked(
   executingOrders.add(order.id)
   announceLive(order.id)
   try {
-    await executeRun(api, { root: dataRoot(), ...run })
+    await executeOrderRun(api, { root: dataRoot(), ...run })
   } finally {
     executingOrders.delete(order.id)
     announceLive(order.id)
@@ -93,12 +87,8 @@ function transcriptActivity(sessionId: string): ReturnType<typeof readTranscript
   return run ? readTranscript(run.transcriptPath) : []
 }
 
-// Stop the whole order, as opposed to one agent.
-//
-// `foundry:run-stop` ends one session; this ends the run. The distinction is
-// the reason a dead run could never be got rid of: the only order-level stop
-// was a gate option that did nothing, and `order.cancel` refuses a running
-// order and points back at that gate.
+// Stop the whole order, where `foundry:run-stop` ends one session: without it a
+// dead run could not be got rid of, since `order.cancel` refuses a running order.
 function registerRunStop({ api, dataRoot }: ActivationContext): void {
   reg(
     api,
@@ -109,13 +99,9 @@ function registerRunStop({ api, dataRoot }: ActivationContext): void {
   )
 }
 
-// Start the same order over.
-//
-// Stop whatever is still running, destroy everything the run made — every
-// lane's checkout and branch, the graph, the gates, the rung outputs — and
-// put the order back to `agreed` so it can be run again from node zero. The
-// ask, the criteria and the plan survive, which is the whole difference
-// between this and making a fourth order for the same sentence.
+// Start the same order over: stop what runs, destroy every lane checkout and branch,
+// the graph, gates and rung outputs, and put the order back to `agreed`. The ask,
+// criteria and plan survive.
 function registerRunReset(context: ActivationContext): void {
   reg(
     context.api,
@@ -131,7 +117,7 @@ async function resetRun({ api, dataRoot }: ActivationContext, id: string) {
 
   await stopOrder(root, id, 'starting over')
   const result = await tearDownRun(order, {
-    exec: (o) => api.shell.exec(o),
+    exec: shellExecOf(api),
     root,
     removeProjectAt: projectRemover(api.workspace),
   })

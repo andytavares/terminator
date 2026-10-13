@@ -15,10 +15,8 @@ import type { Gate, GateRuleId } from '../gates/rules.js'
 import { isLive } from '../gates/autonomy.js'
 import type { ExecutorDeps } from './executor.js'
 
-// One run of an order, while it runs: the graph as it stands, what it has
-// judged and raised so far, and whether it has stopped. Everything that moves
-// the graph or raises a gate goes through here, so there is one place that can
-// be wrong rather than fifteen.
+// One run of an order while it runs: the graph, what it judged and raised, whether it
+// stopped. Everything that moves the graph or raises a gate goes through here.
 
 /** What a gate this run raises says, beyond its rule. */
 export interface GateAsk {
@@ -26,12 +24,7 @@ export interface GateAsk {
   readonly why: string
   readonly nodeId?: string | null
   readonly blockedUnits?: number
-  /**
-   * Minutes before this gate takes its stated default. A recipe's own
-   * `deadlineMinutes`, when the step declared one — without this the field
-   * parsed and reached nothing, so "what happens when nobody answers" was a
-   * promise no gate could keep.
-   */
+  /** Minutes before this gate takes its default: the recipe step's `deadlineMinutes`. */
   readonly deadlineMinutes?: number
   readonly breach?: BudgetBreach
   readonly evidence?: readonly Evidence[]
@@ -43,10 +36,7 @@ type Breach = NonNullable<ReturnType<typeof budgetBreach>>
 export class Execution {
   readonly roles: RoleRegistry
   current: RunGraph
-  /**
-   * The order as later briefs see it, which is not the order the run is judged
-   * against. See `RungCollection.order`.
-   */
+  /** The order as later briefs see it, not the one the run is judged against. */
   briefed: WorkOrder
   readonly verdicts: Verdict[] = []
   /** unit id → the session that did the work, so a checker is never it. */
@@ -81,32 +71,20 @@ export class Execution {
   }
 
   /** The order's own directory under the data root. */
-  dir(): string {
+  recordsDir(): string {
     return orderDir(this.deps.sources.dataRoot, this.order.id)
   }
 
-  /**
-   * Move to the next state of the graph, and say so. Never fatal: a run that
-   * cannot write its graph down is still a run, and failing it here would
-   * turn a reporting problem into a lost agent.
-   */
+  // Move to the graph's next state and say so. Never fatal: a run that cannot write
+  // its graph is still a run.
   async advance(next: RunGraph): Promise<void> {
     this.current = next
     await this.deps.persist(this.current).catch(() => undefined)
   }
 
-  /**
-   * Put a node's session on the graph, and say it started.
-   *
-   * Called the moment the agent exists rather than when its turn ends. Both
-   * happen: `run` reports the session as it comes up, and the result names it
-   * again for a caller that reports nothing — the set is what makes the second
-   * one a no-op instead of a second start.
-   *
-   * The Floor renders Watch and Attach on `node.sessionId !== null`, so before
-   * this a running rung had no controls at all and the only agent you could
-   * reach was one that had already finished.
-   */
+  // Put a node's session on the graph as soon as the agent exists, so the Floor's
+  // Watch and Attach appear while it runs. The result names it again; the set makes
+  // that a no-op rather than a second start.
   async noteStarted(nodeId: string, sessionId: string): Promise<void> {
     if (this.announced.has(nodeId)) return
     this.announced.add(nodeId)
@@ -114,17 +92,13 @@ export class Execution {
     this.deps.onEvent({ type: 'started', nodeId, sessionId })
   }
 
-  /**
-   * Where this node writes what it found, or null when it has nothing to file.
-   *
-   * Null for a role whose product is the checkout and for a bare command.
-   */
+  /** Where this node files what it found; null for a checkout-only role or a command. */
   outputFor(node: RunNode, roleId: string | null): string | null {
     if (roleId === null) return null
     const role = this.roles.get(roleId)
     if (role === null || collectableWrites(role).length === 0) return null
     try {
-      return rungOutputPath(this.dir(), node.id)
+      return rungOutputPath(this.recordsDir(), node.id)
     } catch {
       // A node id a recipe gave that would not sit under this order. Refusing
       // the channel is right; failing the run over it is not.
@@ -137,18 +111,13 @@ export class Execution {
     if (roleId === null) return null
     const role = this.roles.get(roleId)
     if (!collectableWrites(role).includes('document')) return null
-    return path.join(this.dir(), 'outputs')
+    return path.join(this.recordsDir(), 'outputs')
   }
 
-  /**
-   * Raise one, if this autonomy setting is asking about it.
-   *
-   * Returns true when the run must stop. A rule this setting silences raises
-   * nothing and stops nothing — that is what the dial *is*. A rule it asks
-   * about, with nowhere to put the question, still stops: continuing past a
-   * decision nobody could take is the failure the gates exist to prevent.
-   */
-  async raise(rule: GateRuleId, ask: GateAsk): Promise<boolean> {
+  // Raise one if this autonomy setting asks about it; true when the run must stop. A
+  // silenced rule raises and stops nothing; an asked one with nowhere to ask still
+  // stops, since continuing past an untakeable decision is what gates prevent.
+  async stopAtGate(rule: GateRuleId, ask: GateAsk): Promise<boolean> {
     if (!isLive(rule, this.deps.autonomy)) return false
     const nodeId = ask.nodeId ?? null
     const approved = this.priorGates.some(
@@ -156,14 +125,14 @@ export class Execution {
     )
     if (approved) return false
     this.gateSeq += 1
-    const gate = this.gateFor(rule, { ...ask, nodeId })
+    const gate = this.newGate(rule, { ...ask, nodeId })
     this.gates.push(gate)
     this.deps.onEvent({ type: 'gate', gate })
     await this.deps.raise(gate)
     return true
   }
 
-  private gateFor(rule: GateRuleId, ask: GateAsk & { nodeId: string | null }): Gate {
+  private newGate(rule: GateRuleId, ask: GateAsk & { nodeId: string | null }): Gate {
     return raiseGate({
       id: `${this.order.id}-${rule}-${this.gateSeq}`,
       rule,
@@ -194,18 +163,9 @@ export class Execution {
     })
   }
 
-  /**
-   * Wait for the wave, or for the budget to be exceeded while it runs.
-   *
-   * Checking budgets only *between* waves means a single agent that never
-   * returns is the one case the check cannot catch — and it is the case the
-   * budget exists for. FR-030 asks for a pause when the budget is exceeded,
-   * not for one when the wave that exceeded it happens to end.
-   *
-   * The agents are not killed: their terminals are still there and their work
-   * is still in the worktree, which is what "preserving work in progress"
-   * means. The run stops asking for more.
-   */
+  // Wait for the wave, or for a budget breach while it runs: checking only between
+  // waves misses the agent that never returns (FR-030). Agents are not killed; their
+  // terminals and worktrees stay, and the run stops asking for more.
   async waveOrBreach<T>(wave: Promise<T[]>): Promise<{ results: T[] } | { breach: Breach }> {
     const pollMs = this.deps.budgetPollMs ?? 15_000
     let settled = false

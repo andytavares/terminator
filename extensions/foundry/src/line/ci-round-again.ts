@@ -32,13 +32,9 @@ interface ShippedOrder {
   readonly pulls: LanePullRequest[]
 }
 
-/**
- * `ciRounds` against the drafts that already exist, then `finishShipping` so
- * the order gets its ready gate again, or `ci.red` if the round failed. Shared
- * by the `ci.red` gate's "another round" and the refinery's recheck after a
- * rebase. Nothing happens for an order with no recipe, no graph or one whose
- * recipe no longer resolves.
- */
+// `ciRounds` on the existing drafts, then `finishShipping` for the ready gate again,
+// or `ci.red` on a failed round: the `ci.red` gate's "another round" and the
+// refinery's recheck. Nothing for an order with no recipe or graph that resolves.
 export async function ciRoundAgain(request: CiRoundAgain): Promise<void> {
   const { api, root } = request
   const shipped = await loadShipped(api, root, request.orderId)

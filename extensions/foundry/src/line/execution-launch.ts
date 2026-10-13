@@ -34,14 +34,10 @@ interface Skipped {
 
 export type Launched = Ran | Skipped
 
-/**
- * A `run` step whose command is not a slash instruction runs as a command,
- * not as an agent. Handed to an agent, a `run` step was told "run this
- * exactly" and the turn's end reported exit 0 regardless — a `run` step could
- * never actually fail. A slash command such as `/speckit-plan` is an agent
- * instruction, not a shell command, and keeps going to `deps.run`.
- */
-export function launch(run: Execution, node: RunNode): Promise<Launched> {
+// A `run` step that is not a slash instruction runs as a command, so it can fail:
+// handed to an agent it always reported exit 0. A slash command such as
+// `/speckit-plan` is an agent instruction and still goes to `deps.run`.
+export function launchNode(run: Execution, node: RunNode): Promise<Launched> {
   const step = stepFor(run.recipe, node)
   if (
     step?.kind === 'run' &&
@@ -67,7 +63,11 @@ async function runCommandNode(run: Execution, node: RunNode, command: string): P
     const name = /toolchain\.(\w+)/.exec(command)?.[1] ?? node.stepId
     return { node, skipped: true, skipReason: `no ${name} command in this repository` }
   }
-  const logPath = path.join(run.dir(), 'runs', `${safeFilename(node.id)}.${node.attempts}.log`)
+  const logPath = path.join(
+    run.recordsDir(),
+    'runs',
+    `${safeFilename(node.id)}.${node.attempts}.log`
+  )
   const exitCode = await deps.runCommand({ node, command: resolved, title: node.stepId, logPath })
   const roleId = node.role
   return {
@@ -102,40 +102,9 @@ async function runAgentNode(run: Execution, node: RunNode, step: Step | undefine
   }
 }
 
-/**
- * The session this node may carry on in, or undefined for a fresh one.
- *
- * One conversation per lane, where the role allows it. A fresh agent per node
- * is a terminal per node and an agent that has read nothing — which is what
- * `continueRun` exists to avoid. `assertResumable` is what makes the
- * permission structural: a role with `allowResume: false` is *handed*
- * undefined, so the refusal cannot be forgotten by a caller.
- *
- * A step may demand a fresh conversation even from a role that is allowed to
- * resume. Five of the six built-in shapes say `context: fresh` on their verify
- * step, and it reached nothing — the effect happened to hold only because the
- * verifier's own role file forbids resuming, so a recipe asking it of any
- * other role got a resumed session anyway.
- *
- * And never across a change of role. The conversation carries who the agent
- * has been, not only what it has read, and forty turns of being the architect
- * outweigh a paragraph saying the next turn is the builder's. Three live runs
- * died on it. The last one ended with the builder writing its own recap: "I've
- * handed over the work order with criteria and two units, and I'm waiting on
- * your sign-off plus write access to implement." It was still the architect,
- * waiting to be approved, while the graph said the unit was being built.
- *
- * This is what `context: fresh` already says for the verifier, and the
- * evidence is that it is not a verifier quirk — it is what a change of role
- * needs. What the architect produced is carried by the work order, which is
- * the artefact for exactly that, rather than by a context window that also
- * carries its posture.
- *
- * A role continuing its own work still resumes, which is where the saving
- * was: a builder taking a second unit in the same lane keeps everything it
- * learned taking the first. `sessionFor` keys on the role, so across a
- * boundary there is simply nothing to offer.
- */
+// The session this node may carry on in, or undefined for a fresh one: one per lane
+// and role, never across a change of role, a role with `allowResume: false` or a
+// `context: fresh` step (SUPERVISION.md, "One conversation per lane").
 function resumeFor(run: Execution, node: RunNode): string | undefined {
   const roleId = node.role
   const wantsFresh = wantsFreshContext(run.recipe, node)
@@ -146,16 +115,12 @@ function resumeFor(run: Execution, node: RunNode): string | undefined {
   return resumeSessionId
 }
 
-/**
- * This node's skills, mounted for its agent — outside the checkout,
- * read-only, and refreshed on every run rather than only the first. A run
- * step that ran as a command never reaches here, so only an agent ever gets a
- * mount. Null when it declared none.
- */
+// This node's skills, mounted for its agent outside the checkout, read-only and
+// refreshed every run. Only an agent gets a mount; null when it declared none.
 async function mountNodeSkills(run: Execution, node: RunNode): Promise<string | null> {
   const skillIds = skillsFor(run.recipe, node, run.roles)
   if (skillIds.length === 0) return null
-  const skillsMount = path.join(run.dir(), 'skills-mount', safeFilename(node.id))
+  const skillsMount = path.join(run.recordsDir(), 'skills-mount', safeFilename(node.id))
   const { skills } = resolveSkills(skillIds, run.deps.sources)
   mountSkills(skillsMount, skills)
   await run.deps.record(

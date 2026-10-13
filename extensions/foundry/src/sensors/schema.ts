@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
   checkVersion,
-  fail,
+  yamlFailure,
   idMatchesFile,
   loadYaml,
   type ParseResult,
@@ -73,11 +73,12 @@ export function parseSensor(text: string, file: string): ParseResult<SensorDef> 
   if (versionProblem !== null) return versionProblem
 
   const parsed = SensorSchema.safeParse(loaded.value)
-  if (!parsed.success) return fail(file, parsed.error.issues.map((i) => i.message).join('; '))
+  if (!parsed.success)
+    return yamlFailure(file, parsed.error.issues.map((i) => i.message).join('; '))
   const sensor = parsed.data
 
   if (!idMatchesFile(sensor.id, file)) {
-    return fail(file, `declares id "${sensor.id}", which does not match the filename`)
+    return yamlFailure(file, `declares id "${sensor.id}", which does not match the filename`)
   }
 
   return {

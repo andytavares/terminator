@@ -224,12 +224,10 @@ function openBlockingFindings(order: WorkOrder): WorkOrder['redTeam'] {
   return order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
 }
 
-/**
- * What is open on the order: its blocking red-team findings, its unanswered
- * questions, and whether the findings now wait on the operator (rule 5)
- * because the machine is not acting on them or has run out of rounds.
- */
-function openWork(input: Pick<ReadinessInput, 'order' | 'intake' | 'loop'>) {
+// What is open on the order: blocking red-team findings, unanswered questions, and
+// whether the findings now wait on the operator (rule 5): the machine is not acting
+// on them, or has run out of rounds.
+function openWorkOf(input: Pick<ReadinessInput, 'order' | 'intake' | 'loop'>) {
   const { order, intake, loop } = input
   const openBlocking = openBlockingFindings(order)
   const machineActing = intake.kind === 'running' && loop.heldAt === null
@@ -254,7 +252,7 @@ interface HolderStrip {
 }
 
 /** What the holder rules read: the input, what is open on the order, and the shape's name. */
-interface StripFacts extends ReturnType<typeof openWork> {
+interface StripFacts extends ReturnType<typeof openWorkOf> {
   readonly input: ReadinessInput
   readonly Shape: string
 }
@@ -264,7 +262,7 @@ type StripRule = (facts: StripFacts) => HolderStrip | null
 
 function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
   const facts: StripFacts = {
-    ...openWork(input),
+    ...openWorkOf(input),
     input,
     Shape: capitalise(input.shape.name ?? 'the proposed'),
   }
@@ -430,7 +428,7 @@ function architectRevising({ input }: StripFacts, intake: RunningIntake): Holder
 }
 
 /** 4. Held. */
-const held: StripRule = ({ input }) => {
+const heldForOperator: StripRule = ({ input }) => {
   const { loop, clock } = input
   if (loop.heldAt === null) return null
   return {
@@ -482,10 +480,7 @@ const questionsToAnswer: StripRule = ({ openQuestions }) => {
   }
 }
 
-/**
- * 7. Nothing drafted yet. Criteria alone are not a plan: an order seeded from
- * a ticket arrives with them, and no unit to satisfy them.
- */
+/** 7. Nothing drafted yet: a ticket-seeded order arrives with criteria and no unit. */
 const noPlan: StripRule = ({ input }) => {
   if (input.order.plan.units.length > 0) return null
   return {
@@ -521,7 +516,7 @@ const STRIP_RULES: readonly StripRule[] = [
   handedOff,
   intakeRefused,
   intakeRunning,
-  held,
+  heldForOperator,
   findingsToDecide,
   questionsToAnswer,
   noPlan,
@@ -627,7 +622,7 @@ function checkRow(id: CheckId, input: ReadinessInput): Row {
   if (id === 'questions')
     return { id, label: ROW_LABELS[id], state: 'needs-you', detail: failure.detail }
   if (id === 'redTeam') {
-    if (openWork({ order, intake, loop }).rule5Applies)
+    if (openWorkOf({ order, intake, loop }).rule5Applies)
       return { id, label: ROW_LABELS[id], state: 'needs-you', detail: failure.detail }
   }
   return { id, label: ROW_LABELS[id], state: 'failing', detail: failure.detail }
@@ -734,7 +729,7 @@ function planStep(context: StepContext): BaseStep {
     intake.autoTurn !== null &&
     intake.round === null
   if (revising) return { state: 'work', mark: 'spin', word: `Revising ${intake.autoTurn} of 2` }
-  const { machineActing } = openWork(context.input)
+  const { machineActing } = openWorkOf(context.input)
   // An empty plan fails coverage by construction, so it is named before the
   // failing checks or it would read "Needs a fix" before anything was drafted.
   if (order.plan.units.length === 0) {
@@ -767,7 +762,7 @@ function planChecksStep({ order, compile }: ReadinessInput, machineActing: boole
 
 function redTeamStep({ input }: StepContext): BaseStep {
   const { intake, loop } = input
-  const { openBlocking, rule5Applies } = openWork(input)
+  const { openBlocking, rule5Applies } = openWorkOf(input)
   if (intake.kind === 'running' && intake.actor === 'red team') {
     return { state: 'work', mark: 'spin', word: `Reviewing, round ${intake.round} of 3` }
   }
@@ -845,11 +840,8 @@ function buildSteps(
   return draftSteps(ids, context)
 }
 
-/**
- * A draft's steps in order. The first step that is bad, the operator's, or
- * being worked while findings are open stops the ones after it — every later
- * step but hand-off reads "not yet".
- */
+// A draft's steps in order. The first step that is bad, the operator's, or worked
+// while findings are open stops the rest: every later step but hand-off is "not yet".
 function draftSteps(ids: readonly StepId[], context: StepContext): StepView[] {
   const openBlocking = openBlockingFindings(context.input.order)
   const views: StepView[] = []
@@ -941,16 +933,13 @@ function buildFindings(input: ReadinessInput): readonly FindingView[] {
 
 // ── Locks ────────────────────────────────────────────────────────────────
 
-/**
- * One reason hand-off may be locked. A string is the lock, null is "not
- * locked" said for certain, and undefined is "not this reason" — the next one
- * is asked.
- */
+// One reason hand-off may be locked: a string is the lock, null is "not locked" for
+// certain, undefined is "not this reason" and the next one is asked.
 type LockRule = (facts: StripFacts) => string | null | undefined
 
 function buildHandOffLock(input: ReadinessInput): string | null {
   const facts: StripFacts = {
-    ...openWork(input),
+    ...openWorkOf(input),
     input,
     Shape: capitalise(input.shape.name ?? 'the proposed'),
   }

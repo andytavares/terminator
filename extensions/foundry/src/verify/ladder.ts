@@ -79,12 +79,8 @@ export interface LadderInput {
   readonly changedFiles?: readonly string[]
 }
 
-/**
- * Not a command, and not a gap: the verifier runs as its own node on every
- * unit, and its exit status is in the criteria table. Calling this "not
- * measured" put three phantom gaps in every pull request body and taught the
- * operator to skim the one signal that matters.
- */
+// Not a command and not a gap: the verifier runs as its own node on every unit and its
+// exit status is in the criteria table. "Not measured" here taught skimming.
 const INDEPENDENT_VERIFICATION: LadderStep = {
   rung: 'L3',
   name: 'Independent verification',
@@ -117,10 +113,7 @@ function inspectionStep(risk: RiskAssessment): LadderStep {
   }
 }
 
-/**
- * End-to-end tests run against the built application; a checkout that was
- * never built fails every one of them whatever the change was.
- */
+/** End-to-end tests run against the built application, so a step builds it first. */
 function integrationSteps(toolchain: Toolchain, touchesUi: boolean): LadderStep[] {
   const build =
     toolchain.e2e !== null && toolchain.build !== null
@@ -186,13 +179,9 @@ export interface LadderOutcome {
 
 export type RunStep = (step: LadderStep) => Promise<number | null>
 
-/**
- * What a step that is not run here records. `unavailable` is not a failure —
- * the climb continues — but it is never a pass either, and it is carried all
- * the way out so nothing downstream can read the absence as a green.
- * `elsewhere` is decided, but not here: neither a pass this climb can claim
- * nor a gap it should report.
- */
+// What a step not run here records. `unavailable` is not a failure (the climb goes on)
+// but never a pass, carried out so nothing reads it as green; `elsewhere` is decided,
+// neither a pass this climb can claim nor a gap to report.
 const NOT_RUN: Record<Exclude<RungStatus, 'runnable'>, StepOutcome['result']> = {
   not_triggered: 'not_triggered',
   elsewhere: 'elsewhere',
@@ -216,7 +205,7 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
   const passed = new Map<string, string>()
 
   for (const step of steps) {
-    const outcome = await outcomeOf(step, run, passed)
+    const outcome = await rungOutcomeOf(step, run, passed)
     outcomes.push(outcome)
     if (outcome.result === 'fail') {
       stoppedAt = step.rung
@@ -232,7 +221,7 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
   }
 }
 
-async function outcomeOf(
+async function rungOutcomeOf(
   step: LadderStep,
   run: RunStep,
   passed: Map<string, string>

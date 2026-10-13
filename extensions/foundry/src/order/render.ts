@@ -80,8 +80,8 @@ export function renderOrder(order: WorkOrder): string {
     '',
     ...coverageTable(order),
     '',
-    ...listed('Assumptions', liveAssumptions(order)),
-    ...listed('Open questions', openQuestionTexts(order)),
+    ...listedSection('Assumptions', liveAssumptions(order)),
+    ...listedSection('Open questions', openQuestionTexts(order)),
     ...redTeamLines(order),
     '## Budgets',
     '',
@@ -92,7 +92,7 @@ export function renderOrder(order: WorkOrder): string {
 }
 
 /** A heading over one bullet per item, or nothing at all when there are none. */
-function listed(heading: string, items: readonly string[]): string[] {
+function listedSection(heading: string, items: readonly string[]): string[] {
   if (items.length === 0) return []
   return [`## ${heading}`, '', ...items.map((item) => `- ${item}`), '']
 }
@@ -166,9 +166,9 @@ function redTeamLines(order: WorkOrder): string[] {
   const open = order.redTeam.filter((f) => f.status === 'open')
   const settled = order.redTeam.filter((f) => f.status !== 'open')
   return [
-    ...listed('Red team — blocking', open.filter((f) => isBlocking(f)).map(openFinding)),
-    ...listed('Red team — notes', open.filter((f) => !isBlocking(f)).map(openFinding)),
-    ...listed('Red team — settled', settled.map(settledFinding)),
+    ...listedSection('Red team — blocking', open.filter((f) => isBlocking(f)).map(openFinding)),
+    ...listedSection('Red team — notes', open.filter((f) => !isBlocking(f)).map(openFinding)),
+    ...listedSection('Red team — settled', settled.map(settledFinding)),
   ]
 }
 

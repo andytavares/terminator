@@ -9,7 +9,7 @@ import { buildRunGraph, withNode } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import type { RunGraph } from '../../src/line/run-graph.js'
+import type { NodeState, RunGraph } from '../../src/line/run-graph.js'
 import { diffObservation } from '../../src/factory/events.js'
 import type { Observation, FactoryEvent } from '../../src/factory/events.js'
 import { readTranscript } from '../../src/runtime/transcript-tailer.js'
@@ -896,5 +896,28 @@ describe('direct: queue', () => {
     const first = direct(world, [{ kind: 'queued', position: 2, behind: ['Other order'] }], 0)
     const second = direct(first, [{ kind: 'queued', position: 1, behind: ['Other order'] }], 0)
     expect(second.queue).toEqual({ position: 1, behind: ['Other order'] })
+  })
+})
+
+describe('direct: a hall that cannot seat everyone, and a corrupted state', () => {
+  it('leaves a resting crew member where it is when no rest seat is free', () => {
+    const g = graph()
+    const world = createWorld({ ...layoutHall(g), restSeats: [] }, obs(g))
+    const next = direct(
+      world,
+      [{ kind: 'node-state', nodeId: 'a', from: 'running', to: 'passed' }],
+      0
+    )
+    expect(next.crew.find((c) => c.nodeId === 'a')).toEqual(
+      world.crew.find((c) => c.nodeId === 'a')
+    )
+  })
+
+  it('throws on a state a corrupted run graph file holds', () => {
+    const to: NodeState = JSON.parse('"rebuilding"')
+    const world = worldFor(graph())
+    expect(() =>
+      direct(world, [{ kind: 'node-state', nodeId: 'a', from: 'running', to }], 0)
+    ).toThrow('unhandled node state: rebuilding')
   })
 })

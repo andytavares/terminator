@@ -282,11 +282,8 @@ function bakeFloorDecals(map: HallMap, paint: Paint): void {
   }
 }
 
-/**
- * A station's name, stencilled on the floor — a bake, so belts and crew walk
- * over it. Desks and rigs wear it in the row above; the press and the gate,
- * which the hazard hatch fronts, wear it below.
- */
+// A station's name stencilled on the floor, baked so belts and crew walk over it:
+// desks and rigs wear it in the row above, the press and gate below.
 function stencilName(paint: Paint, prop: HallProp): void {
   if (prop.sign === null) return
   const below = prop.kind === 'press' || prop.kind === 'gate'
@@ -325,11 +322,7 @@ function bakeWalls(map: HallMap, paint: Paint): void {
   rect(paint, [0, (map.height - 1) * TILE_PX, w, TILE_PX], HALL.wallTrim)
 }
 
-/**
- * The breakroom's own floor, rug and door threshold — ported verbatim from
- * the prototype's `bakeHall2` tail, reading `map.breakroom` in place of its
- * `room`.
- */
+/** The breakroom's floor, rug and threshold, ported from the prototype's `bakeHall2`. */
 function bakeBreakroom(r: HallMap['breakroom'], paint: Paint): void {
   for (let y = r.y + 1; y < r.y + r.h; y++) {
     for (let x = r.x + 1; x < r.x + r.w - 1; x++) {
@@ -968,11 +961,8 @@ function drawGate(paint: Paint, prop: HallProp, { context, tMs }: Scene): void {
   }
 }
 
-/**
- * A gate's beacon: flashing amber while it waits on a person, green once
- * passed, and — for a gate whose step is running (the ship step, through
- * the final check and CI) — steady cyan, busy rather than idle.
- */
+// A gate's beacon: flashing amber while it waits on a person, green once passed,
+// steady cyan while its step runs (the ship step, through the final check and CI).
 function gateBeacon(prop: HallProp, { context, tMs }: Scene): string {
   if (gateIsWaiting(context, prop.nodeId)) {
     return Math.floor(tMs / 250) % 2 === 0 ? HALL.amber : HALL.amberDim
@@ -1138,11 +1128,8 @@ interface CellPlace {
   readonly measured: boolean
 }
 
-/**
- * Where something `width` wide starts, centred in its cell. One third of the
- * board each: a cell keeps clear of the frame on the board's outer edges and of
- * the divider on its own left.
- */
+// Where something `width` wide starts, centred in its third of the board, clear of
+// the frame on the outer edges and of the divider on its own left.
 function placeInCell(
   { cellLeft, cellW, index }: Pick<CellPlace, 'cellLeft' | 'cellW' | 'index'>,
   width: number
@@ -1160,23 +1147,23 @@ function drawBoardCell(
   [icon, value, color]: BoardCell,
   { cellLeft, top, cellW, index, measured }: CellPlace
 ): void {
-  const place = (width: number): number => placeInCell({ cellLeft, cellW, index }, width)
+  const placeInBoard = (width: number): number => placeInCell({ cellLeft, cellW, index }, width)
   if (index > 0) rect(paint, [cellLeft, top + 3, 1, BOARD_HEIGHT - 6], BOARD_DIVIDER)
-  drawIcon(paint, [place(ICON_SIZE), top + 3], {
+  drawIcon(paint, [placeInBoard(ICON_SIZE), top + 3], {
     icon,
     color: value === null ? BOARD_DIM : color,
   })
   const numberTop = top + 3 + ICON_SIZE + 3
   if (value === null) {
-    if (measured) rect(paint, [place(6), numberTop + 4, 6, 2], BOARD_DIM)
+    if (measured) rect(paint, [placeInBoard(6), numberTop + 4, 6, 2], BOARD_DIM)
     return
   }
   const digits = String(Math.min(Math.max(value, 0), BOARD_MAX))
   if (digits.length > 2) {
-    drawText(paint, [place(textWidth(digits)), numberTop + 3], { text: digits, color })
+    drawText(paint, [placeInBoard(textWidth(digits)), numberTop + 3], { text: digits, color })
     return
   }
-  let dx = place(digitsWidth(digits))
+  let dx = placeInBoard(digitsWidth(digits))
   for (const digit of digits) {
     drawDigit(paint, [dx, numberTop], { digit, color })
     dx += 7

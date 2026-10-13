@@ -198,12 +198,9 @@ function useFactoryHall(orderId: string, overlayRef: OverlayRef) {
 
 type Hall = ReturnType<typeof useFactoryHall>
 
-/**
- * The replay on show, what it last said, and the refs its own world lives in,
- * beside the live one: live polling carries on underneath a replay, so leaving
- * it lands back on the run as it is now. `refs` keeps one identity for the
- * life of the hall.
- */
+// The replay on show, what it last said and its own world's refs, beside the live
+// one: live polling carries on under a replay, so leaving it lands on the run as it
+// is now. `refs` keeps one identity for the life of the hall.
 function useReplayState() {
   const [replay, setReplay] = useState<Replay | null>(null)
   const [replayNote, setReplayNote] = useState<string | null>(null)
@@ -220,10 +217,7 @@ function useReplayState() {
 
 type ReplayRefs = ReturnType<typeof useReplayState>['refs']
 
-/**
- * The live world and the beats that gate it live outside React; a render
- * reads only the part of them it draws (see `LiveHall`).
- */
+/** The live world and its beats live outside React; a render reads only what it draws. */
 function useLiveStore() {
   const [liveHall] = useState(createLiveHall)
   const live = useSyncExternalStore(liveHall.subscribe, liveHall.snapshot)
@@ -240,10 +234,7 @@ async function readOrderMetrics(orderId: string): Promise<OrderMetrics | null | 
   return r.orders?.find((o) => o.orderId === orderId) ?? null
 }
 
-/**
- * The order's own numbers for the status wall, read again when anything
- * recorded about this order changes — a rework or a new CI round included.
- */
+/** The order's numbers for the status wall, read again when any record of it changes. */
 function useOrderMetrics(orderId: string): OrderMetrics | null {
   const [orderMetrics, setOrderMetrics] = useState<OrderMetrics | null>(null)
   const read = useCallback(() => readOrderMetrics(orderId), [orderId])
@@ -313,10 +304,8 @@ function useLiveFeed(liveHall: LiveHall, { view, activity, announce, replayRef }
       }),
     [liveHall, announce, replayRef]
   )
-  // The one place the live hall is handed an observation — on every poll of
-  // either the graph or the activity feed, event or no event, with a real
-  // clock. A call held open across polls only crosses its walking threshold
-  // on a poll that brought no new event at all.
+  // The one place the live hall gets an observation: every poll, event or not, with
+  // a real clock, since a call held open crosses its walking threshold on a quiet poll.
   useEffect(() => {
     if (view === null) return
     liveHall.observe(observationOf(view, activity), view.labels ?? {}, Date.now())
@@ -335,7 +324,7 @@ interface Recording {
 }
 
 /** The run as recorded; null when nothing was. */
-async function readTimeline(orderId: string): Promise<Recording | null> {
+async function readRecording(orderId: string): Promise<Recording | null> {
   const r = (await invoke('foundry:run.timeline', { id: orderId })) as {
     graph?: RunGraph
     timeline?: Timeline
@@ -405,10 +394,8 @@ function settleReplay(r: Replay, observation: Observation, refs: ReplayRefs): vo
   refs.replayBeatsRef.current = createBeats(statesOf(observation.graph))
 }
 
-/**
- * Plays the replay forward to `observation`, at replay time `at`, through the
- * same diff and director as a live poll; the events that came due.
- */
+// Plays the replay forward to `observation` at replay time `at`, through the same
+// diff and director as a live poll; the events that came due.
 function playReplay(
   r: Replay,
   [observation, at]: readonly [Observation, number],
@@ -469,7 +456,7 @@ function useReplay(orderId: string, { labels, talk, refs }: ReplayDeps) {
   const { announce, setCallouts } = talk
   const startReplay = useCallback(async () => {
     refs.setReplayNote(null)
-    const recording = await readTimeline(orderId)
+    const recording = await readRecording(orderId)
     if (recording === null) {
       refs.setReplayNote('Nothing recorded for this run yet.')
       return
@@ -558,11 +545,8 @@ interface LayoutDeps {
   readonly talk: Talk
 }
 
-/**
- * Callouts are sized by their text, so only the laid-out page knows which
- * ones would cover each other. Measured before paint, so a callout is never
- * seen at the level it is about to leave.
- */
+// Callouts are sized by their text, so only the laid-out page knows which overlap.
+// Measured before paint, so a callout is never seen at the level it is leaving.
 function useCalloutLayout({ liveMap, shownCi, talk, overlayRef }: LayoutDeps) {
   const { callouts, setCalloutLift } = talk
   // Pinned to the tower while any check is pending; stacked like a raised one.
@@ -603,13 +587,9 @@ interface AgentWordsDeps {
   readonly setTranscript: (lines: TranscriptLine[]) => void
 }
 
-/**
- * The one poll left on this view. Tool activity and a station's transcript are
- * both read from the agents' own transcript files, which change in their
- * processes with nothing Foundry writes to announce it. An open station's
- * transcript is read as often as the activity is, and only for as long as
- * this station stays open.
- */
+// The one poll left on this view: tool activity and a station's transcript come from
+// the agents' transcript files, which nothing Foundry writes announces. An open
+// station's transcript is read with the activity, only while it stays open.
 function useAgentWords(orderId: string, deps: AgentWordsDeps): void {
   const { selectedSessionId, setActivity, setTranscript } = deps
   const readTranscript = useCallback(() => readStationLines(selectedSessionId), [selectedSessionId])
@@ -671,10 +651,7 @@ function useStation(orderId: string, { view, setActivity }: StationDeps) {
   return { selected, setSelected, transcript, attachProblem, openStation, attach }
 }
 
-/**
- * Answers go through the same channels the Floor and the Inbox use; a refusal
- * is shown on the card it came from, never swallowed.
- */
+/** Answers use the Floor's and the Inbox's channels; a refusal shows on its card. */
 function useAnswers(refresh: () => Promise<void>) {
   const [answerProblem, setAnswerProblem] = useState<Readonly<Record<string, string>>>({})
   const [busy, setBusy] = useState<string | null>(null)
@@ -1283,10 +1260,8 @@ interface HudAlertProps {
   readonly onOpenInList: () => void
 }
 
-/**
- * A move no card owns — a run nothing is running, say — still names its
- * place. A gate is decided in the queue above the hall.
- */
+// A move no card owns (a run nothing is running, say) still names its place. A gate
+// is decided in the queue above the hall.
 function HudAlert({ standing, waitingCount, onOpenInList }: HudAlertProps) {
   if (standing === undefined || standing.turn !== 'you' || waitingCount !== 0) return null
   return (
@@ -1345,11 +1320,8 @@ function gateCardStyle(anchor: Anchor, flip: boolean): React.CSSProperties {
   } as React.CSSProperties
 }
 
-/**
- * The same one-line gate the list views draw: collapsed, its answers on the
- * line, the reason a click away and read as markdown. A replay shows it where
- * it happened with every answer disabled.
- */
+// The one-line gate the list views draw: answers on the line, the reason a click
+// away as markdown. A replay shows it where it happened, every answer disabled.
 function GateInterruption(props: InterruptionCardProps & { readonly item: GateItem }) {
   const { item, readOnly, flip, problem } = props
   return (

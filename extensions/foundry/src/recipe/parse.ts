@@ -1,5 +1,11 @@
 import { z } from 'zod'
-import { checkVersion, fail, idMatchesFile, loadYaml, type ParseResult } from './yaml-file.js'
+import {
+  checkVersion,
+  yamlFailure,
+  idMatchesFile,
+  loadYaml,
+  type ParseResult,
+} from './yaml-file.js'
 
 export type { ParseResult } from './yaml-file.js'
 
@@ -28,15 +34,9 @@ function badSkillIds(ids: readonly string[]): string[] {
 
 // ── recipes ──────────────────────────────────────────────────────────────
 
-/**
- * Five step kinds, and there is no sixth.
- *
- * They exist because concrete recipes need them, not in anticipation: fan out
- * over units, a barrier for lane merge order, a human decision, an agent role
- * and a shell command. A recipe that wants arbitrary logic wants a role — a
- * prompt and an output schema — not code in a data file.
- * @internal
- */
+// Five step kinds, each one recipes need (fan-out, lane barrier, human decision, agent,
+// shell command); arbitrary logic belongs in a role, not in a data file.
+/** @internal */
 export const STEP_KINDS = ['agent', 'run', 'gate', 'fanout', 'join'] as const
 export type StepKind = (typeof STEP_KINDS)[number]
 
@@ -176,21 +176,22 @@ export function parseRecipe(text: string, file: string): ParseResult<Recipe> {
   if (versionProblem !== null) return versionProblem
 
   const parsed = RecipeSchema.safeParse(loaded.value)
-  if (!parsed.success) return fail(file, parsed.error.issues.map((i) => i.message).join('; '))
+  if (!parsed.success)
+    return yamlFailure(file, parsed.error.issues.map((i) => i.message).join('; '))
   const recipe = parsed.data
 
   // A name has to resolve to what it says it is, because resolution is by name
   // across three directories and a mismatch would silently shadow a built-in.
   if (!idMatchesFile(recipe.id, file)) {
-    return fail(file, `declares id "${recipe.id}", which does not match the filename`)
+    return yamlFailure(file, `declares id "${recipe.id}", which does not match the filename`)
   }
 
   const problem = stepGraphProblem(recipe.steps)
-  if (problem !== null) return fail(file, problem)
+  if (problem !== null) return yamlFailure(file, problem)
   const onFailProblem = checkOnFail(recipe.steps, file)
   if (onFailProblem !== null) return onFailProblem
   const ci = ciProblem(recipe)
-  return ci === null ? { ok: true, value: recipe } : fail(file, ci)
+  return ci === null ? { ok: true, value: recipe } : yamlFailure(file, ci)
 }
 
 /** The first thing wrong with how the steps name and wait on each other, in words. */
@@ -262,7 +263,7 @@ function checkOnFail(steps: readonly Step[], file: string): { ok: false; reason:
   for (const step of steps) {
     if (step.onFail === undefined) continue
     if (step.kind !== 'run') {
-      return fail(
+      return yamlFailure(
         file,
         `step "${step.id}" has onFail, but only a command step can fail on its own today`
       )
@@ -270,13 +271,13 @@ function checkOnFail(steps: readonly Step[], file: string): { ok: false; reason:
     const target = byId.get(step.onFail.rework)
     const upstream = upstreamOf(step.id, byId)
     if (target === undefined || !upstream.has(target.id)) {
-      return fail(
+      return yamlFailure(
         file,
         `step "${step.id}" has onFail.rework "${step.onFail.rework}", which is not upstream of it`
       )
     }
     if (target.kind !== 'agent' && target.kind !== 'fanout') {
-      return fail(
+      return yamlFailure(
         file,
         `step "${step.id}" has onFail.rework "${target.id}", but only an agent or fanout step can rework`
       )
@@ -307,22 +308,37 @@ const RoleSchema = z.object({
 export type Role = z.infer<typeof RoleSchema>
 
 export function parseRole(text: string, file: string): ParseResult<Role> {
+  const parsed = parseNamedFile(RoleSchema, text, file)
+  if (!parsed.ok) return parsed
+  const bad = badSkillIds(parsed.value.skills)
+  if (bad.length > 0) {
+    return yamlFailure(
+      file,
+      `role "${parsed.value.id}" names skill "${bad[0]}", which is not a valid skill id`
+    )
+  }
+  return parsed
+}
+
+/** A schema for a file named by its `id`. */
+type NamedSchema = z.ZodType<{ id: string }, z.ZodTypeDef, unknown>
+
+/** A role or rule file: YAML at a known version, valid for `schema`, named by its id. */
+function parseNamedFile<S extends NamedSchema>(
+  schema: S,
+  text: string,
+  file: string
+): ParseResult<z.output<S>> {
   const loaded = loadYaml(text, file)
   if (!loaded.ok) return loaded
   const versionProblem = checkVersion(loaded.value, file, RECIPE_SCHEMA_VERSION)
   if (versionProblem !== null) return versionProblem
-
-  const parsed = RoleSchema.safeParse(loaded.value)
-  if (!parsed.success) return fail(file, parsed.error.issues.map((i) => i.message).join('; '))
-  if (!idMatchesFile(parsed.data.id, file)) {
-    return fail(file, `declares id "${parsed.data.id}", which does not match the filename`)
+  const parsed = schema.safeParse(loaded.value)
+  if (!parsed.success) {
+    return yamlFailure(file, parsed.error.issues.map((i) => i.message).join('; '))
   }
-  const bad = badSkillIds(parsed.data.skills)
-  if (bad.length > 0) {
-    return fail(
-      file,
-      `role "${parsed.data.id}" names skill "${bad[0]}", which is not a valid skill id`
-    )
+  if (!idMatchesFile(parsed.data.id, file)) {
+    return yamlFailure(file, `declares id "${parsed.data.id}", which does not match the filename`)
   }
   return { ok: true, value: parsed.data }
 }
@@ -348,15 +364,5 @@ const RuleSchema = z.object({
 export type Rule = z.infer<typeof RuleSchema>
 
 export function parseRule(text: string, file: string): ParseResult<Rule> {
-  const loaded = loadYaml(text, file)
-  if (!loaded.ok) return loaded
-  const versionProblem = checkVersion(loaded.value, file, RECIPE_SCHEMA_VERSION)
-  if (versionProblem !== null) return versionProblem
-
-  const parsed = RuleSchema.safeParse(loaded.value)
-  if (!parsed.success) return fail(file, parsed.error.issues.map((i) => i.message).join('; '))
-  if (!idMatchesFile(parsed.data.id, file)) {
-    return fail(file, `declares id "${parsed.data.id}", which does not match the filename`)
-  }
-  return { ok: true, value: parsed.data }
+  return parseNamedFile(RuleSchema, text, file)
 }

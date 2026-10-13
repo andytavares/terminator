@@ -50,13 +50,9 @@ export function createDeciding(): Deciding {
   return { has: (orderId) => deciding.has(orderId), during: whileDeciding }
 }
 
-// Where every surface's answer to "what is this order doing" comes from.
-//
-// Assembled once and handed to both the order list and the Floor, because
-// the alternative was tried and shipped: each surface worked it out from
-// whatever it happened to hold, so the same order halted at an undecided
-// gate read "ready to hand off" in the list and drew `building` chips on
-// the Floor, and neither of them named the gate.
+// Every surface's answer to "what is this order doing", assembled once for the order
+// list and the Floor: worked out per surface, one halted order read "ready to hand
+// off" in the list and `building` on the Floor, and neither named the gate.
 export function createStandingSources(
   dataRoot: () => string,
   deciding: Deciding

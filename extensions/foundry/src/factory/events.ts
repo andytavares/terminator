@@ -102,7 +102,8 @@ function gateNodeIds(waiting: readonly Gate[], graph: RunGraph): Set<string> {
   return ids
 }
 
-function nodeOfSession(graph: RunGraph, sessionId: string): string | null {
+/** The node whose agent runs in `sessionId`, when one does. */
+export function nodeOfSession(graph: RunGraph, sessionId: string): string | null {
   return graph.nodes.find((n) => n.sessionId === sessionId)?.id ?? null
 }
 

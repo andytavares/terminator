@@ -65,7 +65,7 @@ function ArmedConfirm({
   // Disarmed before the work, not after: the second run of a
   // destructive action is a second decision, and leaving it armed
   // through a slow teardown invites a double click into being one.
-  const confirm = (): void => {
+  const disarmThenConfirm = (): void => {
     onDisarm()
     onConfirm()
   }
@@ -75,7 +75,7 @@ function ArmedConfirm({
         <TriangleAlert aria-hidden="true" /> {warning}
       </p>
       <div className="fdry-ask-actions">
-        <Button variant="danger" size="sm" disabled={disabled} onClick={confirm}>
+        <Button variant="danger" size="sm" disabled={disabled} onClick={disarmThenConfirm}>
           {confirmLabel}
         </Button>
         <Button size="sm" disabled={disabled} onClick={onDisarm}>

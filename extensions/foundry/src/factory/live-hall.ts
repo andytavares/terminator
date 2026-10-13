@@ -9,13 +9,9 @@ import { createBeats, release, schedule } from './beats.js'
 import type { Beats } from './beats.js'
 import type { NodeState, RunGraph } from '../line/run-graph.js'
 
-// The hall of a run as it is now: the world the scene draws, and the beats
-// that hold what happened until it can play out in order.
-//
-// It lives outside React because the world moves every animation frame and is
-// written back by the scene itself, while the parts a render needs — the map,
-// the states the stations show, the queue — change only when an observation
-// or a due beat says so. A component subscribes to exactly those.
+// A run's hall as it is now: the world the scene draws, and beats holding events until
+// they can play in order. Outside React: the world moves every frame, but what a render
+// needs changes only on an observation or a due beat, and a component subscribes to that.
 
 export function statesOf(graph: RunGraph): Record<string, NodeState> {
   return Object.fromEntries(graph.nodes.map((n) => [n.id, n.state]))
@@ -66,7 +62,7 @@ export function createLiveHall(): LiveHall {
       hall.eventListeners.add(listener)
       return () => hall.eventListeners.delete(listener)
     },
-    observe: (observation, labels, nowMs) => hall.observe(observation, { labels, nowMs }),
+    observe: (observation, labels, nowMs) => hall.observeRun(observation, { labels, nowMs }),
     releaseDue: (labels, nowMs) => hall.releaseDue(labels, nowMs),
   }
 }
@@ -90,7 +86,7 @@ class LiveHallState {
     for (const listener of this.sceneListeners) listener()
   }
 
-  private play(released: ReturnType<typeof release>, nowMs: number): void {
+  private playReleased(released: ReturnType<typeof release>, nowMs: number): void {
     this.beats = released.beats
     this.world.current = direct(this.world.current as World, released.events, nowMs)
     this.publish({ shown: released.beats.shown, queue: this.world.current.queue })
@@ -105,7 +101,7 @@ class LiveHallState {
     this.publish({ map, shown: this.beats.shown, queue: this.world.current.queue })
   }
 
-  observe(observation: Observation, { labels, nowMs }: { labels: Labels; nowMs: number }): void {
+  observeRun(observation: Observation, { labels, nowMs }: { labels: Labels; nowMs: number }): void {
     const key = mapKeyOf(observation)
     if (this.mapKey !== key) return this.rebuild(observation, labels, key)
     const seen = diffObservation(this.previous, observation)
@@ -115,7 +111,7 @@ class LiveHallState {
       nowMs
     )
     const released = release(held, nowMs)
-    this.play(released, nowMs)
+    this.playReleased(released, nowMs)
     this.previous = observation
     for (const listener of this.eventListeners) listener(released.events, labels)
   }
@@ -125,7 +121,7 @@ class LiveHallState {
     if (beats === null || beats.held.length === 0 || this.world.current === null) return
     const released = release(beats, nowMs)
     if (released.events.length === 0) return
-    this.play(released, nowMs)
+    this.playReleased(released, nowMs)
     for (const listener of this.eventListeners) listener(released.events, labels)
   }
 }

@@ -26,10 +26,10 @@ function key(rule: MuteRule): string {
 
 export function createMuteStore(filePath: string): MuteStore {
   return {
-    list: () => readRules(filePath),
+    list: () => readMuteRules(filePath),
 
     add(rule): void {
-      const rules = readRules(filePath)
+      const rules = readMuteRules(filePath)
       if (rules.some((existing) => key(existing) === key(rule))) return
       writeRules(filePath, [...rules, rule])
     },
@@ -37,7 +37,7 @@ export function createMuteStore(filePath: string): MuteStore {
     remove(rule): void {
       writeRules(
         filePath,
-        readRules(filePath).filter((existing) => key(existing) !== key(rule))
+        readMuteRules(filePath).filter((existing) => key(existing) !== key(rule))
       )
     },
 
@@ -47,7 +47,7 @@ export function createMuteStore(filePath: string): MuteStore {
   }
 }
 
-function readRules(filePath: string): MuteRule[] {
+function readMuteRules(filePath: string): MuteRule[] {
   try {
     const parsed: unknown = JSON.parse(fs.readFileSync(filePath, 'utf8'))
     if (!Array.isArray(parsed)) return []

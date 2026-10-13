@@ -9,7 +9,7 @@ import type { Gate } from '../gates/rules.js'
 import type { Autonomy } from '../gates/autonomy.js'
 import { Execution } from './execution.js'
 import { runWaves } from './execution-waves.js'
-import { finishRun } from './execution-final.js'
+import { finishExecution } from './execution-final.js'
 
 export { opensPullRequest, skillsFor } from './execution-parts.js'
 
@@ -355,11 +355,11 @@ export interface RunPlan {
  * then climb the final check over the finished work.
  *
  * The waves are `runWaves` (execution-waves.ts), the final check and the
- * gates only the finished work can raise are `finishRun` (execution-final.ts),
+ * gates only the finished work can raise are `finishExecution` (execution-final.ts),
  * and what a run holds while it runs is `Execution` (execution.ts).
  */
-export async function execute(plan: RunPlan, deps: ExecutorDeps): Promise<RunOutcome> {
+export async function executePlan(plan: RunPlan, deps: ExecutorDeps): Promise<RunOutcome> {
   const run = new Execution(plan, deps)
   await runWaves(run)
-  return finishRun(run)
+  return finishExecution(run)
 }

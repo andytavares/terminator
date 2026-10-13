@@ -209,26 +209,9 @@ function oneLine(text: string): string {
   return text.replace(/\r?\n/g, ' ').trim()
 }
 
-/**
- * The shell's arguments for a check: read the user's startup files, then
- * become the script.
- *
- * A check was typed into the tab's interactive login shell, so what the
- * startup files export (JAVA_HOME, GOPATH, nvm's PATH) reached it; the app
- * adopts only PATH from them. `-i -l -c` reads the same files that shell did:
- * zsh reads .zshenv, .zprofile, .zshrc and .zlogin for an interactive login
- * shell (https://zsh.sourceforge.io/Doc/Release/Files.html), and bash reads
- * /etc/profile and the first of ~/.bash_profile, ~/.bash_login, ~/.profile,
- * where ~/.bashrc is usually sourced from
- * (https://www.gnu.org/software/bash/manual/html_node/Bash-Startup-Files.html).
- * `-i` makes a shell interactive even with `-c` in both.
- *
- * `exec` then replaces that shell with `$SHELL script`, which is what was
- * typed before: the process the core watches is the script's, so its exit
- * code is the command's, and the interactive shell is not left in between to
- * report its own. The paths are single-quoted, which every POSIX shell, zsh
- * and fish read alike.
- */
+// The shell's arguments for a check: `-i -l -c` reads the startup files a typed command
+// got (https://zsh.sourceforge.io/Doc/Release/Files.html, https://www.gnu.org/software/bash/manual/html_node/Bash-Startup-Files.html),
+// then `exec` makes the single-quoted script the process whose exit code is reported.
 function startupFilesThen(shell: string, script: string): string[] {
   return ['-i', '-l', '-c', `exec ${shellQuote(shell)} ${shellQuote(script)}`]
 }
@@ -315,16 +298,16 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
   const context = runnerContext(options)
   const { running } = context
   return {
-    start: (start) => startRun(context, start),
-    runCommand: (command) => runCommand(context, command),
+    start: (start) => startSupervisedRun(context, start),
+    runCommand: (command) => runCommandInTab(context, command),
     continueRun: (sessionId, next) => continueRun(context, sessionId, next),
     resolve: (sessionId, requestId, decision) =>
       running.get(sessionId)?.bridge.resolve(requestId, decision) ?? false,
     handBackToTerminal: (sessionId, requestId) =>
       running.get(sessionId)?.bridge.handBackToTerminal(requestId),
     interrupt: (sessionId) => interruptRun(context, sessionId),
-    stop: (sessionId, reason) => stopRun(context, sessionId, reason),
-    send: (sessionId, message) => sendTo(context, sessionId, message),
+    stop: (sessionId, reason) => stopSupervisedRun(context, sessionId, reason),
+    send: (sessionId, message) => sendToSession(context, sessionId, message),
     terminalFor: (sessionId) => terminalOf(running.get(sessionId)),
     watchable: () => watchableRuns(running),
     dispose: () => {
@@ -333,15 +316,9 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
   }
 }
 
-/**
- * The launch, as a file the terminal runs rather than a line it is typed.
- *
- * `MAX_CANON` is the reason: a terminal in canonical mode silently mangles
- * anything past 1024 bytes on one line, and a brief — a role prompt plus a
- * whole work order — is always longer. The `cat` echo is deliberate: the
- * whole command still appears in the terminal, so what an agent was told is
- * readable there, which is the point of running it in a terminal at all.
- */
+// The launch as a file the terminal runs, not a typed line: canonical mode mangles a
+// line past `MAX_CANON`, and a brief is longer. The `cat` echo keeps the whole command
+// readable in the terminal (SUPERVISION.md, "The launch is a file, not a typed line").
 function writeLaunchScript(
   stateDir: string,
   sessionId: string,
@@ -355,19 +332,8 @@ function writeLaunchScript(
     [
       '#!/bin/sh',
       '# Written by Terminator. One per session; overwritten on every start.',
-      // A fresh agent must not inherit another session's identity.
-      //
-      // Terminator launched from a Claude Code terminal passes its whole
-      // environment down — Electron inherits the shell, the pty inherits
-      // Electron, `claude` inherits the pty — so the agent came up carrying
-      // the *parent's* bridge session, messaging socket and session id. It
-      // joined that bridge, sat at `lastSequenceNum: 0` waiting for
-      // instructions only the parent could send, and produced no turn at
-      // all. From the console it looked exactly like an agent thinking.
-      //
-      // `CLAUDE_CODE_CHILD_SESSION` was already known about and worked
-      // around with FORCE_SESSION_PERSISTENCE below; these are the rest of
-      // the same family.
+      // A fresh agent must not inherit the parent Claude Code session's identity from
+      // the environment (SUPERVISION.md, "A fresh agent, not the parent's session").
       `unset ${INHERITED_SESSION_VARS.join(' ')}`,
       parts.exports,
       // A quoted heredoc: nothing in the brief is expanded or run.
@@ -389,13 +355,8 @@ interface CommandScript {
   readonly logPath?: string
 }
 
-/**
- * A script that shows the command, then runs it and exits with its status.
- *
- * The terminal runs it as its own process, so its exit status is the tab's.
- * The command is run by the shell rather than `exec`ed, so a command with
- * `&&` in it still works.
- */
+// A script that shows the command, runs it and exits with its status, which is the
+// tab's. Run by the shell, not `exec`ed, so `&&` in a command still works.
 function writeCommandScript(stateDir: string, { id, command, logPath }: CommandScript): string {
   const dir = path.join(stateDir, 'launch')
   fs.mkdirSync(dir, { recursive: true })
@@ -416,27 +377,17 @@ function writeCommandScript(stateDir: string, { id, command, logPath }: CommandS
   return file
 }
 
-/**
- * The line that runs the command, its output kept in `logPath` and its status
- * the script's.
- *
- * Not `set -o pipefail`: the script is run by the user's own $SHELL, which
- * may not support it. A status file survives the pipe into tee instead.
- */
+// The line that runs the command, output kept in `logPath`, status the script's. No
+// `pipefail` (the user's $SHELL may lack it): a status file survives the pipe to tee.
 function teedRunLine(file: string, command: string, logPath: string): string {
   fs.mkdirSync(path.dirname(logPath), { recursive: true })
   const statusFile = `${file}.status`
-  // A subshell, not a brace group: the command may itself call
-  // `exit` (as a test runner does on failure), which would end the
-  // whole script before the status file is written if it shared
-  // the script's own shell.
+  // A subshell, not a brace group: a command that calls `exit` would otherwise end the
+  // script before the status file is written.
   return `{ ( ${command} ); echo $? > ${shellQuote(statusFile)}; } 2>&1 | tee ${shellQuote(logPath)}; exit "$(cat ${shellQuote(statusFile)})"`
 }
 
-/**
- * `clean` closes the tab: a finished agent's terminal is a shell nobody
- * needs. A failed one stays open so the operator can read why.
- */
+/** `clean` closes a finished agent's tab; a failed one stays open to read why. */
 function end(context: RunnerContext, sessionId: string, clean: boolean): void {
   const run = context.running.get(sessionId)
   if (run === undefined) return
@@ -451,7 +402,7 @@ function end(context: RunnerContext, sessionId: string, clean: boolean): void {
   if (clean) context.api.pty.closeTerminalTab?.(run.terminalSessionId)
 }
 
-async function startRun(
+async function startSupervisedRun(
   context: RunnerContext,
   start: StartSupervisedRunOptions
 ): Promise<SupervisedRun | null> {
@@ -459,17 +410,15 @@ async function startRun(
   // before the process exists and a hook callback needs no correlation.
   const sessionId = start.resumeSessionId ?? randomUUID()
 
-  // Shared with the record below rather than closed over by value, so
-  // `continueRun` can swap which phase a hook belongs to without tearing
-  // the session down and building a new one. A box, because these closures
-  // are installed before the record exists.
+  // A box shared with the record, so `continueRun` can move a hook to another phase
+  // without a new session; the closures exist before the record does.
   const phase: Running['phase'] = { current: { id: start.phase, ...start } }
 
-  const bridge = bridgeFor(context, sessionId, { phase, autoDecide: start.autoDecide })
+  const bridge = permissionBridgeFor(context, sessionId, { phase, autoDecide: start.autoDecide })
   const spec = launchSpecFor(context, sessionId, start)
   const release = registerControl(context, sessionId, { bridge, phase, spec })
 
-  const opened = await openAgentTerminal(context, start)
+  const opened = await openSupervisedTerminal(context, start)
   if (opened === null) {
     release()
     return null
@@ -501,7 +450,7 @@ interface BridgeSeams {
   readonly autoDecide: StartSupervisedRunOptions['autoDecide']
 }
 
-function bridgeFor(
+function permissionBridgeFor(
   context: RunnerContext,
   sessionId: string,
   { phase, autoDecide }: BridgeSeams
@@ -570,12 +519,8 @@ function registerControl(
     onEvent: (kind) => {
       const run = context.running.get(sessionId)
       if (kind === 'stop') {
-        // The agent has finished responding and is sitting at its prompt.
-        // That is blocked on a person — the same state as a held tool call
-        // — and the stall detector must not read it as stuck. It used to:
-        // a phase that finished cleanly and was waiting to be approved
-        // went quiet, fired a stall eight minutes later, and stayed in the
-        // Stalls tab offering to interrupt work that was already done.
+        // Finished responding and sitting at the prompt is blocked on a person, like a
+        // held call, so the stall detector must not read a finished phase as stuck.
         if (run !== undefined) run.isWaiting = true
         phase.current.onTurnEnd?.(countTurns(spec.transcriptPath))
         return
@@ -587,7 +532,7 @@ function registerControl(
 }
 
 /** Where a run lives: its worktree's project, and the terminal tab in it. */
-async function openAgentTerminal(
+async function openSupervisedTerminal(
   { api }: RunnerContext,
   start: StartSupervisedRunOptions
 ): Promise<{ projectId: string; terminalSessionId: string } | null> {
@@ -620,10 +565,8 @@ function trackRun(
   sessionId: string,
   run: Omit<Running, 'detachExit' | 'startedAt' | 'isWaiting'>
 ): SupervisedRun {
-  // The terminal dying is the other way a run ends. Without this, closing
-  // the tab left the phase `running` with no completion ever delivered:
-  // `session_end` only arrives when the runtime exits cleanly enough to
-  // fire its hook.
+  // The terminal dying is the other way a run ends: `session_end` fires only when the
+  // runtime exits cleanly, so a closed tab would leave the phase `running`.
   const detachExit =
     context.api.pty.onExit?.(run.terminalSessionId, (exitCode: number | null) => {
       run.phase.current.onEnd?.(exitCode)
@@ -649,34 +592,9 @@ function trackRun(
   }
 }
 
-/**
- * The launch, run in the terminal through its script.
- *
- * Typed, exactly as a person would. The skills read these to find the card's
- * spec, plan and tasks regardless of the branch name.
- *
- * CLAUDE_CODE_FORCE_SESSION_PERSISTENCE, because everything this runtime
- * knows it reads from the transcript. The runtime sets
- * CLAUDE_CODE_CHILD_SESSION=1 in every process it spawns, and a nested
- * interactive session carrying that marker is excluded from history —
- * "Transcript saving is off" — so when the console itself was started
- * from a Claude Code session, its agents write no transcript and the
- * stall detector, the turn count and the card's console all read empty
- * forever. Documented as the override for exactly this case.
- *
- * Through a file, not typed. A terminal in canonical mode drops or
- * corrupts anything past `MAX_CANON` on one line — 1024 bytes on macOS —
- * and a brief is a role prompt plus a whole work order, which is always
- * more than that. Typing it produced a command line with a fragment of
- * the order repeated fifteen times and the rest cut off mid-word, so
- * every agent this runtime has ever launched was handed a mangled brief.
- * Nothing could see it: the terminal shows the first line correctly, the
- * agent starts, and it simply does the wrong work or none at all.
- *
- * The script echoes itself first, so the terminal still shows the whole
- * command — the operator can read exactly what is running, which is the
- * point of running it in a terminal at all.
- */
+// The launch, run through its script with the card's paths exported for the skills.
+// CLAUDE_CODE_FORCE_SESSION_PERSISTENCE keeps a nested session's transcript, which
+// all of this reads (SUPERVISION.md, "Two things the runtime does to a supervised run").
 function typeLaunch(
   context: RunnerContext,
   { sessionId, terminalSessionId }: SupervisedRun,
@@ -693,7 +611,7 @@ function typeLaunch(
   )
 }
 
-async function runCommand(
+async function runCommandInTab(
   { api, stateDir }: RunnerContext,
   options: RunCommandOptions
 ): Promise<number | null> {
@@ -747,10 +665,8 @@ function continueRun(
   // not stalled — but the previous phase left this true if it ended while
   // something was waiting, and nothing else clears it.
   run.isWaiting = false
-  // A new turn is a new state, and the stall detector measures silence
-  // from when the state began. Left at registration, a conversation the
-  // operator came back to twenty minutes later was judged against a start
-  // twenty minutes stale and fired the moment it was given work again.
+  // A new turn is a new state, and silence counts from when the state began, so a
+  // conversation resumed after a gap is not judged against a stale start.
   run.startedAt = context.now()
 
   // Typed as a person would type it. The agent is sitting at its prompt
@@ -772,7 +688,7 @@ function interruptRun(context: RunnerContext, sessionId: string): void {
   if (run !== undefined) context.api.pty.write(run.terminalSessionId, INTERRUPT)
 }
 
-function stopRun(context: RunnerContext, sessionId: string, reason?: string): boolean {
+function stopSupervisedRun(context: RunnerContext, sessionId: string, reason?: string): boolean {
   const run = context.running.get(sessionId)
   if (run === undefined) return false
   const { pty } = context.api
@@ -786,7 +702,7 @@ function stopRun(context: RunnerContext, sessionId: string, reason?: string): bo
   return true
 }
 
-function sendTo(context: RunnerContext, sessionId: string, message: string): boolean {
+function sendToSession(context: RunnerContext, sessionId: string, message: string): boolean {
   const run = context.running.get(sessionId)
   if (run === undefined) return false
   // It has been given something to do, so it is no longer waiting on us,

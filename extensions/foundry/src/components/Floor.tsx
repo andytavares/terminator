@@ -84,11 +84,8 @@ function stallInWords(firing: StallFiring['firing']): string {
   return `no tool call for ${minutes} minutes`
 }
 
-/**
- * How often what an agent is saying is refetched, while the view is visible.
- * Everything Foundry itself changes is pushed; a transcript is written by the
- * agent's own process, so this is the one thing left to ask for.
- */
+// How often an agent's words are refetched while the view is visible. Foundry's own
+// changes are pushed; a transcript is written by the agent's process, so it is polled.
 const LIVE_POLL_MS = 2000
 
 /** How many of a running agent's last lines the standing band shows. */
@@ -247,11 +244,8 @@ type Watch = ReturnType<typeof useWatch>
 
 const NO_LIVE: LiveRead = { stalls: [], shadowMode: true, feed: [], mutes: [] }
 
-/**
- * The feed and the stall firings, which are Foundry's own and are pushed. What
- * the agents say is read by the one fallback poll (`useAgentWords`), and by
- * `pollLive` after an action.
- */
+// The feed and the stall firings, which are pushed. What the agents say is read by
+// the one fallback poll (`useAgentWords`), and by `pollLive` after an action.
 function useActivity({ watching, setTranscript }: Watch) {
   const [activity, showLive] = useState<LiveRead>(NO_LIVE)
   usePushed(readLiveState, showLive, { kinds: ['live'] })
@@ -360,14 +354,8 @@ function openOutside(url: string): void {
   void window.electronAPI.shell?.openExternal(url)
 }
 
-/**
- * Review a pull request in the git extension, or open it where it lives.
- *
- * Foundry used to draw its own hunk-by-hunk review of the working copy, a
- * second and worse review beside the one the git extension already has for
- * the pull request. Asking that one is the whole of it; when it is not
- * there, the pull request on GitHub is the next best thing.
- */
+// Review a pull request in the git extension, or open it on GitHub when that is not
+// installed. Foundry no longer draws a second, worse review of its own.
 function useReview(view: FloorView | null, setProblem: SetProblem) {
   const [reviewable, setReviewable] = useReviewable((view?.pulls ?? []).length > 0)
   const review = useCallback(
@@ -425,17 +413,8 @@ function useAttach(orderId: string) {
 
 type RunChannel = 'foundry:run.resume' | 'foundry:run.stop' | 'foundry:run.reset'
 
-/**
- * Pick the run back up, or stop it; and answer the gate holding this order.
- *
- * The two answers to a run nothing is running. `run.resume` has existed and
- * been registered the whole time with no surface calling it: the only way to
- * restart a run was to happen to have a gate open in the inbox.
- *
- * The gate is answered on the same channel the inbox answers it with — this is
- * not a second queue, it is the one blocking thing on this order put where the
- * person looking at the order will see it. The inbox stays the cross-order queue.
- */
+// Resume or stop a run nothing is running, and answer the gate holding this order on
+// the inbox's own channel: one queue, shown where the person looking at the order is.
 function useDecisions(orderId: string, setProblem: SetProblem, refresh: () => Promise<void>) {
   const [busy, setBusy] = useState(false)
   const decide = useCallback(
@@ -469,11 +448,8 @@ function useDecisions(orderId: string, setProblem: SetProblem, refresh: () => Pr
   return { busy, decideRun, decideGate }
 }
 
-/**
- * Every running agent's session, without choosing one to watch. The band read
- * "0 of 3 steps done" for the whole of a build step, which is most of a run,
- * and said nothing else: reported as "basically always blank".
- */
+// Every running agent's session, without choosing one to watch, so the band says
+// more than "0 of 3 steps done" for the whole of a build step.
 function runningSessionsOf(view: FloorView | null): string {
   return (view?.graph.nodes ?? [])
     .filter((n) => isLive(n, view?.orphaned ?? []))
@@ -486,10 +462,8 @@ interface AgentWords {
   readonly tails: Record<string, TranscriptLine[]>
 }
 
-/**
- * The one poll left on this view: what the agents have been saying changes in
- * their own processes, with nothing Foundry writes to announce it.
- */
+// The one poll left on this view: an agent's words change in its own process, and
+// nothing Foundry writes announces it.
 function useAgentWords(view: FloorView | null, { watching, setTranscript }: Watch) {
   /** The last few things each running agent said, by session. */
   const [live, setLive] = useState<Record<string, TranscriptLine[]>>({})
@@ -590,10 +564,7 @@ interface FloorLinksProps {
   readonly review: (pull: Pull) => Promise<void>
 }
 
-/**
- * Where the work is, one click away: the pull requests it opened and the
- * ticket it came from, and the review of each.
- */
+/** The pull requests the work opened and the ticket it came from, with a review of each. */
 function FloorLinks({ view, reviewable, review }: FloorLinksProps) {
   const pulls = view.pulls ?? []
   const source = view.source ?? null
@@ -620,12 +591,8 @@ function reviewLabel(reviewable: boolean | null, pull: Pull, pullCount: number):
   return pullCount > 1 ? `Review #${pull.number}` : 'Review'
 }
 
-/**
- * The refinery's file-overlap queue: what this order sits behind, and why —
- * the collision the merge-order section cannot see, because it is between
- * orders, not between lanes of the same one. Nothing here when it is not
- * queued behind anything (R5).
- */
+// The refinery's file-overlap queue: what this order sits behind and why — a collision
+// between orders, which the merge-order section (lanes of one order) cannot see (R5).
 function RefineryQueue({ view }: { readonly view: FloorView }) {
   const queue = view.queue
   if (queue === null || queue === undefined || queue.behind.length === 0) return null
@@ -642,16 +609,8 @@ function RefineryQueue({ view }: { readonly view: FloorView }) {
 
 type StandingOf = NonNullable<FloorView['standing']>
 
-/**
- * Where the run stands, and the move that takes it forward.
- *
- * First on the screen and across its width, because everything below is
- * detail about a run whose state this is the only statement of. Without it
- * the panel opened on a wall of grey chips: a run halted two hours earlier at
- * an undecided gate drew the same chips as one mid-build, the gate holding it
- * was named nowhere, and the list that sent you here called the same order
- * "ready to hand off".
- */
+// Where the run stands and the move that takes it forward, first and full width:
+// without it a run halted at an undecided gate drew the same chips as one mid-build.
 function StandingBand({ floor, view }: PageProps) {
   const standing = view.standing
   if (standing === undefined) return null
@@ -775,13 +734,8 @@ function LiveAgent({ name, lines, now }: LiveAgentProps) {
   )
 }
 
-/**
- * An agent stopped at a prompt only a person can clear.
- *
- * Nothing on this screen could answer it: the bridge had already taken the
- * question out of the UI and put it in the terminal, so the one move is to go
- * there.
- */
+// An agent stopped at a prompt only a person can clear. The bridge has already put
+// the question in the terminal, so the one move is to go there.
 function StrandedGate({ floor, view }: PageProps) {
   const stranded = view.stranded ?? []
   if (view.standing?.kind !== 'stranded' || stranded.length === 0) return null
@@ -836,13 +790,8 @@ function ResumeOption({ floor, label, children }: ResumeOptionProps) {
   )
 }
 
-/**
- * A run nothing is running, and the one thing to do about it.
- *
- * This was its own panel below the band, which meant the screen said "nothing
- * is running this" twice in two different voices. The band states it; this is
- * the move.
- */
+// A run nothing is running, and the one move. The band states the fact; this is
+// only the move, so the screen does not say it twice.
 function AdriftGate({ floor, view }: PageProps) {
   if (view.standing?.kind !== 'adrift') return null
   return (
@@ -857,12 +806,8 @@ function AdriftGate({ floor, view }: PageProps) {
   )
 }
 
-/**
- * Every step passed and the run still never opened its pull request — or it
- * failed outright — and neither is answerable by starting a fresh run: the
- * finished steps are still finished. The one move is to have Foundry check the
- * work again.
- */
+// Every step passed but no pull request opened, or the run failed: a fresh run would
+// redo finished steps, so the one move is to have Foundry check the work again.
 function StoppedGate({ floor, view }: PageProps) {
   if (view.standing?.kind !== 'stopped') return null
   return (
@@ -881,15 +826,8 @@ interface RunControlsProps {
   readonly decideRun: (channel: RunChannel) => Promise<void>
 }
 
-/**
- * Always here, not only when the run is orphaned.
- *
- * Both of these lived inside the "nothing is running this" band, so a run that
- * was live — or halted at a gate — had no way out on this screen at all, and
- * `order.cancel` refuses a running order and points back at the gate. Three
- * orders for one ask, all `cancelled`, and four branches cut by hand, is what
- * that cost.
- */
+// Always shown, not only for an orphaned run: `order.cancel` refuses a running order,
+// so a live or gated run needs its own way out here.
 function RunControls({ view, busy, decideRun }: RunControlsProps) {
   return (
     <div className="fdry-run-controls">
@@ -917,16 +855,9 @@ interface HeldCallsProps {
   readonly handBack: (ask: PendingAsk) => Promise<void>
 }
 
-/**
- * Held tool calls, oldest first — the order they must be answered in. This is
- * the UI-first half of the promise: the terminal is the backstop, not the only
- * way to answer.
- *
- * Above the run graph rather than under it. A held call is the only thing on
- * this screen that is waiting on a person; it used to sit below every lane and
- * every unit, which on a real run is a scroll — and an agent blocked at a
- * PreToolUse hook looks exactly like an agent that has gone quiet.
- */
+// Held tool calls, oldest first — the order they must be answered in. Above the run
+// graph: the only thing here waiting on a person, and a held agent looks just like a
+// quiet one. The terminal is the backstop, not the only way to answer.
 function HeldCalls({ pending, answer, handBack }: HeldCallsProps) {
   if (pending.length === 0) return null
   return (
@@ -996,11 +927,7 @@ function AskDetail({ ask }: { readonly ask: PendingAsk }) {
   )
 }
 
-/**
- * Only where there is more than one repository. A single-lane order gets no
- * merge-order section at all, because "1 of 1, merges first" is ceremony over
- * nothing (FR-068).
- */
+/** Only for more than one repository: "1 of 1, merges first" is ceremony (FR-068). */
 function MergeOrder({ view }: { readonly view: FloorView }) {
   if ((view.lanes?.length ?? 0) <= 1) return null
   return (
@@ -1030,10 +957,7 @@ function MergeRow({ row }: { readonly row: NonNullable<FloorView['lanes']>[numbe
 
 type CiOf = NonNullable<FloorView['ci']>
 
-/**
- * Present only when the ship tail has actually written a CI state — a draft
- * that has never shipped a pull says nothing here (ADR-060).
- */
+/** Present only once the ship tail has written a CI state (ADR-060). */
 function CiPanel({ view }: { readonly view: FloorView }) {
   const ci = view.ci
   if (!ci) return null
@@ -1090,11 +1014,8 @@ function CiChecks({ ci }: { readonly ci: CiOf }) {
   )
 }
 
-/**
- * The step being read, so its transcript opens under that step's own row. A
- * session no step owns — a stall names one by session — has no row to sit
- * under, and goes at the foot.
- */
+// The step being read, so its transcript opens under that step's row. A session no
+// step owns (a stall names one by session) goes at the foot.
 function watchedNodeOf(view: FloorView, watching: string | null): RunNode | undefined {
   return watching === null ? undefined : view.graph.nodes.find((n) => n.sessionId === watching)
 }
@@ -1159,10 +1080,8 @@ function Unit({ node, floor, view }: UnitProps) {
 }
 
 function UnitChip({ node, floor, view }: UnitProps) {
-  // A node the graph calls running that nothing is running. Drawn as what it
-  // is: left alone the chip read "building" under a band saying nothing was
-  // running it, and a surface that contradicts itself is worse than one that
-  // says less.
+  // A node the graph calls running that nothing is running is drawn as gone, not
+  // "building" under a band saying nothing runs it.
   const gone = (view.orphaned ?? []).includes(node.id)
   const skipped = skipNote(node)
   return (
@@ -1328,11 +1247,8 @@ function WatchedButtons({ watching, control }: Omit<RedirectFormProps, 'watch'>)
   )
 }
 
-/**
- * What happened while you were away. Every row can be cleared, and a run that
- * keeps interrupting can be muted without hiding what it does — a feed you
- * cannot clear a line from is one you stop reading.
- */
+// What happened while you were away. Every row can be cleared and a noisy run muted
+// without hiding what it does: a feed you cannot clear is one you stop reading.
 function ActivityPanel({ floor }: { readonly floor: FloorModel }) {
   const { feed, mutes } = floor
   if (feed.length === 0 && mutes.length === 0) return null
@@ -1394,10 +1310,7 @@ function FeedRow({ entry, dismiss }: { readonly entry: FeedEntry } & Pick<FloorM
   )
 }
 
-/**
- * Work that stopped making progress without asking for anything — the failure
- * nobody instruments, because it looks exactly like work.
- */
+/** Work that stopped making progress without asking for anything: it looks like work. */
 function StallsPanel({ floor, view }: PageProps) {
   const { stalls, shadowMode } = floor
   if (stalls.length === 0) return null
@@ -1444,10 +1357,7 @@ function StallRow({ entry, floor, view }: PageProps & { readonly entry: StallFir
   )
 }
 
-/**
- * A panel that names a stall and offers nothing is a wall. These are the three
- * things you do about one, and every channel behind them already existed.
- */
+/** The three things you do about a stall, each over a channel that already existed. */
 interface StallActionsProps {
   readonly session: string
   readonly floor: FloorModel

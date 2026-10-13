@@ -80,11 +80,9 @@ function p1Of(change: ChangeSummary): GradedChange | null {
   return null
 }
 
-// ── P3 ────────────────────────────────────────────────────────────────────
-// Last, and only when every file is trivial AND the checks actually passed.
-// Anything other than `passing` — including an unreachable code host — must
-// not produce a P3, because P3 is the only grade eligible for unattended
-// merge (FR-057, FR-062).
+// ── P3 ── last, and only when every file is trivial and the checks passed: anything
+// else, an unreachable host too, must not grade P3, the one grade eligible for
+// unattended merge (FR-057, FR-062).
 function p3Of(change: ChangeSummary): GradedChange | null {
   if (
     change.files.length > 0 &&

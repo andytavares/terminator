@@ -281,12 +281,8 @@ function takeOutstanding(state: BridgeState, requestId: string): Outstanding | u
   return entry
 }
 
-/**
- * Gives the decision back to Claude Code, which prompts in the terminal.
- *
- * Not an allow and not a deny: nothing is approved on the operator's behalf,
- * and nothing is refused because they were away from the console.
- */
+// Gives the decision back to Claude Code, which prompts in the terminal: nothing is
+// approved for the operator, and nothing refused because they were away.
 function handBack(state: BridgeState, requestId: string): void {
   const entry = takeOutstanding(state, requestId)
   if (entry === undefined) return
@@ -317,22 +313,20 @@ function canUseTool(state: BridgeState, toolName: string, input: unknown): Promi
   const auto = options.autoDecide?.(toolName, input) ?? null
   if (auto === 'mode') return Promise.resolve({ permissionDecision: 'defer' })
   if (auto !== null) {
-    // Resolved by the autonomy ladder — the operator is never interrupted,
-    // and no prompt is raised for a surface to display.
-    //
-    // A *refusal* is said out loud, though. An allow is one of hundreds and
-    // would drown the feed; a denial is the reason an agent is about to do
-    // something else, or nothing, and it was invisible: four live runs died
-    // on refused commands and the console showed an agent that had simply
-    // gone quiet. Reading its transcript was the only way to find out.
+    // Resolved by the autonomy ladder, with no prompt. A refusal is said out loud (an
+    // allow would drown the feed): unseen, refusals made agents look like they went quiet.
     if (!auto.allow) options.onAutoDenied?.(toolName, auto.reason ?? 'no reason given')
     return Promise.resolve(toResult(auto, input))
   }
-  return hold(state, toolName, input)
+  return holdForAnswer(state, toolName, input)
 }
 
 /** Raises the call for a person and holds it until answered or handed back. */
-function hold(state: BridgeState, toolName: string, input: unknown): Promise<HookDecision> {
+function holdForAnswer(
+  state: BridgeState,
+  toolName: string,
+  input: unknown
+): Promise<HookDecision> {
   const { options } = state
   const { sessionId } = options
   const requestId = `${sessionId}-perm-${++state.held}`
@@ -367,12 +361,12 @@ function resolveRequest(
   // An answer is its own outcome. `toResult` encodes one as a deny
   // carrying the words, so reporting it as `allow` — or as `deny` — both
   // misread what the operator did.
-  state.options.onResolved(requestId, outcomeOf(decision))
+  state.options.onResolved(requestId, permissionOutcomeOf(decision))
   entry.settle(toResult(decision, entry.input))
   return true
 }
 
-function outcomeOf(decision: PermissionDecision): PermissionOutcome {
+function permissionOutcomeOf(decision: PermissionDecision): PermissionOutcome {
   if (answerOf(decision) !== '') return 'answered'
   return decision.allow ? 'allow' : 'deny'
 }

@@ -82,10 +82,8 @@ export async function refineryTick(deps: RefineryTickDeps): Promise<void> {
   }
 }
 
-/**
- * Whether every pull of the order has merged, recording the moment it is
- * first seen. An order with no pulls has nothing to watch yet.
- */
+// Whether every pull of the order merged, recording when that is first seen. An order
+// with no pulls has nothing to watch yet.
 async function hasMerged(
   deps: RefineryTickDeps,
   { order, pulls }: RefineryCandidate
@@ -117,22 +115,22 @@ async function restackBehind(
   if (state.restackedFor.includes(merged.id)) return
 
   const { conflictFiles, failedReason } = await restackLanes(deps, orderId)
-  const record = (action: string, reason: string) =>
+  const recordOnLedger = (action: string, reason: string) =>
     deps.record({ orderId, action, subject: orderId, reason })
   if (conflictFiles !== null) {
     const title = await deps.titleOf(orderId)
     const why = `${title} no longer rebases onto its base after ${merged.title} merged`
     await deps.raiseConflict(orderId, why, conflictFiles)
-    await record('refinery.conflict', why)
+    await recordOnLedger('refinery.conflict', why)
     return
   }
   if (failedReason !== null) {
-    await record('refinery.failed', failedReason)
+    await recordOnLedger('refinery.failed', failedReason)
     return
   }
 
   await deps.writeState(orderId, { ...state, restackedFor: [...state.restackedFor, merged.id] })
-  await record(
+  await recordOnLedger(
     'refinery.rebased',
     `Rebased onto its base after ${merged.title} merged; shared files: ${files.join(', ')}.`
   )

@@ -20,10 +20,8 @@ import { announceLive } from '../state/live-index.js'
 import { stallShadowMode } from '../state/settings.js'
 import { runtime, pendingPermissions, stallFirings } from '../runtime/runtime-state.js'
 
-/**
- * What the console needs from the supervision runtime: what is held, what
- * stalled, the feed, answering a held call, and the actions on one run.
- */
+// What the console needs from the supervision runtime: held calls, stalls, the
+// feed, answering a held call, and the actions on one run.
 export function registerSupervisionChannels(api: ExtensionAPI): void {
   registerFeedChannels(api)
   registerPermissionAnswers(api)
@@ -31,10 +29,8 @@ export function registerSupervisionChannels(api: ExtensionAPI): void {
 }
 
 function registerFeedChannels(api: ExtensionAPI): void {
-  // What a supervised run is waiting on, and how the operator answers it.
-  // Without these a phase blocks at its PreToolUse hook until the bridge hands
-  // the decision back to the terminal — which works, but makes the console a
-  // spectator of its own agents.
+  // What a supervised run waits on and how the operator answers it, so the console
+  // answers its agents instead of waiting for the bridge to hand back to the terminal.
   reg(
     api,
     foundryChannel('foundry:permissions-list', noPayload, () => ({
@@ -117,10 +113,8 @@ function resolvePermission({
 }
 
 function registerRunActions(api: ExtensionAPI): void {
-  // The four things you do about a run that has stopped making progress, and
-  // the one you do about any run. Without these the supervision panel could
-  // name a stall and offer nothing — which is the shape of every "correct and
-  // useless" surface this line of work exists to stop shipping.
+  // The four moves for a run that stopped progressing, and the one for any run: a
+  // panel that names a stall and offers nothing is useless.
   reg(
     api,
     sessionChannel('foundry:run-terminal', SessionPayload, ({ sessionId }) =>
@@ -145,16 +139,13 @@ function registerRunActions(api: ExtensionAPI): void {
       return { ok: true }
     }),
     sessionChannel('foundry:run-redirect', RedirectPayload, redirectRun),
-    sessionChannel('foundry:run-stop', SessionStopPayload, stopRun)
+    sessionChannel('foundry:run-stop', SessionStopPayload, stopSessionOnRequest)
   )
 }
 
-// Takes you to the terminal the run is in.
-//
-// Done here rather than in the panel: the extension's UI is a separate
-// renderer process, so a store it imports from core is a second copy that
-// nothing renders. `terminal:navigate-to-session` is the core's own channel
-// for this — it selects the workspace, the project and the tab.
+// Takes you to the run's terminal through the core's `terminal:navigate-to-session`
+// (workspace, project, tab): the extension's UI is another renderer, where a core
+// store it imported would be a copy nothing renders.
 function goToRunTerminal(api: ExtensionAPI, sessionId: string): { ok: boolean } {
   const terminal = runtime.supervisedRunner?.terminalFor(sessionId) ?? null
   if (terminal === null) return { ok: false }
@@ -186,7 +177,9 @@ function redirectRun({ sessionId, message }: z.infer<typeof RedirectPayload>): {
 }
 
 // Ends the run, saying why first so the agent's own record carries it.
-function stopRun({ sessionId, reason }: z.infer<typeof SessionStopPayload>): { ok: boolean } {
+function stopSessionOnRequest({ sessionId, reason }: z.infer<typeof SessionStopPayload>): {
+  ok: boolean
+} {
   if (runtime.supervisedRunner === null) return { ok: false }
   const ok = runtime.supervisedRunner.stop(sessionId, reason)
   if (ok) {

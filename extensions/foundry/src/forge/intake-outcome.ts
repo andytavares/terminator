@@ -88,10 +88,7 @@ function roundIn(reason: string, pattern: RegExp): number | null {
   return match === null ? null : Number(match[1])
 }
 
-/**
- * Which automatic follow-up this is: every `converge.followed_up` since the
- * most recent `converge.started`, this one included.
- */
+/** Which automatic follow-up this is: the `converge.followed_up`s since the last start. */
 function autoTurnAt(entries: readonly LedgerEntry[], i: number): number {
   let autoTurn = 0
   for (let j = i; j >= 0; j -= 1) {
@@ -107,12 +104,16 @@ type IntakeReader = (
   i: number
 ) => IntakeOutcome
 
-const refused: IntakeReader = (entry) => ({ kind: 'refused', at: entry.at, reason: entry.reason })
+const readRefusal: IntakeReader = (entry) => ({
+  kind: 'refused',
+  at: entry.at,
+  reason: entry.reason,
+})
 const redrafted: IntakeReader = (entry) => ({ kind: 'redrafted', at: entry.at, note: entry.reason })
 
 /** What each ledger action says about the last intake turn. */
 const INTAKE_READERS: Record<string, IntakeReader> = {
-  [REFUSED]: refused,
+  [REFUSED]: readRefusal,
   [REDRAFTED]: redrafted,
   // A fix turn the review loop started names its own round in the reason it
   // records: `red team round 2 fix`. Every other start is the operator's,
@@ -136,7 +137,7 @@ const INTAKE_READERS: Record<string, IntakeReader> = {
       round: null,
       autoTurn: autoTurnAt(entries, i),
     }),
-  [REVIEW_REFUSED]: refused,
+  [REVIEW_REFUSED]: readRefusal,
   // The loop giving up is "needs you", not a refusal — nothing about the
   // proposal was rejected, and the findings it stopped on are surfaced
   // through `loopFacts(entries).exhausted` instead.

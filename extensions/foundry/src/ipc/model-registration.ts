@@ -18,13 +18,9 @@ import {
 export function registerModelChannels(api: ExtensionAPI): void {
   reg(
     api,
-    // What can go in the model box, and which one is chosen. Asked for rather
-    // than hardcoded in the view, where the last list sat naming a superseded
-    // generation until somebody noticed.
-    //
-    // `selected` comes back with the list because the two must not drift: the
-    // settings view keeps its own copy for rendering, and a copy that disagrees
-    // with what the runs are actually launched with is worse than no setting.
+    // What the model box offers and which is chosen, asked for rather than hardcoded
+    // in the view. `selected` comes with the list so the view's copy cannot drift from
+    // what runs are launched with.
     foundryChannel('foundry:models-list', noPayload, async () => ({
       models: await modelCatalog(),
       selected: defaultModel(api),

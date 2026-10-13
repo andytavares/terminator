@@ -28,6 +28,7 @@ import { ciRoundAgain } from '../line/ci-round-again.js'
 import { readLiveStandings } from './standing.js'
 import type { LiveStandingSources } from './standing.js'
 import type { ForgeLoop } from '../forge/forge-loop.js'
+import { isoNow } from '../host-calls.js'
 
 /** What answering a gate reaches beyond the host: the run channels and the Forge's loop. */
 export interface InboxRegistrationDeps {
@@ -36,12 +37,8 @@ export interface InboxRegistrationDeps {
   readonly loop: ForgeLoop
 }
 
-/**
- * The inbox — the one surface the operator is required to visit — and the
- * attention count every surface shows. Nothing reaches it that a named rule
- * did not raise, which is what makes "nothing needs you" a state worth
- * trusting rather than a state worth double-checking.
- */
+// The inbox, the one surface the operator must visit, and the attention count every
+// surface shows. Only a named rule raises anything, so "nothing needs you" is trusted.
 export function registerInboxChannels(
   context: ActivationContext,
   deps: InboxRegistrationDeps
@@ -68,7 +65,7 @@ function createInbox(context: ActivationContext, deps: InboxRegistrationDeps): I
     waiting: () => ordersWaitingOnSomething(dataRoot, deps.standingSources),
     autonomy: () => autonomyFor(api),
     readPulls: (orderId) => readPulls(dataRoot(), orderId),
-    now: () => new Date().toISOString(),
+    now: isoNow,
     record: async (orderId, line) => {
       await orderStoreAt(dataRoot()).record({
         at: new Date().toISOString(),
@@ -100,12 +97,8 @@ interface Decision {
   readonly option: string
 }
 
-// What a decision actually does.
-//
-// Two things, and the second is the one that was missing: "mark ready"
-// turns the drafts into review requests, and every other answer that
-// unblocks work puts the run back on. A decision the operator takes that
-// leaves the run stopped is a decision that did nothing.
+// What a decision does: "mark ready" turns the drafts into review requests, and any
+// other unblocking answer puts the run back on. One that leaves it stopped did nothing.
 async function actOnDecision(
   context: ActivationContext,
   deps: InboxRegistrationDeps,
@@ -117,10 +110,8 @@ async function actOnDecision(
     return
   }
 
-  // A `ci.red` gate is not the run stopping — the run already finished
-  // and shipped a draft. "Another round" is one more watch-fail-rework
-  // cycle against the drafts that already exist, not a resume of a graph
-  // that has nothing left waiting on it.
+  // A `ci.red` gate comes after the run shipped its draft: "another round" is one more
+  // watch-fail-rework cycle on the existing drafts, not a resume.
   if (gate.rule === 'ci.red') {
     if (option === 'send_back') await anotherCiRound(context, gate.orderId)
     return
@@ -188,15 +179,9 @@ async function anotherCiRound(
   })
 }
 
-/**
- * "Answer" on `forge-defect` used to call `resume` no matter what — but
- * the finding that raised it already sent the order back to `draft`,
- * and `resume` refuses anything that is not `running`. Read the order
- * first: a drafted order gets the architect, in one turn, on every open
- * blocking finding; a still-running order resumes as it always did.
- *
- * True when the architect was asked, so there is nothing to resume.
- */
+// "Answer" on `forge-defect`: the finding already sent the order back to `draft`,
+// which `resume` refuses, so a draft gets the architect on every open blocking
+// finding in one turn. True when it was asked; a running order resumes as before.
 async function answerForgeDefect(
   dataRoot: () => string,
   loop: ForgeLoop,
@@ -230,10 +215,8 @@ async function answerForgeDefect(
   return true
 }
 
-// The final check fails after every node has passed, so there is no node
-// to retry: "Send back" gives the failure to the nodes that wrote the
-// work and reruns everything after them. Retrying nothing only re-ran the
-// same failing check.
+// The final check fails after every node passed, so there is none to retry: "Send
+// back" gives the failure to the nodes that wrote the work and reruns what follows.
 async function sendBackFinalCheck({ api, dataRoot }: ActivationContext, gate: Gate): Promise<void> {
   const root = dataRoot()
   const graph = await readGraph(root, gate.orderId)
@@ -260,13 +243,8 @@ async function sendBackFinalCheck({ api, dataRoot }: ActivationContext, gate: Ga
   )
 }
 
-// How much is waiting for the operator, and where.
-//
-// Read by the surfaces themselves so the answer to "is anything waiting" is
-// on screen wherever you are. Foundry holds work in three places and used to
-// announce it on none of them: an open question sat third down the Forge's
-// rail and a held tool call sat under a whole run graph, so the only way to
-// find either was to already be looking at it.
+// How much is waiting for the operator, and where, read by every surface so "is
+// anything waiting" is on screen wherever you are, not only where the work sits.
 function registerAttention(
   { api, dataRoot }: ActivationContext,
   standingSources: LiveStandingSources
@@ -275,10 +253,8 @@ function registerAttention(
   reg(
     api,
     foundryChannel('foundry:attention', noPayload, async () => {
-      // The chrome polls this from the moment the application opens, which makes
-      // it the earliest place a run the last one left behind can be noticed. A
-      // dead run that announces itself in four seconds is the whole difference
-      // between this and finding out hours later that nothing had moved.
+      // The chrome polls this from launch, the earliest place to notice a run the last
+      // process left behind: seconds after opening rather than hours later.
       await adoptInterruptedRuns(dataRoot())
       const { orders, waiting } = await readLiveStandings(dataRoot, standingSources)
       return countAttention({

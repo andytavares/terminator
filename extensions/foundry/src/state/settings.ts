@@ -8,24 +8,16 @@ import { budgetFromSetting } from '../order/budget-setting.js'
 export const MODEL_SETTING_KEY = 'terminator.foundry.defaultModel'
 export const ASK_MODEL_SETTING_KEY = 'terminator.foundry.askModel'
 
-/**
- * Tools the operator has declared read-only, beyond the ones the policy knows.
- *
- * Never inferred. `mcp__server__get_thing` and `mcp__server__delete_thing` are
- * the same shape to anything reading names, so guessing from one would be
- * guessing about writes — and the whole point of the read-only policy is that
- * a review cannot change what it is reviewing.
- */
+// Tools the operator declared read-only beyond those the policy knows, never inferred:
+// `mcp__server__get_thing` and `mcp__server__delete_thing` look alike to a reader.
 export function readOnlyTools(api: ExtensionAPI, repoPath: string): string[] {
   return api.settings?.get<string[]>('terminator.foundry.readOnlyTools', { repoPath }) ?? []
 }
 
 const LINE_LIST_SETTINGS = ['terminator.foundry.readOnlyTools', 'terminator.foundry.criticalPaths']
 
-/**
- * Both lists were text settings, one item per line, before the settings page
- * had a list type. A value stored that way becomes the list it spelled.
- */
+// Both lists were one-item-per-line text settings before the list type existed; a
+// value stored that way becomes the list it spelled.
 export function migrateLineListSettings(api: ExtensionAPI): void {
   for (const key of LINE_LIST_SETTINGS) {
     const stored = api.settings.get<unknown>(key)
@@ -61,14 +53,8 @@ export function askModel(api: ExtensionAPI): AskModel {
   return ASK_MODELS.find((m) => m === value) ?? DEFAULT_ASK_MODEL
 }
 
-/**
- * The model every phase launches with.
- *
- * Empty string is a real answer, not a missing one: it means "pass no
- * `--model`", so the run follows the operator's own Claude Code configuration.
- * Only an unset setting falls through to the default.
- */
-
+// The model every phase launches with. An empty string means "pass no `--model`" and
+// follows the operator's Claude Code configuration; only an unset one takes the default.
 export function defaultModel(api: ExtensionAPI): string {
   const value = api.settings.get<string>(MODEL_SETTING_KEY)
   // An alias, not a pinned id: `--model opus` resolves to the latest of that
@@ -77,18 +63,9 @@ export function defaultModel(api: ExtensionAPI): string {
   return typeof value === 'string' ? value : 'opus'
 }
 
-/**
- * The model this role runs on.
- *
- * A role declares `modelTier: fast | deep`, and the settings panel has always
- * said the operator's choice applies "unless a role asks for something else" —
- * which was not true of anything, because nothing read the field. A `fast`
- * role now runs on the small model; `deep`, and a node with no role at all,
- * take the operator's choice.
- *
- * An alias again rather than a pinned id, for the same reason: `haiku`
- * follows the latest of that family.
- */
+// The model a role runs on: `modelTier: fast` takes the small model (an alias, so the
+// latest of its family); `deep`, or no role, takes the operator's choice, as the
+// settings panel says.
 export function modelForTier(api: ExtensionAPI, tier: 'fast' | 'deep'): string {
   const chosen = defaultModel(api)
   // An empty choice means "pass no --model", and a role asking for the fast
@@ -97,13 +74,8 @@ export function modelForTier(api: ExtensionAPI, tier: 'fast' | 'deep'): string {
   return tier === 'fast' ? 'haiku' : chosen
 }
 
-/**
- * Shadow mode: record, do not interrupt. On by default and deliberately so — a
- * detector with a 20% false-positive rate produces alarm fatigue and gets turned
- * off, which is worse than not shipping it. Turn it off on the evidence of the
- * firings below, not on faith.
- */
-
+// Shadow mode, on by default: record, do not interrupt. A noisy detector gets turned
+// off; turn this off on the evidence of the firings, not on faith.
 export function stallShadowMode(api: ExtensionAPI): boolean {
   return api.settings.get<boolean>('terminator.foundry.stallShadowMode') ?? true
 }
@@ -118,13 +90,8 @@ export function defaultWriteBack(api: ExtensionAPI): WriteBack[] {
   return enabled
 }
 
-/**
- * The budgets a new order starts with, from settings (FR-030).
- *
- * Read at seed time rather than at run time: the order carries its own agreed
- * budgets, and changing the setting later must not silently re-price work the
- * operator already agreed to.
- */
+// A new order's budgets from settings (FR-030), read at seed time: the order carries
+// what was agreed, and a later setting must not re-price it.
 export function defaultBudgets(api: ExtensionAPI): Omit<Budgets, 'tokens'> {
   const num = (key: string, fallback: number): number | null =>
     budgetFromSetting(api.settings?.get<number>(key), fallback)
@@ -134,10 +101,8 @@ export function defaultBudgets(api: ExtensionAPI): Omit<Budgets, 'tokens'> {
   }
 }
 
-/**
- * The operator's critical paths, one glob per line (FR-043), for every
- * repository's workspace (the list is workspace-scoped). Never inferred.
- */
+// The operator's critical paths, one glob per line (FR-043), for every repository's
+// workspace; never inferred.
 export function declaredCriticalPaths(api: ExtensionAPI, repoPaths: readonly string[]): string[] {
   const listFor = (repoPath: string) =>
     api.settings?.get<string[]>('terminator.foundry.criticalPaths', { repoPath }) ?? []

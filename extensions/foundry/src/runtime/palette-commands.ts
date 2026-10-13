@@ -4,37 +4,15 @@ import { paletteEntries } from './palette.js'
 
 import { runtime } from './runtime-state.js'
 
-/**
- * The palette's current entries, disposed and rebuilt when what is running
- * changes.
- *
- * The host takes a fixed contribution list, so keeping runs in the palette
- * means re-registering rather than answering a query. Cheap: the list is one
- * entry per live run and one per queued diff, and it only rebuilds when the
- * text would actually differ.
- */
+// The palette's entries, rebuilt when what is running changes: the host takes a fixed
+// contribution list. One entry per live run and per queued diff, rebuilt only when
+// the text would differ.
 let paletteRegistrations: Disposable[] = []
 let paletteSignature = ''
 let paletteTimer: NodeJS.Timeout | null = null
 
-/**
- * Puts what is running one keystroke away.
- *
- * Three surfaces answer the same question — what needs me, ranked — and this is
- * the one you reach without moving your hands.
- */
-/**
- * Take me to the run this is about.
- *
- * The window first: navigation that changes what is on screen behind another
- * window has done nothing you can see. Then the terminal it is actually in,
- * when it still has one — that is where the agent is and where you can type at
- * it. A run that has ended has no terminal, so the panel opened on it is the
- * closest thing to the same place.
- *
- * Shared by the command palette and by clicking a notification, because they
- * are the same request phrased twice, and two copies would drift.
- */
+// Take me to the run: the window first, then its terminal while it has one, else the
+// panel opened on it. Shared by the palette and a notification click, the same request.
 export function gotoRun(api: ExtensionAPI, kind: 'run', sessionId: string): void {
   api.window.focusSelf()
   const terminal = runtime.supervisedRunner?.terminalFor(sessionId) ?? null
@@ -81,11 +59,8 @@ function refreshPalette(api: ExtensionAPI): void {
   })
 }
 
-/**
- * Kept in step with the register on a timer rather than an event: the
- * registry is read by everything and subscribed to by nothing, and a palette
- * that lists a run which ended is worse than one a few seconds behind.
- */
+// Kept in step with the register on a timer: nothing subscribes to the registry, and
+// a palette a few seconds behind beats one listing a run that ended.
 export function startPaletteRefresh(api: ExtensionAPI): void {
   refreshPalette(api)
   paletteTimer = setInterval(() => refreshPalette(api), 5_000)

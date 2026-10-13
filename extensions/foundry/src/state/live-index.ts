@@ -7,23 +7,16 @@ import { diskSourceFor } from './disk-source.js'
 import { createGateStore } from '../gates/store.js'
 import { createOrderStore } from '../order/store.js'
 import type { RunGraph } from '../line/run-graph.js'
+import { computeQueueEntries } from '../line/refinery-entries.js'
+import type { QueueEntry } from '../line/refinery.js'
 
-/**
- * What Foundry holds of its own records in memory, one index per data root.
- *
- * Every store call below goes through it, so a write reaches disk first and
- * the index second, and a read after that is a lookup. Replaced on activation
- * with one that tells the windows (`foundry:changed`); until then a change
- * goes nowhere, which is what a call made outside a running extension wants.
- */
+// One in-memory index per data root, behind every store call below. Activation swaps
+// in one that broadcasts `foundry:changed`; until then a change goes nowhere, as a call
+// outside a running extension wants.
 let indexes: FoundryIndexes = createFoundryIndexes(diskSourceFor, () => {})
 
-/**
- * Something only this process knows has changed — a held tool call, a stall, a
- * running or stranded agent, an open intake — and a standing is drawn from it.
- * No file records these, so the windows are told directly. `orderId` is empty
- * when the change is not tied to one order.
- */
+// A change only this process knows (a held call, a stall, a running or stranded agent,
+// an open intake), told to the windows directly. `orderId` is empty for no one order.
 export function announceLive(orderId: string): void {
   indexes.announce({ kind: 'live', orderId })
 }
@@ -40,6 +33,11 @@ export const readGraph = (root: string, orderId: string): ReturnType<typeof read
   readRunGraph(root, orderId, indexFor(root))
 export const writeGraph = (root: string, graph: RunGraph): Promise<void> =>
   writeRunGraph(root, graph, indexFor(root))
+
+/** The refinery queue, read afresh each call from wherever the records are then. */
+export function queueEntriesOf(root: () => string): () => Promise<QueueEntry[]> {
+  return () => computeQueueEntries(root(), orderStoreAt(root()))
+}
 
 /** Replace the index with one that tells every window what changed. */
 export function connectIndexes(api: ExtensionAPI): void {

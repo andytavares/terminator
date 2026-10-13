@@ -45,10 +45,8 @@ export function parseDiffStat(
   return { files, added, removed }
 }
 
-/**
- * One `--numstat` row: the file, and its line counts — null for a binary file.
- * Null for a line that is not a well-formed row.
- */
+// One `--numstat` row: the file and its line counts (null for a binary file); null
+// for a line that is not a well-formed row.
 function numstatRow(
   line: string
 ): { path: string; lines: { added: number; removed: number } | null } | null {
@@ -67,10 +65,7 @@ function numstatRow(
   return { path, lines: { added, removed } }
 }
 
-/**
- * The paths a change touched. Risk grading is meaningless without them.
- * @internal
- */
+/** The paths a change touched; risk grading is meaningless without them. @internal */
 export function parseChangedFiles(stdout: string): string[] {
   const files: string[] = []
   for (const line of stdout.split('\n')) {

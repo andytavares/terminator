@@ -13,10 +13,9 @@ import type { WorkOrder } from '../order/schema.js'
 /** @internal */
 export const CONFIDENCE_BAR = 0.9
 
-/**
- * Turns the Forge starts on its own after the operator's. Bounded, so a plan it cannot fix stops rather than loops.
- * @internal
- */
+// Turns the Forge starts on its own after the operator's, bounded so a plan it
+// cannot fix stops rather than loops.
+/** @internal */
 export const MAX_AUTO_TURNS = 2
 
 const percent = (confidence: number): string => `${Math.round(confidence * 100)}%`
