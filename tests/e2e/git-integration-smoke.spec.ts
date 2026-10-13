@@ -158,5 +158,9 @@ test('the git project view renders, and everything on it is styled', async () =>
       { timeout: 20000, message: 'git-integration project view never finished loading' }
     )
     .toBe(true)
+  // The view is its own chunk (React.lazy), so it renders after the load event.
+  await expect
+    .poll(async () => (await inGit('project', PROBE)).bodyLength, { timeout: 10000 })
+    .toBeGreaterThan(20)
   assertClean('project', await inGit('project', PROBE))
 })

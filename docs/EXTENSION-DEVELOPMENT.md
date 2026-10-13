@@ -90,6 +90,8 @@ task-vault/
 
 Each surface shows the extension's view, with its `view` string passed as `?view=VALUE`, so one `index.html` serves every surface. `src/renderer/extensions/loader.ts` turns these entries into the core's tabs and panels; an extension cannot register a surface any other way.
 
+A page shows only the view its `?view=` names, so an `App.tsx` that routes between heavy views can load each with [`React.lazy`](https://react.dev/reference/react/lazy) behind a `Suspense` boundary. Vite then builds each as its own chunk ([dynamic import](https://vite.dev/guide/features#dynamic-import)), and a page loads only the view it shows. git-integration's `src/renderer/App.tsx` does this.
+
 | Key            | Fields                                                           | Where it appears                                                                                 | Default `view` |
 | -------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------- |
 | `globalTab`    | `label`, `icon?`, `view?`                                        | An icon in the sidebar's app band; the view fills the main area                                  | `main`         |

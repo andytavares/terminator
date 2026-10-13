@@ -59,15 +59,19 @@ function inView<T>(part: string, script: string): Promise<T> {
   ) as Promise<T>
 }
 
-/** True once the extension surface's own WebContentsView has finished loading. */
-function viewReady(part: string): Promise<boolean> {
-  return handle.app.evaluate(
+/**
+ * True once the extension surface's own WebContentsView has finished loading
+ * and drawn its view, which may be a lazy chunk that renders after the load.
+ */
+async function viewReady(part: string): Promise<boolean> {
+  const loaded = await handle.app.evaluate(
     ({ webContents }, p) =>
       webContents
         .getAllWebContents()
         .some((wc) => !wc.isDestroyed() && wc.getURL().includes(p) && !wc.isLoading()),
     part
   )
+  return loaded && (await inView<number>(part, 'document.body.innerText.length')) > 20
 }
 
 for (const { id, label, part, expand } of SURFACES) {
