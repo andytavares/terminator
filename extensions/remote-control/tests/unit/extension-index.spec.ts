@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
-import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
+import { dispatchChannel, type ChannelSpec, type RegisterChannel } from '@terminator/extension-sdk'
 import { hashPassword, verifyPassword } from '../../src/server/password-hash'
 
 // Hoisted mocks must be declared before module imports
 const mockCreateRemoteServer = vi.hoisted(() => vi.fn())
 const mockBroadcast = vi.hoisted(() => vi.fn())
 const mockSettingsGet = vi.hoisted(() => vi.fn())
-const mockSettingsSet = vi.hoisted(() => vi.fn())
-const mockIpcRegisterHandler = vi.hoisted(() => vi.fn())
+const mockSettingsSet = vi.hoisted(() => vi.fn<(key: string, value: unknown) => void>())
+const mockIpcRegisterHandler = vi.hoisted(() => vi.fn<RegisterChannel>())
 const mockNgrokIsInstalled = vi.hoisted(() => vi.fn(() => false))
 
 vi.mock('../../src/server/remote-server', () => ({
@@ -54,7 +54,7 @@ function makeApi() {
 }
 
 function registeredSpecs(): ChannelSpec[] {
-  return mockIpcRegisterHandler.mock.calls.map(([spec]: [ChannelSpec]) => spec)
+  return mockIpcRegisterHandler.mock.calls.map(([spec]) => spec)
 }
 
 /** What a renderer's invoke of `channel` reaches: the registered channel, payload parsing included. */

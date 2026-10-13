@@ -1,14 +1,17 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 import Fastify from 'fastify'
 import type { FastifyInstance } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import { WebSocket } from 'ws'
 import { WsTicketStore } from '../../src/server/ws-ticket-store'
 
-let mockInvokeChannel: ReturnType<typeof vi.fn>
-let mockSendChannel: ReturnType<typeof vi.fn>
-let mockOnWindowEvent: ReturnType<typeof vi.fn>
-let mockIsRemoteAccessible: ReturnType<typeof vi.fn>
+type BridgeIpc = ExtensionAPI['ipc']
+
+let mockInvokeChannel: Mock<BridgeIpc['invokeChannel']>
+let mockSendChannel: Mock<BridgeIpc['sendChannel']>
+let mockOnWindowEvent: Mock<BridgeIpc['onWindowEvent']>
+let mockIsRemoteAccessible: Mock<BridgeIpc['isRemoteAccessible']>
 
 function waitForClose(ws: WebSocket): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -99,10 +102,10 @@ describe('bridge.route', bridgeRouteTests)
 function bridgeRouteTests() {
   beforeEach(async () => {
     vi.resetModules()
-    mockInvokeChannel = vi.fn().mockResolvedValue(undefined)
-    mockSendChannel = vi.fn()
-    mockOnWindowEvent = vi.fn().mockReturnValue(vi.fn())
-    mockIsRemoteAccessible = vi.fn().mockReturnValue(true)
+    mockInvokeChannel = vi.fn<BridgeIpc['invokeChannel']>().mockResolvedValue(undefined)
+    mockSendChannel = vi.fn<BridgeIpc['sendChannel']>()
+    mockOnWindowEvent = vi.fn<BridgeIpc['onWindowEvent']>().mockReturnValue(vi.fn())
+    mockIsRemoteAccessible = vi.fn<BridgeIpc['isRemoteAccessible']>().mockResolvedValue(true)
     ;({ app, ticketStore, bridgeCleanup } = await buildBridgeApp())
     await app.listen({ port: 0, host: '127.0.0.1' })
     const addr = app.server.address() as { port: number; address: string }
@@ -380,7 +383,7 @@ function bridgeAllowlistTests() {
 
 function bridgeAllowlistInvokeDenyTests() {
   it('rejects invoke for a non-allowlisted channel with type:error', async () => {
-    mockIsRemoteAccessible.mockReturnValue(false)
+    mockIsRemoteAccessible.mockResolvedValue(false)
 
     const ws = await openBridge()
     const parsed = await invokeOverBridge(ws, {
@@ -399,7 +402,7 @@ function bridgeAllowlistInvokeDenyTests() {
 
 function bridgeAllowlistInvokeAllowTests() {
   it('executes handler for an allowlisted channel', async () => {
-    mockIsRemoteAccessible.mockImplementation((ch: string) => ch === 'terminal:create')
+    mockIsRemoteAccessible.mockImplementation(async (ch: string) => ch === 'terminal:create')
     mockInvokeChannel.mockResolvedValue({ sessionId: 's1' })
 
     const ws = await openBridge()
@@ -418,7 +421,7 @@ function bridgeAllowlistInvokeAllowTests() {
 
 function bridgeAllowlistDenyTests() {
   it('rejects subscribe and send for non-allowlisted channels (default-deny)', async () => {
-    mockIsRemoteAccessible.mockReturnValue(false)
+    mockIsRemoteAccessible.mockResolvedValue(false)
 
     const ws = await openBridge()
 
@@ -434,7 +437,7 @@ function bridgeAllowlistDenyTests() {
 
 function bridgeAllowlistAllowTests() {
   it('allows subscribe and send for allowlisted channels', async () => {
-    mockIsRemoteAccessible.mockImplementation((ch: string) =>
+    mockIsRemoteAccessible.mockImplementation(async (ch: string) =>
       ['terminal:output', 'terminal:input'].includes(ch)
     )
 

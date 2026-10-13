@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { SessionInfo, SpawnSessionOptions } from '../../../src/types'
+import type { SessionInfo, SpawnSessionOptions } from '@terminator/extension-sdk'
 
 /** The fake's state: a real session map and the data/exit fan-out. */
 interface FakePtyState {
