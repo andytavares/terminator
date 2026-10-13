@@ -36,9 +36,8 @@ function listNames(names: string[]): string {
   return `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`
 }
 
-export function TestsPopover({ block, prPaths, onOpenInReview, onClose }: Props) {
+function useTestSearch(block: TestBlock): State {
   const [state, setState] = useState<State>({ phase: 'loading' })
-
   useEffect(() => {
     let live = true
     githubAPI
@@ -54,49 +53,75 @@ export function TestsPopover({ block, prPaths, onOpenInReview, onClose }: Props)
       live = false
     }
   }, [block])
+  return state
+}
 
-  const open = (loc: TestLocation) => {
-    if (prPaths.has(loc.path)) {
-      onOpenInReview(loc.path, loc.line)
-    } else {
-      window.electronAPI.shell.openPath(`${block.repoRoot}/${loc.path}`).catch(() => {})
-    }
-    onClose()
+/** What the search found when it lists nothing: no symbol to search for, or no test naming one. */
+function SearchNote({ state }: { state: State }) {
+  if (state.phase === 'loading') return <p className="tp-note">Searching the tests…</p>
+  if (state.phase === 'error') {
+    return <p className="tp-note">Could not search the tests: {state.message}</p>
   }
+  if (state.symbols.length === 0) {
+    return (
+      <p className="tp-note">
+        This block does not define or sit inside a named function, so there is nothing to search the
+        tests for.
+      </p>
+    )
+  }
+  if (state.locations.length === 0) {
+    return <p className="tp-note">No test mentions {listNames(state.symbols)}.</p>
+  }
+  return null
+}
 
+/** A test outside the PR opens in the editor, which a gh: root without a checkout cannot do. */
+function LocationRow(props: { loc: TestLocation; inPr: boolean; onOpen: () => void }) {
+  const { loc } = props
+  return (
+    <li>
+      <button type="button" className="tp-row" onClick={props.onOpen}>
+        <span className="tp-where">{`${loc.path}:${loc.line}`}</span>
+        <span className="tp-action">{props.inPr ? 'Open in review' : 'Open file'}</span>
+        <code className="tp-text">{loc.text}</code>
+      </button>
+    </li>
+  )
+}
+
+/** A test in the PR opens in the review; any other in the editor. */
+function openerFor(props: Props) {
+  return (loc: TestLocation) => {
+    if (props.prPaths.has(loc.path)) props.onOpenInReview(loc.path, loc.line)
+    else window.electronAPI.shell.openPath(`${props.block.repoRoot}/${loc.path}`).catch(() => {})
+    props.onClose()
+  }
+}
+
+export function TestsPopover(props: Props) {
+  const { block, prPaths, onClose } = props
+  const state = useTestSearch(block)
+  const open = openerFor(props)
   const canOpenOutside = !block.repoRoot.startsWith('gh:')
-
+  const shown =
+    state.phase === 'done'
+      ? state.locations.filter((l) => prPaths.has(l.path) || canOpenOutside)
+      : []
   return (
     <Popover label="Tests for this block" className="tp-popover" onDismiss={onClose}>
       <div className="tp-head">Tests for this block</div>
-      {state.phase === 'loading' && <p className="tp-note">Searching the tests…</p>}
-      {state.phase === 'error' && (
-        <p className="tp-note">Could not search the tests: {state.message}</p>
-      )}
-      {state.phase === 'done' && state.symbols.length === 0 && (
-        <p className="tp-note">
-          This block does not define or sit inside a named function, so there is nothing to search
-          the tests for.
-        </p>
-      )}
-      {state.phase === 'done' && state.symbols.length > 0 && state.locations.length === 0 && (
-        <p className="tp-note">No test mentions {listNames(state.symbols)}.</p>
-      )}
+      <SearchNote state={state} />
       {state.phase === 'done' && state.locations.length > 0 && (
         <ul className="tp-list">
-          {state.locations.map((loc) => {
-            const inPr = prPaths.has(loc.path)
-            if (!inPr && !canOpenOutside) return null
-            return (
-              <li key={`${loc.path}:${loc.line}`}>
-                <button type="button" className="tp-row" onClick={() => open(loc)}>
-                  <span className="tp-where">{`${loc.path}:${loc.line}`}</span>
-                  <span className="tp-action">{inPr ? 'Open in review' : 'Open file'}</span>
-                  <code className="tp-text">{loc.text}</code>
-                </button>
-              </li>
-            )
-          })}
+          {shown.map((loc) => (
+            <LocationRow
+              key={`${loc.path}:${loc.line}`}
+              loc={loc}
+              inPr={prPaths.has(loc.path)}
+              onOpen={() => open(loc)}
+            />
+          ))}
         </ul>
       )}
     </Popover>

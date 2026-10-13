@@ -57,7 +57,9 @@ describe('review-pull-request command', () => {
       showOverview: 'false',
     })
   })
+})
 
+describe('review-pull-request command — opens nothing without args', () => {
   it('opens nothing without args', () => {
     const { api, registered, openAuxiliary } = build()
     registerReviewPullRequestCommand(api as never)
@@ -98,24 +100,25 @@ describe('window:review-submitted relay', () => {
   })
 })
 
-describe('review settings', () => {
-  function setup(stored: Record<string, unknown>) {
-    const handlers: Record<string, (payload?: unknown) => unknown> = {}
-    const set = vi.fn()
-    const api = {
-      ipc: {
-        registerHandler: vi.fn((spec: ChannelSpec) => {
-          handlers[spec.channel] = (payload) => dispatchChannel(spec, payload)
-          return { dispose: vi.fn() }
-        }),
-      },
-      settings: { get: (key: string) => stored[key], set },
-    }
-    const disposables = registerReviewSettings(api as never)
-    return { handlers, set, disposables }
+function setup(stored: Record<string, unknown>) {
+  const handlers: Record<string, (payload?: unknown) => unknown> = {}
+  const set = vi.fn()
+  const api = {
+    ipc: {
+      registerHandler: vi.fn((spec: ChannelSpec) => {
+        handlers[spec.channel] = (payload) => dispatchChannel(spec, payload)
+        return { dispose: vi.fn() }
+      }),
+    },
+    settings: { get: (key: string) => stored[key], set },
   }
-  const REPOS = 'terminator.git-integration.review.repos'
+  const disposables = registerReviewSettings(api as never)
+  return { handlers, set, disposables }
+}
 
+const REPOS = 'terminator.git-integration.review.repos'
+
+describe('review settings', () => {
   it('returns the clone folder and the selected repositories', async () => {
     const { handlers, disposables } = setup({
       'terminator.git-integration.review.cloneFolder': '/src',
@@ -138,7 +141,9 @@ describe('review settings', () => {
       repos: [],
     })
   })
+})
 
+describe('review settings — stores a deduplicated selection', () => {
   it('stores a deduplicated selection', async () => {
     const { handlers, set } = setup({})
     expect(

@@ -1,5 +1,14 @@
 import type { ReviewQueuePR } from '../../../src/schemas/pr-review.schema'
 
+const UNKNOWN_DOTS: ReviewQueuePR['signalDots'] = {
+  tests: 'unknown',
+  coverage: 'unknown',
+  ci: 'unknown',
+  lint: 'unknown',
+  churn: 'unknown',
+  blast: 'unknown',
+}
+
 /** A queue row as the review view holds it, which is what it saves as an active review. */
 export function reviewQueuePr(number: number): ReviewQueuePR {
   return {
@@ -18,14 +27,7 @@ export function reviewQueuePr(number: number): ReviewQueuePR {
     deletions: 2,
     estimatedMinutes: 5,
     riskLevel: 'low',
-    signalDots: {
-      tests: 'unknown',
-      coverage: 'unknown',
-      ci: 'unknown',
-      lint: 'unknown',
-      churn: 'unknown',
-      blast: 'unknown',
-    },
+    signalDots: UNKNOWN_DOTS,
     sessionStatus: 'in-progress',
     viewedFileCount: 0,
     approvalCount: 0,

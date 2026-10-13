@@ -11,40 +11,9 @@ interface Run {
   rawFirstLine: string
 }
 
-function normalize(line: string): string {
-  return line.replace(/\s+/g, ' ').trim()
-}
-
-/**
- * Collects maximal runs of consecutive `type` lines, treating blank lines as
- * transparent (they neither break a run nor count toward its length).
- */
-function collectRuns(lines: DiffLine[], type: 'remove' | 'add', path: string, into: Run[]): void {
-  let current: { text: string; lineNumber: number }[] = []
-
-  const flush = (): void => {
-    if (current.length >= MIN_RUN_LINES) {
-      into.push({
-        path,
-        startLine: current[0].lineNumber,
-        lines: current.map((c) => c.text),
-        rawFirstLine: current[0].text,
-      })
-    }
-    current = []
-  }
-
-  for (const line of lines) {
-    if (line.content.trim() === '') continue // blank lines are transparent
-    if (line.type === type) {
-      const lineNumber = type === 'remove' ? line.oldLineNumber : line.newLineNumber
-      if (lineNumber == null) continue
-      current.push({ text: line.content, lineNumber })
-    } else {
-      flush()
-    }
-  }
-  flush()
+interface RunLine {
+  text: string
+  lineNumber: number
 }
 
 const SYMBOL_PATTERNS = [
@@ -53,6 +22,43 @@ const SYMBOL_PATTERNS = [
   /^\s*(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:\(|async\s*\(|function|[A-Za-z_$][\w$]*\s*=>)/,
   /^\s*def\s+([A-Za-z_][\w]*)/,
 ]
+
+function normalize(line: string): string {
+  return line.replace(/\s+/g, ' ').trim()
+}
+
+/** The run `current` forms, when it is long enough to count as a moved block. */
+function completedRun(current: RunLine[], path: string): Run[] {
+  if (current.length < MIN_RUN_LINES) return []
+  const lines = current.map((c) => c.text)
+  return [{ path, startLine: current[0].lineNumber, lines, rawFirstLine: current[0].text }]
+}
+
+/**
+ * Collects maximal runs of consecutive `type` lines, treating blank lines as
+ * transparent (they neither break a run nor count toward its length).
+ */
+function runsIn(lines: DiffLine[], type: 'remove' | 'add', path: string): Run[] {
+  const runs: Run[] = []
+  let current: RunLine[] = []
+  for (const line of lines) {
+    if (line.content.trim() === '') continue // blank lines are transparent
+    if (line.type !== type) {
+      runs.push(...completedRun(current, path))
+      current = []
+      continue
+    }
+    const lineNumber = type === 'remove' ? line.oldLineNumber : line.newLineNumber
+    if (lineNumber != null) current.push({ text: line.content, lineNumber })
+  }
+  return [...runs, ...completedRun(current, path)]
+}
+
+function runsOf(files: ParsedPrFile[], type: 'remove' | 'add'): Run[] {
+  return files
+    .filter((file) => file.path)
+    .flatMap((file) => file.diff.hunks.flatMap((hunk) => runsIn(hunk.lines, type, file.path)))
+}
 
 function extractSymbol(line: string): string | null {
   for (const pattern of SYMBOL_PATTERNS) {
@@ -67,48 +73,38 @@ function arraysEqual(a: string[], b: string[]): boolean {
   return a.every((v, i) => v === b[i])
 }
 
+/** Whether `added` is `removed` put somewhere else: same lines up to whitespace, another place. */
+function isMoveOf(removed: Run, added: Run): boolean {
+  if (added.lines.length !== removed.lines.length) return false
+  if (added.path === removed.path && added.startLine === removed.startLine) return false
+  return arraysEqual(removed.lines.map(normalize), added.lines.map(normalize))
+}
+
+function movedBlockFrom(removed: Run, added: Run): MovedBlock {
+  return {
+    fromPath: removed.path,
+    fromLine: removed.startLine,
+    toPath: added.path,
+    toLine: added.startLine,
+    lineCount: removed.lines.length,
+    symbol: extractSymbol(removed.rawFirstLine),
+  }
+}
+
 /**
  * Detects code moved between hunks (or files): a run of >= 3 consecutive
  * removed lines that is whitespace-equal to a run of >= 3 consecutive added
  * lines elsewhere. Pure — does not need tree-sitter.
  */
 export function detectMovedBlocks(files: ParsedPrFile[]): MovedBlock[] {
-  const removedRuns: Run[] = []
-  const addedRuns: Run[] = []
-
-  for (const file of files) {
-    if (!file.path) continue
-    for (const hunk of file.diff.hunks) {
-      collectRuns(hunk.lines, 'remove', file.path, removedRuns)
-      collectRuns(hunk.lines, 'add', file.path, addedRuns)
-    }
-  }
-
+  const addedRuns = runsOf(files, 'add')
   const usedAdded = new Set<number>()
   const results: MovedBlock[] = []
-
-  for (const removed of removedRuns) {
-    const normRemoved = removed.lines.map(normalize)
-    for (let i = 0; i < addedRuns.length; i++) {
-      if (usedAdded.has(i)) continue
-      const added = addedRuns[i]
-      if (added.lines.length !== removed.lines.length) continue
-      if (added.path === removed.path && added.startLine === removed.startLine) continue
-      const normAdded = added.lines.map(normalize)
-      if (!arraysEqual(normRemoved, normAdded)) continue
-
-      usedAdded.add(i)
-      results.push({
-        fromPath: removed.path,
-        fromLine: removed.startLine,
-        toPath: added.path,
-        toLine: added.startLine,
-        lineCount: removed.lines.length,
-        symbol: extractSymbol(removed.rawFirstLine),
-      })
-      break
-    }
+  for (const removed of runsOf(files, 'remove')) {
+    const match = addedRuns.findIndex((added, i) => !usedAdded.has(i) && isMoveOf(removed, added))
+    if (match === -1) continue
+    usedAdded.add(match)
+    results.push(movedBlockFrom(removed, addedRuns[match]))
   }
-
   return results
 }

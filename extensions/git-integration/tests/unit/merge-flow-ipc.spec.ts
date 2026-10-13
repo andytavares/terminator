@@ -152,7 +152,9 @@ describe('git:undo-resolve', () => {
     expect(written).toContain(original)
     expect(written).not.toContain(resolvedText)
   })
+})
 
+describe('git:undo-resolve — returns error when resolved text not found in file', () => {
   it('returns error when resolved text not found in file', async () => {
     const bridge = makeRegister()
     mockReadFile.mockResolvedValueOnce('completely different content\n')
@@ -180,7 +182,9 @@ describe('git:merge-commit', () => {
     })) as { commitHash: string }
     expect(result.commitHash).toBeTruthy()
   })
+})
 
+describe('git:merge-commit — includes push error when push fails but commit succeeds', () => {
   it('includes push error when push fails but commit succeeds', async () => {
     const bridge = makeRegister()
     mockExecFile
@@ -196,7 +200,9 @@ describe('git:merge-commit', () => {
     expect(result.commitHash).toBeTruthy()
     expect(result.pushError).toContain('no upstream')
   })
+})
 
+describe('git:merge-commit — resolves upstream and pushes when upstream is configured', () => {
   it('resolves upstream and pushes when upstream is configured', async () => {
     const bridge = makeRegister()
     mockExecFile
@@ -216,7 +222,9 @@ describe('git:merge-commit', () => {
     const pushCall = mockExecFile.mock.calls[3]
     expect(pushCall[1]).toContain('--force-with-lease')
   })
+})
 
+describe('git:merge-commit — returns error on commit failure', () => {
   it('returns error on commit failure', async () => {
     const bridge = makeRegister()
     mockExecFile
@@ -252,7 +260,9 @@ describe('git:resolve-conflict — branch paths', () => {
     expect(written).toContain('new resolution')
     expect(written).not.toContain(currentResolvedText)
   })
+})
 
+describe('git:resolve-conflict — branch paths — falls back to index-based lookup when neither text found', () => {
   it('falls back to index-based lookup when neither text found', async () => {
     const bridge = makeRegister()
     const fileContent = '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n'
@@ -281,7 +291,9 @@ describe('git:resolve-conflict — branch paths', () => {
     })
     expect(result).toEqual({ success: true })
   })
+})
 
+describe('git:resolve-conflict — branch paths — returns soft success when block index not found (already consumed)', () => {
   it('returns soft success when block index not found (already consumed)', async () => {
     const bridge = makeRegister()
     // file has no conflict markers and neither text matches
@@ -300,7 +312,9 @@ describe('git:resolve-conflict — branch paths', () => {
     // writeFile must not have been called in this invocation
     expect(mockWriteFile.mock.calls.length).toBe(countBefore)
   })
+})
 
+describe('git:resolve-conflict — branch paths — returns error on readFile exception', () => {
   it('returns error on readFile exception', async () => {
     const bridge = makeRegister()
     mockReadFile.mockRejectedValueOnce(new Error('ENOENT'))
@@ -323,7 +337,9 @@ describe('git:session-restore', () => {
     }
     expect(result.session).toBeNull()
   })
+})
 
+describe('git:session-restore — returns stored session when present and valid', () => {
   it('returns stored session when present and valid', async () => {
     const bridge = makeRegister()
     const storedSession = {
@@ -351,7 +367,9 @@ describe('git:session-restore', () => {
     }
     expect(result.session).toEqual(storedSession)
   })
+})
 
+describe('git:session-restore — clears session and returns null when no conflicted files remain in working tree', () => {
   it('clears session and returns null when no conflicted files remain in working tree', async () => {
     const bridge = makeRegister()
     const storedSession = {
@@ -371,7 +389,9 @@ describe('git:session-restore', () => {
     expect(result.session).toBeNull()
     expect(mockStoreDel).toHaveBeenCalledOnce()
   })
+})
 
+describe('git:session-restore — returns null when stored session has 0 conflicts (stale empty session)', () => {
   it('returns null when stored session has 0 conflicts (stale empty session)', async () => {
     const bridge = makeRegister()
     const staleSession = {
@@ -489,7 +509,9 @@ describe('git:prepare-pr-worktree', () => {
     })) as { error: string }
     expect(result.error).toContain("'origin/feature' not found")
   })
+})
 
+describe('git:prepare-pr-worktree — returns error when base remote ref not found', () => {
   it('returns error when base remote ref not found', async () => {
     const bridge = makeRegister()
     mockExecFile
@@ -504,7 +526,9 @@ describe('git:prepare-pr-worktree', () => {
     })) as { error: string }
     expect(result.error).toContain("'origin/main' not found")
   })
+})
 
+describe('git:prepare-pr-worktree — returns hasConflicts: false on clean merge', () => {
   it('returns hasConflicts: false on clean merge', async () => {
     const bridge = makeRegister()
     mockExecFile
@@ -521,7 +545,9 @@ describe('git:prepare-pr-worktree', () => {
     })) as { hasConflicts: boolean }
     expect(result.hasConflicts).toBe(false)
   })
+})
 
+describe('git:prepare-pr-worktree — returns hasConflicts: true when merge produces conflict markers', () => {
   it('returns hasConflicts: true when merge produces conflict markers', async () => {
     const bridge = makeRegister()
     mockExecFile
@@ -540,7 +566,9 @@ describe('git:prepare-pr-worktree', () => {
     })) as { hasConflicts: boolean }
     expect(result.hasConflicts).toBe(true)
   })
+})
 
+describe('git:prepare-pr-worktree — returns error when merge fails with no conflict markers', () => {
   it('returns error when merge fails with no conflict markers', async () => {
     const bridge = makeRegister()
     mockExecFile
@@ -560,7 +588,9 @@ describe('git:prepare-pr-worktree', () => {
     })) as { error: string }
     expect(result.error).toContain('no conflict markers')
   })
+})
 
+describe('git:prepare-pr-worktree — returns error and cleans up worktree on outer exception', () => {
   it('returns error and cleans up worktree on outer exception', async () => {
     const bridge = makeRegister()
     mockExecFile

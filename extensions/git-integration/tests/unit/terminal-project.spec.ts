@@ -10,6 +10,15 @@ import { projectForCheckout } from '../../src/review/terminal-project'
 // the temporary and home folders sit behind symlinks (/var -> /private/var),
 // so the two strings differ for the same directory.
 
+/** One workspace at `folderPath` holding `projects`. */
+const workspaceOf = (
+  projects: Array<{ id: string; worktreePath?: string }>,
+  folderPath: string
+) => ({
+  list: () => [{ id: 'ws', folderPath }],
+  listProjects: () => projects,
+})
+
 describe('projectForCheckout', () => {
   let dir: string
   let real: string
@@ -25,13 +34,8 @@ describe('projectForCheckout', () => {
 
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-  const workspace = (
-    projects: Array<{ id: string; worktreePath?: string }>,
-    folderPath = link
-  ) => ({
-    list: () => [{ id: 'ws', folderPath }],
-    listProjects: () => projects,
-  })
+  const workspace = (projects: Array<{ id: string; worktreePath?: string }>) =>
+    workspaceOf(projects, link)
 
   it("finds the branch whose checkout is the review's, through a symlink", () => {
     const api = workspace([{ id: 'main', worktreePath: realpathSync(real) }])
@@ -45,8 +49,7 @@ describe('projectForCheckout', () => {
   it('finds nothing for a checkout no branch has', () => {
     const other = join(dir, 'other')
     mkdirSync(other)
-    expect(
-      projectForCheckout(workspace([{ id: 'main', worktreePath: real }]), other)
-    ).toBeUndefined()
+    const api = workspace([{ id: 'main', worktreePath: real }])
+    expect(projectForCheckout(api, other)).toBeUndefined()
   })
 })

@@ -13,11 +13,11 @@ const status = (over: Partial<GitStatus> = {}): GitStatus =>
 
 const diff = (path: string): FileDiff => ({ path, hunks: [], isBinary: false, truncated: false })
 
-describe('git store setStatus', () => {
-  beforeEach(() => {
-    useGitStore.setState({ status: null, diffCache: new Map() })
-  })
+beforeEach(() => {
+  useGitStore.setState({ status: null, diffCache: new Map() })
+})
 
+describe('git store setStatus', () => {
   it('keeps the same status object when a poll returns identical content', () => {
     useGitStore.getState().setStatus(status())
     const first = useGitStore.getState().status
@@ -44,7 +44,9 @@ describe('git store setStatus', () => {
     useGitStore.getState().setStatus(status({ branch: 'feature' }))
     expect(useGitStore.getState().diffCache.size).toBe(0)
   })
+})
 
+describe('git store setStatus — treats a null to null update as no change', () => {
   it('treats a null to null update as no change', () => {
     const before = useGitStore.getState()
     useGitStore.getState().setStatus(null)

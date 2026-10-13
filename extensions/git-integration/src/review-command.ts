@@ -65,35 +65,36 @@ const ReviewReposArgs = z.object({
   repos: z.array(z.string().regex(/^[^/\s]+\/[^/\s]+$/)).transform((repos) => [...new Set(repos)]),
 })
 
+function reviewSettingsChannel(api: ExtensionAPI) {
+  return defineChannel({
+    channel: 'github:review-settings',
+    schema: noPayload,
+    invalid: VALIDATION_ERROR,
+    run: () => {
+      const repos = api.settings.get<unknown>(REVIEW_REPOS_KEY)
+      const cloneFolder =
+        api.settings.get<string>('terminator.git-integration.review.cloneFolder') ?? ''
+      return { cloneFolder, repos: Array.isArray(repos) ? repos : [] }
+    },
+  })
+}
+
+function reviewReposSetChannel(api: ExtensionAPI) {
+  return defineChannel({
+    channel: 'github:review-repos-set',
+    schema: ReviewReposArgs,
+    invalid: VALIDATION_ERROR,
+    run: ({ repos }) => {
+      api.settings.set(REVIEW_REPOS_KEY, repos)
+      return { ok: true }
+    },
+  })
+}
+
 /** The Reviews view reads the clone folder and the repository selection, and writes the selection. */
 export function registerReviewSettings(api: ExtensionAPI): Disposable[] {
   return [
-    api.ipc.registerHandler(
-      defineChannel({
-        channel: 'github:review-settings',
-        schema: noPayload,
-        invalid: VALIDATION_ERROR,
-        run: () => {
-          const repos = api.settings.get<unknown>(REVIEW_REPOS_KEY)
-          return {
-            cloneFolder:
-              api.settings.get<string>('terminator.git-integration.review.cloneFolder') ?? '',
-            repos: Array.isArray(repos) ? repos : [],
-          }
-        },
-      }),
-      remoteAccessFor('github:review-settings')
-    ),
-    api.ipc.registerHandler(
-      defineChannel({
-        channel: 'github:review-repos-set',
-        schema: ReviewReposArgs,
-        invalid: VALIDATION_ERROR,
-        run: ({ repos }) => {
-          api.settings.set(REVIEW_REPOS_KEY, repos)
-          return { ok: true }
-        },
-      })
-    ),
+    api.ipc.registerHandler(reviewSettingsChannel(api), remoteAccessFor('github:review-settings')),
+    api.ipc.registerHandler(reviewReposSetChannel(api)),
   ]
 }

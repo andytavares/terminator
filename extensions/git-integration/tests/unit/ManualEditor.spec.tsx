@@ -71,7 +71,9 @@ describe('ManualEditor', () => {
     const { container } = renderEditor(makeBlock({ oursText: 'abc', theirsText: 'xyz' }))
     expect(documentText(container)).toBe('xyz')
   })
+})
 
+describe('ManualEditor — strips conflict markers from pre-populated content', () => {
   it('strips conflict markers from pre-populated content', () => {
     const { container } = renderEditor(
       makeBlock({
@@ -96,7 +98,9 @@ describe('ManualEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: /Save/i }))
     expect(onSave).toHaveBeenCalledWith('longer theirs text')
   })
+})
 
+describe('ManualEditor — passes the edited document to onSave', () => {
   it('passes the edited document to onSave', () => {
     const { container, onSave } = renderEditor(makeBlock())
     replaceDocument(container, 'my custom edit')
@@ -118,7 +122,9 @@ describe('ManualEditor', () => {
     replaceDocument(container, 'a\nb\nc')
     expect(screen.getByText('3 lines')).toBeTruthy()
   })
+})
 
+describe('ManualEditor — calls onCancel, and not onSave, when Cancel is clicked', () => {
   it('calls onCancel, and not onSave, when Cancel is clicked', () => {
     const { onSave, onCancel } = renderEditor(makeBlock())
     fireEvent.click(screen.getByText(/Cancel/i))
@@ -139,7 +145,9 @@ describe('ManualEditor', () => {
     )
     expect(documentText(container)).toBe('kept mine')
   })
+})
 
+describe('ManualEditor (continued)', () => {
   it.each([
     ['src/foo.ts#0', 'TypeScript'],
     ['src/foo.js#0', 'JavaScript'],

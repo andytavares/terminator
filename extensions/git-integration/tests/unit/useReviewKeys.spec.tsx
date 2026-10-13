@@ -18,38 +18,38 @@ function fireKey(key: string, opts: Partial<KeyboardEventInit> = {}, target?: Ev
   ;(target ?? window).dispatchEvent(event)
 }
 
-describe('useReviewKeys', () => {
-  let handlers: {
-    nextFile: ReturnType<typeof vi.fn>
-    prevFile: ReturnType<typeof vi.fn>
-    nextChapter: ReturnType<typeof vi.fn>
-    prevChapter: ReturnType<typeof vi.fn>
-    nextUnviewedFile: ReturnType<typeof vi.fn>
-    markViewed: ReturnType<typeof vi.fn>
-    toggleInsights: ReturnType<typeof vi.fn>
-    openSubmit: ReturnType<typeof vi.fn>
+let handlers: {
+  nextFile: ReturnType<typeof vi.fn>
+  prevFile: ReturnType<typeof vi.fn>
+  nextChapter: ReturnType<typeof vi.fn>
+  prevChapter: ReturnType<typeof vi.fn>
+  nextUnviewedFile: ReturnType<typeof vi.fn>
+  markViewed: ReturnType<typeof vi.fn>
+  toggleInsights: ReturnType<typeof vi.fn>
+  openSubmit: ReturnType<typeof vi.fn>
+}
+
+beforeEach(() => {
+  handlers = {
+    nextFile: vi.fn(),
+    prevFile: vi.fn(),
+    nextChapter: vi.fn(),
+    prevChapter: vi.fn(),
+    nextUnviewedFile: vi.fn(),
+    markViewed: vi.fn(),
+    toggleInsights: vi.fn(),
+    openSubmit: vi.fn(),
   }
-
-  beforeEach(() => {
-    handlers = {
-      nextFile: vi.fn(),
-      prevFile: vi.fn(),
-      nextChapter: vi.fn(),
-      prevChapter: vi.fn(),
-      nextUnviewedFile: vi.fn(),
-      markViewed: vi.fn(),
-      toggleInsights: vi.fn(),
-      openSubmit: vi.fn(),
-    }
-    useReviewUiStore.setState({
-      diffRange: 'since',
-      commentVisibility: 'all',
-      agentNotesOn: true,
-      keyboardHelpOpen: false,
-      fileListHidden: false,
-    })
+  useReviewUiStore.setState({
+    diffRange: 'since',
+    commentVisibility: 'all',
+    agentNotesOn: true,
+    keyboardHelpOpen: false,
+    fileListHidden: false,
   })
+})
 
+describe('useReviewKeys', () => {
   it('dispatches nextHunk on k and prevHunk on j', () => {
     render(<TestHarness handlers={handlers} />)
     const nextSpy = vi.fn()
@@ -65,7 +65,9 @@ describe('useReviewKeys', () => {
     window.removeEventListener(REVIEW_KEY_EVENTS.nextHunk, nextSpy)
     window.removeEventListener(REVIEW_KEY_EVENTS.prevHunk, prevSpy)
   })
+})
 
+describe('useReviewKeys — calls the matching handler for ], [, n and v', () => {
   it('calls the matching handler for ], [, n and v', () => {
     render(<TestHarness handlers={handlers} />)
     fireKey(']')
@@ -87,7 +89,9 @@ describe('useReviewKeys', () => {
     expect(handlers.prevChapter).toHaveBeenCalledTimes(1)
     expect(handlers.nextFile).not.toHaveBeenCalled()
   })
+})
 
+describe('useReviewKeys — binds the window listener once across rerenders and calls the latest handlers', () => {
   it('binds the window listener once across rerenders and calls the latest handlers', () => {
     const addSpy = vi.spyOn(window, 'addEventListener')
     const { rerender } = render(<TestHarness handlers={handlers} />)
@@ -114,7 +118,9 @@ describe('useReviewKeys', () => {
     fireKey('C', { shiftKey: true })
     expect(useReviewUiStore.getState().agentNotesOn).toBe(false)
   })
+})
 
+describe('useReviewKeys — opens the keyboard help sheet on ?', () => {
   it('opens the keyboard help sheet on ?', () => {
     render(<TestHarness handlers={handlers} />)
     fireKey('?')
@@ -132,7 +138,9 @@ describe('useReviewKeys', () => {
     fireKey('i')
     expect(handlers.toggleInsights).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('useReviewKeys — dispatches peekDefinition when g then d within 1s', () => {
   it('dispatches peekDefinition when g then d within 1s', () => {
     render(<TestHarness handlers={handlers} />)
     const spy = vi.fn()
@@ -142,7 +150,9 @@ describe('useReviewKeys', () => {
     expect(spy).toHaveBeenCalledTimes(1)
     window.removeEventListener(REVIEW_KEY_EVENTS.peekDefinition, spy)
   })
+})
 
+describe('useReviewKeys — dispatches askAgent, explain, comment and note events', () => {
   it('dispatches askAgent, explain, comment and note events', () => {
     render(<TestHarness handlers={handlers} />)
     const askAgent = vi.fn()
@@ -168,7 +178,9 @@ describe('useReviewKeys', () => {
     fireKey('t')
     expect(useReviewUiStore.getState().fileListHidden).toBe(true)
   })
+})
 
+describe('useReviewKeys — calls an explicit toggleFileList handler on t when given', () => {
   it('calls an explicit toggleFileList handler on t when given', () => {
     const toggleFileList = vi.fn()
     render(<TestHarness handlers={{ ...handlers, toggleFileList }} />)
@@ -189,7 +201,9 @@ describe('useReviewKeys', () => {
     fireKey('v', {}, input)
     expect(handlers.markViewed).not.toHaveBeenCalled()
   })
+})
 
+describe('useReviewKeys — ignores keys held with an unrelated modifier', () => {
   it('ignores keys held with an unrelated modifier', () => {
     render(<TestHarness handlers={handlers} />)
     fireKey('v', { ctrlKey: true })
