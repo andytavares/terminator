@@ -201,11 +201,12 @@ function registerChannels(api: ExtensionAPI, roots: ChannelRoots): void {
   registerFn(pendingRequestChannel())
   registerGithub(api, registerFn, roots)
   // Read-only review agent: headless `claude -p` in a detached PR-head worktree.
-  registerReviewAgentHandlers(registerFn, {
+  const reviewAgent = registerReviewAgentHandlers(registerFn, {
     getSetting: (key) => api.settings.get(key),
     broadcast: (channel, data) => api.window.broadcast(channel, data),
     openTerminal: (input) => openAgentTerminal(api, input),
   })
+  disposables.push(reviewAgent)
 }
 
 /**
