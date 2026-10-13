@@ -38,6 +38,7 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
     settings[key] = value
   },
   getAllExtensionSettings: () => ({ ...settings }),
+  extensionSettingsSnapshot: () => ({ global: { ...settings }, workspaces: {} }),
 }))
 
 const workspaces: Array<{ id: string; name: string; folderPath: string }> = []

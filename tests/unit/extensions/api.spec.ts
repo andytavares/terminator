@@ -61,7 +61,12 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
     mockExtensionStore[key] = value
   },
   getAllExtensionSettings: () => ({ ...mockExtensionStore }),
+  extensionSettingsSnapshot: () => ({
+    global: { ...mockExtensionStore },
+    workspaces: mockWorkspaceExtensionValues,
+  }),
 }))
+const mockWorkspaceExtensionValues: Record<string, Record<string, Record<string, unknown>>> = {}
 
 const mockGetGlobalSettings = vi.fn()
 const mockGetWorkspaceSettings = vi.fn()
@@ -345,6 +350,9 @@ function useEmptySettingsStore(): void {
     for (const key of Object.keys(mockExtensionStore)) {
       delete mockExtensionStore[key]
     }
+    for (const id of Object.keys(mockWorkspaceExtensionValues)) {
+      delete mockWorkspaceExtensionValues[id]
+    }
   })
 }
 
@@ -364,6 +372,51 @@ describe('api.settings workspace precedence', () => {
 
     const val = api.settings.get<boolean>('com.test.missing')
     expect(val).toBeUndefined()
+  })
+})
+
+describe('api.settings workspace precedence — a path in a workspace', () => {
+  useEmptySettingsStore()
+  beforeEach(() => {
+    mockListWorkspaces.mockReturnValue([
+      { id: 'w1', name: 'API', folderPath: '/code/api' },
+      { id: 'w2', name: 'Web', folderPath: '/code/web' },
+    ])
+    mockExtensionStore['com.test.signOff'] = false
+    mockWorkspaceExtensionValues.w1 = { 'com.test': { 'com.test.signOff': true } }
+  })
+
+  it("returns the workspace's own value for a path in it, the global one elsewhere", () => {
+    const api = createExtensionAPI('com.test')
+
+    expect(api.settings.get<boolean>('com.test.signOff', { repoPath: '/code/api' })).toBe(true)
+    expect(api.settings.get<boolean>('com.test.signOff', { repoPath: '/code/web' })).toBe(false)
+    expect(api.settings.get<boolean>('com.test.signOff')).toBe(false)
+  })
+})
+
+describe('api.settings workspace precedence — a path in a workspace that sets nothing', () => {
+  useEmptySettingsStore()
+  beforeEach(() => {
+    mockListWorkspaces.mockReturnValue([{ id: 'w1', name: 'API', folderPath: '/code/api' }])
+    mockWorkspaceExtensionValues.w1 = {}
+  })
+
+  it('returns the schema default when neither the workspace nor the global settings hold it', () => {
+    const api = createExtensionAPI('com.test')
+    api.settings.register({
+      label: 'Test',
+      properties: {
+        'com.test.signOff': {
+          type: 'boolean',
+          label: 'Sign off',
+          default: true,
+          workspaceScoped: true,
+        },
+      },
+    })
+
+    expect(api.settings.get<boolean>('com.test.signOff', { repoPath: '/code/api' })).toBe(true)
   })
 })
 

@@ -1,5 +1,6 @@
 import type { ProjectSnapshot, TrackerId, WorkspaceSnapshot } from '@terminator/extension-sdk'
 import type { AppPaths } from '../extension-paths.js'
+import type { ExtensionSettingsSnapshot } from '../setting-scope.js'
 
 /** Workspaces and each one's projects, as `api.workspace.list` / `listProjects` read them. */
 export interface WorkspacesSnapshot {
@@ -19,7 +20,7 @@ export interface HostSnapshot {
   databasePath: string
   /** Each extension's `api.paths` is built from these (`extensionPaths`). */
   paths: AppPaths
-  settings: Record<string, unknown>
+  settings: ExtensionSettingsSnapshot
   workspaces: WorkspacesSnapshot
   trackers: TrackerAbilities
 }

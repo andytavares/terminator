@@ -6,6 +6,7 @@ import { CallbackRegistry } from './callbacks.js'
 import { createHostExtensionAPI, type HostCommand } from './host-api.js'
 import type { HostSnapshot, WorkspacesSnapshot } from './snapshot.js'
 import type { BackendFiles, BackendLoader, BackendModule } from './backend-loader.js'
+import type { ExtensionSettingsSnapshot } from '../setting-scope.js'
 
 /** What main sends to activate one backend in the extension host. */
 export interface BackendRecord extends BackendFiles {
@@ -59,7 +60,7 @@ export class HostRuntime {
     endpoint.handle('callback', (id: string, callbackId: number, args: unknown[]) =>
       this.active.get(id)?.callbacks.invoke(callbackId, args)
     )
-    endpoint.handle('settings.changed', (settings: Record<string, unknown>) => {
+    endpoint.handle('settings.changed', (settings: ExtensionSettingsSnapshot) => {
       snapshot.settings = settings
     })
     endpoint.handle('workspaces.changed', (workspaces: WorkspacesSnapshot) => {

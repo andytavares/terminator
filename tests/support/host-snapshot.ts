@@ -5,7 +5,7 @@ export function hostSnapshot(overrides: Partial<HostSnapshot> = {}): HostSnapsho
   return {
     databasePath: ':memory:',
     paths: { app: '/app', userData: '/data' },
-    settings: {},
+    settings: { global: {}, workspaces: {} },
     workspaces: { workspaces: [], projects: {} },
     trackers: {
       linear: { transitions: true, create: true },

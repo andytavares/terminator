@@ -73,7 +73,10 @@ function mainApi() {
   const { channels, dataListeners, ipc, pty } = channelsAndOutputInMain()
   const api = partialFake<ExtensionAPI>({
     issues: partialFake<ExtensionAPI['issues']>({ transition }),
-    settings: partialFake<ExtensionAPI['settings']>({ set: setSetting }),
+    settings: partialFake<ExtensionAPI['settings']>({
+      set: setSetting,
+      register: () => ({ dispose: () => {} }),
+    }),
     commands: commandsApi,
     ipc,
     pty,
@@ -98,6 +101,32 @@ const backend = {
   },
 }
 
+/** A backend that answers `demo.signOff` as it applies to the path it is asked about. */
+const signOffReader: BackendModule = {
+  activate(api: ExtensionAPI) {
+    api.settings.register({
+      label: 'Demo',
+      properties: {
+        'demo.signOff': {
+          type: 'boolean',
+          label: 'Sign off',
+          default: false,
+          workspaceScoped: true,
+        },
+      },
+    })
+    api.ipc.registerHandler(
+      defineChannel({
+        channel: 'demo:sign-off',
+        schema: z.object({ repoPath: z.string().optional() }),
+        invalid: { error: 'VALIDATION_ERROR' },
+        run: ({ repoPath }) =>
+          api.settings.get<boolean>('demo.signOff', repoPath ? { repoPath } : undefined),
+      })
+    )
+  },
+}
+
 /** A host process whose "process" is a HostRuntime on the other end of a MessageChannel. */
 function harness(modules: Record<string, BackendModule> = {}) {
   const main = mainApi()
@@ -112,7 +141,8 @@ function harness(modules: Record<string, BackendModule> = {}) {
   const onBackendsFailed = vi.fn()
   const process = new ExtensionHostProcess({
     spawn: spawned,
-    snapshot: () => hostSnapshot({ settings: { 'demo.greeting': 'hello' } }),
+    snapshot: () =>
+      hostSnapshot({ settings: { global: { 'demo.greeting': 'hello' }, workspaces: {} } }),
     apiFor: (id) => (id === 'demo' ? main.api : undefined),
     onBackendsFailed,
     log: () => {},
@@ -159,7 +189,7 @@ describe('extension backends — settings and listeners', () => {
   it('reads settings from the snapshot main pushes', async () => {
     const { main, process, record } = harness()
     await process.activate(record)
-    process.pushSettings({ 'demo.greeting': 'hi' })
+    process.pushSettings({ global: { 'demo.greeting': 'hi' }, workspaces: {} })
     const spec = main.channels.get('demo:greet')!
 
     await vi.waitFor(async () =>
@@ -184,6 +214,32 @@ describe('extension backends — settings and listeners', () => {
     await process.deactivate('demo')
     expect(main.channels.has('demo:greet')).toBe(false)
     expect(main.dataListeners).toHaveLength(0)
+  })
+})
+
+describe('extension backends — workspace-scoped settings', () => {
+  it("reads a workspace's own value for a path in it, else the global value, else the default", async () => {
+    const { main, process, record } = harness({ '/demo/main.cjs': signOffReader })
+    await process.activate(record)
+    process.pushWorkspaces({
+      workspaces: [
+        { id: 'ws-api', name: 'API', folderPath: '/code/api' },
+        { id: 'ws-web', name: 'Web', folderPath: '/code/web' },
+      ],
+      projects: {},
+    })
+    const spec = main.channels.get('demo:sign-off')!
+    await expect(dispatchChannel(spec, { repoPath: '/code/api' })).resolves.toBe(false)
+
+    process.pushSettings({
+      global: { 'demo.signOff': true },
+      workspaces: { 'ws-api': { demo: { 'demo.signOff': false } } },
+    })
+    await vi.waitFor(async () =>
+      expect(await dispatchChannel(spec, { repoPath: '/code/api' })).toBe(false)
+    )
+    await expect(dispatchChannel(spec, { repoPath: '/code/web' })).resolves.toBe(true)
+    await expect(dispatchChannel(spec, {})).resolves.toBe(true)
   })
 })
 

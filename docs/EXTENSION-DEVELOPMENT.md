@@ -498,7 +498,7 @@ A spec that hands `activate` a `globalStorage` makes it with `makeTempDir(prefix
 
 ### `api.settings`
 
-`register(schema)` adds a section to Settings. A property with `workspaceScoped: true` can be overridden per workspace. Property types are `string`, `number`, `boolean`, `enum` (with `options`), `folder`, `list` (a `string[]`, edited one item per line) and `action` (a button that invokes `channel`, optionally after `confirmMessage`); `secret` masks the value.
+`register(schema)` adds a section to Settings. A property with `workspaceScoped: true` can also be set per workspace, in Workspace Settings, where "Use global default" hands it back to the global value. Property types are `string`, `number`, `boolean`, `enum` (with `options`), `folder`, `list` (a `string[]`, edited one item per line) and `action` (a button that invokes `channel`, optionally after `confirmMessage`); `secret` masks the value.
 
 ```typescript
 api.settings.register({
@@ -521,11 +521,16 @@ api.settings.register({
 
 const mode = api.settings.get<string>('com.example.my-extension.mode') // stored value, else the default
 api.settings.set('com.example.my-extension.mode', 'safe')
+
+// A workspace-scoped setting, for the repository the call is about (since SDK 4.1.0):
+const enabled = api.settings.get<boolean>('com.example.my-extension.enabled', { repoPath })
 ```
 
 Prefix every key with your extension id; nothing else keeps two extensions' keys apart.
 
-A view reads the stored values with `window.electronAPI.extension.getSettingsValues()`, which holds only what has been set, so apply your own defaults. `extension.onSettingsChanged(handler)` is called after any setting changes; re-read there and a change made in Settings applies without reopening the view (Notepad's `src/stores/settings.store.ts`).
+`get(key, { repoPath })` resolves a `workspaceScoped` setting in this order: the value the workspace that owns `repoPath` sets for itself (its folder holds the path, or one of its projects' worktrees does), else the global value, else the schema's `default`. Without a scope, or for a path outside every workspace, it is the global value. Pass the repository or worktree path the work is in, as `isBranchExcluded` takes it; the core stores the workspace values in that workspace's settings, under `extensions`, by extension id then key. `set` writes the global value only.
+
+A view reads the stored values with `window.electronAPI.extension.getSettingsValues()`, which holds only what has been set, so apply your own defaults. `extension.onSettingsChanged(handler)` is called after any setting changes, with `{ workspaceId }`: the workspace whose own value changed, or `null` for a global value (SDK 4.1.0); re-read there and a change made in Settings applies without reopening the view (Notepad's `src/stores/settings.store.ts`).
 
 `isBranchExcluded(branch, repoPath?)` resolves whether a branch matches Settings → Git → Branch Exclude Patterns: the override of the workspace that owns `repoPath`, else the global list. `*` matches anything, slashes included. The core owns the patterns, so your lists hide the same branches the core's pickers do:
 

@@ -15,6 +15,7 @@ import type {
   ProjectSnapshot,
   RegisterHandlerOptions,
   SessionSnapshot,
+  SettingScope,
   ShellExecOptions,
   ToastType,
   TrackerConnection,
@@ -58,7 +59,13 @@ import {
   setExtensionNotificationSettingReader,
 } from '../notifications/notification-manager.js'
 import type { NotificationTarget } from '../notifications/notification-manager.js'
-import { getExtensionSetting, setExtensionSetting } from '../storage/extension-settings-store.js'
+import {
+  extensionSettingsSnapshot,
+  getExtensionSetting,
+  setExtensionSetting,
+} from '../storage/extension-settings-store.js'
+import { workspaceFolders } from '../storage/workspace-folders.js'
+import { storedSettingValue } from './setting-scope.js'
 import { getGlobalSettings } from '../storage/settings-store.js'
 import { defaultShellFor } from '../terminal/default-shell.js'
 import { basename } from 'path'
@@ -395,9 +402,17 @@ function closedDb(extensionId: string): ExtensionDB {
   return { exec: notReady, query: notReady, get: notReady, run: notReady, transaction: notReady }
 }
 
-/** A setting's stored value, or the default this extension's schema gives it. */
-function extensionSettingValue<T>(extensionId: string, key: string): T | undefined {
-  const stored = getExtensionSetting(key)
+/**
+ * A setting's stored value, the own value of the workspace owning `repoPath`
+ * first, or the default this extension's schema gives it.
+ */
+function extensionSettingValue<T>(
+  extensionId: string,
+  key: string,
+  repoPath?: string
+): T | undefined {
+  const read = { extensionId, key, repoPath }
+  const stored = storedSettingValue(extensionSettingsSnapshot(), workspaceFolders(), read)
   if (stored !== undefined) return stored as T
   const schema = globalRegistry.settingsSections.get(`${extensionId}.settings`)
   if (schema?.properties[key] !== undefined) {
@@ -482,7 +497,8 @@ function settingsApi({ extensionId, deps, disposable }: ApiContext): ExtensionAP
         deps?.broadcastToWindows?.('extension:list-changed', null)
       })
     },
-    get: <T>(key: string): T | undefined => extensionSettingValue<T>(extensionId, key),
+    get: <T>(key: string, scope?: SettingScope): T | undefined =>
+      extensionSettingValue<T>(extensionId, key, scope?.repoPath),
     set(key: string, value: unknown): void {
       setExtensionSetting(key, value)
     },

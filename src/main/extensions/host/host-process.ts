@@ -4,6 +4,7 @@ import { RpcEndpoint, type MessageLink, type RpcMessage } from './rpc-endpoint.j
 import { ExtensionApiServer } from './api-server.js'
 import type { BackendRecord } from './host-runtime.js'
 import type { HostSnapshot, WorkspacesSnapshot } from './snapshot.js'
+import type { ExtensionSettingsSnapshot } from '../setting-scope.js'
 
 /** A started extension host, as main drives it. */
 export interface SpawnedHost {
@@ -62,7 +63,7 @@ export class ExtensionHostProcess {
     await endpoint?.request('deactivate', extensionId)
   }
 
-  pushSettings(settings: Record<string, unknown>): void {
+  pushSettings(settings: ExtensionSettingsSnapshot): void {
     this.running?.endpoint.notify('settings.changed', settings)
   }
 

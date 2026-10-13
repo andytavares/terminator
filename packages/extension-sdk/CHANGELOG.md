@@ -2,7 +2,18 @@
 
 ## Unreleased
 
+Minor: 4.1.0. Every addition is optional, so an extension built for 4.0.0 runs unchanged.
+
 ### Added
+
+- `settings.get(key, { repoPath })` (`SettingScope`): a `workspaceScoped` setting resolves to the
+  value the workspace owning `repoPath` sets for itself, else the global value, else the schema's
+  default. Without a scope it is the global value, as before. Workspace Settings shows every
+  `workspaceScoped` setting with "Use global default"; the values live in that workspace's
+  settings under `extensions`, by extension id then key. `workspaceScoped` was declared since 2.x
+  but nothing stored or read a per-workspace value.
+- A view's `extension.onSettingsChanged` handler receives a `SettingsChange`, `{ workspaceId }`:
+  the workspace whose own value changed, or `null` for a global value.
 
 - `@terminator/extension-sdk/vite`: `extensionViewConfig(directory, { plugins, chunkSizeWarningLimit? })`,
   the Vite config of an extension's view (`index.html` built to `dist/` with relative URLs).

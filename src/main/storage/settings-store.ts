@@ -50,6 +50,36 @@ export function updateWorkspaceSettings(workspaceId: string, patch: unknown): Wo
   return updated
 }
 
+/** The values each workspace sets for itself, by workspace id, then extension id, then key. */
+export function listWorkspaceExtensionSettings(): Record<string, WorkspaceSettings['extensions']> {
+  const workspaces = store.get('workspaces')
+  return Object.fromEntries(
+    Object.entries(workspaces).map(([id, settings]) => [id, settings.extensions ?? {}])
+  )
+}
+
+/** One extension setting's value in one workspace; no value hands it back to the global one. */
+export interface WorkspaceExtensionSettingChange {
+  extensionId: string
+  key: string
+  value?: unknown
+}
+
+export function updateWorkspaceExtensionSetting(
+  workspaceId: string,
+  change: WorkspaceExtensionSettingChange
+): WorkspaceSettings {
+  const current = getWorkspaceSettings(workspaceId)
+  const { extensionId, key, value } = change
+  const own = mergeOverrides(current.extensions?.[extensionId] ?? {}, { [key]: value })
+  const updated: WorkspaceSettings = {
+    ...current,
+    extensions: { ...current.extensions, [extensionId]: own as Record<string, unknown> },
+  }
+  store.set('workspaces', { ...store.get('workspaces'), [workspaceId]: updated })
+  return updated
+}
+
 function deepMerge<T>(target: T, source: Partial<T>): T {
   const result = { ...target }
   for (const key in source) {

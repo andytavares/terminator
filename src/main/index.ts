@@ -36,7 +36,7 @@ import { ExtensionHost } from './extensions/extension-host.js'
 import { ExtensionHostProcess, spawnUtilityHost } from './extensions/host/host-process.js'
 import { trackerAbilitiesOf, workspacesOf } from './extensions/host/main-snapshot.js'
 import {
-  getAllExtensionSettings,
+  extensionSettingsSnapshot,
   onExtensionSettingsChanged,
 } from './storage/extension-settings-store.js'
 import { onWorkspacesChanged } from './storage/workspace-store.js'
@@ -75,7 +75,7 @@ const extensionHostProcess: ExtensionHostProcess = new ExtensionHostProcess({
   snapshot: () => ({
     databasePath: join(app.getPath('userData'), 'app.sqlite'),
     paths: { app: app.getAppPath(), userData: app.getPath('userData') },
-    settings: getAllExtensionSettings(),
+    settings: extensionSettingsSnapshot(),
     workspaces: workspacesOf(coreView.workspace),
     trackers: trackerAbilitiesOf(coreView.issues),
   }),
@@ -530,10 +530,11 @@ app.whenReady().then(async () => {
   extensionHost.setDeps(extensionDeps(terminalRelay, userData))
 
   // The extension host's synchronous getters read these; main pushes every change.
-  // Views re-read on extension:settings-changed, so a change made in Settings applies at once.
-  onExtensionSettingsChanged(() => {
-    extensionHostProcess.pushSettings(getAllExtensionSettings())
-    broadcastToWindows('extension:settings-changed', null)
+  // Views re-read on extension:settings-changed, so a change made in Settings applies at once;
+  // it carries the workspace whose own value changed, or null for a global value.
+  onExtensionSettingsChanged((change) => {
+    extensionHostProcess.pushSettings(extensionSettingsSnapshot())
+    broadcastToWindows('extension:settings-changed', change)
   })
   onWorkspacesChanged(() => extensionHostProcess.pushWorkspaces(workspacesOf(coreView.workspace)))
   setupMenu()

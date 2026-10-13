@@ -6,12 +6,14 @@ import type {
   ExtensionAPI,
   ExtensionDB,
   ExtensionSettingsSchema,
+  SettingScope,
 } from '@terminator/extension-sdk'
 import type { RpcEndpoint } from './rpc-endpoint.js'
 import type { ApiCall, HeldRegistration } from './messages.js'
 import { CallbackRegistry } from './callbacks.js'
 import type { HostSnapshot } from './snapshot.js'
 import { extensionPaths } from '../extension-paths.js'
+import { storedSettingValue } from '../setting-scope.js'
 
 /** A command as the extension host keeps it: main sees neither its handler nor its schema. */
 export interface HostCommand {
@@ -102,13 +104,16 @@ function settingsFor(context: HostContext, main: MainCalls): ExtensionAPI['setti
       schema = registered
       return main.held('settings.register', registered)
     },
-    get<T>(key: string): T | undefined {
-      const values = context.snapshot.settings
-      if (key in values) return values[key] as T
+    get<T>(key: string, scope?: SettingScope): T | undefined {
+      const { settings, workspaces } = context.snapshot
+      const read = { extensionId: context.extensionId, key, repoPath: scope?.repoPath }
+      const stored = storedSettingValue(settings, workspaces, read)
+      if (stored !== undefined) return stored as T
       return schema?.properties[key]?.default as T | undefined
     },
     set(key, value) {
-      context.snapshot.settings = { ...context.snapshot.settings, [key]: value }
+      const { settings } = context.snapshot
+      context.snapshot.settings = { ...settings, global: { ...settings.global, [key]: value } }
       main.fire('settings.set', key, value)
     },
     isBranchExcluded: (branch, repoPath) =>

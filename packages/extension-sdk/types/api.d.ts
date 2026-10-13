@@ -70,11 +70,29 @@ export interface SettingDefinition {
   options?: string[]
   min?: number
   max?: number
+  /**
+   * Workspace Settings can set a value for one workspace, with "Use global
+   * default" to hand it back. Read it with `settings.get(key, { repoPath })`.
+   */
   workspaceScoped?: boolean
   secret?: boolean
   channel?: string
   confirmMessage?: string
   danger?: boolean
+}
+
+/** Where `settings.get` reads a `workspaceScoped` setting. Since 4.1.0. */
+export interface SettingScope {
+  /**
+   * A path in a workspace: its folder, a project's worktree, or anything below
+   * one. The setting resolves to that workspace's own value, else the global one.
+   */
+  repoPath?: string
+}
+
+/** Which value of an extension setting changed: one workspace's own, or (null) the global one. Since 4.1.0. */
+export interface SettingsChange {
+  workspaceId: string | null
 }
 
 export interface NativeMenuItemContribution {
@@ -345,8 +363,12 @@ export interface ExtensionAPI {
     /**
      * Read from a snapshot of the settings the core pushes on every change, so it stays
      * synchronous; `set` updates the snapshot at once.
+     *
+     * With `scope.repoPath`, a `workspaceScoped` setting resolves to the value
+     * the workspace owning that path sets for itself, else the global value,
+     * else the schema's default. Without a scope, the global value (scope since 4.1.0).
      */
-    get<T>(key: string): T | undefined
+    get<T>(key: string, scope?: SettingScope): T | undefined
     set(key: string, value: unknown): void
     /**
      * Whether a branch matches Settings → Git → Branch Exclude Patterns: the
