@@ -39,7 +39,7 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
    its effect, or removed with its migration.
 4. Foundry `readOnlyTools` and `criticalPaths` settings need multi-line input.
 5. Tests for the effect of each remaining setting.
-6. Remote Control: 4 of 9 channels are driven end to end; the other 5 need e2e.
+6. Done: Remote Control's 9 channels are driven end to end (`remote-control.spec.ts`).
 7. Done: `knip --production` is a second gate (ADR 107).
 8. Final review, the PR description with a "How to read this change" section, CI green on the head.
 

@@ -1107,14 +1107,15 @@ network or over the internet.
 Open the **Remote Control** tab. The top of the screen answers the question you came to ask —
 whether it is on, and how to reach it:
 
-| It says                             | Meaning                                                                                        |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **Off**                             | Your terminals are not reachable from any browser. **Turn on** starts the server.              |
-| **Starting…**                       | Opening the port and creating an address.                                                      |
-| **On — reachable on this network**  | The address works for devices on your network. Add an account token in Settings to go further. |
-| **On — reachable from any browser** | There is a public address.                                                                     |
-| A failure, in words                 | What went wrong and what fixes it — e.g. the port is already in use, so pick another or quit   |
-|                                     | whatever is listening on it.                                                                   |
+| It says                                 | Meaning                                                                                                                                |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Off**                                 | Your terminals are not reachable from any browser. **Turn on** starts the server.                                                      |
+| **Starting…**                           | Opening the port and creating an address.                                                                                              |
+| **On — reachable on this network**      | The address works for devices on your network. Add an account token in Settings to go further.                                         |
+| **On — reachable from any browser**     | There is a public address.                                                                                                             |
+| A failure, in words                     | What went wrong and what fixes it — e.g. the port is already in use, so pick another or quit                                           |
+|                                         | whatever is listening on it.                                                                                                           |
+| **The public address stopped working.** | The tunnel dropped. **Reconnect** makes a new public address without restarting the server, so devices on your network stay connected. |
 
 When it is on you get the address, a **QR code**, and the password. Point a phone camera at the
 code and it connects — the code carries the password, so on the everyday path the credential never
@@ -1130,11 +1131,18 @@ into your terminals.**
 on each row. The list is live: it changes as devices come and go, because "who currently has
 shell access" is not a question to answer with a stale list.
 
+A device you disconnect is told so ("The desktop app disconnected this device.") and does not
+reconnect by itself; it can only come back by its own **Retry**. To keep it out, change the
+password.
+
 ### Settings
 
 Port, viewer limit, password and the account token for a public address are under **Settings**
 at the bottom of the screen, collapsed until you want them. The summary line shows the port and
 viewer limit without opening it.
+
+The viewer limit is how many browsers may watch one terminal at once. One more is turned away and
+told why, with a **Retry** for when someone leaves.
 
 ### Accessing terminals in a browser
 

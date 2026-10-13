@@ -69,6 +69,15 @@ const CLAUDE_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures'
  */
 const CLAUDE_STUB_ZDOTDIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'zdotdir')
 
+/**
+ * The app's PATH: `firstDirs`, then the `claude` stub, then the runner's own.
+ * A spec that stands in for another program passes its folder as `env.PATH`
+ * through this, so the `claude` stub stays ahead of any real one.
+ */
+export function e2ePath(...firstDirs: string[]): string {
+  return [...firstDirs, CLAUDE_STUB_DIR, process.env.PATH ?? ''].join(delimiter)
+}
+
 /** The environment every e2e-launched Electron process gets. */
 function e2eEnv(): Record<string, string> {
   // Electron's launch takes defined strings only; an unset variable is left out.
@@ -78,7 +87,7 @@ function e2eEnv(): Record<string, string> {
   return {
     ...Object.fromEntries(inherited),
     NODE_ENV: 'test',
-    PATH: `${CLAUDE_STUB_DIR}${delimiter}${process.env.PATH ?? ''}`,
+    PATH: e2ePath(),
     // Pins terminal.defaultShell's process.env.SHELL fallback to zsh
     // regardless of the developer's or CI runner's own $SHELL (CI's macOS
     // runners default to bash), so ZDOTDIR below is guaranteed to apply.

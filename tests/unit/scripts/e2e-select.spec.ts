@@ -44,6 +44,7 @@ const specs = [
   'extension-escape-exit.spec.ts',
   'quick-actions.spec.ts',
   'remote-app.spec.ts',
+  'remote-control.spec.ts',
   'extension-smoke.spec.ts',
   'extension-keyboard.spec.ts',
   'extension-themes.spec.ts',
@@ -95,6 +96,18 @@ describe('select() — a foundry-only diff', () => {
       ].sort()
     )
   })
+})
+
+describe('select() — a remote-control diff', () => {
+  it.each(['extensions/remote-control/src/index.ts', 'src/renderer-remote/MobileApp.tsx'])(
+    'selects both remote specs for %s',
+    (changed) => {
+      const result = select({ changed: [changed], specs, isMainPush: false })
+      expect(result.specs).toEqual(
+        expect.arrayContaining(['remote-app.spec.ts', 'remote-control.spec.ts'])
+      )
+    }
+  )
 })
 
 describe('select() — changed specs and main pushes', () => {
