@@ -225,3 +225,24 @@ describe('CreateWorkspaceDialog — auto-creates a branch project when the chose
     ])
   })
 })
+
+describe('CreateWorkspaceDialog — a repo whose root or branch is unknown', () => {
+  it('uses the folder as the root and names the branch main', async () => {
+    nextWorkspaceId = REPO_WORKSPACE
+    withApi({
+      isRepo: async () => ({ isRepo: true }),
+      currentBranch: async () => ({ error: 'NOT_A_REPO', message: 'detached' }),
+    })
+    const onClose = vi.fn()
+    render(<CreateWorkspaceDialog onClose={onClose} />)
+    fireEvent.change(screen.getByPlaceholderText('My Workspace'), { target: { value: 'Repo WS' } })
+    fireEvent.change(screen.getByPlaceholderText('/path/to/folder'), {
+      target: { value: '/picked' },
+    })
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(useWorkspaceStore.getState().projectsByWorkspaceId.get(REPO_WORKSPACE)).toEqual([
+      expect.objectContaining({ name: 'main', gitBranch: 'main', worktreePath: '/picked' }),
+    ])
+  })
+})
