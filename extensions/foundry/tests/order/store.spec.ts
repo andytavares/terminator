@@ -44,7 +44,9 @@ function atomicSavesTests() {
     const store = createOrderStore(root)
     await store.save(order())
     const seen: (WorkOrder | null)[] = []
-    for (let i = 0; i < 200; i++) {
+    // Saved in place, five reads in six land in the gap, from the first round
+    // on; twenty rounds catch that every time without 200 rounds of disk work.
+    for (let i = 0; i < 20; i++) {
       const [, loaded] = await Promise.all([
         store.save(order({ title: `Save ${i}` })),
         store.load('WO-0913-c71'),
