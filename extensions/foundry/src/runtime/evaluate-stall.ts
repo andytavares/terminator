@@ -71,7 +71,38 @@ export function evaluateStall(
   // earns the reputation that gets it turned off.
   if (!facts.canStall) return null
 
-  const shellInFlight = facts.openShellStartedAt !== null
+  const inputs = stallInputs(facts, now)
+  const fire = (signal: StallSignal): StallFiring => ({
+    sessionId: facts.sessionId,
+    signal,
+    firedAt: now,
+    inputs,
+  })
+
+  // Looping on one file with nothing to show for it. Deliberately still
+  // evaluated while a command is in flight — a loop is a different failure
+  // from silence, and the command being slow does not excuse it.
+  if (
+    inputs.diffSilenceMs > thresholds.noProgressMs &&
+    inputs.distinctFiles === 1 &&
+    facts.recentNetChange === 0
+  ) {
+    return fire('loop')
+  }
+
+  // The exemption. A session blocked inside one long command it started is
+  // working, not stuck: its silence is the command's, not the agent's. Without
+  // this, every test suite longer than the threshold reads as a stall — the
+  // spec's named "obvious first bug", and the gate on shipping this at all.
+  if (inputs.shellInFlight) return null
+
+  if (inputs.toolSilenceMs > thresholds.silenceMs) return fire('silence')
+
+  return null
+}
+
+/** The values a firing is judged on, at `now`. */
+function stallInputs(facts: SessionFacts, now: number): StallFiring['inputs'] {
   // An agent that has never called a tool has been quiet since it started, and
   // one that has never changed a line has changed nothing since it started.
   //
@@ -84,43 +115,11 @@ export function evaluateStall(
   // the order before the builder's third command. Silence belongs to the state
   // the session is in now, and `stateSince` is when that state began.
   const since = (at: number | null): number => Math.max(at ?? facts.stateSince, facts.stateSince)
-  const toolSilenceMs = now - since(facts.lastToolActivityAt)
-  const diffSilenceMs = now - since(facts.lastNetChangeAt)
-  const distinctFiles = new Set(facts.recentToolPaths).size
-
-  const inputs = {
-    toolSilenceMs,
-    diffSilenceMs,
-    distinctFiles,
+  return {
+    toolSilenceMs: now - since(facts.lastToolActivityAt),
+    diffSilenceMs: now - since(facts.lastNetChangeAt),
+    distinctFiles: new Set(facts.recentToolPaths).size,
     netChange: facts.recentNetChange,
-    shellInFlight,
+    shellInFlight: facts.openShellStartedAt !== null,
   }
-
-  const fire = (signal: StallSignal): StallFiring => ({
-    sessionId: facts.sessionId,
-    signal,
-    firedAt: now,
-    inputs,
-  })
-
-  // Looping on one file with nothing to show for it. Deliberately still
-  // evaluated while a command is in flight — a loop is a different failure
-  // from silence, and the command being slow does not excuse it.
-  if (
-    diffSilenceMs > thresholds.noProgressMs &&
-    distinctFiles === 1 &&
-    facts.recentNetChange === 0
-  ) {
-    return fire('loop')
-  }
-
-  // The exemption. A session blocked inside one long command it started is
-  // working, not stuck: its silence is the command's, not the agent's. Without
-  // this, every test suite longer than the threshold reads as a stall — the
-  // spec's named "obvious first bug", and the gate on shipping this at all.
-  if (shellInFlight) return null
-
-  if (toolSilenceMs > thresholds.silenceMs) return fire('silence')
-
-  return null
 }
