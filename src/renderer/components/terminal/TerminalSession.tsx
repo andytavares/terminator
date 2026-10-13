@@ -85,11 +85,9 @@ function handleCustomKey(terminal: Terminal, e: KeyboardEvent): boolean {
   // The quick-actions leader belongs to the app. Off macOS it is Ctrl+P, which
   // xterm would send to the shell as ^P and stop from reaching the app's listener.
   if (isLeader(e)) return false
-  // Cmd+Enter / Shift+Enter — send a literal newline to the running program.
-  // terminal.paste() wraps in bracketed-paste sequences when the program has enabled
-  // that mode (e.g. claude CLI), so the program receives a newline without executing.
-  // Note: Shift+Enter is intercepted unconditionally — programs that handle it
-  // natively (e.g. IPython) will not receive the raw key event.
+  // Cmd+Enter / Shift+Enter send a literal newline: paste() brackets it when the program asked
+  // (claude CLI), so it is not executed. Shift+Enter is always taken, so a program that handles it
+  // itself (IPython) never sees the raw key.
   if ((e.metaKey || e.shiftKey) && e.key === 'Enter' && e.type === 'keydown') {
     // Must call preventDefault() ourselves — xterm does NOT call it when the custom
     // handler returns false. Without this, the browser fires a subsequent `input` event
@@ -161,11 +159,9 @@ export class TerminalInstance {
     this.registerLinkProviders()
     this.outputUnsubscribe = this.subscribeToOutput(sessionId)
 
-    // Subscribed first, then attached: anything the process printed before this
-    // terminal existed on screen has been held back, and is delivered now. A
-    // terminal the operator opened themselves has nothing held and this is a
-    // no-op; one the application opened — a supervised agent — would otherwise
-    // be missing its launch command and everything up to the moment it appeared.
+    // Subscribed first, then attached: what the process printed before this terminal was on screen
+    // was held and arrives now. Without it a terminal the app opened (a supervised agent) would
+    // miss its launch command and all output up to the moment it appeared.
     void window.electronAPI.terminal.attach(sessionId)
   }
 

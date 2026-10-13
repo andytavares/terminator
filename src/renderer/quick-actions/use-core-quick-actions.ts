@@ -55,10 +55,8 @@ function usePaletteSessions(): CoreSessionSummary[] {
   }, [sessions, projectsByWorkspaceId, workspaces])
 }
 
-/**
- * Quick Actions' issue actions follow the focused terminal's own resolved
- * ticket — its own link, else its branch's — rather than always the branch's.
- */
+/** Quick Actions' issue actions follow the focused terminal's own resolved ticket — its own
+ * link, else its branch's — rather than always the branch's. */
 function useFocusedIssue(focusedSessionId: string | null) {
   const sessionFacts = useSessionFacts()
   const focusedFacts = focusedSessionId
@@ -126,10 +124,9 @@ function cycleTab(projectId: string | null, delta: number): void {
   if (list.length === 0) return
   const idx = list.findIndex((s) => s.id === store.getActiveSessionForProject?.(projectId))
   const next = list[(((idx + delta) % list.length) + list.length) % list.length]
-  // Cycling stays within the project already on screen — unlike the other
-  // "go to session" paths it must not switch to the session's own
-  // projectId — but still has to leave whatever tab is showing and ask
-  // for focus, the way every other path does.
+  // Cycling stays within the project already on screen — unlike the other "go to session" paths it
+  // must not switch to the session's own projectId — but still has to leave whatever tab is showing
+  // and ask for focus, the way every other path does.
   useExtensionRegistry.getState().setActiveGlobalTab(null)
   useExtensionRegistry.getState().setActiveWorkspaceTab(null)
   useExtensionRegistry.getState().setActiveProjectTab(null)

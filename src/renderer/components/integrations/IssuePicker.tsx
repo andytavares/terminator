@@ -66,11 +66,9 @@ function usePicker(onSelect: (issue: IssueSummary) => void, onClear: () => void)
   }
 }
 
-/**
- * Whether the list is open. The list is a dropdown, so it goes away the way one
- * does: Escape, or a pointer anywhere else. Without this it stayed open over
- * whatever it was opened from, and only picking an issue closed it.
- */
+/** Whether the list is open. The list is a dropdown, so it goes away the way one does: Escape,
+ * or a pointer anywhere else. Without this it stayed open over whatever it was opened from, and
+ * only picking an issue closed it. */
 function useDropdown() {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)

@@ -4,10 +4,8 @@ import { revealSession } from '../../terminal/navigate-to-session'
 import { closeSessionFromFacts } from '../../terminal/close-session'
 import { resumeSession } from '../../terminal/start-session'
 
-/**
- * What a session row or tile does on Home and the wall, the same everywhere:
- * open it, save its description, resume, close, or forget a closed one.
- */
+/** What a session row or tile does on Home and the wall, the same everywhere: open it, save its
+ * description, resume, close, or forget a closed one. */
 export const SESSION_ACTIONS: SessionActions = {
   onOpen: (sessionId) => revealSession(sessionId),
   onSaveDescription: (target, description) =>

@@ -43,12 +43,9 @@ export function readExtensionSettings(sink: {
     .catch(() => {})
 }
 
-// Any extension may declare per-notification-kind delivery settings using the
-// convention `<extensionId>.notify.<notificationKey>.(system|center|toast)`
-// (3 booleans per notification kind). This is a naming convention only — core
-// never knows which specific notification keys an extension defines — but it
-// lets the generic settings UI group them into a compact table instead of a
-// long list of individual switches.
+// A naming convention, `<extensionId>.notify.<notificationKey>.(system|center|toast)`, three
+// booleans per notification kind, which the settings UI groups into one table. Core never knows an
+// extension's notification keys.
 const NOTIFICATION_SETTING_KEY_RE = /^(.+)\.notify\.([^.]+)\.(system|center|toast)$/
 
 type DeliveryTarget = 'system' | 'center' | 'toast'
@@ -154,10 +151,8 @@ function settingText(value: unknown): string {
 
 type Save = (key: string, value: unknown) => Promise<void>
 
-/**
- * The setting's text as edited, saved 400ms after the last edit, and saved at
- * once if the panel closes first so closing does not lose it.
- */
+/** The setting's text as edited, saved 400ms after the last edit, and saved at once if the panel
+ * closes first so closing does not lose it. */
 function useDebouncedSetting(propKey: string, def: SettingPropDef, save: Save) {
   const [text, setText] = useState(settingText(def.default))
   const pending = useRef<{ timer: ReturnType<typeof setTimeout>; text: string } | null>(null)

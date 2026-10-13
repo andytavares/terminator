@@ -83,10 +83,8 @@ function useLinkMenu(canLink: boolean) {
   return { menu, closeMenu: () => setMenu(null), openMenu: canLink ? openMenu : undefined }
 }
 
-/**
- * Link issue… for a session with no link of its own, else change or remove
- * that link. Each closes the menu first.
- */
+/** Link issue… for a session with no link of its own, else change or remove that link. Each
+ * closes the menu first. */
 function linkItems(
   { onLinkIssue, onRemoveLink }: TerminalRowProps,
   key: string | null,

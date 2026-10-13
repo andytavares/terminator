@@ -31,15 +31,9 @@ export function useSidebarData() {
 
 export type SidebarData = ReturnType<typeof useSidebarData>
 
-/**
- * The sessions the list is built from, with their agent state derived.
- *
- * agentState is view state derived from bell, byte flow and exit — the type
- * says so, but nothing was deriving it, so every session read as 'idle'
- * forever and the Needs me / Active / Stale views filtered on a constant.
- * Deriving here keeps it a pure function of the store rather than a fourth
- * thing to hold in sync, and keeps buildGroups pure.
- */
+/** The sessions the list is built from, with agentState derived from bell, byte flow and exit.
+ * Derived here, so it is a pure function of the store rather than one more thing to keep in sync,
+ * and buildGroups stays pure. */
 function liveSessions(sessions: Map<string, TerminalSession>): TerminalSession[] {
   const source = new BellAndBusySource()
   // Derive before filtering: the keep-if-exited rule reads agentState, and
@@ -52,13 +46,9 @@ function liveSessions(sessions: Map<string, TerminalSession>): TerminalSession[]
     .filter((s) => s.status !== 'closed' || s.agentState === 'exited')
 }
 
-/**
- * Work in a terminal changes the tree under it, so a branch whose terminals
- * just stopped printing gets its statistics dropped rather than waiting out
- * the TTL: once per burst, not once per activity stamp. Tracked here rather
- * than in the session store: making the session store import the stats store
- * would couple two things that have no other reason to know about each other.
- */
+/** Drops a branch's change statistics once its terminals stop printing (once per burst), as their
+ * work changed the tree, rather than waiting out the TTL. Here, so the session store need not
+ * import the stats store. */
 function useRefreshStatsWhenSettled(sessionList: TerminalSession[]): void {
   const invalidateStats = useChangeStatsStore((s) => s.invalidate)
   /** Branches that were printing at the last render, so one settling refreshes its statistics. */
@@ -104,10 +94,8 @@ export function useSidebarRows({ data, view, views, now, workItems }: RowsInput)
   return { ...rows, viewCounts, clock, sessions, sessionList }
 }
 
-/**
- * What each view would show, so a chip can say "Needs me · 6" without the
- * user having to switch to it and look.
- */
+/** What each view would show, so a chip can say "Needs me · 6" without the user having to switch
+ * to it and look. */
 function countViews(
   views: SessionView[],
   source: BranchRowsSource,

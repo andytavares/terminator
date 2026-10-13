@@ -120,14 +120,8 @@ function useProjectFields(hasNonWorktreeProject: boolean) {
   return { draft, update, nameError, setNameError, error, setError, ...issue }
 }
 
-/**
- * Set when the operator started from an issue; drives the prefill and the
- * link made once the project exists.
- *
- * The prefill happens once. Every field stays editable afterwards and is never
- * re-derived: an operator who renamed the branch meant it, and a second
- * prefill would quietly undo their edit.
- */
+/** The issue the operator started from: it prefills the form once, and is linked once the project
+ * exists. Fields are never derived again: an operator who renamed the branch meant it. */
 function useStartingIssue(update: Update, setNameError: (error: string) => void) {
   const [issue, setIssue] = useState<IssueSummary | null>(null)
   const applyIssue = (picked: IssueSummary): void => {
@@ -187,11 +181,8 @@ function useBranchFetch({ gitRoot, setBranches }: Repo, setError: (error: string
 
 type Fields = ReturnType<typeof useProjectFields>
 
-/**
- * Keeps the worktree path following the branch: git's suggestion for it, or,
- * before one is named, the base directory, so users can see where worktrees go
- * by default.
- */
+/** Keeps the worktree path following the branch: git's suggestion for it, or, before one is
+ * named, the base directory, so users can see where worktrees go by default. */
 function useWorktreePath(
   { draft, update }: Fields,
   { gitRoot, baseDir }: { gitRoot: string | null; baseDir: string | undefined }

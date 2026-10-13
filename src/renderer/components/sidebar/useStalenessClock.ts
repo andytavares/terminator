@@ -2,10 +2,8 @@ import { useState } from 'react'
 import type { TerminalSession } from '../../../shared/types/index'
 import { staleSessionsKey } from '../../sidebar/view-model'
 
-/**
- * The branch rows read the clock only to decide staleness, so they are handed a
- * time that moves only when the set of stale sessions changes, not every tick.
- */
+/** The branch rows read the clock only to decide staleness, so they are handed a time that moves
+ * only when the set of stale sessions changes, not every tick. */
 export function useStalenessClock(
   sessions: TerminalSession[],
   now: number,

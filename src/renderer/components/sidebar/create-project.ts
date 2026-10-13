@@ -77,10 +77,8 @@ export function freeBranches(branches: Branch[], worktrees: WorktreeInfo[]): Bra
   return branches.filter((b) => !used.has(b.name))
 }
 
-/**
- * Creates the branch's card, and first the branch or worktree it needs. The
- * created project's id, or why nothing was created.
- */
+/** Creates the branch's card, and first the branch or worktree it needs. The created project's
+ * id, or why nothing was created. */
 export async function createFromDraft(request: CreateRequest): Promise<string | Refusal> {
   if (request.gitRoot && request.draft.branchMode === 'worktree') {
     return createOnWorktree(request.gitRoot, request)

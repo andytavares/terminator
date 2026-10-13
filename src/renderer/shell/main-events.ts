@@ -16,10 +16,8 @@ import { revealSession } from '../terminal/navigate-to-session'
 // What the main process tells the window: menu accelerators, notifications,
 // and what extensions ask the shell to do.
 
-/**
- * Counts a use of a core shortcut, so the palette stops hinting at it once the
- * operator knows it. Writes only when the count changed.
- */
+/** Counts a use of a core shortcut, so the palette stops hinting at it once the operator knows
+ * it. Writes only when the count changed. */
 export function recordDirectShortcut(actionId: string): void {
   const current = useSettingsStore.getState().globalSettings?.quickActions?.directUse ?? []
   const directUse = recordDirectUse(current, actionId)
@@ -136,10 +134,9 @@ function surfaceHandlers(
 /** Terminals an extension opens, closes or brings into view. */
 function terminalHandlers(): BridgeHandlers {
   return {
-    // A terminal an extension opened. The renderer owns the tab list, so
-    // without adopting it the process runs and nothing on screen ever shows
-    // it, and its output is held until the tab is mounted rather than
-    // delivered to nobody.
+    // A terminal an extension opened. The renderer owns the tab list, so without adopting it the
+    // process runs and nothing on screen ever shows it, and its output is held until the tab is
+    // mounted rather than delivered to nobody.
     'terminal:adopt': (data) => {
       const { sessionId, projectId, tabTitle, scrollbackLimit } = data as {
         sessionId: string

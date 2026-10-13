@@ -16,10 +16,8 @@ interface DragReorder {
   getItemProps: (index: number) => DragItemProps
 }
 
-/**
- * The list as it is now, read through a ref so a drop commits against it
- * rather than the list as it was when the drag started.
- */
+/** The list as it is now, read through a ref so a drop commits against it rather than the list
+ * as it was when the drag started. */
 function useCurrentItems<T>(items: T[]): React.MutableRefObject<T[]> {
   const itemsRef = useRef(items)
   useEffect(() => {

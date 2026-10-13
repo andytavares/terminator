@@ -10,12 +10,9 @@ function activeView(views: SessionView[], activeViewId: string, searchQuery: str
   return searchQuery ? { ...base, filters: { ...base.filters, query: searchQuery } } : base
 }
 
-/**
- * The saved views, which one is active, and the search.
- *
- * The active view is deliberately component state, never restored from
- * storage: a filtered view must never be what greets you at launch (FR-015).
- */
+/** The saved views, which one is active, and the search. The active view is deliberately
+ * component state, never restored from storage: a filtered view must never be what greets you
+ * at launch (FR-015). */
 export function useSidebarViews(initialViewId: string) {
   const [views, setViews] = useState(loadViews)
   const [activeViewId, setActiveViewId] = useState(initialViewId)

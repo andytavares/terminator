@@ -160,16 +160,9 @@ function useHighlightReset(
   }
 }
 
-/**
- * Focus follows the mode: the search box while searching, else the panel.
- *
- * Moving DOM focus into the panel as soon as it mounts matters. Without it,
- * focus stays on whatever was focused before ⌘P (most often the terminal), and
- * xterm attaches its own Escape handling directly to its textarea in the
- * capture phase — which stops propagation before this component's window-level
- * keydown listener ever sees the event. The panel would then never close on
- * Escape while a terminal had focus.
- */
+/** Focus follows the mode: the search box while searching, else the panel, from mount. Left on the
+ * terminal, xterm's capture-phase Escape handler stops the event before this window-level listener,
+ * and the panel would never close on Escape. */
 function usePanelFocus(mode: Mode) {
   const inputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -435,13 +428,8 @@ function RowList({ rows, offset, panel, pins, onTogglePin }: RowListProps): JSX.
   )
 }
 
-/**
- * `.qa-row` is a 3-column grid (`24px 1fr auto`). Omitting this element
- * entirely for a mnemonic-less action (a direct-shortcut-only action, or one
- * surfaced dynamically) left only 2 grid children, so the label landed in the
- * 24px key column and clipped to a single letter. An empty, invisible
- * placeholder keeps every row's children aligned to the same three columns.
- */
+/** Always rendered, empty for an action with no mnemonic: `.qa-row` is a 3-column grid (`24px
+ * 1fr auto`), and without it the label landed in the 24px key column, clipped to a letter. */
 function KeyLabel({ keyLabel }: { keyLabel: string }): JSX.Element {
   if (!keyLabel) return <span className="qa-key qa-key--empty" aria-hidden="true" />
   return <span className={`qa-key${keyLabel.length > 1 ? ' qa-key--wide' : ''}`}>{keyLabel}</span>

@@ -59,12 +59,9 @@ import type {
 
 type RemoteBehavior = 'same' | 'omit' | 'stub'
 
-/**
- * Whether extension views (WebContentsViews running an extension's renderer)
- * receive the method. 'shared': the app renderer and extension views both do.
- * 'only': extension views do, the app renderer and the remote client do not.
- * Absent: the app renderer only.
- */
+/** Whether extension views (WebContentsViews running an extension's renderer) receive the
+ * method. 'shared': the app renderer and extension views both do. 'only': extension views do,
+ * the app renderer and the remote client do not. Absent: the app renderer only. */
 export type ExtensionViewBehavior = 'shared' | 'only'
 
 export type BridgeMethod = (...args: never[]) => unknown

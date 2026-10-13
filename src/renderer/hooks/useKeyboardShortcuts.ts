@@ -47,11 +47,9 @@ interface KeyTarget {
   inTextField: boolean
 }
 
-/**
- * One core shortcut: when it applies, the CORE_SHORTCUTS action id it reports
- * (none for Cmd+P, which is no action, and for Cmd+1–9, which reports only when
- * there is a workspace to switch to), and what it does.
- */
+/** One core shortcut: when it applies, the CORE_SHORTCUTS action id it reports (none for Cmd+P,
+ * which is no action, and for Cmd+1–9, which reports only when there is a workspace to switch
+ * to), and what it does. */
 interface CoreKey {
   test(e: KeyboardEvent, at: KeyTarget): boolean
   actionId?: string | ((e: KeyboardEvent) => string)
@@ -137,10 +135,9 @@ const TERMINAL_KEYS: CoreKey[] = [
     run: (c) =>
       c.options.onNewTab ? c.options.onNewTab() : newTerminalTab(projectOf(c), terminalDeps(c)),
   },
-  // Cmd+D splits side by side, Cmd+Shift+D top and bottom. The effective
-  // project rather than the active one, so a scratch terminal splits too — it
-  // used to do nothing at all there, and say nothing, which reads as the
-  // feature having been removed rather than as not applying.
+  // Cmd+D splits side by side, Cmd+Shift+D top and bottom. The effective project rather than the
+  // active one, so a scratch terminal splits too — it used to do nothing at all there, and say
+  // nothing, which reads as the feature having been removed rather than as not applying.
   {
     test: (e, at) => at.isMeta && !e.shiftKey && e.key === 'd',
     actionId: 'core.split-vertical',
@@ -247,10 +244,8 @@ function handleKeyDown(e: KeyboardEvent, c: ShortcutContext): void {
   }
 }
 
-/**
- * The app's keyboard shortcuts, on the window. The store state they act on is
- * read when the key is pressed; the caller's callbacks are always its latest.
- */
+/** The app's keyboard shortcuts, on the window. The store state they act on is read when the key
+ * is pressed; the caller's callbacks are always its latest. */
 export function useKeyboardShortcuts(options: Options = {}): void {
   const { keyboardShortcuts } = useExtensionRegistry()
   const terminals = useTerminalSession()

@@ -19,13 +19,9 @@ function terminalRowsIn(element: Element): string[] {
   return terminal.readVisibleRows()
 }
 
-/**
- * Lets the end-to-end specs read what the terminals show. The WebGL renderer
- * draws into a canvas and leaves no text in the DOM, so the specs read each
- * terminal's xterm buffer here instead, which is the same under every renderer.
- * `terminalRows` reads every open terminal, one after another; a spec that
- * needs a row's place on screen reads one pane's terminal with `terminalRowsIn`.
- */
+/** Lets the e2e specs read the terminals' xterm buffers, as WebGL leaves no text in the DOM:
+ * `terminalRows` reads every open terminal in turn, `terminalRowsIn` one pane's, for a spec that
+ * needs a row's place on screen. */
 export function exposeTerminalRows(): void {
   window.terminatorE2E = {
     terminalRows: () => openTerminals().flatMap((terminal) => terminal.readVisibleRows()),

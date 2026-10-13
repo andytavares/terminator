@@ -66,11 +66,8 @@ const REFUSALS: Record<number, string> = {
   429: 'Too many attempts. Try again later',
 }
 
-/**
- * Logs in, then swaps the session for a one-time ticket to the mobile or the
- * desktop app and goes there. Resolves to why it could not, or null once it
- * has left the page.
- */
+/** Logs in, then swaps the session for a one-time ticket to the mobile or the desktop app and
+ * goes there. Resolves to why it could not, or null once it has left the page. */
 async function logIn(password: string): Promise<string | null> {
   const res = await fetch('/api/login', {
     method: 'POST',

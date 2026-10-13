@@ -282,26 +282,9 @@ function sortGroups(groups: RepoGroup[], sortBy: SortKey, source: BranchRowsSour
     .sort(byRepo)
 }
 
-/**
- * The sidebar's list: repos, and the branches under them.
- *
- * Written beside `buildGroups` rather than replacing it, so the switch can land
- * under a passing suite. The difference that matters is BR-1: **every branch is
- * a row, whether or not a terminal is open on it**, unconditionally. `buildGroups`
- * seeded empty project buckets only while the view was un-narrowed; here a
- * branch is the unit of work and exists in its own right, so only a filter can
- * hide it.
- *
- * A filter lifts one level: a branch matches when any of its terminals matches.
- * A branch with no terminals therefore matches only an unfiltered view — except
- * `hideStale`, which is a standing preference about abandoned work and has
- * nothing to say about a branch nobody has started yet.
- *
- * Deliberately absent: change statistics and the linked issue key. Both arrive
- * from stores on their own schedule, and folding them in here would make the
- * result a function of when git or the tracker last answered, which is exactly
- * the determinism this layer exists to protect (ADR-031).
- */
+/** The sidebar's repos and branches: every branch is a row, terminal or not (BR-1). A filter keeps
+ * a branch when one of its terminals matches; one with none survives only `hideStale`. No change
+ * stats or issue keys: they arrive on their own schedule, and this layer stays pure (ADR-031). */
 export function buildBranchRows(
   source: BranchRowsSource,
   view: SessionView,

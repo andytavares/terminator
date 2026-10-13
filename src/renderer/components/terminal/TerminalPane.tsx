@@ -97,16 +97,9 @@ function useSinglePaneMount(
 
 type PaneState = ReturnType<typeof usePaneState>
 
-// Any "go to session" path (sidebar click, Quick Actions, a notification)
-// bumps focusRequest.nonce, even when the requested session was already
-// active — which is exactly the case a change to activeSessionId alone
-// cannot see, so this cannot be keyed off activeSessionId. Only reacts when
-// the requested session belongs to this pane's project: single mode, it is
-// the active session; split mode, it is one of the leaves.
-// The request this pane last met. A modal closing re-runs the effect so a
-// request made while it was open is met then; one already met is not met
-// again, or closing Quick Actions would take focus from what the action
-// just focused (the note editor of Edit session note).
+// Keyed on focusRequest.nonce, which every "go to session" path bumps even for the active session,
+// for this pane's sessions only. A request is met once: a modal closing meets one made while it was
+// open, and never re-takes focus from what an action focused (Edit session note's editor).
 function useFocusRequests(
   projectId: string,
   { focusRequest, layout, activeSessionId }: PaneState

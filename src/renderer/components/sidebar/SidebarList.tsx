@@ -42,13 +42,9 @@ export function useSidebarCollapse() {
   return {
     isCollapsed: (namespace: GroupKey, key: string) => isCollapsed(state, namespace, key),
     toggle,
-    /**
-     * Whether a branch's terminals are listed.
-     *
-     * The polarity is *collapsed*, like every other group here — but a branch's
-     * terminals start hidden, because the sidebar's job is still to stop at the
-     * branch by default (ADR-035) and expanding is how you go further.
-     */
+    /** Whether a branch's terminals are listed. The polarity is *collapsed*, like every other
+     * group here — but a branch's terminals start hidden, because the sidebar's job is still to
+     * stop at the branch by default (ADR-035) and expanding is how you go further. */
     terminalsExpanded: (projectId: string) => isCollapsed(state, TERMINALS_NAMESPACE, projectId),
   }
 }
@@ -76,13 +72,9 @@ export interface RowContext {
   onSelectWorkspaceTab: (workspaceId: string, tabId: string) => void
 }
 
-/**
- * The repos, in the order drawn, each with its branches.
- *
- * A drag reorders the list as drawn, which is not the list as stored the
- * moment a computed sort or a filter is on. So the hook is given the drawn
- * repos, and the context folds the result back into the stored list.
- */
+/** The repos, in the order drawn, each with its branches. A drag reorders the list as drawn,
+ * which is not the list as stored the moment a computed sort or a filter is on. So the hook is
+ * given the drawn repos, and the context folds the result back into the stored list. */
 export function RepoList({ groups, ctx }: { groups: RepoGroup[]; ctx: RowContext }) {
   const { workspaceById } = ctx.data
   const drawn = useMemo(
@@ -167,12 +159,8 @@ interface BranchListProps {
   ctx: RowContext
 }
 
-/**
- * One repo's branches, drag-reorderable.
- *
- * A component rather than a loop in the parent because each repo needs its own
- * drag state and a hook cannot be called per iteration.
- */
+/** One repo's branches, drag-reorderable. A component rather than a loop in the parent because
+ * each repo needs its own drag state and a hook cannot be called per iteration. */
 function BranchList({ rows, workspace, onReorder, ctx }: BranchListProps): JSX.Element {
   const { dragOverIndex, getItemProps } = useDragReorder(rows, (reordered) =>
     onReorder?.(reordered)
@@ -268,10 +256,8 @@ function branchRowActions(row: BranchRowData, renamable: boolean, ctx: RowContex
   }
 }
 
-/**
- * Asks for a branch's change volume each time its row renders — the store
- * answers from its cache inside the TTL — and never awaits the answer.
- */
+/** Asks for a branch's change volume each time its row renders — the store answers from its
+ * cache inside the TTL — and never awaits the answer. */
 function requestChangeStats(projectId: string, cwd: string | undefined, now: number): void {
   if (cwd) useChangeStatsStore.getState().ensure(projectId, cwd, now)
 }

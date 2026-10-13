@@ -16,12 +16,9 @@ interface ScratchSectionProps {
   onSelectScratchSession: (sessionId: string) => void
 }
 
-/**
- * Scratch terminals belong to no branch, so they are the one place a terminal
- * is still a row. Drawn as branch rows because in this section a scratch
- * terminal IS the unit of work — same anatomy, same vocabulary, and no colour
- * rail because it has no repo.
- */
+/** Scratch terminals belong to no branch, so they are the one place a terminal is still a row.
+ * Drawn as branch rows because in this section a scratch terminal IS the unit of work — same
+ * anatomy, same vocabulary, and no colour rail because it has no repo. */
 export function ScratchSection(props: ScratchSectionProps): JSX.Element {
   const { scratch, sessions, workItems, now } = props
   return (

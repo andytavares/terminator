@@ -14,10 +14,8 @@ function ensureOpen(id: string): void {
   if (!registry.openPanels.has(id)) registry.togglePanel(id)
 }
 
-/**
- * Restores the panels open at the last quit (once extensions have registered
- * them), saves them whenever they change, and tells main which are open.
- */
+/** Restores the panels open at the last quit (once extensions have registered them), saves them
+ * whenever they change, and tells main which are open. */
 export function usePanelPersistence(openPanels: Set<string>): void {
   const panelsRestored = useRef(false)
   useEffect(() => {
@@ -41,10 +39,8 @@ export function usePanelPersistence(openPanels: Set<string>): void {
   }, [openPanels])
 }
 
-/**
- * Closes the open panels while an extension's project tab is showing, and
- * reopens them when the operator comes back to the terminal.
- */
+/** Closes the open panels while an extension's project tab is showing, and reopens them when the
+ * operator comes back to the terminal. */
 export function usePanelsAroundProjectTabs(
   openPanels: Set<string>,
   activeProjectTabId: string | null
@@ -70,10 +66,8 @@ export function usePanelsAroundProjectTabs(
   }, [activeProjectTabId])
 }
 
-/**
- * Every non-core surface an extension registered, generic over the four
- * registration kinds — core never names an extension (Constitution II).
- */
+/** Every non-core surface an extension registered, generic over the four registration kinds —
+ * core never names an extension (Constitution II). */
 export function useSurfaces(): SurfaceRegistration[] {
   const { globalTabs, workspaceTabs, projectTabs, sidebarPanels } = useExtensionRegistry(
     useShallow((s) => ({

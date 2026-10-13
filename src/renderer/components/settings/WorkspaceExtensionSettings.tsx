@@ -34,10 +34,8 @@ function useExtensionSettings() {
   return { groups: workspaceScopedSettings(schemas), values }
 }
 
-/**
- * The extension settings a workspace may set for itself: each shows the value
- * that applies here, and "Use global default" once the workspace sets its own.
- */
+/** The extension settings a workspace may set for itself: each shows the value that applies
+ * here, and "Use global default" once the workspace sets its own. */
 export function WorkspaceExtensionSettings({ workspaceId }: { workspaceId: string }) {
   const { groups, values } = useExtensionSettings()
   const own = useSettingsStore((s) => s.workspaceSettings.get(workspaceId)?.extensions)

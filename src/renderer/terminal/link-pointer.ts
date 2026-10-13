@@ -20,10 +20,8 @@ function openTarget(target: LinkTarget): void {
   else window.electronAPI.shell.openPath(target.path).catch(() => {})
 }
 
-/**
- * Underlines the link under the pointer while ⌘ (Ctrl off macOS) is held, and
- * opens it on ⌘-click. On macOS Ctrl-click is a secondary click, left alone.
- */
+/** Underlines the link under the pointer while ⌘ (Ctrl off macOS) is held, and opens it on
+ * ⌘-click. On macOS Ctrl-click is a secondary click, left alone. */
 export class LinkPointer {
   /** A 1px line under the hovered link, inside the terminal's element. */
   readonly overlay: HTMLDivElement

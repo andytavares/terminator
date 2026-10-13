@@ -32,11 +32,8 @@ function storeWidth(width: number): void {
   }
 }
 
-/**
- * The sidebar's width: stored across launches, dragged from its handle (the
- * element follows the pointer, state is written once on release), and reset
- * to the default by a double click.
- */
+/** The sidebar's width: stored across launches, dragged from its handle (the element follows the
+ * pointer, state is written once on release), and reset to the default by a double click. */
 export function useSidebarWidth() {
   const [width, setWidth] = useState(readStoredWidth)
   const sidebarRef = useRef<HTMLDivElement>(null)

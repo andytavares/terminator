@@ -2,10 +2,8 @@ import React, { useEffect, useRef, useState, type ReactNode } from 'react'
 import { closeAllContextMenus } from '../ContextMenu'
 import { useMenuPlacement } from '../use-menu-placement'
 
-/**
- * One drop-down menu's state: open or not, where its panel sits, and closing
- * on any click outside it or when another context menu opens.
- */
+/** One drop-down menu's state: open or not, where its panel sits, and closing on any click
+ * outside it or when another context menu opens. */
 function useMenu() {
   const [open, setOpen] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)

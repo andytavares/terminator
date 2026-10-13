@@ -123,11 +123,8 @@ function useShellWindows() {
 
 type ShellWindows = ReturnType<typeof useShellWindows>
 
-/**
- * The palette: open or not, when it was opened (for ranking recent use), and
- * a signal that ⌘P was pressed again while it was open, which switches it to
- * search.
- */
+/** The palette: open or not, when it was opened (for ranking recent use), and a signal that ⌘P
+ * was pressed again while it was open, which switches it to search. */
 function useQuickActionsPanel() {
   const [isOpen, setIsOpen] = useState(false)
   const [openedAt, setOpenedAt] = useState(0)
@@ -248,10 +245,8 @@ function useShellCommands({ windows, launch, note }: CommandsInput): ShellComman
   )
 }
 
-/**
- * App-level destinations in a stable order: core's first, then contributed
- * ones, unless a registration asked for a place of its own.
- */
+/** App-level destinations in a stable order: core's first, then contributed ones, unless a
+ * registration asked for a place of its own. */
 function ShellBand({ onOpenQuickActions }: { onOpenQuickActions: () => void }): JSX.Element {
   const { globalTabs, activeGlobalTabId } = useExtensionRegistry(
     useShallow((s) => ({ globalTabs: s.globalTabs, activeGlobalTabId: s.activeGlobalTabId }))

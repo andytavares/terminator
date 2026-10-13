@@ -66,13 +66,9 @@ function groupOf(key: string, label: string, facts: SessionFacts[]): LedgerGroup
   return facts.length === 0 ? [] : [{ key, label, facts }]
 }
 
-/**
- * The Ledger's rows, grouped and ordered.
- *
- * Filters apply first, so a group that loses every row to them is not drawn.
- * Closed sessions are always their own last group, newest first: they are
- * history, and ordering them by state would put every one of them last anyway.
- */
+/** The Ledger's rows, grouped and ordered. Filters apply first, so a group that loses every row
+ * to them is not drawn. Closed sessions are always their own last group, newest first: they are
+ * history, and ordering them by state would put every one of them last anyway. */
 export function buildLedger(
   facts: readonly SessionFacts[],
   prefs: HomePrefs,

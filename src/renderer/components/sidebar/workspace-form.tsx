@@ -48,10 +48,8 @@ export function useWorkspaceForm(initial: WorkspaceDraft, nameTaken: (name: stri
 
 type WorkspaceForm = ReturnType<typeof useWorkspaceForm>
 
-/**
- * Shows a refused save on the form: a taken name beside the name, anything
- * else as `failure`. False, narrowing to the saved workspace, when it went through.
- */
+/** Shows a refused save on the form: a taken name beside the name, anything else as `failure`.
+ * False, narrowing to the saved workspace, when it went through. */
 export function showSaveError(
   form: WorkspaceForm,
   result: { workspace: Workspace } | { error: string },

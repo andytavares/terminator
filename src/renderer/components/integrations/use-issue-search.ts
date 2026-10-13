@@ -30,10 +30,8 @@ function useIssueQuery(mineLimit: number | undefined) {
   )
 }
 
-/**
- * The issues a picker lists, the search debounced and only the latest
- * answer kept. Nothing is fetched while `enabled` is false.
- */
+/** The issues a picker lists, the search debounced and only the latest answer kept. Nothing is
+ * fetched while `enabled` is false. */
 export function useIssueSearch(
   term: string,
   enabled: boolean,

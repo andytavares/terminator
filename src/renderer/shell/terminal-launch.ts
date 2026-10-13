@@ -93,12 +93,9 @@ export function useTerminalLaunch() {
   }
 }
 
-/**
- * Opens a terminal whenever the Terminal tab is active and has none. Covers
- * the first selection of a branch, coming back from an extension tab, and the
- * last terminal closing. A failure is kept for the branch to show, and a
- * retry from there runs this again.
- */
+/** Opens a terminal whenever the Terminal tab is active and has none. Covers the first selection
+ * of a branch, coming back from an extension tab, and the last terminal closing. A failure is
+ * kept for the branch to show, and a retry from there runs this again. */
 export function useAutoOpenTerminal(activeProjectTabId: string | null): void {
   const { createSession } = useTerminalSession()
   const activeProjectId = useWorkspaceStore((s) => s.activeProjectId)

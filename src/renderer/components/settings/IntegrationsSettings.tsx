@@ -33,10 +33,8 @@ function StatusDot({ connection }: { connection: TrackerConnection | undefined }
 
 type ConnectInput = Parameters<ReturnType<typeof useIntegrationsStore.getState>['connect']>[0]
 
-/**
- * Sending a credential for `tracker`: busy while main verifies it, and the
- * error it gave back, cleared as soon as the operator types again.
- */
+/** Sending a credential for `tracker`: busy while main verifies it, and the error it gave back,
+ * cleared as soon as the operator types again. */
 function useConnect(tracker: TrackerId) {
   const error = useIntegrationsStore((s) => s.connectError[tracker])
   const [busy, setBusy] = useState(false)
@@ -156,10 +154,8 @@ const DEFAULT_JQL = 'assignee = currentUser() AND resolution = Unresolved'
 
 type JiraDraft = { site: string; email: string; apiToken: string; jql: string }
 
-/**
- * The Jira form's fields and sending them. The token is cleared after every
- * attempt, the site and email only once connected.
- */
+/** The Jira form's fields and sending them. The token is cleared after every attempt, the site
+ * and email only once connected. */
 function useJiraForm() {
   const { connect, clearError, ...state } = useConnect('jira')
   const [draft, setDraft] = useState<JiraDraft>({

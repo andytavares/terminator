@@ -197,11 +197,8 @@ function useSidebarSources({ workspaces, projectsByWorkspaceId, allProjects }: S
   useTrackerLinks(allProjects)
 }
 
-/**
- * The sidebar's view model knows nothing about issue trackers; it deals in
- * projects. Each branch's link is loaded here, by project id, and looked up by
- * its row.
- */
+/** The sidebar's view model knows nothing about issue trackers; it deals in projects. Each
+ * branch's link is loaded here, by project id, and looked up by its row. */
 function useTrackerLinks(allProjects: SidebarData['allProjects']): void {
   const { loadLink, subscribe, loadConnections } = useIntegrationsStore(
     useShallow((s) => ({
@@ -220,10 +217,8 @@ function useTrackerLinks(allProjects: SidebarData['allProjects']): void {
   }, [allProjects, loadLink])
 }
 
-/**
- * A session's own link, keyed by session id, so a terminal row can draw it
- * without the pure branch-rows layer knowing trackers exist (ADR-031).
- */
+/** A session's own link, keyed by session id, so a terminal row can draw it without the pure
+ * branch-rows layer knowing trackers exist (ADR-031). */
 function useSessionLinks() {
   const sessionFacts = useSessionFacts()
   const factsBySessionId = useMemo(

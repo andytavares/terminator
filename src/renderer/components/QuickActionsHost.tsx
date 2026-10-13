@@ -116,10 +116,7 @@ function rendererCommand(c: CommandRegistration): RendererCommand {
   }
 }
 
-/**
- * What a custom action runs against: the focused terminal, and the variables
- * its body can use.
- */
+/** What a custom action runs against: the focused terminal, and the variables its body can use. */
 function useCustomEnv(target: QuickActionTarget): CustomRunEnv {
   const { activeWorkspace, activeProject } = useActiveScope()
   const activeProjectId = useWorkspaceStore((s) => s.activeProjectId)
@@ -243,11 +240,8 @@ function contextLabelFor(
   return target.focusedSession ? `in terminal · ${target.focusedSession.tabTitle}` : undefined
 }
 
-/**
- * The palette and everything it offers, mounted only while it is open: the
- * actions read every session, so building them is work the closed palette
- * should not cost the rest of the app.
- */
+/** The palette and everything it offers, mounted only while it is open: the actions read every
+ * session, so building them is work the closed palette should not cost the rest of the app. */
 export function QuickActionsHost(props: QuickActionsHostProps): JSX.Element {
   const target = useQuickActionTarget()
   const quickActionGroups = useExtensionRegistry((s) => s.quickActionGroups)

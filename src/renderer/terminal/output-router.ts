@@ -12,15 +12,9 @@ function route(sessionId: string, data: string): void {
   else acknowledge()
 }
 
-/**
- * Receive the output of one session. All sessions share one `terminal:output`
- * listener, installed with the first subscriber and kept for the life of the
- * page, so N terminals cost one IPC handler rather than N handlers each
- * filtering by id, and output for a session that has no subscriber is still
- * acknowledged.
- * The handler calls `written` once xterm has taken the data, which is what lets
- * main pause a process that outruns the renderer (flow control).
- */
+/** One session's output, through one shared `terminal:output` listener kept for the page's life,
+ * which also acknowledges output nobody subscribes to. The handler calls `written` once xterm took
+ * the data, which lets main pause a process that outruns the renderer (flow control). */
 export function subscribeToSessionOutput(sessionId: string, handler: OutputHandler): () => void {
   if (!listening) {
     window.electronAPI.terminal.onOutput(route)

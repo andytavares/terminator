@@ -58,10 +58,8 @@ function unlinkAndClose(projectId: string, onClose: () => void): void {
   onClose()
 }
 
-/**
- * The literal text an agent session on this branch would receive, read again
- * whenever the issue does.
- */
+/** The literal text an agent session on this branch would receive, read again whenever the issue
+ * does. */
 function useContextPreview(projectId: string, issue: Issue | null): AgentContext | null {
   const [context, setContext] = useState<AgentContext | null>(null)
   useEffect(() => {

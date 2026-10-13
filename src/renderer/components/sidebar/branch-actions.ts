@@ -20,11 +20,9 @@ const EDITOR_ERRORS: Record<string, string> = {
   VALIDATION_ERROR: 'That folder could not be opened.',
 }
 
-/**
- * Opening reports back. The first version discarded the result, so a folder
- * that had moved, or a machine with no editor, produced exactly nothing on
- * screen — indistinguishable from the action not being wired up at all.
- */
+/** Opening reports back. The first version discarded the result, so a folder that had moved, or
+ * a machine with no editor, produced exactly nothing on screen — indistinguishable from the
+ * action not being wired up at all. */
 export function openInEditor(folderPath: string | undefined): void {
   const say = (message: string): void =>
     useToastStore.getState().addToast({ type: 'error', message })
@@ -58,14 +56,8 @@ function startTerminal(project: Project, createSession: CreateSession): void {
   }).catch(() => {})
 }
 
-/**
- * Which terminal a branch opens on (FR-047).
- *
- * One that is waiting on you first — it is the only state blocked on you and
- * the reason you clicked. Then the one you last had open on this branch,
- * which the store has kept all along. Then the most recently active. A branch
- * with none is left to the caller to offer starting one.
- */
+/** The terminal a branch opens on (FR-047): one waiting on you (why you clicked), else the one you
+ * last had open here, else the most recently active. With none, the caller offers to start one. */
 function terminalToFocus(sessionList: TerminalSession[], projectId: string): string | undefined {
   const own = sessionList.filter((s) => s.projectId === projectId)
   if (own.length === 0) return undefined
@@ -90,11 +82,9 @@ export function useBranchActions({ data, sessionList, onSelectProject }: Actions
 
   const selectProjectScope = (project: Project): void => selectProject(project, onSelectProject)
 
-  /**
-   * Selecting a session sets activeProjectId as well as the project's active
-   * session. Leaving activeProjectId undefined under a non-project grouping
-   * would break per-project auto-open and the project tab bar (invariant I4).
-   */
+  /** Selecting a session sets activeProjectId as well as the project's active session. Leaving
+   * activeProjectId undefined under a non-project grouping would break per-project auto-open
+   * and the project tab bar (invariant I4). */
   function selectSession(sessionId: string): void {
     revealSession(sessionId)
     onSelectProject?.()
@@ -125,11 +115,8 @@ export function useBranchActions({ data, sessionList, onSelectProject }: Actions
   }
 }
 
-/**
- * Selecting a project is what the tree's project row did on click, and what
- * the per-project auto-open effect keys off: a project with no sessions gets
- * its first terminal from this.
- */
+/** Selecting a project is what the tree's project row did on click, and what the per-project
+ * auto-open effect keys off: a project with no sessions gets its first terminal from this. */
 function selectProject(project: Project, onSelectProject: (() => void) | undefined): void {
   useWorkspaceStore.getState().setActiveWorkspace(project.workspaceId)
   useWorkspaceStore.getState().setActiveProject(project.id)
@@ -142,11 +129,8 @@ function closeTerminal(projectId: string, sessionId: string): void {
   void useSessionStore.getState().closeSession(sessionId)
 }
 
-/**
- * The folder a branch's work happens in: its own working copy when it has
- * one, else the repo it was checked out from. Same resolution the terminal
- * and the change statistics use.
- */
+/** The folder a branch's work happens in: its own working copy when it has one, else the repo it
+ * was checked out from. Same resolution the terminal and the change statistics use. */
 function folderForBranch(
   { projectById, workspaceById }: SidebarData,
   projectId: string
@@ -158,10 +142,8 @@ function folderForBranch(
 
 export type BranchActions = ReturnType<typeof useBranchActions>
 
-/**
- * FR-027 lists three ways to reach a scope action: the group header, the row
- * scope menu, and the command palette. This is the third.
- */
+/** FR-027 lists three ways to reach a scope action: the group header, the row scope menu, and
+ * the command palette. This is the third. */
 function useNewTerminalCommands(
   { allProjects, workspaceById }: SidebarData,
   createSession: CreateSession
@@ -180,10 +162,8 @@ function useNewTerminalCommands(
   }, [allProjects, workspaceById, registerCommand, createSession])
 }
 
-/**
- * Qualified by repo: every repo's default branch is called main, so an
- * unqualified label lists the same words once per repo.
- */
+/** Qualified by repo: every repo's default branch is called main, so an unqualified label lists
+ * the same words once per repo. */
 function commandBranchLabel(project: Project, workspaceById: Map<string, Workspace>): string {
   return qualifiedBranchLabel(project, workspaceById.get(project.workspaceId)?.name)
 }
