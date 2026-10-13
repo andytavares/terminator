@@ -46,7 +46,7 @@ async function insertTaggedTask(db: ExtensionDB, fullText: string, place: Placem
   return { taskId: id }
 }
 
-async function capture({ db }: IpcContext, args: z.infer<typeof CaptureRequestSchema>) {
+async function insertCapture({ db }: IpcContext, args: z.infer<typeof CaptureRequestSchema>) {
   const { text, hintArea, hintProject } = args
   const tags: string[] = []
   if (hintProject) tags.push(`@${hintProject}`)
@@ -65,7 +65,7 @@ function taggedText(args: z.infer<typeof AddTaskRequestSchema>): string {
   return parts.join(' ')
 }
 
-async function addTask({ db }: IpcContext, args: z.infer<typeof AddTaskRequestSchema>) {
+async function insertNewTask({ db }: IpcContext, args: z.infer<typeof AddTaskRequestSchema>) {
   const { source, sourceRef } = resolveSource(args.filePath)
   const todaySince = source === 'daily' ? (sourceRef ?? null) : null
   return insertTaggedTask(db, taggedText(args), { source, sourceRef, todaySince })
@@ -117,8 +117,8 @@ async function addSubtask({ db }: IpcContext, args: z.infer<typeof AddSubtaskReq
 
 /** Channels that put new task text into the vault or rewrite it. */
 export const CAPTURE_ROUTES = [
-  route('task-vault:vault:capture', CaptureRequestSchema, capture),
-  route('task-vault:vault:add-task', AddTaskRequestSchema, addTask),
+  route('task-vault:vault:capture', CaptureRequestSchema, insertCapture),
+  route('task-vault:vault:add-task', AddTaskRequestSchema, insertNewTask),
   route('task-vault:vault:edit-task', EditTaskRequestSchema, editTask),
   route('task-vault:vault:add-subtask', AddSubtaskRequestSchema, addSubtask),
 ]

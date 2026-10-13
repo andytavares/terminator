@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Dialog, formatRelativeTime } from '@terminator/extension-ui'
 import { Lock } from 'lucide-react'
 import { githubAPI } from '../../api/github'
-import { errorText } from '../text'
+import { errorMessageOf } from '../text'
 
 interface Repo {
   fullName: string
@@ -54,7 +54,7 @@ async function fetchAccessibleRepos(refresh: boolean): Promise<Loaded> {
   try {
     return (await githubAPI.accessibleRepos(refresh)) as Loaded
   } catch (err) {
-    return { error: errorText(err) }
+    return { error: errorMessageOf(err) }
   }
 }
 
@@ -123,7 +123,7 @@ function useRepoSelection(initial: string[], onSaved: () => void) {
       await githubAPI.setReviewRepos([...selected])
       onSaved()
     } catch (err) {
-      setSaveError(errorText(err))
+      setSaveError(errorMessageOf(err))
       setSaving(false)
     }
   }

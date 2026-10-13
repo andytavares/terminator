@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ExtensionDB } from '@terminator/extension-sdk'
-import { createIpcHarness, createVaultDb, taskRow } from '../support/vault-db'
+import { createIpcHarness, createVaultDb, selectTaskRow } from '../support/vault-db'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
   triggerSchedulerTick: vi.fn(),
@@ -36,7 +36,7 @@ function taskVaultVaultCaptureIPCStoringTests() {
   it('stores an open inbox task and returns its id', async () => {
     const { taskId } = (await captureVia({ text: 'New task' })) as { taskId: string }
 
-    expect(await taskRow(db, taskId)).toMatchObject({
+    expect(await selectTaskRow(db, taskId)).toMatchObject({
       text: 'New task',
       status: 'open',
       source: 'inbox',

@@ -195,11 +195,11 @@ function InboxBody({ items, load, processing: mode }: BodyProps) {
 
   if (items.length === 0) return <EmptyInbox />
   if (processing) {
-    const back = () => {
+    const backToInbox = () => {
       setProcessing(false)
       void load()
     }
-    return <ProcessingPane items={items} onBack={back} onDone={handleDone} />
+    return <ProcessingPane items={items} onBack={backToInbox} onDone={handleDone} />
   }
   const process = async () => {
     await load()

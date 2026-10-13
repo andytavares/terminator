@@ -7,7 +7,7 @@ import {
   seedArea,
   seedProject,
   seedTask,
-  taskRow,
+  selectTaskRow,
   taskMetadata,
 } from '../support/vault-db'
 
@@ -99,7 +99,7 @@ describe('task-vault:vault:cancel-task', () => {
     expect(await harness.invoke('task-vault:vault:cancel-task', { taskId: 'task-1' })).toEqual({
       success: true,
     })
-    expect(await taskRow(db, 'task-1')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({ status: 'cancelled' })
   })
 
   it('returns STALE_ID for an unknown task', async () => {
@@ -120,7 +120,10 @@ function taskReopeningTests(channel: string) {
     await seedTask(db, { id: 'task-1', status: 'done', completedDate: '2026-01-05' })
 
     expect(await harness.invoke(channel, { taskId: 'task-1' })).toEqual({ success: true })
-    expect(await taskRow(db, 'task-1')).toMatchObject({ status: 'open', completed_date: null })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
+      status: 'open',
+      completed_date: null,
+    })
   })
 
   it('returns STALE_ID for an unknown task', async () => {
@@ -163,7 +166,7 @@ function migrationSubtaskTests(channel: string) {
 
     await harness.invoke(channel, { taskId: 'parent-1' })
 
-    expect(await taskRow(db, 'sub')).toMatchObject({ status: 'open', migrated_to: null })
+    expect(await selectTaskRow(db, 'sub')).toMatchObject({ status: 'open', migrated_to: null })
     expect(await taskMetadata(db, 'sub')).toEqual({})
   })
 }
@@ -176,11 +179,14 @@ describe('task-vault:vault:restore-task', () => {
     await harness.invoke('task-vault:vault:restore-task', { taskId: 'restored' })
     await harness.invoke('task-vault:vault:reopen-task', { taskId: 'reopened' })
 
-    expect(await taskRow(db, 'restored')).toMatchObject({
+    expect(await selectTaskRow(db, 'restored')).toMatchObject({
       source: 'daily',
       source_ref: localDate(),
     })
-    expect(await taskRow(db, 'reopened')).toMatchObject({ source: 'someday', source_ref: null })
+    expect(await selectTaskRow(db, 'reopened')).toMatchObject({
+      source: 'someday',
+      source_ref: null,
+    })
   })
 })
 
@@ -331,7 +337,7 @@ function taskVaultVaultCompleteTaskCompletingTests() {
     expect(await harness.invoke('task-vault:vault:complete-task', { taskId: 'task-1' })).toEqual({
       success: true,
     })
-    expect(await taskRow(db, 'task-1')).toMatchObject({
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       status: 'done',
       completed_date: localDate(),
     })
@@ -391,7 +397,7 @@ function taskVaultVaultAddTaskInboxDailyTests() {
       taskId: string
     }
 
-    expect(await taskRow(db, taskId)).toMatchObject({
+    expect(await selectTaskRow(db, taskId)).toMatchObject({
       text: 'New task',
       source: 'inbox',
       source_ref: null,
@@ -404,7 +410,7 @@ function taskVaultVaultAddTaskInboxDailyTests() {
       text: 'Daily task',
     })) as { taskId: string }
 
-    expect(await taskRow(db, taskId)).toMatchObject({
+    expect(await selectTaskRow(db, taskId)).toMatchObject({
       source: 'daily',
       source_ref: '2026-05-20',
       today_since: '2026-05-20',
@@ -496,13 +502,13 @@ function taskVaultVaultGetTodayRollingOverTests() {
       const result = await getTodayVia()
 
       expect(result.rolledOver).toBe(1)
-      expect(await taskRow(db, 'old')).toMatchObject({
+      expect(await selectTaskRow(db, 'old')).toMatchObject({
         status: 'migrated',
         migrated_to: localDate(),
       })
-      expect(await taskRow(db, 'old-sub')).toMatchObject({ source_ref: localDate() })
+      expect(await selectTaskRow(db, 'old-sub')).toMatchObject({ source_ref: localDate() })
       const [newId] = result.rolledOverIds
-      expect(await taskRow(db, newId)).toMatchObject({
+      expect(await selectTaskRow(db, newId)).toMatchObject({
         status: 'open',
         source: 'daily',
         source_ref: localDate(),
@@ -565,12 +571,12 @@ function taskVaultVaultMigrateTaskMigratingTests() {
       newTaskId: string
     }
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       status: 'migrated',
       migrated_to: '2026-05-21',
     })
     expect(await taskMetadata(db, 'task-1')).toEqual({ migration_twin_id: newTaskId })
-    expect(await taskRow(db, newTaskId)).toMatchObject({
+    expect(await selectTaskRow(db, newTaskId)).toMatchObject({
       text: 'Carry on',
       status: 'open',
       project_id: 'p1',
@@ -597,8 +603,8 @@ function taskVaultVaultMigrateTaskSubtasksTests() {
       newTaskId: string
     }
 
-    expect(await taskRow(db, 'sub-1')).toMatchObject({ status: 'migrated' })
-    expect(await taskRow(db, 'sub-2')).toMatchObject({ status: 'migrated' })
+    expect(await selectTaskRow(db, 'sub-1')).toMatchObject({ status: 'migrated' })
+    expect(await selectTaskRow(db, 'sub-2')).toMatchObject({ status: 'migrated' })
     const twins = await db.query<Record<string, unknown>>(
       `SELECT text, status, source_ref FROM tasks WHERE parent_id = ? ORDER BY sort_order`,
       [newTaskId]
@@ -619,7 +625,7 @@ function taskVaultVaultMigrateTaskNoOpsErrorsTests() {
       newTaskId: 'task-1',
     })
     expect(await taskIds()).toEqual(['task-1'])
-    expect(await taskRow(db, 'task-1')).toMatchObject({ status: 'open' })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({ status: 'open' })
   })
 
   it('returns STALE_ID for an unknown task', async () => {
@@ -715,7 +721,7 @@ function taskVaultVaultBlockTaskBlockingTests() {
     })
 
     expect(result).toEqual({ success: true })
-    expect(await taskRow(db, 'task-1')).toMatchObject({
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       status: 'blocked',
       blocked_reason: 'Waiting on design',
       blocked_check_interval: '1-day',
@@ -745,7 +751,7 @@ function taskVaultVaultBlockTaskUnblockingReopeningTests() {
     expect(await harness.invoke('task-vault:vault:unblock-task', { taskId: 'task-1' })).toEqual({
       success: true,
     })
-    expect(await taskRow(db, 'task-1')).toMatchObject({
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       status: 'open',
       blocked_reason: null,
       blocked_check_interval: null,

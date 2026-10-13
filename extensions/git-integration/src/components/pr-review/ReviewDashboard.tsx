@@ -16,7 +16,7 @@ import { useReviewUiStore } from '../../stores/review-ui.store'
 import { PrRow, shortAge, type MetaPart } from './DiffSize'
 import { SortSelect } from './SortSelect'
 import { RepoPicker } from './RepoPicker'
-import { choose, errorText, plural } from '../text'
+import { choose, errorMessageOf, plural } from '../text'
 import './review-dashboard.css'
 
 type Tab = 'needs' | 'mine' | 'involved'
@@ -350,7 +350,7 @@ function useDashboardData() {
       if (problem && !('error' in result)) setData((d) => ({ ...d, failed: [] }))
       if (!problem && !('error' in result)) setData(resultData(result))
     } catch (err) {
-      setError(errorText(err))
+      setError(errorMessageOf(err))
     } finally {
       setLoading(false)
       lastFetchRef.current = Date.now()
@@ -400,7 +400,7 @@ function useClone(cloneFolder: string) {
       setCloneStatus((prev) => withoutKey(prev, pr.number))
       if (result?.repoRoot) openReview(result.repoRoot, pr.number)
     } catch (err) {
-      setState(pr.number, { status: 'error', message: errorText(err) })
+      setState(pr.number, { status: 'error', message: errorMessageOf(err) })
     }
   }
   return { cloneStatus, handleClone }

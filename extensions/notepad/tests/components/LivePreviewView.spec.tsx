@@ -51,7 +51,7 @@ function mountWith(doc: string, extensions: Extension[]): EditorView {
   return view
 }
 
-function mount(doc: string, extensions: Extension[] = []): EditorView {
+function mountPreview(doc: string, extensions: Extension[] = []): EditorView {
   return mountWith(doc, [livePreviewPlugin, ...extensions])
 }
 
@@ -65,13 +65,13 @@ function installShell() {
   return openExternal
 }
 
-function press(el: Element, type: 'click' | 'mousedown'): MouseEvent {
+function pressOn(el: Element, type: 'click' | 'mousedown'): MouseEvent {
   const event = new MouseEvent(type, { bubbles: true, cancelable: true })
   el.dispatchEvent(event)
   return event
 }
 
-function toggle(v: EditorView, checked: boolean): HTMLInputElement {
+function toggleCheckbox(v: EditorView, checked: boolean): HTMLInputElement {
   const box = v.dom.querySelector<HTMLInputElement>('.notepad-task-checkbox')!
   box.checked = checked
   box.dispatchEvent(new Event('change'))
@@ -88,72 +88,72 @@ describe('focusing the editor', focusTests)
 
 function listAndTaskTests() {
   it('draws a bullet for each item of a bullet list', () => {
-    const bullets = mount('- one\n- two\n\nend').dom.querySelectorAll('.notepad-list-bullet')
+    const bullets = mountPreview('- one\n- two\n\nend').dom.querySelectorAll('.notepad-list-bullet')
     expect([...bullets].map((b) => b.textContent)).toEqual(['•', '•'])
   })
 
   it('writes a ticked checkbox back into the markdown', () => {
-    const v = mount('- [ ] buy milk\n\nend')
-    toggle(v, true)
+    const v = mountPreview('- [ ] buy milk\n\nend')
+    toggleCheckbox(v, true)
     expect(v.state.doc.toString()).toBe('- [x] buy milk\n\nend')
   })
 
   it('unticks a done task in the markdown', () => {
-    const v = mount('- [x] buy milk\n\nend')
-    toggle(v, false)
+    const v = mountPreview('- [x] buy milk\n\nend')
+    toggleCheckbox(v, false)
     expect(v.state.doc.toString()).toBe('- [ ] buy milk\n\nend')
   })
 
   it('leaves a read-only note as written, and the checkbox as it was', () => {
-    const v = mount('- [ ] buy milk\n\nend', [EditorState.readOnly.of(true)])
-    expect(toggle(v, true).checked).toBe(false)
+    const v = mountPreview('- [ ] buy milk\n\nend', [EditorState.readOnly.of(true)])
+    expect(toggleCheckbox(v, true).checked).toBe(false)
     expect(v.state.doc.toString()).toBe('- [ ] buy milk\n\nend')
   })
 
   it('keeps the caret where it was when the checkbox is pressed', () => {
-    const box = mount('- [ ] buy milk\n\nend').dom.querySelector('.notepad-task-checkbox')!
-    expect(press(box, 'mousedown').defaultPrevented).toBe(true)
+    const box = mountPreview('- [ ] buy milk\n\nend').dom.querySelector('.notepad-task-checkbox')!
+    expect(pressOn(box, 'mousedown').defaultPrevented).toBe(true)
   })
 }
 
 function linkImageRuleTests() {
   it('opens a link in the system browser, not in the app', () => {
     const openExternal = installShell()
-    const link = mount('see [the docs](https://example.com/docs)\n\nend').dom.querySelector(
+    const link = mountPreview('see [the docs](https://example.com/docs)\n\nend').dom.querySelector(
       'a.notepad-link-widget'
     )!
     expect(link.textContent).toBe('the docs')
-    expect(press(link, 'click').defaultPrevented).toBe(true)
+    expect(pressOn(link, 'click').defaultPrevented).toBe(true)
     expect(openExternal).toHaveBeenCalledWith('https://example.com/docs')
   })
 
   it('opens a link inside a table cell the same way', () => {
     const openExternal = installShell()
-    const v = mount('| site |\n| --- |\n| [home](https://example.com) |\n\nend')
-    press(v.dom.querySelector('.notepad-table a.notepad-link-widget')!, 'click')
+    const v = mountPreview('| site |\n| --- |\n| [home](https://example.com) |\n\nend')
+    pressOn(v.dom.querySelector('.notepad-table a.notepad-link-widget')!, 'click')
     expect(openExternal).toHaveBeenCalledWith('https://example.com')
   })
 
   it('shows an image with its alt text', () => {
-    const v = mount('![a cat](cat.png)\n\nend')
+    const v = mountPreview('![a cat](cat.png)\n\nend')
     const img = v.dom.querySelector<HTMLImageElement>('img.notepad-image-widget')!
     expect(img.getAttribute('src')).toBe('cat.png')
     expect(img.alt).toBe('a cat')
   })
 
   it('names a link with no label by its address', () => {
-    const v = mount('[](https://example.com)\n\nend')
+    const v = mountPreview('[](https://example.com)\n\nend')
     expect(v.dom.querySelector('a.notepad-link-widget')?.textContent).toBe('https://example.com')
   })
 
   it('draws a horizontal rule for ---', () => {
-    expect(mount('above\n\n---\n\nend').dom.querySelector('hr.notepad-hr')).not.toBeNull()
+    expect(mountPreview('above\n\n---\n\nend').dom.querySelector('hr.notepad-hr')).not.toBeNull()
   })
 }
 
 function mermaidTests() {
   it('replaces a finished mermaid block with the rendered diagram', async () => {
-    const v = mount('```mermaid\ngraph TD; A-->B\n```\n\nend')
+    const v = mountPreview('```mermaid\ngraph TD; A-->B\n```\n\nend')
     const container = v.dom.querySelector('.notepad-mermaid')!
     await vi.waitFor(() =>
       expect(container.querySelector('[data-testid="diagram"]')).not.toBeNull()
@@ -163,13 +163,13 @@ function mermaidTests() {
 
 function unusualTableTests() {
   it('leaves a table inside a quote as raw markdown', () => {
-    const v = mount('> | a | b |\n> | --- | --- |\n> | 1 | 2 |\n\nend')
+    const v = mountPreview('> | a | b |\n> | --- | --- |\n> | 1 | 2 |\n\nend')
     expect(v.dom.querySelector('.notepad-table')).toBeNull()
     expect(v.dom.textContent).toContain('| --- | --- |')
   })
 
   it('draws a table inside a list item in line with the item', () => {
-    const v = mount('- item\n\n  | a | b |\n  | --- | --- |\n  | 1 | 2 |\n\nend')
+    const v = mountPreview('- item\n\n  | a | b |\n  | --- | --- |\n  | 1 | 2 |\n\nend')
     expect(v.dom.querySelector('.cm-line .notepad-table')).not.toBeNull()
   })
 }
@@ -196,7 +196,7 @@ const WIDGET_SELECTORS = [
 
 function redrawTests() {
   it('keeps every drawn widget rather than drawing it again', () => {
-    const v = mount(EVERY_WIDGET)
+    const v = mountPreview(EVERY_WIDGET)
     const before = WIDGET_SELECTORS.map((selector) => v.dom.querySelector(selector))
     expect(before).not.toContain(null)
 
@@ -207,7 +207,7 @@ function redrawTests() {
   })
 
   it('draws a widget again when its own markdown changes', () => {
-    const v = mount('- [ ] task\n\nend')
+    const v = mountPreview('- [ ] task\n\nend')
     const before = v.dom.querySelector('.notepad-task-checkbox')
     v.dispatch({ changes: { from: 3, to: 4, insert: 'x' } })
     const after = v.dom.querySelector<HTMLInputElement>('.notepad-task-checkbox')
@@ -218,22 +218,22 @@ function redrawTests() {
 
 function widgetPressTests() {
   it('is left to the widget: the editor neither moves the caret nor takes focus', () => {
-    const v = mount(EVERY_WIDGET)
+    const v = mountPreview(EVERY_WIDGET)
     const head = v.state.selection.main.head
     for (const selector of ['.notepad-list-bullet', '.notepad-hr', '.notepad-image-widget']) {
-      press(v.dom.querySelector(selector)!, 'mousedown')
+      pressOn(v.dom.querySelector(selector)!, 'mousedown')
       expect(v.hasFocus, selector).toBe(false)
       expect(v.state.selection.main.head, selector).toBe(head)
     }
     for (const selector of ['.notepad-mermaid', '.notepad-table', '.notepad-alert__header']) {
-      press(v.dom.querySelector(selector)!, 'mousedown')
+      pressOn(v.dom.querySelector(selector)!, 'mousedown')
       expect(v.hasFocus, selector).toBe(false)
     }
   })
 
   it('on a link reaches the editor too, which takes focus', () => {
-    const v = mount('[link](https://example.com)\n\nend')
-    press(v.dom.querySelector('.notepad-link-widget')!, 'mousedown')
+    const v = mountPreview('[link](https://example.com)\n\nend')
+    pressOn(v.dom.querySelector('.notepad-link-widget')!, 'mousedown')
     expect(v.hasFocus).toBe(true)
   })
 }
@@ -242,7 +242,7 @@ const BOLD = '**bold** text\nnext line'
 
 function focusTests() {
   it('shows the raw markdown of the caret line while focused, and hides it on blur', async () => {
-    const v = mount(BOLD)
+    const v = mountPreview(BOLD)
     v.dispatch({ selection: { anchor: 2 } })
     expect(v.contentDOM.textContent).not.toContain('**')
 

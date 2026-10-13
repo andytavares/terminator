@@ -158,7 +158,7 @@ async function startServer(context: RemoteControlContext): Promise<void> {
 
 function serverDeps({ api, credentials }: RemoteControlContext) {
   return {
-    getPasswordHash: () => credentials.getPasswordHash(),
+    getPasswordHash: () => credentials.storedPasswordHash(),
     getMaxSubscribers: () => getMaxSubscribers(api),
     listWorkspaces: () => api.workspace.list(),
     listProjects: (id: string) => api.workspace.listProjects(id),

@@ -282,9 +282,9 @@ function FileSection({ section }: { section: FileSectionProps }) {
 }
 
 function FileSections({ session, hub }: { session: ConflictSession; hub: Props }) {
-  const isDone = (f: ConflictFile) => f.resolvedCount >= f.conflictCount
-  const unresolved = session.files.filter((f) => !isDone(f))
-  const resolved = session.files.filter(isDone)
+  const isFileResolved = (f: ConflictFile) => f.resolvedCount >= f.conflictCount
+  const unresolved = session.files.filter((f) => !isFileResolved(f))
+  const resolved = session.files.filter(isFileResolved)
   const common = { session, onSelectFile: hub.onSelectFile }
   return (
     <>

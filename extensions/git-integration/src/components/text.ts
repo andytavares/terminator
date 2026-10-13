@@ -18,7 +18,7 @@ export function splitPath(filePath: string): { dir: string; name: string } {
 }
 
 /** An error's message, or the thrown value as text. */
-export function errorText(err: unknown): string {
+export function errorMessageOf(err: unknown): string {
   if (err instanceof Error) return err.message
   return String(err)
 }

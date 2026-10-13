@@ -148,11 +148,15 @@ function InlineTags({ tags }: { tags: string[] }): React.JSX.Element | null {
 /** The tag being typed: Enter or comma adds it, Backspace on empty removes the last. */
 function useTagDraft({ tags, onChange }: TagChipInputProps) {
   const [tagInput, setTagInput] = useState('')
-  const updateTags = (change: (tags: string[]) => string[]) => {
+  const applyTagChange = (change: (tags: string[]) => string[]) => {
     const next = change(tags)
     if (next !== tags) onChange(next)
   }
-  return { tagInput, setTagInput, ...tagEditing({ tags, updateTags, tagInput, setTagInput }) }
+  return {
+    tagInput,
+    setTagInput,
+    ...tagEditing({ tags, updateTags: applyTagChange, tagInput, setTagInput }),
+  }
 }
 
 function TagChipInput(props: TagChipInputProps): React.JSX.Element {

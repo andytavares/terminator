@@ -7,7 +7,7 @@ import {
   seedArea,
   seedProject,
   seedTask,
-  taskRow,
+  selectTaskRow,
   taskMetadata,
 } from '../support/vault-db'
 
@@ -59,7 +59,7 @@ describe('task-vault settings and today_since', () => {
     expect(await harness.invoke('task-vault:vault:reset-today-since', { taskId: 't1' })).toEqual({
       success: true,
     })
-    expect(await taskRow(db, 't1')).toMatchObject({ today_since: localDate() })
+    expect(await selectTaskRow(db, 't1')).toMatchObject({ today_since: localDate() })
   })
 })
 
@@ -78,7 +78,7 @@ function taskVaultVaultSetRecurrenceRulesTests() {
     expect(await setRecurrenceVia({ taskId: 'task-1', interval: 'daily', time: '08:00' })).toEqual({
       success: true,
     })
-    expect(await taskRow(db, 'task-1')).toMatchObject({
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       recurrence_rule: 'daily',
       recurrence_notify_at: '08:00',
       recurrence_end_type: 'none',
@@ -91,7 +91,7 @@ function taskVaultVaultSetRecurrenceRulesTests() {
 
     await setRecurrenceVia({ taskId: 'task-1', interval: 'weekly', days: [5, 1, 3] })
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({ recurrence_rule: 'weekly:1,3,5' })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({ recurrence_rule: 'weekly:1,3,5' })
   })
 }
 
@@ -106,7 +106,7 @@ function taskVaultVaultSetRecurrenceEndDateTests() {
       endDate: '2026-12-31',
     })
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       recurrence_end_type: 'on_date',
       recurrence_end_date: '2026-12-31',
       recurrence_end_count: null,
@@ -131,7 +131,7 @@ function taskVaultVaultSetRecurrenceEndAfterCountTests() {
       endCount: 5,
     })
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       recurrence_end_type: 'after_count',
       recurrence_end_count: 5,
       recurrence_end_date: null,
@@ -150,7 +150,7 @@ function taskVaultVaultSetRecurrenceDueDatesTests() {
 
     await setRecurrenceVia({ taskId: 'task-1', interval: 'daily' })
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({ due_date: '2026-05-27' })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({ due_date: '2026-05-27' })
   })
 
   it('keeps an existing due_date', async () => {
@@ -163,7 +163,7 @@ function taskVaultVaultSetRecurrenceDueDatesTests() {
 
     await setRecurrenceVia({ taskId: 'task-1', interval: 'daily' })
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({ due_date: '2026-06-01' })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({ due_date: '2026-06-01' })
   })
 }
 
@@ -235,7 +235,7 @@ function taskVaultVaultClearRecurrenceClearingTests() {
     await seedTask(db, RECURRING_TASK)
     expect(await clearRecurrenceVia('task-1')).toEqual({ success: true })
 
-    expect(await taskRow(db, 'task-1')).toMatchObject({
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       recurrence_rule: null,
       recurrence_notify_at: null,
       recurrence_end_type: null,
@@ -265,8 +265,8 @@ function taskVaultVaultClearRecurrenceOccurrencesErrorsDeletesTheOpenTests() {
 
     await clearRecurrenceVia('task-1')
 
-    expect(await taskRow(db, 'spawn-open')).toBeUndefined()
-    expect(await taskRow(db, 'spawn-done')).toBeDefined()
+    expect(await selectTaskRow(db, 'spawn-open')).toBeUndefined()
+    expect(await selectTaskRow(db, 'spawn-done')).toBeDefined()
   })
 }
 
@@ -280,7 +280,10 @@ function taskVaultVaultClearRecurrenceOccurrencesErrorsStillClearsTheTests() {
     })
 
     expect(await clearRecurrenceVia('task-1')).toEqual({ success: true })
-    expect(await taskRow(db, 'task-1')).toMatchObject({ recurrence_rule: null, metadata: '{}' })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({
+      recurrence_rule: null,
+      metadata: '{}',
+    })
   })
 
   it('returns STALE_ID for an unknown task', async () => {
@@ -392,7 +395,7 @@ function taskVaultVaultExportJsonImportingTests() {
     })
 
     expect(result).toEqual({ success: true, imported: 3 })
-    expect(await taskRow(db, 't1')).toMatchObject({
+    expect(await selectTaskRow(db, 't1')).toMatchObject({
       text: 'Task',
       status: 'open',
       source: 'inbox',
@@ -422,7 +425,7 @@ function taskVaultVaultExportJsonImportingTasksAloneTests() {
       tasks: [{ id: 't1', text: 'Imported', created_at: now, updated_at: now }],
     })
 
-    expect(await taskRow(db, 't1')).toMatchObject({ text: 'Original' })
+    expect(await selectTaskRow(db, 't1')).toMatchObject({ text: 'Original' })
   })
 }
 
@@ -441,7 +444,7 @@ function taskVaultVaultExportJsonRoundTripsTests() {
     registerVaultIpcHandlers(otherHarness.api, other)
     await otherHarness.invoke('task-vault:vault:import-json', exported)
 
-    expect(await taskRow(other, 't1')).toMatchObject({
+    expect(await selectTaskRow(other, 't1')).toMatchObject({
       text: 'Round trip',
       status: 'done',
       due_date: '2026-03-01',
@@ -486,8 +489,11 @@ function taskVaultVaultExportJsonTasksThroughExportTests() {
     registerVaultIpcHandlers(otherHarness.api, other)
     await otherHarness.invoke('task-vault:vault:import-json', exported)
 
-    expect(await taskRow(other, 'in-project')).toMatchObject({ project_id: 'p1', area_id: null })
-    expect(await taskRow(other, 'in-area')).toMatchObject({ project_id: null, area_id: 'a1' })
+    expect(await selectTaskRow(other, 'in-project')).toMatchObject({
+      project_id: 'p1',
+      area_id: null,
+    })
+    expect(await selectTaskRow(other, 'in-area')).toMatchObject({ project_id: null, area_id: 'a1' })
   })
 }
 

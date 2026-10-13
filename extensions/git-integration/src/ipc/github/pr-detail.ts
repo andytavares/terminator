@@ -20,7 +20,7 @@ import { applyReadingOrder } from '../../review/apply-reading-order.js'
 import { findTestReferencesInRepo } from '../../review/test-references.js'
 import { VALIDATION_ERROR } from '../register.js'
 import { catchError, PullRequestPayload, type GithubContext } from './context.js'
-import { assigneeLoginsOf, textOf } from '../../github/pr-review-service.js'
+import { assigneeLoginsOf, asText } from '../../github/pr-review-service.js'
 
 type RawRecord = Record<string, unknown>
 
@@ -117,17 +117,17 @@ function prIdentity(meta: RawRecord) {
   const author = (meta.author ?? {}) as RawRecord
   return {
     number: Number(meta.number),
-    title: textOf(meta.title),
-    body: textOf(meta.body),
-    author: textOf(author.login),
-    authorAvatarUrl: textOf(author.avatarUrl),
-    openedAt: textOf(meta.createdAt),
-    headRefName: textOf(meta.headRefName),
-    baseRefName: textOf(meta.baseRefName),
-    headSHA: textOf(meta.headRefOid),
+    title: asText(meta.title),
+    body: asText(meta.body),
+    author: asText(author.login),
+    authorAvatarUrl: asText(author.avatarUrl),
+    openedAt: asText(meta.createdAt),
+    headRefName: asText(meta.headRefName),
+    baseRefName: asText(meta.baseRefName),
+    headSHA: asText(meta.headRefOid),
     nodeId: typeof meta.id === 'string' ? meta.id : undefined,
     isDraft: Boolean(meta.isDraft),
-    mergeStateStatus: mapMergeStateStatus(textOf(meta.mergeStateStatus)),
+    mergeStateStatus: mapMergeStateStatus(asText(meta.mergeStateStatus)),
   }
 }
 

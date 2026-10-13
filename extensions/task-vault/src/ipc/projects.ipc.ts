@@ -123,7 +123,7 @@ async function weeklyReview({ api, db }: IpcContext) {
   }
 }
 
-async function createProject({ db }: IpcContext, args: z.infer<typeof CreateProjectRequestSchema>) {
+async function insertProject({ db }: IpcContext, args: z.infer<typeof CreateProjectRequestSchema>) {
   const { name, area, deadline, outcome } = args
   const displayName = toDisplayName(name.trim())
   const existing = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [
@@ -141,7 +141,10 @@ async function createProject({ db }: IpcContext, args: z.infer<typeof CreateProj
   return { success: true, filePath: displayName }
 }
 
-async function deleteProject({ db }: IpcContext, args: z.infer<typeof DeleteProjectRequestSchema>) {
+async function deleteProjectRow(
+  { db }: IpcContext,
+  args: z.infer<typeof DeleteProjectRequestSchema>
+) {
   const proj = await db.get<{ id: string; status: string }>(
     `SELECT id, status FROM projects WHERE name=?`,
     [args.projectFilePath]
@@ -203,7 +206,10 @@ async function updateDeadline(
   return { success: true }
 }
 
-async function renameProject({ db }: IpcContext, args: z.infer<typeof RenameProjectRequestSchema>) {
+async function renameProjectRow(
+  { db }: IpcContext,
+  args: z.infer<typeof RenameProjectRequestSchema>
+) {
   const { projectFilePath: projectName, newName } = args
   const now = nowIso()
   const proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [projectName])
@@ -225,8 +231,8 @@ async function renameProject({ db }: IpcContext, args: z.infer<typeof RenameProj
 const PROJECT_ROUTES = [
   route('task-vault:projects:list', ListProjectsRequestSchema.default({}), queryProjects),
   route('task-vault:projects:weekly-review', noPayload, weeklyReview),
-  route('task-vault:projects:create', CreateProjectRequestSchema, createProject),
-  route('task-vault:projects:delete', DeleteProjectRequestSchema, deleteProject),
+  route('task-vault:projects:create', CreateProjectRequestSchema, insertProject),
+  route('task-vault:projects:delete', DeleteProjectRequestSchema, deleteProjectRow),
   route(
     'task-vault:projects:update-status',
     UpdateProjectStatusRequestSchema,
@@ -234,7 +240,7 @@ const PROJECT_ROUTES = [
   ),
   route('task-vault:projects:update-area', UpdateProjectAreaRequestSchema, updateArea),
   route('task-vault:projects:update-deadline', UpdateProjectDeadlineRequestSchema, updateDeadline),
-  route('task-vault:projects:rename', RenameProjectRequestSchema, renameProject),
+  route('task-vault:projects:rename', RenameProjectRequestSchema, renameProjectRow),
 ]
 
 export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {

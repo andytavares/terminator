@@ -155,7 +155,7 @@ function lacksSurfaceSession(request: FastifyRequest, surface: string, store: Se
   const pathname = request.url.split('?')[0]
   const prefix = `/${surface}/`
   if (!pathname.startsWith(prefix) || pathname === prefix) return false
-  return !store.hasValidSession(request.headers.cookie ?? '')
+  return !store.hasLiveSession(request.headers.cookie ?? '')
 }
 
 // Gate /app/* and /mobile/* static assets behind their respective session cookies.
@@ -205,7 +205,7 @@ function admitToSurface(
 ): boolean {
   const { request, reply } = exchange
   const store = parts.sessions[surface]
-  if (store.hasValidSession(request.headers.cookie ?? '')) return true
+  if (store.hasLiveSession(request.headers.cookie ?? '')) return true
   const t = request.query.t ?? ''
   if (!t || !parts.ticketStore.consumeTicket(t, surface)) return false
   reply.header('Set-Cookie', store.issueSession().setCookie)
@@ -280,7 +280,7 @@ function registerSurfaceTickets(fastify: FastifyInstance, ticketStore: WsTicketS
 async function registerLogin(parts: RemoteServerParts): Promise<void> {
   const { fastify, sessions } = parts
   await registerAuthMiddleware(fastify, {
-    hasValidSession: (cookieHeader) => sessions.login.hasValidSession(cookieHeader),
+    hasValidSession: (cookieHeader) => sessions.login.hasLiveSession(cookieHeader),
   })
   await registerLoginRoute(fastify, {
     getPasswordHash: parts.options.deps.getPasswordHash,

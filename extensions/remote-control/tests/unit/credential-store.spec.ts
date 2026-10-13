@@ -26,7 +26,7 @@ function credentialStoreTests() {
     const store = new CredentialStore(settings, KEYS)
     await store.setPassword('s3cret-passphrase')
     expect(store.hasPassword()).toBe(true)
-    expect(await verifyPassword('s3cret-passphrase', store.getPasswordHash())).toBe(true)
+    expect(await verifyPassword('s3cret-passphrase', store.storedPasswordHash())).toBe(true)
     expect(JSON.stringify([...settings.values.values()])).not.toContain('s3cret-passphrase')
   })
 
@@ -43,7 +43,7 @@ function credentialLegacyValueTests() {
     const settings = memorySettings({ pw: 'old-plaintext', hash: BCRYPT })
     const store = new CredentialStore(settings, KEYS)
     expect(await store.migrateLegacy()).toBe('migrated')
-    expect(await verifyPassword('old-plaintext', store.getPasswordHash())).toBe(true)
+    expect(await verifyPassword('old-plaintext', store.storedPasswordHash())).toBe(true)
     expect(JSON.stringify([...settings.values.values()])).not.toContain('old-plaintext')
   })
 
@@ -52,7 +52,7 @@ function credentialLegacyValueTests() {
     const store = new CredentialStore(settings, KEYS)
     expect(await store.migrateLegacy()).toBe('invalidated')
     expect(store.hasPassword()).toBe(false)
-    expect(store.getPasswordHash()).toBe('')
+    expect(store.storedPasswordHash()).toBe('')
   })
 }
 
@@ -62,7 +62,7 @@ function credentialCurrentHashTests() {
     const settings = memorySettings({ pw: 'leftover', hash: current })
     const store = new CredentialStore(settings, KEYS)
     expect(await store.migrateLegacy()).toBe('current')
-    expect(store.getPasswordHash()).toBe(current)
+    expect(store.storedPasswordHash()).toBe(current)
     expect(settings.values.get('pw')).toBe('')
   })
 

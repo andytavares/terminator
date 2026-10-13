@@ -123,21 +123,21 @@ function statusCommands(task: IndexedTask, onRefresh: () => Promise<void>) {
 
 /** Sending the task to the backlog, and setting or clearing its recurrence. */
 function scheduleCommands(task: IndexedTask, onRefresh: () => Promise<void>) {
-  const run = taskRunner(task, onRefresh)
+  const runScheduleChannel = taskRunner(task, onRefresh)
   return {
     sendToBacklog: () =>
-      run('task-vault:vault:process-inbox-item', { action: 'someday' }, () =>
+      runScheduleChannel('task-vault:vault:process-inbox-item', { action: 'someday' }, () =>
         notify('info', `Moved to backlog: ${task.text}`, 'taskMovedToBacklog')
       ),
     setRecurrence: (draft: RecurrenceDraft) =>
-      run('task-vault:vault:set-recurrence', recurrencePayload(task.id, draft), () =>
+      runScheduleChannel('task-vault:vault:set-recurrence', recurrencePayload(task.id, draft), () =>
         notify('success', `Recurrence set: ${formatRecurrenceRule(draftRule(draft))}`, {
           key: 'recurrenceSet',
           onClick: makeTaskNavHandler(task.id),
         })
       ),
     clearRecurrence: () =>
-      run('task-vault:vault:clear-recurrence', {}, () =>
+      runScheduleChannel('task-vault:vault:clear-recurrence', {}, () =>
         notify('info', `Recurrence removed: ${task.text}`, 'recurrenceRemoved')
       ),
   }

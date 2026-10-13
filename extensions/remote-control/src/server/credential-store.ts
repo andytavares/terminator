@@ -20,12 +20,12 @@ export class CredentialStore {
     private readonly keys: CredentialKeys
   ) {}
 
-  getPasswordHash(): string {
+  storedPasswordHash(): string {
     return this.settings.get<string>(this.keys.passwordHash) ?? ''
   }
 
   hasPassword(): boolean {
-    return isPasswordHash(this.getPasswordHash())
+    return isPasswordHash(this.storedPasswordHash())
   }
 
   async setPassword(password: string): Promise<void> {
@@ -42,7 +42,7 @@ export class CredentialStore {
       return 'migrated'
     }
     if (plaintext) this.settings.set(this.keys.legacyPassword, '')
-    if (this.getPasswordHash() && !this.hasPassword()) {
+    if (this.storedPasswordHash() && !this.hasPassword()) {
       this.settings.set(this.keys.passwordHash, '')
       return 'invalidated'
     }

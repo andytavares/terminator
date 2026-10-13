@@ -40,7 +40,7 @@ export class SessionStore {
   }
 
   /** True when the cookie header carries a live token; expired tokens are forgotten. */
-  hasValidSession(cookieHeader: string): boolean {
+  hasLiveSession(cookieHeader: string): boolean {
     const token = this.parseToken(cookieHeader)
     if (!token) return false
     const expiresAt = this.sessions.get(token)

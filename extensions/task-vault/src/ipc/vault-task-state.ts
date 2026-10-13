@@ -145,7 +145,7 @@ async function migrateTask({ db }: IpcContext, args: z.infer<typeof MigrateTaskR
   return { newTaskId: newId }
 }
 
-async function deleteTask({ db }: IpcContext, args: z.infer<typeof DeleteTaskRequestSchema>) {
+async function deleteTaskRow({ db }: IpcContext, args: z.infer<typeof DeleteTaskRequestSchema>) {
   if (!(await taskExists(db, args.taskId))) return { error: 'STALE_ID' }
   await deleteTaskTree(db, args.taskId)
   indexUpdated()
@@ -179,7 +179,10 @@ async function dropMigrationTwin(db: ExtensionDB, taskId: string, now: string) {
   return meta
 }
 
-async function restoreTask({ db }: IpcContext, args: z.infer<typeof RestoreTaskRequestSchema>) {
+async function reopenArchivedTask(
+  { db }: IpcContext,
+  args: z.infer<typeof RestoreTaskRequestSchema>
+) {
   const { taskId } = args
   const now = nowIso()
   const meta = await dropMigrationTwin(db, taskId, now)
@@ -285,9 +288,9 @@ function saveTaskDetail({ db }: IpcContext, args: z.infer<typeof SaveTaskDetailR
 export const TASK_STATE_ROUTES = [
   route('task-vault:vault:complete-task', CompleteTaskRequestSchema, completeTask),
   route('task-vault:vault:migrate-task', MigrateTaskRequestSchema, migrateTask),
-  route('task-vault:vault:delete-task', DeleteTaskRequestSchema, deleteTask),
+  route('task-vault:vault:delete-task', DeleteTaskRequestSchema, deleteTaskRow),
   route('task-vault:vault:cancel-task', CancelTaskRequestSchema, cancelTask),
-  route('task-vault:vault:restore-task', RestoreTaskRequestSchema, restoreTask),
+  route('task-vault:vault:restore-task', RestoreTaskRequestSchema, reopenArchivedTask),
   route('task-vault:vault:reopen-task', RestoreTaskRequestSchema, reopenTask),
   route('task-vault:vault:block-task', BlockTaskRequestSchema, blockTask),
   route('task-vault:vault:unblock-task', UnblockTaskRequestSchema, unblockTask),

@@ -7,7 +7,7 @@ import {
   seedArea,
   seedProject,
   seedTask,
-  taskRow,
+  selectTaskRow,
 } from '../support/vault-db'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
@@ -212,10 +212,10 @@ function taskVaultVaultArchiveAreaArchivingTests() {
     expect(await areaRow('Work')).toMatchObject({ status: 'archived' })
     expect(await projectRowById('p1')).toMatchObject({ status: 'archived' })
     for (const id of ['project-task', 'project-sub', 'area-task']) {
-      expect(await taskRow(db, id)).toMatchObject({ status: 'cancelled' })
+      expect(await selectTaskRow(db, id)).toMatchObject({ status: 'cancelled' })
     }
-    expect(await taskRow(db, 'finished')).toMatchObject({ status: 'done' })
-    expect(await taskRow(db, 'elsewhere')).toMatchObject({ status: 'open' })
+    expect(await selectTaskRow(db, 'finished')).toMatchObject({ status: 'done' })
+    expect(await selectTaskRow(db, 'elsewhere')).toMatchObject({ status: 'open' })
   })
 
   it('creates an "Area archived" notification', async () => {
@@ -244,9 +244,9 @@ function taskVaultVaultArchiveAreaRestoringTasksTests() {
 
     expect(await areaRow('Work')).toMatchObject({ status: 'active' })
     expect(await projectRowById('p1')).toMatchObject({ status: 'active' })
-    expect(await taskRow(db, 'project-task')).toMatchObject({ status: 'open' })
-    expect(await taskRow(db, 'area-task')).toMatchObject({ status: 'in-progress' })
-    expect(await taskRow(db, 'user-cancelled')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'project-task')).toMatchObject({ status: 'open' })
+    expect(await selectTaskRow(db, 'area-task')).toMatchObject({ status: 'in-progress' })
+    expect(await selectTaskRow(db, 'user-cancelled')).toMatchObject({ status: 'cancelled' })
   })
 }
 
@@ -263,10 +263,10 @@ function taskVaultVaultArchiveAreaRestoringSubtasksTests() {
 
     await harness.invoke('task-vault:vault:restore-area', { areaName: 'Work' })
 
-    expect(await taskRow(db, 'project-sub')).toMatchObject({ status: 'blocked' })
-    expect(await taskRow(db, 'area-sub')).toMatchObject({ status: 'open' })
-    expect(await taskRow(db, 'area-sub-cancelled')).toMatchObject({ status: 'cancelled' })
-    expect(await taskRow(db, 'project-sub-cancelled')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'project-sub')).toMatchObject({ status: 'blocked' })
+    expect(await selectTaskRow(db, 'area-sub')).toMatchObject({ status: 'open' })
+    expect(await selectTaskRow(db, 'area-sub-cancelled')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'project-sub-cancelled')).toMatchObject({ status: 'cancelled' })
   })
 }
 
@@ -277,8 +277,8 @@ function taskVaultVaultArchiveAreaRestoringAfterChangesTests() {
 
     await harness.invoke('task-vault:vault:restore-area', { areaName: 'Job' })
 
-    expect(await taskRow(db, 'area-task')).toMatchObject({ status: 'in-progress' })
-    expect(await taskRow(db, 'project-sub')).toMatchObject({ status: 'blocked' })
+    expect(await selectTaskRow(db, 'area-task')).toMatchObject({ status: 'in-progress' })
+    expect(await selectTaskRow(db, 'project-sub')).toMatchObject({ status: 'blocked' })
   })
 
   it('restore keeps a project that was not active before the archive as it was', async () => {
@@ -307,9 +307,9 @@ function taskVaultVaultArchiveAreaLegacyArchivesTests() {
 
     expect(await projectRowById('p1')).toMatchObject({ status: 'active' })
     for (const id of ['project-task', 'area-task']) {
-      expect(await taskRow(db, id)).toMatchObject({ status: 'open' })
+      expect(await selectTaskRow(db, id)).toMatchObject({ status: 'open' })
     }
-    expect(await taskRow(db, 'user-cancelled')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'user-cancelled')).toMatchObject({ status: 'cancelled' })
   })
 }
 
@@ -392,7 +392,7 @@ function taskVaultVaultUpdateProjectUpdatingTests() {
       success: true,
     })
     expect(await projectRowById('proj-1')).toMatchObject({ status: 'someday' })
-    expect(await taskRow(db, 'open')).toMatchObject({ status: 'open' })
+    expect(await selectTaskRow(db, 'open')).toMatchObject({ status: 'open' })
     expect(harness.createNotification).not.toHaveBeenCalled()
   })
 
@@ -412,9 +412,9 @@ function taskVaultVaultUpdateProjectArchivingTests() {
     })
 
     expect(await projectRowById('proj-1')).toMatchObject({ status: 'archived' })
-    expect(await taskRow(db, 'open')).toMatchObject({ status: 'cancelled' })
-    expect(await taskRow(db, 'sub')).toMatchObject({ status: 'cancelled' })
-    expect(await taskRow(db, 'done')).toMatchObject({ status: 'done' })
+    expect(await selectTaskRow(db, 'open')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'sub')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'done')).toMatchObject({ status: 'done' })
     expect(harness.createNotification).toHaveBeenCalledWith({
       type: 'info',
       title: 'Project archived',
@@ -474,12 +474,12 @@ function taskVaultVaultListSomedayMovingTodayTests() {
         success: true,
       }
     )
-    expect(await taskRow(db, 'parked')).toMatchObject({
+    expect(await selectTaskRow(db, 'parked')).toMatchObject({
       source: 'daily',
       source_ref: localDate(),
       status: 'open',
     })
-    expect(await taskRow(db, 'parked-sub')).toMatchObject({
+    expect(await selectTaskRow(db, 'parked-sub')).toMatchObject({
       source: 'daily',
       source_ref: localDate(),
     })

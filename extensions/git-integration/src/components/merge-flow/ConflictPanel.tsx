@@ -96,15 +96,15 @@ function diffLineClass(type: DiffLine['type'], side: DiffCodeViewProps['side']):
 /** Context, diff and context rows, numbered on the new side: removed lines take no number. */
 function codeRows(props: DiffCodeViewProps): CodeRow[] {
   let lineNum = 1
-  const next = () => String(lineNum++)
+  const nextLineNumber = () => String(lineNum++)
   const numberFor = (type: DiffLine['type']) => {
     if (type === 'removed') return ''
-    return next()
+    return nextLineNumber()
   }
   const contextLineFor = (keyPrefix: string) => (line: string, idx: number) => ({
     key: `${keyPrefix}${idx}`,
     cls: 'conflict-line--context',
-    num: next(),
+    num: nextLineNumber(),
     prefix: ' ',
     line,
   })

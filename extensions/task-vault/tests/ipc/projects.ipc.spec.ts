@@ -7,7 +7,7 @@ import {
   seedArea,
   seedProject,
   seedTask,
-  taskRow,
+  selectTaskRow,
 } from '../support/vault-db'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
@@ -340,10 +340,10 @@ function taskVaultProjectsUpdateStatusArchivingTests() {
       status: 'archived',
     })
 
-    expect(await taskRow(db, 'open')).toMatchObject({ status: 'cancelled' })
-    expect(await taskRow(db, 'blocked-child')).toMatchObject({ status: 'cancelled' })
-    expect(await taskRow(db, 'done')).toMatchObject({ status: 'done' })
-    expect(await taskRow(db, 'elsewhere')).toMatchObject({ status: 'open' })
+    expect(await selectTaskRow(db, 'open')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'blocked-child')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'done')).toMatchObject({ status: 'done' })
+    expect(await selectTaskRow(db, 'elsewhere')).toMatchObject({ status: 'open' })
   })
 
   it('returns NOT_FOUND for an unknown project', async () => {

@@ -9,7 +9,7 @@ import {
   seedArea,
   seedProject,
   seedTask,
-  taskRow,
+  selectTaskRow,
 } from '../support/vault-db'
 
 const TARGET = '11111111-1111-4111-8111-111111111111'
@@ -149,7 +149,7 @@ describe('registerLinksIpcHandlers', () => {
     await seedTask(db, { id: 't1' })
     await seedTask(db, { id: 't2' })
     await harness.invoke('task-vault:links:create', { taskId: 't1', targetId: TARGET })
-    expect(await taskRow(db, 't2')).toMatchObject({ terminator_links: '[]' })
+    expect(await selectTaskRow(db, 't2')).toMatchObject({ terminator_links: '[]' })
   })
 })
 

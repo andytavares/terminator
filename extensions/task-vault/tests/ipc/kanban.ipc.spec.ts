@@ -10,7 +10,7 @@ import {
   seedArea,
   seedProject,
   seedTask,
-  taskRow,
+  selectTaskRow,
 } from '../support/vault-db'
 
 let db: ExtensionDB
@@ -175,7 +175,7 @@ function moveTaskTests() {
         toStatus: 'in-progress',
       })
     ).toEqual({ ok: true })
-    expect(await taskRow(db, 'task-1')).toMatchObject({ status: 'in-progress' })
+    expect(await selectTaskRow(db, 'task-1')).toMatchObject({ status: 'in-progress' })
   })
 
   it('reports a missing task', async () => {

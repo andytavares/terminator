@@ -498,7 +498,7 @@ class FileGrouping {
     if (ga && gb) this.uf.union(ga, gb)
   }
 
-  groupOf(path: string): string {
+  groupIdOf(path: string): string {
     return this.uf.find(this.fileGroup.get(path)!)
   }
 }
@@ -558,7 +558,7 @@ function groupFilesIntoChapters(
   mergeByFeatureStem(grouping)
   mergeByCoupling(grouping, files, coChangeAffinity)
   const groups = new Map<string, RawFile[]>()
-  for (const f of files) pushTo(groups, grouping.groupOf(f.path), f)
+  for (const f of files) pushTo(groups, grouping.groupIdOf(f.path), f)
   return withOversizedSplit(groups)
 }
 
@@ -833,7 +833,7 @@ function upper(value: unknown): string {
   return String(value ?? '').toUpperCase()
 }
 
-export function textOf(value: unknown): string {
+export function asText(value: unknown): string {
   return String(value ?? '')
 }
 
@@ -842,12 +842,12 @@ function queueIdentity(obj: RawRecord) {
   const author = (obj.author ?? {}) as RawRecord
   return {
     number: Number(obj.number),
-    title: textOf(obj.title),
-    author: textOf(author.login),
-    authorAvatarUrl: textOf(author.avatarUrl),
-    openedAt: textOf(obj.createdAt),
-    headRefName: textOf(obj.headRefName),
-    baseRefName: textOf(obj.baseRefName),
+    title: asText(obj.title),
+    author: asText(author.login),
+    authorAvatarUrl: asText(author.avatarUrl),
+    openedAt: asText(obj.createdAt),
+    headRefName: asText(obj.headRefName),
+    baseRefName: asText(obj.baseRefName),
     state: PR_STATES[upper(obj.state)] ?? 'open',
     isDraft: Boolean(obj.isDraft),
   }
@@ -1010,8 +1010,8 @@ function rollupFromCommits(obj: RawRecord): RawRecord[] {
   const commits = obj.commits as Nodes<CommitNode>
   const contexts = commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? []
   return contexts.map((ctx) => {
-    const state = textOf(firstOf(ctx, ['conclusion', 'state']))
-    return { name: textOf(firstOf(ctx, ['name', 'context'])), state, conclusion: state }
+    const state = asText(firstOf(ctx, ['conclusion', 'state']))
+    return { name: asText(firstOf(ctx, ['name', 'context'])), state, conclusion: state }
   })
 }
 
@@ -1124,11 +1124,11 @@ function commentBase(obj: RawRecord) {
   const user = (firstOf(obj, ['user', 'author']) ?? {}) as RawRecord
   return {
     id: Number(obj.id),
-    author: textOf(user.login),
-    authorAvatarUrl: textOf(user.avatar_url),
-    body: textOf(obj.body),
-    createdAt: textOf(obj.created_at),
-    updatedAt: textOf(obj.updated_at),
+    author: asText(user.login),
+    authorAvatarUrl: asText(user.avatar_url),
+    body: asText(obj.body),
+    createdAt: asText(obj.created_at),
+    updatedAt: asText(obj.updated_at),
   }
 }
 

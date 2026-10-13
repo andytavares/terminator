@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 import { insertTask, type NewTaskRow } from '../../src/vault/task-repository'
-import { createVaultDb, seedArea, seedProject, seedTask, taskRow } from '../support/vault-db'
+import { createVaultDb, seedArea, seedProject, seedTask, selectTaskRow } from '../support/vault-db'
 
 let db: ExtensionDB
 
@@ -37,7 +37,7 @@ function insertTaskDefaultsTests() {
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
 
-    expect(await taskRow(db, 't1')).toMatchObject({
+    expect(await selectTaskRow(db, 't1')).toMatchObject({
       text: 'Do the thing',
       status: 'open',
       source: 'inbox',
@@ -116,7 +116,7 @@ function insertTaskEveryFieldTests() {
 
     await insertTask(db, EVERY_FIELD)
 
-    expect(await taskRow(db, 't2')).toMatchObject(EVERY_COLUMN)
+    expect(await selectTaskRow(db, 't2')).toMatchObject(EVERY_COLUMN)
   })
 }
 
@@ -130,6 +130,6 @@ function insertTaskDuplicatesTests() {
     await insertTask(db, row)
     await insertTask(db, { ...row, text: 'second' }, { orIgnore: true })
 
-    expect(await taskRow(db, 't3')).toMatchObject({ text: 'x' })
+    expect(await selectTaskRow(db, 't3')).toMatchObject({ text: 'x' })
   })
 }
