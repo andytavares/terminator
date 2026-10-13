@@ -195,12 +195,11 @@ function deadlinesTests() {
     const c = channels()
     const r = (await c.list()) as { gates: Gate[] }
     expect(r.gates).toHaveLength(0)
-    expect(record).toHaveBeenCalledWith(
-      'WO-1',
-      'gate.default',
-      'G-late',
-      expect.stringContaining('no answer')
-    )
+    expect(record).toHaveBeenCalledWith('WO-1', {
+      action: 'gate.default',
+      subject: 'G-late',
+      reason: expect.stringContaining('no answer'),
+    })
     expect((await createGateStore(root).get('G-late'))?.decision?.by).toBe('default')
   })
 
@@ -235,12 +234,11 @@ function undefaultedGatesAndFailuresTests() {
     })
     const r = (await c.list()) as { gates: Gate[] }
     expect(r.gates).toHaveLength(0)
-    expect(record).toHaveBeenCalledWith(
-      'WO-1',
-      'gate.action_failed',
-      'G-late',
-      'gh: not authenticated'
-    )
+    expect(record).toHaveBeenCalledWith('WO-1', {
+      action: 'gate.action_failed',
+      subject: 'G-late',
+      reason: 'gh: not authenticated',
+    })
   })
 }
 
@@ -302,12 +300,13 @@ function recordingTests() {
     await createGateStore(root).save(gate())
     const c = channels()
     await c.decide({ gateId: 'G-1', option: 'approve' })
-    expect(record).toHaveBeenCalledWith(
-      'WO-1',
-      'gate.decided',
-      'G-1',
-      expect.stringContaining('changes that turn out to be riskier than planned -> approve')
-    )
+    expect(record).toHaveBeenCalledWith('WO-1', {
+      action: 'gate.decided',
+      subject: 'G-1',
+      reason: expect.stringContaining(
+        'changes that turn out to be riskier than planned -> approve'
+      ),
+    })
   })
 }
 
@@ -448,14 +447,22 @@ function settingTheLimitTests() {
     expect(r).toMatchObject({ ok: true })
     expect(act).toHaveBeenCalledWith(expect.objectContaining({ id: 'G-1' }), 'raise')
     expect(budgetsWhenActed).toMatchObject({ wallClockMinutes: 60, agents: 3 })
-    expect(record).toHaveBeenCalledWith('WO-1', 'budget.raised', 'wall_clock', '10 -> 60')
+    expect(record).toHaveBeenCalledWith('WO-1', {
+      action: 'budget.raised',
+      subject: 'wall_clock',
+      reason: '10 -> 60',
+    })
   })
 
   it('takes no limit', async () => {
     await halted()
     await channels().decide({ gateId: 'G-1', option: 'raise', limit: null })
     expect((await createOrderStore(root).load('WO-1'))?.budgets.wallClockMinutes).toBeNull()
-    expect(record).toHaveBeenCalledWith('WO-1', 'budget.raised', 'wall_clock', '10 -> no limit')
+    expect(record).toHaveBeenCalledWith('WO-1', {
+      action: 'budget.raised',
+      subject: 'wall_clock',
+      reason: '10 -> no limit',
+    })
   })
 }
 

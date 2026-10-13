@@ -69,14 +69,12 @@ function createInbox(context: ActivationContext, deps: InboxRegistrationDeps): I
     autonomy: () => autonomyFor(api),
     readPulls: (orderId) => readPulls(dataRoot(), orderId),
     now: () => new Date().toISOString(),
-    record: async (orderId, action, subject, reason) => {
+    record: async (orderId, line) => {
       await orderStoreAt(dataRoot()).record({
         at: new Date().toISOString(),
         orderId,
         actor: 'operator',
-        action,
-        subject,
-        reason,
+        ...line,
         evidence: [],
       })
     },
