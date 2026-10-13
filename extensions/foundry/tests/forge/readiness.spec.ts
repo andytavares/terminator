@@ -117,6 +117,27 @@ function blockingFinding(over: Partial<RedTeamFinding> = {}): RedTeamFinding {
 }
 
 describe('readiness — holder and strip', () => {
+  describe('an earlier hand-off', anEarlierHandOffTests)
+  describe('shipped and cancelled', shippedAndCancelledTests)
+  describe('handed off by you', handedOffByYouTests)
+  describe('intake refused', intakeRefusedTests)
+  describe('a malformed plan', aMalformedPlanTests)
+  describe('an unreadable plan', anUnreadablePlanTests)
+  describe('the scout', theScoutTests)
+  describe('red team with a previous round', redTeamWithAPreviousRoundTests)
+  describe('red team held', redTeamHeldTests)
+  describe('fixing findings', fixingFindingsTests)
+  describe('fixing one finding', fixingOneFindingTests)
+  describe('revising', revisingTests)
+  describe('your request', yourRequestTests)
+  describe('held and exhausted', heldAndExhaustedTests)
+  describe('one blocking finding', oneBlockingFindingTests)
+  describe('open questions', openQuestionsTests)
+  describe('no criteria', noCriteriaTests)
+  describe('compile failures and ok', compileFailuresAndOkTests)
+})
+
+function anEarlierHandOffTests() {
   it('1. an order an earlier build handed off on its own still says so, with nothing to turn off', () => {
     const order = wo0928Order({ status: 'agreed', agreedAt: T1 })
     const result = readiness(
@@ -134,7 +155,9 @@ describe('readiness — holder and strip', () => {
     expect(result.strip.detail).toBe('Running with the Direct shape, 1 unit.')
     expect(result.strip.actions).toEqual(['open-run'])
   })
+}
 
+function shippedAndCancelledTests() {
   it('1. a shipped order is not described as running', () => {
     const order = wo0928Order({ status: 'shipped', agreedAt: T1 })
     const result = readiness(baseInput({ order, agreed: { at: T1, by: 'you' } }))
@@ -166,7 +189,9 @@ describe('readiness — holder and strip', () => {
     const order = wo0928Order({ status: 'cancelled' })
     expect(readiness(baseInput({ order, turn: 'you' })).runState).toBe('Cancelled')
   })
+}
 
+function handedOffByYouTests() {
   it('1. handed off by you, uses agreed.at', () => {
     const order = wo0928Order({ status: 'agreed', agreedAt: T1 })
     const result = readiness(baseInput({ order, agreed: { at: T2, by: 'you' } }))
@@ -181,7 +206,9 @@ describe('readiness — holder and strip', () => {
     const result = readiness(baseInput({ order, agreed: null }))
     expect(result.strip.headline).toBe(`Handed off at ${T1}`)
   })
+}
 
+function intakeRefusedTests() {
   it('2. intake refused', () => {
     const result = readiness(
       baseInput({ intake: { kind: 'refused', at: T1, reason: 'Invalid enum value.' } })
@@ -195,7 +222,9 @@ describe('readiness — holder and strip', () => {
     expect(result.strip.detail).toBe('Why: Invalid enum value.')
     expect(result.strip.actions).toEqual(['tell-architect', 'start-over'])
   })
+}
 
+function aMalformedPlanTests() {
   it('2b. intake refused for a malformed plan says where and what to do, not the schema error', () => {
     const result = readiness(
       baseInput({
@@ -216,7 +245,9 @@ describe('readiness — holder and strip', () => {
     )
     expect(result.strip.detail).not.toContain('Expected object')
   })
+}
 
+function anUnreadablePlanTests() {
   it('3b. running: rewriting a plan it could not read says so, not which checks it closes', () => {
     const result = readiness(
       baseInput({
@@ -236,7 +267,9 @@ describe('readiness — holder and strip', () => {
       `Started ${T0}. Its last plan was in the wrong format, so it is writing it again. You don't need to do anything.`
     )
   })
+}
 
+function theScoutTests() {
   it('3. running: scout', () => {
     const result = readiness(
       baseInput({
@@ -259,7 +292,9 @@ describe('readiness — holder and strip', () => {
     expect(result.strip.detail).toBe(`Started ${T0}. The architect drafts the plan next.`)
     expect(result.strip.actions).toEqual(['watch'])
   })
+}
 
+function redTeamWithAPreviousRoundTests() {
   it('3. running: red team, with a previous finished round, says the hand-off is yours', () => {
     const result = readiness(
       baseInput({
@@ -289,7 +324,9 @@ describe('readiness — holder and strip', () => {
     )
     expect(result.strip.actions).toEqual(['hold'])
   })
+}
 
+function redTeamHeldTests() {
   it('3. running: red team, no previous round, held shows release', () => {
     const result = readiness(
       baseInput({
@@ -309,7 +346,9 @@ describe('readiness — holder and strip', () => {
     expect(result.strip.detail).toBe(`Started ${T0}. When it finishes clean, you can hand off.`)
     expect(result.strip.actions).toEqual(['release'])
   })
+}
 
+function fixingFindingsTests() {
   it('3. running: architect fixing findings automatically', () => {
     const findings = [blockingFinding({ id: 'RT-1' }), blockingFinding({ id: 'RT-2' })]
     const result = readiness(
@@ -334,7 +373,9 @@ describe('readiness — holder and strip', () => {
     )
     expect(result.strip.actions).toEqual(['hold'])
   })
+}
 
+function fixingOneFindingTests() {
   it('3. running: architect fixing a single finding, singular wording', () => {
     const result = readiness(
       baseInput({
@@ -353,7 +394,9 @@ describe('readiness — holder and strip', () => {
     )
     expect(result.strip.headline).toBe('The architect is fixing 1 red-team finding · round 1 of 3')
   })
+}
 
+function revisingTests() {
   it('3. running: architect revising automatically (autoTurn)', () => {
     const order = wo0928Order({ acceptance: [] })
     const compile = compileOrder(order)
@@ -381,7 +424,9 @@ describe('readiness — holder and strip', () => {
     )
     expect(result.strip.actions).toEqual(['hold'])
   })
+}
 
+function yourRequestTests() {
   it('3. running: architect working on your request', () => {
     const result = readiness(
       baseInput({
@@ -402,7 +447,9 @@ describe('readiness — holder and strip', () => {
     expect(result.strip.detail).toBe(`Started ${T0}. Hand-off opens when it finishes.`)
     expect(result.strip.actions).toEqual(['watch'])
   })
+}
 
+function heldAndExhaustedTests() {
   it('4. held (nothing running)', () => {
     const result = readiness(baseInput({ loop: baseLoop({ heldAt: T1 }) }))
     expect(result.holder).toBe('you')
@@ -431,7 +478,9 @@ describe('readiness — holder and strip', () => {
       'The red team and the architect did not agree after 3 rounds. Nothing moves until you decide. Hand-off opens when both are decided and the architect has applied them.'
     )
   })
+}
 
+function oneBlockingFindingTests() {
   it('5. one blocking finding, singular wording, not exhausted', () => {
     const order = wo0928Order({ redTeam: [blockingFinding({ id: 'RT-1' })] })
     const result = readiness(baseInput({ order }))
@@ -440,7 +489,9 @@ describe('readiness — holder and strip', () => {
       'Nothing moves until you decide. Hand-off opens when it is decided and the architect has applied them.'
     )
   })
+}
 
+function openQuestionsTests() {
   it('6. unanswered open questions', () => {
     const order = wo0928Order({
       openQuestions: [
@@ -464,7 +515,9 @@ describe('readiness — holder and strip', () => {
       'The architect was less than 90% sure. Nothing moves until you answer.'
     )
   })
+}
 
+function noCriteriaTests() {
   it('7. no acceptance criteria yet', () => {
     const order = wo0928Order({ acceptance: [], plan: { ...wo0928Order().plan, units: [] } })
     const result = readiness(baseInput({ order }))
@@ -483,7 +536,9 @@ describe('readiness — holder and strip', () => {
     expect(result.strip.actions).toEqual(['draft'])
     expect(result.steps.find((s) => s.id === 'plan')?.word).toBe('Not drafted yet')
   })
+}
 
+function compileFailuresAndOkTests() {
   it('8. other compile failures, nothing running', () => {
     const order = wo0928Order({
       risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] },
@@ -507,9 +562,21 @@ describe('readiness — holder and strip', () => {
       'All six rows pass and nobody is changing the plan. Press Hand off to start the work.'
     )
   })
-})
+}
 
 describe('readiness — rows', () => {
+  describe('all rows pass', allRowsPassTests)
+  describe('questions answered', questionsAnsweredTests)
+  describe('questions failing', questionsFailingTests)
+  describe('verifiable phrasing and kinds', verifiablePhrasingAndKindsTests)
+  describe('verifiable failing', verifiableFailingTests)
+  describe('in-progress checks', inProgressChecksTests)
+  describe('redTeam row', redteamRowTests)
+  describe('turn row per actor', turnRowPerActorTests)
+  describe('turn row refused and passed', turnRowRefusedAndPassedTests)
+})
+
+function allRowsPassTests() {
   it('all six rows pass on the clean WO-0928-9c6-like fixture', () => {
     const result = readiness(baseInput())
     expect(result.rows.map((r) => r.id)).toEqual([
@@ -538,7 +605,9 @@ describe('readiness — rows', () => {
     expect(redTeam.detail).toBe('No findings.')
     expect(turn.detail).toBe('No turn has run yet.')
   })
+}
 
+function questionsAnsweredTests() {
   it('questions row: all answered', () => {
     const order = wo0928Order({
       openQuestions: [
@@ -557,7 +626,9 @@ describe('readiness — rows', () => {
     const result = readiness(baseInput({ order }))
     expect(result.rows[0].detail).toBe('All 1 answered.')
   })
+}
 
+function questionsFailingTests() {
   it('questions row: failing is needs-you', () => {
     const order = wo0928Order({
       openQuestions: [
@@ -579,7 +650,9 @@ describe('readiness — rows', () => {
       compileOrder(order).failures.find((f) => f.check === 'questions')?.detail
     )
   })
+}
 
+function verifiablePhrasingAndKindsTests() {
   it('verifiable row: 1 criterion phrasing', () => {
     const order = wo0928Order({
       acceptance: [wo0928Order().acceptance[0]],
@@ -608,7 +681,9 @@ describe('readiness — rows', () => {
     const result = readiness(baseInput({ order }))
     expect(result.rows[1].detail).toBe('2 criteria, each with a way to prove it.')
   })
+}
 
+function verifiableFailingTests() {
   it('verifiable row: failing (not in-progress) is a plain failure, not needs-you', () => {
     const order = wo0928Order({
       acceptance: [
@@ -618,7 +693,9 @@ describe('readiness — rows', () => {
     const result = readiness(baseInput({ order }))
     expect(result.rows[1].state).toBe('failing')
   })
+}
 
+function inProgressChecksTests() {
   it('a failing check is in-progress while a machine turn runs and is not held', () => {
     const order = wo0928Order({
       acceptance: [
@@ -642,7 +719,9 @@ describe('readiness — rows', () => {
     )
     expect(result.rows[1].state).toBe('in-progress')
   })
+}
 
+function redteamRowTests() {
   it('redTeam row: needs-you when open blocking findings are the operators to decide', () => {
     const order = wo0928Order({ redTeam: [blockingFinding()] })
     const result = readiness(baseInput({ order }))
@@ -660,7 +739,9 @@ describe('readiness — rows', () => {
     const result = readiness(baseInput({ order }))
     expect(result.rows[4].detail).toBe("2 resolved. 1 note that don't block.")
   })
+}
 
+function turnRowPerActorTests() {
   it('turn row: in-progress per actor', () => {
     const redTeam = readiness(
       baseInput({
@@ -714,7 +795,9 @@ describe('readiness — rows', () => {
     ).rows[5]
     expect(scout.detail).toBe('The scout is reading the repository.')
   })
+}
 
+function turnRowRefusedAndPassedTests() {
   it('turn row: refused is failing', () => {
     const result = readiness(baseInput({ intake: { kind: 'refused', at: T1, reason: 'bad' } }))
     expect(result.rows[5].state).toBe('failing')
@@ -727,9 +810,17 @@ describe('readiness — rows', () => {
     const result = readiness(baseInput({ turnEndedAt: T1 }))
     expect(result.rows[5].detail).toBe(`The last turn ended at ${T1}.`)
   })
-})
+}
 
 describe('readiness — steps and the not-yet rule', () => {
+  describe('a plan gone bad', aPlanGoneBadTests)
+  describe('an empty plan', anEmptyPlanTests)
+  describe('a plan being revised', aPlanBeingRevisedTests)
+  describe('a clean order', aCleanOrderTests)
+  describe('not draft', notDraftTests)
+})
+
+function aPlanGoneBadTests() {
   it('a plan gone bad cascades: redTeam, shape and tracker become not-yet, handOff is exempt', () => {
     const order = wo0928Order({
       risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] },
@@ -757,7 +848,9 @@ describe('readiness — steps and the not-yet rule', () => {
     expect(byId.handOff.mark).toBe('number')
     expect(byId.handOff.word).toBe('Waiting on you')
   })
+}
 
+function anEmptyPlanTests() {
   it('names an empty plan before its failing checks, and says when it is being drafted', () => {
     const empty = wo0928Order({ plan: { ...wo0928Order().plan, units: [] } })
     const idle = readiness(baseInput({ order: empty }))
@@ -780,7 +873,9 @@ describe('readiness — steps and the not-yet rule', () => {
       word: 'Being drafted',
     })
   })
+}
 
+function aPlanBeingRevisedTests() {
   it('shows a failing plan check as being revised while the architect works on your request', () => {
     const order = wo0928Order({
       risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] },
@@ -798,7 +893,9 @@ describe('readiness — steps and the not-yet rule', () => {
     const plan = readiness(baseInput({ order, intake: running })).steps.find((s) => s.id === 'plan')
     expect(plan).toMatchObject({ state: 'work', mark: 'spin', word: 'Being revised' })
   })
+}
 
+function aCleanOrderTests() {
   it('a clean order: every step done, handOff ready', () => {
     const result = readiness(baseInput())
     const byId = Object.fromEntries(result.steps.map((s) => [s.id, s]))
@@ -820,7 +917,9 @@ describe('readiness — steps and the not-yet rule', () => {
     expect(byId.redTeam.state).toBe('done')
     expect(byId.redTeam.word).toBe('Clean after round 1')
   })
+}
 
+function notDraftTests() {
   it('not draft: every step done and check, with hand-off-specific words', () => {
     const order = wo0928Order({ status: 'agreed', agreedAt: T1 })
     const result = readiness(
@@ -836,9 +935,16 @@ describe('readiness — steps and the not-yet rule', () => {
     expect(byId.shape.word).toBe('Direct, proposed')
     expect(byId.handOff.word).toBe(`Handed off ${T1}`)
   })
-})
+}
 
 describe('readiness — findings', () => {
+  describe('fixing', fixingTests)
+  describe('needs you', needsYouTests)
+  describe('notes', notesTests)
+  describe('resolved and text', resolvedAndTextTests)
+})
+
+function fixingTests() {
   it('groups a blocking finding as fixing while the architect fix turn or a red-team round runs', () => {
     const order = wo0928Order({
       redTeam: [blockingFinding({ id: 'RT-1', round: 2 })],
@@ -866,7 +972,9 @@ describe('readiness — findings', () => {
     )
     expect(result.findings[0].group).toBe('fixing')
   })
+}
 
+function needsYouTests() {
   it('groups an unattended blocking finding as needs-you, with the round it was raised in', () => {
     const order = wo0928Order({ redTeam: [blockingFinding({ id: 'RT-1', round: 1 })] })
     const result = readiness(
@@ -884,7 +992,9 @@ describe('readiness — findings', () => {
     const result = readiness(baseInput({ order }))
     expect(result.findings[0].meta).toBe('Would make the change wrong')
   })
+}
 
+function notesTests() {
   it('groups non-blocking open findings as notes, by category', () => {
     const order = wo0928Order({
       redTeam: [
@@ -902,7 +1012,9 @@ describe('readiness — findings', () => {
     expect(metaById['RT-3']).toBe('Already true before this change')
     expect(metaById['RT-4']).toBe('Setup')
   })
+}
 
+function resolvedAndTextTests() {
   it('groups settled findings as resolved, with the reason', () => {
     const order = wo0928Order({
       redTeam: [
@@ -927,9 +1039,18 @@ describe('readiness — findings', () => {
     const result = readiness(baseInput({ order }))
     expect(result.findings[0].text).toBe('Wrong outcome claim.')
   })
-})
+}
 
 describe('readiness — locks and canHandOff', () => {
+  describe('a clean draft', aCleanDraftTests)
+  describe('handOff lock across states', handoffLockAcrossStatesTests)
+  describe('held orders', heldOrdersTests)
+  describe('who handed off', whoHandedOffTests)
+  describe('the redraft lock', theRedraftLockTests)
+  describe('handOffWhy', handoffwhyTests)
+})
+
+function aCleanDraftTests() {
   it('canHandOff is true and every lock is null on a clean draft', () => {
     const result = readiness(baseInput())
     expect(result.canHandOff).toBe(true)
@@ -938,7 +1059,9 @@ describe('readiness — locks and canHandOff', () => {
     expect(result.locks.message).toBeNull()
     expect(result.handOffWhy).toBeNull()
   })
+}
 
+function handoffLockAcrossStatesTests() {
   it('locks.handOff is null exactly when canHandOff, across several draft states', () => {
     // "Held, with nothing running and compile ok" is a deliberate exception to
     // this property (see the dedicated test below) and is excluded here.
@@ -989,7 +1112,9 @@ describe('readiness — locks and canHandOff', () => {
       expect(result.locks.handOff === null).toBe(result.canHandOff)
     }
   })
+}
 
+function heldOrdersTests() {
   it('held with compile ok and nothing running is not locked, even though canHandOff is false', () => {
     const result = readiness(baseInput({ loop: baseLoop({ heldAt: T1 }) }))
     expect(result.canHandOff).toBe(false)
@@ -1005,7 +1130,9 @@ describe('readiness — locks and canHandOff', () => {
       `Held by you since ${T1}. Let it continue, or hand off yourself once nothing is running.`
     )
   })
+}
 
+function whoHandedOffTests() {
   it('handOff lock, not draft, records who handed off', () => {
     const order = wo0928Order({ status: 'agreed', agreedAt: T1 })
     const byYou = readiness(baseInput({ order, agreed: { at: T1, by: 'you' } }))
@@ -1013,7 +1140,9 @@ describe('readiness — locks and canHandOff', () => {
     const auto = readiness(baseInput({ order, agreed: { at: T1, by: 'automatic' } }))
     expect(auto.locks.handOff).toBe(`Handed off at ${T1} automatically. The order is read-only.`)
   })
+}
 
+function theRedraftLockTests() {
   it('redraft lock: red team running warns of loss, architect/scout say to wait', () => {
     const redTeam = readiness(
       baseInput({
@@ -1052,7 +1181,9 @@ describe('readiness — locks and canHandOff', () => {
       `The architect is already working (started ${T0}). Wait for it to finish, or watch it.`
     )
   })
+}
 
+function handoffwhyTests() {
   it('handOffWhy names what finishing opens hand-off, and is null when ready', () => {
     const redTeam = readiness(
       baseInput({
@@ -1104,7 +1235,7 @@ describe('readiness — locks and canHandOff', () => {
 
     expect(readiness(baseInput()).handOffWhy).toBeNull()
   })
-})
+}
 
 describe('readiness — summary', () => {
   it('renders grade, unit count, shape and status', () => {

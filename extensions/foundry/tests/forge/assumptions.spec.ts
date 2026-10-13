@@ -68,6 +68,11 @@ function order(): WorkOrder {
 }
 
 describe('strikeAssumption', () => {
+  describe('what to redraw', whatToRedrawTests)
+  describe('draft, mutation and repeats', draftMutationAndRepeatsTests)
+})
+
+function whatToRedrawTests() {
   it('marks the assumption struck', () => {
     const after = strikeAssumption(order(), 'A-1')
     expect(after.order.assumptions.find((a) => a.id === 'A-1')?.struck).toBe(true)
@@ -87,7 +92,9 @@ describe('strikeAssumption', () => {
     const after = strikeAssumption(order(), 'A-3')
     expect(after.redraw).toEqual([])
   })
+}
 
+function draftMutationAndRepeatsTests() {
   it('returns an order to draft, because the plan is about to change', () => {
     const agreed: WorkOrder = { ...order(), status: 'agreed', agreedAt: '2026-09-06T11:00:00.000Z' }
     const after = strikeAssumption(agreed, 'A-1')
@@ -113,7 +120,7 @@ describe('strikeAssumption', () => {
     expect(after.redraw).toEqual([])
     expect(after.order.assumptions).toHaveLength(3)
   })
-})
+}
 
 describe('liveAssumptions', () => {
   it('is what the operator still has to scan', () => {

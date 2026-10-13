@@ -74,6 +74,15 @@ function ids(o: WorkOrder): string[] {
 }
 
 describe('structuralFindings', () => {
+  describe('outcomes and scope', outcomesAndScopeTests)
+  describe('criteria and units', criteriaAndUnitsTests)
+  describe('dependency chains', dependencyChainsTests)
+  describe('judgements', judgementsTests)
+  describe('untouched files and unavailable checks', untouchedFilesAndUnavailableChecksTests)
+  describe('categories', categoriesTests)
+})
+
+function outcomesAndScopeTests() {
   it('finds nothing wrong with a well-formed order', () => {
     expect(structuralFindings(order())).toEqual([])
   })
@@ -89,7 +98,9 @@ describe('structuralFindings', () => {
     const o = order({ intent: { problem: 'p', outcome: 'o', nonGoals: [] } })
     expect(ids(o)).toContain('no-non-goals')
   })
+}
 
+function criteriaAndUnitsTests() {
   it('attacks a criterion whose statement is not falsifiable', () => {
     const o = order()
     o.acceptance[0].statement = 'the terminal works better'
@@ -108,7 +119,9 @@ describe('structuralFindings', () => {
     o.plan.units[0].touches = []
     expect(ids(o)).toContain('unit-touches-nothing')
   })
+}
 
+function dependencyChainsTests() {
   it('attacks a dependency chain with no parallelism when there is more than one unit', () => {
     const o = order()
     o.plan.units = [
@@ -155,7 +168,9 @@ describe('structuralFindings', () => {
     ]
     expect(ids(o)).toContain('fully-serial-plan')
   })
+}
 
+function judgementsTests() {
   it('attacks a P0 criterion proved only by a judgement', () => {
     const o = order()
     o.acceptance[0].verify = { kind: 'judge', rubric: 'looks right', evidence: ['screenshot'] }
@@ -168,7 +183,9 @@ describe('structuralFindings', () => {
     o.acceptance[0].verify = { kind: 'judge', rubric: 'looks right', evidence: ['screenshot'] }
     expect(ids(o)).not.toContain('p0-judged-not-run')
   })
+}
 
+function untouchedFilesAndUnavailableChecksTests() {
   it('attacks a plan that touches a file no criterion could be about', () => {
     const o = order()
     o.plan.units[0].touches = ['src/a.css', '.github/workflows/release.yml']
@@ -184,7 +201,9 @@ describe('structuralFindings', () => {
   it('does not raise the unavailable-check finding when the repository has a test command', () => {
     expect(ids(order())).not.toContain('no-runnable-check')
   })
+}
 
+function categoriesTests() {
   it('categorises every rule as the design decides, blocking or not', () => {
     const expected: Record<string, string> = {
       'outcome-restates-problem': 'unprovable',
@@ -207,9 +226,14 @@ describe('structuralFindings', () => {
       expect(finding.category).toBe(expected[finding.rule])
     }
   })
-})
+}
 
 describe('applyFindings', () => {
+  describe('adding', addingTests)
+  describe('repeats and non-blocking', repeatsAndNonBlockingTests)
+})
+
+function addingTests() {
   it('adds every finding as open, so none can be forgotten', () => {
     const o = applyFindings(
       order({ intent: { problem: 'p', outcome: 'p', nonGoals: [] } }),
@@ -232,7 +256,9 @@ describe('applyFindings', () => {
     expect(after.redTeam).toEqual([])
     expect(after.status).toBe('agreed')
   })
+}
 
+function repeatsAndNonBlockingTests() {
   it('does not raise the same finding twice across two passes', () => {
     const dirty = order({ intent: { problem: 'p', outcome: 'p', nonGoals: [] } })
     const once = applyFindings(dirty, '2026-09-06T12:00:00.000Z')
@@ -252,7 +278,7 @@ describe('applyFindings', () => {
     expect(after.redTeam[0].category).toBe('scope')
     expect(after.status).toBe('agreed')
   })
-})
+}
 
 describe('resolveFindings and acceptFinding', () => {
   const dirty = (): WorkOrder => order({ intent: { problem: 'p', outcome: 'p', nonGoals: [] } })
@@ -285,14 +311,19 @@ describe('resolveFindings and acceptFinding', () => {
   })
 })
 
+function raised(over: Partial<WorkOrder> = {}): WorkOrder {
+  return applyFindings(order({ intent: { ...order().intent, nonGoals: [] }, ...over }), 'now')
+}
+
 // Asking the architect to clear a finding is only worth something if the
 // redraft that clears it also closes it. The structural pass is deterministic,
 // so whether one of its findings still holds is a fact, not an opinion.
 describe('settleFindings', () => {
-  function raised(over: Partial<WorkOrder> = {}): WorkOrder {
-    return applyFindings(order({ intent: { ...order().intent, nonGoals: [] }, ...over }), 'now')
-  }
+  describe('structural findings', structuralFindingsTests)
+  describe('reviewer and accepted findings', reviewerAndAcceptedFindingsTests)
+})
 
+function structuralFindingsTests() {
   it('resolves a structural finding the order no longer trips', () => {
     const before = raised()
     expect(before.redTeam.find((f) => f.id === 'RT-no-non-goals')?.status).toBe('open')
@@ -308,7 +339,9 @@ describe('settleFindings', () => {
       'open'
     )
   })
+}
 
+function reviewerAndAcceptedFindingsTests() {
   // A reviewer's finding is judgement, not a rule this pass can re-run.
   it('leaves a reviewer’s finding open, since nothing here can decide it', () => {
     const before = order({
@@ -323,4 +356,4 @@ describe('settleFindings', () => {
       'accepted'
     )
   })
-})
+}

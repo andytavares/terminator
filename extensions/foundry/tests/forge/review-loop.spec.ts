@@ -58,6 +58,11 @@ function finding(over: Partial<RedTeamFinding> = {}): RedTeamFinding {
 }
 
 describe('reviewPrompt', () => {
+  describe('the brief', theBriefTests)
+  describe('what changed', whatChangedTests)
+})
+
+function theBriefTests() {
   it('builds the red-team brief with a round heading', () => {
     const prompt = reviewPrompt({
       order: order(),
@@ -70,7 +75,9 @@ describe('reviewPrompt', () => {
     expect(prompt).toContain('## Round 1')
     expect(prompt).not.toContain('What changed since the last round')
   })
+}
 
+function whatChangedTests() {
   it('adds what changed since the last round, on round 2 and later', () => {
     const prompt = reviewPrompt({
       order: order(),
@@ -96,7 +103,7 @@ describe('reviewPrompt', () => {
     })
     expect(prompt).not.toContain('What changed since the last round')
   })
-})
+}
 
 describe('fixMessage', () => {
   it('is null when there is no open blocking finding', () => {
@@ -176,10 +183,18 @@ describe('afterFix', () => {
 })
 
 describe('shouldReview', () => {
+  describe('a bare draft', aBareDraftTests)
+  describe('every other check passing', everyOtherCheckPassingTests)
+  describe('unanswered questions', unansweredQuestionsTests)
+})
+
+function aBareDraftTests() {
   it('is false for a bare draft, which fails checks other than redTeam', () => {
     expect(shouldReview(order())).toBe(false)
   })
+}
 
+function everyOtherCheckPassingTests() {
   it('is true once every other compile check passes', () => {
     const ready = order({
       intent: { problem: 'p', outcome: 'o', nonGoals: [] },
@@ -220,7 +235,9 @@ describe('shouldReview', () => {
     })
     expect(shouldReview(ready)).toBe(true)
   })
+}
 
+function unansweredQuestionsTests() {
   it('is false when questions are unanswered, even with an otherwise clean order', () => {
     const draft = order({
       openQuestions: [
@@ -238,7 +255,7 @@ describe('shouldReview', () => {
     })
     expect(shouldReview(draft)).toBe(false)
   })
-})
+}
 
 describe('nextRound', () => {
   it('is 1 before any round has run', () => {
@@ -256,48 +273,71 @@ describe('nextRound', () => {
   })
 })
 
-describe('afterRelease', () => {
-  const clean = { rounds: [], heldAt: null, exhausted: false }
-  const reviewed = {
-    rounds: [{ round: 1, startedAt: 'a', finishedAt: 'b' }],
-    heldAt: null,
-    exhausted: false,
-  }
-
-  function ready(over: Partial<WorkOrder> = {}): WorkOrder {
-    return order({
-      intent: { problem: 'p', outcome: 'o', nonGoals: [] },
-      risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-      acceptance: [
+const clean = { rounds: [], heldAt: null, exhausted: false }
+const reviewed = {
+  rounds: [{ round: 1, startedAt: 'a', finishedAt: 'b' }],
+  heldAt: null,
+  exhausted: false,
+}
+function ready(over: Partial<WorkOrder> = {}): WorkOrder {
+  return order({
+    intent: { problem: 'p', outcome: 'o', nonGoals: [] },
+    risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    acceptance: [
+      {
+        id: 'AC-1',
+        statement: 'it works',
+        priority: 'P0',
+        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+        unverifiable: null,
+      },
+    ],
+    plan: {
+      ...order().plan,
+      units: [
         {
-          id: 'AC-1',
-          statement: 'it works',
-          priority: 'P0',
-          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-          unverifiable: null,
+          id: 'U-1',
+          title: 'do it',
+          role: 'builder',
+          lane: 1,
+          dependsOn: [],
+          satisfies: ['AC-1'],
+          touches: ['src/a.ts'],
+          verify: [],
         },
       ],
-      plan: {
-        ...order().plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'do it',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: ['src/a.ts'],
-            verify: [],
-          },
-        ],
-        lanes: [{ ord: 1, repo: '/repos/a', branch: '', role: null, blocks: [], blockedBy: [] }],
-        sharedFiles: [],
-      },
-      ...over,
-    })
-  }
+      lanes: [{ ord: 1, repo: '/repos/a', branch: '', role: null, blocks: [], blockedBy: [] }],
+      sharedFiles: [],
+    },
+    ...over,
+  })
+}
 
+describe('afterRelease', () => {
+  describe('reviewing and handing off', reviewingAndHandingOffTests)
+  describe('blocking findings', blockingFindingsTests)
+  describe('other checks and questions', otherChecksAndQuestionsTests)
+})
+
+const unit = (id: string, lane: number): WorkOrder['plan']['units'][number] => ({
+  id,
+  title: id,
+  role: 'builder',
+  lane,
+  touches: ['src/a.ts'],
+  dependsOn: [],
+  acceptance: [],
+})
+const small = (over: Partial<WorkOrder> = {}): WorkOrder => {
+  const base = order()
+  return order({
+    risk: { ...base.risk, grade: 'P3', triggers: [] },
+    plan: { ...base.plan, units: [unit('U1', 1), unit('U2', 1)] },
+    ...over,
+  })
+}
+
+function reviewingAndHandingOffTests() {
   it('reviews a plan the red team has not seen', () => {
     expect(afterRelease(ready(), { loop: clean, reviewedCurrentPlan: false })).toEqual({
       kind: 'review',
@@ -310,7 +350,9 @@ describe('afterRelease', () => {
       kind: 'hand-off',
     })
   })
+}
 
+function blockingFindingsTests() {
   it('sends open blocking findings back to the architect for the last round', () => {
     const next = afterRelease(ready({ redTeam: [finding()] }), {
       loop: reviewed,
@@ -328,7 +370,9 @@ describe('afterRelease', () => {
       })
     ).toEqual({ kind: 'nothing' })
   })
+}
 
+function otherChecksAndQuestionsTests() {
   it('asks the architect to close any other failing check', () => {
     expect(afterRelease(order(), { loop: clean, reviewedCurrentPlan: false }).kind).toBe(
       'follow-up'
@@ -354,27 +398,14 @@ describe('afterRelease', () => {
       kind: 'nothing',
     })
   })
-})
+}
 
 describe('reviewSkipReason', () => {
-  const unit = (id: string, lane: number): WorkOrder['plan']['units'][number] => ({
-    id,
-    title: id,
-    role: 'builder',
-    lane,
-    touches: ['src/a.ts'],
-    dependsOn: [],
-    acceptance: [],
-  })
-  const small = (over: Partial<WorkOrder> = {}): WorkOrder => {
-    const base = order()
-    return order({
-      risk: { ...base.risk, grade: 'P3', triggers: [] },
-      plan: { ...base.plan, units: [unit('U1', 1), unit('U2', 1)] },
-      ...over,
-    })
-  }
+  describe('skipping and grades', skippingAndGradesTests)
+  describe('triggers and plans', triggersAndPlansTests)
+})
 
+function skippingAndGradesTests() {
   it('skips an order graded P3 with one lane and no risk triggers, and says why', () => {
     expect(reviewSkipReason(small())).toBe('graded P3, one lane, no risk triggers')
   })
@@ -389,7 +420,9 @@ describe('reviewSkipReason', () => {
     const plan = { ...base.plan, units: [unit('U1', 1), unit('U2', 2)] }
     expect(reviewSkipReason({ ...base, plan })).toBeNull()
   })
+}
 
+function triggersAndPlansTests() {
   it('runs the red team when a risk trigger is present', () => {
     const base = small()
     expect(
@@ -405,9 +438,14 @@ describe('reviewSkipReason', () => {
   it('does not skip while a blocking finding is open', () => {
     expect(reviewSkipReason(small({ redTeam: [finding()] }))).toBeNull()
   })
-})
+}
 
 describe('scoutFindingsSection', () => {
+  describe('the section', theSectionTests)
+  describe('in the red-team brief', inTheRedTeamBriefTests)
+})
+
+function theSectionTests() {
   it('is null when the scout found nothing', () => {
     expect(scoutFindingsSection(order())).toBeNull()
   })
@@ -428,7 +466,9 @@ describe('scoutFindingsSection', () => {
     expect(section).toContain('- abc123 hid done tickets')
     expect(section).toContain('- kebab-case files')
   })
+}
 
+function inTheRedTeamBriefTests() {
   it('goes into the red-team brief when given', () => {
     const base = order()
     const prompt = reviewPrompt({
@@ -441,7 +481,7 @@ describe('scoutFindingsSection', () => {
     expect(prompt).toContain('## What the scout found')
     expect(prompt).toContain('- src/picker.ts')
   })
-})
+}
 
 describe('lighterRedTeamModel', () => {
   it('runs on the balanced tier', () => {

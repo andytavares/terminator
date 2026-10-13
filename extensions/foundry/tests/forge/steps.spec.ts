@@ -39,6 +39,11 @@ function failing(...checks: CheckId[]): CompileResult {
 const ALL = { shape: true, tracker: true }
 
 describe('the steps of the Forge', () => {
+  describe('order and gaps', orderAndGapsTests)
+  describe('where checks go', whereChecksGoTests)
+})
+
+function orderAndGapsTests() {
   it('runs from what is asked to hand-off, in that order', () => {
     expect(forgeSteps(failing(), ALL).map((s) => s.id)).toEqual([
       'intent',
@@ -58,7 +63,9 @@ describe('the steps of the Forge', () => {
       'handOff',
     ])
   })
+}
 
+function whereChecksGoTests() {
   it('puts each failing check on the step that clears it', () => {
     const steps = forgeSteps(failing('verifiable', 'coverage', 'redTeam'), ALL)
     const blocking = Object.fromEntries(steps.map((s) => [s.id, s.blocking]))
@@ -73,9 +80,14 @@ describe('the steps of the Forge', () => {
     const steps = forgeSteps(failing('questions'), ALL)
     expect(steps.every((s) => s.blocking.length === 0)).toBe(true)
   })
-})
+}
 
 describe('where an order opens', () => {
+  describe('criteria and questions', criteriaAndQuestionsTests)
+  describe('blocking and hand-off', blockingAndHandOffTests)
+})
+
+function criteriaAndQuestionsTests() {
   it('opens a draft with no criteria on what is asked, where the plan gets drafted', () => {
     const shown = order()
     expect(openingStep(shown, forgeSteps(failing('coverage', 'redTeam'), ALL))).toBe('intent')
@@ -100,7 +112,9 @@ describe('where an order opens', () => {
     })
     expect(openingStep(asked, forgeSteps(failing('questions', 'coverage'), ALL))).toBe('plan')
   })
+}
 
+function blockingAndHandOffTests() {
   it('opens a drafted order on the first step that is blocking', () => {
     const shown = order({ acceptance: [CRITERION] })
     expect(openingStep(shown, forgeSteps(failing('redTeam', 'coverage'), ALL))).toBe('plan')
@@ -116,4 +130,4 @@ describe('where an order opens', () => {
     const shown = order({ status: 'agreed' })
     expect(openingStep(shown, forgeSteps(failing('coverage'), ALL))).toBe('handOff')
   })
-})
+}
