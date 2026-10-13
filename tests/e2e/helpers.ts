@@ -4,7 +4,7 @@ import { mkdtempSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
-import { expectNoProcessesLeft, launchMarker } from './leftover-processes'
+import { appProcessTree, expectNoProcessesLeft, launchMarker } from './leftover-processes'
 
 // Shared e2e harness. Every spec launches the real Electron app in an isolated,
 // throwaway profile (via Chromium's --user-data-dir, which Electron honours for
@@ -298,8 +298,9 @@ export async function closeApp(
 ): Promise<void> {
   if (!handle) return
   await saveIpcTrace(handle.app)
+  const started = appProcessTree(handle.app.process().pid ?? -1)
   await stopApp(handle.app, GRACEFUL_CLOSE_MS)
-  await expectNoProcessesLeft(handle.launchId)
+  await expectNoProcessesLeft(handle.launchId, started)
   // The profile is not deleted here. It is still being written to as the app
   // dies — a terminal's scrollback, an extension's state, a transcript — and
   // the directory disappearing out from under those raced the delete: a spec
