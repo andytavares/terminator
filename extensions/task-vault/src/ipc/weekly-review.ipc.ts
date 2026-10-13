@@ -45,31 +45,31 @@ const idSchema = z.object({ reviewId: z.string().min(1) })
 
 const listSchema = z.object({ limit: z.number().int().positive().max(500).optional() }).default({})
 
-function start({ db }: IpcContext) {
+function startWeeklyReview({ db }: IpcContext) {
   return startOrResumeReview(db)
 }
 
-async function log({ db }: IpcContext, args: z.infer<typeof logSchema>) {
+async function logWeeklyReviewAction({ db }: IpcContext, args: z.infer<typeof logSchema>) {
   return { action: await logReviewAction(db, args) }
 }
 
-async function complete({ db }: IpcContext, args: z.infer<typeof completeSchema>) {
+async function completeWeeklyReview({ db }: IpcContext, args: z.infer<typeof completeSchema>) {
   await completeReview(db, args)
   return { ok: true }
 }
 
-async function list({ db }: IpcContext, args: z.infer<typeof listSchema>) {
+async function listWeeklyReviews({ db }: IpcContext, args: z.infer<typeof listSchema>) {
   return { reviews: await listReviews(db, args.limit) }
 }
 
-async function get({ db }: IpcContext, args: z.infer<typeof idSchema>) {
+async function getWeeklyReview({ db }: IpcContext, args: z.infer<typeof idSchema>) {
   const review = await getReview(db, args.reviewId)
   if (!review) return { error: 'REVIEW_NOT_FOUND' }
   return { review }
 }
 
 /** Asks where to save a review as Markdown, then writes it there. */
-async function exportReview({ api, db }: IpcContext, args: z.infer<typeof idSchema>) {
+async function exportWeeklyReview({ api, db }: IpcContext, args: z.infer<typeof idSchema>) {
   const review = await getReview(db, args.reviewId)
   if (!review) return { error: 'REVIEW_NOT_FOUND' }
   const result = await api.dialog.showSaveDialog({
@@ -84,12 +84,12 @@ async function exportReview({ api, db }: IpcContext, args: z.infer<typeof idSche
 }
 
 const REVIEW_ROUTES = [
-  route('task-vault:review:start', noPayload, start),
-  route('task-vault:review:log', logSchema, log),
-  route('task-vault:review:complete', completeSchema, complete),
-  route('task-vault:review:list', listSchema, list),
-  route('task-vault:review:get', idSchema, get),
-  localRoute('task-vault:review:export', idSchema, exportReview),
+  route('task-vault:review:start', noPayload, startWeeklyReview),
+  route('task-vault:review:log', logSchema, logWeeklyReviewAction),
+  route('task-vault:review:complete', completeSchema, completeWeeklyReview),
+  route('task-vault:review:list', listSchema, listWeeklyReviews),
+  route('task-vault:review:get', idSchema, getWeeklyReview),
+  localRoute('task-vault:review:export', idSchema, exportWeeklyReview),
 ]
 
 export function registerWeeklyReviewIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {

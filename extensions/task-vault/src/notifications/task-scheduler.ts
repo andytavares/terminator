@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionDB, Disposable } from '@terminator/extension-sdk'
 import { openInVault } from '../navigation.js'
+import { localDate } from '../vault/recurrence'
 
 let _tick: (() => void) | null = null
 
@@ -83,11 +84,6 @@ type BlockedRow = {
   updated_at: string
   metadata: string
   source_ref: string | null
-}
-
-function localDay(d: Date): string {
-  const pad = (n: number): string => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 /** Minutes after midnight of an "HH:MM" time; missing parts default to 9:00. */
@@ -229,7 +225,7 @@ async function runTick(api: ExtensionAPI, db: ExtensionDB, state: SchedulerState
   const wasStartup = state.isStartup
   try {
     const nowDate = new Date()
-    const tick = { api, db, state, now: Date.now(), nowDate, today: localDay(nowDate), wasStartup }
+    const tick = { api, db, state, now: Date.now(), nowDate, today: localDate(nowDate), wasStartup }
     rollDay(state)
     await dismissFinished(tick)
     await notifyDueTasks(tick)

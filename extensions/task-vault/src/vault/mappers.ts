@@ -73,7 +73,7 @@ function recurrenceEndFields(row: Row): RecurrenceEndFields {
 }
 
 /** Where the task is filed, as `source/sourceRef` (or just the source). */
-function filePathOf(row: Row): string {
+function rowFilePath(row: Row): string {
   const source = row.source as string
   const sourceRef = row.source_ref as string | null
   if (sourceRef) return `${source}/${sourceRef}`
@@ -85,7 +85,7 @@ export function rowToTask(row: Row): IndexedTask {
   const end = recurrenceEndFields(row)
   return {
     id: row.id as string,
-    filePath: filePathOf(row),
+    filePath: rowFilePath(row),
     line: 0,
     status: row.status as TaskStatus,
     text: row.text as string,

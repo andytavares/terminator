@@ -20,7 +20,7 @@ import { orErrorString } from './vault-shared'
 
 type Row = Record<string, unknown>
 
-async function count(db: ExtensionDB, sql: string, params: unknown[]): Promise<number> {
+async function countRows(db: ExtensionDB, sql: string, params: unknown[]): Promise<number> {
   const row = await db.get<{ c: string }>(sql, params)
   return Number(row?.c ?? 0)
 }
@@ -28,17 +28,17 @@ async function count(db: ExtensionDB, sql: string, params: unknown[]): Promise<n
 /** A project with its open, total and finished top-level task counts. */
 async function projectWithCounts(db: ExtensionDB, p: Row) {
   const id = [p.id as string]
-  const nextActionCount = await count(
+  const nextActionCount = await countRows(
     db,
     `SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status='open'`,
     id
   )
-  const totalTaskCount = await count(
+  const totalTaskCount = await countRows(
     db,
     `SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND parent_id IS NULL`,
     id
   )
-  const doneTaskCount = await count(
+  const doneTaskCount = await countRows(
     db,
     `SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status IN ('done','cancelled','migrated') AND parent_id IS NULL`,
     id
@@ -55,12 +55,12 @@ async function projectWithCounts(db: ExtensionDB, p: Row) {
 /** Open and total top-level tasks of an area, counting those of its projects too. */
 async function areaTaskCounts(db: ExtensionDB, areaId: string) {
   const ids = [areaId, areaId]
-  const openTaskCount = await count(
+  const openTaskCount = await countRows(
     db,
     `SELECT COUNT(DISTINCT t.id) as c FROM tasks t WHERE t.parent_id IS NULL AND t.status='open' AND (t.area_id=? OR t.project_id IN (SELECT id FROM projects WHERE area_id=?))`,
     ids
   )
-  const taskCount = await count(
+  const taskCount = await countRows(
     db,
     `SELECT COUNT(DISTINCT t.id) as c FROM tasks t WHERE t.parent_id IS NULL AND (t.area_id=? OR t.project_id IN (SELECT id FROM projects WHERE area_id=?))`,
     ids
@@ -170,7 +170,7 @@ function queryWhere(args: QueryArgs): { where: string; params: unknown[] } {
   return { where, params }
 }
 
-async function query({ db }: IpcContext, args: QueryArgs) {
+async function queryTasks({ db }: IpcContext, args: QueryArgs) {
   const { where, params } = queryWhere(args)
   const rows = await db.query<Row>(
     `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} ${where} ORDER BY t.created_at`,
@@ -181,7 +181,7 @@ async function query({ db }: IpcContext, args: QueryArgs) {
 
 /** Read-only channels: the area overview, a project's tasks, the archive and task queries. */
 export const QUERY_ROUTES = [
-  route('task-vault:vault:query', QueryRequestSchema, query),
+  route('task-vault:vault:query', QueryRequestSchema, queryTasks),
   route('task-vault:vault:list-areas', ListAreasRequestSchema, listAreas),
   route('task-vault:projects:get-tasks', GetProjectTasksRequestSchema, projectTasks),
   route('task-vault:vault:list-archive', ListArchiveRequestSchema.default({}), listArchive),

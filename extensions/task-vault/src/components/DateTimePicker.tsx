@@ -321,12 +321,17 @@ function useDisplayMonth(datePart: string) {
       setDisplayMonth(d.getMonth())
     }
   }
-  const step = (delta: 1 | -1) => {
+  const stepShownMonth = (delta: 1 | -1) => {
     const next = displayMonth + delta
     if (next < 0 || next > 11) setDisplayYear((y) => y + delta)
     setDisplayMonth((next + 12) % 12)
   }
-  return { displayYear, displayMonth, prev: () => step(-1), next: () => step(1) }
+  return {
+    displayYear,
+    displayMonth,
+    prev: () => stepShownMonth(-1),
+    next: () => stepShownMonth(1),
+  }
 }
 
 /** The AM/PM half shown: the picked time's half, else the current one. */
@@ -358,14 +363,16 @@ function useScrollToSlot(open: boolean, timePart: string, amPm: AmPm) {
 function choices({ props, parts, setOpen, setAmPm }: ChoiceContext) {
   const { mode, onChange } = props
   const { datePart, timePart } = parts
-  const commit = (value: string, close: boolean) => {
+  const commitValue = (value: string, close: boolean) => {
     onChange(value)
     if (close) setOpen(false)
   }
   const selectDate = (dateStr: string) =>
-    mode === 'date' ? commit(dateStr, true) : commit(`${dateStr}T${timePart || '12:00'}`, false)
+    mode === 'date'
+      ? commitValue(dateStr, true)
+      : commitValue(`${dateStr}T${timePart || '12:00'}`, false)
   const selectTime = (time: string) =>
-    mode === 'time' ? commit(time, true) : commit(joinDateTime(datePart, time), false)
+    mode === 'time' ? commitValue(time, true) : commitValue(joinDateTime(datePart, time), false)
   const toggleHalf = (half: AmPm) => {
     setAmPm(half)
     if (!timePart) return
@@ -377,7 +384,7 @@ function choices({ props, parts, setOpen, setAmPm }: ChoiceContext) {
     setAmPm(halfOf(time))
     selectTime(time)
   }
-  return { selectDate, selectTime, timeShortcut, toggleHalf, clear: () => commit('', true) }
+  return { selectDate, selectTime, timeShortcut, toggleHalf, clear: () => commitValue('', true) }
 }
 
 /** Everything the popover shows and does. */

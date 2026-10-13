@@ -168,9 +168,9 @@ function somedayToToday({ db }: IpcContext, args: z.infer<typeof CompleteTaskReq
 
 async function calendarMonth({ db }: IpcContext, args: z.infer<typeof CalendarMonthRequestSchema>) {
   const { year, month } = args
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const startDate = `${year}-${pad(month)}-01`
-  const endDate = `${year}-${pad(month)}-31`
+  const twoDigits = (n: number) => String(n).padStart(2, '0')
+  const startDate = `${year}-${twoDigits(month)}-01`
+  const endDate = `${year}-${twoDigits(month)}-31`
   type DayRow = { date: string; status: string; count: string }
   const rows = await db.query<DayRow>(
     `SELECT source_ref AS date, status, COUNT(*) AS count

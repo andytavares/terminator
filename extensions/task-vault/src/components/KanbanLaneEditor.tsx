@@ -45,7 +45,7 @@ function generateId(label: string): string {
   )
 }
 
-function toggled(statuses: TaskStatus[], status: TaskStatus): TaskStatus[] {
+function withStatusToggled(statuses: TaskStatus[], status: TaskStatus): TaskStatus[] {
   if (statuses.includes(status)) return statuses.filter((s) => s !== status)
   return [...statuses, status]
 }
@@ -55,16 +55,16 @@ function useLaneDraft(lanes: KanbanLane[]) {
   const [draft, setDraft] = useState<KanbanLane[]>(
     lanes.map((l) => ({ ...l, taskStatuses: [...l.taskStatuses] }))
   )
-  const patch = (index: number, change: (lane: KanbanLane) => KanbanLane) =>
+  const patchLane = (index: number, change: (lane: KanbanLane) => KanbanLane) =>
     setDraft((prev) => prev.map((l, i) => (i === index ? change(l) : l)))
 
   return {
     draft,
-    rename: (index: number, label: string) => patch(index, (l) => ({ ...l, label })),
+    rename: (index: number, label: string) => patchLane(index, (l) => ({ ...l, label })),
     toggleStatus: (index: number, status: TaskStatus) =>
-      patch(index, (l) => ({ ...l, taskStatuses: toggled(l.taskStatuses, status) })),
+      patchLane(index, (l) => ({ ...l, taskStatuses: withStatusToggled(l.taskStatuses, status) })),
     setDotColor: (index: number, dotColor: string | undefined) =>
-      patch(index, (l) => ({ ...l, dotColor })),
+      patchLane(index, (l) => ({ ...l, dotColor })),
     remove: (index: number) => setDraft((prev) => prev.filter((_, i) => i !== index)),
     add: (label: string) =>
       setDraft((prev) => [...prev, { id: generateId(label), label, taskStatuses: [] }]),

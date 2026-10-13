@@ -22,6 +22,7 @@ import { SmartTaskInput } from './SmartTaskInput'
 import { useIndexReload } from './vault-hooks'
 import { RenameRow, TaskTextEditor, useTaskTextDraft } from './inline-edits'
 import { SessionOptions, useTerminalSessions } from './terminal-sessions'
+import { countLabel } from '../utils/count-label'
 
 interface AreaOption {
   name: string
@@ -191,11 +192,17 @@ function useCombobox({ value, onChange, existingAreas }: ComboboxProps) {
     setOpen(false)
   }
   const pick = () => options[highlighted] && select(options[highlighted])
-  const onKeyDown = comboKeyHandler({ open, setOpen, count: options.length, setHighlighted, pick })
+  const onKeyDown = comboKeyHandler({
+    open,
+    setOpen,
+    count: options.length,
+    setHighlighted,
+    pick,
+  })
   return { open, setOpen, highlighted, setHighlighted, options, select, onKeyDown }
 }
 
-function optionClass(opt: ComboOption, highlighted: boolean): string {
+function comboOptionClass(opt: ComboOption, highlighted: boolean): string {
   let cls = 'area-combobox__option'
   if (highlighted) cls += ' area-combobox__option--highlighted'
   if (opt.isCreate) cls += ' area-combobox__option--create'
@@ -209,7 +216,7 @@ function ComboList({ combo }: { combo: Combo }): React.JSX.Element | null {
       {combo.options.map((opt, i) => (
         <li
           key={opt.value + String(opt.isCreate)}
-          className={optionClass(opt, i === combo.highlighted)}
+          className={comboOptionClass(opt, i === combo.highlighted)}
           onMouseDown={(e) => {
             e.preventDefault()
             combo.select(opt)
@@ -257,7 +264,7 @@ function AreaCombobox(props: ComboboxProps): React.JSX.Element {
 }
 
 /** Picks one of the open terminal sessions, loaded while the picker is open. */
-function SessionPicker({ open, onSelect, onClose }: PickerProps): React.JSX.Element {
+function ProjectLinkPicker({ open, onSelect, onClose }: PickerProps): React.JSX.Element {
   const { sessions, labelOf } = useTerminalSessions(open)
   if (sessions.length === 0) {
     return (
@@ -281,13 +288,13 @@ function SessionPicker({ open, onSelect, onClose }: PickerProps): React.JSX.Elem
 function useLink(filePath: string) {
   const [linking, setLinking] = useState(false)
   const [linked, setLinked] = useState(false)
-  async function link(sessionId: string) {
+  async function linkProjectToSession(sessionId: string) {
     if (!sessionId) return
     await invoke('task-vault:links:create', { projectFilePath: filePath, targetId: sessionId })
     setLinked(true)
     setLinking(false)
   }
-  return { linking, setLinking, linked, link }
+  return { linking, setLinking, linked, link: linkProjectToSession }
 }
 
 function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element {
@@ -307,7 +314,7 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
     )
   }
   return (
-    <SessionPicker
+    <ProjectLinkPicker
       open={linking}
       onSelect={(id) => void link(id)}
       onClose={() => setLinking(false)}
@@ -340,23 +347,26 @@ function useCreateProject(onCreated: () => void) {
   const set = (key: keyof NewProject) => (value: string) =>
     setFields((f) => ({ ...f, [key]: value }))
 
-  async function create() {
+  async function createFromForm() {
     if (!fields.name.trim()) return
     setCreating(true)
     setError(null)
     try {
-      const err = await createProject(fields, existingAreas)
+      const err = await requestCreateProject(fields, existingAreas)
       if (err) setError(err === 'PROJECT_EXISTS' ? 'A project with that name already exists.' : err)
       else onCreated()
     } finally {
       setCreating(false)
     }
   }
-  return { fields, set, creating, error, existingAreas, create }
+  return { fields, set, creating, error, existingAreas, create: createFromForm }
 }
 
 /** Creates the project (and its area when new); returns the error it answered with, if any. */
-async function createProject(fields: NewProject, existing: AreaOption[]): Promise<string | null> {
+async function requestCreateProject(
+  fields: NewProject,
+  existing: AreaOption[]
+): Promise<string | null> {
   const areaName = fields.area.trim()
   await ensureArea(areaName, existing)
   const result = await invoke('task-vault:projects:create', {
@@ -368,7 +378,7 @@ async function createProject(fields: NewProject, existing: AreaOption[]): Promis
   return errorOf(result)
 }
 
-function Field(props: { label: string; children: React.ReactNode }): React.JSX.Element {
+function ProjectFormField(props: { label: string; children: React.ReactNode }): React.JSX.Element {
   return (
     <div className="create-project-form__field">
       <label>{props.label}</label>
@@ -381,7 +391,7 @@ function NameAndOutcome({ form }: { form: CreateForm }): React.JSX.Element {
   const { fields, set } = form
   return (
     <>
-      <Field label="Name *">
+      <ProjectFormField label="Name *">
         <input
           autoFocus
           type="text"
@@ -390,15 +400,15 @@ function NameAndOutcome({ form }: { form: CreateForm }): React.JSX.Element {
           onKeyDown={(e) => e.key === 'Enter' && form.create()}
           placeholder="Project name"
         />
-      </Field>
-      <Field label="Outcome">
+      </ProjectFormField>
+      <ProjectFormField label="Outcome">
         <input
           type="text"
           value={fields.outcome}
           onChange={(e) => set('outcome')(e.target.value)}
           placeholder="What does done look like?"
         />
-      </Field>
+      </ProjectFormField>
     </>
   )
 }
@@ -407,21 +417,21 @@ function AreaAndDeadline({ form }: { form: CreateForm }): React.JSX.Element {
   const { fields, set } = form
   return (
     <div className="create-project-form__row">
-      <Field label="Area">
+      <ProjectFormField label="Area">
         <AreaCombobox
           value={fields.area}
           onChange={set('area')}
           existingAreas={form.existingAreas}
         />
-      </Field>
-      <Field label="Deadline">
+      </ProjectFormField>
+      <ProjectFormField label="Deadline">
         <DateTimePicker
           mode="date"
           value={fields.deadline}
           onChange={set('deadline')}
           className="dtp--full"
         />
-      </Field>
+      </ProjectFormField>
     </div>
   )
 }
@@ -460,30 +470,26 @@ function useProjectTasks(projectName: string) {
   const [tasks, setTasks] = useState<IndexedTask[]>([])
   const [loaded, setLoaded] = useState(false)
 
-  async function load() {
+  async function loadProjectTasks() {
     const result = await invoke('task-vault:projects:get-tasks', { projectName })
     if (result && typeof result === 'object' && 'tasks' in result) {
       setTasks((result as { tasks: IndexedTask[] }).tasks)
     }
     setLoaded(true)
   }
-  const reload = async () => {
-    await load()
+  const reloadProjectTasks = async () => {
+    await loadProjectTasks()
     tickCalendar()
   }
-  const then = async (channel: string, payload: unknown) => {
+  const invokeThenReload = async (channel: string, payload: unknown) => {
     await invoke(channel, payload)
-    await reload()
+    await reloadProjectTasks()
   }
   return {
-    ...{ projectName, tasks, loaded, load, reload },
-    complete: (taskId: string) => then('task-vault:vault:complete-task', { taskId }),
-    restore: (taskId: string) => then('task-vault:vault:restore-task', { taskId }),
+    ...{ projectName, tasks, loaded, load: loadProjectTasks, reload: reloadProjectTasks },
+    complete: (taskId: string) => invokeThenReload('task-vault:vault:complete-task', { taskId }),
+    restore: (taskId: string) => invokeThenReload('task-vault:vault:restore-task', { taskId }),
   }
-}
-
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count !== 1 ? 's' : ''}`
 }
 
 /** Task text tagged with the project, unless it already references it. */
@@ -497,7 +503,7 @@ function useAddProjectTask(tasks: ProjectTasks) {
   const { projectName } = tasks
   const [addingText, setAddingText] = useState('')
   const [adding, setAdding] = useState(false)
-  async function add() {
+  async function addProjectTask() {
     if (!addingText.trim()) return
     setAdding(true)
     try {
@@ -511,7 +517,7 @@ function useAddProjectTask(tasks: ProjectTasks) {
       setAdding(false)
     }
   }
-  return { addingText, setAddingText, adding, add }
+  return { addingText, setAddingText, adding, add: addProjectTask }
 }
 
 function AddProjectTask({ tasks }: { tasks: ProjectTasks }): React.JSX.Element {
@@ -556,12 +562,12 @@ function TaskStatusIcon({ task }: { task: IndexedTask }): React.JSX.Element {
   )
 }
 
-function TaskEditor({ task, tasks, onDone }: EditorProps): React.JSX.Element {
+function ProjectTaskEditor({ task, tasks, onDone }: EditorProps): React.JSX.Element {
   const draft = useTaskTextDraft(task, onDone, tasks.reload)
   return <TaskTextEditor draft={draft} className="projects-browser__task-edit" saveSize="sm" />
 }
 
-function TaskText({ task, onEdit }: { task: IndexedTask; onEdit: () => void }) {
+function ProjectTaskText({ task, onEdit }: { task: IndexedTask; onEdit: () => void }) {
   return (
     <>
       <span
@@ -593,9 +599,9 @@ function OpenTaskRow(props: OpenRowProps): React.JSX.Element {
         <TaskStatusIcon task={task} />
       </button>
       {props.editing ? (
-        <TaskEditor task={task} tasks={tasks} onDone={() => props.setEditingId(null)} />
+        <ProjectTaskEditor task={task} tasks={tasks} onDone={() => props.setEditingId(null)} />
       ) : (
-        <TaskText task={task} onEdit={() => props.setEditingId(task.id)} />
+        <ProjectTaskText task={task} onEdit={() => props.setEditingId(task.id)} />
       )}
     </div>
   )
@@ -635,7 +641,7 @@ function ExpandedTaskList({ tasks, onHide }: { tasks: ProjectTasks; onHide: () =
     <div className="projects-browser__task-list">
       <div className="projects-browser__task-list-header">
         <span>
-          {plural(tasks.tasks.length, 'task')} tagged @{projectName}
+          {countLabel(tasks.tasks.length, 'task')} tagged @{projectName}
         </span>
         <IconButton icon={ChevronUp} label="Hide tasks" onClick={onHide} />
       </div>
@@ -668,7 +674,7 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
   }
   if (expanded) return <ExpandedTaskList tasks={tasks} onHide={() => setExpanded(false)} />
   const label = tasks.loaded
-    ? `${plural(tasks.tasks.length, 'task')} tagged @${projectName}`
+    ? `${countLabel(tasks.tasks.length, 'task')} tagged @${projectName}`
     : `Show tasks tagged @${projectName}`
   return (
     <Button variant="ghost" size="sm" onClick={toggle}>
@@ -789,7 +795,7 @@ function useProjectList() {
 }
 
 /** Renames a project; returns the message to show when the rename was refused. */
-async function renameProject(from: string, to: string): Promise<string | null> {
+async function requestRenameProject(from: string, to: string): Promise<string | null> {
   const err = errorOf(
     await invoke('task-vault:projects:rename', { projectFilePath: from, newName: to })
   )
@@ -816,7 +822,7 @@ function useRenameProject(load: () => Promise<void>) {
     if (!renamingProject || !renameText.trim()) return
     setRenameError(null)
     try {
-      const refused = await renameProject(renamingProject, renameText.trim())
+      const refused = await requestRenameProject(renamingProject, renameText.trim())
       if (refused) return setRenameError(refused)
       setRenamingProject(null)
       await load()
@@ -977,7 +983,7 @@ function CardFooter({ project, browser }: CardProps): React.JSX.Element {
   )
 }
 
-function cardClass(project: IndexedProject, selectedName: string | null): string {
+function projectCardClass(project: IndexedProject, selectedName: string | null): string {
   let cls = 'projects-browser__card'
   if (project.isStale) cls += ' projects-browser__card--stale'
   if (project.name === selectedName) cls += ' projects-browser__card--selected'
@@ -986,10 +992,10 @@ function cardClass(project: IndexedProject, selectedName: string | null): string
 
 function ProjectCard({ project, browser }: CardProps): React.JSX.Element {
   return (
-    <div className={cardClass(project, browser.selectedProjectName)}>
+    <div className={projectCardClass(project, browser.selectedProjectName)}>
       <CardHeader project={project} browser={browser} />
       <div className="projects-browser__stats">
-        <span>{plural(project.nextActionCount, 'next action')}</span>
+        <span>{countLabel(project.nextActionCount, 'next action')}</span>
         <LinkToTerminator filePath={project.filePath} />
       </div>
       <ProjectTaskList projectName={project.name} />

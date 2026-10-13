@@ -5,7 +5,7 @@ import { SmartTaskInput } from './SmartTaskInput'
 import type { IndexedTask } from '../vault/types'
 
 /** A task's text with its tags written back out, for editing. */
-function taggedText(task: IndexedTask): string {
+function taskTextWithTags(task: IndexedTask): string {
   const parts = [task.text]
   if (task.project) parts.push(`@${task.project}`)
   if (task.context) parts.push(`+${task.context}`)
@@ -47,8 +47,8 @@ export function useTaskTextDraft(
   close: () => void,
   reload: () => Promise<unknown>
 ) {
-  const [text, setText] = useState(() => taggedText(task))
-  async function save() {
+  const [text, setText] = useState(() => taskTextWithTags(task))
+  async function writeDraft() {
     if (!text.trim()) return
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:edit-task', {
       taskId: task.id,
@@ -57,7 +57,7 @@ export function useTaskTextDraft(
     close()
     await reload()
   }
-  return { text, setText, save, cancel: close }
+  return { text, setText, save: writeDraft, cancel: close }
 }
 
 interface TaskTextEditorProps {
@@ -99,12 +99,12 @@ export interface RenameDraft {
 /** The rename field of an area or a project; `scope` adds that view's own classes. */
 export function RenameRow(props: { rename: RenameDraft; scope?: string }): React.JSX.Element {
   const { rename, scope } = props
-  const scoped = (part: string) => `area-detail__${part}${scope ? ` ${scope}__${part}` : ''}`
+  const scopedClass = (part: string) => `area-detail__${part}${scope ? ` ${scope}__${part}` : ''}`
   return (
-    <div className={scoped('rename-row')}>
+    <div className={scopedClass('rename-row')}>
       <input
         autoFocus
-        className={scoped('rename-input')}
+        className={scopedClass('rename-input')}
         value={rename.renameText}
         onChange={(e) => rename.setRenameText(e.target.value)}
         onKeyDown={(e) => {

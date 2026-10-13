@@ -127,12 +127,12 @@ function useMonth(refreshKey: number) {
     void loadMonth()
   }, [year, month, refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const step = (delta: 1 | -1) => {
+  const stepMonth = (delta: 1 | -1) => {
     const next = month + delta
     if (next < 1 || next > 12) setYear((y) => y + delta)
     setMonth(((next + 11) % 12) + 1)
   }
-  return { year, month, dayMap, loadMonth, prev: () => step(-1), next: () => step(1) }
+  return { year, month, dayMap, loadMonth, prev: () => stepMonth(-1), next: () => stepMonth(1) }
 }
 
 /** The picked day and its tasks; picking a day also opens it in the vault. */
@@ -143,7 +143,7 @@ function useSelectedDay(todayStr: string) {
   const [selectedDayTasks, setSelectedDayTasks] = useState<Task[]>([])
   const [loadingDay, setLoadingDay] = useState(true)
 
-  async function pick(dateStr: string) {
+  async function pickDay(dateStr: string) {
     setPickedADay(true)
     setSelectedDate(dateStr)
     if (dateStr === todayStr) void loadToday()
@@ -159,7 +159,7 @@ function useSelectedDay(todayStr: string) {
     fetchDayTasks(date).then((tasks) => {
       if (tasks) setSelectedDayTasks(tasks)
     })
-  return { selectedDate, pickedADay, selectedDayTasks, loadingDay, pick, refreshTasks }
+  return { selectedDate, pickedADay, selectedDayTasks, loadingDay, pick: pickDay, refreshTasks }
 }
 
 /** Refreshes the month dots and the selected day's tasks whenever any task changes, both in the

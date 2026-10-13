@@ -141,22 +141,22 @@ export function useSubtaskDraft(taskId: string, onRefresh: () => Promise<void>) 
   const [active, setActive] = useState(false)
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
-  const cancel = () => {
+  const cancelNewSubtask = () => {
     setText('')
     setActive(false)
   }
-  async function add() {
+  async function addNewSubtask() {
     if (!text.trim()) return
     setSaving(true)
     try {
       await invokeVault('task-vault:vault:add-subtask', { taskId, text: text.trim() })
-      cancel()
+      cancelNewSubtask()
       await onRefresh()
     } finally {
       setSaving(false)
     }
   }
-  return { active, setActive, text, setText, saving, add, cancel }
+  return { active, setActive, text, setText, saving, add: addNewSubtask, cancel: cancelNewSubtask }
 }
 
 /** The input row a new subtask is written in. */

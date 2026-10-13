@@ -97,23 +97,27 @@ function navNotice(task: IndexedTask) {
 
 /** Archiving, restoring, blocking and removing the task. */
 function statusCommands(task: IndexedTask, onRefresh: () => Promise<void>) {
-  const run = taskRunner(task, onRefresh)
+  const runTaskChannel = taskRunner(task, onRefresh)
   const told = navNotice(task)
   return {
     archive: () =>
-      run('task-vault:vault:cancel-task', {}, told('info', 'Archived', 'taskArchived')),
+      runTaskChannel('task-vault:vault:cancel-task', {}, told('info', 'Archived', 'taskArchived')),
     restore: () =>
-      run('task-vault:vault:reopen-task', {}, told('info', 'Reopened', 'taskReopened')),
+      runTaskChannel('task-vault:vault:reopen-task', {}, told('info', 'Reopened', 'taskReopened')),
     unblock: () =>
-      run('task-vault:vault:unblock-task', {}, told('success', 'Unblocked', 'taskUnblocked')),
+      runTaskChannel(
+        'task-vault:vault:unblock-task',
+        {},
+        told('success', 'Unblocked', 'taskUnblocked')
+      ),
     block: (reason: string, checkInterval: string) =>
-      run(
+      runTaskChannel(
         'task-vault:vault:block-task',
         { reason, checkInterval },
         told('warning', 'Blocked', 'taskBlocked')
       ),
-    remove: () => run('task-vault:vault:delete-task', {}, () => {}),
-    resetStale: () => run('task-vault:vault:reset-today-since', {}, () => {}),
+    remove: () => runTaskChannel('task-vault:vault:delete-task', {}, () => {}),
+    resetStale: () => runTaskChannel('task-vault:vault:reset-today-since', {}, () => {}),
   }
 }
 
@@ -143,17 +147,17 @@ function scheduleCommands(task: IndexedTask, onRefresh: () => Promise<void>) {
 function useTaskEdit(task: IndexedTask, onRefresh: () => Promise<void>) {
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState('')
-  const start = () => {
+  const startRowEdit = () => {
     setEditText(rawTaskText(task))
     setEditing(true)
   }
-  async function save() {
+  async function saveRowText() {
     if (!editText.trim()) return
     await invokeVault('task-vault:vault:edit-task', { taskId: task.id, text: editText.trim() })
     setEditing(false)
     await onRefresh()
   }
-  return { editing, setEditing, editText, setEditText, start, save }
+  return { editing, setEditing, editText, setEditText, start: startRowEdit, save: saveRowText }
 }
 
 /** A click selects after a short wait, so a second click can turn it into an edit; a task that
@@ -217,7 +221,7 @@ function jumpToSession(sessionId: string | null, relink: () => void): void {
 function useTerminalLink(task: IndexedTask, onRefresh: () => Promise<void>) {
   const [linking, setLinking] = useState(false)
   const session = useLinkedSession(task)
-  async function link(choice: SessionChoice) {
+  async function linkTaskToSession(choice: SessionChoice) {
     const result = await invokeVault('task-vault:links:create', {
       taskId: task.id,
       targetId: choice.sessionId,
@@ -231,20 +235,20 @@ function useTerminalLink(task: IndexedTask, onRefresh: () => Promise<void>) {
     await onRefresh()
   }
   const jump = () => jumpToSession(session.linkedSessionId, () => setLinking(true))
-  return { linking, setLinking, linked: session.linked, link, jump }
+  return { linking, setLinking, linked: session.linked, link: linkTaskToSession, jump }
 }
 
 /** Moving the task to another day. */
 function useMigrate(task: IndexedTask, onMigrate: TaskRowProps['onMigrate']) {
   const [open, setOpen] = useState(false)
   const [date, setDate] = useState('')
-  async function migrate() {
+  async function migrateToChosenDay() {
     if (!date) return
     await onMigrate(task.id, date)
     setOpen(false)
     setDate('')
   }
-  return { open, setOpen, date, setDate, migrate }
+  return { open, setOpen, date, setDate, migrate: migrateToChosenDay }
 }
 
 function statusFlags(status: TaskStatus) {
@@ -337,7 +341,7 @@ function TaskText({ row }: RowProps): React.JSX.Element {
   )
 }
 
-function LinkButton({ row }: RowProps): React.JSX.Element {
+function TerminalLinkButton({ row }: RowProps): React.JSX.Element {
   if (!row.link.linked) {
     return (
       <IconButton
@@ -381,7 +385,7 @@ function OpenActions({ row }: RowProps): React.JSX.Element {
         label="Send to backlog"
         onClick={() => void row.commands.sendToBacklog()}
       />
-      <LinkButton row={row} />
+      <TerminalLinkButton row={row} />
       <AddSubtaskButton row={row} />
       <IconButton
         icon={Repeat}

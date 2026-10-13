@@ -158,7 +158,7 @@ function SectionPreview({ value, placeholder, onEdit }: PreviewProps): React.JSX
 function SectionEditor(props: SectionEditorProps) {
   const { label, value, placeholder, onSave } = props
   const d = useSectionDraft(value, onSave)
-  const toggle = () => (d.editing ? void d.save() : d.setEditing(true))
+  const toggleSectionEdit = () => (d.editing ? void d.save() : d.setEditing(true))
   return (
     <div className="tv-detail__section">
       <div className="tv-detail__section-header">
@@ -167,7 +167,7 @@ function SectionEditor(props: SectionEditorProps) {
           icon={d.editing ? Eye : Pencil}
           label={d.editing ? 'Preview' : 'Edit'}
           size="sm"
-          onClick={toggle}
+          onClick={toggleSectionEdit}
           disabled={d.saving}
         />
       </div>
@@ -232,7 +232,7 @@ function useTaskDetail(taskId: string) {
     })
   }
 
-  return { detail, loading, error, saveField }
+  return { detail, loading, error, saveField: saveField }
 }
 
 export function TaskDetailPanel({ taskId, taskText, onClose }: TaskDetailPanelProps) {

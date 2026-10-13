@@ -17,12 +17,12 @@ interface Capture {
 }
 
 /** Sends typed text to the inbox, remembering what this step captured. */
-function useCapture(reviewId: string | null): Capture {
+function useReviewCapture(reviewId: string | null): Capture {
   const [text, setText] = useState('')
   const [adding, setAdding] = useState(false)
   const [captured, setCaptured] = useState<string[]>([])
 
-  async function add() {
+  async function addReviewCapture() {
     const item = text.trim()
     if (!item) return
     setAdding(true)
@@ -45,10 +45,10 @@ function useCapture(reviewId: string | null): Capture {
     }
   }
 
-  return { text, setText, adding, captured, add }
+  return { text, setText, adding, captured, add: addReviewCapture }
 }
 
-function CaptureRow({ capture }: { capture: Capture }): React.JSX.Element {
+function ReviewCaptureRow({ capture }: { capture: Capture }): React.JSX.Element {
   const { text, setText, adding, add } = capture
   return (
     <div className="wr-step__capture-row">
@@ -103,7 +103,7 @@ function StepActions(props: { canSkip: boolean; onComplete: () => void }): React
 }
 
 export function WeeklyReviewStep1GetClear({ onComplete, reviewId }: Props): React.JSX.Element {
-  const capture = useCapture(reviewId)
+  const capture = useReviewCapture(reviewId)
   return (
     <div className="wr-step wr-step-1">
       <h3>Step 1: Get Clear</h3>
@@ -111,7 +111,7 @@ export function WeeklyReviewStep1GetClear({ onComplete, reviewId }: Props): Reac
         Capture any loose items not yet in your inbox — physical papers, email, sticky notes, open
         browser tabs.
       </p>
-      <CaptureRow capture={capture} />
+      <ReviewCaptureRow capture={capture} />
       <CapturedList items={capture.captured} />
       <StepActions canSkip={capture.captured.length === 0} onComplete={onComplete} />
     </div>

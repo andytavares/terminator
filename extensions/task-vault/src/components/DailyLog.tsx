@@ -10,7 +10,7 @@ import { BacklogSection } from './DailyLogBacklog'
 import {
   bindId,
   definedFields,
-  formatDate,
+  formatDayHeading,
   invokeVault,
   isStaleSince,
   modifier,
@@ -101,10 +101,10 @@ function withDefaults(props: DailyLogProps): DailyLogProps & typeof DEFAULTS {
  *  One empty state, not three: the day is empty only when it and the backlog under it are. */
 function partitionDay(day: Day) {
   const { selectedContexts } = day
-  const matches = (t: IndexedTask) =>
+  const matchesContext = (t: IndexedTask) =>
     selectedContexts.length === 0 || selectedContexts.includes(t.context ?? '')
   const rolled = new Set(day.rolledOverTaskIds)
-  const visible = day.log.tasks.filter(matches)
+  const visible = day.log.tasks.filter(matchesContext)
   const today = visible.filter((t) => !rolled.has(t.id))
   return {
     rolledOver: visible.filter((t) => rolled.has(t.id)),
@@ -151,7 +151,7 @@ function useTaskDrag(active: IndexedTask[], onRefresh: () => Promise<void>) {
     draggingId.current = null
     await persistMove(active, move, onRefresh)
   }
-  const handlersFor = (taskId: string): DragHandlers => ({
+  const dragHandlersFor = (taskId: string): DragHandlers => ({
     onDragStart: (e) => {
       e.dataTransfer.effectAllowed = 'move'
       draggingId.current = taskId
@@ -167,14 +167,14 @@ function useTaskDrag(active: IndexedTask[], onRefresh: () => Promise<void>) {
     },
     onDrop: (e) => void drop(e, taskId),
   })
-  return { dragOverId, handlersFor }
+  return { dragOverId, handlersFor: dragHandlersFor }
 }
 
 function useAddTask(onAdd: AddTaskRowProps['onAdd'], startOpen: boolean) {
   const [text, setText] = useState('')
   const [adding, setAdding] = useState(false)
   const [open, setOpen] = useState(startOpen)
-  async function submit() {
+  async function submitNewTask() {
     if (!text.trim()) return
     setAdding(true)
     try {
@@ -185,7 +185,7 @@ function useAddTask(onAdd: AddTaskRowProps['onAdd'], startOpen: boolean) {
       setAdding(false)
     }
   }
-  return { text, setText, adding, open, setOpen, submit }
+  return { text, setText, adding, open, setOpen, submit: submitNewTask }
 }
 
 function AddTaskOpener({ onOpen }: { onOpen: () => void }): React.JSX.Element {
@@ -263,7 +263,7 @@ function TaskWithSubtasks(props: TaskItemProps): React.JSX.Element {
 }
 
 function DayTitle({ day }: DayProps): React.JSX.Element {
-  const { weekday, detail } = formatDate(day.log.date)
+  const { weekday, detail } = formatDayHeading(day.log.date)
   return (
     <div className="daily-log__date-text">
       <span className="daily-log__date-weekday">
@@ -382,7 +382,7 @@ function EmptyDay(props: EmptyDayProps): React.JSX.Element {
   )
 }
 
-async function addTask(day: Day, text: string): Promise<void> {
+async function addDayTask(day: Day, text: string): Promise<void> {
   await invokeVault('task-vault:vault:add-task', { filePath: day.log.filePath, text })
   await day.onRefresh()
 }
@@ -400,7 +400,7 @@ function backlogActionsOf(day: Day) {
 function DayTasks({ parts, list }: PartsProps): React.JSX.Element {
   const { day } = list
   const [forceAddOpen, setForceAddOpen] = useState(false)
-  const addTaskToDay = (text: string) => addTask(day, text)
+  const addTaskToDay = (text: string) => addDayTask(day, text)
   const showAdd = !parts.isEmptyDay || forceAddOpen
   return (
     <>

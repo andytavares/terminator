@@ -45,7 +45,7 @@ function statusFilterOf(status: unknown): ProjectStatus[] {
   return [status as ProjectStatus]
 }
 
-async function listProjects({ db }: IpcContext, args: z.infer<typeof ListProjectsRequestSchema>) {
+async function queryProjects({ db }: IpcContext, args: z.infer<typeof ListProjectsRequestSchema>) {
   const statusFilter = statusFilterOf(args.status)
   const placeholders = statusFilter.map(() => '?').join(',')
   const rows = await db.query<Row>(
@@ -163,7 +163,7 @@ async function deleteProject({ db }: IpcContext, args: z.infer<typeof DeleteProj
   return { success: true }
 }
 
-async function updateStatus(
+async function updateProjectFileStatus(
   { db }: IpcContext,
   args: z.infer<typeof UpdateProjectStatusRequestSchema>
 ) {
@@ -223,11 +223,15 @@ async function renameProject({ db }: IpcContext, args: z.infer<typeof RenameProj
 }
 
 const PROJECT_ROUTES = [
-  route('task-vault:projects:list', ListProjectsRequestSchema.default({}), listProjects),
+  route('task-vault:projects:list', ListProjectsRequestSchema.default({}), queryProjects),
   route('task-vault:projects:weekly-review', noPayload, weeklyReview),
   route('task-vault:projects:create', CreateProjectRequestSchema, createProject),
   route('task-vault:projects:delete', DeleteProjectRequestSchema, deleteProject),
-  route('task-vault:projects:update-status', UpdateProjectStatusRequestSchema, updateStatus),
+  route(
+    'task-vault:projects:update-status',
+    UpdateProjectStatusRequestSchema,
+    updateProjectFileStatus
+  ),
   route('task-vault:projects:update-area', UpdateProjectAreaRequestSchema, updateArea),
   route('task-vault:projects:update-deadline', UpdateProjectDeadlineRequestSchema, updateDeadline),
   route('task-vault:projects:rename', RenameProjectRequestSchema, renameProject),

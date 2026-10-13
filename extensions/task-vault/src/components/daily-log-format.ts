@@ -1,6 +1,7 @@
 import type React from 'react'
 import type { IndexedTask } from '../vault/types'
 import { useVaultNavStore } from '../stores/vault-nav.store'
+import { localDate } from '../vault/recurrence'
 
 export type EndType = 'none' | 'on_date' | 'after_count'
 
@@ -59,18 +60,9 @@ export const RECURRENCE_INTERVALS: { value: string; label: string }[] = [
 
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]
 
-function pad(n: number): string {
-  return String(n).padStart(2, '0')
-}
-
-/** A local date as YYYY-MM-DD. */
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
 /** The date shares the weekday's line and carries the weight: you navigate by the date, and you
  *  know what day it is (the weekday was once ~48px with the date small beneath it). */
-export function formatDate(iso: string): { weekday: string; detail: string } {
+export function formatDayHeading(iso: string): { weekday: string; detail: string } {
   const [y, m, d] = iso.split('-').map(Number)
   const dt = new Date(y, m - 1, d)
   return {
@@ -94,14 +86,14 @@ export function formatCheckInterval(value: string): string {
 
 /** Today, the earliest day a custom check-in can fall on. */
 export function localDateMin(): string {
-  return ymd(new Date())
+  return localDate(new Date())
 }
 
 /** Tomorrow, where a custom check-in starts. */
 export function defaultCustomDate(): string {
   const d = new Date()
   d.setDate(d.getDate() + 1)
-  return ymd(d)
+  return localDate(d)
 }
 
 function hour12(hour: number): number {
@@ -196,7 +188,7 @@ export function isStaleSince(todaySince: string | undefined, thresholdDays?: num
   if (!thresholdDays || !todaySince) return false
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - thresholdDays)
-  return todaySince <= ymd(cutoff)
+  return todaySince <= localDate(cutoff)
 }
 
 /** Leads back to the task, already inside the vault view. (A tab activation once here reached a
@@ -206,7 +198,7 @@ export function makeTaskNavHandler(taskId: string): () => void {
 }
 
 /** Calls one of the vault's channels. */
-export function invokeVault(channel: string, payload: unknown): Promise<unknown> {
+export function invokeVault(channel: string, payload?: unknown): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 

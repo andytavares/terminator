@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { Play, RefreshCw, Trash2 } from 'lucide-react'
 import { invoke } from '@terminator/extension-sdk/renderer'
 import { Button, IconButton } from '@terminator/extension-ui'
+import { countLabel } from '../utils/count-label'
 
 interface TableStats {
   [table: string]: number
@@ -158,7 +159,7 @@ function useAdmin(onWrite?: () => void) {
   const [running, setRunning] = useState(false)
   const [confirmPending, setConfirmPending] = useState<ConfirmPending | null>(null)
 
-  async function runQuery(querySql: string) {
+  async function runAdminQuery(querySql: string) {
     if (!querySql.trim()) return
     setRunning(true)
     setResult(null)
@@ -171,11 +172,11 @@ function useAdmin(onWrite?: () => void) {
 
   const show = (querySql: string) => {
     setSql(querySql)
-    void runQuery(querySql)
+    void runAdminQuery(querySql)
   }
   return {
     ...{ stats, loadStats, sql, setSql, result, running },
-    ...{ runQuery, show, confirmPending, setConfirmPending },
+    ...{ runQuery: runAdminQuery, show, confirmPending, setConfirmPending },
   }
 }
 
@@ -247,8 +248,8 @@ function TableStatsPanel({ admin }: AdminProps): React.JSX.Element {
   )
 }
 
-function QuickActions({ admin }: AdminProps): React.JSX.Element {
-  const choose = (action: QuickActionDef) => {
+function QueryQuickActions({ admin }: AdminProps): React.JSX.Element {
+  const chooseQuickAction = (action: QuickActionDef) => {
     if (action.destructive)
       admin.setConfirmPending({ title: 'Run destructive query?', sql: action.sql })
     else admin.show(action.sql)
@@ -262,7 +263,7 @@ function QuickActions({ admin }: AdminProps): React.JSX.Element {
             key={a.label}
             variant={a.destructive ? 'danger' : 'ghost'}
             size="sm"
-            onClick={() => choose(a)}
+            onClick={() => chooseQuickAction(a)}
           >
             {a.label}
           </Button>
@@ -283,7 +284,7 @@ function runOnModEnter(run: () => void) {
 }
 
 function SqlEditor({ admin }: AdminProps): React.JSX.Element {
-  const run = () => void admin.runQuery(admin.sql)
+  const runTypedQuery = () => void admin.runQuery(admin.sql)
   return (
     <div className="db-admin__section db-admin__editor-section">
       <span className="db-admin__section-title">SQL</span>
@@ -292,7 +293,7 @@ function SqlEditor({ admin }: AdminProps): React.JSX.Element {
           className="db-admin__editor"
           value={admin.sql}
           onChange={(e) => admin.setSql(e.target.value)}
-          onKeyDown={runOnModEnter(run)}
+          onKeyDown={runOnModEnter(runTypedQuery)}
           placeholder="SELECT * FROM tasks LIMIT 50"
           rows={4}
           spellCheck={false}
@@ -300,7 +301,7 @@ function SqlEditor({ admin }: AdminProps): React.JSX.Element {
         <Button
           variant="primary"
           icon={Play}
-          onClick={run}
+          onClick={runTypedQuery}
           disabled={admin.running || !admin.sql.trim()}
           title="Run (⌘↵)"
         >
@@ -317,14 +318,10 @@ function elapsedText(result: QueryResult, lead: string): string | false {
   return lead + result.elapsed + 'ms'
 }
 
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count !== 1 ? 's' : ''}`
-}
-
 function ResultMeta({ result, table }: Omit<RowsProps, 'admin'>): React.JSX.Element {
   return (
     <div className="db-admin__result-meta">
-      {plural(result.rows.length, 'row')} {elapsedText(result, '· ')}
+      {countLabel(result.rows.length, 'row')} {elapsedText(result, '· ')}
       {table && (
         <span className="db-admin__result-hint">
           {' · click '}
@@ -394,7 +391,7 @@ function Results({ admin, result }: { admin: Admin; result: QueryResult }): Reac
   if (result.rows.length === 0) {
     return (
       <div className="db-admin__result-meta">
-        {plural(result.changes, 'row')} affected
+        {countLabel(result.changes, 'row')} affected
         {elapsedText(result, ' · ')}
       </div>
     )
@@ -408,24 +405,24 @@ function Results({ admin, result }: { admin: Admin; result: QueryResult }): Reac
   )
 }
 
-function ConfirmDialog({ admin }: AdminProps): React.JSX.Element | null {
+function QueryConfirmDialog({ admin }: AdminProps): React.JSX.Element | null {
   const pending = admin.confirmPending
   if (!pending) return null
-  const close = () => admin.setConfirmPending(null)
-  const confirm = () => {
-    close()
+  const closeConfirm = () => admin.setConfirmPending(null)
+  const confirmPendingQuery = () => {
+    closeConfirm()
     admin.show(pending.sql)
   }
   return (
-    <div className="db-admin__confirm-backdrop" onClick={close}>
+    <div className="db-admin__confirm-backdrop" onClick={closeConfirm}>
       <div className="db-admin__confirm" onClick={(e) => e.stopPropagation()}>
         <p className="db-admin__confirm-title">{pending.title}</p>
         <p className="db-admin__confirm-sql">{pending.sql}</p>
         <div className="db-admin__confirm-actions">
-          <Button variant="danger" onClick={confirm}>
+          <Button variant="danger" onClick={confirmPendingQuery}>
             Run
           </Button>
-          <Button variant="ghost" onClick={close}>
+          <Button variant="ghost" onClick={closeConfirm}>
             Cancel
           </Button>
         </div>
@@ -439,14 +436,14 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
   return (
     <div className="db-admin">
       <TableStatsPanel admin={admin} />
-      <QuickActions admin={admin} />
+      <QueryQuickActions admin={admin} />
       <SqlEditor admin={admin} />
       {admin.result && (
         <div className="db-admin__results">
           <Results admin={admin} result={admin.result} />
         </div>
       )}
-      <ConfirmDialog admin={admin} />
+      <QueryConfirmDialog admin={admin} />
     </div>
   )
 }

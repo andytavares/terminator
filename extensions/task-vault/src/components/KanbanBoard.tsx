@@ -258,13 +258,13 @@ function useKanbanConfig(onConfigChange?: (config: KanbanConfig) => void) {
       setKanbanLanes(loaded.lanes)
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  async function saveConfig(newConfig: KanbanConfig) {
+  async function saveKanbanConfig(newConfig: KanbanConfig) {
     setConfig(newConfig)
     setKanbanLanes(newConfig.lanes)
     onConfigChange?.(newConfig)
     await window.electronAPI.extensionBridge.invoke('task-vault:kanban:save-config', newConfig)
   }
-  return { config, saveConfig }
+  return { config, saveConfig: saveKanbanConfig }
 }
 
 /** The board's config and cards. */
@@ -287,7 +287,7 @@ async function moveToLane(lanes: KanbanLane[], laneId: string, taskId: string): 
 function useDragAndDrop(lanes: KanbanLane[], afterMove: () => Promise<void>) {
   const [dragOverLane, setDragOverLane] = useState<string | null>(null)
   const draggingTaskId = useRef<string | null>(null)
-  async function onDrop(e: React.DragEvent, laneId: string) {
+  async function dropOnLane(e: React.DragEvent, laneId: string) {
     e.preventDefault()
     setDragOverLane(null)
     const taskId = draggingTaskId.current
@@ -297,7 +297,7 @@ function useDragAndDrop(lanes: KanbanLane[], afterMove: () => Promise<void>) {
   }
   return {
     dragOverLane,
-    onDrop: (e: React.DragEvent, laneId: string) => void onDrop(e, laneId),
+    onDrop: (e: React.DragEvent, laneId: string) => void dropOnLane(e, laneId),
     onDragStart: (e: React.DragEvent, taskId: string) => {
       draggingTaskId.current = taskId
       e.dataTransfer.effectAllowed = 'move'
@@ -318,12 +318,12 @@ function useDragAndDrop(lanes: KanbanLane[], afterMove: () => Promise<void>) {
 /** The card shown in the detail panel; selecting it again closes the panel. */
 function useSelectedCard() {
   const [selected, setSelected] = useState<SelectedCard | null>(null)
-  const onSelect = (task: KanbanTask) =>
+  const toggleSelected = (task: KanbanTask) =>
     setSelected((prev) => {
       if (prev?.id === task.id) return null
       return { id: task.id, text: task.text }
     })
-  return { selected, onSelect, close: () => setSelected(null) }
+  return { selected, onSelect: toggleSelected, close: () => setSelected(null) }
 }
 
 const GROUPINGS: { value: SwimlaneGrouping; label: string }[] = [
