@@ -266,15 +266,13 @@ test('a popped-out note window gets the same outline', async () => {
     .poll(noteWindowLoaded, { timeout: 20000, message: 'note window never finished loading' })
     .toBe(true)
 
-  const items = await inNotepad<string[]>(
-    `(async () => {
-       for (let i = 0; i < 60; i++) {
-         if (document.querySelectorAll('.notepad-outline__item').length > 0) break
-         await new Promise((r) => requestAnimationFrame(r))
-       }
-       return [...document.querySelectorAll('.notepad-outline__item')].map((el) => el.textContent)
-     })()`,
-    'window'
-  )
-  expect(items).toEqual(['Alpha', 'Beta', 'Omega'])
+  // Loaded is not rendered: the window still fetches the note over the bridge.
+  await expect
+    .poll(() =>
+      inNotepad<string[]>(
+        `[...document.querySelectorAll('.notepad-outline__item')].map((el) => el.textContent)`,
+        'window'
+      )
+    )
+    .toEqual(['Alpha', 'Beta', 'Omega'])
 })
