@@ -159,6 +159,23 @@ describe('ensureReviewWorktree against real git', () => {
 
     expect(await ensureReviewWorktree(checkout, 212, head)).toBe(wt)
   })
+
+  // A running review's "Continue in terminal" asks for the worktree while the
+  // run's own call may still be creating it (a slow git, as on macOS CI). The
+  // second call must get that same worktree, not race `git worktree add` into it.
+  it('gives a call made while the worktree is being created that same worktree', async () => {
+    const checkout = join(dir, 'checkout')
+    git(dir, ['init', '-q', '-b', 'main', checkout])
+    git(checkout, ['remote', 'add', 'origin', origin])
+
+    const [first, second] = await Promise.all([
+      ensureReviewWorktree(checkout, 212, head),
+      ensureReviewWorktree(checkout, 212, head),
+    ])
+
+    expect(second).toBe(first)
+    expect(git(second, ['rev-parse', 'HEAD'])).toBe(head)
+  })
 })
 
 /** fast-import input: an empty `main`, a PR head adding shard.ts, then the head's SHA on stdout. */
