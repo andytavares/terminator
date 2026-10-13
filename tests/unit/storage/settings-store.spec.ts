@@ -127,3 +127,23 @@ describe('settings-store — workspace overrides', () => {
     expect(ws.overrides?.appearance?.theme).toBe('light')
   })
 })
+
+describe('settings-store — handing a workspace override back', () => {
+  useEmptyStores()
+
+  it('"Use global default" drops the override it names, and keeps the others', async () => {
+    const { updateWorkspaceSettings, getWorkspaceSettings } = await import(
+      '../../../src/main/storage/settings-store'
+    )
+    updateWorkspaceSettings('ws-reset', {
+      appearance: { theme: 'light' },
+      terminal: { scrollbackLimit: 2000, defaultShell: '/bin/fish' },
+    })
+    updateWorkspaceSettings('ws-reset', { appearance: undefined })
+    updateWorkspaceSettings('ws-reset', { terminal: { scrollbackLimit: undefined } })
+
+    expect(getWorkspaceSettings('ws-reset').overrides).toEqual({
+      terminal: { defaultShell: '/bin/fish' },
+    })
+  })
+})

@@ -7,6 +7,7 @@ import type {
   SettingDefinition,
 } from '@terminator/extension-sdk'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
+import { gitSettings, MAX_DISPLAYED_FILES } from './git-settings.js'
 import { bindWorkspaceRoots } from './ipc/repo-root.js'
 import { projectForCheckout } from './review/terminal-project.js'
 import { VALIDATION_ERROR, type RegisterFn } from './ipc/register.js'
@@ -97,15 +98,18 @@ const SETTINGS: Record<string, SettingDefinition> = {
   'terminator.git-integration.git.commit.signOff': {
     type: 'boolean',
     label: 'Add sign-off to commits',
+    description: 'Commits from the Git view end with a Signed-off-by line (git commit --signoff).',
     default: false,
     workspaceScoped: true,
   },
   'terminator.git-integration.git.maxDisplayedFiles': {
     type: 'number',
     label: 'Max displayed changed files',
-    default: 500,
-    min: 10,
-    max: 5000,
+    description:
+      'The Git view lists this many changed files at most, and says when there are more.',
+    default: MAX_DISPLAYED_FILES.default,
+    min: MAX_DISPLAYED_FILES.min,
+    max: MAX_DISPLAYED_FILES.max,
   },
   'terminator.git-integration.review.agentModel': {
     type: 'enum',
@@ -197,7 +201,7 @@ function registerChannels(api: ExtensionAPI, roots: ChannelRoots): void {
   const registerFn = (spec: ChannelSpec) => {
     disposables.push(api.ipc.registerHandler(spec, remoteAccessFor(spec.channel)))
   }
-  registerGitExtensionHandlers(registerFn)
+  registerGitExtensionHandlers(registerFn, gitSettings(api))
   registerFn(pendingRequestChannel())
   registerGithub(api, registerFn, roots)
   // Read-only review agent: headless `claude -p` in a detached PR-head worktree.

@@ -30,6 +30,9 @@ export type {
 export { SegmentedControl } from './SegmentedControl'
 export type { SegmentedControlProps, SegmentedOption } from './SegmentedControl'
 
+export { ListInput, listItems } from './ListInput'
+export type { ListInputProps } from './ListInput'
+
 export { Markdown } from './Markdown'
 export type { MarkdownProps } from './Markdown'
 

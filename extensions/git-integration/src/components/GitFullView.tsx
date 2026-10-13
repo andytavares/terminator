@@ -212,7 +212,6 @@ async function runCommit(r: CommitRunner, noVerify: boolean): Promise<CommitResu
   return gitAPI.commit({
     repoRoot: r.repoRoot,
     message: r.message.trim(),
-    signOff: false,
     noVerify,
   })
 }

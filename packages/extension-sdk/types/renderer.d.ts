@@ -116,6 +116,8 @@ export interface ElectronAPI {
     getSettingsSchemas(): Promise<{ schemas: unknown[] }>
     getSettingsValues(): Promise<{ values: Record<string, unknown> }>
     updateSetting(key: string, value: unknown): Promise<{ ok: true }>
+    /** Called after any extension setting changes; re-read with `getSettingsValues`. */
+    onSettingsChanged(handler: () => void): () => void
     getCommands(): Promise<{
       commands: Array<{
         key: string

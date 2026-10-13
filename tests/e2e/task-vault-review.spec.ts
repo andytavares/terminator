@@ -4,20 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { answerNextSaveDialog, invokeChannel } from './extension-page'
-import { goTo, openVault, storedTask } from './task-vault-harness'
+import { goTo, openVault, storedTask, localDate } from './task-vault-harness'
 
 // The six-step weekly review, walked end to end: every decision a step offers
 // is made once, then the review is read back from History and exported.
 
 let handle: AppHandle
 let vault: Page
-
-function localDate(offsetDays: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() + offsetDays)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-}
 
 async function projectStatus(name: string): Promise<string | undefined> {
   const result = await invokeChannel<{ projects: { name: string; status: string }[] }>(

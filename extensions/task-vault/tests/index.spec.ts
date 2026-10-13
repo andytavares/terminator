@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { partialFake } from '../../../tests/support/fakes'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
@@ -33,19 +34,34 @@ vi.mock('../src/navigation.js', () => ({
   popPendingNavigation: vi.fn(),
 }))
 
-function makeApi() {
-  const commandsRegister = vi.fn(() => ({ dispose: vi.fn() }))
-  const globalShortcutRegister = vi.fn(async () => ({ dispose: vi.fn() }))
-  const api = {
-    db: {},
-    ipc: { registerHandler: vi.fn(() => ({ dispose: vi.fn() })) },
-    settings: { register: vi.fn(() => ({ dispose: vi.fn() })), get: vi.fn(() => '0') },
-    window: { broadcast: vi.fn(), focusSelf: vi.fn(), raise: vi.fn() },
-    notifications: { showToast: vi.fn(), createNotification: vi.fn() },
-    nativeMenu: { addViewMenuItem: vi.fn(() => ({ dispose: vi.fn() })) },
-    globalShortcut: { register: globalShortcutRegister },
-    commands: { register: commandsRegister },
-  } as unknown as ExtensionAPI
+const disposable = () => ({ dispose: vi.fn() })
+
+/** The API Task Vault activates with; settings not in `settings` read as '0'. */
+function makeApi(settings: Record<string, unknown> = {}) {
+  const commandsRegister = vi.fn(disposable)
+  const globalShortcutRegister = vi.fn(async () => disposable())
+  const api = partialFake<ExtensionAPI>({
+    db: partialFake<ExtensionAPI['db']>({ get: vi.fn(async () => undefined) }),
+    ipc: partialFake<ExtensionAPI['ipc']>({ registerHandler: vi.fn(disposable) }),
+    settings: partialFake<ExtensionAPI['settings']>({
+      register: vi.fn(disposable),
+      get: <T>(key: string) => (settings[key] ?? '0') as T,
+    }),
+    window: partialFake<ExtensionAPI['window']>({
+      broadcast: vi.fn(),
+      focusSelf: vi.fn(),
+      raise: vi.fn(),
+    }),
+    notifications: partialFake<ExtensionAPI['notifications']>({
+      showToast: vi.fn(),
+      createNotification: vi.fn(disposable),
+    }),
+    nativeMenu: partialFake<ExtensionAPI['nativeMenu']>({ addViewMenuItem: vi.fn(disposable) }),
+    globalShortcut: partialFake<ExtensionAPI['globalShortcut']>({
+      register: globalShortcutRegister,
+    }),
+    commands: partialFake<ExtensionAPI['commands']>({ register: commandsRegister }),
+  })
   return { api, commandsRegister, globalShortcutRegister }
 }
 
@@ -57,7 +73,7 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('scheduleWeeklyReviewNudge interval guard', scheduleWeeklyReviewNudgeIntervalGuardTests)
+describe('the weekly review nudge', weeklyReviewNudgeTests)
 
 describe('task-vault manifest quick action', () => {
   it('declares a Task Vault group and a mnemonic on the capture command', () => {
@@ -117,59 +133,44 @@ describe('task-vault activate() exports (ADR 094)', () => {
   })
 })
 
-function scheduleWeeklyReviewNudgeIntervalGuardTests() {
-  describe('with the guard', scheduleWeeklyReviewNudgeIntervalGuardGuardTests)
-  describe('without the guard', scheduleWeeklyReviewNudgeIntervalGuardWithoutGuardTests)
+const REVIEW_DAY = 'terminator.task-vault.weeklyReviewDay'
+// 2026-10-14 is a Wednesday, day 3.
+const WEDNESDAY_MORNING = new Date(2026, 9, 14, 9, 0)
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** How many "Weekly review is ready" notifications the API was asked for. */
+function reviewNudges(api: ExtensionAPI): number {
+  return vi
+    .mocked(api.notifications.createNotification)
+    .mock.calls.filter(([notification]) => notification.title === 'Weekly review is ready').length
 }
 
-function scheduleWeeklyReviewNudgeIntervalGuardGuardTests() {
-  it('guard pattern: second call clears the first interval before scheduling a new one', () => {
-    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
-    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval')
+function weeklyReviewNudgeTests() {
+  beforeEach(() => vi.setSystemTime(WEDNESDAY_MORNING))
 
-    let storedInterval: ReturnType<typeof setInterval> | null = null
+  it('comes on the day "Weekly Review Day" names, and not on another', async () => {
+    const { activate, deactivate } = await import('../src/index.ts')
+    const onWednesday = makeApi({ [REVIEW_DAY]: '3' }).api
+    await activate(onWednesday)
+    await deactivate()
+    const onMonday = makeApi({ [REVIEW_DAY]: '1' }).api
+    await activate(onMonday)
+    await deactivate()
 
-    // This simulates the CORRECT guard pattern (T035 implementation target)
-    function scheduleWithGuard() {
-      if (storedInterval !== null) {
-        clearInterval(storedInterval)
-        storedInterval = null
-      }
-      storedInterval = setInterval(() => {}, 24 * 60 * 60 * 1000)
-    }
-
-    scheduleWithGuard()
-    expect(setIntervalSpy).toHaveBeenCalledTimes(1)
-    expect(clearIntervalSpy).toHaveBeenCalledTimes(0)
-
-    scheduleWithGuard()
-    expect(setIntervalSpy).toHaveBeenCalledTimes(2)
-    // The guard must have cleared the first interval before creating the second
-    expect(clearIntervalSpy).toHaveBeenCalledTimes(1)
-
-    if (storedInterval) clearInterval(storedInterval)
-    setIntervalSpy.mockRestore()
-    clearIntervalSpy.mockRestore()
+    expect(reviewNudges(onWednesday)).toBe(1)
+    expect(reviewNudges(onMonday)).toBe(0)
   })
-}
 
-function scheduleWeeklyReviewNudgeIntervalGuardWithoutGuardTests() {
-  it('without guard: double-call creates two intervals (this is the bug being fixed)', () => {
-    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
-    const intervals: ReturnType<typeof setInterval>[] = []
+  it('follows a day changed after activation, from the next daily check', async () => {
+    const settings: Record<string, unknown> = { [REVIEW_DAY]: '1' }
+    const { api } = makeApi(settings)
+    const { activate, deactivate } = await import('../src/index.ts')
+    await activate(api)
+    settings[REVIEW_DAY] = '4'
+    vi.advanceTimersByTime(DAY_MS)
+    await deactivate()
 
-    // This simulates the BUGGY pattern (no guard)
-    function scheduleBuggy() {
-      intervals.push(setInterval(() => {}, 24 * 60 * 60 * 1000))
-    }
-
-    scheduleBuggy()
-    scheduleBuggy()
-    expect(setIntervalSpy).toHaveBeenCalledTimes(2)
-    expect(intervals).toHaveLength(2)
-
-    for (const id of intervals) clearInterval(id)
-    setIntervalSpy.mockRestore()
+    expect(reviewNudges(api)).toBe(1)
   })
 }
 

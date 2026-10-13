@@ -213,6 +213,26 @@ describe('review-agent IPC — passes no effort for the Default choice or an uns
   })
 })
 
+describe('review-agent IPC — stops a run after the configured timeout', () => {
+  it('gives the agent the "Review agent timeout" in minutes, five when unset', async () => {
+    const runReview = vi.fn(() => ({
+      runId: 'x',
+      done: Promise.resolve(makeDoneRun()),
+      cancel: vi.fn(),
+    }))
+    const ensureWorktree = vi.fn(async () => '/wt')
+    const { handlers, settings } = captureHandlers({ ensureWorktree, runReview })
+
+    await handlers['review-agent:start'](startPayload())
+    await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(1))
+    settings['terminator.git-integration.review.agentTimeoutMinutes'] = 12
+    await handlers['review-agent:start'](startPayload({ prNumber: 2, headSHA: 'sha2' }))
+    await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(2))
+
+    expect(runReview.mock.calls.map((c) => c[0].timeoutMs)).toEqual([5 * 60_000, 12 * 60_000])
+  })
+})
+
 describe('review-agent IPC — review-agent:settings returns the configured default model', () => {
   it('review-agent:settings returns the configured default model', async () => {
     const { handlers, settings } = captureHandlers({})

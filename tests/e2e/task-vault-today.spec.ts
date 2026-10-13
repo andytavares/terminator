@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
-import { openVault, storedTask, todayTasks, type StoredTask } from './task-vault-harness'
+import { openVault, storedTask, todayTasks, type StoredTask, localDate } from './task-vault-harness'
 
 // The daily log: everything a user does to a task on today's page, each read
 // back from what the vault stored.
@@ -17,13 +17,6 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await closeApp(handle)
 })
-
-function localDate(offsetDays = 0): string {
-  const date = new Date()
-  date.setDate(date.getDate() + offsetDays)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-}
 
 function taskRow(text: string) {
   return vault

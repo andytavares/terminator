@@ -21,6 +21,8 @@ interface SettingsState {
   updateWorkspaceScrollback: (workspaceId: string, limit: number) => Promise<void>
   updateWorktreeBaseDir: (dir: string) => Promise<void>
   updateWorkspaceWorktreeBaseDir: (workspaceId: string, dir: string | undefined) => Promise<void>
+  /** The workspace's own default shell; undefined hands it back to the global one. */
+  updateWorkspaceDefaultShell: (workspaceId: string, shell: string | undefined) => Promise<void>
   updateBranchExcludePatterns: (patterns: string[]) => Promise<void>
   updateWorkspaceBranchExcludePatterns: (
     workspaceId: string,
@@ -175,6 +177,7 @@ function workspaceSlice(
   | 'updateWorkspaceTheme'
   | 'updateWorkspaceScrollback'
   | 'updateWorkspaceWorktreeBaseDir'
+  | 'updateWorkspaceDefaultShell'
   | 'updateWorkspaceBranchExcludePatterns'
   | 'updateWorkspaceQuickActions'
 > {
@@ -182,14 +185,13 @@ function workspaceSlice(
     updateWorkspaceTheme: (workspaceId, theme) => updateWorkspaceTheme(set, workspaceId, theme),
     updateWorkspaceScrollback: (workspaceId, limit) =>
       saveWorkspace(set, workspaceId, { terminal: { scrollbackLimit: limit } }),
+    updateWorkspaceDefaultShell: (workspaceId, shell) =>
+      saveWorkspace(set, workspaceId, { terminal: { defaultShell: shell } }),
+    // An undefined value hands only that setting back to the global one.
     updateWorkspaceWorktreeBaseDir: (workspaceId, dir) =>
-      saveWorkspace(set, workspaceId, {
-        git: dir !== undefined ? { worktreeBaseDir: dir } : undefined,
-      }),
+      saveWorkspace(set, workspaceId, { git: { worktreeBaseDir: dir } }),
     updateWorkspaceBranchExcludePatterns: (workspaceId, patterns) =>
-      saveWorkspace(set, workspaceId, {
-        git: patterns !== undefined ? { branchExcludePatterns: patterns } : undefined,
-      }),
+      saveWorkspace(set, workspaceId, { git: { branchExcludePatterns: patterns } }),
     updateWorkspaceQuickActions: (workspaceId, custom) =>
       saveWorkspace(set, workspaceId, { quickActions: { custom } }),
   }

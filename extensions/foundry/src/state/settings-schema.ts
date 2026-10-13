@@ -1,9 +1,11 @@
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 import { disposables } from '../ipc/register.js'
+import { migrateLineListSettings } from './settings.js'
 
 /** Foundry's settings page: where records go, autonomy, budgets, write-backs. */
 export function registerSettings(api: ExtensionAPI): void {
+  migrateLineListSettings(api)
   disposables.push(
     api.settings.register({
       label: 'Foundry',
@@ -72,8 +74,8 @@ export function registerSettings(api: ExtensionAPI): void {
           default: 45,
           min: 0,
         },
-        // Three booleans rather than a list: the settings surface has no array
-        // type, and each write-back is independently worth turning off.
+        // Three booleans rather than a list: each write-back is independently
+        // worth turning off.
         'terminator.foundry.writeBack.summaryComment': {
           type: 'boolean',
           label: 'Comment the agreed work order on its source issue',
@@ -96,19 +98,19 @@ export function registerSettings(api: ExtensionAPI): void {
         // Named by the operator, never inferred: an MCP server's tools are
         // named by somebody else, and a name is not a contract about writing.
         'terminator.foundry.readOnlyTools': {
-          type: 'string',
+          type: 'list',
           label: 'Tools a review may also use, one per line',
           description:
             'The read-only policy refuses any tool it has not been taught about. List the ones you know only read — a documentation lookup, for instance. Foundry never infers this list.',
-          default: '',
+          default: [],
           workspaceScoped: true,
         },
         'terminator.foundry.criticalPaths': {
-          type: 'string',
+          type: 'list',
           label: 'Critical paths, one glob per line',
           description:
             'Touching one of these raises a decision before anything is pushed. Foundry never infers this list.',
-          default: '',
+          default: [],
           workspaceScoped: true,
         },
         // Written by the extension, not shown: it is how "once" is remembered.

@@ -970,7 +970,8 @@
 
 .notepad-editor-cm .cm-scroller {
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
-  font-size: 14px;
+  /* Set by NoteEditor from the "Editor font size" setting. */
+  font-size: var(--notepad-editor-font-size, 14px);
   line-height: 1.65;
 }
 

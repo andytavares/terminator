@@ -41,6 +41,7 @@ export const IMPACT_MAP = [
       'merge-flow.spec.ts',
       'merge-flow-resolve.spec.ts',
       'git-commit-flow.spec.ts',
+      'git-settings.spec.ts',
       'pr-review-*.spec.ts',
       'review-*.spec.ts',
       'extension-commands.spec.ts',

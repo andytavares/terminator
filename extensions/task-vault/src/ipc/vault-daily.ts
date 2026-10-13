@@ -4,6 +4,7 @@ import { noPayload } from '@terminator/extension-sdk'
 import { route, type IpcContext } from './register'
 import { insertTask } from '../vault/task-repository'
 import { randomUUID } from '../vault/db'
+import { staleDaysThreshold, STALE_THRESHOLD_KEY } from '../stale-threshold'
 import {
   CalendarMonthRequestSchema,
   CompleteTaskRequestSchema,
@@ -97,14 +98,7 @@ async function rollOverStaleTasks(db: ExtensionDB, date: string) {
   return { rolledOver: staleRows.length, rolledOverIds }
 }
 
-async function staleDaysThreshold(db: ExtensionDB): Promise<number> {
-  const thresholdRow = await db.get<{ value: string }>(
-    `SELECT value FROM settings WHERE extension_id='task-vault' AND key='stale_days_threshold'`
-  )
-  return thresholdRow ? parseInt(thresholdRow.value, 10) || 7 : 7
-}
-
-function getToday({ db }: IpcContext) {
+function getToday({ api, db }: IpcContext) {
   return orErrorString(async () => {
     const date = today()
     const { rolledOver, rolledOverIds } = await rollOverStaleTasks(db, date)
@@ -116,7 +110,7 @@ function getToday({ db }: IpcContext) {
       rolledOver,
       rolledOverIds,
       exists: tasks.length > 0,
-      staleDaysThreshold: await staleDaysThreshold(db),
+      staleDaysThreshold: staleDaysThreshold(api),
     }
   })
 }
@@ -201,14 +195,9 @@ async function resetTodaySince(
   return { success: true }
 }
 
-async function setStaleThreshold(
-  { db }: IpcContext,
-  args: z.infer<typeof StaleThresholdRequestSchema>
-) {
-  await db.run(
-    `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'stale_days_threshold', ?) ON CONFLICT (extension_id, key) DO UPDATE SET value = excluded.value`,
-    [String(args.days)]
-  )
+/** Writes the "Stale task threshold" setting, as its settings page does. */
+function setStaleThreshold({ api }: IpcContext, args: z.infer<typeof StaleThresholdRequestSchema>) {
+  api.settings.set(STALE_THRESHOLD_KEY, args.days)
   return { success: true }
 }
 

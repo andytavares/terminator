@@ -43,14 +43,17 @@ let getHandler: (channel: string) => Handler
 beforeEach(() => {
   vi.clearAllMocks()
   const registry = buildRegistry()
-  registerGitExtensionHandlers(registry.register)
+  registerGitExtensionHandlers(registry.register, {
+    signOff: () => false,
+    maxDisplayedFiles: () => 500,
+  })
   getHandler = registry.getHandler
 })
 
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 describe('git:status', () => {
-  it('returns the status from getStatus, defaulting maxFiles to 500', async () => {
+  it('returns the status from getStatus, capped at the configured file limit', async () => {
     vi.mocked(gitService.getStatus).mockResolvedValue({
       branch: 'main',
       files: [],
@@ -60,17 +63,6 @@ describe('git:status', () => {
     const result = await getHandler('git:status')({ path: '/repo' })
     expect(gitService.getStatus).toHaveBeenCalledWith('/repo', 500)
     expect(result).toEqual({ branch: 'main', files: [], hasConflicts: false, truncated: false })
-  })
-
-  it('forwards a caller-supplied maxFiles', async () => {
-    vi.mocked(gitService.getStatus).mockResolvedValue({
-      branch: 'main',
-      files: [],
-      hasConflicts: false,
-      truncated: false,
-    })
-    await getHandler('git:status')({ path: '/repo', maxFiles: 10 })
-    expect(gitService.getStatus).toHaveBeenCalledWith('/repo', 10)
   })
 
   it('returns an error when getStatus throws', async () => {
@@ -164,11 +156,10 @@ describe('git:commit', () => {
     const result = await getHandler('git:commit')({
       repoRoot: '/repo',
       message: 'feat: add x',
-      signOff: true,
       noVerify: true,
     })
     expect(gitService.commitChanges).toHaveBeenCalledWith('/repo', 'feat: add x', {
-      signOff: true,
+      signOff: false,
       noVerify: true,
       onOutput: expect.any(Function),
     })
@@ -177,7 +168,7 @@ describe('git:commit', () => {
 })
 
 describe('git:commit — defaults and streamed output', () => {
-  it('defaults signOff and noVerify to false when omitted', async () => {
+  it('defaults noVerify to false when omitted', async () => {
     vi.mocked(gitService.commitChanges).mockResolvedValue({ commitHash: 'abc123' })
     await getHandler('git:commit')({ repoRoot: '/repo', message: 'msg' })
     expect(gitService.commitChanges).toHaveBeenCalledWith('/repo', 'msg', {
