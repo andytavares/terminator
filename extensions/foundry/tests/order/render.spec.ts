@@ -58,6 +58,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 describe('renderOrder', () => {
   describe('the head', theHeadTests)
   describe('criteria', criteriaTests)
+  describe('the plan', thePlanTests)
   describe('coverage', coverageTests)
   describe('non-goals and assumptions', nonGoalsAndAssumptionsTests)
   describe('checks', checksTests)
@@ -85,6 +86,29 @@ function theHeadTests() {
 
   it('says nothing about a source when the idea was typed', () => {
     expect(renderOrder(order())).not.toContain('Source:')
+  })
+}
+
+function thePlanTests() {
+  it('names what a unit waits on, and what it touches', () => {
+    const o = order()
+    o.plan.units = [
+      ...o.plan.units,
+      builderUnit('U-2', { title: 'trim the gutter', dependsOn: ['U-1'], satisfies: ['AC-2'] }),
+    ]
+    const out = renderOrder(o)
+    expect(out).toContain(
+      '- **U-2** trim the gutter — builder, lane 1 · after U-1 · satisfies AC-2'
+    )
+    expect(out).toContain(
+      '- **U-1** widen the row — builder, lane 1 · satisfies AC-1, AC-2\n  - touches: src/a.css'
+    )
+  })
+
+  it('says a unit satisfies nothing rather than leaving the list blank', () => {
+    const o = order()
+    o.plan.units[0].satisfies = []
+    expect(renderOrder(o)).toContain('satisfies _nothing_')
   })
 }
 

@@ -143,6 +143,32 @@ function sentBackTests() {
     expect(standing.kind).toBe('working')
     expect(standing.detail).toBe('Reworking after lint failed.')
   })
+
+  it('names the check by its id when that check is no longer on the graph', () => {
+    const feedback = [{ ...CHECK_FAILED, from: 'lint-gone' }]
+    const standing = standingOf(
+      input({ graph: graph([node({ id: 'build', state: 'running', feedback })]) })
+    )
+    expect(standing.detail).toBe('Reworking after lint-gone failed.')
+  })
+
+  it('reads a node written before feedback existed as never sent back', () => {
+    const { feedback: _none, ...legacy } = node({ id: 'build', state: 'running' })
+    const standing = standingOf(input({ graph: graph([legacy as RunNode]) }))
+    expect(standing.headline).toBe('Building')
+    expect(standing.detail).toBe('1 agent is working — 0 of 1 steps done.')
+  })
+}
+
+/** What a check that failed hands back to the node it sends the work to. */
+const CHECK_FAILED: RunNode['feedback'][number] = {
+  from: 'check',
+  attempt: 1,
+  source: 'check',
+  command: 'npm test',
+  exitCode: 1,
+  excerpt: 'FAIL',
+  logPath: null,
 }
 
 function ordinaryWorkTests() {
@@ -386,6 +412,15 @@ function draftChecksTests() {
     expect(standing.headline).toBe('Shaping stopped')
     expect(standing.detail).toContain('RT-6 is open and blocks hand-off')
     expect(standing.detail).toContain('2 checks')
+  })
+
+  it('points to the Forge for which check when it cannot name the one a draft is stuck on', () => {
+    const standing = standingOf(
+      input({ status: 'draft', graph: null, shaping: false, failures: 1, blocker: null })
+    )
+    expect(standing.detail).toBe(
+      'Nothing is working on this and 1 check has yet to clear: open it in the Forge to see which. Open it in the Forge and ask for the gap to be closed.'
+    )
   })
 }
 
