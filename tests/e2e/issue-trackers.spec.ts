@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, createWorkspace, launchApp, projectGroup, type AppHandle } from './helpers'
 import { git } from './git-harness'
+import { allowCredentialsWithoutKeychain } from './main-stubs'
 import { JIRA_SITE, startTrackerStub, type TrackerStub } from './tracker-stub'
 
 /**
@@ -66,6 +67,7 @@ test.beforeAll(async () => {
     }
   )
   handle = await launchApp(undefined, stub.env)
+  await allowCredentialsWithoutKeychain(handle.app)
   credentialStore = await handle.app.evaluate(({ safeStorage }) =>
     safeStorage.isEncryptionAvailable()
   )
@@ -74,10 +76,12 @@ test.beforeAll(async () => {
 })
 
 // The core refuses to store a tracker credential without OS encryption. On
-// macOS Playwright's --use-mock-keychain provides it; on Linux Playwright's
-// Electron loader appends --password-store=basic
-// (playwright-core/lib/server/electron/loader.js), under which safeStorage
-// reports no encryption, so nothing here can connect.
+// macOS Playwright's --use-mock-keychain provides it, so the keychain path is
+// what runs there; on Linux Playwright's Electron loader appends
+// --password-store=basic (playwright-core/lib/server/electron/loader.js), under
+// which safeStorage reports no encryption, and allowCredentialsWithoutKeychain
+// switches it to Electron's plain-text backend, as integrations.spec.ts does.
+// The skip is for a platform that has neither.
 test.beforeEach(() => {
   test.skip(!credentialStore, 'safeStorage has no OS encryption under Playwright here')
 })
