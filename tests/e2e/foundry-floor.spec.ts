@@ -200,8 +200,10 @@ test('the Ledger’s Factory tab reads the numbers off what was recorded', async
     join(repo, '.foundry', 'orders', id, 'ledger.jsonl'),
     [entry(10, 'run.started'), entry(30, 'ship.draft_opened')].map((line) => `${line}\n`).join('')
   )
+  // Foundry keeps each ledger in memory from its first read and never sees a
+  // hand edit; an open panel may already have read this order's after create.
+  handle = await restartFoundry(handle, 'Foundry Floor')
 
-  await openFoundry(handle)
   expect(await clickByName(handle, 'button', 'Ledger')).toBe(true)
   await expect.poll(() => clickByName(handle, 'button', 'Factory'), { timeout: 15_000 }).toBe(true)
 
