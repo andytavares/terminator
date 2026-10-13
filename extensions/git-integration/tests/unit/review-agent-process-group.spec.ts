@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll } from 'vitest'
+import { describe, it, expect, afterAll, vi } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -53,5 +53,24 @@ describe('runAgentReview — cancelling a running claude', () => {
 
     expect((await done).status).toBe('cancelled')
     await expect.poll(() => isAlive(grandchild)).toBe(false)
+  })
+})
+
+describe('runAgentReview — cancelling while claude is looked up', () => {
+  // claude is found by asking the person's interactive login shell, whose rc
+  // files can start processes of their own and take a while.
+  it('ends the login shell, and what it started, at once', async () => {
+    rmSync(pidFile, { force: true })
+    vi.stubEnv('SHELL', claude)
+    const exec = async () => ({ stdout: 'diff' })
+    const { done, cancel } = runAgentReview(input, { exec })
+    await expect.poll(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8') !== '').toBe(true)
+    const grandchild = Number(readFileSync(pidFile, 'utf8'))
+
+    cancel()
+
+    expect((await done).status).toBe('cancelled')
+    await expect.poll(() => isAlive(grandchild)).toBe(false)
+    vi.unstubAllEnvs()
   })
 })
