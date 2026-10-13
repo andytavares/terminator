@@ -57,21 +57,24 @@ function blocksOf(message: Record<string, unknown>): Block[] {
   const content = message.content
   if (typeof content === 'string') return content === '' ? [] : [{ kind: 'text', text: content }]
   if (!Array.isArray(content)) return []
-  const blocks: Block[] = []
-  for (const block of content) {
-    if (typeof block !== 'object' || block === null) continue
-    const b = block as Record<string, unknown>
-    if (b.type === 'text' && typeof b.text === 'string') blocks.push({ kind: 'text', text: b.text })
-    // Some models write their notes between tool calls as thinking blocks;
-    // an empty one is thinking the runtime chose not to show.
-    else if (b.type === 'thinking' && typeof b.thinking === 'string')
-      blocks.push({ kind: 'text', text: b.thinking })
-    else if (b.type === 'tool_use' && typeof b.name === 'string') {
-      const argument = argumentOf(b.input)
-      blocks.push({ kind: 'tool', text: argument === '' ? `${b.name}` : `${b.name}: ${argument}` })
-    }
+  return content.map(blockOf).filter((block): block is Block => block !== null && block.text !== '')
+}
+
+/** One content block as a line's kind and text; null for a block with nothing to show. */
+function blockOf(block: unknown): Block | null {
+  if (typeof block !== 'object' || block === null) return null
+  const b = block as Record<string, unknown>
+  if (b.type === 'text' && typeof b.text === 'string') return { kind: 'text', text: b.text }
+  // Some models write their notes between tool calls as thinking blocks;
+  // an empty one is thinking the runtime chose not to show.
+  if (b.type === 'thinking' && typeof b.thinking === 'string') {
+    return { kind: 'text', text: b.thinking }
   }
-  return blocks.filter((block) => block.text !== '')
+  if (b.type === 'tool_use' && typeof b.name === 'string') {
+    const argument = argumentOf(b.input)
+    return { kind: 'tool', text: argument === '' ? `${b.name}` : `${b.name}: ${argument}` }
+  }
+  return null
 }
 
 /**
@@ -86,33 +89,38 @@ export function readTranscriptTail(
   transcriptPath: string,
   limit = DEFAULT_LIMIT
 ): TranscriptLine[] {
-  let raw: string
+  const raw = readTranscriptFile(transcriptPath)
+  if (raw === null) return []
+  const lines = raw.split('\n').flatMap(linesOfEntry)
+  return lines.slice(-Math.max(1, limit))
+}
+
+/** The transcript's text, or null when there is no file to read. */
+function readTranscriptFile(transcriptPath: string): string | null {
   try {
-    if (!statSync(transcriptPath).isFile()) return []
-    raw = readFileSync(transcriptPath, 'utf8')
+    if (!statSync(transcriptPath).isFile()) return null
+    return readFileSync(transcriptPath, 'utf8')
+  } catch {
+    return null
+  }
+}
+
+/** What one JSONL line said, a line per content block; none for anything but a message. */
+function linesOfEntry(line: string): TranscriptLine[] {
+  if (line.trim() === '') return []
+  let entry: Record<string, unknown>
+  try {
+    entry = JSON.parse(line) as Record<string, unknown>
   } catch {
     return []
   }
-
-  const lines: TranscriptLine[] = []
-  for (const line of raw.split('\n')) {
-    if (line.trim() === '') continue
-    let entry: Record<string, unknown>
-    try {
-      entry = JSON.parse(line) as Record<string, unknown>
-    } catch {
-      continue
-    }
-    const role = entry.type
-    if (role !== 'user' && role !== 'assistant') continue
-    const message = entry.message
-    if (typeof message !== 'object' || message === null) continue
-    const parsed = Date.parse(String(entry.timestamp ?? ''))
-    const at = Number.isNaN(parsed) ? 0 : parsed
-    for (const block of blocksOf(message as Record<string, unknown>)) {
-      if (block.text.trim() === '') continue
-      lines.push({ role, ...block, at })
-    }
-  }
-  return lines.slice(-Math.max(1, limit))
+  const role = entry.type
+  if (role !== 'user' && role !== 'assistant') return []
+  const message = entry.message
+  if (typeof message !== 'object' || message === null) return []
+  const parsed = Date.parse(String(entry.timestamp ?? ''))
+  const at = Number.isNaN(parsed) ? 0 : parsed
+  return blocksOf(message as Record<string, unknown>)
+    .filter((block) => block.text.trim() !== '')
+    .map((block) => ({ role, ...block, at }))
 }
