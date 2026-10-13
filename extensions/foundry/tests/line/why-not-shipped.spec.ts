@@ -16,7 +16,7 @@ const host = partialFake<ExtensionAPI>({
   workspace: partialFake<ExtensionAPI['workspace']>({ list: () => [] }),
 })
 
-function recipe(name: string): Recipe {
+function builtInRecipe(name: string): Recipe {
   const resolved = resolveRecipe(name, resolveSources(host, '/nowhere'))
   if (!resolved.ok) throw new Error(resolved.reason)
   return resolved.resolved.value
@@ -28,7 +28,7 @@ const finished = partialFake<RunOutcome>({
   ladder: { ok: true, steps: [], stoppedAt: null, unmeasured: [] },
 })
 
-const outcome = (over: Record<string, unknown>): RunOutcome =>
+const finishedWith = (over: Record<string, unknown>): RunOutcome =>
   partialFake<RunOutcome>({ ...finished, ...over })
 
 describe('why a finished run opened nothing', () => {
@@ -39,7 +39,7 @@ describe('why a finished run opened nothing', () => {
 
 function shapesAndPassingChecksTests() {
   it('names a shape that never opens a pull request', () => {
-    const direct = recipe('direct')
+    const direct = builtInRecipe('direct')
     // An operator's own shape with no ready-for-review gate: it answers a question.
     const question = {
       ...direct,
@@ -52,7 +52,7 @@ function shapesAndPassingChecksTests() {
   })
 
   it('admits it cannot say which check refused, when every check it knows passed', () => {
-    expect(whyNotShipped(recipe('direct'), finished)).toBe(
+    expect(whyNotShipped(builtInRecipe('direct'), finished)).toBe(
       'it was not shippable, and this build cannot say which check said so'
     )
   })
@@ -60,18 +60,18 @@ function shapesAndPassingChecksTests() {
 
 function unfinishedGatedUncheckedTests() {
   it('names unfinished nodes before anything else', () => {
-    expect(whyNotShipped(recipe('direct'), outcome({ complete: false }))).toBe(
+    expect(whyNotShipped(builtInRecipe('direct'), finishedWith({ complete: false }))).toBe(
       'not every node finished'
     )
   })
 
   it('names the gates holding it, in words', () => {
-    const held = outcome({ gates: [{ rule: 'ready-for-review' }] })
-    expect(whyNotShipped(recipe('direct'), held)).toMatch(/^held by /)
+    const held = finishedWith({ gates: [{ rule: 'ready-for-review' }] })
+    expect(whyNotShipped(builtInRecipe('direct'), held)).toMatch(/^held by /)
   })
 
   it('says nothing was checked when verification never ran', () => {
-    expect(whyNotShipped(recipe('direct'), outcome({ ladder: null }))).toBe(
+    expect(whyNotShipped(builtInRecipe('direct'), finishedWith({ ladder: null }))).toBe(
       'verification never ran, so nothing has been checked'
     )
   })
@@ -79,7 +79,7 @@ function unfinishedGatedUncheckedTests() {
 
 function theFailedRungTests() {
   it('names the rung that failed, or what could not be measured', () => {
-    const failed = outcome({
+    const failed = finishedWith({
       ladder: {
         ok: false,
         stoppedAt: 'test',
@@ -87,11 +87,13 @@ function theFailedRungTests() {
         steps: [{ name: 'unit tests', result: 'fail' }],
       },
     })
-    expect(whyNotShipped(recipe('direct'), failed)).toBe('verification stopped at unit tests')
-    const unmeasured = outcome({
+    expect(whyNotShipped(builtInRecipe('direct'), failed)).toBe(
+      'verification stopped at unit tests'
+    )
+    const unmeasured = finishedWith({
       ladder: { ok: false, stoppedAt: null, unmeasured: ['lint', 'typecheck'], steps: [] },
     })
-    expect(whyNotShipped(recipe('direct'), unmeasured)).toBe(
+    expect(whyNotShipped(builtInRecipe('direct'), unmeasured)).toBe(
       'verification could not measure lint, typecheck'
     )
   })

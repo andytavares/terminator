@@ -5,6 +5,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { FactorySite } from '../../../src/components/factory/FactorySite.js'
 import type { FactoryOrderRow } from '../../../src/components/factory/FactorySite.js'
 import type { Signal } from '../../../src/sensors/types.js'
+import { timesInvoked } from '../../helpers/bridge-calls.js'
 
 function dockSignal(over: Partial<Signal> = {}): Signal {
   return {
@@ -79,15 +80,14 @@ describe('FactorySite reading', () => {
   it('reads the orders again when Foundry says one changed, and not for time passing', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { invoke } = mount([])
-    const lists = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:order.list').length
-    await waitFor(() => expect(lists()).toBe(1))
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:order.list')).toBe(1))
 
     await vi.advanceTimersByTimeAsync(60_000)
-    expect(lists()).toBe(1)
+    expect(timesInvoked(invoke, 'foundry:order.list')).toBe(1)
     vi.useRealTimers()
 
     bus.emit({ kind: 'order', orderId: 'WO-1' })
-    await waitFor(() => expect(lists()).toBe(2))
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:order.list')).toBe(2))
   })
 })
 

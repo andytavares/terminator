@@ -10,7 +10,7 @@ import * as path from 'node:path'
 import { fakeHost, temporaryDirectory, execSucceeded } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
-import { agentsAnswer, agreedOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
+import { agentsAnswer, agreedLineOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { checkoutPath } from '../../src/line/worktree.js'
@@ -56,25 +56,21 @@ function githubWithOneDraft(checksFor: () => string): void {
   })
 }
 
-function order(over: Partial<WorkOrder> = {}): WorkOrder {
-  return agreedOrder(repo, over)
-}
-
-async function started(saved: WorkOrder, recipe = 'direct'): Promise<void> {
+async function startOrderRun(saved: WorkOrder, recipe = 'direct'): Promise<void> {
   await createOrderStore(dataDir).save(saved)
   expect(await host.call('foundry:run.start', { id: saved.id, recipe })).toMatchObject({
     started: true,
   })
 }
 
-async function shipped(): Promise<void> {
+async function untilShipped(): Promise<void> {
   await vi.waitFor(
     async () => expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('shipped'),
     { timeout: 20_000, interval: 100 }
   )
 }
 
-async function gateFor(rule: string): Promise<string> {
+async function gateIdFor(rule: string): Promise<string> {
   const gate = (await createGateStore(dataDir).list()).find((g) => g.rule === rule)
   if (gate === undefined) throw new Error(`no ${rule} gate`)
   return gate.id
@@ -95,12 +91,12 @@ beforeEach(async () => {
 describe('an agreed order whose checks pass', () => {
   it('opens a draft, watches CI to green, asks whether it is ready, and is shipped', async () => {
     githubWithOneDraft(() => checks('pass'))
-    await started(order())
-    await shipped()
+    await startOrderRun(agreedLineOrder(repo))
+    await untilShipped()
     expect(await ledgerActions(dataDir)).toEqual(
       expect.arrayContaining(['run.complete', 'ship.draft_opened'])
     )
-    expect(await gateFor('ready-for-review')).toBeTruthy()
+    expect(await gateIdFor('ready-for-review')).toBeTruthy()
   })
 })
 
@@ -109,13 +105,13 @@ describe('an order taken from a tracker issue', () => {
     githubWithOneDraft(() => checks('pass'))
     vi.mocked(host.issues.supportsTransitions).mockReturnValue(true)
     vi.mocked(host.issues.transition).mockClear()
-    await started(
-      order({
+    await startOrderRun(
+      agreedLineOrder(repo, {
         source: { kind: 'tracker', tracker: 'linear', key: 'ENG-1', url: null },
         writeBack: ['status'],
       })
     )
-    await shipped()
+    await untilShipped()
     expect(vi.mocked(host.issues.transition).mock.calls.map((call) => call[2])).toEqual([
       'started',
       'in_review',
@@ -127,8 +123,8 @@ describe('an order whose CI goes red', () => {
   it('sends the failure back to the builder and ships once the fix is green', async () => {
     let round = 0
     githubWithOneDraft(() => (++round === 1 ? checks('fail', 11) : checks('pass', 12)))
-    await started(order())
-    await shipped()
+    await startOrderRun(agreedLineOrder(repo))
+    await untilShipped()
     const builders = theRunner.start.mock.calls.filter(
       (call) => (call[0] as { phase: string }).phase === 'builder'
     )
@@ -173,10 +169,10 @@ describe('answering the inbox after a run shipped', () => {
 function markingReadyTests() {
   it('marks the drafts ready for review when the operator says so', async () => {
     githubWithOneDraft(() => checks('pass'))
-    await started(order())
-    await shipped()
+    await startOrderRun(agreedLineOrder(repo))
+    await untilShipped()
     const decided = await host.call('foundry:inbox.decide', {
-      gateId: await gateFor('ready-for-review'),
+      gateId: await gateIdFor('ready-for-review'),
       option: 'mark_ready',
     })
     expect(decided).toMatchObject({ ok: true })
@@ -192,18 +188,18 @@ function redCiSentBackTests() {
     // A fresh failing run for every pushed fix, the way CI reports one.
     let run = 20
     githubWithOneDraft(() => checks('fail', ++run))
-    await started(order(), recipe)
-    await vi.waitFor(async () => expect(await gateFor('ci.red')).toBeTruthy(), {
+    await startOrderRun(agreedLineOrder(repo), recipe)
+    await vi.waitFor(async () => expect(await gateIdFor('ci.red')).toBeTruthy(), {
       timeout: 20_000,
       interval: 100,
     })
 
     githubWithOneDraft(() => checks('pass', 99))
     await host.call('foundry:inbox.decide', {
-      gateId: await gateFor('ci.red'),
+      gateId: await gateIdFor('ci.red'),
       option: 'send_back',
     })
-    await vi.waitFor(async () => expect(await gateFor('ready-for-review')).toBeTruthy(), {
+    await vi.waitFor(async () => expect(await gateIdFor('ready-for-review')).toBeTruthy(), {
       timeout: 20_000,
       interval: 100,
     })
@@ -214,21 +210,21 @@ describe('an order whose check keeps failing', () => {
   it('does not ship, and says on the ledger why not', async () => {
     githubWithOneDraft(() => '[]')
     theRunner.runCommand.mockResolvedValue(1)
-    await started(order())
+    await startOrderRun(agreedLineOrder(repo))
     await vi.waitFor(
       async () =>
         expect(await ledgerActions(dataDir)).toEqual(expect.arrayContaining(['run.halted'])),
       { timeout: 20_000, interval: 100 }
     )
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
-    await expect(gateFor('ready-for-review')).rejects.toThrow()
+    await expect(gateIdFor('ready-for-review')).rejects.toThrow()
   })
 })
 
-async function halted(): Promise<void> {
+async function untilHalted(): Promise<void> {
   githubWithOneDraft(() => '[]')
   theRunner.runCommand.mockResolvedValue(1)
-  await started(order())
+  await startOrderRun(agreedLineOrder(repo))
   await vi.waitFor(
     async () =>
       expect(await ledgerActions(dataDir)).toEqual(expect.arrayContaining(['run.halted'])),
@@ -243,7 +239,7 @@ describe('the run’s own channels', () => {
 
 function agentTranscriptsTests() {
   it('show what each agent has been doing, from its transcript', async () => {
-    await halted()
+    await untilHalted()
     const graph = await readGraph(dataDir, 'WO-1')
     const builder = graph?.nodes.find((node) => node.role === 'builder')
     fs.writeFileSync(
@@ -267,20 +263,20 @@ function agentTranscriptsTests() {
 
 function startingOverAndStoppingTests() {
   it('start an order over: its checkout is gone and it can be run again from the start', async () => {
-    await halted()
+    await untilHalted()
     const reset = (await host.call('foundry:run.reset', { id: 'WO-1' })) as {
       ok: boolean
       removed: string[]
     }
     expect(reset.ok).toBe(true)
     expect(reset.removed.length).toBeGreaterThan(0)
-    expect(fs.existsSync(checkoutPath(dataDir, order(), 'app'))).toBe(false)
+    expect(fs.existsSync(checkoutPath(dataDir, agreedLineOrder(repo), 'app'))).toBe(false)
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('agreed')
     expect(await ledgerActions(dataDir)).toContain('run.reset')
   })
 
   it('stop the whole order', async () => {
-    await halted()
+    await untilHalted()
     expect(await host.call('foundry:run.stop', { id: 'WO-1' })).toEqual({ ok: true })
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('cancelled')
     expect(await ledgerActions(dataDir)).toContain('run.stopped')

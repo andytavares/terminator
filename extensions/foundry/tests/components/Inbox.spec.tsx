@@ -5,6 +5,7 @@ import { Inbox, SIGNAL_POLL_MS } from '../../src/components/Inbox.js'
 import { createChangeBus } from '../helpers/change-bus.js'
 import { raiseGate, GATE_RULES, ruleInWords } from '../../src/gates/rules.js'
 import type { Signal } from '../../src/sensors/types.js'
+import { timesInvoked } from '../helpers/bridge-calls.js'
 
 // The one surface the operator is required to visit. Every row names the rule
 // that raised it, says what it looked at, and says what happens if it is
@@ -496,12 +497,11 @@ function severalSignalsAndArrivalsTests() {
 function refreshingAndEmptyTests() {
   it('reads the inbox again when Foundry says a gate changed, not before', async () => {
     mount({})
-    const lists = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:inbox.list').length
-    await waitFor(() => expect(lists()).toBeGreaterThan(0))
-    const before = lists()
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:inbox.list')).toBeGreaterThan(0))
+    const before = timesInvoked(invoke, 'foundry:inbox.list')
 
     bus.emit({ kind: 'gates', orderId: 'WO-1' })
-    await waitFor(() => expect(lists()).toBe(before + 1))
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:inbox.list')).toBe(before + 1))
   })
 
   it('does not show the section when there are no open signals', async () => {

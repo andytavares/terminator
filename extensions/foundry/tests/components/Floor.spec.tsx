@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent, within } from '@testing-library/rea
 import React from 'react'
 import { createChangeBus } from '../helpers/change-bus.js'
 import { Floor } from '../../src/components/Floor.js'
+import { timesInvoked } from '../helpers/bridge-calls.js'
 
 // Where you watch, not where you act — with one exception, which is getting
 // into a running agent's terminal.
@@ -1399,16 +1400,15 @@ function refetchingTests() {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     mount(reply({ standing: standing() }))
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:run.observe', { id: 'WO-1' }))
-    const observed = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe').length
-    const before = observed()
+    const before = timesInvoked(invoke, 'foundry:run.observe')
 
     bus.emit({ kind: 'graph', orderId: 'WO-2' })
     await vi.advanceTimersByTimeAsync(200)
-    expect(observed()).toBe(before)
+    expect(timesInvoked(invoke, 'foundry:run.observe')).toBe(before)
 
     bus.emit({ kind: 'graph', orderId: 'WO-1' })
     await vi.advanceTimersByTimeAsync(200)
-    expect(observed()).toBe(before + 1)
+    expect(timesInvoked(invoke, 'foundry:run.observe')).toBe(before + 1)
     vi.useRealTimers()
   })
 }

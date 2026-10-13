@@ -177,11 +177,15 @@ describe('the record of earlier decisions', () => {
         now: '2026-10-12T10:00:00.000Z',
       })
     )
-    const decided = (at: string, subject: string, reason: string) =>
+    const recordDecision = (at: string, subject: string, reason: string) =>
       store.record({ ...ACCEPTED, at, subject, reason })
-    await decided('2026-10-01T10:00:00.000Z', 'src/theme.ts', 'keep tokens')
-    await decided('2026-10-05T10:00:00.000Z', 'RT-1', 'src/theme.ts stays the source of colour')
-    await decided('2026-10-06T10:00:00.000Z', 'src/other.ts', 'unrelated')
+    await recordDecision('2026-10-01T10:00:00.000Z', 'src/theme.ts', 'keep tokens')
+    await recordDecision(
+      '2026-10-05T10:00:00.000Z',
+      'RT-1',
+      'src/theme.ts stays the source of colour'
+    )
+    await recordDecision('2026-10-06T10:00:00.000Z', 'src/other.ts', 'unrelated')
 
     expect(await priorArtFor(dataDir, ['src/theme.ts'])).toEqual([
       '2026-10-05 operator: finding.accepted — src/theme.ts stays the source of colour',

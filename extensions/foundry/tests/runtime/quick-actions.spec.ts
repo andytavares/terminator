@@ -7,15 +7,16 @@
  * that what reaches `api.commands.register` carries the group's category and
  * mnemonic rule, and that the static command actually brings Foundry forward.
  */
-import { freshGlobalStorage } from '../helpers/foundry-host.js'
+import { freshFoundryStorage } from '../helpers/foundry-host.js'
 
-const GLOBAL_STORAGE = freshGlobalStorage()
+const GLOBAL_STORAGE = freshFoundryStorage()
 
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
 import { partialFake } from '../../../../tests/support/fakes'
 import { activate } from '../../src/index.ts'
 import type { ExtensionAPI, CommandContribution } from '@terminator/extension-sdk'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
+import { disposableStub } from '../helpers/foundry-host.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -77,9 +78,8 @@ function registeringCommands(): ExtensionAPI['commands'] {
 
 /** A host that keeps every command registered, so a spec can read it and run it. */
 function paletteApi(): ExtensionAPI {
-  const disposable = () => ({ dispose: vi.fn() })
   return partialFake<ExtensionAPI>({
-    ipc: partialFake<ExtensionAPI['ipc']>({ registerHandler: vi.fn(disposable) }),
+    ipc: partialFake<ExtensionAPI['ipc']>({ registerHandler: vi.fn(disposableStub) }),
     window: partialFake<ExtensionAPI['window']>({
       broadcast: vi.fn(),
       openAuxiliary: vi.fn(),
@@ -89,12 +89,12 @@ function paletteApi(): ExtensionAPI {
     commands: registeringCommands(),
     notifications: partialFake<ExtensionAPI['notifications']>({
       showToast: vi.fn(),
-      createNotification: vi.fn(disposable),
+      createNotification: vi.fn(disposableStub),
     }),
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     paths: { app: '', globalStorage: GLOBAL_STORAGE },
     settings: partialFake<ExtensionAPI['settings']>({
-      register: vi.fn(disposable),
+      register: vi.fn(disposableStub),
       get: vi.fn(),
       set: vi.fn(),
     }),

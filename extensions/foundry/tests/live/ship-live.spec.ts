@@ -36,7 +36,7 @@ const exec: ShellExec = ({ command, args, cwd }) =>
     })
   })
 
-function git(...args: string[]): void {
+function gitInLive(...args: string[]): void {
   gitIn(LIVE, ...args)
 }
 
@@ -63,7 +63,7 @@ const READ_TTL = builderUnit('U-1', {
   touches: ['src/session.js'],
 })
 
-function order(): WorkOrder {
+function liveOrder(): WorkOrder {
   const base = draftOrder({
     id: 'WO-LIVE-1',
     title: 'Read the session TTL from configuration',
@@ -107,10 +107,10 @@ function sessionSource(): string {
 function commitTheChangeInAWorktree(): void {
   dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-'))
   branch = `foundry/live-${Date.now().toString(36)}`
-  git('fetch', 'origin')
-  const worktree = checkoutPath(dataRoot, order(), order().context.repos[0].name)
+  gitInLive('fetch', 'origin')
+  const worktree = checkoutPath(dataRoot, liveOrder(), liveOrder().context.repos[0].name)
   fs.mkdirSync(path.dirname(worktree), { recursive: true })
-  git('worktree', 'add', '-b', branch, worktree, 'origin/main')
+  gitInLive('worktree', 'add', '-b', branch, worktree, 'origin/main')
   fs.writeFileSync(path.join(worktree, 'src', 'session.js'), sessionSource())
   gitIn(worktree, 'add', '-A')
   gitIn(worktree, 'commit', '-m', 'read the session TTL from the environment')
@@ -120,7 +120,7 @@ function commitTheChangeInAWorktree(): void {
  * `git worktree prune` drops the live checkout's record of the worktree inside it. */
 function removeTheLiveRecords(): void {
   fs.rmSync(dataRoot, { recursive: true, force: true })
-  git('worktree', 'prune')
+  gitInLive('worktree', 'prune')
 }
 
 /** A verified change: the one criterion passed, lint and the unit's tests passed. */
@@ -173,7 +173,7 @@ const PASSED_LADDER: Shipment['ladder'] = {
 async function recordInTheLedger(action: string, subject: string, reason: string) {
   await createOrderStore(dataRoot).record({
     at: new Date().toISOString(),
-    orderId: order().id,
+    orderId: liveOrder().id,
     actor: 'rule:ship',
     action,
     subject,
@@ -221,7 +221,7 @@ async function viewOnGitHub(url: string): Promise<PullView> {
 
 async function opensADraftGitHubCanShowBack(): Promise<void> {
   const raised: Gate[] = []
-  const result = await shipOrder(order(), verifiedShipment(), liveShipDeps(raised))
+  const result = await shipOrder(liveOrder(), verifiedShipment(), liveShipDeps(raised))
 
   expect(result.pulls, `shipOrder reported: ${JSON.stringify(result)}`).toHaveLength(1)
   const pull = result.pulls[0]
@@ -287,7 +287,7 @@ async function marksTheDraftReady(): Promise<void> {
 async function recordsTheDraftInTheOrdersLedger(): Promise<void> {
   // `ship.draft_opened`'s subject is the pull request URL; filing by subject once put it in
   // `orders/https:/github.com/…/ledger.jsonl`, not here (docs/ARCHITECTURE.md, "The ledger").
-  const ledger = path.join(dataRoot, 'orders', order().id, 'ledger.jsonl')
+  const ledger = path.join(dataRoot, 'orders', liveOrder().id, 'ledger.jsonl')
   expect(fs.existsSync(ledger), 'the order has no ledger').toBe(true)
   const actions = fs
     .readFileSync(ledger, 'utf8')
@@ -299,7 +299,7 @@ async function recordsTheDraftInTheOrdersLedger(): Promise<void> {
 
   // And no order directory named after anything but an order.
   const orders = fs.readdirSync(path.join(dataRoot, 'orders'))
-  expect(orders, 'a ledger was filed somewhere that is not an order').toEqual([order().id])
+  expect(orders, 'a ledger was filed somewhere that is not an order').toEqual([liveOrder().id])
 }
 
 describe.skipIf(LIVE === '')('shipping, for real', () => {

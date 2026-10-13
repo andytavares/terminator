@@ -114,7 +114,7 @@ describe('what the watcher fires on', () => {
 
 const INTERVAL_MS = 1_000
 /** A watcher on a fake clock that counts how often it looks at the runs. */
-function counted() {
+function countingWatcher() {
   let looks = 0
   const watcher = createStallWatcher({
     runs: () => {
@@ -254,7 +254,7 @@ describe('starting and stopping', () => {
 
 function theTimerTests() {
   it('looks at the runs once every interval after it starts', () => {
-    const { watcher, looks } = counted()
+    const { watcher, looks } = countingWatcher()
     watcher.start()
     vi.advanceTimersByTime(3 * INTERVAL_MS)
     watcher.stop()
@@ -262,7 +262,7 @@ function theTimerTests() {
   })
 
   it('looks no more after it is stopped, and stopping twice is harmless', () => {
-    const { watcher, looks } = counted()
+    const { watcher, looks } = countingWatcher()
     watcher.start()
     vi.advanceTimersByTime(INTERVAL_MS)
     watcher.stop()
@@ -272,7 +272,7 @@ function theTimerTests() {
   })
 
   it('starting twice does not run two timers', () => {
-    const { watcher, looks } = counted()
+    const { watcher, looks } = countingWatcher()
     watcher.start()
     watcher.start()
     vi.advanceTimersByTime(3 * INTERVAL_MS)

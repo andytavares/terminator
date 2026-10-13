@@ -42,7 +42,7 @@ function scriptOf(input: { args: string[] }): string {
   return match[1]
 }
 
-function api() {
+function runnerCoreApi() {
   return {
     workspace: {
       addProject: async (input: Record<string, unknown>) => {
@@ -74,11 +74,11 @@ function api() {
 }
 
 /** Lets the runner's awaits on the core (addProject, openTerminal) finish. */
-const settled = () => new Promise((resolve) => setImmediate(resolve))
+const coreCallsSettled = () => new Promise((resolve) => setImmediate(resolve))
 
 function runner(now: () => number = () => 1_000) {
   return createSupervisedRunner({
-    api: api(),
+    api: runnerCoreApi(),
     control,
     stateDir: join(dir, 'state'),
     now,
@@ -502,7 +502,7 @@ function endingTheRunTests() {
 
 function aHostThatCannotCloseTabsTests() {
   it('still stops answering the agent on a host that cannot close the tab', async () => {
-    const host = api() as { pty: { closeTerminalTab?: unknown } }
+    const host = runnerCoreApi() as { pty: { closeTerminalTab?: unknown } }
     delete host.pty.closeTerminalTab
     const r = createSupervisedRunner({
       api: host as never,
@@ -942,13 +942,13 @@ describe('running one command in a terminal, with no agent', () => {
 function openingTheTabTests() {
   it("links the order's ticket to the project a command opens, too", async () => {
     void runner().runCommand({ ...command, issue: { tracker: 'linear', key: 'TAV-15' } })
-    await settled()
+    await coreCallsSettled()
     expect(created[0]).toMatchObject({ issue: { tracker: 'linear', key: 'TAV-15' } })
   })
 
   it('opens a plain terminal tab in the worktree project', async () => {
     void runner().runCommand(command)
-    await settled()
+    await coreCallsSettled()
     expect(created[0]).toMatchObject({ worktreePath: '/wt/feat-thing', gitBranch: 'feat/thing' })
     expect(ran[0]).toMatchObject({
       projectId: 'project-1',
@@ -962,7 +962,7 @@ function openingTheTabTests() {
   // read as exit 0 (extensions/foundry/CLAUDE.md, "Verification commands").
   it("runs the command's script as the terminal's process, typing nothing", async () => {
     void runner().runCommand(command)
-    await settled()
+    await coreCallsSettled()
     expect(written).toEqual([])
     const shell = process.env.SHELL ?? '/bin/sh'
     expect(ran[0].file).toBe(shell)
@@ -1019,7 +1019,7 @@ async function scriptFor(commandLine: string, logPath?: string): Promise<string>
     command: commandLine,
     logPath,
   })
-  await settled()
+  await coreCallsSettled()
   return scriptOf(ran[ran.length - 1])
 }
 
@@ -1141,7 +1141,7 @@ function runCheck(commandLine: string, logPath?: string): Promise<number | null>
   })
 }
 
-async function check(commandLine: string, logPath?: string): Promise<number | null> {
+async function checkOrTimeOut(commandLine: string, logPath?: string): Promise<number | null> {
   const ended = runCheck(commandLine, logPath)
   let timer: ReturnType<typeof setTimeout> | undefined
   const stuck = new Promise<never>((_, reject) => {
@@ -1158,7 +1158,7 @@ async function check(commandLine: string, logPath?: string): Promise<number | nu
 }
 
 /** Makes `startup.shell` the user's shell, in a HOME holding only its startup files. */
-function useShell(startup: StartupShell): void {
+function withStartupShell(startup: StartupShell): void {
   for (const [name, body] of Object.entries(startup.files)) writeFileSync(join(home, name), body)
   process.env.HOME = home
   process.env.SHELL = startup.shell
@@ -1184,26 +1184,26 @@ function startupFileTests(startup: StartupShell) {
   const { shell } = startup
 
   it(`(${shell}) passes a check that needs a variable only a startup file exports`, async () => {
-    useShell(startup)
-    await expect(check('test "$FOUNDRY_RC_ONLY" = from-rc')).resolves.toBe(0)
+    withStartupShell(startup)
+    await expect(checkOrTimeOut('test "$FOUNDRY_RC_ONLY" = from-rc')).resolves.toBe(0)
   })
 
   it(`(${shell}) still resolves the command's own exit code, not the shell's`, async () => {
-    useShell(startup)
-    await expect(check('echo "$FOUNDRY_RC_ONLY"; exit 3')).resolves.toBe(3)
+    withStartupShell(startup)
+    await expect(checkOrTimeOut('echo "$FOUNDRY_RC_ONLY"; exit 3')).resolves.toBe(3)
   })
 
   // bash ends by the signal (null, "not measured"); zsh catches SIGHUP and
   // exits 1. Either way a check nobody let finish is never a pass.
   it(`(${shell}) never passes a check whose tab was closed while it ran`, async () => {
-    useShell(startup)
-    await expect(check('echo hang-up-"now"; sleep 30')).resolves.not.toBe(0)
+    withStartupShell(startup)
+    await expect(checkOrTimeOut('echo hang-up-"now"; sleep 30')).resolves.not.toBe(0)
   })
 
   it(`(${shell}) keeps both through the log file`, async () => {
-    useShell(startup)
+    withStartupShell(startup)
     const logPath = join(home, 'logs', 'check.log')
-    await expect(check('echo "$FOUNDRY_RC_ONLY"; exit 3', logPath)).resolves.toBe(3)
+    await expect(checkOrTimeOut('echo "$FOUNDRY_RC_ONLY"; exit 3', logPath)).resolves.toBe(3)
     expect(readFileSync(logPath, 'utf8')).toContain('from-rc')
   })
 }

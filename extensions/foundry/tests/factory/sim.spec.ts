@@ -28,6 +28,7 @@ import type { RunGraph } from '../../src/line/run-graph.js'
 import type { Observation } from '../../src/factory/events.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import { findPath } from '../../src/factory/path.js'
+import { idleWorld } from '../helpers/hall-views.js'
 
 // createWorld settles a run onto its floor with no motion at all: nothing
 // walked in, it is simply where the run already is. tick is the only thing
@@ -753,17 +754,7 @@ function member(
   }
 }
 function world(crew: Crew[]): World {
-  return {
-    map: corridor,
-    crew,
-    crates: [],
-    gatesWaiting: [],
-    openCalls: [],
-    verdicts: [],
-    clockMs: 0,
-    ci: null,
-    queue: null,
-  }
+  return idleWorld(corridor, crew)
 }
 function atGoal(c: Crew): boolean {
   const t = tileOf(c.x, c.y)

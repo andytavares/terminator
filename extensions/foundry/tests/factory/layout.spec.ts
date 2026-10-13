@@ -810,7 +810,7 @@ function beltFree(map: HallMap): boolean[][] {
   return free
 }
 
-function seatOf(map: HallMap, nodeId: string): Tile {
+function seatedTileOf(map: HallMap, nodeId: string): Tile {
   return map.props.find((p) => p.nodeId === nodeId && p.seat !== null)?.seat as Tile
 }
 
@@ -818,7 +818,10 @@ describe("layoutHall — crossovers on a station's way to the breakroom", () => 
   it('opens a clear pair of crossovers where a station would detour round the belts', () => {
     const map = layoutHall(SEAT_WAY_PAIR)
     const open = new Set(map.crossovers.map(tileKey))
-    const way = findPath(beltFree(map), { from: seatOf(map, 'n4'), to: map.breakroom.door[0] })
+    const way = findPath(beltFree(map), {
+      from: seatedTileOf(map, 'n4'),
+      to: map.breakroom.door[0],
+    })
     const crossed = way.filter((t) => open.has(tileKey(t)))
     expect(crossed.length).toBeGreaterThan(0)
     for (const t of crossed) {

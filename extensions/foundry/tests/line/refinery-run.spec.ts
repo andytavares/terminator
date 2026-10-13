@@ -10,7 +10,7 @@ import * as path from 'node:path'
 import { fakeHost, realGit, temporaryDirectory, execSucceeded } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
-import { agentsAnswer, agreedOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
+import { agentsAnswer, agreedLineOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { writeObservedFiles } from '../../src/line/observed-files.js'
@@ -68,8 +68,8 @@ function githubWithADraftPerOrder(): void {
 
 async function shipBoth(): Promise<void> {
   const store = createOrderStore(dataDir)
-  await store.save(agreedOrder(repo, { id: 'WO-1', agreedAt: '2026-10-12T10:01:00.000Z' }))
-  await store.save(agreedOrder(repo, { id: 'WO-2', agreedAt: '2026-10-12T10:02:00.000Z' }))
+  await store.save(agreedLineOrder(repo, { id: 'WO-1', agreedAt: '2026-10-12T10:01:00.000Z' }))
+  await store.save(agreedLineOrder(repo, { id: 'WO-2', agreedAt: '2026-10-12T10:02:00.000Z' }))
   for (const id of ['WO-1', 'WO-2']) {
     await host.call('foundry:run.start', { id, recipe: 'direct' })
     await vi.waitFor(async () => expect((await store.load(id))?.status).toBe('shipped'), {
@@ -139,7 +139,7 @@ function aFailedRebaseTests() {
   it('puts an order that no longer rebases in front of the operator', async () => {
     await shipBoth()
     // main moves under WO-2's own file with different contents.
-    const clash = path.join(checkoutPath(dataDir, agreedOrder(repo, { id: 'WO-1' }), 'app'))
+    const clash = path.join(checkoutPath(dataDir, agreedLineOrder(repo, { id: 'WO-1' }), 'app'))
     fs.writeFileSync(path.join(clash, 'wo-2.css'), 'a { color: blue }\n')
     await realGit({ command: 'git', args: ['add', '-A'], cwd: clash })
     await realGit({ command: 'git', args: ['commit', '-q', '-m', 'blue'], cwd: clash })
@@ -167,7 +167,7 @@ function theMergedIssueTests() {
     try {
       const store = createOrderStore(dataDir)
       await store.save(
-        agreedOrder(repo, {
+        agreedLineOrder(repo, {
           id: 'WO-1',
           source: { kind: 'tracker', tracker: 'linear', key: 'ENG-1', url: null },
           writeBack: ['status'],

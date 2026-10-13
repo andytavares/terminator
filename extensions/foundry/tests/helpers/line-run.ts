@@ -21,7 +21,7 @@ export async function repositoryWithRemote(parent: string): Promise<string> {
 }
 
 /** One unit in one lane, checked by the repository's own `npm test`. */
-export function agreedOrder(repo: string, over: Partial<WorkOrder> = {}): WorkOrder {
+export function agreedLineOrder(repo: string, over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
     id: over.id ?? 'WO-1',
     title: 'Make it red',

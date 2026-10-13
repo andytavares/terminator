@@ -50,7 +50,11 @@ function outside(calls: readonly PaintCall[], rect: Rect): Fill[] {
   )
 }
 
-function checks(pass: number, pending: number, fail: number): Record<string, Check['bucket']> {
+function checkBuckets(
+  pass: number,
+  pending: number,
+  fail: number
+): Record<string, Check['bucket']> {
   const all: Record<string, Check['bucket']> = {}
   for (let i = 0; i < pass; i++) all[`pass-${i}`] = 'pass'
   for (let i = 0; i < pending; i++) all[`pending-${i}`] = 'pending'
@@ -179,7 +183,8 @@ function towerBoundsTests() {
         bottom: (tower.y + 1) * TILE_PX + 2,
       }
       const paint = createRecordingPaint()
-      drawProp(paint, tower, { context: context({ ci: { checks: checks(p, w, f) } }), tMs: 0 })
+      const ci = { checks: checkBuckets(p, w, f) }
+      drawProp(paint, tower, { context: context({ ci }), tMs: 0 })
       const strays = outside(paint.calls, towerRect(tower)).filter(
         (c) =>
           c.x < exitTile.left ||
@@ -195,7 +200,7 @@ function towerBoundsTests() {
 function lampsTests() {
   it('shows three lamps however many checks there are, each with its count in one-pixel digits', () => {
     const paint = createRecordingPaint()
-    drawProp(paint, tower, { context: context({ ci: { checks: checks(12, 5, 2) } }), tMs: 0 })
+    drawProp(paint, tower, { context: context({ ci: { checks: checkBuckets(12, 5, 2) } }), tMs: 0 })
     expect(
       lamps(paint.calls)
         .map((c) => c.style)
@@ -207,7 +212,7 @@ function lampsTests() {
 
   it('lights a lamp only for a bucket that has checks in it', () => {
     const paint = createRecordingPaint()
-    drawProp(paint, tower, { context: context({ ci: { checks: checks(3, 0, 0) } }), tMs: 0 })
+    drawProp(paint, tower, { context: context({ ci: { checks: checkBuckets(3, 0, 0) } }), tMs: 0 })
     expect(lamps(paint.calls).map((c) => c.style)).toEqual([HALL.green])
   })
 }
@@ -221,24 +226,24 @@ function theBeaconTests() {
       )
 
     const on = createRecordingPaint()
-    drawProp(on, tower, { context: context({ ci: { checks: checks(1, 1, 0) } }), tMs: 0 })
+    drawProp(on, tower, { context: context({ ci: { checks: checkBuckets(1, 1, 0) } }), tMs: 0 })
     expect(beacon(on.calls, HALL.amber)).toBe(true)
     expect(fills(on.calls).some((c) => c.style === crate)).toBe(true)
 
     const off = createRecordingPaint()
-    drawProp(off, tower, { context: context({ ci: { checks: checks(1, 1, 0) } }), tMs: 400 })
+    drawProp(off, tower, { context: context({ ci: { checks: checkBuckets(1, 1, 0) } }), tMs: 400 })
     expect(beacon(off.calls, HALL.amber)).toBe(false)
     expect(beacon(off.calls, HALL.amberDim)).toBe(true)
 
     const steady = createRecordingPaint()
     drawProp(steady, tower, {
-      context: context({ steady: true, ci: { checks: checks(1, 1, 0) } }),
+      context: context({ steady: true, ci: { checks: checkBuckets(1, 1, 0) } }),
       tMs: 400,
     })
     expect(beacon(steady.calls, HALL.amber)).toBe(true)
 
     const quiet = createRecordingPaint()
-    drawProp(quiet, tower, { context: context({ ci: { checks: checks(2, 0, 0) } }), tMs: 0 })
+    drawProp(quiet, tower, { context: context({ ci: { checks: checkBuckets(2, 0, 0) } }), tMs: 0 })
     expect(beacon(quiet.calls, HALL.amber)).toBe(false)
     expect(beacon(quiet.calls, HALL.amberDim)).toBe(false)
     expect(fills(quiet.calls).some((c) => c.style === crate)).toBe(false)

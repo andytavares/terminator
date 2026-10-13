@@ -413,7 +413,7 @@ function breakroomBox(map: HallMap): Box {
 }
 
 /** Whether a fill starts inside `box`. */
-function inside(call: PaintCall, box: Box): boolean {
+function paintedInside(call: PaintCall, box: Box): boolean {
   if (call.op !== 'fillRect') return false
   return call.x >= box.x0 && call.x < box.x1 && call.y >= box.y0 && call.y < box.y1
 }
@@ -461,9 +461,9 @@ function theBreakroomTests() {
     const room = breakroomBox(map)
     const fills = paint.calls.filter((c) => c.op === 'fillRect')
     const floor = fills.filter((c) => c.style === '#4a4038' || c.style === '#524740')
-    expect(floor.some((c) => inside(c, room))).toBe(true)
+    expect(floor.some((c) => paintedInside(c, room))).toBe(true)
     const rug = fills.filter((c) => c.style === HALL.rug)
-    expect(rug.some((c) => !inside(c, room))).toBe(false)
+    expect(rug.some((c) => !paintedInside(c, room))).toBe(false)
   })
 }
 

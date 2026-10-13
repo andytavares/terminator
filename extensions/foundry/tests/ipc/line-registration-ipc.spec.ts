@@ -48,7 +48,7 @@ afterEach(() => {
   theRunner.terminalFor.mockReset().mockReturnValue(null)
 })
 
-async function saveOrder(over: Partial<WorkOrder>): Promise<void> {
+async function saveTypedOrder(over: Partial<WorkOrder>): Promise<void> {
   await createOrderStore(dataDir).save({
     ...draftOrder({
       id: 'WO-1',
@@ -63,7 +63,7 @@ async function saveOrder(over: Partial<WorkOrder>): Promise<void> {
 
 describe('agents handed back to their terminals', () => {
   it('are offered for this order only, and only while their terminal is open', async () => {
-    await saveOrder({ status: 'running', recipe: 'direct' })
+    await saveTypedOrder({ status: 'running', recipe: 'direct' })
     const graph = {
       orderId: 'WO-1',
       recipe: 'direct',
@@ -84,7 +84,7 @@ describe('agents handed back to their terminals', () => {
 
 describe('starting over an order its run left nothing behind for', () => {
   it('puts it back to agreed and says there was nothing to remove', async () => {
-    await saveOrder({ status: 'cancelled', recipe: 'direct', recipeOverriddenBy: 'operator' })
+    await saveTypedOrder({ status: 'cancelled', recipe: 'direct', recipeOverriddenBy: 'operator' })
     // Git has no checkout and no branch to remove: the run never cut them.
     host.exec.mockResolvedValue({
       exitCode: 128,

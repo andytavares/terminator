@@ -51,7 +51,7 @@ const REFUSED_CRITERION: WorkOrder['acceptance'][number] = {
   unverifiable: null,
 }
 
-function order(over: Partial<WorkOrder> = {}): WorkOrder {
+function refreshTokenOrder(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
     id: 'WO-1',
     title: 'Refuse an expired refresh token',
@@ -80,6 +80,11 @@ function verdict(over: Partial<Parameters<typeof makeVerdict>[0]> = {}): Verdict
     at: '2026-09-06T10:00:00.000Z',
     ...over,
   })
+}
+
+/** Ships the order with one passing verdict and no findings, over `d`. */
+function shipVerified(d: IntegrateDeps) {
+  return shipOrder(refreshTokenOrder(), { verdicts: [verdict()], findings: [] }, d)
 }
 
 function deps(over: Partial<IntegrateDeps> = {}): IntegrateDeps & { exec: Mock<ShellExec> } {
@@ -129,13 +134,13 @@ describe('the command line', () => {
 function theDraftCommandTests() {
   it('opens a draft, not a review request', async () => {
     const d = deps()
-    await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    await shipVerified(d)
     expect(callsTo(d.exec, 'gh', 'create')[0].args).toContain('--draft')
   })
 
   it('names the head, the base, the title and a body file — never an inline body', async () => {
     const d = deps()
-    await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    await shipVerified(d)
     const args = callsTo(d.exec, 'gh', 'create')[0].args
 
     expect(args).toEqual(
@@ -158,7 +163,7 @@ function theDraftCommandTests() {
 function theBodyAndTheWorktreeTests() {
   it('writes the body to the order directory and points gh at that file', async () => {
     const d = deps()
-    await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    await shipVerified(d)
     const args = callsTo(d.exec, 'gh', 'create')[0].args
     const file = args[args.indexOf('--body-file') + 1]
 
@@ -175,8 +180,8 @@ function theBodyAndTheWorktreeTests() {
   // commit was sitting in the worktree the push never looked at.
   it("runs in the lane's worktree, which is where the work is", async () => {
     const d = deps()
-    await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
-    const expected = checkoutPath(root, order(), 'app')
+    await shipVerified(d)
+    const expected = checkoutPath(root, refreshTokenOrder(), 'app')
     const pushes = callsTo(d.exec, 'git').filter((call) => call.args[0] === 'push')
     expect(pushes).toHaveLength(1)
     expect(pushes[0].cwd).toBe(expected)
@@ -188,14 +193,14 @@ function theBodyAndTheWorktreeTests() {
 function pushingTests() {
   it('pushes the branch before asking gh to open anything', async () => {
     const d = deps()
-    await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    await shipVerified(d)
     const order_ = d.exec.mock.calls.map((c) => (c[0] as { command: string }).command)
     expect(order_.indexOf('git')).toBeLessThan(order_.indexOf('gh'))
   })
 
   it('sets the upstream on the push, so the branch is trackable afterwards', async () => {
     const d = deps()
-    await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    await shipVerified(d)
     expect(callsTo(d.exec, 'git')[0].args).toEqual([
       'push',
       '--set-upstream',
@@ -205,7 +210,7 @@ function pushingTests() {
   })
 
   it('returns the pull request URL gh printed', async () => {
-    const result = await shipOrder(order(), { verdicts: [verdict()], findings: [] }, deps())
+    const result = await shipVerified(deps())
     expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
   })
 }
@@ -219,18 +224,14 @@ function integratePushFailuresTests() {
       timedOut: false,
     }))
     const d = deps({ exec: exec as never })
-    await expect(
-      shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
-    ).rejects.toBeInstanceOf(PushRefusedError)
+    await expect(shipVerified(d)).rejects.toBeInstanceOf(PushRefusedError)
     expect(callsTo(exec, 'gh')).toHaveLength(0)
   })
 
   it('fails the push that timed out, saying so, and opens no pull request', async () => {
     const exec = vi.fn(async () => ({ exitCode: 0, stdout: '', stderr: '', timedOut: true }))
     const d = deps({ exec: exec as never })
-    await expect(shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)).rejects.toThrow(
-      /timed out/
-    )
+    await expect(shipVerified(d)).rejects.toThrow(/timed out/)
     expect(callsTo(exec, 'gh')).toHaveLength(0)
   })
 }
@@ -243,9 +244,7 @@ function carryingFailuresThroughTests() {
       stderr: 'rejected: non-fast-forward',
       timedOut: false,
     }))
-    await expect(
-      shipOrder(order(), { verdicts: [verdict()], findings: [] }, deps({ exec: exec as never }))
-    ).rejects.toThrow(/non-fast-forward/)
+    await expect(shipVerified(deps({ exec: exec as never }))).rejects.toThrow(/non-fast-forward/)
   })
 
   // `gh pr create` can fail with an empty stderr and its reason on stdout
@@ -262,9 +261,7 @@ function carryingFailuresThroughTests() {
             timedOut: false,
           }
     )
-    await expect(
-      shipOrder(order(), { verdicts: [verdict()], findings: [] }, deps({ exec: exec as never }))
-    ).rejects.toThrow(/already exists/)
+    await expect(shipVerified(deps({ exec: exec as never }))).rejects.toThrow(/already exists/)
   })
 }
 
@@ -275,11 +272,7 @@ function ghFailingSilentlyTests() {
         ? { exitCode: 0, stdout: '', stderr: '', timedOut: false }
         : { exitCode: 1, stdout: '', stderr: '', timedOut: false }
     )
-    const err = await shipOrder(
-      order(),
-      { verdicts: [verdict()], findings: [] },
-      deps({ exec: exec as never })
-    ).then(
+    const err = await shipVerified(deps({ exec: exec as never })).then(
       () => new Error('shipOrder resolved'),
       (e: Error) => e
     )
@@ -300,11 +293,7 @@ function bothStreamsTests() {
             timedOut: false,
           }
     )
-    const err = await shipOrder(
-      order(),
-      { verdicts: [verdict()], findings: [] },
-      deps({ exec: exec as never })
-    ).then(
+    const err = await shipVerified(deps({ exec: exec as never })).then(
       () => new Error('shipOrder resolved'),
       (e: Error) => e
     )
@@ -321,9 +310,7 @@ function aPushFailingOnStdoutTests() {
       stderr: '',
       timedOut: false,
     }))
-    await expect(
-      shipOrder(order(), { verdicts: [verdict()], findings: [] }, deps({ exec: exec as never }))
-    ).rejects.toThrow(/refused anyway/)
+    await expect(shipVerified(deps({ exec: exec as never }))).rejects.toThrow(/refused anyway/)
   })
 }
 
@@ -364,13 +351,21 @@ describe('risk-ordered shipping (FR-055)', () => {
 function whenToGateTests() {
   it('gates before pushing for the two highest grades', () => {
     expect(GATED_GRADES).toEqual(['P0', 'P1'])
-    expect(shipModeFor(order({ risk: { ...order().risk, grade: 'P0' } }))).toBe('gate_then_push')
-    expect(shipModeFor(order({ risk: { ...order().risk, grade: 'P1' } }))).toBe('gate_then_push')
+    expect(
+      shipModeFor(refreshTokenOrder({ risk: { ...refreshTokenOrder().risk, grade: 'P0' } }))
+    ).toBe('gate_then_push')
+    expect(
+      shipModeFor(refreshTokenOrder({ risk: { ...refreshTokenOrder().risk, grade: 'P1' } }))
+    ).toBe('gate_then_push')
   })
 
   it('opens the draft first for everything lower, so review happens on a real change', () => {
-    expect(shipModeFor(order({ risk: { ...order().risk, grade: 'P2' } }))).toBe('push_then_gate')
-    expect(shipModeFor(order({ risk: { ...order().risk, grade: 'P3' } }))).toBe('push_then_gate')
+    expect(
+      shipModeFor(refreshTokenOrder({ risk: { ...refreshTokenOrder().risk, grade: 'P2' } }))
+    ).toBe('push_then_gate')
+    expect(
+      shipModeFor(refreshTokenOrder({ risk: { ...refreshTokenOrder().risk, grade: 'P3' } }))
+    ).toBe('push_then_gate')
   })
 }
 
@@ -393,7 +388,7 @@ function p0Tests() {
       }
     }) as never
     await shipOrder(
-      order({ risk: { ...order().risk, grade: 'P0' } }),
+      refreshTokenOrder({ risk: { ...refreshTokenOrder().risk, grade: 'P0' } }),
       { verdicts: [verdict()], findings: [] },
       d
     )
@@ -405,7 +400,7 @@ function integrateHoldingTests() {
   it('pushes nothing when the operator holds a P0', async () => {
     const d = deps({ decide: vi.fn(async () => 'hold') })
     const result = await shipOrder(
-      order({ risk: { ...order().risk, grade: 'P0' } }),
+      refreshTokenOrder({ risk: { ...refreshTokenOrder().risk, grade: 'P0' } }),
       { verdicts: [verdict()], findings: [] },
       d
     )
@@ -416,7 +411,7 @@ function integrateHoldingTests() {
 
   it('says a held shipping decision waits on the operator, not that they chose to hold', async () => {
     const result = await shipOrder(
-      order({ risk: { ...order().risk, grade: 'P1' } }),
+      refreshTokenOrder({ risk: { ...refreshTokenOrder().risk, grade: 'P1' } }),
       { verdicts: [verdict()], findings: [] },
       deps({ decide: vi.fn(async () => 'hold') })
     )
@@ -430,7 +425,7 @@ function p2AndNamingTheGradeTests() {
   it('asks nobody before pushing at P2', async () => {
     const d = deps()
     await shipOrder(
-      order({ risk: { ...order().risk, grade: 'P2' } }),
+      refreshTokenOrder({ risk: { ...refreshTokenOrder().risk, grade: 'P2' } }),
       { verdicts: [verdict()], findings: [] },
       d
     )
@@ -440,7 +435,7 @@ function p2AndNamingTheGradeTests() {
   it('names the risk grade in the gate it raises, since the rule id does not', async () => {
     const decide = vi.fn<IntegrateDeps['decide']>(async () => 'approve')
     await shipOrder(
-      order({ risk: { ...order().risk, grade: 'P1' } }),
+      refreshTokenOrder({ risk: { ...refreshTokenOrder().risk, grade: 'P1' } }),
       { verdicts: [verdict()], findings: [] },
       deps({ decide })
     )
@@ -451,7 +446,7 @@ function p2AndNamingTheGradeTests() {
 describe('the setting that turns pushing off (FR-054)', () => {
   it('pushes nothing when draft-first is off, and says so', async () => {
     const d = deps({ autoOpen: false })
-    const result = await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    const result = await shipVerified(d)
     expect(d.exec).not.toHaveBeenCalled()
     expect(result.held).toBe(true)
     expect(result.reason).toMatch(/draft/i)
@@ -459,7 +454,7 @@ describe('the setting that turns pushing off (FR-054)', () => {
 
   it('still writes the body, so the operator can read what would have shipped', async () => {
     const d = deps({ autoOpen: false })
-    const result = await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    const result = await shipVerified(d)
     expect(fs.readFileSync(result.bodyPaths[0], 'utf8')).toContain('AC-1')
   })
 })
@@ -472,24 +467,24 @@ describe('the pull request body (FR-056)', () => {
 
 function summaryAndVerdictsTests() {
   it('carries a written summary of the work', () => {
-    const body = prBody(order(), { verdicts: [verdict()], findings: [] })
+    const body = prBody(refreshTokenOrder(), { verdicts: [verdict()], findings: [] })
     expect(body).toContain('Refuse an expired refresh token')
   })
 
   it('carries a verdict for every criterion', () => {
-    const body = prBody(order(), { verdicts: [verdict()], findings: [] })
+    const body = prBody(refreshTokenOrder(), { verdicts: [verdict()], findings: [] })
     expect(body).toContain('AC-1')
     expect(body).toContain('pass')
   })
 
   it('says "not measured" for a criterion nothing checked, rather than leaving it out', () => {
-    const body = prBody(order(), { verdicts: [], findings: [] })
+    const body = prBody(refreshTokenOrder(), { verdicts: [], findings: [] })
     expect(body).toContain('AC-1')
     expect(body).toMatch(/not measured/i)
   })
 
   it('never reads a not-measured criterion as a pass', () => {
-    const body = prBody(order(), {
+    const body = prBody(refreshTokenOrder(), {
       verdicts: [verdict({ result: 'not_measured', reason: 'no lint command in this repository' })],
       findings: [],
     })
@@ -500,7 +495,7 @@ function summaryAndVerdictsTests() {
 
 function integrateInspectionTests() {
   it('carries inspection findings when there were any', () => {
-    const body = prBody(order(), {
+    const body = prBody(refreshTokenOrder(), {
       verdicts: [verdict()],
       findings: ['Token comparison is not constant-time'],
     })
@@ -508,12 +503,12 @@ function integrateInspectionTests() {
   })
 
   it('says the inspection found nothing rather than omitting the section', () => {
-    const body = prBody(order(), { verdicts: [verdict()], findings: [] })
+    const body = prBody(refreshTokenOrder(), { verdicts: [verdict()], findings: [] })
     expect(body).toMatch(/inspection/i)
   })
 
   it('says the inspection did not run, with the reason, when it did not', () => {
-    const body = prBody(order(), {
+    const body = prBody(refreshTokenOrder(), {
       verdicts: [verdict()],
       findings: [],
       inspection: { ran: false, reason: 'graded P3 with no risk triggers' },
@@ -525,23 +520,23 @@ function integrateInspectionTests() {
 
 function provenanceTests() {
   it('names the order it came from', () => {
-    expect(prBody(order(), { verdicts: [], findings: [] })).toContain('WO-1')
+    expect(prBody(refreshTokenOrder(), { verdicts: [], findings: [] })).toContain('WO-1')
   })
 
   it('marks itself as a draft opened by the factory, not by a person', () => {
-    expect(prBody(order(), { verdicts: [], findings: [] })).toMatch(/Foundry/)
+    expect(prBody(refreshTokenOrder(), { verdicts: [], findings: [] })).toMatch(/Foundry/)
   })
 }
 
 describe('remembering what was opened', () => {
   it('writes the drafts down, so a decision taken later knows which one it means', async () => {
     const d = deps()
-    await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    await shipVerified(d)
     const { readPulls } = await import('../../src/line/integrate.js')
     const remembered = await readPulls(root, 'WO-1')
     expect(remembered[0]).toMatchObject({
       url: 'https://github.com/tav/app/pull/7',
-      cwd: checkoutPath(root, order(), 'app'),
+      cwd: checkoutPath(root, refreshTokenOrder(), 'app'),
     })
   })
 
@@ -600,7 +595,7 @@ const TWO_LANE_PLAN: Pick<WorkOrder['plan'], 'sharedFiles' | 'lanes' | 'units'> 
 }
 
 function twoLanes(over: Partial<WorkOrder> = {}): WorkOrder {
-  const base = order()
+  const base = refreshTokenOrder()
   return {
     ...base,
     context: { ...base.context, repos: TWO_LANE_REPOS },
@@ -629,7 +624,7 @@ function multiDeps() {
 
 function theWorstVerdictTests() {
   it('reports the worst verdict for a criterion, not the first', () => {
-    const body = prBody(order(), {
+    const body = prBody(refreshTokenOrder(), {
       verdicts: [
         verdict({ nodeId: 'N-1' }),
         verdict({ nodeId: 'N-2', result: 'fail', reason: 'the token was accepted' }),
@@ -641,7 +636,7 @@ function theWorstVerdictTests() {
   })
 
   it('prefers a not-measured over a pass, so a gap is never hidden by a sibling', () => {
-    const body = prBody(order(), {
+    const body = prBody(refreshTokenOrder(), {
       verdicts: [
         verdict({ nodeId: 'N-1' }),
         verdict({ nodeId: 'N-2', result: 'not_measured', reason: 'no lint command here' }),
@@ -654,9 +649,9 @@ function theWorstVerdictTests() {
 
 function integrateUnitsTests() {
   it('lists the units that did the work', () => {
-    const withUnits = order({
+    const withUnits = refreshTokenOrder({
       plan: {
-        ...order().plan,
+        ...refreshTokenOrder().plan,
         units: [
           builderUnit('U-1', {
             title: 'reject expired tokens',
@@ -672,18 +667,18 @@ function integrateUnitsTests() {
   })
 
   it('says there are no units rather than leaving the section blank', () => {
-    expect(prBody(order(), { verdicts: [], findings: [] })).toContain('_No units._')
+    expect(prBody(refreshTokenOrder(), { verdicts: [], findings: [] })).toContain('_No units._')
   })
 }
 
 function criteriaAndIntentTests() {
   it('says there are no criteria rather than printing an empty table', () => {
-    const body = prBody(order({ acceptance: [] }), { verdicts: [], findings: [] })
+    const body = prBody(refreshTokenOrder({ acceptance: [] }), { verdicts: [], findings: [] })
     expect(body).toContain('_No criteria._')
   })
 
   it('carries the intent when the order states one', () => {
-    const stated = order({
+    const stated = refreshTokenOrder({
       intent: { problem: 'expired tokens are accepted', outcome: 'they are refused', nonGoals: [] },
     })
     const body = prBody(stated, { verdicts: [], findings: [] })
@@ -696,7 +691,9 @@ function triggersTests() {
   it('names the risk triggers in the shipping gate when there are any', async () => {
     const decide = vi.fn<IntegrateDeps['decide']>(async () => 'approve')
     await shipOrder(
-      order({ risk: { grade: 'P0', triggers: ['secrets'], blastRadius: [], criticalPaths: [] } }),
+      refreshTokenOrder({
+        risk: { grade: 'P0', triggers: ['secrets'], blastRadius: [], criticalPaths: [] },
+      }),
       { verdicts: [verdict()], findings: [] },
       deps({ decide })
     )
@@ -711,18 +708,14 @@ function whatGhPrintedTests() {
         ? { exitCode: 0, stdout: '', stderr: '', timedOut: false }
         : { exitCode: 1, stdout: '', stderr: 'no upstream configured', timedOut: false }
     )
-    await expect(
-      shipOrder(order(), { verdicts: [verdict()], findings: [] }, deps({ exec: exec as never }))
-    ).rejects.toThrow(/no upstream configured/)
+    await expect(shipVerified(deps({ exec: exec as never }))).rejects.toThrow(
+      /no upstream configured/
+    )
   })
 
   it('records an empty URL rather than inventing one when gh printed nothing', async () => {
     const exec = vi.fn(async () => ({ exitCode: 0, stdout: '', stderr: '', timedOut: false }))
-    const result = await shipOrder(
-      order(),
-      { verdicts: [verdict()], findings: [] },
-      deps({ exec: exec as never })
-    )
+    const result = await shipVerified(deps({ exec: exec as never }))
     expect(result.pulls[0].url).toBe('')
   })
 }
@@ -827,13 +820,13 @@ function aFailedCrossLinkTests() {
 function singleRepositoryOrdersTests() {
   it('says nothing about lanes on a single-repository order', async () => {
     const d = deps()
-    const result = await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    const result = await shipVerified(d)
     expect(fs.readFileSync(result.pulls[0].bodyPath, 'utf8')).not.toMatch(/repository change/)
   })
 
   it('edits nothing for a single-repository order', async () => {
     const d = deps()
-    await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    await shipVerified(d)
     expect(callsTo(d.exec, 'gh', 'edit')).toHaveLength(0)
   })
 }
@@ -864,7 +857,7 @@ function theQuestionTests() {
   it('is whether to mark it ready, not whether to create it', async () => {
     const raiseGate = vi.fn(async () => undefined)
     const result = await shipOrder(
-      order(),
+      refreshTokenOrder(),
       { verdicts: [verdict()], findings: [], ladder: ladderOk },
       deps({ raiseGate })
     )
@@ -876,7 +869,7 @@ function theQuestionTests() {
 
   it('never defaults to shipping when nobody answers', async () => {
     const result = await shipOrder(
-      order(),
+      refreshTokenOrder(),
       { verdicts: [verdict()], findings: [], ladder: ladderOk },
       deps()
     )
@@ -887,7 +880,7 @@ function theQuestionTests() {
 function integrateNotMeasuredTests() {
   it('says what was never measured, so a bare repository cannot look checked', async () => {
     const result = await shipOrder(
-      order(),
+      refreshTokenOrder(),
       {
         verdicts: [verdict()],
         findings: [],
@@ -904,7 +897,7 @@ function integrateNotMeasuredTests() {
 function theInspectionTests() {
   it('says the inspection found nothing only when it ran', async () => {
     const result = await shipOrder(
-      order(),
+      refreshTokenOrder(),
       {
         verdicts: [verdict()],
         findings: [],
@@ -918,7 +911,7 @@ function theInspectionTests() {
 
   it('says why the inspection did not run, never that it found nothing', async () => {
     const result = await shipOrder(
-      order(),
+      refreshTokenOrder(),
       {
         verdicts: [verdict()],
         findings: [],
@@ -935,7 +928,7 @@ function theInspectionTests() {
 function markdownTests() {
   it('writes the decision as Markdown with one fact per line', async () => {
     const result = await shipOrder(
-      order(),
+      refreshTokenOrder(),
       {
         verdicts: [verdict()],
         findings: [],
@@ -955,7 +948,7 @@ function markdownTests() {
 function noVerdictsAndTheBodyTests() {
   it('does not call an order with no verdicts passed', async () => {
     const result = await shipOrder(
-      order(),
+      refreshTokenOrder(),
       { verdicts: [], findings: [], ladder: ladderOk },
       deps()
     )
@@ -965,7 +958,7 @@ function noVerdictsAndTheBodyTests() {
 
   it('points at the body, so the decision is taken on the evidence', async () => {
     const result = await shipOrder(
-      order(),
+      refreshTokenOrder(),
       { verdicts: [verdict()], findings: [], ladder: ladderOk },
       deps()
     )
@@ -976,11 +969,7 @@ function noVerdictsAndTheBodyTests() {
 function nothingPushedTests() {
   it('raises nothing when nothing was pushed', async () => {
     const raiseGate = vi.fn(async () => undefined)
-    const result = await shipOrder(
-      order(),
-      { verdicts: [verdict()], findings: [] },
-      deps({ autoOpen: false, raiseGate })
-    )
+    const result = await shipVerified(deps({ autoOpen: false, raiseGate }))
     expect(result.gate).toBeUndefined()
     expect(raiseGate).not.toHaveBeenCalled()
   })
@@ -1006,7 +995,7 @@ const UNMEASURED_GATE: LadderOutcome = {
 
 describe('the body reports the climb (FR-056)', () => {
   it('names every rung and its result', () => {
-    const body = prBody(order(), {
+    const body = prBody(refreshTokenOrder(), {
       verdicts: [verdict()],
       findings: [],
       ladder: UNMEASURED_GATE,
@@ -1017,7 +1006,7 @@ describe('the body reports the climb (FR-056)', () => {
   })
 
   it('has no verification section when there was no climb', () => {
-    const body = prBody(order(), { verdicts: [verdict()], findings: [] })
+    const body = prBody(refreshTokenOrder(), { verdicts: [verdict()], findings: [] })
     expect(body).not.toContain('### Verification')
   })
 })
@@ -1046,19 +1035,19 @@ describe('the rungs decided somewhere else', () => {
   }
 
   it('says they were decided, and where', () => {
-    const body = prBody(order(), { verdicts: [verdict()], findings: [], ladder: CLIMB })
+    const body = prBody(refreshTokenOrder(), { verdicts: [verdict()], findings: [], ladder: CLIMB })
     expect(body).toContain('decided — by the verifier on each unit')
   })
 
   it('never calls them a gap', () => {
-    const body = prBody(order(), { verdicts: [verdict()], findings: [], ladder: CLIMB })
+    const body = prBody(refreshTokenOrder(), { verdicts: [verdict()], findings: [], ladder: CLIMB })
     expect(body).not.toMatch(/not measured here/)
     expect(body).not.toContain('not measured — by the verifier')
   })
 })
 
 function withNoHeadBranch(over: Partial<WorkOrder> = {}): WorkOrder {
-  const o = order()
+  const o = refreshTokenOrder()
   return {
     ...o,
     context: {
@@ -1152,11 +1141,7 @@ const pull = {
 function noCiWatchTests() {
   it('is unchanged, byte for byte, when there is no watchCi', async () => {
     const raiseGate = vi.fn(async () => undefined)
-    const result = await shipOrder(
-      order(),
-      { verdicts: [verdict()], findings: [] },
-      deps({ raiseGate })
-    )
+    const result = await shipVerified(deps({ raiseGate }))
     expect(result.gate?.rule).toBe('ready-for-review')
     expect(result.gate?.why).not.toContain('CI')
     expect(result.held).toBe(false)
@@ -1173,11 +1158,7 @@ function theDraftOpenedCallbackTests() {
       calls.push('watchCi')
       return { kind: 'green', checks: [check()] }
     })
-    const result = await shipOrder(
-      order(),
-      { verdicts: [verdict()], findings: [] },
-      deps({ watchCi, onDraftOpened })
-    )
+    const result = await shipVerified(deps({ watchCi, onDraftOpened }))
     expect(calls).toEqual(['onDraftOpened', 'watchCi'])
     expect(onDraftOpened).toHaveBeenCalledTimes(1)
     expect(onDraftOpened).toHaveBeenCalledWith(result.pulls)
@@ -1185,7 +1166,7 @@ function theDraftOpenedCallbackTests() {
 
   it('does not fail shipping when the draft-opened callback throws', async () => {
     const result = await shipOrder(
-      order(),
+      refreshTokenOrder(),
       { verdicts: [verdict()], findings: [] },
       deps({
         onDraftOpened: vi.fn(async () => Promise.reject(new Error('tracker down'))),
@@ -1199,11 +1180,7 @@ function theReadyGateNoteTests() {
   it('adds "CI passed: N checks." to the ready gate when CI is green', async () => {
     const outcome: CiOutcome = { kind: 'green', checks: [check(), check({ name: 'lint' })] }
     const watchCi = vi.fn(async () => outcome)
-    const result = await shipOrder(
-      order(),
-      { verdicts: [verdict()], findings: [] },
-      deps({ watchCi })
-    )
+    const result = await shipVerified(deps({ watchCi }))
     expect(watchCi).toHaveBeenCalledWith(result.pulls)
     expect(result.gate?.rule).toBe('ready-for-review')
     expect(result.gate?.why).toContain('CI passed: 2 checks.')
@@ -1213,11 +1190,7 @@ function theReadyGateNoteTests() {
   it('adds the reason, never as a pass, when CI was not measured', async () => {
     const outcome: CiOutcome = { kind: 'not_measured', reason: 'gh is not authenticated' }
     const watchCi = vi.fn(async () => outcome)
-    const result = await shipOrder(
-      order(),
-      { verdicts: [verdict()], findings: [] },
-      deps({ watchCi })
-    )
+    const result = await shipVerified(deps({ watchCi }))
     expect(result.gate?.rule).toBe('ready-for-review')
     expect(result.gate?.why).toContain('CI not measured: gh is not authenticated.')
     expect(result.gate?.why).not.toMatch(/CI passed/)
@@ -1235,17 +1208,13 @@ function redCiTests() {
       rounds: 3,
     }
     const watchCi = vi.fn(async () => outcome)
-    const result = await shipOrder(
-      order(),
-      { verdicts: [verdict()], findings: [] },
-      deps({ watchCi, raiseGate })
-    )
+    const result = await shipVerified(deps({ watchCi, raiseGate }))
     expect(raiseGate).toHaveBeenCalledTimes(1)
     expect(raiseGate).toHaveBeenCalledWith(expect.objectContaining({ rule: 'ci.red' }))
     expect(result.gate?.rule).toBe('ci.red')
     expect(result.gate?.id).toBe('WO-1-ci-red')
     expect(result.gate?.summary).toContain('unit-tests')
-    expect(result.gate?.summary).toContain(order().title)
+    expect(result.gate?.summary).toContain(refreshTokenOrder().title)
     expect(result.gate?.why).toContain('**3 automatic rounds ran and CI is still red.**')
     expect(result.gate?.why).toContain('```\nline 10')
     expect(result.gate?.why).toContain('line 29')
@@ -1264,7 +1233,7 @@ function shipCiRedTests() {
       rounds: 1,
     }
     await shipOrder(
-      order(),
+      refreshTokenOrder(),
       { verdicts: [verdict()], findings: [] },
       deps({ watchCi: vi.fn(async () => outcome), record })
     )
@@ -1278,7 +1247,7 @@ function haltedWatchesAndNoneTests() {
     const record = vi.fn(async () => undefined)
     const outcome: CiOutcome = { kind: 'halted', reason: 'the fix round could not finish' }
     const result = await shipOrder(
-      order(),
+      refreshTokenOrder(),
       { verdicts: [verdict()], findings: [] },
       deps({ watchCi: vi.fn(async () => outcome), raiseGate, record })
     )
@@ -1292,7 +1261,7 @@ function haltedWatchesAndNoneTests() {
   it('behaves as today for a "none" CI outcome', async () => {
     const outcome: CiOutcome = { kind: 'none' }
     const result = await shipOrder(
-      order(),
+      refreshTokenOrder(),
       { verdicts: [verdict()], findings: [] },
       deps({ watchCi: vi.fn(async () => outcome) })
     )
@@ -1316,7 +1285,7 @@ describe('finishShipping', () => {
 })
 
 function twoLanesOrder(): WorkOrder {
-  const base = order()
+  const base = refreshTokenOrder()
   return {
     ...base,
     context: {
@@ -1347,7 +1316,7 @@ function ciStayedRedTests() {
       excerpt: 'boom',
       rounds: 2,
     }
-    const result = await finishShipping(order(), shippedWith(ci), deps({ raiseGate }))
+    const result = await finishShipping(refreshTokenOrder(), shippedWith(ci), deps({ raiseGate }))
     expect(raiseGate).toHaveBeenCalledWith(expect.objectContaining({ rule: 'ci.red' }))
     expect(result.gate?.rule).toBe('ci.red')
     expect(result.held).toBe(true)
@@ -1358,7 +1327,7 @@ function ciGreenTests() {
   it('raises a ready-for-review gate carrying the CI note when CI is green', async () => {
     const raiseGate = vi.fn(async () => undefined)
     const ci: CiOutcome = { kind: 'green', checks: [check()] }
-    const result = await finishShipping(order(), shippedWith(ci), deps({ raiseGate }))
+    const result = await finishShipping(refreshTokenOrder(), shippedWith(ci), deps({ raiseGate }))
     expect(raiseGate).toHaveBeenCalledWith(expect.objectContaining({ rule: 'ready-for-review' }))
     expect(result.gate?.rule).toBe('ready-for-review')
     expect(result.gate?.why).toContain('CI passed: 1 checks.')
@@ -1429,7 +1398,7 @@ function integrateOpeningTests() {
     const watchCi = vi.fn(async () => ({ kind: 'none' }) as CiOutcome)
     const raise = vi.fn(async () => undefined)
     const d = deps({ watchCi, raiseGate: raise })
-    const opened = await openDrafts(order(), { verdicts: [verdict()], findings: [] }, d)
+    const opened = await openDrafts(refreshTokenOrder(), { verdicts: [verdict()], findings: [] }, d)
     expect(opened.pulls).toHaveLength(1)
     expect(opened.held).toBe(false)
     expect(watchCi).not.toHaveBeenCalled()
@@ -1440,11 +1409,11 @@ function integrateOpeningTests() {
   it('reuses a lane’s existing draft: pushes, creates nothing, and does not announce it again', async () => {
     const onDraftOpened = vi.fn(async () => undefined)
     const first = deps({ onDraftOpened })
-    await openDrafts(order(), { verdicts: [], findings: [] }, first)
+    await openDrafts(refreshTokenOrder(), { verdicts: [], findings: [] }, first)
     expect(onDraftOpened).toHaveBeenCalledTimes(1)
 
     const again = deps({ onDraftOpened })
-    const reopened = await openDrafts(order(), { verdicts: [], findings: [] }, again)
+    const reopened = await openDrafts(refreshTokenOrder(), { verdicts: [], findings: [] }, again)
     expect(callsTo(again.exec, 'gh', 'create')).toHaveLength(0)
     expect(callsTo(again.exec, 'git').some((c) => c.args[0] === 'push')).toBe(true)
     expect(reopened.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
@@ -1460,7 +1429,7 @@ function watchingTests() {
       watchCi: async () => (seen.push('watched'), { kind: 'none' }) as CiOutcome,
       raiseGate: async () => void seen.push('asked'),
     })
-    await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    await shipVerified(d)
     expect(seen).toEqual(['opened', 'watched', 'asked'])
   })
 
@@ -1468,7 +1437,7 @@ function watchingTests() {
     const raise = vi.fn(async () => undefined)
     const d = deps({ raiseGate: raise })
     const result = await watchAndFinish(
-      order(),
+      refreshTokenOrder(),
       { shipment: { verdicts: [verdict()], findings: [] }, drafts: { pulls: [], bodyPaths: [] } },
       d
     )
@@ -1486,11 +1455,11 @@ function committingTests() {
       stderr: '',
       timedOut: false,
     }))
-    expect(await commitAndPushLanes(order(), 'final check: format', dirty)).toBe(true)
+    expect(await commitAndPushLanes(refreshTokenOrder(), 'final check: format', dirty)).toBe(true)
     expect(callsTo(dirty.exec, 'git').some((c) => c.args[0] === 'push')).toBe(true)
 
     const clean = deps()
-    expect(await commitAndPushLanes(order(), 'final check: format', clean)).toBe(false)
+    expect(await commitAndPushLanes(refreshTokenOrder(), 'final check: format', clean)).toBe(false)
     expect(callsTo(clean.exec, 'git').some((c) => c.args[0] === 'push')).toBe(false)
   })
 }
@@ -1498,12 +1467,12 @@ function committingTests() {
 function adoptingTests() {
   it('adopts it: retitles it, takes it back to draft, and opens no second one', async () => {
     const d = withOpenPull(listing(false))
-    const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+    const result = await openDrafts(refreshTokenOrder(), { verdicts: [], findings: [] }, d)
     expect(result.pulls[0].url).toBe(OPEN)
     const edit = callsTo(d.exec, 'gh', 'edit')
     expect(edit).toHaveLength(1)
     expect(edit[0].args).toEqual(
-      expect.arrayContaining([OPEN, '--title', order().title, '--body-file'])
+      expect.arrayContaining([OPEN, '--title', refreshTokenOrder().title, '--body-file'])
     )
     expect(callsTo(d.exec, 'gh', 'ready').map((c) => c.args)).toEqual([
       ['pr', 'ready', '--undo', OPEN],
@@ -1515,7 +1484,7 @@ function adoptingTests() {
 
   it('leaves an adopted draft as a draft', async () => {
     const d = withOpenPull(listing(true))
-    const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+    const result = await openDrafts(refreshTokenOrder(), { verdicts: [], findings: [] }, d)
     expect(result.pulls[0].url).toBe(OPEN)
     expect(callsTo(d.exec, 'gh', 'ready')).toHaveLength(0)
     expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(0)
@@ -1533,7 +1502,7 @@ function failedEditsTests() {
       }
       return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
     })
-    const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+    const result = await openDrafts(refreshTokenOrder(), { verdicts: [], findings: [] }, d)
     expect(result.pulls[0].url).toBe(OPEN)
     expect(d.record).toHaveBeenCalledWith('ship.adopt_edit_failed', OPEN, expect.any(String))
     expect(d.record).toHaveBeenCalledWith('ship.undraft_failed', OPEN, expect.any(String))
@@ -1544,21 +1513,21 @@ function failedEditsTests() {
 function creatingOneTests() {
   it('creates one when the listing is not a list', async () => {
     const d = withOpenPull({ exitCode: 0, stdout: JSON.stringify({ url: OPEN }) })
-    const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+    const result = await openDrafts(refreshTokenOrder(), { verdicts: [], findings: [] }, d)
     expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(1)
     expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
   })
 
   it('creates one when nothing is open', async () => {
     const d = withOpenPull({ exitCode: 0, stdout: '[]' })
-    const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+    const result = await openDrafts(refreshTokenOrder(), { verdicts: [], findings: [] }, d)
     expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(1)
     expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
   })
 
   it('creates one when the lookup fails', async () => {
     const d = withOpenPull({ exitCode: 1, stdout: '' })
-    const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+    const result = await openDrafts(refreshTokenOrder(), { verdicts: [], findings: [] }, d)
     expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(1)
     expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
   })
@@ -1573,7 +1542,7 @@ describe('what the ready question and the bodies say', () => {
 
 /** Four criteria: one passed, one failed, one nothing judged, one not measured. */
 function fourCriteria(): WorkOrder {
-  return order({
+  return refreshTokenOrder({
     acceptance: ['AC-1', 'AC-2', 'AC-3', 'AC-4'].map((id) =>
       testCriterion(id, { statement: `statement ${id}` })
     ),
@@ -1608,7 +1577,7 @@ function everyCriterionTests() {
 
 function oneHouseRuleTests() {
   it('says rule, not rules, when one house rule was in force', () => {
-    const body = prBody(order(), {
+    const body = prBody(refreshTokenOrder(), {
       verdicts: [verdict()],
       findings: [],
       rulesInForce: ['exit-code-not-count (L2)'],
@@ -1648,7 +1617,7 @@ function cancelledChecksTests() {
       excerpt: 'boom',
       rounds: 2,
     }
-    const result = await finishShipping(order(), shippedWith(ci), deps())
+    const result = await finishShipping(refreshTokenOrder(), shippedWith(ci), deps())
     expect(result.gate?.summary).toBe(
       'CI is still red on e2e, unit-tests for Refuse an expired refresh token'
     )

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { queued } from '../helpers/queue-entries.js'
+import { queueEntry } from '../helpers/queue-entries.js'
 import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -39,7 +39,7 @@ function channels(readIssue?: ReturnType<typeof vi.fn>) {
 }
 
 /** Through the channel's own schema, as the renderer's request arrives. */
-function send(channel: string, payload: unknown): Promise<unknown> {
+function sendThroughSchema(channel: string, payload: unknown): Promise<unknown> {
   const spec = forgeChannelSpecs(channels()).find((row) => row.channel === channel)
   if (spec === undefined) throw new Error(`no channel ${channel}`)
   return Promise.resolve(dispatchChannel(spec, payload))
@@ -352,11 +352,11 @@ function forgeChannelsTheQueuePositionTests() {
     const c = createForgeChannels(
       forgeDeps({
         queueEntries: async () => [
-          queued(seeded.order.id, {
+          queueEntry(seeded.order.id, {
             title: seeded.order.title,
             agreedAt: '2026-09-02T00:00:00.000Z',
           }),
-          queued('WO-earlier', { title: 'Earlier work' }),
+          queueEntry('WO-earlier', { title: 'Earlier work' }),
         ],
       })
     )
@@ -636,7 +636,9 @@ function compileFlagsAndAgreedOrdersTests() {
       repoPaths: [repo],
     })) as OrderView
     // Through the channel's schema, which is what supplies the missing flag.
-    const r = (await send('foundry:order.compile', { id: seeded.order.id })) as OrderView
+    const r = (await sendThroughSchema('foundry:order.compile', {
+      id: seeded.order.id,
+    })) as OrderView
     expect(r.order.status).toBe('draft')
   })
 
@@ -883,7 +885,11 @@ function forgeChannelsRefusalsTests() {
   it('refuses an intent that is not one of the three', async () => {
     await createOrderStore(root).save(await agreeable())
     expect(
-      await send('foundry:order.mapState', { id: 'WO-1', intent: 'shipped', optionId: 'x' })
+      await sendThroughSchema('foundry:order.mapState', {
+        id: 'WO-1',
+        intent: 'shipped',
+        optionId: 'x',
+      })
     ).toEqual({ error: 'Malformed request.' })
   })
 
@@ -1305,7 +1311,7 @@ function fixingByDecreeAndAcceptingTests() {
   // behind it cleared the gate without changing the order.
   it('refuses to mark one fixed by decree', async () => {
     const o = await withFinding()
-    const r = (await send('foundry:order.turn', {
+    const r = (await sendThroughSchema('foundry:order.turn', {
       id: o.id,
       finding: { id: o.redTeam[0].id, decision: 'resolved' },
     })) as { error?: string }
@@ -1526,7 +1532,10 @@ function recordingRefusingAndUnknownOrdersTests() {
       repoPaths: [repo],
     })) as OrderView
     expect(
-      await send('foundry:order.writeBack', { id: seed.order.id, writeBack: ['everything'] })
+      await sendThroughSchema('foundry:order.writeBack', {
+        id: seed.order.id,
+        writeBack: ['everything'],
+      })
     ).toEqual({ error: 'Malformed request.' })
   })
 
@@ -1569,7 +1578,7 @@ function keepingTheChoiceTests() {
   it('refuses a files budget', async () => {
     const { order } = await seed()
     expect(
-      await send('foundry:order.budgets', {
+      await sendThroughSchema('foundry:order.budgets', {
         id: order.id,
         budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25 },
       })
@@ -1592,7 +1601,7 @@ function recordingAndZeroLimitsTests() {
   it('refuses a limit of zero', async () => {
     const { order } = await seed()
     expect(
-      await send('foundry:order.budgets', {
+      await sendThroughSchema('foundry:order.budgets', {
         id: order.id,
         budgets: { agents: 0, wallClockMinutes: 45 },
       })
@@ -1848,7 +1857,7 @@ function whoAgreedTests() {
 describe('foundry:order.compile — who agrees', () => {
   it('records the operator even when a caller names the rule, since only a person hands off', async () => {
     const order = await completeOrder()
-    const r = (await send('foundry:order.compile', {
+    const r = (await sendThroughSchema('foundry:order.compile', {
       id: order.id,
       commit: true,
       actor: 'rule:forge',
@@ -1953,7 +1962,7 @@ describe('foundry:order.cancel', () => {
 function discardingADraftTests() {
   it('marks the order cancelled, records why, and takes it off the list', async () => {
     const seed = await drafted()
-    const r = (await send('foundry:order.cancel', {
+    const r = (await sendThroughSchema('foundry:order.cancel', {
       id: seed.order.id,
       reason: 'made by mistake',
     })) as OrderView
@@ -1971,7 +1980,7 @@ function discardingADraftTests() {
 
   it('says the operator discarded it when no reason is given', async () => {
     const seed = await drafted()
-    await send('foundry:order.cancel', { id: seed.order.id })
+    await sendThroughSchema('foundry:order.cancel', { id: seed.order.id })
     const last = (await store.entries(seed.order.id)).at(-1)
     expect(last?.reason).toBe('Discarded by the operator.')
   })
@@ -1980,9 +1989,9 @@ function discardingADraftTests() {
 function alreadyCancelledTests() {
   it('leaves an order already cancelled as it is, recording nothing more', async () => {
     const seed = await drafted()
-    await send('foundry:order.cancel', { id: seed.order.id })
+    await sendThroughSchema('foundry:order.cancel', { id: seed.order.id })
     const before = (await store.entries(seed.order.id)).length
-    const r = (await send('foundry:order.cancel', { id: seed.order.id })) as OrderView
+    const r = (await sendThroughSchema('foundry:order.cancel', { id: seed.order.id })) as OrderView
     expect(r.order.status).toBe('cancelled')
     expect(await store.entries(seed.order.id)).toHaveLength(before)
   })
@@ -1992,7 +2001,9 @@ function whatCancelRefusesTests() {
   it('refuses a running order, sending the operator to its gate', async () => {
     const seed = await drafted()
     await store.save({ ...seed.order, status: 'running' })
-    const r = (await send('foundry:order.cancel', { id: seed.order.id })) as { error: string }
+    const r = (await sendThroughSchema('foundry:order.cancel', { id: seed.order.id })) as {
+      error: string
+    }
     expect(r.error).toBe(
       `${seed.order.id} is running. Stop it at its gate before discarding it — its agents still have work in their worktrees.`
     )
@@ -2000,7 +2011,7 @@ function whatCancelRefusesTests() {
   })
 
   it('reports an order it cannot find', async () => {
-    expect(await send('foundry:order.cancel', { id: 'WO-nope' })).toEqual({
+    expect(await sendThroughSchema('foundry:order.cancel', { id: 'WO-nope' })).toEqual({
       error: 'No order WO-nope.',
     })
   })

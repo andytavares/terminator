@@ -7,12 +7,12 @@
  * cover that — but that the channel a surface calls reaches it. Every bug this
  * branch shipped was in exactly that gap.
  */
-import { freshGlobalStorage } from '../helpers/foundry-host.js'
+import { freshFoundryStorage } from '../helpers/foundry-host.js'
 
 // A real userData, created before any spec mocks `node:fs`: the supervision
 // runtime writes its feed, mutes and per-session settings in Foundry's own
 // folder under it.
-const GLOBAL_STORAGE = freshGlobalStorage()
+const GLOBAL_STORAGE = freshFoundryStorage()
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { partialFake } from '../../../../tests/support/fakes'

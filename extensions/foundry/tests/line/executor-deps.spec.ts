@@ -11,7 +11,7 @@ import * as path from 'node:path'
 import {
   fakeHost,
   fakeRunner,
-  realGit,
+  gitAt,
   seededRepository,
   temporaryDirectory,
   type FoundryHost,
@@ -136,10 +136,6 @@ function agentStarts(sessionId: string): { started: Promise<StartInput> } {
     }
   }) as never)
   return { started }
-}
-
-function git(cwd: string, ...args: string[]) {
-  return realGit({ command: 'git', args, cwd })
 }
 
 describe('an agent node', () => {
@@ -376,8 +372,8 @@ describe('committing a node', () => {
     const checkout = checkoutPath(root, order, 'app')
     const node = { ...builderNode(), startedAt: new Date(Date.now() - 60_000).toISOString() }
     fs.writeFileSync(path.join(checkout, 'red.css'), 'a { color: red }')
-    await git(checkout, 'add', '-A')
-    await git(checkout, 'commit', '-q', '-m', 'agent did it')
+    await gitAt(checkout, 'add', '-A')
+    await gitAt(checkout, 'commit', '-q', '-m', 'agent did it')
     expect(await deps.commitNode({ node, message: 'red' })).toEqual({ kind: 'committed' })
   })
 })
@@ -483,8 +479,8 @@ function executorDepsTheGraphTests() {
     const checkout = checkoutPath(root, order, 'app')
     fs.mkdirSync(path.join(checkout, 'src'))
     fs.writeFileSync(path.join(checkout, 'src', 'a.ts'), 'export const red = 1\n')
-    await git(checkout, 'add', '-A')
-    await git(checkout, 'commit', '-q', '-m', 'red')
+    await gitAt(checkout, 'add', '-A')
+    await gitAt(checkout, 'commit', '-q', '-m', 'red')
 
     await deps.persist(graph)
     expect(await readObservedFiles(root, 'WO-1')).toEqual([])
@@ -504,8 +500,8 @@ function measuringTheChangeTests() {
     const checkout = checkoutPath(root, order, 'app')
     fs.writeFileSync(path.join(checkout, 'a.ts'), 'one\ntwo\n')
     fs.writeFileSync(path.join(checkout, 'package-lock.json'), '{\n}\n')
-    await git(checkout, 'add', '-A')
-    await git(checkout, 'commit', '-q', '-m', 'work')
+    await gitAt(checkout, 'add', '-A')
+    await gitAt(checkout, 'commit', '-q', '-m', 'work')
     const change = await deps.observedChange()
     expect([...change.changedFiles].sort()).toEqual(['a.ts', 'package-lock.json'])
     expect(change.linesChanged).toBe(2)

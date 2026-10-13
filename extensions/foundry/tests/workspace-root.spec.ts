@@ -12,7 +12,7 @@ interface HostShape {
   workspace: () => { folderPath: string }[]
 }
 
-function host({ dataDir, workspace }: HostShape): ExtensionAPI {
+function workspaceHost({ dataDir, workspace }: HostShape): ExtensionAPI {
   return partialFake<ExtensionAPI>({
     settings: partialFake<ExtensionAPI['settings']>({ get: <T>() => dataDir as T }),
     workspace: partialFake<ExtensionAPI['workspace']>({ list: workspace as never }),
@@ -27,17 +27,20 @@ describe('resolveFoundryDataRoot', () => {
 
 function withAWorkspaceTests() {
   it('keeps the records beside the first workspace folder by default', () => {
-    const api = host({ dataDir: '', workspace: () => [{ folderPath: '/work/default' }] })
+    const api = workspaceHost({ dataDir: '', workspace: () => [{ folderPath: '/work/default' }] })
     expect(resolveFoundryDataRoot(api)).toBe(path.join('/work/default', '.foundry'))
   })
 
   it('takes a configured absolute directory for every order', () => {
-    const api = host({ dataDir: '/records/abs', workspace: () => [{ folderPath: '/work/abs' }] })
+    const api = workspaceHost({
+      dataDir: '/records/abs',
+      workspace: () => [{ folderPath: '/work/abs' }],
+    })
     expect(resolveFoundryDataRoot(api)).toBe('/records/abs')
   })
 
   it('falls back to the default when the configured directory is relative', () => {
-    const api = host({
+    const api = workspaceHost({
       dataDir: 'relative/records',
       workspace: () => [{ folderPath: '/work/rel' }],
     })
@@ -47,7 +50,7 @@ function withAWorkspaceTests() {
 
 function unlistedWorkspaceTests() {
   it('keeps the configured directory when the workspace cannot be listed', () => {
-    const api = host({
+    const api = workspaceHost({
       dataDir: '/records/no-workspace',
       workspace: () => {
         throw new Error('no workspace service yet')
@@ -57,7 +60,7 @@ function unlistedWorkspaceTests() {
   })
 
   it('uses Foundry’s own storage when there is no workspace and nothing is configured', () => {
-    const api = host({
+    const api = workspaceHost({
       dataDir: '',
       workspace: () => {
         throw new Error('no workspace service yet')

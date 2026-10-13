@@ -70,6 +70,13 @@ export function forgeAnswerPath(dataDir: string, phase: ForgePhase, turn: number
   return rungOutputPath(order, phase === 'scout' ? 'forge-scout' : `review-${turn}`)
 }
 
+/** Writes the architect's proposal for `orderId` under `dataDir`; where it went. */
+export function writeProposalFor(dataDir: string, orderId: string, proposal: unknown): string {
+  const file = path.join(orderDir(dataDir, orderId), 'proposal.json')
+  writeFileWithDirs(file, proposal)
+  return file
+}
+
 /** Ends a turn: its answer is in, and a turn that wrote nothing is over when its session ends. */
 function endTurn(input: ForgeTurnInput, wrote: boolean): void {
   input.onTurnEnd()

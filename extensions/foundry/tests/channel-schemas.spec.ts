@@ -2,13 +2,13 @@
  * Every channel Foundry registers, read from the registry `activate` builds
  * rather than from its source.
  */
-import { freshGlobalStorage } from './helpers/foundry-host.js'
+import { freshFoundryStorage } from './helpers/foundry-host.js'
 import { partialFake } from '../../../tests/support/fakes'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const GLOBAL_STORAGE = freshGlobalStorage()
+const GLOBAL_STORAGE = freshFoundryStorage()
 
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { activate } from '../src/index.ts'
@@ -87,7 +87,7 @@ beforeAll(async () => {
   await startSupervisionRuntime(api)
 })
 
-function channels(): string[] {
+function registeredChannels(): string[] {
   return specs.map((spec) => spec.channel)
 }
 
@@ -95,7 +95,7 @@ function channels(): string[] {
 // checks once, for every channel Foundry registers, that one is declared.
 describe('every Foundry channel', () => {
   it('declares a schema that keeps a malformed payload from reaching run', async () => {
-    expect(channels()).toContain('foundry:order.create')
+    expect(registeredChannels()).toContain('foundry:order.create')
     for (const spec of specs) {
       expect(spec.schema, `${spec.channel} has no schema`).toBeDefined()
       const run = vi.fn()
@@ -108,19 +108,19 @@ describe('every Foundry channel', () => {
   // `activate`, so one duplicated registration stops the whole extension
   // loading while every build and unit test stays green.
   it('is registered exactly once', () => {
-    const twice = channels().filter((name, at, all) => all.indexOf(name) !== at)
+    const twice = registeredChannels().filter((name, at, all) => all.indexOf(name) !== at)
     expect(twice, `registered more than once: ${twice.join(', ')}`).toEqual([])
-    expect(channels().length).toBeGreaterThan(30)
+    expect(registeredChannels().length).toBeGreaterThan(30)
   })
 
   // Constitution VIII: the contract ships with the code.
   it('is documented in the IPC contract', () => {
-    const undocumented = channels().filter((name) => !contract.includes(name))
+    const undocumented = registeredChannels().filter((name) => !contract.includes(name))
     expect(undocumented, `not in the IPC contract: ${undocumented.join(', ')}`).toEqual([])
   })
 
   it('is named under this extension prefix', () => {
-    const foreign = channels().filter((name) => !name.startsWith('foundry:'))
+    const foreign = registeredChannels().filter((name) => !name.startsWith('foundry:'))
     expect(foreign).toEqual([])
   })
 })

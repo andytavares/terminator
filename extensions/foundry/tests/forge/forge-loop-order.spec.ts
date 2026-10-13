@@ -18,14 +18,14 @@ const STARTS = new Set(['converge.started', 'converge.followed_up'])
 
 vi.mock('../../src/state/live-index.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/state/live-index.js')>()
-  const write = async (entry: { action: string }): Promise<void> => {
+  const recordEntry = async (entry: { action: string }): Promise<void> => {
     if (STARTS.has(entry.action)) await new Promise((landed) => setImmediate(landed))
     ledger.entries.push(entry)
   }
   return {
     ...actual,
     orderStoreAt: () => ({
-      record: write,
+      record: recordEntry,
       entries: async () => [...ledger.entries] as never[],
     }),
   }

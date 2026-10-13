@@ -62,7 +62,7 @@ interface TurnInput {
 }
 
 /** What a turn hands back once it is running. */
-const running = (sessionId: string) => ({
+const startedTurn = (sessionId: string) => ({
   sessionId,
   transcriptFrom: 0,
   terminalSessionId: 't',
@@ -104,7 +104,7 @@ describe('an architect turn that ends before its proposal is written', () => {
     theRunner.start.mockImplementation((async (input: TurnInput) => {
       seen.turn = input
       input.onRegistered({ sessionId: 'architect-1', transcriptFrom: 0 })
-      return running('architect-1')
+      return startedTurn('architect-1')
     }) as never)
     expect((await convergeOrder(host, dataDir, readyDraft(repo))).converging).toBe('architect-1')
     const architect = seen.turn
@@ -123,7 +123,7 @@ function architectEndsWith(exitCode: number | null) {
   return (async (input: TurnInput) => {
     input.onRegistered({ sessionId: 'architect-1', transcriptFrom: 0 })
     setTimeout(() => input.onEnd(exitCode), 0)
-    return running('architect-1')
+    return startedTurn('architect-1')
   }) as never
 }
 
@@ -156,7 +156,7 @@ function turns(redTeam: Turn) {
     writeFileWithDirs(proposalPath(), { note: 'tightened' })
     input.onRegistered({ sessionId: 'architect-1', transcriptFrom: 0 })
     setTimeout(() => input.onTurnEnd(), 0)
-    return running('architect-1')
+    return startedTurn('architect-1')
   }) as never
 }
 
@@ -167,7 +167,7 @@ function redTeamWriting(output: unknown, before?: (input: TurnInput) => void): T
     writeFileWithDirs(reviewPath(1), output)
     input.onRegistered({ sessionId: 'red-team-1', transcriptFrom: 0 })
     setTimeout(() => input.onTurnEnd(), 0)
-    return running('red-team-1')
+    return startedTurn('red-team-1')
   }
 }
 

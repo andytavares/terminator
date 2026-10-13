@@ -23,7 +23,7 @@ steps:
     after: [a]
 `
 
-function graph(): RunGraph {
+function standardGraph(): RunGraph {
   const parsed = parseRecipe(RECIPE, 'standard.yaml')
   if (!parsed.ok) throw new Error(parsed.reason)
   const order = draftOrder({
@@ -49,10 +49,10 @@ function observation(g: RunGraph, over: Partial<Observation> = {}): Observation 
   }
 }
 
-const running = (): RunGraph => withNode(graph(), 'a', { state: 'running' })
+const graphWithARunning = (): RunGraph => withNode(standardGraph(), 'a', { state: 'running' })
 /** `a` has passed and `b` has begun, in the same poll. */
 const handedOver = (): RunGraph =>
-  withNode(withNode(graph(), 'a', { state: 'passed' }), 'b', { state: 'running' })
+  withNode(withNode(standardGraph(), 'a', { state: 'passed' }), 'b', { state: 'running' })
 
 describe('createLiveHall', () => {
   describe('before and after the first observation', beforeAndAfterTheFirstObservationTests)
@@ -72,7 +72,7 @@ function beforeAndAfterTheFirstObservationTests() {
 
   it('lays out the hall and creates the world from the first observation', () => {
     const hall = createLiveHall()
-    hall.observe(observation(running()), {}, 0)
+    hall.observe(observation(graphWithARunning()), {}, 0)
     expect(hall.snapshot().map).not.toBeNull()
     expect(hall.world.current).not.toBeNull()
     expect(hall.snapshot().shown.a).toBe('running')
@@ -83,7 +83,7 @@ function beforeAndAfterTheFirstObservationTests() {
 function dwellTests() {
   it('shows a step that passed at once, and holds the step behind it for the dwell', () => {
     const hall = createLiveHall()
-    hall.observe(observation(running()), {}, 0)
+    hall.observe(observation(graphWithARunning()), {}, 0)
     hall.observe(observation(handedOver()), {}, 1000)
     expect(hall.snapshot().shown).toMatchObject({ a: 'passed', b: 'waiting' })
 
@@ -100,7 +100,7 @@ function subscribersTests() {
     const hall = createLiveHall()
     const changed = vi.fn()
     hall.subscribe(changed)
-    hall.observe(observation(running()), {}, 0)
+    hall.observe(observation(graphWithARunning()), {}, 0)
     expect(changed).toHaveBeenCalledTimes(1)
 
     hall.observe(observation(handedOver()), {}, 1000)
@@ -114,7 +114,7 @@ function subscribersTests() {
 
   it('does not tell subscribers when the same run is observed again unchanged', () => {
     const hall = createLiveHall()
-    const g = running()
+    const g = graphWithARunning()
     hall.observe(observation(g), {}, 0)
     const changed = vi.fn()
     hall.subscribe(changed)
@@ -129,7 +129,7 @@ function unsubscribingTests() {
     const hall = createLiveHall()
     const changed = vi.fn()
     hall.subscribe(changed)()
-    hall.observe(observation(running()), {}, 0)
+    hall.observe(observation(graphWithARunning()), {}, 0)
     expect(changed).not.toHaveBeenCalled()
   })
 }
@@ -139,7 +139,7 @@ function playedEventsTests() {
     const hall = createLiveHall()
     const heard = vi.fn()
     hall.onEvents(heard)
-    hall.observe(observation(running()), {}, 0)
+    hall.observe(observation(graphWithARunning()), {}, 0)
     expect(heard).not.toHaveBeenCalled()
 
     hall.observe(observation(handedOver()), { a: 'Build' }, 1000)
@@ -156,19 +156,19 @@ function playedEventsTests() {
 function queueAndRelayoutTests() {
   it('reflects the refinery queue it was told of', () => {
     const hall = createLiveHall()
-    hall.observe(observation(running()), {}, 0)
+    hall.observe(observation(graphWithARunning()), {}, 0)
     expect(hall.snapshot().queue).toBeNull()
 
     const queue = { position: 2, behind: [{ orderId: 'WO-2', title: 'Other', files: ['x.ts'] }] }
-    hall.observe(observation(running(), { queue }), {}, 100)
+    hall.observe(observation(graphWithARunning(), { queue }), {}, 100)
     expect(hall.snapshot().queue).toEqual({ position: 2, behind: ['Other'] })
   })
 
   it('lays the hall out again when the nodes change', () => {
     const hall = createLiveHall()
-    hall.observe(observation(running()), {}, 0)
+    hall.observe(observation(graphWithARunning()), {}, 0)
     const first = hall.snapshot().map
-    const fewer = { ...running(), nodes: running().nodes.slice(0, 1) }
+    const fewer = { ...graphWithARunning(), nodes: graphWithARunning().nodes.slice(0, 1) }
     hall.observe(observation(fewer), {}, 100)
     expect(hall.snapshot().map).not.toBe(first)
   })

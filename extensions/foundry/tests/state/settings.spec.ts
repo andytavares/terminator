@@ -19,7 +19,7 @@ import { partialFake } from '../../../../tests/support/fakes'
 
 // What the operator wrote in the settings page, as each reader hands it on.
 
-function host(values: Record<string, unknown> = {}): ExtensionAPI {
+function settingsHost(values: Record<string, unknown> = {}): ExtensionAPI {
   const settings = partialFake<ExtensionAPI['settings']>({
     get: <T>(key: string) => values[key] as T,
   })
@@ -27,7 +27,7 @@ function host(values: Record<string, unknown> = {}): ExtensionAPI {
 }
 
 describe('settings the operator never touched', () => {
-  const nothing = host()
+  const nothing = settingsHost()
 
   it('run at standard autonomy, on opus, with the stall detector in shadow mode', () => {
     expect(autonomyFor(nothing)).toBe('standard')
@@ -50,26 +50,28 @@ describe('settings the operator never touched', () => {
 
 describe('the model a run launches with', () => {
   it('is no --model at all when the operator cleared the box, for every tier', () => {
-    const cleared = host({ 'terminator.foundry.defaultModel': '' })
+    const cleared = settingsHost({ 'terminator.foundry.defaultModel': '' })
     expect(defaultModel(cleared)).toBe('')
     expect(modelForTier(cleared, 'fast')).toBe('')
     expect(modelForTier(cleared, 'deep')).toBe('')
   })
 
   it('is the small model for a fast role and the chosen one for a deep role', () => {
-    const chosen = host({ 'terminator.foundry.defaultModel': 'sonnet' })
+    const chosen = settingsHost({ 'terminator.foundry.defaultModel': 'sonnet' })
     expect(modelForTier(chosen, 'fast')).toBe('haiku')
     expect(modelForTier(chosen, 'deep')).toBe('sonnet')
   })
 
   it('answers an ask with the default when the setting names a model that is not offered', () => {
-    expect(askModel(host({ 'terminator.foundry.askModel': 'gpt-4' }))).toBe(DEFAULT_ASK_MODEL)
+    expect(askModel(settingsHost({ 'terminator.foundry.askModel': 'gpt-4' }))).toBe(
+      DEFAULT_ASK_MODEL
+    )
   })
 })
 
 describe('lists the operator wrote, one item per line', () => {
   it('are read as written, and name a critical path once', () => {
-    const written = host({
+    const written = settingsHost({
       'terminator.foundry.readOnlyTools': ['mcp__docs__get', 'mcp__docs__search'],
       'terminator.foundry.criticalPaths': ['src/auth/**', 'src/auth/**', 'migrations/**'],
     })
@@ -84,7 +86,7 @@ const READ_ONLY = 'terminator.foundry.readOnlyTools'
 const CRITICAL = 'terminator.foundry.criticalPaths'
 
 /** Settings as the core resolves them, with `own` values by workspace folder. */
-function scoped(
+function scopedSettingsHost(
   global: Record<string, unknown>,
   own: Record<string, Record<string, unknown>>
 ): ExtensionAPI {
@@ -99,7 +101,7 @@ function scoped(
 
 describe("the lists for an order's repositories", () => {
   it("reads the read-only tools of the repository's workspace, else the global list", () => {
-    const api = scoped(
+    const api = scopedSettingsHost(
       { [READ_ONLY]: ['mcp__docs__get'] },
       { '/code/api': { [READ_ONLY]: ['mcp__api__read'] } }
     )
@@ -108,7 +110,7 @@ describe("the lists for an order's repositories", () => {
   })
 
   it("gathers the critical paths of every repository's workspace, each once", () => {
-    const api = scoped(
+    const api = scopedSettingsHost(
       { [CRITICAL]: ['migrations/**'] },
       { '/code/api': { [CRITICAL]: ['src/auth/**', 'migrations/**'] } }
     )
@@ -145,7 +147,7 @@ describe('a list an earlier version stored as text', () => {
 
 describe('a new order', () => {
   it('leaves out each write-back the operator turned off', () => {
-    const off = host({
+    const off = settingsHost({
       'terminator.foundry.writeBack.summaryComment': false,
       'terminator.foundry.writeBack.prLink': false,
     })
@@ -153,7 +155,7 @@ describe('a new order', () => {
   })
 
   it('takes the budgets the operator set', () => {
-    const set = host({
+    const set = settingsHost({
       'terminator.foundry.budgets.agents': 5,
       'terminator.foundry.budgets.wallClockMinutes': 90,
     })

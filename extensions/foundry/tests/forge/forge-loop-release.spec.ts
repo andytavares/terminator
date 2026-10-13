@@ -89,7 +89,7 @@ async function firstTurnAfterRelease() {
   return turn === undefined ? undefined : { action: turn.action, reason: turn.reason }
 }
 
-const hold = (held: boolean) => host.call('foundry:order.hold', { id: 'WO-1', held })
+const setOrderHeld = (held: boolean) => host.call('foundry:order.hold', { id: 'WO-1', held })
 
 /** Converges, and holds the order while the red team's first round is still running. */
 async function heldDuringTheRedTeam(order: WorkOrder): Promise<void> {
@@ -101,7 +101,7 @@ async function heldDuringTheRedTeam(order: WorkOrder): Promise<void> {
       'red-team'
     )
   )
-  await hold(true)
+  await setOrderHeld(true)
   letItFinish()
   await untilLedgerHas(dataDir, 'review.round')
 }
@@ -112,7 +112,7 @@ describe('a clean round that finishes while the order is held', () => {
     await heldDuringTheRedTeam(readyDraft(repo))
     await new Promise((resolve) => setTimeout(resolve, 100))
     expect(toastsShown(host)).not.toContain(READY)
-    await hold(false)
+    await setOrderHeld(false)
     await untilToastShown(host, READY)
     expect(theRunner.start).toHaveBeenCalledTimes(2)
   })
@@ -132,7 +132,7 @@ describe('a round that asks to see the fix, finishing while held', () => {
     }
     await heldDuringTheRedTeam(readyDraft(repo))
     await untilLedgerHas(dataDir, 'review.another_pass', 'round 1 asked to review the fix')
-    await hold(false)
+    await setOrderHeld(false)
     await untilLedgerHas(dataDir, 'converge.started', 'red team round 1 fix')
     await untilToastShown(host, READY)
   })
@@ -160,10 +160,10 @@ describe('a plan still failing its checks when the operator lets go', () => {
     const gap = readyDraft(repo)
     const units = gap.plan.units.map((unit) => ({ ...unit, satisfies: [] }))
     await createOrderStore(dataDir).save({ ...gap, plan: { ...gap.plan, units } })
-    await hold(true)
+    await setOrderHeld(true)
     await host.call('foundry:order.converge', { id: 'WO-1', message: 'tighten the plan' })
     await untilLedgerHas(dataDir, 'order.redrafted')
-    await hold(false)
+    await setOrderHeld(false)
     await untilLedgerHas(dataDir, 'converge.followed_up')
     expect(await firstTurnAfterRelease()).toEqual({
       action: 'converge.followed_up',
@@ -187,8 +187,8 @@ describe('a plan still failing its checks when the operator lets go', () => {
 describe('letting go of an order with nothing to pick up', () => {
   it('starts nothing for an order that is no longer a draft', async () => {
     await createOrderStore(dataDir).save({ ...readyDraft(repo), status: 'agreed' })
-    await hold(true)
-    await hold(false)
+    await setOrderHeld(true)
+    await setOrderHeld(false)
     await new Promise((resolve) => setTimeout(resolve, 100))
     expect(theRunner.start).not.toHaveBeenCalled()
   })
@@ -198,8 +198,8 @@ describe('letting go of an order with nothing to pick up', () => {
     let letItFinish = (): void => undefined
     heldTurn = { phase: 'architect', release: new Promise((resolve) => (letItFinish = resolve)) }
     await convergeOrder(host, dataDir, readyDraft(repo))
-    await hold(true)
-    await hold(false)
+    await setOrderHeld(true)
+    await setOrderHeld(false)
     await new Promise((resolve) => setTimeout(resolve, 100))
     expect(theRunner.start).toHaveBeenCalledTimes(1)
     letItFinish()

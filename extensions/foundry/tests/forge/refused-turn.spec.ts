@@ -11,6 +11,7 @@ import type { OrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { writeProposalFor } from '../helpers/forge-turns.js'
 
 // WO-0909-6db, from the proposal on disk to the screen that had to say so.
 //
@@ -130,14 +131,6 @@ afterEach(() => {
   for (const d of [root, repo]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 5 })
 })
 
-function writeProposal(body: unknown): string {
-  const dir = orderDir(root, 'WO-0909-6db')
-  fs.mkdirSync(dir, { recursive: true })
-  const file = path.join(dir, 'proposal.json')
-  fs.writeFileSync(file, JSON.stringify(body))
-  return file
-}
-
 describe('a proposal refused after the turn ended', () => {
   describe('refusing', refusedTurnRefusingTests)
   describe('the surface', theSurfaceTests)
@@ -146,7 +139,7 @@ describe('a proposal refused after the turn ended', () => {
 
 function refusedTurnRefusingTests() {
   it('refuses a file path where an evidence kind belongs, and names the field', async () => {
-    await finish(seeded(), writeProposal(BAD_PROPOSAL))
+    await finish(seeded(), writeProposalFor(root, 'WO-0909-6db', BAD_PROPOSAL))
 
     const refusal = lastIntake(await store.entries('WO-0909-6db'))
     expect(refusal.kind).toBe('refused')
@@ -158,7 +151,7 @@ function refusedTurnRefusingTests() {
   // document is untouched — and the document was all any surface read.
   it('leaves the order byte-for-byte what it was', async () => {
     const before = fs.readFileSync(path.join(orderDir(root, 'WO-0909-6db'), 'order.json'), 'utf8')
-    await finish(seeded(), writeProposal(BAD_PROPOSAL))
+    await finish(seeded(), writeProposalFor(root, 'WO-0909-6db', BAD_PROPOSAL))
     const after = fs.readFileSync(path.join(orderDir(root, 'WO-0909-6db'), 'order.json'), 'utf8')
     expect(after).toBe(before)
     expect((await store.load('WO-0909-6db'))?.provenance.decisions).toEqual([])
@@ -167,7 +160,7 @@ function refusedTurnRefusingTests() {
 
 function theSurfaceTests() {
   it('reaches the surface that has to say so', async () => {
-    await finish(seeded(), writeProposal(BAD_PROPOSAL))
+    await finish(seeded(), writeProposalFor(root, 'WO-0909-6db', BAD_PROPOSAL))
     const c = createForgeChannels({
       store,
       now: () => '2026-09-09T19:34:00.000Z',
@@ -195,7 +188,7 @@ function theSurfaceTests() {
 function theCorrectedProposalTests() {
   // The correction the operator's next turn asks for, all the way through.
   it('accepts the corrected proposal and clears the refusal', async () => {
-    await finish(seeded(), writeProposal(BAD_PROPOSAL))
+    await finish(seeded(), writeProposalFor(root, 'WO-0909-6db', BAD_PROPOSAL))
     await store.record({
       at: '2026-09-09T19:40:00.000Z',
       orderId: 'WO-0909-6db',
@@ -205,7 +198,7 @@ function theCorrectedProposalTests() {
       reason: 'Your last proposal was refused',
       evidence: [],
     })
-    await finish(seeded(), writeProposal(GOOD_PROPOSAL))
+    await finish(seeded(), writeProposalFor(root, 'WO-0909-6db', GOOD_PROPOSAL))
 
     const after = lastIntake(await store.entries('WO-0909-6db'))
     expect(after.kind).toBe('redrafted')
@@ -224,7 +217,7 @@ function theCorrectedProposalTests() {
   // refused turn read as the next turn's answer would make a redraft that
   // never happened look like it worked.
   it('clears the proposal it refused', async () => {
-    const file = writeProposal(BAD_PROPOSAL)
+    const file = writeProposalFor(root, 'WO-0909-6db', BAD_PROPOSAL)
     await finish(seeded(), file)
     expect(fs.existsSync(file)).toBe(false)
   })
