@@ -31,45 +31,62 @@ const PanelBoundsSchema = z.object({
   repoRoot: z.string().nullable().optional(),
 })
 
-export function registerExtensionHandlers(
-  extensionHost: ExtensionHost,
-  broadcast: (channel: string, data: unknown) => void,
-  getViewHost: () => ExtensionViewHost | null
-): void {
-  registerInvokeTable([
-    ...lifecycleSpecs(extensionHost, broadcast),
-    ...settingsAndCommandSpecs(),
-    defineChannel({
-      channel: 'extension:update-panel-bounds',
-      schema: PanelBoundsSchema,
-      invalid,
-      run: async ({ extensionId, viewParam, bounds, visible, repoRoot }) => {
-        // A view talks to its extension's backend as soon as it loads.
-        await extensionHost.whenActivated(extensionId)
-        await getViewHost()?.updatePanelBounds(
-          () => extensionHost.listExtensions().find((e) => e.id === extensionId),
-          extensionId,
-          viewParam,
-          bounds,
-          visible,
-          repoRoot
-        )
-      },
+const settingsChannels: ChannelSpec[] = [
+  defineChannel({
+    channel: 'extension:get-settings-schemas',
+    schema: noPayload,
+    invalid,
+    run: () => ({ schemas: listExtensionSettingsSections() }),
+  }),
+  defineChannel({
+    channel: 'extension:get-settings-values',
+    schema: noPayload,
+    invalid,
+    run: () => ({ values: getAllExtensionSettings() }),
+  }),
+  defineChannel({
+    channel: 'extension:update-setting',
+    schema: z.object({ key: z.string().min(1), value: z.unknown() }),
+    invalid,
+    run: ({ key, value }) => {
+      setExtensionSetting(key, value)
+      return { ok: true }
+    },
+  }),
+]
+
+const commandChannels: ChannelSpec[] = [
+  defineChannel({
+    channel: 'extension:get-commands',
+    schema: noPayload,
+    invalid,
+    run: () => ({ commands: listExtensionCommands() }),
+  }),
+  // Not on the remote allowlist: an extension view runs another extension's command locally.
+  defineChannel({
+    channel: 'extension:run-command',
+    schema: z.object({
+      key: z.string().min(1),
+      args: z.unknown(),
+      ctx: CommandContextSchema.optional(),
     }),
-  ])
+    invalid,
+    run: ({ key, args, ctx }) =>
+      executeExtensionCommand(
+        key,
+        ctx ?? { projectId: null, sessionId: null, repoRoot: null },
+        args
+      ),
+  }),
+  defineChannel({
+    channel: 'extension:has-command',
+    schema: z.object({ key: z.string().min(1) }),
+    invalid: false,
+    run: ({ key }) => isExtensionCommandRegistered(key),
+  }),
+]
 
-  onChannel(
-    'extension:execute-command',
-    (_event, { key, ctx }: { key: string; ctx: CommandContext }) => {
-      void executeExtensionCommand(key, ctx)
-    }
-  )
-}
-
-function lifecycleSpecs(
-  extensionHost: ExtensionHost,
-  broadcast: (channel: string, data: unknown) => void
-): ChannelSpec[] {
+function catalogueChannels(extensionHost: ExtensionHost): ChannelSpec[] {
   return [
     defineChannel({
       channel: 'extension:list',
@@ -83,6 +100,11 @@ function lifecycleSpecs(
       invalid,
       run: ({ directoryPath }) => extensionHost.load(directoryPath),
     }),
+  ]
+}
+
+function enablementChannels(extensionHost: ExtensionHost): ChannelSpec[] {
+  return [
     defineChannel({
       channel: 'extension:toggle',
       schema: z.object({ id: z.string().min(1), enabled: z.boolean() }),
@@ -103,69 +125,62 @@ function lifecycleSpecs(
         return { ok: true }
       },
     }),
-    defineChannel({
-      channel: 'extension:reload',
-      schema: IdSchema,
-      invalid,
-      run: async ({ id }) => {
-        const result = await extensionHost.reload(id)
-        if (!('error' in result)) broadcast('extension:renderer-reload', { id })
-        return result
-      },
-    }),
   ]
 }
 
-function settingsAndCommandSpecs(): ChannelSpec[] {
-  return [
-    defineChannel({
-      channel: 'extension:get-settings-schemas',
-      schema: noPayload,
-      invalid,
-      run: () => ({ schemas: listExtensionSettingsSections() }),
-    }),
-    defineChannel({
-      channel: 'extension:get-settings-values',
-      schema: noPayload,
-      invalid,
-      run: () => ({ values: getAllExtensionSettings() }),
-    }),
-    defineChannel({
-      channel: 'extension:update-setting',
-      schema: z.object({ key: z.string().min(1), value: z.unknown() }),
-      invalid,
-      run: ({ key, value }) => {
-        setExtensionSetting(key, value)
-        return { ok: true }
-      },
-    }),
-    defineChannel({
-      channel: 'extension:get-commands',
-      schema: noPayload,
-      invalid,
-      run: () => ({ commands: listExtensionCommands() }),
-    }),
-    // Not on the remote allowlist: an extension view runs another extension's command locally.
-    defineChannel({
-      channel: 'extension:run-command',
-      schema: z.object({
-        key: z.string().min(1),
-        args: z.unknown(),
-        ctx: CommandContextSchema.optional(),
-      }),
-      invalid,
-      run: ({ key, args, ctx }) =>
-        executeExtensionCommand(
-          key,
-          ctx ?? { projectId: null, sessionId: null, repoRoot: null },
-          args
-        ),
-    }),
-    defineChannel({
-      channel: 'extension:has-command',
-      schema: z.object({ key: z.string().min(1) }),
-      invalid: false,
-      run: ({ key }) => isExtensionCommandRegistered(key),
-    }),
-  ]
+function reloadChannel(
+  extensionHost: ExtensionHost,
+  broadcast: (channel: string, data: unknown) => void
+): ChannelSpec {
+  return defineChannel({
+    channel: 'extension:reload',
+    schema: IdSchema,
+    invalid,
+    run: async ({ id }) => {
+      const result = await extensionHost.reload(id)
+      if (!('error' in result)) broadcast('extension:renderer-reload', { id })
+      return result
+    },
+  })
+}
+
+function panelBoundsChannel(
+  extensionHost: ExtensionHost,
+  getViewHost: () => ExtensionViewHost | null
+): ChannelSpec {
+  return defineChannel({
+    channel: 'extension:update-panel-bounds',
+    schema: PanelBoundsSchema,
+    invalid,
+    run: async (placement) => {
+      // A view talks to its extension's backend as soon as it loads.
+      await extensionHost.whenActivated(placement.extensionId)
+      await getViewHost()?.updatePanelBounds(
+        () => extensionHost.listExtensions().find((e) => e.id === placement.extensionId),
+        placement
+      )
+    },
+  })
+}
+
+export function registerExtensionHandlers(
+  extensionHost: ExtensionHost,
+  broadcast: (channel: string, data: unknown) => void,
+  getViewHost: () => ExtensionViewHost | null
+): void {
+  registerInvokeTable([
+    ...catalogueChannels(extensionHost),
+    ...enablementChannels(extensionHost),
+    reloadChannel(extensionHost, broadcast),
+    ...settingsChannels,
+    ...commandChannels,
+    panelBoundsChannel(extensionHost, getViewHost),
+  ])
+
+  onChannel(
+    'extension:execute-command',
+    (_event, { key, ctx }: { key: string; ctx: CommandContext }) => {
+      void executeExtensionCommand(key, ctx)
+    }
+  )
 }
