@@ -9,8 +9,7 @@ import Store from 'electron-store'
  * Values are handed out as copies so a caller changing one cannot change the
  * cache.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- electron-store's own constraint on a schema
-export class CachedStore<Schema extends Record<string, any>> {
+export class CachedStore<Schema extends object> {
   private readonly store: Store<Schema>
   private readonly cache = new Map<keyof Schema, unknown>()
 

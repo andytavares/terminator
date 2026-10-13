@@ -76,9 +76,9 @@ type Handle = Disposable | (() => void)
 /** The member at `path` and the object it is called on. */
 function memberAt(api: ExtensionAPI, path: string): { owner: object; member: Member } {
   const names = path.split('.')
-  let owner: Record<string, unknown> = api as unknown as Record<string, unknown>
-  for (const name of names.slice(0, -1)) owner = owner[name] as Record<string, unknown>
-  return { owner, member: owner[names[names.length - 1]] as Member }
+  let owner: object = api
+  for (const name of names.slice(0, -1)) owner = Reflect.get(owner, name)
+  return { owner, member: Reflect.get(owner, names[names.length - 1]) }
 }
 
 function disposeHandle(handle: Handle | undefined): void {

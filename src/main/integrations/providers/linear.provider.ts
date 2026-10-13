@@ -1,4 +1,4 @@
-import { LinearClient } from '@linear/sdk'
+import { LinearClient, PaginationOrderBy, type LinearDocument } from '@linear/sdk'
 import type {
   Issue,
   IssueComment,
@@ -31,29 +31,19 @@ import type {
 const MAX_COMMENTS = 5
 
 /** Filter to exclude completed and canceled issues from listMine results. */
-const OPEN_STATES_FILTER = {
+const OPEN_STATES_FILTER: LinearDocument.IssueFilter = {
   state: { type: { nin: ['completed', 'canceled'] } },
-} as const
-
-interface LinearLike {
-  viewer: Promise<{
-    name: string
-    email: string
-    assignedIssues?: (vars?: unknown) => unknown
-    teams?: (vars?: unknown) => unknown
-  }>
-  issues(vars?: unknown): unknown
-  searchIssues(term: string, vars?: unknown): unknown
-  issue(id: string): unknown
-  createComment(input: { issueId: string; body: string }): unknown
-  updateIssue(id: string, input: { stateId: string }): unknown
-  createIssue(input: NewIssueInput): unknown
 }
+
+/** The part of the SDK client the provider calls; specs pass a fake of it. */
+type LinearLike = Pick<
+  LinearClient,
+  'viewer' | 'issues' | 'searchIssues' | 'issue' | 'createComment' | 'updateIssue' | 'createIssue'
+>
 
 export type LinearClientFactory = (apiKey: string) => LinearLike
 
-const defaultFactory: LinearClientFactory = (apiKey) =>
-  new LinearClient({ apiKey }) as unknown as LinearLike
+const defaultFactory: LinearClientFactory = (apiKey) => new LinearClient({ apiKey })
 
 function assertLinear(
   cred: StoredCredential
@@ -307,7 +297,7 @@ async function assignedIssues(client: LinearLike, email: string | null, limit: n
   return client.issues({
     filter: { ...OPEN_STATES_FILTER, assignee: { email: { eq: email } } },
     first: limit,
-    orderBy: 'updatedAt',
+    orderBy: PaginationOrderBy.UpdatedAt,
   })
 }
 
