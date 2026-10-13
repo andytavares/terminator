@@ -15,7 +15,7 @@ export interface WorkspaceDraft {
   tags: string
 }
 
-export const DUPLICATE_NAME = 'A workspace with this name already exists'
+const DUPLICATE_NAME = 'A workspace with this name already exists'
 
 /** The draft, its errors, and the checks a submit runs first. */
 export function useWorkspaceForm(initial: WorkspaceDraft, nameTaken: (name: string) => boolean) {
@@ -104,7 +104,7 @@ interface FieldsProps {
 }
 
 /** Name, folder, colour and tags, in the dialog's field styles. */
-export function WorkspaceFields({ form, placeholders }: FieldsProps): JSX.Element {
+function WorkspaceFields({ form, placeholders }: FieldsProps): JSX.Element {
   return (
     <>
       <NameField form={form} placeholder={placeholders?.name} />

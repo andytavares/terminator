@@ -17,7 +17,7 @@ import type { TerminalInstance } from '../components/terminal/TerminalSession'
  * five parallel maps — removing or moving a session reconciles it in exactly
  * one place (detachSessionFromView).
  */
-export interface ProjectView {
+interface ProjectView {
   activeSessionId?: string
   focusedSessionId?: string
   /**

@@ -3,7 +3,7 @@ import { useWorkspaceStore } from '../../stores/workspace.store'
 
 // The Create Branch dialog's rules and its submit, apart from its fields.
 
-export type BranchMode = 'existing' | 'worktree'
+type BranchMode = 'existing' | 'worktree'
 
 /** Everything the operator has chosen or typed so far. */
 export interface ProjectDraft {
@@ -58,7 +58,7 @@ export function sanitizeBranchName(value: string): string {
 }
 
 /** The typed branch name as submitted: trimmed, with no trailing `.` or `/`. */
-export function typedBranchName(draft: ProjectDraft): string {
+function typedBranchName(draft: ProjectDraft): string {
   return draft.newBranchName.trim().replace(/[./]+$/, '')
 }
 

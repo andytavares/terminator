@@ -6,7 +6,7 @@ import type { AgentState, Project, TerminalSession, Workspace } from '../../shar
 import type { WorkItem } from './work-item'
 
 /** A terminal's own work item, keyed by session id. Absent when nothing links it. */
-export type WorkItemsBySession = ReadonlyMap<string, WorkItem | null>
+type WorkItemsBySession = ReadonlyMap<string, WorkItem | null>
 
 /**
  * One terminal under a branch, and the panes split off it.

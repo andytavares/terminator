@@ -8,7 +8,7 @@ import type { ChangeStats } from '../../shared/schemas/git.schema'
  */
 export const CHANGE_STATS_TTL_MS = 15_000
 
-export interface ChangeStatsEntry {
+interface ChangeStatsEntry {
   stats: ChangeStats | null
   /** Epoch ms, supplied by the caller — this store holds no clock. */
   fetchedAt: number
