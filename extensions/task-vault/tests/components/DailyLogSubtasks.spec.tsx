@@ -1,7 +1,8 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, within } from '@testing-library/react'
+import { screen, cleanup, fireEvent, within } from '@testing-library/react'
 import { installVaultBridge, eventually, task } from './helpers/bridge'
+import { buttonNamed, renderDailyLog } from './helpers/daily-log'
 import type { IndexedTask } from '../../src/vault/types'
 
 vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
@@ -13,20 +14,7 @@ import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 
 vi.setConfig({ testTimeout: 30_000 })
 
-type Props = React.ComponentProps<typeof DailyLog>
-
 let bridge: ReturnType<typeof installVaultBridge>
-
-function renderTask(one: IndexedTask) {
-  const props: Props = {
-    log: { date: '2026-01-05', filePath: 'daily/2026-01-05.md', tasks: [one], exists: true },
-    onTaskComplete: vi.fn(async () => {}),
-    onTaskMigrate: vi.fn(async () => {}),
-    onRefresh: vi.fn(async () => {}),
-  }
-  const view = render(React.createElement(DailyLog, props))
-  return { props, view }
-}
 
 function withSubtasks(status: IndexedTask['status'] = 'open') {
   return task('p', 'Parent', {
@@ -37,7 +25,6 @@ function withSubtasks(status: IndexedTask['status'] = 'open') {
 
 const subtask = (text: string) =>
   screen.getByText(text).closest('.daily-log__subtask') as HTMLElement
-const button = (name: string) => screen.getByRole('button', { name })
 
 const SESSIONS = [
   { sessionId: 'sess-aaaaaaaa1', projectId: 'pr1', tabTitle: 'zsh' },
@@ -77,7 +64,7 @@ describe('DailyLog jumping to a linked terminal, continued', jumpTestsPart2)
 
 function subtaskTests() {
   it('completes an open subtask with a notice that leads back to it', async () => {
-    const { props } = renderTask(withSubtasks())
+    const { props } = renderDailyLog(withSubtasks())
     expect(screen.queryByRole('button', { name: 'Add subtask' })).toBeNull()
     fireEvent.click(within(subtask('Step one')).getByTitle('Complete subtask'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
@@ -89,7 +76,7 @@ function subtaskTests() {
   })
 
   it('shows a finished subtask struck through, with only Delete', () => {
-    renderTask(withSubtasks())
+    renderDailyLog(withSubtasks())
     const done = subtask('Step two')
     expect(done.className).toContain('daily-log__subtask--done')
     expect(done.querySelector('.daily-log__task-text--strikethrough')).toBeTruthy()
@@ -102,7 +89,7 @@ function subtaskTests() {
 function subtaskTestsPart2() {
   it('deletes a subtask only once confirmed', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
-    const { props } = renderTask(withSubtasks())
+    const { props } = renderDailyLog(withSubtasks())
     fireEvent.click(within(subtask('Step two')).getByRole('button', { name: 'Delete' }))
     expect(confirm).toHaveBeenCalledWith('Delete subtask: "Step two"?')
     fireEvent.click(within(subtask('Step one')).getByRole('button', { name: 'Delete' }))
@@ -113,14 +100,14 @@ function subtaskTestsPart2() {
 
 function subtaskEditTests() {
   it('edits an open subtask by its button or a double click', async () => {
-    const { props } = renderTask(withSubtasks())
+    const { props } = renderDailyLog(withSubtasks())
     fireEvent.click(within(subtask('Step one')).getByRole('button', { name: 'Edit' }))
-    fireEvent.click(button('Cancel edit'))
+    fireEvent.click(buttonNamed('Cancel edit'))
     fireEvent.doubleClick(screen.getByText('Step one'))
     const input = screen.getByLabelText('Task text') as HTMLInputElement
     expect(input.value).toBe('Step one')
     fireEvent.change(input, { target: { value: ' ' } })
-    fireEvent.click(button('Save'))
+    fireEvent.click(buttonNamed('Save'))
     fireEvent.change(input, { target: { value: ' Step 1 ' } })
     fireEvent.keyDown(input, { key: 'Enter' })
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
@@ -128,7 +115,7 @@ function subtaskEditTests() {
   })
 
   it('cancels an edit with Escape', () => {
-    renderTask(withSubtasks())
+    renderDailyLog(withSubtasks())
     fireEvent.doubleClick(screen.getByText('Step one'))
     fireEvent.keyDown(screen.getByLabelText('Task text'), { key: 'Escape' })
     expect(screen.queryByLabelText('Task text')).toBeNull()
@@ -137,21 +124,21 @@ function subtaskEditTests() {
 
 function ghostTests() {
   it('adds another subtask from the ghost row', async () => {
-    const { props } = renderTask(withSubtasks())
+    const { props } = renderDailyLog(withSubtasks())
     fireEvent.click(screen.getByText('· + Add subtask…'))
-    expect(button('Add')).toHaveProperty('disabled', true)
+    expect(buttonNamed('Add')).toHaveProperty('disabled', true)
     fireEvent.change(screen.getByLabelText('Subtask…'), { target: { value: ' three ' } })
-    fireEvent.click(button('Add'))
+    fireEvent.click(buttonNamed('Add'))
     await eventually(() => expect(screen.getByText('· + Add subtask…')).toBeTruthy())
     expect(bridge.calls('task-vault:vault:add-subtask')).toEqual([{ taskId: 'p', text: 'three' }])
     expect(props.onRefresh).toHaveBeenCalled()
   })
 
   it('cancels the ghost row by button or Escape, ignoring a blank submit', () => {
-    renderTask(withSubtasks('blocked'))
+    renderDailyLog(withSubtasks('blocked'))
     fireEvent.click(screen.getByText('· + Add subtask…'))
     fireEvent.keyDown(screen.getByLabelText('Subtask…'), { key: 'Enter' })
-    fireEvent.click(button('Cancel'))
+    fireEvent.click(buttonNamed('Cancel'))
     fireEvent.click(screen.getByText('· + Add subtask…'))
     fireEvent.keyDown(screen.getByLabelText('Subtask…'), { key: 'Escape' })
     expect(screen.queryByLabelText('Subtask…')).toBeNull()
@@ -161,18 +148,18 @@ function ghostTests() {
 
 function ghostTestsPart2() {
   it('offers no ghost row under an in-progress or finished task', () => {
-    renderTask(withSubtasks('in-progress'))
+    renderDailyLog(withSubtasks('in-progress'))
     expect(screen.queryByText('· + Add subtask…')).toBeNull()
     cleanup()
-    renderTask(withSubtasks('done'))
+    renderDailyLog(withSubtasks('done'))
     expect(screen.queryByText('· + Add subtask…')).toBeNull()
   })
 }
 
 function linkTests() {
   it('links a session chosen by workspace, project and tab', async () => {
-    const { props } = renderTask(task('t1', 'Write'))
-    fireEvent.click(button('Link to terminal session'))
+    const { props } = renderDailyLog(task('t1', 'Write'))
+    fireEvent.click(buttonNamed('Link to terminal session'))
     expect(await screen.findByRole('option', { name: 'Work › App › zsh' })).toBeTruthy()
     expect(screen.getByRole('option', { name: 'sess-bbb' })).toBeTruthy()
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'sess-aaaaaaaa1' } })
@@ -181,15 +168,15 @@ function linkTests() {
       { taskId: 't1', targetId: 'sess-aaaaaaaa1' },
     ])
     expect(screen.queryByRole('combobox')).toBeNull()
-    expect(button('Jump to linked terminal')).toBeTruthy()
+    expect(buttonNamed('Jump to linked terminal')).toBeTruthy()
   })
 }
 
 function linkTestsPart2() {
   it('reports a link the vault refused', async () => {
     bridge.responses['task-vault:links:create'] = { error: 'nope' }
-    renderTask(task('t1', 'Write'))
-    fireEvent.click(button('Link to terminal session'))
+    renderDailyLog(task('t1', 'Write'))
+    fireEvent.click(buttonNamed('Link to terminal session'))
     await screen.findByRole('option', { name: 'Work › App › zsh' })
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'sess-aaaaaaaa1' } })
     await eventually(() =>
@@ -200,23 +187,23 @@ function linkTestsPart2() {
       )
     )
     expect(screen.queryByRole('combobox')).toBeNull()
-    expect(button('Link to terminal session')).toBeTruthy()
+    expect(buttonNamed('Link to terminal session')).toBeTruthy()
   })
 
   it('says when no session is open, and closes', () => {
     installTerminal([])
-    renderTask(task('t1', 'Write'))
-    fireEvent.click(button('Link to terminal session'))
+    renderDailyLog(task('t1', 'Write'))
+    fireEvent.click(buttonNamed('Link to terminal session'))
     expect(screen.getByText('No active terminal sessions.')).toBeTruthy()
-    fireEvent.click(button('Close'))
+    fireEvent.click(buttonNamed('Close'))
     expect(screen.queryByText('No active terminal sessions.')).toBeNull()
   })
 }
 
 function jumpTests() {
   it('jumps to the linked session when it is still open', async () => {
-    renderTask(task('t1', 'Write', { terminatorLinks: ['sess-aaaaaaaa1'] }))
-    fireEvent.click(button('Jump to linked terminal'))
+    renderDailyLog(task('t1', 'Write', { terminatorLinks: ['sess-aaaaaaaa1'] }))
+    fireEvent.click(buttonNamed('Jump to linked terminal'))
     await eventually(() =>
       expect(bridge.calls('task-vault:navigate-to-terminal')).toEqual([
         { sessionId: 'sess-aaaaaaaa1', projectId: 'pr1' },
@@ -225,13 +212,13 @@ function jumpTests() {
   })
 
   it('offers to relink when the session is gone or the lookup fails', async () => {
-    renderTask(task('t1', 'Write', { terminatorLinks: ['gone'] }))
-    fireEvent.click(button('Jump to linked terminal'))
+    renderDailyLog(task('t1', 'Write', { terminatorLinks: ['gone'] }))
+    fireEvent.click(buttonNamed('Jump to linked terminal'))
     expect(await screen.findByRole('combobox')).toBeTruthy()
     cleanup()
     installTerminal().mockRejectedValueOnce(new Error('down'))
-    renderTask(task('t1', 'Write', { terminatorLinks: ['gone'] }))
-    fireEvent.click(button('Jump to linked terminal'))
+    renderDailyLog(task('t1', 'Write', { terminatorLinks: ['gone'] }))
+    fireEvent.click(buttonNamed('Jump to linked terminal'))
     await eventually(() => expect(document.querySelector('.daily-log__link-picker')).toBeTruthy())
     expect(bridge.calls('task-vault:navigate-to-terminal')).toEqual([])
   })
@@ -239,12 +226,12 @@ function jumpTests() {
 
 function jumpTestsPart2() {
   it('follows the links the task arrives with', async () => {
-    const { view, props } = renderTask(task('t1', 'Write'))
+    const { view, props } = renderDailyLog(task('t1', 'Write'))
     const linked = task('t1', 'Write', { terminatorLinks: ['sess-aaaaaaaa1'] })
     view.rerender(
       React.createElement(DailyLog, { ...props, log: { ...props.log, tasks: [linked] } })
     )
-    fireEvent.click(button('Jump to linked terminal'))
+    fireEvent.click(buttonNamed('Jump to linked terminal'))
     await eventually(() => expect(bridge.calls('task-vault:navigate-to-terminal')).toHaveLength(1))
   })
 }
@@ -252,13 +239,13 @@ function jumpTestsPart2() {
 /** Collects the promise rejections nothing handled while `run` and a macrotask after it ran. */
 async function unhandledRejectionsDuring(run: () => Promise<void>): Promise<unknown[]> {
   const reasons: unknown[] = []
-  const record = (reason: unknown) => void reasons.push(reason)
-  process.on('unhandledRejection', record)
+  const recordReason = (reason: unknown) => void reasons.push(reason)
+  process.on('unhandledRejection', recordReason)
   try {
     await run()
     await new Promise((resolve) => setTimeout(resolve, 0))
   } finally {
-    process.off('unhandledRejection', record)
+    process.off('unhandledRejection', recordReason)
   }
   return reasons
 }
@@ -271,8 +258,8 @@ function unlistableTests() {
       project: { list: vi.fn(async () => ({ projects: [] })) },
     })
     const reasons = await unhandledRejectionsDuring(async () => {
-      renderTask(task('t1', 'Write'))
-      fireEvent.click(button('Link to terminal session'))
+      renderDailyLog(task('t1', 'Write'))
+      fireEvent.click(buttonNamed('Link to terminal session'))
     })
     expect(reasons).toEqual([])
     expect(screen.getByText('No active terminal sessions.')).toBeTruthy()
@@ -285,8 +272,8 @@ function unlistableTests() {
       project: { list: vi.fn(async () => ({ projects: [] })) },
     })
     const reasons = await unhandledRejectionsDuring(async () => {
-      renderTask(task('t1', 'Write'))
-      fireEvent.click(button('Link to terminal session'))
+      renderDailyLog(task('t1', 'Write'))
+      fireEvent.click(buttonNamed('Link to terminal session'))
     })
     expect(reasons).toEqual([])
     expect(await screen.findByRole('option', { name: 'zsh' })).toBeTruthy()

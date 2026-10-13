@@ -19,7 +19,7 @@ function renderOpen(props: Partial<DateTimePickerProps> & Pick<DateTimePickerPro
   return { onChange, ...utils }
 }
 
-const label = () => document.querySelector('.dtp__cal-month-label')?.textContent
+const shownMonthLabel = () => document.querySelector('.dtp__cal-month-label')?.textContent
 const trigger = () => document.querySelector('.dtp__trigger') as HTMLElement
 const popover = () => document.querySelector('.dtp__popover')
 
@@ -90,18 +90,18 @@ function monthsTests() {
 function monthsMonthsTests() {
   it('wraps the year forward from December and back from January', () => {
     renderOpen({ mode: 'date' })
-    expect(label()).toBe('December 2026')
+    expect(shownMonthLabel()).toBe('December 2026')
     fireEvent.click(document.querySelector('.dtp__cal-header button:last-child') as HTMLElement)
-    expect(label()).toBe('January 2027')
+    expect(shownMonthLabel()).toBe('January 2027')
     fireEvent.click(document.querySelector('.dtp__cal-header button') as HTMLElement)
     fireEvent.click(document.querySelector('.dtp__cal-header button') as HTMLElement)
-    expect(label()).toBe('November 2026')
+    expect(shownMonthLabel()).toBe('November 2026')
   })
 
   it('re-anchors the calendar when the value changes from outside', () => {
     const { rerender, onChange } = renderOpen({ mode: 'date' })
     rerender(<DateTimePicker mode="date" value="2025-03-04" onChange={onChange} defaultOpen />)
-    expect(label()).toBe('March 2025')
+    expect(shownMonthLabel()).toBe('March 2025')
   })
 }
 

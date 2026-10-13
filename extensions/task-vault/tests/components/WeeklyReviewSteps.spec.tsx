@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import { installVaultBridge, eventually, project, task } from './helpers/bridge'
+import { installVaultBridge, eventually, indexedProject, task } from './helpers/bridge'
 import { WeeklyReviewStep1GetClear } from '../../src/components/WeeklyReviewStep1GetClear'
 import { WeeklyReviewStep3Projects } from '../../src/components/WeeklyReviewStep3Projects'
 import { WeeklyReviewStep5Someday } from '../../src/components/WeeklyReviewStep5Someday'
@@ -70,8 +70,8 @@ function step1FailuresAndSkippingTests() {
   })
 }
 
-const fresh = project('Launch')
-const stale = project('Garden', { isStale: true, nextActionCount: 0 })
+const fresh = indexedProject('Launch')
+const stale = indexedProject('Garden', { isStale: true, nextActionCount: 0 })
 
 function step3Tests() {
   describe('actions', step3ActionsTests)
@@ -123,7 +123,7 @@ function step3UpdatingTests() {
 function renderStep5() {
   render(
     <WeeklyReviewStep5Someday
-      somedayProjects={[project('Boat', { status: 'someday' })]}
+      somedayProjects={[indexedProject('Boat', { status: 'someday' })]}
       somedayTasks={[task('t1', 'learn knots'), task('t2', 'paint fence')]}
       onComplete={vi.fn()}
       reviewId="r1"

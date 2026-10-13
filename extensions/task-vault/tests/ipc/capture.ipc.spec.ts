@@ -18,7 +18,7 @@ beforeEach(async () => {
   registerVaultIpcHandlers(harness.api, db)
 })
 
-const capture = (payload: unknown) => harness.invoke('task-vault:vault:capture', payload)
+const captureVia = (payload: unknown) => harness.invoke('task-vault:vault:capture', payload)
 
 describe('task-vault:vault:capture IPC handler', taskVaultVaultCaptureIPCTests)
 
@@ -34,7 +34,7 @@ function taskVaultVaultCaptureIPCStoringTests() {
   })
 
   it('stores an open inbox task and returns its id', async () => {
-    const { taskId } = (await capture({ text: 'New task' })) as { taskId: string }
+    const { taskId } = (await captureVia({ text: 'New task' })) as { taskId: string }
 
     expect(await taskRow(db, taskId)).toMatchObject({
       text: 'New task',
@@ -53,7 +53,7 @@ function taskVaultVaultCaptureIPCTagsTests() {
 
 function taskVaultVaultCaptureIPCTagsCreatesTheProjectTests() {
   it('creates the project and area named by inline tags and links the task to them', async () => {
-    const { taskId } = (await capture({
+    const { taskId } = (await captureVia({
       text: 'Plan launch @website #work +computer due:2026-03-01',
     })) as {
       taskId: string
@@ -77,8 +77,8 @@ function taskVaultVaultCaptureIPCTagsCreatesTheProjectTests() {
 
 function taskVaultVaultCaptureIPCTagsReusesAnExistingTests() {
   it('reuses an existing project instead of creating a second one', async () => {
-    await capture({ text: 'First @website' })
-    await capture({ text: 'Second @website' })
+    await captureVia({ text: 'First @website' })
+    await captureVia({ text: 'Second @website' })
 
     expect(await db.query('SELECT id FROM projects')).toHaveLength(1)
     expect(await db.query('SELECT id FROM tasks WHERE project_id IS NOT NULL')).toHaveLength(2)
@@ -87,7 +87,7 @@ function taskVaultVaultCaptureIPCTagsReusesAnExistingTests() {
 
 function taskVaultVaultCaptureIPCHintsErrorsTests() {
   it('applies the project and area hints as tags', async () => {
-    const { taskId } = (await capture({
+    const { taskId } = (await captureVia({
       text: 'Call',
       hintProject: 'alpha',
       hintArea: 'home',
@@ -105,6 +105,6 @@ function taskVaultVaultCaptureIPCHintsErrorsTests() {
 
   it('returns { error } instead of throwing when the database fails', async () => {
     await db.exec('DROP TABLE tasks')
-    expect(await capture({ text: 'Doomed' })).toMatchObject({ error: expect.any(String) })
+    expect(await captureVia({ text: 'Doomed' })).toMatchObject({ error: expect.any(String) })
   })
 }

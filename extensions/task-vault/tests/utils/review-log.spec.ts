@@ -17,9 +17,9 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'window')
 })
 
-describe('logReviewAction', logReviewActionTests)
+describe('logReviewAction', reviewLogActionTests)
 
-function logReviewActionTests() {
+function reviewLogActionTests() {
   describe('logging', logReviewActionLoggingTests)
   describe('outside reviews and failures', logReviewActionOutsideReviewsFailuresTests)
 }

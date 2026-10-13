@@ -61,17 +61,17 @@ beforeEach(() => {
 
 afterEach(() => cleanup())
 
-const card = (text: string) =>
+const cardWithText = (text: string) =>
   screen
     .getByText(text, { selector: '.tv-kanban__card-text' })
     .closest('.tv-kanban__card') as HTMLElement
-const lane = (label: string) =>
+const laneLabelled = (label: string) =>
   screen.getAllByText(label)[0].closest('.tv-kanban__lane') as HTMLElement
 
-describe('KanbanBoard dragging', dragTests)
+describe('KanbanBoard dragging', kanbanDragTests)
 describe('KanbanBoard cards and config', cardTests)
 
-function dragTests() {
+function kanbanDragTests() {
   describe('moving', dragMovingTests)
   describe('ignoring', dragIgnoringTests)
 }
@@ -81,12 +81,12 @@ function dragMovingTests() {
     const onConfigChange = vi.fn()
     render(<KanbanBoard onConfigChange={onConfigChange} />)
     await screen.findByText('Write')
-    fireEvent.dragStart(card('Write'))
-    fireEvent.dragOver(lane('Done'))
-    expect(lane('Done').className).toContain('dragover')
-    fireEvent.dragLeave(lane('Done'))
-    expect(lane('Done').className).not.toContain('dragover')
-    fireEvent.drop(lane('Done'))
+    fireEvent.dragStart(cardWithText('Write'))
+    fireEvent.dragOver(laneLabelled('Done'))
+    expect(laneLabelled('Done').className).toContain('dragover')
+    fireEvent.dragLeave(laneLabelled('Done'))
+    expect(laneLabelled('Done').className).not.toContain('dragover')
+    fireEvent.drop(laneLabelled('Done'))
     await eventually(() =>
       expect(bridge.calls('task-vault:kanban:move-task')).toEqual([
         { taskId: 't1', toStatus: 'done' },
@@ -101,12 +101,12 @@ function dragIgnoringTests() {
   it('ignores a drop on a lane with no statuses, or with nothing dragged', async () => {
     render(<KanbanBoard />)
     await screen.findByText('Write')
-    fireEvent.drop(lane('Done'))
-    fireEvent.dragStart(card('Write'))
-    fireEvent.drop(lane('Parked'))
-    fireEvent.dragStart(card('Ship'))
-    fireEvent.dragEnd(card('Ship'))
-    fireEvent.drop(lane('Done'))
+    fireEvent.drop(laneLabelled('Done'))
+    fireEvent.dragStart(cardWithText('Write'))
+    fireEvent.drop(laneLabelled('Parked'))
+    fireEvent.dragStart(cardWithText('Ship'))
+    fireEvent.dragEnd(cardWithText('Ship'))
+    fireEvent.drop(laneLabelled('Done'))
     expect(bridge.calls('task-vault:kanban:move-task')).toEqual([])
   })
 }
@@ -121,11 +121,11 @@ function cardSelectingTests() {
   it('opens a card in the detail panel and closes it again', async () => {
     render(<KanbanBoard />)
     fireEvent.click(await screen.findByText('Write'))
-    expect(card('Write').className).toContain('--selected')
+    expect(cardWithText('Write').className).toContain('--selected')
     expect(await screen.findByRole('button', { name: 'Close detail panel' })).toBeTruthy()
-    fireEvent.click(card('Write'))
+    fireEvent.click(cardWithText('Write'))
     expect(screen.queryByRole('button', { name: 'Close detail panel' })).toBeNull()
-    fireEvent.click(card('Ship'))
+    fireEvent.click(cardWithText('Ship'))
     fireEvent.click(await screen.findByRole('button', { name: 'Close detail panel' }))
     expect(screen.queryByRole('button', { name: 'Close detail panel' })).toBeNull()
   })
@@ -133,7 +133,7 @@ function cardSelectingTests() {
   it('opens a link in a description without selecting the card, and shows tags', async () => {
     render(<KanbanBoard />)
     fireEvent.click(await screen.findByText('x'))
-    expect(card('Write').className).not.toContain('--selected')
+    expect(cardWithText('Write').className).not.toContain('--selected')
     expect(screen.getByText('due:2026-02-02')).toBeTruthy()
   })
 }

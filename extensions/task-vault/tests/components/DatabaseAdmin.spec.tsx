@@ -29,7 +29,8 @@ beforeEach(() => {
 
 afterEach(() => cleanup())
 
-const runs = () => bridge.calls('task-vault:admin:run-query').map((c) => (c as { sql: string }).sql)
+const queriesRun = () =>
+  bridge.calls('task-vault:admin:run-query').map((c) => (c as { sql: string }).sql)
 
 function renderAdmin() {
   const onWrite = vi.fn()
@@ -68,7 +69,7 @@ function tablesTests() {
     expect(screen.getByText('Loading…')).toBeTruthy()
     fireEvent.click(await screen.findByTitle('Browse tasks'))
     await shows(/^2 rows/)
-    expect(runs()).toEqual(['SELECT * FROM tasks LIMIT 100'])
+    expect(queriesRun()).toEqual(['SELECT * FROM tasks LIMIT 100'])
     expect(screen.getAllByRole('button', { name: 'Delete this row' })).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: 'Refresh tables' }))
     await eventually(() =>
@@ -81,7 +82,7 @@ function tablesTests() {
     fireEvent.click(await screen.findByRole('button', { name: 'Clear all rows from areas' }))
     expect(screen.getByText('Clear all rows from "areas"?')).toBeTruthy()
     fireEvent.click(confirmRun())
-    await eventually(() => expect(runs()).toEqual(['DELETE FROM areas']))
+    await eventually(() => expect(queriesRun()).toEqual(['DELETE FROM areas']))
   })
 }
 
@@ -133,7 +134,7 @@ function confirmTests() {
     expect(screen.queryByText('Run destructive query?')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Delete all cancelled tasks' }))
     fireEvent.click(document.querySelector('.db-admin__confirm-backdrop')!)
-    expect(runs()).toEqual([])
+    expect(queriesRun()).toEqual([])
   })
 
   it('deletes a row by its id, quoting string ids', async () => {
@@ -143,7 +144,7 @@ function confirmTests() {
     fireEvent.click(screen.getAllByRole('button', { name: 'Delete this row' })[0])
     fireEvent.click(document.querySelector('.db-admin__confirm')!)
     fireEvent.click(confirmRun())
-    await eventually(() => expect(runs()).toContain("DELETE FROM tasks WHERE id = 't1'"))
+    await eventually(() => expect(queriesRun()).toContain("DELETE FROM tasks WHERE id = 't1'"))
     fireEvent.click(await screen.findByTitle('Browse tasks'))
     await shows(/^2 rows/)
     fireEvent.click(screen.getAllByRole('button', { name: 'Delete this row' })[1])

@@ -1,38 +1,18 @@
-import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { screen, cleanup, fireEvent, act } from '@testing-library/react'
 import { installVaultBridge, eventually, task } from './helpers/bridge'
-import type { IndexedTask } from '../../src/vault/types'
+import { buttonNamed, lastNotice, renderDailyLog } from './helpers/daily-log'
 
 vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
 vi.mock('../../src/components/SmartTaskInput', () => import('./helpers/input-stubs'))
 vi.mock('../../src/components/DateTimePicker', () => import('./helpers/input-stubs'))
 
-import { DailyLog } from '../../src/components/DailyLog'
 import { notify } from '../../src/utils/notify'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 
 vi.setConfig({ testTimeout: 30_000 })
 
-type Props = React.ComponentProps<typeof DailyLog>
-
 let bridge: ReturnType<typeof installVaultBridge>
-
-function renderTask(one: IndexedTask, overrides: Partial<Props> = {}) {
-  const props: Props = {
-    log: { date: '2026-01-05', filePath: 'daily/2026-01-05.md', tasks: [one], exists: true },
-    onTaskComplete: vi.fn(async () => {}),
-    onTaskMigrate: vi.fn(async () => {}),
-    onRefresh: vi.fn(async () => {}),
-    onSelectTask: vi.fn(),
-    ...overrides,
-  }
-  render(React.createElement(DailyLog, props))
-  return props
-}
-
-const button = (name: string) => screen.getByRole('button', { name })
-const lastNotice = () => vi.mocked(notify).mock.calls.at(-1)
 
 beforeEach(() => {
   vi.mocked(notify).mockClear()
@@ -58,14 +38,14 @@ describe('DailyLog task row: tags, continued', metaTestsPart2)
 
 function selectTests() {
   it('completes an open task from its checkbox', () => {
-    const props = renderTask(task('t1', 'Write'))
+    const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
     fireEvent.click(screen.getByTitle('Complete task'))
     expect(props.onTaskComplete).toHaveBeenCalledWith('t1')
   })
 
   it('selects an open task a moment after a single click', () => {
     vi.useFakeTimers()
-    const props = renderTask(task('t1', 'Write'))
+    const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
     fireEvent.click(screen.getByText('Write'))
     expect(props.onSelectTask).not.toHaveBeenCalled()
     act(() => vi.advanceTimersByTime(220))
@@ -73,7 +53,10 @@ function selectTests() {
   })
 
   it('selects a finished task at once, and marks the selected row', () => {
-    const props = renderTask(task('t1', 'Write', { status: 'done' }), { selectedTaskId: 't1' })
+    const { props } = renderDailyLog(task('t1', 'Write', { status: 'done' }), {
+      onSelectTask: vi.fn(),
+      ...{ selectedTaskId: 't1' },
+    })
     expect(screen.getByTitle('Click to open detail')).toBeTruthy()
     fireEvent.click(screen.getByText('Write'))
     expect(props.onSelectTask).toHaveBeenCalledWith('t1')
@@ -85,7 +68,7 @@ function selectTests() {
 function selectTestsPart2() {
   it('cancels a pending select when unmounted', () => {
     vi.useFakeTimers()
-    const props = renderTask(task('t1', 'Write'))
+    const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
     fireEvent.click(screen.getByText('Write'))
     cleanup()
     act(() => vi.advanceTimersByTime(500))
@@ -95,20 +78,21 @@ function selectTestsPart2() {
 
 function editTests() {
   it('edits on a double click, starting from the raw text', async () => {
-    const props = renderTask(
+    const { props } = renderDailyLog(
       task('t1', 'Write', {
         project: 'big job',
         context: 'desk',
         area: 'work',
         dueDate: '2026-02-01',
-      })
+      }),
+      { onSelectTask: vi.fn() }
     )
     fireEvent.click(screen.getByText('Write'))
     fireEvent.click(screen.getByText('Write'))
     const input = screen.getByLabelText('Task text') as HTMLInputElement
     expect(input.value).toBe('Write @big-job +desk #work due:2026-02-01')
     fireEvent.change(input, { target: { value: ' Rewrite ' } })
-    fireEvent.click(button('Save'))
+    fireEvent.click(buttonNamed('Save'))
     await eventually(() => expect(screen.queryByLabelText('Task text')).toBeNull())
     expect(bridge.calls('task-vault:vault:edit-task')).toEqual([{ taskId: 't1', text: 'Rewrite' }])
     expect(props.onRefresh).toHaveBeenCalled()
@@ -118,12 +102,12 @@ function editTests() {
 
 function editTestsPart2() {
   it('ignores a blank edit, and cancels by button or Escape', () => {
-    renderTask(task('t1', 'Write'))
+    renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
     fireEvent.click(screen.getByText('Write'))
     fireEvent.click(screen.getByText('Write'))
     fireEvent.change(screen.getByLabelText('Task text'), { target: { value: ' ' } })
     fireEvent.keyDown(screen.getByLabelText('Task text'), { key: 'Enter' })
-    fireEvent.click(button('Cancel edit'))
+    fireEvent.click(buttonNamed('Cancel edit'))
     fireEvent.click(screen.getByText('Write'))
     fireEvent.click(screen.getByText('Write'))
     fireEvent.keyDown(screen.getByLabelText('Task text'), { key: 'Escape' })
@@ -134,8 +118,8 @@ function editTestsPart2() {
 
 function openActionTests() {
   it('sends a task to the backlog', async () => {
-    const props = renderTask(task('t1', 'Write'))
-    fireEvent.click(button('Send to backlog'))
+    const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
+    fireEvent.click(buttonNamed('Send to backlog'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:process-inbox-item')).toEqual([
       { taskId: 't1', action: 'someday' },
@@ -144,8 +128,8 @@ function openActionTests() {
   })
 
   it('archives a task with a notice that leads back to it', async () => {
-    const props = renderTask(task('t1', 'Write'))
-    fireEvent.click(button('Archive task'))
+    const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
+    fireEvent.click(buttonNamed('Archive task'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:cancel-task')).toEqual([{ taskId: 't1' }])
     const [type, message, options] = lastNotice()!
@@ -157,22 +141,22 @@ function openActionTests() {
 
 function openActionTestsPart2() {
   it('adds the first subtask inline', async () => {
-    const props = renderTask(task('t1', 'Write'))
-    fireEvent.click(button('Add subtask'))
-    expect(button('Add')).toHaveProperty('disabled', true)
+    const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
+    fireEvent.click(buttonNamed('Add subtask'))
+    expect(buttonNamed('Add')).toHaveProperty('disabled', true)
     fireEvent.change(screen.getByLabelText('Subtask…'), { target: { value: ' step ' } })
-    fireEvent.click(button('Add'))
+    fireEvent.click(buttonNamed('Add'))
     await eventually(() => expect(screen.queryByLabelText('Subtask…')).toBeNull())
     expect(bridge.calls('task-vault:vault:add-subtask')).toEqual([{ taskId: 't1', text: 'step' }])
     expect(props.onRefresh).toHaveBeenCalled()
   })
 
   it('cancels the first subtask by button or Escape, and ignores a blank one', () => {
-    renderTask(task('t1', 'Write'))
-    fireEvent.click(button('Add subtask'))
+    renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
+    fireEvent.click(buttonNamed('Add subtask'))
     fireEvent.keyDown(screen.getByLabelText('Subtask…'), { key: 'Enter' })
-    fireEvent.click(button('Cancel'))
-    fireEvent.click(button('Add subtask'))
+    fireEvent.click(buttonNamed('Cancel'))
+    fireEvent.click(buttonNamed('Add subtask'))
     fireEvent.keyDown(screen.getByLabelText('Subtask…'), { key: 'Escape' })
     expect(screen.queryByLabelText('Subtask…')).toBeNull()
     expect(bridge.calls('task-vault:vault:add-subtask')).toEqual([])
@@ -181,19 +165,19 @@ function openActionTestsPart2() {
 
 function migrateTests() {
   it('migrates to a chosen day', async () => {
-    const props = renderTask(task('t1', 'Write'))
-    fireEvent.click(button('Migrate to another day'))
-    expect(button('Move')).toHaveProperty('disabled', true)
+    const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
+    fireEvent.click(buttonNamed('Migrate to another day'))
+    expect(buttonNamed('Move')).toHaveProperty('disabled', true)
     fireEvent.change(screen.getByLabelText('date picker'), { target: { value: '2026-01-09' } })
-    fireEvent.click(button('Move'))
+    fireEvent.click(buttonNamed('Move'))
     await eventually(() => expect(screen.queryByLabelText('date picker')).toBeNull())
     expect(props.onTaskMigrate).toHaveBeenCalledWith('t1', '2026-01-09')
   })
 
   it('closes the migrate picker without moving', () => {
-    const props = renderTask(task('t1', 'Write'))
-    fireEvent.click(button('Migrate to another day'))
-    fireEvent.click(button('Cancel move'))
+    const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
+    fireEvent.click(buttonNamed('Migrate to another day'))
+    fireEvent.click(buttonNamed('Cancel move'))
     expect(screen.queryByLabelText('date picker')).toBeNull()
     expect(props.onTaskMigrate).not.toHaveBeenCalled()
   })
@@ -206,21 +190,23 @@ function finishedTests() {
       blockedReason: 'waiting',
       blockedCheckInterval: '2-day',
     })
-    const props = renderTask(blocked)
+    const { props } = renderDailyLog(blocked, { onSelectTask: vi.fn() })
     expect(screen.getByTitle('Check in: 2 days').textContent).toBe('⊘ waiting')
     expect(document.querySelector('.daily-log__task--blocked')).toBeTruthy()
     expect(screen.queryByTitle('Complete task')).toBeNull()
-    fireEvent.click(button('Unblock'))
+    fireEvent.click(buttonNamed('Unblock'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:unblock-task')).toEqual([{ taskId: 't1' }])
     expect(lastNotice()?.slice(0, 2)).toEqual(['success', 'Unblocked: Write'])
   })
 
   it('adds a subtask to, or archives, a blocked task', async () => {
-    const props = renderTask(task('t1', 'Write', { status: 'blocked' }))
-    fireEvent.click(button('Add subtask'))
+    const { props } = renderDailyLog(task('t1', 'Write', { status: 'blocked' }), {
+      onSelectTask: vi.fn(),
+    })
+    fireEvent.click(buttonNamed('Add subtask'))
     expect(screen.getByLabelText('Subtask…')).toBeTruthy()
-    fireEvent.click(button('Archive task'))
+    fireEvent.click(buttonNamed('Archive task'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:cancel-task')).toEqual([{ taskId: 't1' }])
   })
@@ -228,23 +214,27 @@ function finishedTests() {
 
 function finishedTestsPart2() {
   it('restores a finished task', async () => {
-    const props = renderTask(task('t1', 'Write', { status: 'done' }))
+    const { props } = renderDailyLog(task('t1', 'Write', { status: 'done' }), {
+      onSelectTask: vi.fn(),
+    })
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
-    fireEvent.click(button('Restore to open'))
+    fireEvent.click(buttonNamed('Restore to open'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:reopen-task')).toEqual([{ taskId: 't1' }])
     expect(lastNotice()?.slice(0, 2)).toEqual(['info', 'Reopened: Write'])
   })
 
   it('removes a cancelled or migrated task', async () => {
-    const props = renderTask(task('t1', 'Write', { status: 'cancelled' }))
+    const { props } = renderDailyLog(task('t1', 'Write', { status: 'cancelled' }), {
+      onSelectTask: vi.fn(),
+    })
     expect(document.querySelector('.daily-log__task--cancelled')).toBeTruthy()
     expect(document.querySelector('.daily-log__task-text--cancelled')).toBeTruthy()
-    fireEvent.click(button('Remove'))
+    fireEvent.click(buttonNamed('Remove'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     cleanup()
-    renderTask(task('t2', 'Moved', { status: 'migrated' }))
-    fireEvent.click(button('Remove'))
+    renderDailyLog(task('t2', 'Moved', { status: 'migrated' }), { onSelectTask: vi.fn() })
+    fireEvent.click(buttonNamed('Remove'))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:delete-task')).toEqual([
         { taskId: 't1' },
@@ -256,7 +246,7 @@ function finishedTestsPart2() {
 
 function metaTests() {
   it('shows the tags, a custom check-in, and the recurrence', () => {
-    renderTask(
+    renderDailyLog(
       task('t1', 'Write', {
         status: 'blocked',
         blockedReason: 'why',
@@ -267,7 +257,8 @@ function metaTests() {
         dueDate: '2026-02-01',
         recurrenceRule: 'weekly:5,1',
         recurrenceNotifyAt: '13:05',
-      })
+      }),
+      { onSelectTask: vi.fn() }
     )
     const meta = document.querySelector('.daily-log__task-meta')!
     expect(meta.textContent).toContain('@p+c#adue:2026-02-01⊘ why')
@@ -280,16 +271,21 @@ function metaTests() {
 
 function metaTestsPart2() {
   it('shows no meta line for a plain task, and midnight as 12 AM', () => {
-    renderTask(task('t1', 'Write'))
+    renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
     expect(document.querySelector('.daily-log__task-meta')).toBeNull()
     cleanup()
-    renderTask(task('t1', 'Write', { recurrenceRule: 'daily', recurrenceNotifyAt: '00:30' }))
+    renderDailyLog(task('t1', 'Write', { recurrenceRule: 'daily', recurrenceNotifyAt: '00:30' }), {
+      onSelectTask: vi.fn(),
+    })
     expect(screen.getByTitle('Repeats: Daily at 12:30 AM')).toBeTruthy()
-    expect(button('Recurrence: Daily')).toBeTruthy()
+    expect(buttonNamed('Recurrence: Daily')).toBeTruthy()
   })
 
   it('names an unknown rule as itself, and a reason without a check-in plainly', () => {
-    renderTask(task('t1', 'W', { recurrenceRule: 'yearly', status: 'blocked', blockedReason: 'r' }))
+    renderDailyLog(
+      task('t1', 'W', { recurrenceRule: 'yearly', status: 'blocked', blockedReason: 'r' }),
+      { onSelectTask: vi.fn() }
+    )
     expect(screen.getByTitle('Repeats: yearly')).toBeTruthy()
     expect(screen.getByText('⊘ r').getAttribute('title')).toBeNull()
   })

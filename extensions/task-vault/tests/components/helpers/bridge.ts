@@ -23,7 +23,10 @@ export function task(id: string, text: string, overrides: Partial<IndexedTask> =
 }
 
 /** A project as the vault channels return it. */
-export function project(name: string, overrides: Partial<IndexedProject> = {}): IndexedProject {
+export function indexedProject(
+  name: string,
+  overrides: Partial<IndexedProject> = {}
+): IndexedProject {
   return {
     id: `p-${name}`,
     filePath: name,
@@ -35,4 +38,11 @@ export function project(name: string, overrides: Partial<IndexedProject> = {}): 
     terminatorLinks: [],
     ...overrides,
   }
+}
+
+/** The local date `offset` days from today, as YYYY-MM-DD. */
+export function dayFromToday(offset = 0): string {
+  const d = new Date()
+  d.setDate(d.getDate() + offset)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

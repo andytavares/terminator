@@ -32,7 +32,7 @@ function registerAdminIpcHandlersRegistrationTests() {
   })
 }
 
-const runQuery = (sql: string) => harness.invoke('task-vault:admin:run-query', { sql })
+const runAdminSql = (sql: string) => harness.invoke('task-vault:admin:run-query', { sql })
 
 function registerAdminIpcHandlersChannelTests() {
   describe('table-stats', tableStatsTests)
@@ -54,7 +54,7 @@ function runQueryTests() {
 
 function runQueryReadsTests() {
   it('returns rows for a SELECT', async () => {
-    const result = (await runQuery('SELECT id, text FROM tasks ORDER BY id')) as {
+    const result = (await runAdminSql('SELECT id, text FROM tasks ORDER BY id')) as {
       rows: Record<string, unknown>[]
       changes: number
     }
@@ -66,7 +66,7 @@ function runQueryReadsTests() {
   })
 
   it('runs a WITH query as a read', async () => {
-    const result = (await runQuery(
+    const result = (await runAdminSql(
       'WITH c AS (SELECT id FROM tasks) SELECT COUNT(*) AS n FROM c'
     )) as {
       rows: { n: number }[]
@@ -77,7 +77,7 @@ function runQueryReadsTests() {
 
 function runQueryWritesTests() {
   it('executes a write and reports how many rows it changed', async () => {
-    const result = (await runQuery("DELETE FROM tasks WHERE status='cancelled'")) as {
+    const result = (await runAdminSql("DELETE FROM tasks WHERE status='cancelled'")) as {
       rows: unknown[]
       changes: number
     }
@@ -86,7 +86,7 @@ function runQueryWritesTests() {
   })
 
   it('reports zero changes when a write matches nothing', async () => {
-    expect(await runQuery("UPDATE tasks SET status='open' WHERE 1=0")).toMatchObject({
+    expect(await runAdminSql("UPDATE tasks SET status='open' WHERE 1=0")).toMatchObject({
       changes: 0,
     })
   })
@@ -98,7 +98,7 @@ function runQueryRefusalsTests() {
     'CREATE TABLE foo (id TEXT)',
     'ALTER TABLE tasks ADD COLUMN x TEXT',
   ])('refuses %s and leaves the schema alone', async (sql) => {
-    const result = (await runQuery(sql)) as { error: string }
+    const result = (await runAdminSql(sql)) as { error: string }
     expect(result.error).toMatch(/not permitted/i)
     expect(await db.query('SELECT id FROM tasks')).toHaveLength(2)
     expect(await db.get(`SELECT name FROM sqlite_master WHERE name = 'foo'`)).toBeUndefined()
@@ -107,11 +107,11 @@ function runQueryRefusalsTests() {
 
 function runQueryErrorsTests() {
   it('returns an error for an empty query', async () => {
-    expect(await runQuery('   ')).toEqual({ error: 'Empty query' })
+    expect(await runAdminSql('   ')).toEqual({ error: 'Empty query' })
   })
 
   it('returns the database error for invalid SQL', async () => {
-    const result = (await runQuery('SELECT FROM nowhere')) as { error: string }
+    const result = (await runAdminSql('SELECT FROM nowhere')) as { error: string }
     expect(result.error).toMatch(/syntax error/i)
   })
 }
