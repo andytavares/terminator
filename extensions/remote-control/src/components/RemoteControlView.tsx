@@ -170,11 +170,37 @@ function FailedBand(props: BandProps & { status: FailedStatus }): React.JSX.Elem
           <h2 className="rc-band__title">{failure.message}</h2>
           {failure.resolution !== null && <p className="rc-band__sub">{failure.resolution}</p>}
         </div>
-        <Button variant="primary" disabled={props.busy} onClick={() => props.onToggle(true)}>
-          Try again
-        </Button>
+        {failure.reason.startsWith('tunnel-') ? (
+          <ReconnectButton />
+        ) : (
+          <Button variant="primary" disabled={props.busy} onClick={() => props.onToggle(true)}>
+            Try again
+          </Button>
+        )}
       </div>
     </section>
+  )
+}
+
+/**
+ * Only the public address failed: the server is still listening, and anyone
+ * on this network is still connected. Reconnecting the tunnel keeps them;
+ * turning the server off and on would not.
+ */
+function ReconnectButton(): React.JSX.Element {
+  const [busy, setBusy] = useState(false)
+  const reconnect = async () => {
+    setBusy(true)
+    try {
+      await window.electronAPI.extensionBridge.invoke('remote:tunnel-reconnect', {})
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Button variant="primary" disabled={busy} onClick={reconnect}>
+      Reconnect
+    </Button>
   )
 }
 

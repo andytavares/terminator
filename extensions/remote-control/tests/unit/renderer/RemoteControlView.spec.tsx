@@ -68,6 +68,7 @@ function remoteViewTests() {
   describe('refusing to start', remoteViewRefusalTests)
   remoteViewDeviceTests()
   remoteViewFailureTests()
+  describe('a tunnel that failed', remoteViewTunnelTests)
   describe('configuration and control', remoteViewControlTests)
 }
 
@@ -171,6 +172,39 @@ function remoteViewFailureTests() {
       expect(screen.getByText('The public address stopped working.')).toBeTruthy()
       expect(screen.queryByText('https://tender-lynx-42.ngrok.app')).toBeNull()
     })
+  })
+}
+
+/** What the extension broadcasts once ngrok has crashed: the drop, then the local address. */
+function dropTunnel(): void {
+  emit('remote:status', ON)
+  emit('remote:tunnel-disconnected', {})
+  emit('remote:status', { ...ON, publicUrl: null, ngrokInstalled: true })
+}
+
+function remoteViewTunnelTests() {
+  it('still says the public address stopped once the local address is broadcast', async () => {
+    render(<RemoteControlView />)
+    await waitFor(() => screen.getByText('Off'))
+    dropTunnel()
+    expect(screen.getByText('The public address stopped working.')).toBeTruthy()
+  })
+
+  it('reconnects the tunnel alone, leaving the server and its viewers up', async () => {
+    render(<RemoteControlView />)
+    await waitFor(() => screen.getByText('Off'))
+    dropTunnel()
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+    expect(invoke).toHaveBeenCalledWith('remote:tunnel-reconnect', {})
+    expect(invoke).not.toHaveBeenCalledWith('remote:toggle', expect.anything())
+  })
+
+  it('offers the same for a public address that could not be created', async () => {
+    render(<RemoteControlView />)
+    await waitFor(() => screen.getByText('Off'))
+    emit('remote:status', { ...ON, publicUrl: null, ngrokError: 'ERR_NGROK_8012: upstream down' })
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+    expect(invoke).toHaveBeenCalledWith('remote:tunnel-reconnect', {})
   })
 }
 
