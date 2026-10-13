@@ -14,44 +14,22 @@ const groups: QuickActionGroup[] = [
   { id: 'git', mnemonic: 'g', label: 'Git' },
 ]
 
+/** An action with its id's prefix as its group, unless `rest` says otherwise. */
+function qa(id: string, label: string, rest: Partial<QuickAction> = {}): QuickAction {
+  return { id, label, group: id.split('.')[0], run: vi.fn(), ...rest }
+}
+
 function makeActions(): QuickAction[] {
   return [
-    {
-      id: 'terminal.split',
-      label: 'Split right',
-      group: 'terminal',
-      mnemonic: 'd',
-      shortcut: '⌘D',
-      run: vi.fn(),
-    },
-    {
-      id: 'terminal.split-down',
-      label: 'Split down',
-      group: 'terminal',
-      mnemonic: 'D',
-      shortcut: '⌘⇧D',
-      run: vi.fn(),
-    },
-    { id: 'git.push', label: 'Push', group: 'git', mnemonic: 'p', run: vi.fn() },
-    {
-      id: 'git.pull',
-      label: 'Pull',
-      group: 'git',
-      mnemonic: 'l',
-      disabledReason: 'No repository focused',
-      run: vi.fn(),
-    },
-    { id: 'top.home', label: 'Home', group: 'top', mnemonic: 'h', shortcut: '⌘`', run: vi.fn() },
+    qa('terminal.split', 'Split right', { mnemonic: 'd', shortcut: '⌘D' }),
+    qa('terminal.split-down', 'Split down', { mnemonic: 'D', shortcut: '⌘⇧D' }),
+    qa('git.push', 'Push', { mnemonic: 'p' }),
+    qa('git.pull', 'Pull', { mnemonic: 'l', disabledReason: 'No repository focused' }),
+    qa('top.home', 'Home', { mnemonic: 'h', shortcut: '⌘`' }),
     // Legitimately mnemonic-less: a direct-shortcut-only action (e.g. Toggle
     // log window) or a dynamically surfaced one (e.g. a per-notification
     // action) never gets a letter.
-    {
-      id: 'top.no-mnemonic',
-      label: 'Toggle log window',
-      group: 'top',
-      shortcut: '⌘⇧L',
-      run: vi.fn(),
-    },
+    qa('top.no-mnemonic', 'Toggle log window', { shortcut: '⌘⇧L' }),
   ]
 }
 
@@ -333,5 +311,128 @@ describe('QuickActions — arrow navigation', () => {
     fireEvent.keyDown(window, { key: 'ArrowUp' })
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'git.push' }))
+  })
+})
+
+const key = (k: string, mods: Partial<KeyboardEventInit> = {}): void => {
+  fireEvent.keyDown(window, { key: k, ...mods })
+}
+const ran = (): string[] => onRun.mock.calls.map(([action]) => action.id)
+
+describe('QuickActions — group mode keys', () => {
+  it('moves through the group with the arrows and runs the highlighted action on Enter', () => {
+    renderPanel()
+    key('t')
+    key('ArrowDown')
+    key('ArrowDown')
+    key('Enter')
+    key('ArrowUp')
+    key('Enter')
+    // The second ArrowDown stops at the last of the two.
+    expect(ran()).toEqual(['terminal.split-down', 'terminal.split'])
+  })
+
+  it('goes to search on "/"', () => {
+    renderPanel()
+    key('t')
+    key('/')
+    expect(screen.getByRole('combobox')).toBeTruthy()
+  })
+
+  it('ignores a letter no action has, and keys with a modifier', () => {
+    renderPanel()
+    key('t')
+    key('z')
+    key('d', { altKey: true })
+    expect(onRun).not.toHaveBeenCalled()
+    expect(screen.getByText('Split right')).toBeTruthy()
+  })
+})
+
+describe('QuickActions — top level keys and pointer', () => {
+  it('runs a Go action by its letter, and ignores a letter nothing has', () => {
+    renderPanel()
+    key('z')
+    expect(onRun).not.toHaveBeenCalled()
+    key('h')
+    expect(ran()).toEqual(['top.home'])
+  })
+
+  it('opens a group from its row with Enter', () => {
+    renderPanel()
+    // Push and Split right (pinned and recent), then the Terminal group.
+    key('ArrowDown')
+    key('ArrowDown')
+    key('Enter')
+    expect(screen.getByRole('listbox', { name: 'Terminal' })).toBeTruthy()
+  })
+
+  it('opens a group, and runs an action, with the pointer', () => {
+    renderPanel()
+    fireEvent.mouseDown(screen.getByText('Git').closest('.qa-row')!)
+    fireEvent.mouseEnter(screen.getByText('Push').closest('.qa-row')!)
+    fireEvent.mouseDown(screen.getByText('Push').closest('.qa-row')!)
+    expect(ran()).toEqual(['git.push'])
+  })
+
+  it('does not run a row when its pin button is pressed', () => {
+    renderPanel()
+    fireEvent.mouseDown(screen.getByRole('button', { name: 'Unpin Push' }))
+    expect(onRun).not.toHaveBeenCalled()
+  })
+})
+
+describe('QuickActions — top level keys and pointer — pins nothing when cmd+. lands on a group row', () => {
+  it('pins nothing when cmd+. lands on a group row', () => {
+    renderPanel({ pinned: [], recent: [] })
+    key('.', { metaKey: true })
+    expect(onTogglePin).not.toHaveBeenCalled()
+  })
+})
+
+describe('QuickActions — search keys', () => {
+  it('moves back up the results with ArrowUp', () => {
+    renderPanel()
+    key('/')
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'split' } })
+    key('ArrowDown')
+    key('ArrowUp')
+    key('Enter')
+    expect(ran()).toEqual(['terminal.split'])
+  })
+
+  it('keeps searching on Backspace while there is a query', () => {
+    renderPanel()
+    key('/')
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p' } })
+    key('Backspace')
+    expect(screen.getByRole('combobox')).toBeTruthy()
+  })
+})
+
+describe('QuickActions — rows from a group it does not list', () => {
+  const orphan = qa('gone.thing', 'Orphan', {
+    mnemonic: 'o',
+    description: 'From an extension that left',
+  })
+
+  it('labels a pinned row by its own letter when its group is gone, with its description', () => {
+    renderPanel({ pinned: [orphan], recent: [] })
+    const row = screen.getByText('Orphan').closest('.qa-row')!
+    expect(row.querySelector('.qa-key')!.textContent).toBe('o')
+    expect(row.querySelector('.qa-row__group')).toBeNull()
+    expect(screen.getByText('From an extension that left')).toBeTruthy()
+  })
+
+  it('labels a pinned Go action by its own letter', () => {
+    const home = makeActions().find((a) => a.id === 'top.home')!
+    renderPanel({ pinned: [home], recent: [] })
+    const rows = screen.getAllByText('Home').map((el) => el.closest('.qa-row')!)
+    expect(rows[0].querySelector('.qa-key')!.textContent).toBe('h')
+  })
+
+  it('draws no context section for a context group it does not have', () => {
+    renderPanel({ contextGroupId: 'gone' })
+    expect(screen.queryByText(/· here/)).toBeNull()
   })
 })
