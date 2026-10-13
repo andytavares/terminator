@@ -1,0 +1,57 @@
+import { describe, it, expect, afterAll } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { runAgentReview, type RunAgentReviewInput } from '../../src/review/review-agent'
+
+// A real `claude` starts processes of its own (its tools' shells, MCP servers).
+// Cancelling a review, which the extension does for every run as it is
+// deactivated, must end those too, not only `claude`. The stand-in claude here
+// starts a `sleep` and writes the sleep's pid down.
+
+const scratch = mkdtempSync(join(tmpdir(), 'review-agent-group-'))
+const pidFile = join(scratch, 'grandchild.pid')
+const claude = join(scratch, 'claude')
+writeFileSync(claude, `#!/bin/sh\nsleep 30 &\necho $! > "${pidFile}"\nwait\n`)
+chmodSync(claude, 0o755)
+
+afterAll(() => rmSync(scratch, { recursive: true, force: true }))
+
+const input: RunAgentReviewInput = {
+  repoRoot: scratch,
+  worktreePath: scratch,
+  prNumber: 42,
+  headSHA: 'abc1234',
+  baseRefName: 'main',
+  title: 'Add review agent',
+  body: 'body',
+  scope: { kind: 'pr' },
+  request: 'review',
+  sessionId: 'sess-1',
+  model: 'opus',
+}
+
+/** Running, and not a zombie waiting for its new parent to reap it. */
+function isAlive(pid: number): boolean {
+  try {
+    const state = execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' })
+    return !state.startsWith('Z')
+  } catch {
+    return false
+  }
+}
+
+describe('runAgentReview — cancelling a running claude', () => {
+  it('ends the processes claude started as well as claude', async () => {
+    const exec = async () => ({ stdout: 'diff' })
+    const { done, cancel } = runAgentReview(input, { exec, resolveClaude: async () => claude })
+    await expect.poll(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8') !== '').toBe(true)
+    const grandchild = Number(readFileSync(pidFile, 'utf8'))
+
+    cancel()
+
+    expect((await done).status).toBe('cancelled')
+    await expect.poll(() => isAlive(grandchild)).toBe(false)
+  })
+})

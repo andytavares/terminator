@@ -47,12 +47,29 @@ type SpawnFn = (
   opts: { cwd: string; env: Record<string, string> }
 ) => SpawnedProcess
 
+/**
+ * claude leads a process group of its own, and kill() signals the whole group,
+ * so cancelling a run also ends what claude started (its tools' shells, MCP
+ * servers): https://nodejs.org/api/child_process.html#optionsdetached. Not on
+ * Windows, where `detached` gives the child a console of its own instead.
+ */
+const OWN_PROCESS_GROUP = process.platform !== 'win32'
+
 function defaultSpawn(
   cmd: string,
   args: string[],
   opts: { cwd: string; env: Record<string, string> }
 ): SpawnedProcess {
-  return spawnCb(cmd, args, { cwd: opts.cwd, env: opts.env }) as unknown as SpawnedProcess
+  const child = spawnCb(cmd, args, { cwd: opts.cwd, env: opts.env, detached: OWN_PROCESS_GROUP })
+  const kill = (signal?: NodeJS.Signals): void => {
+    if (!OWN_PROCESS_GROUP || child.pid === undefined) return void child.kill(signal)
+    try {
+      process.kill(-child.pid, signal)
+    } catch {
+      // Already gone.
+    }
+  }
+  return Object.assign(child, { kill }) as unknown as SpawnedProcess
 }
 
 /**
