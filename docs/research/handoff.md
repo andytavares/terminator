@@ -24,16 +24,20 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
 - Real-app e2e for the features the coverage map listed as undriven
   (`docs/research/feature-coverage.md`), with network services stubbed locally.
 - Test audit: tests that failed the standard were fixed or removed (`docs/research/test-audit-core.md`).
-- Function size limits (≤30 lines, complexity ≤10, ≤3 params) enforced by ESLint for
-  git-integration, task-vault, notepad and remote-control.
+- Function size limits (≤30 lines, complexity ≤10, ≤3 params) enforced by ESLint for every
+  `.js`, `.mjs`, `.cjs`, `.ts`, `.mts` and `.tsx` file, and an explicit `any` is a lint error
+  (`eslint.config.mjs`, `tests/unit/lint/size-limits.spec.ts`).
+- Every spec, the extensions' included, is typechecked (`tsconfig.test.json` beside each
+  `tsconfig.json`), and no spec casts with `as unknown as`: it fakes with `partialFake`.
 
 ## What is left
 
-1. Function size limits for Foundry (about 380 source and 600 test functions) and the core
-   (`src/main`, `src/renderer`, `src/renderer-remote`, `src/shared`, `packages`; about 250
-   functions, including `ExtensionsSection` and `executor.execute`), then turn the ESLint rule on
-   for them.
-2. Clean-gate final report items: 929 repeated names and 255 runs of comments.
+1. Done: function size limits for Foundry, the core and every other file; the ESLint rule is on
+   for all of them (decision 33).
+2. Measured, not fixed: the clean-gate report is `docs/research/clean-gate.md`. Repeated names
+   went from 929 to 2,807 and comment runs from 255 to 986 because the branch grew from 53,463 to
+   187,972 added lines; neither is a mechanical fix. It lists every finding and why each is left.
+   Four `as unknown as`, four `any` and 30 coverage-ignore comments are left, each with its reason.
 3. Done: the settings nothing read are implemented or removed (decisions 15–18).
 4. Done: list settings are edited one item per line (decision 19).
 5. Done: every declared setting has a test of its effect. `workspaceScoped` extension settings
@@ -129,11 +133,49 @@ Each entry: what was decided, why, and how to undo it.
     reads merge over the defaults, and the next global write drops it: the zod object strips
     keys it does not declare (`tests/unit/storage/settings-store.spec.ts`). Undo: revert that
     commit.
+22. TypeScript is pinned at 6.0.3, not 7.0: 7.0 is the Go port and ships no compiler API, which
+    typescript-eslint needs (ADR 106). Undo: when typescript-eslint supports 7, follow ADR 106.
+23. A split pane belongs to the tab it was made in, not to the branch: a new tab beside a split
+    showed the old split and typed into it (`9cd9f6b`, `tests/e2e/split-panes.spec.ts`). Layouts
+    are not persisted, so nothing migrates. This also answers the ⌘-click question: the e2e case
+    went back in once split then New tab kept focus. Undo: revert `9cd9f6b`.
+24. On quit, Terminator does not SIGKILL jobs a user started with `nohup` or `disown` in a
+    terminal: ordinary terminals send SIGHUP and those jobs are meant to survive it. The e2e
+    `closeApp` check kills and reports any such leftovers in specs. Undo: kill each pty's whole
+    session on quit.
+25. Review agent runs are cancelled when git-integration deactivates; they used to outlive a quit
+    (`8e282ce`). Undo: revert it.
+26. Notepad's editor mounted twice when a note opened; it now mounts once the note has loaded
+    (`aee89b8`). That was the root cause of the intermittent `notepad-settings` e2e failure.
+27. knip `--production` (ADR 107): 224 exports the app uses in their own file and specs also
+    import are tagged `/** @internal */`, knip's mechanism for test-only exports
+    ([knip docs](https://knip.dev/reference/jsdoc-tsdoc-tags#internal)). `src/**/__tests__/` is
+    test code to knip, as `tests/` is (`knip.jsonc`). Undo: un-export them and test through callers.
+28. Remote Control's 9 channels are local-only, so `tests/e2e/remote-control.spec.ts` drives them
+    from the desktop view and checks the effect in the real remote renderer. It found 4 bugs, all
+    fixed: Reconnect, phones told when turned away or disconnected, a stale viewer limit with
+    unlabelled inputs, and the ngrok PATH order.
+29. A build over budget is fixed at its cause, never by raising the budget: at `eda7797` the
+    git-integration chunk was 1,208 kB against 1,200 kB after the size-limits split, fixed with a
+    lazy boundary. Run `npm run build` before every push, not only typecheck, lint and vitest.
+30. Commits are made with `git commit --no-verify` in this container, after the full checks pass
+    under `setpriv`. The pre-commit hook runs `vitest related` as root without `setpriv`, so the
+    chmod specs cannot make a write fail and fail every commit that touches Foundry's IPC
+    (`run-channels.spec.ts`: "refuses to start when the records location cannot be written to").
+    On a machine where you are not root the hook runs as is.
+31. The extensions' specs are typechecked (`746b6d2`): 538 type errors across 5 extensions were
+    fixed without casts or ignores.
+32. Specs fake with `partialFake`, never `as unknown as` (`2a8d850`, `4fa8a48`). Removing the
+    casts showed fixtures that no longer matched their types (a gate rule `merge`, a decision with
+    `actor`, git files without `isBinary`); they now match.
+33. One ESLint block holds every file to the size limits, and `@typescript-eslint/no-explicit-any`
+    is an error (`16439dd`). The two `any`s left are behind `eslint-disable` comments that say why
+    (`src/main/ipc/channel-registrar.ts`, `src/main/storage/cached-store.ts`). Undo: revert it.
 
 ## Known advisories
 
 Checked 2026-10-13 at 311df92. `npm audit` reports 10 (2 low, 8 moderate), exit 1;
-`npm audit --audit-level=high` (the CI gate) exits 0. Both advisories below stay because no
+`npm audit --audit-level=high` (the CI gate) exits 0. The two dependency advisories (1, 2) stay because no
 released upgrade removes them. `overrides` were not used: they would force versions the parents
 do not declare.
 
@@ -158,6 +200,7 @@ do not declare.
    Path: `electron-builder@26.15.3` → `app-builder-lib@26.15.3` → `@electron/get@3.1.0` →
    (optional) `global-agent@3.0.0` → `roarr@2.15.4` → `sprintf-js@1.1.3`. Affected `<=1.1.3`, no
    patched version. A format string with an out-of-range precision throws a `RangeError`.
+
    - Not reachable: build-time packaging only, never shipped in the app. `@electron/get` loads
      `global-agent` only when `ELECTRON_GET_USE_PROXY` is set (`dist/cjs/index.js`, `proxy.js`),
      and every `global-agent` log call passes a literal message with no precision specifier
@@ -168,13 +211,36 @@ do not declare.
      the prerelease `27.0.0-alpha.10` (`next`) moves to `^5.0.0`. Move to electron-builder 27 once it
      is released as stable ([releases](https://github.com/electron-userland/electron-builder/releases)).
 
+3. **Codecov reports 1 uncovered patch line in `extensions/foundry/src/ipc/forge-channels.ts`**
+   (99.95% patch coverage, 2026-10-13 14:57 UTC). A local Foundry coverage run intersected with the
+   PR diff shows 0 uncovered changed lines, and the proxy here answers 403 for the Codecov API, so
+   the line cannot be named from this container. The patch gate (target 80%, `codecov.yml`) passes.
+   Open the Codecov report for the PR to see the line.
+4. **Three Foundry jsdom specs time out only at about 10x CPU oversubscription** (load 40 on 4
+   cores): jsdom's `getComputedStyle` for `ByRole` queries is the cost. CI's 4 unit shards stay
+   green. happy-dom was tried for Foundry and rejected: 6 specs went red and the change is global.
+   The notepad and git-integration DOM specs do run in happy-dom (`7318fe9`).
+5. **The live Linear spec was fixed but not run.** `extensions/foundry/tests/live/linear-transition-live.spec.ts`
+   read a field the provider no longer returns (`issue.status`); it is fixed, but it needs a Linear
+   API key and an issue it may move, which this container does not have. Run it with
+   `LINEAR_API_KEY=lin_api_… LINEAR_TEST_ISSUE=TEAM-123 npm run test:live` on a scratch issue.
+6. **The extension-ui Playwright visual suite passes on CI and fails locally.** CI's Stories job
+   compares every story with the Linux baselines in `packages/extension-ui/visual/__screenshots__/linux`
+   and passed at `da1fe0b` (run 38425911132). In this container,
+   `npm run build-storybook && PLAYWRIGHT_BROWSERS_PATH=… CI=1 npm run test:visual` exits 1: 106 of
+   118 stories differ by about 1% of their pixels (55 to 1,996 pixels). The baselines were written by
+   CI's ubuntu runner, and Playwright's screenshots depend on the platform and browser build
+   ([Playwright docs](https://playwright.dev/docs/test-snapshots)). Compare on CI only; refresh
+   baselines with the `update-story-baselines` label (decision 1).
+
 ## How to continue
 
 - Node 24 (`.nvmrc`). `npm ci`, then `npm run dev`.
 - Checks before every push: `npm run typecheck`, `npm run lint`, `npm run format:check`,
-  `npm run lint:unused`, `npm run lint:duplicates`, `npx vitest run`.
+  `npm run lint:unused`, `npm run lint:unused:production`, `npm run lint:duplicates`,
+  `npm run lint:deps`, `npm run build` (0 `(!)` lines), `npx vitest run`.
 - On Linux as root, run vitest under
   `setpriv --bounding-set=-dac_override,-dac_read_search` so the chmod specs can fail a write.
-- Work items 1–8 above split cleanly by area. Each can be a separate worker in its own worktree:
+- The open work items above split cleanly by area. Each can be a separate worker in its own worktree:
   write the failing test first, keep functions within the limits, one commit per logical unit,
   and merge into this branch only after the full checks pass.
