@@ -6,12 +6,8 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import {
-  activateFoundry,
-  fakeHost,
-  temporaryDirectory,
-  type FoundryHost,
-} from '../helpers/foundry-host.js'
+import { fakeHost, temporaryDirectory, type FoundryHost } from '../helpers/foundry-host.js'
+import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
@@ -46,7 +42,6 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  const { deactivate } = await import('../../src/index.ts')
   deactivate()
   vi.unstubAllEnvs()
 })

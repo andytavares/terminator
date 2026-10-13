@@ -7,13 +7,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import {
-  activateFoundry,
-  fakeHost,
-  realGit,
-  seededRepository,
-  temporaryDirectory,
-} from './helpers/foundry-host.js'
+import { fakeHost, realGit, seededRepository, temporaryDirectory } from './helpers/foundry-host.js'
+import { activateFoundry, deactivate } from './helpers/foundry-activation.js'
 import type { FoundryHost } from './helpers/foundry-host.js'
 import { resolveFoundryDataRoot } from '../src/workspace-root.js'
 
@@ -38,7 +33,6 @@ function write(file: string, content: string): void {
 }
 
 afterEach(async () => {
-  const { deactivate } = await import('../src/index.ts')
   deactivate()
 })
 

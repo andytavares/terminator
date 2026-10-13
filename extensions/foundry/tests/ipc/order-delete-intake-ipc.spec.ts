@@ -17,6 +17,7 @@ import { makeTempDir } from '../../../../tests/support/temp-dir'
 const GLOBAL_STORAGE = freshGlobalStorage()
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
+import { activate } from '../../src/index.ts'
 import { vi } from 'vitest'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 import { createOrderStore } from '../../src/order/store.js'
@@ -131,8 +132,6 @@ beforeAll(async () => {
     },
     app: { version: '0.0.0-test' },
   } as unknown as ExtensionAPI
-
-  const { activate } = await import('../../src/index.ts')
   const { startSupervisionRuntime } = await import('../../src/runtime/supervision-runtime.ts')
   activate(api)
   getHandler = (channel) => handlers.get(channel)

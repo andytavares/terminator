@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 const GLOBAL_STORAGE = freshGlobalStorage()
 
 import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { activate } from '../src/index.ts'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 
 vi.mock('electron', () => ({
@@ -97,7 +98,6 @@ function quietHost(): Partial<ExtensionAPI> {
 
 beforeAll(async () => {
   const api = registeringApi()
-  const { activate } = await import('../src/index.ts')
   const { startSupervisionRuntime } = await import('../src/runtime/supervision-runtime.ts')
   activate(api)
   await startSupervisionRuntime(api)

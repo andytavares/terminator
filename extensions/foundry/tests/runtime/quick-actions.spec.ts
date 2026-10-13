@@ -12,6 +12,7 @@ import { freshGlobalStorage } from '../helpers/foundry-host.js'
 const GLOBAL_STORAGE = freshGlobalStorage()
 
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
+import { activate } from '../../src/index.ts'
 import type { ExtensionAPI, CommandContribution } from '@terminator/extension-sdk'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
 
@@ -157,8 +158,6 @@ beforeAll(async () => {
     },
     app: { version: '0.0.0-test' },
   } as unknown as ExtensionAPI
-
-  const { activate } = await import('../../src/index.ts')
   const { startSupervisionRuntime } = await import('../../src/runtime/supervision-runtime.ts')
   activate(api)
   const started = await startSupervisionRuntime(api)

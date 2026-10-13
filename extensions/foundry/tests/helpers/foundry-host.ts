@@ -236,16 +236,3 @@ export function fakeHost(dataDir: () => string): FoundryHost {
 export function temporaryDirectory(prefix: string): string {
   return makeTempDir(`${prefix}-`)
 }
-
-/**
- * Activates Foundry over the host and waits for the supervision runtime, so a
- * spec's first call finds the runner the way a call minutes after start does.
- */
-export async function activateFoundry(host: FoundryHost): Promise<void> {
-  const { activate } = await import('../../src/index.ts')
-  const { runtime } = await import('../../src/runtime/runtime-state.ts')
-  activate(host.api)
-  await vi.waitFor(() => {
-    if (runtime.supervision === null) throw new Error('the supervision runtime is not up yet')
-  })
-}

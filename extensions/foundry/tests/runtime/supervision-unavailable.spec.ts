@@ -3,6 +3,7 @@
  * told, and nothing that needs an agent pretends to have started one.
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
+import { activate, deactivate } from '../../src/index.ts'
 import * as path from 'node:path'
 
 import { fakeHost, seededRepository, temporaryDirectory } from '../helpers/foundry-host.js'
@@ -30,13 +31,11 @@ beforeAll(async () => {
   dataDir = path.join(parent, 'records')
   repo = await seededRepository(parent)
   host = fakeHost(() => dataDir)
-  const { activate } = await import('../../src/index.ts')
   activate(host.api)
   await vi.waitFor(() => expect(host.showToast).toHaveBeenCalled())
 })
 
 afterAll(async () => {
-  const { deactivate } = await import('../../src/index.ts')
   deactivate()
   vi.unstubAllEnvs()
 })
