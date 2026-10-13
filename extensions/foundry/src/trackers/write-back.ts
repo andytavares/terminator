@@ -38,7 +38,7 @@ export interface IssuesPort {
   supportsTransitions(tracker: string): boolean
 }
 
-export type WriteBackEvent = 'agreed' | 'amended' | 'started' | 'draft_opened' | 'merged'
+type WriteBackEvent = 'agreed' | 'amended' | 'started' | 'draft_opened' | 'merged'
 
 /**
  * What each moment in an order's life means in the tracker's own terms.
