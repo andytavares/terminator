@@ -30,10 +30,17 @@ function request(over: Partial<ToolRequest> = {}): ToolRequest {
   }
 }
 
-describe('a role that may not write', () => {
-  const reviewing = (over: Partial<ToolRequest> = {}) =>
-    decideTool(request({ readOnly: true, role: 'verifier', ...over }))
+const reviewing = (over: Partial<ToolRequest> = {}) =>
+  decideTool(request({ readOnly: true, role: 'verifier', ...over }))
 
+describe('a role that may not write', () => {
+  describe('allowed and refused', allowedAndRefusedTests)
+  describe('run_tests', runTestsTests)
+  describe('operator tools', operatorToolsTests)
+  describe('never abstaining', neverAbstainingTests)
+})
+
+function allowedAndRefusedTests() {
   it('answers an allowed command itself rather than asking a person', () => {
     // `null` here sent the call to the operator, where it sat for the
     // five-minute hold before falling back. Six tool calls was half an hour of
@@ -49,7 +56,9 @@ describe('a role that may not write', () => {
     expect(decision?.allow).toBe(false)
     expect(decision?.reason).toContain('rm')
   })
+}
 
+function runTestsTests() {
   it("runs the project's own command when its role declared run_tests", () => {
     // FR-033 asks the verifier for a verdict from an exit status, and the
     // read-only policy refuses `npm test` like any other unknown binary.
@@ -69,7 +78,9 @@ describe('a role that may not write', () => {
     })
     expect(decision?.allow).toBe(false)
   })
+}
 
+function operatorToolsTests() {
   it('uses a tool the operator listed as read-only', () => {
     // An architect was refused a documentation lookup and wrote "Environment
     // is read-only for execution and MCP, so I could not pull Node docs. That
@@ -87,15 +98,23 @@ describe('a role that may not write', () => {
     const decision = reviewing({ tool: 'mcp__docs__query', input: {} })
     expect(decision?.allow).toBe(false)
   })
+}
 
+function neverAbstainingTests() {
   it('never abstains, whatever it decides', () => {
     for (const command of ['git status', 'rm -rf x', 'npm test', 'find . -delete']) {
       expect(reviewing({ input: { command } }), command).not.toBeNull()
     }
   })
-})
+}
 
 describe('a role that writes', () => {
+  describe('tool classes and ordinary work', toolClassesAndOrdinaryWorkTests)
+  describe('destructive and outside', destructiveAndOutsideTests)
+  describe('escorted and no role', escortedAndNoRoleTests)
+})
+
+function toolClassesAndOrdinaryWorkTests() {
   it('is refused a class of tool its role file does not list', () => {
     const decision = decideTool(
       request({
@@ -122,7 +141,9 @@ describe('a role that writes', () => {
       expect(decideTool(request({ input: { command } }))?.allow, command).toBe(true)
     }
   })
+}
 
+function destructiveAndOutsideTests() {
   it('never takes a destructive action, at any setting', () => {
     // The rule is "never automatically", not "always by asking". Where somebody
     // can be asked, it asks; where nobody can — `lights-out` — it refuses and
@@ -136,7 +157,9 @@ describe('a role that writes', () => {
   it('asks about a write outside its own checkout', () => {
     expect(decideTool(request({ tool: 'Edit', input: { file_path: '/etc/hosts' } }))).toBeNull()
   })
+}
 
+function escortedAndNoRoleTests() {
   it('asks about everything at escorted, which is what the setting means', () => {
     expect(
       decideTool(
@@ -152,9 +175,17 @@ describe('a role that writes', () => {
     )
     expect(decision?.allow).toBe(true)
   })
-})
+}
 
 describe('the order the four checks run in', () => {
+  describe('run_tests first', runTestsFirstTests)
+  describe('read-only before autonomy', readOnlyBeforeAutonomyTests)
+})
+
+const unattended = (over: Partial<ToolRequest> = {}) =>
+  decideTool(request({ autonomy: 'lights-out', ...over }))
+
+function runTestsFirstTests() {
   it('lets the run_tests allowance beat the read-only policy', () => {
     const decision = decideTool(
       request({
@@ -167,7 +198,9 @@ describe('the order the four checks run in', () => {
     )
     expect(decision?.allow).toBe(true)
   })
+}
 
+function readOnlyBeforeAutonomyTests() {
   it('lets the read-only policy beat the autonomy setting', () => {
     // A reviewer at lights-out is still a reviewer.
     const decision = decideTool(
@@ -192,7 +225,7 @@ describe('the order the four checks run in', () => {
     )
     expect(decision?.allow).toBe(false)
   })
-})
+}
 
 // At `lights-out` a question has nobody to answer it. Asking is right whenever
 // somebody is there; when nobody is, the held call goes to the operator, then
@@ -202,9 +235,23 @@ describe('the order the four checks run in', () => {
 // the checkout, and so worth a question — and thirty minutes later the order
 // had shipped nothing.
 describe('a question with nobody to answer it', () => {
-  const unattended = (over: Partial<ToolRequest> = {}) =>
-    decideTool(request({ autonomy: 'lights-out', ...over }))
+  describe('refusing instead of waiting', refusingInsteadOfWaitingTests)
+  describe('as strict as the wait', asStrictAsTheWaitTests)
+  describe('scratch files and somebody there', scratchFilesAndSomebodyThereTests)
+  describe('ordinary work', ordinaryWorkTests)
+})
 
+const rung = (over: Partial<ToolRequest> = {}) =>
+  decideTool(
+    request({
+      readOnly: true,
+      role: 'red-team',
+      outputPath: '/data/orders/WO-1/rungs/challenge.json',
+      ...over,
+    })
+  )
+
+function refusingInsteadOfWaitingTests() {
   it('refuses instead of waiting, for a write outside the checkout', () => {
     const decision = unattended({ tool: 'Edit', input: { file_path: '/etc/hosts' } })
     expect(decision).not.toBeNull()
@@ -225,7 +272,9 @@ describe('a question with nobody to answer it', () => {
     expect(decision?.reason).toContain('unattended')
     expect(decision?.reason).toContain('inside the worktree')
   })
+}
 
+function asStrictAsTheWaitTests() {
   it('is exactly as strict as the wait it replaces — nothing new is allowed', () => {
     // The whole safety argument in one assertion: everything that used to be
     // held is now refused, and nothing that used to be held is now permitted.
@@ -245,7 +294,9 @@ describe('a question with nobody to answer it', () => {
       expect(unattendedDecision?.allow, JSON.stringify(call)).toBe(false)
     }
   })
+}
 
+function scratchFilesAndSomebodyThereTests() {
   // The one thing that changed, and the only one. A throwaway under the OS
   // temp directory — where the harness's own system prompt tells the agent to
   // put intermediate files — used to be held as a write outside the checkout,
@@ -268,14 +319,16 @@ describe('a question with nobody to answer it', () => {
       ).toBeNull()
     }
   })
+}
 
+function ordinaryWorkTests() {
   it('leaves ordinary work alone — it was never a question', () => {
     expect(
       unattended({ tool: 'Edit', input: { file_path: '/work/checkout/src/a.ts' } })?.allow
     ).toBe(true)
     expect(unattended({ input: { command: 'npm test 2>&1 | tail -20' } })?.allow).toBe(true)
   })
-})
+}
 
 // A read-only rung has one thing it is allowed to change: the file it hands
 // back what it found in. Without it the policy refused every channel the
@@ -283,16 +336,14 @@ describe('a question with nobody to answer it', () => {
 // architect lost a complete corrected order to "a review may not redirect
 // output" while the builders it had just contradicted were starting.
 describe('where a read-only rung hands back what it found', () => {
-  const rung = (over: Partial<ToolRequest> = {}) =>
-    decideTool(
-      request({
-        readOnly: true,
-        role: 'red-team',
-        outputPath: '/data/orders/WO-1/rungs/challenge.json',
-        ...over,
-      })
-    )
+  describe('its own file', itsOwnFileTests)
+  describe('no output', noOutputTests)
+  describe('writing roles', writingRolesTests)
+})
 
+const mount = '/data/orders/WO-1/skills'
+
+function itsOwnFileTests() {
   it('lets the rung write its own output file', () => {
     expect(
       rung({ tool: 'Write', input: { file_path: '/data/orders/WO-1/rungs/challenge.json' } })
@@ -317,7 +368,9 @@ describe('where a read-only rung hands back what it found', () => {
       })?.allow
     ).toBe(false)
   })
+}
 
+function noOutputTests() {
   it('grants nothing to a rung with no output of its own', () => {
     expect(
       decideTool(
@@ -331,7 +384,9 @@ describe('where a read-only rung hands back what it found', () => {
       )?.allow
     ).toBe(false)
   })
+}
 
+function writingRolesTests() {
   it('does not widen a role that may already write', () => {
     // The permission is an exception to the read-only policy, not a rule of
     // its own: a builder is judged by its role's tool list and the autonomy
@@ -349,7 +404,7 @@ describe('where a read-only rung hands back what it found', () => {
       )
     ).toEqual({ allow: false, reason: expect.stringContaining('builder') })
   })
-})
+}
 
 // The mount a node's skills are copied into and passed to the agent with
 // `--add-dir`. Every tool call goes through `decideTool`, and anything it
@@ -357,8 +412,17 @@ describe('where a read-only rung hands back what it found', () => {
 // fell through to "ask" would cost the run five minutes for looking at its
 // own skill.
 describe('a skill mounted for this node', () => {
-  const mount = '/data/orders/WO-1/skills'
+  describe('reading the mount', readingTheMountTests)
+  describe('writing in the mount', writingInTheMountTests)
+  describe('writing as a reader', writingAsAReaderTests)
+  describe('paths that only look inside', pathsThatOnlyLookInsideTests)
+  describe('no mount', noMountTests)
+})
 
+const auto = (over: Partial<ToolRequest> = {}) =>
+  decideTool(request({ letModeDecide: true, ...over }))
+
+function readingTheMountTests() {
   it.each(['Read', 'Glob', 'Grep', 'LS'])('allows %s of the mount for a writing role', (tool) => {
     const decision = decideTool(
       request({
@@ -382,7 +446,9 @@ describe('a skill mounted for this node', () => {
     )
     expect(decision).toEqual({ allow: true, reason: expect.any(String) })
   })
+}
 
+function writingInTheMountTests() {
   it.each(['Write', 'Edit', 'MultiEdit', 'NotebookEdit'])(
     'denies %s inside the mount for a writing role',
     (tool) => {
@@ -397,7 +463,9 @@ describe('a skill mounted for this node', () => {
       expect(decision?.reason).toContain('read-only')
     }
   )
+}
 
+function writingAsAReaderTests() {
   it.each(['Write', 'Edit', 'MultiEdit', 'NotebookEdit'])(
     'denies %s inside the mount for a read-only role',
     (tool) => {
@@ -414,7 +482,9 @@ describe('a skill mounted for this node', () => {
       expect(decision?.reason).toContain('read-only')
     }
   )
+}
 
+function pathsThatOnlyLookInsideTests() {
   it('does not treat a sibling path with the mount as a string prefix as inside it', () => {
     // Not caught by the mount allowance, so it falls through to the ordinary
     // write rules: outside the checkout, at standard autonomy, that asks.
@@ -443,7 +513,9 @@ describe('a skill mounted for this node', () => {
     )
     expect(decision).toBeNull()
   })
+}
 
+function noMountTests() {
   it('changes nothing when the node has no mount', () => {
     expect(
       decideTool(
@@ -455,15 +527,29 @@ describe('a skill mounted for this node', () => {
       )?.allow
     ).toBe(true)
   })
-})
+}
 
 // Claude Code's auto mode answers what Foundry's own policy has no opinion on,
 // instead of the call waiting five minutes for a person and then prompting in
 // a terminal nobody is watching.
 describe('letting auto mode decide', () => {
-  const auto = (over: Partial<ToolRequest> = {}) =>
-    decideTool(request({ letModeDecide: true, ...over }))
+  describe('handing to auto mode', handingToAutoModeTests)
+  describe('holding', holdingTests)
+  describe('decided calls', decidedCallsTests)
+})
 
+const documenting = (file: string, tool = 'Edit') =>
+  decideTool(
+    request({
+      role: 'scribe',
+      docsOnly: true,
+      tool,
+      input: { file_path: file },
+      worktreePath: '/work/checkout',
+    })
+  )
+
+function handingToAutoModeTests() {
   it('hands a call the policy has no opinion on to auto mode', () => {
     expect(auto({ tool: 'Edit', input: { file_path: '/etc/hosts' } })).toBe('mode')
     expect(auto({ input: { command: 'npm test > /work/other/out.log' } })).toBe('mode')
@@ -485,7 +571,9 @@ describe('letting auto mode decide', () => {
       expect(auto({ input: { command }, autonomy: 'lights-out' })).toBe('mode')
     }
   })
+}
 
+function holdingTests() {
   it('still holds a destructive action when auto mode may not decide', () => {
     expect(decideTool(request({ input: { command: 'git reset --hard' } }))).toBeNull()
   })
@@ -495,7 +583,9 @@ describe('letting auto mode decide', () => {
       auto({ tool: 'Edit', input: { file_path: '/work/checkout/a.ts' }, autonomy: 'escorted' })
     ).toBeNull()
   })
+}
 
+function decidedCallsTests() {
   it('leaves the decisions the policy does take alone', () => {
     expect(auto({ tool: 'Edit', input: { file_path: '/work/checkout/a.ts' } })).toEqual({
       allow: true,
@@ -505,20 +595,29 @@ describe('letting auto mode decide', () => {
       auto({ readOnly: true, role: 'verifier', input: { command: 'rm -rf x' } })
     ).toMatchObject({ allow: false })
   })
-})
+}
 
 describe('a role that writes documentation only', () => {
-  const documenting = (file: string, tool = 'Edit') =>
-    decideTool(
-      request({
-        role: 'scribe',
-        docsOnly: true,
-        tool,
-        input: { file_path: file },
-        worktreePath: '/work/checkout',
-      })
-    )
+  describe('what it may write', whatItMayWriteTests)
+  describe('what it may not', whatItMayNotTests)
+})
 
+const authoring = (file: string, over: Partial<ToolRequest> = {}) =>
+  decideTool(
+    request({
+      role: 'author',
+      docsOnly: true,
+      tool: 'Write',
+      input: { file_path: file },
+      worktreePath: '/work/checkout',
+      outputsDir: '/data/orders/WO-1/outputs',
+      outputPath: '/data/orders/WO-1/rungs/write.json',
+      autonomy: 'lights-out',
+      ...over,
+    })
+  )
+
+function whatItMayWriteTests() {
   it('is refused an edit to source, with a reason it can act on', () => {
     const decision = documenting(
       '/work/checkout/src/main/integrations/providers/linear.provider.ts'
@@ -537,7 +636,9 @@ describe('a role that writes documentation only', () => {
   ])('may write %s', (file) => {
     expect(documenting(file)).not.toMatchObject({ allow: false })
   })
+}
 
+function whatItMayNotTests() {
   it.each(['Write', 'MultiEdit', 'NotebookEdit'])('refuses %s to source too', (tool) => {
     expect(documenting('/work/checkout/src/a.ts', tool)).toMatchObject({ allow: false })
   })
@@ -552,24 +653,19 @@ describe('a role that writes documentation only', () => {
     )
     expect(decision).not.toMatchObject({ allow: false })
   })
-})
+}
 
 describe('where an author may put a document', () => {
-  const authoring = (file: string, over: Partial<ToolRequest> = {}) =>
-    decideTool(
-      request({
-        role: 'author',
-        docsOnly: true,
-        tool: 'Write',
-        input: { file_path: file },
-        worktreePath: '/work/checkout',
-        outputsDir: '/data/orders/WO-1/outputs',
-        outputPath: '/data/orders/WO-1/rungs/write.json',
-        autonomy: 'lights-out',
-        ...over,
-      })
-    )
+  describe('allowed places', allowedPlacesTests)
+  describe('refused places', refusedPlacesTests)
+  describe('no outputs and the shell', noOutputsAndTheShellTests)
+})
 
+const REASON =
+  'Foundry pushes the branch and opens the pull request itself; leave both to the line.'
+const refused = { allow: false, reason: REASON }
+
+function allowedPlacesTests() {
   it('may write under the order\u2019s outputs directory, even unattended', () => {
     expect(authoring('/data/orders/WO-1/outputs/answer.md')).toMatchObject({ allow: true })
     expect(authoring('/data/orders/WO-1/outputs/notes/answer.txt')).toMatchObject({ allow: true })
@@ -582,7 +678,9 @@ describe('where an author may put a document', () => {
   it('may still write documentation in the checkout', () => {
     expect(authoring('/work/checkout/docs/answer.md')).not.toMatchObject({ allow: false })
   })
+}
 
+function refusedPlacesTests() {
   it('is refused source in the checkout', () => {
     expect(authoring('/work/checkout/src/a.ts')).toMatchObject({ allow: false })
   })
@@ -597,7 +695,9 @@ describe('where an author may put a document', () => {
   it('is refused a sibling that only starts with the same letters', () => {
     expect(authoring('/data/orders/WO-1/outputs-old/answer.md')).toMatchObject({ allow: false })
   })
+}
 
+function noOutputsAndTheShellTests() {
   it('has no outputs to write to when the node was given none', () => {
     expect(
       authoring('/data/orders/WO-1/outputs/answer.md', { outputsDir: null, outputPath: null })
@@ -612,13 +712,14 @@ describe('where an author may put a document', () => {
       })
     ).not.toMatchObject({ allow: true })
   })
-})
+}
 
 describe('pushing and opening pull requests', () => {
-  const REASON =
-    'Foundry pushes the branch and opens the pull request itself; leave both to the line.'
-  const refused = { allow: false, reason: REASON }
+  describe('refusals', refusalsTests)
+  describe('other gh commands', otherGhCommandsTests)
+})
 
+function refusalsTests() {
   it("refuses the scribe's own pull request", () => {
     const command =
       'gh pr create --draft --base main --head foundry/wo-1008-1de --title "git integration: render sanitized HTML in comments and PR descriptions" --body-file "$S/pr-body.md" 2>&1 | tail -3'
@@ -646,7 +747,9 @@ describe('pushing and opening pull requests', () => {
       decideTool(request({ readOnly: true, role: 'verifier', input: { command: 'gh pr create' } }))
     ).toEqual(refused)
   })
+}
 
+function otherGhCommandsTests() {
   it.each(['gh pr view 248', 'gh pr checks 248', 'git status', 'echo "gh pr create"'])(
     'does not refuse %s by this rule',
     (command) => {
@@ -654,4 +757,4 @@ describe('pushing and opening pull requests', () => {
       expect(decision).not.toEqual(refused)
     }
   )
-})
+}

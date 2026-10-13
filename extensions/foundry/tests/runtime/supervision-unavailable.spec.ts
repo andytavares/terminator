@@ -82,6 +82,11 @@ function readyDraft() {
 }
 
 describe('a supervision runtime that could not start', () => {
+  describe('saying so', sayingSoTests)
+  describe('refusals', refusalsTests)
+})
+
+function sayingSoTests() {
   it('is said out loud: phases would approve their own tool calls', () => {
     expect(host.showToast).toHaveBeenCalledWith(
       'error',
@@ -98,7 +103,9 @@ describe('a supervision runtime that could not start', () => {
       ok: false,
     })
   })
+}
 
+function refusalsTests() {
   it('refuses an architect turn and says why', async () => {
     await createOrderStore(dataDir).save(readyDraft())
     const started = (await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })) as {
@@ -118,4 +125,4 @@ describe('a supervision runtime that could not start', () => {
       )
     })
   })
-})
+}

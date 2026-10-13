@@ -25,6 +25,19 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }))
 
 describe('the tail of a conversation', () => {
+  describe('what was said', whatWasSaidTests)
+  describe('progress notes', progressNotesTests)
+  describe('several blocks', severalBlocksTests)
+  describe('string content and empty blocks', stringContentAndEmptyBlocksTests)
+  describe('the limit', theLimitTests)
+  describe('tool call summaries', toolCallSummariesTests)
+  describe('identifying arguments', identifyingArgumentsTests)
+  describe('multi-line commands and the tail', multiLineCommandsAndTheTailTests)
+  describe('skipping', skippingTests)
+  describe('no transcript and bad timestamps', noTranscriptAndBadTimestampsTests)
+})
+
+function whatWasSaidTests() {
   it('reads what was said, oldest first', () => {
     write(
       line({
@@ -43,7 +56,9 @@ describe('the tail of a conversation', () => {
       { role: 'assistant', kind: 'text', text: 'on it', at: Date.parse('2026-07-27T10:00:05Z') },
     ])
   })
+}
 
+function progressNotesTests() {
   it('shows a progress note carried in a thinking block, and skips an empty one', () => {
     write(
       line({
@@ -63,7 +78,9 @@ describe('the tail of a conversation', () => {
       'Bash: npm run lint',
     ])
   })
+}
 
+function severalBlocksTests() {
   it('gives a message with text and two tool calls three lines, a call being its own kind', () => {
     write(
       line({
@@ -85,7 +102,9 @@ describe('the tail of a conversation', () => {
       { role: 'assistant', kind: 'tool', text: 'Bash: npm test', at },
     ])
   })
+}
 
+function stringContentAndEmptyBlocksTests() {
   it('reads string content as one text line', () => {
     write(line({ type: 'user', timestamp: '2026-07-27T10:00:00Z', message: { content: 'hi' } }))
     expect(readTranscriptTail(file).map((l) => [l.kind, l.text])).toEqual([['text', 'hi']])
@@ -108,7 +127,9 @@ describe('the tail of a conversation', () => {
     )
     expect(readTranscriptTail(file)).toEqual([])
   })
+}
 
+function theLimitTests() {
   it('counts the limit in lines, so a message with many blocks can be cut part way', () => {
     write(
       line({
@@ -125,7 +146,9 @@ describe('the tail of a conversation', () => {
     )
     expect(readTranscriptTail(file, 2).map((l) => l.text)).toEqual(['two', 'three'])
   })
+}
 
+function toolCallSummariesTests() {
   it('summarises a tool call rather than printing all of its arguments', () => {
     // Both extremes are useless. The name alone gives fifteen consecutive
     // `[Bash]` rows, which cannot distinguish a run looping on one command
@@ -150,7 +173,9 @@ describe('the tail of a conversation', () => {
     expect(text.length).toBeLessThan(200)
     expect(text.endsWith('\u2026')).toBe(true)
   })
+}
 
+function identifyingArgumentsTests() {
   it('picks the argument that identifies the call, whatever the tool calls it', () => {
     write(
       line({
@@ -174,7 +199,9 @@ describe('the tail of a conversation', () => {
     )
     expect(readTranscriptTail(file).at(-1)?.text).toBe('TodoWrite')
   })
+}
 
+function multiLineCommandsAndTheTailTests() {
   it('flattens a multi-line command, so one call stays one line', () => {
     write(
       line({
@@ -196,7 +223,9 @@ describe('the tail of a conversation', () => {
     )
     expect(readTranscriptTail(file, 3).map((l) => l.text)).toEqual(['m7', 'm8', 'm9'])
   })
+}
 
+function skippingTests() {
   it('skips a line it cannot parse without losing the rest', () => {
     write(
       'not json at all',
@@ -220,7 +249,9 @@ describe('the tail of a conversation', () => {
     )
     expect(readTranscriptTail(file).map((l) => l.text)).toEqual(['kept'])
   })
+}
 
+function noTranscriptAndBadTimestampsTests() {
   it('reports zero rather than throwing when there is no transcript yet', () => {
     // A run whose file has not been written is the normal first second of its
     // life, not an error worth a stack trace.
@@ -231,4 +262,4 @@ describe('the tail of a conversation', () => {
     write(line({ type: 'user', timestamp: 'whenever', message: { content: 'kept' } }))
     expect(readTranscriptTail(file)[0].at).toBe(0)
   })
-})
+}

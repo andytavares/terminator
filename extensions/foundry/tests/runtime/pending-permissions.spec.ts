@@ -21,6 +21,13 @@ const ask = (over: Partial<PendingAsk> = {}): PendingAsk => ({
 })
 
 describe('holding what is waiting on the operator', () => {
+  describe('listing', listingTests)
+  describe('clearing', clearingTests)
+  describe('which run', whichRunTests)
+  describe('run ends and duplicates', runEndsAndDuplicatesTests)
+})
+
+function listingTests() {
   it('lists a raised request', () => {
     const pending = createPendingPermissions()
     pending.add(ask())
@@ -33,7 +40,9 @@ describe('holding what is waiting on the operator', () => {
     pending.add(ask({ requestId: 'second', featureDir: '/repo/specs/022-other' }))
     expect(pending.list().map((a) => a.requestId)).toEqual(['first', 'second'])
   })
+}
 
+function clearingTests() {
   it('clears one that has been answered', () => {
     const pending = createPendingPermissions()
     pending.add(ask())
@@ -45,7 +54,9 @@ describe('holding what is waiting on the operator', () => {
     const pending = createPendingPermissions()
     expect(() => pending.remove('never-raised')).not.toThrow()
   })
+}
 
+function whichRunTests() {
   it('says which run an answer belongs to', () => {
     const pending = createPendingPermissions()
     pending.add(ask({ sessionId: 'session-7' }))
@@ -56,7 +67,9 @@ describe('holding what is waiting on the operator', () => {
     // A stale click must not be sent to some other run.
     expect(createPendingPermissions().sessionFor('req-1')).toBeNull()
   })
+}
 
+function runEndsAndDuplicatesTests() {
   it('drops a card’s requests when its run ends', () => {
     const pending = createPendingPermissions()
     pending.add(ask({ requestId: 'a' }))
@@ -72,4 +85,4 @@ describe('holding what is waiting on the operator', () => {
     expect(pending.list()).toHaveLength(1)
     expect(pending.list()[0].summary).toBe('second')
   })
-})
+}

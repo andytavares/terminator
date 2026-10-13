@@ -31,6 +31,14 @@ afterEach(() => {
 })
 
 describe('ensureTrusted', () => {
+  describe('trusting', trustingTests)
+  describe('keeping other entries', keepingOtherEntriesTests)
+  describe('configs it will not touch', configsItWillNotTouchTests)
+  describe('empty paths and no projects', emptyPathsAndNoProjectsTests)
+  describe('temporary files', temporaryFilesTests)
+})
+
+function trustingTests() {
   it('trusts a repository Claude Code has never seen', () => {
     writeConfig({ projects: {} })
     expect(ensureTrusted(REPO, home)).toEqual({ changed: true })
@@ -47,7 +55,9 @@ describe('ensureTrusted', () => {
     writeConfig({ projects: { [REPO]: { hasTrustDialogAccepted: true } } })
     expect(ensureTrusted(REPO, home)).toEqual({ changed: false, reason: 'already trusted' })
   })
+}
 
+function keepingOtherEntriesTests() {
   it('keeps everything else in the project entry', () => {
     writeConfig({
       projects: {
@@ -73,7 +83,9 @@ describe('ensureTrusted', () => {
     expect(config.oauthAccount).toEqual({ emailAddress: 'someone@example.com' })
     expect(config.projects['/repos/other']).toEqual({ hasTrustDialogAccepted: true, lastCost: 2 })
   })
+}
 
+function configsItWillNotTouchTests() {
   it('never creates the file — a machine with no Claude Code config is not ours to set up', () => {
     expect(ensureTrusted(REPO, home)).toEqual({ changed: false, reason: 'no config to amend' })
     expect(fs.existsSync(claudeConfigPath(home))).toBe(false)
@@ -89,7 +101,9 @@ describe('ensureTrusted', () => {
     writeConfig(['not', 'a', 'config'])
     expect(ensureTrusted(REPO, home)).toEqual({ changed: false, reason: 'no config to amend' })
   })
+}
 
+function emptyPathsAndNoProjectsTests() {
   it('does nothing for an empty path', () => {
     writeConfig({ projects: {} })
     expect(ensureTrusted('', home)).toEqual({ changed: false, reason: 'no config to amend' })
@@ -101,19 +115,26 @@ describe('ensureTrusted', () => {
     const entry = readConfig().projects[REPO] as unknown as Record<string, unknown>
     expect(entry.hasTrustDialogAccepted).toBe(true)
   })
+}
 
+function temporaryFilesTests() {
   it('leaves no temporary file behind', () => {
     writeConfig({ projects: {} })
     ensureTrusted(REPO, home)
     expect(fs.readdirSync(home).filter((f) => f.includes('tmp'))).toEqual([])
   })
-})
+}
 
 // macOS hands out two paths for the same directory — `/var/folders/…` and
 // `/private/var/folders/…` — and this config is keyed by string. Trusting only
 // the name we happened to be given leaves the agent at the dialog whenever the
 // runtime resolves the other one, which is a coin flip nobody would ever debug.
 describe('a directory with two names', () => {
+  describe('both names', bothNamesTests)
+  describe('already trusted', alreadyTrustedTests)
+})
+
+function bothNamesTests() {
   it('trusts both the path it was given and the one it resolves to', () => {
     const real = fs.mkdtempSync(path.join(home, 'real-'))
     const link = path.join(home, 'link')
@@ -135,7 +156,9 @@ describe('a directory with two names', () => {
     const projects = readConfig().projects as unknown as Record<string, { [k: string]: unknown }>
     expect(projects[link]?.hasTrustDialogAccepted).toBe(true)
   })
+}
 
+function alreadyTrustedTests() {
   it('does not rewrite the file when both names are already trusted', () => {
     const real = fs.mkdtempSync(path.join(home, 'real-'))
     const link = path.join(home, 'link')
@@ -154,4 +177,4 @@ describe('a directory with two names', () => {
     ensureTrusted(REPO, home)
     expect(Object.keys(readConfig().projects)).toEqual([REPO])
   })
-})
+}

@@ -9,6 +9,13 @@ import { readShell, redirectTargets } from '../../src/runtime/shell-split.js'
 // binary. It tried three more spellings and gave up.
 
 describe('readShell', () => {
+  describe('quotes and operators', quotesAndOperatorsTests)
+  describe('redirections', redirectionsTests)
+  describe('substitutions', substitutionsTests)
+  describe('unterminated and escaped', unterminatedAndEscapedTests)
+})
+
+function quotesAndOperatorsTests() {
   it('leaves punctuation inside double quotes alone', () => {
     const command = 'grep -rn -E "TTL|15 \\* 60|900000|process\\.env" .'
     expect(readShell(command).segments).toEqual([command])
@@ -30,7 +37,9 @@ describe('readShell', () => {
     // ordinary command an agent writes into three, the middle one being "1".
     expect(readShell('npm test 2>&1 | tail -20').segments).toEqual(['npm test 2>&1', 'tail -20'])
   })
+}
 
+function redirectionsTests() {
   it('reports a redirection, which writes whatever is to its left', () => {
     expect(readShell('echo hi > out.txt').redirects).toBe(true)
     expect(readShell('ls 2>/dev/null').redirects).toBe(true)
@@ -41,7 +50,9 @@ describe('readShell', () => {
     expect(readShell('grep "a>b" .').redirects).toBe(false)
     expect(readShell("echo 'x < y'").redirects).toBe(false)
   })
+}
 
+function substitutionsTests() {
   // A substitution's contents are right there in the text, so they are read
   // and returned as commands rather than refused as a shape. Refusing the
   // shape cost a live run: the builder's second command was
@@ -69,7 +80,9 @@ describe('readShell', () => {
     expect(readShell("echo '$(rm -rf x)'").segments).toEqual(["echo '$(rm -rf x)'"])
     expect(readShell("grep '`x`' .").segments).toEqual(["grep '`x`' ."])
   })
+}
 
+function unterminatedAndEscapedTests() {
   it('says so when it cannot read one to the end, rather than guessing', () => {
     expect(readShell('echo $(').unreadable).toBe(true)
     expect(readShell('echo `x').unreadable).toBe(true)
@@ -86,7 +99,7 @@ describe('readShell', () => {
     expect(readShell('  ;  ls  ;  ').segments).toEqual(['ls'])
     expect(readShell('').segments).toEqual([])
   })
-})
+}
 
 describe('redirectTargets', () => {
   it('names the file a command writes', () => {
@@ -154,6 +167,15 @@ describe('a parenthesis inside a quoted argument', () => {
   })
 })
 
+const spec = [
+  "cat > tests/unit/a.spec.ts <<'TESTEOF'",
+  '/**',
+  ' * Text colour is decided in `styles.css` and in `EXTENSION_BASE_CSS`.',
+  ' */',
+  "import { describe } from 'vitest'",
+  'TESTEOF',
+].join('\n')
+
 // A heredoc body is data the shell hands to a command's stdin. It is not
 // shell, and reading it as shell is how the builder's single most common
 // operation — writing a test file — became a five-minute hold.
@@ -167,15 +189,12 @@ describe('a parenthesis inside a quoted argument', () => {
 //
 // Quoting is exactly what this module exists to track. A heredoc is quoting.
 describe('a heredoc body, which is data and not shell', () => {
-  const spec = [
-    "cat > tests/unit/a.spec.ts <<'TESTEOF'",
-    '/**',
-    ' * Text colour is decided in `styles.css` and in `EXTENSION_BASE_CSS`.',
-    ' */',
-    "import { describe } from 'vitest'",
-    'TESTEOF',
-  ].join('\n')
+  describe('the body', theBodyTests)
+  describe('after the terminator', afterTheTerminatorTests)
+  describe('spellings', spellingsTests)
+})
 
+function theBodyTests() {
   it('is not read as an unterminated substitution', () => {
     expect(readShell(spec).unreadable).toBe(false)
   })
@@ -183,7 +202,9 @@ describe('a heredoc body, which is data and not shell', () => {
   it('does not offer its lines up as commands to judge', () => {
     expect(readShell(spec).segments).not.toContain("import { describe } from 'vitest'")
   })
+}
 
+function afterTheTerminatorTests() {
   it('reads the command that follows the terminator', () => {
     const reading = readShell(`${spec}\nnpx vitest run tests/unit/a.spec.ts`)
     expect(reading.unreadable).toBe(false)
@@ -194,7 +215,9 @@ describe('a heredoc body, which is data and not shell', () => {
     const reading = readShell(`${spec}\nrm -f tests/unit/a.spec.ts`)
     expect(reading.segments).toContain('rm -f tests/unit/a.spec.ts')
   })
+}
 
+function spellingsTests() {
   it('handles the tab-stripping and unquoted spellings too', () => {
     expect(readShell('cat > a <<-EOF\n\tone `two\nEOF\necho done').unreadable).toBe(false)
     expect(readShell('cat > a <<EOF\nplain `text\nEOF\necho done').unreadable).toBe(false)
@@ -210,4 +233,4 @@ describe('a heredoc body, which is data and not shell', () => {
   it('reports a heredoc whose terminator never arrives', () => {
     expect(readShell("cat > a <<'EOF'\nunterminated body").unreadable).toBe(true)
   })
-})
+}

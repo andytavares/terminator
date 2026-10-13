@@ -152,6 +152,24 @@ afterEach(async () => {
 })
 
 describe('starting a supervised run', () => {
+  describe('the project', theProjectTests)
+  describe('the terminal and session', theTerminalAndSessionTests)
+  describe('skills and transcripts', skillsAndTranscriptsTests)
+  describe('resuming', resumingTests)
+  describe('nothing started', nothingStartedTests)
+})
+
+function ask(sessionId: string): Promise<unknown> {
+  const pending = fetch(control.url, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId, toolName: 'Bash', input: { command: 'rm -rf /' } }),
+  }).then((r) => r.json())
+  pending.catch(() => {})
+  return pending
+}
+
+function theProjectTests() {
   it('registers the worktree as a project, so the run has somewhere to live', async () => {
     await runner().start(start)
     expect(created[0]).toMatchObject({
@@ -166,7 +184,9 @@ describe('starting a supervised run', () => {
     await runner().start({ ...start, issue: { tracker: 'linear', key: 'TAV-15' } })
     expect(created[0]).toMatchObject({ issue: { tracker: 'linear', key: 'TAV-15' } })
   })
+}
 
+function theTerminalAndSessionTests() {
   it('opens a terminal in that project rather than a hidden child process', async () => {
     await runner().start(start)
     expect(opened[0]).toMatchObject({
@@ -189,7 +209,9 @@ describe('starting a supervised run', () => {
     expect(written.map((w) => w.data).join('')).not.toContain('bypassPermissions')
     expect(launchScriptBody()).not.toContain('bypassPermissions')
   })
+}
 
+function skillsAndTranscriptsTests() {
   it('points the skills at the card, so they work whatever the branch is called', async () => {
     await runner().start(start)
     // Quoted: it goes into the operator's shell, and a slug is not guaranteed
@@ -213,7 +235,9 @@ describe('starting a supervised run', () => {
       terminalSessionId: 'terminal-1',
     })
   })
+}
 
+function resumingTests() {
   it('resumes an existing conversation rather than starting a second one', async () => {
     const run = await runner().start({ ...start, resumeSessionId: 'earlier-session' })
     expect(run?.sessionId).toBe('earlier-session')
@@ -234,7 +258,9 @@ describe('starting a supervised run', () => {
     const second = await r.start({ ...start, resumeSessionId: first?.sessionId })
     expect(second?.transcriptFrom).toBe(512)
   })
+}
 
+function nothingStartedTests() {
   it('starts nothing when the worktree cannot be made a project', async () => {
     projectId = null
     expect(await runner().start(start)).toBeNull()
@@ -246,19 +272,23 @@ describe('starting a supervised run', () => {
     expect(await runner().start(start)).toBeNull()
     expect(written).toEqual([])
   })
-})
+}
 
 describe('a tool call the agent may not make on its own', () => {
-  function ask(sessionId: string): Promise<unknown> {
-    const pending = fetch(control.url, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId, toolName: 'Bash', input: { command: 'rm -rf /' } }),
-    }).then((r) => r.json())
-    pending.catch(() => {})
-    return pending
-  }
+  describe('reaching the operator', reachingTheOperatorTests)
+  describe('the answer', theAnswerTests)
+  describe('the ladder', theLadderTests)
+})
 
+async function report(sessionId: string, kind: string): Promise<void> {
+  await fetch(control.eventUrl, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId, kind }),
+  })
+}
+
+function reachingTheOperatorTests() {
   it('reaches the operator instead of being approved for them', async () => {
     const call = held()
     const r = runner()
@@ -278,7 +308,9 @@ describe('a tool call the agent may not make on its own', () => {
     await call.arrived
     expect(settled).toBe(false)
   })
+}
 
+function theAnswerTests() {
   it('proceeds once the operator allows it', async () => {
     const call = held()
     const r = runner()
@@ -304,7 +336,9 @@ describe('a tool call the agent may not make on its own', () => {
       reason: 'use the staging host',
     })
   })
+}
 
+function theLadderTests() {
   it('is settled by the autonomy ladder without troubling the operator', async () => {
     const seen: PendingPermission[] = []
     const r = runner()
@@ -316,17 +350,17 @@ describe('a tool call the agent may not make on its own', () => {
     expect(await ask(run?.sessionId ?? '')).toMatchObject({ permissionDecision: 'allow' })
     expect(seen).toEqual([])
   })
-})
+}
 
 describe('taking a run over, or ending it', () => {
-  async function report(sessionId: string, kind: string): Promise<void> {
-    await fetch(control.eventUrl, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId, kind }),
-    })
-  }
+  describe('typing and interrupting', typingAndInterruptingTests)
+  describe('stopping and ending', stoppingAndEndingTests)
+  describe('turn and conversation ends', turnAndConversationEndsTests)
+  describe('closing the tab', closingTheTabTests)
+  describe('disposing', disposingTests)
+})
 
+function typingAndInterruptingTests() {
   it('sends a message by typing it, exactly as the operator would', async () => {
     const r = runner()
     const run = await r.start(start)
@@ -343,7 +377,9 @@ describe('taking a run over, or ending it', () => {
     r.send(run?.sessionId ?? '', 'do it differently')
     expect(written.map((w) => w.data)).toEqual([ESC, 'do it differently\r'])
   })
+}
 
+function stoppingAndEndingTests() {
   it('stops the turn first, so the reason is not queued behind it', async () => {
     const r = runner()
     const run = await r.start(start)
@@ -364,7 +400,9 @@ describe('taking a run over, or ending it', () => {
     expect(runner().stop('nobody')).toBe(false)
     expect(runner().send('nobody', 'hi')).toBe(false)
   })
+}
 
+function turnAndConversationEndsTests() {
   it('reports the end of a turn without calling the run over', async () => {
     const turns: number[] = []
     const ends: number[] = []
@@ -387,14 +425,18 @@ describe('taking a run over, or ending it', () => {
     expect(ends).toEqual([1])
     expect(r.terminalFor(run?.sessionId ?? '')).toBeNull()
   })
+}
 
+function closingTheTabTests() {
   it('closes the tab once the conversation has ended, rather than leaving a shell behind', async () => {
     const r = runner()
     const run = await r.start(start)
     await report(run?.sessionId ?? '', 'session_end')
     expect(closed).toEqual(['terminal-1'])
   })
+}
 
+function disposingTests() {
   it('stops answering the agent once disposed, rather than holding a call open', async () => {
     const call = held()
     const r = runner()
@@ -409,7 +451,7 @@ describe('taking a run over, or ending it', () => {
     r.dispose()
     expect(await pending).toMatchObject({ permissionDecision: 'deny' })
   })
-})
+}
 
 describe('the environment the agent runs in', () => {
   it('forces session persistence, or there is no transcript to read', async () => {
@@ -424,6 +466,12 @@ describe('the environment the agent runs in', () => {
 })
 
 describe('when the terminal itself goes', () => {
+  describe('ending the run', endingTheRunTests)
+  describe('a host that cannot close tabs', aHostThatCannotCloseTabsTests)
+  describe('killed and failed runs', killedAndFailedRunsTests)
+})
+
+function endingTheRunTests() {
   // Supervised runs ended on the runtime's `session_end` hook. Closing the tab
   // fires no hook, so the phase stayed running with no completion ever
   // delivered.
@@ -448,7 +496,9 @@ describe('when the terminal itself goes', () => {
     exitListener?.(0)
     expect(closed).toEqual(['terminal-1'])
   })
+}
 
+function aHostThatCannotCloseTabsTests() {
   it('still stops answering the agent on a host that cannot close the tab', async () => {
     const host = api() as { pty: { closeTerminalTab?: unknown } }
     delete host.pty.closeTerminalTab
@@ -470,7 +520,9 @@ describe('when the terminal itself goes', () => {
     expect(() => exitListener?.(0)).not.toThrow()
     expect(await pending).toMatchObject({ permissionDecision: 'deny' })
   })
+}
 
+function killedAndFailedRunsTests() {
   // Closing the tab kills the shell with SIGHUP. The core reports that as no
   // exit status; it used to arrive as 0, and the phase was recorded as ended.
   it('ends a run whose terminal was killed with no exit status, never a clean 0', async () => {
@@ -494,7 +546,7 @@ describe('when the terminal itself goes', () => {
     exitListener?.(0)
     expect(exitDetached).toBe(true)
   })
-})
+}
 
 // Awaiting the response is enough: the control server runs an event's
 // handler synchronously in the tick it answers, before the answer can be read.
@@ -516,6 +568,14 @@ function askPermission(sessionId: string): void {
 }
 
 describe('running the next phase in the conversation that is already open', () => {
+  describe('no second terminal', noSecondTerminalTests)
+  describe('keeping the session', keepingTheSessionTests)
+  describe('gone sessions and turn ends', goneSessionsAndTurnEndsTests)
+  describe('permission asks', permissionAsksTests)
+  describe('the waiting flag', theWaitingFlagTests)
+})
+
+function noSecondTerminalTests() {
   it('opens no second terminal, which is where the tab-per-phase sprawl came from', async () => {
     const supervised = runner()
     const run = await supervised.start(start)
@@ -542,7 +602,9 @@ describe('running the next phase in the conversation that is already open', () =
     })
     expect(written).toEqual([{ terminal: 'terminal-1', data: '/speckit-plan\r' }])
   })
+}
 
+function keepingTheSessionTests() {
   it('keeps the session and its transcript, which is the point of reusing it', async () => {
     const supervised = runner()
     const run = await supervised.start(start)
@@ -567,7 +629,9 @@ describe('running the next phase in the conversation that is already open', () =
     })
     expect(written[0].data).toBe('do this and that\r')
   })
+}
 
+function goneSessionsAndTurnEndsTests() {
   it('reports nothing for a session that is gone, rather than typing into thin air', () => {
     // The tab was closed, or the console restarted. The caller's signal to open
     // a fresh conversation instead of silently dropping the phase.
@@ -595,7 +659,9 @@ describe('running the next phase in the conversation that is already open', () =
     await reportEvent(run!.sessionId, 'stop')
     expect(seen).toEqual(['plan'])
   })
+}
 
+function permissionAsksTests() {
   it('reports the new phase’s permission asks, not the one that just finished', async () => {
     const supervised = runner()
     const seen: string[] = []
@@ -617,7 +683,9 @@ describe('running the next phase in the conversation that is already open', () =
     await plan.arrived
     expect(seen).toEqual(['plan'])
   })
+}
 
+function theWaitingFlagTests() {
   it('clears the waiting flag, so the new phase is not born already blocked', async () => {
     const supervised = runner()
     const run = await supervised.start(start)
@@ -631,7 +699,7 @@ describe('running the next phase in the conversation that is already open', () =
     })
     expect(supervised.watchable()[0].isWaiting).toBe(false)
   })
-})
+}
 
 describe('an agent sitting at its prompt', () => {
   it('counts as blocked on a person, not as having stopped making progress', async () => {
@@ -694,6 +762,14 @@ describe('acting on a session that is not there', () => {
   })
 })
 
+const longPrompt = [
+  'Turn intent and context into criteria and a plan.',
+  '',
+  '# Read the session TTL from the environment',
+  '',
+  'x'.repeat(4000),
+].join('\n')
+
 // A terminal in canonical mode silently mangles anything past `MAX_CANON` on
 // one line — 1024 bytes on macOS. A brief is a role prompt plus a whole work
 // order, which is always longer, and it was typed at the shell prompt. A live
@@ -701,16 +777,24 @@ describe('acting on a session that is not there', () => {
 // the rest cut off mid-word, and nothing could see it: the terminal shows the
 // first line correctly, the agent starts, and it does the wrong work or none.
 describe('launching with a brief longer than a terminal line', () => {
+  describe('line length', lineLengthTests)
+  describe('what still shows', whatStillShowsTests)
+  describe('the heredoc', theHeredocTests)
+})
+
+const IDENTITY = [
+  'CLAUDE_CODE_BRIDGE_SESSION_ID',
+  'CLAUDE_CODE_MESSAGING_SOCKET',
+  'CLAUDE_CODE_MESSAGING_TOKEN',
+  'CLAUDE_CODE_SESSION_ID',
+  'CLAUDE_CODE_CHILD_SESSION',
+  'CLAUDE_PID',
+  'CLAUDECODE',
+]
+
+function lineLengthTests() {
   /** The canonical-mode line limit this is all about. */
   const MAX_CANON = 1024
-
-  const longPrompt = [
-    'Turn intent and context into criteria and a plan.',
-    '',
-    '# Read the session TTL from the environment',
-    '',
-    'x'.repeat(4000),
-  ].join('\n')
 
   it('never types a line the terminal cannot carry', async () => {
     await runner().start({ ...start, prompt: longPrompt })
@@ -730,7 +814,9 @@ describe('launching with a brief longer than a terminal line', () => {
     // Intact, not truncated: the tail of the brief is there too.
     expect(body).toContain('x'.repeat(4000))
   })
+}
 
+function whatStillShowsTests() {
   it('still shows the whole command in the terminal, which is the point of a terminal', async () => {
     await runner().start({ ...start, prompt: longPrompt })
     const body = launchScriptBody()
@@ -746,7 +832,9 @@ describe('launching with a brief longer than a terminal line', () => {
     expect(body).toContain('SPECIFY_FEATURE=')
     expect(body).toContain('CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1')
   })
+}
 
+function theHeredocTests() {
   it('never lets the brief out of the quoted heredoc, so nothing in it is run', async () => {
     await runner().start({ ...start, prompt: 'plan it\nTERMINATOR_LAUNCH\nrm -rf /' })
     const body = launchScriptBody()
@@ -757,7 +845,7 @@ describe('launching with a brief longer than a terminal line', () => {
     expect(firstEnd).toBeGreaterThan(0)
     expect(afterHeredoc.slice(firstEnd)).toContain('exec ')
   })
-})
+}
 
 // A fresh agent must not inherit another session's identity.
 //
@@ -768,16 +856,11 @@ describe('launching with a brief longer than a terminal line', () => {
 // all, and from the console it looked exactly like an agent thinking. Four
 // live runs died on it.
 describe('the parent session it must not inherit', () => {
-  const IDENTITY = [
-    'CLAUDE_CODE_BRIDGE_SESSION_ID',
-    'CLAUDE_CODE_MESSAGING_SOCKET',
-    'CLAUDE_CODE_MESSAGING_TOKEN',
-    'CLAUDE_CODE_SESSION_ID',
-    'CLAUDE_CODE_CHILD_SESSION',
-    'CLAUDE_PID',
-    'CLAUDECODE',
-  ]
+  describe('unsetting', unsettingTests)
+  describe('what it keeps', whatItKeepsTests)
+})
 
+function unsettingTests() {
   it.each(IDENTITY)('unsets %s before the agent starts', async (name) => {
     await runner().start(start)
     const body = launchScriptBody()
@@ -792,7 +875,9 @@ describe('the parent session it must not inherit', () => {
     expect(body.indexOf('unset ')).toBeLessThan(body.indexOf('exec '))
     expect(body.indexOf('unset ')).toBeLessThan(body.indexOf('SPECIFY_FEATURE='))
   })
+}
 
+function whatItKeepsTests() {
   it('still forces session persistence, which is the other half of the same problem', async () => {
     await runner().start(start)
     expect(launchScriptBody()).toContain('CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1')
@@ -802,7 +887,7 @@ describe('the parent session it must not inherit', () => {
     const run = await runner().start(start)
     expect(launchScriptBody()).toContain(`--session-id ${run?.sessionId}`)
   })
-})
+}
 
 // The other half of the stall the detector could not have seen through. A
 // session's `startedAt` was written once, at registration, and the stall
@@ -839,15 +924,20 @@ describe('when a session is given something new to do', () => {
   })
 })
 
-describe('running one command in a terminal, with no agent', () => {
-  const command = {
-    worktreePath: '/wt/feat-thing',
-    workspaceId: 'ws-1',
-    branch: 'feat/thing',
-    title: 'Lint',
-    command: 'npm run lint',
-  }
+const command = {
+  worktreePath: '/wt/feat-thing',
+  workspaceId: 'ws-1',
+  branch: 'feat/thing',
+  title: 'Lint',
+  command: 'npm run lint',
+}
 
+describe('running one command in a terminal, with no agent', () => {
+  describe('opening the tab', openingTheTabTests)
+  describe('exit statuses', exitStatusesTests)
+})
+
+function openingTheTabTests() {
   it("links the order's ticket to the project a command opens, too", async () => {
     void runner().runCommand({ ...command, issue: { tracker: 'linear', key: 'TAV-15' } })
     await settled()
@@ -880,7 +970,9 @@ describe('running one command in a terminal, with no agent', () => {
     expect(ran[0].args).toEqual(['-i', '-l', '-c', `exec '${shell}' '${scriptOf(ran[0])}'`])
     expect(readFileSync(scriptOf(ran[0]), 'utf8')).toContain('npm run lint')
   })
+}
 
+function exitStatusesTests() {
   it('resolves 0 for a command that exited 0, and closes its tab', async () => {
     exitWith({ exitCode: 0 })
     await expect(runner().runCommand(command)).resolves.toBe(0)
@@ -908,7 +1000,7 @@ describe('running one command in a terminal, with no agent', () => {
     terminalId = null
     await expect(runner().runCommand(command)).resolves.toBeNull()
   })
-})
+}
 
 // A command step's output used to vanish the moment the tab scrolled past it.
 // logPath tees stdout+stderr to a file while keeping the script's own exit

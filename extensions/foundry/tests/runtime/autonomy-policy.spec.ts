@@ -61,22 +61,28 @@ describe('ordinary work inside the checkout', () => {
   })
 })
 
-describe('a destructive action (FR-050)', () => {
-  const DESTRUCTIVE = [
-    'rm -rf build',
-    'rm src/session.js',
-    'git reset --hard origin/main',
-    'git clean -fd',
-    'git push --force origin main',
-    'git push --force-with-lease',
-    'git branch -D main',
-    'git rebase -i main',
-    'shred -u secrets.txt',
-    'dd if=/dev/zero of=disk.img',
-    'chmod -R 777 /',
-    'pkill -f node',
-  ]
+const DESTRUCTIVE = [
+  'rm -rf build',
+  'rm src/session.js',
+  'git reset --hard origin/main',
+  'git clean -fd',
+  'git push --force origin main',
+  'git push --force-with-lease',
+  'git branch -D main',
+  'git rebase -i main',
+  'shred -u secrets.txt',
+  'dd if=/dev/zero of=disk.img',
+  'chmod -R 777 /',
+  'pkill -f node',
+]
 
+describe('a destructive action (FR-050)', () => {
+  describe('destructive commands', destructiveCommandsTests)
+  describe('parsing', parsingTests)
+  describe('a command joined to another command', aCommandJoinedToAnotherCommandTests)
+})
+
+function destructiveCommandsTests() {
   it.each(DESTRUCTIVE)('asks about `%s` at every setting', (command) => {
     for (const autonomy of ['escorted', 'standard', 'lights-out'] as Autonomy[]) {
       expect(decide('Bash', bash(command), autonomy), `${command} at ${autonomy}`).toBeNull()
@@ -86,7 +92,9 @@ describe('a destructive action (FR-050)', () => {
   it.each(DESTRUCTIVE)('recognises `%s` as destructive', (command) => {
     expect(isDestructive('Bash', bash(command))).toBe(true)
   })
+}
 
+function parsingTests() {
   it('asks about anything it cannot parse, rather than assuming it is safe', () => {
     // The hole the read-only policy documents: reading `git status` off the
     // front of `git status; rm -rf .` is reading the wrong command.
@@ -110,48 +118,52 @@ describe('a destructive action (FR-050)', () => {
   it('is never claimed of a tool that is not a shell', () => {
     expect(isDestructive('Edit', { file_path: '/x/rm -rf' })).toBe(false)
   })
+}
 
-  // Every compound command used to be called destructive, on the reasoning
-  // that a shell might be doing something other than the first word. But that
-  // does not stop at the dangerous ones: `pwd && git status` and
-  // `npm test 2>&1 | tail -20` are the ordinary sentences every agent writes,
-  // and each was classified as destroying work and sent to an operator — at
-  // every setting, lights-out included. Which is why builders sat doing
-  // nothing while the graph said `running` and the worktree stayed clean.
-  describe('a command joined to another command', () => {
-    const ORDINARY = [
-      'pwd && git rev-parse --abbrev-ref HEAD && git status --short',
-      'npm test 2>&1 | tail -20',
-      'grep -rn TTL . | head -20',
-      'cd src && cat session.js',
-      'ls -la; cat package.json',
-      'npm run lint 2>/dev/null | tail -5',
-    ]
+function aCommandJoinedToAnotherCommandTests() {
+  const ORDINARY = [
+    'pwd && git rev-parse --abbrev-ref HEAD && git status --short',
+    'npm test 2>&1 | tail -20',
+    'grep -rn TTL . | head -20',
+    'cd src && cat session.js',
+    'ls -la; cat package.json',
+    'npm run lint 2>/dev/null | tail -5',
+  ]
 
-    it.each(ORDINARY)('takes `%s` without asking anyone', (command) => {
-      expect(isDestructive('Bash', bash(command))).toBe(false)
-      expect(decide('Bash', bash(command))?.allow).toBe(true)
-    })
-
-    it('still catches the destructive half, wherever it sits', () => {
-      expect(isDestructive('Bash', bash('npm test && git reset --hard'))).toBe(true)
-      expect(isDestructive('Bash', bash('ls; git clean -fd'))).toBe(true)
-      expect(isDestructive('Bash', bash('cat x | rm -rf y'))).toBe(true)
-    })
-
-    it('reads the binary past a leading environment assignment', () => {
-      expect(isDestructive('Bash', bash('CI=1 npm test'))).toBe(false)
-      expect(isDestructive('Bash', bash('CI=1 FORCE=1 rm -rf build'))).toBe(true)
-    })
-
-    it('still asks about a command built inside another, which it cannot read', () => {
-      expect(isDestructive('Bash', bash('echo $(rm -rf x)'))).toBe(true)
-      expect(isDestructive('Bash', bash('echo `rm -rf x`'))).toBe(true)
-    })
+  it.each(ORDINARY)('takes `%s` without asking anyone', (command) => {
+    expect(isDestructive('Bash', bash(command))).toBe(false)
+    expect(decide('Bash', bash(command))?.allow).toBe(true)
   })
-})
+
+  it('still catches the destructive half, wherever it sits', () => {
+    expect(isDestructive('Bash', bash('npm test && git reset --hard'))).toBe(true)
+    expect(isDestructive('Bash', bash('ls; git clean -fd'))).toBe(true)
+    expect(isDestructive('Bash', bash('cat x | rm -rf y'))).toBe(true)
+  })
+
+  it('reads the binary past a leading environment assignment', () => {
+    expect(isDestructive('Bash', bash('CI=1 npm test'))).toBe(false)
+    expect(isDestructive('Bash', bash('CI=1 FORCE=1 rm -rf build'))).toBe(true)
+  })
+
+  it('still asks about a command built inside another, which it cannot read', () => {
+    expect(isDestructive('Bash', bash('echo $(rm -rf x)'))).toBe(true)
+    expect(isDestructive('Bash', bash('echo `rm -rf x`'))).toBe(true)
+  })
+}
 
 describe('a write outside the checkout (FR-050)', () => {
+  describe('outside the checkout', outsideTheCheckoutTests)
+  describe('inside the checkout', insideTheCheckoutTests)
+  describe(
+    'a redirection, which writes the file it names',
+    aRedirectionWhichWritesTheFileItNamesTests
+  )
+  describe('a directory with two names', aDirectoryWithTwoNamesTests)
+  describe('the path field', thePathFieldTests)
+})
+
+function outsideTheCheckoutTests() {
   it('asks, at every setting', () => {
     for (const autonomy of ['standard', 'lights-out'] as Autonomy[]) {
       expect(decide('Write', { file_path: '/etc/hosts' }, autonomy)).toBeNull()
@@ -166,7 +178,9 @@ describe('a write outside the checkout (FR-050)', () => {
   it('is not fooled by a sibling directory that shares the prefix', () => {
     expect(writesOutside('Write', { file_path: `${WORKTREE}-other/x.js` }, WORKTREE)).toBe(true)
   })
+}
 
+function insideTheCheckoutTests() {
   it('allows the checkout itself and everything under it', () => {
     expect(writesOutside('Edit', { file_path: `${WORKTREE}/src/deep/x.js` }, WORKTREE)).toBe(false)
     expect(writesOutside('Edit', { file_path: WORKTREE }, WORKTREE)).toBe(false)
@@ -179,84 +193,76 @@ describe('a write outside the checkout (FR-050)', () => {
   it('says nothing when there is no checkout to be outside of', () => {
     expect(writesOutside('Write', { file_path: '/etc/hosts' }, '')).toBe(false)
   })
+}
 
-  // A shell redirection is a write, and it names its file in the command
-  // rather than in a field. It used to be covered by accident — every command
-  // containing `>` was called destructive — so dropping that blanket test
-  // without reading the redirect would have quietly lost FR-050 here.
-  describe('a redirection, which writes the file it names', () => {
-    it('asks when it writes outside the checkout', () => {
-      expect(writesOutside('Bash', bash('echo hi > /etc/hosts'), '/work/checkout')).toBe(true)
-      expect(writesOutside('Bash', bash('npm test >> /work/other/out.log'), '/work/checkout')).toBe(
-        true
-      )
-    })
-
-    it('takes one inside it, which is a unit writing its own files', () => {
-      expect(writesOutside('Bash', bash('echo hi > notes.txt'), '/work/checkout')).toBe(false)
-      expect(
-        writesOutside('Bash', bash('npm test > /work/checkout/out.log'), '/work/checkout')
-      ).toBe(false)
-    })
-
-    it('says nothing about a discard, which writes nothing', () => {
-      expect(writesOutside('Bash', bash('npm test 2>/dev/null'), '/work/checkout')).toBe(false)
-      expect(writesOutside('Bash', bash('ls 2>&1'), '/work/checkout')).toBe(false)
-    })
-
-    it('says nothing about a shell command that redirects nowhere', () => {
-      expect(writesOutside('Bash', bash('npm test'), '/work/checkout')).toBe(false)
-    })
+function aRedirectionWhichWritesTheFileItNamesTests() {
+  it('asks when it writes outside the checkout', () => {
+    expect(writesOutside('Bash', bash('echo hi > /etc/hosts'), '/work/checkout')).toBe(true)
+    expect(writesOutside('Bash', bash('npm test >> /work/other/out.log'), '/work/checkout')).toBe(
+      true
+    )
   })
 
-  // macOS hands out `/var/folders/…` and `/private/var/folders/…` for the same
-  // directory, and `path.resolve` does not follow symlinks. A checkout known by
-  // one name and a file written under the other read as different places, so
-  // every ordinary edit inside the unit's own worktree asked — at every
-  // setting. The same coin flip that left agents sitting at the trust dialog.
-  describe('a directory with two names', () => {
-    let base: string
-    let checkout: string
-
-    // The checkout is reached through a symlink, so its real path is its
-    // other name on every platform, not only where the temp dir is one.
-    beforeEach(() => {
-      base = makeTempDir('fdry-outside-')
-      fs.mkdirSync(path.join(base, 'real', 'src'), { recursive: true })
-      checkout = path.join(base, 'link')
-      fs.symlinkSync(path.join(base, 'real'), checkout)
-    })
-
-    afterEach(() => {
-      fs.rmSync(base, { recursive: true, force: true })
-    })
-
-    it("takes a file under the checkout's other name", () => {
-      const other = fs.realpathSync(checkout)
-      expect(other).not.toBe(checkout)
-      expect(writesOutside('Edit', { file_path: path.join(other, 'src/a.ts') }, checkout)).toBe(
-        false
-      )
-    })
-
-    it('takes a file that does not exist yet, which is most of what a builder writes', () => {
-      const other = fs.realpathSync(checkout)
-      expect(
-        writesOutside('Edit', { file_path: path.join(other, 'deep/er/new.ts') }, checkout)
-      ).toBe(false)
-    })
-
-    it('still asks about a path that is genuinely elsewhere', () => {
-      expect(writesOutside('Edit', { file_path: '/etc/hosts' }, checkout)).toBe(true)
-      expect(writesOutside('Edit', { file_path: '/work/other/x.ts' }, checkout)).toBe(true)
-    })
+  it('takes one inside it, which is a unit writing its own files', () => {
+    expect(writesOutside('Bash', bash('echo hi > notes.txt'), '/work/checkout')).toBe(false)
+    expect(writesOutside('Bash', bash('npm test > /work/checkout/out.log'), '/work/checkout')).toBe(
+      false
+    )
   })
 
+  it('says nothing about a discard, which writes nothing', () => {
+    expect(writesOutside('Bash', bash('npm test 2>/dev/null'), '/work/checkout')).toBe(false)
+    expect(writesOutside('Bash', bash('ls 2>&1'), '/work/checkout')).toBe(false)
+  })
+
+  it('says nothing about a shell command that redirects nowhere', () => {
+    expect(writesOutside('Bash', bash('npm test'), '/work/checkout')).toBe(false)
+  })
+}
+
+function aDirectoryWithTwoNamesTests() {
+  let base: string
+
+  let checkout: string
+
+  // The checkout is reached through a symlink, so its real path is its
+  // other name on every platform, not only where the temp dir is one.
+  beforeEach(() => {
+    base = makeTempDir('fdry-outside-')
+    fs.mkdirSync(path.join(base, 'real', 'src'), { recursive: true })
+    checkout = path.join(base, 'link')
+    fs.symlinkSync(path.join(base, 'real'), checkout)
+  })
+
+  afterEach(() => {
+    fs.rmSync(base, { recursive: true, force: true })
+  })
+
+  it("takes a file under the checkout's other name", () => {
+    const other = fs.realpathSync(checkout)
+    expect(other).not.toBe(checkout)
+    expect(writesOutside('Edit', { file_path: path.join(other, 'src/a.ts') }, checkout)).toBe(false)
+  })
+
+  it('takes a file that does not exist yet, which is most of what a builder writes', () => {
+    const other = fs.realpathSync(checkout)
+    expect(writesOutside('Edit', { file_path: path.join(other, 'deep/er/new.ts') }, checkout)).toBe(
+      false
+    )
+  })
+
+  it('still asks about a path that is genuinely elsewhere', () => {
+    expect(writesOutside('Edit', { file_path: '/etc/hosts' }, checkout)).toBe(true)
+    expect(writesOutside('Edit', { file_path: '/work/other/x.ts' }, checkout)).toBe(true)
+  })
+}
+
+function thePathFieldTests() {
   it('reads the path from whichever field the tool names it in', () => {
     expect(writesOutside('NotebookEdit', { notebook_path: '/etc/x.ipynb' }, WORKTREE)).toBe(true)
     expect(writesOutside('Read', { path: '/etc/hosts' }, WORKTREE)).toBe(true)
   })
-})
+}
 
 describe('what this is not', () => {
   it('never refuses — it either takes the decision or leaves it to the operator', () => {

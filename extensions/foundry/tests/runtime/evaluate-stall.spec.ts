@@ -25,6 +25,11 @@ function facts(over: Partial<SessionFacts> = {}): SessionFacts {
 }
 
 describe('silence signal (FR-012)', () => {
+  describe('the threshold', theThresholdTests)
+  describe('sessions with no activity', sessionsWithNoActivityTests)
+})
+
+function theThresholdTests() {
   it('does not fire below the threshold', () => {
     expect(evaluateStall(facts(), DEFAULT_THRESHOLDS, 7 * MIN)).toBeNull()
   })
@@ -44,7 +49,9 @@ describe('silence signal (FR-012)', () => {
     expect(evaluateStall(facts(), thresholds, 9 * MIN)).toBeNull()
     expect(evaluateStall(facts(), thresholds, 21 * MIN)?.signal).toBe('silence')
   })
+}
 
+function sessionsWithNoActivityTests() {
   it('treats a session that has never recorded activity as silent from its start', () => {
     const firing = evaluateStall(facts({ lastToolActivityAt: null }), DEFAULT_THRESHOLDS, 9 * MIN)
     expect(firing?.signal).toBe('silence')
@@ -75,7 +82,7 @@ describe('silence signal (FR-012)', () => {
     )
     expect(firing?.inputs.diffSilenceMs).toBe(10 * MIN)
   })
-})
+}
 
 describe('the long-running-command exemption (FR-015)', () => {
   // The spec calls this "the obvious first bug" and quickstart.md makes it the
@@ -188,6 +195,18 @@ describe('purity', () => {
   })
 })
 
+const turnFacts = (over: Partial<SessionFacts> = {}): SessionFacts => ({
+  sessionId: 's1',
+  canStall: true,
+  stateSince: 0,
+  lastToolActivityAt: null,
+  lastNetChangeAt: null,
+  openShellStartedAt: null,
+  recentToolPaths: [],
+  recentNetChange: 1,
+  ...over,
+})
+
 // Measured on WO-0910-1fb. The architect's intake conversation is one session
 // across many turns: it converged, went quiet while the operator read what it
 // had written, and was sent a new turn twenty minutes later. `lastToolActivityAt`
@@ -201,23 +220,15 @@ describe('purity', () => {
 // says when that began; it was only ever consulted when there was no tool
 // activity at all.
 describe('a session that has just been given a new turn', () => {
-  const facts = (over: Partial<SessionFacts> = {}): SessionFacts => ({
-    sessionId: 's1',
-    canStall: true,
-    stateSince: 0,
-    lastToolActivityAt: null,
-    lastNetChangeAt: null,
-    openShellStartedAt: null,
-    recentToolPaths: [],
-    recentNetChange: 1,
-    ...over,
-  })
+  describe('a new turn', aNewTurnTests)
+})
 
+function aNewTurnTests() {
   it('is not silent for the time it spent between turns', () => {
     const resumedAt = 20 * 60_000
     expect(
       evaluateStall(
-        facts({ stateSince: resumedAt, lastToolActivityAt: 0, lastNetChangeAt: 0 }),
+        turnFacts({ stateSince: resumedAt, lastToolActivityAt: 0, lastNetChangeAt: 0 }),
         DEFAULT_THRESHOLDS,
         resumedAt + 23_000
       )
@@ -227,7 +238,7 @@ describe('a session that has just been given a new turn', () => {
   it('is silent once the new turn has itself been quiet for long enough', () => {
     const resumedAt = 20 * 60_000
     const firing = evaluateStall(
-      facts({ stateSince: resumedAt, lastToolActivityAt: 0, lastNetChangeAt: 0 }),
+      turnFacts({ stateSince: resumedAt, lastToolActivityAt: 0, lastNetChangeAt: 0 }),
       DEFAULT_THRESHOLDS,
       resumedAt + 9 * 60_000
     )
@@ -236,11 +247,11 @@ describe('a session that has just been given a new turn', () => {
 
   it('still measures from the last tool call when that is the more recent of the two', () => {
     const firing = evaluateStall(
-      facts({ stateSince: 0, lastToolActivityAt: 60_000, lastNetChangeAt: 60_000 }),
+      turnFacts({ stateSince: 0, lastToolActivityAt: 60_000, lastNetChangeAt: 60_000 }),
       DEFAULT_THRESHOLDS,
       60_000 + 9 * 60_000
     )
     expect(firing?.signal).toBe('silence')
     expect(firing?.inputs.toolSilenceMs).toBe(9 * 60_000)
   })
-})
+}

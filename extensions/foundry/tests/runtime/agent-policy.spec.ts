@@ -69,12 +69,11 @@ describe('a read-only turn in the Forge', () => {
   })
 })
 
-describe('trusting the repository an agent starts in', () => {
-  let home: string
-  const entries: LedgerEntry[] = []
-  const store = { record: async (entry: LedgerEntry) => void entries.push(entry) }
-  const api = { log: { error: vi.fn() } } as unknown as ExtensionAPI
+let home: string
+const entries: LedgerEntry[] = []
+const api = { log: { error: vi.fn() } } as unknown as ExtensionAPI
 
+describe('trusting the repository an agent starts in', () => {
   beforeEach(() => {
     home = temporaryDirectory('fdry-home')
     vi.stubEnv('HOME', home)
@@ -83,6 +82,12 @@ describe('trusting the repository an agent starts in', () => {
   })
 
   afterEach(() => vi.unstubAllEnvs())
+
+  describe('trusting', trustingTests)
+})
+
+function trustingTests() {
+  const store = { record: async (entry: LedgerEntry) => void entries.push(entry) }
 
   it('marks it trusted in the Claude Code configuration and says so on the order', async () => {
     fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ projects: {} }))
@@ -113,4 +118,4 @@ describe('trusting the repository an agent starts in', () => {
     expect(api.log.error).toHaveBeenCalledWith(expect.stringContaining('trust dialog'))
     expect(entries).toEqual([])
   })
-})
+}

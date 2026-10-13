@@ -72,6 +72,22 @@ describe('installHookScript', () => {
 })
 
 describe('the hook script, run the way Claude Code runs it', () => {
+  describe('allow and defer', allowAndDeferTests)
+  describe('the tool and input', theToolAndInputTests)
+  describe('the reason', theReasonTests)
+  describe('edited input', editedInputTests)
+  describe('an unreachable or refusing console', anUnreachableOrRefusingConsoleTests)
+  describe('unrecognisable answers and input', unrecognisableAnswersAndInputTests)
+  describe('exit status', exitStatusTests)
+})
+
+const STOP_INPUT = JSON.stringify({
+  session_id: 'runtime-1',
+  hook_event_name: 'Stop',
+  reason: 'end_turn',
+})
+
+function allowAndDeferTests() {
   it('reports allow as the documented hookSpecificOutput shape', async () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
@@ -97,7 +113,9 @@ describe('the hook script, run the way Claude Code runs it', () => {
     )
     expect(stdout).toBe('')
   })
+}
 
+function theToolAndInputTests() {
   it('passes the tool and its input through to the console', async () => {
     server = await createControlServer()
     let seen: unknown = null
@@ -114,7 +132,9 @@ describe('the hook script, run the way Claude Code runs it', () => {
       input: { command: 'rm -rf /' },
     })
   })
+}
 
+function theReasonTests() {
   it('carries the operator words back to the agent as the decision reason', async () => {
     server = await createControlServer()
     server.register('s1', {
@@ -138,7 +158,9 @@ describe('the hook script, run the way Claude Code runs it', () => {
       },
     })
   })
+}
 
+function editedInputTests() {
   it('carries an edited input back inside hookSpecificOutput, where the runtime reads it', async () => {
     server = await createControlServer()
     server.register('s1', {
@@ -158,7 +180,9 @@ describe('the hook script, run the way Claude Code runs it', () => {
       updatedInput: { command: 'ls' },
     })
   })
+}
 
+function anUnreachableOrRefusingConsoleTests() {
   it('asks in the terminal when the console cannot be reached', async () => {
     // Nothing is listening on this port: the console is closed, or crashed.
     const stdout = await run(
@@ -179,7 +203,9 @@ describe('the hook script, run the way Claude Code runs it', () => {
       hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask' },
     })
   })
+}
 
+function unrecognisableAnswersAndInputTests() {
   it('asks in the terminal when the console answers something unrecognisable', async () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'maybe' }) as never })
@@ -205,7 +231,9 @@ describe('the hook script, run the way Claude Code runs it', () => {
       hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask' },
     })
   })
+}
 
+function exitStatusTests() {
   it('exits zero even when it denies, so the runtime reads the decision rather than an error', async () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'deny' }) })
@@ -213,15 +241,14 @@ describe('the hook script, run the way Claude Code runs it', () => {
       run(installHookScript(directory), [server.url, server.token, 's1'], HOOK_INPUT)
     ).resolves.toBeTruthy()
   })
-})
+}
 
 describe('the hook script reporting a lifecycle event', () => {
-  const STOP_INPUT = JSON.stringify({
-    session_id: 'runtime-1',
-    hook_event_name: 'Stop',
-    reason: 'end_turn',
-  })
+  describe('reporting the end', reportingTheEndTests)
+  describe('staying out of the way', stayingOutOfTheWayTests)
+})
 
+function reportingTheEndTests() {
   it('tells the console the turn ended', async () => {
     server = await createControlServer()
     const seen: string[] = []
@@ -251,7 +278,9 @@ describe('the hook script reporting a lifecycle event', () => {
     )
     expect(seen).toEqual(['session_end'])
   })
+}
 
+function stayingOutOfTheWayTests() {
   it('says nothing to the agent, because a lifecycle report is not a decision', async () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
@@ -272,7 +301,7 @@ describe('the hook script reporting a lifecycle event', () => {
       )
     ).resolves.toBe('')
   })
-})
+}
 
 // "Nothing is approved silently and nothing is blocked forever" is this
 // script's stated contract, and the second half needed the request itself to

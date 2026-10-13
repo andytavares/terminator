@@ -13,6 +13,11 @@ import { makeTempDir } from '../../../../tests/support/temp-dir'
 // review queue at all (FR-045), and the >300-line P1 trigger (FR-048).
 
 describe('parseDiffStat', () => {
+  describe('counting', countingTests)
+  describe('odd rows', oddRowsTests)
+})
+
+function countingTests() {
   it('sums added and removed lines across files', () => {
     expect(parseDiffStat('12\t3\tsrc/a.ts\n4\t1\tsrc/b.ts\n')).toEqual({
       files: 2,
@@ -42,7 +47,9 @@ describe('parseDiffStat', () => {
       removed: 2,
     })
   })
+}
 
+function oddRowsTests() {
   it('handles a file with only additions', () => {
     expect(parseDiffStat('9\t0\tsrc/new.ts\n')).toEqual({ files: 1, added: 9, removed: 0 })
   })
@@ -58,7 +65,7 @@ describe('parseDiffStat', () => {
   it('handles paths containing tabs in a rename by taking the leading counts', () => {
     expect(parseDiffStat('3\t1\told.ts => new.ts\n')).toMatchObject({ files: 1, added: 3 })
   })
-})
+}
 
 /**
  * A git that answers each command with its own output. The two calls this makes
@@ -73,20 +80,24 @@ function git(over: { diff?: string; untracked?: string; ok?: boolean } = {}) {
   }))
 }
 
-describe('counting the lines in a file git has never seen', () => {
-  // A new file's lines count towards the change like any other, so the
-  // 300-line review trigger sees work that arrived as new files.
-  let dir: string
+// A new file's lines count towards the change like any other, so the
+// 300-line review trigger sees work that arrived as new files.
+let dir: string
+const summarise = (untracked: string) => readDiffSummary(dir, 'main', git({ diff: '', untracked }))
 
+describe('counting the lines in a file git has never seen', () => {
   beforeEach(() => {
     dir = makeTempDir('session-metrics-')
   })
 
   afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }))
 
-  const summarise = (untracked: string) =>
-    readDiffSummary(dir, 'main', git({ diff: '', untracked }))
+  describe('counting lines', countingLinesTests)
+  describe('binary, huge and unreadable files', binaryHugeAndUnreadableFilesTests)
+  describe('an unlistable tree', anUnlistableTreeTests)
+})
 
+function countingLinesTests() {
   it('counts them', async () => {
     writeFileSync(join(dir, 'new.ts'), 'a\nb\nc\n')
     await expect(summarise('new.ts\n')).resolves.toMatchObject({ files: 1, added: 3 })
@@ -101,7 +112,9 @@ describe('counting the lines in a file git has never seen', () => {
     writeFileSync(join(dir, 'empty.ts'), '')
     await expect(summarise('empty.ts\n')).resolves.toMatchObject({ files: 1, added: 0 })
   })
+}
 
+function binaryHugeAndUnreadableFilesTests() {
   it('attributes no lines to something binary, rather than distorting the trigger', async () => {
     writeFileSync(join(dir, 'logo.png'), Buffer.from([0x89, 0x50, 0x00, 0x01, 0x02]))
     await expect(summarise('logo.png\n')).resolves.toMatchObject({ files: 1, added: 0 })
@@ -115,7 +128,9 @@ describe('counting the lines in a file git has never seen', () => {
   it('counts a file it cannot read as a file, without inventing lines', async () => {
     await expect(summarise('vanished.ts\n')).resolves.toMatchObject({ files: 1, added: 0 })
   })
+}
 
+function anUnlistableTreeTests() {
   it('reports nothing untracked when git cannot list it', async () => {
     const run = vi.fn(async () => ({ ok: false, stdout: '', stderr: 'no' }))
     await expect(readDiffSummary(dir, 'main', run)).resolves.toEqual({
@@ -124,9 +139,15 @@ describe('counting the lines in a file git has never seen', () => {
       removed: 0,
     })
   })
-})
+}
 
 describe('readDiffSummary', () => {
+  describe('asking', askingTests)
+  describe('untracked and ignored files', untrackedAndIgnoredFilesTests)
+  describe('failures', failuresTests)
+})
+
+function askingTests() {
   it('asks git for numeric stats against the merge base', async () => {
     const run = vi.fn().mockResolvedValue({ ok: true, stdout: '1\t1\ta.ts\n', stderr: '' })
     await readDiffSummary('/wt/s1', 'main', run)
@@ -145,7 +166,9 @@ describe('readDiffSummary', () => {
       }
     )
   })
+}
 
+function untrackedAndIgnoredFilesTests() {
   it('counts files git has never seen, which `git diff` does not report at all', async () => {
     // Creating files is most of what an agent does. Missed, an agent whose
     // whole job was to add them reported having changed nothing — no review, no
@@ -164,7 +187,9 @@ describe('readDiffSummary', () => {
     const lsFiles = run.mock.calls.find((call) => call[1].includes('ls-files'))
     expect(lsFiles?.[1]).toContain('--exclude-standard')
   })
+}
 
+function failuresTests() {
   it('reports an empty summary when git fails, rather than throwing', async () => {
     const run = vi.fn().mockResolvedValue({ ok: false, stdout: '', stderr: 'not a repository' })
     await expect(readDiffSummary('/wt/s1', 'main', run)).resolves.toEqual({
@@ -182,7 +207,7 @@ describe('readDiffSummary', () => {
       removed: 0,
     })
   })
-})
+}
 
 // The file list is what lets the grader see auth, payments, migrations and the
 // repo's critical paths. Without it every change grades P2 and P0 never fires
@@ -214,6 +239,11 @@ describe('parseChangedFiles', () => {
 })
 
 describe('readChangedFiles', () => {
+  describe('the diff', theDiffTests)
+  describe('changed-file failures', changedFileFailuresTests)
+})
+
+function theDiffTests() {
   it('diffs the worktree against the base branch', async () => {
     const run = vi.fn().mockResolvedValue({ ok: true, stdout: '1\t0\ta.ts\n', stderr: '' })
     await readChangedFiles('/wt/s1', 'main', run)
@@ -240,7 +270,9 @@ describe('readChangedFiles', () => {
       )
     ).resolves.toEqual(['src/a.ts', 'migrations/003_add_users.sql'])
   })
+}
 
+function changedFileFailuresTests() {
   it('returns nothing when git fails, rather than throwing', async () => {
     const run = vi.fn().mockResolvedValue({ ok: false, stdout: '', stderr: 'no' })
     await expect(readChangedFiles('/wt/s1', 'main', run)).resolves.toEqual([])
@@ -250,4 +282,4 @@ describe('readChangedFiles', () => {
     const run = vi.fn().mockRejectedValue(new Error('ENOENT'))
     await expect(readChangedFiles('/wt/s1', 'main', run)).resolves.toEqual([])
   })
-})
+}

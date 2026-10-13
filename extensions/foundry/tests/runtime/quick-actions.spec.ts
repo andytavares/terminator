@@ -173,6 +173,12 @@ afterEach(() => {
 })
 
 describe('the go-to-run entries', () => {
+  describe('registering', registeringTests)
+  describe('labels', labelsTests)
+  describe('stable ids', stableIdsTests)
+})
+
+function registeringTests() {
   it('register under the Foundry category', async () => {
     await addRunAndWaitForPalette({ sessionId: 'a', branch: 'feat/a', state: 'working' })
     expect(goToRunEntries().some((c) => c.id === 'run.a')).toBe(true)
@@ -197,7 +203,9 @@ describe('the go-to-run entries', () => {
     expect(withMnemonic).toHaveLength(1)
     expect(withMnemonic[0].mnemonic).toBe('w')
   })
+}
 
+function labelsTests() {
   it('labels the most urgent entry as the run waiting on you, when it is waiting', async () => {
     await addRunAndWaitForPalette({ sessionId: 'a', branch: 'feat/a', state: 'waiting' })
     const entry = registered.get('run.a')!.command
@@ -216,7 +224,9 @@ describe('the go-to-run entries', () => {
     expect(entry.label).toBe('Go to 021-thing')
     expect(entry.mnemonic).toBe('w')
   })
+}
 
+function stableIdsTests() {
   it('keeps ids stable across a refresh', async () => {
     await addRunAndWaitForPalette({ sessionId: 'a', branch: 'feat/a', state: 'working' })
     expect(registered.has('run.a')).toBe(true)
@@ -224,7 +234,7 @@ describe('the go-to-run entries', () => {
     await vi.advanceTimersByTimeAsync(5100)
     expect(registered.has('run.a')).toBe(true)
   })
-})
+}
 
 describe('the new work order command', () => {
   it('is registered under Foundry with mnemonic n', () => {
