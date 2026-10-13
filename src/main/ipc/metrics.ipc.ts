@@ -1,10 +1,9 @@
 import { z } from 'zod'
 import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
-import { execFile } from 'child_process'
 import * as os from 'os'
 import { readFile } from 'fs/promises'
-import { promisify } from 'util'
+import { runCommand } from '../shell/command-runner.js'
 import type { PtyManager } from '../terminal/pty-manager.js'
 import type { SystemMetrics, ProcessMetrics } from '../../shared/types/index.js'
 
@@ -30,7 +29,20 @@ function takeCpuSnapshot(): CpuSnapshot {
 
 // ─── Network sampler ─────────────────────────────────────────────────────────
 
-const execFileAsync = promisify(execFile)
+/**
+ * Runs a sampler (netstat, ps) and resolves with its stdout, or rejects when it
+ * fails. Through runCommand, so one still running as the app quits is stopped.
+ */
+async function runSampler(
+  command: string,
+  args: string[],
+  options: { timeout: number }
+): Promise<{ stdout: string }> {
+  const input = { command, args, cwd: process.cwd(), timeoutMs: options.timeout }
+  const result = await runCommand(input, process.env)
+  if (result.exitCode !== 0) throw new Error(`${command} failed: ${result.stderr}`)
+  return { stdout: result.stdout }
+}
 
 interface NetBytes {
   bytesIn: number
@@ -76,7 +88,7 @@ export async function readNetBytes(): Promise<NetBytes> {
     if (process.platform === 'linux') {
       return sumProcNetDev(await readFile('/proc/net/dev', 'utf-8'))
     }
-    const { stdout } = await execFileAsync('netstat', ['-ib'], { timeout: 2000 })
+    const { stdout } = await runSampler('netstat', ['-ib'], { timeout: 2000 })
     return sumNetstat(stdout.toString())
   } catch {
     return { bytesIn: 0, bytesOut: 0 }
@@ -163,7 +175,7 @@ export async function queryProcessMetrics(pids: number[]): Promise<ProcessMetric
       ? ['-o', 'pid,%cpu,rss', '--no-headers']
       : ['-o', 'pid=,%cpu=,rss=']
   try {
-    const { stdout } = await execFileAsync('ps', ['-p', pids.join(','), ...columns], {
+    const { stdout } = await runSampler('ps', ['-p', pids.join(','), ...columns], {
       timeout: 3000,
     })
     return parsePsRows(stdout)

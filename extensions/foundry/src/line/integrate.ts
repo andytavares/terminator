@@ -228,7 +228,7 @@ function verdictLine(order: WorkOrder, criterionId: string, verdicts: readonly V
 }
 
 /** Which lane a body is for, and the drafts already open beside it. */
-export interface BodyPlace {
+interface BodyPlace {
   readonly lane: number
   readonly opened: readonly LanePullRequest[]
 }

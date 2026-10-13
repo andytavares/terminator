@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { execShell, stopRunningCommands } from '../../../src/main/shell/shell-executor'
+import { execShell } from '../../../src/main/shell/shell-executor'
+import { stopRunningCommands } from '../../../src/main/shell/command-runner'
 import { makeTempDir } from '../../support/temp-dir'
 
 // A git or gh command still running when the app quits, and whatever it started,

@@ -172,6 +172,32 @@ function extensionIndexTests() {
   describe('startServer failure handling', startServerFailureTests)
   describe('remote:tunnel-reconnect', tunnelReconnectTests)
   describe('the settings a start reads', startSettingsTests)
+  describe('deactivate', deactivateTests)
+}
+
+function deactivateTests() {
+  // ngrok's start waits up to 30 s for the tunnel; a quit that waited for it
+  // before stopping ngrok left ngrok running once the extension host was gone.
+  it('stops an ngrok whose tunnel is still opening, without waiting for it', async () => {
+    mockNgrokIsInstalled.mockReturnValue(true)
+    mockNgrokStart.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          mockNgrokStop.mockImplementationOnce(() => reject(new Error('ngrok stopped')))
+        })
+    )
+    const { handler } = await activateWithSettings({
+      [`${EXT}.passwordHash`]: currentHash,
+      [`${EXT}.port`]: 7681,
+    })
+    await handler('remote:toggle')({ enabled: true })
+    await vi.waitFor(() => expect(mockNgrokStart).toHaveBeenCalled())
+
+    const { deactivate } = await import('../../src/index.ts')
+    await deactivate()
+
+    expect(mockNgrokStop).toHaveBeenCalled()
+  })
 }
 
 function startSettingsTests() {

@@ -1,7 +1,7 @@
 import { join } from 'path'
 import type { Branch, WorktreeInfo } from '../../shared/types/index.js'
 import type { ChangeStats } from '../../shared/schemas/git.schema.js'
-import { runCommand } from '../shell/shell-executor.js'
+import { runCommand } from '../shell/command-runner.js'
 import { GIT_ENV } from './git-env.js'
 
 const GIT_TIMEOUT = 10_000

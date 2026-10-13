@@ -45,6 +45,7 @@ export const REWORK_WALK_MS = Math.round(((30 * 16) / WALK_PX_PER_S) * 1000)
  */
 export const STROKE_MS = 700
 
+/** @internal */
 export interface BeatNode {
   readonly id: string
   readonly kind: StepKind

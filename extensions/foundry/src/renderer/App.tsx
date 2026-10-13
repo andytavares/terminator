@@ -1,14 +1,24 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { Settings, ArrowLeft, List, Factory } from 'lucide-react'
 import { Button, IconButton } from '@terminator/extension-ui'
 import { Inbox } from '../components/Inbox.js'
 import { usePushed, ANY_RECORD } from './use-pushed.js'
-import { Orders } from '../components/Orders.js'
-import { Ledger } from '../components/Ledger.js'
-import { SettingsView } from '../components/SettingsView.js'
-import { FactorySite } from '../components/factory/FactorySite.js'
-import { FactoryHall } from '../components/factory/FactoryHall.js'
 import type { FactoryOrderRow } from '../components/factory/FactorySite.js'
+
+// The window shows one view under the queue, so each is its own chunk and the
+// first script stays under the renderer's chunk budget (vite.renderer.config.ts;
+// https://react.dev/reference/react/lazy, https://vite.dev/guide/features#dynamic-import).
+const Orders = lazy(() => import('../components/Orders.js').then((m) => ({ default: m.Orders })))
+const Ledger = lazy(() => import('../components/Ledger.js').then((m) => ({ default: m.Ledger })))
+const SettingsView = lazy(() =>
+  import('../components/SettingsView.js').then((m) => ({ default: m.SettingsView }))
+)
+const FactorySite = lazy(() =>
+  import('../components/factory/FactorySite.js').then((m) => ({ default: m.FactorySite }))
+)
+const FactoryHall = lazy(() =>
+  import('../components/factory/FactoryHall.js').then((m) => ({ default: m.FactoryHall }))
+)
 
 // Two surfaces, and a way into settings.
 //
@@ -256,7 +266,9 @@ export function App(): JSX.Element {
         />
       </header>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <ShownSurface chrome={chrome} />
+        <Suspense fallback={null}>
+          <ShownSurface chrome={chrome} />
+        </Suspense>
       </div>
     </div>
   )
@@ -378,27 +390,36 @@ interface ForgeSurfaceProps {
 
 /** The queue of what is waiting, over the orders drawn as a list or as halls. */
 function ForgeSurface({ forge, repoRoot, focusIdeaSignal }: ForgeSurfaceProps): JSX.Element {
-  const { hall } = forge
   return (
     <>
       <Inbox onOpenOrder={forge.openInList} />
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        {forge.view === 'list' ? (
-          <Orders
-            repoRoot={repoRoot}
-            focusIdeaSignal={focusIdeaSignal}
-            openOrderId={forge.listOpenOrderId}
-          />
-        ) : hall === null ? (
-          <FactorySite repoRoot={repoRoot} onOpen={forge.openFromSite} />
-        ) : (
-          <FactoryHall
-            orderId={hall.id}
-            onOpenInList={() => forge.openInList(hall.id)}
-            onBack={forge.leaveHall}
-          />
-        )}
+        <Suspense fallback={null}>
+          <OrdersView forge={forge} repoRoot={repoRoot} focusIdeaSignal={focusIdeaSignal} />
+        </Suspense>
       </div>
     </>
+  )
+}
+
+/** The orders, drawn as a list, as the site of every hall, or as one hall. */
+function OrdersView({ forge, repoRoot, focusIdeaSignal }: ForgeSurfaceProps): JSX.Element {
+  const { hall } = forge
+  if (forge.view === 'list') {
+    return (
+      <Orders
+        repoRoot={repoRoot}
+        focusIdeaSignal={focusIdeaSignal}
+        openOrderId={forge.listOpenOrderId}
+      />
+    )
+  }
+  if (hall === null) return <FactorySite repoRoot={repoRoot} onOpen={forge.openFromSite} />
+  return (
+    <FactoryHall
+      orderId={hall.id}
+      onOpenInList={() => forge.openInList(hall.id)}
+      onBack={forge.leaveHall}
+    />
   )
 }

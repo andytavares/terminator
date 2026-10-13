@@ -521,20 +521,39 @@ function editorCallbacks(session: NoteSession) {
 }
 
 function NoteEditorPane(props: { session: NoteSession; readingMode: boolean }) {
-  const { session, readingMode } = props
-  const { draft, hover } = session
-  const { bodyDraft, previewMode } = useEditorStore()
+  const { session } = props
   const editorWrapRef = useRef<HTMLDivElement>(null)
   const { handleEditorMouseOver, goToComment } = useAnchorHover(session, editorWrapRef)
-  const { onChange, onAnchorsReady } = editorCallbacks(session)
 
   return (
     <div
       ref={editorWrapRef}
       className="notepad-view__editor-wrap"
       onMouseOver={handleEditorMouseOver}
-      onMouseLeave={hover.scheduleHoverHide}
+      onMouseLeave={session.hover.scheduleHoverHide}
     >
+      {/* Mounted once the selected note's body is in: an editor mounted before then
+          is replaced when it arrives, and what was typed into it is lost. */}
+      {session.loadedNoteId === session.selectedNoteId && (
+        <LoadedNoteEditor {...props} onGoToComment={goToComment} />
+      )}
+    </div>
+  )
+}
+
+interface LoadedNoteEditorProps {
+  session: NoteSession
+  readingMode: boolean
+  onGoToComment: (commentId: string) => void
+}
+
+/** The editor on the loaded note's body, with its comment overlays. */
+function LoadedNoteEditor({ session, readingMode, onGoToComment }: LoadedNoteEditorProps) {
+  const { draft, hover } = session
+  const { bodyDraft, previewMode } = useEditorStore()
+  const { onChange, onAnchorsReady } = editorCallbacks(session)
+  return (
+    <>
       <NoteEditor
         key={session.loadedNoteId}
         initialDoc={bodyDraft}
@@ -544,8 +563,8 @@ function NoteEditorPane(props: { session: NoteSession; readingMode: boolean }) {
         readOnly={readingMode}
         sourceMode={!previewMode}
       />
-      <EditorCommentOverlays draft={draft} hover={hover} onGoToComment={goToComment} />
-    </div>
+      <EditorCommentOverlays draft={draft} hover={hover} onGoToComment={onGoToComment} />
+    </>
   )
 }
 
