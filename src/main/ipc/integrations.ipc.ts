@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { BrowserWindow } from 'electron'
-import { defineChannel } from '@terminator/extension-sdk'
+import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable } from './invoke-table.js'
 import { sendToWindow } from '../safe-send.js'
 import { z as zod } from 'zod'
@@ -83,197 +83,210 @@ async function announceStatus(): Promise<void> {
   })
 }
 
+const connectionChannels: ChannelSpec[] = [
+  defineChannel({
+    channel: 'integrations:status',
+    schema: StatusInputSchema,
+    invalid: VALIDATION,
+    run: async ({ tracker }) => {
+      const connections = await listConnections()
+      return {
+        connections:
+          tracker === undefined ? connections : connections.filter((c) => c.tracker === tracker),
+      }
+    },
+    onError: fail,
+  }),
+
+  defineChannel({
+    channel: 'integrations:connect',
+    schema: ConnectInputSchema,
+    invalid: VALIDATION,
+    run: async (input) => {
+      const cred = credentialOf(input)
+      // Verified before it is stored, so a bad paste fails here rather than
+      // three screens later as an empty issue list.
+      const account = await verifiers[input.tracker].verify(cred)
+      await setCredential(cred)
+      await setAccount(input.tracker, { name: account.name, email: account.email })
+      if (input.tracker === 'linear') {
+        await setMine('linear', { kind: 'assignee', email: input.email ?? null })
+      } else {
+        await setMine('jira', { kind: 'query', jql: input.jql })
+      }
+      // The service holds a client built from the old credential.
+      resetIssueService()
+      const connections = await listConnections()
+      // Every open surface learns about it, not just the settings panel that
+      // did the connecting.
+      await announceStatus()
+      return { connection: connections.find((c) => c.tracker === input.tracker) }
+    },
+    onError: fail,
+  }),
+
+  defineChannel({
+    channel: 'integrations:disconnect',
+    schema: DisconnectInputSchema,
+    invalid: VALIDATION,
+    run: async ({ tracker }) => {
+      await clearCredential(tracker)
+      resetIssueService()
+      await announceStatus()
+      return { ok: true }
+    },
+    onError: fail,
+  }),
+
+  defineChannel({
+    channel: 'integrations:set-mine',
+    schema: SetMineInputSchema,
+    invalid: VALIDATION,
+    run: async ({ tracker, mine }) => {
+      await setMine(tracker, mine)
+      await announceStatus()
+      return { ok: true }
+    },
+    onError: fail,
+  }),
+]
+
+const issueReadChannels: ChannelSpec[] = [
+  defineChannel({
+    channel: 'integrations:issue-list-mine',
+    schema: ListMineInputSchema,
+    invalid: VALIDATION,
+    run: async ({ tracker, limit }) =>
+      getIssueService().listMine({ tracker: tracker as TrackerId | undefined, limit }),
+    onError: fail,
+  }),
+
+  defineChannel({
+    channel: 'integrations:issue-search',
+    schema: SearchInputSchema,
+    invalid: VALIDATION,
+    run: async ({ term, tracker, limit }) =>
+      getIssueService().search(term, { tracker: tracker as TrackerId | undefined, limit }),
+    onError: fail,
+  }),
+
+  defineChannel({
+    channel: 'integrations:issue-get',
+    schema: IssueGetInputSchema,
+    invalid: VALIDATION,
+    run: async ({ tracker, key, refresh }) => ({
+      issue: await getIssueService().get(tracker, key, { refresh }),
+    }),
+    onError: fail,
+  }),
+]
+
+const linkChannels: ChannelSpec[] = [
+  defineChannel({
+    channel: 'integrations:link-set',
+    schema: LinkSetInputSchema,
+    invalid: VALIDATION,
+    run: async ({ projectId, tracker, key, injectContext }) => {
+      // Replaces whatever was there; warning the operator first is the
+      // caller's job, and doing it here would make the channel un-scriptable.
+      const link = await setLink({ projectId, tracker, key, injectContext })
+      try {
+        await syncProjectContext(projectId, getIssueService())
+      } catch (error) {
+        // A link that cannot feed a session is worse than no link: it looks
+        // attached and silently does nothing. Undo it and say why (FR-026).
+        await clearLink(projectId)
+        announceLink(projectId)
+        throw error
+      }
+      announceLink(projectId)
+      return { link }
+    },
+    onError: fail,
+  }),
+
+  defineChannel({
+    channel: 'integrations:link-get',
+    schema: ProjectIdInputSchema,
+    invalid: VALIDATION,
+    run: async ({ projectId }) => {
+      const link = getLink(projectId)
+      if (link === null) return { link: null, issue: null }
+      try {
+        return { link, issue: await getIssueService().get(link.tracker, link.key) }
+      } catch (error) {
+        // The association exists and the issue could not be read. Both facts
+        // matter: the badge renders unavailable rather than vanishing.
+        // Named issueError, not error: the call succeeded, and a caller
+        // narrowing on `error` must not mistake this for a failed channel.
+        return { link, issue: null, issueError: toErrorKind(error) }
+      }
+    },
+    onError: fail,
+  }),
+
+  defineChannel({
+    channel: 'integrations:link-clear',
+    schema: ProjectIdInputSchema,
+    invalid: VALIDATION,
+    run: async ({ projectId }) => {
+      await clearLink(projectId)
+      await clearProjectContext(projectId)
+      announceLink(projectId)
+      return { ok: true }
+    },
+    onError: fail,
+  }),
+
+  defineChannel({
+    channel: 'integrations:context-preview',
+    schema: ProjectIdInputSchema,
+    invalid: VALIDATION,
+    run: async ({ projectId }) => ({
+      context: await previewProjectContext(projectId, getIssueService()),
+    }),
+    onError: fail,
+  }),
+
+  defineChannel({
+    channel: 'integrations:set-inject-context',
+    schema: zod.object({
+      projectId: zod.string().uuid(),
+      injectContext: zod.boolean(),
+    }),
+    invalid: VALIDATION,
+    run: async ({ projectId, injectContext }) => {
+      await setInjectContext(projectId, injectContext)
+      // Turning it off removes what was written into the project directory;
+      // turning it on puts it back.
+      await syncProjectContext(projectId, getIssueService())
+      announceLink(projectId)
+      return { ok: true }
+    },
+    onError: fail,
+  }),
+]
+
+const issueCommentChannels: ChannelSpec[] = [
+  defineChannel({
+    channel: 'integrations:issue-comment',
+    schema: IssueCommentInputSchema,
+    invalid: VALIDATION,
+    run: async ({ tracker, key, body }) => {
+      // Failure is returned, never swallowed — the whole point of FR-034a.
+      await getIssueService().comment(tracker, key, body)
+      return { ok: true }
+    },
+    onError: fail,
+  }),
+]
+
 export function registerIntegrationsHandlers(window: () => BrowserWindow | null): void {
   getWindow = window
   registerInvokeTable([
-    defineChannel({
-      channel: 'integrations:status',
-      schema: StatusInputSchema,
-      invalid: VALIDATION,
-      run: async ({ tracker }) => {
-        const connections = await listConnections()
-        return {
-          connections:
-            tracker === undefined ? connections : connections.filter((c) => c.tracker === tracker),
-        }
-      },
-      onError: fail,
-    }),
-
-    defineChannel({
-      channel: 'integrations:connect',
-      schema: ConnectInputSchema,
-      invalid: VALIDATION,
-      run: async (input) => {
-        const cred = credentialOf(input)
-        // Verified before it is stored, so a bad paste fails here rather than
-        // three screens later as an empty issue list.
-        const account = await verifiers[input.tracker].verify(cred)
-        await setCredential(cred)
-        await setAccount(input.tracker, { name: account.name, email: account.email })
-        if (input.tracker === 'linear') {
-          await setMine('linear', { kind: 'assignee', email: input.email ?? null })
-        } else {
-          await setMine('jira', { kind: 'query', jql: input.jql })
-        }
-        // The service holds a client built from the old credential.
-        resetIssueService()
-        const connections = await listConnections()
-        // Every open surface learns about it, not just the settings panel that
-        // did the connecting.
-        await announceStatus()
-        return { connection: connections.find((c) => c.tracker === input.tracker) }
-      },
-      onError: fail,
-    }),
-
-    defineChannel({
-      channel: 'integrations:disconnect',
-      schema: DisconnectInputSchema,
-      invalid: VALIDATION,
-      run: async ({ tracker }) => {
-        await clearCredential(tracker)
-        resetIssueService()
-        await announceStatus()
-        return { ok: true }
-      },
-      onError: fail,
-    }),
-
-    defineChannel({
-      channel: 'integrations:set-mine',
-      schema: SetMineInputSchema,
-      invalid: VALIDATION,
-      run: async ({ tracker, mine }) => {
-        await setMine(tracker, mine)
-        await announceStatus()
-        return { ok: true }
-      },
-      onError: fail,
-    }),
-
-    defineChannel({
-      channel: 'integrations:issue-list-mine',
-      schema: ListMineInputSchema,
-      invalid: VALIDATION,
-      run: async ({ tracker, limit }) =>
-        getIssueService().listMine({ tracker: tracker as TrackerId | undefined, limit }),
-      onError: fail,
-    }),
-
-    defineChannel({
-      channel: 'integrations:issue-search',
-      schema: SearchInputSchema,
-      invalid: VALIDATION,
-      run: async ({ term, tracker, limit }) =>
-        getIssueService().search(term, { tracker: tracker as TrackerId | undefined, limit }),
-      onError: fail,
-    }),
-
-    defineChannel({
-      channel: 'integrations:issue-get',
-      schema: IssueGetInputSchema,
-      invalid: VALIDATION,
-      run: async ({ tracker, key, refresh }) => ({
-        issue: await getIssueService().get(tracker, key, { refresh }),
-      }),
-      onError: fail,
-    }),
-
-    defineChannel({
-      channel: 'integrations:link-set',
-      schema: LinkSetInputSchema,
-      invalid: VALIDATION,
-      run: async ({ projectId, tracker, key, injectContext }) => {
-        // Replaces whatever was there; warning the operator first is the
-        // caller's job, and doing it here would make the channel un-scriptable.
-        const link = await setLink({ projectId, tracker, key, injectContext })
-        try {
-          await syncProjectContext(projectId, getIssueService())
-        } catch (error) {
-          // A link that cannot feed a session is worse than no link: it looks
-          // attached and silently does nothing. Undo it and say why (FR-026).
-          await clearLink(projectId)
-          announceLink(projectId)
-          throw error
-        }
-        announceLink(projectId)
-        return { link }
-      },
-      onError: fail,
-    }),
-
-    defineChannel({
-      channel: 'integrations:link-get',
-      schema: ProjectIdInputSchema,
-      invalid: VALIDATION,
-      run: async ({ projectId }) => {
-        const link = getLink(projectId)
-        if (link === null) return { link: null, issue: null }
-        try {
-          return { link, issue: await getIssueService().get(link.tracker, link.key) }
-        } catch (error) {
-          // The association exists and the issue could not be read. Both facts
-          // matter: the badge renders unavailable rather than vanishing.
-          // Named issueError, not error: the call succeeded, and a caller
-          // narrowing on `error` must not mistake this for a failed channel.
-          return { link, issue: null, issueError: toErrorKind(error) }
-        }
-      },
-      onError: fail,
-    }),
-
-    defineChannel({
-      channel: 'integrations:link-clear',
-      schema: ProjectIdInputSchema,
-      invalid: VALIDATION,
-      run: async ({ projectId }) => {
-        await clearLink(projectId)
-        await clearProjectContext(projectId)
-        announceLink(projectId)
-        return { ok: true }
-      },
-      onError: fail,
-    }),
-
-    defineChannel({
-      channel: 'integrations:context-preview',
-      schema: ProjectIdInputSchema,
-      invalid: VALIDATION,
-      run: async ({ projectId }) => ({
-        context: await previewProjectContext(projectId, getIssueService()),
-      }),
-      onError: fail,
-    }),
-
-    defineChannel({
-      channel: 'integrations:set-inject-context',
-      schema: zod.object({
-        projectId: zod.string().uuid(),
-        injectContext: zod.boolean(),
-      }),
-      invalid: VALIDATION,
-      run: async ({ projectId, injectContext }) => {
-        await setInjectContext(projectId, injectContext)
-        // Turning it off removes what was written into the project directory;
-        // turning it on puts it back.
-        await syncProjectContext(projectId, getIssueService())
-        announceLink(projectId)
-        return { ok: true }
-      },
-      onError: fail,
-    }),
-
-    defineChannel({
-      channel: 'integrations:issue-comment',
-      schema: IssueCommentInputSchema,
-      invalid: VALIDATION,
-      run: async ({ tracker, key, body }) => {
-        // Failure is returned, never swallowed — the whole point of FR-034a.
-        await getIssueService().comment(tracker, key, body)
-        return { ok: true }
-      },
-      onError: fail,
-    }),
+    ...connectionChannels,
+    ...issueReadChannels,
+    ...linkChannels,
+    ...issueCommentChannels,
   ])
 }
