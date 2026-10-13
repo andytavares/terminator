@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { QuickActions } from './QuickActions'
-import type { QuickAction, QuickActionGroup } from '../quick-actions/types'
+import type { ActionContext, QuickAction, QuickActionGroup } from '../quick-actions/types'
 import { buildSurfaceActions, type SurfaceRegistration } from '../quick-actions/surface-actions'
 import {
   buildExtensionActions,
   type RegisteredCommand,
   type DeclaredCommand,
+  type RendererCommand,
 } from '../quick-actions/extension-actions'
 import { CORE_GROUPS } from '../quick-actions/groups'
 import { buildCustomQuickActions } from '../quick-actions/custom-runtime'
+import type { CustomRunEnv } from '../quick-actions/custom-actions'
 import { rankFirstScreen } from '../quick-actions/rank'
 import { recordUsage, pruneUsage, togglePin, shouldShowHint } from '../quick-actions/usage'
 import {
@@ -62,16 +64,11 @@ function useSurfaceOwner(): string | null {
   return owner ?? null
 }
 
-function useExtensionQuickActions(
-  target: QuickActionTarget,
-  groups: QuickActionGroup[],
-  surfaceOwner: string | null
-): QuickAction[] {
-  const { registered, declared } = useDeclaredCommands()
+/** Where an extension command would run: the branch, the focused terminal, the repo. */
+function useActionContext(target: QuickActionTarget, surfaceOwner: string | null): ActionContext {
   const { repoRoot } = useActiveScope()
-  const { commands } = useExtensionRegistry(useShallow((s) => ({ commands: s.commands })))
   const { projectId, focusedSessionId, focusedSession } = target
-  const context = useMemo(
+  return useMemo(
     () => ({
       projectId,
       sessionId: focusedSessionId,
@@ -82,62 +79,56 @@ function useExtensionQuickActions(
     }),
     [projectId, focusedSessionId, repoRoot, focusedSession, surfaceOwner]
   )
+}
+
+function useExtensionQuickActions(
+  target: QuickActionTarget,
+  groups: QuickActionGroup[],
+  surfaceOwner: string | null
+): QuickAction[] {
+  const { registered, declared } = useDeclaredCommands()
+  const commands = useExtensionRegistry((s) => s.commands)
+  const ctx = useActionContext(target, surfaceOwner)
   return useMemo(
     () =>
       buildExtensionActions(
-        {
-          registered,
-          declared,
-          renderer: commands.map((c) => ({
-            id: c.id,
-            label: c.label,
-            description: c.description,
-            shortcut: c.shortcut,
-            action: c.action,
-          })),
-        },
+        { registered, declared, renderer: commands.map(rendererCommand) },
         groups,
         {
-          ctx: context,
-          execute: (key, ctx) => void window.electronAPI.extension.executeCommand(key, ctx),
+          ctx,
+          execute: (key, context) => void window.electronAPI.extension.executeCommand(key, context),
         }
       ),
-    [registered, declared, groups, context, commands]
+    [registered, declared, groups, ctx, commands]
   )
 }
 
-function useCustomQuickActions(target: QuickActionTarget): QuickAction[] {
-  const { activeWorkspace, activeProject } = useActiveScope()
-  const { activeWorkspaceId, activeProjectId, resolveActiveCwd } = useWorkspaceStore(
-    useShallow((s) => ({
-      activeWorkspaceId: s.activeWorkspaceId,
-      activeProjectId: s.activeProjectId,
-      resolveActiveCwd: s.resolveActiveCwd,
-    }))
-  )
-  const { globalSettings, resolveSettings } = useSettingsStore(
-    useShallow((s) => ({
-      globalSettings: s.globalSettings,
-      resolveSettings: s.resolveSettings,
-      workspaceSettings: s.workspaceSettings,
-    }))
-  )
-  const { linkFor } = useIntegrationsStore(
-    useShallow((s) => ({ linkFor: s.linkFor, links: s.links }))
-  )
-  const { getTerminalInstance } = useSessionStore(
-    useShallow((s) => ({
-      getTerminalInstance: s.getTerminalInstance,
-      terminalInstances: s.terminalInstances,
-    }))
-  )
-  const { addToast } = useToastStore(useShallow((s) => ({ addToast: s.addToast })))
-  const { createSession } = useTerminalSession()
-  const { projectId, focusedSessionId, focusedSession } = target
-  const issueKey = activeProjectId ? (linkFor(activeProjectId)?.key ?? null) : null
+type CommandRegistration = ReturnType<typeof useExtensionRegistry.getState>['commands'][number]
 
-  return useMemo(() => {
-    const env = {
+/** A command the renderer registered, as the palette lists it. */
+function rendererCommand(c: CommandRegistration): RendererCommand {
+  return {
+    id: c.id,
+    label: c.label,
+    description: c.description,
+    shortcut: c.shortcut,
+    action: c.action,
+  }
+}
+
+/**
+ * What a custom action runs against: the focused terminal, and the variables
+ * its body can use.
+ */
+function useCustomEnv(target: QuickActionTarget): CustomRunEnv {
+  const { activeWorkspace, activeProject } = useActiveScope()
+  const activeProjectId = useWorkspaceStore((s) => s.activeProjectId)
+  const issueKey = useIntegrationsStore((s) =>
+    activeProjectId ? (s.linkFor(activeProjectId)?.key ?? null) : null
+  )
+  const { projectId, focusedSessionId, focusedSession } = target
+  return useMemo(
+    () => ({
       focused: focusedSession
         ? {
             sessionId: focusedSession.id,
@@ -147,51 +138,61 @@ function useCustomQuickActions(target: QuickActionTarget): QuickAction[] {
         : null,
       projectId,
       vars: {
-        cwd: resolveActiveCwd(),
+        cwd: useWorkspaceStore.getState().resolveActiveCwd(),
         branch: activeProject?.gitBranch ?? null,
         worktree: activeProject?.worktreePath ?? null,
         repo: activeWorkspace?.folderPath ?? null,
         issue: issueKey,
-        selection: focusedSessionId
-          ? getTerminalInstance?.(focusedSessionId)?.getSelection() || null
-          : null,
+        selection: focusedSessionId ? selectionOf(focusedSessionId) : null,
       },
-    }
-    const global = globalSettings?.quickActions?.custom ?? []
-    const workspaceCustom = activeWorkspaceId
-      ? (useSettingsStore.getState().workspaceSettings.get(activeWorkspaceId)?.overrides
-          .quickActions?.custom ?? [])
-      : []
-    return buildCustomQuickActions([...global, ...workspaceCustom], env, {
-      input: (sessionId, data) => window.electronAPI.terminal.input(sessionId, data),
-      openTab: async (tabProjectId) => {
-        const settings = resolveSettings(activeWorkspaceId)
-        const id = await createSession({
-          projectId: tabProjectId,
-          type: 'human',
-          title: '',
-          cwd: resolveActiveCwd(),
-          scrollbackLimit: settings.terminal.scrollbackLimit,
-        })
-        return id as string
-      },
-      notify: (message) => addToast({ type: 'error', message }),
-    })
-  }, [
-    focusedSession,
+    }),
+    [focusedSession, projectId, focusedSessionId, activeProject, activeWorkspace, issueKey]
+  )
+}
+
+/** What is selected in a terminal, or null when nothing is. */
+function selectionOf(sessionId: string): string | null {
+  return useSessionStore.getState().getTerminalInstance?.(sessionId)?.getSelection() || null
+}
+
+function useCustomQuickActions(target: QuickActionTarget): QuickAction[] {
+  const env = useCustomEnv(target)
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
+  const globalCustom = useSettingsStore((s) => s.globalSettings?.quickActions?.custom)
+  const workspaceCustom = useSettingsStore((s) =>
+    activeWorkspaceId
+      ? s.workspaceSettings.get(activeWorkspaceId)?.overrides.quickActions?.custom
+      : undefined
+  )
+  const { createSession } = useTerminalSession()
+  return useMemo(
+    () =>
+      buildCustomQuickActions([...(globalCustom ?? []), ...(workspaceCustom ?? [])], env, {
+        input: (sessionId, data) => window.electronAPI.terminal.input(sessionId, data),
+        openTab: (tabProjectId) => openTab(tabProjectId, activeWorkspaceId, createSession),
+        notify: (message) => useToastStore.getState().addToast({ type: 'error', message }),
+      }),
+    [globalCustom, workspaceCustom, env, activeWorkspaceId, createSession]
+  )
+}
+
+type CreateSession = ReturnType<typeof useTerminalSession>['createSession']
+
+/** A new terminal on the branch, for a custom action that types into one. */
+async function openTab(
+  projectId: string,
+  workspaceId: string | null,
+  createSession: CreateSession
+): Promise<string> {
+  const settings = useSettingsStore.getState().resolveSettings(workspaceId)
+  const id = await createSession({
     projectId,
-    focusedSessionId,
-    activeProject,
-    activeWorkspace,
-    issueKey,
-    globalSettings,
-    activeWorkspaceId,
-    resolveSettings,
-    resolveActiveCwd,
-    getTerminalInstance,
-    createSession,
-    addToast,
-  ])
+    type: 'human',
+    title: '',
+    cwd: useWorkspaceStore.getState().resolveActiveCwd(),
+    scrollbackLimit: settings.terminal.scrollbackLimit,
+  })
+  return id as string
 }
 
 /** Records the run, offers the shortcut hint, then runs the action and reports a failure. */
@@ -249,11 +250,54 @@ function contextLabelFor(
  */
 export function QuickActionsHost(props: QuickActionsHostProps): JSX.Element {
   const target = useQuickActionTarget()
-  const { quickActionGroups } = useExtensionRegistry(
-    useShallow((s) => ({ quickActionGroups: s.quickActionGroups }))
-  )
+  const quickActionGroups = useExtensionRegistry((s) => s.quickActionGroups)
   const groups = useMemo(() => [...CORE_GROUPS, ...quickActionGroups], [quickActionGroups])
   const surfaceOwner = useSurfaceOwner()
+  const actions = usePaletteActions({ target, groups, surfaceOwner, props })
+  const { pinned, recent, pins } = useFirstScreen(actions, props.openedAt)
+  const { onClose } = props
+  const handleRun = useCallback(
+    (action: QuickAction) => {
+      onClose()
+      runQuickAction(action, new Set(actions.map((a) => a.id)), useToastStore.getState().addToast)
+    },
+    [actions, onClose]
+  )
+  const contextGroup = surfaceOwner ? groups.find((g) => g.owner === surfaceOwner) : undefined
+
+  return (
+    <QuickActions
+      {...{ groups, actions, pinned, recent, onClose }}
+      pins={pins}
+      contextGroupId={contextGroup?.id ?? null}
+      contextLabel={contextLabelFor(contextGroup, target)}
+      searchSignal={props.searchSignal}
+      onRun={handleRun}
+      onTogglePin={toggleQuickActionPin}
+    />
+  )
+}
+
+/** The pinned and recently used actions the palette opens on, ranked as of `openedAt`. */
+function useFirstScreen(actions: QuickAction[], openedAt: number) {
+  const settings = useSettingsStore((s) => s.globalSettings?.quickActions)
+  const pins = useMemo(() => settings?.pins ?? [], [settings])
+  const firstScreen = useMemo(
+    () => rankFirstScreen(actions, { pins, usage: settings?.usage ?? [], now: openedAt }),
+    [actions, settings, pins, openedAt]
+  )
+  return { ...firstScreen, pins }
+}
+
+interface PaletteInput {
+  target: QuickActionTarget
+  groups: QuickActionGroup[]
+  surfaceOwner: string | null
+  props: QuickActionsHostProps
+}
+
+/** Core actions, the open surfaces, extension commands and custom actions, in that order. */
+function usePaletteActions({ target, groups, surfaceOwner, props }: PaletteInput): QuickAction[] {
   const coreActions = useCoreQuickActions(target, props.shell)
   const extActions = useExtensionQuickActions(target, groups, surfaceOwner)
   const customActions = useCustomQuickActions(target)
@@ -266,47 +310,8 @@ export function QuickActionsHost(props: QuickActionsHostProps): JSX.Element {
       }),
     [surfaces, groups, activateSurface, coreActions, extActions]
   )
-  const actions = useMemo(
+  return useMemo(
     () => [...coreActions, ...surfaceActions, ...extActions, ...customActions],
     [coreActions, surfaceActions, extActions, customActions]
-  )
-  const { globalSettings } = useSettingsStore(
-    useShallow((s) => ({ globalSettings: s.globalSettings }))
-  )
-  const settings = globalSettings?.quickActions
-  const { pinned, recent } = useMemo(
-    () =>
-      rankFirstScreen(actions, {
-        pins: settings?.pins ?? [],
-        usage: settings?.usage ?? [],
-        now: props.openedAt,
-      }),
-    [actions, settings, props.openedAt]
-  )
-  const { addToast } = useToastStore(useShallow((s) => ({ addToast: s.addToast })))
-  const { onClose } = props
-  const handleRun = useCallback(
-    (action: QuickAction) => {
-      onClose()
-      runQuickAction(action, new Set(actions.map((a) => a.id)), addToast)
-    },
-    [actions, onClose, addToast]
-  )
-  const contextGroup = surfaceOwner ? groups.find((g) => g.owner === surfaceOwner) : undefined
-
-  return (
-    <QuickActions
-      groups={groups}
-      actions={actions}
-      pinned={pinned}
-      recent={recent}
-      pins={settings?.pins ?? []}
-      contextGroupId={contextGroup?.id ?? null}
-      contextLabel={contextLabelFor(contextGroup, target)}
-      searchSignal={props.searchSignal}
-      onRun={handleRun}
-      onTogglePin={toggleQuickActionPin}
-      onClose={onClose}
-    />
   )
 }
