@@ -332,7 +332,7 @@ export async function createRemoteServer(
   registerSurfaceTickets(parts.fastify, parts.ticketStore)
   await registerLogin(parts)
   const connections = await registerApi(parts)
-  return new RemoteServer(parts, connections).handle()
+  return new RemoteServer(parts, connections).toHandle()
 }
 
 /** The running state of a built server: whether it listens, and its sweep timer. */
@@ -345,7 +345,7 @@ class RemoteServer {
     private connections: ServerConnections
   ) {}
 
-  handle(): RemoteServerHandle {
+  toHandle(): RemoteServerHandle {
     const { fastify, deviceRegistry } = this.parts
     return {
       start: () => this.start(),
@@ -387,7 +387,7 @@ class RemoteServer {
       clearInterval(this.sessionCleanupTimer)
       this.sessionCleanupTimer = null
     }
-    forEachSessionStore(this.parts.sessions, (store) => store.clear())
+    forEachSessionStore(this.parts.sessions, (store) => store.revokeAll())
     await this.connections.terminalCleanup.cleanup()
     this.connections.bridgeCleanup.disconnectAll()
     this.parts.subscriberManager.destroyAll()
@@ -396,7 +396,7 @@ class RemoteServer {
   }
 
   private disconnectAllClients(): void {
-    forEachSessionStore(this.parts.sessions, (store) => store.clear())
+    forEachSessionStore(this.parts.sessions, (store) => store.revokeAll())
     // Kill all remote PTYs — password rotation invalidates existing sessions
     void this.connections.terminalCleanup.cleanup()
     this.connections.bridgeCleanup.disconnectAll()

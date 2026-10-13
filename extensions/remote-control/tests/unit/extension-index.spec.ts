@@ -117,9 +117,9 @@ async function activateWithSettings(initial: Record<string, unknown>) {
   mockCreateRemoteServer.mockResolvedValue(makeServerHandle())
   const { activate } = await import('../../src/index.ts')
   activate(makeApi() as never)
-  const handler = (channel: string) =>
+  const channelHandler = (channel: string) =>
     registeredHandler(channel) as (payload?: unknown) => Promise<Record<string, unknown>>
-  return { values, handler }
+  return { values, channelHandler }
 }
 
 const EXT = 'terminator.remote-control'
@@ -183,11 +183,11 @@ function deactivateTests() {
           mockNgrokStop.mockImplementationOnce(() => reject(new Error('ngrok stopped')))
         })
     )
-    const { handler } = await activateWithSettings({
+    const { channelHandler } = await activateWithSettings({
       [`${EXT}.passwordHash`]: currentHash,
       [`${EXT}.port`]: 7681,
     })
-    await handler('remote:toggle')({ enabled: true })
+    await channelHandler('remote:toggle')({ enabled: true })
     await vi.waitFor(() => expect(mockNgrokStart).toHaveBeenCalled())
 
     const { deactivate } = await import('../../src/index.ts')
@@ -200,14 +200,14 @@ function deactivateTests() {
 function startSettingsTests() {
   it('caps viewers at "Max Concurrent Viewers" and opens the tunnel with "ngrok Auth Token"', async () => {
     mockNgrokIsInstalled.mockReturnValue(true)
-    const { handler } = await activateWithSettings({
+    const { channelHandler } = await activateWithSettings({
       [`${EXT}.passwordHash`]: currentHash,
       [`${EXT}.port`]: 7681,
       [`${EXT}.maxSubscribers`]: 13,
       [`${EXT}.ngrokAuthToken`]: 'ngrok-token',
     })
 
-    await handler('remote:toggle')({ enabled: true })
+    await channelHandler('remote:toggle')({ enabled: true })
     await vi.waitFor(() => expect(mockNgrokStart).toHaveBeenCalled())
     await queueDrained()
 
@@ -311,8 +311,8 @@ function credentialHandlingTests() {
 
 function passwordStorageTests() {
   it('stores a chosen password only as a hash and does not echo it back', async () => {
-    const { values, handler } = await activateWithSettings({})
-    const result = await handler('remote:update-password')({ password: 'my-chosen-secret' })
+    const { values, channelHandler } = await activateWithSettings({})
+    const result = await channelHandler('remote:update-password')({ password: 'my-chosen-secret' })
     expect(JSON.stringify(result)).not.toContain('my-chosen-secret')
     expect(JSON.stringify([...values.values()])).not.toContain('my-chosen-secret')
     expect(
@@ -321,8 +321,8 @@ function passwordStorageTests() {
   })
 
   it('returns a generated password once, storing only its hash', async () => {
-    const { values, handler } = await activateWithSettings({})
-    const result = await handler('remote:update-password')({ password: '' })
+    const { values, channelHandler } = await activateWithSettings({})
+    const result = await channelHandler('remote:update-password')({ password: '' })
     const generated = result.password as string
     expect(generated.length).toBeGreaterThanOrEqual(16)
     expect(JSON.stringify([...values.values()])).not.toContain(generated)
@@ -332,16 +332,16 @@ function passwordStorageTests() {
 
 function passwordGateTests() {
   it('never returns the password from get-settings, only whether one is set', async () => {
-    const { handler } = await activateWithSettings({ [`${EXT}.passwordHash`]: currentHash })
-    const settings = await handler('remote:get-settings')()
+    const { channelHandler } = await activateWithSettings({ [`${EXT}.passwordHash`]: currentHash })
+    const settings = await channelHandler('remote:get-settings')()
     expect(settings.hasPassword).toBe(true)
     expect(JSON.stringify(settings)).not.toContain('existing-password')
     expect(settings).not.toHaveProperty('password')
   })
 
   it('refuses to turn on while no password is set', async () => {
-    const { values, handler } = await activateWithSettings({})
-    const result = await handler('remote:toggle')({ enabled: true })
+    const { values, channelHandler } = await activateWithSettings({})
+    const result = await channelHandler('remote:toggle')({ enabled: true })
     expect(result).toEqual({ error: 'PASSWORD_REQUIRED' })
     expect(values.get(`${EXT}.enabled`)).toBe(false)
     expect(mockCreateRemoteServer).not.toHaveBeenCalled()

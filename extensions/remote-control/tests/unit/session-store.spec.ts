@@ -67,7 +67,7 @@ function sessionStoreClearTests() {
   it('clear drops every session', () => {
     store.issueSession()
     store.issueSession()
-    store.clear()
+    store.revokeAll()
     expect(store.size).toBe(0)
   })
 }

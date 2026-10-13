@@ -17,7 +17,7 @@ vi.mock('../../src/server/remote-server', () => {
 const settings = new Map<string, unknown>()
 const specs: ChannelSpec[] = []
 
-function api() {
+function fakeHostApi() {
   return {
     settings: {
       register: vi.fn(),
@@ -32,7 +32,7 @@ function api() {
   }
 }
 
-const toggle = (enabled: boolean) =>
+const toggleRemote = (enabled: boolean) =>
   dispatchChannel(specs.find((spec) => spec.channel === 'remote:toggle')!, { enabled })
 
 beforeAll(async () => {
@@ -51,10 +51,10 @@ beforeAll(async () => {
 describe('the remote server', () => {
   it('is not loaded while Remote Control is off, and is once it is turned on', async () => {
     const { activate } = await import('../../src/index.ts')
-    activate(api() as never)
+    activate(fakeHostApi() as never)
     expect(loaded.server).toBe(false)
 
-    await toggle(true)
+    await toggleRemote(true)
 
     await vi.waitFor(() => expect(createRemoteServer).toHaveBeenCalled())
     expect(loaded.server).toBe(true)

@@ -53,7 +53,7 @@ function acceptBridgeSocket(ws: WebSocket, opts: BridgeOptions, connections: Set
   ws.on('message', (raw) => connection.receive(raw.toString()))
   ws.on('close', () => {
     connections.delete(ws)
-    connection.close()
+    connection.unsubscribeAll()
   })
 }
 
@@ -75,11 +75,11 @@ class BridgeConnection {
     }
     if (!msg.channel) return
     if (msg.type === 'subscribe') return this.subscribe(msg.channel)
-    if (msg.type === 'send') return this.send(msg.channel, msg.args)
-    if (msg.type === 'invoke' && msg.id) return this.invoke(msg.id, msg.channel, msg.args)
+    if (msg.type === 'send') return this.relaySend(msg.channel, msg.args)
+    if (msg.type === 'invoke' && msg.id) return this.relayInvoke(msg.id, msg.channel, msg.args)
   }
 
-  close(): void {
+  unsubscribeAll(): void {
     for (const unsub of this.unsubscribers.values()) unsub()
     this.unsubscribers.clear()
   }
@@ -90,31 +90,35 @@ class BridgeConnection {
     if (!(await this.opts.isRemoteAccessible(channel))) return
     if (this.unsubscribers.has(channel)) return
     const unsub = this.opts.onWindowEvent(channel, (...args) =>
-      this.reply({ type: 'event', channel, args })
+      this.sendToClient({ type: 'event', channel, args })
     )
     this.unsubscribers.set(channel, unsub)
   }
 
-  private async send(channel: string, args: unknown[] | undefined): Promise<void> {
+  private async relaySend(channel: string, args: unknown[] | undefined): Promise<void> {
     // Default-deny: only allowlisted fire-and-forget channels may be driven.
     if (!(await this.opts.isRemoteAccessible(channel))) return
     this.opts.sendChannel(channel, (args?.[0] ?? {}) as unknown)
   }
 
-  private async invoke(id: string, channel: string, args: unknown[] | undefined): Promise<void> {
+  private async relayInvoke(
+    id: string,
+    channel: string,
+    args: unknown[] | undefined
+  ): Promise<void> {
     if (!(await this.opts.isRemoteAccessible(channel))) {
-      this.reply({ type: 'error', id, error: 'channel not remote-accessible' })
+      this.sendToClient({ type: 'error', id, error: 'channel not remote-accessible' })
       return
     }
     try {
       const result = await this.opts.invokeChannel(channel, args?.[0] ?? {})
-      this.reply({ type: 'result', id, result })
+      this.sendToClient({ type: 'result', id, result })
     } catch (err) {
-      this.reply({ type: 'error', id, error: String(err) })
+      this.sendToClient({ type: 'error', id, error: String(err) })
     }
   }
 
-  private reply(message: Record<string, unknown>): void {
+  private sendToClient(message: Record<string, unknown>): void {
     if (this.ws.readyState !== this.ws.OPEN) return
     this.ws.send(JSON.stringify(message))
   }

@@ -60,7 +60,7 @@ export class SessionStore {
     }
   }
 
-  clear(): void {
+  revokeAll(): void {
     this.sessions.clear()
   }
 

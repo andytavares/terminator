@@ -88,7 +88,7 @@ function stillDropped(previous: RemoteStatus, message: StatusBroadcast): boolean
 
 function hardErrorStatus(message: StatusBroadcast, port: number): RemoteStatus | null {
   if (message.error === 'PORT_IN_USE') {
-    return failed(port, {
+    return failedStatus(port, {
       reason: 'port-in-use',
       message: `Port ${port} is already in use.`,
       resolution:
@@ -96,7 +96,7 @@ function hardErrorStatus(message: StatusBroadcast, port: number): RemoteStatus |
     })
   }
   if (message.error === 'PASSWORD_REQUIRED') {
-    return failed(port, {
+    return failedStatus(port, {
       reason: 'password-required',
       message: message.message ?? 'Remote Control needs a password before it can start.',
       resolution: 'Open Settings below and set a password, or generate one.',
@@ -129,14 +129,14 @@ function tunnelErrorStatus(ngrokError: string, port: number, localUrl: string): 
   if (isMissingCredential(ngrokError)) {
     return { kind: 'on', port, localUrl, publicUrl: null, reach: 'local-only' }
   }
-  return failed(port, {
+  return failedStatus(port, {
     reason: 'tunnel-unreachable',
     message: 'The public address could not be created.',
     resolution: ngrokError,
   })
 }
 
-function failed(port: number, failure: RemoteFailure): RemoteStatus {
+function failedStatus(port: number, failure: RemoteFailure): RemoteStatus {
   return { kind: 'failed', port, failure }
 }
 
