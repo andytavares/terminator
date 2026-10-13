@@ -42,45 +42,51 @@ const REMOTE_LOCALS = {
 // The built object is data-driven; type it loosely for property access in tests.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+function nativeBridge() {
+  const t = makeTransport()
+  return { t, api: buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any }
+}
+
+function remoteBridge() {
+  const t = makeTransport()
+  return { t, api: buildElectronApi(t, { mode: 'remote', locals: REMOTE_LOCALS }) as any }
+}
+
 describe('buildElectronApi — native mode', () => {
   it('maps invoke methods with a payload mapper', async () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const { t, api } = nativeBridge()
     await api.terminal.close('sess-1')
     expect(t.invoke).toHaveBeenCalledWith('terminal:close', { sessionId: 'sess-1' })
   })
 
   it('sends the folder as a payload when opening an editor', async () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const { t, api } = nativeBridge()
     await api.editor.open('/repos/app')
     expect(t.invoke).toHaveBeenCalledWith('editor:open', { folderPath: '/repos/app' })
   })
 
   it('asks which editor is available with no payload at all', async () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const { t, api } = nativeBridge()
     await api.editor.detect()
     expect(t.invoke).toHaveBeenCalledWith('editor:detect', undefined)
   })
 
   it('passes the first argument through when no mapper is declared', async () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const { t, api } = nativeBridge()
     await api.terminal.create({ cwd: '/repo' })
     expect(t.invoke).toHaveBeenCalledWith('terminal:create', { cwd: '/repo' })
   })
 
   it('maps send methods', () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const { t, api } = nativeBridge()
     api.terminal.input('sess-1', 'ls\n')
     expect(t.send).toHaveBeenCalledWith('terminal:input', { sessionId: 'sess-1', data: 'ls\n' })
   })
+})
 
+describe('buildElectronApi — native mode events', () => {
   it('subscribes event methods and maps pushed args to handler args', () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const { t, api } = nativeBridge()
     const handler = vi.fn()
     const unsubscribe = api.terminal.onOutput(handler)
     t.push('terminal:output', { sessionId: 'sess-1', data: 'hello' })
@@ -91,8 +97,7 @@ describe('buildElectronApi — native mode', () => {
   })
 
   it('maps zero-payload menu events to zero handler args', () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const { t, api } = nativeBridge()
     const handler = vi.fn()
     api.extensionEvents.onMenuOpenSettings(handler)
     t.push('menu:open-settings')
@@ -100,95 +105,139 @@ describe('buildElectronApi — native mode', () => {
   })
 
   it('delivers menu:open-home to onMenuOpenHome with no args', () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const { t, api } = nativeBridge()
     const handler = vi.fn()
     api.extensionEvents.onMenuOpenHome(handler)
     t.push('menu:open-home')
     expect(handler).toHaveBeenCalledTimes(1)
     expect(handler).toHaveBeenCalledWith()
   })
+})
 
-  it.each([
-    ['terminal.attach', ['s1'], 'invoke', 'terminal:attach', { sessionId: 's1' }],
-    ['git.changeStats', ['/repo'], 'invoke', 'git:change-stats', { path: '/repo' }],
-    ['extension.setBottomInset', [280], 'send', 'extension:set-bottom-inset', { inset: 280 }],
-    [
-      'workspace.setActive',
-      [{ workspaceId: 'w1', projectId: 'p1', repoRoot: '/repo' }],
-      'send',
-      'workspace:active-changed',
-      { workspaceId: 'w1', projectId: 'p1', repoRoot: '/repo' },
-    ],
-    ['extension.setLeftInset', [44], 'send', 'extension:set-left-inset', { inset: 44 }],
-    [
-      'extensionEvents.notifyPanelState',
-      ['p1', true],
-      'send',
-      'menu:set-panel-checked',
-      { panelId: 'p1', open: true },
-    ],
-  ] as const)('%s puts its arguments on the wire', async (path, args, kind, channel, payload) => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
-    const [ns, method] = path.split('.')
-    await api[ns][method](...args)
-    expect(t[kind]).toHaveBeenCalledWith(channel, payload)
-  })
+const WIRE_CASES = [
+  {
+    path: 'terminal.attach',
+    args: ['s1'],
+    kind: 'invoke',
+    channel: 'terminal:attach',
+    payload: { sessionId: 's1' },
+  },
+  {
+    path: 'git.changeStats',
+    args: ['/repo'],
+    kind: 'invoke',
+    channel: 'git:change-stats',
+    payload: { path: '/repo' },
+  },
+  {
+    path: 'extension.setBottomInset',
+    args: [280],
+    kind: 'send',
+    channel: 'extension:set-bottom-inset',
+    payload: { inset: 280 },
+  },
+  {
+    path: 'workspace.setActive',
+    args: [{ workspaceId: 'w1', projectId: 'p1', repoRoot: '/repo' }],
+    kind: 'send',
+    channel: 'workspace:active-changed',
+    payload: { workspaceId: 'w1', projectId: 'p1', repoRoot: '/repo' },
+  },
+  {
+    path: 'extension.setLeftInset',
+    args: [44],
+    kind: 'send',
+    channel: 'extension:set-left-inset',
+    payload: { inset: 44 },
+  },
+  {
+    path: 'extensionEvents.notifyPanelState',
+    args: ['p1', true],
+    kind: 'send',
+    channel: 'menu:set-panel-checked',
+    payload: { panelId: 'p1', open: true },
+  },
+] as const
+
+describe('buildElectronApi — native mode payloads', () => {
+  it.each(WIRE_CASES)(
+    '$path puts its arguments on the wire',
+    async ({ path, args, kind, channel, payload }) => {
+      const { t, api } = nativeBridge()
+      const [ns, method] = path.split('.')
+      await api[ns][method](...args)
+      expect(t[kind]).toHaveBeenCalledWith(channel, payload)
+    }
+  )
 
   it('wraps the url when opening an external link natively', async () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const { t, api } = nativeBridge()
     await api.shell.openExternal('https://example.com')
     expect(t.invoke).toHaveBeenCalledWith('shell:open-external', { url: 'https://example.com' })
   })
+})
 
-  it.each([
-    [
-      'project.onAdded',
-      'workspace:project-added',
-      [{ id: 'p1', name: 'app' }, 'extra'],
-      [{ id: 'p1', name: 'app' }],
-    ],
-    ['project.onRemoved', 'workspace:project-removed', [{ id: 'p1' }], ['p1']],
-    [
-      'extensionEvents.onExtensionPanelLoaded',
-      'extension:panel-loaded',
-      [{ id: 'ext.a', viewParam: 'main' }],
-      ['ext.a'],
-    ],
-    [
-      'extensionEvents.onExtensionRendererReload',
-      'extension:renderer-reload',
-      [{ id: 'ext.a' }],
-      ['ext.a'],
-    ],
-    [
-      'extensionEvents.onExtensionExitToTerminal',
-      'extension:exit-to-terminal',
-      ['panel-1', 'extra'],
-      ['panel-1'],
-    ],
-    ['quickActions.onOpen', 'quick-actions:open', [{ ignored: true }], []],
-  ] as const)('%s hands its handler only what it needs', (path, channel, pushed, expected) => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
-    const [ns, method] = path.split('.')
-    const handler = vi.fn()
-    api[ns][method](handler)
-    t.push(channel, ...pushed)
-    expect(handler).toHaveBeenCalledWith(...expected)
-  })
+const HANDLER_CASES = [
+  {
+    path: 'project.onAdded',
+    channel: 'workspace:project-added',
+    pushed: [{ id: 'p1', name: 'app' }, 'extra'],
+    expected: [{ id: 'p1', name: 'app' }],
+  },
+  {
+    path: 'project.onRemoved',
+    channel: 'workspace:project-removed',
+    pushed: [{ id: 'p1' }],
+    expected: ['p1'],
+  },
+  {
+    path: 'extensionEvents.onExtensionPanelLoaded',
+    channel: 'extension:panel-loaded',
+    pushed: [{ id: 'ext.a', viewParam: 'main' }],
+    expected: ['ext.a'],
+  },
+  {
+    path: 'extensionEvents.onExtensionRendererReload',
+    channel: 'extension:renderer-reload',
+    pushed: [{ id: 'ext.a' }],
+    expected: ['ext.a'],
+  },
+  {
+    path: 'extensionEvents.onExtensionExitToTerminal',
+    channel: 'extension:exit-to-terminal',
+    pushed: ['panel-1', 'extra'],
+    expected: ['panel-1'],
+  },
+  {
+    path: 'quickActions.onOpen',
+    channel: 'quick-actions:open',
+    pushed: [{ ignored: true }],
+    expected: [],
+  },
+] as const
 
+describe('buildElectronApi — native mode handler arguments', () => {
+  it.each(HANDLER_CASES)(
+    '$path hands its handler only what it needs',
+    ({ path, channel, pushed, expected }) => {
+      const { t, api } = nativeBridge()
+      const [ns, method] = path.split('.')
+      const handler = vi.fn()
+      api[ns][method](handler)
+      t.push(channel, ...pushed)
+      expect(handler).toHaveBeenCalledWith(...expected)
+    }
+  )
+})
+
+describe('buildElectronApi — native mode surface', () => {
   it('uses the supplied local implementations', () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const { api } = nativeBridge()
     expect(api.getFilePath()).toBe('/tmp/file')
   })
 
   it('includes native-only methods', () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const { api } = nativeBridge()
     expect(typeof api.workspace.getActive).toBe('function')
     expect(typeof api.db.health).toBe('function')
     expect(typeof api.getFilePath).toBe('function')
@@ -196,12 +245,20 @@ describe('buildElectronApi — native mode', () => {
     expect(typeof api.extension.setTheme).toBe('function')
   })
 
+  it('throws at build time when a local implementation is missing', () => {
+    const t = makeTransport()
+    expect(() => buildElectronApi(t, { mode: 'native', locals: {} })).toThrow(
+      /missing local implementation/
+    )
+  })
+})
+
+describe('buildElectronApi — extension theme', () => {
   // An extension view is its own document and never sees the renderer's
   // `data-theme`, so the theme has to travel over this channel. It is
   // native-only: the remote client renders its own chrome.
   it('sends the theme to the extension host', () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const { t, api } = nativeBridge()
     api.extension.setTheme('light')
     expect(t.send).toHaveBeenCalledWith('extension:set-theme', { theme: 'light' })
     api.extension.setTheme('dark')
@@ -209,16 +266,8 @@ describe('buildElectronApi — native mode', () => {
   })
 
   it('omits the theme channel from the remote client', () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'remote', locals: REMOTE_LOCALS }) as any
+    const { api } = remoteBridge()
     expect(api.extension.setTheme).toBeUndefined()
-  })
-
-  it('throws at build time when a local implementation is missing', () => {
-    const t = makeTransport()
-    expect(() => buildElectronApi(t, { mode: 'native', locals: {} })).toThrow(
-      /missing local implementation/
-    )
   })
 })
 
@@ -237,33 +286,31 @@ describe('buildElectronApi — remote mode', () => {
   })
 
   it('omits native-only methods and their empty namespaces', () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'remote', locals: REMOTE_LOCALS }) as any
+    const { api } = remoteBridge()
     expect(api.workspace.getActive).toBeUndefined()
     expect(api.db).toBeUndefined()
     expect(api.getFilePath).toBeUndefined()
     expect(api.extension.setBottomInset).toBeUndefined()
     expect(api.project.onAdded).toBeUndefined()
   })
+})
 
+describe('buildElectronApi — remote mode transport', () => {
   it('replaces stub methods with the supplied local implementation', async () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'remote', locals: REMOTE_LOCALS }) as any
+    const { t, api } = remoteBridge()
     await expect(api.dialog.openDirectory()).resolves.toEqual({ cancelled: true })
     api.extension.updatePanelBounds({})
     expect(t.invoke).not.toHaveBeenCalled()
   })
 
   it('routes non-stub methods through the transport unchanged', async () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'remote', locals: REMOTE_LOCALS }) as any
+    const { t, api } = remoteBridge()
     await api.git.checkout('/repo', 'main')
     expect(t.invoke).toHaveBeenCalledWith('git:checkout', { path: '/repo', branch: 'main' })
   })
 
   it('builds the same event subscription surface as native for shared events', () => {
-    const t = makeTransport()
-    const api = buildElectronApi(t, { mode: 'remote', locals: REMOTE_LOCALS }) as any
+    const { t, api } = remoteBridge()
     const handler = vi.fn()
     api.extensionEvents.onTogglePanel(handler)
     t.push('extension:toggle-panel', 'terminator.git-integration')

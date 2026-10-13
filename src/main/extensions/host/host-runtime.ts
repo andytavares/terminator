@@ -1,6 +1,7 @@
 import { dispatchChannel } from '@terminator/extension-sdk'
 import type { ChannelSpec, CommandContext, ExtensionDB } from '@terminator/extension-sdk'
 import type { RpcEndpoint } from './rpc-endpoint.js'
+import type { CommandRun } from './messages.js'
 import { CallbackRegistry } from './callbacks.js'
 import { createHostExtensionAPI, type HostCommand } from './host-api.js'
 import type { HostSnapshot, WorkspacesSnapshot } from './snapshot.js'
@@ -10,6 +11,13 @@ import type { BackendFiles, BackendLoader, BackendModule } from './backend-loade
 export interface BackendRecord extends BackendFiles {
   id: string
   dependencies: string[]
+}
+
+/** What the runtime reads and loads backends with, besides its port to main. */
+export interface HostRuntimeDeps {
+  snapshot: HostSnapshot
+  db: ExtensionDB
+  loader: BackendLoader
 }
 
 interface Active {
@@ -29,19 +37,24 @@ export class HostRuntime {
   private readonly channels = new Map<string, ChannelSpec>()
   private readonly commands = new Map<string, HostCommand>()
 
+  private readonly snapshot: HostSnapshot
+  private readonly db: ExtensionDB
+  private readonly loader: BackendLoader
+
   constructor(
     private readonly endpoint: RpcEndpoint,
-    private readonly snapshot: HostSnapshot,
-    private readonly db: ExtensionDB,
-    private readonly loader: BackendLoader
+    { snapshot, db, loader }: HostRuntimeDeps
   ) {
+    this.snapshot = snapshot
+    this.db = db
+    this.loader = loader
     endpoint.handle('activate', (record: BackendRecord) => this.activate(record))
     endpoint.handle('deactivate', (id: string) => this.deactivate(id))
     endpoint.handle('channel.dispatch', (_id: string, channel: string, payload: unknown) =>
       this.dispatch(channel, payload)
     )
-    endpoint.handle('command.run', (id: string, command: string, context: CommandContext, args) =>
-      this.runCommand(`${id}.command.${command}`, context, args)
+    endpoint.handle('command.run', ({ extensionId, commandId, context, args }: CommandRun) =>
+      this.runCommand(`${extensionId}.command.${commandId}`, context, args)
     )
     endpoint.handle('callback', (id: string, callbackId: number, args: unknown[]) =>
       this.active.get(id)?.callbacks.invoke(callbackId, args)

@@ -104,7 +104,9 @@ describe('jira provider — listMine', () => {
     expect(result).toHaveLength(1)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('jira provider — listMine summaries and limits', () => {
   it('reports a null branch name on summaries — Jira has no equivalent', async () => {
     routeFetch([[/\/search\/jql/, { issues: [ISSUE_TAV_7], isLast: true }]])
     const [issue] = await provider.listMine(CREDENTIAL, { kind: 'query', jql: 'x = y' }, 25)
@@ -170,7 +172,9 @@ describe('jira provider — get', () => {
       createdAt: '2026-08-22T10:15:00.000+0000',
     })
   })
+})
 
+describe('jira provider — get fields', () => {
   it('always reports branchName as null — Jira has no equivalent', async () => {
     routeFetch([
       [/\/issue\/TAV-7\/comment/, COMMENTS],
@@ -193,6 +197,43 @@ describe('jira provider — get', () => {
   it('returns null on 404 rather than throwing', async () => {
     routeFetch([[/\/issue\//, { errorMessages: ['Issue does not exist'] }, 404]])
     await expect(provider.get(CREDENTIAL, 'TAV-999')).resolves.toBeNull()
+  })
+})
+
+describe('jira provider — get edge cases', () => {
+  it('returns null when Jira answers the issue request with no body', async () => {
+    stubFetch(async () => new Response('', { status: 200 }))
+    await expect(provider.get(CREDENTIAL, 'TAV-7')).resolves.toBeNull()
+  })
+
+  it('rejects a failure other than not-found rather than reading it as no issue', async () => {
+    routeFetch([[/\/issue\//, {}, 500]])
+    await expect(provider.get(CREDENTIAL, 'TAV-7')).rejects.toMatchObject({ kind: 'unavailable' })
+  })
+})
+
+describe('jira provider — get comments and account', () => {
+  it('orders comments newest first, with an undated one last', async () => {
+    const comments = [
+      { created: '2026-01-01', body: 'old' },
+      { body: 'undated' },
+      { created: '2026-02-01', body: 'new' },
+    ]
+    routeFetch([
+      [/\/comment/, { comments }],
+      [/\/issue\//, ISSUE_TAV_7],
+    ])
+    const issue = await provider.get(CREDENTIAL, 'TAV-7')
+    expect(issue?.comments.map((c) => [c.body, c.createdAt])).toEqual([
+      ['new', '2026-02-01'],
+      ['old', '2026-01-01'],
+      ['undated', ''],
+    ])
+  })
+
+  it('names no one when /myself omits a display name', async () => {
+    routeFetch([[/\/myself/, { emailAddress: 'a@b.c' }]])
+    await expect(provider.verify(CREDENTIAL)).resolves.toMatchObject({ name: '', email: 'a@b.c' })
   })
 })
 
@@ -243,7 +284,9 @@ describe('jira provider — hostile and incomplete responses', () => {
       assignee: null,
     })
   })
+})
 
+describe('jira provider — unknown categories and failed comment requests', () => {
   it('falls back to backlog for a status category Jira adds later', async () => {
     routeFetch([
       [/\/comment/, { comments: [] }],
@@ -268,7 +311,9 @@ describe('jira provider — hostile and incomplete responses', () => {
     })
     await expect(provider.get(CREDENTIAL, 'TAV-7')).resolves.toMatchObject({ comments: [] })
   })
+})
 
+describe('jira provider — incomplete comments and search pages', () => {
   it('names an author Jira did not supply', async () => {
     routeFetch([
       [/\/comment/, { comments: [{ created: '2026-01-01', body: 'x' }] }],
@@ -298,7 +343,9 @@ describe('jira provider — hostile and incomplete responses', () => {
     await provider.listMine(CREDENTIAL, { kind: 'assignee', email: null }, 10)
     expect(jqlOf(fetchMock.mock.calls[0][0])).toContain('currentUser()')
   })
+})
 
+describe('jira provider — failed requests', () => {
   it('maps a dead network to unavailable, not to a bad credential', async () => {
     vi.stubGlobal(
       'fetch',
@@ -322,7 +369,9 @@ describe('jira provider — hostile and incomplete responses', () => {
       provider.listMine(CREDENTIAL, { kind: 'query', jql: 'x = y' }, 10)
     ).rejects.toMatchObject({ kind: 'unavailable', message: 'Jira request failed' })
   })
+})
 
+describe('jira provider — incomplete accounts and foreign credentials', () => {
   it('falls back to the configured email when /myself omits one', async () => {
     routeFetch([[/\/myself/, { displayName: 'Andrew' }]])
     await expect(provider.verify(CREDENTIAL)).resolves.toMatchObject({

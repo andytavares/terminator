@@ -28,7 +28,9 @@ describe('escapeContextFromTarget', () => {
     term.appendChild(child)
     expect(escapeContextFromTarget(child, 0).inTerminal).toBe(true)
   })
+})
 
+describe('escapeContextFromTarget — plain elements, modals and null', () => {
   it('reports a plain element as neither', () => {
     const ctx = escapeContextFromTarget(document.createElement('div'), 0)
     expect(ctx.inTextField).toBe(false)

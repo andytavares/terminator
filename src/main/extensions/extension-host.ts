@@ -418,7 +418,7 @@ export class ExtensionHost {
     const inactive = this.inactiveDependency(record)
     if (inactive) return { error: 'DEPENDENCY_ERROR', message: inactive }
     const deps = { ...this.deps, shellRootSettings: declaredShellRoots(record) }
-    const api = createExtensionAPI(record.id, app.getVersion(), deps, record.rendererUrl)
+    const api = createExtensionAPI(record.id, deps, record.rendererUrl)
     this.hostedApis.set(record.id, api)
     try {
       const dependencies = declaredDependencies(record)

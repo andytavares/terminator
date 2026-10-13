@@ -97,7 +97,11 @@ async function extensionHost(): Promise<ExtensionHost> {
   const backends = new ExtensionHostProcess({
     spawn: (initial) => {
       const { port1, port2 } = new MessageChannel()
-      new HostRuntime(new RpcEndpoint(link(port2)), initial, {} as ExtensionDB, loader)
+      new HostRuntime(new RpcEndpoint(link(port2)), {
+        snapshot: initial,
+        db: {} as ExtensionDB,
+        loader,
+      })
       return { link: link(port1), onExit: () => {}, kill: () => {} }
     },
     snapshot: () => hostSnapshot(),

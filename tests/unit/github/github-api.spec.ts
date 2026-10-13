@@ -52,7 +52,9 @@ describe('api.github', () => {
     expect(login).toBe('alice\n')
     expect(run.mock.calls.map(([input]) => input.env)).toEqual([{ GH_TOKEN: 'expired' }, {}])
   })
+})
 
+describe('api.github — request bodies', () => {
   it('sends a JSON body on stdin and rejects with what gh printed when GitHub refuses it', async () => {
     const refusal = '{"message":"Validation Failed"}'
     const { run, github } = fakeGh(
@@ -75,7 +77,9 @@ describe('api.github', () => {
       input: '{"event":"APPROVE"}',
     })
   })
+})
 
+describe('api.github — gh api command lines', () => {
   it('puts string and typed parameters, paging and a jq filter on the gh api command line', async () => {
     const { run, github } = fakeGh(result({ stdout: '[]' }))
 
@@ -102,7 +106,9 @@ describe('api.github', () => {
       '.data',
     ])
   })
+})
 
+describe('api.github — pull requests, repositories and timeouts', () => {
   it('opens a pull request and reads its number from the URL gh prints', async () => {
     const { run, github } = fakeGh(result({ stdout: 'https://github.com/o/r/pull/42\n' }))
 
@@ -126,7 +132,9 @@ describe('api.github', () => {
       '--draft',
     ])
   })
+})
 
+describe('api.github — repositories and timeouts', () => {
   it('reads the repository a checkout belongs to', async () => {
     const { run, github } = fakeGh(result({ stdout: '{"name":"repo","owner":{"login":"octo"}}' }))
 

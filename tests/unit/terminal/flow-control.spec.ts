@@ -40,7 +40,9 @@ describe('FlowControl', () => {
     flow.acknowledged(1)
     expect(output.resume).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('FlowControl — after a resume, and acknowledgements', () => {
   it('pauses again after a resume when output outruns the renderer again', () => {
     const { flow, output } = makeFlow()
     flow.sent(HIGH_WATERMARK_CHARS + 1)
@@ -64,7 +66,9 @@ describe('FlowControl', () => {
     flow.sent(HIGH_WATERMARK_CHARS)
     expect(output.pause).not.toHaveBeenCalled()
   })
+})
 
+describe('FlowControl — reset', () => {
   it('resumes a paused process and forgets what was owed when reset', () => {
     const { flow, output } = makeFlow()
     flow.sent(HIGH_WATERMARK_CHARS + 1)

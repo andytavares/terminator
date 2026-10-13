@@ -96,7 +96,9 @@ describe('notifications:trigger-action', () => {
     expect(destroyed.show).not.toHaveBeenCalled()
     expect(await invoke('notifications:list')).toEqual([expect.objectContaining({ id })])
   })
+})
 
+describe('notifications:trigger-action — refusals', () => {
   it('cannot open a notification that is not about a session', async () => {
     const id = await create({})
 

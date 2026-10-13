@@ -33,26 +33,26 @@ function readSettings(): Record<string, unknown> {
 // Run for real with node: the whole point of this file is what the runtime
 // receives on stdout, and asserting on the source string would prove nothing.
 
-describe('the hook script, executed', () => {
-  async function runScript(
-    contextFileContents: string | null,
-    options: { sessionContextDir?: string; env?: Record<string, string> } = {}
-  ): Promise<string> {
-    const mod = await load()
-    const scriptPath = await mod.installHookScript(userData)
-    const contextFile = path.join(userData, 'ctx.json')
-    if (contextFileContents !== null) fs.writeFileSync(contextFile, contextFileContents, 'utf8')
-    const args = [
-      scriptPath,
-      contextFile,
-      ...(options.sessionContextDir ? [options.sessionContextDir] : []),
-    ]
-    return execFileSync(process.execPath, args, {
-      encoding: 'utf8',
-      env: options.env ? { ...process.env, ...options.env } : process.env,
-    })
-  }
+async function runScript(
+  contextFileContents: string | null,
+  options: { sessionContextDir?: string; env?: Record<string, string> } = {}
+): Promise<string> {
+  const mod = await load()
+  const scriptPath = await mod.installHookScript(userData)
+  const contextFile = path.join(userData, 'ctx.json')
+  if (contextFileContents !== null) fs.writeFileSync(contextFile, contextFileContents, 'utf8')
+  const args = [
+    scriptPath,
+    contextFile,
+    ...(options.sessionContextDir ? [options.sessionContextDir] : []),
+  ]
+  return execFileSync(process.execPath, args, {
+    encoding: 'utf8',
+    env: options.env ? { ...process.env, ...options.env } : process.env,
+  })
+}
 
+describe('the hook script, executed', () => {
   it('emits hookEventName — without it the runtime ignores the whole object', async () => {
     const out = await runScript(JSON.stringify({ markdown: '# TAV-42', key: 'TAV-42' }))
     expect(JSON.parse(out).hookSpecificOutput.hookEventName).toBe('SessionStart')
@@ -87,42 +87,50 @@ describe('the hook script, executed', () => {
     expect(await runScript('"just a string"')).toBe('')
     expect(await runScript('null')).toBe('')
   })
+})
 
-  describe('when the session has its own link', () => {
-    let sessionContextDir: string
+describe('the hook script, when the session has its own link', () => {
+  let sessionContextDir: string
 
-    beforeEach(() => {
-      sessionContextDir = makeTempDir('session-hook-sctx-')
+  beforeEach(() => {
+    sessionContextDir = makeTempDir('session-hook-sctx-')
+  })
+
+  it('stays silent — the session’s own hook already printed its context', async () => {
+    fs.writeFileSync(
+      path.join(sessionContextDir, 'term-1.json'),
+      JSON.stringify({ markdown: '# own link', key: 'OWN-1' }),
+      'utf8'
+    )
+    const out = await runScript(JSON.stringify({ markdown: '# project link', key: 'PROJ-1' }), {
+      sessionContextDir,
+      env: { TERMINATOR_SESSION_ID: 'term-1' },
     })
+    expect(out).toBe('')
+  })
 
-    it('stays silent — the session’s own hook already printed its context', async () => {
-      fs.writeFileSync(
-        path.join(sessionContextDir, 'term-1.json'),
-        JSON.stringify({ markdown: '# own link', key: 'OWN-1' }),
-        'utf8'
-      )
-      const out = await runScript(JSON.stringify({ markdown: '# project link', key: 'PROJ-1' }), {
-        sessionContextDir,
-        env: { TERMINATOR_SESSION_ID: 'term-1' },
-      })
-      expect(out).toBe('')
+  it('prints the project context when the session has no context file of its own', async () => {
+    const out = await runScript(JSON.stringify({ markdown: '# project link', key: 'PROJ-1' }), {
+      sessionContextDir,
+      env: { TERMINATOR_SESSION_ID: 'term-1' },
     })
+    expect(JSON.parse(out).hookSpecificOutput.additionalContext).toBe('# project link')
+  })
+})
 
-    it('prints the project context when the session has no context file of its own', async () => {
-      const out = await runScript(JSON.stringify({ markdown: '# project link', key: 'PROJ-1' }), {
-        sessionContextDir,
-        env: { TERMINATOR_SESSION_ID: 'term-1' },
-      })
-      expect(JSON.parse(out).hookSpecificOutput.additionalContext).toBe('# project link')
-    })
+describe('the hook script, with no terminal id', () => {
+  let sessionContextDir: string
 
-    it('prints as before when there is no terminal id at all', async () => {
-      const out = await runScript(JSON.stringify({ markdown: '# project link', key: 'PROJ-1' }), {
-        sessionContextDir,
-        env: { TERMINATOR_SESSION_ID: '' },
-      })
-      expect(JSON.parse(out).hookSpecificOutput.additionalContext).toBe('# project link')
+  beforeEach(() => {
+    sessionContextDir = makeTempDir('session-hook-sctx-')
+  })
+
+  it('prints as before when there is no terminal id at all', async () => {
+    const out = await runScript(JSON.stringify({ markdown: '# project link', key: 'PROJ-1' }), {
+      sessionContextDir,
+      env: { TERMINATOR_SESSION_ID: '' },
     })
+    expect(JSON.parse(out).hookSpecificOutput.additionalContext).toBe('# project link')
   })
 })
 
@@ -148,7 +156,9 @@ describe('hookCommand', () => {
     })
     expect(command).toContain(path.join(userData, 'integrations', 'session-context'))
   })
+})
 
+describe('hookCommand quoting', () => {
   it('quotes paths containing spaces and apostrophes', async () => {
     const mod = await load()
     const command = mod.hookCommand({
@@ -163,16 +173,16 @@ describe('hookCommand', () => {
 
 // ── The owned block ─────────────────────────────────────────────────────────
 
-describe('installProjectHook', () => {
-  const options = {
-    execPath: '/bin/electron',
-    hookScriptPath: '/tmp/hook.cjs',
-    projectId: PROJECT_ID,
-  }
+const HOOK_OPTIONS = {
+  execPath: '/bin/electron',
+  hookScriptPath: '/tmp/hook.cjs',
+  projectId: PROJECT_ID,
+}
 
+describe('installProjectHook', () => {
   it('creates the settings file with a SessionStart hook', async () => {
     const mod = await load()
-    await mod.installProjectHook(projectDir, options)
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
 
     const settings = readSettings() as { hooks: { SessionStart: unknown[] } }
     expect(settings.hooks.SessionStart).toHaveLength(1)
@@ -191,13 +201,15 @@ describe('installProjectHook', () => {
       'utf8'
     )
     const mod = await load()
-    await mod.installProjectHook(projectDir, options)
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
 
     const settings = readSettings() as { hooks: { SessionStart: unknown[] } }
     expect(settings.hooks.SessionStart).toHaveLength(2)
     expect(JSON.stringify(settings)).toContain('echo mine')
   })
+})
 
+describe('installProjectHook — other settings and repeats', () => {
   it('leaves unrelated settings and other hook events untouched', async () => {
     fs.mkdirSync(path.join(projectDir, '.claude'))
     fs.writeFileSync(
@@ -209,7 +221,7 @@ describe('installProjectHook', () => {
       'utf8'
     )
     const mod = await load()
-    await mod.installProjectHook(projectDir, options)
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
 
     const settings = readSettings() as { permissions: unknown; hooks: { PostToolUse: unknown } }
     expect(settings.permissions).toEqual({ allow: ['Bash(npm test *)'] })
@@ -218,14 +230,16 @@ describe('installProjectHook', () => {
 
   it('is idempotent — relinking does not stack up copies', async () => {
     const mod = await load()
-    await mod.installProjectHook(projectDir, options)
-    await mod.installProjectHook(projectDir, options)
-    await mod.installProjectHook(projectDir, options)
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
 
     const settings = readSettings() as { hooks: { SessionStart: unknown[] } }
     expect(settings.hooks.SessionStart).toHaveLength(1)
   })
+})
 
+describe('installProjectHook — what it refuses to touch', () => {
   it('never touches the shared, checked-in settings.json', async () => {
     fs.mkdirSync(path.join(projectDir, '.claude'))
     const shared = path.join(projectDir, '.claude', 'settings.json')
@@ -233,7 +247,7 @@ describe('installProjectHook', () => {
     const before = fs.readFileSync(shared, 'utf8')
 
     const mod = await load()
-    await mod.installProjectHook(projectDir, options)
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
 
     expect(fs.readFileSync(shared, 'utf8')).toBe(before)
   })
@@ -243,7 +257,7 @@ describe('installProjectHook', () => {
     fs.writeFileSync(settingsPath(), '{ this is not json', 'utf8')
 
     const mod = await load()
-    await expect(mod.installProjectHook(projectDir, options)).rejects.toThrow()
+    await expect(mod.installProjectHook(projectDir, HOOK_OPTIONS)).rejects.toThrow()
     expect(fs.readFileSync(settingsPath(), 'utf8')).toBe('{ this is not json')
   })
 
@@ -251,22 +265,16 @@ describe('installProjectHook', () => {
     // A file where `.claude` should be: no one can write the hook into it.
     fs.writeFileSync(path.join(projectDir, '.claude'), '')
     const mod = await load()
-    await expect(mod.installProjectHook(projectDir, options)).rejects.toThrow()
+    await expect(mod.installProjectHook(projectDir, HOOK_OPTIONS)).rejects.toThrow()
   })
 })
 
 describe('removeProjectHook', () => {
-  const options = {
-    execPath: '/bin/electron',
-    hookScriptPath: '/tmp/hook.cjs',
-    projectId: PROJECT_ID,
-  }
-
   it('leaves the directory as it found it when we created everything (SC-010)', async () => {
     const before = fs.readdirSync(projectDir)
     const mod = await load()
-    await mod.installProjectHook(projectDir, options)
-    await mod.removeProjectHook(projectDir, options.hookScriptPath)
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
+    await mod.removeProjectHook(projectDir, HOOK_OPTIONS.hookScriptPath)
 
     expect(fs.readdirSync(projectDir)).toEqual(before)
     expect(fs.existsSync(path.join(projectDir, '.claude'))).toBe(false)
@@ -278,12 +286,14 @@ describe('removeProjectHook', () => {
     fs.writeFileSync(settingsPath(), `${JSON.stringify(original, null, 2)}\n`, 'utf8')
 
     const mod = await load()
-    await mod.installProjectHook(projectDir, options)
-    await mod.removeProjectHook(projectDir, options.hookScriptPath)
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
+    await mod.removeProjectHook(projectDir, HOOK_OPTIONS.hookScriptPath)
 
     expect(readSettings()).toEqual(original)
   })
+})
 
+describe('removeProjectHook — other tools and directories', () => {
   it("leaves another tool's SessionStart hook in place", async () => {
     fs.mkdirSync(path.join(projectDir, '.claude'))
     fs.writeFileSync(
@@ -296,8 +306,8 @@ describe('removeProjectHook', () => {
       'utf8'
     )
     const mod = await load()
-    await mod.installProjectHook(projectDir, options)
-    await mod.removeProjectHook(projectDir, options.hookScriptPath)
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
+    await mod.removeProjectHook(projectDir, HOOK_OPTIONS.hookScriptPath)
 
     const settings = readSettings() as { hooks: { SessionStart: unknown[] } }
     expect(settings.hooks.SessionStart).toHaveLength(1)
@@ -306,31 +316,39 @@ describe('removeProjectHook', () => {
 
   it('keeps a .claude directory that has other things in it', async () => {
     const mod = await load()
-    await mod.installProjectHook(projectDir, options)
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
     fs.writeFileSync(path.join(projectDir, '.claude', 'settings.json'), '{}', 'utf8')
-    await mod.removeProjectHook(projectDir, options.hookScriptPath)
+    await mod.removeProjectHook(projectDir, HOOK_OPTIONS.hookScriptPath)
 
     expect(fs.existsSync(path.join(projectDir, '.claude'))).toBe(true)
     expect(fs.existsSync(settingsPath())).toBe(false)
   })
+})
 
+describe('removeProjectHook — nothing to remove', () => {
   it('is harmless when there is nothing to remove', async () => {
     const mod = await load()
-    await expect(mod.removeProjectHook(projectDir, options.hookScriptPath)).resolves.toBeUndefined()
+    await expect(
+      mod.removeProjectHook(projectDir, HOOK_OPTIONS.hookScriptPath)
+    ).resolves.toBeUndefined()
   })
 
   it('is harmless on settings it cannot parse', async () => {
     fs.mkdirSync(path.join(projectDir, '.claude'))
     fs.writeFileSync(settingsPath(), 'not json', 'utf8')
     const mod = await load()
-    await expect(mod.removeProjectHook(projectDir, options.hookScriptPath)).resolves.toBeUndefined()
+    await expect(
+      mod.removeProjectHook(projectDir, HOOK_OPTIONS.hookScriptPath)
+    ).resolves.toBeUndefined()
     expect(fs.readFileSync(settingsPath(), 'utf8')).toBe('not json')
   })
 
   it('is idempotent', async () => {
     const mod = await load()
-    await mod.installProjectHook(projectDir, options)
-    await mod.removeProjectHook(projectDir, options.hookScriptPath)
-    await expect(mod.removeProjectHook(projectDir, options.hookScriptPath)).resolves.toBeUndefined()
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
+    await mod.removeProjectHook(projectDir, HOOK_OPTIONS.hookScriptPath)
+    await expect(
+      mod.removeProjectHook(projectDir, HOOK_OPTIONS.hookScriptPath)
+    ).resolves.toBeUndefined()
   })
 })

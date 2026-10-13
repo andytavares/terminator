@@ -28,34 +28,39 @@ function belongsToSurface(spec: ChannelSpec, mode: BuildApiOptions['mode']): boo
   return mode === 'native' || (spec.remote ?? 'same') !== 'omit'
 }
 
+type ApiMethod = (...args: unknown[]) => unknown
+
 function methodFor(
   spec: ChannelSpec,
   transport: ApiTransport,
   opts: BuildApiOptions
-): ((...args: unknown[]) => unknown) | undefined {
+): ApiMethod | undefined {
   if (!belongsToSurface(spec, opts.mode)) return undefined
-
   const needsLocal = spec.kind === 'local' || (opts.mode === 'remote' && spec.remote === 'stub')
-  if (needsLocal) {
-    const local = opts.locals?.[spec.path]
-    if (!local) {
-      throw new Error(`electronAPI builder: missing local implementation for '${spec.path}'`)
-    }
-    return local as (...args: unknown[]) => unknown
-  }
+  return needsLocal ? localMethod(spec, opts.locals) : transportMethod(spec, transport)
+}
 
+function localMethod(spec: ChannelSpec, locals: BuildApiOptions['locals']): ApiMethod {
+  const local = locals?.[spec.path]
+  if (!local) {
+    throw new Error(`electronAPI builder: missing local implementation for '${spec.path}'`)
+  }
+  return local as ApiMethod
+}
+
+function transportMethod(spec: ChannelSpec, transport: ApiTransport): ApiMethod | undefined {
   const channel = spec.channel
   if (!channel) {
     throw new Error(`electronAPI builder: spec '${spec.path}' has no channel`)
   }
+  const payload = (args: unknown[]) =>
+    spec.toPayload ? spec.toPayload(...(args as never[])) : args[0]
 
   switch (spec.kind) {
     case 'invoke':
-      return (...args: unknown[]) =>
-        transport.invoke(channel, spec.toPayload ? spec.toPayload(...(args as never[])) : args[0])
+      return (...args: unknown[]) => transport.invoke(channel, payload(args))
     case 'send':
-      return (...args: unknown[]) =>
-        transport.send(channel, spec.toPayload ? spec.toPayload(...(args as never[])) : args[0])
+      return (...args: unknown[]) => transport.send(channel, payload(args))
     case 'event':
       return (...args: unknown[]) => {
         const handler = args[0] as (...handlerArgs: unknown[]) => void

@@ -59,7 +59,9 @@ describe('session-record-store — loading', () => {
     await store.loadRecords()
     expect(store.listRecords()).toEqual([])
   })
+})
 
+describe('session-record-store — loading entries', () => {
   it('skips malformed entries but keeps the valid ones', async () => {
     const good = { ...SNAP, description: 'kept', link: null, updatedAt: SNAP.startedAt }
     fs.writeFileSync(
@@ -78,6 +80,26 @@ describe('session-record-store — loading', () => {
     expect(records.map((r) => r.sessionId).sort()).toEqual(['s1', 's3'])
     // An unknown tracker loses its link, not the whole record.
     expect(records.find((r) => r.sessionId === 's3')?.link).toBeNull()
+  })
+
+  it('skips an entry without its start and update times', async () => {
+    const stored = { ...SNAP, description: 'd', link: null, updatedAt: SNAP.startedAt }
+    const { updatedAt: _updatedAt, ...noUpdate } = { ...stored, sessionId: 's2' }
+    fs.writeFileSync(FILE(), JSON.stringify([stored, noUpdate]))
+    const store = await load()
+    await store.loadRecords()
+    expect(store.listRecords().map((r) => r.sessionId)).toEqual(['s1'])
+  })
+})
+
+describe('session-record-store — loading fields and retention', () => {
+  it('reads a stored link, and gives a record with no tab title an empty one', async () => {
+    const link = { tracker: 'jira', key: 'TAV-7' }
+    const { tabTitle: _tabTitle, ...stored } = { ...SNAP, description: null, link }
+    fs.writeFileSync(FILE(), JSON.stringify([{ ...stored, updatedAt: SNAP.startedAt }]))
+    const store = await load()
+    await store.loadRecords()
+    expect(store.listRecords()[0]).toMatchObject({ link, tabTitle: '' })
   })
 
   it('prunes records closed more than 30 days ago on load', async () => {
@@ -123,7 +145,9 @@ describe('session-record-store — writing', () => {
     await second.loadRecords()
     expect(second.listRecords()[0]?.description).toBe('why')
   })
+})
 
+describe('session-record-store — later writes', () => {
   it('refreshes the snapshot on a later write', async () => {
     const store = await load()
     await store.setDescription(SNAP, 'why')
@@ -143,7 +167,9 @@ describe('session-record-store — writing', () => {
     expect(await store.setDescription(SNAP, '   ')).toBeNull()
     expect(store.listRecords()).toEqual([])
   })
+})
 
+describe('session-record-store — clearing', () => {
   it('keeps the record when the description is cleared but a link remains', async () => {
     const store = await load()
     await store.setLink(SNAP, { tracker: 'linear', key: 'NW-88' })
@@ -164,7 +190,9 @@ describe('session-record-store — writing', () => {
     expect(await store.setDescription(SNAP, null)).toBeNull()
     expect(fs.existsSync(FILE())).toBe(false)
   })
+})
 
+describe('session-record-store — limits and closed records', () => {
   it('rejects a description over 500 characters', async () => {
     const store = await load()
     await expect(store.setDescription(SNAP, 'x'.repeat(501))).rejects.toMatchObject({
@@ -203,7 +231,9 @@ describe('session-record-store — closing', () => {
     await store.markClosed('nobody', new Date())
     expect(fs.existsSync(FILE())).toBe(false)
   })
+})
 
+describe('session-record-store — closing once', () => {
   it('does not move the close time of an already-closed record', async () => {
     const store = await load()
     await store.setDescription(SNAP, 'why')
@@ -218,7 +248,9 @@ describe('session-record-store — closing', () => {
     await store.markClosed('s1', new Date('2026-09-15T11:00:00.000Z'))
     expect(sessionContext.deleted).toContain('s1')
   })
+})
 
+describe('session-record-store — the startup sweep', () => {
   it('closes every open record at its last update when swept', async () => {
     const open = { ...SNAP, description: 'why', link: null, updatedAt: '2026-09-14T09:00:00.000Z' }
     const closed = {
@@ -297,7 +329,9 @@ describe('session-record-store — the conversation that ran in a session', () =
     expect(record?.agent?.sessionId).toBe('second')
     expect(store.listRecords()).toHaveLength(1)
   })
+})
 
+describe('session-record-store — the conversation outlives the rest', () => {
   it('keeps the record when the description and link go but the conversation stays', async () => {
     const store = await load()
     await store.setAgent(SNAP, CONVERSATION)
@@ -312,7 +346,9 @@ describe('session-record-store — the conversation that ran in a session', () =
     expect(await store.setAgent(SNAP, null)).toBeNull()
     expect(store.listRecords()).toEqual([])
   })
+})
 
+describe('session-record-store — the conversation across restarts', () => {
   it('survives a reload, a close and the startup sweep', async () => {
     const first = await load()
     await first.setAgent(SNAP, CONVERSATION)
@@ -336,7 +372,9 @@ describe('session-record-store — the conversation that ran in a session', () =
     expect(swept?.closedAt).toBeDefined()
     expect(swept?.agent).toEqual(CONVERSATION)
   })
+})
 
+describe('session-record-store — unreadable conversations', () => {
   it('drops an unreadable conversation on load rather than the record', async () => {
     const first = await load()
     await first.setDescription(SNAP, 'why')
@@ -347,7 +385,9 @@ describe('session-record-store — the conversation that ran in a session', () =
     await second.loadRecords()
     expect(second.listRecords()[0]).toMatchObject({ description: 'why', agent: null })
   })
+})
 
+describe('session-record-store — conversations of closed sessions', () => {
   it('refuses a conversation for a closed session', async () => {
     const store = await load()
     await store.setDescription(SNAP, 'why')
@@ -358,9 +398,9 @@ describe('session-record-store — the conversation that ran in a session', () =
   })
 })
 
-describe('session-record-store — transfer', () => {
-  const RESUMED: SessionSnapshot = { ...SNAP, sessionId: 's2', tabTitle: 'claude' }
+const RESUMED: SessionSnapshot = { ...SNAP, sessionId: 's2', tabTitle: 'claude' }
 
+describe('session-record-store — transfer', () => {
   it('moves everything the old session held to the new one, and forgets the old', async () => {
     const store = await load()
     await store.setAgent(SNAP, CONVERSATION)
@@ -384,7 +424,9 @@ describe('session-record-store — transfer', () => {
     expect(await store.transfer('nobody', RESUMED)).toBeNull()
     expect(store.listRecords()).toEqual([])
   })
+})
 
+describe('session-record-store — transfer announcements', () => {
   it('announces both the new record and the old one going', async () => {
     const store = await load()
     await store.setAgent(SNAP, CONVERSATION)
@@ -420,7 +462,9 @@ describe('session-record-store — forgetting', () => {
     await store.forget('s1')
     expect(sessionContext.deleted).toContain('s1')
   })
+})
 
+describe('session-record-store — forgetting what retention drops', () => {
   it('deletes the agent context of a record dropped by retention on load', async () => {
     const stale = {
       ...SNAP,
@@ -435,7 +479,9 @@ describe('session-record-store — forgetting', () => {
     await store.loadRecords()
     expect(sessionContext.deleted).toContain('stale')
   })
+})
 
+describe('session-record-store — what cannot be forgotten', () => {
   it('refuses to forget a session that is still open', async () => {
     const store = await load()
     await store.setDescription(SNAP, 'why')

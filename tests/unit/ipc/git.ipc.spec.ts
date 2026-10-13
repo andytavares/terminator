@@ -94,6 +94,9 @@ describe('git:current-branch', () => {
   })
 })
 
+const b = (name: string) => ({ name, isCurrent: false, isRemote: true })
+const all = [b('main'), b('gh-readonly-queue/main/pr-248-3f1a'), b('trunk-merge/pr-9'), b('dev')]
+
 describe('git:list-branches', () => {
   it('returns branches, and an empty list on error', async () => {
     gitService.listBranches.mockResolvedValue(['main', 'dev'])
@@ -105,9 +108,9 @@ describe('git:list-branches', () => {
       branches: [],
     })
   })
-  const b = (name: string) => ({ name, isCurrent: false, isRemote: true })
-  const all = [b('main'), b('gh-readonly-queue/main/pr-248-3f1a'), b('trunk-merge/pr-9'), b('dev')]
+})
 
+describe('git:list-branches — exclusion patterns', () => {
   it('hides branches matching the global exclusion patterns', async () => {
     gitService.listBranches.mockResolvedValue(all)
     settingsStore.updateGlobalSettings({
@@ -130,7 +133,9 @@ describe('git:list-branches', () => {
     }
     expect(r.branches.map((x) => x.name)).toEqual(['main', 'trunk-merge/pr-9', 'dev'])
   })
+})
 
+describe("git:list-branches — which workspace's patterns", () => {
   it("finds the workspace through a project's worktree outside its folder", async () => {
     gitService.listBranches.mockResolvedValue(all)
     const workspaceId = workspaceAt('/repos/app', ['trunk-merge/*'])
@@ -216,7 +221,12 @@ describe('git:create-worktree and git:remove-worktree', () => {
     await expect(handler('git:create-worktree')({}, createPayload)).resolves.toEqual({
       success: true,
     })
-    expect(gitService.createWorktree).toHaveBeenCalledWith('/r', '/wt', 'dev', true)
+    expect(gitService.createWorktree).toHaveBeenCalledWith({
+      repoRoot: '/r',
+      worktreePath: '/wt',
+      branch: 'dev',
+      isNewBranch: true,
+    })
     await expect(
       handler('git:remove-worktree')({}, { repoRoot: '/r', worktreePath: '/wt' })
     ).resolves.toEqual({ success: true })

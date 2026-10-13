@@ -1,11 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { ipcInvokeRegistry, ipcSendRegistry, type IpcRegistryEntry } from '../ipc-registry.js'
 
-describe('ipcInvokeRegistry', () => {
+function useEmptyRegistries(): void {
   beforeEach(() => {
     ipcInvokeRegistry.clear()
     ipcSendRegistry.clear()
   })
+}
+
+describe('ipcInvokeRegistry', () => {
+  useEmptyRegistries()
 
   it('stores IpcRegistryEntry with handler and remoteAccessible flag', () => {
     const handler = () => 'result'
@@ -24,6 +28,10 @@ describe('ipcInvokeRegistry', () => {
     })
     expect(ipcInvokeRegistry.get('internal:channel')?.remoteAccessible).toBe(false)
   })
+})
+
+describe('ipcInvokeRegistry — several channels', () => {
+  useEmptyRegistries()
 
   it('stores multiple channels independently', () => {
     const h1 = () => 'a'

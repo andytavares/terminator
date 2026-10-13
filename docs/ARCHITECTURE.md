@@ -108,7 +108,7 @@ Specs marked `extensionView` are what an extension view receives. `src/main/prel
 
 Every invoke channel, core and extension, is a `ChannelSpec` (declared in `packages/extension-sdk/src/index.ts`): the channel name, a required zod `schema`, the `invalid` response for a payload the schema rejects, `run`, which receives the parsed payload, and an optional `onError` ([ADR-096](adr/096-every-ipc-channel-has-a-schema.md)). `dispatchChannel` is the one parse step both kinds share.
 
-- Core channels are registered by `registerInvokeTable` (`src/main/ipc/invoke-table.ts`), one table per `src/main/ipc/*.ipc.ts` file that has invoke channels (`log.ipc.ts` has only a send channel).
+- Core channels are registered by `registerInvokeTable` (`src/main/ipc/invoke-table.ts`), one table per `src/main/ipc/*.ipc.ts` file that has invoke channels (`log.ipc.ts` has only a send channel). A file with many channels keeps them in module-level `ChannelSpec[]` arrays grouped by topic, and its register function passes them to one table, as `git.ipc.ts` does with its repository, branch and worktree channels. That keeps each function within the size limits in [CONTRIBUTING.md](CONTRIBUTING.md#lint-and-format).
 - Extension channels are registered by `api.ipc.registerHandler(spec, { remoteAccessible? })` in `src/main/extensions/api.ts`. The spec's `schema` and `run` stay in the extension host, which validates the payload before `run`.
 
 Both call `handleChannel` (`src/main/ipc/channel-registrar.ts`); ESLint (`eslint.config.mjs`) forbids any other caller. Registration records the channel and its remote-access declaration in the bridge registry (`src/main/remote/ipc-registry.ts`); `ipcMain` is never patched. The remote bridge dispatches to the same registered handler, so a payload from a remote client is validated exactly as the renderer's is.
@@ -315,6 +315,7 @@ Three classes share the work in main:
 | `host/callbacks.ts`                            | both           | A function argument becomes `{ $callback: id }`; main calls it back with a `callback` event                                            |
 | `host/api-server.ts`                           | main           | Runs each call on that extension's `ExtensionAPI` from `api.ts`, for members in `CROSSING_MEMBERS` only; keeps registrations by id     |
 | `host/rpc-endpoint.ts`                         | both           | Requests with answers, events without, errors with their `name`                                                                        |
+| `host/messages.ts`                             | both           | One record per message: an `ApiCall` (`extensionId`, `path`, `params`, `handleId` for a registration), a registration, a `CommandRun`  |
 
 Values the core holds cross as promises, except `settings.get`, `workspace.list` / `listProjects` and `issues.supports*`, which read a snapshot main pushes on every change (`onExtensionSettingsChanged`, `onWorkspacesChanged`). `pty.onData` arrives batched, one message per frame (`src/main/extensions/pty-stream.ts`), every batch before the exit. A channel's or command's schema stays in the extension host, which validates the payload before `run`.
 

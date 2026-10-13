@@ -23,12 +23,12 @@ vi.mock('electron', () => ({
 import { registerShellHandlers } from '../../../src/main/ipc/shell.ipc'
 
 // Real processes: a stand-in `git` on PATH that prints its arguments and where it ran.
-describe('shell:exec IPC handler', () => {
-  const originalPath = process.env.PATH
-  let scratch: string
-  let repo: string
-  let handler: (event: unknown, payload: unknown) => Promise<unknown>
+const originalPath = process.env.PATH
+let scratch: string
+let repo: string
+let execHandler: (event: unknown, payload: unknown) => Promise<unknown>
 
+function useFakeGitOnPath(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     scratch = makeTempDir('shell-ipc-')
@@ -41,16 +41,20 @@ describe('shell:exec IPC handler', () => {
 
     registerShellHandlers()
     const calls = vi.mocked(ipcMain.handle).mock.calls
-    handler = calls.find(([channel]) => channel === 'shell:exec')![1] as typeof handler
+    execHandler = calls.find(([channel]) => channel === 'shell:exec')![1] as typeof execHandler
   })
 
   afterEach(() => {
     process.env.PATH = originalPath
     rmSync(scratch, { recursive: true, force: true })
   })
+}
+
+describe('shell:exec IPC execHandler', () => {
+  useFakeGitOnPath()
 
   it('runs the command in the directory it is given and returns what it printed', async () => {
-    const result = await handler({}, { command: 'git', args: ['status', '-s'], cwd: repo })
+    const result = await execHandler({}, { command: 'git', args: ['status', '-s'], cwd: repo })
     expect(result).toMatchObject({
       exitCode: 0,
       stdout: `status -s\n${repo}\n`,
@@ -60,15 +64,19 @@ describe('shell:exec IPC handler', () => {
   })
 
   it('runs inside the workspace root it is given', async () => {
-    const result = await handler(
+    const result = await execHandler(
       {},
       { command: 'git', args: ['status'], cwd: repo, workspaceRoot: scratch }
     )
     expect(result).toMatchObject({ exitCode: 0, stdout: `status\n${repo}\n` })
   })
+})
+
+describe('shell:exec IPC execHandler — refusals', () => {
+  useFakeGitOnPath()
 
   it('returns CWD_OUT_OF_SCOPE when cwd escapes the workspace, and runs nothing', async () => {
-    const result = await handler(
+    const result = await execHandler(
       {},
       { command: 'git', args: ['status'], cwd: scratch, workspaceRoot: repo }
     )
@@ -79,7 +87,7 @@ describe('shell:exec IPC handler', () => {
     const outside = join(scratch, 'outside')
     mkdirSync(outside)
     symlinkSync(outside, join(repo, 'escape'))
-    const result = await handler(
+    const result = await execHandler(
       {},
       { command: 'git', args: ['status'], cwd: join(repo, 'escape'), workspaceRoot: repo }
     )
@@ -87,7 +95,7 @@ describe('shell:exec IPC handler', () => {
   })
 
   it('reports a command that could not start, with the reason', async () => {
-    const result = (await handler(
+    const result = (await execHandler(
       {},
       { command: 'git', args: ['log'], cwd: join(scratch, 'missing') }
     )) as { exitCode: number; stderr: string }
@@ -155,6 +163,22 @@ describe('shell:open-path IPC handler', () => {
     await handler({}, { filePath: '~/projects/foo' })
     const { homedir } = await import('os')
     expect(mockOpenPath).toHaveBeenCalledWith(`${homedir()}/projects/foo`)
+  })
+})
+
+describe('shell:open-path IPC handler — home directory', () => {
+  let handler: (event: unknown, payload: unknown) => Promise<unknown>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockOpenPath.mockResolvedValue('')
+
+    registerShellHandlers()
+
+    const calls = vi.mocked(ipcMain.handle).mock.calls
+    const call = calls.find(([channel]) => channel === 'shell:open-path')
+    expect(call).toBeDefined()
+    handler = call![1] as typeof handler
   })
 
   it('expands bare ~ to the home directory', async () => {

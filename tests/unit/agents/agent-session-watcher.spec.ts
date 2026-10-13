@@ -93,7 +93,9 @@ describe('the agent session watcher', () => {
     await quiet()
     expect(recorded).toHaveLength(1)
   })
+})
 
+describe('the agent session watcher — several conversations and terminals', () => {
   it('follows a second conversation in the same terminal', async () => {
     const mod = await load()
     stop = mod.startAgentSessionWatcher({ snapshotFor: (id) => snapshot(id) })
@@ -123,7 +125,9 @@ describe('the agent session watcher', () => {
       ])
     )
   })
+})
 
+describe('the agent session watcher — unplaceable reports and stopping', () => {
   it('ignores a report for a session it cannot place', async () => {
     const mod = await load()
     stop = mod.startAgentSessionWatcher({ snapshotFor: () => null })
@@ -152,7 +156,9 @@ describe('the agent session watcher', () => {
     await quiet()
     expect(recorded).toEqual([])
   })
+})
 
+describe('the agent session watcher — deleting reports', () => {
   it('ignores anything in the directory that is not a report', async () => {
     const mod = await load()
     stop = mod.startAgentSessionWatcher({ snapshotFor: (id) => snapshot(id) })
@@ -177,7 +183,9 @@ describe('the agent session watcher', () => {
     expect(fs.readdirSync(dir)).toEqual([])
     expect(recorded).toEqual([])
   })
+})
 
+describe('the agent session watcher — startup and other files', () => {
   it('records a report found at startup once, and deletes it', async () => {
     await write('sess-1', 'conv-0')
     const mod = await load()

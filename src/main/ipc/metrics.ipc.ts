@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defineChannel } from '@terminator/extension-sdk'
+import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { execFile } from 'child_process'
 import * as os from 'os'
@@ -189,43 +189,49 @@ function parsePsRows(raw: string): ProcessMetrics[] {
 
 // ─── IPC registration ────────────────────────────────────────────────────────
 
+const machineChannels: ChannelSpec[] = [
+  defineChannel({
+    channel: 'metrics:system',
+    schema: noPayload,
+    invalid: { error: 'VALIDATION_ERROR' },
+    run: (): { data: SystemMetrics } => {
+      keepSamplerRunning()
+      return {
+        data: {
+          cpuPercent: Math.min(100, Math.max(0, latestCpuPercent)),
+          memUsedBytes: os.totalmem() - os.freemem(),
+          memTotalBytes: os.totalmem(),
+          netInBytesPerSec: latestNetIn,
+          netOutBytesPerSec: latestNetOut,
+        },
+      }
+    },
+  }),
+  defineChannel({
+    channel: 'metrics:processes',
+    schema: z.object({ pids: z.array(z.number().int()).optional() }),
+    invalid: { data: [] },
+    run: async ({ pids }): Promise<{ data: ProcessMetrics[] }> => ({
+      data: await queryProcessMetrics(pids ?? []),
+    }),
+  }),
+]
+
+/** The process id behind each live terminal session asked about. */
+function sessionPidsChannel(ptyManager: PtyManager): ChannelSpec {
+  return defineChannel({
+    channel: 'metrics:pids',
+    schema: z.object({ sessionIds: z.array(z.string()).optional() }),
+    invalid: { data: [] },
+    run: ({ sessionIds }) => {
+      const data = (sessionIds ?? [])
+        .map((sessionId) => ({ sessionId, pid: ptyManager.getPid(sessionId) }))
+        .filter((r): r is { sessionId: string; pid: number } => r.pid !== undefined)
+      return { data }
+    },
+  })
+}
+
 export function registerMetricsHandlers(ptyManager: PtyManager): void {
-  registerInvokeTable([
-    defineChannel({
-      channel: 'metrics:system',
-      schema: noPayload,
-      invalid: { error: 'VALIDATION_ERROR' },
-      run: (): { data: SystemMetrics } => {
-        keepSamplerRunning()
-        return {
-          data: {
-            cpuPercent: Math.min(100, Math.max(0, latestCpuPercent)),
-            memUsedBytes: os.totalmem() - os.freemem(),
-            memTotalBytes: os.totalmem(),
-            netInBytesPerSec: latestNetIn,
-            netOutBytesPerSec: latestNetOut,
-          },
-        }
-      },
-    }),
-    defineChannel({
-      channel: 'metrics:processes',
-      schema: z.object({ pids: z.array(z.number().int()).optional() }),
-      invalid: { data: [] },
-      run: async ({ pids }): Promise<{ data: ProcessMetrics[] }> => ({
-        data: await queryProcessMetrics(pids ?? []),
-      }),
-    }),
-    defineChannel({
-      channel: 'metrics:pids',
-      schema: z.object({ sessionIds: z.array(z.string()).optional() }),
-      invalid: { data: [] },
-      run: ({ sessionIds }) => {
-        const data = (sessionIds ?? [])
-          .map((sessionId) => ({ sessionId, pid: ptyManager.getPid(sessionId) }))
-          .filter((r): r is { sessionId: string; pid: number } => r.pid !== undefined)
-        return { data }
-      },
-    }),
-  ])
+  registerInvokeTable([...machineChannels, sessionPidsChannel(ptyManager)])
 }

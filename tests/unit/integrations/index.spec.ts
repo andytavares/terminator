@@ -85,7 +85,9 @@ describe('integrations composition root', () => {
     expect(providers.linear.get).toHaveBeenCalledWith(LINEAR, 'TAV-1')
     expect(providers.jira.get).toHaveBeenCalledWith(JIRA, 'TAV-1')
   })
+})
 
+describe('integrations composition root — errors and credentials', () => {
   it('records a tracker error against the connection so settings can show it', async () => {
     const mod = await load()
     // Built from the freshly-loaded module graph: vi.resetModules() gives the

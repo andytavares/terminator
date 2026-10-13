@@ -139,7 +139,9 @@ describe('transition', () => {
     const { service } = build()
     await expect(service.transition('jira', 'TAV-42', 'done')).rejects.toThrow(/jira/)
   })
+})
 
+describe('transition and the cache', () => {
   it('invalidates the cached issue on success, since its state just changed', async () => {
     const { service, linear } = build()
     await service.get('linear', 'TAV-42')

@@ -101,14 +101,15 @@ describe('ExtensionHost.start', () => {
   it('activates extensions concurrently: one waits for another to have started', async () => {
     let markPeerStarted = () => {}
     const peerStarted = new Promise<void>((resolve) => (markPeerStarted = resolve))
-    // Cleared once the race is decided: left running, it rejected a promise
-    // nothing awaited any more, and vitest failed the run on the stray rejection.
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error('peer never started')), 1000)
-    })
     const { host, backendHost } = await newHost({
       'com.waiter': async () => {
+        // Started here, not before newHost: importing the host can take longer
+        // than the timeout, and a rejection nothing awaits yet fails the run.
+        // Cleared once the race is decided, for the same reason.
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const timeout = new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('peer never started')), 1000)
+        })
         await Promise.race([peerStarted, timeout]).finally(() => clearTimeout(timer))
       },
       'com.peer': () => markPeerStarted(),
@@ -122,7 +123,9 @@ describe('ExtensionHost.start', () => {
     expect(backendHost.activated.map((record) => record.id)).toEqual(['com.peer', 'com.waiter'])
     expect(host.listExtensions().map((e) => e.status)).toEqual(['enabled', 'enabled'])
   })
+})
 
+describe('ExtensionHost.start — failures and logging', () => {
   it('marks a failing extension as errored and still activates the others', async () => {
     const { host, backendHost } = await newHost({
       'com.broken': () => {
@@ -140,7 +143,9 @@ describe('ExtensionHost.start', () => {
     expect(extensions['com.healthy']).toMatchObject({ status: 'enabled' })
     expect(backendHost.activated.map((record) => record.id)).toEqual(['com.healthy'])
   })
+})
 
+describe('ExtensionHost.start — logging', () => {
   it('logs every extension it activates, new or stored, and never one that failed', async () => {
     writeBundle({ 'com.stored': [] })
     storeData.extensions = [storedRecord('com.stored', 'enabled')]
@@ -160,7 +165,9 @@ describe('ExtensionHost.start', () => {
     expect(logged).not.toContain('Extension com.broken activated')
     expect(logged).toContain('Extension com.broken failed to load: boom')
   })
+})
 
+describe('ExtensionHost.start — listing and stored extensions', () => {
   it('lists extensions as soon as start is called, before any is activated, and activates only after beforeActivation', async () => {
     const { host, backendHost } = await newHost()
     let release = () => {}
@@ -189,7 +196,9 @@ describe('ExtensionHost.start', () => {
     expect(backendHost.activated.map((record) => record.id)).toEqual(['com.stored'])
     expect(host.listExtensions()).toHaveLength(1)
   })
+})
 
+describe('ExtensionHost.start — disabled extensions and whenActivated', () => {
   it('does not activate an extension stored as disabled', async () => {
     writeBundle({ 'com.off': [] })
     storeData.extensions = [storedRecord('com.off', 'disabled')]
@@ -211,7 +220,9 @@ describe('ExtensionHost.start', () => {
 
     expect(backendHost.activated.map((record) => record.id)).toEqual(['com.quick'])
   })
+})
 
+describe('ExtensionHost.start — afterActivation', () => {
   it('whenActivated also waits for afterActivation, which runs once every extension is done', async () => {
     const events: string[] = []
     const { host } = await newHost({
@@ -269,7 +280,9 @@ describe('ExtensionHost.start with extensionDependencies (ADR 094)', () => {
     })
     expect(byId(host)['com.a-consumer']).toMatchObject({ status: 'enabled' })
   })
+})
 
+describe('ExtensionHost.start with extensionDependencies — missing dependencies', () => {
   it('fails activation with a clear message when a dependency is not installed', async () => {
     const { host, backendHost } = await newHost()
 
@@ -303,7 +316,9 @@ describe('ExtensionHost.start with extensionDependencies (ADR 094)', () => {
     })
     expect(backendHost.activated).toEqual([])
   })
+})
 
+describe('ExtensionHost.start with extensionDependencies — cycles', () => {
   it('fails every extension in a dependency cycle, naming the cycle, and activates the rest', async () => {
     const { host, backendHost } = await newHost()
 

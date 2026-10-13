@@ -81,39 +81,46 @@ function linkOf(value: unknown): WorkItemRef | null {
   return { tracker: link.tracker, key: link.key }
 }
 
+/** The stored entries, or none when the file is missing, unreadable or not a list. */
+async function readStoredEntries(): Promise<unknown[]> {
+  try {
+    const parsed: unknown = JSON.parse(await fs.readFile(filePath(), 'utf8'))
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    // Missing or unreadable means no history, never a failed startup.
+    return []
+  }
+}
+
+/** One stored entry as a record, or null when it lacks what identifies one. */
+function storedRecord(entry: unknown): SessionRecord | null {
+  if (typeof entry !== 'object' || entry === null) return null
+  const r = entry as Partial<SessionRecord>
+  if (typeof r.sessionId !== 'string' || typeof r.projectId !== 'string') return null
+  if (typeof r.startedAt !== 'string' || typeof r.updatedAt !== 'string') return null
+  return {
+    sessionId: r.sessionId,
+    projectId: r.projectId,
+    workspaceName: stringOrNull(r.workspaceName),
+    projectName: stringOrNull(r.projectName),
+    branch: stringOrNull(r.branch),
+    tabTitle: typeof r.tabTitle === 'string' ? r.tabTitle : '',
+    shell: stringOrNull(r.shell),
+    description: stringOrNull(r.description),
+    link: linkOf(r.link),
+    agent: agentOf(r.agent),
+    startedAt: r.startedAt,
+    updatedAt: r.updatedAt,
+    ...(typeof r.closedAt === 'string' ? { closedAt: r.closedAt } : {}),
+  }
+}
+
 /** Read what was stored. Called once at startup; safe to call again. */
 export async function loadRecords(): Promise<void> {
   records.clear()
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(await fs.readFile(filePath(), 'utf8'))
-  } catch {
-    // Missing or unreadable means no history, never a failed startup.
-    return
-  }
-  if (!Array.isArray(parsed)) return
-  const loaded: SessionRecord[] = []
-  for (const entry of parsed) {
-    if (typeof entry !== 'object' || entry === null) continue
-    const r = entry as Partial<SessionRecord>
-    if (typeof r.sessionId !== 'string' || typeof r.projectId !== 'string') continue
-    if (typeof r.startedAt !== 'string' || typeof r.updatedAt !== 'string') continue
-    loaded.push({
-      sessionId: r.sessionId,
-      projectId: r.projectId,
-      workspaceName: stringOrNull(r.workspaceName),
-      projectName: stringOrNull(r.projectName),
-      branch: stringOrNull(r.branch),
-      tabTitle: typeof r.tabTitle === 'string' ? r.tabTitle : '',
-      shell: stringOrNull(r.shell),
-      description: stringOrNull(r.description),
-      link: linkOf(r.link),
-      agent: agentOf(r.agent),
-      startedAt: r.startedAt,
-      updatedAt: r.updatedAt,
-      ...(typeof r.closedAt === 'string' ? { closedAt: r.closedAt } : {}),
-    })
-  }
+  const loaded = (await readStoredEntries())
+    .map(storedRecord)
+    .filter((record): record is SessionRecord => record !== null)
   const kept = pruneRecords(loaded, Date.now())
   for (const record of kept) records.set(record.sessionId, record)
   const keptIds = new Set(kept.map((r) => r.sessionId))
@@ -142,34 +149,34 @@ export function listRecords(): SessionRecord[] {
   return [...records.values()]
 }
 
-async function write(
-  session: SessionSnapshot,
-  patch: Pick<Partial<SessionRecord>, 'description' | 'link' | 'agent'>
-): Promise<SessionRecord | null> {
+type RecordPatch = Pick<Partial<SessionRecord>, 'description' | 'link' | 'agent'>
+
+/** The patched fields, each kept from the existing record when the patch leaves it out. */
+function patchedFields(
+  existing: SessionRecord | undefined,
+  patch: RecordPatch
+): Pick<SessionRecord, 'description' | 'link' | 'agent'> {
+  return {
+    description: 'description' in patch ? patch.description! : (existing?.description ?? null),
+    link: 'link' in patch ? patch.link! : (existing?.link ?? null),
+    agent: 'agent' in patch ? patch.agent! : (existing?.agent ?? null),
+  }
+}
+
+async function write(session: SessionSnapshot, patch: RecordPatch): Promise<SessionRecord | null> {
   const existing = records.get(session.sessionId)
   if (existing?.closedAt !== undefined) {
     throw new SessionRecordError('RECORD_CLOSED', 'This session has closed')
   }
-  const description = 'description' in patch ? patch.description! : (existing?.description ?? null)
-  const link = 'link' in patch ? patch.link! : (existing?.link ?? null)
-  const agent = 'agent' in patch ? patch.agent! : (existing?.agent ?? null)
+  const fields = patchedFields(existing, patch)
+  const empty = fields.description === null && fields.link === null && fields.agent === null
+  if (empty && existing === undefined) return null
 
-  if (description === null && link === null && agent === null) {
-    if (existing === undefined) return null
-    records.delete(session.sessionId)
-    await persist()
-    announce(session.sessionId)
-    return null
-  }
-
-  const record: SessionRecord = {
-    ...session,
-    description,
-    link,
-    agent,
-    updatedAt: new Date().toISOString(),
-  }
-  records.set(session.sessionId, record)
+  const record: SessionRecord | null = empty
+    ? null
+    : { ...session, ...fields, updatedAt: new Date().toISOString() }
+  if (record === null) records.delete(session.sessionId)
+  else records.set(session.sessionId, record)
   await persist()
   announce(session.sessionId)
   return record

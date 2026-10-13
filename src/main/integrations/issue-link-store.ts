@@ -40,19 +40,28 @@ export async function loadLinks(): Promise<void> {
   }
   if (!Array.isArray(parsed)) return
   for (const entry of parsed) {
-    // The file is on disk and hand-editable. A null or a bare string in it
-    // used to throw here, which took out every *other* link the operator had.
-    if (typeof entry !== 'object' || entry === null) continue
-    const link = entry as Partial<IssueLink>
-    if (typeof link.projectId !== 'string' || typeof link.key !== 'string') continue
-    if (link.tracker !== 'linear' && link.tracker !== 'jira') continue
-    links.set(link.projectId, {
-      projectId: link.projectId,
-      tracker: link.tracker,
-      key: link.key,
-      injectContext: link.injectContext !== false,
-      linkedAt: typeof link.linkedAt === 'string' ? link.linkedAt : new Date().toISOString(),
-    })
+    const link = storedLink(entry)
+    if (link !== null) links.set(link.projectId, link)
+  }
+}
+
+/**
+ * One entry of the file as a link, or null when it is not one.
+ *
+ * The file is on disk and hand-editable. A null or a bare string in it used
+ * to throw, which took out every *other* link the operator had.
+ */
+function storedLink(entry: unknown): IssueLink | null {
+  if (typeof entry !== 'object' || entry === null) return null
+  const link = entry as Partial<IssueLink>
+  if (typeof link.projectId !== 'string' || typeof link.key !== 'string') return null
+  if (link.tracker !== 'linear' && link.tracker !== 'jira') return null
+  return {
+    projectId: link.projectId,
+    tracker: link.tracker,
+    key: link.key,
+    injectContext: link.injectContext !== false,
+    linkedAt: typeof link.linkedAt === 'string' ? link.linkedAt : new Date().toISOString(),
   }
 }
 

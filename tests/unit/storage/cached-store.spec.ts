@@ -42,12 +42,16 @@ async function newStore() {
   })
 }
 
-describe('CachedStore', () => {
+function useCountingStore(): void {
   beforeEach(() => {
     vi.resetModules()
     file.reads = 0
     file.anyChangeCallbacks = []
   })
+}
+
+describe('CachedStore', () => {
+  useCountingStore()
 
   it('reads a key from the file once however many times it is read', async () => {
     const store = await newStore()
@@ -78,6 +82,10 @@ describe('CachedStore', () => {
 
     expect(store.get('settings')).toEqual({ theme: 'light' })
   })
+})
+
+describe('CachedStore — copies and file watching', () => {
+  useCountingStore()
 
   it('does not let a caller change the cached value by changing what it was given back', async () => {
     const store = await newStore()

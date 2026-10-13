@@ -59,7 +59,7 @@ function renderer(channel: string, data: unknown): void {
 
 /** The API as an extension backend in the extension host holds it. */
 function hostApi(): ExtensionAPI {
-  const coreApi = createExtensionAPI('test.runner', '0.1.0', {
+  const coreApi = createExtensionAPI('test.runner', {
     ptyManager,
     terminalRelay: { start: () => {} } as never,
     broadcastToWindows: renderer,
@@ -125,25 +125,25 @@ describe('pty.runInTerminal, over a real PTY and the extension host port', () =>
   })
 
   it('resolves null, opening nothing, when there is no window to show the tab in', async () => {
-    const api = createExtensionAPI('test.runner', '0.1.0', { ptyManager })
+    const api = createExtensionAPI('test.runner', { ptyManager })
     await expect(run(api, 'exit 0')).resolves.toBeNull()
     expect(ptyManager.listSessions()).toEqual([])
   })
 })
 
-describe('PtyManager exit status, over a real PTY', () => {
-  function exitOf(script: string): Promise<number | null> {
-    ptyManager.spawnSession({
-      sessionId: 'exit-probe',
-      cwd: userData,
-      shell: '/bin/sh',
-      args: ['-c', script],
-      type: 'human',
-      origin: 'app',
-    })
-    return new Promise((resolve) => ptyManager.onExit('exit-probe', resolve))
-  }
+function exitOf(script: string): Promise<number | null> {
+  ptyManager.spawnSession({
+    sessionId: 'exit-probe',
+    cwd: userData,
+    shell: '/bin/sh',
+    args: ['-c', script],
+    type: 'human',
+    origin: 'app',
+  })
+  return new Promise((resolve) => ptyManager.onExit('exit-probe', resolve))
+}
 
+describe('PtyManager exit status, over a real PTY', () => {
   it('reports the exit code of a process that exited', async () => {
     await expect(exitOf('exit 7')).resolves.toBe(7)
   })

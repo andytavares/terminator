@@ -120,7 +120,9 @@ describe('projects', () => {
     expect(reply).toEqual({ error: 'DUPLICATE_NAME' })
     expect(sent).toEqual([])
   })
+})
 
+describe('projects — branch, name and order', () => {
   it('records the branch and the new name of a project', async () => {
     const workspace = await createWorkspace('alpha')
     const project = await createProject(workspace.id, 'app')
@@ -170,7 +172,9 @@ describe('project:delete', () => {
     expect(git.removeWorktree).toHaveBeenCalledWith('/repos/alpha', '/repos/alpha-feature')
     expect(await projectNames(workspace.id)).toEqual([])
   })
+})
 
+describe('project:delete — failing worktree removal', () => {
   it('still removes the project when git cannot remove the worktree', async () => {
     git.removeWorktree.mockRejectedValue(new Error('worktree is dirty'))
     const workspace = await createWorkspace('alpha')

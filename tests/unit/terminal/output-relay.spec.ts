@@ -16,11 +16,11 @@ function makeFakePtyManager() {
   }
 }
 
-describe('OutputRelay', () => {
-  let ptyManager: ReturnType<typeof makeFakePtyManager>
-  let send: Mock<RendererSend>
-  let relay: OutputRelay
+let ptyManager: ReturnType<typeof makeFakePtyManager>
+let send: Mock<RendererSend>
+let relay: OutputRelay
 
+function useRelay(): void {
   beforeEach(() => {
     vi.useFakeTimers()
     ptyManager = makeFakePtyManager()
@@ -32,6 +32,10 @@ describe('OutputRelay', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
+}
+
+describe('OutputRelay', () => {
+  useRelay()
 
   it('sends the chunks of one frame as one message', () => {
     ptyManager.emitData('a')
@@ -48,54 +52,61 @@ describe('OutputRelay', () => {
       ['terminal:process-exit', { sessionId: 's1', exitCode: 3 }],
     ])
   })
+})
 
-  describe('flow control', () => {
-    function flood(chars: number): void {
-      ptyManager.emitData('x'.repeat(chars))
-      vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
-    }
+/** Sends `chars` characters of output and lets the frame go out. */
+function flood(chars: number): void {
+  ptyManager.emitData('x'.repeat(chars))
+  vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
+}
 
-    it('pauses the process when the renderer is too far behind', () => {
-      flood(HIGH_WATERMARK_CHARS + 1)
-      expect(ptyManager.pause).toHaveBeenCalledWith('s1')
-    })
+describe('OutputRelay — flow control', () => {
+  useRelay()
 
-    it('resumes it when the renderer has caught up', () => {
-      flood(HIGH_WATERMARK_CHARS + 1)
-      relay.acknowledge('s1', HIGH_WATERMARK_CHARS + 1 - LOW_WATERMARK_CHARS + 1)
-      expect(ptyManager.resume).toHaveBeenCalledWith('s1')
-    })
+  it('pauses the process when the renderer is too far behind', () => {
+    flood(HIGH_WATERMARK_CHARS + 1)
+    expect(ptyManager.pause).toHaveBeenCalledWith('s1')
+  })
 
-    it('keeps it paused while the renderer is still behind', () => {
-      flood(HIGH_WATERMARK_CHARS + 1)
-      relay.acknowledge('s1', 10)
-      expect(ptyManager.resume).not.toHaveBeenCalled()
-    })
+  it('resumes it when the renderer has caught up', () => {
+    flood(HIGH_WATERMARK_CHARS + 1)
+    relay.acknowledge('s1', HIGH_WATERMARK_CHARS + 1 - LOW_WATERMARK_CHARS + 1)
+    expect(ptyManager.resume).toHaveBeenCalledWith('s1')
+  })
 
-    it('does not count output nobody received, so a missing window never stalls the process', () => {
-      send.mockReturnValue(false)
-      flood(HIGH_WATERMARK_CHARS * 2)
-      expect(ptyManager.pause).not.toHaveBeenCalled()
-    })
+  it('keeps it paused while the renderer is still behind', () => {
+    flood(HIGH_WATERMARK_CHARS + 1)
+    relay.acknowledge('s1', 10)
+    expect(ptyManager.resume).not.toHaveBeenCalled()
+  })
+})
 
-    it('resumes a paused process when the renderer starts over', () => {
-      flood(HIGH_WATERMARK_CHARS + 1)
-      relay.reset('s1')
-      expect(ptyManager.resume).toHaveBeenCalledWith('s1')
-    })
+describe('OutputRelay — flow control without a window or a session', () => {
+  useRelay()
 
-    it('ignores acknowledgements and resets for sessions it does not relay', () => {
-      flood(HIGH_WATERMARK_CHARS + 1)
-      relay.acknowledge('other', HIGH_WATERMARK_CHARS + 1)
-      relay.reset('other')
-      expect(ptyManager.resume).not.toHaveBeenCalled()
-    })
+  it('does not count output nobody received, so a missing window never stalls the process', () => {
+    send.mockReturnValue(false)
+    flood(HIGH_WATERMARK_CHARS * 2)
+    expect(ptyManager.pause).not.toHaveBeenCalled()
+  })
 
-    it('ignores acknowledgements after the session has exited', () => {
-      flood(HIGH_WATERMARK_CHARS + 1)
-      ptyManager.emitExit(0)
-      relay.acknowledge('s1', HIGH_WATERMARK_CHARS)
-      expect(ptyManager.resume).not.toHaveBeenCalled()
-    })
+  it('resumes a paused process when the renderer starts over', () => {
+    flood(HIGH_WATERMARK_CHARS + 1)
+    relay.reset('s1')
+    expect(ptyManager.resume).toHaveBeenCalledWith('s1')
+  })
+
+  it('ignores acknowledgements and resets for sessions it does not relay', () => {
+    flood(HIGH_WATERMARK_CHARS + 1)
+    relay.acknowledge('other', HIGH_WATERMARK_CHARS + 1)
+    relay.reset('other')
+    expect(ptyManager.resume).not.toHaveBeenCalled()
+  })
+
+  it('ignores acknowledgements after the session has exited', () => {
+    flood(HIGH_WATERMARK_CHARS + 1)
+    ptyManager.emitExit(0)
+    relay.acknowledge('s1', HIGH_WATERMARK_CHARS)
+    expect(ptyManager.resume).not.toHaveBeenCalled()
   })
 })
