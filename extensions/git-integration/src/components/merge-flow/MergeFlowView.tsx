@@ -116,6 +116,11 @@ function useFlowActions(): FlowContext['store'] {
   )
 }
 
+/**
+ * The merge flow's state. The session outlives the view: it is kept until the merge is
+ * committed or aborted, and opens once per repository, with the context of the render that
+ * opened it.
+ */
 function useMergeFlow(props: Props) {
   const { repoRoot, onExit } = props
   const session = useMergeFlowStore((s) => s.session)
@@ -124,9 +129,9 @@ function useMergeFlow(props: Props) {
   const [activeFileIndex, setActiveFile] = useState<number>(-1)
   const [isComplete, setIsComplete] = useState(false)
   const ctx: FlowContext = { repoRoot, onExit, store, view: { setIsComplete, setActiveFile } }
-  // The session outlives the view: it is kept until the merge is committed or aborted.
   useEffect(() => {
     void openSession(ctx)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoRoot])
   const handleStartOver = async () => {
     if (session) await startOver(ctx, session)

@@ -168,7 +168,7 @@ function useBranchChoices(props: PrDialogProps, setBody: (body: string) => void)
       const picked = defaultBase(local)
       if (picked) setBase(picked)
     })
-  }, [repoRoot, branch])
+  }, [repoRoot, branch, setBody])
   return { base, setBase, localBranches, remoteBranches }
 }
 

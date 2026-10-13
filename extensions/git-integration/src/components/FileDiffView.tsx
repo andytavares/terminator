@@ -1,8 +1,9 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
+import React, { useMemo, useState, useRef } from 'react'
 import hljs from '../utils/hljs'
 import { Button, SegmentedControl } from '@terminator/extension-ui'
 import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
 import { choose } from './text'
+import { useSplitDivider } from '../hooks/useSplitDivider'
 
 type ViewMode = 'unified' | 'split'
 
@@ -260,49 +261,10 @@ function SplitTable({ hunks, lang, onDividerMouseDown }: SplitTableProps) {
 
 // ── FileDiffView ──────────────────────────────────────────────────────────────
 
-interface SplitDrag {
-  active: boolean
-  startX: number
-  startPct: number
-  containerWidth: number
-}
-
-/** Follows the mouse while the split divider is held, keeping the left side between 20% and 80%. */
-function useSplitDragListeners(dragRef: { current: SplitDrag }, setPct: (pct: number) => void) {
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      const s = dragRef.current
-      if (!s.active || s.containerWidth === 0) return
-      const deltaPct = ((e.clientX - s.startX) / s.containerWidth) * 100
-      setPct(Math.max(20, Math.min(80, s.startPct + deltaPct)))
-    }
-    const onUp = () => {
-      dragRef.current.active = false
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [dragRef, setPct])
-}
-
-function useSplitDivider() {
-  const [splitLeftPct, setSplitLeftPct] = useState(50)
-  const dragRef = useRef<SplitDrag>({ active: false, startX: 0, startPct: 50, containerWidth: 0 })
+/** The split divider, measured against the diff's scroll area. */
+function useDiffDivider() {
   const scrollRef = useRef<HTMLDivElement>(null)
-  useSplitDragListeners(dragRef, setSplitLeftPct)
-  const onDividerMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      const container = scrollRef.current
-      if (!container) return
-      const containerWidth = container.getBoundingClientRect().width
-      dragRef.current = { active: true, startX: e.clientX, startPct: splitLeftPct, containerWidth }
-      e.preventDefault()
-    },
-    [splitLeftPct]
-  )
+  const { splitLeftPct, onDividerMouseDown } = useSplitDivider(scrollRef)
   return { splitLeftPct, scrollRef, onDividerMouseDown }
 }
 
@@ -355,7 +317,7 @@ function DiffNotices({ props }: { props: FileDiffViewProps & { diff: FileDiff } 
   )
 }
 
-type SplitDivider = ReturnType<typeof useSplitDivider>
+type SplitDivider = ReturnType<typeof useDiffDivider>
 
 interface ViewState {
   viewMode: ViewMode
@@ -397,7 +359,7 @@ export function FileDiffView(props: FileDiffViewProps): JSX.Element {
   const { diff } = props
   // The layout and divider position outlive the file shown, so they stay as files change.
   const [viewMode, setViewMode] = useState<ViewMode>('unified')
-  const divider = useSplitDivider()
+  const divider = useDiffDivider()
   if (!diff) {
     return (
       <div className="file-diff-view file-diff-view--empty">Select a file to view its diff.</div>
