@@ -429,6 +429,30 @@ describe('TerminalPane', () => {
   })
 
   describe('split mode (layout present)', () => {
+    it("takes a lone tab's terminal down when a split tab comes on screen", () => {
+      const lone = { terminal: { focus: vi.fn() }, mount: vi.fn(), unmount: vi.fn() }
+      mockGetSessions.mockReturnValue([
+        { id: 'ses-1', tabTitle: 'T1', type: 'human' },
+        { id: 'ses-2', tabTitle: 'T2', type: 'human', parentSessionId: 'ses-1' },
+        { id: 'ses-3', tabTitle: 'T3', type: 'human' },
+      ])
+      mockGetActive.mockReturnValue('ses-3')
+      mockGetInstance.mockImplementation((id: string) => (id === 'ses-3' ? lone : undefined))
+      const { rerender } = render(<TerminalPane projectId="proj-1" />)
+      expect(lone.mount).toHaveBeenCalled()
+      mockGetActive.mockReturnValue('ses-1')
+      mockGetPaneLayout.mockReturnValue({
+        type: 'split',
+        id: 'split-1',
+        direction: 'horizontal',
+        ratio: 0.5,
+        first: { type: 'leaf', sessionId: 'ses-1' },
+        second: { type: 'leaf', sessionId: 'ses-2' },
+      })
+      rerender(<TerminalPane projectId="proj-1" />)
+      expect(lone.unmount).toHaveBeenCalled()
+    })
+
     it('renders split container instead of single pane when layout exists', () => {
       const layout: PaneNode = {
         type: 'split',

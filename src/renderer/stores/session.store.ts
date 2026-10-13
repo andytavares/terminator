@@ -11,15 +11,19 @@ import type { TerminalInstance } from '../components/terminal/TerminalSession'
 
 /**
  * Everything one project's terminal area needs to render: which tab is
- * active, which split pane is focused, the pane layout, tab order, and the
- * monotonically increasing "Terminal N" counter. One aggregate instead of
+ * active, which split pane is focused, each split tab's pane layout, tab
+ * order, and the monotonically increasing "Terminal N" counter. One aggregate instead of
  * five parallel maps — removing or moving a session reconciles it in exactly
  * one place (detachSessionFromView).
  */
 export interface ProjectView {
   activeSessionId?: string
   focusedSessionId?: string
-  paneLayout?: PaneNode
+  /**
+   * One per split tab: its root session and the panes split off it. The one on
+   * screen is the one holding the active session; a tab with none shows alone.
+   */
+  paneLayouts?: PaneNode[]
   order?: string[]
   terminalCounter: number
 }
@@ -28,6 +32,23 @@ const EMPTY_VIEW: ProjectView = { terminalCounter: 0 }
 
 function viewOf(views: Map<string, ProjectView>, projectId: string): ProjectView {
   return views.get(projectId) ?? EMPTY_VIEW
+}
+
+/** The split holding `sessionId`, if one does. */
+function layoutHolding(view: ProjectView, sessionId: string | undefined): PaneNode | undefined {
+  if (sessionId === undefined) return undefined
+  return view.paneLayouts?.find((layout) => leafIds(layout).includes(sessionId))
+}
+
+/** The view's layouts with `previous` swapped for `next`, or dropped when there is no `next`. */
+function replaceLayout(
+  view: ProjectView,
+  previous: PaneNode | undefined,
+  next: PaneNode | undefined
+): PaneNode[] | undefined {
+  const others = (view.paneLayouts ?? []).filter((layout) => layout !== previous)
+  const layouts = next ? [...others, next] : others
+  return layouts.length > 0 ? layouts : undefined
 }
 
 /** Writes a view back, dropping it entirely when it holds nothing. */
@@ -39,7 +60,7 @@ function normalizeView(
   const empty =
     view.activeSessionId === undefined &&
     view.focusedSessionId === undefined &&
-    view.paneLayout === undefined &&
+    view.paneLayouts === undefined &&
     (view.order === undefined || view.order.length === 0) &&
     view.terminalCounter === 0
   if (empty) views.delete(projectId)
@@ -62,9 +83,14 @@ function detachSessionFromView(
   const next: ProjectView = { ...view }
 
   // Layout: drop the leaf; a layout with ≤1 leaf collapses to single-pane mode.
-  if (next.paneLayout && leafIds(next.paneLayout).includes(sessionId)) {
-    const pruned = removeLeaf(next.paneLayout, sessionId)
-    next.paneLayout = pruned && leafIds(pruned).length > 1 ? pruned : undefined
+  const held = layoutHolding(next, sessionId)
+  const pruned = held ? removeLeaf(held, sessionId) : null
+  if (held) {
+    next.paneLayouts = replaceLayout(
+      next,
+      held,
+      pruned && leafIds(pruned).length > 1 ? pruned : undefined
+    )
   }
 
   // Order: filter the departing session out.
@@ -73,16 +99,41 @@ function detachSessionFromView(
     next.order = filtered.length > 0 ? filtered : undefined
   }
 
-  // Active: first remaining tab in display order.
+  // Active: what is left of its split, else the first remaining tab in display order.
   if (next.activeSessionId === sessionId) {
-    next.activeSessionId = remainingOrderedIds[0]
+    next.activeSessionId = pruned ? leafIds(pruned)[0] : remainingOrderedIds[0]
   }
 
-  // Focused: only meaningful while a split layout exists.
-  if (next.focusedSessionId === sessionId || !next.paneLayout) {
-    next.focusedSessionId = next.paneLayout ? leafIds(next.paneLayout)[0] : undefined
+  // Focused: only meaningful while a split is on screen.
+  const onScreen = layoutHolding(next, next.activeSessionId)
+  if (next.focusedSessionId === sessionId || !onScreen) {
+    next.focusedSessionId = onScreen ? leafIds(onScreen)[0] : undefined
   }
 
+  return next
+}
+
+/**
+ * Unsplitting: `sessionId` leaves the split `held`, and the session stays in
+ * the project. A split left with one pane collapses and, when it was on
+ * screen, its remaining pane activates. A split off screen changes nothing
+ * on screen.
+ */
+function withoutLeaf(view: ProjectView, held: PaneNode, sessionId: string): ProjectView {
+  const onScreen = layoutHolding(view, view.activeSessionId) === held
+  const pruned = removeLeaf(held, sessionId)
+  const next: ProjectView = { ...view }
+  if (!pruned || leafIds(pruned).length <= 1) {
+    next.paneLayouts = replaceLayout(view, held, undefined)
+    if (!onScreen) return next
+    next.focusedSessionId = undefined
+    if (pruned?.type === 'leaf') next.activeSessionId = pruned.sessionId
+    return next
+  }
+  next.paneLayouts = replaceLayout(view, held, pruned)
+  if (next.focusedSessionId === sessionId) next.focusedSessionId = leafIds(pruned)[0]
+  // The split stays on screen when the pane closing was the active one.
+  if (next.activeSessionId === sessionId) next.activeSessionId = leafIds(pruned)[0]
   return next
 }
 
@@ -157,8 +208,8 @@ interface SessionState {
   isProjectBusy: (projectId: string) => boolean
   renameSession: (sessionId: string, title: string) => void
 
+  /** The split of the tab on screen; null when that tab shows alone. */
   getPaneLayout: (projectId: string) => PaneNode | null
-  setSplitLayout: (projectId: string, layout: PaneNode | null) => void
   activateSplit: (
     projectId: string,
     focusedId: string,
@@ -167,6 +218,7 @@ interface SessionState {
   ) => void
   closeSplitLeaf: (projectId: string, sessionId: string) => void
   setSplitRatio: (projectId: string, splitId: string, ratio: number) => void
+  /** The focused pane of the split on screen; null when that tab shows alone. */
   getFocusedSession: (projectId: string) => string | null
   setFocusedSession: (projectId: string, sessionId: string) => void
 
@@ -495,54 +547,50 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set((s) => patchSession(s, sessionId, { tabTitle: title }) ?? s)
   },
 
-  getPaneLayout: (projectId) => get().projectViews.get(projectId)?.paneLayout ?? null,
-
-  setSplitLayout: (projectId, layout) => {
-    set((s) => patchView(s, projectId, { paneLayout: layout ?? undefined }))
+  getPaneLayout: (projectId) => {
+    const view = viewOf(get().projectViews, projectId)
+    return layoutHolding(view, view.activeSessionId) ?? null
   },
 
   activateSplit: (projectId, focusedId, newId, direction) => {
     set((s) => {
-      const existing = s.projectViews.get(projectId)?.paneLayout
+      const view = viewOf(s.projectViews, projectId)
+      const existing = layoutHolding(view, focusedId)
       const root: PaneNode = existing ?? { type: 'leaf', sessionId: focusedId }
       const newLayout = splitLeaf(root, focusedId, newId, direction)
-      return patchView(s, projectId, { paneLayout: newLayout, focusedSessionId: newId })
+      return patchView(s, projectId, {
+        paneLayouts: replaceLayout(view, existing, newLayout),
+        focusedSessionId: newId,
+      })
     })
   },
 
   closeSplitLeaf: (projectId, sessionId) => {
     set((s) => {
       const view = s.projectViews.get(projectId)
-      if (!view?.paneLayout) return s
-      const pruned = removeLeaf(view.paneLayout, sessionId)
-      const next: ProjectView = { ...view }
-      if (!pruned || leafIds(pruned).length <= 1) {
-        // Layout collapses to single-pane mode: the surviving leaf activates.
-        next.paneLayout = undefined
-        next.focusedSessionId = undefined
-        const survivorId = pruned?.type === 'leaf' ? pruned.sessionId : undefined
-        if (survivorId) next.activeSessionId = survivorId
-      } else {
-        next.paneLayout = pruned
-        if (next.focusedSessionId === sessionId) {
-          next.focusedSessionId = leafIds(pruned).filter((id) => id !== sessionId)[0]
-        }
-      }
+      const held = view && layoutHolding(view, sessionId)
+      if (!view || !held) return s
       const projectViews = new Map(s.projectViews)
-      normalizeView(projectViews, projectId, next)
+      normalizeView(projectViews, projectId, withoutLeaf(view, held, sessionId))
       return { projectViews }
     })
   },
 
   setSplitRatio: (projectId, splitId, ratio) => {
     set((s) => {
-      const layout = s.projectViews.get(projectId)?.paneLayout
-      if (!layout) return s
-      return patchView(s, projectId, { paneLayout: updateSplitRatio(layout, splitId, ratio) })
+      const layouts = s.projectViews.get(projectId)?.paneLayouts
+      if (!layouts) return s
+      const paneLayouts = layouts.map((layout) => updateSplitRatio(layout, splitId, ratio))
+      return patchView(s, projectId, { paneLayouts })
     })
   },
 
-  getFocusedSession: (projectId) => get().projectViews.get(projectId)?.focusedSessionId ?? null,
+  getFocusedSession: (projectId) => {
+    const view = viewOf(get().projectViews, projectId)
+    const focused = view.focusedSessionId
+    const onScreen = layoutHolding(view, view.activeSessionId)
+    return focused && onScreen && leafIds(onScreen).includes(focused) ? focused : null
+  },
 
   setFocusedSession: (projectId, sessionId) => {
     set((s) => patchView(s, projectId, { focusedSessionId: sessionId }))
