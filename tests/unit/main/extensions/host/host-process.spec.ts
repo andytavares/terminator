@@ -100,6 +100,28 @@ describe('extension backends in the extension host', () => {
     await expect(dispatchChannel(spec, { name: 3 })).resolves.toEqual({ error: 'VALIDATION_ERROR' })
   })
 
+  it("gives the backend the app's directory and its own folder under userData", async () => {
+    const paths = {
+      activate(api: ExtensionAPI) {
+        api.ipc.registerHandler(
+          defineChannel({
+            channel: 'demo:paths',
+            schema: z.object({}),
+            invalid: { error: 'VALIDATION_ERROR' },
+            run: () => api.paths,
+          })
+        )
+      },
+    }
+    const { main, process, record } = harness({ '/demo/main.cjs': paths })
+    await process.activate(record)
+
+    await expect(dispatchChannel(main.channels.get('demo:paths')!, {})).resolves.toEqual({
+      app: '/app',
+      globalStorage: '/data/extensions/demo',
+    })
+  })
+
   it('reads settings from the snapshot main pushes', async () => {
     const { main, process, record } = harness()
     await process.activate(record)

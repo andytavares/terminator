@@ -1,9 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync, chmodSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { execShell } from '../../../src/main/shell/shell-executor'
 import { startAdoptingLoginShellPath } from '../../../src/main/shell/login-shell-path'
+import { makeTempDir } from '../../support/temp-dir'
 
 // On macOS the window now opens while the login-shell PATH probe is still
 // running. A command run in that window must still find tools that only the
@@ -26,7 +26,7 @@ afterEach(() => {
 
 describe('execShell while the login-shell PATH is still being read', () => {
   it('waits for it, so a tool only on that PATH is found', async () => {
-    scratch = mkdtempSync(join(tmpdir(), 'login-path-'))
+    scratch = makeTempDir('login-path-')
     const loginBin = join(scratch, 'bin')
     mkdirSync(loginBin)
     executable(join(loginBin, 'gh'), 'echo from-login-path')

@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
-import * as path from 'node:path'
 import { createFoundryIndexes } from '../../src/state/foundry-index.js'
 import type { FoundryChange } from '../../src/state/foundry-index.js'
 import { diskSourceFor } from '../../src/state/disk-source.js'
@@ -12,6 +10,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The store modules and the index together, on real files: what a write left
 // on disk is what the index answers with, and the windows are told which order
@@ -53,7 +52,7 @@ function graph(orderId: string): RunGraph {
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-index-'))
+  root = makeTempDir('fdry-index-')
   changes = []
 })
 

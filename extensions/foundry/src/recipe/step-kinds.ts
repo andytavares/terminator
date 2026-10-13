@@ -28,7 +28,7 @@ export function selectOver(expression: string, order: WorkOrder): PlanUnit[] {
 }
 
 /** Whether a fan-out expression asked to be grouped: `… by lane`. */
-export function groupsByLane(expression: string): boolean {
+function groupsByLane(expression: string): boolean {
   return /\s+by\s+lane$/.test(expression.trim())
 }
 

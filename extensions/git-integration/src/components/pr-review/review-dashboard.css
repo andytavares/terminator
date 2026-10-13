@@ -29,18 +29,6 @@
   flex: 1;
 }
 
-.rd-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11.5px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--tm-border-strong);
-  color: var(--tm-text-secondary);
-  white-space: nowrap;
-}
-
 .rd-note {
   font-size: 11.5px;
   color: var(--tm-text-muted);
@@ -75,17 +63,6 @@
   font-variant-numeric: tabular-nums;
   color: var(--tm-text-muted);
   margin-left: 4px;
-}
-
-.rd-band {
-  margin: 10px 14px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--tm-accent-dim);
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
 }
 
 .rd-band b {

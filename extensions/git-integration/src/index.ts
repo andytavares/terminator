@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defineChannel } from '@terminator/extension-sdk'
+import { defineChannel, noPayload } from '@terminator/extension-sdk'
 import type {
   ChannelSpec,
   ExtensionAPI,
@@ -8,13 +8,14 @@ import type {
 } from '@terminator/extension-sdk'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
 import { bindWorkspaceRoots } from './ipc/repo-root.js'
+import { projectForCheckout } from './review/terminal-project.js'
 import { VALIDATION_ERROR } from './ipc/register.js'
 import { registerGithubHandlers } from './ipc/github.ipc.js'
 import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'
-import { registerQuickActionCommands } from './commands.js'
+import { consumePendingViewRequest, registerQuickActionCommands } from './commands.js'
 import { remoteAccessFor } from './remote-access.js'
 import { bindShell } from './shell/run-git.js'
-import { setStoreDirectory } from './storage-directory.js'
+import { openStorageDirectory } from './storage-directory.js'
 import {
   openPrReviewWindow,
   registerReviewPullRequestCommand,
@@ -51,6 +52,7 @@ const NOTIFICATION_KEYS: { key: string; label: string }[] = [
   { key: 'pushFailed', label: 'Push failed' },
   { key: 'pullSucceeded', label: 'Pull succeeded' },
   { key: 'pullFailed', label: 'Pull failed' },
+  { key: 'prCreated', label: 'Pull request opened' },
 ]
 
 function buildNotificationSettingProperties(): Record<string, SettingDefinition> {
@@ -77,11 +79,78 @@ function buildNotificationSettingProperties(): Record<string, SettingDefinition>
 
 const disposables: Disposable[] = []
 
+/**
+ * The settings page. Registered before the enabled check: switched off, the
+ * extension registers nothing else, and the page is the only way back on.
+ */
+function registerSettingsPage(api: ExtensionAPI): Disposable {
+  return api.settings.register({
+    label: 'Git Integration',
+    properties: {
+      'terminator.git-integration.git.enabled': {
+        type: 'boolean',
+        label: 'Enable Git Integration',
+        default: true,
+        workspaceScoped: true,
+      },
+      'terminator.git-integration.git.githubToken': {
+        type: 'string',
+        label: 'GitHub token',
+        description:
+          'Personal access token or fine-grained token with repo scope. Used as GH_TOKEN when running gh commands.',
+        default: '',
+        secret: true,
+      },
+      'terminator.git-integration.git.commit.signOff': {
+        type: 'boolean',
+        label: 'Add sign-off to commits',
+        default: false,
+        workspaceScoped: true,
+      },
+      'terminator.git-integration.git.maxDisplayedFiles': {
+        type: 'number',
+        label: 'Max displayed changed files',
+        default: 500,
+        min: 10,
+        max: 5000,
+      },
+      'terminator.git-integration.review.agentModel': {
+        type: 'enum',
+        label: 'Review agent model',
+        options: ['opus', 'sonnet'],
+        default: 'sonnet',
+      },
+      'terminator.git-integration.review.agentEffort': {
+        type: 'enum',
+        label: 'Review agent effort',
+        options: ['default', 'low', 'medium', 'high'],
+        default: 'default',
+      },
+      'terminator.git-integration.review.cloneFolder': {
+        type: 'folder',
+        label: 'Clone folder for reviews',
+        description:
+          'Where "Clone and review" puts repositories you have not cloned. Empty keeps reviews diff-only.',
+        default: '',
+      },
+      'terminator.git-integration.review.agentTimeoutMinutes': {
+        type: 'number',
+        label: 'Review agent timeout (minutes)',
+        default: 5,
+        min: 1,
+        max: 30,
+      },
+      ...buildNotificationSettingProperties(),
+    },
+  })
+}
+
 export function activate(api: ExtensionAPI): void {
+  disposables.push(registerSettingsPage(api))
   const enabled = api.settings.get<boolean>('terminator.git-integration.git.enabled') ?? true
   if (!enabled) return
   bindShell(api.shell)
-  setStoreDirectory(api.paths.userData)
+  const storage = openStorageDirectory(api)
 
   const projectRoots = () =>
     api.workspace
@@ -98,6 +167,14 @@ export function activate(api: ExtensionAPI): void {
   }
   registerGitExtensionHandlers(registerFn)
   disposables.push(...registerQuickActionCommands(api))
+  registerFn(
+    defineChannel({
+      channel: 'git:ui.consume-pending-request',
+      schema: noPayload,
+      invalid: VALIDATION_ERROR,
+      run: () => ({ request: consumePendingViewRequest() }),
+    })
+  )
   disposables.push(registerReviewPullRequestCommand(api))
   disposables.push(registerReviewSubmittedRelay(api))
   registerGithubHandlers(
@@ -105,7 +182,7 @@ export function activate(api: ExtensionAPI): void {
     {
       github: api.github,
       getToken: () => api.settings.get<string>('terminator.git-integration.git.githubToken') ?? '',
-      noCheckoutCwd: api.paths.userData,
+      noCheckoutCwd: storage,
     },
     // Optional: an older host has no issues namespace, and the review view
     // then renders references exactly as it does today.
@@ -121,14 +198,7 @@ export function activate(api: ExtensionAPI): void {
     getSetting: (key) => api.settings.get(key),
     broadcast: (channel, data) => api.window.broadcast(channel, data),
     openTerminal: async ({ repoRoot, cwd, title, command }) => {
-      let projectId: string | undefined
-      for (const ws of api.workspace.list()) {
-        const match = api.workspace.listProjects(ws.id).find((p) => p.worktreePath === repoRoot)
-        if (match) {
-          projectId = match.id
-          break
-        }
-      }
+      const projectId = projectForCheckout(api.workspace, repoRoot)
       if (!projectId) return
       const sessionId = await api.pty.openTerminal({
         projectId,
@@ -156,68 +226,6 @@ export function activate(api: ExtensionAPI): void {
         },
       })
     )
-  )
-
-  disposables.push(
-    api.settings.register({
-      label: 'Git Integration',
-      properties: {
-        'terminator.git-integration.git.enabled': {
-          type: 'boolean',
-          label: 'Enable Git Integration',
-          default: true,
-          workspaceScoped: true,
-        },
-        'terminator.git-integration.git.githubToken': {
-          type: 'string',
-          label: 'GitHub token',
-          description:
-            'Personal access token or fine-grained token with repo scope. Used as GH_TOKEN when running gh commands.',
-          default: '',
-          secret: true,
-        },
-        'terminator.git-integration.git.commit.signOff': {
-          type: 'boolean',
-          label: 'Add sign-off to commits',
-          default: false,
-          workspaceScoped: true,
-        },
-        'terminator.git-integration.git.maxDisplayedFiles': {
-          type: 'number',
-          label: 'Max displayed changed files',
-          default: 500,
-          min: 10,
-          max: 5000,
-        },
-        'terminator.git-integration.review.agentModel': {
-          type: 'enum',
-          label: 'Review agent model',
-          options: ['opus', 'sonnet'],
-          default: 'sonnet',
-        },
-        'terminator.git-integration.review.agentEffort': {
-          type: 'enum',
-          label: 'Review agent effort',
-          options: ['default', 'low', 'medium', 'high'],
-          default: 'default',
-        },
-        'terminator.git-integration.review.cloneFolder': {
-          type: 'folder',
-          label: 'Clone folder for reviews',
-          description:
-            'Where "Clone and review" puts repositories you have not cloned. Empty keeps reviews diff-only.',
-          default: '',
-        },
-        'terminator.git-integration.review.agentTimeoutMinutes': {
-          type: 'number',
-          label: 'Review agent timeout (minutes)',
-          default: 5,
-          min: 1,
-          max: 30,
-        },
-        ...buildNotificationSettingProperties(),
-      },
-    })
   )
 
   disposables.push(

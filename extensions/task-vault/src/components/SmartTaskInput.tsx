@@ -26,6 +26,20 @@ interface DropdownOption {
   isCreate?: boolean
 }
 
+/** The options whose label contains the typed query (a dash in it read as a space). */
+function matching(options: DropdownOption[], query: string): DropdownOption[] {
+  const q = query.toLowerCase().replace(/-/g, ' ')
+  return options.filter((o) => o.label.toLowerCase().includes(q))
+}
+
+/** The matching options, then an option to create `query` unless one has exactly that label. */
+function matchesOrCreate(options: DropdownOption[], query: string): DropdownOption[] {
+  const q = query.toLowerCase().replace(/-/g, ' ')
+  const exact = options.some((o) => o.label.toLowerCase() === q)
+  const create = query.length > 0 && !exact ? [{ label: query, value: query, isCreate: true }] : []
+  return [...matching(options, query), ...create]
+}
+
 // Detect which trigger is active given the text and cursor position
 function detectTrigger(text: string, cursor: number): ActiveTrigger | null {
   const before = text.slice(0, cursor)
@@ -135,29 +149,13 @@ export function SmartTaskInput({
   const getOptionsForTrigger = useCallback(
     (trigger: ActiveTrigger): DropdownOption[] => {
       if (!optionsLoaded && !optionCache.loaded) return []
-      const q = trigger.query.toLowerCase()
-      const qNorm = q.replace(/-/g, ' ')
       switch (trigger.type) {
-        case 'project': {
-          const matches = optionCache.projects.filter((o) => o.label.toLowerCase().includes(qNorm))
-          const exactMatch = optionCache.projects.some((o) => o.label.toLowerCase() === qNorm)
-          const createOpt: DropdownOption[] =
-            q.length > 0 && !exactMatch
-              ? [{ label: trigger.query, value: trigger.query, isCreate: true }]
-              : []
-          return [...matches, ...createOpt]
-        }
-        case 'area': {
-          const matches = optionCache.areas.filter((o) => o.label.toLowerCase().includes(qNorm))
-          const exactMatch = optionCache.areas.some((o) => o.label.toLowerCase() === qNorm)
-          const createOpt: DropdownOption[] =
-            q.length > 0 && !exactMatch
-              ? [{ label: trigger.query, value: trigger.query, isCreate: true }]
-              : []
-          return [...matches, ...createOpt]
-        }
+        case 'project':
+          return matchesOrCreate(optionCache.projects, trigger.query)
+        case 'area':
+          return matchesOrCreate(optionCache.areas, trigger.query)
         case 'context':
-          return optionCache.contexts.filter((o) => o.label.toLowerCase().includes(qNorm))
+          return matching(optionCache.contexts, trigger.query)
         default:
           return []
       }

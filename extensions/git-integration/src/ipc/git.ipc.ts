@@ -124,14 +124,5 @@ export function registerGitExtensionHandlers(registerRaw: RegisterFn): void {
     })
   )
 
-  register(
-    defineChannel({
-      channel: 'git:pr-status',
-      schema: RepoRootPayload,
-      invalid: VALIDATION_ERROR,
-      run: () => ({ pr: null }),
-    })
-  )
-
   registerMergeFlowHandlers(register)
 }

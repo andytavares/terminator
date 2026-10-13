@@ -92,17 +92,23 @@
   background: var(--tm-bg-card-hover);
 }
 
-.notepad-composer__body {
+/* A text field */
+.notepad-composer__body,
+.notepad-input,
+.notepad-textarea {
   width: 100%;
   box-sizing: border-box;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border);
   border-radius: 6px;
   color: var(--tm-text-primary);
+  outline: none;
+}
+
+.notepad-composer__body {
   font-size: 12px;
   font-family: inherit;
   padding: 6px 8px;
-  outline: none;
   resize: none;
 }
 
@@ -694,16 +700,9 @@
 
 /* ── Form inputs ────────────────────────────────────────────────── */
 .notepad-input {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: 6px;
-  color: var(--tm-text-primary);
   font-size: 13px;
   font-family: inherit;
   padding: 7px 10px;
-  outline: none;
   transition: border-color 100ms ease;
 }
 
@@ -716,16 +715,9 @@
 }
 
 .notepad-textarea {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: 6px;
-  color: var(--tm-text-primary);
   font-size: 13px;
   font-family: var(--font-mono, monospace);
   padding: 8px 10px;
-  outline: none;
   resize: vertical;
   transition: border-color 100ms ease;
 }
@@ -1177,19 +1169,8 @@
 
 .notepad-export-dialog__folder-input {
   flex: 1;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: 6px;
-  color: var(--tm-text-primary);
-  font-size: 13px;
   font-family: var(--font-mono, monospace);
-  padding: 7px 10px;
-  outline: none;
   transition: border-color 100ms ease;
-}
-
-.notepad-export-dialog__folder-input:focus {
-  border-color: var(--tm-accent, color-mix(in srgb, var(--tm-accent) 50%, transparent));
 }
 
 /* Scope segmented tabs */

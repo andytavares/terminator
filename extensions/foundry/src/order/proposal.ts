@@ -24,7 +24,7 @@ const orderShape = WorkOrderSchema.shape
  * code keeps, and the prior art it found. Those are findings, and nothing else
  * fills them: Scout runs after agreement, which is too late to inform one.
  */
-const FindingsSchema = z
+export const FindingsSchema = z
   .object({
     entryPoints: z.array(z.string()).optional(),
     conventions: z.array(z.string()).optional(),
@@ -35,7 +35,7 @@ const FindingsSchema = z
 // The object-valued fields merge key by key, because an amending turn is told
 // to send only what it changed: `plan.units` alone is an edit, not a plan with
 // no lanes.
-export const ProposalSchema = z
+const ProposalSchema = z
   .object({
     intent: orderShape.intent.partial().optional(),
     findings: FindingsSchema.optional(),

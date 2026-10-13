@@ -258,7 +258,7 @@ export interface ShellExecOptions {
   args: string[]
   /**
    * Must be, after resolving symlinks, one of the extension's shell roots or
-   * below one: a workspace folder, a project worktree, `api.paths.userData`, or
+   * below one: a workspace folder, a project worktree, `api.paths.globalStorage`, or
    * the directory a folder setting the manifest declares in
    * `contributes.shellRoots` holds. Since 4.0.0.
    */
@@ -317,12 +317,16 @@ export interface ExtensionAPI {
    * holds its own connection, so `transaction(fn)` runs `fn` in the extension's own process.
    */
   db: ExtensionDB
-  /** Where the application lives on disk. A snapshot taken at activation. Since 4.0.0. */
+  /** Where the application and this extension's data live on disk. Since 4.0.0. */
   paths: {
     /** The application's own directory (Electron's `app.getAppPath()`). */
     readonly app: string
-    /** The per-user data directory (Electron's `app.getPath('userData')`). */
-    readonly userData: string
+    /**
+     * This extension's own data folder, `<userData>/extensions/<id>`: VS Code's
+     * `ExtensionContext.globalStorageUri`, shared by no other extension. It may
+     * not exist yet; create it (recursively) before writing into it.
+     */
+    readonly globalStorage: string
   }
   /** The operating system's file dialogs, over the focused window. Since 4.0.0. */
   dialog: {

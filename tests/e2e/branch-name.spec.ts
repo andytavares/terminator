@@ -1,9 +1,13 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace, workspaceRow } from './helpers'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  workspaceRow,
+  e2eTempDir,
+} from './helpers'
 
 /**
  * A branch card is named by its branch (ADR-034), and the branch is the one its
@@ -28,7 +32,7 @@ function git(...args: string[]): string {
 // selected to run alone.
 test.describe.serial('branch naming', () => {
   test.beforeAll(async () => {
-    repo = mkdtempSync(join(tmpdir(), 'terminator-e2e-repo-'))
+    repo = e2eTempDir('terminator-e2e-repo-')
     git('init', '--initial-branch=main')
     git('config', 'user.email', 'e2e@example.com')
     git('config', 'user.name', 'E2E')

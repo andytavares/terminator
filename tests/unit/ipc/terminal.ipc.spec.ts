@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import * as fs from 'node:fs'
 import * as os from 'node:os'
-import * as path from 'node:path'
+import { makeTempDir } from '../../support/temp-dir'
 
 const { mockHandle, mockOn } = vi.hoisted(() => ({ mockHandle: vi.fn(), mockOn: vi.fn() }))
 const paths = vi.hoisted(() => ({ userData: '' }))
@@ -30,7 +29,7 @@ import { notificationManager } from '../../../src/main/notifications/notificatio
 
 /** Each test starts from an empty user-data directory and an empty notification centre. */
 beforeEach(async () => {
-  paths.userData = fs.mkdtempSync(path.join(os.tmpdir(), 'terminal-ipc-'))
+  paths.userData = makeTempDir('terminal-ipc-')
   await records.loadRecords()
   await links.loadLinks()
   for (const notification of notificationManager.list())

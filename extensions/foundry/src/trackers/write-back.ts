@@ -16,7 +16,7 @@ import type { WorkOrder } from '../order/schema.js'
 
 export type TransitionIntent = 'started' | 'in_review' | 'done'
 
-export interface TrackerStateOption {
+interface TrackerStateOption {
   readonly id: string
   readonly name: string
   readonly intent: TransitionIntent | null

@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { seedOrder, houseDocsIn, newOrderId, pathsNamedIn } from '../../src/forge/intake-source.js'
 import { applyProposal, parseProposal } from '../../src/order/proposal.js'
 import { branchFor } from '../../src/line/worktree.js'
 import type { SeedDeps } from '../../src/forge/intake-source.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Scout runs before the operator is asked anything (FR-002). By the time a
 // question could be put to them, the repository has already been read, the
@@ -31,7 +31,7 @@ function deps(over: Partial<SeedDeps> = {}): SeedDeps {
 }
 
 beforeEach(() => {
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-intake-'))
+  repo = makeTempDir('foundry-intake-')
   write('package.json', JSON.stringify({ scripts: { test: 'vitest run', lint: 'eslint .' } }))
 })
 
@@ -80,7 +80,7 @@ describe('seedOrder from a typed idea', () => {
   })
 
   it('completes in a repository that says nothing about itself', async () => {
-    const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-bare-'))
+    const bare = makeTempDir('foundry-bare-')
     const r = await seedOrder({ kind: 'typed', text: 'x', repoPaths: [bare] }, deps())
     fs.rmSync(bare, { recursive: true, force: true })
     if (!('order' in r)) throw new Error('expected an order')
@@ -89,7 +89,7 @@ describe('seedOrder from a typed idea', () => {
   })
 
   it('opens one lane per repository', async () => {
-    const second = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-second-'))
+    const second = makeTempDir('foundry-second-')
     const r = await seedOrder({ kind: 'typed', text: 'x', repoPaths: [repo, second] }, deps())
     fs.rmSync(second, { recursive: true, force: true })
     if (!('order' in r)) throw new Error('expected an order')

@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
-import * as path from 'node:path'
 
 import { createSensorChannels } from '../../src/ipc/sensor-channels.js'
 import { createSignalStore } from '../../src/sensors/store.js'
@@ -11,13 +9,14 @@ import type { Signal } from '../../src/sensors/types.js'
 import type { SensorDef } from '../../src/sensors/types.js'
 import type { AvailableSensor } from '../../src/ipc/sensor-channels.js'
 import type { CollectDeps } from '../../src/sensors/collect.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let root: string
 let repo: string
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-sensor-channels-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-sensor-repo-'))
+  root = makeTempDir('foundry-sensor-channels-')
+  repo = makeTempDir('foundry-sensor-repo-')
 })
 
 afterEach(() => {

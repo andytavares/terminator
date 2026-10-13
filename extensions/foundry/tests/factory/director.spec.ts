@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, appendFileSync, readFileSync } from 'fs'
-import { tmpdir } from 'os'
+import { rmSync, writeFileSync, appendFileSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { direct } from '../../src/factory/director.js'
 import { createWorld, seatOf, tick, VERDICT_MS } from '../../src/factory/sim.js'
@@ -14,6 +13,7 @@ import type { RunGraph } from '../../src/line/run-graph.js'
 import { diffObservation } from '../../src/factory/events.js'
 import type { Observation, FactoryEvent } from '../../src/factory/events.js'
 import { readTranscript } from '../../src/runtime/transcript-tailer.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // direct() turns a batch of FactoryEvents into a new World: it never moves
 // anyone for a reason that is not one of those events, and coalescing is
@@ -725,7 +725,7 @@ describe('direct: the real pipeline never strands a worker at the shelf or the r
   let transcript: string
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'director-pipeline-'))
+    dir = makeTempDir('director-pipeline-')
     transcript = join(dir, 's1.jsonl')
   })
 

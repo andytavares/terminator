@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { ensureTrusted, claudeConfigPath } from '../../src/runtime/workspace-trust.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Claude Code shows its workspace trust dialog for a directory it has not
 // seen, "in interactive sessions only" — and Foundry runs interactively on
@@ -23,7 +23,7 @@ function readConfig(): Record<string, never> {
 }
 
 beforeEach(() => {
-  home = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-trust-'))
+  home = makeTempDir('fdry-trust-')
 })
 
 afterEach(() => {

@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { readFile, writeFile } from 'fs/promises'
+import { readFile } from 'fs/promises'
+import { writeFileAtomic } from '../utils/write-atomic.js'
 import { isAbsolute } from 'path'
 import { namedStore } from '../storage-directory.js'
 import { defineChannel } from '@terminator/extension-sdk'
@@ -78,14 +79,14 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
         //    blocks have already been resolved (block indices shift as markers are removed)
         if (originalConflictText && content.includes(originalConflictText)) {
           const updated = content.replace(originalConflictText, resolvedText)
-          await writeFile(fullPath, updated, 'utf-8')
+          await writeFileAtomic(fullPath, updated)
           return { success: true }
         }
 
         // 2. Block already resolved — replace the previously written resolved text
         if (currentResolvedText && content.includes(currentResolvedText)) {
           const updated = content.replace(currentResolvedText, resolvedText)
-          await writeFile(fullPath, updated, 'utf-8')
+          await writeFileAtomic(fullPath, updated)
           return { success: true }
         }
 
@@ -95,7 +96,7 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
         const target = blocks[blockIndex]
         if (target) {
           const updated = content.replace(target.originalConflictText, resolvedText)
-          await writeFile(fullPath, updated, 'utf-8')
+          await writeFileAtomic(fullPath, updated)
           return { success: true }
         }
 
@@ -129,7 +130,7 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
           }
         }
         const updated = content.replace(resolvedText, originalConflictText)
-        await writeFile(fullPath, updated, 'utf-8')
+        await writeFileAtomic(fullPath, updated)
         return { success: true }
       },
       onError: errorEnvelope,
@@ -255,20 +256,21 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
       schema: RepoRootPayload,
       invalid: VALIDATION_ERROR,
       run: async ({ repoRoot }) => {
-        const stored = store().get(sessionKey(repoRoot)) as unknown
+        const sessions = await store()
+        const stored = sessions.get(sessionKey(repoRoot)) as unknown
         if (!stored) return { session: null }
 
         // Validate that conflicts still exist in the working tree
         const conflicted = await listConflictedFiles(repoRoot).catch(() => [])
         if (conflicted.length === 0) {
-          store().delete(sessionKey(repoRoot))
+          sessions.delete(sessionKey(repoRoot))
           return { session: null }
         }
 
         // Reject stale empty sessions (e.g., from a broken Start Over)
         const sessionObj = stored as { totalConflicts?: number; files?: unknown[] }
         if (!sessionObj.totalConflicts || sessionObj.totalConflicts === 0) {
-          store().delete(sessionKey(repoRoot))
+          sessions.delete(sessionKey(repoRoot))
           return { session: null }
         }
 
@@ -283,8 +285,9 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
       channel: 'git:session-persist',
       schema: z.object({ repoRoot: RepoRoot, session: z.unknown() }),
       invalid: VALIDATION_ERROR,
-      run: ({ repoRoot, session }) => {
-        store().set(sessionKey(repoRoot), session)
+      run: async ({ repoRoot, session }) => {
+        const sessions = await store()
+        sessions.set(sessionKey(repoRoot), session)
         return { success: true }
       },
       onError: errorEnvelope,
@@ -297,8 +300,9 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
       channel: 'git:session-clear',
       schema: RepoRootPayload,
       invalid: { success: true },
-      run: ({ repoRoot }) => {
-        store().delete(sessionKey(repoRoot))
+      run: async ({ repoRoot }) => {
+        const sessions = await store()
+        sessions.delete(sessionKey(repoRoot))
         return { success: true }
       },
       onError: () => ({ success: true }),
@@ -320,7 +324,8 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
           // regardless of whether block.resolvedText is populated in persisted sessions
           await git(['checkout', '--conflict=merge', '--', file.filePath], repoRoot)
         }
-        store().delete(sessionKey(repoRoot))
+        const sessions = await store()
+        sessions.delete(sessionKey(repoRoot))
         return { success: true }
       },
       onError: errorEnvelope,

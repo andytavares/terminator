@@ -2,14 +2,14 @@ import { create } from 'zustand'
 import { SORT_MODES, type SortMode } from '../review/sort-prs'
 import type { AgentRun, AgentScope } from '../schemas/review-agent.schema'
 
-export type AgentRequest = 'review' | 'explain' | 'ask'
+type AgentRequest = 'review' | 'explain' | 'ask'
 
-export type CommentVisibility = 'all' | 'unresolved' | 'hidden'
-export type DiffRange = 'since' | 'whole'
-export type DiffViewMode = 'unified' | 'split'
+type CommentVisibility = 'all' | 'unresolved' | 'hidden'
+type DiffRange = 'since' | 'whole'
+type DiffViewMode = 'unified' | 'split'
 
 /** A line range the reviewer has selected in the diff, for the float bar and the agent. */
-export interface LineSelection {
+interface LineSelection {
   path: string
   side: 'LEFT' | 'RIGHT'
   startLine: number
@@ -17,7 +17,7 @@ export interface LineSelection {
 }
 
 /** A composer opened from somewhere other than the gutter (an agent finding, the float bar). */
-export interface ComposerRequest {
+interface ComposerRequest {
   path: string
   side: 'LEFT' | 'RIGHT'
   line: number

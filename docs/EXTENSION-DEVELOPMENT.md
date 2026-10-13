@@ -147,7 +147,8 @@ Every backend runs in the **extension host**, one Electron [`utilityProcess`](ht
 - A callback you pass (a command handler, a notification's `onClick`, `pty.onData`) stays in the extension host, and the core calls it by id. Registrations still return a `Disposable` at once.
 - Values you pass and return must survive structured clone: plain data, no functions or class instances. An `Error` arrives with its `name` and `message`.
 - `api.db` is the extension host's own connection to the app database, so `transaction(fn)` runs `fn` in your process.
-- `electron` is not available. Use `api.paths` for `app.getAppPath()` and `app.getPath('userData')`, `api.dialog` for file dialogs, and `api.window` for windows. A store such as electron-store needs `cwd: api.paths.userData`. Node's own modules work: Remote Control's HTTP server runs here.
+- `electron` is not available. Use `api.paths` for `app.getAppPath()` and for your own data folder, `api.dialog` for file dialogs, and `api.window` for windows. A store such as electron-store needs `cwd: api.paths.globalStorage`. Node's own modules work: Remote Control's HTTP server runs here.
+- Every backend shares the host's memory. Import a large dependency the first time you need it (`await import(...)`), not at the top of your entry: Remote Control loads fastify only when its server starts, and git-integration loads electron-store only when a store is first read ([measurements](research/perf/2026-10-12-extension-host.md)).
 
 If the extension host crashes, the app stays up. It is restarted once and every backend activated
 again in the same order as at startup: an extension after those in its `extensionDependencies`, so
@@ -321,6 +322,10 @@ useEffect(
 
 `window.electronAPI.workspace.getActive()` answers what the operator has focused in the main window.
 
+A backend brings its own project tab forward with
+`api.window.broadcast('extension:select-project-tab', { tabId: '<your extension id>' })`, and
+toggles its sidebar panel with `api.window.broadcast('extension:toggle-panel', '<your extension id>')`.
+
 ### Running another extension's command
 
 A view can run a command another extension registered with an `args` schema ([ADR 083](adr/083-extension-commands-take-arguments.md)), by its full id `<extensionId>.command.<id>`:
@@ -340,6 +345,25 @@ await window.electronAPI.extension.hasCommand(key) // boolean
 
 - **`⌘P` / `Ctrl+P`** opens the core's Quick Actions panel even while focus is in your view: the host watches `before-input-event` on every view (`isQuickActionsOpenShortcut`).
 - **`Esc` twice within 500 ms** leaves your extension and returns the operator to their terminal ([ADR 026](adr/026-double-escape-extension-exit.md)). The listener in the webview preload is passive and bubble-phase, so your own single-`Esc` handlers run as normal. It stands down inside a text field and while a dialog is open; `Dialog` from the design system reports open dialogs over `electronAPI.ui.setModalDepth`, and a modal you write yourself must call it too. Do not stop `Esc` propagation at the window level, or the gesture stops working in your view.
+
+### Testing your view end to end
+
+A view is its own `WebContentsView` on an `ext://` origin, and Playwright attaches to it like any other page in the app's browser context. `tests/e2e/extension-page.ts` finds it, so a spec clicks, types and drags in your view with ordinary locators:
+
+```ts
+const vault = await openExtension(
+  handle,
+  'Task Vault',
+  'terminator.task-vault/dist/index.html?view=main'
+)
+await vault.getByRole('button', { name: 'Add task', exact: true }).click()
+```
+
+- Read back what an action stored with `invokeChannel(page, channel, payload)`, which calls your channel exactly as your view does. Perform the action itself the way a user does.
+- A native file dialog cannot be clicked. `answerNextOpenDialog` and `answerNextSaveDialog` answer the next one in main with the path a user would pick.
+- Playwright's keyboard reaches one page and never the X server, so it cannot fire an `api.globalShortcut`. On Linux `tests/e2e/x11-keys.ts` presses the chord through XTEST; the spec skips where there is no X server. CI runs such specs in the E2E (Linux, X11) job, under xvfb; add yours to its command in `.github/workflows/ci.yml`.
+- `E2E_ELECTRON_ARGS` passes extra Electron switches to every launch, space-separated. A Linux runner without Chromium's sandbox sets `E2E_ELECTRON_ARGS=--no-sandbox`.
+- `tests/e2e/task-vault-harness.ts` and `tests/e2e/notepad-harness.ts` are worked examples.
 
 ---
 
@@ -436,7 +460,7 @@ It is SQLite, not Postgres:
 - Parameters are `?`, each a `string`, `number`, `bigint`, `null` or `Uint8Array`. `undefined` throws (`Provided value cannot be bound`): write `value ?? null`. Write booleans as `flag ? 1 : 0`.
 - Store booleans as `INTEGER` 0/1, dates as ISO-8601 `TEXT`, JSON as `TEXT` read with `json_extract` / `json_remove`. Use `TEXT PRIMARY KEY` with `crypto.randomUUID()`, or `INTEGER PRIMARY KEY` for a rowid.
 - `STRING_AGG(x, ',')` is `GROUP_CONCAT(x, ',')`. Prefer passing `new Date().toISOString()` over `datetime('now')`.
-- There is no `ILIKE`. `LIKE` is case-insensitive for ASCII letters only: `'É' LIKE 'é'` is false.
+- There is no `ILIKE`. `LIKE` is case-insensitive for ASCII letters only: `'É' LIKE 'é'` is false, and so is `LOWER('É') = 'é'` ([SQLite: LIKE](https://www.sqlite.org/lang_expr.html#like)). Search that must ignore case in every script filters in TypeScript with `toLowerCase()`, as Notepad's `search.query` does.
 - `ON CONFLICT (col) DO UPDATE SET v = excluded.v` and `ON CONFLICT DO NOTHING` work. `INSERT OR IGNORE` also drops rows that violate `NOT NULL` or `UNIQUE`; prefer `ON CONFLICT`.
 - `COUNT(*)` comes back as a `number`.
 - `ALTER TABLE ... ADD COLUMN` cannot add a `NOT NULL` column without a default. To change anything else, create a new table, copy and rename.
@@ -447,7 +471,20 @@ Test against a real in-memory database (`new DatabaseSync(':memory:')`), not a m
 
 ### `api.paths`
 
-`paths.app` (Electron's `app.getAppPath()`) and `paths.userData` (`app.getPath('userData')`), taken when the extension activates.
+`paths.app` is Electron's `app.getAppPath()`. `paths.globalStorage` is your extension's own data folder, `<userData>/extensions/<id>`, which no other extension shares: VS Code's [`ExtensionContext.globalStorageUri`](https://code.visualstudio.com/api/references/vscode-api#ExtensionContext). It may not exist yet; create it (`mkdirSync(path, { recursive: true })`) before writing into it ([ADR 103](adr/103-each-extension-has-its-own-data-folder.md)).
+
+An extension that kept data in the shared userData folder before 4.0.0 moves it at the top of `activate` with `moveFromUserData` from `@terminator/extension-sdk/node`. Each path moves only while its new location does not exist; when both exist neither is touched and `api.log.warn` names the old copy:
+
+```typescript
+import { moveFromUserData } from '@terminator/extension-sdk/node'
+
+export function activate(api: ExtensionAPI): void {
+  moveFromUserData(api, [{ from: 'foundry', to: 'records' }])
+  // ...
+}
+```
+
+A spec that hands `activate` a `globalStorage` makes it with `makeTempDir(prefix)` from `tests/support/temp-dir.ts`, which the root `tests/setup.ts` removes when the spec file ends. CI fails a unit run that leaves anything in the temporary directory (`scripts/check-temp-leaks.mjs`).
 
 ### `api.dialog`
 
@@ -557,7 +594,7 @@ Output is never trimmed. The core runs the command in the main process (`src/mai
 
 - a workspace folder (`workspace.list()`'s `folderPath`);
 - a project worktree (`workspace.listProjects(id)`'s `worktreePath`);
-- `api.paths.userData`, the application's per-user data directory (the same directory for every extension);
+- `api.paths.globalStorage`, your own data folder, and nothing else in userData: another extension's folder is outside ([ADR 103](adr/103-each-extension-has-its-own-data-folder.md));
 - the value of each folder setting your manifest declares in [`contributes.shellRoots`](#contributes).
 
 The `cwd` and each root are compared after `realpath`, by path segment: a symlink or a `..` that leads out of a root, or a sibling such as `/repos/app-old` beside the root `/repos/app`, is outside. A directory that does not exist yet is judged by where it would be. Outside every root, `exec` runs nothing and rejects with an error named `CwdOutOfScopeError`:
@@ -571,11 +608,11 @@ try {
 }
 ```
 
-When the directory does not matter to the command (`gh api` with an explicit repository, `gh api user`), run it in `api.paths.userData`. The roots bound the core's side; a channel that takes a path from a caller still checks it itself, as git-integration's `RepoRoot` schema does (`extensions/git-integration/src/ipc/repo-root.ts`).
+When the directory does not matter to the command (`gh api` with an explicit repository, `gh api user`), run it in `api.paths.globalStorage`, after creating it. The roots bound the core's side; a channel that takes a path from a caller still checks it itself, as git-integration's `RepoRoot` schema does (`extensions/git-integration/src/ipc/repo-root.ts`).
 
 ### `api.github`
 
-Pull requests and the GitHub API through the `gh` CLI the core runs. Each call takes a `GithubTarget`: the checkout gh runs in (`cwd`), or a repository without a checkout (`repository: 'owner/name'`, with `cwd: api.paths.userData`), and optionally a `token` that is retried under gh's own login when GitHub rejects it. `cwd` follows the same shell roots as `api.shell.exec` and is refused with `CwdOutOfScopeError` outside them.
+Pull requests and the GitHub API through the `gh` CLI the core runs. Each call takes a `GithubTarget`: the checkout gh runs in (`cwd`), or a repository without a checkout (`repository: 'owner/name'`, with `cwd: api.paths.globalStorage`), and optionally a `token` that is retried under gh's own login when GitHub rejects it. `cwd` follows the same shell roots as `api.shell.exec` and is refused with `CwdOutOfScopeError` outside them.
 
 ```typescript
 const target = { cwd: repoRoot }

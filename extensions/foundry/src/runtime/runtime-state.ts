@@ -55,11 +55,11 @@ export const pendingPermissions = createPendingPermissions()
  * supervised run died on "Settings file not found" the moment it launched: the
  * card sat at WORKING with 0 turns and the console stayed empty forever.
  *
- * Beside the extension's credentials, in userData: this is the pilot's own
- * state, not repository content, and nothing here should ever land in a diff.
+ * In Foundry's own `api.paths.globalStorage`: this is the pilot's own state,
+ * not repository content, and nothing here should ever land in a diff.
  */
-export function runtimeStateDir(userData: string): string {
-  return path.join(userData, 'foundry-runtime')
+export function runtimeStateDir(globalStorage: string): string {
+  return path.join(globalStorage, 'runtime')
 }
 /**
  * The notification a held tool call raised, so answering it takes the

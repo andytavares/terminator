@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { rmSync } from 'node:fs'
+import { makeTempDir } from '../../support/temp-dir'
 
 type Handler = (event: unknown, payload?: unknown) => unknown
 const handlers = vi.hoisted(() => new Map<string, Handler>())
@@ -25,7 +24,7 @@ describe('db:health', () => {
   })
 
   it('answers ok while the app database is open', async () => {
-    userData = mkdtempSync(join(tmpdir(), 'db-health-'))
+    userData = makeTempDir('db-health-')
     initAppDb(userData)
 
     expect(await handlers.get('db:health')!({})).toEqual({ ok: true })

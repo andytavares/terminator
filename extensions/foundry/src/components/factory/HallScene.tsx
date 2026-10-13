@@ -5,7 +5,7 @@ import { cratePosition, tick, tileOf } from '../../factory/sim.js'
 import type { World } from '../../factory/sim.js'
 import type { NodeState } from '../../line/run-graph.js'
 import type { ToolProp } from '../../factory/events.js'
-import type { Paint, PaintGradient } from '../../factory/art/kit.js'
+import type { Paint } from '../../factory/art/kit.js'
 import { glow } from '../../factory/art/kit.js'
 import {
   bakeHall,
@@ -16,6 +16,7 @@ import {
 } from '../../factory/art/props.js'
 import type { SceneContext } from '../../factory/art/props.js'
 import { drawCrew } from '../../factory/art/crew.js'
+import { prefersReducedMotion, toPaint } from './canvas.js'
 
 // The one place the hall gets painted. Everything here is a projection: it
 // owns no state of its own, reads `worldRef.current` on every frame, and
@@ -90,33 +91,6 @@ const SCREEN_TINT: Readonly<Record<ToolProp, string>> = {
   rack: '140,230,120',
   archive: '232,197,106',
   desk: '90,200,235',
-}
-
-function toPaint(ctx: CanvasRenderingContext2D): Paint {
-  return {
-    get fillStyle() {
-      return ctx.fillStyle as unknown as string
-    },
-    set fillStyle(value: string | PaintGradient) {
-      ctx.fillStyle = value as unknown as string
-    },
-    get globalCompositeOperation() {
-      return ctx.globalCompositeOperation
-    },
-    set globalCompositeOperation(value: string) {
-      ctx.globalCompositeOperation = value as GlobalCompositeOperation
-    },
-    fillRect: (x, y, w, h) => ctx.fillRect(x, y, w, h),
-    createRadialGradient: (x0, y0, r0, x1, y1, r1) =>
-      ctx.createRadialGradient(x0, y0, r0, x1, y1, r1),
-    drawImage: (image, dx, dy) => ctx.drawImage(image, dx, dy),
-  }
-}
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia !== undefined
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false
 }
 
 /**

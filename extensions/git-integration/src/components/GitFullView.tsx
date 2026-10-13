@@ -8,6 +8,7 @@ import { useResizePanel } from '../hooks/useResizePanel'
 import { StagingArea } from './StagingArea'
 import { FileDiffView } from './FileDiffView'
 import { PrDialog } from './PrDialog'
+import { PrCreatedNotice } from './PrCreatedNotice'
 import type { FileDiff, PullRequest } from '../schemas/git.schema'
 import { gitAPI, type CommitResult } from '../api/git'
 import { MergeFlowView } from './merge-flow/MergeFlowView'
@@ -61,6 +62,21 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       const { repoRoot: targetRoot } = (data ?? {}) as { repoRoot?: string }
       if (!targetRoot || targetRoot === repoRoot) commitMessageRef.current?.focus()
     })
+  }, [repoRoot])
+
+  // A Commit… or Create PR… run before this view existed broadcast to nobody;
+  // the request waits in the backend for the view to collect it on mount.
+  useEffect(() => {
+    if (!repoRoot) return
+    void window.electronAPI.extensionBridge
+      .invoke('git:ui.consume-pending-request', {})
+      .then((result) => {
+        const request = (result as { request?: { kind: string; repoRoot: string } | null })?.request
+        if (!request || request.repoRoot !== repoRoot) return
+        if (request.kind === 'commit') commitMessageRef.current?.focus()
+        else setShowPrDialog(true)
+      })
+      .catch(() => {})
   }, [repoRoot])
 
   // Quick action "Create PR…" — same broadcast pattern as focus-commit-message.
@@ -148,23 +164,31 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     [setCommitMessage]
   )
 
-  const handleCommit = useCallback(
-    async (noVerify = false) => {
-      if (!canCommit || !repoRoot) return
+  /** Commits what is staged; true when the commit was made. */
+  const commitStaged = useCallback(
+    async (root: string, noVerify: boolean): Promise<boolean> => {
       setIsCommitting(true)
       setCommitError(null)
       setHookOutput(null)
       setIsHookFailure(false)
-      startCommitPhase(repoRoot)
+      startCommitPhase(root)
+      const result = await gitAPI.commit(root, commitMessage.trim(), false, noVerify)
+      return applyCommitResult(result)
+    },
+    [commitMessage, startCommitPhase, applyCommitResult]
+  )
+
+  const handleCommit = useCallback(
+    async (noVerify = false) => {
+      if (!canCommit || !repoRoot) return
       try {
-        const result = await gitAPI.commit(repoRoot, commitMessage.trim(), false, noVerify)
-        applyCommitResult(result)
+        await commitStaged(repoRoot, noVerify)
       } finally {
         setIsCommitting(false)
         endCommitPhase()
       }
     },
-    [repoRoot, commitMessage, canCommit, startCommitPhase, endCommitPhase, applyCommitResult]
+    [repoRoot, canCommit, commitStaged, endCommitPhase]
   )
 
   const handleOpenPr = useCallback(async () => {
@@ -180,14 +204,8 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
   const handleCommitAndPush = useCallback(
     async (noVerify = false) => {
       if (!canCommit || !repoRoot) return
-      setIsCommitting(true)
-      setCommitError(null)
-      setHookOutput(null)
-      setIsHookFailure(false)
-      startCommitPhase(repoRoot)
       try {
-        const result = await gitAPI.commit(repoRoot, commitMessage.trim(), false, noVerify)
-        if (!applyCommitResult(result)) return
+        if (!(await commitStaged(repoRoot, noVerify))) return
         setIsCommitting(false)
         endCommitPhase()
         setIsPushing(true)
@@ -205,7 +223,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
         endCommitPhase()
       }
     },
-    [repoRoot, commitMessage, canCommit, startCommitPhase, endCommitPhase, applyCommitResult]
+    [repoRoot, canCommit, commitStaged, endCommitPhase]
   )
 
   const handlePrCreated = useCallback((pr: PullRequest) => {
@@ -270,6 +288,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
               {charCount} chars
             </span>
           )}
+          <PrCreatedNotice />
           {commitError && (
             <div className="git-view__commit-error">
               <span className="git-view__commit-error-msg">{commitError}</span>

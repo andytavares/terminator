@@ -292,8 +292,9 @@ describe('the very first draft', () => {
     await untilLedgerHas('scout.collected')
     const entries = await createOrderStore(dataDir).entries('WO-1')
     expect(entries.find((e) => e.action === 'scout.collected')?.reason).toBe('found 1 entry point')
-    // The loop goes on to the red team's round. Left running, it would write
-    // into the next case's records once beforeEach moves dataDir.
+    // The loop goes on to the red team and the hand-off. Waited for here, or
+    // it finishes during the next test, which shares the host, and writes its
+    // red team's round into that test's records.
     await vi.waitFor(() => expect(said()).toContain('Make it red is ready to hand off.'), {
       timeout: 10_000,
     })
@@ -365,5 +366,12 @@ describe('a question the architect asks', () => {
     )
     answer('ask-1')
     expect(await host.call('foundry:permissions-list')).toEqual({ pending: [] })
+    // The session goes onto the order in a save nobody awaits. Waiting for it
+    // keeps that save from landing after the spec file's records are removed.
+    await vi.waitFor(async () =>
+      expect((await createOrderStore(dataDir).load('WO-1'))?.provenance.forgeSession).toBe(
+        'architect-1'
+      )
+    )
   })
 })

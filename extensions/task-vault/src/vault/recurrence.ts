@@ -77,7 +77,7 @@ export function computeNextDueDate(fromDate: string, rule: RecurrenceRule): stri
 
 // ─── Recurrence end-condition decoding ───────────────────────────────────────
 
-export type RecurrenceEndType = 'none' | 'on_date' | 'after_count'
+type RecurrenceEndType = 'none' | 'on_date' | 'after_count'
 
 export interface RecurrenceEndMeta {
   endType: RecurrenceEndType
@@ -93,9 +93,7 @@ export interface RecurrenceEndMeta {
  * rows that predate the columns. Returns null when the blob carries no
  * end-conditions (or is malformed).
  */
-export function parseRecurrenceEndMeta(
-  metadata: string | null | undefined
-): RecurrenceEndMeta | null {
+function parseRecurrenceEndMeta(metadata: string | null | undefined): RecurrenceEndMeta | null {
   if (!metadata || metadata === '{}') return null
   try {
     const meta = JSON.parse(metadata) as Record<string, unknown>

@@ -9,10 +9,12 @@
  * by nothing, and every gate offering "Stop here" did nothing at all.
  */
 import { tmpdir } from 'node:os'
+import { freshGlobalStorage } from '../helpers/foundry-host.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
-const USER_DATA = tmpdir()
+const GLOBAL_STORAGE = freshGlobalStorage()
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
@@ -130,7 +132,7 @@ const GRAPH: RunGraph = {
 
 /** A records location holding one run the last application left in flight. */
 async function seedInterruptedRun(over: Partial<WorkOrder> = {}): Promise<void> {
-  dataDir = fs.mkdtempSync(path.join(tmpdir(), 'fdry-interrupted-'))
+  dataDir = makeTempDir('fdry-interrupted-')
   const store = createOrderStore(dataDir)
   await store.save(order(over))
   fs.writeFileSync(
@@ -174,7 +176,7 @@ beforeAll(async () => {
     shell: { exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }) },
     notifications: { showToast: vi.fn(), createNotification: vi.fn() },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    paths: { app: '', userData: USER_DATA },
+    paths: { app: '', globalStorage: GLOBAL_STORAGE },
     settings: {
       register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       get: settingsGet,

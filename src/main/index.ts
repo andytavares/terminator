@@ -3,7 +3,11 @@ import { onChannel } from './ipc/channel-registrar.js'
 import { registerAppInfoHandlers, registerDialogHandlers } from './ipc/app.ipc.js'
 import { app, BrowserWindow, dialog, Menu, shell, net, session, protocol } from 'electron'
 import { join } from 'path'
-import { registerWorkspaceHandlers } from './ipc/workspace.ipc.js'
+import {
+  registerWorkspaceHandlers,
+  setActiveWorkspaceContext,
+  type ActiveWorkspaceContext,
+} from './ipc/workspace.ipc.js'
 import { registerTerminalHandlers, sendToRenderer } from './ipc/terminal.ipc.js'
 import { OutputRelay } from './terminal/output-relay.js'
 import { registerSettingsHandlers } from './ipc/settings.ipc.js'
@@ -369,7 +373,8 @@ app.whenReady().then(async () => {
     })
   })
 
-  onChannel('workspace:active-changed', (_event, data) => {
+  onChannel('workspace:active-changed', (_event, data: ActiveWorkspaceContext) => {
+    setActiveWorkspaceContext(data)
     viewHost?.broadcastToAll('workspace:changed', data)
   })
   registerGitHandlers()

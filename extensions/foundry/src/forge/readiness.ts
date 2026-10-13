@@ -59,7 +59,7 @@ export interface ReadinessInput {
   readonly clock: (iso: string) => string
 }
 
-export type RunState = 'Running' | 'Shipped' | 'Cancelled' | 'Shipped · waiting on you'
+type RunState = 'Running' | 'Shipped' | 'Cancelled' | 'Shipped · waiting on you'
 
 function runStateOf(status: WorkOrder['status']): Exclude<RunState, 'Shipped · waiting on you'> {
   return status === 'shipped' ? 'Shipped' : status === 'cancelled' ? 'Cancelled' : 'Running'
@@ -70,10 +70,10 @@ function pillOf(status: WorkOrder['status'], turn: ReadinessInput['turn']): RunS
   return status === 'shipped' && turn === 'you' ? 'Shipped · waiting on you' : runStateOf(status)
 }
 
-export type Holder = 'you' | 'architect' | 'red team' | 'scout' | 'nobody'
+type Holder = 'you' | 'architect' | 'red team' | 'scout' | 'nobody'
 
 /** The status strip's colour: accent while the machine works, then by whose move it is. */
-export type Tone = 'working' | 'you' | 'ready' | 'bad' | 'neutral'
+type Tone = 'working' | 'you' | 'ready' | 'bad' | 'neutral'
 
 export type StripIcon = 'load' | 'user' | 'check' | 'play' | 'alert' | 'pause'
 
@@ -86,7 +86,7 @@ export type StripAction =
   | 'open-run'
   | 'draft'
 
-export interface Strip {
+interface Strip {
   readonly tone: Tone
   readonly icon: StripIcon
   readonly headline: string
@@ -94,7 +94,7 @@ export interface Strip {
   readonly actions: readonly StripAction[]
 }
 
-export type RowState = 'passed' | 'in-progress' | 'needs-you' | 'failing'
+type RowState = 'passed' | 'in-progress' | 'needs-you' | 'failing'
 
 /** One row of "Ready to hand off?": the five checks and whether anyone is changing the plan. */
 export interface Row {
@@ -104,7 +104,7 @@ export interface Row {
   readonly detail: string
 }
 
-export type StepState = 'done' | 'work' | 'you' | 'bad' | 'not-yet'
+type StepState = 'done' | 'work' | 'you' | 'bad' | 'not-yet'
 
 export type StepMark = 'number' | 'check' | 'spin' | 'alert' | 'x'
 
@@ -224,6 +224,23 @@ function openBlockingFindings(order: WorkOrder): WorkOrder['redTeam'] {
   return order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
 }
 
+/**
+ * What is open on the order: its blocking red-team findings, its unanswered
+ * questions, and whether the findings now wait on the operator (rule 5)
+ * because the machine is not acting on them or has run out of rounds.
+ */
+function openWork(input: Pick<ReadinessInput, 'order' | 'intake' | 'loop'>) {
+  const { order, intake, loop } = input
+  const openBlocking = openBlockingFindings(order)
+  const machineActing = intake.kind === 'running' && loop.heldAt === null
+  return {
+    openBlocking,
+    machineActing,
+    rule5Applies: openBlocking.length > 0 && (loop.exhausted || !machineActing),
+    openQuestions: order.openQuestions.filter((q) => q.answer === null),
+  }
+}
+
 function lastFinishedRound(loop: LoopFacts): LoopFacts['rounds'][number] | null {
   const finished = loop.rounds.filter((r) => r.finishedAt !== null)
   return finished.length === 0 ? null : finished[finished.length - 1]
@@ -239,10 +256,7 @@ interface HolderStrip {
 function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
   const { order, compile, intake, loop, agreed, shape, clock } = input
   const Shape = capitalise(shape.name ?? 'the proposed')
-  const openBlocking = openBlockingFindings(order)
-  const machineActing = intake.kind === 'running' && loop.heldAt === null
-  const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
-  const openQuestions = order.openQuestions.filter((q) => q.answer === null)
+  const { openBlocking, rule5Applies, openQuestions } = openWork(input)
 
   // 1. Not draft.
   if (order.status !== 'draft') {
@@ -567,10 +581,7 @@ function checkRow(id: CheckId, input: ReadinessInput): Row {
   if (id === 'questions')
     return { id, label: ROW_LABELS[id], state: 'needs-you', detail: failure.detail }
   if (id === 'redTeam') {
-    const openBlocking = openBlockingFindings(order)
-    const machineActing = intake.kind === 'running' && loop.heldAt === null
-    const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
-    if (rule5Applies)
+    if (openWork({ order, intake, loop }).rule5Applies)
       return { id, label: ROW_LABELS[id], state: 'needs-you', detail: failure.detail }
   }
   return { id, label: ROW_LABELS[id], state: 'failing', detail: failure.detail }
@@ -665,9 +676,7 @@ function computeBaseStep(
   Shape: string
 ): BaseStep {
   const { order, compile, intake, loop } = input
-  const openBlocking = openBlockingFindings(order)
-  const machineActing = intake.kind === 'running' && loop.heldAt === null
-  const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
+  const { openBlocking, machineActing, rule5Applies } = openWork(input)
 
   if (id === 'intent') {
     const stated = order.intent.problem.trim() !== '' && order.intent.outcome.trim() !== ''
@@ -881,10 +890,7 @@ function buildFindings(input: ReadinessInput): readonly FindingView[] {
 
 function buildHandOffLock(input: ReadinessInput): string | null {
   const { order, compile, intake, loop, agreed, clock } = input
-  const openBlocking = openBlockingFindings(order)
-  const machineActing = intake.kind === 'running' && loop.heldAt === null
-  const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
-  const openQuestions = order.openQuestions.filter((q) => q.answer === null)
+  const { openBlocking, rule5Applies, openQuestions } = openWork(input)
 
   if (order.status !== 'draft') {
     const t = clock(agreed?.at ?? order.agreedAt ?? '')

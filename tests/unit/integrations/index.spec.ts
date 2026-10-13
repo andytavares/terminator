@@ -1,7 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import * as fs from 'node:fs'
-import * as os from 'node:os'
-import * as path from 'node:path'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
+import { makeTempDir } from '../../support/temp-dir'
 
 let userData: string
 
@@ -26,6 +24,23 @@ vi.mock('../../../src/main/integrations/providers/jira.provider', () => ({
   createJiraProvider: vi.fn(() => providers.jira),
 }))
 
+// The service records each call's outcome with a write nobody awaits
+// (`void setLastError`). Each test waits for its writes, so none lands in a
+// later test's userData or in a directory already removed.
+const lastErrorWrites = vi.hoisted(() => [] as Promise<void>[])
+vi.mock('../../../src/main/integrations/tracker-store', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../../src/main/integrations/tracker-store')>()
+  return {
+    ...real,
+    setLastError: (...args: Parameters<typeof real.setLastError>) => {
+      const write = real.setLastError(...args)
+      lastErrorWrites.push(write)
+      return write
+    },
+  }
+})
+afterEach(() => Promise.all(lastErrorWrites.splice(0)))
+
 const LINEAR = { tracker: 'linear', apiKey: 'k' } as const
 const JIRA = {
   tracker: 'jira',
@@ -43,7 +58,7 @@ async function load() {
 beforeEach(async () => {
   vi.clearAllMocks()
   vi.resetModules()
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'integrations-index-'))
+  userData = makeTempDir('integrations-index-')
   trackers = await import('../../../src/main/integrations/tracker-store')
   await trackers.setCredential(LINEAR)
   await trackers.setCredential(JIRA)

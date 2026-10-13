@@ -1,5 +1,6 @@
 import React from 'react'
 import type { ChoicePrompt } from '../../../shared/types/index'
+import './ResumeButton.css'
 import './ChoiceButtons.css'
 
 interface Props {

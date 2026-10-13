@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { readProposal } from '../../src/forge/converge.js'
 import { lastIntake } from '../../src/forge/intake-outcome.js'
@@ -11,6 +10,7 @@ import { orderDir } from '../../src/data-root.js'
 import type { OrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // WO-0909-6db, from the proposal on disk to the screen that had to say so.
 //
@@ -111,8 +111,8 @@ async function finish(order: WorkOrder, proposalPath: string): Promise<void> {
 }
 
 beforeEach(async () => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-refused-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-refused-repo-'))
+  root = makeTempDir('foundry-refused-')
+  repo = makeTempDir('foundry-refused-repo-')
   store = createOrderStore(root)
   await store.save(seeded())
   await store.record({

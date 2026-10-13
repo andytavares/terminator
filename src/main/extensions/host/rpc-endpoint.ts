@@ -12,7 +12,7 @@ export type RpcMessage =
  * An error as it crosses: only `name` and `message`, so a caller can still tell a
  * MissingCwdError or a CwdOutOfScopeError, and nothing else of it leaks.
  */
-export interface RpcErrorShape {
+interface RpcErrorShape {
   name: string
   message: string
 }

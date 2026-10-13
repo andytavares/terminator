@@ -19,6 +19,7 @@ import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
 import { Button, usePolling } from '@terminator/extension-ui'
 import type { Signal } from '../sensors/types.js'
 import { invoke } from '@terminator/extension-sdk/renderer'
+import { readSignals, type SensorRow, type SignalsRead } from './signals-read.js'
 
 // Everything waiting on the operator, as a band above the Forge.
 //
@@ -35,13 +36,6 @@ interface InboxView {
   })[]
   /** Orders waiting on you that no gate stands for, with why. */
   waiting?: { orderId: string; title: string; headline: string; detail: string }[]
-}
-
-/** A sensor as `sensors.list` answers it — just enough to label a signal
- *  and offer its own repository as the default a promotion asks for. */
-interface SensorRow {
-  readonly def: { readonly id: string; readonly description: string }
-  readonly state: { readonly repoPath: string | null }
 }
 
 /** The evidence a signal was last seen with, most recent first. */
@@ -74,19 +68,6 @@ const RULE_TONE: Record<GateRuleId, string> = {
   'run.interrupted': 'is-warn',
   'ci.red': 'is-warn',
   'refinery.conflict': 'is-warn',
-}
-
-interface SignalsRead {
-  readonly signals: Signal[]
-  readonly sensors: SensorRow[]
-}
-
-async function readSignals(): Promise<SignalsRead> {
-  const [sig, sen] = await Promise.all([
-    invoke('foundry:signals.list') as Promise<{ signals?: Signal[] }>,
-    invoke('foundry:sensors.list') as Promise<{ sensors?: SensorRow[] }>,
-  ])
-  return { signals: sig.signals ?? [], sensors: sen.sensors ?? [] }
 }
 
 async function readInbox(): Promise<InboxView> {

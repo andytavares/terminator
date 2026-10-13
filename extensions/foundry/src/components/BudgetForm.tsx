@@ -5,7 +5,7 @@ import type { BudgetBreach } from '../line/scheduler.js'
 // A budget is a whole number or no limit. Used to set an order's budgets in the
 // Forge and to raise the one a run stopped at.
 
-export interface BudgetRow {
+interface BudgetRow {
   readonly key: string
   readonly label: string
   readonly value: number | null
@@ -122,7 +122,7 @@ const BREACH_LABEL: Record<BudgetBreach['kind'], string> = {
  * The limit a raise is offered at: a quarter above where the run already is,
  * rounded up, since a limit it reaches on the next poll stops it again.
  */
-export function raisedLimitFor(reached: number): number {
+function raisedLimitFor(reached: number): number {
   return reached + Math.ceil(reached * 0.25)
 }
 

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
+import { makeTempDir } from '../../support/temp-dir'
 
 let userData: string
 
@@ -17,8 +17,8 @@ const PROJECT_ID = '11111111-1111-4111-8111-111111111111'
 let projectDir: string
 
 beforeEach(() => {
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'session-hook-ud-'))
-  projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-hook-proj-'))
+  userData = makeTempDir('session-hook-ud-')
+  projectDir = makeTempDir('session-hook-proj-')
 })
 
 function settingsPath(): string {
@@ -92,7 +92,7 @@ describe('the hook script, executed', () => {
     let sessionContextDir: string
 
     beforeEach(() => {
-      sessionContextDir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-hook-sctx-'))
+      sessionContextDir = makeTempDir('session-hook-sctx-')
     })
 
     it('stays silent — the session’s own hook already printed its context', async () => {
@@ -248,10 +248,10 @@ describe('installProjectHook', () => {
   })
 
   it('fails loudly when the project directory cannot be written (FR-026)', async () => {
-    fs.chmodSync(projectDir, 0o500)
+    // A file where `.claude` should be: no one can write the hook into it.
+    fs.writeFileSync(path.join(projectDir, '.claude'), '')
     const mod = await load()
     await expect(mod.installProjectHook(projectDir, options)).rejects.toThrow()
-    fs.chmodSync(projectDir, 0o700)
   })
 })
 

@@ -3,20 +3,7 @@ import { Check, ChevronDown, ChevronRight, Dot, Plus } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { PrReviewDetail, Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
 import { chapterRiskLevel } from '../../github/pr-review-service'
-
-type RowState = 'viewed' | 'changed' | 'new' | 'default'
-
-function rowState(
-  file: PrChangedFile,
-  viewedFiles: Set<string>,
-  changedSince: Set<string>,
-  newSinceLook: Set<string>
-): RowState {
-  if (changedSince.has(file.path)) return 'changed'
-  if (newSinceLook.has(file.path)) return 'new'
-  if (viewedFiles.has(file.path)) return 'viewed'
-  return 'default'
-}
+import { rowState } from './file-row-state'
 
 interface Props {
   pr: PrReviewDetail
@@ -123,7 +110,7 @@ export function FullFileList({
               files.map((file, fi) => {
                 const isActive = file.path === currentFilePath
                 const isViewed = viewedFiles.has(file.path)
-                const state = rowState(file, viewedFiles, changedSince, newSinceLook)
+                const state = rowState(file, { viewedFiles, changedSince, newSinceLook })
                 const reasonInfo = reasonByPath.get(file.path)
                 return (
                   <button

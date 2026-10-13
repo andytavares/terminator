@@ -240,6 +240,9 @@ tile) disposes it, so a hidden terminal or a thumbnail never holds a GPU context
 and a terminal past that stays on the DOM renderer. A lost context (`onContextLoss`) or a machine without
 WebGL2 also falls back to the DOM renderer. The DOM renderer clips the last column's glyph on macOS (about
 2px), which WebGL does not do because it has no row boxes to clip. The phone client keeps the DOM renderer.
+Because WebGL leaves no terminal text in the DOM, the renderer sets `window.terminatorE2E.terminalRows()`
+(`src/renderer/terminal/terminal-rows.ts`), which reads every terminal's visible rows from its xterm buffer;
+the end-to-end specs read terminals through it.
 
 **Batching and flow control.** A PTY produces thousands of small chunks a second. `OutputRelay`
 (`src/main/terminal/output-relay.ts`) joins them in an `OutputBatcher` and sends one `terminal:output`
@@ -357,7 +360,7 @@ Main window renderer                         Main process
 
 ### Shell execution
 
-`api.shell.exec()` runs `git` or `gh` for an extension: the call crosses from the extension host on its port, main runs it through `src/main/shell/shell-executor.ts`, and `onOutput` chunks come back as callback events before the result. `api.github` runs gh through the same executor. Before either runs anything, `assertCwdInScope` checks the `cwd` against the extension's shell roots (`src/main/extensions/shell-roots.ts`, [ADR 102](adr/102-shell-exec-runs-in-declared-roots.md)): every workspace folder, every project worktree, `api.paths.userData`, and the folder settings the manifest declares in `contributes.shellRoots`. A `cwd` outside them rejects with `CwdOutOfScopeError`. The renderer's own `shell:exec` channel uses the same check with its single `workspaceRoot`, when given one. Both use `shell: false` and a minimal environment, and allow only `git` and `gh` (`COMMAND_NOT_ALLOWED` otherwise).
+`api.shell.exec()` runs `git` or `gh` for an extension: the call crosses from the extension host on its port, main runs it through `src/main/shell/shell-executor.ts`, and `onOutput` chunks come back as callback events before the result. `api.github` runs gh through the same executor. Before either runs anything, `assertCwdInScope` checks the `cwd` against the extension's shell roots (`src/main/extensions/shell-roots.ts`, [ADR 102](adr/102-shell-exec-runs-in-declared-roots.md)): every workspace folder, every project worktree, the extension's own `api.paths.globalStorage` (`<userData>/extensions/<id>`, [ADR 103](adr/103-each-extension-has-its-own-data-folder.md)), and the folder settings the manifest declares in `contributes.shellRoots`. A `cwd` outside them rejects with `CwdOutOfScopeError`. The renderer's own `shell:exec` channel uses the same check with its single `workspaceRoot`, when given one. Both use `shell: false` and a minimal environment, and allow only `git` and `gh` (`COMMAND_NOT_ALLOWED` otherwise).
 
 Commands resolve against `process.env.PATH`. On macOS an app started from the Dock or Finder gets `/usr/bin:/bin:/usr/sbin:/sbin`, which has no Homebrew `gh`, so at startup `src/main/shell/login-shell-path.ts` puts the login shell's PATH (`$SHELL -ilc`) ahead of it. A command that cannot be started reports its spawn error (`spawn gh ENOENT`) as stderr, never a bare exit code. A command killed by its timeout resolves with `timedOut: true` and exit code 124, never 0.
 
@@ -556,7 +559,7 @@ A manifest can declare `contributes.commands[]` (`{ id, label, description?, sho
 
 ### Reaching the panel from an extension's own view
 
-An extension's UI is a separate `WebContentsView` with its own `webContents`; the host window's `⌘P` keydown listener never sees a keystroke that originated there. `extension-view-host.ts` attaches a `before-input-event` listener to every extension view (`isQuickActionsOpenShortcut`, unit-tested for both the mac and non-mac branches); on `⌘P`/`Ctrl+P` it calls `preventDefault()`, focuses the main window, and sends `quick-actions:open`, which `App.tsx` handles the same way as the in-window shortcut. The panel's own Escape closes only the panel — it claims Escape through the `useModalEffect` "modal depth" signal the double-Escape-exit detector already reads, so closing the panel is never counted as the first half of a double-Escape extension exit. The panel also moves DOM focus into itself on mount (a plain `tabIndex={-1}` container), because leaving focus on whatever was focused before `⌘P` — most often a terminal — meant xterm's own capture-phase Escape handler (attached directly to its textarea) could consume Escape and stop it from ever bubbling to the panel's own window-level listener.
+The leader is `CmdOrCtrl+P`: `⌘P` on macOS, `Ctrl+P` elsewhere, decided in one place, `isQuickActionsLeader` (`src/shared/quick-actions-leader.ts`). A focused terminal hands it on: xterm turns `Ctrl+P` into `^P` for the shell and stops the event, so `TerminalInstance`'s custom key handler returns `false` for the leader, and the keydown reaches the window listener in `useKeyboardShortcuts.ts`. An extension's UI is a separate `WebContentsView` with its own `webContents`; the host window's `⌘P` keydown listener never sees a keystroke that originated there. `extension-view-host.ts` attaches a `before-input-event` listener to every extension view (`isQuickActionsOpenShortcut`, unit-tested for both the mac and non-mac branches); on `⌘P`/`Ctrl+P` it calls `preventDefault()`, focuses the main window, and sends `quick-actions:open`, which `App.tsx` handles the same way as the in-window shortcut. The panel's own Escape closes only the panel — it claims Escape through the `useModalEffect` "modal depth" signal the double-Escape-exit detector already reads, so closing the panel is never counted as the first half of a double-Escape extension exit. The panel also moves DOM focus into itself on mount (a plain `tabIndex={-1}` container), because leaving focus on whatever was focused before `⌘P` — most often a terminal — meant xterm's own capture-phase Escape handler (attached directly to its textarea) could consume Escape and stop it from ever bubbling to the panel's own window-level listener.
 
 ### Persistence
 
@@ -630,7 +633,7 @@ Deliberately absent from a `BranchRow`: change statistics and the linked issue k
 
 ### One state vocabulary, three surfaces
 
-The sidebar gutter, the terminal tabs, Home and the Overview wall all read `STATUS_ORDER` and `statusPresentationFor`, so they cannot disagree about severity or shape. Nothing stores `agentState`: every surface derives it through `BellAndBusySource`, from exit, the bell, byte flow, and a numbered choice prompt left on screen. Emphasis is the `--state-op-*` scale in `styles.css` — opacity, never hue, because Constitution XII forbids differentiating an icon's state by colour, and because that is what keeps the four readable in greyscale.
+The sidebar gutter, the terminal tabs, Home and the Overview wall all read `STATUS_ORDER` and `statusPresentationFor`, so they cannot disagree about severity or shape. Nothing stores `agentState`: every surface derives it through `BellAndBusySource`, from exit, the bell, byte flow, and a numbered choice prompt left on screen. A `TerminalSession` still carries an `agentState` field, set once to `idle` and never updated; code that is not a sidebar row reads `agentStateOf(session)` (`src/renderer/sidebar/agent-state.ts`), never the field, which is how Next waiting and the tab glyphs once never saw a waiting session. A session whose process ended keeps `status: 'closed'` when its tab is selected. Emphasis is the `--state-op-*` scale in `styles.css` — opacity, never hue, because Constitution XII forbids differentiating an icon's state by colour, and because that is what keeps the four readable in greyscale.
 
 Precedence is fixed: waiting on the user, then working, then idle, then exited. A branch with no terminals is **idle, not exited** — folding an empty list would otherwise land on the last entry in the order, and a branch you have not opened is not a finished one.
 
@@ -722,6 +725,20 @@ existing issue's assignee or any other field, or to delete one, and a test asser
 surface so it stays true. `transition` moves an issue by intent (ADR-041); `create` files one the
 operator asked for, Linear only (ADR-061).
 
+**One writer at a time.** Every `tracker-store` change reads, edits and writes `integrations.json`;
+changes run through one queue, so two at once (a field's blur and a Disconnect click) both land.
+
+**End to end against stubs.** `tests/e2e/issue-trackers.spec.ts` drives every `integrations:*`
+channel against stub Linear and Jira at their real addresses: the app runs with
+`NODE_USE_ENV_PROXY=1`, `HTTPS_PROXY` naming a local proxy and `NODE_EXTRA_CA_CERTS` naming a CA made
+for the run, so Node's fetch tunnels to `tests/e2e/tracker-stub.ts`, which answers TLS itself and
+refuses every other host. Verification stays on. The CA and the leaf certificate are made with
+`openssl x509 -req -extfile` and an explicit extension list, so no openssl.cnf default can add a
+second copy of an extension. macOS ships LibreSSL's config, Linux ships OpenSSL's. The leaf's
+SANs name both hosts, it has `extendedKeyUsage=serverAuth`, and its key identifiers link it to the CA.
+The stub records every CONNECT and TLS error, and the spec prints them when a tracker fails to
+connect. `close()` destroys the open tunnels, so a failed test cannot hold up `afterAll`.
+
 ---
 
 ## Security model
@@ -731,7 +748,7 @@ operator asked for, Linear only (ADR-061).
 - **Extensions are not sandboxed.** Their backends run in the extension host, a separate process, with full Node.js privileges. The process boundary protects the terminals and the core from an extension's slow or failing code, not from a malicious extension. Install only extensions you trust.
 - **An extension's view can read only its own files.** The `ext://` handler serves files inside the extension's own directory and answers `403` for any path outside it.
 - **Shell commands are limited.** `api.shell.exec` and `shell:exec` run only `git` and `gh`, without a shell, in a minimal environment (`src/main/shell/shell-executor.ts`).
-- **Shell commands run only in declared roots.** An extension's `api.shell.exec` and `api.github` run in a workspace folder, a project worktree, `api.paths.userData` or a folder setting its manifest declares in `contributes.shellRoots`, and nowhere else ([ADR 102](adr/102-shell-exec-runs-in-declared-roots.md), superseding ADR-006's workspace-only rule). Both the `cwd` and the roots are compared after `realpath`, by path segment, so neither a symlink nor a `..` nor a sibling sharing a prefix leads out. A manifest that declares another extension's setting is refused at load.
+- **Shell commands run only in declared roots.** An extension's `api.shell.exec` and `api.github` run in a workspace folder, a project worktree, the extension's own data folder `api.paths.globalStorage` or a folder setting its manifest declares in `contributes.shellRoots`, and nowhere else ([ADR 102](adr/102-shell-exec-runs-in-declared-roots.md), superseding ADR-006's workspace-only rule; [ADR 103](adr/103-each-extension-has-its-own-data-folder.md) replaced the shared userData root with the extension's own folder). Both the `cwd` and the roots are compared after `realpath`, by path segment, so neither a symlink nor a `..` nor a sibling sharing a prefix leads out. A manifest that declares another extension's setting is refused at load.
 - **Tracker credentials never leave main.** They are `safeStorage`-encrypted in `integrations.json`, read only by a provider, and no channel returns one (see [Issue tracker integrations](#issue-tracker-integrations)).
 - **The remote bridge is default-deny.** Only channels in the allowlist `src/main/remote/remote-accessible-channels.ts` (derived from the manifest) and extension channels registered `remoteAccessible: true` are reachable from a browser. Internal channels (`dialog:*`, `db:health`, `integrations:connect` / `disconnect`) and every other extension channel are not; Task Vault's SQL console and Notepad's file import and export are never opted in. See [Remote Control](#remote-control).
 
@@ -797,11 +814,13 @@ See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural deci
 
 The Git project tab (status, staging, commit, pull requests), the Code Reviews workspace tab and the Reviews global tab. It runs git and gh through `api.shell.exec` and `api.github`, and is the only git parser in the repository ([ADR 094](adr/094-extensions-follow-the-vs-code-model.md) ended ADR-025's two parsers).
 
+Its e2e specs run against real local repositories with a bare `origin` and a stub GitHub at the boundary the app has, the gh CLI: `tests/e2e/fixtures/bin/gh`, on the app's PATH beside the `claude` stub, forwards a call to `tests/e2e/github-stub.ts` when the app's `XDG_CONFIG_HOME` holds `gh/e2e-stub-url`, and otherwise runs the real gh. gh itself cannot be pointed at a local server (`GH_HOST` means HTTPS to `<host>/api/v3`, and the core passes no `GH_HOST`). Each extension view is a WebContentsView, which Playwright lists among the app's windows, so `tests/e2e/git-harness.ts` drives it as a page.
+
 #### The review window
 
 `window:open-pr-review` and the `review-pull-request` command call `openPrReviewWindow` (`src/review-command.ts`), which calls `api.window.openAuxiliary('pr-review', params)` with `repoRoot`, and `prNumber` and `showOverview` to restore straight into a review; the View menu's "Code Reviews in New Window" opens it with no params. The window loads the extension's own view, whose `src/renderer/App.tsx` routes `pr-review` to the review UI. Closing a review pauses its session through the store's `setPaused`, which writes the whole session (viewed marks, private notes and unsent draft comments included); a session written without them would replace the stored one and erase them. Every markdown preview in the extension, including the Open Pull Request template preview, goes through the sanitising `RichContent` component (ADR 091), which renders with the design system's `Markdown`.
 
-The review's cost grows with the PR, so two paths keep it bounded. In the backend, `github:pr-review-detail` runs `analysePr` (`src/review/analyse.ts`), which parses each file's patch once and hands the parsed files to the reading-order, moved-code and insights passes. Every tree-sitter parse goes through `withSyntaxTree` (`src/review/symbols.ts`), which deletes the tree when its reader returns: web-tree-sitter trees live in WASM memory that garbage collection does not reclaim. In the view, `ReviewDiffPane` flattens a file into list entries (`src/review/diff-items.ts`) and `VirtualDiffList` mounts only those near the viewport with `@tanstack/react-virtual`, measuring each entry so comments keep their place. Code rows are memoised (`DiffLineRows.tsx`), so a drag or a divider move re-renders only the rows whose state changed. Rows off screen are not in the DOM: scroll to a hunk or line by entry index, never by querying rows.
+The review's cost grows with the PR, so two paths keep it bounded. In the backend, `github:pr-review-detail` runs `analysePr` (`src/review/analyse.ts`), which parses each file's patch once and hands the parsed files to the reading-order, moved-code and insights passes. Every tree-sitter parse goes through `withSyntaxTree` (`src/review/symbols.ts`), which deletes the tree when its reader returns: web-tree-sitter trees live in WASM memory that garbage collection does not reclaim. In the view, `ReviewDiffPane` flattens a file into list entries (`src/review/diff-items.ts`) and `VirtualDiffList` mounts only those in the viewport and five past each edge with `@tanstack/react-virtual`, measuring each entry so comments keep their place. Code rows are memoised (`DiffLineRows.tsx`), so a drag or a divider move re-renders only the rows whose state changed. Rows off screen are not in the DOM: scroll to a hunk or line by entry index, never by querying rows.
 
 #### MergeFlow conflict resolver
 
@@ -1479,7 +1498,11 @@ App
   the tab's exit status, with no agent in between (ADR 059). The command's
   script is the tab's own process (`api.pty.runInTerminal`), nothing is typed
   into a shell, and an exit with no status (a signal, or the tab closed
-  first) is "not measured", never a pass.
+  first) is "not measured", never a pass. The tab runs
+  `$SHELL -i -l -c "exec $SHELL <script>"`: an interactive login shell reads
+  the user's startup files, so what they export reaches the check as it did
+  when the command was typed, then `exec` makes the script the process whose
+  exit is reported.
 - **It closes the tabs it opens (ADR 076).** A tab is titled for its agent
   ("Architect", "Red team", "Builder") or its check ("Lint"). An agent is
   stopped once its turn's output is collected, and `SupervisedRunner` closes a

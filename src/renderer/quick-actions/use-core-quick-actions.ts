@@ -9,6 +9,7 @@ import { useTerminalSession } from '../hooks/useTerminalSession'
 import { useSessionFacts, useIssue } from '../components/session/useSessionFacts'
 import { revealSession } from '../terminal/navigate-to-session'
 import { qualifiedBranchLabel } from '../sidebar/branch-display'
+import { agentStateOf } from '../sidebar/agent-state'
 import { buildCoreActions, type CoreSessionSummary } from './core-actions'
 import type { QuickActionTarget } from './use-active-scope'
 import type { QuickAction } from './types'
@@ -189,7 +190,7 @@ export function useCoreQuickActions(
           revealSession(session.id)
         },
         onNextWaiting: () => {
-          const waiting = [...sessions.values()].filter((s) => s.agentState === 'awaiting-input')
+          const waiting = [...sessions.values()].filter((s) => agentStateOf(s) === 'awaiting-input')
           if (waiting.length === 0) return
           const idx = waiting.findIndex((s) => s.id === focusedSessionId)
           const next = waiting[(idx + 1) % waiting.length]

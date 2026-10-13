@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { dispatchChannel } from '@terminator/extension-sdk'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 vi.mock('electron-store', () => ({
   default: class {
@@ -76,7 +76,7 @@ describe("a remote-accessible channel's repoRoot", () => {
   let outside: string
 
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'gi-roots-'))
+    scratch = makeTempDir('gi-roots-')
     workspaceFolder = join(scratch, 'workspace')
     project = join(scratch, 'project-worktree')
     outside = join(scratch, 'elsewhere')

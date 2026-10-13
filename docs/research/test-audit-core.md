@@ -362,6 +362,8 @@ Running against the real stores found three bugs, each fixed with a case that fa
 
 `rg -c "as unknown as" tests` finds nothing (exit 1). At ce69b17 there were 316 in 61 files (`git grep -c "as unknown as" ce69b17 -- tests`, summed). Each fake now has its real type: `partialFake<T>()` (`tests/support/fakes.ts`) where the code reaches a few members of a class or DOM object, `electronApiOf` / `installElectronApi` for the bridge, complete fixture builders (`workspaceOf`, `projectOf`, `terminalSessionOf`, `extensionOf`, …) for data, `vi.fn<Signature>()` for callbacks, typed `it.each` tables, `vi.stubGlobal` and `vi.stubEnv` for globals and the environment, and a real `Response` for `fetch`. No cast needed a reason the type system cannot express.
 
+Merging the main line at 431aaef brought 13 more in 11 files (new e2e specs and helpers, terminal-rows, SettingsPanel); the merge removes them the same way. Electron's private `ipcMain._invokeHandlers`, which no type declares, is read with `Reflect.get` into a typed variable.
+
 Typing the fakes found two more bugs: Create Workspace sent an empty folder that main's schema refuses, and the dialog said only "Failed to create workspace" (0fca009); and AboutDialog's fixture, typed, was missing `homeDir`. In `packages/extension-ui`, the modal-depth registry now types its host (`ModalDepthHost`), which removed three casts from production code as well (4fdb750).
 
 ### Type-checking every spec
@@ -370,7 +372,7 @@ Typing the fakes found two more bugs: Create Workspace sent an empty folder that
 
 ### TypeScript 6.0.3
 
-`npm view typescript dist-tags` gives `latest: '7.0.2'`. 7.0 is the native port and ships no compiler API, and typescript-eslint 8.71.1, the newest, supports `>=4.8.4 <6.1.0` ([Dependency Versions](https://typescript-eslint.io/users/dependency-versions)). The repository pins 6.0.3, the newest release the lint toolchain supports, and records why in [ADR 103](../adr/103-typescript-6-until-the-lint-toolchain-supports-7.md) with the four config changes 6.0's breaking changes required ([TypeScript 6.0 release notes](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-6-0.html)). typescript-eslint did not have to move: 8.71.1 already accepts 6.0.3. `package.json` and `package-lock.json` changed in 32044af; the shared checkout needs an install from that lockfile.
+`npm view typescript dist-tags` gives `latest: '7.0.2'`. 7.0 is the native port and ships no compiler API, and typescript-eslint 8.71.1, the newest, supports `>=4.8.4 <6.1.0` ([Dependency Versions](https://typescript-eslint.io/users/dependency-versions)). The repository pins 6.0.3, the newest release the lint toolchain supports, and records why in [ADR 106](../adr/106-typescript-6-until-the-lint-toolchain-supports-7.md) with the four config changes 6.0's breaking changes required ([TypeScript 6.0 release notes](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-6-0.html)). typescript-eslint did not have to move: 8.71.1 already accepts 6.0.3. `package.json` and `package-lock.json` changed in 32044af; the shared checkout needs an install from that lockfile.
 
 ### Unreachable code
 
@@ -637,6 +639,6 @@ All at fc686f4, the last code commit of this pass.
 
 ### Not done, and why
 
-- **TypeScript 7.0**: blocked until typescript-eslint supports it (ADR 103). The configs already avoid what 7.0 removes, so the move is a version bump then.
+- **TypeScript 7.0**: blocked until typescript-eslint supports it (ADR 106). The configs already avoid what 7.0 removes, so the move is a version bump then.
 - **Three documentation sites** named in the brief, devblogs.microsoft.com/typescript, typescript-eslint.io and eslint.org, answered `CONNECT tunnel failed, response 403` through this environment's proxy (`curl -sS -o /dev/null -w '%{http_code}' <url>`). The TypeScript release notes were read from their source in the TypeScript-Website repository on GitHub, and typescript-eslint's supported range from `npm view typescript-eslint@latest peerDependencies`; the links above are the canonical pages.
 - **Foundry's `forge-loop.spec.ts` under four parallel processes**: its `beforeAll` (activating Foundry) timed out at vitest's 10 s hook timeout with four vitest processes at once on four cores; with three it passes. It is outside the core suite and was not in this pass's list.

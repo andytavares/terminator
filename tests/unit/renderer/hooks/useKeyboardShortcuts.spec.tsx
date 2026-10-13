@@ -403,7 +403,7 @@ describe('session navigation shortcuts (FR-032)', () => {
     withSessions(
       mkSession('a', 'p1', { lastAttendedAt: 300 }),
       mkSession('b', 'p2', { lastAttendedAt: 200 }),
-      mkSession('c', 'p3', { lastAttendedAt: 100, agentState: 'awaiting-input' })
+      mkSession('c', 'p3', { lastAttendedAt: 100, bellCount: 1 })
     )
   })
 

@@ -167,6 +167,15 @@ export function App(): JSX.Element {
 
   const { repoRoot } = useActiveScope()
 
+  // Tells main what is on screen, for an extension asking workspace.getActive.
+  useEffect(() => {
+    window.electronAPI.workspace?.setActive?.({
+      workspaceId: activeWorkspaceId,
+      projectId: activeProjectId,
+      repoRoot,
+    })
+  }, [activeWorkspaceId, activeProjectId, repoRoot])
+
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), [])
   const setLogOpenWithInset = useCallback((open: boolean) => {
     setLogOpen(open)

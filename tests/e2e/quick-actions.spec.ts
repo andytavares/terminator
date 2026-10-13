@@ -1,9 +1,15 @@
 import { test, expect, type Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  e2eTempDir,
+} from './helpers'
 
 /**
  * Feature 057 — Quick Actions.
@@ -20,12 +26,16 @@ import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } 
 
 const DIALOG_NAME = 'Quick actions'
 
+// The leader is CmdOrCtrl+P: ⌘ on macOS, Ctrl elsewhere. Page keys say so with
+// Playwright's ControlOrMeta; sendInputEvent into an extension view needs it spelled out.
+const LEADER_MODIFIER = process.platform === 'darwin' ? 'meta' : 'control'
+
 function dialog(page: Page) {
   return page.getByRole('dialog', { name: DIALOG_NAME })
 }
 
 async function openPanel(page: Page): Promise<void> {
-  await page.keyboard.press('Meta+p')
+  await page.keyboard.press('ControlOrMeta+p')
   const d = dialog(page)
   await expect(d).toBeVisible({ timeout: 10000 })
   // Keys sent before the panel owns focus land in the terminal underneath.
@@ -97,7 +107,7 @@ test.describe('opening and running the panel', () => {
   let folder: string
 
   test.beforeAll(async () => {
-    folder = mkdtempSync(join(tmpdir(), 'terminator-e2e-qa-'))
+    folder = e2eTempDir('terminator-e2e-qa-')
     handle = await launchApp()
     await createWorkspace(handle.page, 'QA Workspace', folder)
     await addAndSelectProject(handle.page, 'QA Workspace', 'scratch')
@@ -243,7 +253,7 @@ test.describe('opening and running the panel', () => {
       )
       .toBe(true)
 
-    await keyInView(handle, 'notepad', 'P', ['meta'])
+    await keyInView(handle, 'notepad', 'P', [LEADER_MODIFIER])
     await expect(dialog(page)).toBeVisible({ timeout: 10000 })
 
     // A single Escape closes only the panel — Notes stays the active surface.
@@ -325,7 +335,7 @@ test.describe('pins and recent survive a relaunch', () => {
 
     // Highlight starts on the first row of "Pinned & recent" (no context group
     // on Home), which is our just-used action — pin it.
-    await page.keyboard.press('Meta+.')
+    await page.keyboard.press('ControlOrMeta+.')
     await expect(recentList.getByRole('option').first()).toContainText('Toggle sidebar')
     await page.keyboard.press('Escape')
     await expect(dialog(page)).toBeHidden()
@@ -364,8 +374,8 @@ test.describe('git push and a custom shell action', () => {
   }
 
   test.beforeAll(async () => {
-    bareDir = mkdtempSync(join(tmpdir(), 'terminator-e2e-qa-bare-'))
-    workDir = mkdtempSync(join(tmpdir(), 'terminator-e2e-qa-work-'))
+    bareDir = e2eTempDir('terminator-e2e-qa-bare-')
+    workDir = e2eTempDir('terminator-e2e-qa-work-')
     git(bareDir, 'init', '--bare', '-b', 'main')
     git(workDir, 'init', '-b', 'main')
     git(workDir, 'config', 'user.email', 'e2e@example.com')
@@ -419,7 +429,7 @@ test.describe('git push and a custom shell action', () => {
   test('AC10: a custom shell action "echo {branch}" targeting a new tab writes the branch to the terminal', async () => {
     const { page } = handle
 
-    await page.keyboard.press('Meta+,')
+    await page.keyboard.press('ControlOrMeta+,')
     await page.waitForSelector('.settings-panel', { timeout: 5000 })
     await page
       .locator('.settings-section__title', { hasText: 'Quick actions' })
@@ -465,7 +475,7 @@ test.describe('panel screenshots', () => {
   let folder: string
 
   test.beforeAll(async () => {
-    folder = mkdtempSync(join(tmpdir(), 'terminator-e2e-qa-shots-'))
+    folder = e2eTempDir('terminator-e2e-qa-shots-')
     handle = await launchApp()
     await createWorkspace(handle.page, 'QA Shots', folder)
     await addAndSelectProject(handle.page, 'QA Shots', 'scratch')

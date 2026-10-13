@@ -1,26 +1,22 @@
 import { useShallow } from 'zustand/react/shallow'
-import { useState } from 'react'
-import { Button, Dialog } from '@terminator/extension-ui'
+import { Dialog } from '@terminator/extension-ui'
 import { useWorkspaceStore } from '../../stores/workspace.store'
-import {
-  WORKSPACE_PRESET_COLORS as PRESET_COLORS,
-  type WorkspacePresetColor,
-} from './workspace-colors'
+import { WORKSPACE_PRESET_COLORS as PRESET_COLORS } from './workspace-colors'
 import { useModalEffect } from '../../stores/modal.store'
-import './dialog-fields.css'
+import { DUPLICATE_NAME, WorkspaceFields, useWorkspaceForm } from './workspace-form'
 
 interface Props {
   onClose: () => void
 }
 
+const PLACEHOLDERS = {
+  name: 'My Workspace',
+  folderPath: '/path/to/folder',
+  tags: 'frontend, work, personal',
+}
+
 export function CreateWorkspaceDialog({ onClose }: Props): JSX.Element {
   useModalEffect()
-  const [name, setName] = useState('')
-  const [folderPath, setFolderPath] = useState('')
-  const [color, setColor] = useState<WorkspacePresetColor>(PRESET_COLORS[0])
-  const [tags, setTags] = useState('')
-  const [error, setError] = useState('')
-  const [nameError, setNameError] = useState('')
   const { createWorkspace, createProject, workspaces } = useWorkspaceStore(
     useShallow((s) => ({
       createWorkspace: s.createWorkspace,
@@ -28,64 +24,48 @@ export function CreateWorkspaceDialog({ onClose }: Props): JSX.Element {
       workspaces: s.workspaces,
     }))
   )
-
-  function validateName(value: string): string {
-    if (!value.trim()) return 'Name is required'
-    if (value.length > 100) return 'Name must be 100 characters or less'
-    if (workspaces.some((w) => w.name.toLowerCase() === value.toLowerCase())) {
-      return 'A workspace with this name already exists'
-    }
-    return ''
-  }
-
-  function handleNameBlur(): void {
-    setNameError(validateName(name))
-  }
-
-  async function handleBrowse(): Promise<void> {
-    const result = await window.electronAPI.dialog.openDirectory()
-    if ('filePath' in result) setFolderPath(result.filePath)
-  }
+  const form = useWorkspaceForm(
+    { name: '', folderPath: '', color: PRESET_COLORS[0], tags: '' },
+    (value) => workspaces.some((w) => w.name.toLowerCase() === value.toLowerCase())
+  )
 
   async function handleSubmit(): Promise<void> {
-    const nameErr = validateName(name)
-    if (nameErr) {
-      setNameError(nameErr)
-      return
-    }
+    if (!form.nameIsValid()) return
+    const { name, folderPath, color } = form.draft
+    // Main refuses a workspace without a folder; say so before sending anything.
     if (!folderPath.trim()) {
-      setError('Choose a folder for the workspace')
+      form.setError('Choose a folder for the workspace')
       return
     }
-
-    const tagList = tags
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean)
-
-    const result = await createWorkspace({ name: name.trim(), folderPath, color, tags: tagList })
+    const result = await createWorkspace({
+      name: name.trim(),
+      folderPath,
+      color,
+      tags: form.tagList(),
+    })
     if ('error' in result) {
-      if (result.error === 'DUPLICATE_NAME')
-        setNameError('A workspace with this name already exists')
-      else setError('Failed to create workspace')
+      if (result.error === 'DUPLICATE_NAME') form.setNameError(DUPLICATE_NAME)
+      else form.setError('Failed to create workspace')
       return
     }
-
-    const gitInfo = await window.electronAPI.git.isRepo(folderPath)
-    if (gitInfo.isRepo) {
-      const root = gitInfo.root ?? folderPath
-      const branchInfo = await window.electronAPI.git.currentBranch(root)
-      const branch = 'branch' in branchInfo ? branchInfo.branch : 'main'
-      await createProject({
-        workspaceId: result.workspace.id,
-        name: branch,
-        gitBranch: branch,
-        worktreePath: root,
-        isWorktree: false,
-      })
-    }
-
+    await addCheckout(result.workspace.id, folderPath)
     onClose()
+  }
+
+  /** A folder that is a git checkout becomes the workspace's first branch. */
+  async function addCheckout(workspaceId: string, folderPath: string): Promise<void> {
+    const gitInfo = await window.electronAPI.git.isRepo(folderPath)
+    if (!gitInfo.isRepo) return
+    const root = gitInfo.root ?? folderPath
+    const branchInfo = await window.electronAPI.git.currentBranch(root)
+    const branch = 'branch' in branchInfo ? branchInfo.branch : 'main'
+    await createProject({
+      workspaceId,
+      name: branch,
+      gitBranch: branch,
+      worktreePath: root,
+      isWorktree: false,
+    })
   }
 
   return (
@@ -98,66 +78,12 @@ export function CreateWorkspaceDialog({ onClose }: Props): JSX.Element {
           label: 'Create',
           tone: 'primary',
           submit: true,
-          disabled: !!nameError,
+          disabled: !!form.nameError,
           onSelect: handleSubmit,
         },
       ]}
     >
-      <div className="dialog__field">
-        <label className="dialog__label">Name *</label>
-        <input
-          className={`dialog__input${nameError ? ' dialog__input--error' : ''}`}
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value)
-            setNameError('')
-          }}
-          onBlur={handleNameBlur}
-          placeholder="My Workspace"
-          autoFocus
-        />
-        {nameError && <span className="dialog__error">{nameError}</span>}
-      </div>
-
-      <div className="dialog__field">
-        <label className="dialog__label">Folder</label>
-        <div className="dialog__row">
-          <input
-            className="dialog__input"
-            value={folderPath}
-            onChange={(e) => setFolderPath(e.target.value)}
-            placeholder="/path/to/folder"
-          />
-          <Button onClick={handleBrowse}>Browse</Button>
-        </div>
-      </div>
-
-      <div className="dialog__field">
-        <label className="dialog__label">Color</label>
-        <div className="dialog__colors">
-          {PRESET_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={`dialog__color-swatch${color === c ? ' dialog__color-swatch--selected' : ''}`}
-              style={{ backgroundColor: c }}
-              onClick={() => setColor(c)}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="dialog__field">
-        <label className="dialog__label">Tags (comma-separated)</label>
-        <input
-          className="dialog__input"
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-          placeholder="frontend, work, personal"
-        />
-      </div>
-
-      {error && <p className="dialog__error">{error}</p>}
+      <WorkspaceFields form={form} placeholders={PLACEHOLDERS} />
     </Dialog>
   )
 }

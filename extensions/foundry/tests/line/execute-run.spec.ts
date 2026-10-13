@@ -16,6 +16,10 @@ import { checkoutPath } from '../../src/line/worktree.js'
 import { readGraph } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
+// These cases drive real git and give each step up to 20 s (the vi.waitFor
+// calls below); the 5 s default case timeout cut them off first on a busy machine.
+vi.setConfig({ testTimeout: 45_000 })
+
 const runner = vi.hoisted(() => ({ current: null as unknown }))
 
 vi.mock('../../src/runtime/supervised-runner.js', () => ({
@@ -70,9 +74,9 @@ async function ledger(): Promise<string[]> {
   return (await createOrderStore(dataDir).entries('WO-1')).map((entry) => entry.action)
 }
 
-async function started(saved: WorkOrder): Promise<void> {
+async function started(saved: WorkOrder, recipe = 'direct'): Promise<void> {
   await createOrderStore(dataDir).save(saved)
-  expect(await host.call('foundry:run.start', { id: saved.id, recipe: 'direct' })).toMatchObject({
+  expect(await host.call('foundry:run.start', { id: saved.id, recipe })).toMatchObject({
     started: true,
   })
 }
@@ -144,6 +148,38 @@ describe('an order whose CI goes red', () => {
   })
 })
 
+/**
+ * Build, then ship, with one automatic CI round: the least a recipe can be
+ * and still open a draft whose CI is watched. Kept in the records location,
+ * the rung that wins over the built-ins.
+ */
+const BUILD_AND_SHIP = `schemaVersion: 1
+id: build-and-ship
+ci:
+  rounds: 1
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units by lane
+    step: { kind: agent, role: builder }
+  - id: integrate
+    kind: join
+    order: lane.ord
+    after: [build]
+  - id: ship
+    kind: gate
+    rule: ready-for-review
+    options: [mark_ready, hold]
+    defaultIfIgnored: hold
+    after: [integrate]
+`
+
+function buildAndShip(): string {
+  fs.mkdirSync(path.join(dataDir, 'recipes'), { recursive: true })
+  fs.writeFileSync(path.join(dataDir, 'recipes', 'build-and-ship.yaml'), BUILD_AND_SHIP)
+  return 'build-and-ship'
+}
+
 describe('answering the inbox after a run shipped', () => {
   it('marks the drafts ready for review when the operator says so', async () => {
     githubAnswers(() => checks('pass'))
@@ -158,10 +194,15 @@ describe('answering the inbox after a run shipped', () => {
   })
 
   it('runs one more CI round on the open drafts when red CI is sent back, and asks again once it is green', async () => {
+    // Every step and every automatic round before the question is a whole
+    // round of agents over real git, and none of them is what this asks about.
+    // On the built-in recipe, with its inspector, scribe and two automatic
+    // rounds, this ran past five seconds under load.
+    const recipe = buildAndShip()
     // A fresh failing run for every pushed fix, the way CI reports one.
     let run = 20
     githubAnswers(() => checks('fail', ++run))
-    await started(order())
+    await started(order(), recipe)
     await vi.waitFor(async () => expect(await gateFor('ci.red')).toBeTruthy(), {
       timeout: 20_000,
       interval: 100,

@@ -5,6 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 import { previewWindow } from '../../terminal/preview-window'
 import { subscribeToSessionOutput } from '../../terminal/output-router'
 import { webglContexts } from '../../terminal/webgl-contexts'
+import { isQuickActionsLeader } from '../../../shared/quick-actions-leader'
 
 const IDLE_DEBOUNCE_MS = 1500
 
@@ -25,6 +26,17 @@ export const XTERM_THEMES = {
     scrollbarSliderActiveBackground: 'rgba(0, 0, 0, 0.4)',
   },
 } as const
+
+function isLeader(e: KeyboardEvent): boolean {
+  const press = {
+    key: e.key,
+    meta: e.metaKey,
+    control: e.ctrlKey,
+    shift: e.shiftKey,
+    alt: e.altKey,
+  }
+  return isQuickActionsLeader(press, navigator.platform.startsWith('Mac'))
+}
 
 function measureCharWidth(fontSize: number): number {
   const canvas = document.createElement('canvas')
@@ -94,6 +106,9 @@ export class TerminalInstance {
     this.element.style.cssText = 'width:100%;height:100%;position:relative;'
 
     this.terminal.attachCustomKeyEventHandler((e) => {
+      // The quick-actions leader belongs to the app. Off macOS it is Ctrl+P, which
+      // xterm would send to the shell as ^P and stop from reaching the app's listener.
+      if (isLeader(e)) return false
       // Cmd+Enter / Shift+Enter — send a literal newline to the running program.
       // terminal.paste() wraps in bracketed-paste sequences when the program has enabled
       // that mode (e.g. claude CLI), so the program receives a newline without executing.

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, chmodSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync, chmodSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { execShell } from '../../../src/main/shell/shell-executor'
+import { makeTempDir } from '../../support/temp-dir'
 
 // Real processes: a stand-in `gh` on PATH whose script each test writes.
 
@@ -16,7 +16,7 @@ function fakeGh(body: string): void {
 }
 
 beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), 'shell-options-'))
+  scratch = makeTempDir('shell-options-')
   process.env.PATH = `${scratch}:${originalPath}`
 })
 

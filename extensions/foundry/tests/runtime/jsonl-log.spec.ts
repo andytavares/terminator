@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync, appendFileSync, existsSync } from 'fs'
-import { tmpdir } from 'os'
+import { rmSync, readFileSync, appendFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { createJsonlLog } from '../../src/runtime/jsonl-log.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Backs the two growing logs — stall firings and the feed (research.md R9).
 // Append-only, so a torn final line from an interrupted write is expected and
@@ -12,7 +12,7 @@ let dir: string
 let logPath: string
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'jsonl-log-'))
+  dir = makeTempDir('jsonl-log-')
   logPath = join(dir, 'nested', 'firings.jsonl')
 })
 

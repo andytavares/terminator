@@ -9,7 +9,6 @@ import { CommentComposer } from './CommentComposer'
 import { NoteOutline } from './NoteOutline'
 import {
   NoteEditor,
-  applyAnchors,
   applyExternalDoc,
   scrollToAnchor,
   scrollToPosition,
@@ -17,16 +16,14 @@ import {
   type SelectionAnchor,
 } from '../editor/NoteEditor'
 import { ORIGIN_ID, onForeignNoteChange } from '../editor/noteSync'
-import { reanchorComment } from '../editor/reanchor'
-import { commentAnchorField } from '../editor/commentField'
-import type { EditorView } from '@codemirror/view'
 import type { Comment } from '../db/types'
+import { adoptLoadedComments, reanchorAfterSave } from './comment-anchors'
+import { useCommentCards } from './use-comment-cards'
+import { noteTitle } from '../db/note-title'
 
 const NOTE_ID = new URLSearchParams(window.location.search).get('noteId') ?? ''
 const AUTOSAVE_DELAY = 800
 const ANCHOR_DEBOUNCE = 2000
-const CARD_HEIGHT_EST = 110
-const CARD_GAP = 8
 
 interface NoteData {
   id: string
@@ -40,8 +37,6 @@ export function NoteWindowView(): React.JSX.Element {
   const [loadError, setLoadError] = useState<string | null>(NOTE_ID ? null : 'No note ID provided')
   const [pendingAnchor, setPendingAnchor] = useState<SelectionAnchor | null>(null)
   const [composingAnchor, setComposingAnchor] = useState<SelectionAnchor | null>(null)
-  const [anchorTops, setAnchorTops] = useState<Record<string, number>>({})
-  const [panelContentHeight, setPanelContentHeight] = useState(0)
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
   const [commentHover, setCommentHover] = useState<{ id: string; top: number } | null>(null)
   const [showOutline, setShowOutline] = useState(true)
@@ -60,8 +55,10 @@ export function NoteWindowView(): React.JSX.Element {
   const { comments, setComments } = useCommentsStore()
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const anchorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const editorViewRef = useRef<EditorView | null>(null)
-  const commentPanelRef = useRef<HTMLDivElement>(null)
+  const { editorViewRef, onEditorReady, cards, commentPanelRef } = useCommentCards(
+    comments,
+    note ? NOTE_ID : null
+  )
   const editorWrapRef = useRef<HTMLDivElement>(null)
 
   // Load note + comments on mount
@@ -88,47 +85,11 @@ export function NoteWindowView(): React.JSX.Element {
         document.title = data.title || 'Note'
 
         const allComments = (commentsResult as { data?: Comment[] }).data ?? []
-        const anchorUpdates: { id: string; newFrom: number; newTo: number }[] = []
-        const orphanIds: string[] = []
-        for (const c of allComments) {
-          if (c.parentId !== null || c.status === 'orphaned') continue
-          const result = reanchorComment(c, data.body)
-          if (result.status === 'orphaned') {
-            orphanIds.push(c.id)
-          } else if (result.newFrom !== undefined && result.newTo !== undefined) {
-            anchorUpdates.push({ id: c.id, newFrom: result.newFrom, newTo: result.newTo })
-          }
-        }
-        const updMap = new Map(anchorUpdates.map((u) => [u.id, u]))
-        const orphanSet = new Set(orphanIds)
-        setComments(
-          allComments.map((c) => {
-            if (orphanSet.has(c.id)) return { ...c, status: 'orphaned' as const }
-            const u = updMap.get(c.id)
-            return u ? { ...c, startOffset: u.newFrom, endOffset: u.newTo } : c
-          })
+        anchorTimer.current = adoptLoadedComments(
+          { comments: allComments, body: data.body },
+          anchorTimer.current,
+          ANCHOR_DEBOUNCE
         )
-        if (anchorUpdates.length > 0 || orphanIds.length > 0) {
-          if (anchorTimer.current) clearTimeout(anchorTimer.current)
-          anchorTimer.current = setTimeout(async () => {
-            await Promise.all([
-              ...anchorUpdates.map((u) =>
-                window.electronAPI.extensionBridge
-                  .invoke('terminator.notepad:comments.updateAnchor', {
-                    id: u.id,
-                    startOffset: u.newFrom,
-                    endOffset: u.newTo,
-                  })
-                  .catch(console.error)
-              ),
-              ...orphanIds.map((id) =>
-                window.electronAPI.extensionBridge
-                  .invoke('terminator.notepad:comments.markOrphaned', { id })
-                  .catch(console.error)
-              ),
-            ])
-          }, ANCHOR_DEBOUNCE)
-        }
       } catch (err) {
         setLoadError(String(err))
       }
@@ -136,147 +97,34 @@ export function NoteWindowView(): React.JSX.Element {
     void load()
   }, [setActiveNote, setComments])
 
-  // Re-layout comment cards when comments or editor changes
-  const computeAnchorTops = useCallback((view: EditorView, commentList: Comment[]) => {
-    requestAnimationFrame(() => {
-      const scrollTop = view.scrollDOM.scrollTop
-      const rect = view.scrollDOM.getBoundingClientRect()
-      const livePositions = new Map(view.state.field(commentAnchorField).map((a) => [a.id, a.from]))
-      const targets: { id: string; targetTop: number; createdAt: string }[] = []
-      for (const c of commentList) {
-        if (c.parentId === null && c.status !== 'orphaned') {
-          const livePos = livePositions.get(c.id)
-          const rawPos = livePos !== undefined ? livePos : c.startOffset
-          if (rawPos === null) continue
-          const pos = Math.min(rawPos, Math.max(0, view.state.doc.length - 1))
-          try {
-            const coords = view.coordsAtPos(pos)
-            if (coords)
-              targets.push({
-                id: c.id,
-                targetTop: coords.top - rect.top + scrollTop,
-                createdAt: c.createdAt,
-              })
-          } catch {
-            /* out of viewport */
-          }
-        }
-      }
-      targets.sort((a, b) => a.targetTop - b.targetTop || a.createdAt.localeCompare(b.createdAt))
-      const tops: Record<string, number> = {}
-      let prevBottom = 0
-      for (const t of targets) {
-        const top = Math.max(t.targetTop, prevBottom + CARD_GAP)
-        tops[t.id] = top
-        prevBottom = top + CARD_HEIGHT_EST
-      }
-      setAnchorTops(tops)
-      const lastTop = Object.values(tops).reduce((m, v) => Math.max(m, v), 0)
-      setPanelContentHeight(Math.max(view.scrollDOM.scrollHeight, lastTop + CARD_HEIGHT_EST + 20))
-      if (commentPanelRef.current) commentPanelRef.current.scrollTop = view.scrollDOM.scrollTop
-    })
-  }, [])
-
-  useEffect(() => {
-    const view = editorViewRef.current
-    if (!view) return
-    const validAnchors = comments
-      .filter((c) => c.parentId === null && c.status !== 'orphaned')
-      .map((c) => ({ id: c.id, from: c.startOffset ?? 0, to: c.endOffset ?? 0 }))
-      .filter((a) => a.from < a.to)
-    applyAnchors(view, validAnchors)
-    computeAnchorTops(view, comments)
-  }, [comments, computeAnchorTops])
-
-  useEffect(() => {
-    if (!note) return
-    let removeScroll: (() => void) | undefined
-    const t = setTimeout(() => {
-      const view = editorViewRef.current
-      const panel = commentPanelRef.current
-      if (!view || !panel) return
-      const onScroll = () => {
-        panel.scrollTop = view.scrollDOM.scrollTop
-      }
-      view.scrollDOM.addEventListener('scroll', onScroll, { passive: true })
-      removeScroll = () => view.scrollDOM.removeEventListener('scroll', onScroll)
-    }, 100)
-    return () => {
-      clearTimeout(t)
-      removeScroll?.()
-    }
-  }, [note])
-
   const scheduleAutosave = useCallback(
     (newBody: string) => {
       if (!note) return
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
       autosaveTimer.current = setTimeout(async () => {
         markSaving()
-        const headingMatch = /^#{1,6}\s+(.+)/m.exec(newBody)
-        const firstLine = newBody.split('\n').find((l) => l.trim().length > 0)
-        const title = headingMatch
-          ? headingMatch[1].trim()
-          : (firstLine?.trim().slice(0, 120) ?? 'Untitled note')
+        const title = noteTitle(newBody)
         try {
-          await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.autosave', {
-            id: note.id,
-            title,
-            body: newBody,
-            tags: note.tags,
-            originId: ORIGIN_ID,
-          })
-          setNote((n) => (n ? { ...n, title } : n))
-          document.title = title || 'Note'
+          const saved = await window.electronAPI.extensionBridge.invoke(
+            'terminator.notepad:notes.autosave',
+            { id: note.id, title, body: newBody, tags: note.tags, originId: ORIGIN_ID }
+          )
+          // A title set by hand is kept by the save, so the stored one is shown.
+          const storedTitle = (saved as { data?: { title?: string } }).data?.title ?? title
+          setNote((n) => (n ? { ...n, title: storedTitle } : n))
+          document.title = storedTitle || 'Note'
           markSaved()
 
           // Re-check anchors after save against the live editor body, not the
           // stale newBody captured at debounce time.
           const liveBody = editorViewRef.current?.state.doc.toString() ?? newBody
-          const currentComments = useCommentsStore.getState().comments
-          const orphanIds: string[] = []
-          const anchorUpdates: { id: string; newFrom: number; newTo: number }[] = []
-          for (const comment of currentComments) {
-            if (comment.parentId !== null || comment.status === 'orphaned') continue
-            const result = reanchorComment(comment, liveBody)
-            if (result.status === 'orphaned') {
-              orphanIds.push(comment.id)
-            } else if (result.newFrom !== undefined && result.newTo !== undefined) {
-              anchorUpdates.push({ id: comment.id, newFrom: result.newFrom, newTo: result.newTo })
-            }
-          }
-          if (orphanIds.length > 0 || anchorUpdates.length > 0) {
-            const updatedMap = new Map(anchorUpdates.map((u) => [u.id, u]))
-            useCommentsStore.getState().setComments(
-              currentComments.map((c) => {
-                if (orphanIds.includes(c.id)) return { ...c, status: 'orphaned' as const }
-                const upd = updatedMap.get(c.id)
-                return upd ? { ...c, startOffset: upd.newFrom, endOffset: upd.newTo } : c
-              })
-            )
-            await Promise.all([
-              ...orphanIds.map((id) =>
-                window.electronAPI.extensionBridge
-                  .invoke('terminator.notepad:comments.markOrphaned', { id })
-                  .catch((err) => console.error('[notepad] markOrphaned failed', err))
-              ),
-              ...anchorUpdates.map((u) =>
-                window.electronAPI.extensionBridge
-                  .invoke('terminator.notepad:comments.updateAnchor', {
-                    id: u.id,
-                    startOffset: u.newFrom,
-                    endOffset: u.newTo,
-                  })
-                  .catch((err) => console.error('[notepad] updateAnchor failed', err))
-              ),
-            ])
-          }
+          await reanchorAfterSave(liveBody)
         } catch {
           /* silent — main window will retry */
         }
       }, AUTOSAVE_DELAY)
     },
-    [note, markSaving, markSaved]
+    [note, markSaving, markSaved, editorViewRef]
   )
 
   function handleEditorChange(newBody: string) {
@@ -297,7 +145,7 @@ export function NoteWindowView(): React.JSX.Element {
       setNote((n) => (n ? { ...n, title: event.title, tags: event.tags } : n))
       document.title = event.title || 'Note'
     })
-  }, [setActiveNote])
+  }, [setActiveNote, editorViewRef])
 
   function handleEditorMouseOver(e: React.MouseEvent<HTMLDivElement>) {
     const target = e.target as HTMLElement
@@ -306,7 +154,7 @@ export function NoteWindowView(): React.JSX.Element {
       const id = anchor.dataset.commentId
       if (id) {
         if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current)
-        const top = anchorTops[id] ?? 0
+        const top = cards.tops[id] ?? 0
         setCommentHover({ id, top })
       }
     }
@@ -385,21 +233,7 @@ export function NoteWindowView(): React.JSX.Element {
             key={note.id}
             initialDoc={bodyDraft}
             onChange={handleEditorChange}
-            onAnchorsReady={(getView) => {
-              const v = getView()
-              editorViewRef.current = v
-              // Apply anchors immediately so React Strict Mode's double-mount doesn't
-              // leave the second view without highlights (parent effect won't re-run
-              // if deps haven't changed, but editorViewRef now holds a fresh view).
-              if (v) {
-                const live = useCommentsStore.getState().comments
-                const validAnchors = live
-                  .filter((c) => c.parentId === null && c.status !== 'orphaned')
-                  .map((c) => ({ id: c.id, from: c.startOffset ?? 0, to: c.endOffset ?? 0 }))
-                  .filter((a) => a.from < a.to)
-                applyAnchors(v, validAnchors)
-              }
-            }}
+            onAnchorsReady={onEditorReady}
             onSelectionChange={(sel) => {
               setPendingAnchor(sel)
               if (!sel) setComposingAnchor(null)
@@ -462,8 +296,8 @@ export function NoteWindowView(): React.JSX.Element {
             )}
             <CommentMargin
               noteId={NOTE_ID}
-              anchorTops={anchorTops}
-              containerHeight={panelContentHeight}
+              anchorTops={cards.tops}
+              containerHeight={cards.contentHeight}
               activeCommentId={activeCommentId}
               onCommentClick={(from, to) => scrollToAnchor(editorViewRef.current, from, to)}
               onHoverComment={(id) => setEditorHoverAnchor(editorViewRef.current, id)}

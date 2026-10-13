@@ -10,10 +10,12 @@
  * that closure.
  */
 import { tmpdir } from 'node:os'
+import { freshGlobalStorage } from '../helpers/foundry-host.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
-const USER_DATA = tmpdir()
+const GLOBAL_STORAGE = freshGlobalStorage()
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { vi } from 'vitest'
@@ -131,7 +133,7 @@ beforeAll(async () => {
     shell: { exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }) },
     notifications: { showToast: vi.fn(), createNotification: vi.fn() },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    paths: { app: '', userData: USER_DATA },
+    paths: { app: '', globalStorage: GLOBAL_STORAGE },
     settings: {
       register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       get: settingsGet,
@@ -184,7 +186,7 @@ beforeEach(() => {
 
 describe('answering a forge-defect gate', () => {
   it('starts the architect on every open blocking finding, rather than resuming, when the order is not running', async () => {
-    dataDir = fs.mkdtempSync(path.join(tmpdir(), 'fdry-forge-defect-'))
+    dataDir = makeTempDir('fdry-forge-defect-')
     const store = createOrderStore(dataDir)
     await store.save(
       order({
@@ -216,7 +218,7 @@ describe('answering a forge-defect gate', () => {
   })
 
   it('records a resume failure as gate.action_failed, rather than a silent no-op', async () => {
-    dataDir = fs.mkdtempSync(path.join(tmpdir(), 'fdry-forge-defect-resume-'))
+    dataDir = makeTempDir('fdry-forge-defect-resume-')
     const store = createOrderStore(dataDir)
     // No red-team findings: `fixMessage` is null, and the gate's own rule name
     // is what the architect turn (or, on a rule this test does not special-
@@ -320,7 +322,7 @@ describe('after the architect amends an answered defect', () => {
   }
 
   async function seed(released: boolean): Promise<void> {
-    dataDir = fs.mkdtempSync(path.join(tmpdir(), 'fdry-amended-'))
+    dataDir = makeTempDir('fdry-amended-')
     const store = createOrderStore(dataDir)
     await store.save(cleanOrder())
     if (released) {

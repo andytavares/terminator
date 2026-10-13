@@ -57,7 +57,7 @@ export interface GateOption {
   readonly consequence: string
 }
 
-export interface GateDecision {
+interface GateDecision {
   readonly option: string
   readonly by: 'operator' | 'default'
   readonly note: string

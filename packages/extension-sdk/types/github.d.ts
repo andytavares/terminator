@@ -10,7 +10,7 @@ export interface GithubTarget {
    * The directory gh runs in; a checkout there tells gh which repository. The
    * same shell roots as `shell.exec` apply, and a call outside them rejects with
    * 'CwdOutOfScopeError' (since 4.0.0). With `repository` set, gh does not need
-   * a checkout: pass `api.paths.userData`.
+   * a checkout: pass `api.paths.globalStorage`, after creating it.
    */
   cwd: string
   /** `owner/name`, for a repository with no checkout (gh's `GH_REPO`). */

@@ -18,7 +18,7 @@ import { isDocumentationRelative } from './documentation-path.js'
 export const RUNGS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'] as const
 export type Rung = (typeof RUNGS)[number]
 
-export type RungStatus = 'runnable' | 'unavailable' | 'not_triggered' | 'elsewhere'
+type RungStatus = 'runnable' | 'unavailable' | 'not_triggered' | 'elsewhere'
 
 const RUNG_LEVEL_IN_WORDS: Record<Rung, string> = {
   L0: 'formatting and lint',

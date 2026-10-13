@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent } from '@testing-library/react'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useTerminalOpenErrorStore } from '../../../../src/renderer/stores/terminal-open-error.store'
 import { TerminalPane } from '../../../../src/renderer/components/terminal/TerminalPane'
@@ -381,6 +381,50 @@ describe('TerminalPane', () => {
       useModalStore.setState({ depth: 1 })
       frame?.(0)
       expect(mockFocus).not.toHaveBeenCalled()
+    })
+
+    function seedFocusRequest(mockFocus: () => void): void {
+      mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
+      mockGetActive.mockReturnValue('ses-1')
+      mockGetInstance.mockReturnValue({
+        terminal: { focus: mockFocus, scrollToBottom: vi.fn() },
+        mount: vi.fn(),
+        unmount: vi.fn(),
+      })
+      seedStore(useSessionStore, {
+        getSessionsForProject: mockGetSessions,
+        getActiveSessionForProject: mockGetActive,
+        getTerminalInstance: mockGetInstance,
+        clearBellCount: mockClearBell,
+        getPaneLayout: mockGetPaneLayout,
+        setSplitRatio: mockSetSplitRatio,
+        setFocusedSession: mockSetFocusedSession,
+        focusRequest: { sessionId: 'ses-1', nonce: 1 },
+      })
+    }
+
+    // A modal closing is not a request to focus: an action run from Quick
+    // Actions (Edit session note) has just put focus where it wants it.
+    it('does not take focus again when a modal closes after the request was met', () => {
+      withRaf()
+      const mockFocus = vi.fn()
+      seedFocusRequest(mockFocus)
+      render(<TerminalPane projectId="proj-1" />)
+      expect(mockFocus).toHaveBeenCalledTimes(1)
+      act(() => useModalStore.setState({ depth: 1 }))
+      act(() => useModalStore.setState({ depth: 0 }))
+      expect(mockFocus).toHaveBeenCalledTimes(1)
+    })
+
+    it('meets a request made while a modal was open once the modal closes', () => {
+      withRaf()
+      useModalStore.setState({ depth: 1 })
+      const mockFocus = vi.fn()
+      seedFocusRequest(mockFocus)
+      render(<TerminalPane projectId="proj-1" />)
+      expect(mockFocus).not.toHaveBeenCalled()
+      act(() => useModalStore.setState({ depth: 0 }))
+      expect(mockFocus).toHaveBeenCalledTimes(1)
     })
   })
 

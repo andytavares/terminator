@@ -1,5 +1,5 @@
 import { test } from '@playwright/test'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -8,6 +8,7 @@ import {
   createWorkspace,
   addAndSelectProject,
   type AppHandle,
+  e2eTempDir,
 } from '../helpers'
 
 // SC-005: typing stays responsive while other terminals print continuously.
@@ -21,7 +22,7 @@ test('measure keystroke echo with six busy terminals', async () => {
   test.setTimeout(240_000)
   handle = await launchApp()
   const { page } = handle
-  await createWorkspace(page, 'load', mkdtempSync(join(tmpdir(), 'echo-')))
+  await createWorkspace(page, 'load', e2eTempDir('echo-'))
   for (let i = 1; i <= 12; i++) {
     await addAndSelectProject(page, 'load', `t${i}`)
     if (i <= 6) {
@@ -44,10 +45,7 @@ test('measure keystroke echo with six busy terminals', async () => {
     const started = Date.now()
     await page.keyboard.type(key)
     await page.waitForFunction(
-      (expected) =>
-        [...document.querySelectorAll('.terminal-pane .xterm-rows > div')].some((row) =>
-          (row.textContent ?? '').includes(expected)
-        ),
+      (expected) => window.terminatorE2E!.terminalRows().some((row) => row.includes(expected)),
       typed,
       { polling: 'raf', timeout: 5000 }
     )

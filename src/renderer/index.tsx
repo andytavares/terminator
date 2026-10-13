@@ -4,12 +4,15 @@ import { App } from './App'
 import { ExtensionWindowView } from './ExtensionWindowView'
 import '@terminator/extension-ui/fonts'
 import '@terminator/extension-ui/tokens.css'
+import '@terminator/extension-ui/controls.css'
 import './styles.css'
 import { useSettingsStore } from './stores/settings.store'
 import { initExtensions } from './extensions/loader'
 import { installLogInterceptor } from './logger'
+import { exposeTerminalRows } from './terminal/terminal-rows'
 
 installLogInterceptor()
+exposeTerminalRows()
 
 const view = new URLSearchParams(window.location.search).get('view')
 

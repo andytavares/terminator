@@ -1,10 +1,9 @@
 import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { writeFileSync as write } from 'node:fs'
-import { launchApp, closeApp, createWorkspace, type AppHandle } from '../helpers'
+import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
 
 // Retakes the user-guide screenshots of the Foundry surfaces.
 //
@@ -24,7 +23,7 @@ let repo: string
 
 test('capture the Foundry surfaces', async () => {
   test.setTimeout(180_000)
-  repo = mkdtempSync(join(tmpdir(), 'foundry-shot-'))
+  repo = e2eTempDir('foundry-shot-')
   const git = (...args: string[]): void => {
     const env = { ...process.env }
     delete env.GIT_DIR

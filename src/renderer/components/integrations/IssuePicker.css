@@ -20,31 +20,6 @@
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
-.issue-picker__search svg {
-  width: 11px;
-  height: 11px;
-  /* Inherits currentColor and dims by opacity — never a colour of its own
-     (Constitution XII). */
-  opacity: 0.55;
-  flex-shrink: 0;
-}
-
-.issue-picker__input {
-  height: auto;
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text-primary);
-  font-family: var(--font-ui);
-  font-size: 12px;
-}
-
-.issue-picker__input::placeholder {
-  color: var(--text-muted);
-}
-
 /*
  * Overlaid rather than inline: this sits inside a form, and pushing every
  * field below it down by 200px as soon as the input takes focus makes the
@@ -65,23 +40,7 @@
 }
 
 .issue-picker__row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
   padding: 6px 10px;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-primary);
-  font-family: var(--font-ui);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.issue-picker__row:last-child {
-  border-bottom: none;
 }
 
 .issue-picker__row:hover {

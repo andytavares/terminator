@@ -37,7 +37,7 @@ export interface SpawnedProcess {
   kill(signal?: string): void
 }
 
-export type SpawnFn = (
+type SpawnFn = (
   cmd: string,
   args: string[],
   opts: { cwd: string; env: Record<string, string> }

@@ -1,0 +1,124 @@
+import { test, expect, type Page } from '@playwright/test'
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { closeApp, launchApp, type AppHandle } from './helpers'
+import { makeRepoWithRemote, openCodeReviews, openRepo, pushBranch } from './git-harness'
+import { startGithubStub, type GithubStub } from './github-stub'
+
+/**
+ * The review agent on a pull request: a run in the PR head's worktree that is
+ * cancelled, continued in a terminal, and one that returns a finding, which is
+ * dismissed and stays dismissed. `claude` is the e2e stub
+ * (tests/e2e/fixtures/bin/claude), which idles until E2E_CLAUDE_REVIEW_REPLY
+ * holds the JSON a headless `claude -p --output-format json` prints.
+ */
+
+let handle: AppHandle
+let stub: GithubStub
+let repo: string
+let bare: string
+let replyDir: string
+
+const REPLY = {
+  type: 'result',
+  structured_output: {
+    summary: 'One real problem in subtract.',
+    findings: [
+      {
+        severity: 'must-fix',
+        path: 'src/math.ts',
+        startLine: 5,
+        endLine: 6,
+        side: 'RIGHT',
+        title: 'subtract swaps its operands',
+        body: 'It returns `b - a`.',
+        suggestedCode: null,
+      },
+    ],
+    walkthrough: [],
+  },
+}
+
+test.describe.configure({ mode: 'serial' })
+
+test.beforeAll(async () => {
+  ;({ repo, bare } = makeRepoWithRemote('terminator-e2e-agent'))
+  pushBranch(repo, 'feat/subtract', {
+    'src/math.ts':
+      'export function add(a: number, b: number) {\n  return a + b\n}\n\nexport function subtract(a: number, b: number) {\n  return b - a\n}\n',
+  })
+  stub = await startGithubStub({ bareRepo: bare })
+  stub.openPullRequest({ title: 'Add subtract', headRefName: 'feat/subtract' })
+  replyDir = mkdtempSync(join(tmpdir(), 'terminator-e2e-agent-reply-'))
+  handle = await launchApp(undefined, {
+    ...stub.env,
+    E2E_CLAUDE_REVIEW_REPLY: join(replyDir, 'reply.json'),
+  })
+  // Opened through a symlink, as macOS's temporary folders are (/var -> /private/var):
+  // the workspace names the link, git's top level is the real path.
+  symlinkSync(repo, `${repo}-link`)
+  await openRepo(handle, 'Agent Review', `${repo}-link`)
+})
+
+test.afterAll(async () => {
+  await closeApp(handle)
+  await stub?.close()
+  for (const dir of [repo, `${repo}-link`, bare, replyDir]) {
+    if (dir) rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+async function askAgent(): Promise<Page> {
+  const view = await openCodeReviews(handle, 'Agent Review')
+  const queueOrReview = view.locator('.rd-row, [aria-label="Close review"]').first()
+  await expect(queueOrReview).toBeVisible({ timeout: 15000 })
+  if (await view.locator('.rd-row').first().isVisible()) {
+    await view.locator('.rd-row').filter({ hasText: 'Add subtract' }).click()
+    await view.getByRole('button', { name: /^(Start|Continue|Resume) Review/ }).click()
+  }
+  await view.getByRole('button', { name: 'Ask agent about this PR' }).click()
+  return view
+}
+
+const panel = (view: Page) => view.getByRole('complementary', { name: 'Agent panel' })
+
+test('a running review can be continued in a terminal, then cancelled', async () => {
+  const view = await askAgent()
+  await panel(view).getByRole('button', { name: 'Run' }).click()
+  await expect(panel(view)).toContainText('Reviewing', { timeout: 15000 })
+
+  await panel(view).getByRole('button', { name: 'Continue in terminal' }).click()
+  await handle.page.locator('.branch-row').first().click()
+  const tab = handle.page.locator('.tab-bar__tab').filter({ hasText: 'Review #1' })
+  await expect(tab).toBeVisible({ timeout: 15000 })
+  await tab.click()
+  await expect(handle.page.locator('.xterm-rows', { hasText: 'claude-stub --resume' })).toBeVisible(
+    { timeout: 15000 }
+  )
+
+  await openCodeReviews(handle, 'Agent Review')
+  await panel(view).getByRole('button', { name: 'Cancel' }).click()
+  await expect(panel(view)).not.toContainText('Reviewing')
+})
+
+test('a finished review lists its finding, and a dismissed finding stays dismissed', async () => {
+  writeFileSync(join(replyDir, 'reply.json'), JSON.stringify(REPLY))
+  const view = await askAgent()
+  await panel(view)
+    .getByRole('button', { name: /^(Run|Try again|Ask again)$/ })
+    .click()
+  if (await panel(view).getByRole('button', { name: 'Run' }).isVisible()) {
+    await panel(view).getByRole('button', { name: 'Run' }).click()
+  }
+  await expect(panel(view)).toContainText('1 findings', { timeout: 20000 })
+  await expect(panel(view)).toContainText('subtract swaps its operands')
+
+  await panel(view).getByRole('button', { name: 'Dismiss' }).click()
+  await expect(panel(view)).toContainText('0 findings')
+
+  await view.getByRole('button', { name: 'Close review' }).click()
+  await askAgent()
+  await expect(panel(view)).toContainText('0 findings')
+  await expect(panel(view)).not.toContainText('subtract swaps its operands')
+})

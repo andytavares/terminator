@@ -45,7 +45,7 @@ export interface HookDecision {
   reason?: string
 }
 
-export interface HookRequest {
+interface HookRequest {
   /** The console's session id, passed on the hook command line. */
   sessionId: string
   toolName: string
@@ -53,16 +53,16 @@ export interface HookRequest {
 }
 
 /** Decides one tool call, resolving whenever the operator does — possibly never. */
-export type PermissionHandler = (request: HookRequest) => Promise<HookDecision>
+type PermissionHandler = (request: HookRequest) => Promise<HookDecision>
 
 /**
  * `stop` — the agent finished responding and is waiting for input, which is
  * the difference between a session that is done and one that is stuck.
  * `session_end` — the conversation is over.
  */
-export type AgentEventKind = 'stop' | 'session_end'
+type AgentEventKind = 'stop' | 'session_end'
 
-export interface SessionHandlers {
+interface SessionHandlers {
   decide: PermissionHandler
   /** Optional: a session may want the tool decisions and not the lifecycle. */
   onEvent?: (kind: AgentEventKind) => void

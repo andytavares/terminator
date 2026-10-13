@@ -9,22 +9,17 @@ import { useIssue } from '../session/useSessionFacts'
 import { formatRelativeTime } from '../../sidebar/relative-time'
 import type { LedgerColumns } from '../../sidebar/home-prefs'
 import type { LedgerGroup } from '../../sidebar/ledger-rows'
-import type { SessionFacts } from '../../sidebar/session-facts'
+import type { SessionActions, SessionFacts } from '../../sidebar/session-facts'
+import '../screen-chrome.css'
 import './LedgerView.css'
 
-interface Props {
+interface Props extends SessionActions {
   groups: LedgerGroup[]
   columns: LedgerColumns
   previewSelected: boolean
   selectedId: string | null
   now: number
   onSelect: (sessionId: string) => void
-  onOpen: (sessionId: string) => void
-  onSaveDescription: (facts: SessionFacts, description: string | null) => void
-  onLink?: (facts: SessionFacts) => void
-  onResume?: (facts: SessionFacts) => void
-  onCloseSession?: (facts: SessionFacts) => void
-  onForgetSession?: (facts: SessionFacts) => void
   /** Drawn inside the selected row's preview, beside Open: answers to a waiting prompt. */
   renderAnswers?: (facts: SessionFacts) => React.ReactNode
 }

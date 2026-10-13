@@ -19,7 +19,7 @@ export function getIssueService(): IssueService {
       getMine,
       // A credential that has started failing is worth showing in settings —
       // otherwise the operator sees empty lists and blames the feature.
-      onTrackerError: (tracker, kind) => void setLastError(tracker, kind),
+      onTrackerError: setLastError,
     })
   }
   return service

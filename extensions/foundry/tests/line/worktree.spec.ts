@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import {
   ensureCheckout,
   ensureCheckouts,
@@ -17,6 +16,7 @@ import {
 import type { CheckoutDeps, Checkout } from '../../src/line/worktree.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Somewhere for a lane's work to happen, cut from the lane's own repository
 // and living under the data root — never inside the repository, which is the
@@ -297,7 +297,7 @@ describe('provisioning dependencies', () => {
   const scratch: string[] = []
 
   function tmpDir(prefix: string): string {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
+    const dir = makeTempDir(prefix)
     scratch.push(dir)
     return dir
   }

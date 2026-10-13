@@ -40,16 +40,6 @@
   margin-bottom: 4px;
 }
 
-.vm-kbd {
-  font: 500 11px/1 var(--tm-font-mono);
-  border: 1px solid var(--tm-border-strong);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  padding: 2px 5px;
-  color: var(--tm-text-secondary);
-  background: var(--tm-bg-elevated);
-}
-
 .vm-switch-row {
   display: flex;
   align-items: center;

@@ -2,6 +2,7 @@ import { WebContentsView, session as electronSession } from 'electron'
 import type { BrowserWindow } from 'electron'
 import type { Extension } from '../../shared/types/index.js'
 import { makeLogger } from '../logger.js'
+import { isQuickActionsLeader, type LeaderKeyPress } from '../../shared/quick-actions-leader.js'
 import { sendToView } from '../safe-send.js'
 import { EXTENSION_BASE_CSS } from '@terminator/extension-ui/extension-base-css'
 
@@ -14,20 +15,10 @@ const logger = makeLogger('extension-view-host')
  * Electron WebContentsView.
  */
 export function isQuickActionsOpenShortcut(
-  input: {
-    type: string
-    key: string
-    meta: boolean
-    control: boolean
-    shift: boolean
-    alt: boolean
-  },
+  input: LeaderKeyPress & { type: string },
   platform: NodeJS.Platform = process.platform
 ): boolean {
-  if (input.type !== 'keyDown') return false
-  if (input.key.toLowerCase() !== 'p') return false
-  if (input.shift || input.alt) return false
-  return platform === 'darwin' ? input.meta : input.control
+  return input.type === 'keyDown' && isQuickActionsLeader(input, platform === 'darwin')
 }
 
 // Injected into every extension WebContentsView so --tm-* CSS variables are defined.

@@ -10,7 +10,7 @@ export const TrackerIdSchema = z.enum(['linear', 'jira'])
 // against the tracker before anything is stored, so a wrong address fails at
 // `connect` with the tracker's own message — which is more useful than a regex
 // that also rejects legitimate addresses (short TLDs, plus-addressing, IDN).
-export const MineSelectorSchema = z.union([
+const MineSelectorSchema = z.union([
   z.object({ kind: z.literal('assignee'), email: z.string().min(1).nullable() }),
   z.object({ kind: z.literal('query'), jql: z.string().min(1) }),
 ])
@@ -73,7 +73,3 @@ export const SetMineInputSchema = z.object({
   tracker: TrackerIdSchema,
   mine: MineSelectorSchema,
 })
-
-export type ConnectInput = z.infer<typeof ConnectInputSchema>
-export type LinkSetInput = z.infer<typeof LinkSetInputSchema>
-export type SetMineInput = z.infer<typeof SetMineInputSchema>

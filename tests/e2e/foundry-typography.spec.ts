@@ -1,8 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, closeApp, createWorkspace, type AppHandle } from './helpers'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from './helpers'
 import { execFileSync } from 'node:child_process'
 
 // Nothing in an extension view should render at the browser's default size.
@@ -21,7 +18,7 @@ let repoPath: string
 
 test.beforeAll(async () => {
   test.setTimeout(120_000)
-  const repo = mkdtempSync(join(tmpdir(), 'fdry-type-'))
+  const repo = e2eTempDir('fdry-type-')
   repoPath = repo
   execFileSync('git', ['init', '-q', repo])
   execFileSync('git', ['-C', repo, 'commit', '-q', '--allow-empty', '-m', 'initial'])

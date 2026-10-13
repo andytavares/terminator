@@ -304,7 +304,7 @@ export class ExtensionHost {
     })
   }
 
-  getExtensionContributes(id: string) {
+  getExtensionContributes(id: string): Extension['contributes'] | null {
     const record = store.get('extensions').find((e) => e.id === id)
     return record?.contributes ?? null
   }
@@ -429,6 +429,8 @@ export class ExtensionHost {
       this.disposeAll(getApiDisposables(api))
       return { error: 'ACTIVATE_ERROR', message: e instanceof Error ? e.message : String(e) }
     }
+    // Every launch, not only an extension's first: scripts/smoke-start.mjs reads it.
+    hostLogger.info(`Extension ${record.id} activated`)
     if (this.hostFailures.delete(record.id)) this.announceListChanged()
     // The live array from the api: registrations made after activate() land in
     // it too, so unload disposes everything the backend ever registered.

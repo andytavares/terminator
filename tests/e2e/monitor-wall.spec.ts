@@ -1,8 +1,13 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
+import { rmSync } from 'node:fs'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  e2eTempDir,
+} from './helpers'
 
 // The Overview tab as a Monitor wall, against the running app: a tile shows its
 // terminal's output as it arrives, and the wall's arrangement survives a restart.
@@ -16,7 +21,7 @@ let handle: AppHandle | undefined
 let folder: string
 
 test.beforeEach(() => {
-  folder = mkdtempSync(join(tmpdir(), 'wall-'))
+  folder = e2eTempDir('wall-')
 })
 
 test.afterEach(async () => {

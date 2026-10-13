@@ -253,3 +253,18 @@ describe('api.window.showSelf', () => {
     })
   })
 })
+
+// Settings → Extensions reads the pages once when it opens. A backend that
+// registers its page after that (it activates late, or is reloaded) must be
+// announced, or its ⚙ never appears until the panel is reopened.
+describe('api.settings.register', () => {
+  it('announces the change when a page is registered and when it is removed', () => {
+    const broadcastToWindows = vi.fn()
+    const api = createExtensionAPI('test.ext', '0.1.0', { broadcastToWindows })
+    const page = api.settings.register({ label: 'Test', properties: {} })
+    expect(broadcastToWindows).toHaveBeenCalledWith('extension:list-changed', null)
+    broadcastToWindows.mockClear()
+    page.dispose()
+    expect(broadcastToWindows).toHaveBeenCalledWith('extension:list-changed', null)
+  })
+})

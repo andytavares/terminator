@@ -269,6 +269,25 @@ describe('ExtensionsSection', () => {
     await waitFor(() => expect(screen.getByText('New Ext')).toBeTruthy())
   })
 
+  // Main announces the changed list while the install is answering, so the
+  // re-read can already hold the new extension: it must be listed once.
+  it('lists an installed extension once when the list was re-read first', async () => {
+    const newExt = extensionOf({ id: 'com.new', name: 'New Ext', version: '2.0.0' })
+    api.dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/ext' })
+    api.extension.install.mockImplementation(async () => {
+      api.extension.list.mockResolvedValue({ extensions: [newExt] })
+      const announce = api.extension.onListChanged.mock.calls[0][0] as () => void
+      announce()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      return { extension: newExt }
+    })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    fireEvent.click(await screen.findByText('Install from Directory'))
+    await waitFor(() => expect(mockDispatchNotification).toHaveBeenCalled())
+    expect(screen.getAllByText('New Ext')).toHaveLength(1)
+  })
+
   it('shows toast on install error', async () => {
     api.dialog.openDirectory.mockResolvedValue({ filePath: '/path' })
     api.extension.install.mockResolvedValue({

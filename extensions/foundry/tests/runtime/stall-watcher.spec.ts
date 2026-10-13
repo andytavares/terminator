@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createStallWatcher, factsFrom, type WatchedRun } from '../../src/runtime/stall-watcher.js'
 import type { StallFiring } from '../../src/runtime/evaluate-stall.js'
 import { readTranscript } from '../../src/runtime/transcript-tailer.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // A run that is blocked tells you: it raises a permission request and the board
 // lights up. A run that has simply gone quiet tells you nothing, and looks
@@ -15,7 +15,7 @@ const MIN = 60_000
 let dir: string
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'stall-watcher-'))
+  dir = makeTempDir('stall-watcher-')
 })
 
 afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }))

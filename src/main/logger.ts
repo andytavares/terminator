@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { createWriteStream, existsSync, renameSync, statSync, WriteStream } from 'fs'
 import { join } from 'path'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
@@ -48,12 +49,8 @@ function write(level: LogLevel, namespace: string, message: string): void {
   }
 }
 
-export interface NamespacedLogger {
-  debug(message: string, ...meta: unknown[]): void
-  info(message: string, ...meta: unknown[]): void
-  warn(message: string, ...meta: unknown[]): void
-  error(message: string, ...meta: unknown[]): void
-}
+/** The logger the SDK declares for extensions; the core's own modules get the same shape. */
+export type NamespacedLogger = ExtensionAPI['log']
 
 function format(message: string, meta: unknown[]): string {
   if (meta.length === 0) return message

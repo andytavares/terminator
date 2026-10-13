@@ -1,6 +1,6 @@
 import type { Note, Tag, Comment, SearchResult } from './types'
 
-interface NoteRow {
+export type NoteRow = {
   id: string
   title: string
   body: string

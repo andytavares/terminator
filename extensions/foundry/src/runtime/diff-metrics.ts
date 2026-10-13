@@ -77,7 +77,7 @@ export function parseChangedFiles(stdout: string): string[] {
  * `--exclude-standard` honours .gitignore, which is what keeps node_modules and
  * build output out of it.
  */
-export async function readUntrackedFiles(worktreePath: string, run: RunCommand): Promise<string[]> {
+async function readUntrackedFiles(worktreePath: string, run: RunCommand): Promise<string[]> {
   try {
     const result = await run('git', ['ls-files', '--others', '--exclude-standard'], worktreePath)
     if (!result.ok) return []

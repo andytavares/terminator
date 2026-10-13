@@ -1,0 +1,68 @@
+/* Rules more than one view draws the same way. The view entry imports this file
+   first, so each view's own stylesheet still overrides it. */
+
+/* A column divider the pointer drags */
+.git-resize-handle,
+.pr-resize-handle,
+.diff-split-resize-handle {
+  width: 5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: var(--tm-overlay);
+  transition: background 0.15s;
+  position: relative;
+  z-index: var(--tm-layer-panel);
+}
+
+/* A key the shortcut names */
+.rc-kbd,
+.vm-kbd {
+  font: 500 11px/1 var(--tm-font-mono);
+  border: 1px solid var(--tm-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: var(--tm-text-secondary);
+  background: var(--tm-bg-elevated);
+}
+
+/* A count badge */
+.rc-pip,
+.rs-pip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--tm-accent-dim);
+  color: var(--tm-accent-text);
+  font: 600 10px/1 var(--tm-font-ui);
+}
+
+/* A rounded label */
+.rd-chip,
+.rs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--tm-border-strong);
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+}
+
+/* A highlighted strip across a list */
+.rd-band,
+.rs-band {
+  margin: 10px 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--tm-accent-dim);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}

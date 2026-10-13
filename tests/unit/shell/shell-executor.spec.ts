@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   assertCommandAllowed,
@@ -9,6 +8,7 @@ import {
   CommandNotAllowedError,
   CwdOutOfScopeError,
 } from '../../../src/main/shell/shell-executor'
+import { makeTempDir } from '../../support/temp-dir'
 
 // ─── assertCommandAllowed ─────────────────────────────────────────────────────
 
@@ -57,7 +57,7 @@ describe('assertCwdInScope', () => {
   let outside: string
 
   beforeEach(() => {
-    scratch = realpathSync(mkdtempSync(join(tmpdir(), 'cwd-scope-')))
+    scratch = realpathSync(makeTempDir('cwd-scope-'))
     root = join(scratch, 'root')
     otherRoot = join(scratch, 'other')
     outside = join(scratch, 'outside')

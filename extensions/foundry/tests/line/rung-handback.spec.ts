@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execute } from '../../src/line/executor.js'
@@ -13,6 +12,7 @@ import { collectableWrites, readRungOutput } from '../../src/line/rung-output.js
 import { decideTool } from '../../src/runtime/tool-decision.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The whole chain, with the real role files and the real policy.
 //
@@ -50,8 +50,8 @@ let dataRoot: string
 let repo: string
 
 beforeEach(() => {
-  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-handback-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-handback-repo-'))
+  dataRoot = makeTempDir('fdry-handback-')
+  repo = makeTempDir('fdry-handback-repo-')
 })
 
 afterEach(() => {

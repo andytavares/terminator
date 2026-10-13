@@ -11,8 +11,6 @@ import {
   listReviews,
   logReviewAction,
   startOrResumeReview,
-  type ReviewActionKind,
-  type ReviewEntityType,
 } from '../vault/weekly-review-repository'
 
 const ACTION_KINDS = [
@@ -91,5 +89,3 @@ export function registerWeeklyReviewIpcHandlers(api: ExtensionAPI, db: Extension
 
   return cleanup
 }
-
-export type { ReviewActionKind, ReviewEntityType }

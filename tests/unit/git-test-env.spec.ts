@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { makeTempDir } from '../support/temp-dir'
 
 // `git fetch` starts `git maintenance run --auto --detach`, which keeps writing
 // into the repository after the command returns. A spec's afterEach then
@@ -14,7 +14,7 @@ describe('git run by the test suite', () => {
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
   it('never starts background maintenance on fetch', () => {
-    dir = mkdtempSync(join(tmpdir(), 'git-test-env-'))
+    dir = makeTempDir('git-test-env-')
     const git = (cwd: string, ...args: string[]) =>
       execFileSync('git', args, { cwd, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] })
     git(dir, 'init', '-q', '-b', 'main', 'origin')
@@ -49,7 +49,7 @@ describe('git run by the test suite', () => {
   })
 
   it('leaves nothing writing into .git after a commit returns', async () => {
-    dir = mkdtempSync(join(tmpdir(), 'git-test-env-'))
+    dir = makeTempDir('git-test-env-')
     execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: dir })
     execFileSync(
       'git',

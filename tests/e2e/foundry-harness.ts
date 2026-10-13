@@ -1,9 +1,8 @@
 import { expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { launchApp, closeApp, workspaceRow } from './helpers'
+import { launchApp, closeApp, workspaceRow, e2eTempDir } from './helpers'
 import type { AppHandle } from './helpers'
 
 // Shared helpers for every `tests/e2e/foundry-*.spec.ts` file. Each spec keeps
@@ -14,19 +13,20 @@ import type { AppHandle } from './helpers'
 // grow shared state of its own by accident.
 
 /** Runs `git` against the fixture repo, with any inherited GIT_* stripped so a
- *  git hook running this suite does not point every command at itself. */
-export function git(repo: string, ...args: string[]): void {
+ *  git hook running this suite does not point every command at itself, and
+ *  returns its trimmed output. */
+export function git(repo: string, ...args: string[]): string {
   const env = { ...process.env }
   delete env.GIT_DIR
   delete env.GIT_INDEX_FILE
   delete env.GIT_WORK_TREE
-  execFileSync('git', args, { cwd: repo, env })
+  return execFileSync('git', args, { cwd: repo, env, encoding: 'utf8' }).trim()
 }
 
 /** A minimal git repository with a real toolchain, exactly what every foundry
  *  spec seeds before launching the app. */
 export function makeFixtureRepo(prefix: string): string {
-  const repo = mkdtempSync(join(tmpdir(), prefix))
+  const repo = e2eTempDir(prefix)
   git(repo, 'init', '-b', 'main')
   git(repo, 'config', 'user.email', 'e2e@example.com')
   git(repo, 'config', 'user.name', 'E2E')
@@ -238,7 +238,8 @@ export async function openForge(handle: AppHandle): Promise<void> {
  * scraping a screen an agent's own output may since have scrolled past.
  */
 export function launchScript(handle: AppHandle): string {
-  const dir = join(handle.userDataDir, 'foundry-runtime', 'launch')
+  // Foundry's own folder (ADR 103): <userData>/extensions/<id>/runtime.
+  const dir = join(handle.userDataDir, 'extensions', 'terminator.foundry', 'runtime', 'launch')
   const scripts = readdirSync(dir)
     .filter((name) => name.endsWith('.sh'))
     .map((name) => join(dir, name))

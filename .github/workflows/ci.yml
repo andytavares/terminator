@@ -34,6 +34,14 @@ jobs:
       - name: Dependency versions
         run: npm run lint:deps
 
+      # Unused files, exports and dependencies (knip.jsonc, ADR 104).
+      - name: Unused code
+        run: npm run lint:unused
+
+      # Copy-pasted code in src, packages and extensions (.jscpd.json, ADR 105).
+      - name: Duplicate code
+        run: npm run lint:duplicates
+
       - name: Lint
         run: npm run lint
 
@@ -150,8 +158,12 @@ jobs:
       - name: Install zsh
         run: command -v zsh || (sudo apt-get update -qq && sudo apt-get install -y -qq zsh)
 
+      # TMPDIR is an empty directory for the run, and the step fails if a spec
+      # leaves anything in it (scripts/check-temp-leaks.mjs): specs that never
+      # removed their temporary directories once filled a disk with ~22,000.
       - name: Test
         run: >-
+          node scripts/check-temp-leaks.mjs
           npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=blob --reporter=dot
           --coverage.thresholds.lines=0 --coverage.thresholds.functions=0
           --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
@@ -165,6 +177,28 @@ jobs:
           path: .vitest-reports/
           include-hidden-files: true
           retention-days: 1
+
+  # The wall-clock budgets (`*.perf.spec.ts`), one file at a time in a job of
+  # their own: in the unit shards they share the CPU with every other spec and
+  # measure the load rather than the code.
+  perf:
+    name: Perf budgets
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Perf budgets
+        run: npm run test:perf
+        timeout-minutes: 5
 
   # The required "Test" check. Same OS as the shards, because the blobs carry
   # their absolute source paths and coverage is remapped against them.
@@ -249,6 +283,85 @@ jobs:
             echo "::error::npm run build printed the warnings above"
             exit 1
           fi
+
+  # The app started the way a developer starts it, from a clean checkout with no
+  # npm cache: `npm run dev`, and `npm run preview` after `npm run build`. A
+  # fresh install once could not start at all ("Error: Electron uninstall")
+  # while every other job passed, because none of them ran these scripts.
+  # scripts/smoke-start.mjs checks for App ready, every extension activated, and
+  # no error or uncaught exception, then quits the app.
+  start:
+    name: Start (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Electron needs a display on Linux; macOS has one.
+      - name: npm run dev
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}node scripts/smoke-start.mjs dev
+        timeout-minutes: 8
+
+      - name: npm run build
+        run: npm run build
+
+      - name: npm run preview
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}node scripts/smoke-start.mjs preview
+        timeout-minutes: 8
+
+      # The packaged app, unsigned, from the same electron-builder.cjs the
+      # release uses. It once started with no extensions at all: they were not
+      # in app.asar. Linux only: macOS packaging signs and notarizes.
+      - name: Packaged app
+        if: runner.os == 'Linux'
+        run: |
+          npx electron-builder --linux dir --publish never
+          xvfb-run -a node scripts/smoke-start.mjs exec "$PWD/dist/linux-unpacked/@andytavaresterminator"
+        timeout-minutes: 15
+
+  # The specs that press keys at the X server (tests/e2e/x11-keys.ts), such as
+  # Task Vault's global capture shortcut. The E2E job runs on macOS, where they
+  # skip: synthesising a system-wide key there needs Accessibility consent for
+  # the runner. Chromium's sandbox needs a setuid helper or user namespaces this
+  # runner does not grant, so the app starts with --no-sandbox, as Start does.
+  e2e-x11:
+    name: E2E (Linux, X11)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The e2e harness runs terminals under zsh; XTEST presses the keys.
+      - name: Install zsh and the X test extension
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh libxtst6
+
+      - name: Build
+        run: npm run build
+
+      - name: Run X11 specs
+        env:
+          E2E_ELECTRON_ARGS: --no-sandbox
+        run: xvfb-run -a npx playwright test tests/e2e/task-vault-capture.spec.ts --reporter=dot
+        timeout-minutes: 10
 
   e2e-select:
     name: E2E select

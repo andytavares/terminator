@@ -37,7 +37,7 @@ import { join } from 'path'
 // stdout with exit 0 is the channel. The stderr-and-exit-2 form also blocks,
 // but it cannot express allow or carry an edited input, so it is not enough.
 
-export const HOOK_SCRIPT = `// Written by Terminator. Do not edit: it is overwritten on every start.
+const HOOK_SCRIPT = `// Written by Terminator. Do not edit: it is overwritten on every start.
 const [url, token, sessionId, kind] = process.argv.slice(2)
 
 const ASK = JSON.stringify({

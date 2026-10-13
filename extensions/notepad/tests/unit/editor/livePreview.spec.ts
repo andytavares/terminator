@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import { buildDecorations } from '../../../src/editor/livePreview'
+import { parsedState } from '../support/parsed-state'
 
 describe('buildDecorations', () => {
   function makeState(doc: string) {
-    return EditorState.create({ doc, extensions: [markdown()] })
+    return parsedState({ doc, extensions: [markdown()] })
   }
 
   function makeStateGFM(doc: string) {
-    return EditorState.create({ doc, extensions: [markdown({ extensions: [GFM] })] })
+    return parsedState({ doc, extensions: [markdown({ extensions: [GFM] })] })
   }
 
   it('marks heading # text with a heading decoration (cursor off heading line)', () => {

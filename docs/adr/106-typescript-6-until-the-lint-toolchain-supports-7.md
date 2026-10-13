@@ -1,4 +1,4 @@
-# ADR-103: TypeScript 6.0.3, Not 7.0, Until typescript-eslint Supports 7
+# ADR-106: TypeScript 6.0.3, Not 7.0, Until typescript-eslint Supports 7
 
 **Status**: Accepted
 **Date**: 2026-10-12

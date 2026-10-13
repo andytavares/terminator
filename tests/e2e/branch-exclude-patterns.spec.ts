@@ -1,9 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { AppHandle, launchApp, closeApp, createWorkspace, e2eTempDir } from './helpers'
 
 /**
  * Settings → Git → Branch Exclude Patterns, end to end: real git, the real
@@ -34,7 +31,7 @@ async function branchNames(): Promise<string[]> {
 }
 
 test.beforeAll(async () => {
-  repo = mkdtempSync(join(tmpdir(), 'terminator-e2e-exclude-'))
+  repo = e2eTempDir('terminator-e2e-exclude-')
   git('init', '--initial-branch=main')
   git('config', 'user.email', 'e2e@example.com')
   git('config', 'user.name', 'E2E')

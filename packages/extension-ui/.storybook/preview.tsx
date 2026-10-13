@@ -3,6 +3,7 @@ import type { Decorator, Preview } from '@storybook/react-vite'
 import '../src/fonts'
 import '../src/tokens.css'
 import '../src/extension-base.css'
+import '../src/controls.css'
 
 type Theme = 'dark' | 'light'
 
