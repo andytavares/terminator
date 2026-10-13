@@ -1,4 +1,4 @@
-import type { QuickAction, QuickActionGroup } from './types'
+import type { QuickActionGroup } from './types'
 
 export const CORE_GROUPS: QuickActionGroup[] = [
   { id: 'terminal', mnemonic: 't', label: 'Terminal' },
@@ -81,41 +81,4 @@ export function allocateExtensionGroups(requests: ExtensionGroupRequest[]): {
   }
 
   return { groups, warnings }
-}
-
-export function findMnemonicConflicts(
-  actions: QuickAction[],
-  groups: QuickActionGroup[]
-): string[] {
-  const conflicts: string[] = []
-  const groupLetters = new Set(groups.map((g) => g.mnemonic))
-
-  const byGroup = new Map<string, Map<string, string[]>>()
-  for (const action of actions) {
-    if (!action.mnemonic) continue
-
-    if (action.group === 'top' && groupLetters.has(action.mnemonic)) {
-      conflicts.push(
-        `Top-level action "${action.id}" uses mnemonic "${action.mnemonic}", which is also a group letter.`
-      )
-    }
-
-    const byMnemonic = byGroup.get(action.group) ?? new Map<string, string[]>()
-    const ids = byMnemonic.get(action.mnemonic) ?? []
-    ids.push(action.id)
-    byMnemonic.set(action.mnemonic, ids)
-    byGroup.set(action.group, byMnemonic)
-  }
-
-  for (const [group, byMnemonic] of byGroup) {
-    for (const [mnemonic, ids] of byMnemonic) {
-      if (ids.length > 1) {
-        conflicts.push(
-          `Group "${group}" has duplicate mnemonic "${mnemonic}" on: ${ids.join(', ')}.`
-        )
-      }
-    }
-  }
-
-  return conflicts
 }

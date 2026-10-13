@@ -14,8 +14,6 @@ export interface LedgerFilters {
   text: string
 }
 
-export const NO_FILTERS: LedgerFilters = { needsYou: false, text: '' }
-
 const NO_BRANCH = 'No branch'
 const ALL_SESSIONS = 'All sessions'
 const CLOSED = 'Closed'

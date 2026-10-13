@@ -5,7 +5,7 @@ import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useTerminalSession } from '../../../../src/renderer/hooks/useTerminalSession'
-import { CORE_SHORTCUTS } from '../../../../src/renderer/quick-actions/core-actions'
+import { CORE_SHORTCUTS } from '../../../support/quick-actions'
 import { projectOf, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
 
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({

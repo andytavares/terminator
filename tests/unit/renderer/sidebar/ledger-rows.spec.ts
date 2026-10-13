@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { buildLedger, NO_FILTERS } from '../../../../src/renderer/sidebar/ledger-rows'
+import { buildLedger, type LedgerFilters } from '../../../../src/renderer/sidebar/ledger-rows'
 import { DEFAULT_HOME_PREFS } from '../../../../src/renderer/sidebar/home-prefs'
 import { fact } from './fixtures/facts'
 
+const NO_FILTERS: LedgerFilters = { needsYou: false, text: '' }
 const titles = new Map<string, string>()
 const shape = (groups: ReturnType<typeof buildLedger>) =>
   groups.map((g) => [g.label, g.facts.map((f) => f.sessionId)])

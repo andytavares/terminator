@@ -30,7 +30,7 @@ interface Options {
   onOpenHome?: () => void
   /** When scratch mode is active, pass SCRATCH_PROJECT_ID here so all terminal shortcuts work. */
   scratchProjectId?: string | null
-  /** Called with the CORE_SHORTCUTS action id whenever this hook handles a direct shortcut. */
+  /** Called with the core Quick Action's id whenever this hook handles a direct shortcut. */
   onDirectShortcut?: (actionId: string) => void
 }
 
