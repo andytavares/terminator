@@ -10,6 +10,15 @@ vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
 }))
 
+const PASSING_DOTS: ReviewQueuePR['signalDots'] = {
+  tests: 'pass',
+  coverage: 'pass',
+  ci: 'pass',
+  lint: 'pass',
+  churn: 'pass',
+  blast: 'pass',
+}
+
 function makePr(overrides: Partial<ReviewQueuePR> = {}): ReviewQueuePR {
   return {
     number: 1,
@@ -28,14 +37,7 @@ function makePr(overrides: Partial<ReviewQueuePR> = {}): ReviewQueuePR {
     riskLevel: 'low',
     estimatedMinutes: 10,
     sessionStatus: 'not-started',
-    signalDots: {
-      tests: 'pass',
-      coverage: 'pass',
-      ci: 'pass',
-      lint: 'pass',
-      churn: 'pass',
-      blast: 'pass',
-    },
+    signalDots: PASSING_DOTS,
     approvalCount: 0,
     approvedBy: [],
     requestedReviewers: [],

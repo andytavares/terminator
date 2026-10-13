@@ -1,10 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { buildChapters } from '../../src/github/pr-review-service'
 
-const f = (path: string, additions = 10, deletions = 2, patch?: string) => ({
+const f = (path: string, size = { additions: 10, deletions: 2 }, patch?: string) => ({
   path,
-  additions,
-  deletions,
+  ...size,
   status: 'modified',
   patch,
 })
@@ -131,8 +130,8 @@ describe('buildChapters() — all-mechanical files form their own chapter with t
 describe('buildChapters() — sets estimatedMinutes on each chapter as sum of file estimates', () => {
   it('sets estimatedMinutes on each chapter as sum of file estimates', () => {
     const chapters = buildChapters([
-      f('src/big.ts', 120, 0), // ceil(120/60) = 2
-      f('src/small.ts', 30, 0), // ceil(30/60) = 1
+      f('src/big.ts', { additions: 120, deletions: 0 }), // ceil(120/60) = 2
+      f('src/small.ts', { additions: 30, deletions: 0 }), // ceil(30/60) = 1
     ])
     const chap = chapters.find((c) => c.id === 'src')
     expect(chap?.estimatedMinutes).toBe(3)
@@ -211,7 +210,10 @@ describe('buildChapters() — merges groups connected by an import in patch text
 
   it('merges groups connected by an import in patch text', () => {
     const patch = "@@ -0,0 +1 @@\n+import { Foo } from '../utils/foo'"
-    const chapters = buildChapters([f('components/Bar.tsx', 10, 0, patch), f('utils/foo.ts')])
+    const chapters = buildChapters([
+      f('components/Bar.tsx', { additions: 10, deletions: 0 }, patch),
+      f('utils/foo.ts'),
+    ])
     // import connects the two files even though their stems differ
     expect(chapters).toHaveLength(1)
     const paths = chapters[0].files.map((f) => f.path)

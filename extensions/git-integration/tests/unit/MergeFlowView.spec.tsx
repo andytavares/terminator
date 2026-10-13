@@ -49,10 +49,9 @@ import { MergeFlowView } from '../../src/components/merge-flow/MergeFlowView'
 const mockStartSession = vi.fn()
 const mockStoreClearSession = vi.fn()
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  mockRestoreSession.mockResolvedValue({ session: null })
-  mockListConflicts.mockResolvedValue({
+/** A fresh session with one unresolved conflict in src/foo.ts. */
+function oneConflictSession() {
+  return {
     repoRoot: '/repo',
     files: [
       {
@@ -69,7 +68,13 @@ beforeEach(() => {
     totalResolved: 0,
     isRebase: false,
     startedAt: '',
-  })
+  }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockRestoreSession.mockResolvedValue({ session: null })
+  mockListConflicts.mockResolvedValue(oneConflictSession())
   mockPersistSession.mockResolvedValue({ success: true })
   mockStoreState = {
     session: null,

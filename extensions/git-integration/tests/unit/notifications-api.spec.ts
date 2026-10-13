@@ -31,7 +31,9 @@ describe('notificationsAPI bridge', () => {
       message: 'hook rejected',
     })
   })
+})
 
+describe('notificationsAPI bridge — notify works without a message', () => {
   it('notify works without a message', async () => {
     const { notificationsAPI } = await import('../../src/api/notifications')
     await notificationsAPI.notify({

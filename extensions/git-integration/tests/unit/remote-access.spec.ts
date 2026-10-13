@@ -69,29 +69,47 @@ const PAYLOAD_AT: Record<string, ((root: string) => unknown) | null> = {
   'review-agent:settings': null,
 }
 
-describe("a remote-accessible channel's repoRoot", () => {
-  let scratch: string
-  let workspaceFolder: string
-  let project: string
-  let outside: string
+interface ScratchDirs {
+  scratch: string
+  workspaceFolder: string
+  project: string
+  outside: string
+}
 
+/**
+ * A workspace folder, a project with a worktree inside it and a symlink leading out of it,
+ * and a folder outside both; made before the describe's tests and removed after them.
+ */
+function useScratchDirs(): ScratchDirs {
+  const dirs = {} as ScratchDirs
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'gi-roots-'))
-    workspaceFolder = join(scratch, 'workspace')
-    project = join(scratch, 'project-worktree')
-    outside = join(scratch, 'elsewhere')
+    dirs.scratch = mkdtempSync(join(tmpdir(), 'gi-roots-'))
+    dirs.workspaceFolder = join(dirs.scratch, 'workspace')
+    dirs.project = join(dirs.scratch, 'project-worktree')
+    dirs.outside = join(dirs.scratch, 'elsewhere')
+    const { workspaceFolder, project, outside } = dirs
     for (const dir of [workspaceFolder, project, outside, join(project, '.worktrees', 'fix')]) {
       mkdirSync(dir, { recursive: true })
     }
     symlinkSync(outside, join(project, 'escape'))
   })
+  afterAll(() => rmSync(dirs.scratch, { recursive: true, force: true }))
+  return dirs
+}
 
-  afterAll(() => rmSync(scratch, { recursive: true, force: true }))
+/** The remote-accessible channels' specs, as activation registers them. */
+function remoteChannelsIn(dirs: ScratchDirs) {
+  return activateCapturingChannels({
+    folderPath: dirs.workspaceFolder,
+    worktreePaths: [dirs.project],
+  })
+    .channels.filter((c) => c.remoteAccessible)
+    .map((c) => c.spec)
+}
 
-  const remoteChannels = () =>
-    activateCapturingChannels({ folderPath: workspaceFolder, worktreePaths: [project] })
-      .channels.filter((c) => c.remoteAccessible)
-      .map((c) => c.spec)
+describe("a remote-accessible channel's repoRoot", () => {
+  const dirs = useScratchDirs()
+  const remoteChannels = () => remoteChannelsIn(dirs)
 
   it('is checked for every remote channel that takes a directory', () => {
     expect(Object.keys(PAYLOAD_AT).sort()).toEqual(
@@ -107,15 +125,21 @@ describe("a remote-accessible channel's repoRoot", () => {
       if (!payloadAt) continue
       const run = vi.fn()
       const refused = await dispatchChannel({ ...spec, run }, 42)
-      for (const root of [outside, join(project, 'escape'), '/']) {
+      for (const root of [dirs.outside, join(dirs.project, 'escape'), '/']) {
         const answer = await dispatchChannel({ ...spec, run }, payloadAt(root))
         expect(answer, `${spec.channel} at ${root}`).toEqual(refused)
       }
       expect(run, `${spec.channel} ran outside the workspace`).not.toHaveBeenCalled()
     }
   })
+})
+
+describe("a remote-accessible channel's repoRoot — inside the workspace", () => {
+  const dirs = useScratchDirs()
+  const remoteChannels = () => remoteChannelsIn(dirs)
 
   it('is accepted at a project, the workspace folder, a worktree inside one, or a gh: repository', async () => {
+    const { project, workspaceFolder } = dirs
     const roots = [project, workspaceFolder, join(project, '.worktrees', 'fix'), 'gh:acme/widgets']
     for (const spec of remoteChannels()) {
       const payloadAt = PAYLOAD_AT[spec.channel]
@@ -125,11 +149,16 @@ describe("a remote-accessible channel's repoRoot", () => {
       expect(run, spec.channel).toHaveBeenCalledTimes(roots.length)
     }
   })
+})
+
+describe("a remote-accessible channel's repoRoot — outside the workspace", () => {
+  const dirs = useScratchDirs()
 
   it('outside the workspace runs no git and no gh', async () => {
+    const { outside } = dirs
     const { channels, exec, githubApi } = activateCapturingChannels({
-      folderPath: workspaceFolder,
-      worktreePaths: [project],
+      folderPath: dirs.workspaceFolder,
+      worktreePaths: [dirs.project],
     })
     const spec = (name: string) => channels.find((c) => c.spec.channel === name)!.spec
 

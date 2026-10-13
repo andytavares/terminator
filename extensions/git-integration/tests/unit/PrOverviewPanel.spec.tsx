@@ -56,36 +56,35 @@ vi.mock('../../src/components/pr-review/RichContent', () => ({
   ),
 }))
 
+const riskScoreOf = (level: 'low' | 'medium' | 'high', composite: number) => ({
+  level,
+  composite,
+  metrics: {
+    changeSize: 15,
+    churn90d: 5,
+    blastRadius: 2,
+    testFilePresent: true,
+    complexityDelta: 0,
+    patchCoverage: null,
+  },
+  dominantDriver: 'Change size',
+  topImporters: [],
+  importerCount: 0,
+})
+
 const makeFile = (
   path: string,
-  level: 'low' | 'medium' | 'high',
-  composite: number,
-  additions = 10,
-  deletions = 5
+  risk: { level: 'low' | 'medium' | 'high'; composite: number },
+  size = { additions: 10, deletions: 5 }
 ) => ({
   path,
   oldPath: undefined,
   changeType: 'modified' as const,
-  additions,
-  deletions,
+  ...size,
   isBinary: false,
   tier: 1 as const,
   whyHere: 'test',
-  riskScore: {
-    level,
-    composite,
-    metrics: {
-      changeSize: 15,
-      churn90d: 5,
-      blastRadius: 2,
-      testFilePresent: true,
-      complexityDelta: 0,
-      patchCoverage: null,
-    },
-    dominantDriver: 'Change size',
-    topImporters: [],
-    importerCount: 0,
-  },
+  riskScore: riskScoreOf(risk.level, risk.composite),
   estimatedMinutes: 5,
 })
 
@@ -115,9 +114,13 @@ const basePr: PrReviewDetail = {
       estimatedMinutes: 15,
       status: 'not-started',
       files: [
-        makeFile('src/high.ts', 'high', 80, 50, 20),
-        makeFile('src/medium.ts', 'medium', 50, 30, 10),
-        makeFile('src/low.ts', 'low', 10, 5, 2),
+        makeFile('src/high.ts', { level: 'high', composite: 80 }, { additions: 50, deletions: 20 }),
+        makeFile(
+          'src/medium.ts',
+          { level: 'medium', composite: 50 },
+          { additions: 30, deletions: 10 }
+        ),
+        makeFile('src/low.ts', { level: 'low', composite: 10 }, { additions: 5, deletions: 2 }),
       ],
     },
   ],

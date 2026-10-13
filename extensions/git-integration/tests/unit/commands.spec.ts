@@ -55,30 +55,15 @@ describe('registerQuickActionCommands', () => {
     expect(registrations).toHaveLength(4)
     const byId = Object.fromEntries(registrations.map((r) => [r.command.id, r.command]))
 
-    expect(byId.commit).toMatchObject({
-      label: 'Commit…',
-      mnemonic: 'c',
-      requires: 'repo',
-      category: 'Git',
-    })
-    expect(byId.push).toMatchObject({
-      label: 'Push',
-      mnemonic: 'p',
-      requires: 'repo',
-      category: 'Git',
-    })
-    expect(byId.pull).toMatchObject({
-      label: 'Pull',
-      mnemonic: 'l',
-      requires: 'repo',
-      category: 'Git',
-    })
-    expect(byId['create-pr']).toMatchObject({
-      label: 'Create PR…',
-      mnemonic: 'r',
-      requires: 'repo',
-      category: 'Git',
-    })
+    const expected = [
+      ['commit', 'Commit…', 'c'],
+      ['push', 'Push', 'p'],
+      ['pull', 'Pull', 'l'],
+      ['create-pr', 'Create PR…', 'r'],
+    ]
+    for (const [id, label, mnemonic] of expected) {
+      expect(byId[id]).toMatchObject({ label, mnemonic, requires: 'repo', category: 'Git' })
+    }
   })
 })
 

@@ -275,6 +275,14 @@ describe('PrReviewTab (continued) — after an approval', () => {
     expect(mockInvoke).toHaveBeenCalledWith('window:review-submitted', {})
     close.mockRestore()
   })
+})
+
+describe('PrReviewTab (continued) — after an approval — returns the docked panel to its queue', () => {
+  const activePr = { number: 7, title: 'My PR', headSHA: 'abc123' } as unknown as PrReviewDetail
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+  })
 
   it('returns the docked panel to its queue', async () => {
     const close = vi.spyOn(window, 'close').mockImplementation(() => {})

@@ -61,7 +61,9 @@ describe('mergeFlowAPI bridge — resolveConflict calls correct channel without 
       originalConflictText: undefined,
     })
   })
+})
 
+describe('mergeFlowAPI bridge — resolveConflict calls correct channel without optional args — undoResolve calls correct channel', () => {
   it('undoResolve calls correct channel', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
     await mergeFlowAPI.undoResolve({

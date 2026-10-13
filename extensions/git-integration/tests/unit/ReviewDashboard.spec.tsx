@@ -95,42 +95,41 @@ const pr213 = makePr({
   createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
 })
 
-function mockInvoke(
+interface InvokeOptions {
+  cloneFolder?: string
+  cloneResult?: unknown
+  cloneError?: Error
+  repos?: string[]
+}
+
+const ACCESSIBLE_REPOS = () => ({
+  repos: [
+    { fullName: 'acme/api', owner: 'acme', private: false, pushedAt: new Date().toISOString() },
+    { fullName: 'acme/web', owner: 'acme', private: true, pushedAt: new Date().toISOString() },
+  ],
+})
+
+function cloneAnswer(options: InvokeOptions): Promise<unknown> {
+  if (options.cloneError) return Promise.reject(options.cloneError)
+  return Promise.resolve(options.cloneResult ?? { repoRoot: '/cloned/terminator' })
+}
+
+/** The bridge's answer to each channel the dashboard calls. */
+function answerFor(
+  channel: string,
   dashboardResult: unknown,
-  options: {
-    cloneFolder?: string
-    cloneResult?: unknown
-    cloneError?: Error
-    repos?: string[]
-  } = {}
-) {
-  const invoke = vi.fn((channel: string) => {
-    if (channel === 'github:dashboard-search') return Promise.resolve(dashboardResult)
-    if (channel === 'github:review-settings')
-      return Promise.resolve({ cloneFolder: options.cloneFolder ?? '', repos: options.repos ?? [] })
-    if (channel === 'github:accessible-repos')
-      return Promise.resolve({
-        repos: [
-          {
-            fullName: 'acme/api',
-            owner: 'acme',
-            private: false,
-            pushedAt: new Date().toISOString(),
-          },
-          {
-            fullName: 'acme/web',
-            owner: 'acme',
-            private: true,
-            pushedAt: new Date().toISOString(),
-          },
-        ],
-      })
-    if (channel === 'github:clone-repo') {
-      if (options.cloneError) return Promise.reject(options.cloneError)
-      return Promise.resolve(options.cloneResult ?? { repoRoot: '/cloned/terminator' })
-    }
-    return Promise.resolve({})
-  })
+  options: InvokeOptions
+): Promise<unknown> {
+  if (channel === 'github:dashboard-search') return Promise.resolve(dashboardResult)
+  if (channel === 'github:review-settings')
+    return Promise.resolve({ cloneFolder: options.cloneFolder ?? '', repos: options.repos ?? [] })
+  if (channel === 'github:accessible-repos') return Promise.resolve(ACCESSIBLE_REPOS())
+  if (channel === 'github:clone-repo') return cloneAnswer(options)
+  return Promise.resolve({})
+}
+
+function mockInvoke(dashboardResult: unknown, options: InvokeOptions = {}) {
+  const invoke = vi.fn((channel: string) => answerFor(channel, dashboardResult, options))
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: {
       invoke,

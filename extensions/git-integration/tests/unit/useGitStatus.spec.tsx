@@ -102,10 +102,11 @@ describe('useGitStatus — sets status to null on exception', () => {
   })
 })
 
+const setVisibility = (state: 'hidden' | 'visible') => {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state })
+}
+
 describe('useGitStatus (continued) — polling', () => {
-  const setVisibility = (state: 'hidden' | 'visible') => {
-    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state })
-  }
   afterEach(() => setVisibility('visible'))
 
   it('polls on the interval while visible', async () => {
@@ -128,6 +129,10 @@ describe('useGitStatus (continued) — polling', () => {
     })
     expect(mockGitStatus).not.toHaveBeenCalled()
   })
+})
+
+describe('useGitStatus (continued) — polling — refreshes once when the document becomes visible again', () => {
+  afterEach(() => setVisibility('visible'))
 
   it('refreshes once when the document becomes visible again', async () => {
     renderHook(() => useGitStatus('/repo', 3000))
@@ -142,6 +147,10 @@ describe('useGitStatus (continued) — polling', () => {
     })
     expect(mockGitStatus).toHaveBeenCalledTimes(1)
   })
+})
+
+describe('useGitStatus (continued) — polling — does not start a second refresh while one is in flight', () => {
+  afterEach(() => setVisibility('visible'))
 
   it('does not start a second refresh while one is in flight', async () => {
     let resolve!: (v: unknown) => void

@@ -1460,6 +1460,16 @@ describe('useLoadIssueComments', () => {
     })
     expect(mockPrIssueCommentsAPI).not.toHaveBeenCalled()
   })
+})
+
+describe('useLoadIssueComments — does nothing when no prNumber (no activePr and no override)', () => {
+  beforeEach(() => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: validActivePr,
+      setIssueComments: mockSetIssueComments,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
 
   it('does nothing when no prNumber (no activePr and no override)', async () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
@@ -1473,6 +1483,16 @@ describe('useLoadIssueComments', () => {
       await result.current()
     })
     expect(mockPrIssueCommentsAPI).not.toHaveBeenCalled()
+  })
+})
+
+describe('useLoadIssueComments — loads comments using activePr.number when no override given', () => {
+  beforeEach(() => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: validActivePr,
+      setIssueComments: mockSetIssueComments,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
   })
 
   it('loads comments using activePr.number when no override given', async () => {
@@ -1489,6 +1509,16 @@ describe('useLoadIssueComments', () => {
     expect(mockPrIssueCommentsAPI).toHaveBeenCalledWith('/repo', validActivePr.number)
     expect(mockSetIssueComments).toHaveBeenCalledWith(comments)
   })
+})
+
+describe('useLoadIssueComments — loads comments using prNumber override', () => {
+  beforeEach(() => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: validActivePr,
+      setIssueComments: mockSetIssueComments,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
 
   it('loads comments using prNumber override', async () => {
     const comments = [
@@ -1504,6 +1534,16 @@ describe('useLoadIssueComments', () => {
     expect(mockPrIssueCommentsAPI).toHaveBeenCalledWith('/repo', 99)
     expect(mockSetIssueComments).toHaveBeenCalledWith(comments)
   })
+})
+
+describe('useLoadIssueComments — does not call setIssueComments when result contains an error', () => {
+  beforeEach(() => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: validActivePr,
+      setIssueComments: mockSetIssueComments,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
 
   it('does not call setIssueComments when result contains an error', async () => {
     mockPrIssueCommentsAPI.mockResolvedValue({ error: 'NOT_AUTHENTICATED' })
@@ -1514,6 +1554,16 @@ describe('useLoadIssueComments', () => {
     })
 
     expect(mockSetIssueComments).not.toHaveBeenCalled()
+  })
+})
+
+describe('useLoadIssueComments — handles thrown exceptions gracefully without crashing', () => {
+  beforeEach(() => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: validActivePr,
+      setIssueComments: mockSetIssueComments,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
   })
 
   it('handles thrown exceptions gracefully without crashing', async () => {

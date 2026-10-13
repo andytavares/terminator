@@ -7,6 +7,15 @@ import type { ReviewQueuePR } from '../../src/schemas/pr-review.schema'
 
 vi.mock('../../src/stores/pr-review.store', () => ({ usePrReviewStore: vi.fn() }))
 
+const PASSING_DOTS: ReviewQueuePR['signalDots'] = {
+  tests: 'pass',
+  coverage: 'pass',
+  ci: 'pass',
+  lint: 'pass',
+  churn: 'pass',
+  blast: 'pass',
+}
+
 function makePr(overrides: Partial<ReviewQueuePR> = {}): ReviewQueuePR {
   return {
     number: 1,
@@ -25,14 +34,7 @@ function makePr(overrides: Partial<ReviewQueuePR> = {}): ReviewQueuePR {
     riskLevel: 'low',
     estimatedMinutes: 10,
     sessionStatus: 'not-started',
-    signalDots: {
-      tests: 'pass',
-      coverage: 'pass',
-      ci: 'pass',
-      lint: 'pass',
-      churn: 'pass',
-      blast: 'pass',
-    },
+    signalDots: PASSING_DOTS,
     approvalCount: 0,
     approvedBy: [],
     requestedReviewers: [],
@@ -84,9 +86,9 @@ beforeEach(() => {
  * the eye lands on, and it must not look safer on a PR the tool happens to
  * have scored low-risk — the score is a heuristic and the mistake is permanent.
  */
-describe('review queue rows never lead with approval', () => {
-  const risks: ReviewQueuePR['riskLevel'][] = ['low', 'medium', 'high']
+const risks: ReviewQueuePR['riskLevel'][] = ['low', 'medium', 'high']
 
+describe('review queue rows never lead with approval', () => {
   for (const riskLevel of risks) {
     it(`offers reading, not approving, as the ${riskLevel}-risk row's action`, () => {
       withQueue([makePr({ number: 7, title: 'Some change', riskLevel })])
@@ -104,6 +106,19 @@ describe('review queue rows never lead with approval', () => {
     expect(screen.getByText('High risk')).toBeTruthy()
     expect(screen.queryByText('HIGH')).toBeNull()
   })
+})
+
+describe('review queue rows never lead with approval — drops the six-dot signal strip that never carried a visible label', () => {
+  for (const riskLevel of risks) {
+    it(`offers reading, not approving, as the ${riskLevel}-risk row's action`, () => {
+      withQueue([makePr({ number: 7, title: 'Some change', riskLevel })])
+      render(<ReviewQueue {...props} />)
+
+      const row = screen.getByText('Some change').closest<HTMLElement>('.rd-row')!
+      expect(within(row).queryByText(/approve/i)).toBeNull()
+      expect(within(row).getByRole('button', { name: 'Review' })).toBeTruthy()
+    })
+  }
 
   it('drops the six-dot signal strip that never carried a visible label', () => {
     const { container } = render(

@@ -80,7 +80,9 @@ describe('pr-review store — session v2 — treats every viewed file as changed
     expect(s.changedSince.size).toBe(3)
     expect(s.historyRewritten).toBe(true)
   })
+})
 
+describe('pr-review store — session v2 — treats every viewed file as changed when the old head is gone — viewing a changed file again records the new head and syncs GitHub', () => {
   it('viewing a changed file again records the new head and syncs GitHub', () => {
     const store = usePrReviewStore.getState()
     store.initSession(session())
@@ -216,7 +218,9 @@ describe('pr-review store — session v2 (continued) — viewed marks and risk s
       nodeId: 'PR_node_211',
     })
   })
+})
 
+describe('pr-review store — session v2 (continued) — viewed marks and risk scores against an active PR — marks several files with one session write and one GitHub request', () => {
   it('marks several files with one session write and one GitHub request', () => {
     usePrReviewStore.getState().setActivePr(activePr())
     usePrReviewStore
@@ -236,7 +240,9 @@ describe('pr-review store — session v2 (continued) — viewed marks and risk s
       viewed: true,
     })
   })
+})
 
+describe('pr-review store — session v2 (continued) — viewed marks and risk scores against an active PR — does nothing for an empty batch', () => {
   it('does nothing for an empty batch', () => {
     usePrReviewStore
       .getState()

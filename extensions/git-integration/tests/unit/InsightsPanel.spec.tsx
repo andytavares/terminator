@@ -4,13 +4,29 @@ import { render, screen } from '@testing-library/react'
 import { InsightsPanel } from '../../src/components/pr-review/InsightsPanel'
 import type { PrReviewDetail, PrInsights } from '../../src/schemas/pr-review.schema'
 
-const makeFile = (
-  path: string,
-  level: 'low' | 'medium' | 'high',
-  composite: number | null,
-  dominantDriver: string,
-  estimatedMinutes = 6
-) => ({
+interface Risk {
+  level: 'low' | 'medium' | 'high'
+  composite: number | null
+  dominantDriver: string
+}
+
+const riskScoreOf = ({ level, composite, dominantDriver }: Risk) => ({
+  level,
+  composite,
+  metrics: {
+    changeSize: 15,
+    churn90d: 5,
+    blastRadius: 2,
+    testFilePresent: true,
+    complexityDelta: 0,
+    patchCoverage: null,
+  },
+  dominantDriver,
+  topImporters: [],
+  importerCount: 0,
+})
+
+const makeFile = (path: string, risk: Risk, estimatedMinutes = 6) => ({
   path,
   oldPath: undefined,
   changeType: 'modified' as const,
@@ -19,21 +35,7 @@ const makeFile = (
   isBinary: false,
   tier: 1 as const,
   whyHere: 'test',
-  riskScore: {
-    level,
-    composite,
-    metrics: {
-      changeSize: 15,
-      churn90d: 5,
-      blastRadius: 2,
-      testFilePresent: true,
-      complexityDelta: 0,
-      patchCoverage: null,
-    },
-    dominantDriver,
-    topImporters: [],
-    importerCount: 0,
-  },
+  riskScore: riskScoreOf(risk),
   estimatedMinutes,
 })
 
@@ -81,7 +83,7 @@ const baseInsights: PrInsights = {
   },
 }
 
-const buildPr = (overrides: Partial<PrReviewDetail> = {}): PrReviewDetail => ({
+const prHeader = () => ({
   number: 211,
   title: 'Shard e2e specs by duration',
   body: '',
@@ -92,26 +94,47 @@ const buildPr = (overrides: Partial<PrReviewDetail> = {}): PrReviewDetail => ({
   baseRefName: 'main',
   headSHA: 'abc123',
   isDraft: false,
-  mergeStateStatus: 'clean',
-  ciStatus: 'passing',
-  lintStatus: 'pass',
-  coverageStatus: 'pass',
+  mergeStateStatus: 'clean' as const,
+  ciStatus: 'passing' as const,
+  lintStatus: 'pass' as const,
+  coverageStatus: 'pass' as const,
   statusChecks: [],
   approvals: [],
   requestedReviewers: [],
   assigneeLogins: [],
-  chapters: [
-    {
-      id: 'ch1',
-      name: 'Sharding',
-      estimatedMinutes: 18,
-      status: 'not-started',
-      files: [
-        makeFile('playwright.config.ts', 'high', 78, 'Wide blast radius — 41 importers', 12),
-        makeFile('scripts/e2e-shard.ts', 'medium', 50, 'High churn — 14 commits/90d', 6),
-      ],
-    },
+})
+
+/** The "Sharding" chapter holding `files`. */
+const chapterWith = (files: ReturnType<typeof makeFile>[]) => ({
+  id: 'ch1',
+  name: 'Sharding',
+  estimatedMinutes: 18,
+  status: 'not-started' as const,
+  files,
+})
+
+const shardingChapter = () => ({
+  id: 'ch1',
+  name: 'Sharding',
+  estimatedMinutes: 18,
+  status: 'not-started' as const,
+  files: [
+    makeFile(
+      'playwright.config.ts',
+      { level: 'high', composite: 78, dominantDriver: 'Wide blast radius — 41 importers' },
+      12
+    ),
+    makeFile(
+      'scripts/e2e-shard.ts',
+      { level: 'medium', composite: 50, dominantDriver: 'High churn — 14 commits/90d' },
+      6
+    ),
   ],
+})
+
+const buildPr = (overrides: Partial<PrReviewDetail> = {}): PrReviewDetail => ({
+  ...prHeader(),
+  chapters: [shardingChapter()],
   issueRefs: [],
   dryViolations: [],
   readingOrder: [],
@@ -242,7 +265,13 @@ describe('InsightsPanel — leaves low risk files out of the hotspots', () => {
           name: 'Sharding',
           estimatedMinutes: 6,
           status: 'not-started',
-          files: [makeFile('a/b/c/quiet.ts', 'low', 10, 'No dominant risk signal', 6)],
+          files: [
+            makeFile(
+              'a/b/c/quiet.ts',
+              { level: 'low', composite: 10, dominantDriver: 'No dominant risk signal' },
+              6
+            ),
+          ],
         },
       ],
     })
@@ -257,13 +286,13 @@ describe('InsightsPanel — shows Not measured for risk when no file has a compo
   it('shows "Not measured" for risk when no file has a composite score', () => {
     const pr = buildPr({
       chapters: [
-        {
-          id: 'ch1',
-          name: 'Sharding',
-          estimatedMinutes: 18,
-          status: 'not-started',
-          files: [makeFile('scripts/e2e-shard.ts', 'low', null, 'No dominant risk signal', 6)],
-        },
+        chapterWith([
+          makeFile(
+            'scripts/e2e-shard.ts',
+            { level: 'low', composite: null, dominantDriver: 'No dominant risk signal' },
+            6
+          ),
+        ]),
       ],
     })
     render(<InsightsPanel pr={pr} />)
