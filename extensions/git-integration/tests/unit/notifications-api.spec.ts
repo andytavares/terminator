@@ -5,14 +5,16 @@ const mockInvoke = vi.fn().mockResolvedValue({ ok: true })
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as unknown as Record<string, unknown>).window = globalThis
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke: mockInvoke },
-  }
+  Object.assign(globalThis, { window: globalThis })
+  Object.assign(globalThis, {
+    electronAPI: {
+      extensionBridge: { invoke: mockInvoke },
+    },
+  })
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 describe('notificationsAPI bridge', () => {

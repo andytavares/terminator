@@ -6,13 +6,15 @@ const mockInvoke = vi.fn()
 beforeEach(() => {
   vi.clearAllMocks()
   mockInvoke.mockResolvedValue({})
-  ;(globalThis as unknown as { window: unknown }).window = {
-    electronAPI: { extensionBridge: { invoke: mockInvoke } },
-  }
+  Object.assign(globalThis, {
+    window: {
+      electronAPI: { extensionBridge: { invoke: mockInvoke } },
+    },
+  })
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as { window?: unknown }).window
+  Reflect.deleteProperty(globalThis, 'window')
 })
 
 describe('logReviewAction', logReviewActionTests)

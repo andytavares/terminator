@@ -422,7 +422,9 @@ function mockInstalledExtensions(entries: string[], files: Record<string, string
     const path = String(p)
     return path === EXT_ROOT || path in files || path === `${EXT_DIR}/dist`
   })
-  vi.mocked(readdirSync).mockReturnValue(entries as unknown as ReturnType<typeof readdirSync>)
+  // The overload that lists names, the one the server calls.
+  const readNames: (path: string) => string[] = readdirSync
+  vi.mocked(readNames).mockReturnValue(entries)
   vi.mocked(readFileSync).mockImplementation((p) => {
     const content = files[String(p)]
     if (content !== undefined) return content

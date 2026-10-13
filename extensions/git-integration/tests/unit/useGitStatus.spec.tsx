@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useGitStore } from '../../src/stores/git.store'
 import { useGitStatus } from '../../src/hooks/useGitStatus'
+import { partialFake } from '../../../../tests/support/fakes'
+
+type GitState = ReturnType<typeof useGitStore.getState>
 
 vi.mock('../../src/stores/git.store', () => ({
   useGitStore: vi.fn(),
@@ -22,18 +25,21 @@ beforeEach(() => {
     if (channel === 'git:status') return mockGitStatus(payload)
     return Promise.resolve({})
   })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke: mockInvoke },
-    fs: { onChanged: mockOnChanged },
-  }
+  Object.assign(globalThis, {
+    electronAPI: {
+      extensionBridge: { invoke: mockInvoke },
+      fs: { onChanged: mockOnChanged },
+    },
+  })
   const state = { setStatus: mockSetStatus, setDisabled: vi.fn(), setLoading: mockSetLoading }
-  vi.mocked(useGitStore).mockImplementation(((sel?: (s: unknown) => unknown) =>
-    sel ? sel(state) : state) as unknown as typeof useGitStore)
+  vi.mocked(useGitStore).mockImplementation((sel?: (s: GitState) => unknown) =>
+    sel ? sel(partialFake<GitState>(state)) : state
+  )
 })
 
 afterEach(() => {
   vi.useRealTimers()
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 describe('useGitStatus', () => {

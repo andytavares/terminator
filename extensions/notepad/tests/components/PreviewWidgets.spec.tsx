@@ -2,12 +2,19 @@ import { describe, it, expect, vi } from 'vitest'
 import type { EditorView } from '@codemirror/view'
 import { TableWidget, AlertHeaderWidget } from '../../src/editor/livePreview'
 import { parseTable, ALERT_KINDS } from '../../src/editor/markdownTable'
+import { partialFake } from '../../../../tests/support/fakes'
 
 function makeView(docLength = 10_000) {
   const dispatch = vi.fn()
   const focus = vi.fn()
   return {
-    view: { state: { doc: { length: docLength } }, dispatch, focus } as unknown as EditorView,
+    view: partialFake<EditorView>({
+      state: partialFake<EditorView['state']>({
+        doc: partialFake<EditorView['state']['doc']>({ length: docLength }),
+      }),
+      dispatch,
+      focus,
+    }),
     dispatch,
     focus,
   }

@@ -114,9 +114,10 @@ describe('setSchedulerTick / triggerSchedulerTick', () => {
     expect(fn).toHaveBeenCalledTimes(1)
   })
 
-  it('triggerSchedulerTick is a no-op before setSchedulerTick is called', () => {
-    setSchedulerTick(null as unknown as () => void)
-    expect(() => triggerSchedulerTick()).not.toThrow()
+  it('triggerSchedulerTick is a no-op before setSchedulerTick is called', async () => {
+    vi.resetModules()
+    const fresh = await import('../../src/notifications/task-scheduler.js')
+    expect(() => fresh.triggerSchedulerTick()).not.toThrow()
   })
 })
 

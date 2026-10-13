@@ -64,9 +64,11 @@ function mount(
     }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: bus.on },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: bus.on },
+    },
+  })
   render(<FactorySite repoRoot="/repo" onOpen={onOpen} />)
   return { onOpen, invoke }
 }

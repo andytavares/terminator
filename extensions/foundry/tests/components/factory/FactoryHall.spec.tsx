@@ -80,10 +80,12 @@ function mount(props: MountProps = {}) {
   const onOpenInList = props.onOpenInList ?? vi.fn()
   const replies = hallReplies(props)
   invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-    shell: { openExternal },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      shell: { openExternal },
+    },
+  })
   render(<FactoryHall orderId="WO-1" onOpenInList={onOpenInList} onBack={onBack} />)
   return { onOpenInList, onBack }
 }
@@ -202,9 +204,11 @@ function replayable(frames: unknown[], ci?: unknown[]) {
       }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    },
+  })
   render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
 }
 const plateText = () =>
@@ -620,9 +624,11 @@ function theSiteAndFailuresTests() {
       if (channel === 'foundry:session.attach') return { error: 'gone' }
       return {}
     })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-    }
+    Object.assign(window, {
+      electronAPI: {
+        extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      },
+    })
     render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
     fireEvent.click(screen.getByRole('button', { name: /Build the thing/ }))

@@ -6,6 +6,7 @@ import { signText } from '../../../src/factory/layout.js'
 import type { RunNode } from '../../../src/line/run-graph.js'
 import { parseRecipe } from '../../../src/recipe/parse.js'
 import { createRecordingPaint } from './paint-fake.js'
+import { partialFake } from '../../../../../tests/support/fakes'
 
 const RECIPES = path.join(__dirname, '..', '..', '..', 'recipes')
 
@@ -112,7 +113,7 @@ function shippedIdsTests() {
       const parsed = parseRecipe(fs.readFileSync(path.join(RECIPES, file), 'utf-8'), file)
       if (!parsed.ok) throw new Error(parsed.reason)
       for (const step of parsed.value.steps) {
-        const role = (step as unknown as { step?: { role?: string } }).step?.role
+        const role = partialFake<{ step?: { role?: string } }>(step).step?.role
         for (const name of [step.id, role]) {
           if (name === undefined) continue
           names++

@@ -14,26 +14,35 @@ vi.mock('../src/notifications/task-scheduler.js', async (importOriginal) => ({
 }))
 
 import { activate, deactivate } from '../src/index.ts'
+import { partialFake } from '../../../tests/support/fakes'
 
 const disposable = { dispose: () => {} }
 
 async function activateCapturingChannels(): Promise<ChannelSpec[]> {
   const specs: ChannelSpec[] = []
-  const api = {
+  const api = partialFake<ExtensionAPI>({
     db: wrapDb(new DatabaseSync(':memory:')),
-    ipc: {
+    ipc: partialFake<ExtensionAPI['ipc']>({
       registerHandler: (spec: ChannelSpec) => {
         specs.push(spec)
         return disposable
       },
-    },
-    settings: { register: () => disposable, get: () => '0' },
-    window: { broadcast: () => {}, focusSelf: () => {} },
-    notifications: { showToast: () => {}, createNotification: () => disposable },
-    nativeMenu: { addViewMenuItem: () => disposable },
-    globalShortcut: { register: () => disposable },
-    commands: { register: () => disposable },
-  } as unknown as ExtensionAPI
+    }),
+    settings: partialFake<ExtensionAPI['settings']>({
+      register: () => disposable,
+      get: <T>() => '0' as T,
+    }),
+    window: partialFake<ExtensionAPI['window']>({ broadcast: () => {}, focusSelf: () => {} }),
+    notifications: partialFake<ExtensionAPI['notifications']>({
+      showToast: () => {},
+      createNotification: () => disposable,
+    }),
+    nativeMenu: partialFake<ExtensionAPI['nativeMenu']>({ addViewMenuItem: () => disposable }),
+    globalShortcut: partialFake<ExtensionAPI['globalShortcut']>({
+      register: async () => disposable,
+    }),
+    commands: partialFake<ExtensionAPI['commands']>({ register: () => disposable }),
+  })
   await activate(api)
   return specs
 }

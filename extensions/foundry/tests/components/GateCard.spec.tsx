@@ -27,7 +27,7 @@ function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
 
 beforeEach(() => {
   openExternal = vi.fn(async () => ({ ok: true }))
-  ;(window as unknown as Record<string, unknown>).electronAPI = { shell: { openExternal } }
+  Object.assign(window, { electronAPI: { shell: { openExternal } } })
 })
 
 describe('a gate collapsed to one line', () => {

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
+import { partialFake } from '../../../../tests/support/fakes'
 
 const mockSetShowCaptureModal = vi.fn()
 const mockSetView = vi.fn()
@@ -34,9 +35,9 @@ function setSearch(params: Record<string, string>): void {
 
 beforeEach(() => {
   mockInvoke.mockResolvedValue({ data: { pending: false } })
-  window.electronAPI = {
+  window.electronAPI = partialFake<typeof window.electronAPI>({
     extensionBridge: { on: mockOn, invoke: mockInvoke },
-  } as unknown as typeof window.electronAPI
+  })
 })
 
 afterEach(() => {

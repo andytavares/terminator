@@ -130,15 +130,17 @@ function answerFor(
 
 function mockInvoke(dashboardResult: unknown, options: InvokeOptions = {}) {
   const invoke = vi.fn((channel: string) => answerFor(channel, dashboardResult, options))
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: {
-      invoke,
-      on: vi.fn(() => () => {}),
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: {
+        invoke,
+        on: vi.fn(() => () => {}),
+      },
+      shell: {
+        openExternal: vi.fn().mockResolvedValue(undefined),
+      },
     },
-    shell: {
-      openExternal: vi.fn().mockResolvedValue(undefined),
-    },
-  }
+  })
 }
 
 beforeEach(() => {
@@ -264,21 +266,15 @@ describe('ReviewDashboard — sorts each section with the chosen sort', () => {
 describe('ReviewDashboard — reloads when a review is submitted elsewhere', () => {
   it('reloads when a review is submitted elsewhere', async () => {
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
-    const bridge = (
-      window as unknown as {
-        electronAPI: {
-          extensionBridge: { invoke: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn> }
-        }
-      }
-    ).electronAPI.extensionBridge
-    const listeners: Record<string, () => void> = {}
-    bridge.on.mockImplementation((channel: string, cb: () => void) => {
+    const bridge = window.electronAPI.extensionBridge
+    const listeners: Record<string, (data?: unknown) => void> = {}
+    vi.mocked(bridge.on).mockImplementation((channel: string, cb: (data: unknown) => void) => {
       listeners[channel] = cb
       return () => {}
     })
     render(<ReviewDashboard />)
     await screen.findByText('REQUESTED OF YOU')
-    bridge.invoke.mockImplementation((channel: string) =>
+    vi.mocked(bridge.invoke).mockImplementation((channel: string) =>
       Promise.resolve(
         channel === 'github:dashboard-search'
           ? { prs: [], login: 'andytavares', fetchedAt: new Date().toISOString() }

@@ -6,14 +6,15 @@ import { resolveRecipe } from '../../src/recipe/resolve.js'
 import { resolveSources } from '../../src/workspace-root.js'
 import type { Recipe } from '../../src/recipe/parse.js'
 import type { RunOutcome } from '../../src/line/executor.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 // The one sentence the ledger gets when a finished run opens nothing: the
 // first thing that actually stopped it.
 
-const host = {
-  settings: { get: () => undefined },
-  workspace: { list: () => [] },
-} as unknown as ExtensionAPI
+const host = partialFake<ExtensionAPI>({
+  settings: partialFake<ExtensionAPI['settings']>({ get: () => undefined }),
+  workspace: partialFake<ExtensionAPI['workspace']>({ list: () => [] }),
+})
 
 function recipe(name: string): Recipe {
   const resolved = resolveRecipe(name, resolveSources(host, '/nowhere'))
@@ -21,14 +22,14 @@ function recipe(name: string): Recipe {
   return resolved.resolved.value
 }
 
-const finished = {
+const finished = partialFake<RunOutcome>({
   complete: true,
   gates: [],
   ladder: { ok: true, steps: [], stoppedAt: null, unmeasured: [] },
-} as unknown as RunOutcome
+})
 
 const outcome = (over: Record<string, unknown>): RunOutcome =>
-  ({ ...finished, ...over }) as unknown as RunOutcome
+  partialFake<RunOutcome>({ ...finished, ...over })
 
 describe('why a finished run opened nothing', () => {
   describe('shapes and passing checks', shapesAndPassingChecksTests)

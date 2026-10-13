@@ -98,11 +98,13 @@ function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}
   invoke = vi.fn(async (channel: string) =>
     channel in replies ? replies[channel]() : { terminalSessionId: 't-1', ok: true }
   )
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: bus.on },
-    shell: { openExternal },
-    extension: { runCommand, hasCommand },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: bus.on },
+      shell: { openExternal },
+      extension: { runCommand, hasCommand },
+    },
+  })
   render(<Floor orderId="WO-1" />)
 }
 

@@ -494,7 +494,8 @@ function resumingTests() {
   // gate naming a budget that no longer exists, so there is nothing to raise.
   it('resumes a gate stopped at the retired files budget, and changes no budget', async () => {
     await createOrderStore(root).save(order())
-    const retired = { kind: 'files_touched', limit: 10, actual: 47 } as unknown as typeof breach
+    // Parsed, as it is read from a gate file written before the budget was retired.
+    const retired: typeof breach = JSON.parse('{"kind":"files_touched","limit":10,"actual":47}')
     await createGateStore(root).save(gate({ rule: 'budget.exceeded', breach: retired }))
     expect((await createGateStore(root).get('G-1'))?.breach).toBeNull()
 

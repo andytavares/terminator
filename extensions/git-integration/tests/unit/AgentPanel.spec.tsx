@@ -5,6 +5,9 @@ import { AgentPanel } from '../../src/components/pr-review/AgentPanel'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import type { AgentRun, AgentScope } from '../../src/schemas/review-agent.schema'
+import { partialFake } from '../../../../tests/support/fakes'
+
+type ReviewUiState = ReturnType<typeof useReviewUiStore.getState>
 
 vi.mock('../../src/stores/review-ui.store', () => ({ useReviewUiStore: vi.fn() }))
 
@@ -100,8 +103,8 @@ function setStoreState(overrides: Record<string, unknown>) {
     requestComposer: mockRequestComposer,
     ...overrides,
   }
-  ;(useReviewUiStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(
-    (selector: (s: typeof state) => unknown) => selector(state)
+  vi.mocked(useReviewUiStore).mockImplementation((selector: (s: ReviewUiState) => unknown) =>
+    selector(partialFake<ReviewUiState>(state))
   )
 }
 

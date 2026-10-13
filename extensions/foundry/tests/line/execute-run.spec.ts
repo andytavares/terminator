@@ -142,7 +142,7 @@ describe('an order whose CI goes red', () => {
     await started(order())
     await shipped()
     const builders = theRunner.start.mock.calls.filter(
-      (call) => (call[0] as unknown as { phase: string }).phase === 'builder'
+      (call) => (call[0] as { phase: string }).phase === 'builder'
     )
     expect(builders.length).toBe(2)
   })

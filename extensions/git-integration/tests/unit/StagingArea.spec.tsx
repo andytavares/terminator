@@ -8,12 +8,18 @@ vi.mock('../../src/stores/git.store', () => ({
 
 import { useGitStore } from '../../src/stores/git.store'
 import { StagingArea } from '../../src/components/StagingArea'
+import type { GitFileStatus, GitStatus } from '../../src/schemas/git.schema'
+import { partialFake } from '../../../../tests/support/fakes'
+
+type GitState = ReturnType<typeof useGitStore.getState>
+type Status = GitFileStatus['status']
 
 const mockUseGitStore = vi.mocked(useGitStore)
 // The component reads the store through selectors; resolve them against a plain state object.
-function mockStore(state: Record<string, unknown>) {
-  mockUseGitStore.mockImplementation(((sel?: (s: unknown) => unknown) =>
-    sel ? sel(state) : state) as unknown as typeof useGitStore)
+function mockStore(state: Partial<GitState>) {
+  mockUseGitStore.mockImplementation((sel?: (s: GitState) => unknown) =>
+    sel ? sel(partialFake<GitState>(state)) : state
+  )
 }
 const mockStage = vi.fn()
 const mockUnstage = vi.fn()
@@ -21,7 +27,7 @@ const mockStatus = vi.fn()
 const mockSetStatus = vi.fn()
 const mockInvoke = vi.fn()
 
-const makeFile = (status: string, staged: boolean, path?: string) => ({
+const makeFile = (status: Status, staged: boolean, path?: string): GitFileStatus => ({
   path: path ?? `test.${status}.ts`,
   status,
   staged,
@@ -31,6 +37,8 @@ const makeFile = (status: string, staged: boolean, path?: string) => ({
 // The badge used to carry git's porcelain letters — M, A, D, R, U, and a bare
 // "?" for an untracked file — with the raw status word as its tooltip. Both say
 // it in the reader's language now.
+const STATUSES = ['modified', 'added', 'deleted', 'renamed', 'untracked', 'conflicted'] as const
+
 const STATUS_TOOLTIP: Record<string, string> = {
   modified: 'Changed since the last commit',
   added: 'Staged as a new file',
@@ -49,22 +57,15 @@ const STATUS_BADGE_TEXT: Record<string, string> = {
   conflicted: 'Conflict',
 }
 
-function setupStore(
-  files: ReturnType<typeof makeFile>[] = [],
-  overrides: { status?: Record<string, unknown>; selectedFile?: unknown } = {}
-) {
+function setupStore(status: GitStatus) {
   mockStore({
-    status:
-      files.length === 0 && !overrides.status
-        ? null
-        : { branch: 'main', files, truncated: false, hasConflicts: false, ...overrides.status },
+    status,
     setStatus: mockSetStatus,
-    selectedFile: overrides.selectedFile ?? null,
+    selectedFile: null,
     setSelectedFile: vi.fn(),
     diffCache: new Map(),
     setDiff: vi.fn(),
     setLoading: vi.fn(),
-    ...overrides,
   })
 }
 
@@ -87,15 +88,14 @@ beforeEach(() => {
 })
 
 describe('StagingArea — file status badge tooltips', () => {
-  Object.entries(STATUS_TOOLTIP).forEach(([status, label]) => {
+  STATUSES.forEach((status) => {
+    const label = STATUS_TOOLTIP[status]
     it(`badge for "${status}" has title="${label}"`, () => {
-      setupStore([makeFile(status, false)], {
-        status: {
-          branch: 'main',
-          files: [makeFile(status, false)],
-          truncated: false,
-          hasConflicts: false,
-        },
+      setupStore({
+        branch: 'main',
+        files: [makeFile(status, false)],
+        truncated: false,
+        hasConflicts: false,
       })
       render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
       const badge = document.querySelector(`.staging-area__badge--${status}`)

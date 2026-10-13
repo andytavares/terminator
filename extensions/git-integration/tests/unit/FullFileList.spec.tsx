@@ -62,7 +62,7 @@ beforeEach(() => {
   vi.mocked(usePrReviewStore).mockReturnValue({
     viewedFiles: new Set<string>(),
     fileOrderOverrides: {},
-  } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
 })
 
 const defaultProps = {
@@ -119,7 +119,7 @@ describe('FullFileList — toggles chapter collapsed state when header is clicke
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set(['src/foo.ts']),
       fileOrderOverrides: {},
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     const { container } = render(<FullFileList {...defaultProps} />)
     const viewedRow = container.querySelector('.full-file-row--viewed')
     expect(viewedRow).toBeTruthy()
@@ -144,7 +144,7 @@ describe('FullFileList — shows progress per chapter', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set(['src/foo.ts', 'src/bar.ts']),
       fileOrderOverrides: {},
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     const { container } = render(<FullFileList {...defaultProps} />)
     expect(container.querySelector('.full-file-chapter-done')).toBeTruthy()
   })
@@ -153,7 +153,7 @@ describe('FullFileList — shows progress per chapter', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set<string>(),
       fileOrderOverrides: { 'ch-1': ['src/bar.ts', 'src/foo.ts'] },
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<FullFileList {...defaultProps} />)
     const rows = screen.getAllByTitle(/src\//)
     expect(rows[0].getAttribute('title')).toBe('src/bar.ts')
@@ -168,7 +168,7 @@ describe('FullFileList — shows changed for a file the store lists as changed s
       fileOrderOverrides: {},
       changedSince: new Set(['src/foo.ts']),
       viewedAt: {},
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<FullFileList {...defaultProps} />)
     expect(screen.getByText('changed')).toBeTruthy()
   })
@@ -179,7 +179,7 @@ describe('FullFileList — shows changed for a file the store lists as changed s
       fileOrderOverrides: {},
       changedSince: new Set<string>(),
       viewedAt: { 'src/foo.ts': 'abc' },
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<FullFileList {...defaultProps} />)
     expect(screen.getByText('viewed')).toBeTruthy()
   })
@@ -201,7 +201,7 @@ describe('FullFileList — shows new file for a file a push added since your las
       fileOrderOverrides: {},
       changedSince: new Set<string>(),
       newSinceLook: new Set(['src/new.ts']),
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<FullFileList {...defaultProps} pr={pr} />)
     expect(screen.getByText('new file')).toBeTruthy()
   })
@@ -223,7 +223,7 @@ describe('FullFileList — does not call an added file new on a first review', (
       fileOrderOverrides: {},
       changedSince: new Set<string>(),
       newSinceLook: new Set<string>(),
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<FullFileList {...defaultProps} pr={pr} />)
     expect(screen.queryByText('new file')).toBeNull()
   })
@@ -248,7 +248,7 @@ describe('FullFileList — shows the reading-order reason under the file name', 
       fileOrderOverrides: {},
       changedSince: new Set<string>(),
       viewedAt: {},
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<FullFileList {...defaultProps} pr={pr} />)
     expect(screen.getByText('Defines RiskScore')).toBeTruthy()
   })

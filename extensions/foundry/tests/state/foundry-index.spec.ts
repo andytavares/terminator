@@ -5,12 +5,13 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 function order(id: string, createdAt: string): WorkOrder {
-  return { id, createdAt, title: id, status: 'agreed' } as unknown as WorkOrder
+  return partialFake<WorkOrder>({ id, createdAt, title: id, status: 'agreed' })
 }
 function gate(id: string, orderId: string): Gate {
-  return { id, orderId, rule: 'r', decision: null } as unknown as Gate
+  return partialFake<Gate>({ id, orderId, rule: 'ready-for-review', decision: null })
 }
 function entry(orderId: string, action: string): LedgerEntry {
   return {
@@ -24,7 +25,7 @@ function entry(orderId: string, action: string): LedgerEntry {
   }
 }
 function graph(orderId: string): RunGraph {
-  return { orderId, nodes: [] } as unknown as RunGraph
+  return partialFake<RunGraph>({ orderId, nodes: [] })
 }
 
 function disk(): IndexSource & { reads: Record<string, number> } {

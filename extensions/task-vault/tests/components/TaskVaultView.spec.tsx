@@ -28,6 +28,7 @@ import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 import { useVaultDataStore } from '../../src/stores/vault-data.store'
 import { useVaultFilterStore } from '../../src/stores/vault-filter.store'
 import { notify } from '../../src/utils/notify'
+import { partialFake } from '../../../../tests/support/fakes'
 
 vi.setConfig({ testTimeout: 30_000 })
 
@@ -309,7 +310,7 @@ function importTests() {
   it('imports a chosen JSON file, reporting the count or the failure', async () => {
     await openDataTools()
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
-    const file = (text: string) => ({ text: async () => text }) as unknown as File
+    const file = (text: string) => partialFake<File>({ text: async () => text })
     bridge.responses['task-vault:vault:import-json'] = { success: true, imported: 3 }
     fireEvent.click(screen.getByRole('button', { name: 'Import JSON' }))
     fireEvent.change(input, { target: { files: [file('{"tasks":[]}')] } })

@@ -101,10 +101,12 @@ function mount(over: Record<string, unknown> = {}) {
   invoke = vi.fn(async (channel: string, payload?: unknown) =>
     channel in replies ? replies[channel](payload) : { ok: true }
   )
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: bus.on },
-    shell: { openExternal },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: bus.on },
+      shell: { openExternal },
+    },
+  })
   return render(<Inbox onOpenOrder={over.onOpenOrder as ((id: string) => void) | undefined} />)
 }
 

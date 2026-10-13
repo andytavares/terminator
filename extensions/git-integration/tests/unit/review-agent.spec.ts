@@ -110,10 +110,11 @@ describe('buildAgentPrompt — notes for an explain or ask request', () => {
 
 describe('buildAgentJsonSchema', () => {
   it('derives the severity enum from the shared constant', () => {
-    const schema = buildAgentJsonSchema() as any
-    expect(schema.properties.findings.items.properties.severity.enum).toEqual([
-      ...FINDING_SEVERITIES,
-    ])
+    expect(buildAgentJsonSchema()).toMatchObject({
+      properties: {
+        findings: { items: { properties: { severity: { enum: [...FINDING_SEVERITIES] } } } },
+      },
+    })
   })
 })
 

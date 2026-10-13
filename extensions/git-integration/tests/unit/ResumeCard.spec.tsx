@@ -3,16 +3,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ResumeCard } from '../../src/components/pr-review/ResumeCard'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
-import type { PrReviewDetail, ReviewNote, DraftComment } from '../../src/schemas/pr-review.schema'
+import type {
+  Chapter,
+  PrReviewDetail,
+  ReviewNote,
+  DraftComment,
+} from '../../src/schemas/pr-review.schema'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
+import { partialFake } from '../../../../tests/support/fakes'
 
-const mockPr = {
+const chapter = (id: string, name: string) => partialFake<Chapter>({ id, name })
+
+const mockPr = partialFake<PrReviewDetail>({
   number: 209,
-  chapters: [
-    { id: 'ch-1', name: 'Chapter 1' },
-    { id: 'ch-2', name: 'Chapter 2' },
-  ],
-} as unknown as PrReviewDetail
+  chapters: [chapter('ch-1', 'Chapter 1'), chapter('ch-2', 'Chapter 2')],
+})
 
 type CardProps = React.ComponentProps<typeof ResumeCard>
 

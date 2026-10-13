@@ -5,6 +5,7 @@ import { App } from '../../src/renderer/App.js'
 import '../helpers/app-views.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 // Two surfaces and a way into settings. The board, the card drawer, the phase
 // rail and the ticket importer are gone with the pipeline underneath them, so
@@ -95,6 +96,17 @@ const mockBridgeInvoke = vi.fn(async (channel: string, payload?: unknown) =>
   channel in replies ? replies[channel](payload) : {}
 )
 
+/** The canvas members the factory views draw with; jsdom has no canvas. */
+function fakeCanvasContext(): CanvasRenderingContext2D {
+  return partialFake<CanvasRenderingContext2D>({
+    fillStyle: '#000',
+    globalCompositeOperation: 'source-over',
+    fillRect: vi.fn(),
+    drawImage: vi.fn(),
+    createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+  })
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   pendingNewOrder = false
@@ -102,27 +114,23 @@ beforeEach(() => {
   inboxWaiting = []
   currentView = 'list'
   observeStanding = undefined
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    fillStyle: '#000',
-    globalCompositeOperation: 'source-over',
-    fillRect: vi.fn(),
-    drawImage: vi.fn(),
-    createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
-  } as unknown as CanvasRenderingContext2D)
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(fakeCanvasContext())
   for (const key of Object.keys(bridgeHandlers)) delete bridgeHandlers[key]
   for (const key of Object.keys(everyHandler)) delete everyHandler[key]
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: {
-      on: vi.fn((event: string, handler: (data: unknown) => void) => {
-        bridgeHandlers[event] = handler
-        everyHandler[event] = [...(everyHandler[event] ?? []), handler]
-        return vi.fn()
-      }),
-      invoke: mockBridgeInvoke,
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: {
+        on: vi.fn((event: string, handler: (data: unknown) => void) => {
+          bridgeHandlers[event] = handler
+          everyHandler[event] = [...(everyHandler[event] ?? []), handler]
+          return vi.fn()
+        }),
+        invoke: mockBridgeInvoke,
+      },
+      workspace: { list: vi.fn().mockResolvedValue({ workspaces: [] }) },
+      project: { create: vi.fn() },
     },
-    workspace: { list: vi.fn().mockResolvedValue({ workspaces: [] }) },
-    project: { create: vi.fn() },
-  }
+  })
   window.history.replaceState({}, '', '/?repoRoot=/repo')
 })
 

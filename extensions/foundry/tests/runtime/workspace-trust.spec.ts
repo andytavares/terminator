@@ -3,6 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { ensureTrusted, claudeConfigPath } from '../../src/runtime/workspace-trust.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { partialFake } from '../../../../tests/support/fakes'
 
 // Claude Code shows its workspace trust dialog for a directory it has not
 // seen, "in interactive sessions only" — and Foundry runs interactively on
@@ -42,7 +43,7 @@ function trustingTests() {
   it('trusts a repository Claude Code has never seen', () => {
     writeConfig({ projects: {} })
     expect(ensureTrusted(REPO, home)).toEqual({ changed: true })
-    const entry = readConfig().projects[REPO] as unknown as Record<string, unknown>
+    const entry = partialFake<Record<string, unknown>>(readConfig().projects[REPO])
     expect(entry.hasTrustDialogAccepted).toBe(true)
   })
 
@@ -65,7 +66,7 @@ function keepingOtherEntriesTests() {
       },
     })
     ensureTrusted(REPO, home)
-    const entry = readConfig().projects[REPO] as unknown as Record<string, unknown>
+    const entry = partialFake<Record<string, unknown>>(readConfig().projects[REPO])
     expect(entry.allowedTools).toEqual(['Read'])
     expect(entry.lastCost).toBe(1.5)
     expect(entry.hasTrustDialogAccepted).toBe(true)
@@ -78,7 +79,7 @@ function keepingOtherEntriesTests() {
       projects: { '/repos/other': { hasTrustDialogAccepted: true, lastCost: 2 } },
     })
     ensureTrusted(REPO, home)
-    const config = readConfig() as unknown as Record<string, never>
+    const config = partialFake<Record<string, never>>(readConfig())
     expect(config.numStartups).toBe(41)
     expect(config.oauthAccount).toEqual({ emailAddress: 'someone@example.com' })
     expect(config.projects['/repos/other']).toEqual({ hasTrustDialogAccepted: true, lastCost: 2 })
@@ -112,7 +113,7 @@ function emptyPathsAndNoProjectsTests() {
   it('adds a projects map to a config that has none', () => {
     writeConfig({ numStartups: 1 })
     expect(ensureTrusted(REPO, home)).toEqual({ changed: true })
-    const entry = readConfig().projects[REPO] as unknown as Record<string, unknown>
+    const entry = partialFake<Record<string, unknown>>(readConfig().projects[REPO])
     expect(entry.hasTrustDialogAccepted).toBe(true)
   })
 }
@@ -142,7 +143,7 @@ function bothNamesTests() {
     writeConfig({ projects: {} })
 
     expect(ensureTrusted(link, home)).toEqual({ changed: true })
-    const projects = readConfig().projects as unknown as Record<string, { [k: string]: unknown }>
+    const projects = partialFake<Record<string, { [k: string]: unknown }>>(readConfig().projects)
     expect(projects[link]?.hasTrustDialogAccepted).toBe(true)
     expect(projects[fs.realpathSync(link)]?.hasTrustDialogAccepted).toBe(true)
   })
@@ -153,7 +154,7 @@ function bothNamesTests() {
     fs.symlinkSync(real, link)
     writeConfig({ projects: { [fs.realpathSync(link)]: { hasTrustDialogAccepted: true } } })
     expect(ensureTrusted(link, home)).toEqual({ changed: true })
-    const projects = readConfig().projects as unknown as Record<string, { [k: string]: unknown }>
+    const projects = partialFake<Record<string, { [k: string]: unknown }>>(readConfig().projects)
     expect(projects[link]?.hasTrustDialogAccepted).toBe(true)
   })
 }

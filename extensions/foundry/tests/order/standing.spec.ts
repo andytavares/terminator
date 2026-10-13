@@ -5,6 +5,7 @@ import type { Gate } from '../../src/gates/rules.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
 import type { StandingInput } from '../../src/order/standing.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 // One answer to "what is this order doing, and whose move is it".
 //
@@ -495,10 +496,15 @@ function answeredShippedGatesTests() {
       input({
         status: 'shipped',
         gates: [
-          {
+          partialFake<Gate>({
             ...answered,
-            decision: { by: 'you', at: '2026-09-09T19:00:00.000Z', verdict: 'approve' },
-          } as unknown as Gate,
+            decision: {
+              option: 'approve',
+              by: 'operator',
+              note: '',
+              at: '2026-09-09T19:00:00.000Z',
+            },
+          }),
         ],
       })
     )
@@ -577,7 +583,7 @@ function notRunningTests() {
     const running = await readStanding({ id: 'WO-1', status: 'running' } as WorkOrder, sources)
     expect(running.kind).toBe('done')
     const draft = await readStanding(
-      { id: 'WO-1', status: 'draft', openQuestions: [] } as unknown as WorkOrder,
+      partialFake<WorkOrder>({ id: 'WO-1', status: 'draft', openQuestions: [] }),
       sources
     )
     expect(draft.kind).toBe('shaping')
@@ -600,7 +606,7 @@ function sourcesTests() {
   // as a rule.
   it('assembles from the sources it is given', async () => {
     const standing = await readStanding(
-      { id: 'WO-1', status: 'running', openQuestions: [] } as unknown as WorkOrder,
+      partialFake<WorkOrder>({ id: 'WO-1', status: 'running', openQuestions: [] }),
       {
         graphFor: async () => graph([node({ id: 'a', state: 'passed' }), node({ id: 'b' })]),
         gatesFor: async () => [gate()],
@@ -613,7 +619,7 @@ function sourcesTests() {
 
   it('stands somewhere with no sources at all', async () => {
     const standing = await readStanding(
-      { id: 'WO-1', status: 'draft', openQuestions: [] } as unknown as WorkOrder,
+      partialFake<WorkOrder>({ id: 'WO-1', status: 'draft', openQuestions: [] }),
       {}
     )
     expect(standing.kind).toBe('shaping')
@@ -626,7 +632,7 @@ function askingTheCallerTests() {
   // the caller owns the answer and this only has to ask for it.
   it('asks the caller which nodes nothing is running', async () => {
     const standing = await readStanding(
-      { id: 'WO-1', status: 'running', openQuestions: [] } as unknown as WorkOrder,
+      partialFake<WorkOrder>({ id: 'WO-1', status: 'running', openQuestions: [] }),
       {
         graphFor: async () => graph([node({ id: 'a', state: 'running' })]),
         orphansFor: () => ['a'],
@@ -637,7 +643,7 @@ function askingTheCallerTests() {
 
   it('asks the caller whether anything is still shaping a draft', async () => {
     const standing = await readStanding(
-      { id: 'WO-1', status: 'draft', openQuestions: [] } as unknown as WorkOrder,
+      partialFake<WorkOrder>({ id: 'WO-1', status: 'draft', openQuestions: [] }),
       { shapingFor: async () => false, blockerFor: () => 'plan — no units', failuresFor: () => 1 }
     )
     expect(standing.turn).toBe('you')
@@ -648,7 +654,7 @@ function askingTheCallerTests() {
 function refusalsTests() {
   it('reads why the run refused to start for an agreed order', async () => {
     const standing = await readStanding(
-      { id: 'WO-1', status: 'agreed', openQuestions: [] } as unknown as WorkOrder,
+      partialFake<WorkOrder>({ id: 'WO-1', status: 'agreed', openQuestions: [] }),
       { runFailureFor: async () => 'no runtime' }
     )
     expect(standing.headline).toBe('The run did not start')

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { commitWorktree, committedSince } from '../../src/line/commit.js'
 import type { ShellExec } from '../../src/line/integrate.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 // A format step that writes leaves the checkout ahead of what CI will see, and
 // the push that follows is only honest when a commit was actually made.
@@ -17,7 +18,7 @@ function exec(responses: Record<string, { exitCode: number; stdout?: string; std
       timedOut: false,
     }
   })
-  return { run: run as unknown as ShellExec, calls }
+  return { run: partialFake<ShellExec>(run), calls }
 }
 
 describe('commitWorktree', () => {
@@ -78,7 +79,7 @@ describe('commitWorktree when the commit does not finish', () => {
       stderr: '',
       timedOut: options.args[0] === 'commit',
     }))
-    const outcome = await commitWorktree('/work', 'm', run as unknown as ShellExec)
+    const outcome = await commitWorktree('/work', 'm', partialFake<ShellExec>(run))
 
     expect(outcome).toMatchObject({ kind: 'refused', command: 'git commit' })
     expect((outcome as { output: string }).output).toMatch(/timed out after 300 seconds/)

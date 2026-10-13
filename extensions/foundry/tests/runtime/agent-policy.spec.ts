@@ -12,6 +12,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 import { temporaryDirectory } from '../helpers/foundry-host.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 function orderProbing(test: string | null): WorkOrder {
   const base = draftOrder({
@@ -71,7 +72,7 @@ describe('a read-only turn in the Forge', () => {
 
 let home: string
 const entries: LedgerEntry[] = []
-const api = { log: { error: vi.fn() } } as unknown as ExtensionAPI
+const api = partialFake<ExtensionAPI>({ log: partialFake<ExtensionAPI['log']>({ error: vi.fn() }) })
 
 describe('trusting the repository an agent starts in', () => {
   beforeEach(() => {

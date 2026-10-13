@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useResizePanel } from '../../src/hooks/useResizePanel'
+import { partialFake } from '../../../../tests/support/fakes'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -21,10 +22,12 @@ describe('useResizePanel', () => {
     const { result } = renderHook(() => useResizePanel(300, { min: 100, max: 600 }))
     const preventDefault = vi.fn()
     act(() => {
-      result.current.handleMouseDown({
-        clientX: 500,
-        preventDefault,
-      } as unknown as React.MouseEvent)
+      result.current.handleMouseDown(
+        partialFake<React.MouseEvent>({
+          clientX: 500,
+          preventDefault,
+        })
+      )
     })
     expect(preventDefault).toHaveBeenCalled()
   })
@@ -37,10 +40,12 @@ describe('useResizePanel — onMove updates size when dragging (direction=1)', (
 
     // Start drag
     act(() => {
-      result.current.handleMouseDown({
-        clientX: 500,
-        preventDefault,
-      } as unknown as React.MouseEvent)
+      result.current.handleMouseDown(
+        partialFake<React.MouseEvent>({
+          clientX: 500,
+          preventDefault,
+        })
+      )
     })
 
     // Simulate mousemove event
@@ -58,10 +63,12 @@ describe('useResizePanel — onMove updates size when dragging (direction=-1)', 
     const preventDefault = vi.fn()
 
     act(() => {
-      result.current.handleMouseDown({
-        clientX: 500,
-        preventDefault,
-      } as unknown as React.MouseEvent)
+      result.current.handleMouseDown(
+        partialFake<React.MouseEvent>({
+          clientX: 500,
+          preventDefault,
+        })
+      )
     })
 
     act(() => {
@@ -79,10 +86,12 @@ describe('useResizePanel — onMove clamps size to minimum', () => {
     const preventDefault = vi.fn()
 
     act(() => {
-      result.current.handleMouseDown({
-        clientX: 500,
-        preventDefault,
-      } as unknown as React.MouseEvent)
+      result.current.handleMouseDown(
+        partialFake<React.MouseEvent>({
+          clientX: 500,
+          preventDefault,
+        })
+      )
     })
 
     // Move left by 200px — would give 100, but min is 200
@@ -100,10 +109,12 @@ describe('useResizePanel — onMove clamps size to maximum', () => {
     const preventDefault = vi.fn()
 
     act(() => {
-      result.current.handleMouseDown({
-        clientX: 500,
-        preventDefault,
-      } as unknown as React.MouseEvent)
+      result.current.handleMouseDown(
+        partialFake<React.MouseEvent>({
+          clientX: 500,
+          preventDefault,
+        })
+      )
     })
 
     // Move right by 300px — would give 600, but max is 400
@@ -135,10 +146,12 @@ describe('useResizePanel — onUp stops dragging so subsequent moves have no eff
     const preventDefault = vi.fn()
 
     act(() => {
-      result.current.handleMouseDown({
-        clientX: 500,
-        preventDefault,
-      } as unknown as React.MouseEvent)
+      result.current.handleMouseDown(
+        partialFake<React.MouseEvent>({
+          clientX: 500,
+          preventDefault,
+        })
+      )
     })
 
     // Move to change size
@@ -175,10 +188,12 @@ describe('useResizePanel — cleans up event listeners on unmount', () => {
     const preventDefault = vi.fn()
 
     act(() => {
-      result.current.handleMouseDown({
-        clientX: 500,
-        preventDefault,
-      } as unknown as React.MouseEvent)
+      result.current.handleMouseDown(
+        partialFake<React.MouseEvent>({
+          clientX: 500,
+          preventDefault,
+        })
+      )
     })
 
     act(() => {

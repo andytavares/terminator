@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { MODEL_ALIASES, fetchLiveModels, modelCatalog } from '../../src/state/model-catalog.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 const withKey: NodeJS.ProcessEnv = { ANTHROPIC_API_KEY: 'sk-test' }
 const respond = (body: unknown, ok = true): typeof fetch =>
-  vi.fn().mockResolvedValue({ ok, json: async () => body }) as unknown as typeof fetch
+  partialFake<typeof fetch>(vi.fn().mockResolvedValue({ ok, json: async () => body }))
 
 /**
  * The picker used to be three `<option>` tags typed into the settings view,
@@ -44,17 +45,15 @@ function withACredentialTests() {
   it('sends an API key as x-api-key and a token as a bearer', async () => {
     const keyed = respond({ data: [] })
     await fetchLiveModels({ ANTHROPIC_API_KEY: 'sk-test' }, keyed)
-    expect((keyed as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].headers).toMatchObject({
+    expect(vi.mocked(keyed).mock.calls[0][1]?.headers).toMatchObject({
       'x-api-key': 'sk-test',
     })
 
     const tokened = respond({ data: [] })
     await fetchLiveModels({ ANTHROPIC_AUTH_TOKEN: 'oat-test' }, tokened)
-    expect((tokened as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].headers).toMatchObject(
-      {
-        authorization: 'Bearer oat-test',
-      }
-    )
+    expect(vi.mocked(tokened).mock.calls[0][1]?.headers).toMatchObject({
+      authorization: 'Bearer oat-test',
+    })
   })
 
   it('appends what the account can reach, under its display name', async () => {
@@ -88,7 +87,7 @@ function orderingAndDegradingTests() {
   })
 
   it('degrades to the aliases when the network throws', async () => {
-    const boom = vi.fn().mockRejectedValue(new Error('offline')) as unknown as typeof fetch
+    const boom = partialFake<typeof fetch>(vi.fn().mockRejectedValue(new Error('offline')))
     expect(await modelCatalog(withKey, boom)).toEqual([...MODEL_ALIASES])
   })
 
@@ -106,9 +105,7 @@ function entriesAndOverridesTests() {
   it('honours a base URL override, for a gateway or a proxy', async () => {
     const fetchImpl = respond({ data: [] })
     await fetchLiveModels({ ...withKey, ANTHROPIC_BASE_URL: 'https://gw.example/' }, fetchImpl)
-    expect((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(
-      'https://gw.example/v1/models?limit=100'
-    )
+    expect(vi.mocked(fetchImpl).mock.calls[0][0]).toBe('https://gw.example/v1/models?limit=100')
   })
 
   it('ignores a credential that is only whitespace', async () => {

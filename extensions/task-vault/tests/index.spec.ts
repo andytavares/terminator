@@ -197,7 +197,7 @@ function taskVaultActivateQuickActionsRegisteringTests() {
 
     await activate(api)
 
-    const commandsRegister = api.commands.register as unknown as ReturnType<typeof vi.fn>
+    const commandsRegister = vi.mocked(api.commands.register)
     expect(commandsRegister).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'task-vault:capture-to-inbox',
@@ -216,15 +216,13 @@ function taskVaultActivateQuickActionsRunningTests() {
 
     await activate(api)
 
-    const commandsRegister = api.commands.register as unknown as ReturnType<typeof vi.fn>
+    const commandsRegister = vi.mocked(api.commands.register)
     const handler = commandsRegister.mock.calls.find(
       (c) => (c[0] as { id: string }).id === 'task-vault:capture-to-inbox'
     )?.[1] as (ctx: unknown) => void
     handler({ projectId: null, sessionId: null, repoRoot: null })
 
-    const channels = (api.window.broadcast as unknown as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c) => c[0]
-    )
+    const channels = vi.mocked(api.window.broadcast).mock.calls.map((c) => c[0])
     expect(channels).toContain('extension:activate-global-tab')
     expect(api.window.focusSelf).toHaveBeenCalledWith('main')
   })
@@ -247,9 +245,7 @@ function taskVaultActivateQuickActionsWithoutShortcutTests() {
     )!
     handler({ projectId: null, sessionId: null, repoRoot: null })
 
-    const channels = (api.window.broadcast as unknown as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c) => c[0]
-    )
+    const channels = vi.mocked(api.window.broadcast).mock.calls.map((c) => c[0])
     expect(channels).toContain('extension:activate-global-tab')
   })
 }

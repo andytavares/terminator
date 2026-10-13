@@ -3,6 +3,10 @@ import { describe, it, beforeAll, expect, vi, beforeEach, afterEach } from 'vite
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { GitFullView } from '../../src/components/GitFullView'
 import { useGitStore } from '../../src/stores/git.store'
+import type { GitStatus } from '../../src/schemas/git.schema'
+import { partialFake } from '../../../../tests/support/fakes'
+
+type GitState = ReturnType<typeof useGitStore.getState>
 
 vi.mock('../../src/stores/git.store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/stores/git.store')>()),
@@ -56,10 +60,21 @@ const mockOn = vi.fn((channel: string, cb: (data: unknown) => void) => {
   return () => channelHandlers.delete(channel)
 })
 
-function setupStore(overrides: Record<string, unknown> = {}) {
+/** The feature branch with src/foo.ts staged. */
+function featureWithStagedFile(): GitStatus {
+  const stagedFile = {
+    path: 'src/foo.ts',
+    staged: true,
+    status: 'modified' as const,
+    isBinary: false,
+  }
+  return { branch: 'feature', files: [stagedFile], hasConflicts: false, truncated: false }
+}
+
+function setupStore(overrides: Partial<GitState> = {}) {
   {
-    const state: Record<string, unknown> = {
-      status: { branch: 'feature', files: [] },
+    const state: Partial<GitState> = {
+      status: { branch: 'feature', files: [], hasConflicts: false, truncated: false },
       selectedFile: null,
       diffCache: new Map(),
       setSelectedFile: mockSetSelectedFile,
@@ -68,8 +83,9 @@ function setupStore(overrides: Record<string, unknown> = {}) {
       clearDiffCache: vi.fn(),
       ...overrides,
     }
-    vi.mocked(useGitStore).mockImplementation(((sel?: (s: unknown) => unknown) =>
-      sel ? sel(state) : state) as unknown as typeof useGitStore)
+    vi.mocked(useGitStore).mockImplementation((sel?: (s: GitState) => unknown) =>
+      sel ? sel(partialFake<GitState>(state)) : state
+    )
   }
 }
 
@@ -89,13 +105,15 @@ beforeEach(() => {
     if (channel === 'git:commit-output-poll') return Promise.resolve({ lines: [] })
     return Promise.resolve({})
   })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke: mockInvoke, on: mockOn },
-  }
+  Object.assign(globalThis, {
+    electronAPI: {
+      extensionBridge: { invoke: mockInvoke, on: mockOn },
+    },
+  })
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 async function renderView(
@@ -144,8 +162,7 @@ describe('GitFullView', () => {
 
 describe('GitFullView — shows Enter a commit message hint when files staged but no message', () => {
   it('shows "Enter a commit message" hint when files staged but no message', async () => {
-    const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
-    setupStore({ status: { branch: 'feature', files: [stagedFile] } })
+    setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
     expect(screen.getByText('Enter a commit message')).toBeTruthy()
   })
@@ -159,8 +176,7 @@ describe('GitFullView — shows Enter a commit message hint when files staged bu
 
 describe('GitFullView — calls commit when Commit is clicked with staged files and message', () => {
   it('calls commit when Commit is clicked with staged files and message', async () => {
-    const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
-    setupStore({ status: { branch: 'feature', files: [stagedFile] } })
+    setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'fix: something' },
@@ -179,8 +195,7 @@ describe('GitFullView — calls commit when Commit is clicked with staged files 
 describe('GitFullView — shows commit error message when commit returns error', () => {
   it('shows commit error message when commit returns error', async () => {
     mockGitCommit.mockResolvedValue({ error: 'NOTHING_TO_COMMIT' })
-    const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
-    setupStore({ status: { branch: 'feature', files: [stagedFile] } })
+    setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'fix: something' },
@@ -196,8 +211,7 @@ describe('GitFullView — shows commit error message when commit returns error',
 
 describe('GitFullView — calls commit and push when Commit & Push is clicked', () => {
   it('calls commit and push when Commit & Push is clicked', async () => {
-    const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
-    setupStore({ status: { branch: 'feature', files: [stagedFile] } })
+    setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'feat: add x' },
@@ -243,7 +257,7 @@ describe('GitFullView — closes PR dialog when ClosePrDialog is clicked', () =>
 describe('GitFullView — the pull request Open PR created', () => {
   it('shows the created pull request with a link that opens it, and announces it', async () => {
     const openExternal = vi.fn().mockResolvedValue(undefined)
-    Object.assign((globalThis as unknown as { electronAPI: object }).electronAPI, {
+    Object.assign(window.electronAPI, {
       shell: { openExternal },
     })
     await renderWithPrDialogOpen()
@@ -303,8 +317,7 @@ describe('GitFullView — shows hook output when commit fails due to hook failur
       hookOutput: 'eslint found 3 errors',
       isHookFailure: true,
     })
-    const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
-    setupStore({ status: { branch: 'feature', files: [stagedFile] } })
+    setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'fix: something' },
@@ -325,8 +338,7 @@ describe('GitFullView — commits with --no-verify when Commit without hooks is 
         isHookFailure: true,
       })
       .mockResolvedValueOnce({ commitHash: 'def456' })
-    const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
-    setupStore({ status: { branch: 'feature', files: [stagedFile] } })
+    setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'fix: skip hooks' },
@@ -353,8 +365,7 @@ describe('GitFullView — shows running hooks status text while committing', () 
           resolve = r
         })
     )
-    const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
-    setupStore({ status: { branch: 'feature', files: [stagedFile] } })
+    setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'wip' },
@@ -368,8 +379,7 @@ describe('GitFullView — shows running hooks status text while committing', () 
 describe('GitFullView — shows push error when push fails after commit & push', () => {
   it('shows push error when push fails after commit & push', async () => {
     mockGitPush.mockResolvedValue({ error: 'REJECTED' })
-    const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
-    setupStore({ status: { branch: 'feature', files: [stagedFile] } })
+    setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
     fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
       target: { value: 'feat: add x' },

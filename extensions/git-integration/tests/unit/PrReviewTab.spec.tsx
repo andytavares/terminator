@@ -130,19 +130,19 @@ beforeEach(() => {
   ;(githubModule.githubAPI.saveActiveReview as ReturnType<typeof vi.fn>).mockResolvedValue({
     ok: true,
   })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: {
-      invoke: mockInvoke,
-      on: mockOn,
+  Object.assign(globalThis, {
+    electronAPI: {
+      extensionBridge: {
+        invoke: mockInvoke,
+        on: mockOn,
+      },
     },
-  }
-  vi.mocked(usePrReviewStore).mockReturnValue(
-    defaultStoreState as unknown as ReturnType<typeof usePrReviewStore>
-  )
+  })
+  vi.mocked(usePrReviewStore).mockReturnValue(defaultStoreState)
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 /**
@@ -201,8 +201,8 @@ describe('PrReviewTab', () => {
   it('renders PrOverviewPanel when activePr is set', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
-      activePr: { number: 1, title: 'My PR' } as unknown as PrReviewDetail,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+      activePr: partialFake<PrReviewDetail>({ number: 1, title: 'My PR' }),
+    })
     // showOverview starts false; we need to simulate opening a PR to get it to true
     // Since activePr is pre-set here, showOverview stays false → PrReviewView shows
     render(<PrReviewTab repoRoot="/repo" />)
@@ -224,8 +224,8 @@ describe('PrReviewTab (continued) — window title', () => {
 
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
-      activePr: { number: 214, title: 'Code review revamp' } as unknown as PrReviewDetail,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+      activePr: partialFake<PrReviewDetail>({ number: 214, title: 'Code review revamp' }),
+    })
     rerender(<PrReviewTab repoRoot="/repo" />)
     expect(document.title).toBe('#214 Code review revamp — Review')
   })
@@ -234,8 +234,8 @@ describe('PrReviewTab (continued) — window title', () => {
     document.title = 'Git Integration'
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
-      activePr: { number: 214, title: 'Code review revamp' } as unknown as PrReviewDetail,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+      activePr: partialFake<PrReviewDetail>({ number: 214, title: 'Code review revamp' }),
+    })
     render(<PrReviewTab repoRoot="/repo" />)
     expect(document.title).toBe('Git Integration')
   })
@@ -259,15 +259,15 @@ describe('PrReviewTab — shows pop out button', () => {
 
 describe('PrReviewTab — includes prNumber and showOverview in popout payload when a PR is active', () => {
   it('includes prNumber and showOverview in popout payload when a PR is active', async () => {
-    const activePr = {
+    const activePr = partialFake<PrReviewDetail>({
       number: 42,
       title: 'Active PR',
       headSHA: 'sha123',
-    } as unknown as PrReviewDetail
+    })
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       activePr,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<PrReviewTab repoRoot="/repo" />)
     // activePr is set + showOverview defaults to false → PrReviewView renders
     fireEvent.click(screen.getByTitle('Open in focused window'))
@@ -280,11 +280,11 @@ describe('PrReviewTab — includes prNumber and showOverview in popout payload w
 
 describe('PrReviewTab — closes PR view and persists paused session when onClose is called', () => {
   it('closes PR view and persists paused session when onClose is called', async () => {
-    const activePr = { number: 1, title: 'My PR', headSHA: 'abc123' } as unknown as PrReviewDetail
+    const activePr = partialFake<PrReviewDetail>({ number: 1, title: 'My PR', headSHA: 'abc123' })
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       activePr,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByText('Close PR'))
     // Allow async handleClosePr to settle
@@ -299,7 +299,7 @@ describe('PrReviewTab — closes PR view and persists paused session when onClos
 })
 
 /** PR 7, open in the tab. */
-const pr7 = { number: 7, title: 'My PR', headSHA: 'abc123' } as unknown as PrReviewDetail
+const pr7 = partialFake<PrReviewDetail>({ number: 7, title: 'My PR', headSHA: 'abc123' })
 
 describe('PrReviewTab (continued) — after an approval', () => {
   afterEach(() => {
@@ -312,7 +312,7 @@ describe('PrReviewTab (continued) — after an approval', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       activePr: pr7,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByText('Approved'))
     await waitFor(() => expect(close).toHaveBeenCalled())
@@ -331,7 +331,7 @@ describe('PrReviewTab (continued) — after an approval — returns the docked p
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       activePr: pr7,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByText('Approved'))
     await waitFor(() => expect(mockSetActivePr).toHaveBeenCalledWith(null))

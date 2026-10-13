@@ -15,6 +15,7 @@ import type { HallMap, HallProp } from '../../../src/factory/layout.js'
 import type { Check } from '../../../src/line/ci.js'
 import { createRecordingPaint } from './paint-fake.js'
 import type { PaintCall } from './paint-fake.js'
+import { partialFake } from '../../../../../tests/support/fakes'
 
 // Every sign the hall draws is read, so every sign has to stay on its own
 // fixture: a digit that spills past its board lands on the wall beside it.
@@ -257,7 +258,7 @@ function wallFixturesTests() {
       fixture('statuswall', { id: 'c', x: 19, y: 2, w: 3 }),
       fixture('lockers', { id: 'd', x: 28, y: 2 }),
     ]
-    const x = vendingDecorX({ width: 40, props: fixtures } as unknown as HallMap)
+    const x = vendingDecorX(partialFake<HallMap>({ width: 40, props: fixtures }))
     for (const f of fixtures) {
       const left = f.x * TILE_PX
       const right = (f.x + f.w) * TILE_PX
@@ -271,7 +272,7 @@ function bakingTests() {
     const width = 40
     const height = 30
     const grid = Array.from({ length: height }, () => Array(width).fill(false))
-    const map = {
+    const map = partialFake<HallMap>({
       width,
       height,
       solid: grid,
@@ -291,7 +292,7 @@ function bakingTests() {
         wait: { x: 5, y: 5 },
       },
       lights: [],
-    } as unknown as HallMap
+    })
     expect(() => bakeHall(map, createRecordingPaint())).not.toThrow()
   })
 }

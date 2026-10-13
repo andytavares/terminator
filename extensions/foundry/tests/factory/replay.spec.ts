@@ -7,6 +7,7 @@ import type { Timeline } from '../../src/factory/replay.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 const REAL_TIMELINE = '/Users/atavares/repos/orders/WO-1006-6b5/run-timeline.jsonl'
 
@@ -72,9 +73,9 @@ const timeline: Timeline = {
 }
 
 function gate(raisedAt: number, decidedAt: number | null): Gate {
-  return {
+  return partialFake<Gate>({
     id: 'g-1',
-    rule: 'merge',
+    rule: 'ready-for-review',
     orderId: 'WO-1',
     nodeId: 'g',
     summary: 'Merge?',
@@ -89,8 +90,8 @@ function gate(raisedAt: number, decidedAt: number | null): Gate {
     decision:
       decidedAt === null
         ? null
-        : { option: 'approve', at: new Date(decidedAt).toISOString(), actor: 'operator' },
-  } as unknown as Gate
+        : { option: 'approve', by: 'operator', note: '', at: new Date(decidedAt).toISOString() },
+  })
 }
 
 describe('observationAt', () => {

@@ -62,9 +62,7 @@ const defaultStoreState = {
 beforeEach(() => {
   vi.clearAllMocks()
   useReviewUiStore.setState({ queueSort: 'newest' })
-  vi.mocked(usePrReviewStore).mockReturnValue(
-    defaultStoreState as unknown as ReturnType<typeof usePrReviewStore>
-  )
+  vi.mocked(usePrReviewStore).mockReturnValue(defaultStoreState)
 })
 
 const defaultProps = {
@@ -79,7 +77,7 @@ describe('ReviewQueue', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       queueLoading: true,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText('Loading pull requests…')).toBeTruthy()
   })
@@ -96,7 +94,7 @@ describe('ReviewQueue — summarises the queue in one line instead of four tiles
       ...defaultStoreState,
       prQueue: [makePr({ number: 1, riskLevel: 'high' })],
       totalPrCount: 1,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText(/waiting on you/)).toBeTruthy()
     expect(screen.getByText(/of reading/)).toBeTruthy()
@@ -109,7 +107,7 @@ describe('ReviewQueue — summarises the queue in one line instead of four tiles
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       prQueue: [makePr({ number: 42, title: 'Add feature' })],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText('Add feature')).toBeTruthy()
     expect(screen.getByText('#42')).toBeTruthy()
@@ -122,7 +120,7 @@ describe('ReviewQueue — calls onOpenPr when PR row is clicked', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       prQueue: [pr],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     const onOpenPr = vi.fn()
     render(<ReviewQueue {...defaultProps} onOpenPr={onOpenPr} />)
     fireEvent.click(screen.getByText('My PR'))
@@ -152,7 +150,7 @@ describe('ReviewQueue — shows search input', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       queueError: 'Network failure',
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText(/Failed to load queue: Network failure/)).toBeTruthy()
   })
@@ -161,7 +159,7 @@ describe('ReviewQueue — shows search input', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       rateLimitState: { resetAt: Date.now() + 60000 },
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText(/GitHub API rate limit reached/)).toBeTruthy()
   })
@@ -174,7 +172,7 @@ describe('ReviewQueue — says a page is on its way rather than asking for a cli
       hasMorePrs: true,
       loadingMorePrs: true,
       prQueue: [makePr()],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText('Loading the rest…')).toBeTruthy()
     expect(screen.queryByText('Load more pull requests')).toBeNull()
@@ -184,7 +182,7 @@ describe('ReviewQueue — says a page is on its way rather than asking for a cli
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       prQueue: [makePr({ riskLevel: 'high', number: 10, title: 'Risky PR' })],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText('High risk')).toBeTruthy()
   })
@@ -198,7 +196,7 @@ describe('ReviewQueue — says nothing about medium or low risk', () => {
         makePr({ riskLevel: 'medium', number: 1, title: 'Medium PR' }),
         makePr({ riskLevel: 'low', number: 2, title: 'Low PR' }),
       ],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.queryByText(/risk/i)).toBeNull()
   })
@@ -207,7 +205,7 @@ describe('ReviewQueue — says nothing about medium or low risk', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       prQueue: [makePr({ isDraft: true, number: 11, title: 'Draft PR' })],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText('Draft')).toBeTruthy()
   })
@@ -226,7 +224,7 @@ describe('ReviewQueue — shows Resume action for paused PRs', () => {
           title: 'Paused PR',
         }),
       ],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getAllByText('Resume').length).toBeGreaterThan(0)
   })
@@ -244,7 +242,7 @@ describe('ReviewQueue — shows approval chip when PR has approvals', () => {
           approvedBy: ['bob', 'carol'],
         }),
       ],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText(/2 approved/)).toBeTruthy()
   })
@@ -255,7 +253,7 @@ describe('ReviewQueue — shows approval chip when PR has approvals', () => {
       prQueue: [
         makePr({ number: 100, title: 'No approvals PR', approvalCount: 0, approvedBy: [] }),
       ],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.queryByText(/approved/)).toBeNull()
   })
@@ -266,7 +264,7 @@ function renderMany(prs: ReviewQueuePR[], extra: Record<string, unknown> = {}) {
     ...defaultStoreState,
     prQueue: prs,
     ...extra,
-  } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
   return render(<ReviewQueue {...defaultProps} />)
 }
 
@@ -426,7 +424,7 @@ describe('ReviewQueue (continued) — one list, two lines per row — leaves a q
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       prQueue: [pr],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     const { container } = render(<ReviewQueue {...defaultProps} onOpenPr={onOpenPr} />)
     fireEvent.keyDown(container.querySelector('.rd-row')!, { key: 'Enter' })
     expect(onOpenPr).toHaveBeenCalledWith(pr)

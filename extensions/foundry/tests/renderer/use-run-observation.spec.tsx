@@ -53,9 +53,11 @@ function mockBridge(observe: unknown, pending: unknown[] = []) {
     if (channel === 'foundry:permissions-list') return { pending }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: bus.on },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: bus.on },
+    },
+  })
 }
 
 beforeEach(() => {

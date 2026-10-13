@@ -123,7 +123,7 @@ function setupStore(overrides: Record<string, unknown> = {}) {
     notes: [],
     drafts: [],
     ...overrides,
-  } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
 }
 
 beforeEach(() => {

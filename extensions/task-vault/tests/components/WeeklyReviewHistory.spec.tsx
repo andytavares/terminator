@@ -53,9 +53,11 @@ const DETAIL = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(window as unknown as { electronAPI: unknown }).electronAPI = {
-    extensionBridge: { invoke: mockInvoke, on: vi.fn(() => () => {}) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke: mockInvoke, on: vi.fn(() => () => {}) },
+    },
+  })
   mockInvoke.mockImplementation((channel: string) => {
     if (channel === 'task-vault:review:list') return Promise.resolve({ reviews: [SUMMARY] })
     if (channel === 'task-vault:review:get') return Promise.resolve({ review: DETAIL })

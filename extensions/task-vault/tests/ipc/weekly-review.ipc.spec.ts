@@ -17,20 +17,21 @@ import { applyTaskVaultSchema } from '../../src/vault/db'
 import { registerWeeklyReviewIpcHandlers } from '../../src/ipc/weekly-review.ipc'
 import { dispatchChannel } from '@terminator/extension-sdk'
 import type { ChannelSpec, ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
+import { partialFake } from '../../../../tests/support/fakes'
 
 let db: ExtensionDB
 let handlers: Map<string, ChannelSpec>
 let dispose: () => void
 
-const mockApi = {
-  dialog: { showSaveDialog: mockShowSaveDialog },
-  ipc: {
+const mockApi = partialFake<ExtensionAPI>({
+  dialog: partialFake<ExtensionAPI['dialog']>({ showSaveDialog: mockShowSaveDialog }),
+  ipc: partialFake<ExtensionAPI['ipc']>({
     registerHandler: (spec: ChannelSpec) => {
       handlers.set(spec.channel, spec)
       return { dispose: () => handlers.delete(spec.channel) }
     },
-  },
-} as unknown as ExtensionAPI
+  }),
+})
 
 function invoke(channel: string, payload?: unknown): Promise<unknown> {
   const spec = handlers.get(channel)

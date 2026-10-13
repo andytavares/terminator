@@ -16,10 +16,12 @@ function mount(orders: unknown[], props: Record<string, unknown> = {}) {
     return {}
   })
   const openExternal = vi.fn()
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: bus.on },
-    shell: { openExternal },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: bus.on },
+      shell: { openExternal },
+    },
+  })
   return { ...render(<Orders repoRoot="/repos/app" {...props} />), invoke, openExternal, bus }
 }
 
@@ -152,9 +154,11 @@ function mountWith(offer: unknown, created: unknown = { key: 'TAV-16' }) {
     if (channel === 'foundry:order.create') return {}
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    },
+  })
   render(<Orders repoRoot="/repos/app" />)
   return invoke
 }
@@ -262,9 +266,11 @@ describe('opening an order that has a run', () => {
     const invoke = vi.fn(async (channel: string) =>
       channel === 'foundry:order.list' ? { orders: [row({ status })] } : new Promise(() => {})
     )
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-    }
+    Object.assign(window, {
+      electronAPI: {
+        extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      },
+    })
     render(<Orders repoRoot="/repos/app" openOrderId="WO-1" />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'All orders' })).toBeTruthy())
   }
@@ -325,10 +331,12 @@ function mountWithTickets(orders: unknown[]) {
       }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-    shell: { openExternal: vi.fn() },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      shell: { openExternal: vi.fn() },
+    },
+  })
   return render(<Orders repoRoot="/repos/app" />)
 }
 

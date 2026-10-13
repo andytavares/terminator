@@ -69,7 +69,7 @@ function withQueue(prQueue: ReviewQueuePR[], extra: Record<string, unknown> = {}
     ...baseStore,
     prQueue,
     ...extra,
-  } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
 }
 
 beforeEach(() => {

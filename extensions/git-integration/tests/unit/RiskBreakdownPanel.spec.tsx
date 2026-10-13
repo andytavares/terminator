@@ -8,13 +8,15 @@ const mockOpenPath = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    shell: { openPath: mockOpenPath },
-  }
+  Object.assign(globalThis, {
+    electronAPI: {
+      shell: { openPath: mockOpenPath },
+    },
+  })
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 function makeRiskScore(overrides: Partial<RiskScore> = {}): RiskScore {

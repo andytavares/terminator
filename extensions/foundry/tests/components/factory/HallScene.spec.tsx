@@ -1,9 +1,10 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
 import { HallScene, sceneActivity, drawOrderY } from '../../../src/components/factory/HallScene.js'
 import type { HallMap, HallProp } from '../../../src/factory/layout.js'
 import type { Crew, World } from '../../../src/factory/sim.js'
+import { partialFake } from '../../../../../tests/support/fakes'
 
 // jsdom has no canvas at all, so every 2D context here is a fake this spec
 // records calls on. The point of these tests is the render loop's lifecycle
@@ -53,14 +54,14 @@ function fakeWorld(map: HallMap): World {
   }
 }
 
-function fakeContext2D(fillRectSpy: ReturnType<typeof vi.fn>) {
-  return {
+function fakeContext2D(fillRectSpy: Mock<CanvasRenderingContext2D['fillRect']>) {
+  return partialFake<CanvasRenderingContext2D>({
     fillStyle: '#000',
     globalCompositeOperation: 'source-over',
     fillRect: fillRectSpy,
     drawImage: vi.fn(),
     createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
-  }
+  })
 }
 
 const standAt = (tile: { x: number; y: number }, over: Partial<Crew> = {}): Crew => ({
@@ -79,7 +80,7 @@ const standAt = (tile: { x: number; y: number }, over: Partial<Crew> = {}): Crew
   ...over,
 })
 
-let fillRectSpy: ReturnType<typeof vi.fn>
+let fillRectSpy: Mock<CanvasRenderingContext2D['fillRect']>
 let rafSpy: ReturnType<typeof vi.fn>
 let cancelSpy: ReturnType<typeof vi.fn>
 
@@ -93,8 +94,8 @@ describe('components/factory/HallScene', () => {
     cancelSpy = vi.fn()
     vi.stubGlobal('requestAnimationFrame', rafSpy)
     vi.stubGlobal('cancelAnimationFrame', cancelSpy)
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
-      () => fakeContext2D(fillRectSpy) as unknown as RenderingContext
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() =>
+      fakeContext2D(fillRectSpy)
     )
   })
 

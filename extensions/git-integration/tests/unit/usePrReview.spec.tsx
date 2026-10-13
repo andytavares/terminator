@@ -178,7 +178,7 @@ function withActivePr(activePr: unknown) {
     setIssueComments: mockSetIssueComments,
     updateFileRiskScores: mockUpdateFileRiskScores,
     updateQueuePrRisk: mockUpdateQueuePrRisk,
-  } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
 }
 
 /** Every file's metrics: low churn and blast radius, a test file, and `extra`. */
@@ -295,16 +295,17 @@ function threadOf(comment: ReturnType<typeof reviewComment>) {
 beforeEach(() => {
   vi.clearAllMocks()
   // The hooks read the live PR through getState(); serve whatever the test configured.
-  ;(usePrReviewStore as unknown as { getState: () => unknown }).getState = () =>
-    vi.mocked(usePrReviewStore)()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    github: {
-      listOpenPrs: mockListOpenPrs,
-      prReviewDetail: mockPrReviewDetail,
-      fileMetrics: mockFileMetrics,
-      prInlineComments: mockPrInlineComments,
+  Object.assign(usePrReviewStore, { getState: () => vi.mocked(usePrReviewStore)() })
+  Object.assign(globalThis, {
+    electronAPI: {
+      github: {
+        listOpenPrs: mockListOpenPrs,
+        prReviewDetail: mockPrReviewDetail,
+        fileMetrics: mockFileMetrics,
+        prInlineComments: mockPrInlineComments,
+      },
     },
-  }
+  })
   vi.mocked(usePrReviewStore).mockReturnValue({
     setQueue: mockSetQueue,
     appendQueue: mockAppendQueue,
@@ -320,11 +321,11 @@ beforeEach(() => {
     updateQueuePrRisk: mockUpdateQueuePrRisk,
     setCurrentUserLogin: mockSetCurrentUserLogin,
     activePr: null,
-  } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 describe('useLoadPrQueue', () => {
@@ -557,7 +558,7 @@ describe('useLoadInlineComments', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     const { result } = renderHook(() => useLoadInlineComments(null))
     await load(result.current)
     expect(mockPrInlineComments).not.toHaveBeenCalled()
@@ -576,7 +577,7 @@ describe('useLoadInlineComments — calls prInlineComments and sets threads when
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
       setThreads: mockSetThreads,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     mockPrInlineComments.mockResolvedValue({ comments: [] })
     const { result } = renderHook(() => useLoadInlineComments('/repo'))
     await load(result.current)
@@ -591,7 +592,7 @@ describe('useLoadInlineComments — does nothing when result has error', () => {
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
       setThreads: mockSetThreads,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     mockPrInlineComments.mockResolvedValue({ error: 'RATE_LIMITED' })
     const { result } = renderHook(() => useLoadInlineComments('/repo'))
     await load(result.current)
@@ -628,7 +629,7 @@ describe('useFetchFileMetrics', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     const { result } = renderHook(() => useFetchFileMetrics(null))
     await load(result.current)
     expect(mockFileMetrics).not.toHaveBeenCalled()
@@ -802,7 +803,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
       activePr: pr,
       updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
 
     mockFileMetrics.mockResolvedValue({
       churn90d: 5,
@@ -831,7 +832,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — cover
       activePr: pr,
       updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
 
     mockFileMetrics.mockResolvedValue({
       churn90d: 5,
@@ -859,7 +860,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — cover
       activePr: pr,
       updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
 
     mockFileMetrics.mockResolvedValue({
       churn90d: 5,
@@ -887,7 +888,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — ciDot
       activePr: pr,
       updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
 
     mockFileMetrics.mockResolvedValue({
       churn90d: 5,
@@ -914,7 +915,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — ciDot
       activePr: pr,
       updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
 
     mockFileMetrics.mockResolvedValue({
       churn90d: 5,
@@ -941,7 +942,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — ciDot
       activePr: pr,
       updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
 
     mockFileMetrics.mockResolvedValue({
       churn90d: 5,
@@ -968,7 +969,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — accep
       activePr: null, // no activePr
       updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
 
     const prDetail = makePrWithFile()
 
@@ -994,7 +995,7 @@ describe('useLoadInlineComments — catch branch (line 309)', () => {
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
       setThreads: mockSetThreads,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
 
     mockPrInlineComments.mockRejectedValue(new Error('connection refused'))
 
@@ -1012,7 +1013,7 @@ describe('useLoadIssueComments', () => {
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
       setIssueComments: mockSetIssueComments,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
   })
 
   it('does nothing when repoRoot is null', async () => {
@@ -1028,7 +1029,7 @@ describe('useLoadIssueComments — does nothing when no prNumber (no activePr an
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
       setIssueComments: mockSetIssueComments,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
   })
 
   it('does nothing when no prNumber (no activePr and no override)', async () => {
@@ -1036,7 +1037,7 @@ describe('useLoadIssueComments — does nothing when no prNumber (no activePr an
       ...vi.mocked(usePrReviewStore)(),
       activePr: null,
       setIssueComments: mockSetIssueComments,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
 
     const { result } = renderHook(() => useLoadIssueComments('/repo'))
     await load(result.current)
@@ -1050,7 +1051,7 @@ describe('useLoadIssueComments — loads comments using activePr.number when no 
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
       setIssueComments: mockSetIssueComments,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
   })
 
   it('loads comments using activePr.number when no override given', async () => {
@@ -1073,7 +1074,7 @@ describe('useLoadIssueComments — loads comments using prNumber override', () =
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
       setIssueComments: mockSetIssueComments,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
   })
 
   it('loads comments using prNumber override', async () => {
@@ -1096,7 +1097,7 @@ describe('useLoadIssueComments — does not call setIssueComments when result co
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
       setIssueComments: mockSetIssueComments,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
   })
 
   it('does not call setIssueComments when result contains an error', async () => {
@@ -1115,7 +1116,7 @@ describe('useLoadIssueComments — handles thrown exceptions gracefully without 
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
       setIssueComments: mockSetIssueComments,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
   })
 
   it('handles thrown exceptions gracefully without crashing', async () => {
@@ -1152,7 +1153,7 @@ const setActive = (pr: typeof validActivePr | null) =>
     activePr: pr,
     setThreads: mockSetThreads,
     setIssueComments: mockSetIssueComments,
-  } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
 
 describe('comment loaders — stable across activePr patches', () => {
   it('keeps the inline loader identity when activePr is patched for the same PR', () => {

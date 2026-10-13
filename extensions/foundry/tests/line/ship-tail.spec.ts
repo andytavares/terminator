@@ -9,9 +9,10 @@ import {
 } from '../../src/line/ship-tail.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import type { CiVerdict, Check } from '../../src/line/ci.js'
-import type { Feedback, RunGraph } from '../../src/line/run-graph.js'
+import type { Feedback, NodeState, RunGraph, RunNode } from '../../src/line/run-graph.js'
 import type { CiState } from '../../src/line/ci-state.js'
 import type { Recipe } from '../../src/recipe/parse.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 function check(over: Partial<Check> = {}): Check {
   return { name: 'build', bucket: 'pass', link: 'https://x/1', workflow: 'ci', ...over }
@@ -394,13 +395,18 @@ steps:
   })
 })
 
+/** A one-node graph whose ship node is in `state`. */
+const shipGraph = (state: NodeState): RunGraph =>
+  partialFake<RunGraph>({
+    orderId: 'WO-1',
+    recipe: 'direct',
+    nodes: [
+      partialFake<RunNode>({ id: 'ship', stepId: 'ship', kind: 'gate', state, dependsOn: [] }),
+    ],
+  })
+
 describe('settleShip', () => {
-  const graph = (state: string): RunGraph =>
-    ({
-      orderId: 'WO-1',
-      recipe: 'direct',
-      nodes: [{ id: 'ship', stepId: 'ship', kind: 'gate', state, dependsOn: [] }],
-    }) as unknown as RunGraph
+  const graph = shipGraph
   const stateOf = (g: RunGraph) => g.nodes[0].state
 
   it('passes a running ship node once the ready question is raised', () => {

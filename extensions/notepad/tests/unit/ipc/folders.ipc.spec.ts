@@ -45,9 +45,12 @@ beforeEach(async () => {
 
 /** Invokes the handler registered for a folders channel, as the renderer would. */
 function invokeFolders(action: string, payload?: unknown): Promise<unknown> {
-  const handler = (ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mock.calls.find(
-    ([c]) => c === `terminator.notepad:folders.${action}`
-  )![1] as (e: unknown, payload?: unknown) => Promise<unknown>
+  const handler = vi
+    .mocked(ipcMain.handle)
+    .mock.calls.find(([c]) => c === `terminator.notepad:folders.${action}`)![1] as (
+    e: unknown,
+    payload?: unknown
+  ) => Promise<unknown>
   return handler({}, payload)
 }
 
@@ -239,7 +242,7 @@ function moveItemsToFolderMovingOutTests() {
 
 function registerFoldersIpcHandlersTests() {
   it('dispatches registered handlers to the folder functions', async () => {
-    ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mockClear()
+    vi.mocked(ipcMain.handle).mockClear()
     const cleanup = registerFoldersIpcHandlers(mockApi, db)
     const created = (await invokeFolders('create', { name: 'Inbox' })) as { data: { id: string } }
     expect(created.data.id).toBeTruthy()

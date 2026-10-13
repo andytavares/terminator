@@ -8,26 +8,29 @@ vi.mock('../../src/db/db', async (importOriginal) => ({
 }))
 
 import { activate } from '../../src/index.ts'
+import { partialFake } from '../../../../tests/support/fakes'
 
 const disposable = { dispose: () => {} }
 
 async function activateCapturingChannels(): Promise<ChannelSpec[]> {
   const specs: ChannelSpec[] = []
-  const api = {
-    db: {},
-    ipc: {
+  const api = partialFake<ExtensionAPI>({
+    db: partialFake<ExtensionAPI['db']>({}),
+    ipc: partialFake<ExtensionAPI['ipc']>({
       registerHandler: (spec: ChannelSpec) => {
         specs.push(spec)
         return disposable
       },
-    },
-    settings: { register: () => disposable },
-    window: { broadcast: () => {}, openAuxiliary: () => {} },
-    notifications: { showToast: () => {} },
-    nativeMenu: { addViewMenuItem: () => disposable },
-    globalShortcut: { register: () => disposable },
-    commands: { register: () => disposable },
-  } as unknown as ExtensionAPI
+    }),
+    settings: partialFake<ExtensionAPI['settings']>({ register: () => disposable }),
+    window: partialFake<ExtensionAPI['window']>({ broadcast: () => {}, openAuxiliary: () => {} }),
+    notifications: partialFake<ExtensionAPI['notifications']>({ showToast: () => {} }),
+    nativeMenu: partialFake<ExtensionAPI['nativeMenu']>({ addViewMenuItem: () => disposable }),
+    globalShortcut: partialFake<ExtensionAPI['globalShortcut']>({
+      register: async () => disposable,
+    }),
+    commands: partialFake<ExtensionAPI['commands']>({ register: () => disposable }),
+  })
   await activate(api)
   return specs
 }

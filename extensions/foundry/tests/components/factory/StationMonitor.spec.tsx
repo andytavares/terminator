@@ -4,19 +4,20 @@ import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { StationMonitor } from '../../../src/components/factory/StationMonitor.js'
 import type { MonitorStatus } from '../../../src/components/factory/StationMonitor.js'
 import type { TranscriptLine } from '../../../src/runtime/transcript-excerpt.js'
+import { partialFake } from '../../../../../tests/support/fakes'
 
 // jsdom has no canvas: the case's 2D context is a fake, and what this spec
 // asserts is the screen, the chin and the keys — the case's own drawing is
 // covered by tests/factory/art/monitor.spec.ts.
 
 function fakeContext2D() {
-  return {
+  return partialFake<CanvasRenderingContext2D>({
     fillStyle: '#000',
     globalCompositeOperation: 'source-over',
     fillRect: vi.fn(),
     drawImage: vi.fn(),
     createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
-  }
+  })
 }
 
 const LINES: TranscriptLine[] = [
@@ -56,9 +57,7 @@ function setReducedMotion(reduce: boolean) {
 }
 
 beforeEach(() => {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-    fakeContext2D() as unknown as CanvasRenderingContext2D
-  )
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(fakeContext2D())
   vi.stubGlobal(
     'ResizeObserver',
     class {

@@ -326,10 +326,7 @@ function nothingToMeasureAndTheBaseBranchTests() {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     runner.runCommand.mockResolvedValueOnce(1)
     expect(await deps.runStepOnBase(step, path.join(root, 'base.log'))).toBe(1)
-    const ran = runner.runCommand.mock.calls[0][0] as unknown as {
-      worktreePath: string
-      title: string
-    }
+    const ran = runner.runCommand.mock.calls[0][0] as { worktreePath: string; title: string }
     expect(ran.title).toBe('test on main')
     expect(ran.worktreePath).not.toBe(checkoutPath(root, order, 'app'))
     expect(fs.existsSync(ran.worktreePath)).toBe(true)

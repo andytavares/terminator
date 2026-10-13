@@ -7,13 +7,15 @@ const mockOn = vi.fn().mockReturnValue(() => {})
 beforeEach(() => {
   vi.clearAllMocks()
   mockInvoke.mockResolvedValue({})
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke: mockInvoke, on: mockOn },
-  }
+  Object.assign(globalThis, {
+    electronAPI: {
+      extensionBridge: { invoke: mockInvoke, on: mockOn },
+    },
+  })
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 const scope = {

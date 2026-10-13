@@ -80,12 +80,13 @@ describe('deleteDiagramComment', () => {
 
 describe('registerDiagramCommentsIpcHandlers', () => {
   it('dispatches each registered handler to its function', async () => {
-    ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mockClear()
+    vi.mocked(ipcMain.handle).mockClear()
     const dispose = registerDiagramCommentsIpcHandlers(mockApi, db)
     const get = (ch: string) =>
-      (ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mock.calls.find(
-        ([c]) => c === ch
-      )![1] as (e: unknown, payload?: unknown) => Promise<unknown>
+      vi.mocked(ipcMain.handle).mock.calls.find(([c]) => c === ch)![1] as (
+        e: unknown,
+        payload?: unknown
+      ) => Promise<unknown>
 
     // Invalid payloads still prove the dispatch reaches each function: every
     // handler validates and answers with a structured VALIDATION_ERROR.

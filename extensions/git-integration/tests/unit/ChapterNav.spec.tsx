@@ -5,6 +5,9 @@ import { ChapterNav } from '../../src/components/pr-review/ChapterNav'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { Chapter } from '../../src/schemas/pr-review.schema'
 import { changedFile } from './support/pr-review-file'
+import { partialFake } from '../../../../tests/support/fakes'
+
+type PrReviewState = ReturnType<typeof usePrReviewStore.getState>
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
@@ -23,8 +26,9 @@ function setupStore(state: { currentChapterId?: string | null; viewedFiles?: Set
     viewedFiles: new Set<string>(),
     ...state,
   }
-  vi.mocked(usePrReviewStore).mockImplementation(((selector?: (s: typeof full) => unknown) =>
-    selector ? selector(full) : full) as unknown as typeof usePrReviewStore)
+  vi.mocked(usePrReviewStore).mockImplementation((selector?: (s: PrReviewState) => unknown) =>
+    selector ? selector(partialFake<PrReviewState>(full)) : full
+  )
 }
 
 beforeEach(() => {

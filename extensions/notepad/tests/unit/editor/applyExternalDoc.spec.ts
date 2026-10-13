@@ -2,20 +2,22 @@ import { describe, it, expect, vi } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { applyExternalDoc } from '../../../src/editor/NoteEditor'
+import { partialFake } from '../../../../../tests/support/fakes'
 
 // A stand-in for EditorView that keeps real EditorState semantics (doc,
 // selection, transaction application) without needing a DOM.
 function makeView(doc: string, cursor = 0) {
   let state = EditorState.create({ doc, selection: { anchor: cursor } })
-  const dispatch = vi.fn((spec: Parameters<EditorView['dispatch']>[0]) => {
-    state = state.update(spec as Parameters<EditorState['update']>[0]).state
-  })
-  return {
+  const view = partialFake<EditorView>({
     get state() {
       return state
     },
-    dispatch,
-  } as unknown as EditorView & { dispatch: ReturnType<typeof vi.fn> }
+    dispatch(...specs: unknown[]) {
+      state = state.update(specs[0] as Parameters<EditorState['update']>[0]).state
+    },
+  })
+  vi.spyOn(view, 'dispatch')
+  return view
 }
 
 describe('applyExternalDoc', applyExternalDocTests)
@@ -69,7 +71,7 @@ function applyExternalDocLocalEditsTests() {
   it('marks the transaction so it is not reported as a local edit', () => {
     const view = makeView('before')
     applyExternalDoc(view, 'after')
-    const spec = view.dispatch.mock.calls[0][0] as { annotations?: unknown }
+    const spec = vi.mocked(view.dispatch).mock.calls[0][0] as { annotations?: unknown }
     expect(spec.annotations).toBeDefined()
   })
 }

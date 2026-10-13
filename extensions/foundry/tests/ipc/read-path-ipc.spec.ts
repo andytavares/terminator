@@ -19,6 +19,7 @@ import { writeRunGraph } from '../../src/ipc/run-channels.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import { writeObservedFiles } from '../../src/line/observed-files.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
@@ -106,11 +107,14 @@ async function seedTwoRunningOrders(): Promise<void> {
   ] as const) {
     const order = runningOrder(id, ['src/a.ts'], agreedAt)
     await store.save(order)
-    await writeRunGraph(dataDir, {
-      orderId: id,
-      recipe: 'direct',
-      nodes: [],
-    } as unknown as RunGraph)
+    await writeRunGraph(
+      dataDir,
+      partialFake<RunGraph>({
+        orderId: id,
+        recipe: 'direct',
+        nodes: [],
+      })
+    )
     fs.mkdirSync(checkoutPath(dataDir, order, order.context.repos[0].name), { recursive: true })
   }
 }

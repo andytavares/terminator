@@ -264,15 +264,17 @@ beforeEach(() => {
     if (channel === 'github:pr-file-content') return mockPrFileContent(payload)
     return Promise.resolve({})
   })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke: mockInvoke },
-  }
+  Object.assign(globalThis, {
+    electronAPI: {
+      extensionBridge: { invoke: mockInvoke },
+    },
+  })
   prStoreMock.mockReturnValue(basePrReviewStoreState())
   uiStoreMock.mockReturnValue(baseReviewUiStoreState())
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 async function renderPane(props: Partial<typeof defaultProps> = {}) {

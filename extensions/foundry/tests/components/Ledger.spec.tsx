@@ -98,9 +98,11 @@ function mount(over: Record<string, unknown> = {}) {
   bus = createChangeBus()
   const replies = ledgerReplies(over)
   invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: bus.on },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: bus.on },
+    },
+  })
   render(<Ledger />)
 }
 

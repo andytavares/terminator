@@ -14,13 +14,15 @@ vi.mock('@codemirror/view', () => {
     }
   })
   // Static methods that NoteEditor uses
-  ;(EditorView as unknown as Record<string, unknown>).updateListener = { of: vi.fn(() => ({})) }
-  ;(EditorView as unknown as Record<string, unknown>).theme = vi.fn(() => ({}))
-  ;(EditorView as unknown as Record<string, unknown>).lineWrapping = {}
-  ;(EditorView as unknown as Record<string, unknown>).scrollIntoView = vi.fn((pos, opts) => ({
-    scrollTo: pos,
-    opts,
-  }))
+  Object.assign(EditorView, { updateListener: { of: vi.fn(() => ({})) } })
+  Object.assign(EditorView, { theme: vi.fn(() => ({})) })
+  Object.assign(EditorView, { lineWrapping: {} })
+  Object.assign(EditorView, {
+    scrollIntoView: vi.fn((pos, opts) => ({
+      scrollTo: pos,
+      opts,
+    })),
+  })
   return {
     EditorView,
     keymap: { of: vi.fn(() => ({})) },
@@ -96,12 +98,13 @@ import {
   scrollToPosition,
 } from '../../src/editor/NoteEditor'
 import type { EditorView } from '@codemirror/view'
+import { partialFake } from '../../../../tests/support/fakes'
 
 describe('NoteEditor', noteEditorTests)
 
 describe('applyAnchors', () => {
   it('calls view.dispatch with setAnchors effect', () => {
-    const mockView = { dispatch: vi.fn() } as unknown as EditorView
+    const mockView = partialFake<EditorView>({ dispatch: vi.fn() })
     applyAnchors(mockView, [{ id: 'c1', from: 0, to: 5 }])
     expect(mockView.dispatch).toHaveBeenCalledWith({ effects: expect.any(Array) })
   })
@@ -113,7 +116,7 @@ describe('applyAnchors', () => {
 
 describe('setEditorHoverAnchor', () => {
   it('dispatches setHoveredAnchor effect', () => {
-    const mockView = { dispatch: vi.fn() } as unknown as EditorView
+    const mockView = partialFake<EditorView>({ dispatch: vi.fn() })
     setEditorHoverAnchor(mockView, 'c1')
     expect(mockView.dispatch).toHaveBeenCalledWith({ effects: expect.any(Array) })
   })
@@ -125,7 +128,7 @@ describe('setEditorHoverAnchor', () => {
 
 describe('scrollToAnchor', () => {
   it('dispatches selection and focuses the view', () => {
-    const mockView = { dispatch: vi.fn(), focus: vi.fn() } as unknown as EditorView
+    const mockView = partialFake<EditorView>({ dispatch: vi.fn(), focus: vi.fn() })
     scrollToAnchor(mockView, 5, 10)
     expect(mockView.dispatch).toHaveBeenCalledWith({
       selection: { anchor: 5, head: 10 },
@@ -140,11 +143,13 @@ describe('scrollToAnchor', () => {
 })
 
 function viewWithDoc(length: number) {
-  return {
-    state: { doc: { length } },
+  return partialFake<EditorView>({
+    state: partialFake<EditorView['state']>({
+      doc: partialFake<EditorView['state']['doc']>({ length }),
+    }),
     dispatch: vi.fn(),
     focus: vi.fn(),
-  } as unknown as EditorView
+  })
 }
 
 describe('scrollToPosition', scrollToPositionTests)

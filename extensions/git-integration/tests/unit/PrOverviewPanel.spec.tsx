@@ -136,16 +136,18 @@ beforeEach(() => {
   mockPreparePrWorktree.mockResolvedValue({ hasConflicts: true })
   mockCreateProject.mockResolvedValue({ project: { id: 'proj-conflict' } })
   // Stub window.electronAPI.git.suggestWorktreePath
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    git: {
-      suggestWorktreePath: vi.fn().mockResolvedValue({ path: '/tmp/worktree/branch' }),
+  Object.assign(window, {
+    electronAPI: {
+      git: {
+        suggestWorktreePath: vi.fn().mockResolvedValue({ path: '/tmp/worktree/branch' }),
+      },
     },
-  }
+  })
   vi.mocked(usePrReviewStore).mockReturnValue({
     viewedFiles: new Set(),
     issueComments: [],
     currentUserLogin: null,
-  } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
 })
 
 function renderPanel(overrides: Partial<PrReviewDetail> = {}, props = {}) {
@@ -405,7 +407,7 @@ describe('PrOverviewPanel — puts viewed progress on the footer button for a re
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set(['src/high.ts']),
       issueComments: [],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     renderPanel({}, { sessionStatus: 'in-progress' })
     expect(screen.getByRole('button', { name: 'Continue Review · 1 of 3 viewed' })).toBeTruthy()
     expect(screen.queryByText('1/3 reviewed')).toBeNull()
@@ -525,7 +527,7 @@ describe('PrOverviewPanel — keeps comments collapsed and shows their count', (
         },
       ],
       currentUserLogin: null,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     renderPanel()
     expect(screen.getByRole('button', { name: /Discussion · 1/ })).toBeTruthy()
     expect(screen.queryByText('Looks off')).toBeNull()
@@ -805,7 +807,7 @@ describe('PrOverviewPanel — shows Your review requested badge when current use
       viewedFiles: new Set(),
       issueComments: [],
       currentUserLogin: 'alice',
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(
       <PrOverviewPanel
         repoRoot="/repo"
@@ -825,7 +827,7 @@ describe('PrOverviewPanel — shows Your review requested badge when current use
       viewedFiles: new Set(),
       issueComments: [],
       currentUserLogin: 'alice',
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(
       <PrOverviewPanel
         repoRoot="/repo"
@@ -845,7 +847,7 @@ describe('PrOverviewPanel — does not show Your review requested badge when cur
       viewedFiles: new Set(),
       issueComments: [],
       currentUserLogin: 'alice',
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(
       <PrOverviewPanel
         repoRoot="/repo"

@@ -13,17 +13,18 @@ import { registerLinksIpcHandlers } from '../../src/ipc/links.ipc.js'
 import { registerProjectsIpcHandlers } from '../../src/ipc/projects.ipc.js'
 import { registerVaultIpcHandlers } from '../../src/ipc/vault.ipc.js'
 import { registerWeeklyReviewIpcHandlers } from '../../src/ipc/weekly-review.ipc.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 function registerEverything(): Map<string, boolean> {
   const remoteByChannel = new Map<string, boolean>()
-  const api = {
-    ipc: {
+  const api = partialFake<ExtensionAPI>({
+    ipc: partialFake<ExtensionAPI['ipc']>({
       registerHandler: (spec: ChannelSpec, opts?: { remoteAccessible?: boolean }) => {
         remoteByChannel.set(spec.channel, opts?.remoteAccessible === true)
         return { dispose: () => {} }
       },
-    },
-  } as unknown as ExtensionAPI
+    }),
+  })
   const db = {} as ExtensionDB
   for (const register of [
     registerAdminIpcHandlers,

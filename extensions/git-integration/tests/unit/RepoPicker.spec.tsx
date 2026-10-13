@@ -30,9 +30,11 @@ function setup(listResult: unknown = { repos }) {
     if (channel === 'github:accessible-repos') return Promise.resolve(listResult)
     return Promise.resolve({ ok: true })
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => () => {}) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => () => {}) },
+    },
+  })
   const onSaved = vi.fn()
   const onClose = vi.fn()
   return { invoke, onSaved, onClose }

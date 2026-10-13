@@ -363,13 +363,13 @@ function distanceAndTiesTests() {
     // buggy "lowest id wins" implementation would return the wrong one.
     const rowBlocked = [false, false, true, false, true, false]
     const rowOpen = [false, false, false, false, false, false]
-    const map = {
+    const map = partialFake<HallMap>({
       walk: [rowBlocked, rowOpen],
       restSeats: [
         { id: 1, tile: { x: 4, y: 0 }, facing: 'S', propId: 'far' },
         { id: 7, tile: { x: 2, y: 0 }, facing: 'N', propId: 'near' },
       ] as RestSeat[],
-    } as unknown as HallMap
+    })
     const seat = nearestRestSeat(map, { x: 0, y: 0 }, new Set())
     expect(seat?.id).toBe(7)
   })
@@ -379,13 +379,13 @@ function distanceAndTiesTests() {
     // comparison is a strict `<`, so the earlier (lower-id) seat of an exact
     // tie is the one kept.
     const row = [false, false, true, false, true]
-    const map = {
+    const map = partialFake<HallMap>({
       walk: [row],
       restSeats: [
         { id: 3, tile: { x: 2, y: 0 }, facing: 'N', propId: 'left' },
         { id: 9, tile: { x: 4, y: 0 }, facing: 'S', propId: 'right' },
       ] as RestSeat[],
-    } as unknown as HallMap
+    })
     // Both seats are equidistant (1 step) from x=3 in a single-row corridor.
     const seat = nearestRestSeat(map, { x: 3, y: 0 }, new Set())
     expect(seat?.id).toBe(3)
@@ -395,10 +395,10 @@ function distanceAndTiesTests() {
 function fullBenchesTests() {
   it('returns null when every seat is taken', () => {
     const row = [false, false, true]
-    const map = {
+    const map = partialFake<HallMap>({
       walk: [row],
       restSeats: [{ id: 0, tile: { x: 2, y: 0 }, facing: 'S', propId: 'only' }] as RestSeat[],
-    } as unknown as HallMap
+    })
     expect(nearestRestSeat(map, { x: 0, y: 0 }, new Set([0]))).toBe(null)
   })
 }

@@ -7,15 +7,17 @@ const mockReadFile = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    shell: { exec: vi.fn(), openExternal: vi.fn().mockResolvedValue({ ok: true }) },
-    git: { listBranches: vi.fn().mockResolvedValue({ branches: [] }) },
-    fs: { readFile: mockReadFile },
-  }
+  Object.assign(globalThis, {
+    electronAPI: {
+      shell: { exec: vi.fn(), openExternal: vi.fn().mockResolvedValue({ ok: true }) },
+      git: { listBranches: vi.fn().mockResolvedValue({ branches: [] }) },
+      fs: { readFile: mockReadFile },
+    },
+  })
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 async function previewOf(template: string): Promise<HTMLElement> {

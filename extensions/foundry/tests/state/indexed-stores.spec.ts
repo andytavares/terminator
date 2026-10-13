@@ -11,6 +11,7 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { partialFake } from '../../../../tests/support/fakes'
 
 // The store modules and the index together, on real files: what a write left
 // on disk is what the index answers with, and the windows are told which order
@@ -34,21 +35,21 @@ function order(id: string, createdAt = '2026-09-06T10:00:00.000Z'): WorkOrder {
 }
 
 function gate(id: string, orderId: string): Gate {
-  return {
+  return partialFake<Gate>({
     id,
     rule: 'budget.exceeded',
     orderId,
     summary: 's',
     why: 'w',
     evidence: [],
-    at: '2026-09-06T10:00:00.000Z',
+    raisedAt: '2026-09-06T10:00:00.000Z',
     decision: null,
     breach: null,
-  } as unknown as Gate
+  })
 }
 
 function graph(orderId: string): RunGraph {
-  return { orderId, recipe: 'direct', nodes: [] } as unknown as RunGraph
+  return partialFake<RunGraph>({ orderId, recipe: 'direct', nodes: [] })
 }
 
 beforeEach(() => {

@@ -46,21 +46,23 @@ function onForeignNoteChangeTests() {
   beforeEach(() => {
     handlers = []
     off.mockClear()
-    ;(globalThis as unknown as { window: unknown }).window = {
-      electronAPI: {
-        extensionBridge: {
-          on: vi.fn((channel: string, handler: (data: unknown) => void) => {
-            expect(channel).toBe(NOTES_CHANGED_CHANNEL)
-            handlers.push(handler)
-            return off
-          }),
+    Object.assign(globalThis, {
+      window: {
+        electronAPI: {
+          extensionBridge: {
+            on: vi.fn((channel: string, handler: (data: unknown) => void) => {
+              expect(channel).toBe(NOTES_CHANGED_CHANNEL)
+              handlers.push(handler)
+              return off
+            }),
+          },
         },
       },
-    }
+    })
   })
 
   afterEach(() => {
-    delete (globalThis as unknown as { window?: unknown }).window
+    Reflect.deleteProperty(globalThis, 'window')
   })
 
   describe('delivering', onForeignNoteChangeDeliveringTests)

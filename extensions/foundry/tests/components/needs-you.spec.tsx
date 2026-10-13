@@ -73,9 +73,11 @@ function mountForge(questions: OpenQuestion[]) {
     }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    },
+  })
   return render(<Forge orderId="WO-1" />)
 }
 
@@ -140,9 +142,11 @@ function mountForgeWithOrder(over: Partial<WorkOrder>) {
     }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    },
+  })
   return render(<Forge orderId="WO-1" />)
 }
 
@@ -237,9 +241,11 @@ function mountFloor(pending: unknown[]) {
     if (channel === 'foundry:feed-list') return { entries: [], mutes: [] }
     return { ok: true }
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    },
+  })
   return render(<Floor orderId="WO-1" />)
 }
 
@@ -283,11 +289,13 @@ function mountApp(attention: { inbox: number; forge: number }) {
     if (channel === 'foundry:order.list') return { orders: [] }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-    workspace: { list: vi.fn().mockResolvedValue({ workspaces: [] }) },
-    project: { create: vi.fn() },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      workspace: { list: vi.fn().mockResolvedValue({ workspaces: [] }) },
+      project: { create: vi.fn() },
+    },
+  })
   window.history.replaceState({}, '', '/?repoRoot=/repo')
   return render(<App />)
 }

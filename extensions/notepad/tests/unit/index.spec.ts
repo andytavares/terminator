@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { partialFake } from '../../../../tests/support/fakes'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
@@ -37,16 +38,22 @@ function makeApi() {
   const register = vi.fn<ExtensionAPI['globalShortcut']['register']>(async () => ({
     dispose: vi.fn(),
   }))
-  const api = {
-    db: {},
-    ipc: { registerHandler: vi.fn(() => ({ dispose: vi.fn() })) },
-    settings: { register: vi.fn(() => ({ dispose: vi.fn() })) },
-    window: { broadcast: vi.fn(), openAuxiliary: vi.fn() },
-    notifications: { showToast: vi.fn() },
-    nativeMenu: { addViewMenuItem: vi.fn(() => ({ dispose: vi.fn() })) },
-    globalShortcut: { register },
-    commands: { register: vi.fn(() => ({ dispose: vi.fn() })) },
-  } as unknown as ExtensionAPI
+  const api = partialFake<ExtensionAPI>({
+    db: partialFake<ExtensionAPI['db']>({}),
+    ipc: partialFake<ExtensionAPI['ipc']>({ registerHandler: vi.fn(() => ({ dispose: vi.fn() })) }),
+    settings: partialFake<ExtensionAPI['settings']>({
+      register: vi.fn(() => ({ dispose: vi.fn() })),
+    }),
+    window: partialFake<ExtensionAPI['window']>({ broadcast: vi.fn(), openAuxiliary: vi.fn() }),
+    notifications: partialFake<ExtensionAPI['notifications']>({ showToast: vi.fn() }),
+    nativeMenu: partialFake<ExtensionAPI['nativeMenu']>({
+      addViewMenuItem: vi.fn(() => ({ dispose: vi.fn() })),
+    }),
+    globalShortcut: partialFake<ExtensionAPI['globalShortcut']>({ register }),
+    commands: partialFake<ExtensionAPI['commands']>({
+      register: vi.fn(() => ({ dispose: vi.fn() })),
+    }),
+  })
   return { api, register }
 }
 
@@ -115,7 +122,7 @@ function notepadActivateGlobalShortcutRegistrationsViewMenuTests() {
 
     await activate(api)
 
-    const addItem = api.nativeMenu.addViewMenuItem as unknown as ReturnType<typeof vi.fn>
+    const addItem = vi.mocked(api.nativeMenu.addViewMenuItem)
     const item = addItem.mock.calls.map((c) => c[0]).find((i) => i.id === 'notepad-new-note')
     expect(item?.accelerator).toBe('CmdOrCtrl+Shift+N')
   })
@@ -126,13 +133,11 @@ function notepadActivateGlobalShortcutRegistrationsViewMenuTests() {
 
     await activate(api)
 
-    const addItem = api.nativeMenu.addViewMenuItem as unknown as ReturnType<typeof vi.fn>
+    const addItem = vi.mocked(api.nativeMenu.addViewMenuItem)
     const item = addItem.mock.calls.map((c) => c[0]).find((i) => i.id === 'notepad-new-note')
     item?.onClick()
 
-    const channels = (api.window.broadcast as unknown as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c) => c[0]
-    )
+    const channels = vi.mocked(api.window.broadcast).mock.calls.map((c) => c[0])
     expect(channels).toContain('terminator.notepad:ui.openQuickCreate')
     expect(channels).toContain('extension:activate-global-tab')
   })
@@ -155,7 +160,7 @@ function notepadActivateQuickActionsCommandRegistrationTests() {
 
     await activate(api)
 
-    const commandsRegister = api.commands.register as unknown as ReturnType<typeof vi.fn>
+    const commandsRegister = vi.mocked(api.commands.register)
     expect(commandsRegister).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'notepad:quick-create',
@@ -176,15 +181,13 @@ function notepadActivateQuickActionsCommandRunningTests() {
 
     await activate(api)
 
-    const commandsRegister = api.commands.register as unknown as ReturnType<typeof vi.fn>
+    const commandsRegister = vi.mocked(api.commands.register)
     const handler = commandsRegister.mock.calls.find(
       (c) => (c[0] as { id: string }).id === 'notepad:quick-create'
     )?.[1] as (ctx: unknown) => void
     handler({ projectId: null, sessionId: null, repoRoot: null })
 
-    const channels = (api.window.broadcast as unknown as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c) => c[0]
-    )
+    const channels = vi.mocked(api.window.broadcast).mock.calls.map((c) => c[0])
     expect(channels).toContain('terminator.notepad:ui.openQuickCreate')
     expect(channels).toContain('extension:activate-global-tab')
   })
@@ -197,7 +200,7 @@ function notepadActivateQuickActionsCommandDisposalTests() {
 
     await activate(api)
 
-    const commandsRegister = api.commands.register as unknown as ReturnType<typeof vi.fn>
+    const commandsRegister = vi.mocked(api.commands.register)
     const disposable = commandsRegister.mock.results[0]?.value as {
       dispose: ReturnType<typeof vi.fn>
     }

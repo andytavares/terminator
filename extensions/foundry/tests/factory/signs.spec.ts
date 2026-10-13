@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { hallSigns, joinedWords } from '../../src/factory/signs.js'
 import type { HallMap } from '../../src/factory/layout.js'
+import type { BeltTile } from '../../src/factory/belts.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
-const tile = (kind: 'split' | 'merge', x: number, y: number) => ({
+const tile = (kind: 'split' | 'merge', x: number, y: number): BeltTile => ({
   x,
   y,
   kind,
@@ -11,12 +13,17 @@ const tile = (kind: 'split' | 'merge', x: number, y: number) => ({
   over: null,
 })
 
-const map = {
+/** A prop nobody sits at and no sign names; `nodeId` is the station it stands for. */
+const unseated = (nodeId: string | null) => ({ solid: true, nodeId, seat: null, sign: null })
+const origin = { x: 0, y: 0 }
+const nowhere = { intake: origin, exit: origin, archive: origin, rack: origin, wait: origin }
+
+const map = partialFake<HallMap>({
   width: 40,
   height: 20,
   props: [
-    { id: 'fixture-statuswall', kind: 'statuswall', x: 20, y: 2, w: 3, h: 1, nodeId: null },
-    { id: 'dispatch', kind: 'dispatch', x: 38, y: 8, w: 1, h: 1, nodeId: 'ci' },
+    { id: 'fixture-statuswall', kind: 'statuswall', x: 20, y: 2, w: 3, h: 1, ...unseated(null) },
+    { id: 'dispatch', kind: 'dispatch', x: 38, y: 8, w: 1, h: 1, ...unseated('ci') },
   ],
   belts: [
     {
@@ -41,8 +48,8 @@ const map = {
     { id: 'c-d', fromNodeId: 'scribe', toNodeId: 'integrate', path: [{ x: 9, y: 5 }] },
   ],
   beltTiles: [tile('split', 5, 5), tile('merge', 9, 5)],
-  anchors: { exit: { x: 39, y: 8 } },
-} as unknown as HallMap
+  anchors: { ...nowhere, exit: { x: 39, y: 8 } },
+})
 
 const labels = { inspect: 'Inspector', scribe: 'Scribe', integrate: 'Integrate' }
 const none = { labels, metrics: null, queue: null, ci: null }

@@ -25,12 +25,14 @@ const ORDER = draftOrder({
 })
 
 function bridge(handlers: Record<string, unknown>): void {
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: {
-      invoke: vi.fn(async (channel: string) => handlers[channel] ?? {}),
-      on: vi.fn(() => vi.fn()),
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: {
+        invoke: vi.fn(async (channel: string) => handlers[channel] ?? {}),
+        on: vi.fn(() => vi.fn()),
+      },
     },
-  }
+  })
 }
 
 beforeEach(() => vi.clearAllMocks())

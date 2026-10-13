@@ -5,6 +5,7 @@ import { PrReviewTab } from '../../src/components/pr-review/PrReviewTab'
 import { usePrReviewStore, sessionKey } from '../../src/stores/pr-review.store'
 import { ReviewSessionSchema } from '../../src/schemas/pr-review.schema'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
+import { partialFake } from '../../../../tests/support/fakes'
 
 // What the main process does: it parses the session and replaces the stored one.
 const storedSessions = vi.hoisted(() => new Map<string, unknown>())
@@ -48,15 +49,20 @@ vi.mock('../../src/components/pr-review/PrReviewView', () => ({
   ),
 }))
 
-const activePr = { number: 5, title: 'Add login', headSHA: 'abc123' } as unknown as PrReviewDetail
+const activePr = partialFake<PrReviewDetail>({ number: 5, title: 'Add login', headSHA: 'abc123' })
 const key = sessionKey('/repo', 5)
 
 beforeEach(() => {
   storedSessions.clear()
   usePrReviewStore.getState().reset()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke: vi.fn().mockResolvedValue({ ok: true }), on: vi.fn(() => () => {}) },
-  }
+  Object.assign(globalThis, {
+    electronAPI: {
+      extensionBridge: {
+        invoke: vi.fn().mockResolvedValue({ ok: true }),
+        on: vi.fn(() => () => {}),
+      },
+    },
+  })
 })
 
 describe('closing a PR under review', () => {

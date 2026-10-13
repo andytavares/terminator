@@ -69,9 +69,11 @@ function mount(over: Record<string, unknown> = {}) {
   invoke = vi.fn(async (channel: string, payload?: unknown) =>
     channel in replies ? replies[channel](payload) : { ok: true }
   )
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    },
+  })
   render(<SettingsView />)
 }
 

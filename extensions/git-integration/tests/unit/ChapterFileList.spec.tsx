@@ -60,7 +60,7 @@ beforeEach(() => {
     viewedFiles: new Set<string>(),
     fileOrderOverrides: {},
     reorderFiles: mockReorderFiles,
-  } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
 })
 
 const defaultProps = {
@@ -108,7 +108,7 @@ describe('ChapterFileList — marks active file with active class', () => {
       viewedFiles: new Set(['src/foo.ts']),
       fileOrderOverrides: {},
       reorderFiles: mockReorderFiles,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ChapterFileList {...defaultProps} />)
     expect(screen.getByLabelText('Viewed')).toBeTruthy()
   })
@@ -130,7 +130,7 @@ describe('ChapterFileList — respects fileOrderOverrides for file order', () =>
       viewedFiles: new Set<string>(),
       fileOrderOverrides: { 'ch-1': ['src/bar.ts', 'src/foo.ts'] },
       reorderFiles: mockReorderFiles,
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ChapterFileList {...defaultProps} />)
     const rows = screen.getAllByRole('button')
     expect(rows[0].textContent).toContain('bar.ts')
@@ -194,7 +194,7 @@ describe('ChapterFileList — shows changed for a file changed since it was view
       reorderFiles: mockReorderFiles,
       changedSince: new Set(['src/foo.ts']),
       viewedAt: {},
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ChapterFileList {...defaultProps} />)
     expect(screen.getByText('changed')).toBeTruthy()
   })
@@ -208,7 +208,7 @@ describe('ChapterFileList — shows changed for a file changed since it was view
       reorderFiles: mockReorderFiles,
       changedSince: new Set<string>(),
       newSinceLook: new Set([chapter.files[1].path]),
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ChapterFileList {...defaultProps} chapter={chapter} />)
     expect(screen.getByText('new file')).toBeTruthy()
   })
@@ -224,7 +224,7 @@ describe('ChapterFileList — does not call an added file new on a first review'
       reorderFiles: mockReorderFiles,
       changedSince: new Set<string>(),
       newSinceLook: new Set<string>(),
-    } as unknown as ReturnType<typeof usePrReviewStore>)
+    })
     render(<ChapterFileList {...defaultProps} chapter={chapter} />)
     expect(screen.queryByText('new file')).toBeNull()
   })

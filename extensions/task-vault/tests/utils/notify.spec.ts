@@ -75,8 +75,8 @@ function notifyDispatcherTests() {
 
   it('does not throw when electronAPI.notifications is unavailable', () => {
     const orig = window.electronAPI
-    ;(window as unknown as Record<string, unknown>).electronAPI = undefined
+    Object.assign(window, { electronAPI: undefined })
     expect(() => notify('info', 'Oops', 'testKey')).not.toThrow()
-    ;(window as unknown as Record<string, unknown>).electronAPI = orig
+    Object.assign(window, { electronAPI: orig })
   })
 }

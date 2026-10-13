@@ -43,11 +43,13 @@ function mountOpenFloor(): ReturnType<typeof vi.fn> {
     if (channel === 'foundry:run-transcript') return { lines: [] }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-    shell: { openExternal: vi.fn() },
-    extension: { runCommand: vi.fn(), hasCommand: vi.fn(async () => false) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      shell: { openExternal: vi.fn() },
+      extension: { runCommand: vi.fn(), hasCommand: vi.fn(async () => false) },
+    },
+  })
   render(<Floor orderId="WO-1" />)
   return invoke
 }

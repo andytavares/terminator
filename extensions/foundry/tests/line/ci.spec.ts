@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { watchChecks, failedLogs } from '../../src/line/ci.js'
 import type { Check } from '../../src/line/ci.js'
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 // gh pr checks exits 0 even while pending; a PR with no checks reported
 // exits 1 with a fixed message. Both are read here, never inferred.
@@ -240,10 +241,12 @@ function runLogsTests() {
       }),
     ]
     const lines = Array.from({ length: 250 }, (_, i) => `line ${i}`).join('\n')
-    const exec = vi.fn(async ({ args }: { args: string[] }) => {
-      expect(args).toContain('36256477669')
-      return { exitCode: 0, stdout: lines, stderr: '', timedOut: false }
-    }) as unknown as ShellExec
+    const exec = partialFake<ShellExec>(
+      vi.fn(async ({ args }: { args: string[] }) => {
+        expect(args).toContain('36256477669')
+        return { exitCode: 0, stdout: lines, stderr: '', timedOut: false }
+      })
+    )
     const out = await failedLogs(checks, '/repos/app', exec)
     expect(exec).toHaveBeenCalledTimes(1)
     expect(out.split('\n').length).toBeLessThanOrEqual(200)
@@ -254,9 +257,11 @@ function runLogsTests() {
 function checksWithoutARunAndFailuresTests() {
   it('lists a check by name and link when the link has no run id', async () => {
     const checks: Check[] = [check({ bucket: 'cancel', link: 'https://example.com/no-run-id' })]
-    const exec = vi.fn(async () => {
-      throw new Error('should not be called')
-    }) as unknown as ShellExec
+    const exec = partialFake<ShellExec>(
+      vi.fn(async () => {
+        throw new Error('should not be called')
+      })
+    )
     const out = await failedLogs(checks, '/repos/app', exec)
     expect(out).toContain('Test')
     expect(out).toContain('https://example.com/no-run-id')
@@ -269,9 +274,11 @@ function checksWithoutARunAndFailuresTests() {
         link: 'https://github.com/o/r/actions/runs/1/job/2',
       }),
     ]
-    const exec = vi.fn(async () => {
-      throw new Error('boom')
-    }) as unknown as ShellExec
+    const exec = partialFake<ShellExec>(
+      vi.fn(async () => {
+        throw new Error('boom')
+      })
+    )
     const out = await failedLogs(checks, '/repos/app', exec)
     expect(out).toContain('could not be read')
   })
@@ -282,9 +289,11 @@ function nonErrorThrowsTests() {
     const checks: Check[] = [
       check({ bucket: 'fail', link: 'https://github.com/o/r/actions/runs/1/job/2' }),
     ]
-    const exec = vi.fn(async () => {
-      throw 'gh went away'
-    }) as unknown as ShellExec
+    const exec = partialFake<ShellExec>(
+      vi.fn(async () => {
+        throw 'gh went away'
+      })
+    )
     const out = await failedLogs(checks, '/repos/app', exec)
     expect(out).toBe('## CI/Test (run 1)\nlog could not be read: gh went away')
   })

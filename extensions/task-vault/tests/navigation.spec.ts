@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { openInVault, popPendingNavigation } from '../src/navigation.js'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { partialFake } from '../../../tests/support/fakes'
 
 // Three callers want to take you to a task — the calendar drawer, a due-task
 // notification, a blocked-task check-in — and until this only the first worked.
@@ -8,13 +9,12 @@ import type { ExtensionAPI } from '@terminator/extension-sdk'
 // listener anywhere in the extension.
 
 function api(): ExtensionAPI {
-  return {
-    window: { focusSelf: vi.fn(), broadcast: vi.fn() },
-  } as unknown as ExtensionAPI
+  return partialFake<ExtensionAPI>({
+    window: partialFake<ExtensionAPI['window']>({ focusSelf: vi.fn(), broadcast: vi.fn() }),
+  })
 }
 
-const calls = (a: ExtensionAPI): unknown[][] =>
-  (a.window.broadcast as unknown as ReturnType<typeof vi.fn>).mock.calls
+const calls = (a: ExtensionAPI): unknown[][] => vi.mocked(a.window.broadcast).mock.calls
 
 beforeEach(() => {
   // Drain anything a previous test left held.

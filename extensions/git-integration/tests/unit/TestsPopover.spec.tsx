@@ -21,13 +21,15 @@ const block = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as unknown as { electronAPI: unknown }).electronAPI = {
-    shell: { openPath: mockOpenPath },
-  }
+  Object.assign(globalThis, {
+    electronAPI: {
+      shell: { openPath: mockOpenPath },
+    },
+  })
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as { electronAPI?: unknown }).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 function renderPopover(prPaths: string[] = ['src/utils.spec.ts']) {
