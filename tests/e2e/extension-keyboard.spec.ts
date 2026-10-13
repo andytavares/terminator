@@ -67,7 +67,47 @@ async function key(part: string, keyCode: string, modifiers: string[] = []): Pro
   )
 }
 
-test('a dialog puts focus inside itself, keeps Tab there, and closes on Escape', async () => {
+/** The extension whose panel is up, or null. */
+function activeExtensionPanel(): Promise<string | null> {
+  return handle.page.evaluate(
+    () =>
+      document.querySelector('[data-extension-panel]')?.getAttribute('data-extension-panel') ?? null
+  )
+}
+
+interface Surface {
+  id: string
+  label: string
+  part: string
+}
+
+/**
+ * Brings an extension's panel up and waits for its view to load. Idempotent:
+ * the sidebar button toggles, so clicking it when the panel is already up puts
+ * the extension away instead of bringing it forward.
+ */
+async function showPanel({ id, label, part }: Surface): Promise<void> {
+  const panel = handle.page.locator(`[data-extension-panel="${id}"]`)
+  if ((await panel.count()) === 0) {
+    await handle.page.locator(`button[aria-label="${label}"]`).click()
+  }
+  await expect(panel).toHaveCount(1, { timeout: 20000 })
+  await expect
+    .poll(() => viewReady(part), {
+      timeout: 20000,
+      message: `${label} view never finished loading`,
+    })
+    .toBe(true)
+}
+
+/** Run in a view: whether focus is inside its open surface. */
+const FOCUS_IN_SURFACE = `(() => {
+      const s = document.querySelector('[data-tmui-surface]')
+      return !!s && s.contains(document.activeElement)
+    })()`
+
+/** Opens Notes' composer from the keyboard's point of view: no mouse on it afterwards. */
+async function openNotesComposer(): Promise<void> {
   await handle.page.locator('button[aria-label="Notes"]').click()
   await expect
     .poll(() => viewReady('notepad'), {
@@ -76,7 +116,6 @@ test('a dialog puts focus inside itself, keeps Tab there, and closes on Escape',
     })
     .toBe(true)
 
-  // Open the composer without touching it with a mouse afterwards.
   // Polled: the view reports loaded before React has drawn the button.
   await expect
     .poll(() =>
@@ -96,26 +135,18 @@ test('a dialog puts focus inside itself, keeps Tab there, and closes on Escape',
       message: 'the composer surface never opened',
     })
     .toBe(true)
+}
+
+async function dialogTrapsFocusAndClosesOnEscape(): Promise<void> {
+  await openNotesComposer()
 
   // Focus is inside the surface, not left behind it.
-  const focusedInside = await inView<boolean>(
-    'notepad',
-    `(() => {
-      const s = document.querySelector('[data-tmui-surface]')
-      return !!s && s.contains(document.activeElement)
-    })()`
-  )
+  const focusedInside = await inView<boolean>('notepad', FOCUS_IN_SURFACE)
   expect(focusedInside, 'focus should move into the surface when it opens').toBe(true)
 
   // Tab several times; focus must never escape the surface.
   for (let i = 0; i < 8; i++) await key('notepad', 'Tab')
-  const stillInside = await inView<boolean>(
-    'notepad',
-    `(() => {
-      const s = document.querySelector('[data-tmui-surface]')
-      return !!s && s.contains(document.activeElement)
-    })()`
-  )
+  const stillInside = await inView<boolean>('notepad', FOCUS_IN_SURFACE)
   expect(stillInside, 'Tab should not leave an open surface').toBe(true)
 
   // Escape closes the surface — and only the surface.
@@ -123,31 +154,15 @@ test('a dialog puts focus inside itself, keeps Tab there, and closes on Escape',
   const closed = await inView<boolean>('notepad', `!document.querySelector('[data-tmui-surface]')`)
   expect(closed, 'Escape should close the surface').toBe(true)
 
-  const stillOpen = await handle.page.evaluate(
-    () =>
-      document.querySelector('[data-extension-panel]')?.getAttribute('data-extension-panel') ?? null
-  )
+  const stillOpen = await activeExtensionPanel()
   expect(stillOpen, 'closing a dialog must not close the extension').toBe('terminator.notepad')
-})
+}
 
-test('every focusable control in an extension view shows a focus ring', async () => {
-  // Self-contained: does not assume the previous test left Notes open, so it
-  // passes whether run as part of the file or alone.
-  const panel = handle.page.locator('[data-extension-panel="terminator.notepad"]')
-  if ((await panel.count()) === 0) {
-    await handle.page.locator('button[aria-label="Notes"]').click()
-  }
-  await expect(panel).toHaveCount(1, { timeout: 20000 })
-  await expect
-    .poll(() => viewReady('notepad'), {
-      timeout: 20000,
-      message: 'notepad view never finished loading',
-    })
-    .toBe(true)
+test('a dialog puts focus inside itself, keeps Tab there, and closes on Escape', () =>
+  dialogTrapsFocusAndClosesOnEscape())
 
-  const missing = await inView<string[]>(
-    'notepad',
-    `(() => {
+/** Run in a view: the focusable controls, of the first 40, that show no focus ring. */
+const CONTROLS_WITHOUT_RING = `(() => {
       const bad = []
       const controls = [...document.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
       for (const el of controls.slice(0, 40)) {
@@ -163,7 +178,12 @@ test('every focusable control in an extension view shows a focus ring', async ()
       }
       return bad
     })()`
-  )
+
+test('every focusable control in an extension view shows a focus ring', async () => {
+  // Self-contained: does not assume the previous test left Notes open, so it
+  // passes whether run as part of the file or alone.
+  await showPanel({ id: 'terminator.notepad', label: 'Notes', part: 'notepad' })
+  const missing = await inView<string[]>('notepad', CONTROLS_WITHOUT_RING)
   expect(missing, `controls with no visible focus indicator: ${missing.join(', ')}`).toHaveLength(0)
 })
 
@@ -177,7 +197,7 @@ test('every focusable control in an extension view shows a focus ring', async ()
  * fail the second — which is exactly how three Notepad modals shipped broken.
  * So each extension is checked on whichever it actually has.
  */
-const SURFACES: { id: string; label: string; part: string; open: string }[] = [
+const SURFACES: (Surface & { open: string })[] = [
   { id: 'terminator.notepad', label: 'Notes', part: 'notepad', open: 'new note' },
   // Foundry opens on the inbox, which has no text field; the Forge is where
   // an idea is typed, so that tab is the control to press first.
@@ -187,54 +207,38 @@ const SURFACES: { id: string; label: string; part: string; open: string }[] = [
   { id: 'terminator.task-vault', label: 'Task Vault', part: 'task-vault', open: 'add task' },
 ]
 
-for (const { id, label, part, open } of SURFACES) {
-  test(`${label}: two Escapes with a draft in a text field keep the extension open`, async () => {
-    // Idempotent: the sidebar button toggles, so clicking it when the panel is
-    // already up puts the extension away instead of bringing it forward.
-    const panel = handle.page.locator(`[data-extension-panel="${id}"]`)
-    if ((await panel.count()) === 0) {
-      await handle.page.locator(`button[aria-label="${label}"]`).click()
-    }
-    await expect(panel).toHaveCount(1, { timeout: 20000 })
-    await expect
-      .poll(() => viewReady(part), {
-        timeout: 20000,
-        message: `${label} view never finished loading`,
-      })
-      .toBe(true)
-
-    // Polled: the view reports loaded before React has drawn the button.
-    await expect
-      .poll(
-        () =>
-          inView<boolean>(
-            part,
-            `(() => {
+/** Presses the control named `open`, and waits for a text field to show. */
+async function bringUpTextField({ label, part, open }: Surface & { open: string }): Promise<void> {
+  // Polled: the view reports loaded before React has drawn the button.
+  await expect
+    .poll(
+      () =>
+        inView<boolean>(
+          part,
+          `(() => {
         const b = [...document.querySelectorAll('button')].find((x) =>
           (x.textContent || '').toLowerCase().includes(${JSON.stringify(open)})
         )
         if (b) b.click()
         return !!b
       })()`
-          ),
-        { message: `${label} never offered "${open}"` }
-      )
-      .toBe(true)
-    await expect
-      .poll(
-        () =>
-          inView<boolean>(part, `!!document.querySelector('input:not([type=hidden]),textarea')`),
-        {
-          timeout: 10000,
-          message: `${label} never showed a text field after opening "${open}"`,
-        }
-      )
-      .toBe(true)
+        ),
+      { message: `${label} never offered "${open}"` }
+    )
+    .toBe(true)
+  await expect
+    .poll(
+      () => inView<boolean>(part, `!!document.querySelector('input:not([type=hidden]),textarea')`),
+      {
+        timeout: 10000,
+        message: `${label} never showed a text field after opening "${open}"`,
+      }
+    )
+    .toBe(true)
+}
 
-    // Type into the first field this extension offers, wherever it is.
-    const typed = await inView<boolean>(
-      part,
-      `(() => {
+/** Run in a view: types an unsaved draft into its first text field, and says whether it has focus. */
+const TYPE_DRAFT = `(() => {
         const el = document.querySelector('input:not([type=hidden]),textarea')
         if (!el) return false
         el.focus()
@@ -242,19 +246,26 @@ for (const { id, label, part, open } of SURFACES) {
         el.dispatchEvent(new Event('input', { bubbles: true }))
         return document.activeElement === el
       })()`
-    )
-    expect(typed, `${label} offered no text field to type into`).toBe(true)
 
-    await key(part, 'Escape')
-    await key(part, 'Escape')
+async function escapesKeepDraftOpen(surface: Surface & { open: string }): Promise<void> {
+  const { id, label, part } = surface
+  await showPanel(surface)
+  await bringUpTextField(surface)
 
-    const still = await handle.page.evaluate(
-      () =>
-        document.querySelector('[data-extension-panel]')?.getAttribute('data-extension-panel') ??
-        null
-    )
-    expect(still, `${label} was closed by Escape while a draft was unsaved`).toBe(id)
-  })
+  // Type into the first field this extension offers, wherever it is.
+  const typed = await inView<boolean>(part, TYPE_DRAFT)
+  expect(typed, `${label} offered no text field to type into`).toBe(true)
+
+  await key(part, 'Escape')
+  await key(part, 'Escape')
+
+  const still = await activeExtensionPanel()
+  expect(still, `${label} was closed by Escape while a draft was unsaved`).toBe(id)
+}
+
+for (const surface of SURFACES) {
+  test(`${surface.label}: two Escapes with a draft in a text field keep the extension open`, () =>
+    escapesKeepDraftOpen(surface))
 }
 
 /**
@@ -266,17 +277,7 @@ for (const { id, label, part, open } of SURFACES) {
  */
 test('Remote Control: two Escapes still leave the extension, because nothing is at risk', async () => {
   const id = 'terminator.remote-control'
-  const panel = handle.page.locator(`[data-extension-panel="${id}"]`)
-  if ((await panel.count()) === 0) {
-    await handle.page.locator('button[aria-label="Remote Control"]').click()
-  }
-  await expect(panel).toHaveCount(1, { timeout: 20000 })
-  await expect
-    .poll(() => viewReady('remote-control'), {
-      timeout: 20000,
-      message: 'Remote Control view never finished loading',
-    })
-    .toBe(true)
+  await showPanel({ id, label: 'Remote Control', part: 'remote-control' })
 
   // Nothing typed into, nothing open: the two conditions that would suppress.
   const state = await inView<{ fields: number; surfaces: number }>(
@@ -293,15 +294,9 @@ test('Remote Control: two Escapes still leave the extension, because nothing is 
   await key('remote-control', 'Escape')
 
   await expect
-    .poll(
-      () =>
-        handle.page.evaluate(
-          () =>
-            document
-              .querySelector('[data-extension-panel]')
-              ?.getAttribute('data-extension-panel') ?? null
-        ),
-      { timeout: 6000, message: 'with nothing at risk the exit gesture must still fire' }
-    )
+    .poll(activeExtensionPanel, {
+      timeout: 6000,
+      message: 'with nothing at risk the exit gesture must still fire',
+    })
     .not.toBe(id)
 })

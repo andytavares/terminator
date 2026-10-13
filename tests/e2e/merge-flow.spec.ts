@@ -96,25 +96,8 @@ test.afterAll(async () => {
   if (repo) rmSync(repo, { recursive: true, force: true })
 })
 
-test('MergeFlow opens on a real conflict and reads in both themes', async () => {
-  // The Git project tab is where MergeFlow renders.
-  await handle.page
-    .locator('.tab-bar--primary .tab-bar__tab')
-    .filter({ hasText: 'Git' })
-    .first()
-    .click()
-  await expect(
-    handle.page.locator(
-      '[data-extension-panel="terminator.git-integration"][data-view-param="project"]'
-    )
-  ).toBeVisible({ timeout: 15000 })
-  await expect
-    .poll(() => gitViewReady('project'), {
-      timeout: 20000,
-      message: 'git project view never finished loading',
-    })
-    .toBe(true)
-
+/** Presses Resolve conflicts in the project view, and waits for ConflictHub. */
+async function openConflictHub(): Promise<void> {
   // Retries the click itself on every poll attempt, not just the read: the
   // button can exist before its handler is wired (or get replaced by a
   // re-render before the click lands), so a single click-then-poll can wait
@@ -138,6 +121,12 @@ test('MergeFlow opens on a real conflict and reads in both themes', async () => 
       }
     )
     .toMatch(/Files conflicted|Total conflicts|Needs your attention/)
+}
+
+test('MergeFlow opens on a real conflict and reads in both themes', async () => {
+  // The Git project tab is where MergeFlow renders.
+  await openGitProjectTab()
+  await openConflictHub()
 
   const text = await inGit<string>('project', 'document.body.innerText')
   // ConflictHub's own headings, in sentence case rather than the caps they were.

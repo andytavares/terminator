@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import { closeApp, createWorkspace, launchApp, projectGroup, type AppHandle } from './helpers'
 import { git } from './git-harness'
 import { JIRA_SITE, startTrackerStub, type TrackerStub } from './tracker-stub'
+import type { JiraState } from './tracker-stub-jira'
+import type { LinearState } from './tracker-stub-linear'
 
 /**
  * Linear and Jira, end to end, against stub servers at their real addresses
@@ -22,49 +24,56 @@ const BRANCH = 'main'
 
 test.describe.configure({ mode: 'serial' })
 
+/** Linear's state: Ada's API key, and one issue of hers beside one of Grace's. */
+function linearState(): LinearState {
+  return {
+    apiKey: 'lin_api_e2e',
+    viewer: { name: 'Ada Lovelace', email: 'ada@acme.dev' },
+    issues: [
+      {
+        identifier: 'ENG-12',
+        title: 'Sidebar crashes on resize',
+        description: 'Dragging the divider past 600px throws.',
+        state: { name: 'In Progress', type: 'started' },
+        assigneeEmail: 'ada@acme.dev',
+        comments: [],
+      },
+      {
+        identifier: 'ENG-40',
+        title: 'Add dark mode to the drawer',
+        description: '',
+        state: { name: 'Todo', type: 'unstarted' },
+        assigneeEmail: 'grace@acme.dev',
+        comments: [],
+      },
+    ],
+    operations: [],
+  }
+}
+
+/** Jira's state: Ada's credential and one issue. */
+function jiraState(): JiraState {
+  return {
+    account: { displayName: 'Ada L', emailAddress: 'ada@acme.dev' },
+    credential: 'ada@acme.dev:jira-token',
+    issues: [
+      {
+        key: 'OPS-7',
+        summary: 'Rotate the deploy keys',
+        status: { name: 'To Do', category: 'new' },
+        description: 'Quarterly.',
+        comments: [],
+      },
+    ],
+    searches: [],
+  }
+}
+
 test.beforeAll(async () => {
   repo = mkdtempSync(join(tmpdir(), 'terminator-e2e-trackers-repo-'))
   git(repo, 'init', '--quiet', '-b', BRANCH)
   git(repo, 'commit', '--quiet', '--allow-empty', '-m', 'root')
-  stub = await startTrackerStub(
-    {
-      apiKey: 'lin_api_e2e',
-      viewer: { name: 'Ada Lovelace', email: 'ada@acme.dev' },
-      issues: [
-        {
-          identifier: 'ENG-12',
-          title: 'Sidebar crashes on resize',
-          description: 'Dragging the divider past 600px throws.',
-          state: { name: 'In Progress', type: 'started' },
-          assigneeEmail: 'ada@acme.dev',
-          comments: [],
-        },
-        {
-          identifier: 'ENG-40',
-          title: 'Add dark mode to the drawer',
-          description: '',
-          state: { name: 'Todo', type: 'unstarted' },
-          assigneeEmail: 'grace@acme.dev',
-          comments: [],
-        },
-      ],
-      operations: [],
-    },
-    {
-      account: { displayName: 'Ada L', emailAddress: 'ada@acme.dev' },
-      credential: 'ada@acme.dev:jira-token',
-      issues: [
-        {
-          key: 'OPS-7',
-          summary: 'Rotate the deploy keys',
-          status: { name: 'To Do', category: 'new' },
-          description: 'Quarterly.',
-          comments: [],
-        },
-      ],
-      searches: [],
-    }
-  )
+  stub = await startTrackerStub(linearState(), jiraState())
   handle = await launchApp(undefined, stub.env)
   credentialStore = await handle.app.evaluate(({ safeStorage }) =>
     safeStorage.isEncryptionAvailable()

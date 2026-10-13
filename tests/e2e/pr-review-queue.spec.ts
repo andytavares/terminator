@@ -27,19 +27,8 @@ let bare: string
 
 test.describe.configure({ mode: 'serial' })
 
-test.beforeAll(async () => {
-  ;({ repo, bare } = makeRepoWithRemote('terminator-e2e-queue'))
-  pushBranch(repo, 'feat/subtract', {
-    'src/math.ts':
-      'export const add = (a: number, b: number) => a + b\nexport const subtract = (a: number, b: number) => a - b\n',
-  })
-  pushBranch(repo, 'feat/greeting', { 'README.md': '# widgets, greeted\n' })
-  pushBranch(repo, 'docs/tidy', { 'docs/guide.md': '# Guide\n' })
-  writeFile(repo, 'README.md', '# widgets, renamed on main\n')
-  git(repo, 'commit', '--quiet', '-am', 'main: rename')
-  git(repo, 'push', '--quiet')
-
-  stub = await startGithubStub({ bareRepo: bare })
+/** Three pull requests: a draft behind main with a comment, one in conflict, and one clean. */
+function openQueuePullRequests(stub: GithubStub): void {
   const subtract = stub.openPullRequest({
     title: 'Add subtract',
     headRefName: 'feat/subtract',
@@ -59,6 +48,22 @@ test.beforeAll(async () => {
     mergeStateStatus: 'DIRTY',
   })
   stub.openPullRequest({ title: 'Tidy docs', headRefName: 'docs/tidy' })
+}
+
+test.beforeAll(async () => {
+  ;({ repo, bare } = makeRepoWithRemote('terminator-e2e-queue'))
+  pushBranch(repo, 'feat/subtract', {
+    'src/math.ts':
+      'export const add = (a: number, b: number) => a + b\nexport const subtract = (a: number, b: number) => a - b\n',
+  })
+  pushBranch(repo, 'feat/greeting', { 'README.md': '# widgets, greeted\n' })
+  pushBranch(repo, 'docs/tidy', { 'docs/guide.md': '# Guide\n' })
+  writeFile(repo, 'README.md', '# widgets, renamed on main\n')
+  git(repo, 'commit', '--quiet', '-am', 'main: rename')
+  git(repo, 'push', '--quiet')
+
+  stub = await startGithubStub({ bareRepo: bare })
+  openQueuePullRequests(stub)
   handle = await launchApp(undefined, stub.env)
   await openRepo(handle, 'Review Queue', repo)
 })
