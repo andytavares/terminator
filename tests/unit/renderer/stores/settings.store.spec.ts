@@ -26,7 +26,6 @@ const DEFAULT_SETTINGS: GlobalSettings = {
     promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
-  extensions: {},
   ui: { hasSeenWelcome: false, editor: '' },
   sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
   notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },

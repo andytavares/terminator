@@ -10,7 +10,6 @@ const validGlobal = {
   appearance: { theme: 'dark' as const },
   terminal: { scrollbackLimit: 10000, defaultShell: '/bin/zsh' },
   git: { worktreeBaseDir: '' },
-  extensions: {},
   ui: { hasSeenWelcome: false },
 }
 
@@ -121,19 +120,6 @@ describe('GlobalSettingsSchema — shell, ui and extensions', () => {
     if (result.success) {
       expect(result.data.ui).toEqual({ hasSeenWelcome: false, editor: '' })
     }
-  })
-
-  it('accepts extensions as empty record', () => {
-    const result = GlobalSettingsSchema.safeParse({ ...validGlobal, extensions: {} })
-    expect(result.success).toBe(true)
-  })
-
-  it('accepts extensions with nested unknown values', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      extensions: { 'my-ext': { setting1: true, setting2: 42 } },
-    })
-    expect(result.success).toBe(true)
   })
 })
 

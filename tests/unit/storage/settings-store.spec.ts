@@ -147,3 +147,27 @@ describe('settings-store — handing a workspace override back', () => {
     })
   })
 })
+
+// `extensions` was a global settings field nothing read or wrote; a file
+// written before it was removed still carries it.
+describe('settings-store — a settings file that still has the removed `extensions` field', () => {
+  useEmptyStores()
+
+  it('loads, and the next write leaves the field out of the file', async () => {
+    const Store = (await import('electron-store')).default
+    const file = new Store<Record<string, unknown>>({ name: 'settings', defaults: {} })
+    const { DEFAULT_GLOBAL_SETTINGS, GlobalSettingsSchema } = await import(
+      '../../../src/shared/schemas/settings.schema'
+    )
+    file.set('global', { ...DEFAULT_GLOBAL_SETTINGS, extensions: { 'com.old': { on: true } } })
+    const { getGlobalSettings, updateGlobalSettings } = await import(
+      '../../../src/main/storage/settings-store'
+    )
+
+    expect(GlobalSettingsSchema.safeParse(getGlobalSettings()).success).toBe(true)
+    updateGlobalSettings({ appearance: { theme: 'light' } })
+
+    expect(file.get('global')).not.toHaveProperty('extensions')
+    expect(getGlobalSettings().appearance.theme).toBe('light')
+  })
+})

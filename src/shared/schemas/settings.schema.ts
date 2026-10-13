@@ -40,7 +40,6 @@ export const GlobalSettingsSchema = z.object({
     worktreeBaseDir: z.string(),
     branchExcludePatterns: z.array(z.string()).default([]),
   }),
-  extensions: z.record(z.string(), z.record(z.string(), z.unknown())),
   ui: z
     .object({
       hasSeenWelcome: z.boolean(),
