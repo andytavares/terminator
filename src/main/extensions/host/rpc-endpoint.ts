@@ -1,10 +1,10 @@
-import type { MessagePortMain } from 'electron'
-
 /**
  * The extension host's wire (ADR 094): requests that are answered, and events
  * that are not, over one MessagePort. Main and the extension host each hold one
  * endpoint; either side can call the other.
  */
+import type { MessagePortMain } from 'electron'
+
 export type RpcMessage =
   | { kind: 'request'; id: number; method: string; params: unknown[] }
   | { kind: 'response'; id: number; result?: unknown; error?: RpcErrorShape }
