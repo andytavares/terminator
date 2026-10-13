@@ -32,10 +32,6 @@ export async function createTerminal(opts: CreateTerminalOptions): Promise<{ ses
   return res.json()
 }
 
-export async function deleteTerminal(sessionId: string): Promise<void> {
-  await apiFetch(`/api/terminals/${sessionId}`, { method: 'DELETE' })
-}
-
 export async function resizeTerminal(sessionId: string, cols: number, rows: number): Promise<void> {
   await apiFetch(`/api/terminals/${sessionId}/resize`, {
     method: 'POST',
@@ -59,6 +55,7 @@ export interface Workspace {
   tags: string[]
 }
 
+/** @internal */
 export interface Project {
   id: string
   workspaceId: string
@@ -98,6 +95,7 @@ export async function listWorkspaces(): Promise<Workspace[]> {
   return res.json()
 }
 
+/** @internal */
 export async function listProjects(workspaceId: string): Promise<Project[]> {
   const res = await apiFetch(`/api/projects?workspaceId=${encodeURIComponent(workspaceId)}`)
   if (!res.ok) throw new Error(`listProjects failed: ${res.status}`)

@@ -18,6 +18,7 @@ import { writeJsonAtomic } from '@terminator/extension-sdk/node'
  * substitutes a preview and a path, which would silently turn the issue
  * context into a pointer nobody follows. So the budget is enforced here,
  * visibly, and the operator is shown the number (FR-022, FR-023).
+ * @internal
  */
 export const MAX_CONTEXT_CHARS = 10_000
 

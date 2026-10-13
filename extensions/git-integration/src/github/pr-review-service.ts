@@ -268,6 +268,7 @@ export function computeRiskScore(metrics: FileMetrics, allFilesMetrics: FileMetr
 // deletions across the PR. PrReviewView reuses QUEUE_RISK_HIGH_LINES for its
 // "large PR" cognitive-load banner, so the two stay in lockstep.
 export const QUEUE_RISK_HIGH_LINES = 400
+/** @internal */
 export const QUEUE_RISK_MEDIUM_LINES = 150
 
 export function queueRiskLevel(changeSize: number): 'low' | 'medium' | 'high' {

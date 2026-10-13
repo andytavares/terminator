@@ -6,8 +6,6 @@ import {
   RelativeDataDirError,
   OrderIdEscapesRootError,
   orderDir,
-  unitDir,
-  laneDir,
   ensureWritable,
 } from '../src/data-root.js'
 import { makeTempDir } from '../../../tests/support/temp-dir'
@@ -61,16 +59,6 @@ describe('paths under the root', () => {
 
   it('puts an order in its own directory', () => {
     expect(orderDir(root, 'WO-0913-c71')).toBe('/var/foundry/orders/WO-0913-c71')
-  })
-
-  it('puts a unit under its order', () => {
-    expect(unitDir(root, 'WO-0913-c71', 'U-2')).toBe('/var/foundry/orders/WO-0913-c71/units/U-2')
-  })
-
-  it('names a lane directory by merge order and repository, so it sorts', () => {
-    expect(laneDir(root, 'WO-0913-c71', 1, 'api-contracts')).toBe(
-      '/var/foundry/orders/WO-0913-c71/lanes/1-api-contracts'
-    )
   })
 })
 

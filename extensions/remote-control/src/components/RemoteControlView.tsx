@@ -47,7 +47,7 @@ export function RemoteControlView(): React.JSX.Element {
       {status.kind === 'on' && (
         <ConnectedDevices devices={devices} maxViewers={maxViewers} onDisconnect={disconnect} />
       )}
-      <SettingsSection status={status} maxViewers={maxViewers} />
+      <SettingsSection status={status} maxViewers={maxViewers} onViewersSaved={setMaxViewers} />
     </div>
   )
 }
@@ -170,11 +170,37 @@ function FailedBand(props: BandProps & { status: FailedStatus }): React.JSX.Elem
           <h2 className="rc-band__title">{failure.message}</h2>
           {failure.resolution !== null && <p className="rc-band__sub">{failure.resolution}</p>}
         </div>
-        <Button variant="primary" disabled={props.busy} onClick={() => props.onToggle(true)}>
-          Try again
-        </Button>
+        {failure.reason.startsWith('tunnel-') ? (
+          <ReconnectButton />
+        ) : (
+          <Button variant="primary" disabled={props.busy} onClick={() => props.onToggle(true)}>
+            Try again
+          </Button>
+        )}
       </div>
     </section>
+  )
+}
+
+/**
+ * Only the public address failed: the server is still listening, and anyone
+ * on this network is still connected. Reconnecting the tunnel keeps them;
+ * turning the server off and on would not.
+ */
+function ReconnectButton(): React.JSX.Element {
+  const [busy, setBusy] = useState(false)
+  const reconnect = async () => {
+    setBusy(true)
+    try {
+      await window.electronAPI.extensionBridge.invoke('remote:tunnel-reconnect', {})
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Button variant="primary" disabled={busy} onClick={reconnect}>
+      Reconnect
+    </Button>
   )
 }
 
@@ -302,8 +328,14 @@ function DeviceRow(props: DeviceRowProps): React.JSX.Element {
 
 // ── Configuration, demoted ──────────────────────────────────────────────────
 
-function SettingsSection(props: { status: RemoteStatus; maxViewers: number }): React.JSX.Element {
-  const { status, maxViewers } = props
+interface SettingsSectionProps {
+  status: RemoteStatus
+  maxViewers: number
+  onViewersSaved: (max: number) => void
+}
+
+function SettingsSection(props: SettingsSectionProps): React.JSX.Element {
+  const { status, maxViewers, onViewersSaved } = props
   const [open, setOpen] = useState(false)
   const port = status.kind === 'off' ? 7681 : status.port
   return (
@@ -313,7 +345,7 @@ function SettingsSection(props: { status: RemoteStatus; maxViewers: number }): R
       </SettingsToggle>
       {open && (
         <div className="rc-settings__body">
-          <RemoteControlSettings />
+          <RemoteControlSettings onViewersSaved={onViewersSaved} />
         </div>
       )}
     </section>

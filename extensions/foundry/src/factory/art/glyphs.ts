@@ -8,6 +8,7 @@ import { rect } from './kit.js'
 const GLYPH_W = 3
 const GLYPH_H = 5
 
+/** @internal */
 export const GLYPHS: Readonly<Record<string, string>> = {
   A: '010101111101101',
   B: '110101110101110',

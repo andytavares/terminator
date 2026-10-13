@@ -52,8 +52,6 @@ const ICON_MAP: Record<string, LucideIcon> = {
   brain: Brain,
 }
 
-export const CURATED_ICON_NAMES = Object.keys(ICON_MAP) as ReadonlyArray<string>
-
 export function iconFromName(name: string): React.ReactElement {
   const Icon = ICON_MAP[name] ?? Puzzle
   return React.createElement(Icon)

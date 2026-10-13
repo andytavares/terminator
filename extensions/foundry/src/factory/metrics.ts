@@ -73,6 +73,7 @@ function mean(values: readonly number[]): number | null {
   return values.reduce((sum, v) => sum + v, 0) / values.length
 }
 
+/** @internal */
 export function orderMetrics(records: OrderRecords): OrderMetrics {
   const { order, ledger, gates, graph } = records
 

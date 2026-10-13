@@ -38,6 +38,10 @@ jobs:
       - name: Unused code
         run: npm run lint:unused
 
+      # Code that only tests reach: knip's production mode (knip.jsonc, ADR 107).
+      - name: Unused production code
+        run: npm run lint:unused:production
+
       # Copy-pasted code in src, packages and extensions (.jscpd.json, ADR 105).
       - name: Duplicate code
         run: npm run lint:duplicates

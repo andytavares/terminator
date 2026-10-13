@@ -31,6 +31,7 @@ const REPORT_DIR_NAME = 'agent-sessions'
  * silent, the same as before: this hook runs before every agent session in
  * every folder, and a hook that fails loudly would break sessions that have
  * nothing to do with it.
+ * @internal
  */
 export const CAPTURE_SCRIPT = `// Written by Terminator. Do not edit: it is overwritten on every start.
 const fs = require('fs')

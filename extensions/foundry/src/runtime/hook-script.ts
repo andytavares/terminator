@@ -117,6 +117,7 @@ process.stdin.on('end', () => {
 })
 `
 
+/** @internal */
 export const HOOK_SCRIPT_NAME = 'pretooluse-hook.mjs'
 
 /**

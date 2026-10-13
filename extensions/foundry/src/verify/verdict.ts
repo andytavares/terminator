@@ -9,6 +9,7 @@
 // builder's justification lives in that context window; a verdict derived from
 // it is the builder marking its own homework with extra steps.
 
+/** @internal */
 export type VerdictResult = 'pass' | 'fail' | 'not_measured'
 
 export type EvidenceKind = 'exit_code' | 'stdout' | 'report_file' | 'screenshot' | 'diff'
@@ -35,6 +36,7 @@ export interface Verdict {
   readonly at: string
 }
 
+/** @internal */
 export class SelfVerificationError extends Error {
   readonly code = 'SELF_VERIFICATION'
   constructor(nodeId: string) {
@@ -45,6 +47,7 @@ export class SelfVerificationError extends Error {
   }
 }
 
+/** @internal */
 export class UnevidencedVerdictError extends Error {
   readonly code = 'UNEVIDENCED_VERDICT'
   constructor(nodeId: string, result: VerdictResult) {
@@ -55,6 +58,7 @@ export class UnevidencedVerdictError extends Error {
   }
 }
 
+/** @internal */
 export interface VerdictInput extends Omit<Verdict, 'at'> {
   /** The session that produced the work being checked. */
   readonly nodeSessionId: string | null
@@ -66,6 +70,7 @@ export interface VerdictInput extends Omit<Verdict, 'at'> {
  *
  * Both refusals are structural rather than advisory. A rule that only lives in
  * a prompt is a rule the next model may reinterpret.
+ * @internal
  */
 export function makeVerdict(input: VerdictInput): Verdict {
   if (input.nodeSessionId !== null && input.producedBy.sessionId === input.nodeSessionId) {

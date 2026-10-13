@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import type { ChannelSpec } from '@terminator/extension-sdk'
 
 // ADR 096: every core invoke channel is registered through the schema table.
 // This registers every core handler with its dependencies stubbed, then walks
@@ -17,6 +18,19 @@ const { stubModule } = vi.hoisted(() => ({
     })
   },
 }))
+
+// The schema table's rows, as each handler module hands them to registerInvokeTable.
+const { tableRows } = vi.hoisted(() => ({ tableRows: new Map<string, ChannelSpec>() }))
+vi.mock('../../../src/main/ipc/invoke-table.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/main/ipc/invoke-table.js')>()
+  return {
+    ...actual,
+    registerInvokeTable: (specs: ReadonlyArray<ChannelSpec>) => {
+      for (const spec of specs) tableRows.set(spec.channel, spec)
+      actual.registerInvokeTable(specs)
+    },
+  }
+})
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), on: vi.fn(), removeHandler: vi.fn() },
@@ -53,7 +67,6 @@ vi.mock('../../../src/main/editor/open-in-editor', () => stubModule())
 vi.mock('../../../src/main/db/index', () => stubModule())
 
 import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry.js'
-import { registeredInvokeSpec } from '../../../src/main/ipc/invoke-table.js'
 import { ELECTRON_API_MANIFEST } from '../../../src/shared/electron-api/manifest.js'
 import { registerAppInfoHandlers, registerDialogHandlers } from '../../../src/main/ipc/app.ipc.js'
 import { registerDbIpcHandlers } from '../../../src/main/ipc/db.ipc.js'
@@ -114,11 +127,11 @@ describe('core invoke channels', () => {
 
   describe.each([...ipcInvokeRegistry.keys()])('%s', (channel) => {
     it('was registered through the schema table', () => {
-      expect(registeredInvokeSpec(channel)?.schema).toBeDefined()
+      expect(tableRows.get(channel)?.schema).toBeDefined()
     })
 
     it('answers a payload of the wrong type with its invalid response, without running', async () => {
-      const spec = registeredInvokeSpec(channel)!
+      const spec = tableRows.get(channel)!
       const run = vi.spyOn(spec, 'run')
       const parsed = spec.schema.safeParse(WRONG_TYPE_PAYLOAD)
       const expected =

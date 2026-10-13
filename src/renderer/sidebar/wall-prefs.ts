@@ -10,8 +10,10 @@ export interface WallPrefs {
   thenBy: WallThenBy
 }
 
+/** @internal */
 export const WALL_PREFS_KEY = 'terminator.wall.prefs'
 
+/** @internal */
 export const DEFAULT_WALL_PREFS: WallPrefs = { size: 'm', pinNeeds: true, thenBy: 'state' }
 
 export function loadWallPrefs(): WallPrefs {

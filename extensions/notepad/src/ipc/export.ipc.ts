@@ -11,6 +11,7 @@ import { reconcileTags } from './notes.ipc'
 // Pure utilities
 // ──────────────────────────────────────────────────────────────
 
+/** @internal */
 export function toSlug(title: string, uuid: string): string {
   const uuid8 = uuid.replace(/-/g, '').slice(0, 8)
   const slugBase = title
@@ -222,6 +223,7 @@ async function exportDiagrams(db: ExtensionDB, folder: string): Promise<number> 
   return diagrams.length
 }
 
+/** @internal */
 export async function exportNotes(
   db: ExtensionDB,
   args: ExportArgs
@@ -262,6 +264,7 @@ interface ImportedNote {
   updatedAt: string
 }
 
+/** @internal */
 export async function importNotes(
   db: ExtensionDB,
   args: z.infer<typeof importSchema>

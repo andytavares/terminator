@@ -31,6 +31,7 @@ export interface ShellExecOutput<Output extends string | Buffer = string> {
   exceededMaxBuffer: boolean
 }
 
+/** @internal */
 export class CommandNotAllowedError extends Error {
   readonly code = 'COMMAND_NOT_ALLOWED'
   constructor(command: string) {

@@ -43,7 +43,10 @@ function ensureInit(): Promise<void> {
 
 const languageCache = new Map<string, Promise<Language | null>>()
 
-/** Cached per grammar, loaded lazily on first use. Returns null when `path`'s extension has no grammar. */
+/**
+ * Cached per grammar, loaded lazily on first use. Returns null when `path`'s extension has no grammar.
+ * @internal
+ */
 export function loadLanguageFor(path: string): Promise<Language | null> {
   const grammar = grammarNameFor(path)
   if (!grammar) return Promise.resolve(null)

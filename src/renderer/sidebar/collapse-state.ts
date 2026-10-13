@@ -24,6 +24,7 @@ export type CollapseNamespace = GroupKey | typeof TERMINALS_NAMESPACE
 
 export type CollapseState = Partial<Record<CollapseNamespace, string[]>>
 
+/** @internal */
 export const COLLAPSE_STORAGE_KEY = 'terminator.sidebar.collapsed'
 
 function isStringArray(value: unknown): value is string[] {

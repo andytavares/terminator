@@ -34,6 +34,7 @@ import {
  *
  * Its whole authority is: read one file, print, exit 0. No credential, no
  * network, no knowledge of trackers.
+ * @internal
  */
 export const HOOK_SCRIPT = `// Written by Terminator. Do not edit: it is overwritten on every start.
 const fs = require('fs')
@@ -100,6 +101,7 @@ export interface HookCommandOptions {
  * `ELECTRON_RUN_AS_NODE=1` with the application's own binary, so the hook needs
  * neither a `node` on `PATH` nor whatever a login shell happened to export.
  * Without it, the script would launch a second copy of the application.
+ * @internal
  */
 export function hookCommand(options: HookCommandOptions): string {
   return [

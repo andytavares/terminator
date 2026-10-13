@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useId, useState } from 'react'
 import { Button } from '@terminator/extension-ui'
 import { PasswordField } from './PasswordField'
 
@@ -107,7 +107,14 @@ function useRemoteSettings() {
   return { status, form, updateForm }
 }
 
-export function RemoteControlSettings(): React.JSX.Element {
+interface RemoteControlSettingsProps {
+  /** Called with a viewer limit once it is saved, so the status above can count against it. */
+  onViewersSaved: (maxSubscribers: number) => void
+}
+
+export function RemoteControlSettings({
+  onViewersSaved,
+}: RemoteControlSettingsProps): React.JSX.Element {
   const { status, form, updateForm } = useRemoteSettings()
   return (
     <div className="settings-section">
@@ -118,13 +125,24 @@ export function RemoteControlSettings(): React.JSX.Element {
           public address at all, which is the whole point. */}
       <AccountTokenField form={form} updateForm={updateForm} />
       <PortField form={form} updateForm={updateForm} />
-      <ViewersField form={form} updateForm={updateForm} />
+      <ViewersField form={form} updateForm={updateForm} onSaved={onViewersSaved} />
       <PasswordField
         hasPassword={form.hasPassword}
         onChanged={() => updateForm({ hasPassword: true })}
       />
       {status.enabled && <Addresses status={status} port={form.port} />}
     </div>
+  )
+}
+
+const NUMBER_INPUT_STYLE: React.CSSProperties = { width: '100%', maxWidth: 200 }
+
+/** A field's label, tied to its control so the control is named by it. */
+function FieldLabel(props: { htmlFor: string; children: React.ReactNode }): React.JSX.Element {
+  return (
+    <label className="settings-section__label" htmlFor={props.htmlFor}>
+      {props.children}
+    </label>
   )
 }
 
@@ -139,15 +157,17 @@ function AccountTokenField({ form, updateForm }: FieldProps): React.JSX.Element 
       ngrokAuthToken: form.ngrokTokenInput.trim(),
     })
   }
+  const id = useId()
   return (
     <div className="settings-section__field">
-      <label className="settings-section__label">Account token</label>
+      <FieldLabel htmlFor={id}>Account token</FieldLabel>
       <span className="settings-section__hint">
         Needed to reach your terminals from outside this network. Free from{' '}
         <code>dashboard.ngrok.com</code>.
       </span>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
         <input
+          id={id}
           type="password"
           className="settings-section__input"
           value={form.ngrokTokenInput}
@@ -168,13 +188,15 @@ function PortField({ form, updateForm }: FieldProps): React.JSX.Element {
       void window.electronAPI.extensionBridge.invoke('remote:port-change', { port: val })
     }
   }
+  const id = useId()
   return (
     <div className="settings-section__field">
-      <label className="settings-section__label">Port</label>
+      <FieldLabel htmlFor={id}>Port</FieldLabel>
       <input
+        id={id}
         type="number"
         className="settings-section__input"
-        style={{ width: '100%', maxWidth: 200 }}
+        style={NUMBER_INPUT_STYLE}
         value={form.port}
         min={1024}
         max={65535}
@@ -188,22 +210,33 @@ function PortField({ form, updateForm }: FieldProps): React.JSX.Element {
   )
 }
 
-function ViewersField({ form, updateForm }: FieldProps): React.JSX.Element {
+/** Saves a typed viewer limit; null when it is out of range and nothing was saved. */
+function saveViewerLimit(text: string): number | null {
+  const maxSubscribers = parseInt(text, 10)
+  if (!(maxSubscribers >= 1 && maxSubscribers <= 20)) return null
+  void window.electronAPI.extensionBridge.invoke('remote:update-max-subscribers', {
+    maxSubscribers,
+  })
+  return maxSubscribers
+}
+
+function ViewersField(props: FieldProps & { onSaved: (max: number) => void }): React.JSX.Element {
+  const { form, updateForm, onSaved } = props
   const saveViewers = (e: React.FocusEvent<HTMLInputElement>) => {
-    const val = parseInt(e.target.value, 10)
-    if (!(val >= 1 && val <= 20)) return
-    updateForm({ maxSubscribers: val })
-    void window.electronAPI.extensionBridge.invoke('remote:update-max-subscribers', {
-      maxSubscribers: val,
-    })
+    const saved = saveViewerLimit(e.target.value)
+    if (saved === null) return
+    updateForm({ maxSubscribers: saved })
+    onSaved(saved)
   }
+  const id = useId()
   return (
     <div className="settings-section__field">
-      <label className="settings-section__label">Viewers per terminal</label>
+      <FieldLabel htmlFor={id}>Viewers per terminal</FieldLabel>
       <input
+        id={id}
         type="number"
         className="settings-section__input"
-        style={{ width: '100%', maxWidth: 200 }}
+        style={NUMBER_INPUT_STYLE}
         value={form.maxSubscribers}
         min={1}
         max={20}

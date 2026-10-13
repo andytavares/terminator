@@ -142,6 +142,13 @@ function useMobileTerminal(
   }, [sessionId, openWs, send, close, containerRef, termRef])
 }
 
+/** Why the connection ended, for each way it can end that waits on the person. */
+const ENDED: Partial<Record<ConnectionStatus, string>> = {
+  disconnected: 'Disconnected',
+  full: 'This terminal already has as many viewers as allowed. Retry once one leaves.',
+  removed: 'The desktop app disconnected this device.',
+}
+
 function ConnectionStatusBanner({
   status,
   retry,
@@ -152,10 +159,11 @@ function ConnectionStatusBanner({
   if (status === 'reconnecting') {
     return <div className="mobile-terminal-status">Reconnecting…</div>
   }
-  if (status !== 'disconnected') return null
+  const message = ENDED[status]
+  if (!message) return null
   return (
-    <div className="mobile-terminal-status mobile-terminal-status--error">
-      Disconnected
+    <div className="mobile-terminal-status mobile-terminal-status--error" role="alert">
+      {message}
       <button className="mobile-terminal-status__retry" onClick={retry}>
         Retry
       </button>

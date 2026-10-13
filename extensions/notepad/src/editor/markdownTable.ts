@@ -6,6 +6,7 @@
 // rendered as raw pipes. Cell splitting mirrors @lezer/markdown's parseRow:
 // split on unescaped '|', trim each cell.
 
+/** @internal */
 export type ColumnAlign = 'left' | 'center' | 'right' | null
 
 /**
@@ -29,6 +30,7 @@ export interface ParsedTable {
  * Splits one table row into cells on unescaped pipes, dropping the empty
  * segments produced by leading and trailing pipes. Empty interior cells are
  * kept so columns stay aligned.
+ * @internal
  */
 export function splitTableRow(line: string): TableCell[] {
   const segments = splitOnUnescapedPipes(line)
@@ -78,6 +80,7 @@ const DELIMITER_CELL = /^:?-+:?$/
 /**
  * Parses the `---|:--:|---:` row into per-column alignments. Returns null when
  * the line is not a delimiter row, which is what makes a table a table.
+ * @internal
  */
 export function parseDelimiterRow(line: string): ColumnAlign[] | null {
   const cells = splitTableRow(line).map((c) => c.text)
@@ -216,6 +219,7 @@ function unescapePipes(text: string): string {
 
 // ── GitHub alerts ─────────────────────────────────────────────────
 
+/** @internal */
 export const ALERT_KINDS = ['note', 'tip', 'important', 'warning', 'caution'] as const
 
 export type AlertKind = (typeof ALERT_KINDS)[number]

@@ -115,30 +115,31 @@ Then open the app normally. You only need to run this once.
 
 ## Available Scripts
 
-| Script                     | Description                                                                      |
-| -------------------------- | -------------------------------------------------------------------------------- |
-| `npm run dev`              | Build extensions + remote SPA, then development mode with hot reload             |
-| `npm run build`            | Build extensions + remote SPA + production build                                 |
-| `npm run package`          | Production build packaged as a macOS arm64 app (electron-builder)                |
-| `npm run build:extensions` | Build every extension: backend → `src/index.js` (esbuild), view → `dist/` (Vite) |
-| `npm run build:remote`     | Build the browser remote-control SPA → `out/renderer-remote/`                    |
-| `npm run preview`          | Preview the production build                                                     |
-| `npm test`                 | Unit + integration tests (Vitest) with coverage                                  |
-| `npm run test:watch`       | Tests in watch mode                                                              |
-| `npm run test:coverage`    | Tests with V8 coverage and a JUnit report                                        |
-| `npm run test:live`        | Tests against real services (`vitest.live.config.ts`)                            |
-| `npm run test:e2e`         | E2E tests (Playwright, launches Electron)                                        |
-| `npm run storybook`        | The design system's Storybook                                                    |
-| `npm run test:stories`     | The design system's stories run as tests                                         |
-| `npm run test:visual`      | The design system's screenshot tests (Playwright)                                |
-| `npm run lint`             | ESLint                                                                           |
-| `npm run lint:deps`        | syncpack: one exact version per dependency                                       |
-| `npm run lint:unused`      | knip: no unused files, exports or dependencies                                   |
-| `npm run lint:duplicates`  | jscpd: no copy-pasted code                                                       |
-| `npm run typecheck`        | TypeScript check of main, renderer, shared, packages and extensions (no emit)    |
-| `npm run format`           | Prettier format                                                                  |
-| `npm run format:check`     | Check formatting without writing files (CI)                                      |
-| `npm run create-extension` | Scaffold a new extension                                                         |
+| Script                           | Description                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------- |
+| `npm run dev`                    | Build extensions + remote SPA, then development mode with hot reload             |
+| `npm run build`                  | Build extensions + remote SPA + production build                                 |
+| `npm run package`                | Production build packaged as a macOS arm64 app (electron-builder)                |
+| `npm run build:extensions`       | Build every extension: backend → `src/index.js` (esbuild), view → `dist/` (Vite) |
+| `npm run build:remote`           | Build the browser remote-control SPA → `out/renderer-remote/`                    |
+| `npm run preview`                | Preview the production build                                                     |
+| `npm test`                       | Unit + integration tests (Vitest) with coverage                                  |
+| `npm run test:watch`             | Tests in watch mode                                                              |
+| `npm run test:coverage`          | Tests with V8 coverage and a JUnit report                                        |
+| `npm run test:live`              | Tests against real services (`vitest.live.config.ts`)                            |
+| `npm run test:e2e`               | E2E tests (Playwright, launches Electron)                                        |
+| `npm run storybook`              | The design system's Storybook                                                    |
+| `npm run test:stories`           | The design system's stories run as tests                                         |
+| `npm run test:visual`            | The design system's screenshot tests (Playwright)                                |
+| `npm run lint`                   | ESLint                                                                           |
+| `npm run lint:deps`              | syncpack: one exact version per dependency                                       |
+| `npm run lint:unused`            | knip: no unused files, exports or dependencies                                   |
+| `npm run lint:unused:production` | knip --production: no code that only tests reach                                 |
+| `npm run lint:duplicates`        | jscpd: no copy-pasted code                                                       |
+| `npm run typecheck`              | TypeScript check of main, renderer, shared, packages and extensions (no emit)    |
+| `npm run format`                 | Prettier format                                                                  |
+| `npm run format:check`           | Check formatting without writing files (CI)                                      |
+| `npm run create-extension`       | Scaffold a new extension                                                         |
 
 ## Project Structure
 

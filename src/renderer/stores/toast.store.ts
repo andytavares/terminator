@@ -1,5 +1,3 @@
-import { createToastStore, type QueuedToast } from '@terminator/extension-ui'
-
-export type Toast = QueuedToast
+import { createToastStore } from '@terminator/extension-ui'
 
 export const useToastStore = createToastStore()

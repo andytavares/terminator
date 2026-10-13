@@ -269,32 +269,43 @@ describe('useReconnect — retry() resets attempt count and starts reconnect', (
   })
 })
 
-describe('useReconnect at the edges of a retry', () => {
+/** An EventTarget with a ready state: all the hook reads of a socket. */
+function eventSocket(readyState: WebSocket['readyState']): WebSocket {
+  const events = new EventTarget()
+  return partialFake<WebSocket>({
+    readyState,
+    addEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
+      events.addEventListener(type, listener),
+    removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
+      events.removeEventListener(type, listener),
+    dispatchEvent: (event: Event) => events.dispatchEvent(event),
+  })
+}
+
+/** The server closes the socket with `code`; the hook says `status` and stays there. */
+async function closedOnPurpose(code: number, status: string): Promise<void> {
+  const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
+  const ws = eventSocket(1)
+  const { result } = renderHook(() => useReconnect(mockOpenWs, ws))
+  act(() => {
+    ws.dispatchEvent(new CloseEvent('close', { code }))
+  })
+  expect(result.current.status).toBe(status)
+  act(() => {
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await act(async () => {
+    vi.advanceTimersByTime(6000)
+  })
+  expect(mockOpenWs).not.toHaveBeenCalled()
+  expect(result.current.status).toBe(status)
+}
+
+describe('useReconnect — a socket the server closes on purpose', () => {
   setUpUseReconnect()
 
-  it('a retry that finds the socket open reports connected and opens nothing', async () => {
-    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-    const ws = { readyState: 1 } as WebSocket
-    const { result } = renderHook(() => useReconnect(mockOpenWs, ws))
-    act(() => {
-      result.current.onOpenWsFailed()
-    })
-    expect(result.current.status).toBe('reconnecting')
-    await act(async () => {
-      vi.advanceTimersByTime(2000)
-    })
-    expect(result.current.status).toBe('connected')
-    expect(mockOpenWs).not.toHaveBeenCalled()
-  })
-
-  it('a fourth failure reports disconnected at once', async () => {
-    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-    const { result } = renderHook(() => useReconnect(mockOpenWs, null))
-    for (let failure = 0; failure < 4; failure++) {
-      act(() => {
-        result.current.onOpenWsFailed()
-      })
-    }
-    expect(result.current.status).toBe('disconnected')
-  })
+  it.each([
+    [4003, 'full'],
+    [4004, 'removed'],
+  ])('says why on close code %i, and does not come back by itself', closedOnPurpose)
 })

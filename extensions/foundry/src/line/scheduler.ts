@@ -12,8 +12,10 @@ import type { Budgets } from '../order/schema.js'
 /** Occupying an agent right now. */
 const IN_FLIGHT: readonly RunNode['state'][] = ['running']
 
+/** @internal */
 export const MAX_ATTEMPTS = 2
 
+/** @internal */
 export function inFlight(graph: RunGraph): RunNode[] {
   return graph.nodes.filter((n) => IN_FLIGHT.includes(n.state))
 }
@@ -26,15 +28,6 @@ function dependenciesSettled(graph: RunGraph, node: RunNode): boolean {
     // parser already refuses.
     if (dependency === undefined) return true
     return dependency.state === 'passed' || dependency.state === 'skipped'
-  })
-}
-
-function anyDependencyFailed(graph: RunGraph, node: RunNode): boolean {
-  return node.dependsOn.some((id) => {
-    const dependency = nodeById(graph, id)
-    return (
-      dependency !== undefined && (dependency.state === 'failed' || dependency.state === 'blocked')
-    )
   })
 }
 
@@ -52,13 +45,6 @@ export function readyNodes(graph: RunGraph, budgets: Budgets): RunNode[] {
   const gates = eligible.filter((n) => n.kind === 'gate')
   const work = eligible.filter((n) => n.kind !== 'gate').slice(0, capacity)
   return [...gates, ...work]
-}
-
-/** Nodes that can never start because something they wait on failed. */
-export function blockedNodes(graph: RunGraph): RunNode[] {
-  return graph.nodes.filter(
-    (n) => n.state !== 'passed' && n.state !== 'skipped' && anyDependencyFailed(graph, n)
-  )
 }
 
 /**

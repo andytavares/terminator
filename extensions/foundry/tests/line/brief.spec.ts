@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { brief, READABLE } from '../../src/line/brief.js'
+import { brief } from '../../src/line/brief.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { PlanUnit, WorkOrder } from '../../src/order/schema.js'
 import type { Role, Rule } from '../../src/recipe/parse.js'
@@ -216,18 +216,6 @@ describe('what each role may read is declared, not assumed', () => {
     expect(text).toContain('Refuse an expired refresh token')
     expect(text).not.toContain('no-stubs')
     expect(text).not.toContain('src/auth/session.ts')
-  })
-
-  it('offers a closed set of things a role can ask for', () => {
-    expect([...READABLE]).toEqual([
-      'unit',
-      'criteria',
-      'context',
-      'rules',
-      'order',
-      'conventions',
-      'feedback',
-    ])
   })
 })
 

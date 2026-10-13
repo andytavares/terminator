@@ -1,14 +1,31 @@
 import { useState, useEffect, useRef, useCallback, type MutableRefObject } from 'react'
 
-export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
+export type ConnectionStatus =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'disconnected'
+  /** Turned away: the terminal already has as many viewers as the app allows. */
+  | 'full'
+  /** Disconnected from the desktop app's Remote Control view. */
+  | 'removed'
 
 const MAX_ATTEMPTS = 3
 const RETRY_DELAY_MS = 2000
+
+// The codes the server closes a terminal socket with on purpose (terminal.routes.ts).
+// Reconnecting by itself would undo the owner's decision, so only Retry does.
+const DELIBERATE_CLOSES: Partial<Record<number, ConnectionStatus>> = {
+  4003: 'full',
+  4004: 'removed',
+}
 
 interface Loop {
   wsRef: MutableRefObject<WebSocket | null>
   openWsRef: MutableRefObject<() => void>
   attemptsRef: MutableRefObject<number>
+  /** Set once the server closed the socket on purpose; only a retry clears it. */
+  turnedAwayRef: MutableRefObject<boolean>
   setStatus: (status: ConnectionStatus) => void
 }
 
@@ -20,6 +37,7 @@ export function useReconnect(
     ws?.readyState === WebSocket.OPEN ? 'connected' : 'connecting'
   )
   const attemptsRef = useRef(0)
+  const turnedAwayRef = useRef(false)
   const wsRef = useRef(ws)
   const openWsRef = useRef(openWs)
 
@@ -32,11 +50,13 @@ export function useReconnect(
   }, [openWs])
 
   useConnectedWhenOpen(ws, setStatus, attemptsRef)
-  const loop = { wsRef, openWsRef, attemptsRef, setStatus }
+  const loop = { wsRef, openWsRef, attemptsRef, turnedAwayRef, setStatus }
+  useTurnedAwayOnClose(ws, loop)
   const attempt = useAttempt(loop)
   const onOpenWsFailed = useOnOpenWsFailed(attempt, loop)
   const retry = useCallback(() => {
     attemptsRef.current = 0
+    turnedAwayRef.current = false
     attempt()
   }, [attempt])
   useAttemptWhenVisible(wsRef, attemptsRef, attempt)
@@ -67,11 +87,27 @@ function useConnectedWhenOpen(
   }, [ws, setStatus, attemptsRef])
 }
 
+/** Says why the server closed the socket on purpose, and stops the loop from undoing it. */
+function useTurnedAwayOnClose(ws: WebSocket | null, { turnedAwayRef, setStatus }: Loop): void {
+  useEffect(() => {
+    if (!ws) return
+    const handleClose = (event: CloseEvent) => {
+      const why = DELIBERATE_CLOSES[event.code]
+      if (!why) return
+      turnedAwayRef.current = true
+      setStatus(why)
+    }
+    ws.addEventListener?.('close', handleClose)
+    return () => ws.removeEventListener?.('close', handleClose)
+  }, [ws, turnedAwayRef, setStatus])
+}
+
 /** Up to three attempts, two seconds apart, then disconnected until a retry. */
-function useAttempt({ wsRef, openWsRef, attemptsRef, setStatus }: Loop): () => void {
+function useAttempt({ wsRef, openWsRef, attemptsRef, turnedAwayRef, setStatus }: Loop): () => void {
   const attempt = useCallback(
     function attempt() {
       const state = wsRef.current?.readyState
+      if (turnedAwayRef.current) return
       if (state === WebSocket.OPEN) {
         setStatus('connected')
         attemptsRef.current = 0
@@ -85,7 +121,7 @@ function useAttempt({ wsRef, openWsRef, attemptsRef, setStatus }: Loop): () => v
         setTimeout(attempt, RETRY_DELAY_MS)
       }
     },
-    [wsRef, openWsRef, attemptsRef, setStatus]
+    [wsRef, openWsRef, attemptsRef, turnedAwayRef, setStatus]
   )
 
   return attempt

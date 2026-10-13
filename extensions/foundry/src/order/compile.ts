@@ -14,6 +14,7 @@ import type { WorkOrder } from './schema.js'
 // decoration inside a gate is worse than no gate at all, because it teaches
 // the operator to trust a green they did not earn.
 
+/** @internal */
 export const CHECK_IDS = ['questions', 'verifiable', 'coverage', 'risk', 'redTeam'] as const
 
 export type CheckId = (typeof CHECK_IDS)[number]

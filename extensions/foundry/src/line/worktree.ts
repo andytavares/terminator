@@ -14,6 +14,7 @@ import type { ShellExec } from './integrate.js'
 // metadata rather than working tree — `git status` stays clean, and that is
 // what the portability test measures.
 
+/** @internal */
 export class CheckoutFailedError extends Error {
   readonly code = 'CHECKOUT_FAILED'
   constructor(repo: string, stderr: string) {
@@ -141,6 +142,7 @@ async function prepareCheckout(
  * `git check-ignore` disowns is removed again immediately. Never throws — a
  * failure here should not turn "the checkout was fine, the tools were slow"
  * into a checkout failure.
+ * @internal
  */
 export async function provisionDependencies(
   checkout: Checkout,
@@ -263,7 +265,10 @@ export async function ensureCheckouts(
   return out
 }
 
-/** Take a lane's checkout away again. Best effort; never throws. */
+/**
+ * Take a lane's checkout away again. Best effort; never throws.
+ * @internal
+ */
 export async function removeCheckout(checkout: Checkout, deps: CheckoutDeps): Promise<boolean> {
   const removed = await deps.exec({
     command: 'git',

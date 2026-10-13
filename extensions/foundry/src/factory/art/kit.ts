@@ -100,17 +100,6 @@ export function wear(
   }
 }
 
-/** Faint fixed horizontal scanlines over the whole frame. */
-export function scanlines(
-  paint: Paint,
-  width: number,
-  height: number,
-  color = 'rgba(0,0,0,.08)'
-): void {
-  paint.fillStyle = color
-  for (let y = 0; y < height; y += 2) paint.fillRect(0, y, width, 1)
-}
-
 /**
  * An additive glow: caller is responsible for `globalCompositeOperation`
  * (`'lighter'` for a light source, `'destination-out'` to cut a hole in a

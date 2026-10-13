@@ -1,0 +1,47 @@
+#!/usr/bin/env node
+// Stand-in for the ngrok agent, for tests/e2e/remote-control.spec.ts only: that
+// spec puts this folder first on the app's PATH, and no other spec does.
+//
+// `ngrok http <port> [--authtoken <token>]`, as Remote Control runs it
+// (extensions/remote-control/src/server/ngrok-manager.ts). With the one token the
+// spec saves, it answers the agent API on :4040 as ngrok does, with one https
+// tunnel to <port>, until it is stopped. Without that token it fails the way
+// ngrok fails without an account. GET /e2e/crash makes it exit as a crashed
+// agent would, so the spec can drop the tunnel.
+import { createServer } from 'node:http'
+
+const STUB_TOKEN = 'e2e-ngrok-token'
+const PUBLIC_URL = 'https://e2e-stub.ngrok-free.app'
+
+const args = process.argv.slice(2)
+const port = args[1]
+const tokenAt = args.indexOf('--authtoken')
+const token = tokenAt === -1 ? undefined : args[tokenAt + 1]
+
+if (args[0] !== 'http' || !port) {
+  process.stderr.write(`ngrok stub: unexpected arguments: ${args.join(' ')}\n`)
+  process.exit(2)
+}
+if (token !== STUB_TOKEN) {
+  process.stderr.write('ERROR: authentication failed: Usage of ngrok requires an authtoken.\n')
+  process.exit(1)
+}
+
+const tunnels = {
+  tunnels: [{ public_url: PUBLIC_URL, config: { addr: `http://localhost:${port}` } }],
+}
+
+createServer((request, response) => {
+  if (request.url === '/e2e/crash') {
+    response.end('crashing')
+    setTimeout(() => process.exit(1), 50)
+    return
+  }
+  if (request.url === '/api/tunnels') {
+    response.setHeader('Content-Type', 'application/json')
+    response.end(JSON.stringify(tunnels))
+    return
+  }
+  response.statusCode = 404
+  response.end()
+}).listen(4040)

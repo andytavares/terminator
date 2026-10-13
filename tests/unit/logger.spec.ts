@@ -122,13 +122,6 @@ describe('logger — renderer lines and the log path', () => {
     expect(written).toMatch(/Something broke/)
   })
 
-  // ── getLogPath ─────────────────────────────────────────────────────────
-
-  it('getLogPath returns the path to the log file', async () => {
-    const { getLogPath } = await import('../../src/main/logger')
-    expect(getLogPath()).toBe('/tmp/testlogs/terminator.log')
-  })
-
   // ── getStream / rotatIfNeeded ──────────────────────────────────────────
 
   it('getStream opens a write-stream at the correct path', async () => {

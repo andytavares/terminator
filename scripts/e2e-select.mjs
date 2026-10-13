@@ -59,7 +59,7 @@ export const IMPACT_MAP = [
   },
   {
     globs: ['extensions/remote-control/**', 'src/renderer-remote/**'],
-    specs: ['remote-app.spec.ts', ...EXTENSION_TRIO],
+    specs: ['remote-app.spec.ts', 'remote-control.spec.ts', ...EXTENSION_TRIO],
   },
   {
     globs: ['extensions/task-vault/**'],

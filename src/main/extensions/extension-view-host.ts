@@ -13,6 +13,7 @@ const logger = makeLogger('extension-view-host')
  * quick-actions leader (⌘P on mac, Ctrl+P elsewhere). Exported as a pure
  * function so the mac/other-platform branches are unit-testable without an
  * Electron WebContentsView.
+ * @internal
  */
 export function isQuickActionsOpenShortcut(
   input: LeaderKeyPress & { type: string },

@@ -11,6 +11,7 @@ const CreateDiagramPayload = z
   .strict()
   .default({})
 
+/** @internal */
 export async function createDiagram(
   db: ExtensionDB,
   args: z.infer<typeof CreateDiagramPayload>
@@ -51,6 +52,7 @@ type DiagramRow = {
   archived_at: string | null
 }
 
+/** @internal */
 export async function listDiagrams(
   db: ExtensionDB,
   args: z.infer<typeof ListDiagramsPayload>
@@ -95,6 +97,7 @@ function toDiagramListItem(r: DiagramListRow, tags: string[]) {
   }
 }
 
+/** @internal */
 export async function getDiagram(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
@@ -130,6 +133,7 @@ const AutosaveDiagramPayload = z.object({
   tags: z.array(z.string()).optional(),
 })
 
+/** @internal */
 export async function autosaveDiagram(
   db: ExtensionDB,
   args: z.infer<typeof AutosaveDiagramPayload>
@@ -173,6 +177,7 @@ async function replaceDiagramTags(db: ExtensionDB, id: string, tags: string[]): 
   }
 }
 
+/** @internal */
 export async function archiveDiagram(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
@@ -185,6 +190,7 @@ export async function archiveDiagram(
   return { data: { archivedAt } }
 }
 
+/** @internal */
 export async function restoreDiagram(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
@@ -197,6 +203,7 @@ export async function restoreDiagram(
   return { data: { ok: true } }
 }
 
+/** @internal */
 export async function hardDeleteDiagram(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>

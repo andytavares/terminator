@@ -25,6 +25,7 @@ interface ClaudeConfig {
   [key: string]: unknown
 }
 
+/** @internal */
 export function claudeConfigPath(home = os.homedir()): string {
   return path.join(home, '.claude.json')
 }

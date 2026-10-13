@@ -119,6 +119,7 @@ interface Registry {
 // Internal to this module (and its tests). Other modules use the registry
 // query functions below — never the raw collections, so the string-key
 // conventions stay encapsulated here.
+/** @internal */
 export const globalRegistry: Registry = {
   settingsSections: new Map(),
   settingsValues: new Map(),

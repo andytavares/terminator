@@ -19,7 +19,10 @@ export interface Tile {
 
 export type { Side, BeltTile } from './belts.js'
 
-/** The five prop kinds that carry a `RunNode`; every other kind is decor. */
+/**
+ * The five prop kinds that carry a `RunNode`; every other kind is decor.
+ * @internal
+ */
 export type StationKind = 'desk' | 'rig' | 'press' | 'gate'
 
 export type PropKind =
@@ -167,6 +170,7 @@ function nearestClearColumn(
   return clamped
 }
 
+/** @internal */
 export function stationKind(kind: StepKind): StationKind {
   switch (kind) {
     case 'agent':
@@ -184,6 +188,7 @@ export function stationKind(kind: StepKind): StationKind {
 /**
  * How many characters of a name fit on the floor in front of a station: its
  * width in pixels (`stationWidth` tiles) at four pixels a glyph.
+ * @internal
  */
 export const SIGN_CHARS: Readonly<Record<StationKind, number>> = {
   desk: 12,
@@ -202,6 +207,7 @@ function foldSign(text: string): string {
  * longest of "who unit", "unit", "who" that fits wins; a name that fits none
  * is cut and ends in a full stop. Every character the pixel font lacks
  * becomes a hyphen.
+ * @internal
  */
 export function signText(node: RunNode, maxChars: number): string {
   const named = (node.role ?? node.stepId).trim()

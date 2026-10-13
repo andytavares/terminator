@@ -72,6 +72,7 @@ export interface StallWatcher {
 /** How many tool calls count as "recent" for the loop signal. */
 const RECENT_WINDOW = 8
 
+/** @internal */
 export function factsFrom(
   run: WatchedRun,
   activity: readonly ToolActivity[],

@@ -140,6 +140,7 @@ export function workAnimFor(map: HallMap, nodeId: string): CrewAnim {
   return kind === 'rig' ? 'scan' : 'type'
 }
 
+/** @internal */
 export function tileCenter(tile: Tile): { readonly x: number; readonly y: number } {
   return { x: tile.x * TILE_PX + 8, y: tile.y * TILE_PX + 12 }
 }
@@ -148,6 +149,7 @@ export function tileOf(x: number, y: number): Tile {
   return { x: Math.round((x - 8) / TILE_PX), y: Math.round((y - 12) / TILE_PX) }
 }
 
+/** @internal */
 export function stationOf(map: HallMap, nodeId: string): HallProp | null {
   return map.props.find((p) => p.nodeId === nodeId) ?? null
 }
@@ -542,6 +544,7 @@ const loiterCache = new WeakMap<HallMap, readonly Tile[]>()
  * bar and the vending machine, and beside a few belts. Only tiles the
  * breakroom door can walk to count, so nobody is ever sent somewhere
  * unreachable. Derived from the map alone, in a fixed order.
+ * @internal
  */
 export function loiterPoints(map: HallMap): readonly Tile[] {
   const cached = loiterCache.get(map)

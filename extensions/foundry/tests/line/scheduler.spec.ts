@@ -9,7 +9,6 @@ import {
   sendBack,
   isComplete,
   hasStalled,
-  blockedNodes,
   blockedReason,
   stalledWhy,
   inFlight,
@@ -193,7 +192,7 @@ describe('retry', () => {
   })
 })
 
-describe('blockedNodes and blockedReason', () => {
+describe('blockedReason', () => {
   it('names what a node is waiting on', () => {
     expect(blockedReason(graph(), 'integrate')).toMatch(/waiting on build:U-1/)
   })
@@ -210,11 +209,6 @@ describe('blockedNodes and blockedReason', () => {
 
   it('has no reason for a node that is not there', () => {
     expect(blockedReason(graph(), 'nope')).toBeNull()
-  })
-
-  it('lists everything a failure has stopped', () => {
-    const g = markFailed(graph([unit('U-1')]), 'build:U-1', 'at').graph
-    expect(blockedNodes(g).map((n) => n.id)).toContain('integrate')
   })
 })
 

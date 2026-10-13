@@ -15,6 +15,7 @@ import type { SensorDef, SensorSource } from './types.js'
 // Nothing here throws. A malformed file is reported by path and excluded, the
 // same contract parseRecipe/parseRole/parseRule already keep.
 
+/** @internal */
 export const SENSOR_SCHEMA_VERSION = 1
 
 const EVERY_PATTERN = /^([1-9][0-9]*)(m|h)$/

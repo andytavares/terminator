@@ -1,7 +1,34 @@
 import { describe, it, expect } from 'vitest'
 import React from 'react'
 import { isValidElement } from 'react'
-import { iconFromName, CURATED_ICON_NAMES } from '../../../src/renderer/extensions/icon-from-name'
+import { iconFromName } from '../../../src/renderer/extensions/icon-from-name'
+
+/** The names an extension manifest may give its icon (docs/EXTENSION-DEVELOPMENT.md). */
+const CURATED_ICON_NAMES = [
+  'puzzle',
+  'wrench',
+  'terminal',
+  'git-branch',
+  'git-pull-request',
+  'database',
+  'code',
+  'layers',
+  'settings',
+  'file',
+  'search',
+  'box',
+  'star',
+  'zap',
+  'globe',
+  'cpu',
+  'flask',
+  'chart-bar',
+  'list',
+  'calendar',
+  'wifi',
+  'check',
+  'brain',
+]
 
 describe('iconFromName', () => {
   it('returns a React element for known icon names', () => {
