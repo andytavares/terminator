@@ -3,6 +3,11 @@ import { EventEmitter } from 'events'
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import type { RunAgentReviewDeps } from '../../src/review/review-agent.js'
+
+type SpawnFn = NonNullable<RunAgentReviewDeps['spawn']>
+/** What an EventEmitter calls back with; SpawnedProcess.on takes one per event. */
+type Listener = Parameters<EventEmitter['on']>[1]
 
 // Without an injected resolver the review agent asks the person's interactive
 // login shell where claude is. SHELL is a stand-in here that records each call
@@ -38,7 +43,7 @@ function exitingProcess() {
     stdin: { write: () => {}, end: () => {} },
     stdout: { on: () => {} },
     stderr: { on: () => {} },
-    on: (ev: string, cb: (...a: unknown[]) => void) => {
+    on: (ev: string, cb: Listener) => {
       proc.on(ev, cb)
       if (ev === 'exit') setTimeout(() => proc.emit('exit', 1), 0)
     },
@@ -63,7 +68,7 @@ function shellCalls(): string[] {
 async function spawnedCommands(runs: number) {
   const { runAgentReview } = await import('../../src/review/review-agent.js')
   const exec = vi.fn(async () => ({ stdout: 'diff' }))
-  const spawn = vi.fn(() => exitingProcess())
+  const spawn = vi.fn<SpawnFn>(() => exitingProcess())
   for (let i = 0; i < runs; i++) await runAgentReview(input, { exec, spawn }).done
   return spawn.mock.calls.map((c) => c[0])
 }

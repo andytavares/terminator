@@ -26,6 +26,8 @@ import { registerReviewAgentHandlers, type ReviewAgentDeps } from '../../src/ipc
 import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
 
+type RunReview = NonNullable<ReviewAgentDeps['runReview']>
+
 type Handler = (payload: unknown) => Promise<unknown>
 
 function captureHandlers(deps: Partial<ReviewAgentDeps>) {
@@ -123,7 +125,7 @@ describe('review-agent IPC', () => {
   it('review-agent:start returns a running run immediately, then broadcasts on finish', async () => {
     const { done: donePromise, resolveDone } = deferredRun()
     const cancel = vi.fn()
-    const runReview = vi.fn(() => ({ runId: 'run-done', done: donePromise, cancel }))
+    const runReview = vi.fn<RunReview>(() => ({ runId: 'run-done', done: donePromise, cancel }))
     const ensureWorktree = vi.fn(async () => '/wt')
 
     const { handlers, broadcast } = captureHandlers({ ensureWorktree, runReview })
@@ -150,7 +152,7 @@ describe('review-agent IPC', () => {
 describe('review-agent IPC — a second start with the same scope while running returns the same running run', () => {
   it('a second start with the same scope while running returns the same running run', async () => {
     const { done: donePromise, resolveDone } = deferredRun()
-    const runReview = vi.fn(() => ({ runId: 'x', done: donePromise, cancel: vi.fn() }))
+    const runReview = vi.fn<RunReview>(() => ({ runId: 'x', done: donePromise, cancel: vi.fn() }))
     const ensureWorktree = vi.fn(async () => '/wt')
     const { handlers } = captureHandlers({ ensureWorktree, runReview })
 
@@ -166,7 +168,7 @@ describe('review-agent IPC — a second start with the same scope while running 
 
 describe('review-agent IPC — uses the model override when given, else the setting, else sonnet', () => {
   it('uses the model override when given, else the setting, else sonnet', async () => {
-    const runReview = vi.fn(() => ({
+    const runReview = vi.fn<RunReview>(() => ({
       runId: 'x',
       done: Promise.resolve(makeDoneRun()),
       cancel: vi.fn(),
@@ -193,7 +195,7 @@ describe('review-agent IPC — uses the model override when given, else the sett
 
 describe('review-agent IPC — passes no effort for the Default choice or an unset one, else the chosen level', () => {
   it('passes no effort for the Default choice or an unset one, else the chosen level', async () => {
-    const runReview = vi.fn(() => ({
+    const runReview = vi.fn<RunReview>(() => ({
       runId: 'x',
       done: Promise.resolve(makeDoneRun()),
       cancel: vi.fn(),
@@ -215,7 +217,7 @@ describe('review-agent IPC — passes no effort for the Default choice or an uns
 
 describe('review-agent IPC — stops a run after the configured timeout', () => {
   it('gives the agent the "Review agent timeout" in minutes, five when unset', async () => {
-    const runReview = vi.fn(() => ({
+    const runReview = vi.fn<RunReview>(() => ({
       runId: 'x',
       done: Promise.resolve(makeDoneRun()),
       cancel: vi.fn(),
@@ -246,7 +248,7 @@ describe('review-agent IPC — review-agent:cancel cancels a live run', () => {
   it('review-agent:cancel cancels a live run', async () => {
     const cancel = vi.fn()
     const donePromise = new Promise<AgentRun>(() => {})
-    const runReview = vi.fn(() => ({ runId: 'x', done: donePromise, cancel }))
+    const runReview = vi.fn<RunReview>(() => ({ runId: 'x', done: donePromise, cancel }))
     const ensureWorktree = vi.fn(async () => '/wt')
     const { handlers } = captureHandlers({ ensureWorktree, runReview })
 

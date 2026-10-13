@@ -1,6 +1,12 @@
-import { vi } from 'vitest'
+import { vi, type Mock } from 'vitest'
 import { isAbsolute, join, relative } from 'node:path'
-import type { ChannelSpec, ExtensionAPI, SettingScope } from '@terminator/extension-sdk'
+import type {
+  ChannelSpec,
+  ExtensionAPI,
+  GithubTarget,
+  SettingScope,
+  ShellExecOptions,
+} from '@terminator/extension-sdk'
 import { activate, deactivate } from '../../../src/index.ts'
 import { makeTempDir } from '../../../../../tests/support/temp-dir'
 import { partialFake } from '../../../../../tests/support/fakes'
@@ -25,10 +31,15 @@ export function freshGlobalStorage(): string {
 
 const disposable = { dispose: () => {} }
 
+// The shell and gh spies answer nothing: activation must not wait on either.
+type ShellExec = (options: ShellExecOptions) => Promise<never>
+type GithubCall = (target: GithubTarget) => Promise<never>
+type LogWarn = ExtensionAPI['log']['warn']
+
 interface ApiSpies {
-  exec: ReturnType<typeof vi.fn>
-  githubApi: ReturnType<typeof vi.fn>
-  warn: ReturnType<typeof vi.fn>
+  exec: Mock<ShellExec>
+  githubApi: Mock<GithubCall>
+  warn: Mock<LogWarn>
 }
 
 /** Where the stand-in API says the workspaces and this extension's own folder are, and its settings. */
@@ -89,7 +100,10 @@ function capturingApi(
     shell: partialFake<ExtensionAPI['shell']>({ exec: spies.exec }),
     github: partialFake<ExtensionAPI['github']>({
       api: spies.githubApi,
-      pullRequests: { view: spies.githubApi, list: spies.githubApi },
+      pullRequests: partialFake<ExtensionAPI['github']['pullRequests']>({
+        view: spies.githubApi,
+        list: spies.githubApi,
+      }),
     }),
   })
 }
@@ -119,7 +133,11 @@ export function activateInWorkspaces(
   globalStorage = freshGlobalStorage()
 ) {
   const channels: RegisteredChannel[] = []
-  const spies = { exec: vi.fn(), githubApi: vi.fn(), warn: vi.fn() }
+  const spies: ApiSpies = {
+    exec: vi.fn<ShellExec>(),
+    githubApi: vi.fn<GithubCall>(),
+    warn: vi.fn<LogWarn>(),
+  }
   activate(capturingApi(channels, spies, { workspaces, globalStorage, settings }))
   deactivate()
   return { channels, ...spies }

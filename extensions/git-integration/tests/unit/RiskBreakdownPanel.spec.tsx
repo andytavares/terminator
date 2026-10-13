@@ -19,15 +19,12 @@ afterEach(() => {
 
 function makeRiskScore(overrides: Partial<RiskScore> = {}): RiskScore {
   return {
-    score: 60,
     level: 'medium',
     composite: 60,
     dominantDriver: 'High churn rate',
     topImporters: [],
     importerCount: 0,
     metrics: {
-      linesChanged: 50,
-      filesChanged: 1,
       testFilePresent: true,
       complexityDelta: 2,
       churn90d: 10,

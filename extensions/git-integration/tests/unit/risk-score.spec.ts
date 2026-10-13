@@ -26,6 +26,7 @@ const baseMetrics = (overrides: Partial<FileMetrics> = {}): FileMetrics => ({
 const makeDiff = (hunks: Array<{ adds: string[]; removes: string[] }>): FileDiff => ({
   path: 'src/auth.ts',
   isBinary: false,
+  truncated: false,
   hunks: hunks.map((h, i) => ({
     header: `@@ -${i * 10 + 1},10 +${i * 10 + 1},10 @@`,
     lines: [

@@ -275,18 +275,19 @@ function storedSession(overrides: Record<string, unknown> = {}) {
 
 /** Makes the stores' set and delete write through to their data; returns the delete spy. */
 function keepStoreWrites() {
+  // spyOn types a mock by the last overload, set(object); the stores call set(key, value).
   vi.spyOn(ElectronStore.prototype, 'set').mockImplementation(function (
     this: { store: Record<string, unknown> },
-    key: string,
-    value: unknown
+    ...args: unknown[]
   ) {
-    this.store[key] = value
+    const [key, value] = args
+    this.store[String(key)] = value
   })
   return vi.spyOn(ElectronStore.prototype, 'delete').mockImplementation(function (
     this: { store: Record<string, unknown> },
-    key: string
+    key: PropertyKey
   ) {
-    delete this.store[key]
+    Reflect.deleteProperty(this.store, key)
   })
 }
 

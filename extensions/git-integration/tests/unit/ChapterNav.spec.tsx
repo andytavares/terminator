@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ChapterNav } from '../../src/components/pr-review/ChapterNav'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { Chapter } from '../../src/schemas/pr-review.schema'
+import { changedFile } from './support/pr-review-file'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
@@ -36,7 +37,8 @@ function makeChapter(id: string, name: string, files: string[] = ['a.ts']): Chap
     id,
     name,
     estimatedMinutes: 5,
-    files: files.map((f) => ({ path: f, status: 'modified' as const, additions: 1, deletions: 0 })),
+    status: 'not-started',
+    files: files.map((f) => changedFile(f)),
   }
 }
 

@@ -9,10 +9,15 @@ import {
   claudeFromShellOutput,
   type RunAgentReviewInput,
   type SpawnedProcess,
-  type SpawnFn,
+  type ExecFn,
+  type RunAgentReviewDeps,
 } from '../../src/review/review-agent.js'
 import type { AgentScope } from '../../src/schemas/review-agent.schema.js'
 import { FINDING_SEVERITIES } from '../../src/schemas/review-agent.schema.js'
+
+type SpawnFn = NonNullable<RunAgentReviewDeps['spawn']>
+/** What an EventEmitter calls back with; SpawnedProcess.on takes one per event. */
+type Listener = Parameters<EventEmitter['on']>[1]
 
 const pr = {
   number: 42,
@@ -145,7 +150,7 @@ describe('buildClaudeArgs', () => {
 
 /** Runs buildDiffText for `scope` against a git that prints `stdout`; returns the result and the diff args. */
 async function diffFor(scope: AgentScope, stdout: string) {
-  const exec = vi.fn(async () => ({ stdout }))
+  const exec = vi.fn<ExecFn>(async () => ({ stdout }))
   const result = await buildDiffText(
     { worktreePath: '/wt', baseRefName: 'main', headSHA: 'abc1234', scope },
     exec
@@ -218,7 +223,7 @@ function makeFakeProcess(): FakeProcess {
     },
     stdout: { on: (ev: string, cb: (d: Buffer | string) => void) => stdoutEmitter.on(ev, cb) },
     stderr: { on: (ev: string, cb: (d: Buffer | string) => void) => stderrEmitter.on(ev, cb) },
-    on: (ev: string, cb: (...args: never[]) => void) => procEmitter.on(ev, cb),
+    on: (ev: string, cb: Listener) => procEmitter.on(ev, cb),
     kill: vi.fn(),
     emitExit: (code: number) => procEmitter.emit('exit', code),
     emitError: (e: Error) => procEmitter.emit('error', e),

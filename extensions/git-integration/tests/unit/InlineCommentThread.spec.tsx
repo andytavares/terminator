@@ -12,12 +12,21 @@ type ThreadComment = Thread['comments'][number]
 
 function comment(overrides: Partial<ThreadComment> = {}): ThreadComment {
   return {
-    id: 'c1',
+    id: 1,
     author: 'alice',
     authorAvatarUrl: '',
     body: 'First',
     createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    path: 'src/foo.ts',
+    line: 10,
+    startLine: null,
+    side: 'RIGHT',
+    diffHunk: '',
+    outdated: false,
+    threadId: 'thread-1',
     isReply: false,
+    parentId: null,
     ...overrides,
   }
 }
@@ -27,6 +36,8 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
     id: 'thread-1',
     path: 'src/foo.ts',
     line: 10,
+    startLine: null,
+    side: 'RIGHT',
     collapsed: false,
     outdated: false,
     resolved: false,
@@ -90,14 +101,14 @@ describe('InlineCommentThread — shows show more replies button when thread is 
       comments: [
         comment(),
         comment({
-          id: 'c2',
+          id: 2,
           author: 'bob',
           body: 'Reply',
           createdAt: '2024-01-01T01:00:00Z',
           isReply: true,
         }),
         comment({
-          id: 'c3',
+          id: 3,
           author: 'carol',
           body: 'Another reply',
           createdAt: '2024-01-01T02:00:00Z',
@@ -117,7 +128,7 @@ describe('InlineCommentThread — expands collapsed thread when show more is cli
       comments: [
         comment(),
         comment({
-          id: 'c2',
+          id: 2,
           author: 'bob',
           body: 'Second',
           createdAt: '2024-01-01T01:00:00Z',
@@ -138,7 +149,7 @@ describe('InlineCommentThread — shows singular reply label for single hidden c
       comments: [
         comment(),
         comment({
-          id: 'c2',
+          id: 2,
           author: 'bob',
           body: 'Second',
           createdAt: '2024-01-01T01:00:00Z',

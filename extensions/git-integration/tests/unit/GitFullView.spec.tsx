@@ -39,8 +39,8 @@ vi.mock('../../src/components/PrDialog', () => ({
     </div>
   ),
 }))
-vi.mock('./git-integration.css', () => ({}), { virtual: true })
-vi.mock('../../src/components/git-integration.css', () => ({}), { virtual: true })
+vi.mock('./git-integration.css', () => ({}))
+vi.mock('../../src/components/git-integration.css', () => ({}))
 
 const mockSetSelectedFile = vi.fn()
 const mockSetDiff = vi.fn()

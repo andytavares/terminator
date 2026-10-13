@@ -5,6 +5,7 @@ import { PrReviewTab } from '../../src/components/pr-review/PrReviewTab'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import * as githubModule from '../../src/api/github'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
+import { partialFake } from '../../../../tests/support/fakes'
 
 vi.mock('../../src/stores/pr-review.store', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/stores/pr-review.store')>()
@@ -179,8 +180,8 @@ function storeSessionAtOldSha() {
 /** Renders the tab and opens PR 1, whose detail loads at `headSHA`. */
 async function openPrAtHead(headSHA: string) {
   const { useLoadPrDetail } = await import('../../src/hooks/usePrReview')
-  vi.mocked(useLoadPrDetail).mockReturnValue(async (_n: number, cb: (d: unknown) => unknown) =>
-    cb({ number: 1, headSHA })
+  vi.mocked(useLoadPrDetail).mockReturnValue(async (_n, onSuccess) =>
+    onSuccess(partialFake<PrReviewDetail>({ number: 1, headSHA }))
   )
   render(<PrReviewTab repoRoot="/repo" />)
   await openPr()

@@ -12,6 +12,13 @@ function commitsWithRollup(oid: string, rollup: unknown, committedDate = '2026-0
   return { nodes: [{ commit: { oid, committedDate, statusCheckRollup: rollup } }] }
 }
 
+/** One of a pull request's latest reviews, as the dashboard query returns it. */
+interface LatestReview {
+  author: { login: string }
+  submittedAt: string
+  commit: { oid: string }
+}
+
 function prNode(overrides: Record<string, unknown> = {}) {
   return {
     number: 1,
@@ -29,7 +36,7 @@ function prNode(overrides: Record<string, unknown> = {}) {
     reviewRequests: { totalCount: 1 },
     reviewThreads: { nodes: [{ isResolved: true }, { isResolved: false }] },
     commits: commitsWithRollup('a', { state: 'SUCCESS' }, '2026-01-01T00:00:00Z'),
-    latestReviews: { nodes: [] },
+    latestReviews: { nodes: [] as LatestReview[] },
     ...overrides,
   }
 }

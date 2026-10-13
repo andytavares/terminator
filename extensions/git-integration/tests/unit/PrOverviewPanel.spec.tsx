@@ -107,6 +107,8 @@ const basePr: PrReviewDetail = {
   approvals: [],
   requestedReviewers: [],
   assigneeLogins: [],
+  issueRefs: [],
+  dryViolations: [],
   chapters: [
     {
       id: 'ch1',
@@ -124,6 +126,8 @@ const basePr: PrReviewDetail = {
       ],
     },
   ],
+  readingOrder: [],
+  movedBlocks: [],
   insights: null,
 }
 

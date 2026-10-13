@@ -26,7 +26,7 @@ const input: RunAgentReviewInput = {
   baseRefName: 'main',
   title: 'Add review agent',
   body: 'body',
-  scope: { kind: 'pr' },
+  scope: { kind: 'pr', path: null, startLine: null, endLine: null, side: null, chapter: null },
   request: 'review',
   sessionId: 'sess-1',
   model: 'opus',

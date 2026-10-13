@@ -146,6 +146,7 @@ function addDraftAndNote(store: ReturnType<typeof usePrReviewStore.getState>) {
     id: 'n1',
     path: 'src/hooks/usePrReview.ts',
     line: 312,
+    side: 'RIGHT',
     body: 'why is this recomputed??',
     createdAt: '2026-09-27T10:00:00.000Z',
   })

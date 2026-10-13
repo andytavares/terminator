@@ -97,8 +97,8 @@ describe('sortPrs — the input and dashboard rows', () => {
 
   it('sorts rows that name their age createdAt through dashboardToSortable', () => {
     const rows = [
-      { id: 2, createdAt: '2026-02-01T00:00:00Z', ...pr(2) },
-      { id: 1, createdAt: '2026-01-01T00:00:00Z', ...pr(1) },
+      { createdAt: '2026-02-01T00:00:00Z', ...pr(2) },
+      { createdAt: '2026-01-01T00:00:00Z', ...pr(1) },
     ].map(({ openedAt: _o, ...rest }) => rest)
     const sorted = sortPrs(rows as never[], 'newest', dashboardToSortable as never)
     expect((sorted as Array<{ id: number }>).map((r) => r.id)).toEqual([2, 1])
