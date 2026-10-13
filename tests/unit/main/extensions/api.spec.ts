@@ -105,7 +105,9 @@ describe('api.commands.register', () => {
       requires: 'repo',
     })
   })
+})
 
+describe('api.commands.register — context', () => {
   it('passes CommandContext through to the handler', async () => {
     const api = createExtensionAPI('test.ext')
     const handler = vi.fn()
@@ -149,7 +151,9 @@ describe('executeExtensionCommand', () => {
       executeExtensionCommand(key, { projectId: null, sessionId: null, repoRoot: null })
     ).resolves.toMatchObject({ ok: false, reason: expect.stringContaining('kaboom') })
   })
+})
 
+describe('executeExtensionCommand — synchronous throws', () => {
   it('logs, and does not throw, when the handler throws synchronously', async () => {
     const api = createExtensionAPI('test.ext')
     api.commands.register(
@@ -166,18 +170,18 @@ describe('executeExtensionCommand', () => {
   })
 })
 
+const noCtx = { projectId: null, sessionId: null, repoRoot: null }
+const schema = z.object({ repoRoot: z.string(), number: z.number() })
+
+function registerReview(handler = vi.fn()) {
+  const api = createExtensionAPI('test.ext')
+  api.commands.register({ id: 'review', label: 'Review', args: schema }, handler)
+  return { handler, key: 'test.ext.command.review' }
+}
+
 describe('executeExtensionCommand with args', () => {
-  const noCtx = { projectId: null, sessionId: null, repoRoot: null }
-  const schema = z.object({ repoRoot: z.string(), number: z.number() })
-
-  function register(handler = vi.fn()) {
-    const api = createExtensionAPI('test.ext')
-    api.commands.register({ id: 'review', label: 'Review', args: schema }, handler)
-    return { handler, key: 'test.ext.command.review' }
-  }
-
   it('hands the validated args to the handler', async () => {
-    const { handler, key } = register()
+    const { handler, key } = registerReview()
 
     const result = await executeExtensionCommand(key, noCtx, { repoRoot: '/r', number: 7 })
 
@@ -186,7 +190,7 @@ describe('executeExtensionCommand with args', () => {
   })
 
   it('rejects invalid args with a reason and never runs the handler', async () => {
-    const { handler, key } = register()
+    const { handler, key } = registerReview()
 
     const result = await executeExtensionCommand(key, noCtx, { repoRoot: '/r', number: 'seven' })
 
@@ -195,14 +199,16 @@ describe('executeExtensionCommand with args', () => {
   })
 
   it('rejects missing args when a schema is declared', async () => {
-    const { handler, key } = register()
+    const { handler, key } = registerReview()
 
     const result = await executeExtensionCommand(key, noCtx)
 
     expect(result).toMatchObject({ ok: false, reason: expect.stringMatching(/^invalid-args: /) })
     expect(handler).not.toHaveBeenCalled()
   })
+})
 
+describe('executeExtensionCommand with args — no schema and unknown commands', () => {
   it('a command without a schema receives no args', async () => {
     const api = createExtensionAPI('test.ext')
     const handler = vi.fn()
@@ -214,7 +220,7 @@ describe('executeExtensionCommand with args', () => {
   })
 
   it('reports not-registered for an unknown command and after dispose', async () => {
-    const { key } = register()
+    const { key } = registerReview()
     expect(isExtensionCommandRegistered(key)).toBe(true)
     await expect(executeExtensionCommand('nobody.command.x', noCtx, {})).resolves.toEqual({
       ok: false,
@@ -227,7 +233,7 @@ describe('executeExtensionCommand with args', () => {
   })
 
   it('keeps a command that takes args out of the quick-actions list', () => {
-    register()
+    registerReview()
     expect(listExtensionCommands().find((c) => c.id === 'review')).toBeUndefined()
   })
 })

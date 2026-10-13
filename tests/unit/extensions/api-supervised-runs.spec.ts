@@ -151,7 +151,9 @@ describe('workspace.addProject', () => {
     build().workspace.addProject({ workspaceId: 'ws-1', name: 'a', worktreePath: '/wt/a' })
     expect(projects[0].isWorktree).toBe(true)
   })
+})
 
+describe('workspace.addProject — the same directory twice', () => {
   it('reuses the project already pointing at that directory', async () => {
     // Provisioning the same branch twice should land in the project you were
     // already looking at, not beside it.
@@ -169,7 +171,9 @@ describe('workspace.addProject', () => {
     expect(second?.id).toBe(first?.id)
     expect(projects).toHaveLength(1)
   })
+})
 
+describe('workspace.addProject — worktrees that share a name', () => {
   it('does not merge two worktrees that happen to share a name', async () => {
     // Matching on the name as well meant two cards whose branches were called
     // the same thing got one project, pointing at whichever was registered
@@ -227,55 +231,57 @@ describe('workspace.listProjects and deleteProject', () => {
   })
 })
 
-describe('pty.openTerminal', () => {
-  const input = { projectId: 'proj-1', cwd: '/wt/a', tabTitle: 'feat/x' }
+const openInput = { projectId: 'proj-1', cwd: '/wt/a', tabTitle: 'feat/x' }
 
+describe('pty.openTerminal', () => {
   it('spawns in the directory it was given', () => {
-    build().pty.openTerminal(input)
+    build().pty.openTerminal(openInput)
     expect(spawned[0]).toMatchObject({ cwd: '/wt/a', projectId: 'proj-1', tabTitle: 'feat/x' })
   })
 
   it('marks it an agent terminal by default, though a person can still type in it', () => {
-    build().pty.openTerminal(input)
+    build().pty.openTerminal(openInput)
     expect(spawned[0].type).toBe('agent')
   })
 
   it('holds output until a tab is mounted to receive it', () => {
     // The renderer has to be told, adopt it, render and mount an xterm first.
     // Delivered live, everything in that window goes to nobody.
-    build().pty.openTerminal(input)
+    build().pty.openTerminal(openInput)
     expect(spawned[0].holdOutput).toBe(true)
   })
 
   it('tells the renderer to adopt it, or the process runs with no tab showing it', async () => {
     const api = build()
-    const sessionId = await api.pty.openTerminal(input)
+    const sessionId = await api.pty.openTerminal(openInput)
     expect(broadcasts).toContainEqual({
       channel: 'terminal:adopt',
       payload: { sessionId, projectId: 'proj-1', tabTitle: 'feat/x', scrollbackLimit: 5000 },
     })
   })
+})
 
+describe('pty.openTerminal — what it hands back and sends', () => {
   it('returns the session id, so the caller can write to it', async () => {
-    expect(await build().pty.openTerminal(input)).toEqual(expect.any(String))
+    expect(await build().pty.openTerminal(openInput)).toEqual(expect.any(String))
   })
 
   it('sends its output and exit through the shared batched, flow-controlled relay', async () => {
-    const sessionId = await build().pty.openTerminal(input)
+    const sessionId = await build().pty.openTerminal(openInput)
     expect(relayed).toEqual([sessionId])
   })
 
   it('does not broadcast its output or exit to every window and view', () => {
     // Each chunk used to go to every window and extension view, unbatched and
     // unacknowledged, so a chatty agent cost every one of them a message per chunk.
-    build().pty.openTerminal(input)
+    build().pty.openTerminal(openInput)
     expect(subscribedToPty).toEqual([])
     expect(broadcasts.map((b) => b.channel)).toEqual(['terminal:adopt'])
   })
 
   it('uses the shell and scrollback it is given over the defaults', async () => {
     const api = build()
-    await api.pty.openTerminal({ ...input, shell: '/bin/bash', scrollbackLimit: 99 })
+    await api.pty.openTerminal({ ...openInput, shell: '/bin/bash', scrollbackLimit: 99 })
     expect(spawned[0]).toMatchObject({ shell: '/bin/bash' })
     const adopt = broadcasts.find((b) => b.channel === 'terminal:adopt')
     expect(adopt?.payload.scrollbackLimit).toBe(99)
@@ -283,7 +289,7 @@ describe('pty.openTerminal', () => {
 
   it('opens nothing when there is no window to show it in', async () => {
     // A terminal nobody can see is the thing this exists to prevent.
-    expect(await build(false).pty.openTerminal(input)).toBeNull()
+    expect(await build(false).pty.openTerminal(openInput)).toBeNull()
     expect(spawned).toEqual([])
   })
 })

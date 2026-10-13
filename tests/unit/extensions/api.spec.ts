@@ -157,7 +157,7 @@ describe('api.notifications.showToast', () => {
   })
 })
 
-describe('api.shell.exec', () => {
+function useExecMocks(): void {
   beforeEach(() => {
     vi.mocked(shellExecutor.assertCommandAllowed).mockReset()
     vi.mocked(shellExecutor.assertCwdInScope).mockReset()
@@ -169,6 +169,10 @@ describe('api.shell.exec', () => {
       exceededMaxBuffer: false,
     })
   })
+}
+
+describe('api.shell.exec', () => {
+  useExecMocks()
 
   it('calls execShell with correct args for git command', async () => {
     const api = createExtensionAPI('test.ext')
@@ -184,6 +188,10 @@ describe('api.shell.exec', () => {
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toBe('output')
   })
+})
+
+describe('api.shell.exec — per-call options', () => {
+  useExecMocks()
 
   it('hands the per-call buffer limit, environment and encoding to the command', async () => {
     const api = createExtensionAPI('test.ext')
@@ -207,6 +215,10 @@ describe('api.shell.exec', () => {
       encoding: 'buffer',
     })
   })
+})
+
+describe('api.shell.exec — refusals', () => {
+  useExecMocks()
 
   it('rejects with COMMAND_NOT_ALLOWED for non-allowlisted commands', async () => {
     const api = createExtensionAPI('test.ext')
@@ -220,7 +232,7 @@ describe('api.shell.exec', () => {
   })
 })
 
-describe('api.nativeMenu.addViewMenuItem', () => {
+function useMenuRegistry(): void {
   beforeEach(() => {
     globalRegistry.panelMenuItemIds.clear()
   })
@@ -228,6 +240,10 @@ describe('api.nativeMenu.addViewMenuItem', () => {
   afterEach(() => {
     setMenuRebuildCallback(() => {})
   })
+}
+
+describe('api.nativeMenu.addViewMenuItem', () => {
+  useMenuRegistry()
 
   it('adds the item to the registry under the extension', () => {
     const api = createExtensionAPI('test.ext')
@@ -246,6 +262,10 @@ describe('api.nativeMenu.addViewMenuItem', () => {
     disposable.dispose()
     expect(globalRegistry.nativeMenuItems.has('test.ext.nativemenu.item-to-remove')).toBe(false)
   })
+})
+
+describe('api.nativeMenu.addViewMenuItem — panels', () => {
+  useMenuRegistry()
 
   it('stores panelId and type fields on the contribution', () => {
     const api = createExtensionAPI('test.ext')
@@ -274,6 +294,10 @@ describe('api.nativeMenu.addViewMenuItem', () => {
 
     expect(globalRegistry.panelMenuItemIds.get('rebuild-panel')).toBe('ext-menu-rebuild-test')
   })
+})
+
+describe('api.nativeMenu.addViewMenuItem — menu rebuilds', () => {
+  useMenuRegistry()
 
   it('rebuildViewMenu does not add to panelMenuItemIds when panelId is absent', () => {
     const api = createExtensionAPI('test.ext')
@@ -315,13 +339,17 @@ describe('api.terminal session handlers', () => {
   })
 })
 
-describe('api.settings workspace precedence', () => {
+function useEmptySettingsStore(): void {
   beforeEach(() => {
     // Clear mock store between tests
     for (const key of Object.keys(mockExtensionStore)) {
       delete mockExtensionStore[key]
     }
   })
+}
+
+describe('api.settings workspace precedence', () => {
+  useEmptySettingsStore()
 
   it('returns global value when no workspace override exists', () => {
     const api = createExtensionAPI('com.test')
@@ -337,6 +365,10 @@ describe('api.settings workspace precedence', () => {
     const val = api.settings.get<boolean>('com.test.missing')
     expect(val).toBeUndefined()
   })
+})
+
+describe('api.settings workspace precedence — schema defaults', () => {
+  useEmptySettingsStore()
 
   it('returns schema default when key not set but schema registered', () => {
     const api = createExtensionAPI('com.test')
@@ -445,7 +477,9 @@ describe('api.ipc.registerHandler', () => {
     disposable.dispose()
     expect(ipcInvokeRegistry.has('test.ext:no-option')).toBe(false)
   })
+})
 
+describe('api.ipc.registerHandler — remote access', () => {
   it('makes a channel remote-accessible only when it opts in', () => {
     const api = createExtensionAPI('test.ext')
     const disposable = api.ipc.registerHandler(anyPayload('test.ext:opted-in'), {
@@ -471,7 +505,9 @@ describe('api.ipc.registerHandler', () => {
     }
     dispose()
   })
+})
 
+describe('api.ipc.registerHandler — payloads', () => {
   it('parses the payload of a channel registered with a schema before run sees it', async () => {
     const api = createExtensionAPI('test.ext')
     const run = vi.fn(({ id }: { id: string }) => ({ data: id }))
@@ -491,7 +527,9 @@ describe('api.ipc.registerHandler', () => {
     expect(run).toHaveBeenCalledWith({ id: 'n1' })
     disposable.dispose()
   })
+})
 
+describe('api.ipc.registerHandler — rejected payloads', () => {
   it('answers a payload the schema rejects with the declared invalid response', async () => {
     const api = createExtensionAPI('test.ext')
     const run = vi.fn()
@@ -514,7 +552,9 @@ describe('api.ipc.registerHandler', () => {
     disposable.dispose()
     expect(ipcInvokeRegistry.has('test.ext:strict')).toBe(false)
   })
+})
 
+describe('api.ipc.registerHandler — local-only channels', () => {
   it('honors remoteAccessible: false for local-only channels', () => {
     const api = createExtensionAPI('test.ext')
     const disposable = api.ipc.registerHandler(anyPayload('test.ext:local-only'), {
@@ -545,7 +585,9 @@ describe('registry query functions', () => {
     })
     d.dispose()
   })
+})
 
+describe('registry query functions — commands and menu items', () => {
   it('commands are listed with their key and executed through it', async () => {
     const api = createExtensionAPI('com.query.cmd')
     const handler = vi.fn()
@@ -560,7 +602,9 @@ describe('registry query functions', () => {
     })
     d.dispose()
   })
+})
 
+describe('registry query functions — menu items', () => {
   it('listNativeViewMenuItems records the panel menu-item id mapping', () => {
     const api = createExtensionAPI('com.query.menu')
     const onClick = vi.fn()
@@ -590,7 +634,9 @@ describe('what the extension host cannot reach itself', () => {
     expect(mockWindow.show).toHaveBeenCalled()
     expect(mockWindow.focus).toHaveBeenCalled()
   })
+})
 
+describe('what the extension host cannot reach itself — open dialog', () => {
   it('showOpenDialog opens over a window and answers with only the chosen paths', async () => {
     mockShowOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/x'], bookmarks: [] })
     const api = createExtensionAPI('com.dialog')
@@ -598,7 +644,9 @@ describe('what the extension host cannot reach itself', () => {
     expect(mockShowOpenDialog).toHaveBeenCalledWith(mockWindow, { properties: ['openDirectory'] })
     expect(result).toEqual({ canceled: false, filePaths: ['/x'] })
   })
+})
 
+describe('what the extension host cannot reach itself — dialogs without a window', () => {
   it('showOpenDialog opens on its own when no window is open', async () => {
     const { BrowserWindow } = await import('electron')
     vi.mocked(BrowserWindow.getAllWindows).mockReturnValueOnce([])
@@ -623,7 +671,9 @@ describe('what the extension host cannot reach itself', () => {
     await createExtensionAPI('com.dialog').dialog.showSaveDialog({})
     expect(mockShowSaveDialog).toHaveBeenLastCalledWith({})
   })
+})
 
+describe('what the extension host cannot reach itself — refusals and paths', () => {
   it('refuses the database before the app database is open', () => {
     const api = createExtensionAPI('com.nodb')
     expect(() => api.db.exec('SELECT 1')).toThrow('Extension "com.nodb": AppDB not initialized')

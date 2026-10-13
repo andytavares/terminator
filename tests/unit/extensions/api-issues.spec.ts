@@ -206,7 +206,9 @@ describe('api.workspace.addProject — attaching an issue (v2.2.0)', () => {
       key: 'TAV-42',
     })
   })
+})
 
+describe('api.workspace.addProject — attaching to an existing project', () => {
   it('attaches to the existing project when one already covers that path', async () => {
     const workspaceStore = await import('../../../src/main/storage/workspace-store')
     vi.spyOn(workspaceStore, 'listProjects').mockReturnValue([
@@ -228,7 +230,9 @@ describe('api.workspace.addProject — attaching an issue (v2.2.0)', () => {
       key: 'TAV-7',
     })
   })
+})
 
+describe('api.workspace.addProject — no issue, or a link that fails', () => {
   it('attaches nothing when no issue was named', async () => {
     const workspaceStore = await import('../../../src/main/storage/workspace-store')
     vi.spyOn(workspaceStore, 'listProjects').mockReturnValue([])
