@@ -46,6 +46,11 @@ export function autonomyFor(api: ExtensionAPI): 'escorted' | 'standard' | 'light
   )
 }
 
+/** Whether a tool call Foundry's rules leave undecided goes to Claude Code's auto mode. On unless turned off. */
+export function letAutoModeDecide(api: ExtensionAPI): boolean {
+  return api.settings?.get<boolean>('terminator.foundry.letAutoModeDecide') ?? true
+}
+
 /** Whether the red team runs on the balanced tier. Off unless the operator asks. */
 export function lighterRedTeam(api: ExtensionAPI): boolean {
   return api.settings.get<boolean>('terminator.foundry.lighterRedTeam') ?? false
