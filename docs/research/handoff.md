@@ -78,6 +78,12 @@ Each entry: what was decided, why, and how to undo it.
     (status) payload fields went: the view always sent `signOff: false` and never sent `maxFiles`,
     so a payload could override the setting with a value nobody chose. Undo: revert the commit and
     give the payload fields back.
+16. Notepad's **Enable MCP sidecar** setting is removed. Nothing implements a Notepad MCP
+    sidecar: spec 010 deferred it to a polish phase that never came, and ADR-020 removed the only
+    MCP sidecar the app had (Task Vault's), superseded by the Remote Control bridge. There is no
+    settings migration: a stored value is inert, since nothing reads it and the settings page lists
+    only declared keys, and the extension-settings store has no delete. Undo: put the declaration
+    back in `extensions/notepad/src/index.ts`.
 
 ## Known advisories
 

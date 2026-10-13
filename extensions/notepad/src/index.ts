@@ -98,12 +98,6 @@ const NOTEPAD_SETTINGS: Record<string, SettingDefinition> = {
     channel: 'terminator.notepad:db.reinit',
     default: null,
   },
-  'terminator.notepad.mcpSidecar': {
-    type: 'boolean',
-    label: 'Enable MCP sidecar',
-    description: 'Let agents read/search notes',
-    default: false,
-  },
 }
 
 export async function activate(api: ExtensionAPI): Promise<void> {
