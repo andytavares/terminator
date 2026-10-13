@@ -217,6 +217,19 @@ function remoteViewControlTests() {
     expect(screen.getByText(/port 7681 · up to 5 viewers/)).toBeTruthy()
   })
 
+  it('counts against the viewer limit just saved in Settings', async () => {
+    render(<RemoteControlView />)
+    await waitFor(() => screen.getByText('Off'))
+    emit('remote:status', ON)
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }))
+    const viewers = await screen.findByLabelText('Viewers per terminal')
+    fireEvent.change(viewers, { target: { value: '1' } })
+    fireEvent.blur(viewers)
+    expect(invoke).toHaveBeenCalledWith('remote:update-max-subscribers', { maxSubscribers: 1 })
+    expect(screen.getByText(/up to 1 viewers/)).toBeTruthy()
+    expect(screen.getByText('0 of 1')).toBeTruthy()
+  })
+
   it('turns on through the bridge', async () => {
     render(<RemoteControlView />)
     await waitFor(() => screen.getByText('Off'))

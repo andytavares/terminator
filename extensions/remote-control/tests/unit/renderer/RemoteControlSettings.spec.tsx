@@ -40,13 +40,13 @@ function settingsPasswordTests() {
 function settingsPasswordStateTests() {
   it('says whether a password is set without showing it', async () => {
     respond(true)
-    render(<RemoteControlSettings />)
+    render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     await waitFor(() => expect(screen.getByText(/A password is set/)).toBeTruthy())
   })
 
   it('says none is set, so Remote Control cannot start yet', async () => {
     respond(false)
-    render(<RemoteControlSettings />)
+    render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     await waitFor(() => expect(screen.getByText(/No password is set/)).toBeTruthy())
   })
 }
@@ -54,7 +54,7 @@ function settingsPasswordStateTests() {
 function settingsPasswordSetTests() {
   it('sets the typed password on request and clears the field', async () => {
     respond(false)
-    render(<RemoteControlSettings />)
+    render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     const field = await screen.findByPlaceholderText('New password')
     fireEvent.change(field, { target: { value: ' chosen-secret ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Set password' }))
@@ -69,7 +69,7 @@ function settingsPasswordSetTests() {
 function settingsPasswordWithholdTests() {
   it('does not send a password merely because the field lost focus', async () => {
     respond(true)
-    render(<RemoteControlSettings />)
+    render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     const field = await screen.findByPlaceholderText('New password')
     fireEvent.focus(field)
     fireEvent.blur(field)
@@ -78,7 +78,7 @@ function settingsPasswordWithholdTests() {
 
   it('does not set an empty password', async () => {
     respond(true)
-    render(<RemoteControlSettings />)
+    render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     await screen.findByPlaceholderText('New password')
     const button = screen.getByRole('button', { name: 'Set password' }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
@@ -88,7 +88,7 @@ function settingsPasswordWithholdTests() {
 function settingsPasswordGenerateTests() {
   it('shows a generated password once, with a warning that it cannot be shown again', async () => {
     respond(true, { password: 'generated-abc123' })
-    render(<RemoteControlSettings />)
+    render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     await screen.findByPlaceholderText('New password')
     fireEvent.click(screen.getByRole('button', { name: 'Generate new' }))
     expect(await screen.findByText('generated-abc123')).toBeTruthy()

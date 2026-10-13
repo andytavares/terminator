@@ -47,7 +47,7 @@ export function RemoteControlView(): React.JSX.Element {
       {status.kind === 'on' && (
         <ConnectedDevices devices={devices} maxViewers={maxViewers} onDisconnect={disconnect} />
       )}
-      <SettingsSection status={status} maxViewers={maxViewers} />
+      <SettingsSection status={status} maxViewers={maxViewers} onViewersSaved={setMaxViewers} />
     </div>
   )
 }
@@ -328,8 +328,14 @@ function DeviceRow(props: DeviceRowProps): React.JSX.Element {
 
 // ── Configuration, demoted ──────────────────────────────────────────────────
 
-function SettingsSection(props: { status: RemoteStatus; maxViewers: number }): React.JSX.Element {
-  const { status, maxViewers } = props
+interface SettingsSectionProps {
+  status: RemoteStatus
+  maxViewers: number
+  onViewersSaved: (max: number) => void
+}
+
+function SettingsSection(props: SettingsSectionProps): React.JSX.Element {
+  const { status, maxViewers, onViewersSaved } = props
   const [open, setOpen] = useState(false)
   const port = status.kind === 'off' ? 7681 : status.port
   return (
@@ -339,7 +345,7 @@ function SettingsSection(props: { status: RemoteStatus; maxViewers: number }): R
       </SettingsToggle>
       {open && (
         <div className="rc-settings__body">
-          <RemoteControlSettings />
+          <RemoteControlSettings onViewersSaved={onViewersSaved} />
         </div>
       )}
     </section>
