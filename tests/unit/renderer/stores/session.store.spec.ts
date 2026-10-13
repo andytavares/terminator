@@ -12,7 +12,10 @@ Object.defineProperty(globalThis, 'window', {
   writable: true,
 })
 
-import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import {
+  useSessionStore,
+  type NewSessionRequest,
+} from '../../../../src/renderer/stores/session.store'
 import type { TerminalSession } from '../../../../src/shared/types/index'
 import type { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
 import { partialFake } from '../../../support/fakes'
@@ -29,6 +32,18 @@ function makeSession(overrides: Partial<TerminalSession> = {}): TerminalSession 
     createdAt: new Date().toISOString(),
     lastActivityAt: 0,
     agentState: 'idle',
+    ...overrides,
+  }
+}
+
+/** A shell in proj-1, with whatever a spec changes. */
+function request(overrides: Partial<NewSessionRequest> = {}): NewSessionRequest {
+  return {
+    projectId: 'proj-1',
+    type: 'human',
+    title: 'Shell',
+    cwd: '/home',
+    scrollbackLimit: 10000,
     ...overrides,
   }
 }
@@ -52,23 +67,20 @@ function setUpUseSessionStore(): void {
 describe('useSessionStore', () => {
   setUpUseSessionStore()
 
-  // The main process already ended these; the tabs must not outlive them.
-  describe('dropProjectSessions', () => {
-    it("removes the deleted project's tabs and disposes their terminals, leaving others", () => {
-      const dispose = vi.fn()
-      useSessionStore.setState({
-        sessions: new Map([
-          ['a', makeSession({ id: 'a', projectId: 'gone' })],
-          ['b', makeSession({ id: 'b', projectId: 'kept' })],
-        ]),
-        terminalInstances: new Map([['a', partialFake<TerminalInstance>({ dispose })]]),
-      })
-      useSessionStore.getState().dropProjectSessions('gone')
-      expect([...useSessionStore.getState().sessions.keys()]).toEqual(['b'])
-      expect(useSessionStore.getState().terminalInstances.has('a')).toBe(false)
-      expect(dispose).toHaveBeenCalled()
-      expect(mockElectronAPI.terminal.close).not.toHaveBeenCalled()
+  it("removes the deleted project's tabs and disposes their terminals, leaving others", () => {
+    const dispose = vi.fn()
+    useSessionStore.setState({
+      sessions: new Map([
+        ['a', makeSession({ id: 'a', projectId: 'gone' })],
+        ['b', makeSession({ id: 'b', projectId: 'kept' })],
+      ]),
+      terminalInstances: new Map([['a', partialFake<TerminalInstance>({ dispose })]]),
     })
+    useSessionStore.getState().dropProjectSessions('gone')
+    expect([...useSessionStore.getState().sessions.keys()]).toEqual(['b'])
+    expect(useSessionStore.getState().terminalInstances.has('a')).toBe(false)
+    expect(dispose).toHaveBeenCalled()
+    expect(mockElectronAPI.terminal.close).not.toHaveBeenCalled()
   })
 })
 
@@ -80,15 +92,13 @@ describe('useSessionStore — createSession', () => {
       sessionId: 'sess-sh',
       shell: '/bin/fish',
     })
-    await useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/home', 10000)
+    await useSessionStore.getState().createSession(request())
     expect(useSessionStore.getState().sessions.get('sess-sh')?.shell).toBe('/bin/fish')
   })
 
   it('creates a session and stores it', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
-    const id = await useSessionStore
-      .getState()
-      .createSession('proj-1', 'human', 'Shell', '/home', 10000)
+    const id = await useSessionStore.getState().createSession(request())
     expect(id).toBe('sess-1')
     const session = useSessionStore.getState().sessions.get('sess-1')
     expect(session).toMatchObject({
@@ -107,9 +117,7 @@ describe('useSessionStore — createSession — throws when terminal.create retu
 
   it('throws when terminal.create returns an error', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ error: 'FAILED' })
-    await expect(
-      useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/home', 10000)
-    ).rejects.toThrow('FAILED')
+    await expect(useSessionStore.getState().createSession(request())).rejects.toThrow('FAILED')
   })
 
   // The code names the failure; only the message names the folder, and the
@@ -120,13 +128,13 @@ describe('useSessionStore — createSession — throws when terminal.create retu
       message: 'That folder no longer exists: /repo/.worktrees/removed',
     })
     await expect(
-      useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/gone', 10000)
+      useSessionStore.getState().createSession(request({ cwd: '/gone' }))
     ).rejects.toThrow('That folder no longer exists: /repo/.worktrees/removed')
   })
 
   it('auto-numbers title as "Terminal 1" when empty title given', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
-    await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)
+    await useSessionStore.getState().createSession(request({ title: '' }))
     const session = useSessionStore.getState().sessions.get('sess-1')
     expect(session?.tabTitle).toBe('Terminal 1')
   })
@@ -139,15 +147,15 @@ describe('useSessionStore — createSession — increments counter per project f
     mockElectronAPI.terminal.create
       .mockResolvedValueOnce({ sessionId: 'sess-1' })
       .mockResolvedValueOnce({ sessionId: 'sess-2' })
-    await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)
-    await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)
+    await useSessionStore.getState().createSession(request({ title: '' }))
+    await useSessionStore.getState().createSession(request({ title: '' }))
     expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('Terminal 1')
     expect(useSessionStore.getState().sessions.get('sess-2')?.tabTitle).toBe('Terminal 2')
   })
 
   it('uses explicit title when provided (no auto-numbering)', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
-    await useSessionStore.getState().createSession('proj-1', 'human', 'My Tab', '/home', 10000)
+    await useSessionStore.getState().createSession(request({ title: 'My Tab' }))
     expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('My Tab')
   })
 })
@@ -155,19 +163,17 @@ describe('useSessionStore — createSession — increments counter per project f
 describe('useSessionStore — renameSession', () => {
   setUpUseSessionStore()
 
-  describe('renameSession', () => {
-    it('updates tabTitle of existing session', () => {
-      const session = makeSession({ id: 'sess-1', tabTitle: 'Shell' })
-      useSessionStore.setState({ sessions: new Map([['sess-1', session]]) })
-      useSessionStore.getState().renameSession('sess-1', 'My Custom Name')
-      expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('My Custom Name')
-    })
+  it('updates tabTitle of existing session', () => {
+    const session = makeSession({ id: 'sess-1', tabTitle: 'Shell' })
+    useSessionStore.setState({ sessions: new Map([['sess-1', session]]) })
+    useSessionStore.getState().renameSession('sess-1', 'My Custom Name')
+    expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('My Custom Name')
+  })
 
-    it('is a no-op for unknown session id', () => {
-      const before = useSessionStore.getState().sessions
-      useSessionStore.getState().renameSession('nonexistent', 'Title')
-      expect(useSessionStore.getState().sessions).toBe(before)
-    })
+  it('is a no-op for unknown session id', () => {
+    const before = useSessionStore.getState().sessions
+    useSessionStore.getState().renameSession('nonexistent', 'Title')
+    expect(useSessionStore.getState().sessions).toBe(before)
   })
 })
 
@@ -259,27 +265,25 @@ describe('useSessionStore — closeSession — cascades close to child sessions 
 describe('useSessionStore — getSessionsForProject', () => {
   setUpUseSessionStore()
 
-  describe('getSessionsForProject', () => {
-    it('returns only sessions belonging to the given project', () => {
-      const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
-      const s2 = makeSession({ id: 'sess-2', projectId: 'proj-2' })
-      const s3 = makeSession({ id: 'sess-3', projectId: 'proj-1' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['sess-1', s1],
-          ['sess-2', s2],
-          ['sess-3', s3],
-        ]),
-      })
-      const sessions = useSessionStore.getState().getSessionsForProject('proj-1')
-      expect(sessions).toHaveLength(2)
-      expect(sessions.map((s) => s.id)).toContain('sess-1')
-      expect(sessions.map((s) => s.id)).toContain('sess-3')
+  it('returns only sessions belonging to the given project', () => {
+    const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+    const s2 = makeSession({ id: 'sess-2', projectId: 'proj-2' })
+    const s3 = makeSession({ id: 'sess-3', projectId: 'proj-1' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', s1],
+        ['sess-2', s2],
+        ['sess-3', s3],
+      ]),
     })
+    const sessions = useSessionStore.getState().getSessionsForProject('proj-1')
+    expect(sessions).toHaveLength(2)
+    expect(sessions.map((s) => s.id)).toContain('sess-1')
+    expect(sessions.map((s) => s.id)).toContain('sess-3')
+  })
 
-    it('returns empty array for unknown project', () => {
-      expect(useSessionStore.getState().getSessionsForProject('nonexistent')).toHaveLength(0)
-    })
+  it('returns empty array for unknown project', () => {
+    expect(useSessionStore.getState().getSessionsForProject('nonexistent')).toHaveLength(0)
   })
 })
 
@@ -365,39 +369,35 @@ describe('useSessionStore — setActiveSessionForProject — leaves a closed ses
 describe('useSessionStore — getActiveSessionForProject', () => {
   setUpUseSessionStore()
 
-  describe('getActiveSessionForProject', () => {
-    it('returns the active session id', () => {
-      useSessionStore.setState({
-        projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'sess-1' }]]),
-      })
-      expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-1')
+  it('returns the active session id', () => {
+    useSessionStore.setState({
+      projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'sess-1' }]]),
     })
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-1')
+  })
 
-    it('returns null for unknown project', () => {
-      expect(useSessionStore.getState().getActiveSessionForProject('unknown')).toBeNull()
-    })
+  it('returns null for unknown project', () => {
+    expect(useSessionStore.getState().getActiveSessionForProject('unknown')).toBeNull()
   })
 })
 
 describe('useSessionStore — handleProcessExit', () => {
   setUpUseSessionStore()
 
-  describe('handleProcessExit', () => {
-    it('marks session status as closed and appends [exited] to title', () => {
-      const session = makeSession({ tabTitle: 'Shell' })
-      useSessionStore.setState({ sessions: new Map([['sess-1', session]]) })
-      useSessionStore.getState().handleProcessExit('sess-1', 0)
-      const updated = useSessionStore.getState().sessions.get('sess-1')
-      expect(updated?.status).toBe('closed')
-      expect(updated?.tabTitle).toBe('Shell [exited]')
-      expect(updated?.closedAt).toBeDefined()
-    })
+  it('marks session status as closed and appends [exited] to title', () => {
+    const session = makeSession({ tabTitle: 'Shell' })
+    useSessionStore.setState({ sessions: new Map([['sess-1', session]]) })
+    useSessionStore.getState().handleProcessExit('sess-1', 0)
+    const updated = useSessionStore.getState().sessions.get('sess-1')
+    expect(updated?.status).toBe('closed')
+    expect(updated?.tabTitle).toBe('Shell [exited]')
+    expect(updated?.closedAt).toBeDefined()
+  })
 
-    it('is a no-op for unknown session id', () => {
-      const before = useSessionStore.getState().sessions
-      useSessionStore.getState().handleProcessExit('unknown', 0)
-      expect(useSessionStore.getState().sessions).toBe(before)
-    })
+  it('is a no-op for unknown session id', () => {
+    const before = useSessionStore.getState().sessions
+    useSessionStore.getState().handleProcessExit('unknown', 0)
+    expect(useSessionStore.getState().sessions).toBe(before)
   })
 })
 
@@ -530,240 +530,331 @@ describe('useSessionStore — busy state — closeSession clears busy state for 
 describe('useSessionStore — setTerminalInstance / getTerminalInstance', () => {
   setUpUseSessionStore()
 
-  describe('setTerminalInstance / getTerminalInstance', () => {
-    it('stores and retrieves terminal instance by sessionId', () => {
-      const fakeTerminal = partialFake<TerminalInstance>({ dispose: vi.fn() })
-      useSessionStore.getState().setTerminalInstance('sess-1', fakeTerminal)
-      expect(useSessionStore.getState().getTerminalInstance('sess-1')).toBe(fakeTerminal)
-    })
+  it('stores and retrieves terminal instance by sessionId', () => {
+    const fakeTerminal = partialFake<TerminalInstance>({ dispose: vi.fn() })
+    useSessionStore.getState().setTerminalInstance('sess-1', fakeTerminal)
+    expect(useSessionStore.getState().getTerminalInstance('sess-1')).toBe(fakeTerminal)
+  })
 
-    it('returns undefined for unknown session', () => {
-      expect(useSessionStore.getState().getTerminalInstance('unknown')).toBeUndefined()
-    })
+  it('returns undefined for unknown session', () => {
+    expect(useSessionStore.getState().getTerminalInstance('unknown')).toBeUndefined()
   })
 })
+
+/** The hooks every "useSessionStore — split pane actions" describe registers. */
+function setUpUseSessionStoreSplitPaneActions(): void {
+  setUpUseSessionStore()
+
+  // Every split is made from the tab on screen.
+  beforeEach(() => {
+    vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'split-uuid') })
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-a')
+  })
+}
 
 describe('useSessionStore — split pane actions', () => {
-  setUpUseSessionStore()
+  setUpUseSessionStoreSplitPaneActions()
 
-  describe('split pane actions', () => {
-    // Every split is made from the tab on screen.
-    beforeEach(() => {
-      vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'split-uuid') })
-      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-a')
-    })
+  it('getPaneLayout returns null when no layout set', () => {
+    expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
+  })
 
-    it('getPaneLayout returns null when no layout set', () => {
-      expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
-    })
+  it('getFocusedSession returns null when nothing focused', () => {
+    expect(useSessionStore.getState().getFocusedSession('proj-1')).toBeNull()
+  })
 
-    it('getFocusedSession returns null when nothing focused', () => {
-      expect(useSessionStore.getState().getFocusedSession('proj-1')).toBeNull()
-    })
+  it('setFocusedSession stores the focused pane of the split on screen', () => {
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
+    useSessionStore.getState().setFocusedSession('proj-1', 'sess-a')
+    expect(useSessionStore.getState().getFocusedSession('proj-1')).toBe('sess-a')
+  })
 
-    it('setFocusedSession stores the focused pane of the split on screen', () => {
-      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
-      useSessionStore.getState().setFocusedSession('proj-1', 'sess-a')
-      expect(useSessionStore.getState().getFocusedSession('proj-1')).toBe('sess-a')
-    })
+  it('getFocusedSession names no pane while no split is on screen', () => {
+    useSessionStore.getState().setFocusedSession('proj-1', 'sess-a')
+    expect(useSessionStore.getState().getFocusedSession('proj-1')).toBeNull()
+  })
+})
 
-    it('getFocusedSession names no pane while no split is on screen', () => {
-      useSessionStore.getState().setFocusedSession('proj-1', 'sess-a')
-      expect(useSessionStore.getState().getFocusedSession('proj-1')).toBeNull()
-    })
+describe('useSessionStore — split pane actions — activateSplit creates a split layout from a single session', () => {
+  setUpUseSessionStoreSplitPaneActions()
 
-    it('activateSplit creates a split layout from a single session', () => {
-      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
-      const layout = useSessionStore.getState().getPaneLayout('proj-1')
-      expect(layout?.type).toBe('split')
-      if (layout?.type !== 'split') return
-      expect(layout.direction).toBe('vertical')
-      expect(layout.first).toEqual({ type: 'leaf', sessionId: 'sess-a' })
-      expect(layout.second).toEqual({ type: 'leaf', sessionId: 'sess-b' })
-      expect(layout.ratio).toBe(0.5)
-    })
+  it('activateSplit creates a split layout from a single session', () => {
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
+    const layout = useSessionStore.getState().getPaneLayout('proj-1')
+    expect(layout?.type).toBe('split')
+    if (layout?.type !== 'split') return
+    expect(layout.direction).toBe('vertical')
+    expect(layout.first).toEqual({ type: 'leaf', sessionId: 'sess-a' })
+    expect(layout.second).toEqual({ type: 'leaf', sessionId: 'sess-b' })
+    expect(layout.ratio).toBe(0.5)
+  })
 
-    it('activateSplit sets the new session as focused', () => {
-      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'horizontal')
-      expect(useSessionStore.getState().getFocusedSession('proj-1')).toBe('sess-b')
-    })
+  it('activateSplit sets the new session as focused', () => {
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'horizontal' })
+    expect(useSessionStore.getState().getFocusedSession('proj-1')).toBe('sess-b')
+  })
+})
 
-    it('activateSplit splits an existing layout leaf', () => {
-      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
-      useSessionStore.getState().setFocusedSession('proj-1', 'sess-b')
-      useSessionStore.getState().activateSplit('proj-1', 'sess-b', 'sess-c', 'horizontal')
-      expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({
+describe('useSessionStore — split pane actions — activateSplit splits an existing layout leaf', () => {
+  setUpUseSessionStoreSplitPaneActions()
+
+  it('activateSplit splits an existing layout leaf', () => {
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
+    useSessionStore.getState().setFocusedSession('proj-1', 'sess-b')
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-b', newId: 'sess-c', direction: 'horizontal' })
+    expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({
+      type: 'split',
+      first: { type: 'leaf', sessionId: 'sess-a' },
+      second: {
         type: 'split',
-        first: { type: 'leaf', sessionId: 'sess-a' },
-        second: {
-          type: 'split',
-          direction: 'horizontal',
-          first: { type: 'leaf', sessionId: 'sess-b' },
-          second: { type: 'leaf', sessionId: 'sess-c' },
-        },
-      })
-    })
-
-    it('setSplitRatio updates the ratio of a split node', () => {
-      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
-      const layout = useSessionStore.getState().getPaneLayout('proj-1')
-      if (!layout || layout.type !== 'split') throw new Error('expected split')
-      useSessionStore.getState().setSplitRatio('proj-1', layout.id, 0.7)
-      const updated = useSessionStore.getState().getPaneLayout('proj-1')
-      if (!updated || updated.type !== 'split') throw new Error('expected split')
-      expect(updated.ratio).toBe(0.7)
-    })
-
-    it('setSplitRatio is no-op when no layout exists', () => {
-      useSessionStore.getState().setSplitRatio('proj-1', 'noop', 0.5)
-      expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
-    })
-
-    it('closeSplitLeaf removes a leaf and collapses split to null when 1 left', () => {
-      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
-      useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-b')
-      expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
-    })
-
-    it('closeSplitLeaf sets the surviving session as active', () => {
-      useSessionStore.getState().setFocusedSession('proj-1', 'sess-b')
-      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
-      useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-b')
-      expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-a')
-    })
-
-    it('closeSplitLeaf keeps layout when 2+ panes remain', () => {
-      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
-      useSessionStore.getState().activateSplit('proj-1', 'sess-b', 'sess-c', 'horizontal')
-      useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-c')
-      expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({
-        type: 'split',
-        first: { type: 'leaf', sessionId: 'sess-a' },
-        second: { type: 'leaf', sessionId: 'sess-b' },
-      })
-    })
-
-    it('closeSplitLeaf moves focus to first remaining leaf when focused one is closed', () => {
-      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
-      useSessionStore.getState().setFocusedSession('proj-1', 'sess-b')
-      useSessionStore.getState().activateSplit('proj-1', 'sess-b', 'sess-c', 'horizontal')
-      useSessionStore.getState().setFocusedSession('proj-1', 'sess-c')
-      useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-c')
-      // leafIds after removal = ['sess-a', 'sess-b'], first remaining = 'sess-a'
-      expect(useSessionStore.getState().getFocusedSession('proj-1')).toBe('sess-a')
-    })
-
-    it('closeSession clears the layout when the only split session is closed', async () => {
-      mockElectronAPI.terminal.close.mockResolvedValue({})
-      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
-      useSessionStore.setState((s) => {
-        const sessions = new Map(s.sessions)
-        sessions.set('sess-a', makeSession({ id: 'sess-a', projectId: 'proj-1' }))
-        sessions.set('sess-b', makeSession({ id: 'sess-b', projectId: 'proj-1' }))
-        return { sessions }
-      })
-      await useSessionStore.getState().closeSession('sess-a')
-      await useSessionStore.getState().closeSession('sess-b')
-      expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
-    })
-
-    it('closing the active pane keeps the rest of its split on screen', async () => {
-      mockElectronAPI.terminal.close.mockResolvedValue({})
-      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
-      useSessionStore.getState().activateSplit('proj-1', 'sess-b', 'sess-c', 'horizontal')
-      useSessionStore.setState((s) => {
-        const sessions = new Map(s.sessions)
-        for (const id of ['sess-a', 'sess-b', 'sess-c', 'sess-z'])
-          sessions.set(id, makeSession({ id, projectId: 'proj-1' }))
-        return { sessions }
-      })
-      useSessionStore.getState().reorderSessions('proj-1', ['sess-z', 'sess-a', 'sess-b', 'sess-c'])
-      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-c')
-      useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-c')
-      expect(leafIds(useSessionStore.getState().getPaneLayout('proj-1')!)).toEqual([
-        'sess-a',
-        'sess-b',
-      ])
-      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-b')
-      await useSessionStore.getState().closeSession('sess-b')
-      expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-a')
+        direction: 'horizontal',
+        first: { type: 'leaf', sessionId: 'sess-b' },
+        second: { type: 'leaf', sessionId: 'sess-c' },
+      },
     })
   })
 })
 
-describe('useSessionStore — a split belongs to the tab it was made in', () => {
+describe('useSessionStore — split pane actions — setSplitRatio updates the ratio of a split node', () => {
+  setUpUseSessionStoreSplitPaneActions()
+
+  it('setSplitRatio updates the ratio of a split node', () => {
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
+    const layout = useSessionStore.getState().getPaneLayout('proj-1')
+    if (!layout || layout.type !== 'split') throw new Error('expected split')
+    useSessionStore.getState().setSplitRatio('proj-1', layout.id, 0.7)
+    const updated = useSessionStore.getState().getPaneLayout('proj-1')
+    if (!updated || updated.type !== 'split') throw new Error('expected split')
+    expect(updated.ratio).toBe(0.7)
+  })
+
+  it('setSplitRatio is no-op when no layout exists', () => {
+    useSessionStore.getState().setSplitRatio('proj-1', 'noop', 0.5)
+    expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
+  })
+
+  it('closeSplitLeaf removes a leaf and collapses split to null when 1 left', () => {
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
+    useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-b')
+    expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
+  })
+})
+
+describe('useSessionStore — split pane actions — closeSplitLeaf sets the surviving session as active', () => {
+  setUpUseSessionStoreSplitPaneActions()
+
+  it('closeSplitLeaf sets the surviving session as active', () => {
+    useSessionStore.getState().setFocusedSession('proj-1', 'sess-b')
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
+    useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-b')
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-a')
+  })
+
+  it('closeSplitLeaf keeps layout when 2+ panes remain', () => {
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-b', newId: 'sess-c', direction: 'horizontal' })
+    useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-c')
+    expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({
+      type: 'split',
+      first: { type: 'leaf', sessionId: 'sess-a' },
+      second: { type: 'leaf', sessionId: 'sess-b' },
+    })
+  })
+})
+
+describe('useSessionStore — split pane actions — closeSplitLeaf moves focus to first remaining leaf when focused one is closed', () => {
+  setUpUseSessionStoreSplitPaneActions()
+
+  it('closeSplitLeaf moves focus to first remaining leaf when focused one is closed', () => {
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
+    useSessionStore.getState().setFocusedSession('proj-1', 'sess-b')
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-b', newId: 'sess-c', direction: 'horizontal' })
+    useSessionStore.getState().setFocusedSession('proj-1', 'sess-c')
+    useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-c')
+    // leafIds after removal = ['sess-a', 'sess-b'], first remaining = 'sess-a'
+    expect(useSessionStore.getState().getFocusedSession('proj-1')).toBe('sess-a')
+  })
+})
+
+describe('useSessionStore — split pane actions — closeSession clears the layout when the only split session is closed', () => {
+  setUpUseSessionStoreSplitPaneActions()
+
+  it('closeSession clears the layout when the only split session is closed', async () => {
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
+    useSessionStore.setState((s) => {
+      const sessions = new Map(s.sessions)
+      sessions.set('sess-a', makeSession({ id: 'sess-a', projectId: 'proj-1' }))
+      sessions.set('sess-b', makeSession({ id: 'sess-b', projectId: 'proj-1' }))
+      return { sessions }
+    })
+    await useSessionStore.getState().closeSession('sess-a')
+    await useSessionStore.getState().closeSession('sess-b')
+    expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
+  })
+})
+
+describe('useSessionStore — split pane actions — closing the active pane keeps the rest of its split on screen', () => {
+  setUpUseSessionStoreSplitPaneActions()
+
+  it('closing the active pane keeps the rest of its split on screen', async () => {
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'sess-b', newId: 'sess-c', direction: 'horizontal' })
+    useSessionStore.setState((s) => {
+      const sessions = new Map(s.sessions)
+      for (const id of ['sess-a', 'sess-b', 'sess-c', 'sess-z'])
+        sessions.set(id, makeSession({ id, projectId: 'proj-1' }))
+      return { sessions }
+    })
+    useSessionStore.getState().reorderSessions('proj-1', ['sess-z', 'sess-a', 'sess-b', 'sess-c'])
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-c')
+    useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-c')
+    expect(leafIds(useSessionStore.getState().getPaneLayout('proj-1')!)).toEqual([
+      'sess-a',
+      'sess-b',
+    ])
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-b')
+    await useSessionStore.getState().closeSession('sess-b')
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-a')
+  })
+})
+
+const store = () => useSessionStore.getState()
+
+const leavesOnScreen = () => {
+  const layout = store().getPaneLayout('proj-1')
+  return layout ? leafIds(layout) : null
+}
+
+/** The hooks every "useSessionStore — a split belongs to the tab it was made in" describe registers. */
+function setUpUseSessionStoreASplitBelongs(): void {
   setUpUseSessionStore()
 
-  describe('a split belongs to the tab it was made in', () => {
-    const store = () => useSessionStore.getState()
-    const leavesOnScreen = () => {
-      const layout = store().getPaneLayout('proj-1')
-      return layout ? leafIds(layout) : null
-    }
-
-    beforeEach(() => {
-      vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'split-uuid') })
-      store().setActiveSessionForProject('proj-1', 'sess-a')
-      store().activateSplit('proj-1', 'sess-a', 'sess-b', 'horizontal')
+  beforeEach(() => {
+    vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'split-uuid') })
+    store().setActiveSessionForProject('proj-1', 'sess-a')
+    store().activateSplit('proj-1', {
+      targetId: 'sess-a',
+      newId: 'sess-b',
+      direction: 'horizontal',
     })
+  })
+}
 
-    it('a new tab shows alone, and the split comes back with its own tab', () => {
-      store().setActiveSessionForProject('proj-1', 'sess-c')
-      expect(leavesOnScreen()).toBeNull()
-      store().setActiveSessionForProject('proj-1', 'sess-a')
-      expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
-      store().setActiveSessionForProject('proj-1', 'sess-b')
-      expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
-    })
+describe('useSessionStore — a split belongs to the tab it was made in', () => {
+  setUpUseSessionStoreASplitBelongs()
 
-    it('names no focused pane while the split is off screen', () => {
-      expect(store().getFocusedSession('proj-1')).toBe('sess-b')
-      store().setActiveSessionForProject('proj-1', 'sess-c')
-      expect(store().getFocusedSession('proj-1')).toBeNull()
-    })
+  it('a new tab shows alone, and the split comes back with its own tab', () => {
+    store().setActiveSessionForProject('proj-1', 'sess-c')
+    expect(leavesOnScreen()).toBeNull()
+    store().setActiveSessionForProject('proj-1', 'sess-a')
+    expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
+    store().setActiveSessionForProject('proj-1', 'sess-b')
+    expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
+  })
 
-    it('each tab keeps its own split', () => {
-      store().setActiveSessionForProject('proj-1', 'sess-c')
-      store().activateSplit('proj-1', 'sess-c', 'sess-d', 'vertical')
-      expect(leavesOnScreen()).toEqual(['sess-c', 'sess-d'])
-      store().setActiveSessionForProject('proj-1', 'sess-a')
-      expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
-    })
+  it('names no focused pane while the split is off screen', () => {
+    expect(store().getFocusedSession('proj-1')).toBe('sess-b')
+    store().setActiveSessionForProject('proj-1', 'sess-c')
+    expect(store().getFocusedSession('proj-1')).toBeNull()
+  })
 
-    it("closing a pane of one tab's split leaves the other tab's split alone", () => {
-      store().setActiveSessionForProject('proj-1', 'sess-c')
-      store().activateSplit('proj-1', 'sess-c', 'sess-d', 'vertical')
-      store().closeSplitLeaf('proj-1', 'sess-d')
-      expect(leavesOnScreen()).toBeNull()
-      store().setActiveSessionForProject('proj-1', 'sess-a')
-      expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
+  it('each tab keeps its own split', () => {
+    store().setActiveSessionForProject('proj-1', 'sess-c')
+    store().activateSplit('proj-1', {
+      targetId: 'sess-c',
+      newId: 'sess-d',
+      direction: 'vertical',
     })
+    expect(leavesOnScreen()).toEqual(['sess-c', 'sess-d'])
+    store().setActiveSessionForProject('proj-1', 'sess-a')
+    expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
+  })
+})
+
+describe("useSessionStore — a split belongs to the tab it was made in — closing a pane of one tab's split leaves the other tab's split alone", () => {
+  setUpUseSessionStoreASplitBelongs()
+
+  it("closing a pane of one tab's split leaves the other tab's split alone", () => {
+    store().setActiveSessionForProject('proj-1', 'sess-c')
+    store().activateSplit('proj-1', {
+      targetId: 'sess-c',
+      newId: 'sess-d',
+      direction: 'vertical',
+    })
+    store().closeSplitLeaf('proj-1', 'sess-d')
+    expect(leavesOnScreen()).toBeNull()
+    store().setActiveSessionForProject('proj-1', 'sess-a')
+    expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
+  })
+
+  it('unsplitting a tab that is off screen leaves the tab on screen as it was', () => {
+    store().setActiveSessionForProject('proj-1', 'sess-c')
+    store().closeSplitLeaf('proj-1', 'sess-b')
+    expect(store().getActiveSessionForProject('proj-1')).toBe('sess-c')
+    store().setActiveSessionForProject('proj-1', 'sess-a')
+    expect(leavesOnScreen()).toBeNull()
+  })
+
+  it('unsplitting a pane that is in no split changes nothing', () => {
+    const before = store().projectViews
+    store().closeSplitLeaf('proj-1', 'sess-c')
+    expect(store().projectViews).toBe(before)
   })
 })
 
 describe('useSessionStore — getScratchSessions', () => {
   setUpUseSessionStore()
 
-  describe('getScratchSessions', () => {
-    it('returns sessions with SCRATCH_PROJECT_ID', () => {
-      const SCRATCH = '00000000-0000-0000-0000-000000000000'
-      const s1 = makeSession({ id: 'sess-1', projectId: SCRATCH })
-      const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['sess-1', s1],
-          ['sess-2', s2],
-        ]),
-      })
-      const scratch = useSessionStore.getState().getScratchSessions()
-      expect(scratch).toHaveLength(1)
-      expect(scratch[0].id).toBe('sess-1')
+  it('returns sessions with SCRATCH_PROJECT_ID', () => {
+    const SCRATCH = '00000000-0000-0000-0000-000000000000'
+    const s1 = makeSession({ id: 'sess-1', projectId: SCRATCH })
+    const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', s1],
+        ['sess-2', s2],
+      ]),
     })
+    const scratch = useSessionStore.getState().getScratchSessions()
+    expect(scratch).toHaveLength(1)
+    expect(scratch[0].id).toBe('sess-1')
+  })
 
-    it('returns empty array when no scratch sessions exist', () => {
-      useSessionStore.setState({ sessions: new Map() })
-      expect(useSessionStore.getState().getScratchSessions()).toHaveLength(0)
-    })
+  it('returns empty array when no scratch sessions exist', () => {
+    useSessionStore.setState({ sessions: new Map() })
+    expect(useSessionStore.getState().getScratchSessions()).toHaveLength(0)
   })
 })
 
@@ -972,87 +1063,81 @@ function setUpActivityAttentionAndNotes(): void {
 describe('activity, attention and notes (feature 030)', () => {
   setUpActivityAttentionAndNotes()
 
-  describe('stampActivity', () => {
-    it('records the supplied time without reading the clock itself', () => {
-      seed({ lastActivityAt: 100 })
-      useSessionStore.getState().stampActivity('sess-1', 4242)
-      expect(useSessionStore.getState().sessions.get('sess-1')!.lastActivityAt).toBe(4242)
-    })
+  it('records the supplied time without reading the clock itself', () => {
+    seed({ lastActivityAt: 100 })
+    useSessionStore.getState().stampActivity('sess-1', 4242)
+    expect(useSessionStore.getState().sessions.get('sess-1')!.lastActivityAt).toBe(4242)
+  })
 
-    it('leaves every other field alone', () => {
-      const before = seed({ tabTitle: 'Keep me', bellCount: 2 })
-      useSessionStore.getState().stampActivity('sess-1', 999)
-      const after = useSessionStore.getState().sessions.get('sess-1')!
-      expect(after).toEqual({ ...before, lastActivityAt: 999 })
-    })
+  it('leaves every other field alone', () => {
+    const before = seed({ tabTitle: 'Keep me', bellCount: 2 })
+    useSessionStore.getState().stampActivity('sess-1', 999)
+    const after = useSessionStore.getState().sessions.get('sess-1')!
+    expect(after).toEqual({ ...before, lastActivityAt: 999 })
+  })
 
-    it('is a no-op for an unknown session', () => {
-      const before = useSessionStore.getState().sessions
-      useSessionStore.getState().stampActivity('nope', 1)
-      expect(useSessionStore.getState().sessions).toBe(before)
-    })
+  it('is a no-op for an unknown session', () => {
+    const before = useSessionStore.getState().sessions
+    useSessionStore.getState().stampActivity('nope', 1)
+    expect(useSessionStore.getState().sessions).toBe(before)
   })
 })
 
 describe('activity, attention and notes (feature 030) — lastActivityAt backfill (FR-007)', () => {
   setUpActivityAttentionAndNotes()
 
-  describe('lastActivityAt backfill (FR-007)', () => {
-    it('createSession stamps lastActivityAt from createdAt', async () => {
-      mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'new-1' })
-      await useSessionStore.getState().createSession('proj-1', 'human', 'T', '/tmp', 10000)
-      const created = useSessionStore.getState().sessions.get('new-1')!
-      expect(created.lastActivityAt).toBe(Date.parse(created.createdAt))
-    })
+  it('createSession stamps lastActivityAt from createdAt', async () => {
+    mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'new-1' })
+    await useSessionStore.getState().createSession(request({ title: 'T', cwd: '/tmp' }))
+    const created = useSessionStore.getState().sessions.get('new-1')!
+    expect(created.lastActivityAt).toBe(Date.parse(created.createdAt))
+  })
 
-    it('adoptSession stamps lastActivityAt from createdAt', () => {
-      useSessionStore.getState().adoptSession({
-        sessionId: 'adopted-1',
-        projectId: 'proj-1',
-        tabTitle: 'Agent',
-        scrollbackLimit: 10000,
-      })
-      const adopted = useSessionStore.getState().sessions.get('adopted-1')!
-      expect(adopted.lastActivityAt).toBe(Date.parse(adopted.createdAt))
+  it('adoptSession stamps lastActivityAt from createdAt', () => {
+    useSessionStore.getState().adoptSession({
+      sessionId: 'adopted-1',
+      projectId: 'proj-1',
+      tabTitle: 'Agent',
+      scrollbackLimit: 10000,
     })
+    const adopted = useSessionStore.getState().sessions.get('adopted-1')!
+    expect(adopted.lastActivityAt).toBe(Date.parse(adopted.createdAt))
+  })
 
-    it('a newly created session starts idle', async () => {
-      mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'new-2' })
-      await useSessionStore.getState().createSession('proj-1', 'human', 'T', '/tmp', 10000)
-      expect(useSessionStore.getState().sessions.get('new-2')!.agentState).toBe('idle')
-    })
+  it('a newly created session starts idle', async () => {
+    mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'new-2' })
+    await useSessionStore.getState().createSession(request({ title: 'T', cwd: '/tmp' }))
+    expect(useSessionStore.getState().sessions.get('new-2')!.agentState).toBe('idle')
   })
 })
 
 describe('activity, attention and notes (feature 030) — lastAttendedAt', () => {
   setUpActivityAttentionAndNotes()
 
-  describe('lastAttendedAt', () => {
-    it('is stamped when the session becomes the visible one', () => {
-      seed()
-      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1', 777)
-      expect(useSessionStore.getState().sessions.get('sess-1')!.lastAttendedAt).toBe(777)
-    })
+  it('is stamped when the session becomes the visible one', () => {
+    seed()
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1', 777)
+    expect(useSessionStore.getState().sessions.get('sess-1')!.lastAttendedAt).toBe(777)
+  })
 
-    it('is not stamped on the sessions that were deactivated', () => {
-      const a = makeSession({ id: 'a' })
-      const b = makeSession({ id: 'b' })
-      useSessionStore.setState({
-        sessions: new Map([
-          ['a', a],
-          ['b', b],
-        ]),
-      })
-      useSessionStore.getState().setActiveSessionForProject('proj-1', 'a', 555)
-      expect(useSessionStore.getState().sessions.get('b')!.lastAttendedAt).toBeUndefined()
+  it('is not stamped on the sessions that were deactivated', () => {
+    const a = makeSession({ id: 'a' })
+    const b = makeSession({ id: 'b' })
+    useSessionStore.setState({
+      sessions: new Map([
+        ['a', a],
+        ['b', b],
+      ]),
     })
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'a', 555)
+    expect(useSessionStore.getState().sessions.get('b')!.lastAttendedAt).toBeUndefined()
   })
 })
 
 describe('setSessionScreen', () => {
   it("records a session's last visible line", async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'scr-1' })
-    await useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/home', 10000)
+    await useSessionStore.getState().createSession(request())
     useSessionStore.getState().setSessionScreen('scr-1', { latestLine: 'done', choicePrompt: null })
     const session = useSessionStore.getState().sessions.get('scr-1')
     expect(session?.latestLine).toBe('done')
@@ -1071,7 +1156,7 @@ describe('createSession — resuming', () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'res-1' })
     await useSessionStore
       .getState()
-      .createSession('proj-1', 'human', '', '/repo', 10000, undefined, 'claude --resume abc')
+      .createSession(request({ title: '', cwd: '/repo', initialCommand: 'claude --resume abc' }))
     expect(mockElectronAPI.terminal.create).toHaveBeenCalledWith(
       expect.objectContaining({ initialCommand: 'claude --resume abc' })
     )
@@ -1079,7 +1164,7 @@ describe('createSession — resuming', () => {
 
   it('asks for no command when there is none', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'res-2' })
-    await useSessionStore.getState().createSession('proj-1', 'human', '', '/repo', 10000)
+    await useSessionStore.getState().createSession(request({ title: '', cwd: '/repo' }))
     expect(mockElectronAPI.terminal.create.mock.calls.at(-1)?.[0]).not.toHaveProperty(
       'initialCommand'
     )

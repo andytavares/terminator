@@ -35,7 +35,9 @@ beforeEach(() => {
   useSessionStore.setState(useSessionStore.getInitialState())
   // A pane is drawn only for the split on screen: sess-1 and its pane sess-2.
   useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
-  useSessionStore.getState().activateSplit('proj-1', 'sess-1', 'sess-2', 'vertical')
+  useSessionStore
+    .getState()
+    .activateSplit('proj-1', { targetId: 'sess-1', newId: 'sess-2', direction: 'vertical' })
   useSessionStore.setState({
     sessions: new Map([
       [

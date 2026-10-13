@@ -166,13 +166,13 @@ function useCustomQuickActions(target: QuickActionTarget): QuickAction[] {
       input: (sessionId, data) => window.electronAPI.terminal.input(sessionId, data),
       openTab: async (tabProjectId) => {
         const settings = resolveSettings(activeWorkspaceId)
-        const id = await createSession(
-          tabProjectId,
-          'human',
-          '',
-          resolveActiveCwd(),
-          settings.terminal.scrollbackLimit
-        )
+        const id = await createSession({
+          projectId: tabProjectId,
+          type: 'human',
+          title: '',
+          cwd: resolveActiveCwd(),
+          scrollbackLimit: settings.terminal.scrollbackLimit,
+        })
         return id as string
       },
       notify: (message) => addToast({ type: 'error', message }),

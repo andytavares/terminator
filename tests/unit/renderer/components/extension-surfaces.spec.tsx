@@ -163,7 +163,13 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
   it('a new terminal can be created for the branch scope', () => {
     const { container } = renderSidebar(groupBy)
     fireEvent.click(container.querySelector('.branch-row__action')!)
-    expect(mockCreateSession).toHaveBeenCalledWith('p1', 'human', '', '/b', 5000)
+    expect(mockCreateSession).toHaveBeenCalledWith({
+      projectId: 'p1',
+      type: 'human',
+      title: '',
+      cwd: '/b',
+      scrollbackLimit: 5000,
+    })
   })
 })
 
@@ -179,7 +185,13 @@ describe('scope actions are reachable from the command palette (FR-027)', () => 
       .getState()
       .commands.find((c) => c.label === 'New terminal — Backend · main')!
     command.action()
-    expect(mockCreateSession).toHaveBeenCalledWith('p1', 'human', '', '/b', 5000)
+    expect(mockCreateSession).toHaveBeenCalledWith({
+      projectId: 'p1',
+      type: 'human',
+      title: '',
+      cwd: '/b',
+      scrollbackLimit: 5000,
+    })
   })
 
   it('disposes its commands on unmount so they cannot outlive the sidebar', () => {

@@ -656,7 +656,10 @@ describe('App — command core.toggle-log action opens LogWindow', () => {
     render(<App />)
     openPalette()
     runAction('core.split-vertical')
-    expect(splitSession).toHaveBeenCalledWith('proj-1', 'vertical', '/a', 10000)
+    expect(splitSession).toHaveBeenCalledWith('proj-1', 'vertical', {
+      cwd: '/a',
+      scrollbackLimit: 10000,
+    })
   })
 
   it('command core.split-horizontal action splits the active project', () => {
@@ -664,7 +667,10 @@ describe('App — command core.toggle-log action opens LogWindow', () => {
     render(<App />)
     openPalette()
     runAction('core.split-horizontal')
-    expect(splitSession).toHaveBeenCalledWith('proj-1', 'horizontal', '/a', 10000)
+    expect(splitSession).toHaveBeenCalledWith('proj-1', 'horizontal', {
+      cwd: '/a',
+      scrollbackLimit: 10000,
+    })
   })
 })
 
@@ -760,7 +766,13 @@ describe('App — command core.toggle-overview action opens Overview', () => {
     setupApp({ activeWorkspaceId: 'ws-1', workspaces: [WS1] })
     render(<App />)
     act(() => shortcuts.callbacks.onNewScratch?.())
-    expect(createSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'human', 'Scratch', '/a', 10000)
+    expect(createSession).toHaveBeenCalledWith({
+      projectId: SCRATCH_PROJECT_ID,
+      type: 'human',
+      title: 'Scratch',
+      cwd: '/a',
+      scrollbackLimit: 10000,
+    })
     await waitFor(() => expect(useWorkspaceStore.getState().scratchActive).toBe(true))
   })
 })
@@ -954,7 +966,13 @@ describe('App — handleNewTab', () => {
     })
     render(<App />)
     act(() => shortcuts.callbacks.onNewTab?.())
-    expect(createSession).toHaveBeenCalledWith('proj-1', 'human', '', '/a', 10000)
+    expect(createSession).toHaveBeenCalledWith({
+      projectId: 'proj-1',
+      type: 'human',
+      title: '',
+      cwd: '/a',
+      scrollbackLimit: 10000,
+    })
   })
 })
 
@@ -990,7 +1008,13 @@ describe('App — handleNewTab — NameTerminalDialog onConfirm opens the named 
     await waitFor(() => screen.getByTestId('name-terminal-dialog'))
     fireEvent.click(screen.getByText('Confirm'))
     await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
-    expect(createSession).toHaveBeenCalledWith('proj-1', 'human', 'My Terminal', '~', 10000)
+    expect(createSession).toHaveBeenCalledWith({
+      projectId: 'proj-1',
+      type: 'human',
+      title: 'My Terminal',
+      cwd: '~',
+      scrollbackLimit: 10000,
+    })
   })
 })
 

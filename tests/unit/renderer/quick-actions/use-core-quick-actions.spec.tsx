@@ -107,7 +107,9 @@ describe('useCoreQuickActions — the focused terminal', () => {
       terminalSessionOf({ id: 's2', projectId: 'p1' }),
     ])
     useSessionStore.getState().setActiveSessionForProject('p1', 's1')
-    useSessionStore.getState().activateSplit('p1', 's1', 's2', 'vertical')
+    useSessionStore
+      .getState()
+      .activateSplit('p1', { targetId: 's1', newId: 's2', direction: 'vertical' })
     run('core.close-tab')
     await vi.waitFor(() => expect(useSessionStore.getState().sessions.has('s2')).toBe(false))
     expect(useSessionStore.getState().getPaneLayout('p1')).toBeNull()

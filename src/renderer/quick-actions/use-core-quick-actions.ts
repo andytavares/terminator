@@ -98,7 +98,10 @@ function splitFocused(c: CoreContext, direction: PaneSplitDirection): void {
   if (!c.projectId) return
   const settings = useSettingsStore.getState().resolveSettings(c.activeWorkspaceId)
   const cwd = useWorkspaceStore.getState().resolveActiveCwd()
-  void c.splitSession(c.projectId, direction, cwd, settings.terminal.scrollbackLimit)
+  void c.splitSession(c.projectId, direction, {
+    cwd,
+    scrollbackLimit: settings.terminal.scrollbackLimit,
+  })
 }
 
 /** Closes the focused pane of a split, or else the tab on screen. */

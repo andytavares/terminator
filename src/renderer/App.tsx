@@ -213,7 +213,9 @@ export function App(): JSX.Element {
       const next = (projectViews.get(projectId)?.terminalCounter ?? 0) + 1
       setPendingCreate({ projectId, cwd, scrollbackLimit, defaultName: `Terminal ${next}` })
     } else {
-      void createSession(projectId, 'human', '', cwd, scrollbackLimit).catch(() => {})
+      void createSession({ projectId, type: 'human', title: '', cwd, scrollbackLimit }).catch(
+        () => {}
+      )
     }
   }, [
     scratchActive,
@@ -227,7 +229,13 @@ export function App(): JSX.Element {
   const handleNewScratch = useCallback(() => {
     const settings = resolveSettings(activeWorkspaceId)
     const cwd = resolveActiveCwd()
-    createSession(SCRATCH_PROJECT_ID, 'human', 'Scratch', cwd, settings.terminal.scrollbackLimit)
+    createSession({
+      projectId: SCRATCH_PROJECT_ID,
+      type: 'human',
+      title: 'Scratch',
+      cwd,
+      scrollbackLimit: settings.terminal.scrollbackLimit,
+    })
       .then(() => {
         setScratchActive(true)
       })
@@ -439,7 +447,13 @@ export function App(): JSX.Element {
     const settings = resolveSettings(activeWorkspaceId)
     const cwd = resolveActiveCwd()
     const projectId = activeProjectId
-    createSession(projectId, 'human', '', cwd, settings.terminal.scrollbackLimit).then(
+    createSession({
+      projectId,
+      type: 'human',
+      title: '',
+      cwd,
+      scrollbackLimit: settings.terminal.scrollbackLimit,
+    }).then(
       () => useTerminalOpenErrorStore.getState().clearError(projectId),
       (err: unknown) =>
         useTerminalOpenErrorStore
@@ -822,7 +836,13 @@ export function App(): JSX.Element {
               onConfirm={(name) => {
                 const { projectId, cwd, scrollbackLimit } = pendingCreate
                 setPendingCreate(null)
-                void createSession(projectId, 'human', name, cwd, scrollbackLimit).catch(() => {})
+                void createSession({
+                  projectId,
+                  type: 'human',
+                  title: name,
+                  cwd,
+                  scrollbackLimit,
+                }).catch(() => {})
               }}
               onCancel={() => setPendingCreate(null)}
             />

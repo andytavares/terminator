@@ -506,13 +506,13 @@ export function UnifiedSidebar({
         category: 'Sessions',
         action: () => {
           const settings = resolveSettings(project.workspaceId)
-          void createSession(
-            project.id,
-            'human',
-            '',
-            resolveActiveCwd(),
-            settings.terminal.scrollbackLimit
-          ).catch(() => {})
+          void createSession({
+            projectId: project.id,
+            type: 'human',
+            title: '',
+            cwd: resolveActiveCwd(),
+            scrollbackLimit: settings.terminal.scrollbackLimit,
+          }).catch(() => {})
         },
       })
     )
@@ -586,13 +586,13 @@ export function UnifiedSidebar({
     setActiveProject(projectId)
     onSelectProject?.()
     const settings = resolveSettings(project.workspaceId)
-    void createSession(
+    void createSession({
       projectId,
-      'human',
-      '',
-      resolveActiveCwd(),
-      settings.terminal.scrollbackLimit
-    ).catch(() => {})
+      type: 'human',
+      title: '',
+      cwd: resolveActiveCwd(),
+      scrollbackLimit: settings.terminal.scrollbackLimit,
+    }).catch(() => {})
   }
 
   const workspaceTabList = Array.from(workspaceTabs.values())

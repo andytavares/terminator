@@ -138,7 +138,13 @@ describe('useKeyboardShortcuts — cycles to next workspace on Cmd+=, expanding 
     setup({ activeProjectId: 'proj-1' })
     renderHook(() => useKeyboardShortcuts())
     pressKey('t', { metaKey: true })
-    expect(createSession).toHaveBeenCalledWith('proj-1', 'human', 'Terminal', '/ws1', 5000)
+    expect(createSession).toHaveBeenCalledWith({
+      projectId: 'proj-1',
+      type: 'human',
+      title: 'Terminal',
+      cwd: '/ws1',
+      scrollbackLimit: 5000,
+    })
   })
 })
 
@@ -282,7 +288,10 @@ describe('useKeyboardShortcuts — Cmd+D splits vertically when activeProjectId 
     setup({ activeProjectId: 'proj-1' })
     renderHook(() => useKeyboardShortcuts())
     pressKey('d', { metaKey: true })
-    expect(splitSession).toHaveBeenCalledWith('proj-1', 'vertical', '/ws1', 5000)
+    expect(splitSession).toHaveBeenCalledWith('proj-1', 'vertical', {
+      cwd: '/ws1',
+      scrollbackLimit: 5000,
+    })
   })
 
   it('Cmd+D does nothing when no activeProjectId', () => {
@@ -295,7 +304,10 @@ describe('useKeyboardShortcuts — Cmd+D splits vertically when activeProjectId 
     setup({ activeProjectId: 'proj-1' })
     renderHook(() => useKeyboardShortcuts())
     pressKey('d', { metaKey: true, shiftKey: true })
-    expect(splitSession).toHaveBeenCalledWith('proj-1', 'horizontal', '/ws1', 5000)
+    expect(splitSession).toHaveBeenCalledWith('proj-1', 'horizontal', {
+      cwd: '/ws1',
+      scrollbackLimit: 5000,
+    })
   })
 })
 
@@ -303,7 +315,11 @@ describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split
   it('Cmd+W closes focused split pane when in split mode', async () => {
     setup({ activeProjectId: 'proj-1' })
     withTabs('proj-1', ['ses-root', 'ses-focused'], 'ses-root')
-    sessions().activateSplit('proj-1', 'ses-root', 'ses-focused', 'vertical')
+    sessions().activateSplit('proj-1', {
+      targetId: 'ses-root',
+      newId: 'ses-focused',
+      direction: 'vertical',
+    })
     sessions().setFocusedSession('proj-1', 'ses-focused')
     renderHook(() => useKeyboardShortcuts())
     pressKey('w', { metaKey: true })
@@ -343,13 +359,13 @@ describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides a
   it('Cmd+T creates scratch session when scratchProjectId is set and activeProjectId is null', () => {
     renderHook(() => useKeyboardShortcuts(scratch))
     pressKey('t', { metaKey: true })
-    expect(createSession).toHaveBeenCalledWith(
-      SCRATCH_PROJECT_ID,
-      'human',
-      'Terminal',
-      '/ws1',
-      5000
-    )
+    expect(createSession).toHaveBeenCalledWith({
+      projectId: SCRATCH_PROJECT_ID,
+      type: 'human',
+      title: 'Terminal',
+      cwd: '/ws1',
+      scrollbackLimit: 5000,
+    })
   })
 
   it('Cmd+D splits the scratch terminal when that is what is on screen', () => {
@@ -360,13 +376,19 @@ describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides a
     // the same.
     renderHook(() => useKeyboardShortcuts(scratch))
     pressKey('d', { metaKey: true })
-    expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'vertical', '/ws1', 5000)
+    expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'vertical', {
+      cwd: '/ws1',
+      scrollbackLimit: 5000,
+    })
   })
 
   it('Cmd+Shift+D splits the scratch terminal horizontally', () => {
     renderHook(() => useKeyboardShortcuts(scratch))
     pressKey('d', { metaKey: true, shiftKey: true })
-    expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'horizontal', '/ws1', 5000)
+    expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'horizontal', {
+      cwd: '/ws1',
+      scrollbackLimit: 5000,
+    })
   })
 })
 
