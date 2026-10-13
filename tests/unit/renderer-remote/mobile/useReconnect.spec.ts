@@ -229,4 +229,43 @@ describe('useReconnect', () => {
     expect(result.current.status).toBe('reconnecting')
     expect(mockOpenWs).toHaveBeenCalled()
   })
+
+  describe('a socket the server closes on purpose', () => {
+    // An EventTarget with a ready state: all the hook reads of a socket.
+    const socket = (readyState: WebSocket['readyState']) => {
+      const events = new EventTarget()
+      return partialFake<WebSocket>({
+        readyState,
+        addEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
+          events.addEventListener(type, listener),
+        removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
+          events.removeEventListener(type, listener),
+        dispatchEvent: (event: Event) => events.dispatchEvent(event),
+      })
+    }
+
+    it.each([
+      [4003, 'full'],
+      [4004, 'removed'],
+    ] as const)(
+      'says why on close code %i, and does not come back by itself',
+      async (code, status) => {
+        const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
+        const ws = socket(1)
+        const { result } = renderHook(() => useReconnect(mockOpenWs, ws))
+        act(() => {
+          ws.dispatchEvent(new CloseEvent('close', { code }))
+        })
+        expect(result.current.status).toBe(status)
+        act(() => {
+          document.dispatchEvent(new Event('visibilitychange'))
+        })
+        await act(async () => {
+          vi.advanceTimersByTime(6000)
+        })
+        expect(mockOpenWs).not.toHaveBeenCalled()
+        expect(result.current.status).toBe(status)
+      }
+    )
+  })
 })

@@ -1,6 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
+export type ConnectionStatus =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'disconnected'
+  /** Turned away: the terminal already has as many viewers as the app allows. */
+  | 'full'
+  /** Disconnected from the desktop app's Remote Control view. */
+  | 'removed'
+
+// The codes the server closes a terminal socket with on purpose (terminal.routes.ts).
+// Reconnecting by itself would undo the owner's decision, so only Retry does.
+const DELIBERATE_CLOSES: Partial<Record<number, ConnectionStatus>> = {
+  4003: 'full',
+  4004: 'removed',
+}
 
 export function useReconnect(
   openWs: () => void,
@@ -10,6 +25,7 @@ export function useReconnect(
     ws?.readyState === WebSocket.OPEN ? 'connected' : 'connecting'
   )
   const attemptsRef = useRef(0)
+  const turnedAwayRef = useRef(false)
   const wsRef = useRef(ws)
   const openWsRef = useRef(openWs)
 
@@ -36,11 +52,22 @@ export function useReconnect(
       setStatus('connected')
       attemptsRef.current = 0
     }
+    const handleClose = (event: CloseEvent) => {
+      const why = DELIBERATE_CLOSES[event.code]
+      if (!why) return
+      turnedAwayRef.current = true
+      setStatus(why)
+    }
     ws.addEventListener?.('open', handleOpen)
-    return () => ws.removeEventListener?.('open', handleOpen)
+    ws.addEventListener?.('close', handleClose)
+    return () => {
+      ws.removeEventListener?.('open', handleOpen)
+      ws.removeEventListener?.('close', handleClose)
+    }
   }, [ws])
 
   const attempt = useCallback(function attempt() {
+    if (turnedAwayRef.current) return
     const state = wsRef.current?.readyState
     if (state === WebSocket.OPEN) {
       setStatus('connected')
@@ -74,6 +101,7 @@ export function useReconnect(
 
   const retry = useCallback(() => {
     attemptsRef.current = 0
+    turnedAwayRef.current = false
     attempt()
   }, [attempt])
 

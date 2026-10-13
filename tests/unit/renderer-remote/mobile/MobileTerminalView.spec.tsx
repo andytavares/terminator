@@ -155,6 +155,23 @@ describe('MobileTerminalView', () => {
     expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
   })
 
+  it.each([
+    ['full', /already has as many viewers as allowed/],
+    ['removed', /disconnected this device/],
+  ] as const)(
+    'says why it was turned away when status is %s, and offers to retry',
+    async (status, text) => {
+      const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
+      vi.mocked(useReconnect).mockReturnValue({ status, retry: vi.fn(), onOpenWsFailed: vi.fn() })
+      const { MobileTerminalView } = await import(
+        '../../../../src/renderer-remote/components/MobileTerminalView'
+      )
+      render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
+      expect(screen.getByRole('alert').textContent).toMatch(text)
+      expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
+    }
+  )
+
   it('renders MobileControlToolbar', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
     vi.mocked(useReconnect).mockReturnValue({

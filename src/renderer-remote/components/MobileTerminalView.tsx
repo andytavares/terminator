@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { FitAddon } from '@xterm/addon-fit'
-import { useReconnect } from '../hooks/useReconnect'
+import { useReconnect, type ConnectionStatus } from '../hooks/useReconnect'
 import { MobileControlToolbar } from './MobileControlToolbar'
 import { getWsTicket, resizeTerminal } from '../api/remote-client'
 
@@ -108,16 +108,29 @@ export function MobileTerminalView({ sessionId, cwd, onBack }: Props) {
       <div className="mobile-terminal-container" ref={containerRef} />
 
       {status === 'reconnecting' && <div className="mobile-terminal-status">Reconnecting…</div>}
-      {status === 'disconnected' && (
-        <div className="mobile-terminal-status mobile-terminal-status--error">
-          Disconnected
-          <button className="mobile-terminal-status__retry" onClick={retry}>
-            Retry
-          </button>
-        </div>
-      )}
+      <EndedBanner status={status} onRetry={retry} />
 
       <MobileControlToolbar onKey={handleKey} />
+    </div>
+  )
+}
+
+/** Why the connection ended, for each way it can end that waits on the person. */
+const ENDED: Partial<Record<ConnectionStatus, string>> = {
+  disconnected: 'Disconnected',
+  full: 'This terminal already has as many viewers as allowed. Retry once one leaves.',
+  removed: 'The desktop app disconnected this device.',
+}
+
+function EndedBanner(props: { status: ConnectionStatus; onRetry: () => void }) {
+  const message = ENDED[props.status]
+  if (!message) return null
+  return (
+    <div className="mobile-terminal-status mobile-terminal-status--error" role="alert">
+      {message}
+      <button className="mobile-terminal-status__retry" onClick={props.onRetry}>
+        Retry
+      </button>
     </div>
   )
 }
